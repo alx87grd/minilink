@@ -13,7 +13,7 @@ class Port:
 
 ######################################################################
 class InputPort(Port):
-
+    
     def get(self, t=0):
         return self.default_value
 

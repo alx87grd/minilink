@@ -47,7 +47,10 @@ class System:
 
         self.name = name
 
-        self.inputs = {"u": InputPort("u", self.m)}
+        self.inputs = {
+            "u": InputPort("u", self.m),
+            # "r": InputPort("r", self.m),
+            }
         self.outputs = {
             "y": OutputPort("y", self.p, function=self.h),
             # "x": OutputPort("x", self.n, function=self.hx),
@@ -92,60 +95,52 @@ class System:
             else:
                 u = np.hstack((u, uj))
         return u
+    
+    ######################################################################
+    def print_html(self):
+
+        try:
+            import IPython.display as display
+        except:
+            print("IPython is not available")
+            return
+
+        display.display(display.HTML(self.get_block_html()))
 
     ######################################################################
-    def get_graphviz_label(self):
-
-        label = """<<TABLE BORDER="0" CELLSPACING="0">
-<TR>
-<TD align="left" BORDER="1" COLSPAN="2">
-"""
-        label += self.name
-        label += """
-</TD>
-</TR>"""
+    def get_block_html(self, label='sys1'):
 
         n_ports_out = len(self.outputs)
         n_ports_in = len(self.inputs)
 
+        label = (
+            F'<TABLE BORDER="0" CELLSPACING="0">\n'
+            F'<TR>\n'
+            F'<TD align="left" BORDER="1" COLSPAN="2">{self.name}::{label}</TD>\n'
+            F'</TR>\n'
+        )
+
         for j in range(np.max((n_ports_out, n_ports_in))):
+            label += F'<TR>\n'
 
-            label += """
-<TR>
-"""
-
-            if j < n_ports_in:
-
+            if j < n_ports_in and j < n_ports_out:
                 port_id = list(self.inputs.keys())[j]
-
-                label += """
-<TD PORT="
-"""
-                label += port_id
-                label += """" BORDER="1" >
-"""
-                label += port_id
-                label += """
-</TD>"""
-
-            if j < n_ports_out:
-
+                label += F'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
                 port_id = list(self.outputs.keys())[j]
+                label += F'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
 
-                label += """
-<TD PORT="
-"""
-                label += port_id
-                label += """" BORDER="1" >
-"""
-                label += port_id
-                label += """
-</TD>"""
+            elif j < n_ports_in:
+                port_id = list(self.inputs.keys())[j]
+                label += F'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
+                label += F'<TD BORDER="1"> </TD>\n'
 
-            label += """
-</TR>"""
-        label += """
-</TABLE>>"""
+            elif j < n_ports_out:
+                port_id = list(self.outputs.keys())[j]
+                label += F'<TD BORDER="1"> </TD>\n'
+                label += F'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
+            
+            label += F'</TR>\n'
+        label += F'</TABLE>'
 
         return label
 
@@ -180,6 +175,20 @@ class GrapheSystem(System):
 
         self.subsystems = {}
         self.edges = {}
+
+        System.__init__(self, 0, 0, 0)
+
+        self.name = 'Diagram'
+
+        self.inputs = {
+            "u": InputPort("u", self.m),
+            # "r": InputPort("r", self.m),
+            }
+        self.outputs = {
+            "y": OutputPort("y", self.p, function=self.h),
+            # "x": OutputPort("x", self.n, function=self.hx),
+            # "q": OutputPort("q", self.n, function=self.hq),
+        }
 
     def add_system(self, sys, sys_id):
         self.subsystems[sys_id] = sys
@@ -223,7 +232,7 @@ class GrapheSystem(System):
 
             print(str(i))
 
-            label = sys.get_graphviz_label()
+            label = F'<{sys.get_block_html(sys_id)}>'
 
             g.node(
                 sys_id,
@@ -253,22 +262,26 @@ if __name__ == "__main__":
     sys3 = StaticSystem(1, 1)
     sys4 = DynamicSystem(2, 1, 1)
 
+    sys1.print_html()
+    # sys1.add_input_port("w", 1)
+    # sys1.print_html()
+    # sys1.add_input_port("v", 1)
+    # sys1.print_html()
+
     gsys = GrapheSystem()
+    gsys.print_html()
     gsys.add_system(sys1, "sys1")
     gsys.add_system(sys2, "sys2")
     gsys.add_system(sys3, "sys3")
     gsys.add_system(sys4, "sys4")
+
+    # gsys.render_graphe()
 
     gsys.add_edge("sys1", "y", "sys2", "u")
     gsys.add_edge("sys2", "y", "sys3", "u")
     gsys.add_edge("sys2", "y", "sys4", "u")
     gsys.add_edge("sys4", "y", "sys1", "u")
 
-    print(sys1.get_graphviz_label())
-
-    from IPython.core.display import HTML
-
-    HTML(sys1.get_graphviz_label())
 
     gsys.render_graphe()
 
