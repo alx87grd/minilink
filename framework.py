@@ -4,10 +4,14 @@ import numpy as np
 ######################################################################
 class Port:
 
-    def __init__(self, name="port", n=1):
+    def __init__(self, name="port", n=1, default_value=None):
         self.name = name
         self.n = n
-        self.default_value = np.zeros(self.n)
+        if default_value is not None:
+            assert len(default_value) == n, "Default value has wrong dimensions"
+            self.default_value = default_value
+        else:
+            self.default_value = np.zeros(self.n)
         self.label = [f"{name}_{i}" for i in range(self.n)]
         self.units = [""] * self.n
         self.upper_bound = np.inf * np.ones(self.n)
@@ -47,6 +51,14 @@ class System:
 
         self.name = name
 
+        self.solver_info = {
+            "continuous_time_equation": True,
+            "smallest_time_constant": 0.001,
+            "largest_time_constant": 10,
+            "discontinuous_behavior": False,  # Will use a fixed time step
+            "discrete_time_period": None,
+        }
+
     ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
         dx = np.zeros(self.n)
@@ -69,8 +81,8 @@ class System:
         return dx
 
     ######################################################################
-    def add_input_port(self, key, n=1):
-        self.inputs[key] = InputPort(key, n)
+    def add_input_port(self, key, dim=1, default_value=None):
+        self.inputs[key] = InputPort(key, dim, default_value)
         self.compute_input_dimensions()
 
     ######################################################################
@@ -83,23 +95,32 @@ class System:
 
     ######################################################################
     def fsim(self, x, t=0):
-        u = self.collect_inputs(t)
+        u = self.get_u_from_input_ports(t)
         dx = self.f(x, u, t)
         return dx
 
     ######################################################################
-    def collect_inputs(self):
+    def collect_inputs(self, t=0):
         input_signals = {}
         for key, port in self.inputs.items():
-            input_signals[key] = port.get_signal()
+            input_signals[key] = port.get_signal(t)
         return input_signals
 
     ######################################################################
-    def inputs2u(self, input_signals):
-        return np.concatenate(list(input_signals.values()))
+    def input_signals2u(self, input_signals):
+        input_list = list(input_signals.values())
+        if input_list:
+            return np.concatenate(input_list)
+        else:
+            return np.array([])  # Return empty array if sys has no inputs
 
     ######################################################################
-    def u2inputs(self, u):
+    def get_u_from_input_ports(self):
+        input_signals = self.collect_inputs()
+        return self.input_signals2u(input_signals)
+
+    ######################################################################
+    def u2input_signals(self, u):
         input_signals = {}
         idx = 0
         for key, port in self.inputs.items():
@@ -158,6 +179,24 @@ class System:
         label += f"</TABLE>"
 
         return label
+
+    ######################################################################
+    def show_diagram(self):
+        try:
+            import graphviz
+        except ImportError:
+            print("graphviz is not available")
+            return None
+
+        g = graphviz.Digraph("G", filename="temp.gv", engine="dot")
+        g.attr(rankdir="LR")
+        g.attr(concentrate="true")
+        g.node(
+            self.name,
+            shape="none",
+            label=f"<{self.get_block_html()}>",
+        )
+        g.view()
 
 
 ######################################################################
@@ -323,7 +362,7 @@ class GrapheSystem(System):
             print("graphviz is not available")
             return None
 
-        g = graphviz.Digraph("G", filename="testgraphe.gv", engine="dot")
+        g = graphviz.Digraph("G", filename="temp.gv", engine="dot")
         g.attr(rankdir="LR")
         g.attr(concentrate="true")
 
@@ -356,43 +395,4 @@ class GrapheSystem(System):
 ######################################################################
 if __name__ == "__main__":
 
-    sys1 = DynamicSystem(2, 1, 1)
-    sys2 = DynamicSystem(2, 1, 1)
-    sys3 = StaticSystem(1, 1)
-    sys4 = DynamicSystem(2, 1, 1)
-    step = Step(np.array([0.0]), np.array([1.0]), 1.0)
-
-    sys1.print_html()
-    sys1.add_input_port("w", 2)
-    sys1.print_html()
-    sys1.add_input_port("v", 1)
-    sys1.print_html()
-
-    sys1.inputs["u"].default_value = np.array([7.7])
-    sys1.inputs["w"].default_value = np.array([1.1, 2.2])
-
-    inputs = sys1.collect_inputs()
-    u = sys1.inputs2u(inputs)
-    print(inputs)
-    print(u)
-    print(sys1.u2inputs(u))
-
-    gsys = GrapheSystem()
-    gsys.print_html()
-    gsys.add_system(sys1, "sys1")
-    gsys.add_system(sys2, "sys2")
-    gsys.add_system(sys3, "sys3")
-    gsys.add_system(sys4, "sys4")
-    gsys.add_system(step, "step")
-
-    # gsys.render_graphe()
-
-    gsys.add_edge("sys1", "y", "sys2", "u")
-    gsys.add_edge("sys2", "y", "sys3", "u")
-    gsys.add_edge("sys2", "y", "sys4", "u")
-    gsys.add_edge("sys4", "y", "sys1", "u")
-    gsys.add_edge("step", "y", "sys1", "v")
-
-    gsys.render_graphe()
-
-    # print("Done.")
+    pass
