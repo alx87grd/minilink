@@ -8,16 +8,17 @@ class Port:
     def __init__(self, name="port", n=1):
         self.name = name
         self.n = n
-        self.default_value = np.zeros(n)
-
-    def get_default_value(self):
-        return self.default_value
-
+        self.default_value = np.zeros(self.n)
+        self.label = [f"{name}_{i}" for i in range(self.n)]
+        self.units = [""] * self.n
+        self.upper_bound = np.inf * np.ones(self.n)
+        self.lower_bound = -np.inf * np.ones(self.n)
+        
 
 ######################################################################
 class InputPort(Port):
 
-    def get_default_input(self):
+    def get(self, t=0) -> np.ndarray:
         return self.default_value
 
 
@@ -28,11 +29,11 @@ class OutputPort(Port):
         Port.__init__(self, name, n)
 
         if function is not None:
-            self.h = function
+            self.compute = function
         else:
-            self.h = self.h_bar
+            self.compute = self.compute_default
 
-    def h_bar(self, x=None, u=None, t=0):
+    def compute_default(self, x=None, u=None, t=0) -> np.ndarray:
         return self.default_value
 
 
@@ -46,6 +47,7 @@ class System:
         self.p = p
 
         self.name = name
+        self.latex = '$\dot{x} = f(x, u, t)$\n$y = h(x, u, t)$'
 
         self.inputs = {
             "u": InputPort("u", self.m),
@@ -58,43 +60,64 @@ class System:
         }
 
     ######################################################################
-    def f(self, x, u, t=0, params=None):
+    def f(self, x, u, t=0, params=None) -> np.ndarray:
         dx = np.zeros(self.n)
         return dx
 
     ######################################################################
-    def h(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None) -> np.ndarray:
         y = np.zeros(self.p)
         return y
 
     ######################################################################
-    def hx(self, x, u, t=0, params=None):
+    def compute_state(self, x, u, t=0, params=None):
         return x
+    
+    ######################################################################
+    def fsim(self, x, t=0):
+        inputs = self.collect_inputs(t)
+        u = self.inputs2u(inputs)
+        dx = self.f(x, u, t)
+        return dx
 
     ######################################################################
-    def hq(self, x, u, t=0, params=None):
-        return x
-
-    ######################################################################
-    def add_input_port(self, key, n=1, name="input_port"):
-        self.inputs[key] = InputPort(name, n)
+    def add_input_port(self, key, n=1):
+        self.inputs[key] = InputPort(key, n)
         self.compute_input_dimensions()
 
     ######################################################################
     def compute_input_dimensions(self):
         self.m = 0
-        for j, (k, port) in enumerate(self.inputs.items()):
+        for (key, port) in self.inputs.items():
             self.m += port.n
 
     ######################################################################
-    def get_default_inputs(self, t=0):
-        for j, (k, port) in enumerate(self.inputs.items()):
-            uj = port.get_default_input()
-            if j == 0:
-                u = uj
-            else:
-                u = np.hstack((u, uj))
-        return u
+    def fsim(self, x, t=0):
+        u = self.collect_inputs(t)
+        dx = self.f(x, u, t)
+        return dx
+
+    ######################################################################
+    def collect_inputs(self):
+        input_dict = {}
+        for (key, port) in self.inputs.items():
+            input_dict[key] = port.get()
+        return input_dict
+    
+    ######################################################################
+    def inputs2u(self, input_dict):
+        return np.concatenate(list(input_dict.values()))
+
+    ######################################################################
+    def u2inputs(self, u):
+        input_dict = {}
+        idx = 0
+        for key, port in self.inputs.items():
+            input_dict[key] = u[idx:idx + port.n]
+            idx += port.n
+        return input_dict
+    
+
     
     ######################################################################
     def print_html(self):
@@ -106,6 +129,7 @@ class System:
             return
 
         display.display(display.HTML(self.get_block_html()))
+
 
     ######################################################################
     def get_block_html(self, label='sys1'):
@@ -263,26 +287,36 @@ if __name__ == "__main__":
     sys4 = DynamicSystem(2, 1, 1)
 
     sys1.print_html()
-    # sys1.add_input_port("w", 1)
-    # sys1.print_html()
-    # sys1.add_input_port("v", 1)
-    # sys1.print_html()
+    sys1.add_input_port("w", 2)
+    sys1.print_html()
+    sys1.add_input_port("v", 1)
+    sys1.print_html()
 
-    gsys = GrapheSystem()
-    gsys.print_html()
-    gsys.add_system(sys1, "sys1")
-    gsys.add_system(sys2, "sys2")
-    gsys.add_system(sys3, "sys3")
-    gsys.add_system(sys4, "sys4")
+
+    sys1.inputs["u"].default_value = np.array([7.7])
+    sys1.inputs["w"].default_value = np.array([1.1, 2.2])
+
+    inputs = sys1.collect_inputs()
+    u = sys1.inputs2u( inputs )
+    print(inputs)
+    print(u)
+    print(sys1.u2inputs(u))
+
+    # gsys = GrapheSystem()
+    # gsys.print_html()
+    # gsys.add_system(sys1, "sys1")
+    # gsys.add_system(sys2, "sys2")
+    # gsys.add_system(sys3, "sys3")
+    # gsys.add_system(sys4, "sys4")
+
+    # # gsys.render_graphe()
+
+    # gsys.add_edge("sys1", "y", "sys2", "u")
+    # gsys.add_edge("sys2", "y", "sys3", "u")
+    # gsys.add_edge("sys2", "y", "sys4", "u")
+    # gsys.add_edge("sys4", "y", "sys1", "u")
+
 
     # gsys.render_graphe()
-
-    gsys.add_edge("sys1", "y", "sys2", "u")
-    gsys.add_edge("sys2", "y", "sys3", "u")
-    gsys.add_edge("sys2", "y", "sys4", "u")
-    gsys.add_edge("sys4", "y", "sys1", "u")
-
-
-    gsys.render_graphe()
 
     # print("Done.")
