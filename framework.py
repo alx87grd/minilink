@@ -43,14 +43,23 @@ class OutputPort(Port):
 ######################################################################
 class System:
 
-    def __init__(self, n=0, m=1, p=1, name="System", params={}):
+    def __init__(self, n=0, m=1, p=1, name="System", params=None):
 
+        # Dimensions
         self.n = n
         self.m = m
         self.p = p
 
+        # Name
         self.name = name
 
+        # Parameters dictionary
+        if params is None:
+            self.params = {}
+        else:
+            self.params = params
+
+        # Caracteristics useful to select automatic solver parameters
         self.solver_info = {
             "continuous_time_equation": True,
             "smallest_time_constant": 0.001,
@@ -74,19 +83,12 @@ class System:
         return x
 
     ######################################################################
-    def fsim(self, x, t=0):
-        inputs = self.collect_inputs(t)
-        u = self.inputs2u(inputs)
-        dx = self.f(x, u, t)
-        return dx
-
-    ######################################################################
     def add_input_port(self, key, dim=1, default_value=None):
         self.inputs[key] = InputPort(key, dim, default_value)
-        self.compute_input_dimensions()
+        self.recompute_input_dimensions()
 
     ######################################################################
-    def compute_input_dimensions(self):
+    def recompute_input_dimensions(self):
         self.m = 0
         for key, port in self.inputs.items():
             self.m += port.n
@@ -94,30 +96,19 @@ class System:
         return self.m
 
     ######################################################################
-    def fsim(self, x, t=0):
+    def fsim(self, t, x) -> np.ndarray:
         u = self.get_u_from_input_ports(t)
         dx = self.f(x, u, t)
         return dx
 
     ######################################################################
-    def collect_inputs(self, t=0):
-        input_signals = {}
+    def get_u_from_input_ports(self, t=0) -> np.ndarray:
+        u = np.zeros(self.m)
+        idx = 0
         for key, port in self.inputs.items():
-            input_signals[key] = port.get_signal(t)
-        return input_signals
-
-    ######################################################################
-    def input_signals2u(self, input_signals):
-        input_list = list(input_signals.values())
-        if input_list:
-            return np.concatenate(input_list)
-        else:
-            return np.array([])  # Return empty array if sys has no inputs
-
-    ######################################################################
-    def get_u_from_input_ports(self):
-        input_signals = self.collect_inputs()
-        return self.input_signals2u(input_signals)
+            u[idx : idx + port.n] = port.get_signal(t)
+            idx += port.n
+        return u
 
     ######################################################################
     def u2input_signals(self, u):
@@ -129,15 +120,19 @@ class System:
         return input_signals
 
     ######################################################################
-    def print_html(self):
+    def collect_input_signals(self, t=0) -> dict:
+        input_signals = {}
+        for key, port in self.inputs.items():
+            input_signals[key] = port.get_signal(t)
+        return input_signals
 
-        try:
-            import IPython.display as display
-        except:
-            print("IPython is not available")
-            return
-
-        display.display(display.HTML(self.get_block_html()))
+    ######################################################################
+    def input_signals2u(self, input_signals: dict) -> np.ndarray:
+        input_list = list(input_signals.values())
+        if input_list:
+            return np.concatenate(input_list)
+        else:
+            return np.array([])  # Return empty array if sys has no inputs
 
     ######################################################################
     def get_block_html(self, label="sys1"):
@@ -181,6 +176,17 @@ class System:
         return label
 
     ######################################################################
+    def print_html(self):
+
+        try:
+            import IPython.display as display
+        except ImportError:
+            print("IPython is not available")
+            return
+
+        display.display(display.HTML(self.get_block_html()))
+
+    ######################################################################
     def show_diagram(self):
         try:
             import graphviz
@@ -215,8 +221,9 @@ class StaticSystem(System):
             "y": OutputPort("y", self.p, function=self.h),
         }
 
+    ###################################################################
     def f(self, x, u, t=0, params=None):
-        raise Exception("Static system has no state")
+        raise Exception("Static system has no states")
 
 
 ######################################################################
@@ -227,16 +234,18 @@ class Source(System):
         System.__init__(self, 0, 0, p)
 
         self.name = "Source"
-        params = {"value": np.zeros(p)}
+        self.params = {"value": np.zeros(p)}
 
         self.inputs = {}
         self.outputs = {
             "y": OutputPort("y", self.p, function=self.h),
         }
 
+    ###################################################################
     def f(self, x, u, t=0, params=None):
-        raise Exception("Source system has no state")
+        raise Exception("Source system has no states")
 
+    ###################################################################
     def h(self, x, u, t=0, params=None):
 
         #
@@ -251,19 +260,20 @@ class Source(System):
 class Step(Source):
 
     def __init__(
-        self, intial_value=np.zeros(1), final_value=np.zeros(1), step_time=1.0
+        self, initial_value=np.zeros(1), final_value=np.zeros(1), step_time=1.0
     ):
 
-        p = intial_value.shape[0]
+        p = initial_value.shape[0]
         Source.__init__(self, p)
 
         self.name = "Step"
-        params = {
-            "initial_value": intial_value,
+        self.params = {
+            "initial_value": initial_value,
             "final_value": final_value,
             "step_time": step_time,
         }
 
+    ###################################################################
     def h(self, x, u, t=0, params=None):
 
         #
@@ -311,25 +321,17 @@ class GrapheSystem(System):
 
         self.name = "Diagram"
 
-        self.inputs = {
-            "u": InputPort("u", self.m),
-            # "r": InputPort("r", self.m),
-        }
-        self.outputs = {
-            "y": OutputPort("y", self.p, function=self.h),
-            # "x": OutputPort("x", self.n, function=self.hx),
-            # "q": OutputPort("q", self.n, function=self.hq),
-        }
+        self.inputs = {}
+        self.outputs = {}
 
+    ######################################################################
     def add_system(self, sys, sys_id):
         self.subsystems[sys_id] = sys
         self.edges[sys_id] = {}
-        for j, (port_id, port) in enumerate(sys.inputs.items()):
-            self.edges[sys_id][port_id] = -1
-        # each susbsystem input ports connection are stored in a row:
-        # [source_subsys_id, source_subsys_port_id]
-        # -1 means no connection
+        for port_id, port in sys.inputs.items():
+            self.edges[sys_id][port_id] = None
 
+    ######################################################################
     def compute_properties(self):
 
         self.n_sys = len(self.subsystems)
@@ -340,6 +342,7 @@ class GrapheSystem(System):
             self.n += sys.n
         # TODO : get label, units and bounds for each state
 
+    ######################################################################
     def add_edge(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
         self.edges[target_sys_id][target_port_id] = (source_sys_id, source_port_id)
 
@@ -354,6 +357,7 @@ class GrapheSystem(System):
             + target_port_id
         )
 
+    ######################################################################
     def render_graphe(self):
 
         try:
@@ -378,12 +382,12 @@ class GrapheSystem(System):
                 label=label,
             )
 
-        for i, (sys_id, sys) in enumerate(self.subsystems.items()):
-            for j, (port_id, port) in enumerate(sys.inputs.items()):
+        for sys_id, sys in self.subsystems.items():
+            for port_id in sys.inputs:
 
                 edge = self.edges[sys_id][port_id]
 
-                if not edge == -1:
+                if edge is not None:
                     g.edge(
                         edge[0] + ":" + edge[1] + ":e",
                         sys_id + ":" + port_id + ":w",

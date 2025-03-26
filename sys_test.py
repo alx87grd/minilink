@@ -13,11 +13,13 @@ print("Sys1 y dim:", sys1.p)
 
 default_input_signals = sys1.collect_inputs()
 u = sys1.input_signals2u(default_input_signals)
-reconstructed_input_signals = sys1.u2input_signals(u)
+u2 = sys1.get_u_from_input_ports()
+assert np.allclose(u, u2)
 
 print("Default u:", u)
+# print("Default u:", u2)
 print("Default input signals:", default_input_signals)
-print("Reconstructed input signals:", reconstructed_input_signals)
+
 
 u = np.random.rand(sys1.m)
 u2 = sys1.input_signals2u(sys1.u2input_signals(u))
