@@ -50,6 +50,8 @@ class Simulator:
 
         if self.solver == "scipy":
 
+            # print("Computing trajectory using scipy solve_ivt\n")
+
             # Compute the state trajectory
 
             # Define the ODE
@@ -88,9 +90,15 @@ class Simulator:
 
                 u_traj[:, i] = u
 
+        # Compute the default output trajectory
+        y_traj = np.zeros((sys.p, n_pts))
+        for i in range(n_pts):
+            y_traj[:, i] = sys.h(x_traj[:, i], u_traj[:, i], times[i])
+
+        # Plot the trajectory
         if show:
-            n_plots = sys.n + sys.m
-            fig, ax = plt.subplots(n_plots, 1, figsize=(10, 2 * (sys.n + sys.m)))
+            n_plots = sys.n + sys.m + sys.p
+            fig, ax = plt.subplots(n_plots, 1, figsize=(10, 2 * n_plots))
             fig.canvas.manager.set_window_title("Trajectory for " + sys.name)
             if n_plots == 1:
                 ax = [ax]
@@ -102,9 +110,13 @@ class Simulator:
                 ax[sys.n + i].plot(t_traj, u_traj[i, :], label=f"{sys.input_label[i]}")
                 ax[sys.n + i].set_ylabel(f"{sys.input_label[i]}")
                 ax[sys.n + i].grid()
+            for i in range(sys.p):
+                ax[sys.n + sys.m + i].plot(t_traj, y_traj[i, :], label=f"y{[i]}")
+                ax[sys.n + sys.m + i].set_ylabel(f"y{[i]}")
+                ax[sys.n + sys.m + i].grid()
             plt.show(block=graphical.figure_blocking)
 
-        return x_traj, u_traj, t_traj
+        return x_traj, u_traj, t_traj, y_traj
 
 
 ######################################################################
@@ -114,7 +126,7 @@ if __name__ == "__main__":
     sys1 = DynamicSystem(2, 1, 1)
 
     sys1.add_input_port("v", 1, default_value=np.array([0.6]))
-    sys1.add_input_port("w", 1)
+    sys1.add_input_port("w", 1, default_value=np.array([-10.0]))
 
     def f(x, u, t):
         a = u[0]
@@ -125,16 +137,24 @@ if __name__ == "__main__":
         dx[1] = -x[0] - x[1] + a + v + w
         return dx
 
+    def h(x, u, t):
+        a = u[0]
+        v = u[1]
+        w = u[2]
+        return x[0] + w
+
     sys1.f = f
+    sys1.h = h
     sys1.x0 = np.array([1.0, 0.0])
 
     # Running the simulation
 
     sim = Simulator(sys1, t0=0, tf=25, n_steps=2000)
-    sim.solver = "euler"
-    x_traj, u_traj, t_traj = sim.solve(show=True)
+    # sim.solver = "euler"
+    x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
 
     np.set_printoptions(precision=2, suppress=True)
     print(f"Time vector:\n {t_traj}")
     print(f"Input trajectory:\n {u_traj}")
     print(f"State trajectory:\n {x_traj}")
+    print(f"Output trajectory:\n {y_traj}")
