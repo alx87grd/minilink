@@ -11,7 +11,7 @@ print("Sys1 u dim:", sys1.m)
 print("Sys1 x dim:", sys1.n)
 print("Sys1 y dim:", sys1.p)
 
-default_input_signals = sys1.collect_inputs()
+default_input_signals = sys1.collect_input_signals()
 u = sys1.input_signals2u(default_input_signals)
 u2 = sys1.get_u_from_input_ports()
 assert np.allclose(u, u2)

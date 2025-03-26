@@ -43,7 +43,7 @@ class OutputPort(Port):
 ######################################################################
 class System:
 
-    def __init__(self, n=0, m=1, p=1, name="System", params=None):
+    def __init__(self, n=0, m=0, p=1):
 
         # Dimensions
         self.n = n
@@ -51,13 +51,24 @@ class System:
         self.p = p
 
         # Name
-        self.name = name
+        self.name = "System"
+
+        # State properties
+        self.xbar = np.zeros(self.n)
+        self.state_label = [f"x_{i}" for i in range(self.n)]
+        self.state_units = [""] * self.n
+        self.state_upper_bound = np.inf * np.ones(self.n)
+        self.state_lower_bound = -np.inf * np.ones(self.n)
+
+        # Initial state
+        self.x0 = np.zeros(self.n)
+
+        # Inputs and outputs ports
+        self.inputs = {}
+        self.outputs = {}
 
         # Parameters dictionary
-        if params is None:
-            self.params = {}
-        else:
-            self.params = params
+        self.params = {}
 
         # Caracteristics useful to select automatic solver parameters
         self.solver_info = {
@@ -85,13 +96,29 @@ class System:
     ######################################################################
     def add_input_port(self, key, dim=1, default_value=None):
         self.inputs[key] = InputPort(key, dim, default_value)
-        self.recompute_input_dimensions()
+        self.recompute_input_properties()
 
     ######################################################################
-    def recompute_input_dimensions(self):
+    def recompute_input_properties(self):
         self.m = 0
+        self.input_label = []
+        self.input_units = []
+
         for key, port in self.inputs.items():
             self.m += port.n
+            for i in range(port.n):
+                self.input_label.append(port.label[i])
+                self.input_units.append(port.units[i])
+
+        self.input_upper_bound = np.concatenate(
+            [port.upper_bound for port in self.inputs.values()]
+        )
+        self.input_lower_bound = np.concatenate(
+            [port.lower_bound for port in self.inputs.values()]
+        )
+        self.ubar = np.concatenate(
+            [port.default_value for port in self.inputs.values()]
+        )
 
         return self.m
 
@@ -217,6 +244,8 @@ class StaticSystem(System):
             "u": InputPort("u", self.m),
             # "r": InputPort("r", self.m),
         }
+        self.recompute_input_properties()
+
         self.outputs = {
             "y": OutputPort("y", self.p, function=self.h),
         }
@@ -294,14 +323,17 @@ class DynamicSystem(System):
     # dx = f(x, u, t)
     # y  = g(x, u, t)
 
-    def __init__(self, n, m, p, name="DynamicSystem", params={}):
+    def __init__(self, n, m, p):
 
-        System.__init__(self, n, m, p, name, params)
+        System.__init__(self, n, m, p)
+
+        self.name = "DynamicSystem"
 
         self.inputs = {
             "u": InputPort("u", self.m),
             # "r": InputPort("r", self.m),
         }
+        self.recompute_input_properties()
 
         self.outputs = {
             "y": OutputPort("y", self.p, function=self.h),
