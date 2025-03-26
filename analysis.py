@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.integrate import solve_ivp
+import logging
 import graphical
 import matplotlib.pyplot as plt
 from framework import DynamicSystem, StaticSystem, Step, GrapheSystem
@@ -18,7 +19,9 @@ class Simulator:
         elif n_steps is None:
             time_vector = np.arange(t0, tf + dt, dt)
         else:
-            print("You must choose between n_steps and dt: using the specified n_steps")
+            logging.warning(
+                "You must choose between n_steps and dt: using the specified n_steps"
+            )
             time_vector = np.linspace(t0, tf, n_steps)
 
         self.t = time_vector
@@ -59,13 +62,13 @@ class Simulator:
             )
 
             # For debugging purposes
-            self.sicpy_last_solution = sol
+            self.scipy_last_solution = sol
 
             # Extract the state trajectory
             t_traj = sol.t
             x_traj = sol.y
 
-        if self.solver == "euler":
+        elif self.solver == "euler":
 
             t_traj = times
             x_traj = np.zeros((sys.n, n_pts))
@@ -108,23 +111,26 @@ class Simulator:
 if __name__ == "__main__":
 
     # Defining a test system
-    sys1 = DynamicSystem(1, 1, 1)
+    sys1 = DynamicSystem(2, 1, 1)
 
     sys1.add_input_port("v", 1, default_value=np.array([0.6]))
     sys1.add_input_port("w", 1)
 
     def f(x, u, t):
-        # a = u[0]
-        # v = u[1]
-        # w = u[2]
-        return -x  # + a + v + w
+        a = u[0]
+        v = u[1]
+        w = u[2]
+        dx = np.zeros(2)
+        dx[0] = x[1]
+        dx[1] = -x[0] - x[1] + a + v + w
+        return dx
 
     sys1.f = f
-    sys1.x0 = np.array([1.0])
+    sys1.x0 = np.array([1.0, 0.0])
 
     # Running the simulation
 
-    sim = Simulator(sys1, t0=0, tf=10, n_steps=200)
+    sim = Simulator(sys1, t0=0, tf=25, n_steps=2000)
     sim.solver = "euler"
     x_traj, u_traj, t_traj = sim.solve(show=True)
 
