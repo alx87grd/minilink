@@ -12,7 +12,7 @@ class Port:
             self.default_value = default_value
         else:
             self.default_value = np.zeros(self.n)
-        self.label = [f"{name}_{i}" for i in range(self.n)]
+        self.label = [f"{name}[{i}]" for i in range(self.n)]
         self.units = [""] * self.n
         self.upper_bound = np.inf * np.ones(self.n)
         self.lower_bound = -np.inf * np.ones(self.n)
@@ -55,7 +55,7 @@ class System:
 
         # State properties
         self.xbar = np.zeros(self.n)
-        self.state_label = [f"x_{i}" for i in range(self.n)]
+        self.state_label = [f"x[{i}]" for i in range(self.n)]
         self.state_units = [""] * self.n
         self.state_upper_bound = np.inf * np.ones(self.n)
         self.state_lower_bound = -np.inf * np.ones(self.n)
@@ -363,6 +363,8 @@ class GrapheSystem(System):
         for port_id, port in sys.inputs.items():
             self.edges[sys_id][port_id] = None
 
+        self.compute_properties()
+
     ######################################################################
     def compute_properties(self):
 
@@ -370,9 +372,25 @@ class GrapheSystem(System):
 
         # Compute total number of states
         self.n = 0
+        self.state_label = []
+        self.state_units = []
+        self.state_upper_bound = np.array([])
+        self.state_lower_bound = np.array([])
+        self.xbar = np.array([])
+
         for i, (k, sys) in enumerate(self.subsystems.items()):
+
+            # Update state properties
             self.n += sys.n
-        # TODO : get label, units and bounds for each state
+            self.state_label += sys.state_label
+            self.state_units += sys.state_units
+            self.state_upper_bound = np.concatenate(
+                [self.state_upper_bound, sys.state_upper_bound]
+            )
+            self.state_lower_bound = np.concatenate(
+                [self.state_lower_bound, sys.state_lower_bound]
+            )
+            self.xbar = np.concatenate([self.xbar, sys.xbar])
 
     ######################################################################
     def add_edge(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
@@ -400,7 +418,6 @@ class GrapheSystem(System):
 
         g = graphviz.Digraph("G", filename="temp.gv", engine="dot")
         g.attr(rankdir="LR")
-        g.attr(concentrate="true")
 
         for i, (sys_id, sys) in enumerate(self.subsystems.items()):
 
@@ -426,6 +443,8 @@ class GrapheSystem(System):
                     )
 
         g.view()
+
+        return g
 
 
 ######################################################################

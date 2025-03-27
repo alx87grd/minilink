@@ -30,8 +30,16 @@ gsys.add_edge("sys2", "y", "sys3", "u")
 gsys.add_edge("sys2", "y", "sys4", "u")
 gsys.add_edge("sys4", "y", "sys1", "u")
 gsys.add_edge("step", "y", "sys1", "v")
+gsys.add_edge("sys4", "y", "sys1", "w")
+# gsys.add_edge("sys4", "y", "sys1", "u")
+# gsys.add_edge("sys3", "y", "sys1", "w")
 
 print("List of edges after connections:\n")
 print(gsys.edges)
 
-gsys.render_graphe()
+g = gsys.render_graphe()
+
+print("sys.n = ", gsys.n)
+print("sys.m = ", gsys.m)
+print("sys.p = ", gsys.p)
+print("sys.state_label = ", gsys.state_label)
