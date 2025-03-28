@@ -110,15 +110,16 @@ class System:
                 self.input_label.append(port.label[i])
                 self.input_units.append(port.units[i])
 
-        self.input_upper_bound = np.concatenate(
-            [port.upper_bound for port in self.inputs.values()]
-        )
-        self.input_lower_bound = np.concatenate(
-            [port.lower_bound for port in self.inputs.values()]
-        )
-        self.ubar = np.concatenate(
-            [port.default_value for port in self.inputs.values()]
-        )
+        if self.m > 0:
+            self.input_upper_bound = np.concatenate(
+                [port.upper_bound for port in self.inputs.values()]
+            )
+            self.input_lower_bound = np.concatenate(
+                [port.lower_bound for port in self.inputs.values()]
+            )
+            self.ubar = np.concatenate(
+                [port.default_value for port in self.inputs.values()]
+            )
 
         return self.m
 
@@ -356,6 +357,8 @@ class GrapheSystem(System):
         self.inputs = {}
         self.outputs = {}
 
+        self.recompute_input_properties()
+
     ######################################################################
     def add_system(self, sys, sys_id):
         self.subsystems[sys_id] = sys
@@ -377,8 +380,13 @@ class GrapheSystem(System):
         self.state_upper_bound = np.array([])
         self.state_lower_bound = np.array([])
         self.xbar = np.array([])
+        self.x0 = np.array([])
+        self.state_index = {}
 
-        for i, (k, sys) in enumerate(self.subsystems.items()):
+        idx = 0
+        for i, (key, sys) in enumerate(self.subsystems.items()):
+
+            self.state_index[key] = (idx , idx + sys.n)
 
             # Update state properties
             self.n += sys.n
@@ -391,6 +399,9 @@ class GrapheSystem(System):
                 [self.state_lower_bound, sys.state_lower_bound]
             )
             self.xbar = np.concatenate([self.xbar, sys.xbar])
+            self.x0 = np.concatenate([self.x0, sys.x0])
+
+            idx += sys.n
 
     ######################################################################
     def add_edge(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
@@ -445,6 +456,30 @@ class GrapheSystem(System):
         g.view()
 
         return g
+
+    ######################################################################
+    def get_local_state(self, x, sys_id):
+        idx = self.state_index[sys_id]
+        return x[idx[0] : idx[1]]
+    
+    ######################################################################
+    def f(self, x, u, t=0, params=None) -> np.ndarray:
+
+        dx = np.zeros(self.n)
+
+        idx = 0
+
+        for i, (key, sys) in enumerate(self.subsystems.items()):
+
+            if sys.n > 0:
+
+                sys_u = sys.get_u_from_input_ports(t)
+                sys_x  = self.get_local_state(x, key)
+                sys_dx = sys.f(sys_x, sys_u, t)
+                dx[idx : idx + sys.n] = sys_dx
+                idx += sys.n
+        
+        return dx
 
 
 ######################################################################
