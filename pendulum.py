@@ -60,23 +60,32 @@ class Pendulum(DynamicSystem):
 ######################################################################
 if __name__ == "__main__":
 
+    # Plant system
     sys = Pendulum()
 
-    sys.print_html()
-    # sys.show_diagram()
+    sys.params['m'] = 1.0
+    sys.params['l'] = 5.0
 
-    step = Step( np.array([0.0]) , np.array([2.0]), 2.0)
+    # Source input
+    step = Step( 
+        initial_value=np.array([0.0]),
+        final_value=np.array([-20.0]),
+        step_time=10.0,
+        )
 
+    # Diagram
     diagram = GrapheSystem()
     diagram.add_system(sys,'plant')
     diagram.add_system(sys,'plant2')
     diagram.add_system(step, 'step')
     diagram.add_edge('step','y','plant','u')
+    # diagram.add_edge('step','y','plant2','u')
     diagram.render_graphe()
 
     from analysis import Simulator, plot_trajectory
 
-    diagram.x0[0] = 1.0
+    diagram.x0[0] = 2.0
+    diagram.x0[2] = 2.0
 
-    sim = Simulator(diagram, t0=0, tf=25, n_steps=1000)
+    sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
     x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)

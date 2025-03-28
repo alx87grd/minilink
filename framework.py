@@ -463,19 +463,55 @@ class GrapheSystem(System):
         return x[idx[0] : idx[1]]
     
     ######################################################################
+    def get_local_input(self, x, u , t , sys_id):
+
+        sys = self.subsystems[sys_id]
+
+        u = np.array([])
+
+        for j, (port_id, port) in enumerate(sys.inputs.items()):
+
+            edge = self.edges[sys_id][port_id]
+
+            if edge is None:
+
+                # Default unconnected port signal
+                port_u = port.get_signal(t) 
+            
+            else:
+
+                source_sys_id, source_port_id = edge
+                source_sys = self.subsystems[source_sys_id]
+                source_port = source_sys.outputs[source_port_id]
+
+                # Collect signals needed to compute the source output
+                source_x = self.get_local_state(x, source_sys_id)
+                source_u = self.get_local_input(x, u, t, source_sys_id) # Recursive call, TODO check for algebraic loops
+                port_u = source_port.compute(source_x, source_u, t)
+
+            
+            u = np.concatenate([u, port_u])
+        
+        return u
+        
+    
+    ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
 
         dx = np.zeros(self.n)
 
         idx = 0
 
-        for i, (key, sys) in enumerate(self.subsystems.items()):
+        for i, (sys_id, sys) in enumerate(self.subsystems.items()):
 
             if sys.n > 0:
 
-                sys_u = sys.get_u_from_input_ports(t)
-                sys_x  = self.get_local_state(x, key)
-                sys_dx = sys.f(sys_x, sys_u, t)
+                # Get input signals
+                sys_u = self.get_local_input(x, u, t, sys_id)
+
+                # Compute state derivative
+                sys_x  = self.get_local_state(x, sys_id)
+                sys_dx = sys.f(sys_x, sys_u, t) # Local state derivative
                 dx[idx : idx + sys.n] = sys_dx
                 idx += sys.n
         
