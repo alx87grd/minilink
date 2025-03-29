@@ -79,6 +79,8 @@ class System:
             "discrete_time_period": None,
         }
 
+        self.input_output_dependencies = {}
+
     ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
         dx = np.zeros(self.n)
@@ -97,6 +99,11 @@ class System:
     def add_input_port(self, key, dim=1, default_value=None):
         self.inputs[key] = InputPort(key, dim, default_value)
         self.recompute_input_properties()
+
+    ######################################################################
+    def add_output_port(self, key, dim=1, function=None, dependencies='all'):
+        self.outputs[key] = OutputPort(key, dim, function)
+        self.input_output_dependencies[key] = dependencies
 
     ######################################################################
     def recompute_input_properties(self):
@@ -267,9 +274,8 @@ class Source(System):
         self.params = {"value": np.zeros(p)}
 
         self.inputs = {}
-        self.outputs = {
-            "y": OutputPort("y", self.p, function=self.h),
-        }
+        self.outputs = {}
+        self.add_output_port("y", self.p, function=self.h, dependencies='all')
 
     ###################################################################
     def f(self, x, u, t=0, params=None):
@@ -463,7 +469,7 @@ class GrapheSystem(System):
         return x[idx[0] : idx[1]]
     
     ######################################################################
-    def get_local_input(self, x, u , t , sys_id):
+    def get_local_input(self, x, u , t , sys_id, requested_input_ports = 'all'):
 
         sys = self.subsystems[sys_id]
 
@@ -473,7 +479,10 @@ class GrapheSystem(System):
 
             edge = self.edges[sys_id][port_id]
 
-            if edge is None:
+            if requested_input_ports != 'all' and port_id not in requested_input_ports:
+                port_u = port.get_signal(t) 
+
+            elif edge is None:
 
                 # Default unconnected port signal
                 port_u = port.get_signal(t) 
@@ -484,9 +493,11 @@ class GrapheSystem(System):
                 source_sys = self.subsystems[source_sys_id]
                 source_port = source_sys.outputs[source_port_id]
 
+                req = source_sys.input_output_dependencies[source_port_id]
+
                 # Collect signals needed to compute the source output
                 source_x = self.get_local_state(x, source_sys_id)
-                source_u = self.get_local_input(x, u, t, source_sys_id) # Recursive call, TODO check for algebraic loops
+                source_u = self.get_local_input(x, u, t, source_sys_id, req) # Recursive call, TODO check for algebraic loops
                 port_u = source_port.compute(source_x, source_u, t)
 
             

@@ -1,10 +1,10 @@
-from framework import DynamicSystem, GrapheSystem, Step
+from framework import DynamicSystem, GrapheSystem, Step, StaticSystem
 import numpy as np
 
 
 class Pendulum(DynamicSystem):
     def __init__(self):
-        super().__init__(2, 1, 1)
+        super().__init__(2, 1, 2)
         
         self.params = {
             "g": 9.81,
@@ -23,7 +23,8 @@ class Pendulum(DynamicSystem):
         self.add_input_port("w", 1, default_value=np.array([0.0]))
         self.add_input_port("v", 1, default_value=np.array([0.0]))
 
-        self.outputs['y'].labels = ["noisy theta"]
+        self.outputs = {}
+        self.add_output_port("y", self.p, function=self.h, dependencies=['v'])
 
 
     def f(self, x, u, t = 0 , params = None):
@@ -52,9 +53,55 @@ class Pendulum(DynamicSystem):
         signals = self.u2input_signals(u)
         v = signals['v']
 
-        y = x[0] + v
+        y = np.zeros(self.p)
+
+        y[0] = x[0] + v
+        y[1] = x[1] + v
 
         return y
+    
+
+######################################################################
+class Controller( StaticSystem ):
+    def __init__(self):
+        super().__init__(3, 1)
+
+        self.params = {
+            "Kp": 10.0,
+            "Kd": 1.0,
+        }
+
+        self.name = "Controller"
+
+        self.inputs = {}
+        self.add_input_port("ref", 1, default_value=np.array([0.0]))
+        self.add_input_port("y", 2, default_value=np.array([0.0, 0.0]))
+        self.inputs['y'].labels = ["theta", "theta_dot"]
+        self.inputs['y'].units = ["rad", "rad/s"]
+
+        self.outputs = {}
+        self.add_output_port("u", 1, function=self.ctl, dependencies=['ref', 'y'])
+        self.outputs['u'].labels = ["torque"]
+        self.outputs['u'].units = ["Nm"]
+
+    ######################################################################
+    def ctl(self, x, u, t = 0, params = None):
+
+        if params is None:
+            params = self.params
+
+        Kp = params["Kp"]
+        Kd = params["Kd"]
+
+        ref   = u[0]
+        theta = u[1]
+        theta_dot = u[2]
+
+        torque = Kp * ( ref - theta)  - Kd * theta_dot
+
+        u = np.array([torque])
+
+        return u
     
 
 ######################################################################
@@ -66,26 +113,53 @@ if __name__ == "__main__":
     sys.params['m'] = 1.0
     sys.params['l'] = 5.0
 
+    sys.x0[0] = 2.0
+
     # Source input
     step = Step( 
         initial_value=np.array([0.0]),
-        final_value=np.array([-20.0]),
+        final_value=np.array([1.0]),
         step_time=10.0,
         )
 
-    # Diagram
-    diagram = GrapheSystem()
-    diagram.add_system(sys,'plant')
-    diagram.add_system(sys,'plant2')
-    diagram.add_system(step, 'step')
-    diagram.add_edge('step','y','plant','u')
-    # diagram.add_edge('step','y','plant2','u')
-    diagram.render_graphe()
+    # # Diagram
+    # diagram = GrapheSystem()
+    # diagram.add_system(sys,'plant')
+    # diagram.add_system(sys,'plant2')
+    # diagram.add_system(step, 'step')
+    # diagram.add_edge('step','y','plant','u')
+    # # diagram.add_edge('step','y','plant2','u')
+    # diagram.render_graphe()
 
     from analysis import Simulator, plot_trajectory
 
-    diagram.x0[0] = 2.0
-    diagram.x0[2] = 2.0
+    # # # diagram.x0[0] = 2.0
+    # # # diagram.x0[2] = 2.0
 
-    sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
+    # sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
+    # x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
+
+
+    # Closed loop system
+    ctl = Controller()
+
+    ctl.params['Kp'] = 1000.0
+    ctl.params['Kd'] = 100.0
+
+    # Diagram
+    diagram2 = GrapheSystem()
+    diagram2.add_system(step, 'step')
+    diagram2.add_system(ctl,'controller')
+    diagram2.add_system(sys,'plant')
+    diagram2.add_edge('step','y','controller','ref')
+    diagram2.add_edge('controller','u','plant','u')
+    diagram2.add_edge('plant','y','controller','y')
+    diagram2.render_graphe()
+
+    # Algebraic loop not supported yet
+
+    sim = Simulator(diagram2, t0=0, tf=20, n_steps=10000)
     x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
+
+
+    
