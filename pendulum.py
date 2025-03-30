@@ -151,9 +151,18 @@ if __name__ == "__main__":
     diagram2.add_system(step, 'step')
     diagram2.add_system(ctl,'controller')
     diagram2.add_system(sys,'plant')
+    # diagram2.add_system(sys,'plant2')
+    # diagram2.add_system(sys,'plant3')
+    # diagram2.add_system(sys,'plant4')
+    # diagram2.add_system(sys,'plant5')
     diagram2.add_edge('step','y','controller','ref')
     diagram2.add_edge('controller','u','plant','u')
     diagram2.add_edge('plant','y','controller','y')
+    # diagram2.add_edge('plant','y','plant2','u')
+    # diagram2.add_edge('plant2','y','plant3','u')
+    # diagram2.add_edge('plant3','y','plant4','u')
+    # diagram2.add_edge('plant4','y','plant5','u')
+    # diagram2.add_edge('plant5','y','controller','y')
     diagram2.render_graphe()
 
     # Algebraic loop not supported yet
