@@ -124,7 +124,7 @@ if __name__ == "__main__":
     
     # Noisy input
     noise = WhiteNoise(1)
-    noise.params['var'] = 100.0
+    noise.params['var'] = 1.0
     noise.params['mean'] = 0.0
     noise.params['seed'] = 1
 
