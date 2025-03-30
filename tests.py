@@ -497,13 +497,13 @@ def cascade_controllers_test():
 if __name__ == "__main__":
 
 
-    # sys = system_test()
-    # sim = simulator_test()
+    sys = system_test()
+    sim = simulator_test()
     dia = diagram_test()
-    # pendulum_test()
-    # closedloop_pendulum_test()
-    # closedloop_noisy_pendulum_test()
-    # cascade_controllers_test()
+    pendulum_test()
+    closedloop_pendulum_test()
+    closedloop_noisy_pendulum_test()
+    cascade_controllers_test()
 
 
 

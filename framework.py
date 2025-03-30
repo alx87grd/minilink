@@ -248,8 +248,8 @@ class System:
     
     ######################################################################
     def _repr_svg_(self):
+        """ Display the svg rendered graphe in the notebook """
         g = self.get_graphe()
-        # return g._repr_mimebundle_()
         return g._repr_image_svg_xml()
     
     ######################################################################
@@ -490,8 +490,6 @@ class GrapheSystem(System):
         g.attr(rankdir="LR")
 
         for i, (sys_id, sys) in enumerate(self.subsystems.items()):
-
-            print(str(i))
 
             label = f"<{sys.get_block_html(sys_id)}>"
 
