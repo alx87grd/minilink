@@ -1,4 +1,4 @@
-from framework import DynamicSystem, GrapheSystem, Step, StaticSystem
+from framework import DynamicSystem, GrapheSystem, Step, StaticSystem, WhiteNoise
 import numpy as np
 
 
@@ -121,6 +121,18 @@ if __name__ == "__main__":
         final_value=np.array([1.0]),
         step_time=10.0,
         )
+    
+    # Noisy input
+    noise = WhiteNoise(1)
+    noise.params['var'] = 100.0
+    noise.params['mean'] = 0.0
+    noise.params['seed'] = 1
+
+    # Noisy measurement
+    noise2 = WhiteNoise(1)
+    noise2.params['var'] = 0.1
+    noise2.params['mean'] = 0.0
+    noise2.params['seed'] = 2
 
     # # Diagram
     # diagram = GrapheSystem()
@@ -151,12 +163,16 @@ if __name__ == "__main__":
     diagram2.add_system(step, 'step')
     diagram2.add_system(ctl,'controller')
     diagram2.add_system(sys,'plant')
+    diagram2.add_system(noise, 'noise')
+    diagram2.add_system(noise2, 'noise2')
     # diagram2.add_system(sys,'plant2')
     # diagram2.add_system(sys,'plant3')
     # diagram2.add_system(sys,'plant4')
     # diagram2.add_system(sys,'plant5')
     diagram2.add_edge('step','y','controller','ref')
     diagram2.add_edge('controller','u','plant','u')
+    diagram2.add_edge('noise','y','plant','w')
+    diagram2.add_edge('noise2','y','plant','v')
     diagram2.add_edge('plant','y','controller','y')
     # diagram2.add_edge('plant','y','plant2','u')
     # diagram2.add_edge('plant2','y','plant3','u')
@@ -165,9 +181,12 @@ if __name__ == "__main__":
     # diagram2.add_edge('plant5','y','controller','y')
     diagram2.render_graphe()
 
+    # diagram2.solver_info['solver'] = 'euler'
+
     # Algebraic loop not supported yet
 
-    sim = Simulator(diagram2, t0=0, tf=20, n_steps=10000)
+    sim = Simulator(diagram2, t0=0, tf=20, dt=0.01)
+    sim.solver = 'euler'
     x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
 
 

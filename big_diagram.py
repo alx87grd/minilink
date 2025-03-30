@@ -75,10 +75,9 @@ if __name__ == "__main__":
 
     # Plant system
     sys = Integrator()
-
     sys.x0[0] = 20.0
 
-
+    # Controllers
     ctl1 = Controller()
     ctl1.params["Kp"] = 1.0
     ctl2 = Controller()
@@ -93,6 +92,7 @@ if __name__ == "__main__":
 
     # # Diagram
     diagram = GrapheSystem()
+
     diagram.add_system(step, 'step')
     diagram.add_system(ctl1, 'controller1')
     diagram.add_system(ctl2, 'controller2')

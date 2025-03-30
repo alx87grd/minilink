@@ -1,5 +1,5 @@
 import numpy as np
-from framework import DynamicSystem
+from framework import DynamicSystem, GrapheSystem, Step, StaticSystem, WhiteNoise
 from analysis import Simulator, plot_trajectory
 
 
@@ -41,3 +41,6 @@ plot_trajectory(sys1, t_traj, x_traj)
 # plot_trajectory(sys1, t_traj, u_traj=u_traj)
 # plot_trajectory(sys1, t_traj, x_traj, u_traj)
 plot_trajectory(sys1, t_traj, y_traj=y_traj)
+
+
+noise = WhiteNoise()

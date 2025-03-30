@@ -322,6 +322,39 @@ class Step(Source):
             y = params["final_value"]
 
         return y
+    
+
+######################################################################
+class WhiteNoise(Source):
+    
+    def __init__(self, p=1):
+
+        Source.__init__(self, p)
+
+        self.random_generator = np.random.default_rng()
+
+        self.name = "WhiteNoise"
+        self.params = {
+            "var": 1.0,
+            "mean": 0.0,
+            "seed": 0,
+            }
+
+    ###################################################################
+    def h(self, x, u, t=0, params=None):
+
+        #
+        if params is None:
+            params = self.params
+        
+        seed = params["seed"] + int(t*1000000000)
+        mu = params["mean"]
+        sigma = np.sqrt(params["var"])
+
+        random_generator = np.random.default_rng( seed )
+        y = random_generator.normal(mu, sigma, self.p)
+
+        return y
 
 
 ######################################################################
