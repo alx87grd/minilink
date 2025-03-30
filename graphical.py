@@ -47,7 +47,52 @@ else:
 matplotlib.rcParams["pdf.fonttype"] = 42
 matplotlib.rcParams["ps.fonttype"] = 42
 
-# print('Matplotlib backend:', plt.get_backend())
-# print('Matplotlib interactive:', matplotlib.is_interactive())
+
+print('Graphical settings:\n---------------------------------')
+print('Matplotlib backend:', plt.get_backend())
+print('Matplotlib interactive:', matplotlib.is_interactive())
 # # print('Matplotlib list of interactive backends:', matplotlib.rcsetup.interactive_bk)
-# print('Matplotlib figure blocking:', figure_blocking)
+print('Matplotlib figure blocking:', figure_blocking)
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+def plot_graphviz(graphe, show_inline=False, show_pdf = True, filename = None):
+    """
+    Display a graphviz object in the notebook
+    """
+    if show_inline:
+        import IPython.display as display
+        display.display(graphe)
+    
+    if filename is None:
+        try:
+            import tempfile
+            filename=tempfile.mktemp('_' + graphe.name +'.gv')
+        except ImportError:
+            print("tempfile is not available")
+            filename='temp_' + graphe.name +'.gv'
+    else:
+        filename = filename
+
+    graphe.render(filename=filename,view=show_pdf)
+
+
+
+
+###############################################################################
+######################################################################
+if __name__ == "__main__":
+
+    import numpy as np
+    import graphviz
+    import matplotlib.pyplot as plt
+    import IPython.display as display
+
+    graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")
+    graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")
+    graphe.node("A", label="A", shape="circle")
+
+    plot_graphviz(graphe, show_inline=True, show_pdf=True, filename='aaa')

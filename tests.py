@@ -257,7 +257,7 @@ def system_test():
 
     sys1.print_html()
 
-    sys1.show_diagram()
+    sys1.plot_graphe()
 
     return sys1
 
@@ -300,12 +300,14 @@ def diagram_test():
     print("List of edges after connections:\n")
     print(gsys.edges)
 
-    g = gsys.render_graphe()
+    g = gsys.plot_graphe()
 
     print("sys.n = ", gsys.n)
     print("sys.m = ", gsys.m)
     print("sys.p = ", gsys.p)
     print("sys.state_label = ", gsys.state_label)
+
+    return gsys
 
 ######################################################################
 def pendulum_test():
@@ -345,7 +347,7 @@ def pendulum_test():
     diagram.add_edge('step','y','plant2','u')
     diagram.add_edge('dist','y','plant','w')
     diagram.add_edge('noise','y','plant','v')
-    diagram.render_graphe()
+    diagram.plot_graphe()
 
     sim = Simulator(diagram, t0=0, tf=20, dt=0.01)
     sim.solver = 'euler' # WhiteNoise is discontinuous
@@ -385,7 +387,7 @@ def closedloop_pendulum_test():
     diagram2.add_edge('controller','u','plant','u')
     diagram2.add_edge('plant','y','controller','y')
 
-    diagram2.render_graphe()
+    diagram2.plot_graphe()
 
     sim = Simulator(diagram2, t0=0, tf=20, dt=0.01)
     x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
@@ -439,7 +441,7 @@ def closedloop_noisy_pendulum_test():
     diagram2.add_edge('noise','y','plant','w')
     diagram2.add_edge('noise2','y','plant','v')
 
-    diagram2.render_graphe()
+    diagram2.plot_graphe()
 
     sim = Simulator(diagram2, t0=0, tf=20, dt=0.01)
     sim.solver = 'euler'
@@ -481,7 +483,7 @@ def cascade_controllers_test():
     diagram.add_edge('integrator2','y','controller1','y')
     diagram.add_edge('step','y','controller1','ref')
     
-    diagram.render_graphe()
+    diagram.plot_graphe()
 
     sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
     x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
@@ -495,13 +497,13 @@ def cascade_controllers_test():
 if __name__ == "__main__":
 
 
-    system_test()
-    simulator_test()
-    diagram_test()
-    pendulum_test()
-    closedloop_pendulum_test()
-    closedloop_noisy_pendulum_test()
-    cascade_controllers_test()
+    # sys = system_test()
+    # sim = simulator_test()
+    dia = diagram_test()
+    # pendulum_test()
+    # closedloop_pendulum_test()
+    # closedloop_noisy_pendulum_test()
+    # cascade_controllers_test()
 
 
 
