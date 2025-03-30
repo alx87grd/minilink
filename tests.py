@@ -1,4 +1,5 @@
 from framework import DynamicSystem, GrapheSystem, Step, StaticSystem, WhiteNoise
+from analysis import Simulator, plot_trajectory
 import numpy as np
 
 
@@ -229,13 +230,280 @@ def simulator_test():
 
 
 ######################################################################
+def system_test():
+
+    sys1 = DynamicSystem(2, 1, 1)
+
+    sys1.add_input_port("w", 2, default_value=np.array([7.7, 2.2]))
+    sys1.add_input_port("v", 1, default_value=np.array([1.1]))
+
+    print("Sys1 u dim:", sys1.m)
+    print("Sys1 x dim:", sys1.n)
+    print("Sys1 y dim:", sys1.p)
+
+    default_input_signals = sys1.collect_input_signals()
+    u = sys1.input_signals2u(default_input_signals)
+    u2 = sys1.get_u_from_input_ports()
+    assert np.allclose(u, u2)
+
+    print("Default u:", u)
+    # print("Default u:", u2)
+    print("Default input signals:", default_input_signals)
+
+
+    u = np.random.rand(sys1.m)
+    u2 = sys1.input_signals2u(sys1.u2input_signals(u))
+    assert np.allclose(u, u2)
+
+    sys1.print_html()
+
+    sys1.show_diagram()
+
+    return sys1
+
+
+######################################################################
+def diagram_test():
+
+    sys1 = DynamicSystem(2, 1, 1)
+    sys1.add_input_port("w", 2, default_value=np.array([7.7, 2.2]))
+    sys1.add_input_port("v", 1, default_value=np.array([1.1]))
+    sys2 = DynamicSystem(2, 1, 1)
+    sys3 = StaticSystem(1, 1)
+    sys4 = DynamicSystem(2, 1, 1)
+    step = Step(np.array([0.0]), np.array([1.0]), 1.0)
+
+    gsys = GrapheSystem()
+
+
+    gsys.add_system(sys1, "sys1")
+    gsys.add_system(sys2, "sys2")
+    gsys.add_system(sys3, "sys3")
+    gsys.add_system(sys4, "sys4")
+    gsys.add_system(step, "step")
+
+    print("List of subsystems:\n")
+    print(gsys.subsystems)
+
+    print("List of edges before connections:\n")
+    print(gsys.edges)
+
+    gsys.add_edge("sys1", "y", "sys2", "u")
+    gsys.add_edge("sys2", "y", "sys3", "u")
+    gsys.add_edge("sys2", "y", "sys4", "u")
+    gsys.add_edge("sys4", "y", "sys1", "u")
+    gsys.add_edge("step", "y", "sys1", "v")
+    gsys.add_edge("sys4", "y", "sys1", "w")
+    # gsys.add_edge("sys4", "y", "sys1", "u")
+    # gsys.add_edge("sys3", "y", "sys1", "w")
+
+    print("List of edges after connections:\n")
+    print(gsys.edges)
+
+    g = gsys.render_graphe()
+
+    print("sys.n = ", gsys.n)
+    print("sys.m = ", gsys.m)
+    print("sys.p = ", gsys.p)
+    print("sys.state_label = ", gsys.state_label)
+
+######################################################################
+def pendulum_test():
+
+    # Plant system
+    sys = Pendulum()
+    sys.params['m'] = 1.0
+    sys.params['l'] = 1.0
+    sys.x0[0] = 2.0
+
+    # Source input
+    step = Step()
+    step.params['initial_value'] = np.array([0.0])
+    step.params['final_value'] = np.array([0.2])
+    step.params['step_time'] = 15.0
+    
+    # Noisy input
+    noise = WhiteNoise(1)
+    noise.params['var'] = 10.0
+    noise.params['mean'] = 0.0
+    noise.params['seed'] = 1
+
+    # Noisy measurement
+    noise2 = WhiteNoise(1)
+    noise2.params['var'] = 10.0
+    noise2.params['mean'] = 0.0
+    noise2.params['seed'] = 2
+
+    # # Diagram
+    diagram = GrapheSystem()
+    diagram.add_system(sys,'plant')
+    diagram.add_system(sys,'plant2')
+    diagram.add_system(step, 'step')
+    diagram.add_system(noise, 'dist')
+    diagram.add_system(noise2, 'noise')
+    diagram.add_edge('step','y','plant','u')
+    diagram.add_edge('step','y','plant2','u')
+    diagram.add_edge('dist','y','plant','w')
+    diagram.add_edge('noise','y','plant','v')
+    diagram.render_graphe()
+
+    sim = Simulator(diagram, t0=0, tf=20, dt=0.01)
+    sim.solver = 'euler' # WhiteNoise is discontinuous
+    x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
+
+    return sim
+
+######################################################################
+def closedloop_pendulum_test():
+
+    # Plant system
+    sys = Pendulum()
+
+    sys.params['m'] = 1.0
+    sys.params['l'] = 5.0
+    sys.x0[0] = 2.0
+
+    # Source input
+    step = Step()
+    step.params['initial_value'] = np.array([0.0])
+    step.params['final_value'] = np.array([1.0])
+    step.params['step_time'] = 10.0
+
+    # Closed loop system
+    ctl = KDController()
+    ctl.params['Kp'] = 1000.0
+    ctl.params['Kd'] = 100.0
+
+    # Diagram
+    diagram2 = GrapheSystem()
+
+    diagram2.add_system(step, 'step')
+    diagram2.add_system(ctl,'controller')
+    diagram2.add_system(sys,'plant')
+
+    diagram2.add_edge('step','y','controller','ref')
+    diagram2.add_edge('controller','u','plant','u')
+    diagram2.add_edge('plant','y','controller','y')
+
+    diagram2.render_graphe()
+
+    sim = Simulator(diagram2, t0=0, tf=20, dt=0.01)
+    x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
+
+######################################################################
+def closedloop_noisy_pendulum_test():
+
+    # Plant system
+    sys = Pendulum()
+
+    sys.params['m'] = 1.0
+    sys.params['l'] = 5.0
+
+    sys.x0[0] = 2.0
+
+    # Source input
+    step = Step()
+    step.params['initial_value'] = np.array([0.0])
+    step.params['final_value'] = np.array([1.0])
+    step.params['step_time'] = 10.0
+    
+    # Noisy input
+    noise = WhiteNoise(1)
+    noise.params['var'] = 1.0
+    noise.params['mean'] = 0.0
+    noise.params['seed'] = 1
+
+    # Noisy measurement
+    noise2 = WhiteNoise(1)
+    noise2.params['var'] = 0.1
+    noise2.params['mean'] = 0.0
+    noise2.params['seed'] = 2
+
+    # Closed loop system
+    ctl = KDController()
+    ctl.params['Kp'] = 1000.0
+    ctl.params['Kd'] = 100.0
+
+    # Diagram
+    diagram2 = GrapheSystem()
+
+    diagram2.add_system(step, 'step')
+    diagram2.add_system(ctl,'controller')
+    diagram2.add_system(sys,'plant')
+    diagram2.add_system(noise, 'noise')
+    diagram2.add_system(noise2, 'noise2')
+
+    diagram2.add_edge('step','y','controller','ref')
+    diagram2.add_edge('controller','u','plant','u')
+    diagram2.add_edge('plant','y','controller','y')
+    diagram2.add_edge('noise','y','plant','w')
+    diagram2.add_edge('noise2','y','plant','v')
+
+    diagram2.render_graphe()
+
+    sim = Simulator(diagram2, t0=0, tf=20, dt=0.01)
+    sim.solver = 'euler'
+    x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
+
+
+######################################################################
+def cascade_controllers_test():
+
+    # Plant system
+    sys = Integrator()
+    sys.x0[0] = 20.0
+
+    # Controllers
+    ctl1 = PropController()
+    ctl1.params["Kp"] = 1.0
+    ctl2 = PropController()
+    ctl2.params["Kp"] = 1.0
+
+    # Source input
+    step = Step()
+    step.params['initial_value'] = np.array([0.0])
+    step.params['final_value'] = np.array([1.0])
+    step.params['step_time'] = 10.0
+
+    # # Diagram
+    diagram = GrapheSystem()
+
+    diagram.add_system(step, 'step')
+    diagram.add_system(ctl1, 'controller1')
+    diagram.add_system(ctl2, 'controller2')
+    diagram.add_system(sys,'integrator1')
+    diagram.add_system(sys,'integrator2')
+
+    diagram.add_edge('integrator1','y','integrator2','u')
+    diagram.add_edge('controller2','u','integrator1','u')
+    diagram.add_edge('integrator1','y','controller2','y')
+    diagram.add_edge('controller1','u','controller2','ref')
+    diagram.add_edge('integrator2','y','controller1','y')
+    diagram.add_edge('step','y','controller1','ref')
+    
+    diagram.render_graphe()
+
+    sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
+    x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
+
+    return sim
+
 
     
 
 ######################################################################
 if __name__ == "__main__":
 
+
+    system_test()
     simulator_test()
+    diagram_test()
+    pendulum_test()
+    closedloop_pendulum_test()
+    closedloop_noisy_pendulum_test()
+    cascade_controllers_test()
+
+
 
 
     
