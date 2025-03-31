@@ -1,4 +1,5 @@
 import numpy as np
+from graphical import plot_graphviz
 
 
 ######################################################################
@@ -209,6 +210,10 @@ class System:
         label += f"</TABLE>"
 
         return label
+    
+    # ######################################################################
+    # def _repr_html_(self):
+    #     return self.get_block_html()
 
     ######################################################################
     def print_html(self):
@@ -222,22 +227,37 @@ class System:
         display.display(display.HTML(self.get_block_html()))
 
     ######################################################################
-    def show_diagram(self):
+    def get_graphe(self):
+
         try:
             import graphviz
         except ImportError:
             print("graphviz is not available")
             return None
 
-        g = graphviz.Digraph("G", filename="temp.gv", engine="dot")
+        g = graphviz.Digraph(self.name, engine="dot")
         g.attr(rankdir="LR")
-        g.attr(concentrate="true")
+
         g.node(
             self.name,
             shape="none",
             label=f"<{self.get_block_html()}>",
         )
-        g.view()
+
+        return g
+    
+    ######################################################################
+    def _repr_svg_(self):
+        """ Display the svg rendered graphe in the notebook """
+        g = self.get_graphe()
+        return g._repr_image_svg_xml()
+    
+    ######################################################################
+    def plot_graphe(self, filename=None):
+
+        g = self.get_graphe()
+
+        plot_graphviz(g, filename=filename)
 
 
 ######################################################################
@@ -449,16 +469,16 @@ class GrapheSystem(System):
         print(
             "Added edge from "
             + source_sys_id
-            + " port "
+            + ":"
             + source_port_id
             + " to "
             + target_sys_id
-            + " port "
+            + ":"
             + target_port_id
         )
 
     ######################################################################
-    def render_graphe(self):
+    def get_graphe(self):
 
         try:
             import graphviz
@@ -466,12 +486,10 @@ class GrapheSystem(System):
             print("graphviz is not available")
             return None
 
-        g = graphviz.Digraph("G", filename="temp.gv", engine="dot")
+        g = graphviz.Digraph(self.name, engine="dot")
         g.attr(rankdir="LR")
 
         for i, (sys_id, sys) in enumerate(self.subsystems.items()):
-
-            print(str(i))
 
             label = f"<{sys.get_block_html(sys_id)}>"
 
@@ -491,8 +509,6 @@ class GrapheSystem(System):
                         edge[0] + ":" + edge[1] + ":e",
                         sys_id + ":" + port_id + ":w",
                     )
-
-        g.view()
 
         return g
 
@@ -565,4 +581,6 @@ class GrapheSystem(System):
 ######################################################################
 if __name__ == "__main__":
 
-    pass
+    sys = DynamicSystem(2, 1, 1)
+
+    
