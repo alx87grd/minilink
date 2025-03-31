@@ -469,11 +469,11 @@ class GrapheSystem(System):
         print(
             "Added edge from "
             + source_sys_id
-            + " port "
+            + ":"
             + source_port_id
             + " to "
             + target_sys_id
-            + " port "
+            + ":"
             + target_port_id
         )
 

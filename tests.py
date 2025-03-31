@@ -488,7 +488,7 @@ def cascade_controllers_test():
     sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
     x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
 
-    return sim
+    return diagram
 
 
     
@@ -497,13 +497,13 @@ def cascade_controllers_test():
 if __name__ == "__main__":
 
 
-    sys = system_test()
-    sim = simulator_test()
-    dia = diagram_test()
-    pendulum_test()
-    closedloop_pendulum_test()
-    closedloop_noisy_pendulum_test()
-    cascade_controllers_test()
+    # sys = system_test()
+    # sim = simulator_test()
+    # dia = diagram_test()
+    # pendulum_test()
+    # closedloop_pendulum_test()
+    # closedloop_noisy_pendulum_test()
+    diagram = cascade_controllers_test()
 
 
 
