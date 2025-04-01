@@ -52,7 +52,12 @@ class DiagramSystem(System):
             n += sys.n
 
             for i in range(sys.n):
-                state_label.append(key + ":" + sys.state.labels[i])
+                if sys.state.labels[i] in state_label:
+                    state_label.append(
+                        key + ":" + sys.state.labels[i]
+                    )  # Add subsystem id to the label
+                else:
+                    state_label.append(sys.state.labels[i])
             state_units += sys.state.units
             state_upper_bound = np.concatenate(
                 [state_upper_bound, sys.state.upper_bound]
