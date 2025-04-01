@@ -14,7 +14,7 @@ class VectorSignal:
     the dimension of the signal
     id : str
     the identifier of the signal
-    label : list of str
+    labels : list of str
     the label of each component of the signal
     units : list of str
     the units of each component of the signal

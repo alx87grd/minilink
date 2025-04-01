@@ -505,7 +505,6 @@ def algebraic_loop():
     return diagram
 
 
-
 ######################################################################
 if __name__ == "__main__":
 
@@ -515,5 +514,5 @@ if __name__ == "__main__":
     # pendulum_test()
     # closedloop_pendulum_test()
     # closedloop_noisy_pendulum_test()
-    diagram = cascade_controllers_test()
-    # diagram = algebraic_loop()
+    # diagram = cascade_controllers_test()
+    diagram = algebraic_loop()
