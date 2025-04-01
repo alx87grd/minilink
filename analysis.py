@@ -3,38 +3,68 @@ from scipy.integrate import solve_ivp
 import logging
 import graphical
 import matplotlib.pyplot as plt
-from framework import DynamicSystem, StaticSystem, Step, GrapheSystem
+
+
+######################################################################
+class Trajectory:
+
+    def __init__(self, x, u, t):
+        """
+        x:  array of dim = ( time-steps , sys.n )
+        u:  array of dim = ( time-steps , sys.m )
+        t:  array of dim = ( time-steps , 1 )
+        """
+
+        self.x = x
+        self.u = u
+        self.t = t
+
+        self.port = {}  # dictionary of port signals trajectories
+
+        self._compute_size()
+
+    ############################
+    def _compute_size(self):
+
+        # print(self.t)
+
+        self.time_final = self.t.max()
+        self.time_steps = self.t.size
+
+        self.n = self.x.shape[0]
+        self.m = self.u.shape[0]
+
+        assert self.x.shape[1] == self.time_steps, "x has the wrong dimension"
+        assert self.u.shape[1] == self.time_steps, "u has the wrong dimension"
 
 
 ############################################################
-def plot_trajectory(sys, t_traj=None, x_traj=None, u_traj=None, y_traj=None):
+def plot_trajectory(sys, traj):
 
-    # Extract the system dimensions
+    # Extract the system dimensions and labels
     n = sys.n
     m = sys.m
-    p = sys.p
     name = sys.name
-    state_label = sys.state_label
-    input_label = sys.input_label
-    # output_label = sys.output_label
+    state_labels, state_units = sys.state.labels, sys.state.units
+    input_labels, input_units = sys.get_all_input_labels_and_units()
 
-    # Check if the trajectories are provided
-    if x_traj is None:
-        n = 0
-    if u_traj is None:
-        m = 0
-    if y_traj is None:
-        p = 0
+    # Extract the trajectory data
+    t_traj = traj.t
+    x_traj = traj.x
+    u_traj = traj.u
 
     # Compute the number of plots
-    n_plots = n + m + p
-
-    if n_plots == 0:
-        logging.warning("No signals to plot")
-        return
+    n_plots = n + m
 
     # Create the figure
-    fig, ax = plt.subplots(n_plots, 1, figsize=(10, 2 * n_plots))
+    fig, ax = plt.subplots(
+        n_plots,
+        1,
+        figsize=(10, 2 * n_plots),
+        sharex=True,
+        # dpi=graphical.default_dpi,
+        frameon=True,
+    )
     fig.canvas.manager.set_window_title("Trajectory for " + name)
     if n_plots == 1:
         ax = [ax]
@@ -42,20 +72,23 @@ def plot_trajectory(sys, t_traj=None, x_traj=None, u_traj=None, y_traj=None):
     # Plot the signals
     idx = 0
     for i in range(n):
-        ax[idx].plot(t_traj, x_traj[i, :], label=f"{state_label[i]}")
-        ax[idx].set_ylabel(f"{state_label[i]}")
+        ax[idx].plot(t_traj, x_traj[i, :], "b")
+        ax[idx].set_ylabel(
+            f"{state_labels[i]}[{state_units[i]}]", fontsize=graphical.default_fontsize
+        )
         ax[idx].grid()
+        ax[idx].tick_params(labelsize=graphical.default_fontsize)
         idx += 1
     for i in range(m):
-        ax[idx].plot(t_traj, u_traj[i, :], label=f"{input_label[i]}")
-        ax[idx].set_ylabel(f"{input_label[i]}")
+        ax[idx].plot(t_traj, u_traj[i, :], "r")
+        ax[idx].set_ylabel(
+            f"{input_labels[i]} {input_units[i]}", fontsize=graphical.default_fontsize
+        )
         ax[idx].grid()
+        ax[idx].tick_params(labelsize=graphical.default_fontsize)
         idx += 1
-    for i in range(p):
-        ax[idx].plot(t_traj, y_traj[i, :], label=f"y{[i]}")
-        ax[idx].set_ylabel(f"y{[i]}")
-        ax[idx].grid()
-        idx += 1
+
+    ax[-1].set_xlabel("Time [s]", fontsize=graphical.default_fontsize)
 
     # Show the figure
     plt.show(block=graphical.figure_blocking)
@@ -64,47 +97,6 @@ def plot_trajectory(sys, t_traj=None, x_traj=None, u_traj=None, y_traj=None):
 
 
 ######################################################################
-class Trajectory:
-
-    def __init__(
-        self,
-        time: np.ndarray,
-        states: np.ndarray,
-        inputs: np.ndarray,
-        outputs: np.ndarray,
-    ):
-        """
-        Initialize a trajectory object.
-
-        Parameters:
-        - time: np.ndarray, time vector
-        - states: np.ndarray, state trajectory (n x len(time))
-        - inputs: np.ndarray, input trajectory (m x len(time))
-        """
-        self.time = time
-        self.states = states
-        self.inputs = inputs
-
-    def get_state_at(self, t: float) -> np.ndarray:
-        """Retrieve the state at a specific time."""
-        idx = (np.abs(self.time - t)).argmin()
-        return self.states[:, idx]
-
-    def get_input_at(self, t: float) -> np.ndarray:
-        """Retrieve the input at a specific time."""
-        idx = (np.abs(self.time - t)).argmin()
-        return self.inputs[:, idx]
-
-    def slice(self, start_time: float, end_time: float) -> "Trajectory":
-        """Extract a portion of the trajectory between start_time and end_time."""
-        mask = (self.time >= start_time) & (self.time <= end_time)
-        return Trajectory(
-            time=self.time[mask],
-            states=self.states[:, mask],
-            inputs=self.inputs[:, mask],
-        )
-
-
 class Simulator:
     def __init__(
         self, sys, t0=0, tf=10, n_steps=None, dt=None, solver="scipy", verbose=True
@@ -254,16 +246,13 @@ class Simulator:
 
                 u_traj[:, i] = u
 
-        # Compute the default output trajectory
-        y_traj = np.zeros((sys.p, n_pts))
-        for i in range(n_pts):
-            y_traj[:, i] = sys.h(x_traj[:, i], u_traj[:, i], times[i])
+        traj = Trajectory(x_traj, u_traj, t_traj)
 
         # Plot the trajectory
         if show:
-            plot_trajectory(sys, t_traj, x_traj, u_traj, y_traj)
+            plot_trajectory(sys, traj)
 
-        return x_traj, u_traj, t_traj, y_traj
+        return traj
 
 
 ######################################################################
