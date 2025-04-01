@@ -465,6 +465,48 @@ def cascade_controllers_test():
 
 
 ######################################################################
+def algebraic_loop():
+
+    # Plant system
+    sys = Integrator()
+    sys.x0[0] = 20.0
+
+    # Controllers
+    ctl1 = PropController()
+    ctl1.params["Kp"] = 1.0
+    ctl2 = PropController()
+    ctl2.params["Kp"] = 1.0
+
+    # Source input
+    step = Step()
+    step.params["initial_value"] = np.array([0.0])
+    step.params["final_value"] = np.array([1.0])
+    step.params["step_time"] = 10.0
+
+    # # Diagram
+    diagram = DiagramSystem()
+
+    diagram.add_subsystem(step, "step")
+    diagram.add_subsystem(ctl1, "controller1")
+    diagram.add_subsystem(ctl2, "controller2")
+    diagram.add_subsystem(sys, "integrator1")
+    diagram.add_subsystem(sys, "integrator2")
+
+    diagram.connect("controller2", "u", "integrator2", "u")
+    diagram.connect("controller2", "u", "controller1", "y")
+    diagram.connect("controller1", "u", "controller2", "y")
+    diagram.connect("step", "y", "controller1", "ref")
+
+    diagram.plot_graphe()
+
+    sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
+    sim.solve(show=True)
+
+    return diagram
+
+
+
+######################################################################
 if __name__ == "__main__":
 
     # sys = system_test()
@@ -474,3 +516,4 @@ if __name__ == "__main__":
     # closedloop_pendulum_test()
     # closedloop_noisy_pendulum_test()
     diagram = cascade_controllers_test()
+    # diagram = algebraic_loop()
