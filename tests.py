@@ -32,6 +32,7 @@ class Pendulum(DynamicSystem):
 
         if params is None:
             params = self.params
+
         g = params["g"]
         m = params["m"]
         l = params["l"]
@@ -411,8 +412,12 @@ def closedloop_noisy_pendulum_test():
     diagram2.connect("step", "y", "controller", "ref")
     diagram2.connect("controller", "u", "plant", "u")
     diagram2.connect("plant", "y", "controller", "y")
-    diagram2.connect("noise", "y", "plant", "w")
+    # diagram2.connect("noise", "y", "plant", "w")
     diagram2.connect("noise2", "y", "plant", "v")
+
+    # External input
+    diagram2.add_input_port(1, "w", nominal_value=np.array([0.0]))
+    diagram2.connect("input", "w", "plant", "w")
 
     diagram2.plot_graphe()
 
@@ -506,6 +511,51 @@ def algebraic_loop():
 
 
 ######################################################################
+def diagram_in_a_diagram():
+
+    # Plant system
+    sys = Integrator()
+    sys.x0[0] = 20.0
+
+    # Controllers
+    ctl1 = PropController()
+    ctl1.params["Kp"] = 1.0
+    ctl2 = PropController()
+    ctl2.params["Kp"] = 1.0
+
+    # Source input
+    step = Step()
+    step.params["initial_value"] = np.array([0.0])
+    step.params["final_value"] = np.array([1.0])
+    step.params["step_time"] = 10.0
+
+    # # Diagram
+    diagram = DiagramSystem()
+
+    diagram.add_input_port(1, "y", nominal_value=np.array([0.0]))
+    diagram.add_subsystem(sys, "integrator1")
+    diagram.connect("input", "y", "integrator1", "u")
+
+    diagram.plot_graphe()
+
+    diagram2 = DiagramSystem()
+
+    diagram2.add_subsystem(step, "step")
+    diagram2.add_subsystem(sys, "integrator1")
+    diagram2.add_subsystem(diagram, "Diagram")
+
+    diagram2.connect("step", "y", "integrator1", "u")
+    diagram2.connect("integrator1", "y", "Diagram", "y")
+
+    diagram2.plot_graphe()
+
+    sim = Simulator(diagram2, t0=0, tf=20, n_steps=10000)
+    sim.solve(show=True)
+
+    return diagram
+
+
+######################################################################
 if __name__ == "__main__":
 
     # sys = system_test()
@@ -515,4 +565,5 @@ if __name__ == "__main__":
     # closedloop_pendulum_test()
     # closedloop_noisy_pendulum_test()
     # diagram = cascade_controllers_test()
-    diagram = algebraic_loop()
+    # diagram = algebraic_loop()
+    diagram_in_a_diagram()

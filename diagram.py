@@ -1,5 +1,6 @@
 import numpy as np
 from framework import System, VectorSignal
+from sources import Source
 
 
 ######################################################################
@@ -21,8 +22,10 @@ class DiagramSystem(System):
 
     ######################################################################
     def add_subsystem(self, sys, sys_id):
+
         self.subsystems[sys_id] = sys
         self.connections[sys_id] = {}
+
         for port_id, port in sys.inputs.items():
             self.connections[sys_id][port_id] = None  # No connection by default
 
@@ -82,6 +85,7 @@ class DiagramSystem(System):
 
     ######################################################################
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
+
         self.connections[target_sys_id][target_port_id] = (
             source_sys_id,
             source_port_id,
@@ -104,11 +108,21 @@ class DiagramSystem(System):
         try:
             import graphviz
         except ImportError:
-            print("graphviz is not available")
+            print("graphviz is not available, cannot plot the diagram")
             return None
 
         g = graphviz.Digraph(self.name, engine="dot")
         g.attr(rankdir="LR")
+
+        # Add input node
+        input_block = Source(0)  # This is a hack to use the get_block_html method
+        input_block.name = "Diagram"
+        input_block.outputs = self.inputs
+        g.node(
+            "input",
+            shape="none",
+            label="<" + input_block.get_block_html("Inputs") + ">",
+        )
 
         # Add nodes
         for i, (sys_id, sys) in enumerate(self.subsystems.items()):
@@ -137,8 +151,39 @@ class DiagramSystem(System):
 
     ######################################################################
     def get_local_state(self, x, sys_id):
+
         idx = self.state_index[sys_id]
         return x[idx[0] : idx[1]]
+
+    ######################################################################
+    def get_subsys_input_port(self, x, u, t, sys_id, port_id):
+
+        # Get the source of the signal
+        source = self.connections[sys_id][port_id]
+
+        # Check if the port is not connected
+        if source is None:
+            # Return the nominal value of the port
+            return self.subsystems[sys_id].inputs[port_id].get_signal(t)
+
+        # Source is connected to a system and port
+        source_sys_id, source_port_id = source
+
+        # Check if the source is an input port of the diagram itself
+        if source_sys_id == "input":
+            # Get the value from the diagram gloabl input vector
+            return self.get_port_values_from_u(u)[source_port_id]
+
+        # Else, the source is an output port of another subsystem
+        source_port = self.subsystems[source_sys_id].outputs[source_port_id]
+
+        # Collect signals needed to compute the source output
+        source_x = self.get_local_state(x, source_sys_id)
+        source_u = self.get_local_input(
+            x, u, t, source_sys_id, source_port.dependencies
+        )
+
+        return source_port.compute(source_x, source_u, t)
 
     ######################################################################
     def get_local_input(self, x, u, t, sys_id, dependencies=None):
@@ -166,37 +211,14 @@ class DiagramSystem(System):
         # For all input ports of the subsystem
         for port_id, port in sys.inputs.items():
 
-            # Get the source of the signal
-            source = self.connections[sys_id][port_id]
-
             # Check if the output port requires getting the signal from the input ports
             # If not required, the u vector is filled with nominal values
             if dependencies != None and port_id not in dependencies:
-                port_u = port.get_signal(t)
-
-            # Check if the port is not connected
-            # If not connected, the u vector is filled with nominal values
-            elif source is None:
-
-                # Default unconnected port signal
-                port_u = port.get_signal(t)
+                port_u = port.get_signal(t)  # Nominal value
 
             else:
-
-                # TODO: Add the option to connect to external input ports of the diagram
-                # This assume the source is another subsystem ouput port
-
-                source_sys_id, source_port_id = source
-                source_sys = self.subsystems[source_sys_id]
-                source_port = source_sys.outputs[source_port_id]
-
-                # Collect signals needed to compute the source output
-                source_x = self.get_local_state(x, source_sys_id)
-                source_u = self.get_local_input(
-                    x, u, t, source_sys_id, source_port.dependencies
-                )  # Recursive call, TODO check for algebraic loops
-
-                port_u = source_port.compute(source_x, source_u, t)
+                # Recursively get the input signal
+                port_u = self.get_subsys_input_port(x, u, t, sys_id, port_id)
 
             u = np.concatenate([u, port_u])
 
