@@ -222,8 +222,8 @@ class System:
         """
         input_signals = {}
         i = 0
-        for key, port in self.inputs.items():
-            input_signals[key] = u[i : i + port.dim]
+        for port_id, port in self.inputs.items():
+            input_signals[port_id] = u[i : i + port.dim]
             i += port.dim
         return input_signals
 

@@ -511,17 +511,20 @@ def algebraic_loop():
 
 
 ######################################################################
-def diagram_in_a_diagram():
+def solver_doing_weird_at_discontinuities():
 
     # Plant system
-    sys = Integrator()
-    sys.x0[0] = 20.0
+    sys1 = Integrator()
+    sys1.x0[0] = 20.0
 
-    # Controllers
-    ctl1 = PropController()
-    ctl1.params["Kp"] = 1.0
-    ctl2 = PropController()
-    ctl2.params["Kp"] = 1.0
+    sys2 = Integrator()
+    sys2.x0[0] = 20.0
+
+    # # Controllers
+    # ctl1 = PropController()
+    # ctl1.params["Kp"] = 1.0
+    # ctl2 = PropController()
+    # ctl2.params["Kp"] = 1.0
 
     # Source input
     step = Step()
@@ -529,30 +532,80 @@ def diagram_in_a_diagram():
     step.params["final_value"] = np.array([1.0])
     step.params["step_time"] = 10.0
 
-    # # Diagram
-    diagram = DiagramSystem()
+    # Baseline validation
+    test = DiagramSystem()
+    test.name = "test"
+    test.add_subsystem(step, "step")
+    test.add_subsystem(sys1, "integrator1")
+    test.add_subsystem(sys2, "integrator2")
+    test.connect("step", "y", "integrator2", "u")
+    test.connect("integrator2", "y", "integrator1", "u")
+    test.plot_graphe()
+    test.name = "double integrator with auto solver"
+    test.compute_trajectory()  # Doing weird at discontinuities
+    test.name = "double integrator with scipy solver"
+    test.compute_trajectory(solver="scipy")
+    test.name = "double integrator with custom fixed step euler"
+    test.compute_trajectory(solver="euler")
 
-    diagram.add_input_port(1, "y", nominal_value=np.array([0.0]))
-    diagram.add_subsystem(sys, "integrator1")
-    diagram.connect("input", "y", "integrator1", "u")
 
-    diagram.plot_graphe()
+######################################################################
+def diagram_in_a_diagram():
 
-    diagram2 = DiagramSystem()
+    # Plant system
+    sys1 = Integrator()
+    sys1.x0[0] = 20.0
 
-    diagram2.add_subsystem(step, "step")
-    diagram2.add_subsystem(sys, "integrator1")
-    diagram2.add_subsystem(diagram, "Diagram")
+    sys2 = Integrator()
+    sys2.x0[0] = 20.0
 
-    diagram2.connect("step", "y", "integrator1", "u")
-    diagram2.connect("integrator1", "y", "Diagram", "y")
+    # # Controllers
+    # ctl1 = PropController()
+    # ctl1.params["Kp"] = 1.0
+    # ctl2 = PropController()
+    # ctl2.params["Kp"] = 1.0
 
-    diagram2.plot_graphe()
+    # Source input
+    step = Step()
+    step.params["initial_value"] = np.array([0.0])
+    step.params["final_value"] = np.array([1.0])
+    step.params["step_time"] = 10.0
 
-    sim = Simulator(diagram2, t0=0, tf=20, n_steps=10000)
-    sim.solve(show=True)
+    # Baseline validation
+    test = DiagramSystem()
+    test.name = "test"
+    test.add_subsystem(step, "step")
+    test.add_subsystem(sys1, "integrator1")
+    test.add_subsystem(sys2, "integrator2")
+    test.connect("step", "y", "integrator2", "u")
+    test.connect("integrator2", "y", "integrator1", "u")
+    test.plot_graphe()
+    test.compute_trajectory()
 
-    return diagram
+    # # # Diagram
+    # diagram = DiagramSystem()
+
+    # diagram.add_input_port(1, "y", nominal_value=np.array([0.0]))
+    # diagram.add_subsystem(sys1, "integrator1")
+    # diagram.connect("input", "y", "integrator1", "u")
+
+    # diagram.plot_graphe()
+
+    # diagram2 = DiagramSystem()
+
+    # diagram2.add_subsystem(step, "step")
+    # diagram2.add_subsystem(sys2, "integrator2")
+    # diagram2.add_subsystem(diagram, "diagram")
+
+    # diagram2.connect("step", "y", "integrator2", "u")
+    # diagram2.connect("integrator2", "y", "diagram", "y")
+
+    # diagram2.plot_graphe()
+
+    # sim = Simulator(diagram2, t0=0, tf=20, n_steps=1000)
+    # sim.solve(show=True)
+
+    # return diagram, diagram2
 
 
 ######################################################################
@@ -565,5 +618,6 @@ if __name__ == "__main__":
     # closedloop_pendulum_test()
     # closedloop_noisy_pendulum_test()
     # diagram = cascade_controllers_test()
-    # diagram = algebraic_loop()
-    diagram_in_a_diagram()
+    # diagram = algebraic_loop() # TODO: Program auto check for algebraic loops
+    solver_doing_weird_at_discontinuities()  # TODO: Make fixed step solver for systems with discontinuities
+    # d1, d2 = diagram_in_a_diagram()

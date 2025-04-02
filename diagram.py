@@ -116,7 +116,7 @@ class DiagramSystem(System):
 
         # Add input node
         input_block = Source(0)  # This is a hack to use the get_block_html method
-        input_block.name = "Diagram"
+        input_block.name = ""
         input_block.outputs = self.inputs
         g.node(
             "input",
@@ -172,18 +172,25 @@ class DiagramSystem(System):
         # Check if the source is an input port of the diagram itself
         if source_sys_id == "input":
             # Get the value from the diagram gloabl input vector
-            return self.get_port_values_from_u(u)[source_port_id]
+            port_u = self.get_port_values_from_u(u)[source_port_id]
 
-        # Else, the source is an output port of another subsystem
-        source_port = self.subsystems[source_sys_id].outputs[source_port_id]
+        else:
+            # Else, the source is an output port of another subsystem
+            source_port = self.subsystems[source_sys_id].outputs[source_port_id]
 
-        # Collect signals needed to compute the source output
-        source_x = self.get_local_state(x, source_sys_id)
-        source_u = self.get_local_input(
-            x, u, t, source_sys_id, source_port.dependencies
+            # Collect signals needed to compute the source output
+            source_x = self.get_local_state(x, source_sys_id)
+            source_u = self.get_local_input(
+                x, u, t, source_sys_id, source_port.dependencies
+            )
+
+            port_u = source_port.compute(source_x, source_u, t)
+
+        print(
+            f"getting u={port_u} on edge from {source_sys_id}:{source_port_id} to {sys_id}:{port_id}"
         )
 
-        return source_port.compute(source_x, source_u, t)
+        return port_u
 
     ######################################################################
     def get_local_input(self, x, u, t, sys_id, dependencies=None):
@@ -206,7 +213,7 @@ class DiagramSystem(System):
 
         sys = self.subsystems[sys_id]
 
-        u = np.array([])
+        local_u = np.array([])
 
         # For all input ports of the subsystem
         for port_id, port in sys.inputs.items():
@@ -220,9 +227,9 @@ class DiagramSystem(System):
                 # Recursively get the input signal
                 port_u = self.get_subsys_input_port(x, u, t, sys_id, port_id)
 
-            u = np.concatenate([u, port_u])
+            local_u = np.concatenate([local_u, port_u])
 
-        return u
+        return local_u
 
     ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
@@ -244,6 +251,7 @@ class DiagramSystem(System):
                 sys_x = self.get_local_state(x, sys_id)
 
                 # Compute local state derivative
+                print(f"Comuting {sys_id} dynamic: dx=f({sys_x},{sys_u},{t})")
                 sys_dx = sys.f(sys_x, sys_u, t)
 
                 dx[idx : idx + sys.n] = sys_dx
