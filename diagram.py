@@ -160,7 +160,6 @@ class DiagramSystem(System):
 
         # If diagram has external outputs
         if not len(self.outputs) == 0:
-
             # Add input node block
             # This is a hack to use the get_block_html method
             output_block = System(0, 0, 0)
