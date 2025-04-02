@@ -114,17 +114,22 @@ class DiagramSystem(System):
         g = graphviz.Digraph(self.name, engine="dot")
         g.attr(rankdir="LR")
 
-        # Add input node
-        input_block = Source(0)  # This is a hack to use the get_block_html method
-        input_block.name = ""
-        input_block.outputs = self.inputs
-        g.node(
-            "input",
-            shape="none",
-            label="<" + input_block.get_block_html("Inputs") + ">",
-        )
+        # If diagram has external inputs
+        if not len(self.inputs) == 0:
 
-        # Add nodes
+            # Add input node block
+            # This is a hack to use the get_block_html method
+            input_block = System(0, 0, 0)
+            input_block.name = ""
+            input_block.inputs = {}
+            input_block.outputs = self.inputs
+            g.node(
+                "input",
+                shape="none",
+                label="<" + input_block.get_block_html("Inputs") + ">",
+            )
+
+        # Add subsystems nodes
         for i, (sys_id, sys) in enumerate(self.subsystems.items()):
 
             label = f"<{sys.get_block_html(sys_id)}>"
@@ -133,6 +138,21 @@ class DiagramSystem(System):
                 sys_id,
                 shape="none",
                 label=label,
+            )
+
+        # If diagram has external outputs
+        if not len(self.outputs) == 0:
+
+            # Add input node block
+            # This is a hack to use the get_block_html method
+            output_block = System(0, 0, 0)
+            output_block.name = ""
+            output_block.inputs = self.outputs
+            output_block.outputs = {}
+            g.node(
+                "output",
+                shape="none",
+                label="<" + output_block.get_block_html("Outputs") + ">",
             )
 
         # Add edges
