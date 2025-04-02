@@ -363,7 +363,7 @@ def closedloop_pendulum_test():
     diagram2.plot_graphe()
 
     sim = Simulator(diagram2, t0=0, tf=20, dt=0.01)
-    x_traj, u_traj, t_traj, y_traj = sim.solve(show=True)
+    sim.solve(show=True)
 
 
 ######################################################################
@@ -550,14 +550,14 @@ def solver_doing_weird_at_discontinuities():
 
 
 ######################################################################
-def diagram_in_a_diagram():
+def diagram_in_a_diagram(debug_print=False):
 
     # Plant system
     sys1 = Integrator()
     sys1.x0[0] = 0.0
 
     sys2 = Integrator()
-    sys2.x0[0] = 10.0
+    sys2.x0[0] = 1.0
 
     # # Controllers
     ctl1 = PropController()
@@ -571,37 +571,42 @@ def diagram_in_a_diagram():
 
     # Baseline validation
     test = DiagramSystem()
+    test.debug_print = debug_print
     test.name = "test"
     test.add_subsystem(step, "step")
     test.add_subsystem(ctl1, "ctl")
     test.add_subsystem(sys1, "integrator1")
     test.add_subsystem(sys2, "integrator2")
     test.connect("step", "y", "ctl", "ref")
-    test.connect("ctl", "u", "integrator2", "u")
-    test.connect("integrator2", "y", "integrator1", "u")
-    test.connect("integrator1", "y", "ctl", "y")
+    test.connect("ctl", "u", "integrator1", "u")
+    test.connect("integrator1", "y", "integrator2", "u")
+    test.connect("integrator2", "y", "ctl", "y")
     test.plot_graphe()
     test.compute_trajectory(dt=0.1, solver="euler")
 
     # # # Diagram
     diagram = DiagramSystem()
-    diagram.name = "internal"
-    diagram.add_input_port(1, "y", nominal_value=np.array([0.0]))
+    diagram.debug_print = debug_print
+    diagram.name = "DiagramSystem"
+    diagram.add_input_port(1, "u", nominal_value=np.array([0.0]))
     diagram.add_subsystem(sys1, "integrator1")
-    diagram.connect("input", "y", "integrator1", "u")
-    diagram.connect_new_output_port("integrator1", "y", "y")
+    diagram.add_subsystem(sys2, "integrator2")
+    diagram.connect("input", "u", "integrator1", "u")
+    diagram.connect("integrator1", "y", "integrator2", "u")
+    diagram.connect_new_output_port("integrator2", "y", "y")
 
     diagram.plot_graphe()
 
     diagram2 = DiagramSystem()
+    diagram2.debug_print = debug_print
 
     diagram2.add_subsystem(step, "step")
-    diagram2.add_subsystem(sys2, "integrator2")
-    diagram2.add_subsystem(diagram, "internal")
+    diagram2.add_subsystem(ctl1, "ctl")
+    diagram2.add_subsystem(diagram, "double")
 
-    diagram2.connect("step", "y", "integrator2", "u")
-    diagram2.connect("integrator2", "y", "internal", "y")
-
+    diagram2.connect("step", "y", "ctl", "ref")
+    diagram2.connect("ctl", "u", "double", "u")
+    diagram2.connect("double", "y", "ctl", "y")
     diagram2.plot_graphe()
     diagram2.compute_trajectory(dt=0.1, solver="euler")
 
@@ -611,13 +616,13 @@ def diagram_in_a_diagram():
 ######################################################################
 if __name__ == "__main__":
 
-    # sys = system_test()
-    # sim = simulator_test()
-    # dia = diagram_test()
-    # pendulum_test()
-    # closedloop_pendulum_test()
-    # closedloop_noisy_pendulum_test()
-    # diagram = cascade_controllers_test()
+    sys = system_test()
+    sim = simulator_test()
+    dia = diagram_test()
+    pendulum_test()
+    closedloop_pendulum_test()
+    closedloop_noisy_pendulum_test()
+    diagram = cascade_controllers_test()
     # diagram = algebraic_loop()  # TODO: Program auto check for algebraic loops
     # solver_doing_weird_at_discontinuities()  # TODO: Make fixed step solver for systems with discontinuities
-    test, d1, d2 = diagram_in_a_diagram()
+    test, d1, d2 = diagram_in_a_diagram(debug_print=False)

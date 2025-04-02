@@ -20,6 +20,8 @@ class DiagramSystem(System):
 
         self.recompute_input_properties()
 
+        self.debug_print = False
+
     ######################################################################
     def add_subsystem(self, sys, sys_id):
 
@@ -244,9 +246,10 @@ class DiagramSystem(System):
             # The signal at the input port is the output signal of the source port
             port_u = source_y
 
-        print(
-            f"getting u={port_u} on edge from {source_sys_id}:{source_port_id} to {sys_id}:{port_id}"
-        )
+        if self.debug_print:
+            print(
+                f"getting u={port_u} on edge from {source_sys_id}:{source_port_id} to {sys_id}:{port_id}"
+            )
 
         return port_u
 
@@ -309,7 +312,9 @@ class DiagramSystem(System):
                 sys_x = self.get_local_state(x, sys_id)
 
                 # Compute local state derivative
-                print(f"Comuting {sys_id} dynamic: dx=f({sys_x},{sys_u},{t})")
+                if self.debug_print:
+                    print(f"Comuting {sys_id} dynamic: dx=f({sys_x},{sys_u},{t})")
+
                 sys_dx = sys.f(sys_x, sys_u, t)
 
                 dx[idx : idx + sys.n] = sys_dx
