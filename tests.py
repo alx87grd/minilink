@@ -616,13 +616,13 @@ def diagram_in_a_diagram(debug_print=False):
 ######################################################################
 if __name__ == "__main__":
 
-    sys = system_test()
-    sim = simulator_test()
-    dia = diagram_test()
-    pendulum_test()
-    closedloop_pendulum_test()
-    closedloop_noisy_pendulum_test()
+    # sys = system_test()
+    # sim = simulator_test()
+    # dia = diagram_test()
+    # pendulum_test()
+    # closedloop_pendulum_test()
+    # closedloop_noisy_pendulum_test()
     diagram = cascade_controllers_test()
     # diagram = algebraic_loop()  # TODO: Program auto check for algebraic loops
     # solver_doing_weird_at_discontinuities()  # TODO: Make fixed step solver for systems with discontinuities
-    test, d1, d2 = diagram_in_a_diagram(debug_print=False)
+    # test, d1, d2 = diagram_in_a_diagram(debug_print=False)
