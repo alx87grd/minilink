@@ -560,10 +560,8 @@ def diagram_in_a_diagram():
     sys2.x0[0] = 10.0
 
     # # Controllers
-    # ctl1 = PropController()
-    # ctl1.params["Kp"] = 1.0
-    # ctl2 = PropController()
-    # ctl2.params["Kp"] = 1.0
+    ctl1 = PropController()
+    ctl1.params["Kp"] = 1.0
 
     # Source input
     step = Step()
@@ -575,10 +573,13 @@ def diagram_in_a_diagram():
     test = DiagramSystem()
     test.name = "test"
     test.add_subsystem(step, "step")
+    test.add_subsystem(ctl1, "ctl")
     test.add_subsystem(sys1, "integrator1")
     test.add_subsystem(sys2, "integrator2")
-    test.connect("step", "y", "integrator2", "u")
+    test.connect("step", "y", "ctl", "ref")
+    test.connect("ctl", "u", "integrator2", "u")
     test.connect("integrator2", "y", "integrator1", "u")
+    test.connect("integrator1", "y", "ctl", "y")
     test.plot_graphe()
     test.compute_trajectory(dt=0.1, solver="euler")
 
@@ -588,6 +589,7 @@ def diagram_in_a_diagram():
     diagram.add_input_port(1, "y", nominal_value=np.array([0.0]))
     diagram.add_subsystem(sys1, "integrator1")
     diagram.connect("input", "y", "integrator1", "u")
+    diagram.connect_new_output_port("integrator1", "y", "y")
 
     diagram.plot_graphe()
 
@@ -616,6 +618,6 @@ if __name__ == "__main__":
     # closedloop_pendulum_test()
     # closedloop_noisy_pendulum_test()
     # diagram = cascade_controllers_test()
-    # diagram = algebraic_loop() # TODO: Program auto check for algebraic loops
+    # diagram = algebraic_loop()  # TODO: Program auto check for algebraic loops
     # solver_doing_weird_at_discontinuities()  # TODO: Make fixed step solver for systems with discontinuities
     test, d1, d2 = diagram_in_a_diagram()

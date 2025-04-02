@@ -103,6 +103,24 @@ class DiagramSystem(System):
         )
 
     ######################################################################
+    def connect_new_output_port(self, source_sys_id, source_port_id, output_port_id):
+
+        port = self.subsystems[source_sys_id].outputs[source_port_id]
+
+        # Define the compute function for the output port
+        def compute(x, u, t):
+            return self.compute_subsys_output_port(
+                x, u, t, source_sys_id, source_port_id
+            )
+
+        self.add_output_port(port.dim, output_port_id, compute)
+
+        if "output" not in self.connections:
+            self.connections["output"] = {}  # Create the output dictionary
+
+        self.connect(source_sys_id, source_port_id, "output", output_port_id)
+
+    ######################################################################
     def get_graphe(self):
 
         try:
@@ -167,6 +185,15 @@ class DiagramSystem(System):
                         sys_id + ":" + port_id + ":w",
                     )
 
+        # Add edges to the output node
+        if "output" in self.connections:
+            for port_id, edge in self.connections["output"].items():
+                if edge is not None:
+                    g.edge(
+                        edge[0] + ":" + edge[1] + ":e",
+                        "output" + ":" + port_id + ":w",
+                    )
+
         return g
 
     ######################################################################
@@ -174,6 +201,21 @@ class DiagramSystem(System):
 
         idx = self.state_index[sys_id]
         return x[idx[0] : idx[1]]
+
+    ######################################################################
+    def compute_subsys_output_port(self, x, u, t, sys_id, port_id):
+
+        # Get the subsystem output port
+        port = self.subsystems[sys_id].outputs[port_id]
+
+        # Collect signals needed to compute the output
+        local_x = self.get_local_state(x, sys_id)
+        local_u = self.get_local_input(x, u, t, sys_id, port.dependencies)
+
+        # Compute the output signal of the port
+        port_y = port.compute(local_x, local_u, t)
+
+        return port_y
 
     ######################################################################
     def get_subsys_input_port(self, x, u, t, sys_id, port_id):
@@ -189,22 +231,19 @@ class DiagramSystem(System):
         # Source is connected to a system and port
         source_sys_id, source_port_id = source
 
-        # Check if the source is an input port of the diagram itself
+        # Check if the source is an external input of the diagram
         if source_sys_id == "input":
             # Get the value from the diagram gloabl input vector
             port_u = self.get_port_values_from_u(u)[source_port_id]
 
         else:
             # Else, the source is an output port of another subsystem
-            source_port = self.subsystems[source_sys_id].outputs[source_port_id]
-
-            # Collect signals needed to compute the source output
-            source_x = self.get_local_state(x, source_sys_id)
-            source_u = self.get_local_input(
-                x, u, t, source_sys_id, source_port.dependencies
+            source_y = self.compute_subsys_output_port(
+                x, u, t, source_sys_id, source_port_id
             )
 
-            port_u = source_port.compute(source_x, source_u, t)
+            # The signal at the input port is the output signal of the source port
+            port_u = source_y
 
         print(
             f"getting u={port_u} on edge from {source_sys_id}:{source_port_id} to {sys_id}:{port_id}"
