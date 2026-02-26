@@ -89,8 +89,8 @@ class TestAdvancedPlotting(unittest.TestCase):
                 self.diagram,
                 traj_plus,
                 [
-                    {"state": "plant:x[0]", "label": "Plant State"},
-                    {"output": "ctl:u", "label": "Control Effort"},
+                    {"sys": "plant", "state": "x[0]", "label": "Plant State"},
+                    {"sys": "ctl", "output": "u", "label": "Control Effort"},
                 ],
             )
             self.assertIsNotNone(fig)

@@ -150,8 +150,8 @@ def plot_signals(sys, traj, signals):
         A list of signal specification dictionaries. Each dictionary represents one subplot.
         Example:
         [
-            {"state": ["plant:theta", "plant:theta_dot"]},
-            {"output": "controller:u", "label": "Control Action"},
+            {"sys": "plant", "state": ["theta", "theta_dot"]},
+            {"sys": "controller", "output": "u", "label": "Control Action"},
             {"input": "w", "label": "Disturbance"}
         ]
     """
@@ -187,12 +187,22 @@ def plot_signals(sys, traj, signals):
                 if not isinstance(labels, list):
                     labels = [labels]
 
+                sys_id = signal_req.get("sys")
+
                 for k, item in enumerate(items):
                     lbl = labels[k] if k < len(labels) else item
 
+                    lookup_item = f"{sys_id}:{item}" if sys_id else item
+
                     if key == "state":
-                        if item in sys.state.labels:
+                        if lookup_item in sys.state.labels:
+                            state_idx = sys.state.labels.index(lookup_item)
+                        elif item in sys.state.labels:
                             state_idx = sys.state.labels.index(item)
+                        else:
+                            state_idx = -1
+
+                        if state_idx >= 0:
                             axis.plot(
                                 t_traj,
                                 traj.x[state_idx, :],
@@ -201,14 +211,16 @@ def plot_signals(sys, traj, signals):
                                 label=lbl,
                             )
                         else:
-                            print(f"Warning: State '{item}' not found.")
+                            print(
+                                f"Warning: State '{lookup_item}' or '{item}' not found."
+                            )
 
                     elif key == "output":
                         if (
                             hasattr(traj, "internal_signals")
-                            and item in traj.internal_signals
+                            and lookup_item in traj.internal_signals
                         ):
-                            data = traj.internal_signals[item]
+                            data = traj.internal_signals[lookup_item]
                             for d in range(data.shape[0]):
                                 l = f"{lbl}[{d}]" if data.shape[0] > 1 else lbl
                                 axis.plot(
@@ -220,13 +232,13 @@ def plot_signals(sys, traj, signals):
                                 )
                         else:
                             print(
-                                f"Warning: Output '{item}' not found in internal_signals."
+                                f"Warning: Output '{lookup_item}' not found in internal_signals."
                             )
 
                     elif key == "input":
                         inp_labels, _ = sys.get_all_input_labels_and_units()
-                        if item in inp_labels:
-                            u_idx = inp_labels.index(item)
+                        if lookup_item in inp_labels:
+                            u_idx = inp_labels.index(lookup_item)
                             axis.plot(
                                 t_traj,
                                 traj.u[u_idx, :],
@@ -236,7 +248,7 @@ def plot_signals(sys, traj, signals):
                             )
                         else:
                             print(
-                                f"Warning: Input '{item}' not found in system inputs."
+                                f"Warning: Input '{lookup_item}' not found in system inputs."
                             )
 
         axis.grid(True, linestyle="--", alpha=0.6)

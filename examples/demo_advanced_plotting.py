@@ -70,11 +70,12 @@ if __name__ == "__main__":
         traj_plus,
         signals=[
             {
+                "sys": "plant",
                 "state": ["theta", "theta_dot"],
-                "label": ["Pendulum Angle (rad)", "Angular Velocity (rad/s)"],
             },
-            {"output": "controller:u", "label": "Control Action (Nm)"},
-            {"output": "step:y", "label": "Reference Goal"},
+            {"sys": "plant", "output": "y"},
+            {"sys": "controller", "output": "u"},
+            {"sys": "step", "output": "y"},
         ],
     )
     print("Demo complete!")
