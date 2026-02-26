@@ -37,6 +37,45 @@ class Trajectory:
         assert self.x.shape[1] == self.time_steps, "x has the wrong dimension"
         assert self.u.shape[1] == self.time_steps, "u has the wrong dimension"
 
+    #############################
+    def get_x(self, t):
+        """
+        Get the state trajectory at time t
+        """
+
+        # Check if t is in the trajectory
+        if t < self.t[0]:
+            idx = 0
+        elif t > self.t[-1]:
+            idx = -1
+        else:
+            # Find the index of the closest time step
+            idx = np.argmin(np.abs(self.t - t))
+
+        return self.x[:, idx]
+
+    #############################
+    def get_u(self, t):
+        """
+        Get the input trajectory at time t
+        """
+
+        # Check if t is in the trajectory
+        if t < self.t[0]:
+            idx = 0
+        elif t > self.t[-1]:
+            idx = -1
+        else:
+            # Find the index of the closest time step
+            idx = np.argmin(np.abs(self.t - t))
+
+        return self.u[:, idx]
+
+    #############################
+    def compute_internal_output(diagram):
+
+        pass
+
 
 ############################################################
 def plot_trajectory(sys, traj):
