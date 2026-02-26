@@ -240,9 +240,11 @@ class Simulator:
             for i, t in enumerate(times):
 
                 u = sys.get_u_from_input_ports(t)
-                x = x_traj[:, t]
+                x = x_traj[:, i]
                 x_next = sys.f(x, u, t)
-                x_traj[:, i + 1] = x_next
+                
+                if i < n_pts - 1:
+                    x_traj[:, i + 1] = x_next
 
                 u_traj[:, i] = u
 

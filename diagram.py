@@ -21,6 +21,8 @@ class DiagramSystem(System):
         self.recompute_input_properties()
 
         self.debug_print = False
+        self.compiled = False
+        self.port_execution_order = []
 
     ######################################################################
     def add_subsystem(self, sys, sys_id):
@@ -254,6 +256,91 @@ class DiagramSystem(System):
         return port_u
 
     ######################################################################
+    def compile(self):
+        """
+        Compiles the diagram by determining the valid execution order of all block output ports.
+        
+        This method performs a Depth-First Search (DFS) traverse over the dependencies of each out port.
+        It achieves two main goals:
+        1. Topological Sorting: It builds a `port_execution_order` list which guarantees that blocks 
+           are evaluated in order of their dependencies. This allows for fast sequential evaluation 
+           instead of recursive evaluation.
+        2. Algebraic Loop Detection: It detects cycles that contain only direct feedthrough paths 
+           (where an output port depends directly on an input port, which traces back to itself). 
+           If a cycle is detected, an exception is raised because the system cannot be evaluated.
+        """
+        
+        # 'visited' keeps track of all ports that have been fully processed and added to the execution order.
+        visited = set()
+        # 'stack' keeps track of ports currently in the recursion stack to detect cycles.
+        stack = set()
+        # The list that will store ports in the order they should be executed (dependencies first).
+        self.port_execution_order = []
+        
+        def dfs(sys_id, port_id):
+            """
+            Recursive helper function to traverse the diagram backwards, from outputs to their inputs.
+            
+            Parameters
+            ----------
+            sys_id : str
+                The ID of the subsystem being visited.
+            port_id : str
+                The ID of the output port within the subsystem being visited.
+            """
+            node = (sys_id, port_id)
+            
+            # If the current node is already in the recursion stack, we've found a cycle!
+            # Since DFS only checks direct input dependencies of the output, this confirms an algebraic loop.
+            if node in stack:
+                raise RuntimeError(f"Algebraic loop detected involving direct feedthrough at {sys_id}:{port_id}")
+            
+            # If the node was already processed completely (all its dependencies are resolved), skip it.
+            if node in visited:
+                return
+            
+            # Mark the current node as being processed (add to the recursion stack)
+            stack.add(node)
+            
+            # Retrieve the output port to figure out what it depends on internally
+            port = self.subsystems[sys_id].outputs.get(port_id)
+            if port is None:
+                # If the port does not exist for some reason, finish processing it
+                stack.remove(node)
+                visited.add(node)
+                return
+                
+            # Determine which inputs of the subsystem directly affect this specific output
+            deps = port.dependencies
+            sys_inputs = self.subsystems[sys_id].inputs
+            # If explicit dependencies are not set for the port, assume it depends on ALL system inputs
+            input_deps = deps if deps is not None else sys_inputs.keys()
+            
+            # Subsystem output depends on specific inputs. We trace those inputs backwards to their sources.
+            for in_port_id in input_deps:
+                # Find where this input is connected from
+                source = self.connections[sys_id].get(in_port_id)
+                if source is not None:
+                    src_sys_id, src_port_id = source
+                    # If the source is another block in the diagram (not a global input), recursively visit it
+                    if src_sys_id != "input":
+                        dfs(src_sys_id, src_port_id)
+
+            # Once all dependencies (sources) of this node are resolved, we are done with it
+            stack.remove(node)
+            visited.add(node)
+            # Add to the execution order. Since we use post-order traversal, 
+            # dependencies are appended first, making it a valid topological order.
+            self.port_execution_order.append(node)
+            
+        # Try to visit every output port of every subsystem to ensure the entire graph is compiled
+        for sys_id, sys in self.subsystems.items():
+            for port_id in sys.outputs:
+                dfs(sys_id, port_id)
+        
+        self.compiled = True
+
+    ######################################################################
     def get_local_input(self, x, u, t, sys_id, dependencies=None):
         """
         Get the input signal for a given subsystem
@@ -274,7 +361,7 @@ class DiagramSystem(System):
 
         sys = self.subsystems[sys_id]
 
-        local_u = np.array([])
+        local_u_list = []
 
         # For all input ports of the subsystem
         for port_id, port in sys.inputs.items():
@@ -288,9 +375,12 @@ class DiagramSystem(System):
                 # Recursively get the input signal
                 port_u = self.get_subsys_input_port(x, u, t, sys_id, port_id)
 
-            local_u = np.concatenate([local_u, port_u])
+            local_u_list.append(port_u)
 
-        return local_u
+        if len(local_u_list) == 0:
+            return np.array([])
+            
+        return np.concatenate(local_u_list)
 
     ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
@@ -317,6 +407,92 @@ class DiagramSystem(System):
 
                 sys_dx = sys.f(sys_x, sys_u, t)
 
+                dx[idx : idx + sys.n] = sys_dx
+                idx += sys.n
+
+        return dx
+
+    ######################################################################
+    def f_fast(self, x, u, t=0, params=None) -> np.ndarray:
+        """
+        Evaluate the diagram state derivative without recursive traversal,
+        by sequentially evaluating blocks based on the topological port execution order.
+        """
+        if not self.compiled:
+            self.compile()
+
+        # 1. Compute all output port signals in topological order
+        signal_bus = {}
+        for sys_id, port_id in self.port_execution_order:
+            sys = self.subsystems[sys_id]
+            port = sys.outputs[port_id]
+            
+            local_x = self.get_local_state(x, sys_id)
+            
+            # Gather inputs for THIS port based on its dependencies
+            deps = port.dependencies
+            sys_inputs = sys.inputs
+            input_deps = deps if deps is not None else sys_inputs.keys()
+            
+            local_u_list = []
+            for in_port_id in sys_inputs.keys():
+                if deps is not None and in_port_id not in deps:
+                    # Input not needed by this output port
+                    port_u = sys_inputs[in_port_id].get_signal(t)
+                else:
+                    # Look up from signal bus or external inputs
+                    source = self.connections[sys_id].get(in_port_id)
+                    if source is None:
+                        port_u = sys_inputs[in_port_id].get_signal(t)
+                    else:
+                        src_sys_id, src_port_id = source
+                        if src_sys_id == "input":
+                            port_u = self.get_port_values_from_u(u)[src_port_id]
+                        else:
+                            port_u = signal_bus[(src_sys_id, src_port_id)]
+                
+                local_u_list.append(port_u)
+            
+            if len(local_u_list) == 0:
+                local_u = np.array([])
+            else:
+                local_u = np.concatenate(local_u_list)
+                
+            port_y = port.compute(local_x, local_u, t)
+            signal_bus[(sys_id, port_id)] = port_y
+
+        # 2. Compute state derivatives for all subsystems
+        dx = np.zeros(self.n)
+        idx = 0
+        
+        for sys_id, sys in self.subsystems.items():
+            if sys.n > 0:
+                local_x = self.get_local_state(x, sys_id)
+                
+                # Gather ALL inputs for the subsystem's f()
+                local_u_list = []
+                for in_port_id in sys.inputs.keys():
+                    source = self.connections[sys_id].get(in_port_id)
+                    if source is None:
+                        port_u = sys.inputs[in_port_id].get_signal(t)
+                    else:
+                        src_sys_id, src_port_id = source
+                        if src_sys_id == "input":
+                            port_u = self.get_port_values_from_u(u)[src_port_id]
+                        else:
+                            # All outputs in the diagram have been evaluated
+                            port_u = signal_bus[(src_sys_id, src_port_id)]
+                    local_u_list.append(port_u)
+                
+                if len(local_u_list) == 0:
+                    local_u = np.array([])
+                else:
+                    local_u = np.concatenate(local_u_list)
+                    
+                if self.debug_print:
+                    print(f"Topological Computing {sys_id} dynamic: dx=f({local_x},{local_u},{t})")
+
+                sys_dx = sys.f(local_x, local_u, t)
                 dx[idx : idx + sys.n] = sys_dx
                 idx += sys.n
 
