@@ -1,6 +1,10 @@
 import numpy as np
-from graphical import plot_graphviz
-from analysis import Simulator
+from minilink.graphical.graphe import (
+    plot_graphviz,
+    get_system_block_html,
+    get_system_graphe,
+)
+from minilink.core.analysis import Simulator
 
 
 ######################################################################
@@ -78,7 +82,7 @@ class OutputPort(VectorSignal):
     """
 
     ##############################################
-    def __init__(self, dim=1, id="y", function=None, dependencies=None):
+    def __init__(self, dim=1, id="y", function=None, dependencies="all"):
 
         VectorSignal.__init__(self, dim=dim, id=id)
 
@@ -105,7 +109,7 @@ class System:
         self.p = p
 
         # Name
-        self.label = "System"
+        self.name = "System"
 
         # State properties
         self.state = VectorSignal(n, "x")
@@ -117,7 +121,7 @@ class System:
         self.inputs = {}
         self.add_input_port(self.m, "u")
         self.outputs = {}
-        self.add_output_port(self.p, "y", function=self.h)
+        self.add_output_port(self.p, "y", function=self.h, dependencies="all")
 
         # Parameters dictionary
         self.params = {}
@@ -156,7 +160,7 @@ class System:
         self.recompute_input_properties()
 
     ######################################################################
-    def add_output_port(self, dim, id, function=None, dependencies=[]):
+    def add_output_port(self, dim, id, function=None, dependencies="all"):
         self.outputs[id] = OutputPort(dim, id, function, dependencies)
 
     ######################################################################
@@ -227,86 +231,31 @@ class System:
             i += port.dim
         return input_signals
 
+    ##########################
+
+    # Shortcut functions
+
     ######################################################################
-    def get_block_html(self, html="sys1"):
+    def get_block_html(self, html_id="sys1"):
         """
         Get the HTML representation of the block for the label in the diagram
-
-        Parameters
-        ----------
-        label : str
-        the label to display on the block
-
-        Returns
-        -------
-        str
-        the HTML representation of the block
         """
-
-        n_ports_out = len(self.outputs)
-        n_ports_in = len(self.inputs)
-
-        html = (
-            f'<TABLE BORDER="0" CELLSPACING="0">\n'
-            f"<TR>\n"
-            f'<TD align="left" BORDER="1" COLSPAN="2">{self.name}::{html}</TD>\n'
-            f"</TR>\n"
-        )
-
-        for j in range(np.max((n_ports_out, n_ports_in))):
-            html += f"<TR>\n"
-
-            if j < n_ports_in and j < n_ports_out:
-                port_id = list(self.inputs.keys())[j]
-                html += f'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
-                port_id = list(self.outputs.keys())[j]
-                html += f'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
-
-            elif j < n_ports_in:
-                port_id = list(self.inputs.keys())[j]
-                html += f'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
-                html += f'<TD BORDER="1"> </TD>\n'
-
-            elif j < n_ports_out:
-                port_id = list(self.outputs.keys())[j]
-                html += f'<TD BORDER="1"> </TD>\n'
-                html += f'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
-
-            html += f"</TR>\n"
-        html += f"</TABLE>"
-
-        return html
+        return get_system_block_html(self, html_id)
 
     ######################################################################
     def print_html(self):
 
         try:
             import IPython.display as display
+
+            display.display(display.HTML(self.get_block_html()))
         except ImportError:
             print("IPython is not available")
             return
 
-        display.display(display.HTML(self.get_block_html()))
-
     ######################################################################
     def get_graphe(self):
-
-        try:
-            import graphviz
-        except ImportError:
-            print("graphviz is not available")
-            return None
-
-        g = graphviz.Digraph(self.name, engine="dot")
-        g.attr(rankdir="LR")
-
-        g.node(
-            self.name,
-            shape="none",
-            label=f"<{self.get_block_html()}>",
-        )
-
-        return g
+        return get_system_graphe(self)
 
     ######################################################################
     def _repr_svg_(self):
@@ -352,6 +301,9 @@ class DynamicSystem(System):
         System.__init__(self, n, m, p)
 
         self.name = "DynamicSystem"
+
+        # By default, a dynamic system's output 'y' only depends on its state 'x', not 'u'
+        self.outputs["y"].dependencies = ()
 
         self.add_output_port(self.n, "x", function=self.compute_state)
 

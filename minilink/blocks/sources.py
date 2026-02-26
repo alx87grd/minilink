@@ -1,5 +1,5 @@
 import numpy as np
-from framework import System
+from minilink.core.framework import System
 
 
 ######################################################################

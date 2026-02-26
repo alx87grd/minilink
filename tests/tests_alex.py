@@ -1,7 +1,8 @@
-from framework import DynamicSystem, StaticSystem
-from sources import Step, WhiteNoise
-from diagram import DiagramSystem
-from analysis import Simulator, plot_trajectory
+from minilink.core.framework import DynamicSystem, StaticSystem
+from minilink.blocks.sources import Step, WhiteNoise
+from minilink.core.diagram import DiagramSystem
+from minilink.core.analysis import Simulator
+from minilink.graphical.plotting import plot_trajectory
 import numpy as np
 
 
@@ -195,7 +196,7 @@ def simulator_test():
 
     traj = sim.solve(show=True)
 
-    plot_trajectory(sys1, traj)
+    # plot_trajectory(sys1, traj)
 
     np.set_printoptions(precision=2, suppress=True)
     print(f"Time vector:\n {traj.t}")
@@ -504,6 +505,8 @@ def algebraic_loop():
 
     diagram.plot_graphe()
 
+    # diagram.check_algebraic_loops()
+
     sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
     sim.solve(show=True)
 
@@ -621,7 +624,7 @@ if __name__ == "__main__":
     # dia = diagram_test()
     # pendulum_test()
     # closedloop_pendulum_test()
-    # closedloop_noisy_pendulum_test()
+    closedloop_noisy_pendulum_test()
     diagram = cascade_controllers_test()
     # diagram = algebraic_loop()  # TODO: Program auto check for algebraic loops
     # solver_doing_weird_at_discontinuities()  # TODO: Make fixed step solver for systems with discontinuities

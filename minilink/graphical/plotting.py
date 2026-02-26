@@ -1,6 +1,5 @@
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import sys as python_system
 
 ###############################################################################
@@ -55,45 +54,64 @@ print("Matplotlib interactive:", matplotlib.is_interactive())
 print("Matplotlib figure blocking:", figure_blocking)
 
 
-###############################################################################
-###############################################################################
-###############################################################################
+############################################################
+def plot_trajectory(sys, traj):
 
+    # Extract the system dimensions and labels
+    n = sys.n
+    m = sys.m
+    name = sys.name
+    state_labels, state_units = sys.state.labels, sys.state.units
+    input_labels, input_units = sys.get_all_input_labels_and_units()
 
-def plot_graphviz(graphe, show_inline=False, show_pdf=True, filename=None):
-    """
-    Display a graphviz object in the notebook
-    """
-    if show_inline:
-        import IPython.display as display
+    # Extract the trajectory data
+    t_traj = traj.t
+    x_traj = traj.x
+    u_traj = traj.u
 
-        display.display(graphe)
+    # Compute the number of plots
+    n_plots = n + m
 
-    if filename is None:
+    # Create the figure
+    fig, ax = plt.subplots(
+        n_plots,
+        1,
+        figsize=(10, 2 * n_plots),
+        sharex=True,
+        # dpi=default_dpi,
+        frameon=True,
+    )
+    if fig.canvas and hasattr(fig.canvas, "manager") and fig.canvas.manager:
         try:
-            import tempfile
+            fig.canvas.manager.set_window_title("Trajectory for " + name)
+        except Exception:
+            pass
 
-            filename = tempfile.mktemp("_" + graphe.name + ".gv")
-        except ImportError:
-            print("tempfile is not available")
-            filename = "temp_" + graphe.name + ".gv"
-    else:
-        filename = filename
+    if n_plots == 1:
+        ax = [ax]
 
-    graphe.render(filename=filename, view=show_pdf)
+    # Plot the signals
+    idx = 0
+    for i in range(n):
+        ax[idx].plot(t_traj, x_traj[i, :], "b")
+        ax[idx].set_ylabel(
+            f"{state_labels[i]}[{state_units[i]}]", fontsize=default_fontsize
+        )
+        ax[idx].grid()
+        ax[idx].tick_params(labelsize=default_fontsize)
+        idx += 1
+    for i in range(m):
+        ax[idx].plot(t_traj, u_traj[i, :], "r")
+        ax[idx].set_ylabel(
+            f"{input_labels[i]} {input_units[i]}", fontsize=default_fontsize
+        )
+        ax[idx].grid()
+        ax[idx].tick_params(labelsize=default_fontsize)
+        idx += 1
 
+    ax[-1].set_xlabel("Time [s]", fontsize=default_fontsize)
 
-###############################################################################
-######################################################################
-if __name__ == "__main__":
+    # Show the figure
+    plt.show(block=figure_blocking)
 
-    import numpy as np
-    import graphviz
-    import matplotlib.pyplot as plt
-    import IPython.display as display
-
-    graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")
-    graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")
-    graphe.node("A", label="A", shape="circle")
-
-    plot_graphviz(graphe, show_inline=True, show_pdf=True, filename="aaa")
+    return fig, ax

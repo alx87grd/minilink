@@ -1,8 +1,6 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 import logging
-import graphical
-import matplotlib.pyplot as plt
 
 
 ######################################################################
@@ -36,64 +34,6 @@ class Trajectory:
 
         assert self.x.shape[1] == self.time_steps, "x has the wrong dimension"
         assert self.u.shape[1] == self.time_steps, "u has the wrong dimension"
-
-
-############################################################
-def plot_trajectory(sys, traj):
-
-    # Extract the system dimensions and labels
-    n = sys.n
-    m = sys.m
-    name = sys.name
-    state_labels, state_units = sys.state.labels, sys.state.units
-    input_labels, input_units = sys.get_all_input_labels_and_units()
-
-    # Extract the trajectory data
-    t_traj = traj.t
-    x_traj = traj.x
-    u_traj = traj.u
-
-    # Compute the number of plots
-    n_plots = n + m
-
-    # Create the figure
-    fig, ax = plt.subplots(
-        n_plots,
-        1,
-        figsize=(10, 2 * n_plots),
-        sharex=True,
-        # dpi=graphical.default_dpi,
-        frameon=True,
-    )
-    fig.canvas.manager.set_window_title("Trajectory for " + name)
-    if n_plots == 1:
-        ax = [ax]
-
-    # Plot the signals
-    idx = 0
-    for i in range(n):
-        ax[idx].plot(t_traj, x_traj[i, :], "b")
-        ax[idx].set_ylabel(
-            f"{state_labels[i]}[{state_units[i]}]", fontsize=graphical.default_fontsize
-        )
-        ax[idx].grid()
-        ax[idx].tick_params(labelsize=graphical.default_fontsize)
-        idx += 1
-    for i in range(m):
-        ax[idx].plot(t_traj, u_traj[i, :], "r")
-        ax[idx].set_ylabel(
-            f"{input_labels[i]} {input_units[i]}", fontsize=graphical.default_fontsize
-        )
-        ax[idx].grid()
-        ax[idx].tick_params(labelsize=graphical.default_fontsize)
-        idx += 1
-
-    ax[-1].set_xlabel("Time [s]", fontsize=graphical.default_fontsize)
-
-    # Show the figure
-    plt.show(block=graphical.figure_blocking)
-
-    return fig, ax
 
 
 ######################################################################
@@ -172,6 +112,8 @@ class Simulator:
     ############################################################
     def solve(self, show=False, **solver_args):
 
+        #
+
         # Local variables names
         sys = self.sys
         times = self.t
@@ -223,7 +165,7 @@ class Simulator:
 
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
-                
+
                 if hasattr(sys, "f_fast"):
                     dx = sys.f_fast(x, u, t)
                 else:
@@ -247,12 +189,12 @@ class Simulator:
 
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
-                
+
                 if hasattr(sys, "f_fast"):
                     x_next = sys.f_fast(x, u, t)
                 else:
                     x_next = sys.f(x, u, t)
-                
+
                 if i < n_pts - 1:
                     x_traj[:, i + 1] = x_next
 
@@ -262,6 +204,8 @@ class Simulator:
 
         # Plot the trajectory
         if show:
+            from minilink.graphical.plotting import plot_trajectory
+
             plot_trajectory(sys, traj)
 
         return traj

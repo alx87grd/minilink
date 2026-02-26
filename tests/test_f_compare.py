@@ -1,7 +1,11 @@
 import time
 import numpy as np
-from framework import System
-from diagram import DiagramSystem
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from minilink.core.framework import System
+from minilink.core.diagram import DiagramSystem
 
 ######################################################################
 # Test Subsystems
@@ -25,7 +29,7 @@ class SimpleIntegrator(System):
         super().__init__(1, 1, 1)
         self.name = id_str
         self.add_input_port(1, "u")
-        self.add_output_port(1, "x", function=self.compute_state, dependencies=None)
+        self.add_output_port(1, "x", function=self.compute_state, dependencies=())
 
     def compute_state(self, x, u, t=0, params=None):
         return x
@@ -41,7 +45,7 @@ class MultiInputNode(System):
         self.in_ports = in_ports
         for p in range(in_ports):
             self.add_input_port(1, f"u{p}")
-        self.add_output_port(1, "x", function=self.compute_state, dependencies=None)
+        self.add_output_port(1, "x", function=self.compute_state, dependencies=())
 
     def compute_state(self, x, u, t=0, params=None):
         return x

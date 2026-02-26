@@ -1,6 +1,6 @@
 import numpy as np
-from framework import System, VectorSignal
-from sources import Source
+from minilink.core.framework import System, VectorSignal
+from minilink.graphical.graphe import get_diagram_graphe
 
 
 ######################################################################
@@ -108,6 +108,8 @@ class DiagramSystem(System):
                 + target_port_id
             )
 
+        self.compiled = False
+
     ######################################################################
     def connect_new_output_port(self, source_sys_id, source_port_id, output_port_id):
 
@@ -128,78 +130,7 @@ class DiagramSystem(System):
 
     ######################################################################
     def get_graphe(self):
-
-        try:
-            import graphviz
-        except ImportError:
-            print("graphviz is not available, cannot plot the diagram")
-            return None
-
-        g = graphviz.Digraph(self.name, engine="dot")
-        g.attr(rankdir="LR")
-
-        # If diagram has external inputs
-        if not len(self.inputs) == 0:
-
-            # Add input node block
-            # This is a hack to use the get_block_html method
-            input_block = System(0, 0, 0)
-            input_block.name = ""
-            input_block.inputs = {}
-            input_block.outputs = self.inputs
-            g.node(
-                "input",
-                shape="none",
-                label="<" + input_block.get_block_html("Inputs") + ">",
-            )
-
-        # Add subsystems nodes
-        for i, (sys_id, sys) in enumerate(self.subsystems.items()):
-
-            label = f"<{sys.get_block_html(sys_id)}>"
-
-            g.node(
-                sys_id,
-                shape="none",
-                label=label,
-            )
-
-        # If diagram has external outputs
-        if not len(self.outputs) == 0:
-            # Add input node block
-            # This is a hack to use the get_block_html method
-            output_block = System(0, 0, 0)
-            output_block.name = ""
-            output_block.inputs = self.outputs
-            output_block.outputs = {}
-            g.node(
-                "output",
-                shape="none",
-                label="<" + output_block.get_block_html("Outputs") + ">",
-            )
-
-        # Add edges
-        for sys_id, sys in self.subsystems.items():
-            for port_id in sys.inputs:
-
-                edge = self.connections[sys_id][port_id]
-
-                if edge is not None:
-                    g.edge(
-                        edge[0] + ":" + edge[1] + ":e",
-                        sys_id + ":" + port_id + ":w",
-                    )
-
-        # Add edges to the output node
-        if "output" in self.connections:
-            for port_id, edge in self.connections["output"].items():
-                if edge is not None:
-                    g.edge(
-                        edge[0] + ":" + edge[1] + ":e",
-                        "output" + ":" + port_id + ":w",
-                    )
-
-        return g
+        return get_diagram_graphe(self)
 
     ######################################################################
     def get_local_state(self, x, sys_id):
@@ -258,7 +189,6 @@ class DiagramSystem(System):
         return port_u
 
     ######################################################################
-    ######################################################################
     def check_algebraic_loops(self):
         """
         Detects cycles that contain only direct feedthrough paths and computes
@@ -294,8 +224,11 @@ class DiagramSystem(System):
             if port is not None:
                 deps = port.dependencies
                 sys_inputs = self.subsystems[sys_id].inputs
-                # Assume all inputs are dependencies if not explicitly specified
-                input_deps = deps if deps is not None else sys_inputs.keys()
+                # If dependencies is "all", it depends on all input ports
+                if deps == "all":
+                    input_deps = sys_inputs.keys()
+                else:
+                    input_deps = deps
 
                 # Traverse upstream for each direct feedthrough dependency
                 for in_port_id in input_deps:
@@ -355,7 +288,7 @@ class DiagramSystem(System):
             # For each input port needed by this output port, determine where its signal comes from
             for in_port_id, in_port in sys_inputs.items():
                 # If dependencies are defined and this input port isn't one of them, use the nominal value
-                if deps is not None and in_port_id not in deps:
+                if deps != "all" and in_port_id not in deps:
                     source_type = 0  # nominal
                     source_val = in_port.nominal_value
                 else:
@@ -458,7 +391,7 @@ class DiagramSystem(System):
         self.compiled = True
 
     ######################################################################
-    def get_local_input(self, x, u, t, sys_id, dependencies=None):
+    def get_local_input(self, x, u, t, sys_id, dependencies="all"):
         """
         Get the input signal for a given subsystem
 
@@ -485,7 +418,7 @@ class DiagramSystem(System):
 
             # Check if the output port requires getting the signal from the input ports
             # If not required, the u vector is filled with nominal values
-            if dependencies != None and port_id not in dependencies:
+            if dependencies != "all" and port_id not in dependencies:
                 port_u = port.get_signal(t)  # Nominal value
 
             else:
