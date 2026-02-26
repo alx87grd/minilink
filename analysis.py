@@ -186,6 +186,8 @@ class Simulator:
 
             # Define the ODE
             def f(t, x):
+                if hasattr(sys, "f_fast"):
+                    return sys.f_fast(x, np.array([]), t)
                 return sys.fsim(t, x)
 
             # Solve the ODE
@@ -221,7 +223,11 @@ class Simulator:
 
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
-                dx = sys.f(x, u, t)
+                
+                if hasattr(sys, "f_fast"):
+                    dx = sys.f_fast(x, u, t)
+                else:
+                    dx = sys.f(x, u, t)
 
                 if i < n_pts - 1:
                     dt = times[i + 1] - times[i]
@@ -241,7 +247,11 @@ class Simulator:
 
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
-                x_next = sys.f(x, u, t)
+                
+                if hasattr(sys, "f_fast"):
+                    x_next = sys.f_fast(x, u, t)
+                else:
+                    x_next = sys.f(x, u, t)
                 
                 if i < n_pts - 1:
                     x_traj[:, i + 1] = x_next

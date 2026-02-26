@@ -22,6 +22,7 @@ class DiagramSystem(System):
 
         self.debug_print = False
         self.compiled = False
+        self.graphe_building_verbose = True
         self.port_execution_order = []
 
     ######################################################################
@@ -95,16 +96,17 @@ class DiagramSystem(System):
             source_port_id,
         )
 
-        print(
-            "Connected "
-            + source_sys_id
-            + ":"
-            + source_port_id
-            + " to "
-            + target_sys_id
-            + ":"
-            + target_port_id
-        )
+        if self.graphe_building_verbose:
+            print(
+                "Connected "
+                + source_sys_id
+                + ":"
+                + source_port_id
+                + " to "
+                + target_sys_id
+                + ":"
+                + target_port_id
+            )
 
     ######################################################################
     def connect_new_output_port(self, source_sys_id, source_port_id, output_port_id):
@@ -256,88 +258,203 @@ class DiagramSystem(System):
         return port_u
 
     ######################################################################
-    def compile(self):
+    ######################################################################
+    def check_algebraic_loops(self):
         """
-        Compiles the diagram by determining the valid execution order of all block output ports.
-        
-        This method performs a Depth-First Search (DFS) traverse over the dependencies of each out port.
-        It achieves two main goals:
-        1. Topological Sorting: It builds a `port_execution_order` list which guarantees that blocks 
-           are evaluated in order of their dependencies. This allows for fast sequential evaluation 
-           instead of recursive evaluation.
-        2. Algebraic Loop Detection: It detects cycles that contain only direct feedthrough paths 
-           (where an output port depends directly on an input port, which traces back to itself). 
-           If a cycle is detected, an exception is raised because the system cannot be evaluated.
+        Detects cycles that contain only direct feedthrough paths and computes
+        the topological execution order of ports.
         """
-        
-        # 'visited' keeps track of all ports that have been fully processed and added to the execution order.
         visited = set()
-        # 'stack' keeps track of ports currently in the recursion stack to detect cycles.
-        stack = set()
-        # The list that will store ports in the order they should be executed (dependencies first).
+        stack = []
+        stack_set = set()
         self.port_execution_order = []
-        
+
+        # Depth-First Search to detect cycles and build topological order
         def dfs(sys_id, port_id):
-            """
-            Recursive helper function to traverse the diagram backwards, from outputs to their inputs.
-            
-            Parameters
-            ----------
-            sys_id : str
-                The ID of the subsystem being visited.
-            port_id : str
-                The ID of the output port within the subsystem being visited.
-            """
             node = (sys_id, port_id)
-            
-            # If the current node is already in the recursion stack, we've found a cycle!
-            # Since DFS only checks direct input dependencies of the output, this confirms an algebraic loop.
-            if node in stack:
-                raise RuntimeError(f"Algebraic loop detected involving direct feedthrough at {sys_id}:{port_id}")
-            
-            # If the node was already processed completely (all its dependencies are resolved), skip it.
+
+            # Check if this port is already in the recursion stack (indicating a cycle)
+            if node in stack_set:
+                # Found a cycle! Track back to the start of the cycle for an informative error message
+                cycle_start_idx = stack.index(node)
+                cycle_path = stack[cycle_start_idx:] + [node]
+                cycle_str = " -> ".join([f"{s}:{p}" for s, p in cycle_path])
+                raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
+
+            # If we've already fully explored this port, skip it
             if node in visited:
                 return
-            
-            # Mark the current node as being processed (add to the recursion stack)
-            stack.add(node)
-            
-            # Retrieve the output port to figure out what it depends on internally
-            port = self.subsystems[sys_id].outputs.get(port_id)
-            if port is None:
-                # If the port does not exist for some reason, finish processing it
-                stack.remove(node)
-                visited.add(node)
-                return
-                
-            # Determine which inputs of the subsystem directly affect this specific output
-            deps = port.dependencies
-            sys_inputs = self.subsystems[sys_id].inputs
-            # If explicit dependencies are not set for the port, assume it depends on ALL system inputs
-            input_deps = deps if deps is not None else sys_inputs.keys()
-            
-            # Subsystem output depends on specific inputs. We trace those inputs backwards to their sources.
-            for in_port_id in input_deps:
-                # Find where this input is connected from
-                source = self.connections[sys_id].get(in_port_id)
-                if source is not None:
-                    src_sys_id, src_port_id = source
-                    # If the source is another block in the diagram (not a global input), recursively visit it
-                    if src_sys_id != "input":
-                        dfs(src_sys_id, src_port_id)
 
-            # Once all dependencies (sources) of this node are resolved, we are done with it
-            stack.remove(node)
+            # Mark as currently visiting
+            stack.append(node)
+            stack_set.add(node)
+
+            port = self.subsystems[sys_id].outputs.get(port_id)
+            # If the output port exists, explore its feedthrough dependencies
+            if port is not None:
+                deps = port.dependencies
+                sys_inputs = self.subsystems[sys_id].inputs
+                # Assume all inputs are dependencies if not explicitly specified
+                input_deps = deps if deps is not None else sys_inputs.keys()
+
+                # Traverse upstream for each direct feedthrough dependency
+                for in_port_id in input_deps:
+                    source = self.connections[sys_id].get(in_port_id)
+                    # If the input is connected to another subsystem's output, explore it
+                    if source is not None:
+                        src_sys_id, src_port_id = source
+                        # External diagram inputs are terminal nodes in this search
+                        if src_sys_id != "input":
+                            dfs(src_sys_id, src_port_id)
+
+            # Cleanup recursion stack and mark as visited
+            stack.pop()
+            stack_set.remove(node)
             visited.add(node)
-            # Add to the execution order. Since we use post-order traversal, 
-            # dependencies are appended first, making it a valid topological order.
+            # Port is ready for computation once all its dependencies are visited
             self.port_execution_order.append(node)
-            
-        # Try to visit every output port of every subsystem to ensure the entire graph is compiled
+
+        # Iterate through all subsystems and their output ports to start DFS traversals
         for sys_id, sys in self.subsystems.items():
             for port_id in sys.outputs:
                 dfs(sys_id, port_id)
-        
+
+    ######################################################################
+    def build_execution_plan(self):
+        """
+        Builds a flattened execution plan that avoids string Dictionary lookups
+        and object traversal during the simulation loop.
+        """
+        # 1. Map all outputs to a global signal flat array
+        self.output_slices = {}  # (sys_id, port_id) -> slice
+        current_idx = 0
+        # Iterate through all subsystems to assign a slice of the global signal array to each output port
+        for sys_id, sys in self.subsystems.items():
+            for port_id, port in sys.outputs.items():
+                dim = port.dim
+                self.output_slices[(sys_id, port_id)] = slice(
+                    current_idx, current_idx + dim
+                )
+                current_idx += dim
+
+        self.global_signals = np.zeros(current_idx)
+
+        # 2. Pre-allocate input buffers for each compute/f call
+        # We also map external inputs (u) indices
+        self.port_execution_plan = []
+        # Build the execution plan for output ports in the topological order determined by DFS
+        for sys_id, port_id in self.port_execution_order:
+            sys = self.subsystems[sys_id]
+            port = sys.outputs[port_id]
+
+            deps = port.dependencies
+            sys_inputs = sys.inputs
+
+            port_gather_sources = []
+            port_u_dim = 0
+            # For each input port needed by this output port, determine where its signal comes from
+            for in_port_id, in_port in sys_inputs.items():
+                # If dependencies are defined and this input port isn't one of them, use the nominal value
+                if deps is not None and in_port_id not in deps:
+                    source_type = 0  # nominal
+                    source_val = in_port.nominal_value
+                else:
+                    source = self.connections[sys_id].get(in_port_id)
+                    # If the port is not connected, use its nominal value
+                    if source is None:
+                        source_type = 0  # nominal
+                        source_val = in_port.nominal_value
+                    else:
+                        src_sys_id, src_port_id = source
+                        # If the source is an external input to the diagram, map it to the 'u' vector
+                        if src_sys_id == "input":
+                            source_type = 1  # external_u
+                            u_idx = 0
+                            # Search for the external input port index in the global input dictionary
+                            for pid, p in self.inputs.items():
+                                if pid == src_port_id:
+                                    source_val = slice(u_idx, u_idx + p.dim)
+                                    break
+                                u_idx += p.dim
+                        else:
+                            # If the source is another subsystem's output, map it to the global signal array
+                            source_type = 2  # global_signals
+                            source_val = self.output_slices[(src_sys_id, src_port_id)]
+
+                dim = in_port.dim
+                port_gather_sources.append((source_type, source_val, dim))
+                port_u_dim += dim
+
+            out_slice = self.output_slices[(sys_id, port_id)]
+            # If the subsystem has state, identify its slice in the global state vector
+            local_x_slice = (
+                slice(self.state_index[sys_id][0], self.state_index[sys_id][1])
+                if sys.n > 0
+                else slice(0, 0)
+            )
+
+            # Pack all information needed to compute this output port during simulation
+            self.port_execution_plan.append(
+                (
+                    port.compute,
+                    local_x_slice,
+                    port_gather_sources,
+                    out_slice,
+                    port_u_dim,
+                )
+            )
+
+        self.state_execution_plan = []
+        # Build the execution plan for state derivatives (f) for each subsystem
+        for sys_id, sys in self.subsystems.items():
+            # Only subsystems with state need a derivative calculation
+            if sys.n > 0:
+                sys_gather_sources = []
+                sys_u_dim = 0
+                # Determine signal sources for all inputs of the subsystem needed for its 'f' call
+                for in_port_id, in_port in sys.inputs.items():
+                    source = self.connections[sys_id].get(in_port_id)
+                    # If not connected, use the nominal value
+                    if source is None:
+                        source_type = 0  # nominal
+                        source_val = in_port.nominal_value
+                    else:
+                        src_sys_id, src_port_id = source
+                        # Map to external diagram inputs
+                        if src_sys_id == "input":
+                            source_type = 1  # external_u
+                            u_idx = 0
+                            # Search for the external input port index
+                            for pid, p in self.inputs.items():
+                                if pid == src_port_id:
+                                    source_val = slice(u_idx, u_idx + p.dim)
+                                    break
+                                u_idx += p.dim
+                        else:
+                            # Map to the global signal array for internal connections
+                            source_type = 2  # global_signals
+                            source_val = self.output_slices[(src_sys_id, src_port_id)]
+
+                    dim = in_port.dim
+                    sys_gather_sources.append((source_type, source_val, dim))
+                    sys_u_dim += dim
+
+                # Identify the subsystem's slice in the global state vector
+                local_x_slice = slice(
+                    self.state_index[sys_id][0], self.state_index[sys_id][1]
+                )
+                # Pack all information needed to compute the state derivative during simulation
+                self.state_execution_plan.append(
+                    (sys.f, local_x_slice, sys_gather_sources, sys_u_dim)
+                )
+
+    ######################################################################
+    def compile(self):
+        """
+        Compiles the diagram for fast execution.
+        """
+        self.check_algebraic_loops()
+        self.build_execution_plan()
         self.compiled = True
 
     ######################################################################
@@ -379,7 +496,7 @@ class DiagramSystem(System):
 
         if len(local_u_list) == 0:
             return np.array([])
-            
+
         return np.concatenate(local_u_list)
 
     ######################################################################
@@ -413,242 +530,74 @@ class DiagramSystem(System):
         return dx
 
     ######################################################################
+    ######################################################################
     def f_fast(self, x, u, t=0, params=None) -> np.ndarray:
-        """
-        Evaluate the diagram state derivative without recursive traversal,
-        by sequentially evaluating blocks based on the topological port execution order.
-        """
-        if not self.compiled:
-            self.compile()
-
-        # 1. Compute all output port signals in topological order
-        signal_bus = {}
-        for sys_id, port_id in self.port_execution_order:
-            sys = self.subsystems[sys_id]
-            port = sys.outputs[port_id]
-            
-            local_x = self.get_local_state(x, sys_id)
-            
-            # Gather inputs for THIS port based on its dependencies
-            deps = port.dependencies
-            sys_inputs = sys.inputs
-            input_deps = deps if deps is not None else sys_inputs.keys()
-            
-            local_u_list = []
-            for in_port_id in sys_inputs.keys():
-                if deps is not None and in_port_id not in deps:
-                    # Input not needed by this output port
-                    port_u = sys_inputs[in_port_id].get_signal(t)
-                else:
-                    # Look up from signal bus or external inputs
-                    source = self.connections[sys_id].get(in_port_id)
-                    if source is None:
-                        port_u = sys_inputs[in_port_id].get_signal(t)
-                    else:
-                        src_sys_id, src_port_id = source
-                        if src_sys_id == "input":
-                            port_u = self.get_port_values_from_u(u)[src_port_id]
-                        else:
-                            port_u = signal_bus[(src_sys_id, src_port_id)]
-                
-                local_u_list.append(port_u)
-            
-            if len(local_u_list) == 0:
-                local_u = np.array([])
-            else:
-                local_u = np.concatenate(local_u_list)
-                
-            port_y = port.compute(local_x, local_u, t)
-            signal_bus[(sys_id, port_id)] = port_y
-
-        # 2. Compute state derivatives for all subsystems
-        dx = np.zeros(self.n)
-        idx = 0
-        
-        for sys_id, sys in self.subsystems.items():
-            if sys.n > 0:
-                local_x = self.get_local_state(x, sys_id)
-                
-                # Gather ALL inputs for the subsystem's f()
-                local_u_list = []
-                for in_port_id in sys.inputs.keys():
-                    source = self.connections[sys_id].get(in_port_id)
-                    if source is None:
-                        port_u = sys.inputs[in_port_id].get_signal(t)
-                    else:
-                        src_sys_id, src_port_id = source
-                        if src_sys_id == "input":
-                            port_u = self.get_port_values_from_u(u)[src_port_id]
-                        else:
-                            # All outputs in the diagram have been evaluated
-                            port_u = signal_bus[(src_sys_id, src_port_id)]
-                    local_u_list.append(port_u)
-                
-                if len(local_u_list) == 0:
-                    local_u = np.array([])
-                else:
-                    local_u = np.concatenate(local_u_list)
-                    
-                if self.debug_print:
-                    print(f"Topological Computing {sys_id} dynamic: dx=f({local_x},{local_u},{t})")
-
-                sys_dx = sys.f(local_x, local_u, t)
-                dx[idx : idx + sys.n] = sys_dx
-                idx += sys.n
-
-        return dx
-
-    ######################################################################
-    def compile_super_fast(self):
-        """
-        Builds a flattened execution plan that avoids string Dictionary lookups
-        and object traversal during the simulation loop. It uses a single global signal array.
-        """
-        if not self.compiled:
-            self.compile()
-
-        # 1. Map all outputs to a global signal flat array and allocate it
-        self.output_slices = {} # (sys_id, port_id) -> slice
-        current_idx = 0
-        for sys_id, sys in self.subsystems.items():
-            for port_id, port in sys.outputs.items():
-                dim = port.dim
-                self.output_slices[(sys_id, port_id)] = slice(current_idx, current_idx + dim)
-                current_idx += dim
-                
-        self.global_signals = np.zeros(current_idx)
-        
-        self.port_execution_plan = []
-        
-        for sys_id, port_id in self.port_execution_order:
-            sys = self.subsystems[sys_id]
-            port = sys.outputs[port_id]
-            
-            deps = port.dependencies
-            sys_inputs = sys.inputs
-            
-            port_gather_sources = []
-            port_u_dim = 0
-            for in_port_id, in_port in sys_inputs.items():
-                if deps is not None and in_port_id not in deps:
-                    source_type = "nominal"
-                    source_val = None
-                else:
-                    source = self.connections[sys_id].get(in_port_id)
-                    if source is None:
-                        source_type = "nominal"
-                        source_val = None
-                    else:
-                        src_sys_id, src_port_id = source
-                        if src_sys_id == "input":
-                            source_type = "external_u"
-                            source_val = src_port_id
-                        else:
-                            source_type = "global_signals"
-                            source_val = self.output_slices[(src_sys_id, src_port_id)]
-                
-                dim = in_port.dim
-                port_gather_sources.append((source_type, source_val, in_port, dim))
-                port_u_dim += dim
-                
-            out_slice = self.output_slices[(sys_id, port_id)]
-            local_x_slice = slice(self.state_index[sys_id][0], self.state_index[sys_id][1]) if sys.n > 0 else slice(0, 0)
-            
-            self.port_execution_plan.append((
-                port.compute,
-                local_x_slice,
-                port_gather_sources,
-                out_slice,
-                port_u_dim
-            ))
-            
-        self.state_execution_plan = []
-        
-        for sys_id, sys in self.subsystems.items():
-            if sys.n > 0:
-                sys_gather_sources = []
-                sys_u_dim = 0
-                for in_port_id, in_port in sys.inputs.items():
-                    source = self.connections[sys_id].get(in_port_id)
-                    if source is None:
-                        source_type = "nominal"
-                        source_val = None
-                    else:
-                        src_sys_id, src_port_id = source
-                        if src_sys_id == "input":
-                            source_type = "external_u"
-                            source_val = src_port_id
-                        else:
-                            source_type = "global_signals"
-                            source_val = self.output_slices[(src_sys_id, src_port_id)]
-                            
-                    dim = in_port.dim
-                    sys_gather_sources.append((source_type, source_val, in_port, dim))
-                    sys_u_dim += dim
-                    
-                local_x_slice = slice(self.state_index[sys_id][0], self.state_index[sys_id][1])
-                self.state_execution_plan.append((
-                    sys.f,
-                    local_x_slice,
-                    sys_gather_sources,
-                    sys_u_dim
-                ))
-                
-        self.compiled_super_fast = True
-
-    ######################################################################
-    def f_super_fast(self, x, u, t=0, params=None) -> np.ndarray:
         """
         Hyper-optimized simulation step. No strings, no dicts, just arrays!
         """
-        if not getattr(self, "compiled_super_fast", False):
-            self.compile_super_fast()
-            
+        if not self.compiled:
+            self.compile()
+
         global_signals = self.global_signals
-        
-        external_u_dict = self.get_port_values_from_u(u) if len(u) > 0 else {}
-        
+
         # 1. Compute all output port signals in topological order
-        for compute_func, local_x_slice, gather_sources, out_slice, u_dim in self.port_execution_plan:
+        # This pass ensures all signals are ready before computing state derivatives
+        for (
+            compute_func,
+            local_x_slice,
+            gather_sources,
+            out_slice,
+            u_dim,
+        ) in self.port_execution_plan:
             local_x = x[local_x_slice]
-            
+
+            # Prepare the local input vector for the subsystem's output calculation
             if u_dim == 0:
                 local_u = np.array([])
             else:
                 local_u = np.empty(u_dim)
                 idx = 0
-                for src_type, src_val, in_port, dim in gather_sources:
-                    if src_type == "global_signals":
-                        local_u[idx:idx+dim] = global_signals[src_val]
-                    elif src_type == "nominal":
-                        local_u[idx:idx+dim] = in_port.get_signal(t)
-                    elif src_type == "external_u":
-                        local_u[idx:idx+dim] = external_u_dict.get(src_val, 0)
+                # Efficiently gather signal values from their pre-mapped sources
+                for src_type, src_val, dim in gather_sources:
+                    # Case 2: Source is an output from another subsystem (internal connection)
+                    if src_type == 2:  # global_signals
+                        local_u[idx : idx + dim] = global_signals[src_val]
+                    # Case 0: Source is not connected or uses a constant value
+                    elif src_type == 0:  # nominal
+                        local_u[idx : idx + dim] = src_val
+                    # Case 1: Source is an external input to the whole diagram
+                    elif src_type == 1:  # external_u
+                        local_u[idx : idx + dim] = u[src_val]
                     idx += dim
-                    
+
+            # Execute the port's compute function and store the result in the global signals array
             global_signals[out_slice] = compute_func(local_x, local_u, t)
-            
+
         # 2. Compute state derivatives
+        # This pass updates the dx vector for all subsystems with state
         dx = np.zeros(self.n)
         for f_func, local_x_slice, gather_sources, u_dim in self.state_execution_plan:
             local_x = x[local_x_slice]
-            
+
+            # Prepare the local input vector for the subsystem's f (dynamic) calculation
             if u_dim == 0:
                 local_u = np.array([])
             else:
                 local_u = np.empty(u_dim)
                 idx = 0
-                for src_type, src_val, in_port, dim in gather_sources:
-                    if src_type == "global_signals":
-                        local_u[idx:idx+dim] = global_signals[src_val]
-                    elif src_type == "nominal":
-                        local_u[idx:idx+dim] = in_port.get_signal(t)
-                    elif src_type == "external_u":
-                        local_u[idx:idx+dim] = external_u_dict.get(src_val, 0)
+                # Gather signals similarly to the output pass
+                for src_type, src_val, dim in gather_sources:
+                    if src_type == 2:  # global_signals
+                        local_u[idx : idx + dim] = global_signals[src_val]
+                    elif src_type == 0:  # nominal
+                        local_u[idx : idx + dim] = src_val
+                    elif src_type == 1:  # external_u
+                        local_u[idx : idx + dim] = u[src_val]
                     idx += dim
-                    
+
+            # Execute the subsystem's dynamic function and store results in the global derivative vector
             dx[local_x_slice] = f_func(local_x, local_u, t)
-            
+
         return dx
 
 
