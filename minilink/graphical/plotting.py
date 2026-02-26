@@ -76,9 +76,8 @@ def plot_trajectory(sys, traj):
     fig, ax = plt.subplots(
         n_plots,
         1,
-        figsize=(10, 2 * n_plots),
+        figsize=(8, 1.8 * n_plots),
         sharex=True,
-        # dpi=default_dpi,
         frameon=True,
     )
     if fig.canvas and hasattr(fig.canvas, "manager") and fig.canvas.manager:
@@ -90,23 +89,42 @@ def plot_trajectory(sys, traj):
     if n_plots == 1:
         ax = [ax]
 
+    fig.subplots_adjust(hspace=0.15)  # Tighter subplots
+
     # Plot the signals
     idx = 0
     for i in range(n):
-        ax[idx].plot(t_traj, x_traj[i, :], "b")
-        ax[idx].set_ylabel(
-            f"{state_labels[i]}[{state_units[i]}]", fontsize=default_fontsize
+        ax[idx].plot(
+            t_traj, x_traj[i, :], "b", linewidth=1.5, alpha=0.8, label=state_labels[i]
         )
-        ax[idx].grid()
+        ylabel_text = (
+            f"{state_labels[i]}\n[{state_units[i]}]"
+            if state_units[i]
+            else f"{state_labels[i]}"
+        )
+        ax[idx].set_ylabel(
+            ylabel_text, fontsize=default_fontsize, multialignment="center"
+        )
+        ax[idx].grid(True, linestyle="--", alpha=0.6)
         ax[idx].tick_params(labelsize=default_fontsize)
+        ax[idx].legend(loc="upper right")
         idx += 1
+
     for i in range(m):
-        ax[idx].plot(t_traj, u_traj[i, :], "r")
-        ax[idx].set_ylabel(
-            f"{input_labels[i]} {input_units[i]}", fontsize=default_fontsize
+        ax[idx].plot(
+            t_traj, u_traj[i, :], "r", linewidth=1.5, alpha=0.8, label=input_labels[i]
         )
-        ax[idx].grid()
+        ylabel_text = (
+            f"{input_labels[i]}\n[{input_units[i]}]"
+            if input_units[i]
+            else f"{input_labels[i]}"
+        )
+        ax[idx].set_ylabel(
+            ylabel_text, fontsize=default_fontsize, multialignment="center"
+        )
+        ax[idx].grid(True, linestyle="--", alpha=0.6)
         ax[idx].tick_params(labelsize=default_fontsize)
+        ax[idx].legend(loc="upper right")
         idx += 1
 
     ax[-1].set_xlabel("Time [s]", fontsize=default_fontsize)
@@ -114,4 +132,117 @@ def plot_trajectory(sys, traj):
     # Show the figure
     plt.show(block=figure_blocking)
 
+    return fig, ax
+
+
+############################################################
+def plot_signals(sys, traj, signals):
+    """
+    Plots specifically requested internal or external signals on a dynamic number of subplots.
+
+    Parameters
+    ----------
+    sys : System
+        The minilink system (e.g. DiagramSystem)
+    traj : Trajectory
+        The simulated trajectory object
+    signals : list of dict
+        A list of signal specification dictionaries. Each dictionary represents one subplot.
+        Example:
+        [
+            {"state": ["plant:theta", "plant:theta_dot"]},
+            {"output": "controller:u", "label": "Control Action"},
+            {"input": "w", "label": "Disturbance"}
+        ]
+    """
+    n_plots = len(signals)
+    if n_plots == 0:
+        return None, None
+
+    fig, ax = plt.subplots(
+        n_plots, 1, figsize=(8, 2.0 * n_plots), sharex=True, frameon=True
+    )
+    if n_plots == 1:
+        ax = [ax]
+
+    if fig.canvas and hasattr(fig.canvas, "manager") and fig.canvas.manager:
+        try:
+            fig.canvas.manager.set_window_title("Signal Plot for " + sys.name)
+        except Exception:
+            pass
+
+    fig.subplots_adjust(hspace=0.2)
+    t_traj = traj.t
+
+    for idx, signal_req in enumerate(signals):
+        axis = ax[idx]
+
+        for key in ["state", "output", "input"]:
+            if key in signal_req:
+                items = signal_req[key]
+                if not isinstance(items, list):
+                    items = [items]
+
+                labels = signal_req.get("label", items)
+                if not isinstance(labels, list):
+                    labels = [labels]
+
+                for k, item in enumerate(items):
+                    lbl = labels[k] if k < len(labels) else item
+
+                    if key == "state":
+                        if item in sys.state.labels:
+                            state_idx = sys.state.labels.index(item)
+                            axis.plot(
+                                t_traj,
+                                traj.x[state_idx, :],
+                                linewidth=1.5,
+                                alpha=0.8,
+                                label=lbl,
+                            )
+                        else:
+                            print(f"Warning: State '{item}' not found.")
+
+                    elif key == "output":
+                        if (
+                            hasattr(traj, "internal_signals")
+                            and item in traj.internal_signals
+                        ):
+                            data = traj.internal_signals[item]
+                            for d in range(data.shape[0]):
+                                l = f"{lbl}[{d}]" if data.shape[0] > 1 else lbl
+                                axis.plot(
+                                    t_traj,
+                                    data[d, :],
+                                    linewidth=1.5,
+                                    alpha=0.8,
+                                    label=l,
+                                )
+                        else:
+                            print(
+                                f"Warning: Output '{item}' not found in internal_signals."
+                            )
+
+                    elif key == "input":
+                        inp_labels, _ = sys.get_all_input_labels_and_units()
+                        if item in inp_labels:
+                            u_idx = inp_labels.index(item)
+                            axis.plot(
+                                t_traj,
+                                traj.u[u_idx, :],
+                                linewidth=1.5,
+                                alpha=0.8,
+                                label=lbl,
+                            )
+                        else:
+                            print(
+                                f"Warning: Input '{item}' not found in system inputs."
+                            )
+
+        axis.grid(True, linestyle="--", alpha=0.6)
+        axis.tick_params(labelsize=default_fontsize)
+        axis.legend(loc="upper right")
+
+    ax[-1].set_xlabel("Time [s]", fontsize=default_fontsize)
+    plt.show(block=figure_blocking)
     return fig, ax

@@ -37,6 +37,75 @@ class Trajectory:
 
 
 ######################################################################
+def compute_internal_signals(diagram, traj):
+    """
+    Reconstructs internal signals of a DiagramSystem from a simulated trajectory.
+    Adds a dictionary `internal_signals` to the trajectory object containing time-series data
+    for every output port of every subsystem.
+    """
+    if not hasattr(diagram, "port_execution_plan"):
+        return traj
+
+    if not diagram.compiled:
+        diagram.compile()
+
+    times = traj.t
+    n_pts = len(times)
+
+    # Initialize the internal_signals dict
+    # Maps "sys_id:port_id" to a numpy array of shape (dim, n_pts)
+    internal_signals = {}
+    for sys_id, sys in diagram.subsystems.items():
+        for port_id, port in sys.outputs.items():
+            internal_signals[f"{sys_id}:{port_id}"] = np.zeros((port.dim, n_pts))
+
+    # Iterate through each time step
+    for i, t in enumerate(times):
+        x_i = traj.x[:, i]
+        u_i = traj.u[:, i]
+
+        global_signals = diagram.global_signals
+
+        # 1. Compute all output port signals in topological order
+        for (
+            compute_func,
+            local_x_slice,
+            gather_sources,
+            out_slice,
+            u_dim,
+        ) in diagram.port_execution_plan:
+            local_x = x_i[local_x_slice]
+
+            if u_dim == 0:
+                local_u = np.array([])
+            else:
+                local_u = np.empty(u_dim)
+                idx = 0
+                for src_type, src_val, dim in gather_sources:
+                    if src_type == 2:  # global_signals
+                        local_u[idx : idx + dim] = global_signals[src_val]
+                    elif src_type == 0:  # nominal
+                        local_u[idx : idx + dim] = src_val
+                    elif src_type == 1:  # external_u
+                        local_u[idx : idx + dim] = u_i[src_val]
+                    idx += dim
+
+            # Execute the port's compute function
+            global_signals[out_slice] = compute_func(local_x, local_u, t)
+
+        # Copy the results to internal_signals
+        for sys_id, sys in diagram.subsystems.items():
+            for port_id, port in sys.outputs.items():
+                out_slice = diagram.output_slices[(sys_id, port_id)]
+                internal_signals[f"{sys_id}:{port_id}"][:, i] = global_signals[
+                    out_slice
+                ]
+
+    traj.internal_signals = internal_signals
+    return traj
+
+
+######################################################################
 class Simulator:
     def __init__(
         self, sys, t0=0, tf=10, n_steps=None, dt=None, solver="scipy", verbose=True
