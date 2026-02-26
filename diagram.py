@@ -498,6 +498,159 @@ class DiagramSystem(System):
 
         return dx
 
+    ######################################################################
+    def compile_super_fast(self):
+        """
+        Builds a flattened execution plan that avoids string Dictionary lookups
+        and object traversal during the simulation loop. It uses a single global signal array.
+        """
+        if not self.compiled:
+            self.compile()
+
+        # 1. Map all outputs to a global signal flat array and allocate it
+        self.output_slices = {} # (sys_id, port_id) -> slice
+        current_idx = 0
+        for sys_id, sys in self.subsystems.items():
+            for port_id, port in sys.outputs.items():
+                dim = port.dim
+                self.output_slices[(sys_id, port_id)] = slice(current_idx, current_idx + dim)
+                current_idx += dim
+                
+        self.global_signals = np.zeros(current_idx)
+        
+        self.port_execution_plan = []
+        
+        for sys_id, port_id in self.port_execution_order:
+            sys = self.subsystems[sys_id]
+            port = sys.outputs[port_id]
+            
+            deps = port.dependencies
+            sys_inputs = sys.inputs
+            
+            port_gather_sources = []
+            port_u_dim = 0
+            for in_port_id, in_port in sys_inputs.items():
+                if deps is not None and in_port_id not in deps:
+                    source_type = "nominal"
+                    source_val = None
+                else:
+                    source = self.connections[sys_id].get(in_port_id)
+                    if source is None:
+                        source_type = "nominal"
+                        source_val = None
+                    else:
+                        src_sys_id, src_port_id = source
+                        if src_sys_id == "input":
+                            source_type = "external_u"
+                            source_val = src_port_id
+                        else:
+                            source_type = "global_signals"
+                            source_val = self.output_slices[(src_sys_id, src_port_id)]
+                
+                dim = in_port.dim
+                port_gather_sources.append((source_type, source_val, in_port, dim))
+                port_u_dim += dim
+                
+            out_slice = self.output_slices[(sys_id, port_id)]
+            local_x_slice = slice(self.state_index[sys_id][0], self.state_index[sys_id][1]) if sys.n > 0 else slice(0, 0)
+            
+            self.port_execution_plan.append((
+                port.compute,
+                local_x_slice,
+                port_gather_sources,
+                out_slice,
+                port_u_dim
+            ))
+            
+        self.state_execution_plan = []
+        
+        for sys_id, sys in self.subsystems.items():
+            if sys.n > 0:
+                sys_gather_sources = []
+                sys_u_dim = 0
+                for in_port_id, in_port in sys.inputs.items():
+                    source = self.connections[sys_id].get(in_port_id)
+                    if source is None:
+                        source_type = "nominal"
+                        source_val = None
+                    else:
+                        src_sys_id, src_port_id = source
+                        if src_sys_id == "input":
+                            source_type = "external_u"
+                            source_val = src_port_id
+                        else:
+                            source_type = "global_signals"
+                            source_val = self.output_slices[(src_sys_id, src_port_id)]
+                            
+                    dim = in_port.dim
+                    sys_gather_sources.append((source_type, source_val, in_port, dim))
+                    sys_u_dim += dim
+                    
+                local_x_slice = slice(self.state_index[sys_id][0], self.state_index[sys_id][1])
+                self.state_execution_plan.append((
+                    sys.f,
+                    local_x_slice,
+                    sys_gather_sources,
+                    sys_u_dim
+                ))
+                
+        self.compiled_super_fast = True
+
+    ######################################################################
+    def f_super_fast(self, x, u, t=0, params=None) -> np.ndarray:
+        """
+        Hyper-optimized simulation step. No strings, no dicts, just arrays!
+        """
+        if not getattr(self, "compiled_super_fast", False):
+            self.compile_super_fast()
+            
+        global_signals = self.global_signals
+        
+        external_u_dict = self.get_port_values_from_u(u) if len(u) > 0 else {}
+        
+        # 1. Compute all output port signals in topological order
+        for compute_func, local_x_slice, gather_sources, out_slice, u_dim in self.port_execution_plan:
+            local_x = x[local_x_slice]
+            
+            if u_dim == 0:
+                local_u = np.array([])
+            else:
+                local_u = np.empty(u_dim)
+                idx = 0
+                for src_type, src_val, in_port, dim in gather_sources:
+                    if src_type == "global_signals":
+                        local_u[idx:idx+dim] = global_signals[src_val]
+                    elif src_type == "nominal":
+                        local_u[idx:idx+dim] = in_port.get_signal(t)
+                    elif src_type == "external_u":
+                        local_u[idx:idx+dim] = external_u_dict.get(src_val, 0)
+                    idx += dim
+                    
+            global_signals[out_slice] = compute_func(local_x, local_u, t)
+            
+        # 2. Compute state derivatives
+        dx = np.zeros(self.n)
+        for f_func, local_x_slice, gather_sources, u_dim in self.state_execution_plan:
+            local_x = x[local_x_slice]
+            
+            if u_dim == 0:
+                local_u = np.array([])
+            else:
+                local_u = np.empty(u_dim)
+                idx = 0
+                for src_type, src_val, in_port, dim in gather_sources:
+                    if src_type == "global_signals":
+                        local_u[idx:idx+dim] = global_signals[src_val]
+                    elif src_type == "nominal":
+                        local_u[idx:idx+dim] = in_port.get_signal(t)
+                    elif src_type == "external_u":
+                        local_u[idx:idx+dim] = external_u_dict.get(src_val, 0)
+                    idx += dim
+                    
+            dx[local_x_slice] = f_func(local_x, local_u, t)
+            
+        return dx
+
 
 ######################################################################
 if __name__ == "__main__":
