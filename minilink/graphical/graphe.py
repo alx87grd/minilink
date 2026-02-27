@@ -43,7 +43,7 @@ def get_system_block_html(sys, html_id="sys1"):
     )
 
     for j in range(np.max((n_ports_out, n_ports_in))):
-        html += f"<TR>\n"
+        html += "<TR>\n"
 
         if j < n_ports_in and j < n_ports_out:
             port_id = list(sys.inputs.keys())[j]
@@ -54,15 +54,15 @@ def get_system_block_html(sys, html_id="sys1"):
         elif j < n_ports_in:
             port_id = list(sys.inputs.keys())[j]
             html += f'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
-            html += f'<TD BORDER="1"> </TD>\n'
+            html += '<TD BORDER="1"> </TD>\n'
 
         elif j < n_ports_out:
             port_id = list(sys.outputs.keys())[j]
-            html += f'<TD BORDER="1"> </TD>\n'
+            html += '<TD BORDER="1"> </TD>\n'
             html += f'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
 
-        html += f"</TR>\n"
-    html += f"</TABLE>"
+        html += "</TR>\n"
+    html += "</TABLE>"
 
     return html
 
@@ -170,10 +170,7 @@ def get_diagram_graphe(diagram):
 ######################################################################
 if __name__ == "__main__":
 
-    import numpy as np
     import graphviz
-    import matplotlib.pyplot as plt
-    import IPython.display as display
 
     graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")
     graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")

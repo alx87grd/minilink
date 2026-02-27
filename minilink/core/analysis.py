@@ -161,7 +161,7 @@ class Simulator:
             time_vector = np.arange(t0, tf + dt, dt)
 
             if self.verbose:
-                print(f"Automatic dt based on the smallest time constant of the system")
+                print("Automatic dt based on the smallest time constant of the system")
         elif dt is None:
             time_vector = np.linspace(t0, tf, n_steps)
         elif n_steps is None:

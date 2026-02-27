@@ -12,14 +12,14 @@ try:
     matplotlib.use("Qt5Agg")
     plt.ion()  # Set interactive mode
 
-except:
+except Exception:
 
     try:
         # For MacOSX
         matplotlib.use("MacOSX")
         plt.ion()
 
-    except:
+    except Exception:
 
         print("Warning: Could not load validated backend mode for matplotlib")
         print(
