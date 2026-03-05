@@ -2,7 +2,7 @@ from minilink.core.framework import DynamicSystem, StaticSystem
 from minilink.core.diagram import DiagramSystem
 import numpy as np
 
-from minilink.blocks.basic import Pendulum, PDController
+from minilink.blocks.basic import Pendulum, PendulumPDController
 from minilink.blocks.sources import Step, WhiteNoise
 
 
@@ -19,7 +19,7 @@ step.params["final_value"] = np.array([1.0])
 step.params["step_time"] = 10.0
 
 # Closed loop system
-ctl = PDController()
+ctl = PendulumPDController()
 ctl.params["Kp"] = 1000.0
 ctl.params["Kd"] = 100.0
 

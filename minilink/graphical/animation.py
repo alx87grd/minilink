@@ -1,4 +1,201 @@
-# minilink/graphical/animation.py
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
-# This module will contain tools for creating 2D and 3D renders and animations.
-# Currently under development.
+from minilink.graphical.primitives import Point
+
+
+######################################################################
+class MatplotlibRenderer:
+    """
+    A renderer backend that knows how to map GraphicPrimitives
+    and Transformation Matrices onto Matplotlib artists.
+    """
+
+    def __init__(self, ax, is_3d=False):
+        self.ax = ax
+        self.is_3d = is_3d
+        self.drawn_objects = []
+
+    def draw_primitive(self, primitive, transform_matrix):
+        """
+        Takes a base GraphicPrimitive and its 4x4 Transformation Matrix
+        and draws it on the Matplotlib axis.
+        """
+        if isinstance(primitive, Point):
+            # The primitive's local point is [x, y, z]
+            # Convert to homogeneous coordinates [x, y, z, 1.0]
+            local_pt = np.append(primitive.pt, 1.0)
+
+            # Apply the SE(3) transformation matrix
+            world_pt = transform_matrix @ local_pt
+
+            x, y, z = world_pt[0], world_pt[1], world_pt[2]
+
+            # Draw on matplotlib
+            if self.is_3d:
+                (obj,) = self.ax.plot(
+                    [x],
+                    [y],
+                    [z],
+                    marker=primitive.marker,
+                    color=primitive.color,
+                    markersize=primitive.size,
+                )
+            else:
+                (obj,) = self.ax.plot(
+                    [x],
+                    [y],
+                    marker=primitive.marker,
+                    color=primitive.color,
+                    markersize=primitive.size,
+                )
+
+            self.drawn_objects.append(obj)
+
+    def clear(self):
+        """Removes all currently drawn temporary objects from the axes."""
+        for obj in self.drawn_objects:
+            obj.remove()
+        self.drawn_objects.clear()
+
+
+######################################################################
+class Animator:
+    """
+    The main coordinator for playing back trajectories.
+    It takes a simulated System, loops through its trajectory,
+    and asks the backend Renderer to draw the primitives frame-by-frame.
+    """
+
+    def __init__(self, sys):
+        self.sys = sys
+
+        # Display settings
+        self.figsize = (8, 6)
+        self.dpi = 100
+        # Placeholder default clipping domain, this could later be moved to `sys.get_graphic_domain()`
+        self.domain = [[-10, 10], [-10, 10], [-10, 10]]
+
+    def _create_figure_and_ax(self, is_3d):
+        fig = plt.figure(figsize=self.figsize, dpi=self.dpi)
+        fig.canvas.manager.set_window_title(f"Animation: {self.sys.name}")
+
+        if is_3d:
+            ax = fig.add_subplot(111, projection="3d")
+            ax.set_xlim3d(self.domain[0])
+            ax.set_ylim3d(self.domain[1])
+            ax.set_zlim3d(self.domain[2])
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.set_zlabel("Z")
+        else:
+            ax = fig.add_subplot(111)
+            ax.set_xlim(self.domain[0])
+            ax.set_ylim(self.domain[1])
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.grid(True)
+            ax.set_aspect("equal")
+
+        return fig, ax
+
+    def show(self, x, u, t=0.0, is_3d=False):
+        """
+        Renders a single static frame of the system at state x, u, t.
+        """
+        fig, ax = self._create_figure_and_ax(is_3d)
+        renderer = MatplotlibRenderer(ax, is_3d=is_3d)
+
+        primitives = self.sys.get_kinematic_geometry()
+        transforms = self.sys.get_kinematic_transforms(x, u, t)
+
+        if len(primitives) != len(transforms):
+            raise ValueError(
+                "System graphical error: Number of transforms must equal number of base geometric primitives."
+            )
+
+        # Draw all static geometries
+        for prim, T in zip(primitives, transforms):
+            renderer.draw_primitive(prim, T)
+
+        ax.set_title(f"Time = {t:.2f} s")
+        plt.show(block=True)
+
+    def animate_simulation(
+        self,
+        traj,
+        time_factor_video=1.0,
+        is_3d=False,
+        save=False,
+        file_name="Animation",
+        show=True,
+    ):
+        """
+        Plays back a full simulation trajectory.
+        """
+        fig, ax = self._create_figure_and_ax(is_3d)
+        renderer = MatplotlibRenderer(ax, is_3d=is_3d)
+
+        # We grab the base geometry just once!
+        primitives = self.sys.get_kinematic_geometry()
+
+        nsteps = traj.t.size
+        # The physical time between simulation steps
+        sim_dt = (traj.t[-1] - traj.t[0]) / (nsteps - 1)
+
+        # Fast/Slow motion playback math
+        target_fps = 30.0
+        frame_dt = 1.0 / target_fps
+        video_dt = frame_dt * time_factor_video
+
+        skip_steps = max(1, int(np.round(video_dt / sim_dt)))
+        interval_ms = (sim_dt * skip_steps / time_factor_video) * 1000.0
+
+        n_frames = int(nsteps / skip_steps)
+        time_template = "Time = %.2f s"
+
+        def update(frame_idx):
+            # 1. Clear old frame
+            renderer.clear()
+
+            # 2. Get simulation data for this frame
+            sim_idx = min(frame_idx * skip_steps, nsteps - 1)
+            x = traj.x[:, sim_idx]
+            if len(traj.u) > 0:
+                u = traj.u[:, sim_idx]
+            else:
+                u = np.array([])
+            t = traj.t[sim_idx]
+
+            # 3. Get transformation matrices from the system
+            transforms = self.sys.get_kinematic_transforms(x, u, t)
+
+            if len(primitives) != len(transforms):
+                raise ValueError(
+                    "System graphical error: Number of transforms must equal number of base geometric primitives."
+                )
+
+            # 4. Multiply and draw!
+            for prim, T in zip(primitives, transforms):
+                renderer.draw_primitive(prim, T)
+
+            ax.set_title(time_template % t)
+
+            # Return list of artists for blitting if needed in the future
+            return renderer.drawn_objects
+
+        ani = animation.FuncAnimation(
+            fig, update, frames=n_frames, interval=interval_ms, blit=False
+        )
+
+        if save:
+            print(f"Saving animation to {file_name}.gif ...")
+            ani.save(file_name + ".gif", writer="imagemagick", fps=target_fps)
+
+        if show:
+            plt.show(block=True)
+        else:
+            plt.close(fig)
+
+        return ani

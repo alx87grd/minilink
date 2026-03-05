@@ -1,8 +1,5 @@
 import numpy as np
-import sys
-import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from minilink.core.framework import System
 from minilink.core.diagram import DiagramSystem
 
@@ -24,13 +21,28 @@ def test_algebraic_loop():
     diag = DiagramSystem()
     diag.add_subsystem(FeedthroughSystem("A"), "A")
     diag.add_subsystem(FeedthroughSystem("B"), "B")
+    diag.add_subsystem(FeedthroughSystem("C"), "C")
 
     diag.connect("A", "y", "B", "u")
-    diag.connect("B", "y", "A", "u")
+    diag.connect("B", "y", "C", "u")
+
+    diag.plot_graphe()
 
     try:
         diag.compile()
-        print("FAIL: Expected AlgebraicLoopError, but it compiled successfully.")
+        print("SUCCESS: Compiled successfully with no algebraic loop.")
+    except RuntimeError as e:
+        print(f"FAIL: Caught unexpected algebraic loop: {e}")
+
+    # Now create an algebraic loop
+
+    diag.connect("C", "y", "A", "u")
+
+    diag.plot_graphe()
+
+    try:
+        diag.compile()
+        print("FAIL: Compiled successfully with algebraic loop.")
     except RuntimeError as e:
         print(f"SUCCESS: Caught expected algebraic loop: {e}")
 

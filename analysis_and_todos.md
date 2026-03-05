@@ -51,3 +51,6 @@ The following recommendations are structured in phases to systematically improve
 ### Phase 4: Refactoring and Separation of Concerns
 - [ ] **Decouple Compilation from Diagram:** Move the compilation of `f_fast` execution plans into a separate module (e.g., `compiler.py` or an `ExecutionEngine` class). The `DiagramSystem` should purely represent the structural graph of blocks and connections.
 - [ ] **Refine Default Dependencies:** Provide a cleaner way to designate or infer MIMO algebraic loop dependencies to avoid artificial loop exceptions.
+
+### Phase 5: New Features & Improvements
+- [ ] **Automated Output Port Dependency Inference:** Extend `DiagramSystem` to automatically detect exact dependencies on external inputs when exposing a subsystem's output via `connect_new_output_port(..., dependencies="auto")`. This involves a topological trace through `self.connections` to prevent artificial algebraic loops when building diagrams inside diagrams.
