@@ -43,7 +43,7 @@ class DiagramSystem(System):
 
         # Compute total number of states
         n = 0
-        state_label = []
+        state_labels = []
         state_units = []
         state_upper_bound = np.array([])
         state_lower_bound = np.array([])
@@ -60,12 +60,12 @@ class DiagramSystem(System):
             n += sys.n
 
             for i in range(sys.n):
-                if sys.state.labels[i] in state_label:
-                    state_label.append(
+                if sys.state.labels[i] in state_labels:
+                    state_labels.append(
                         key + ":" + sys.state.labels[i]
                     )  # Add subsystem id to the label
                 else:
-                    state_label.append(sys.state.labels[i])
+                    state_labels.append(sys.state.labels[i])
             state_units += sys.state.units
             state_upper_bound = np.concatenate(
                 [state_upper_bound, sys.state.upper_bound]
@@ -80,7 +80,7 @@ class DiagramSystem(System):
 
         self.n = n
         self.state = VectorSignal(n, "x")
-        self.state.labels = state_label
+        self.state.labels = state_labels
         self.state.units = state_units
         self.state.upper_bound = state_upper_bound
         self.state.lower_bound = state_lower_bound
@@ -111,7 +111,9 @@ class DiagramSystem(System):
         self.compiled = False
 
     ######################################################################
-    def connect_new_output_port(self, source_sys_id, source_port_id, output_port_id):
+    def connect_new_output_port(
+        self, source_sys_id, source_port_id, output_port_id, dependencies="all"
+    ):
 
         port = self.subsystems[source_sys_id].outputs[source_port_id]
 
@@ -121,7 +123,7 @@ class DiagramSystem(System):
                 x, u, t, source_sys_id, source_port_id
             )
 
-        self.add_output_port(port.dim, output_port_id, compute)
+        self.add_output_port(port.dim, output_port_id, compute, dependencies)
 
         if "output" not in self.connections:
             self.connections["output"] = {}  # Create the output dictionary

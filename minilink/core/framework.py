@@ -78,7 +78,7 @@ class OutputPort(VectorSignal):
     the function to compute the signal value based on the inputs, state, time and parameters
     dependencies : list of dict key
     the list of input ports needed to compute the signal, required to avoid algebraic loops when solving diagram
-    None means a default behavior of requiring all inputs ports values
+    TODO: Update None vs all vs list options
     """
 
     ##############################################
@@ -132,6 +132,7 @@ class System:
             "smallest_time_constant": 0.001,
             "discontinuous_behavior": False,  # Will use a fixed time step
             "discrete_time_period": None,
+            "require_building": False,  # If True, the system needs to be built before being simulated
         }
 
     ######################################################################
@@ -173,15 +174,15 @@ class System:
     ######################################################################
     def get_all_input_labels_and_units(self):
 
-        input_label = []
+        input_labels = []
         input_units = []
 
         for key, port in self.inputs.items():
             for i in range(port.dim):
-                input_label.append(port.labels[i])
+                input_labels.append(port.labels[i])
                 input_units.append(port.units[i])
 
-        return input_label, input_units
+        return input_labels, input_units
 
     ######################################################################
     def get_u_from_input_ports(self, t=0) -> np.ndarray:
@@ -204,6 +205,8 @@ class System:
         u = np.zeros(self.m)
         i = 0
         for key, port in self.inputs.items():
+            # Get the signal value of the port at time t and concatenate it to u
+            # By default, the signal value is the nominal value of the port, but it can be overridden by a custom function
             u[i : i + port.dim] = port.get_signal(t)
             i += port.dim
         return u

@@ -278,7 +278,7 @@ def diagram_test():
     print("sys.n = ", gsys.n)
     print("sys.m = ", gsys.m)
     print("sys.p = ", gsys.p)
-    print("sys.state_label = ", gsys.state.labels)
+    print("sys.state_labels = ", gsys.state.labels)
 
     return gsys
 
@@ -596,7 +596,7 @@ def diagram_in_a_diagram(debug_print=False):
     diagram.add_subsystem(sys2, "integrator2")
     diagram.connect("input", "u", "integrator1", "u")
     diagram.connect("integrator1", "y", "integrator2", "u")
-    diagram.connect_new_output_port("integrator2", "y", "y")
+    diagram.connect_new_output_port("integrator2", "y", "y", dependencies=[])
 
     diagram.plot_graphe()
 
@@ -624,8 +624,8 @@ if __name__ == "__main__":
     # dia = diagram_test()
     # pendulum_test()
     # closedloop_pendulum_test()
-    closedloop_noisy_pendulum_test()
-    diagram = cascade_controllers_test()
+    # closedloop_noisy_pendulum_test()
+    # diagram = cascade_controllers_test()
     # diagram = algebraic_loop()  # TODO: Program auto check for algebraic loops
     # solver_doing_weird_at_discontinuities()  # TODO: Make fixed step solver for systems with discontinuities
-    # test, d1, d2 = diagram_in_a_diagram(debug_print=False)
+    test, d1, d2 = diagram_in_a_diagram(debug_print=False)
