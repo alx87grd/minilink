@@ -184,3 +184,7 @@ if __name__ == "__main__":
 
     pendulum = Pendulum()
     controller = PendulumPDController()
+
+    pendulum.x0[0] = np.pi / 4
+    pendulum.compute_trajectory()
+    pendulum.animate()

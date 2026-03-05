@@ -39,9 +39,9 @@ if __name__ == "__main__":
     animator.domain = [[-5, 5], [-5, 5], [-5, 5]]
 
     # 4. Demonstrate a single frame using show()
-    print("Showing a single static frame initialization...")
-    initial_u = sys.get_u_from_input_ports(t=0)
-    animator.show(x=sys.x0, u=initial_u, t=0, is_3d=False)
+    # print("Showing a single static frame initialization...")
+    # initial_u = sys.get_u_from_input_ports(t=0)
+    # animator.show(x=sys.x0, u=initial_u, t=0, is_3d=False)
 
     # 5. Demonstrate the full playback video
     print("Playing back the full animation...")

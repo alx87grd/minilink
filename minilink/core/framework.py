@@ -14,6 +14,7 @@ from minilink.graphical.graphe import (
 )
 from minilink.graphical.primitives import Point, translation_matrix
 from minilink.core.analysis import Simulator
+from minilink.graphical.animation import Animator
 
 
 ######################################################################
@@ -210,6 +211,9 @@ class System:
             "discrete_time_period": None,
             "require_building": False,  # If True, the system needs to be built before being simulated
         }
+
+        # Memory for interactive shorcuts
+        self.traj = None  # Store the last computed trajectory
 
     ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
@@ -546,7 +550,64 @@ class System:
         sim = Simulator(self, t0, tf, n_steps, dt, solver)
         traj = sim.solve(show=show)
 
+        self.traj = (
+            traj  # Store the trajectory in the system for later use (e.g., animation)
+        )
+
         return traj
+
+    ######################################################################
+    def render(self, x, u, t, is_3d=False):
+        """
+        Render the system's graphical representation for a given state, input, and time.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            The current state vector.
+        u : np.ndarray
+            The current input vector.
+        t : float
+            The current time.
+        is_3d : bool, optional
+            Whether to render in 3D (default is False).
+
+        Returns
+        -------
+        None
+            This function renders the system but does not return any value.
+        """
+        animator = Animator(self)
+        animator.show(x, u, t, is_3d=is_3d)
+
+    def animate(self, traj=None, time_factor_video=1.0, is_3d=False):
+        """
+        Animate a given trajectory of the system.
+
+        Parameters
+        ----------
+        traj : Trajectory
+            An object containing time, state, and input histories to animate.
+        time_factor_video : float, optional
+            A factor to speed up (>1) or slow down (<1) the video playback (default is 1.0).
+        is_3d : bool, optional
+            Whether to render in 3D (default is False).
+
+        Returns
+        -------
+        None
+            This function plays the animation but does not return any value.
+        """
+        if traj is None:
+            if self.traj is not None:
+                traj = self.traj
+            else:
+                traj = self.compute_trajectory()
+
+        animator = Animator(self)
+        animator.animate_simulation(
+            traj, time_factor_video=time_factor_video, is_3d=is_3d
+        )
 
     ######################################################################
     # Graphical Animation Engine Baseline
