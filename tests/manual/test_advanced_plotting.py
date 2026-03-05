@@ -3,7 +3,7 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.analysis import Simulator, compute_internal_signals
 from minilink.graphical.plotting import plot_signals
 
-from minilink.blocks.basic import Pendulum, PDController
+from minilink.blocks.basic import Pendulum, PendulumPDController
 from minilink.blocks.sources import Step, WhiteNoise
 
 if __name__ == "__main__":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     noise2.params["seed"] = 2
 
     # Closed loop controller
-    ctl = PDController()
+    ctl = PendulumPDController()
     ctl.params["Kp"] = 1000.0
     ctl.params["Kd"] = 100.0
 
