@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from minilink.graphical.primitives import Point
+from minilink.graphical.primitives import Point, CustomLine, Circle
+import matplotlib.patches as patches
 
 
 ######################################################################
@@ -52,6 +53,90 @@ class MatplotlibRenderer:
                 )
 
             self.drawn_objects.append(obj)
+
+        elif isinstance(primitive, CustomLine):
+            # primitive.pts is Nx2 or Nx3. We need to convert each point to world pts.
+            local_pts = primitive.pts
+            if local_pts.shape[1] == 2:
+                local_pts_hom = np.hstack(
+                    (local_pts, np.zeros((local_pts.shape[0], 1)))
+                )
+            else:
+                local_pts_hom = local_pts
+            local_pts_hom = np.hstack((local_pts_hom, np.ones((local_pts.shape[0], 1))))
+
+            # Apply the SE(3) transformation matrix
+            world_pts = (transform_matrix @ local_pts_hom.T).T
+
+            x = world_pts[:, 0]
+            y = world_pts[:, 1]
+            z = world_pts[:, 2]
+
+            if self.is_3d:
+                (obj,) = self.ax.plot(
+                    x,
+                    y,
+                    z,
+                    color=primitive.color,
+                    linewidth=primitive.linewidth,
+                    linestyle=primitive.style,
+                )
+            else:
+                (obj,) = self.ax.plot(
+                    x,
+                    y,
+                    color=primitive.color,
+                    linewidth=primitive.linewidth,
+                    linestyle=primitive.style,
+                )
+            self.drawn_objects.append(obj)
+
+        elif isinstance(primitive, Circle):
+            local_center = np.zeros(3)
+            local_center[: len(primitive.center)] = primitive.center
+            local_center = np.append(local_center, 1.0)
+
+            # Apply the SE(3) transformation matrix
+            world_center = transform_matrix @ local_center
+
+            x, y, z = world_center[0], world_center[1], world_center[2]
+
+            if self.is_3d:
+                # Approximate circle with a line in 3D
+                th = np.linspace(0, 2 * np.pi, 50)
+                # Circle in local XY plane
+                pts_z = primitive.center[2] if len(primitive.center) > 2 else 0.0
+                pts = np.vstack(
+                    (
+                        primitive.center[0] + primitive.radius * np.cos(th),
+                        primitive.center[1] + primitive.radius * np.sin(th),
+                        np.full_like(th, pts_z),
+                        np.ones_like(th),
+                    )
+                )
+                world_pts = transform_matrix @ pts
+
+                (obj,) = self.ax.plot(
+                    world_pts[0, :],
+                    world_pts[1, :],
+                    world_pts[2, :],
+                    color=primitive.color,
+                    linewidth=primitive.linewidth,
+                    linestyle=primitive.style,
+                )
+                self.drawn_objects.append(obj)
+            else:
+                circ = patches.Circle(
+                    (x, y),
+                    radius=primitive.radius,
+                    ec=primitive.color,
+                    fill=primitive.fill,
+                    fc=primitive.color if primitive.fill else "none",
+                    linewidth=primitive.linewidth,
+                    linestyle=primitive.style,
+                )
+                obj = self.ax.add_patch(circ)
+                self.drawn_objects.append(obj)
 
     def clear(self):
         """Removes all currently drawn temporary objects from the axes."""
@@ -130,6 +215,7 @@ class Animator:
         save=False,
         file_name="Animation",
         show=True,
+        html=False,
     ):
         """
         Plays back a full simulation trajectory.
@@ -192,6 +278,18 @@ class Animator:
         if save:
             print(f"Saving animation to {file_name}.gif ...")
             ani.save(file_name + ".gif", writer="imagemagick", fps=target_fps)
+
+        if html:
+            plt.close(fig)
+            try:
+                from IPython.display import HTML
+
+                return HTML(ani.to_jshtml())
+            except ImportError:
+                print(
+                    "IPython is not available. Ensure you are running in a Jupyter Notebook environment."
+                )
+                return ani
 
         if show:
             plt.show(block=True)

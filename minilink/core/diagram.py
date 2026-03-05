@@ -535,6 +535,30 @@ class DiagramSystem(System):
 
         return dx
 
+    ######################################################################
+    # Graphical Animation Engine Defaults for Diagram
+    ######################################################################
+    def get_kinematic_geometry(self):
+        primitives = []
+        for sys_id, sys in self.subsystems.items():
+            primitives.extend(sys.get_kinematic_geometry())
+        return primitives
+
+    def get_kinematic_transforms(self, x, u, t):
+        transforms = []
+        for sys_id, sys in self.subsystems.items():
+            # Get the input values for this specific subsystem at this time
+            if sys.n > 0:
+                local_u = self.get_local_input(x, u, t, sys_id)
+                local_x = self.get_local_state(x, sys_id)
+            else:
+                # If static, it may only need u evaluated.
+                local_u = self.get_local_input(x, u, t, sys_id)
+                local_x = np.array([])
+
+            transforms.extend(sys.get_kinematic_transforms(local_x, local_u, t))
+        return transforms
+
 
 ######################################################################
 if __name__ == "__main__":

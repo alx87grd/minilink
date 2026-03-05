@@ -580,7 +580,7 @@ class System:
         animator = Animator(self)
         animator.show(x, u, t, is_3d=is_3d)
 
-    def animate(self, traj=None, time_factor_video=1.0, is_3d=False):
+    def animate(self, traj=None, time_factor_video=1.0, is_3d=False, html=False):
         """
         Animate a given trajectory of the system.
 
@@ -592,11 +592,13 @@ class System:
             A factor to speed up (>1) or slow down (<1) the video playback (default is 1.0).
         is_3d : bool, optional
             Whether to render in 3D (default is False).
+        html : bool, optional
+            Whether to return an interactive HTML rendering for Jupyter notebooks (default is False).
 
         Returns
         -------
-        None
-            This function plays the animation but does not return any value.
+        None or IPython.display.HTML
+            If html=True, returns the HTML object to display inline.
         """
         if traj is None:
             if self.traj is not None:
@@ -605,9 +607,24 @@ class System:
                 traj = self.compute_trajectory()
 
         animator = Animator(self)
-        animator.animate_simulation(
-            traj, time_factor_video=time_factor_video, is_3d=is_3d
+        # We don't want blocking plt.show() when generating HTML
+        show_plot = not html
+        ani_obj = animator.animate_simulation(
+            traj,
+            time_factor_video=time_factor_video,
+            is_3d=is_3d,
+            html=html,
+            show=show_plot,
         )
+
+        if html:
+            try:
+                import IPython.display as display
+
+                display.display(ani_obj)
+            except ImportError:
+                print("IPython is not available to display HTML inline")
+            return ani_obj
 
     ######################################################################
     # Graphical Animation Engine Baseline

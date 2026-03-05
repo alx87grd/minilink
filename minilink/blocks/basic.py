@@ -1,4 +1,5 @@
 from minilink.core.framework import DynamicSystem, StaticSystem
+from minilink.graphical.primitives import pose2d_matrix, Circle, CustomLine
 import numpy as np
 
 
@@ -135,6 +136,39 @@ class Pendulum(DynamicSystem):
 
         return y
 
+    ######################################################################
+    def get_kinematic_geometry(self):
+        primitives = []
+        l = self.params["l"]
+
+        radius = 0.1 * l
+
+        # Hinge (black circle)
+        primitives.append(
+            Circle(radius=radius, center=[0, 0], color="black", fill=True)
+        )
+        # Rod (blue line)
+        primitives.append(CustomLine(pts=[[0, 0], [0, -l]], color="black", linewidth=4))
+        # Bob (red circle)
+        primitives.append(
+            Circle(radius=radius, center=[0, -l], color="black", fill=True)
+        )
+
+        return primitives
+
+    ######################################################################
+    def get_kinematic_transforms(self, x, u, t):
+        transforms = []
+        theta = x[0]
+        # Hinge is static
+        transforms.append(pose2d_matrix(0, 0, 0))
+        # Rod rotates around hinge by theta
+        transforms.append(pose2d_matrix(0, 0, theta))
+        # Bob rotates around hinge by theta
+        transforms.append(pose2d_matrix(0, 0, theta))
+
+        return transforms
+
 
 ######################################################################
 class PendulumPDController(StaticSystem):
@@ -184,6 +218,8 @@ if __name__ == "__main__":
 
     pendulum = Pendulum()
     controller = PendulumPDController()
+
+    pendulum.params["l"] = 5.0
 
     pendulum.x0[0] = np.pi / 4
     pendulum.compute_trajectory()

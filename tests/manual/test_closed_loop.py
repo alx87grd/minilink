@@ -45,3 +45,5 @@ diagram.connect("plant", "y", "controller", "y")
 diagram.compute_trajectory(tf=20)
 
 diagram.plot_graphe()
+
+diagram.animate()
