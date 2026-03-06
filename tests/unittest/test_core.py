@@ -1,17 +1,16 @@
 import unittest
+
 import numpy as np
+
 from minilink.core.framework import (
-    VectorSignal,
-    InputPort,
-    OutputPort,
-    System,
-    StaticSystem,
     DynamicSystem,
+    StaticSystem,
+    System,
+    VectorSignal,
 )
 
 
 class TestCoreComponents(unittest.TestCase):
-
     def test_vector_signal(self):
         v = VectorSignal(2, "test", nominal_value=[1.0, 2.0])
         self.assertEqual(v.dim, 2)

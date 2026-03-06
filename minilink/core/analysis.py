@@ -1,11 +1,11 @@
+import logging
+
 import numpy as np
 from scipy.integrate import solve_ivp
-import logging
 
 
 ######################################################################
 class Trajectory:
-
     def __init__(self, x, u, t):
         """
         x:  array of dim = ( time-steps , sys.n )
@@ -194,7 +194,6 @@ class Simulator:
 
         # Regular ODE system
         if solver == "scipy":
-
             # Define the ODE
             def f(t, x):
                 if hasattr(sys, "f_fast"):
@@ -224,14 +223,12 @@ class Simulator:
 
         # Special need for Euler integration
         elif self.solver == "euler":
-
             t_traj = times
             u_traj = np.zeros((sys.m, n_pts))
             x_traj = np.zeros((sys.n, n_pts))
             x_traj[:, 0] = sys.x0
 
             for i, t in enumerate(times):
-
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
 
@@ -248,14 +245,12 @@ class Simulator:
                 u_traj[:, i] = u
 
         elif self.solver == "discrete":
-
             t_traj = times
             u_traj = np.zeros((sys.m, n_pts))
             x_traj = np.zeros((sys.n, n_pts))
             x_traj[:, 0] = sys.x0
 
             for i, t in enumerate(times):
-
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
 
@@ -282,5 +277,4 @@ class Simulator:
 
 ######################################################################
 if __name__ == "__main__":
-
     pass

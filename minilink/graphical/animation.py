@@ -1,9 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-
-from minilink.graphical.primitives import Point, CustomLine, Circle
 import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import numpy as np
+
+from minilink.graphical.primitives import Circle, CustomLine, Point
 
 
 ######################################################################

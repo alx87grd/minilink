@@ -1,10 +1,12 @@
 import unittest
-import numpy as np
-from minilink.core.framework import DynamicSystem, StaticSystem
-from minilink.core.diagram import DiagramSystem
-from minilink.core.analysis import Simulator, compute_internal_signals
-from minilink.graphical.plotting import plot_trajectory, plot_signals
+
 import matplotlib.pyplot as plt
+import numpy as np
+
+from minilink.core.analysis import Simulator, compute_internal_signals
+from minilink.core.diagram import DiagramSystem
+from minilink.core.framework import DynamicSystem, StaticSystem
+from minilink.graphical.plotting import plot_signals
 
 
 class Integrator(DynamicSystem):
@@ -42,7 +44,6 @@ class Step(StaticSystem):
 
 
 class TestAdvancedPlotting(unittest.TestCase):
-
     def setUp(self):
         self.sys = Integrator()
         self.ctl = PropController()

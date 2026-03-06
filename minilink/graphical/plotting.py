@@ -1,6 +1,7 @@
+import sys as python_system
+
 import matplotlib
 import matplotlib.pyplot as plt
-import sys as python_system
 
 ###############################################################################
 #  Note: Modify here matplolib setting to fit your environment
@@ -13,14 +14,12 @@ try:
     plt.ion()  # Set interactive mode
 
 except Exception:
-
     try:
         # For MacOSX
         matplotlib.use("MacOSX")
         plt.ion()
 
     except Exception:
-
         print("Warning: Could not load validated backend mode for matplotlib")
         print(
             "Matplotlib list of interactive backends:",
@@ -222,13 +221,13 @@ def plot_signals(sys, traj, signals):
                         ):
                             data = traj.internal_signals[lookup_item]
                             for d in range(data.shape[0]):
-                                l = f"{lbl}[{d}]" if data.shape[0] > 1 else lbl
+                                label_str = f"{lbl}[{d}]" if data.shape[0] > 1 else lbl
                                 axis.plot(
                                     t_traj,
                                     data[d, :],
                                     linewidth=1.5,
                                     alpha=0.8,
-                                    label=l,
+                                    label=label_str,
                                 )
                         else:
                             print(

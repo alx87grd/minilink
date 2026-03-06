@@ -1,10 +1,10 @@
 import numpy as np
+
 from minilink.core.framework import System
 
 
 ######################################################################
 class Source(System):
-
     def __init__(self, p):
 
         System.__init__(self, 0, 0, p)
@@ -28,7 +28,6 @@ class Source(System):
 
 ######################################################################
 class Step(Source):
-
     def __init__(
         self, initial_value=np.zeros(1), final_value=np.zeros(1), step_time=1.0
     ):
@@ -59,7 +58,6 @@ class Step(Source):
 
 ######################################################################
 class WhiteNoise(Source):
-
     def __init__(self, p=1):
 
         Source.__init__(self, p)

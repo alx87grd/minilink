@@ -1,9 +1,9 @@
-from minilink.core.framework import DynamicSystem, StaticSystem
-from minilink.blocks.sources import Step, WhiteNoise
-from minilink.core.diagram import DiagramSystem
-from minilink.core.analysis import Simulator
-from minilink.graphical.plotting import plot_trajectory
 import numpy as np
+
+from minilink.blocks.sources import Step, WhiteNoise
+from minilink.core.analysis import Simulator
+from minilink.core.diagram import DiagramSystem
+from minilink.core.framework import DynamicSystem, StaticSystem
 
 
 ######################################################################
@@ -36,7 +36,7 @@ class Pendulum(DynamicSystem):
 
         g = params["g"]
         m = params["m"]
-        l = params["l"]
+        length = params["l"]
 
         theta = x[0]
 
@@ -46,7 +46,7 @@ class Pendulum(DynamicSystem):
 
         dx = np.zeros(2)
         dx[0] = x[1]
-        dx[1] = -g / l * np.sin(theta) + 1 / (m * l**2) * (u + w)
+        dx[1] = -g / length * np.sin(theta) + 1 / (m * length**2) * (u + w)
 
         return dx
 
@@ -273,7 +273,7 @@ def diagram_test():
     print("List of connections :\n")
     print(gsys.connections)
 
-    g = gsys.plot_graphe()
+    _ = gsys.plot_graphe()
 
     print("sys.n = ", gsys.n)
     print("sys.m = ", gsys.m)
@@ -618,7 +618,6 @@ def diagram_in_a_diagram(debug_print=False):
 
 ######################################################################
 if __name__ == "__main__":
-
     # sys = system_test()
     # sim = simulator_test()
     # dia = diagram_test()

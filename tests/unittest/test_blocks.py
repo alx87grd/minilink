@@ -1,10 +1,11 @@
 import unittest
+
 import numpy as np
-from minilink.blocks.sources import Source, Step, WhiteNoise
+
+from minilink.blocks.sources import Source, Step
 
 
 class TestBlocks(unittest.TestCase):
-
     def test_source(self):
         s = Source(p=2)
         s.params["value"] = np.array([3.0, 4.0])

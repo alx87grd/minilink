@@ -7,14 +7,15 @@ base System class from which all static and dynamic blocks inherit.
 """
 
 import numpy as np
-from minilink.graphical.graphe import (
-    plot_graphviz,
-    get_system_block_html,
-    get_system_graphe,
-)
-from minilink.graphical.primitives import Point, translation_matrix
+
 from minilink.core.analysis import Simulator
 from minilink.graphical.animation import Animator
+from minilink.graphical.graphe import (
+    get_system_block_html,
+    get_system_graphe,
+    plot_graphviz,
+)
+from minilink.graphical.primitives import Point, translation_matrix
 
 
 ######################################################################
@@ -745,7 +746,6 @@ class DynamicSystem(System):
 
 ######################################################################
 if __name__ == "__main__":
-
     x = VectorSignal(2, "x")
 
     sys = DynamicSystem(2, 1, 1)

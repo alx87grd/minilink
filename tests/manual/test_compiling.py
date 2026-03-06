@@ -1,10 +1,9 @@
 import time
-import numpy as np
-import sys
-import os
 
-from minilink.core.framework import System
+import numpy as np
+
 from minilink.core.diagram import DiagramSystem
+from minilink.core.framework import System
 
 ######################################################################
 # Test Subsystems
@@ -67,7 +66,7 @@ def build_deep_network(depth=50):
         diag.add_subsystem(SimpleGain(f"Gain{i}"), f"Gain{i}")
         diag.connect(f"Int{i}", "x", f"Gain{i}", "u")
         if i > 0:
-            diag.connect(f"Gain{i-1}", "y", f"Int{i}", "u")
+            diag.connect(f"Gain{i - 1}", "y", f"Int{i}", "u")
     return diag
 
 
@@ -110,7 +109,7 @@ def benchmark_simulation(diag, iters=100, label="Network"):
         print("Compiling...")
         start = time.time()
         diag.compile()
-        print(f"Compiled in {time.time()-start:.4f}s")
+        print(f"Compiled in {time.time() - start:.4f}s")
 
     x = np.ones(diag.n)
     u = np.array([])
@@ -176,7 +175,7 @@ def validate_large_network(num_nodes=500, conn_per_node=5, iters=10):
     start_time = time.time()
     print("Executing f_fast...")
     for _ in range(iters):
-        dx_fast = diag.f_fast(x, u, t)
+        _ = diag.f_fast(x, u, t)
     fast_time = time.time() - start_time
     print(f"Fast f time     ({iters} calls): {fast_time:.5f} s")
 

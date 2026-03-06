@@ -1,11 +1,11 @@
 import numpy as np
+
 from minilink.core.framework import System, VectorSignal
 from minilink.graphical.graphe import get_diagram_graphe
 
 
 ######################################################################
 class DiagramSystem(System):
-
     def __init__(self):
 
         self.subsystems = {}  # Nodes
@@ -53,7 +53,6 @@ class DiagramSystem(System):
 
         idx = 0
         for i, (key, sys) in enumerate(self.subsystems.items()):
-
             state_index[key] = (idx, idx + sys.n)
 
             # Update state properties
@@ -417,7 +416,6 @@ class DiagramSystem(System):
 
         # For all input ports of the subsystem
         for port_id, port in sys.inputs.items():
-
             # Check if the output port requires getting the signal from the input ports
             # If not required, the u vector is filled with nominal values
             if dependencies != "all" and port_id not in dependencies:
@@ -443,10 +441,8 @@ class DiagramSystem(System):
 
         # For all subsystems
         for sys_id, sys in self.subsystems.items():
-
             # If the subsystem has states
             if sys.n > 0:
-
                 # Get local input signals of the subsystem
                 sys_u = self.get_local_input(x, u, t, sys_id)
 
@@ -562,5 +558,4 @@ class DiagramSystem(System):
 
 ######################################################################
 if __name__ == "__main__":
-
     diagram = DiagramSystem()

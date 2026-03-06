@@ -169,7 +169,6 @@ def get_diagram_graphe(diagram):
 ###############################################################################
 ######################################################################
 if __name__ == "__main__":
-
     import graphviz
 
     graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")

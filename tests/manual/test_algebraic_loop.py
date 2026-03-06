@@ -1,7 +1,5 @@
-import numpy as np
-
-from minilink.core.framework import System
 from minilink.core.diagram import DiagramSystem
+from minilink.core.framework import System
 
 
 class FeedthroughSystem(System):

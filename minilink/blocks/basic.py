@@ -1,6 +1,7 @@
-from minilink.core.framework import DynamicSystem, StaticSystem
-from minilink.graphical.primitives import pose2d_matrix, Circle, CustomLine
 import numpy as np
+
+from minilink.core.framework import DynamicSystem, StaticSystem
+from minilink.graphical.primitives import Circle, CustomLine, pose2d_matrix
 
 
 ######################################################################
@@ -107,7 +108,7 @@ class Pendulum(DynamicSystem):
 
         g = params["g"]
         m = params["m"]
-        l = params["l"]
+        length = params["l"]
 
         theta = x[0]
 
@@ -117,7 +118,7 @@ class Pendulum(DynamicSystem):
 
         dx = np.zeros(2)
         dx[0] = x[1]
-        dx[1] = -g / l * np.sin(theta) + 1 / (m * l**2) * (u + w)
+        dx[1] = -g / length * np.sin(theta) + 1 / (m * length**2) * (u + w)
 
         return dx
 
@@ -139,19 +140,19 @@ class Pendulum(DynamicSystem):
     ######################################################################
     def get_kinematic_geometry(self):
         primitives = []
-        l = self.params["l"]
+        length = self.params["l"]
 
-        radius = 0.1 * l
+        radius = 0.1 * length
 
         # Hinge (black circle)
         primitives.append(
             Circle(radius=radius, center=[0, 0], color="black", fill=True)
         )
         # Rod (blue line)
-        primitives.append(CustomLine(pts=[[0, 0], [0, -l]], color="black", linewidth=4))
+        primitives.append(CustomLine(pts=[[0, 0], [0, -length]], color="black", linewidth=4))
         # Bob (red circle)
         primitives.append(
-            Circle(radius=radius, center=[0, -l], color="black", fill=True)
+            Circle(radius=radius, center=[0, -length], color="black", fill=True)
         )
 
         return primitives
@@ -214,8 +215,6 @@ class PendulumPDController(StaticSystem):
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
     pendulum = Pendulum()
     controller = PendulumPDController()
 

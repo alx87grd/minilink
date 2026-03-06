@@ -1,10 +1,10 @@
 import numpy as np
-from minilink.core.diagram import DiagramSystem
-from minilink.core.analysis import Simulator, compute_internal_signals
-from minilink.graphical.plotting import plot_signals
 
 from minilink.blocks.basic import Pendulum, PendulumPDController
 from minilink.blocks.sources import Step, WhiteNoise
+from minilink.core.analysis import Simulator, compute_internal_signals
+from minilink.core.diagram import DiagramSystem
+from minilink.graphical.plotting import plot_signals
 
 if __name__ == "__main__":
     # --- 1. Set up the System Components ---
