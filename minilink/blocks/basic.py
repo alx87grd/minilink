@@ -149,7 +149,9 @@ class Pendulum(DynamicSystem):
             Circle(radius=radius, center=[0, 0], color="black", fill=True)
         )
         # Rod (blue line)
-        primitives.append(CustomLine(pts=[[0, 0], [0, -length]], color="black", linewidth=4))
+        primitives.append(
+            CustomLine(pts=[[0, 0], [0, -length]], color="black", linewidth=4)
+        )
         # Bob (red circle)
         primitives.append(
             Circle(radius=radius, center=[0, -length], color="black", fill=True)
