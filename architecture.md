@@ -26,19 +26,16 @@ To simulate a diagram, `diagram.compile()` traces all connections, verifies the 
 - **Side-Effects in Pure Functions:** Post-simulation signal reconstruction mutates a `global_signals` buffer on the Diagram object itself, breaking encapsulation and parallel safety.
 - **Verbose API Setup:** Diagram string-based connection calls are repetitive and lack IDE autocompletion (e.g., `diagram.connect("sys", "y", "ctrl", "ref")`).
 
-## 4. Future Vision: JAX Compilation & Dual-Backend
+## 4. Future Vision: JAX Compilation via Native Duck-Typing
 
-While the current `f_fast` NumPy evaluation is highly optimized for standard Python iteration, the future of computational simulation requires breaking free from the Python Interpreter lock (GIL) and taking advantage of GPU/TPU acceleration.
+While the current `f_fast` NumPy evaluation is optimized for the Python Interpreter, future performance scale (and Autodiff for direct collocation optimization) requires breaking the Python GIL and leveraging GPU/TPU acceleration via JAX (XLA).
 
-To achieve this, `minilink` is transitioning toward a **JAX (XLA)** compiled architecture through a **Dual Backend Injection Strategy**.
+Instead of a heavy "Dual-Backend Injection" forcing users to import an array namespace `xp`, `minilink` embraces **Native Duck-Typing with a Graceful Fallback**:
 
-### The Dual-Backend Goal
-The framework will not force JAX on beginners. By default, standard fast NumPy mutation handles simulations. However, power users can opt-in to XLA JIT compilation to gain 10-100x performance scaling.
-
-### Implementation Requirements
-1. **The Array Namespace (`xp`):**
-   Core blocks and `System` primitives will stop importing `numpy` directly. Instead, they will accept an injected array namespace `xp` (defaulting to `numpy`). When simulating with JAX, `jax.numpy` is injected into the evaluation trace.
-2. **Functional Execution Maps:**
-   The `DiagramSystem.compile(backend="jax")` flag will unroll operations functionally. Instead of `global_signals[slice] = val`, it will use JAX-safe immutable updates like `global_signals.at[slice].set(val)`.
-3. **Pure Math Blocks:**
-   Blocks will be refactored to construct arrays purely functionally (e.g., `xp.array([x[1], -g*xp.sin(x)])`), dropping in-place allocations (`np.zeros()`). Control flow based on runtime signals will rely on `xp.where()` rather than standard Python `if/else` statements.
+### The Hybrid JAX Architecture
+1. **Implicit Tracing via PyTrees:**
+   `DiagramSystem.f_fast` will be refactored to remove all in-place mutable array assignments (`global_signals[slice] = val`). It will instead gather signals functionally (e.g., in lists) and use a final `concatenate`. This allows `jax.jit` and `jax.jacfwd` to trace the entire graphical execution automatically.
+2. **Duck-Typing for Base Users:**
+   Beginners and standard users continue to import pure `numpy` and write equations normally (avoiding in-place mutations like `x[0] = 5`, preferring `np.array([val1, val2])`). JAX will seamlessly override methods like `np.sin` through Python's `__array_function__` protocol without the user modifying their imports.
+3. **Optional `f_jax` Overrides (The Fallback):**
+   If a block's logic is fundamentally incompatible with JAX tracing (e.g., heavy `if/else` procedural control flow or non-JAX compiled dependencies), the user can supply a dedicated purely functional `f_jax(self, x, u, t)` method. The diagram's compilation step will automatically select this method if executed within a JAX optimization context.
