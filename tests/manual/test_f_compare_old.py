@@ -1,9 +1,9 @@
 import time
-
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import System
+
 
 ######################################################################
 # Test Subsystems
@@ -27,7 +27,7 @@ class SimpleIntegrator(System):
         super().__init__(1, 1, 1)
         self.name = id_str
         self.add_input_port(1, "u")
-        self.add_output_port(1, "x", function=self.compute_state, dependencies=())
+        self.add_output_port(1, "x", function=self.compute_state, dependencies="all")
 
     def compute_state(self, x, u, t=0, params=None):
         return x
@@ -66,7 +66,7 @@ def build_deep_network(depth=50):
         diag.add_subsystem(SimpleGain(f"Gain{i}"), f"Gain{i}")
         diag.connect(f"Int{i}", "x", f"Gain{i}", "u")
         if i > 0:
-            diag.connect(f"Gain{i - 1}", "y", f"Int{i}", "u")
+            diag.connect(f"Gain{i-1}", "y", f"Int{i}", "u")
     return diag
 
 
@@ -109,7 +109,7 @@ def benchmark_simulation(diag, iters=100, label="Network"):
         print("Compiling...")
         start = time.time()
         diag.compile()
-        print(f"Compiled in {time.time() - start:.4f}s")
+        print(f"Compiled in {time.time()-start:.4f}s")
 
     x = np.ones(diag.n)
     u = np.array([])
@@ -175,7 +175,7 @@ def validate_large_network(num_nodes=500, conn_per_node=5, iters=10):
     start_time = time.time()
     print("Executing f_fast...")
     for _ in range(iters):
-        _ = diag.f_fast(x, u, t)
+        dx_fast = diag.f_fast(x, u, t)
     fast_time = time.time() - start_time
     print(f"Fast f time     ({iters} calls): {fast_time:.5f} s")
 
@@ -191,8 +191,8 @@ if __name__ == "__main__":
     benchmark_simulation(chain_diag, iters=1000, label="Chain Network")
 
     # 2. Dense network benchmark
-    dense_diag = build_dense_network(num_nodes=80, connections_per_node=30)
-    # dense_diag.plot_graphe()
+    dense_diag = build_dense_network(num_nodes=20, connections_per_node=5)
+    dense_diag.plot_graphe()
     benchmark_simulation(dense_diag, iters=1000, label="Dense Network")
 
     # 3. Large network validation
