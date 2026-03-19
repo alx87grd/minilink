@@ -16,6 +16,13 @@ The primary goal of `minilink` is to provide an intuitive, flexible environment 
 - **`blocks/`**: Pre-built static and dynamic systems such as controllers, linear filters, and signal sources (`basic.py`, `sources.py`).
 - **`graphical/`**: Utilities for plotting simulation trajectories using `matplotlib` and visualizing topological block diagrams using `graphviz`.
 
+In practice, typical user workflows involve:
+
+1. Defining or importing reusable blocks under `blocks/` (e.g., `Integrator`, `Pendulum`, controllers, and signal sources).
+2. Assembling them into a `DiagramSystem` under `core/diagram.py` by wiring input/output ports.
+3. Simulating the resulting closed-loop system via `Simulator` in `core/analysis.py`.
+4. Plotting and/or animating trajectories via `graphical/` utilities.
+
 ## 3. Current Architecture & Known Flaws
 
 ### Evaluation Mechanism (`f_fast`)
@@ -23,8 +30,29 @@ To simulate a diagram, `diagram.compile()` traces all connections, verifies the 
 
 ### Known Design Flaws
 - **Stochastic Logging:** Stochastic inputs are re-evaluated linearly post-integration rather than logging the exact values used by the ODE steps.
-- **Side-Effects in Pure Functions:** Post-simulation signal reconstruction mutates a `global_signals` buffer on the Diagram object itself, breaking encapsulation and parallel safety.
+- **Side-Effects in Pure Functions:** Post-simulation internal-signal reconstruction mutates a `global_signals` buffer on the `DiagramSystem` itself, breaking encapsulation and limiting parallel safety (especially for multi-threaded or multi-scenario evaluation).
 - **Verbose API Setup:** Diagram string-based connection calls are repetitive and lack IDE autocompletion (e.g., `diagram.connect("sys", "y", "ctrl", "ref")`).
+- **Matplotlib Backend Fragility:** The plotting layer currently hard-codes a small set of preferred backends (e.g., `Qt5Agg`, `MacOSX`), which can be brittle in headless or non-standard environments and may need to be revisited for broader deployment scenarios.
+
+### External Dependencies and Integrations
+
+`minilink` intentionally avoids databases, web servers, or cloud integrations. All computation is in-memory and local. The main external dependencies are:
+
+- **NumPy** for array math and vectorized operations throughout the core and blocks.
+- **SciPy** (`solve_ivp`) for ODE integration in the primary continuous-time simulation path.
+- **matplotlib** for plotting and animation of trajectories and system geometry.
+- **Graphviz** for rendering diagrams as graphs.
+
+This keeps the runtime surface area small and focused on scientific computing, while leaving room for users to integrate their own I/O, persistence, or orchestration layers as needed.
+
+### Tests and Example Scenarios
+
+The `tests/` tree contains:
+
+- **Unit tests** that validate the core abstractions (`VectorSignal`, `System`, `StaticSystem`, `DynamicSystem`), basic blocks (`Source`, `Step`), and advanced plotting/diagram compilation flows.
+- **Manual/demo tests** that assemble small closed-loop diagrams, run simulations, and exercise plotting/graphical utilities.
+
+These tests double as executable examples of typical usage patterns (e.g., step → controller → plant diagrams) and are a good starting point for understanding how to compose systems idiomatically.
 
 ## 4. Future Vision: JAX Compilation & Dual-Backend
 

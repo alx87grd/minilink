@@ -20,9 +20,14 @@ The following tasks are structured in phases to systematically improve the API, 
 
 ### Phase 4: Refactoring and Separation of Concerns
 - [ ] **Refine Default Dependencies:** Provide a cleaner way to designate or infer MIMO algebraic loop dependencies to avoid artificial loop exceptions.
+- [ ] **Eliminate Global Signal Buffers for Reconstruction:** Replace the mutable `DiagramSystem.global_signals` buffer used during internal signal reconstruction with a more functional, encapsulated mechanism that is safe for parallel evaluation and clearer in its data flow.
+
 
 ### Phase 5: New Features & Improvements
 - [ ] **Automated Output Port Dependency Inference:** Extend `DiagramSystem` to automatically detect exact dependencies on external inputs when exposing a subsystem's output via `connect_new_output_port(..., dependencies="auto")`. This involves a topological trace through `self.connections` to prevent artificial algebraic loops when building diagrams inside diagrams.
+
+### Phase 5.5: Visualization Robustness
+- [ ] **Harden Matplotlib Backend Selection:** Make the plotting backend selection more robust across headless, Linux, and cloud environments (e.g., prefer non-interactive backends by default with clearer configuration hooks, and degrade gracefully when interactive backends are unavailable).
 
 ### Phase 6: JAX Compilation & Future-Proofing
 - [ ] **Dual Backend Injection (`xp`):** Refactor `System` and basic blocks to accept an array namespace parameter (`xp`), rather than strictly importing `numpy`. This enables passing `jax.numpy` into block mechanics when tracing without breaking standard `numpy` execution for casual users.

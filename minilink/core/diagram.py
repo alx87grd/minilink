@@ -532,6 +532,177 @@ class DiagramSystem(System):
         return dx
 
     ######################################################################
+    # JAX prototype backend (Variant 2)
+    ######################################################################
+    def compile_jax(self, output_ports, jit=True):
+        """
+        Compile the diagram evaluation into a JAX-jittable function.
+
+        This is a *prototype* backend intended for deployment / differentiable
+        optimization when the participating subsystems are JAX-compatible.
+
+        Notes / limitations:
+        - Only intended for evaluating subsystem *output ports* (not diagram
+          `diagram.outputs`).
+        - Blocks must use JAX-traceable operations in their `f`/`h`/port
+          compute functions. Python-side branching on traced values will fail.
+        - This backend does not attempt to differentiate through SciPy/solve_ivp
+          (trajectory rollout lives outside this function).
+
+        Parameters
+        ----------
+        output_ports : list[tuple[str, str]]
+            List of `(sys_id, port_id)` to return.
+        jit : bool
+            If True, wrap the returned callable in `jax.jit`.
+
+        Returns
+        -------
+        callable
+            Function with signature: `fn(x, u, t) -> y_concat`, where:
+            - `x` is the diagram state vector (shape `(self.n,)`)
+            - `u` is the diagram external input vector (shape `(self.m,)`)
+            - `t` is a scalar time
+            - return is concatenated outputs for `output_ports` in order.
+        """
+
+        # Ensure compilation artifacts exist (execution_plan + slices).
+        if not self.compiled:
+            self.compile()
+
+        try:
+            import jax
+            import jax.numpy as jnp
+        except ImportError as e:
+            raise ImportError(
+                "JAX is required for compile_jax(). Install `jax` and `jaxlib`."
+            ) from e
+
+        output_ports = list(output_ports)
+        out_slices = [self.output_slices[(sys_id, port_id)] for sys_id, port_id in output_ports]
+
+        # Cache the plan locally to reduce Python attribute lookups in the hot path.
+        port_plan = self.port_execution_plan
+        output_dim_total = sum(s.stop - s.start for s in out_slices)
+
+        def eval_outputs(x, u, t=0.0):
+            # NOTE: dtype inference is best-effort; if x and u are both empty,
+            # default to float32.
+            sample = x if getattr(x, "size", 0) else u
+            dtype = getattr(sample, "dtype", None)
+            if dtype is None:
+                dtype = jnp.float32
+
+            # Evaluate all subsystem outputs into a global flat buffer.
+            global_signals = jnp.zeros(self.global_signals.shape[0], dtype=dtype)
+
+            for compute_func, local_x_slice, gather_sources, out_slice, u_dim in port_plan:
+                local_x = x[local_x_slice]
+
+                if u_dim == 0:
+                    local_u = jnp.array([], dtype=dtype)
+                else:
+                    # Build local_u without in-place mutation (JAX-friendly).
+                    pieces = []
+                    for src_type, src_val, dim in gather_sources:
+                        if src_type == 2:  # global_signals
+                            pieces.append(global_signals[src_val])
+                        elif src_type == 0:  # nominal (constant)
+                            pieces.append(jnp.asarray(src_val, dtype=dtype))
+                        elif src_type == 1:  # external diagram input vector
+                            pieces.append(u[src_val])
+                        else:
+                            raise RuntimeError(f"Unknown source_type={src_type}")
+
+                    local_u = jnp.concatenate(pieces, axis=0) if pieces else jnp.array([], dtype=dtype)
+
+                y_out = compute_func(local_x, local_u, t)
+                global_signals = global_signals.at[out_slice].set(y_out)
+
+            # Return selected outputs in the requested order.
+            out_pieces = [global_signals[s] for s in out_slices]
+            y_concat = jnp.concatenate(out_pieces, axis=0) if out_pieces else jnp.zeros((output_dim_total,), dtype=dtype)
+            return y_concat
+
+        if jit:
+            return jax.jit(eval_outputs)
+        return eval_outputs
+
+    def f_fast_jax(self, x, u, t=0.0):
+        """
+        JAX-compatible variant of `f_fast`.
+
+        Returns the diagram state derivative `dx` computed from subsystem `f`
+        functions and input/output port wiring.
+
+        Prototype limitations:
+        - Subsystems must be JAX-traceable.
+        - External inputs `u` are treated as differentiable; gradients flow
+          through the diagram evaluation (but not through solve_ivp).
+        """
+        if not self.compiled:
+            self.compile()
+
+        try:
+            import jax.numpy as jnp
+        except ImportError as e:
+            raise ImportError(
+                "JAX is required for f_fast_jax(). Install `jax` and `jaxlib`."
+            ) from e
+
+        sample = x if getattr(x, "size", 0) else u
+        dtype = getattr(sample, "dtype", None)
+        if dtype is None:
+            dtype = jnp.float32
+
+        global_signals = jnp.zeros(self.global_signals.shape[0], dtype=dtype)
+
+        # 1) Compute all output ports (same logic as compile_jax).
+        for compute_func, local_x_slice, gather_sources, out_slice, u_dim in self.port_execution_plan:
+            local_x = x[local_x_slice]
+            if u_dim == 0:
+                local_u = jnp.array([], dtype=dtype)
+            else:
+                pieces = []
+                for src_type, src_val, dim in gather_sources:
+                    if src_type == 2:  # global_signals
+                        pieces.append(global_signals[src_val])
+                    elif src_type == 0:  # nominal
+                        pieces.append(jnp.asarray(src_val, dtype=dtype))
+                    elif src_type == 1:  # external diagram input vector
+                        pieces.append(u[src_val])
+                    else:
+                        raise RuntimeError(f"Unknown source_type={src_type}")
+                local_u = jnp.concatenate(pieces, axis=0)
+
+            y_out = compute_func(local_x, local_u, t)
+            global_signals = global_signals.at[out_slice].set(y_out)
+
+        # 2) Compute state derivatives via subsystem f calls.
+        dx = jnp.zeros(self.n, dtype=dtype)
+        for f_func, local_x_slice, gather_sources, u_dim in self.state_execution_plan:
+            local_x = x[local_x_slice]
+            if u_dim == 0:
+                local_u = jnp.array([], dtype=dtype)
+            else:
+                pieces = []
+                for src_type, src_val, dim in gather_sources:
+                    if src_type == 2:  # global_signals
+                        pieces.append(global_signals[src_val])
+                    elif src_type == 0:  # nominal
+                        pieces.append(jnp.asarray(src_val, dtype=dtype))
+                    elif src_type == 1:  # external diagram input vector
+                        pieces.append(u[src_val])
+                    else:
+                        raise RuntimeError(f"Unknown source_type={src_type}")
+                local_u = jnp.concatenate(pieces, axis=0)
+
+            dx_piece = f_func(local_x, local_u, t)
+            dx = dx.at[local_x_slice].set(dx_piece)
+
+        return dx
+
+    ######################################################################
     # Graphical Animation Engine Defaults for Diagram
     ######################################################################
     def get_kinematic_geometry(self):
