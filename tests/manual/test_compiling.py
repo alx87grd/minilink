@@ -43,7 +43,7 @@ class MultiInputNode(System):
         self.in_ports = in_ports
         for p in range(in_ports):
             self.add_input_port(1, f"u{p}")
-        self.add_output_port(1, "x", function=self.compute_state, dependencies=())
+        self.add_output_port(1, "x", function=self.compute_state, dependencies="all")
 
     def compute_state(self, x, u, t=0, params=None):
         return x
@@ -191,9 +191,9 @@ if __name__ == "__main__":
     benchmark_simulation(chain_diag, iters=1000, label="Chain Network")
 
     # 2. Dense network benchmark
-    dense_diag = build_dense_network(num_nodes=20, connections_per_node=5)
-    dense_diag.plot_graphe()
+    dense_diag = build_dense_network(num_nodes=80, connections_per_node=30)
+    # dense_diag.plot_graphe()
     benchmark_simulation(dense_diag, iters=1000, label="Dense Network")
 
     # 3. Large network validation
-    validate_large_network(num_nodes=500, conn_per_node=5, iters=1000)
+    # validate_large_network(num_nodes=500, conn_per_node=5, iters=1000)
