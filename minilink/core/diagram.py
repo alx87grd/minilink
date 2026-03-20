@@ -392,6 +392,18 @@ class DiagramSystem(System):
         self.compiled = True
 
     ######################################################################
+    def compile_numpy_pipeline(self):
+        """
+        Prototype external compiler entrypoint (Option 1 architecture).
+
+        This keeps the existing in-class compilation/execution methods intact
+        while returning a separate compiled artifact object.
+        """
+        from minilink.compile.api import compile_numpy
+
+        return compile_numpy(self)
+
+    ######################################################################
     def get_local_input(self, x, u, t, sys_id, dependencies="all"):
         """
         Get the input signal for a given subsystem
