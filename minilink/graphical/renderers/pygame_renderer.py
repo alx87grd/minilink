@@ -152,116 +152,62 @@ class PygameRenderer(AnimationRenderer):
     def __init__(self, animator):
         super().__init__(animator)
         self._size = (800, 600)
+        self.pygame = None
+        self.screen = None
+        self.is_3d = False
+        self.show = True
 
-    def _paint_frame(self, screen, primitives, transforms, pygame_mod, t: float, is_3d: bool):
+    def _paint_frame(self, primitives, transforms, t: float):
+        pygame_mod = self.pygame
+        screen = self.screen
         pygame_mod.display.set_caption(f"{self.sys.name} — t = {t:.2f} s")
-        canvas = PygameCanvas(screen, self.animator, is_3d=is_3d)
+        canvas = PygameCanvas(screen, self.animator, is_3d=self.is_3d)
         screen.fill((250, 250, 250))
         for prim, T in zip(primitives, transforms):
             canvas.draw_primitive(prim, T, pygame_mod)
         pygame_mod.display.flip()
 
-    def render_static(self, x, u, t: float, is_3d: bool) -> None:
-        pygame = _import_pygame()
-        pygame.init()
+    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
+        self.pygame = _import_pygame()
+        self.pygame.init()
+        self.is_3d = is_3d
+        self.show = show
+        if show:
+            self.screen = self.pygame.display.set_mode(self._size)
+            if title:
+                self.pygame.display.set_caption(title)
 
-        primitives = self.sys.get_kinematic_geometry()
-        transforms = self.sys.get_kinematic_transforms(x, u, t)
-        if len(primitives) != len(transforms):
-            raise ValueError(
-                "System graphical error: Number of transforms must equal number of base geometric primitives."
-            )
+    def draw_frame(self, primitives, transforms, t: float) -> None:
+        if not self.show or self.screen is None:
+            return
+        self._paint_frame(primitives, transforms, t)
 
-        screen = pygame.display.set_mode(self._size)
-        self._paint_frame(screen, primitives, transforms, pygame, t, is_3d)
+    def present(self, *, block: bool, interval_s: float | None = None) -> None:
+        if not self.show:
+            return
+        if block:
+            clock = self.pygame.time.Clock()
+            while True:
+                events = self.poll_events()
+                if events.get("quit", False):
+                    break
+                clock.tick(30)
+        elif interval_s is not None:
+            fps = max(1, int(round(1.0 / max(interval_s, 1e-3))))
+            self.pygame.time.Clock().tick(fps)
 
-        clock = pygame.time.Clock()
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    running = False
-            clock.tick(30)
-        pygame.quit()
+    def poll_events(self) -> dict[str, bool]:
+        if self.pygame is None:
+            return {"quit": True}
+        for event in self.pygame.event.get():
+            if event.type == self.pygame.QUIT:
+                return {"quit": True}
+            if event.type == self.pygame.KEYDOWN and event.key == self.pygame.K_ESCAPE:
+                return {"quit": True}
+        return {"quit": False}
 
-    def render_animation(
-        self,
-        traj,
-        *,
-        time_factor_video: float,
-        is_3d: bool,
-        save: bool,
-        file_name: str,
-        show: bool,
-        html: bool,
-    ):
-        if html:
-            print(
-                "html=True is only supported for renderer='matplotlib'; "
-                "ignoring html for pygame animation."
-            )
-        if save:
-            print(
-                f"save=True (GIF to {file_name!r}) is not supported for "
-                "renderer='pygame'; skipping export."
-            )
-
-        from minilink.graphical.renderers.timing import (
-            sim_index_for_frame,
-            trajectory_frame_schedule,
-        )
-
-        pygame = _import_pygame()
-        pygame.init()
-
-        primitives = self.sys.get_kinematic_geometry()
-        sched = trajectory_frame_schedule(traj, time_factor_video)
-        n_frames = sched.n_frames
-        if n_frames <= 0:
-            pygame.quit()
-            return None
-
-        if not show:
-            pygame.quit()
-            return None
-
-        screen = pygame.display.set_mode(self._size)
-        pygame.display.set_caption(f"Animation: {self.sys.name}")
-        canvas = PygameCanvas(screen, self.animator, is_3d=is_3d)
-        clock = pygame.time.Clock()
-
-        running = True
-        for frame_idx in range(n_frames):
-            if not running:
-                break
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    running = False
-
-            sim_idx = sim_index_for_frame(frame_idx, sched)
-            x = traj.x[:, sim_idx]
-            if len(traj.u) > 0:
-                u = traj.u[:, sim_idx]
-            else:
-                u = np.array([])
-            t = traj.t[sim_idx]
-
-            transforms = self.sys.get_kinematic_transforms(x, u, t)
-            if len(primitives) != len(transforms):
-                raise ValueError(
-                    "System graphical error: Number of transforms must equal number of base geometric primitives."
-                )
-
-            screen.fill((250, 250, 250))
-            for prim, T in zip(primitives, transforms):
-                canvas.draw_primitive(prim, T, pygame)
-            pygame.display.flip()
-
-            clock.tick(int(sched.target_fps))
-
-        pygame.quit()
-        return None
+    def close_scene(self) -> None:
+        if self.pygame is not None:
+            self.pygame.quit()
+        self.pygame = None
+        self.screen = None

@@ -21,19 +21,29 @@ class AnimationRenderer(ABC):
         self.sys = animator.sys
 
     @abstractmethod
-    def render_static(self, x, u, t: float, is_3d: bool) -> None:
-        """Show a single frame for state *x*, input *u*, time *t*."""
+    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
+        """Initialize backend resources for one render session."""
 
     @abstractmethod
-    def render_animation(
-        self,
-        traj,
-        *,
-        time_factor_video: float,
-        is_3d: bool,
-        save: bool,
-        file_name: str,
-        show: bool,
-        html: bool,
-    ) -> Any:
-        """Play or export a trajectory. Return value is backend-specific (e.g. matplotlib animation)."""
+    def draw_frame(self, primitives, transforms, t: float) -> None:
+        """Draw one frame from precomputed transforms."""
+
+    @abstractmethod
+    def present(self, *, block: bool, interval_s: float | None = None) -> None:
+        """Present the currently drawn frame and optionally block/sleep."""
+
+    def poll_events(self) -> dict[str, Any]:
+        """Return backend events/state for interactive loops."""
+        return {}
+
+    @abstractmethod
+    def close_scene(self) -> None:
+        """Release/close backend resources for the current session."""
+
+    def render_inline_animation(self, primitives, frames, schedule) -> Any:
+        """Optional notebook inline output (default: unsupported)."""
+        raise NotImplementedError("Inline animation is not supported by this renderer.")
+
+    def export_animation(self, primitives, frames, schedule, file_name: str) -> None:
+        """Optional animation export (default: unsupported)."""
+        raise NotImplementedError("Animation export is not supported by this renderer.")

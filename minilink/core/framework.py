@@ -620,8 +620,8 @@ class System:
                 traj = self.compute_trajectory()
 
         animator = Animator(self)
-        # We don't want blocking plt.show() when generating HTML (matplotlib only)
-        show_plot = not html
+        # We don't want blocking window show when generating matplotlib HTML inline.
+        show_plot = not (html and renderer == "matplotlib")
         ani_obj = animator.animate_simulation(
             traj,
             time_factor_video=time_factor_video,
@@ -640,6 +640,35 @@ class System:
             except ImportError:
                 print("IPython is not available to display HTML inline")
             return ani_obj
+
+    ######################################################################
+    def game(
+        self,
+        *,
+        dt=1 / 30.0,
+        renderer="pygame",
+        is_3d=False,
+        x0=None,
+        u0=None,
+        t0=0.0,
+        max_steps=None,
+    ):
+        """
+        Prototype real-time interactive mode (Euler integration + keyboard).
+
+        The keyboard is polled via pygame (input only). Rendering is performed
+        using the selected ``renderer`` backend.
+        """
+        animator = Animator(self)
+        return animator.game(
+            dt=dt,
+            renderer=renderer,
+            is_3d=is_3d,
+            x0=self.x0 if x0 is None else x0,
+            u0=np.zeros(self.m) if u0 is None else u0,
+            t0=t0,
+            max_steps=max_steps,
+        )
 
     ######################################################################
     # Graphical Animation Engine Baseline

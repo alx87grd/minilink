@@ -133,6 +133,12 @@ class MatplotlibCanvas:
 class MatplotlibRenderer(AnimationRenderer):
     """Static matplotlib figure and GIF / notebook HTML animation."""
 
+    def __init__(self, animator):
+        super().__init__(animator)
+        self.fig = None
+        self.ax = None
+        self.canvas = None
+
     def _create_figure_and_ax(self, is_3d):
         a = self.animator
         fig = plt.figure(figsize=a.figsize, dpi=a.dpi)
@@ -157,96 +163,69 @@ class MatplotlibRenderer(AnimationRenderer):
 
         return fig, ax
 
-    def render_static(self, x, u, t: float, is_3d: bool) -> None:
-        fig, ax = self._create_figure_and_ax(is_3d)
-        canvas = MatplotlibCanvas(ax, is_3d=is_3d)
+    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
+        self.fig, self.ax = self._create_figure_and_ax(is_3d)
+        self.canvas = MatplotlibCanvas(self.ax, is_3d=is_3d)
+        if title:
+            self.ax.set_title(title)
 
-        primitives = self.sys.get_kinematic_geometry()
-        transforms = self.sys.get_kinematic_transforms(x, u, t)
-
-        if len(primitives) != len(transforms):
-            raise ValueError(
-                "System graphical error: Number of transforms must equal number of base geometric primitives."
-            )
-
+    def draw_frame(self, primitives, transforms, t: float) -> None:
+        self.canvas.clear()
         for prim, T in zip(primitives, transforms):
-            canvas.draw_primitive(prim, T)
+            self.canvas.draw_primitive(prim, T)
+        self.ax.set_title(f"Time = {t:.2f} s")
 
-        ax.set_title(f"Time = {t:.2f} s")
-        plt.show(block=True)
+    def present(self, *, block: bool, interval_s: float | None = None) -> None:
+        if block:
+            plt.show(block=True)
+            return
+        plt.pause(0.001 if interval_s is None else interval_s)
 
-    def render_animation(
-        self,
-        traj,
-        *,
-        time_factor_video: float,
-        is_3d: bool,
-        save: bool,
-        file_name: str,
-        show: bool,
-        html: bool,
-    ):
-        fig, ax = self._create_figure_and_ax(is_3d)
-        canvas = MatplotlibCanvas(ax, is_3d=is_3d)
-        primitives = self.sys.get_kinematic_geometry()
+    def poll_events(self) -> dict[str, bool]:
+        if self.fig is None:
+            return {"quit": True}
+        return {"quit": not plt.fignum_exists(self.fig.number)}
 
-        from minilink.graphical.renderers.timing import (
-            sim_index_for_frame,
-            trajectory_frame_schedule,
-        )
+    def close_scene(self) -> None:
+        if self.fig is not None:
+            plt.close(self.fig)
+        self.fig = None
+        self.ax = None
+        self.canvas = None
 
-        sched = trajectory_frame_schedule(traj, time_factor_video)
-        n_frames = sched.n_frames
-        interval_ms = sched.interval_ms
-        target_fps = sched.target_fps
-        time_template = "Time = %.2f s"
+    def _build_animation(self, primitives, frames, schedule):
+        fig, ax = self._create_figure_and_ax(is_3d=False)
+        canvas = MatplotlibCanvas(ax, is_3d=False)
 
         def update(frame_idx):
+            frame = frames[frame_idx]
             canvas.clear()
-            sim_idx = sim_index_for_frame(frame_idx, sched)
-            x = traj.x[:, sim_idx]
-            if len(traj.u) > 0:
-                u = traj.u[:, sim_idx]
-            else:
-                u = np.array([])
-            t = traj.t[sim_idx]
-
-            transforms = self.sys.get_kinematic_transforms(x, u, t)
-
-            if len(primitives) != len(transforms):
-                raise ValueError(
-                    "System graphical error: Number of transforms must equal number of base geometric primitives."
-                )
-
-            for prim, T in zip(primitives, transforms):
+            for prim, T in zip(primitives, frame["transforms"]):
                 canvas.draw_primitive(prim, T)
-
-            ax.set_title(time_template % t)
+            ax.set_title(f"Time = {frame['t']:.2f} s")
             return canvas.drawn_objects
 
         ani = animation.FuncAnimation(
-            fig, update, frames=n_frames, interval=interval_ms, blit=False
+            fig,
+            update,
+            frames=len(frames),
+            interval=schedule.interval_ms,
+            blit=False,
         )
+        return fig, ani
 
-        if save:
-            print(f"Saving animation to {file_name}.gif ...")
-            ani.save(file_name + ".gif", writer="imagemagick", fps=target_fps)
+    def render_inline_animation(self, primitives, frames, schedule):
+        fig, ani = self._build_animation(primitives, frames, schedule)
+        plt.close(fig)
+        try:
+            from IPython.display import HTML
 
-        if html:
-            plt.close(fig)
-            try:
-                from IPython.display import HTML
+            return HTML(ani.to_jshtml())
+        except ImportError:
+            return ani
 
-                return HTML(ani.to_jshtml())
-            except ImportError:
-                print(
-                    "IPython is not available. Ensure you are running in a Jupyter Notebook environment."
-                )
-                return ani
-
-        if show:
-            plt.show(block=True)
-        else:
-            plt.close(fig)
-
-        return ani
+    def export_animation(self, primitives, frames, schedule, file_name: str) -> None:
+        fig, ani = self._build_animation(primitives, frames, schedule)
+        print(f"Saving animation to {file_name}.gif ...")
+        ani.save(file_name + ".gif", writer="imagemagick", fps=schedule.target_fps)
+        plt.close(fig)

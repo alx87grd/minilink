@@ -130,99 +130,33 @@ class MeshcatCanvas:
 class MeshcatRenderer(AnimationRenderer):
     """Browser-based playback; optional GIF/HTML not supported."""
 
-    def render_static(self, x, u, t: float, is_3d: bool) -> None:
+    def __init__(self, animator):
+        super().__init__(animator)
+        self.vis = None
+        self.canvas = None
+        self.show = True
+
+    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
         meshcat = _import_meshcat()
-        vis = meshcat.Visualizer()
-        canvas = MeshcatCanvas(vis, is_3d=is_3d)
+        self.show = show
+        self.vis = meshcat.Visualizer()
+        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        if show:
+            self.vis.open()
+            self.vis.wait()
 
-        primitives = self.sys.get_kinematic_geometry()
-        transforms = self.sys.get_kinematic_transforms(x, u, t)
-
-        if len(primitives) != len(transforms):
-            raise ValueError(
-                "System graphical error: Number of transforms must equal number of base geometric primitives."
-            )
-
-        canvas.clear()
+    def draw_frame(self, primitives, transforms, t: float) -> None:
+        self.canvas.clear()
         for prim, T in zip(primitives, transforms):
-            canvas.draw_primitive(prim, T)
+            self.canvas.draw_primitive(prim, T)
 
-        vis.open()
-        vis.wait()
-        print(f"Static frame (t = {t:.2f} s).")
-        input("Press Enter to exit meshcat viewer...")
-
-    def render_animation(
-        self,
-        traj,
-        *,
-        time_factor_video: float,
-        is_3d: bool,
-        save: bool,
-        file_name: str,
-        show: bool,
-        html: bool,
-    ):
-        if html:
-            print(
-                "html=True is only supported for renderer='matplotlib'; "
-                "ignoring html for meshcat animation."
-            )
-        if save:
-            print(
-                f"save=True (GIF to {file_name!r}) is not supported for "
-                "renderer='meshcat'; skipping export."
-            )
-
-        from minilink.graphical.renderers.timing import (
-            sim_index_for_frame,
-            trajectory_frame_schedule,
-        )
-
-        meshcat = _import_meshcat()
-        vis = meshcat.Visualizer()
-        canvas = MeshcatCanvas(vis, is_3d=is_3d)
-        primitives = self.sys.get_kinematic_geometry()
-
-        sched = trajectory_frame_schedule(traj, time_factor_video)
-        n_frames = sched.n_frames
-        nsteps = sched.nsteps
-        interval_s = sched.interval_ms / 1000.0
-
-        if n_frames <= 0:
-            return None
-
-        if show:
-            vis.open()
-            vis.wait()
-
-        sim_idx = 0
-        for frame_idx in range(n_frames):
-            canvas.clear()
-            sim_idx = sim_index_for_frame(frame_idx, sched)
-            x = traj.x[:, sim_idx]
-            if len(traj.u) > 0:
-                u = traj.u[:, sim_idx]
-            else:
-                u = np.array([])
-
-            transforms = self.sys.get_kinematic_transforms(x, u, traj.t[sim_idx])
-
-            if len(primitives) != len(transforms):
-                raise ValueError(
-                    "System graphical error: Number of transforms must equal number of base geometric primitives."
-                )
-
-            for prim, T in zip(primitives, transforms):
-                canvas.draw_primitive(prim, T)
-
-            if show and frame_idx < n_frames - 1:
-                time.sleep(interval_s)
-
-        if show:
-            print(
-                f"Meshcat animation finished (last frame t = {traj.t[sim_idx]:.2f} s)."
-            )
+    def present(self, *, block: bool, interval_s: float | None = None) -> None:
+        if block:
+            print("Meshcat static frame ready.")
             input("Press Enter to exit meshcat viewer...")
+        elif self.show and interval_s is not None:
+            time.sleep(interval_s)
 
-        return None
+    def close_scene(self) -> None:
+        self.canvas = None
+        self.vis = None
