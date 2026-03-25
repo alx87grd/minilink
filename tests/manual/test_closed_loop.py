@@ -44,4 +44,8 @@ diagram.compute_trajectory(tf=20)
 
 diagram.plot_graphe()
 
+
 diagram.animate()
+# renderer = "meshcat"
+# renderer = "pygame"
+# diagram.animate(renderer=renderer)

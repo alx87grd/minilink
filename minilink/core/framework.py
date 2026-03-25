@@ -558,7 +558,7 @@ class System:
         return traj
 
     ######################################################################
-    def render(self, x, u, t, is_3d=False):
+    def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
         """
         Render the system's graphical representation for a given state, input, and time.
 
@@ -572,6 +572,8 @@ class System:
             The current time.
         is_3d : bool, optional
             Whether to render in 3D (default is False).
+        renderer : str, optional
+            ``matplotlib``, ``meshcat``, or ``pygame`` (default is ``matplotlib``).
 
         Returns
         -------
@@ -579,9 +581,16 @@ class System:
             This function renders the system but does not return any value.
         """
         animator = Animator(self)
-        animator.show(x, u, t, is_3d=is_3d)
+        animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
 
-    def animate(self, traj=None, time_factor_video=1.0, is_3d=False, html=False):
+    def animate(
+        self,
+        traj=None,
+        time_factor_video=1.0,
+        is_3d=False,
+        html=False,
+        renderer="matplotlib",
+    ):
         """
         Animate a given trajectory of the system.
 
@@ -595,11 +604,14 @@ class System:
             Whether to render in 3D (default is False).
         html : bool, optional
             Whether to return an interactive HTML rendering for Jupyter notebooks (default is False).
+            Only applies when ``renderer`` is ``matplotlib``.
+        renderer : str, optional
+            ``matplotlib``, ``meshcat``, or ``pygame`` (default is ``matplotlib``).
 
         Returns
         -------
         None or IPython.display.HTML
-            If html=True, returns the HTML object to display inline.
+            If html=True and renderer is matplotlib, returns the HTML object to display inline.
         """
         if traj is None:
             if self.traj is not None:
@@ -608,7 +620,7 @@ class System:
                 traj = self.compute_trajectory()
 
         animator = Animator(self)
-        # We don't want blocking plt.show() when generating HTML
+        # We don't want blocking plt.show() when generating HTML (matplotlib only)
         show_plot = not html
         ani_obj = animator.animate_simulation(
             traj,
@@ -616,13 +628,15 @@ class System:
             is_3d=is_3d,
             html=html,
             show=show_plot,
+            renderer=renderer,
         )
 
-        if html:
+        if html and renderer == "matplotlib":
             try:
                 import IPython.display as display
 
-                display.display(ani_obj)
+                if ani_obj is not None:
+                    display.display(ani_obj)
             except ImportError:
                 print("IPython is not available to display HTML inline")
             return ani_obj

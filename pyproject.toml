@@ -21,6 +21,10 @@ dev = [
     "ruff",
     "mypy",
 ]
+visualization = [
+    "meshcat",
+    "pygame",
+]
 
 [tool.ruff]
 line-length = 88

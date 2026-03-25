@@ -1,211 +1,63 @@
-import matplotlib.animation as animation
-import matplotlib.patches as patches
-import matplotlib.pyplot as plt
-import numpy as np
+"""
+Trajectory animation orchestration.
 
-from minilink.graphical.primitives import Circle, CustomLine, Point
+Backends live under :mod:`minilink.graphical.renderers`; the animator picks one by name
+(see :func:`_make_renderer`).
+"""
+
+from __future__ import annotations
+
+from minilink.graphical.renderers.base import AnimationRenderer
+from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
+from minilink.graphical.renderers.meshcat_renderer import MeshcatRenderer
+from minilink.graphical.renderers.pygame_renderer import PygameRenderer
+
+__all__ = [
+    "Animator",
+    "AnimationRenderer",
+    "MatplotlibRenderer",
+    "MeshcatRenderer",
+    "PygameRenderer",
+]
 
 
-######################################################################
-class MatplotlibRenderer:
+def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
     """
-    A renderer backend that knows how to map GraphicPrimitives
-    and Transformation Matrices onto Matplotlib artists.
+    Return a backend instance for *name* (``matplotlib``, ``meshcat``, ``pygame``).
+
+    To add a backend, implement :class:`~minilink.graphical.renderers.base.AnimationRenderer`
+    and extend this function.
     """
-
-    def __init__(self, ax, is_3d=False):
-        self.ax = ax
-        self.is_3d = is_3d
-        self.drawn_objects = []
-
-    def draw_primitive(self, primitive, transform_matrix):
-        """
-        Takes a base GraphicPrimitive and its 4x4 Transformation Matrix
-        and draws it on the Matplotlib axis.
-        """
-        if isinstance(primitive, Point):
-            # The primitive's local point is [x, y, z]
-            # Convert to homogeneous coordinates [x, y, z, 1.0]
-            local_pt = np.append(primitive.pt, 1.0)
-
-            # Apply the SE(3) transformation matrix
-            world_pt = transform_matrix @ local_pt
-
-            x, y, z = world_pt[0], world_pt[1], world_pt[2]
-
-            # Draw on matplotlib
-            if self.is_3d:
-                (obj,) = self.ax.plot(
-                    [x],
-                    [y],
-                    [z],
-                    marker=primitive.marker,
-                    color=primitive.color,
-                    markersize=primitive.size,
-                )
-            else:
-                (obj,) = self.ax.plot(
-                    [x],
-                    [y],
-                    marker=primitive.marker,
-                    color=primitive.color,
-                    markersize=primitive.size,
-                )
-
-            self.drawn_objects.append(obj)
-
-        elif isinstance(primitive, CustomLine):
-            # primitive.pts is Nx2 or Nx3. We need to convert each point to world pts.
-            local_pts = primitive.pts
-            if local_pts.shape[1] == 2:
-                local_pts_hom = np.hstack(
-                    (local_pts, np.zeros((local_pts.shape[0], 1)))
-                )
-            else:
-                local_pts_hom = local_pts
-            local_pts_hom = np.hstack((local_pts_hom, np.ones((local_pts.shape[0], 1))))
-
-            # Apply the SE(3) transformation matrix
-            world_pts = (transform_matrix @ local_pts_hom.T).T
-
-            x = world_pts[:, 0]
-            y = world_pts[:, 1]
-            z = world_pts[:, 2]
-
-            if self.is_3d:
-                (obj,) = self.ax.plot(
-                    x,
-                    y,
-                    z,
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle=primitive.style,
-                )
-            else:
-                (obj,) = self.ax.plot(
-                    x,
-                    y,
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle=primitive.style,
-                )
-            self.drawn_objects.append(obj)
-
-        elif isinstance(primitive, Circle):
-            local_center = np.zeros(3)
-            local_center[: len(primitive.center)] = primitive.center
-            local_center = np.append(local_center, 1.0)
-
-            # Apply the SE(3) transformation matrix
-            world_center = transform_matrix @ local_center
-
-            x, y, z = world_center[0], world_center[1], world_center[2]
-
-            if self.is_3d:
-                # Approximate circle with a line in 3D
-                th = np.linspace(0, 2 * np.pi, 50)
-                # Circle in local XY plane
-                pts_z = primitive.center[2] if len(primitive.center) > 2 else 0.0
-                pts = np.vstack(
-                    (
-                        primitive.center[0] + primitive.radius * np.cos(th),
-                        primitive.center[1] + primitive.radius * np.sin(th),
-                        np.full_like(th, pts_z),
-                        np.ones_like(th),
-                    )
-                )
-                world_pts = transform_matrix @ pts
-
-                (obj,) = self.ax.plot(
-                    world_pts[0, :],
-                    world_pts[1, :],
-                    world_pts[2, :],
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle=primitive.style,
-                )
-                self.drawn_objects.append(obj)
-            else:
-                circ = patches.Circle(
-                    (x, y),
-                    radius=primitive.radius,
-                    ec=primitive.color,
-                    fill=primitive.fill,
-                    fc=primitive.color if primitive.fill else "none",
-                    linewidth=primitive.linewidth,
-                    linestyle=primitive.style,
-                )
-                obj = self.ax.add_patch(circ)
-                self.drawn_objects.append(obj)
-
-    def clear(self):
-        """Removes all currently drawn temporary objects from the axes."""
-        for obj in self.drawn_objects:
-            obj.remove()
-        self.drawn_objects.clear()
+    key = name.strip().lower()
+    if key == "matplotlib":
+        return MatplotlibRenderer(animator)
+    if key == "meshcat":
+        return MeshcatRenderer(animator)
+    if key == "pygame":
+        return PygameRenderer(animator)
+    raise ValueError(
+        f"Unknown renderer {name!r}. Expected 'matplotlib', 'meshcat', or 'pygame'."
+    )
 
 
-######################################################################
 class Animator:
     """
-    The main coordinator for playing back trajectories.
-    It takes a simulated System, loops through its trajectory,
-    and asks the backend Renderer to draw the primitives frame-by-frame.
+    Coordinates playback: owns display settings and the simulated system,
+    and delegates drawing to an :class:`AnimationRenderer`.
     """
 
     def __init__(self, sys):
         self.sys = sys
 
-        # Display settings
+        # Display settings (used by backends such as matplotlib)
         self.figsize = (8, 6)
         self.dpi = 100
-        # Placeholder default clipping domain, this could later be moved to `sys.get_graphic_domain()`
         self.domain = [[-10, 10], [-10, 10], [-10, 10]]
 
-    def _create_figure_and_ax(self, is_3d):
-        fig = plt.figure(figsize=self.figsize, dpi=self.dpi)
-        fig.canvas.manager.set_window_title(f"Animation: {self.sys.name}")
-
-        if is_3d:
-            ax = fig.add_subplot(111, projection="3d")
-            ax.set_xlim3d(self.domain[0])
-            ax.set_ylim3d(self.domain[1])
-            ax.set_zlim3d(self.domain[2])
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.set_zlabel("Z")
-        else:
-            ax = fig.add_subplot(111)
-            ax.set_xlim(self.domain[0])
-            ax.set_ylim(self.domain[1])
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.grid(True)
-            ax.set_aspect("equal")
-
-        return fig, ax
-
-    def show(self, x, u, t=0.0, is_3d=False):
-        """
-        Renders a single static frame of the system at state x, u, t.
-        """
-        fig, ax = self._create_figure_and_ax(is_3d)
-        renderer = MatplotlibRenderer(ax, is_3d=is_3d)
-
-        primitives = self.sys.get_kinematic_geometry()
-        transforms = self.sys.get_kinematic_transforms(x, u, t)
-
-        if len(primitives) != len(transforms):
-            raise ValueError(
-                "System graphical error: Number of transforms must equal number of base geometric primitives."
-            )
-
-        # Draw all static geometries
-        for prim, T in zip(primitives, transforms):
-            renderer.draw_primitive(prim, T)
-
-        ax.set_title(f"Time = {t:.2f} s")
-        plt.show(block=True)
+    def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib"):
+        """Renders a single static frame of the system at state *x*, *u*, *t*."""
+        backend = _make_renderer(renderer, self)
+        backend.render_static(x, u, t, is_3d)
 
     def animate_simulation(
         self,
@@ -216,84 +68,16 @@ class Animator:
         file_name="Animation",
         show=True,
         html=False,
+        renderer="matplotlib",
     ):
-        """
-        Plays back a full simulation trajectory.
-        """
-        fig, ax = self._create_figure_and_ax(is_3d)
-        renderer = MatplotlibRenderer(ax, is_3d=is_3d)
-
-        # We grab the base geometry just once!
-        primitives = self.sys.get_kinematic_geometry()
-
-        nsteps = traj.t.size
-        # The physical time between simulation steps
-        sim_dt = (traj.t[-1] - traj.t[0]) / (nsteps - 1)
-
-        # Fast/Slow motion playback math
-        target_fps = 30.0
-        frame_dt = 1.0 / target_fps
-        video_dt = frame_dt * time_factor_video
-
-        skip_steps = max(1, int(np.round(video_dt / sim_dt)))
-        interval_ms = (sim_dt * skip_steps / time_factor_video) * 1000.0
-
-        n_frames = int(nsteps / skip_steps)
-        time_template = "Time = %.2f s"
-
-        def update(frame_idx):
-            # 1. Clear old frame
-            renderer.clear()
-
-            # 2. Get simulation data for this frame
-            sim_idx = min(frame_idx * skip_steps, nsteps - 1)
-            x = traj.x[:, sim_idx]
-            if len(traj.u) > 0:
-                u = traj.u[:, sim_idx]
-            else:
-                u = np.array([])
-            t = traj.t[sim_idx]
-
-            # 3. Get transformation matrices from the system
-            transforms = self.sys.get_kinematic_transforms(x, u, t)
-
-            if len(primitives) != len(transforms):
-                raise ValueError(
-                    "System graphical error: Number of transforms must equal number of base geometric primitives."
-                )
-
-            # 4. Multiply and draw!
-            for prim, T in zip(primitives, transforms):
-                renderer.draw_primitive(prim, T)
-
-            ax.set_title(time_template % t)
-
-            # Return list of artists for blitting if needed in the future
-            return renderer.drawn_objects
-
-        ani = animation.FuncAnimation(
-            fig, update, frames=n_frames, interval=interval_ms, blit=False
+        """Plays back a full simulation trajectory."""
+        backend = _make_renderer(renderer, self)
+        return backend.render_animation(
+            traj,
+            time_factor_video=time_factor_video,
+            is_3d=is_3d,
+            save=save,
+            file_name=file_name,
+            show=show,
+            html=html,
         )
-
-        if save:
-            print(f"Saving animation to {file_name}.gif ...")
-            ani.save(file_name + ".gif", writer="imagemagick", fps=target_fps)
-
-        if html:
-            plt.close(fig)
-            try:
-                from IPython.display import HTML
-
-                return HTML(ani.to_jshtml())
-            except ImportError:
-                print(
-                    "IPython is not available. Ensure you are running in a Jupyter Notebook environment."
-                )
-                return ani
-
-        if show:
-            plt.show(block=True)
-        else:
-            plt.close(fig)
-
-        return ani
