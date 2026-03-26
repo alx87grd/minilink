@@ -63,8 +63,8 @@ class Pendulum(DynamicSystem):
 
         y = np.zeros(self.p)
 
-        y[0] = x[0] + v[0]
-        y[1] = x[1]
+        y[0] = x[0]
+        y[1] = x[1] + v[0]
 
         return y
 

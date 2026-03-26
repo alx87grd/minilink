@@ -145,6 +145,8 @@ class WhiteNoise(Source):
 
         rng = np.random.default_rng(seed)
         white = rng.normal(loc=mean, scale=sigma, size=(self.p, n_steps))
+        white[:, 0] = mean
+        white[:, -1] = mean
 
         self._interpolators = [
             interp1d(
@@ -152,7 +154,7 @@ class WhiteNoise(Source):
                 white[i, :],
                 kind="linear",
                 bounds_error=False,
-                fill_value=(white[i, 0], white[i, -1]),
+                fill_value=(mean, mean),
                 assume_sorted=True,
             )
             for i in range(self.p)

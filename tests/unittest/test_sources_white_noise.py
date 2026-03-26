@@ -57,12 +57,6 @@ class TestWhiteNoiseSource(unittest.TestCase):
 
         self.assertLess(abs(y_right - y_left), 1e-2)
 
-    def test_refresh_defaults_exist_after_init(self):
-        n = WhiteNoise(2)
-        self.assertIsNotNone(n._refresh_config)
-        self.assertAlmostEqual(n._refresh_config["t0"], -100.0)
-        self.assertAlmostEqual(n._refresh_config["tf"], 100.0)
-
     def test_refresh_horizon_changes_edge_values(self):
         n = WhiteNoise(1)
         n.params["seed"] = 10

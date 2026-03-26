@@ -23,14 +23,9 @@ ax.set_title("Baseline")
 
 # Change one parameter at a time to visualize each effect.
 demo_changes = [
-    ("mean", 10.0),
-    ("var", 8.0),
     ("sample_period", 0.05),
-    ("sample_period", 0.2),
     ("sample_period", 0.5),
     ("sample_period", 1.0),
-    ("sample_period", 2.0),
-    ("sample_period", 5.0),
 ]
 
 for key, value in demo_changes:
