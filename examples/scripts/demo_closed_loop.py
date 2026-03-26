@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.blocks.basic import Pendulum, PendulumPDController
+from minilink.blocks.tests import Pendulum, PendulumPDController
 from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 
@@ -8,7 +8,7 @@ from minilink.core.diagram import DiagramSystem
 sys = Pendulum()
 sys.params["m"] = 1.0
 sys.params["l"] = 5.0
-sys.x0[0] = 2.0
+sys.x0[0] = -2.0
 
 # Source input
 step = Step()
@@ -28,24 +28,24 @@ diagram.add_subsystem(step, "step")
 diagram.add_subsystem(ctl, "controller")
 diagram.add_subsystem(sys, "plant")
 
+
+# Unconnected controller -> plant
 diagram.connect("step", "y", "controller", "ref")
-
-diagram.compute_trajectory(tf=20)
-
-diagram.connect("controller", "u", "plant", "u")
-# diagram.compile()
-
-diagram.compute_trajectory(tf=20)
-
-diagram.connect("plant", "y", "controller", "y")
-# diagram.compile()
-
-diagram.compute_trajectory(tf=20)
-
+diagram.name = "Pendulum alone"
 diagram.plot_graphe()
-
-
+diagram.compute_trajectory(tf=20)
 diagram.animate()
-# renderer = "meshcat"
-# renderer = "pygame"
-# diagram.animate(renderer=renderer)
+
+# Open loop controller -> plant
+diagram.connect("controller", "u", "plant", "u")
+diagram.name = "Pendulum with Open Loop Controller"
+diagram.plot_graphe()
+diagram.compute_trajectory(tf=20)
+diagram.animate()
+
+# Closed loop controller -> plant
+diagram.connect("plant", "y", "controller", "y")
+diagram.name = "Closed Loop Pendulum "
+diagram.plot_graphe()
+diagram.compute_trajectory(tf=20)
+diagram.animate()

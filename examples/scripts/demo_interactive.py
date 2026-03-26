@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.blocks.basic import Pendulum
+from minilink.blocks.tests import Pendulum
 
 # Plant system
 sys = Pendulum()
@@ -13,7 +13,3 @@ sys.x0[0] = 0.0
 # sys.game(renderer="pygame")
 # sys.game(renderer="meshcat")
 sys.game(renderer="matplotlib")
-
-# sys.animate()
-# sys.animate(renderer="meshcat")
-# sys.animate(renderer="pygame")
