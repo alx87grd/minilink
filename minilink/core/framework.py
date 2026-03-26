@@ -217,6 +217,15 @@ class System:
         self.traj = None  # Store the last computed trajectory
 
     ######################################################################
+    def refresh(self):
+        """
+        Recompute derived internals from current parameters/topology.
+
+        Base implementation is a no-op and can be overridden by subclasses.
+        """
+        return
+
+    ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
         """
         Compute the state derivative `dx/dt`.

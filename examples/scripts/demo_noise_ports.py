@@ -23,12 +23,14 @@ noise = WhiteNoise(1)
 noise.params["var"] = 1.0
 noise.params["mean"] = 0.0
 noise.params["seed"] = 1
+# noise.show_noise_signal()
 
 # Noisy measurement
 noise2 = WhiteNoise(1)
 noise2.params["var"] = 0.1
 noise2.params["mean"] = 0.0
 noise2.params["seed"] = 2
+# noise2.show_noise_signal()
 
 # Closed loop system
 ctl = PendulumPDController()
@@ -53,25 +55,12 @@ diagram.plot_graphe()
 
 
 diagram.name = "Pendulum with Noise"
+diagram.compute_trajectory(tf=20)
 
-
-diagram.compute_trajectory(tf=20)  # takes forever with scipy solver
-# diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)
-
-
+diagram.name = "Pendulum with Noise (0.001)"
 diagram.subsystems["noise"].params["var"] = 0.001
-diagram.subsystems["noise"].refresh()
-diagram.subsystems["noise2"].params["var"] = 0.001
-diagram.subsystems["noise2"].refresh()
-
 diagram.compute_trajectory(tf=20)
-# diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)
 
-
+diagram.name = "Pendulum with Noise (10.0)"
 diagram.subsystems["noise"].params["var"] = 10.0
-diagram.subsystems["noise2"].refresh()
-diagram.subsystems["noise2"].params["var"] = 10.0
-diagram.subsystems["noise2"].refresh()
-
 diagram.compute_trajectory(tf=20)
-# traj = diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)

@@ -181,7 +181,8 @@ class Simulator:
     ############################################################
     def solve(self, show=False, **solver_args):
 
-        #
+        # Refresh the system to reflect changes in parameters
+        self.sys.refresh()
 
         # Local variables names
         sys = self.sys

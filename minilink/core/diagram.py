@@ -25,6 +25,8 @@ class DiagramSystem(System):
         self.graphe_building_verbose = True
         self.port_execution_order = []
 
+        self.refresh()
+
     ######################################################################
     def add_subsystem(self, sys, sys_id):
 
@@ -35,6 +37,7 @@ class DiagramSystem(System):
             self.connections[sys_id][port_id] = None  # No connection by default
 
         self.compute_state_properties()
+        self.compiled = False
 
     ######################################################################
     def compute_state_properties(self):
@@ -390,6 +393,15 @@ class DiagramSystem(System):
         self.check_algebraic_loops()
         self.build_execution_plan()
         self.compiled = True
+
+    ######################################################################
+    def refresh(self):
+        """
+        Refresh all subsystems and rebuild the compiled execution plan.
+        """
+        for _, sys in self.subsystems.items():
+            sys.refresh()
+        self.compile()
 
     ######################################################################
     def compile_numpy_pipeline(self):

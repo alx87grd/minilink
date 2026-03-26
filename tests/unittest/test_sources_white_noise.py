@@ -12,13 +12,17 @@ class TestWhiteNoiseSource(unittest.TestCase):
         n1 = WhiteNoise(1)
         n1.params["seed"] = 123
         n1.params["sample_period"] = 0.01
-        n1.refresh(t0=-1.0, tf=3.0)
+        n1.params["t0"] = -1.0
+        n1.params["tf"] = 3.0
+        n1.refresh()
         y1 = np.array([n1.h(np.array([]), np.array([]), t)[0] for t in times])
 
         n2 = WhiteNoise(1)
         n2.params["seed"] = 123
         n2.params["sample_period"] = 0.01
-        n2.refresh(t0=-1.0, tf=3.0)
+        n2.params["t0"] = -1.0
+        n2.params["tf"] = 3.0
+        n2.refresh()
         y2 = np.array([n2.h(np.array([]), np.array([]), t)[0] for t in times])
 
         self.assertTrue(np.allclose(y1, y2))
@@ -42,7 +46,9 @@ class TestWhiteNoiseSource(unittest.TestCase):
         n = WhiteNoise(1)
         n.params["seed"] = 77
         n.params["sample_period"] = 0.05
-        n.refresh(t0=0.0, tf=1.0)
+        n.params["t0"] = 0.0
+        n.params["tf"] = 1.0
+        n.refresh()
 
         t_left = 0.5 - 1e-6
         t_right = 0.5 + 1e-6
@@ -60,10 +66,14 @@ class TestWhiteNoiseSource(unittest.TestCase):
     def test_refresh_horizon_changes_edge_values(self):
         n = WhiteNoise(1)
         n.params["seed"] = 10
-        n.refresh(t0=-100.0, tf=100.0)
+        n.params["t0"] = -100.0
+        n.params["tf"] = 100.0
+        n.refresh()
         y_at_minus_five = n.h(np.array([]), np.array([]), -5.0)[0]
 
-        n.refresh(t0=0.0, tf=1.0)
+        n.params["t0"] = 0.0
+        n.params["tf"] = 1.0
+        n.refresh()
         y_left_clamped = n.h(np.array([]), np.array([]), -5.0)[0]
 
         self.assertNotEqual(y_at_minus_five, y_left_clamped)

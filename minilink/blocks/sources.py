@@ -26,6 +26,53 @@ class Source(System):
         y = params["value"]
         return y
 
+    ###################################################################
+    def show_signal(self, t0=None, tf=None, n_pts=1000, ax=None):
+        """
+        Plot the source output signal over a time range.
+
+        Parameters
+        ----------
+        t0 : float, optional
+            Start time. Defaults to ``self.params["t0"]`` when available, else 0.0.
+        tf : float, optional
+            End time. Defaults to ``self.params["tf"]`` when available, else 10.0.
+        n_pts : int, optional
+            Number of evaluation points used for plotting.
+        ax : matplotlib.axes.Axes, optional
+            Existing axis to draw on. If None, a new figure is created.
+        """
+        import matplotlib.pyplot as plt
+
+        self.refresh()
+
+        if t0 is None:
+            t0 = 0.0
+        if tf is None:
+            tf = 10.0
+        if n_pts < 2:
+            raise ValueError("n_pts must be >= 2")
+
+        t = np.linspace(t0, tf, int(n_pts))
+        y = np.array([self.h(np.array([]), np.array([]), ti) for ti in t]).T
+
+        if ax is None:
+            fig, ax = plt.subplots(1, 1, figsize=(8, 3))
+        else:
+            fig = ax.figure
+
+        for i in range(self.p):
+            label = f"{self.name}[{i}]" if self.p > 1 else self.name
+            ax.plot(t, y[i, :], linewidth=1.2, label=label)
+
+        ax.set_xlabel("time [s]")
+        ax.set_ylabel("value")
+        ax.set_title(f"{self.name} signal")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best")
+
+        return fig, ax
+
 
 ######################################################################
 class Step(Source):
@@ -69,25 +116,21 @@ class WhiteNoise(Source):
             "mean": 0.0,
             "seed": 0,
             "sample_period": 0.01,
+            "t0": -100.0,
+            "tf": 100.0,
         }
-
-        self._refresh_config = None
-        self._noise_time = None
-        self._noise_samples = None
-        self._interpolators = None
 
         # Keep source ready to use without an explicit refresh() call.
         self.refresh()
 
     ###################################################################
-    def refresh(self, t0=-100.0, tf=100.0, sample_period=None):
+    def refresh(self):
+        t0 = float(self.params["t0"])
+        tf = float(self.params["tf"])
         if tf < t0:
             t0, tf = tf, t0
 
-        if sample_period is None:
-            sample_period = float(self.params["sample_period"])
-        else:
-            sample_period = float(sample_period)
+        sample_period = float(self.params["sample_period"])
 
         if sample_period <= 0:
             raise ValueError("sample_period must be > 0")
@@ -103,42 +146,62 @@ class WhiteNoise(Source):
         rng = np.random.default_rng(seed)
         white = rng.normal(loc=mean, scale=sigma, size=(self.p, n_steps))
 
-        # Keep continuity shaping internal and tied to sample_period.
-        tau = sample_period
-        alpha = np.exp(-sample_period / tau)
-        shaped = np.empty_like(white)
-        shaped[:, 0] = white[:, 0]
-        for k in range(1, n_steps):
-            shaped[:, k] = alpha * shaped[:, k - 1] + (1.0 - alpha) * white[:, k]
-
         self._interpolators = [
             interp1d(
                 noise_time,
-                shaped[i, :],
+                white[i, :],
                 kind="linear",
                 bounds_error=False,
-                fill_value=(shaped[i, 0], shaped[i, -1]),
+                fill_value=(white[i, 0], white[i, -1]),
                 assume_sorted=True,
             )
             for i in range(self.p)
         ]
-        self._noise_time = noise_time
-        self._noise_samples = shaped
-        self._refresh_config = {
-            "t0": float(t0),
-            "tf": float(tf),
-            "sample_period": float(sample_period),
-            "mean": mean,
-            "var": var,
-            "seed": seed,
-        }
 
     ###################################################################
     def h(self, x, u, t=0, params=None):
 
         if params is None:
             params = self.params
+        else:
+            raise ValueError(
+                "The block needs to be refreshed to reflect changes in parameters"
+            )
 
         y = np.array([interp(float(t)) for interp in self._interpolators])
 
         return y
+
+    ###################################################################
+
+
+if __name__ == "__main__":
+    noise = WhiteNoise(1)
+    # Baseline
+    noise.params["t0"] = 0.0
+    noise.params["tf"] = 10.0
+    noise.params["sample_period"] = 0.01
+    noise.params["mean"] = 0.0
+    noise.params["var"] = 1.0
+    noise.params["seed"] = 1
+
+    fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
+    ax.set_title("Baseline")
+
+    # Change one parameter at a time to visualize each effect.
+    demo_changes = [
+        ("mean", 10.0),
+        ("var", 8.0),
+        ("sample_period", 0.05),
+        ("sample_period", 0.2),
+        ("sample_period", 0.5),
+        ("sample_period", 1.0),
+        ("sample_period", 2.0),
+        ("sample_period", 5.0),
+    ]
+
+    for key, value in demo_changes:
+        noise.params[key] = value
+        noise.refresh()
+        fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
+        ax.set_title(f"Changed {key} -> {value}")
