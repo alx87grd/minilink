@@ -591,7 +591,9 @@ class DiagramSystem(System):
             ) from e
 
         output_ports = list(output_ports)
-        out_slices = [self.output_slices[(sys_id, port_id)] for sys_id, port_id in output_ports]
+        out_slices = [
+            self.output_slices[(sys_id, port_id)] for sys_id, port_id in output_ports
+        ]
 
         # Cache the plan locally to reduce Python attribute lookups in the hot path.
         port_plan = self.port_execution_plan
@@ -608,7 +610,13 @@ class DiagramSystem(System):
             # Evaluate all subsystem outputs into a global flat buffer.
             global_signals = jnp.zeros(self.global_signals.shape[0], dtype=dtype)
 
-            for compute_func, local_x_slice, gather_sources, out_slice, u_dim in port_plan:
+            for (
+                compute_func,
+                local_x_slice,
+                gather_sources,
+                out_slice,
+                u_dim,
+            ) in port_plan:
                 local_x = x[local_x_slice]
 
                 if u_dim == 0:
@@ -626,14 +634,22 @@ class DiagramSystem(System):
                         else:
                             raise RuntimeError(f"Unknown source_type={src_type}")
 
-                    local_u = jnp.concatenate(pieces, axis=0) if pieces else jnp.array([], dtype=dtype)
+                    local_u = (
+                        jnp.concatenate(pieces, axis=0)
+                        if pieces
+                        else jnp.array([], dtype=dtype)
+                    )
 
                 y_out = compute_func(local_x, local_u, t)
                 global_signals = global_signals.at[out_slice].set(y_out)
 
             # Return selected outputs in the requested order.
             out_pieces = [global_signals[s] for s in out_slices]
-            y_concat = jnp.concatenate(out_pieces, axis=0) if out_pieces else jnp.zeros((output_dim_total,), dtype=dtype)
+            y_concat = (
+                jnp.concatenate(out_pieces, axis=0)
+                if out_pieces
+                else jnp.zeros((output_dim_total,), dtype=dtype)
+            )
             return y_concat
 
         if jit:
@@ -670,7 +686,13 @@ class DiagramSystem(System):
         global_signals = jnp.zeros(self.global_signals.shape[0], dtype=dtype)
 
         # 1) Compute all output ports (same logic as compile_jax).
-        for compute_func, local_x_slice, gather_sources, out_slice, u_dim in self.port_execution_plan:
+        for (
+            compute_func,
+            local_x_slice,
+            gather_sources,
+            out_slice,
+            u_dim,
+        ) in self.port_execution_plan:
             local_x = x[local_x_slice]
             if u_dim == 0:
                 local_u = jnp.array([], dtype=dtype)

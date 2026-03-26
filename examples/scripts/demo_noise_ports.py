@@ -55,19 +55,23 @@ diagram.plot_graphe()
 diagram.name = "Pendulum with Noise"
 
 
-# diagram2.compute_trajectory(tf=20) # takes forever with scipy solver
-diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)
+diagram.compute_trajectory(tf=20)  # takes forever with scipy solver
+# diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)
 
 
 diagram.subsystems["noise"].params["var"] = 0.001
+diagram.subsystems["noise"].refresh()
 diagram.subsystems["noise2"].params["var"] = 0.001
+diagram.subsystems["noise2"].refresh()
 
-
-diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)
+diagram.compute_trajectory(tf=20)
+# diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)
 
 
 diagram.subsystems["noise"].params["var"] = 10.0
+diagram.subsystems["noise2"].refresh()
 diagram.subsystems["noise2"].params["var"] = 10.0
+diagram.subsystems["noise2"].refresh()
 
-
-traj = diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)
+diagram.compute_trajectory(tf=20)
+# traj = diagram.compute_trajectory(tf=20, solver="euler", dt=0.01)
