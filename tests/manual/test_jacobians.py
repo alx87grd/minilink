@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from minilink.core.framework import DynamicSystem
-from minilink.core.jax_utils import get_f_jax
+from minilink.compile.jax_utils import get_f_jax
 
 class Pendulum(DynamicSystem):
     def __init__(self):

@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.blocks.tests import Pendulum, PendulumPDController
+from minilink.blocks.examples import Pendulum, PendulumPDController
 from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 

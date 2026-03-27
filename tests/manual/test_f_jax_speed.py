@@ -8,7 +8,7 @@ except ImportError:
     print("Warning: JAX not installed, some tests will fail.")
 
 from minilink.core.framework import DynamicSystem
-from minilink.core.jax_utils import get_f_jax
+from minilink.compile.jax_utils import get_f_jax
 
 
 # System 1: A system that explicitly provides f_jax (Best Practice for complex blocks)

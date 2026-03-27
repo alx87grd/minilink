@@ -4,7 +4,7 @@ from minilink.core.analysis import compute_internal_signals
 
 import numpy as np
 
-from minilink.blocks.tests import Pendulum, PendulumPDController
+from minilink.blocks.examples import Pendulum, PendulumPDController
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
 

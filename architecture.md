@@ -21,19 +21,19 @@ Its long-term goal is to serve as a **Pyro 2.0**: a complete replacement for the
 
 ```
 minilink/
-├── core/                      # [1.0] Pure modeling abstractions
+├── core/                      # [1.0] Pure modeling abstractions (only imports numpy at module level)
 │   ├── framework.py           # [1.0] VectorSignal, InputPort, OutputPort, System, StaticSystem, DynamicSystem
 │   ├── diagram.py             # [1.0] DiagramSystem: connections, algebraic-loop detection, compiled f_fast
-│   ├── analysis.py            # [1.0] Trajectory, Simulator, compute_internal_signals
-│   └── jax_utils.py           # [MVP prototype] JAX helper (get_f_jax)
+│   └── analysis.py            # [1.0] Trajectory, Simulator, compute_internal_signals
 ├── blocks/                    # [1.0] Pre-built reusable blocks
 │   ├── basic.py               # [1.0] Integrator, PropController
 │   ├── sources.py             # [1.0] Source, Step, WhiteNoise
-│   └── tests.py               # [1.0] Pendulum, PendulumPDController (demo blocks)
-├── compile/                   # [MVP prototype] IR and backend-specific compiled artifacts
+│   └── examples.py            # [1.0] Pendulum, PendulumPDController (demo/teaching systems)
+├── compile/                   # [MVP prototype] IR, backends, and acceleration
 │   ├── ir.py                  # [MVP prototype] DiagramIR (frozen dataclasses: PortOp, StateOp)
 │   ├── api.py                 # [MVP prototype] lower_diagram_to_ir, compile_numpy
-│   └── numpy_backend.py       # [MVP prototype] CompiledNumpyDiagram
+│   ├── numpy_backend.py       # [MVP prototype] CompiledNumpyDiagram
+│   └── jax_utils.py           # [MVP prototype] JAX helper (get_f_jax)
 ├── graphical/                 # [MVP prototype] Visualization
 │   ├── primitives.py          # [MVP prototype] GraphicPrimitive, Point, Circle, Rectangle, CustomLine
 │   ├── graphe.py              # [MVP prototype] Graphviz diagram rendering
