@@ -7,7 +7,14 @@ import time
 import matplotlib.colors as mcolors
 import numpy as np
 
-from minilink.graphical.primitives import Circle, CustomLine, Point
+from minilink.graphical.primitives import (
+    Arrow,
+    Circle,
+    CustomLine,
+    Point,
+    TorqueArrow,
+    extract_amplitude,
+)
 from minilink.graphical.renderers.base import AnimationRenderer
 
 
@@ -84,6 +91,53 @@ class MeshcatCanvas:
                     ),
                 )
             )
+
+        elif isinstance(primitive, Arrow):
+            local_pts = primitive.pts
+            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
+            world_pts = (transform_matrix @ local_pts_hom.T).T
+            vertices = np.asarray(world_pts[:, :3], dtype=np.float32).T
+            hex_color = _color_to_meshcat_hex(primitive.color)
+            path.set_object(
+                g.Line(
+                    g.PointsGeometry(vertices),
+                    g.LineBasicMaterial(
+                        color=hex_color,
+                        linewidth=float(primitive.linewidth),
+                    ),
+                )
+            )
+
+        elif isinstance(primitive, TorqueArrow):
+            sweep, T_rigid = extract_amplitude(transform_matrix)
+            local_pts = primitive.compute_pts(sweep)
+            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
+            world_pts = (T_rigid @ local_pts_hom.T).T
+            hex_color = _color_to_meshcat_hex(primitive.color)
+            arc_n = local_pts.shape[0] - 3
+            if arc_n >= 2:
+                arc_verts = np.asarray(world_pts[:arc_n, :3], dtype=np.float32).T
+                path.set_object(
+                    g.Line(
+                        g.PointsGeometry(arc_verts),
+                        g.LineBasicMaterial(
+                            color=hex_color,
+                            linewidth=float(primitive.linewidth),
+                        ),
+                    )
+                )
+                head_path = self.scene[f"p{self._idx}"]
+                self._idx += 1
+                head_verts = np.asarray(world_pts[arc_n:, :3], dtype=np.float32).T
+                head_path.set_object(
+                    g.Line(
+                        g.PointsGeometry(head_verts),
+                        g.LineBasicMaterial(
+                            color=hex_color,
+                            linewidth=float(primitive.linewidth),
+                        ),
+                    )
+                )
 
         elif isinstance(primitive, Circle):
             local_center = np.zeros(3)

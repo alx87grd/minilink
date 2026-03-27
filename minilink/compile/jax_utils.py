@@ -26,22 +26,19 @@ def get_f_jax(sys):
     # 2. Duck-type the standard numpy implementation
     from jax.errors import ConcretizationTypeError
 
-    # On dit à JAX de traiter 'params' comme une configuration Python statique (un dict)
-    # Si le contenu de 'params' change, JAX recompilera la fonction. Sinon, il l'intègre en dur dans le C++.
+    # JAX treats 'params' as a static Python config (a dict).
+    # If params changes, JAX recompiles; otherwise it's baked into the XLA code.
     @jax.jit(static_argnames=['params'])
     def f_jitted(x, u, t=0, params=None):
         try:
             return sys.f(x, u, t, params)
         except (ConcretizationTypeError, TypeError, Exception) as e:
-            # JAX tracing error when standard numpy code isn't purely functional 
-            # (e.g. `dx = np.zeros(2); dx[0] = ...` or `np.array([tracer])`)
             raise RuntimeError(
-                f"\n\nLe bloc '{sys.name}' n'est pas compilable avec JAX de façon transparente.\n"
-                f"Son équation f() effectue probablement des mutations in-place ou des opérations "
-                f"strictes avec numpy.\n"
-                f"Veuillez réécrire f() de manière purement fonctionnelle ou définir manuellement "
-                f"une méthode `f_jax` dans votre classe.\n"
-                f"Erreur d'origine JAX : {str(e)}"
+                f"\n\nBlock '{sys.name}' cannot be transparently compiled with JAX.\n"
+                f"Its f() likely performs in-place mutations or strict numpy operations.\n"
+                f"Please rewrite f() in a purely functional style or define a manual "
+                f"`f_jax` method on your class.\n"
+                f"Original JAX error: {str(e)}"
             ) from e
 
     return f_jitted

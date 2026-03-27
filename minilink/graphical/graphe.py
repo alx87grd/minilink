@@ -11,14 +11,12 @@ def plot_graphviz(graphe, show_inline=False, show_pdf=True, filename=None):
             print("IPython is not available for inline display")
 
     if filename is None:
-        try:
-            import tempfile
+        import tempfile
 
-            filename = tempfile.mktemp("_" + graphe.name + ".gv")
-        except ImportError:
-            filename = "temp_" + graphe.name + ".gv"
-    else:
-        filename = filename
+        with tempfile.NamedTemporaryFile(
+            suffix="_" + graphe.name + ".gv", delete=False
+        ) as tmp:
+            filename = tmp.name
 
     try:
         graphe.render(filename=filename, view=show_pdf)
@@ -102,17 +100,17 @@ def get_diagram_graphe(diagram):
     g = graphviz.Digraph(diagram.name, engine="dot")
     g.attr(rankdir="LR")
 
-    # If diagram has external inputs
-    if not len(diagram.inputs) == 0:
-        # Import System inside to avoid circular dependencies if possible,
-        # but here we just need a dummy structure that has name, inputs, outputs
-        class DummySystem:
-            def __init__(self, name, inputs, outputs):
-                self.name = name
-                self.inputs = inputs
-                self.outputs = outputs
+    class _PortStub:
+        """Lightweight stand-in for System so get_system_block_html can render I/O nodes."""
 
-        input_block = DummySystem("", {}, diagram.inputs)
+        def __init__(self, name, inputs, outputs):
+            self.name = name
+            self.inputs = inputs
+            self.outputs = outputs
+
+    # If diagram has external inputs
+    if len(diagram.inputs) != 0:
+        input_block = _PortStub("", {}, diagram.inputs)
         g.node(
             "input",
             shape="none",
@@ -129,15 +127,8 @@ def get_diagram_graphe(diagram):
         )
 
     # If diagram has external outputs
-    if not len(diagram.outputs) == 0:
-
-        class DummySystem:
-            def __init__(self, name, inputs, outputs):
-                self.name = name
-                self.inputs = inputs
-                self.outputs = outputs
-
-        output_block = DummySystem("", diagram.outputs, {})
+    if len(diagram.outputs) != 0:
+        output_block = _PortStub("", diagram.outputs, {})
         g.node(
             "output",
             shape="none",
@@ -166,13 +157,10 @@ def get_diagram_graphe(diagram):
     return g
 
 
-###############################################################################
-######################################################################
 if __name__ == "__main__":
     import graphviz
 
-    graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")
-    graphe = graphviz.Digraph("G", filename="temp.gv", engine="dot")
+    graphe = graphviz.Digraph("G", engine="dot")
     graphe.node("A", label="A", shape="circle")
 
-    plot_graphviz(graphe, show_inline=True, show_pdf=True, filename="aaa")
+    plot_graphviz(graphe, show_inline=False, show_pdf=True)

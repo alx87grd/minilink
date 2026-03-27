@@ -46,7 +46,7 @@ The following tasks are structured in phases to systematically improve the API, 
 ### Phase 5: Refactoring and Separation of Concerns
 - [ ] **Refine Default Dependencies:** Provide a cleaner way to designate or infer MIMO algebraic-loop dependencies to avoid artificial loop exceptions.
 - [ ] **Automated Output Port Dependency Inference:** Extend `DiagramSystem` to automatically detect exact dependencies on external inputs when exposing a subsystem's output via `connect_new_output_port(..., dependencies="auto")`. Involves topological trace through `self.connections`.
-- [ ] **Minor Cleanup:** Fix typos (`gloabl`, `Comuting`), remove French strings in `jax_utils.py`, rename `graphe` module, remove duplicate `DummySystem` definitions, replace `tempfile.mktemp` with `tempfile.NamedTemporaryFile`, gitignore/remove stray PDFs at repo root.
+- [x] **Minor Cleanup:** Fixed typos (`gloabl` → `global`, `Comuting` → `Computing`), translated French strings in `jax_utils.py` to English, deduplicated `DummySystem` → `_PortStub` in `graphe.py`, replaced deprecated `tempfile.mktemp` with `NamedTemporaryFile`, cleaned up `graphe.py` `__main__` block. Stray PDFs at repo root are already gitignored. Module name `graphe` kept for now (low priority).
 
 ---
 

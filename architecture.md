@@ -112,12 +112,12 @@ Additionally, the **MVP prototypes** lay groundwork for:
 
 ### Minor Issues
 
-- Typo `gloabl` in `diagram.py` ~line 176; `Comuting` in debug print.
-- French error strings in `jax_utils.py` vs English elsewhere.
-- Module named `graphe` (French) vs conventional English.
-- `DummySystem` defined twice in `graphe.py`.
-- `tempfile.mktemp` usage in `plot_graphviz` (deprecated, race-prone).
-- Accidental artifact PDFs at repo root (`Diagram.gv.pdf`, `aaa.pdf`).
+- ~~Typo `gloabl` in `diagram.py`; `Comuting` in debug print.~~ **Fixed.**
+- ~~French error strings in `jax_utils.py` vs English elsewhere.~~ **Fixed.**
+- Module named `graphe` (French) vs conventional English. *(Low priority — rename later if desired.)*
+- ~~`DummySystem` defined twice in `graphe.py`.~~ **Fixed** (deduplicated to `_PortStub`).
+- ~~`tempfile.mktemp` usage in `plot_graphviz` (deprecated, race-prone).~~ **Fixed** (uses `NamedTemporaryFile`).
+- Accidental artifact PDFs at repo root (`Diagram.gv.pdf`, `aaa.pdf`). *(Already gitignored via `*.pdf`; safe to delete locally.)*
 
 ## 6. External Dependencies
 

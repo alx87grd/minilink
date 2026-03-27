@@ -174,7 +174,7 @@ class DiagramSystem(System):
 
         # Check if the source is an external input of the diagram
         if source_sys_id == "input":
-            # Get the value from the diagram gloabl input vector
+            # Get the value from the diagram global input vector
             port_u = self.get_port_values_from_u(u)[source_port_id]
 
         else:
@@ -476,7 +476,7 @@ class DiagramSystem(System):
 
                 # Compute local state derivative
                 if self.debug_print:
-                    print(f"Comuting {sys_id} dynamic: dx=f({sys_x},{sys_u},{t})")
+                    print(f"Computing {sys_id} dynamic: dx=f({sys_x},{sys_u},{t})")
 
                 sys_dx = sys.f(sys_x, sys_u, t)
 
