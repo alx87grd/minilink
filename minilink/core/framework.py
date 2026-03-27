@@ -8,15 +8,6 @@ base System class from which all static and dynamic blocks inherit.
 
 import numpy as np
 
-from minilink.core.analysis import Simulator
-from minilink.graphical.animation import Animator
-from minilink.graphical.graphe import (
-    get_system_block_html,
-    get_system_graphe,
-    plot_graphviz,
-)
-from minilink.graphical.primitives import Point, translation_matrix
-
 
 ######################################################################
 class VectorSignal:
@@ -476,6 +467,8 @@ class System:
         str
             The HTML string for the block.
         """
+        from minilink.graphical.graphe import get_system_block_html
+
         return get_system_block_html(self, label)
 
     ######################################################################
@@ -501,6 +494,8 @@ class System:
         graphviz.Digraph
             The graph representing the system.
         """
+        from minilink.graphical.graphe import get_system_graphe
+
         return get_system_graphe(self)
 
     ######################################################################
@@ -526,8 +521,9 @@ class System:
         filename : str, optional
             File path to save the generated graph PDF. If None, it renders without saving.
         """
-        g = self.get_graphe()
+        from minilink.graphical.graphe import plot_graphviz
 
+        g = self.get_graphe()
         plot_graphviz(g, filename=filename)
 
     ######################################################################
@@ -557,12 +553,12 @@ class System:
         Trajectory
             An object containing time, state, and input histories.
         """
+        from minilink.core.analysis import Simulator
+
         sim = Simulator(self, t0, tf, n_steps, dt, solver)
         traj = sim.solve(show=show)
 
-        self.traj = (
-            traj  # Store the trajectory in the system for later use (e.g., animation)
-        )
+        self.traj = traj
 
         return traj
 
@@ -589,6 +585,8 @@ class System:
         None
             This function renders the system but does not return any value.
         """
+        from minilink.graphical.animation import Animator
+
         animator = Animator(self)
         animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
 
@@ -622,6 +620,8 @@ class System:
         None or IPython.display.HTML
             If html=True and renderer is matplotlib, returns the HTML object to display inline.
         """
+        from minilink.graphical.animation import Animator
+
         if traj is None:
             if self.traj is not None:
                 traj = self.traj
@@ -668,6 +668,8 @@ class System:
         The keyboard is polled via pygame (input only). Rendering is performed
         using the selected ``renderer`` backend.
         """
+        from minilink.graphical.animation import Animator
+
         animator = Animator(self)
         return animator.game(
             dt=dt,
@@ -692,6 +694,8 @@ class System:
         list of minilink.graphical.primitives.GraphicPrimitive
             The list of primitive shapes describing the system.
         """
+        from minilink.graphical.primitives import Point
+
         primitives = []
         for i in range(self.n):
             primitives.append(Point(color="blue", marker="o"))
@@ -718,6 +722,8 @@ class System:
         list of np.ndarray
             A list of 4x4 transformation matrices (for 3D) shifting the points.
         """
+        from minilink.graphical.primitives import translation_matrix
+
         transforms = []
 
         for i in range(self.n):

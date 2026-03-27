@@ -1,7 +1,6 @@
 import numpy as np
 
 from minilink.core.framework import System, VectorSignal
-from minilink.graphical.graphe import get_diagram_graphe
 
 
 ######################################################################
@@ -134,6 +133,8 @@ class DiagramSystem(System):
 
     ######################################################################
     def get_graphe(self):
+        from minilink.graphical.graphe import get_diagram_graphe
+
         return get_diagram_graphe(self)
 
     ######################################################################
