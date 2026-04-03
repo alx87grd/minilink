@@ -10,8 +10,9 @@ This plan aims to consolidate the fragmented and redundant compilation MVPs (`f_
 > [!NOTE]
 > **Remaining Work**:
 > - API Polish: Finalize consistent naming across backend methods.
-> - Test Coverage: Move JAX tests to a permanent, comprehensive suite (see `test_jax_backend.py` experiments).
+> - Test Coverage: Move JAX tests to a permanent suite.
 > - Performance Benchmarks: Systematically document speedups for larger diagrams.
+> - **JAX Performance**: Investigating why "naked" JAX (without JIT) is slower than recursive baseline.
 
 ## Proposed Changes
 
