@@ -4,11 +4,13 @@
 
 ## 1. Core Philosophy
 
-1.  **Expressiveness:** Define custom dynamic systems using standard Python.
-2.  **Performance:** Compile topological block execution graphs into optimized array-evaluation sequences (`f_fast`).
-3.  **Transparency:** Lightweight and transparent, avoiding heavy, black-box legacy dependencies.
-4.  **Separation of Concerns:** Modeling core (signals, ports, systems, diagrams) is independent of simulation, visualization, and analysis.
-5.  **Pyro Compatibility:** Full feature parity with the [pyro](https://github.com/SherbyRobotics/pyro) toolbox.
+1.  **Mathematical Readability First**: The primary goal is for the source code to read as close as possible to handwritten mathematical operations (e.g., `dx = A@x + B@u`).
+2.  **Readability Over Performance**: Prioritize pure readability in the core library. Optimization shifts (like the `compile` package) should remain isolated so core equations stay clean.
+3.  **Expressiveness:** Define custom dynamic systems using standard Python.
+4.  **Performance:** Compile topological block execution graphs into optimized array-evaluation sequences (`f_fast`).
+5.  **Transparency:** Lightweight and transparent, avoiding heavy, black-box legacy dependencies.
+6.  **Separation of Concerns:** Modeling core (signals, ports, systems, diagrams) is independent of simulation, visualization, and analysis.
+7.  **Pyro Compatibility:** Full feature parity with the [pyro](https://github.com/SherbyRobotics/pyro) toolbox.
 
 ---
 
@@ -61,7 +63,23 @@ Future performance scales via JAX (XLA) by breaking the Python GIL:
 
 Following these naming schemes ensures consistency and readability across the codebase.
 
-### Variable Naming
+### General Standards
+- **Python Version**: **3.10+** (LTS stable). Use modern syntax like `|` for unions and structural pattern matching.
+- **Type Hinting**: **Uniform & Mandatory**. All functions and methods must have clear type hints.
+- **Docstrings**: **NumPy Style**. Required for all public classes and methods.
+
+### The "Math Rule" (Naming Patterns)
+The top priority is that the code reads like math equations (e.g., `dx = A@x + B@u`). 
+- **Matrices**: Use Uppercase single letters (`A`, `B`, `H`, `M`, `K`).
+- **Vectors**: Use lowercase single letters (`x`, `u`, `y`, `q`, `v`, `dq`).
+- **Dimensions**: Use `n`, `m`, `p` for dimension.
+    - Matrix `A` has dimension `(n, n)`.
+    - Vector `x` has dimension `(n, 1)`.
+    - Vector `u` has dimension `(m, 1)`.
+    - Vector `y` has dimension `(p, 1)`.
+    - Matrix `B` has dimension `(n, m)`.
+
+### Programmatic Variable Naming (Non-Math Context)
 
 -   **`name`**: **Type of System.** Human-readable string for class/type.
     -   *Examples*: `"Pendulum"`, `"Controller"`, `"Diagram"`.

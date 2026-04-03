@@ -18,8 +18,11 @@ This document defines the co-programming preferences and architectural philosoph
 - **Type Hinting**: **Uniform & Mandatory**. All functions and methods must have clear type hints.
 - **Docstrings**: **NumPy Style**. Required for all public classes and methods.
 - **Naming Patterns (The "Math Rule")**:
+    - The top priority is that the code reads like math equations. For example, if you have a state-space system, the code should look like `dx = A@x + B@u`, not 'state_derivative = np.dot(linear_dynamics_matrix, state_vector) + np.dot(input_matrix, input_vector)' the goal is for the code to be readable as a math equation, the same equations in a textbook, for student to understand the code and the math at the same time.
     - **Matrices**: Use Uppercase single letters (`A`, `B`, `H`, `M`, `K`).
     - **Vectors**: Use lowercase single letters (`x`, `u`, `y`, `q`, `v`, `dq`).
+    - **dimensions**: Use 'n', 'm', 'p' for dimension, for instance matrix A has dimension (n, n), vector x has dimension (n, 1), vector u has dimension (m, 1), vector y has dimension (p, 1), matrix B has dimension (n, m)...
+    - **Math context**: All in all for math context, use name convention as close as possible as standard notation in textbooks.
     - **Non-Math Context**: Follow standard **PEP8** (snake_case for methods, CamelCase for classes).
 
 ---
@@ -69,3 +72,13 @@ All features must progress through the following **Task Readiness Levels**:
     - Deleting or renaming files.
     - Architectural changes or core logic refactors.
     - Introducing new heavy dependencies.
+
+---
+
+## 7. Local Development Environment
+
+- **Conda Environment**: Use `dev-h26` for this repository.
+  ```bash
+  conda activate dev-h26
+  ```
+- All commands (pytest, ruff, python scripts, etc.) should be run inside this environment.

@@ -412,9 +412,9 @@ class DiagramSystem(System):
         This keeps the existing in-class compilation/execution methods intact
         while returning a separate compiled artifact object.
         """
-        from minilink.compile.api import compile_numpy
+        from minilink.compile.compiler import compile_diagram
 
-        return compile_numpy(self)
+        return compile_diagram(self)
 
     ######################################################################
     def get_local_input(self, x, u, t, sys_id, dependencies="all"):

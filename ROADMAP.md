@@ -6,13 +6,16 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 
 | Component | Status | Next Milestone |
 | :--- | :--- | :--- |
-| **Core Abstractions** | **1.0** | Optimization of `global_signals` |
-| **Simulation** | **1.0** | SciPy solver input fix (P0) |
-| **Visualization** | MVP | Hardened Matplotlib backend selection |
-| **JAX Integration** | MVP | Re-entrancy and tracing support |
-| **Controllers** | Planned | Base classes and linear library |
-| **Planning** | Planned | RRT and Direct Collocation ports |
-| **Mechanical Templates** | Planned | `MechanicalSystem` base class |
+| **Core Abstractions** | **TRL 9** | Optimization of `global_signals` |
+| **Simulation (Analysis)** | **TRL 2** | Refactor analysis interface and solve_ivp input fix (P0) |
+| **Visualization** | **TRL 2** | Refactor system-to-rendering interface |
+| **JAX Integration** | **TRL 2** | Experimental re-entrancy and tracing support |
+| **Controllers** | **Planned** | Base classes and linear library |
+| **Planning** | **Planned** | RRT and Direct Collocation ports |
+| **Mechanical Templates** | **Planned** | `MechanicalSystem` base class |
+
+> [!NOTE]
+> Progress is tracked via **Task Readiness Levels (TRL 1-9)**. See [agent.md](agent.md) for detailed definitions of each level and the **3-Level Testing Strategy** (Automated, Manual, Demo).
 
 ---
 
@@ -46,16 +49,18 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 
 ### Guiding Principles
 
+-   **Mathematical Readability**: All code must read as close as possible to textbook equations (e.g., `dx = A@x + B@u`).
 -   **MIMO Wiring**: Named ports replace flat vectors.
 -   **True Composition**: `DiagramSystem` handles complex topologies.
 -   **Compiled Execution**: `f_fast` (NumPy) and future JAX/XLA paths.
 -   **Clean Decoupling**: Modeling core is headless-first.
+-   **3-Level Verification**: Automated (pytest), User Manual, and Demo scripts for all features.
 
 ### Status of Core Dynamics Migration
 
 | Pyro Feature | Minilink Equivalent | Status |
 | :--- | :--- | :--- |
-| `ContinuousDynamicSystem` | `DynamicSystem` | **1.0** |
+| `ContinuousDynamicSystem` | `DynamicSystem` | **TRL 9** |
 | `StateSpaceSystem` | `StateSpaceSystem` | Planned |
 | `MechanicalSystem` | `MechanicalSystem` | Planned |
 | `Manipulator` | `Manipulator` | Planned |
