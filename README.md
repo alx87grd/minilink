@@ -1,32 +1,52 @@
 # minilink
 
+`minilink` is a Python-native block-diagram simulation framework for building and analyzing dynamical systems.
+
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
-`minilink` is a small Python framework for **building and simulating dynamical systems as block diagrams**. You compose systems from interconnected blocks (integrators, controllers, pendulums, signal sources, etc.), wire their input/output ports together in a `DiagramSystem`, and then simulate trajectories, plot signals, and optionally animate the resulting motion.
+## ⚡ Key Strengths
 
-`minilink` is a **pure Python simulation library** intended for use from scripts, notebooks, and interactive sessions.
+-   **MIMO Composable Modeling**: Connect N arbitrary blocks via named ports.
+-   **Optimized Execution**: Compiled topological graphs (`f_fast`) for efficient ODE integration.
+-   **Differentiable Simulation**: Functional paths designed for JAX-based tracing and autodiff.
+-   **Headless-First Design**: Pure NumPy core, independent of graphics and simulation backends.
+-   **Pyro Successor**: A flexible, port-based foundation for the [pyro](https://github.com/SherbyRobotics/pyro) robotics toolbox.
 
-## Key Ideas
+## 🚀 Quick Start
 
-- **Block-diagram modeling**: Define `System` objects with typed input/output ports and states, then connect them into larger diagrams.
-- **Compiled execution plans**: `DiagramSystem.compile()` flattens the connection graph into a highly optimized `f_fast` evaluation plan for efficient ODE integration.
-- **Simulation & analysis**: The `Simulator` runs continuous or discrete-time simulations (via NumPy / SciPy) and returns trajectories that can be inspected, plotted, or used to reconstruct internal per-port signals.
-- **Visualization & animation**: Built-in plotting helpers (matplotlib) and graphical primitives let systems expose geometry for animations (e.g., pendulum demos).
+```python
+import numpy as np
+from minilink import DiagramSystem, Integrator, Step, Simulator
 
-## Tech Stack
+# 1. Assemble a simple integrator system
+diagram = DiagramSystem()
+diagram.add_subsystem(Integrator(), "plant")
+diagram.add_subsystem(Step(), "source")
 
-- **Python**, using:
-  - **NumPy** for numerical arrays and math
-  - **SciPy** (`scipy.integrate.solve_ivp`) for ODE solving
-  - **matplotlib** for plotting and animation
-  - **Graphviz** for diagram visualization
+# 2. Wire the diagram
+diagram.connect("source", "y", "plant", "u")
 
-## Learn More
+# 3. Simulate and analyze
+sim = Simulator(diagram)
+traj = sim.solve(tf=10)
+traj.plot_trajectory()
+```
 
-- **Architecture overview**: see `architecture.md` for a deeper description of the core design and future JAX/XLA backend plans.
-- **Coding conventions**: see `CONVENTIONS.md` for naming and API style guidelines.
-- **Roadmap / TODOs**: see `todos.md` for planned improvements and known architectural issues.
+## 🛠 Tech Stack
+-   **Core**: NumPy
+-   **Simulation**: SciPy (`solve_ivp`)
+-   **Visualization**: Matplotlib, Graphviz
+-   **Acceleration**: JAX (Optional)
 
-## Examples
+---
 
-- Colab demo notebook: https://colab.research.google.com/drive/13tnYyZMz4bLFzYLdj88H6cqO6tZg6Xp7?usp=sharing
+## 📖 Documentation Guide
+
+-   **[DESIGN.md](DESIGN.md)**: Deep dive into the architecture, signals, systems, and coding conventions.
+-   **[ROADMAP.md](ROADMAP.md)**: Project status, development phases, and the Pyro 2.0 migration plan.
+
+---
+
+## 💡 Examples
+-   **Interactive Demos**: See the `examples/` directory for pendulums, controllers, and JAX examples.
+-   **Notebooks**: [Colab Tutorial](https://colab.research.google.com/drive/13tnYyZMz4bLFzYLdj88H6cqO6tZg6Xp7?usp=sharing)
