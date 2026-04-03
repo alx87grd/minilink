@@ -35,11 +35,21 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 - [ ] **Eliminate Shared Mutable Buffers**: Move to per-call `global_signals` allocation.
 - [ ] **Standardize Signal Gathering**: Consolidate `src_type` loops into a shared helper.
 - [ ] **Public API Surface**: Populate `minilink/__init__.py`.
+- [ ] **Diagram Validation**: Add wiring guards in `add_subsystem()` and `connect()` (unique names, orphan ports, double-connection detection).
+- [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.
+- [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.
+- [ ] **Context-Based Evaluation**: (Planned Re-evaluation) Transition from `(x, u, t, p)` arguments to a structured `Context` object *only if* hybrid systems (discrete state, modes) are introduced; keep flat textbook-style args for now.
+- [ ] **Parameter Registry & Mapping**: Implement a compile-time map that translates user-friendly parameter names (dict/namespace) into high-performance flat arrays for the engine.
 
 ### Phase 4-5: API UX & Refactoring
 - [ ] Operator overloading for composition (`>>`, `+`, `|`).
 - [ ] Reference-based connections (`ctl.inputs.ref`).
 - [ ] Automated output port dependency inference (`auto` dependencies).
+- [ ] **Library Core Blocks**: Implement `StateSpaceSystem` (with explicit feedthrough via D matrix), `TransferFunction` and `PID`.
+- [ ] **Linearization Tool**: Add a `linearize(diagram, x0, u0)` utility using JAX `jvp`.
+- [ ] **Port Exporting**: Implement `export_input` and `export_output` in `DiagramSystem` to cleanly nest diagrams.
+- [ ] **Port Caching**: Add optional results caching to `OutputPort` to avoid expensive re-computations in a single time step.
+- [ ] **Unconnected Port Defaults**: Enforce or allow default values for unconnected input ports to ensure robust evaluation.
 
 ---
 
@@ -76,6 +86,10 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 ## 4. Future Vision
 
 -   **JAX-Based Optimization**: Leverage autodiff for trajectory optimization (Direct Collocation).
+-   **Full Differentiable Simulation**: Introduce immutable `SimState` dataclass trees, `jax.custom_vjp` for the integrator, and parameter tracking (dynamic vs static) for end-to-end `jax.grad`.
+-   **Hybrid System Simulation**: Support for discrete state updates and zero-crossing events for mode transitions.
 -   **Differentiable LQR**: Integrate learning with control via differentiable Riccati solvers.
 -   **Gymnasium Bridge**: Native `sys2gym` conversion for RL experiments.
 -   **Interactive Game Loop**: Enhanced pygame-based real-time control.
+-   **Multibody Plant Framework**: Introduce a "Plant" system that parses URDF/SDFormat descriptions into rigid body dynamics blocks.
+-   **Scalar-Agnostic Blocks**: Design systems to be "scalar polymorphic" (NumPy, JAX, SymPy) via backend-agnostic mathematical expressions.

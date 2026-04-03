@@ -3,8 +3,9 @@ Diagram compiler: topology analysis and execution plan construction.
 
 This module provides the complete compilation pipeline:
 
-1. :func:`check_algebraic_loops` — Standalone DFS-based algebraic loop
-   detection.  Returns the topological execution order of output ports.
+1. :func:`check_algebraic_loops` — Standalone depth-first search-based
+   algebraic loop detection.  Returns the topological execution order
+   of output ports.
    Can be imported independently by :class:`~minilink.core.diagram.DiagramSystem`
    for use after manual wiring.
 
@@ -65,13 +66,18 @@ def compile_diagram(diagram: DiagramSystem, backend: str = "numpy"):
 
         return NumpyEvaluator(plan)
     elif key == "jax":
+        try:
+            import jax  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "JAX is required for the 'jax' backend. "
+                "Install with: pip install jax jaxlib"
+            )
         from minilink.compile.jax_backend import JaxEvaluator
 
         return JaxEvaluator(plan)
     else:
-        raise ValueError(
-            f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'."
-        )
+        raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
 
 
 def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
@@ -183,48 +189,71 @@ def check_algebraic_loops(
         If an algebraic loop is detected, with the full cycle path in the
         error message.
     """
+    # Tracks ports that have been FULLY explored (including all dependencies)
     visited: set[tuple[str, str]] = set()
+    # Path of the current recursion to provide a trace if a loop is found
     stack: list[tuple[str, str]] = []
+    # Set mirror of stack for O(1) cycle detection
     stack_set: set[tuple[str, str]] = set()
+    # The resulting topological order
     order: list[tuple[str, str]] = []
 
-    def dfs(sys_id: str, port_id: str) -> None:
+    def visit_port(sys_id: str, port_id: str) -> None:
         node = (sys_id, port_id)
 
+        # 1. Algebraic loop detection: if node is already on the recursion stack
         if node in stack_set:
-            # Cycle detected — build informative error message
             cycle_start_idx = stack.index(node)
             cycle_path = stack[cycle_start_idx:] + [node]
             cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
             raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
 
+        # 2. Skip if already processed
         if node in visited:
             return
 
+        # 3. Mark as currently visiting
         stack.append(node)
         stack_set.add(node)
 
+        # 4. Explore dependencies (upstream crawl)
+        # Get the specific output port object we are visiting
         port = diagram.subsystems[sys_id].outputs.get(port_id)
         if port is not None:
+            # Get the list of input ports that this output depends on (feedthrough)
             deps = port.dependencies
             sys_inputs = diagram.subsystems[sys_id].inputs
+            # If "all", this output depends on every input port of the subsystem
             input_deps = sys_inputs.keys() if deps == "all" else deps
 
+            # Iterate over all input ports that this output depends on
             for in_port_id in input_deps:
+                # Find what is connected to this specific input port (the 'source')
                 source = diagram.connections[sys_id].get(in_port_id)
                 if source is not None:
+                    # A source is a tuple: (source_subsystem_id, source_output_port_id)
                     src_sys_id, src_port_id = source
+                    # Recursively visit source subsystem if it's not a global diagram input
                     if src_sys_id != "input":
-                        dfs(src_sys_id, src_port_id)
+                        visit_port(src_sys_id, src_port_id)
 
+        # 5. Finishing node: backtrack and finalize the execution order
+        # Remove the current node from the path list; we've finished this branch
         stack.pop()
+        # Remove from set; this node is no longer part of the "active" path
         stack_set.remove(node)
+        # Mark as visited; ensures we never waste time re-exploring this port
         visited.add(node)
+        # Store result; adding it LAST means all its dependencies are already 
+        # in the 'order' list. This transforms a complex graph into a simple, 
+        # optimized sequence where every signal is calculated before it's needed.
         order.append(node)
 
+    # --- STARTING POINT: EXPLORE ALL OUTPUT PORTS ---
+    # Initiate the recursive depth-first search from every subsystem output port.
     for sys_id, sys in diagram.subsystems.items():
         for port_id in sys.outputs:
-            dfs(sys_id, port_id)
+            visit_port(sys_id, port_id)
 
     return order
 
