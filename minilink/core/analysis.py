@@ -123,6 +123,16 @@ class Simulator:
         self.solver = self.select_solver(sys, solver)
         self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
 
+        # Auto-compile if the system is a Diagram
+        from minilink.core.diagram import DiagramSystem
+        if isinstance(sys, DiagramSystem):
+            self.evaluator = sys.compile(backend="numpy")
+            if self.verbose:
+                print("System is a Diagram: Auto-compiling for optimized execution.")
+        else:
+            self.evaluator = None
+
+
         if self.verbose:
             print(f"Time steps = {n_steps}, dt={dt} and solver= {self.solver}")
 
@@ -197,9 +207,10 @@ class Simulator:
         if solver == "scipy":
             # Define the ODE
             def f(t, x):
-                if hasattr(sys, "f_fast"):
-                    return sys.f_fast(x, np.array([]), t)
+                if self.evaluator:
+                    return self.evaluator.compute_dx(x, np.array([]), t)
                 return sys.fsim(t, x)
+
 
             # Solve the ODE
             sol = solve_ivp(

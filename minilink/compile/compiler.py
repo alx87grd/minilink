@@ -116,10 +116,19 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
         sys = diagram.subsystems[sys_id]
         port = sys.outputs[port_id]
 
+        # Determine the 'recipe' for gathering all inputs required by this output port
+        # This includes mapping which signals come from global 'u', which from the
+        # internal signal buffer, and which use nominal constant values.
+        # gather_sources: list[tuple[int, object, int]] — list of (source_type, source_val, dim)
+        # u_dim: int — total flattened dimension of the local subsystem input vector 'u'
         gather_sources, u_dim = _build_gather_sources(
             diagram, sys_id, output_slices, dependencies=port.dependencies
         )
+
+        # Pre-calculated index in the flat signal buffer where this port writes its result
         out_slice = output_slices[(sys_id, port_id)]
+
+        # Mapping into the global state vector 'x' for this subsystem's local state
         local_x_slice = _state_slice(diagram, sys_id)
 
         port_ops.append(
@@ -208,7 +217,7 @@ def check_algebraic_loops(
             cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
             raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
 
-        # 2. Skip if already processed
+        # 2. End-Point A: if we've already fully analyzed this node, stop here (Memoization)
         if node in visited:
             return
 
@@ -228,12 +237,14 @@ def check_algebraic_loops(
 
             # Iterate over all input ports that this output depends on
             for in_port_id in input_deps:
-                # Find what is connected to this specific input port (the 'source')
+                # Find what is connected to this input port (the 'source')
                 source = diagram.connections[sys_id].get(in_port_id)
+                # End-Point B: if not connected, the chain ends here
                 if source is not None:
                     # A source is a tuple: (source_subsystem_id, source_output_port_id)
                     src_sys_id, src_port_id = source
-                    # Recursively visit source subsystem if it's not a global diagram input
+                    # Recursively visit source subsystem if it's not a diagram input
+                    # End-Point C: Diagram inputs are terminal nodes for this search
                     if src_sys_id != "input":
                         visit_port(src_sys_id, src_port_id)
 
@@ -244,8 +255,8 @@ def check_algebraic_loops(
         stack_set.remove(node)
         # Mark as visited; ensures we never waste time re-exploring this port
         visited.add(node)
-        # Store result; adding it LAST means all its dependencies are already 
-        # in the 'order' list. This transforms a complex graph into a simple, 
+        # Store result; adding it LAST means all its dependencies are already
+        # in the 'order' list. This transforms a complex graph into a simple,
         # optimized sequence where every signal is calculated before it's needed.
         order.append(node)
 
@@ -297,7 +308,7 @@ def _build_gather_sources(
         # If this input port is not a dependency, use the nominal value
         if dependencies != "all" and in_port_id not in dependencies:
             source_type = NOMINAL
-            source_val: object = in_port.nominal_value
+            source_val = in_port.nominal_value
         else:
             source = diagram.connections[sys_id].get(in_port_id)
             if source is None:
@@ -310,11 +321,13 @@ def _build_gather_sources(
                     # External diagram input → slice into u
                     source_type = EXTERNAL_INPUT
                     u_idx = 0
-                    for pid, p in diagram.inputs.items():
-                        if pid == src_port_id:
-                            source_val = slice(u_idx, u_idx + p.dim)
+                    for input_port_id, input_port in diagram.inputs.items():
+                        # We found the matching diagram input port.
+                        # Calculate its 'slice' in the flat global input vector 'u'
+                        if input_port_id == src_port_id:
+                            source_val = slice(u_idx, u_idx + input_port.dim)
                             break
-                        u_idx += p.dim
+                        u_idx += input_port.dim
                 else:
                     # Internal connection → slice into signal buffer
                     source_type = INTERNAL_SIGNAL
