@@ -35,11 +35,15 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 - [x] **Standardize Signal Gathering**: Consolidated `src_type` loops into a shared helper.
 - [ ] **Public API Surface**: Finalize consistent method naming in `minilink.compile`.
 - [ ] **Public API Surface**: Populate `minilink/__init__.py`.
+- [ ] **Unified `compile()` API**: Implement a `compile(backend='numpy')` method on all blocks. Basic blocks return their core function directly; `DiagramSystem` executes the full compilation pipeline and returns the evaluator method. A unified dynamic function exporter for simulator and optimizer should be provided.
 - [ ] **Diagram Validation**: Add wiring guards in `add_subsystem()` and `connect()` (unique names, orphan ports, double-connection detection).
 - [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.
 - [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.
 - [ ] **Context-Based Evaluation**: (Planned Re-evaluation) Transition from `(x, u, t, p)` arguments to a structured `Context` object *only if* hybrid systems (discrete state, modes) are introduced; keep flat textbook-style args for now.
 - [ ] **Parameter Registry & Mapping**: Implement a compile-time map that translates user-friendly parameter names (dict/namespace) into high-performance flat arrays for the engine.
+- [ ] **Parameter Handling Strategy**: Check how to handle parameter vectors across all pipelines. 
+    - [ ] **Fixed Parameters**: Consider them fixed at compilation time and stored in the evaluator artifact.
+    - [ ] **JAX Optimization**: Implement a version of `compile()` that keeps parameters as explicit arguments to facilitate autodiff and gradient-based optimization.
 
 ### Phase 4-5: API UX & Refactoring
 - [ ] Operator overloading for composition (`>>`, `+`, `|`).
