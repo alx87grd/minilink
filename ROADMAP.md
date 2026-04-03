@@ -28,6 +28,7 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 
 ### Phase 3: Core Architecture (P1)
 - [x] Decouple Modeling from Graphics/Simulation (Lazy imports).
+- [ ] **Consolidate Compilation Backends**: Refactor into a unified IR with NumPy/JAX classes. See [COMPILATION_REFACTOR.md](COMPILATION_REFACTOR.md) for the detailed plan.
 - [ ] **Eliminate Shared Mutable Buffers**: Move to per-call `global_signals` allocation.
 - [ ] **Standardize Signal Gathering**: Consolidate `src_type` loops into a shared helper.
 - [ ] **Public API Surface**: Populate `minilink/__init__.py`.
