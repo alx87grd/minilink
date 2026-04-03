@@ -1,8 +1,25 @@
+"""
+Speed comparison: diagram.f (reference) vs NumpyEvaluator vs JaxEvaluator vs JaxEvaluator+JIT.
+
+Tests correctness (NumpyEvaluator must exactly match reference f) and measures
+relative performance across different network topologies and sizes.
+
+Usage:
+    python tests/manual/test_f_compare_old.py
+"""
+
 import time
+
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import System
+
+try:
+    import jax.numpy as jnp
+    JAX_AVAILABLE = True
+except ImportError:
+    JAX_AVAILABLE = False
 
 
 ######################################################################
@@ -96,104 +113,102 @@ def build_dense_network(num_nodes=50, connections_per_node=3):
 
 
 ######################################################################
-# Test Logic
+# Benchmark Logic
 ######################################################################
 
 
-def benchmark_simulation(diag, iters=100, label="Network"):
-    """Core benchmarking function for f vs f_fast."""
-    print(f"\n=== Benchmarking {label} ===")
-    print(f"Subsystems: {len(diag.subsystems)}, States: {diag.n}")
+def benchmark_all_backends(diag, iters=100, label="Network"):
+    """
+    Compares all backends:
+      1. diagram.f           (recursive reference)
+      2. NumpyEvaluator
+      3. JaxEvaluator        (if JAX available)
+      4. JaxEvaluator + JIT  (if JAX available)
+    """
+    print(f"\n{'='*60}")
+    print(f"  {label}")
+    print(f"  Subsystems: {len(diag.subsystems)}, States: {diag.n}")
+    print(f"{'='*60}")
 
-    if not diag.compiled:
-        print("Compiling...")
-        start = time.time()
-        diag.compile()
-        print(f"Compiled in {time.time()-start:.4f}s")
-
-    x = np.ones(diag.n)
-    u = np.array([])
+    x_np = np.ones(diag.n)
+    u_np = np.array([])
     t = 0.0
 
-    # Test Original f (if it doesn't crash)
+    results = {}
+
+    # ── 1. Reference f ──────────────────────────────────────────────
     orig_f_works = True
     try:
-        diag.f(x, u, t)
+        dx_ref = diag.f(x_np, u_np, t)  # trial call
+        start = time.time()
+        for _ in range(iters):
+            dx_ref = diag.f(x_np, u_np, t)
+        results["f()"] = time.time() - start
+        print(f"  Reference f()          ({iters} iters): {results['f()']:.5f} s")
     except RecursionError:
-        print("Original f failed (RecursionError). Skipping its benchmark.")
+        print("  Reference f()          : SKIPPED (RecursionError)")
         orig_f_works = False
 
-    # Warmup Fast
-    diag.f_fast(x, u, t)
-    diag.f_fast(x, u, t)
-
-    # Benchmark Fast
-    start_time = time.time()
-    print("Executing f_fast...")
+    # ── 2. NumpyEvaluator ────────────────────────────────────────────
+    np_evaluator = diag.compile(backend="numpy")
+    np_evaluator.compute_dx(x_np, u_np, t)  # warmup
+    start = time.time()
     for _ in range(iters):
-        dx_fast = diag.f_fast(x, u, t)
-    fast_time = time.time() - start_time
-    print(f"Fast f time     ({iters} calls): {fast_time:.5f} s")
+        dx_np = np_evaluator.compute_dx(x_np, u_np, t)
+    results["numpy"] = time.time() - start
+    print(f"  NumpyEvaluator         ({iters} iters): {results['numpy']:.5f} s")
 
-    # Benchmark Original
     if orig_f_works:
-        start_time = time.time()
-        print("Executing f...")
+        np.testing.assert_allclose(dx_ref, dx_np, atol=1e-8)
+        print("  ✓ NumpyEvaluator matches reference f()")
+
+    # ── 3 & 4. JAX backends ─────────────────────────────────────────
+    if JAX_AVAILABLE:
+        x_jax = jnp.array(x_np)
+        u_jax = jnp.array(u_np)
+
+        jax_evaluator = diag.compile(backend="jax")
+        jit_compute_dx = jax_evaluator.get_jit_compute_dx()
+
+        # Warmup (triggers XLA compile)
+        jax_evaluator.compute_dx(x_jax, u_jax, t).block_until_ready()
+        jit_compute_dx(x_jax, u_jax, t).block_until_ready()
+
+        start = time.time()
         for _ in range(iters):
-            dx_orig = diag.f(x, u, t)
-        orig_time = time.time() - start_time
-        print(f"Original f time ({iters} calls): {orig_time:.5f} s")
-        print(f"Speedup vs Original: {orig_time / fast_time:.2f}x")
+            dx_jax = jax_evaluator.compute_dx(x_jax, u_jax, t)
+        dx_jax.block_until_ready()
+        results["jax"] = time.time() - start
+        print(f"  JaxEvaluator           ({iters} iters): {results['jax']:.5f} s")
 
-        # Validation
-        np.testing.assert_allclose(dx_orig, dx_fast, atol=1e-8)
-        print("Verification: f_fast matches f exactly.")
+        start = time.time()
+        for _ in range(iters):
+            dx_jit = jit_compute_dx(x_jax, u_jax, t)
+        dx_jit.block_until_ready()
+        results["jax_jit"] = time.time() - start
+        print(f"  JaxEvaluator (JIT)     ({iters} iters): {results['jax_jit']:.5f} s")
     else:
-        print("Verification: Skipped (Original f too slow/deep)")
+        print("  JAX backends           : SKIPPED (JAX not installed)")
 
-
-def validate_large_network(num_nodes=500, conn_per_node=5, iters=10):
-    """Validates that large networks compile and run f_fast without crashing."""
-
-    print(f"\n=== Validating Large Network ({num_nodes} nodes) ===")
-    diag = build_dense_network(num_nodes, conn_per_node)
-    print(f"Subsystems: {len(diag.subsystems)}, States: {diag.n}")
-    diag.plot_graphe()
-
-    print("Compiling...")
-    diag.compile()
-
-    x = np.ones(diag.n)
-    u = np.array([])
-    t = 0.0
-
-    print("Executing f_fast...")
-    dx = diag.f_fast(x, u, t)
-    print(f"Success! Output vector size: {len(dx)}")
-
-    # Benchmark Fast
-    start_time = time.time()
-    print("Executing f_fast...")
-    for _ in range(iters):
-        dx_fast = diag.f_fast(x, u, t)
-    fast_time = time.time() - start_time
-    print(f"Fast f time     ({iters} calls): {fast_time:.5f} s")
+    # ── Speedup Summary ──────────────────────────────────────────────
+    base = results["numpy"]
+    print(f"\n  Speedups (vs NumpyEvaluator):")
+    for name, t_val in results.items():
+        if name != "numpy":
+            arrow = "↑" if t_val < base else "↓"
+            print(f"    {name:22s}: {base / t_val:.2f}x {arrow}")
 
 
 ######################################################################
 if __name__ == "__main__":
-    # import sys
-    # sys.setrecursionlimit(2000)
+    benchmark_all_backends(
+        build_deep_network(depth=50),
+        iters=1000,
+        label="Chain Network (depth=50)",
+    )
 
-    # 1. Standard chain benchmark
-    chain_diag = build_deep_network(depth=50)
-    chain_diag.plot_graphe()
-    benchmark_simulation(chain_diag, iters=1000, label="Chain Network")
-
-    # 2. Dense network benchmark
-    dense_diag = build_dense_network(num_nodes=20, connections_per_node=5)
-    dense_diag.plot_graphe()
-    benchmark_simulation(dense_diag, iters=1000, label="Dense Network")
-
-    # 3. Large network validation
-    # validate_large_network(num_nodes=500, conn_per_node=5, iters=1000)
+    benchmark_all_backends(
+        build_dense_network(num_nodes=20, connections_per_node=5),
+        iters=1000,
+        label="Dense Network (20 nodes)",
+    )

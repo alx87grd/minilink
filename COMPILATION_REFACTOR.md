@@ -2,13 +2,16 @@
 
 This plan aims to consolidate the fragmented and redundant compilation MVPs (`f_fast`, `f_fast_jax`, `compile_jax`, etc.) into a robust, backend-agnostic IR system with dedicated NumPy and JAX evaluators.
 
-## User Review Required
+## Status: User Validated (2026-04-03)
 
 > [!IMPORTANT]
-> This refactor will significantly change the internal state of `DiagramSystem`. While standard methods like `.compile()` will remain for backwards compatibility, the inner attributes like `self.port_execution_plan` will be moved to the compiled artifact.
+> The stateless compilation architecture (NumPy and JAX) has been successfully implemented and validated against the baseline recursive evaluator. Demo scripts confirm that `JaxEvaluator` supports `jit` and `grad` correctly.
 
-> [!WARNING]
-> This change will enforce thread-safety by eliminating the shared `global_signals` buffer on `DiagramSystem`. Each simulation call will allocate its own signal buffer via the backend.
+> [!NOTE]
+> **Remaining Work**:
+> - API Polish: Finalize consistent naming across backend methods.
+> - Test Coverage: Move JAX tests to a permanent, comprehensive suite (see `test_jax_backend.py` experiments).
+> - Performance Benchmarks: Systematically document speedups for larger diagrams.
 
 ## Proposed Changes
 

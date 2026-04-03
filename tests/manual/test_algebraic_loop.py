@@ -1,3 +1,10 @@
+"""
+Tests algebraic loop detection via diagram.check_algebraic_loops() and diagram.compile().
+
+Usage:
+    python tests/manual/test_algebraic_loop.py
+"""
+
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import System
 
@@ -16,6 +23,7 @@ class FeedthroughSystem(System):
 
 
 def test_algebraic_loop():
+    # ── Build a valid DAG (no loop) ──────────────────────────────────
     diag = DiagramSystem()
     diag.add_subsystem(FeedthroughSystem("A"), "A")
     diag.add_subsystem(FeedthroughSystem("B"), "B")
@@ -24,25 +32,35 @@ def test_algebraic_loop():
     diag.connect("A", "y", "B", "u")
     diag.connect("B", "y", "C", "u")
 
-    diag.plot_graphe()
-
     try:
-        diag.compile()
-        print("SUCCESS: Compiled successfully with no algebraic loop.")
+        evaluator = diag.compile()
+        assert evaluator is not None
+        print("PASS: Compiled valid DAG successfully — no algebraic loop.")
     except RuntimeError as e:
-        print(f"FAIL: Caught unexpected algebraic loop: {e}")
+        print(f"FAIL: Unexpected algebraic loop raised: {e}")
 
-    # Now create an algebraic loop
+    # ── check_algebraic_loops should return a topological order ──────
+    order = diag.check_algebraic_loops()
+    assert isinstance(order, list) and len(order) == 3, (
+        f"Expected 3 ports in topological order, got {order}"
+    )
+    print(f"PASS: check_algebraic_loops returned order: {order}")
 
+    # ── Now create an actual algebraic loop ──────────────────────────
     diag.connect("C", "y", "A", "u")
 
-    diag.plot_graphe()
-
     try:
         diag.compile()
-        print("FAIL: Compiled successfully with algebraic loop.")
+        print("FAIL: compile() should have raised RuntimeError for algebraic loop.")
     except RuntimeError as e:
-        print(f"SUCCESS: Caught expected algebraic loop: {e}")
+        print(f"PASS: Caught expected algebraic loop: {e}")
+
+    # check_algebraic_loops should also raise (not silently swallow)
+    try:
+        diag.check_algebraic_loops()
+        print("FAIL: check_algebraic_loops() should have raised RuntimeError.")
+    except RuntimeError as e:
+        print(f"PASS: check_algebraic_loops raised: {e}")
 
 
 if __name__ == "__main__":

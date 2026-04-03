@@ -20,7 +20,7 @@
 | :--- | :--- | :--- |
 | `core/` | **1.0** | Pure modeling abstractions (framework, diagram, analysis). |
 | `blocks/` | **1.0** | Pre-built reusable blocks (integrators, sources, pendulums). |
-| `compile/` | MVP | IR, backends, and acceleration. |
+| `compile/` | **0.9** | Stateless IR and multi-backend (NumPy/JAX) evaluators. |
 | `graphical/` | MVP | Visualization and animation renderers. |
 | `control/` | Planned | Controller base classes and library. |
 | `planning/` | Planned | Planners: RRT, direct collocation, DP. |

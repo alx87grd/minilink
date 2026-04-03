@@ -174,7 +174,7 @@ class JaxEvaluator:
         return jnp.concatenate(out_pieces, axis=0)
 
     def compute_internal_signals(self, x, u, t=0.0):
-        """Evaluate and return the full internal signal buffer (JAX-traceable).
+        """Evaluate and return the full internal signal buffer (flat JAX array).
 
         Parameters
         ----------
@@ -188,6 +188,23 @@ class JaxEvaluator:
         """
         dtype = self._infer_dtype(x, u)
         return self._compute_port_signals(x, u, t, dtype)
+
+    def compute_internal_signals_dict(self, x, u, t=0.0):
+        """Evaluate all port signals and return as a labelled dict.
+
+        Returns
+        -------
+        dict mapping ``"sys_id:port_id"`` -> jax array
+            One entry per output port in topological order.
+        """
+        dtype = self._infer_dtype(x, u)
+        signals = self._compute_port_signals(x, u, t, dtype)
+        return {
+            f"{sys_id}:{port_id}": signals[sl]
+            for (sys_id, port_id), sl in self.plan.output_slices.items()
+        }
+
+
 
     # ── JIT wrappers ─────────────────────────────────────────────────
 

@@ -31,6 +31,13 @@ from minilink.compile.execution_plan import (
 )
 from minilink.compile.numpy_backend import NumpyEvaluator
 
+# JaxEvaluator is exported lazily — JAX is optional.
+# Import it here so `from minilink.compile import JaxEvaluator` works when JAX is installed.
+try:
+    from minilink.compile.jax_backend import JaxEvaluator
+except ImportError:
+    JaxEvaluator = None  # type: ignore[assignment,misc]
+
 __all__ = [
     # Entry points
     "compile_diagram",
@@ -40,7 +47,8 @@ __all__ = [
     "ExecutionPlan",
     "PortOperation",
     "StateOperation",
-    # NumPy backend (always available)
+    # Backends
     "NumpyEvaluator",
-    # JAX backend: import via minilink.compile.jax_backend when needed
+    "JaxEvaluator",  # None when JAX is not installed
 ]
+

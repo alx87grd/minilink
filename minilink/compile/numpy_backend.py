@@ -165,19 +165,13 @@ class NumpyEvaluator:
     def compute_internal_signals(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0
     ) -> np.ndarray:
-        """Evaluate and return the full internal signal buffer.
-
-        This is useful for reconstructing all subsystem output signals
-        at a given time step (e.g., for plotting internal signals).
+        """Evaluate and return the full internal signal buffer (flat array).
 
         Parameters
         ----------
         x : np.ndarray, shape (state_dim,)
-            Global state vector.
         u : np.ndarray, shape (m,)
-            External input vector.
         t : float
-            Current time.
 
         Returns
         -------
@@ -185,6 +179,23 @@ class NumpyEvaluator:
             The complete internal signal buffer after evaluation.
         """
         return self._compute_port_signals(x, u, t)
+
+    def compute_internal_signals_dict(
+        self, x: np.ndarray, u: np.ndarray, t: float = 0.0
+    ) -> dict:
+        """Evaluate all port signals and return as a labelled dict.
+
+        Returns
+        -------
+        dict mapping ``"sys_id:port_id"`` -> ``np.ndarray``
+            One entry per output port in topological order.
+        """
+        signals = self._compute_port_signals(x, u, t)
+        return {
+            f"{sys_id}:{port_id}": signals[sl]
+            for (sys_id, port_id), sl in self.plan.output_slices.items()
+        }
+
 
     # ── Private ──────────────────────────────────────────────────────
 

@@ -210,6 +210,122 @@ class TestNumpyEvaluator(unittest.TestCase):
         dx = evaluator.compute_dx(np.array([]), np.array([3.0]), 0.0)
         self.assertEqual(dx.shape, (0,))
 
+    def test_compute_internal_signals_dict(self):
+        """compute_internal_signals_dict returns {sys_id:port_id -> array}."""
+        x = np.array([0.5])
+        u = np.array([1.0])
+        signals = self.evaluator.compute_internal_signals_dict(x, u, 0.0)
+        self.assertIsInstance(signals, dict)
+        # All subsystem output ports should be present
+        for sys_id, sys in self.diag.subsystems.items():
+            for port_id in sys.outputs:
+                self.assertIn(f"{sys_id}:{port_id}", signals)
+
+
+# TODO: add JAX tests with compatible JAX block in a separate test file
+# # ── JAX tests (skipped if JAX not installed) ─────────────────────────
+
+# try:
+#     import jax
+#     import jax.numpy as jnp
+#     from minilink.compile import JaxEvaluator
+#     _JAX_AVAILABLE = True
+# except ImportError:
+#     _JAX_AVAILABLE = False
+
+
+# @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
+# class TestJaxEvaluator(unittest.TestCase):
+#     """Test JaxEvaluator against the reference diagram.f() and for JAX traceability."""
+
+#     def setUp(self):
+#         self.diag = _build_small_closed_loop()
+#         self.evaluator = compile_diagram(self.diag, backend="jax")
+#         self.x = jnp.array([0.3], dtype=jnp.float32)
+#         self.u = jnp.array([1.2], dtype=jnp.float32)
+
+#     def test_returns_jax_evaluator(self):
+#         self.assertIsInstance(self.evaluator, JaxEvaluator)
+
+#     def test_compute_dx_matches_numpy(self):
+#         """JaxEvaluator.compute_dx must match NumpyEvaluator exactly."""
+#         np_evaluator = compile_diagram(self.diag, backend="numpy")
+#         x_np = np.array([0.3])
+#         u_np = np.array([1.2])
+
+#         dx_numpy = np_evaluator.compute_dx(x_np, u_np, 0.1)
+#         dx_jax = np.array(self.evaluator.compute_dx(self.x, self.u, 0.1))
+
+#         np.testing.assert_allclose(dx_jax, dx_numpy, atol=1e-5)
+
+#     def test_compute_dx_multiple_points(self):
+#         """Test at several state/input combinations."""
+#         np_evaluator = compile_diagram(self.diag, backend="numpy")
+#         for x_val, u_val in [(0.0, 0.0), (1.0, 2.0), (-5.0, 10.0)]:
+#             x_np = np.array([x_val])
+#             u_np = np.array([u_val])
+#             x_jax = jnp.array(x_np, dtype=jnp.float32)
+#             u_jax = jnp.array(u_np, dtype=jnp.float32)
+#             dx_ref = np_evaluator.compute_dx(x_np, u_np, 0.0)
+#             dx_jax = np.array(self.evaluator.compute_dx(x_jax, u_jax, 0.0))
+#             np.testing.assert_allclose(dx_jax, dx_ref, atol=1e-5)
+
+#     def test_compute_dx_is_differentiable(self):
+#         """jax.grad must flow through compute_dx."""
+#         def dx0_of_u(u0):
+#             return self.evaluator.compute_dx(
+#                 self.x, jnp.array([u0], dtype=jnp.float32), 0.0
+#             )[0]
+
+#         # For an integrator dx/dt = u, so d(dx)/du = 1
+#         grad_val = float(jax.grad(dx0_of_u)(jnp.array(1.2, dtype=jnp.float32)))
+#         self.assertAlmostEqual(abs(grad_val), 1.0, places=4)
+
+#     def test_compute_outputs_specific_port(self):
+#         """JaxEvaluator.compute_outputs with port selection."""
+#         y = self.evaluator.compute_outputs(
+#             self.x, self.u, 0.0, ports=[("plant", "y")]
+#         )
+#         # Plant output y = x for Integrator
+#         self.assertAlmostEqual(float(y[0]), 0.3, places=5)
+
+#     def test_compute_outputs_is_differentiable(self):
+#         """jax.grad must flow through compute_outputs."""
+#         def y_of_x(x0):
+#             return self.evaluator.compute_outputs(
+#                 jnp.array([x0], dtype=jnp.float32),
+#                 self.u, 0.0, ports=[("plant", "y")]
+#             )[0]
+
+#         grad_val = float(jax.grad(y_of_x)(jnp.array(0.3, dtype=jnp.float32)))
+#         self.assertAlmostEqual(abs(grad_val), 1.0, places=4)
+
+#     def test_jit_compute_dx(self):
+#         """get_jit_compute_dx returns a callable that matches eager result."""
+#         jit_dx = self.evaluator.get_jit_compute_dx()
+#         dx_eager = self.evaluator.compute_dx(self.x, self.u, 0.0)
+#         dx_jit = jit_dx(self.x, self.u, 0.0)
+#         np.testing.assert_allclose(
+#             np.array(dx_jit), np.array(dx_eager), atol=1e-5
+#         )
+
+#     def test_jit_compute_outputs(self):
+#         """get_jit_compute_outputs returns a callable that matches eager result."""
+#         jit_out = self.evaluator.get_jit_compute_outputs()
+#         y_eager = self.evaluator.compute_outputs(self.x, self.u, 0.0)
+#         y_jit = jit_out(self.x, self.u, 0.0)
+#         np.testing.assert_allclose(
+#             np.array(y_jit), np.array(y_eager), atol=1e-5
+#         )
+
+#     def test_compute_internal_signals_dict(self):
+#         """compute_internal_signals_dict returns {sys_id:port_id -> jax array}."""
+#         signals = self.evaluator.compute_internal_signals_dict(self.x, self.u, 0.0)
+#         self.assertIsInstance(signals, dict)
+#         for sys_id, sys in self.diag.subsystems.items():
+#             for port_id in sys.outputs:
+#                 self.assertIn(f"{sys_id}:{port_id}", signals)
+
 
 if __name__ == "__main__":
     unittest.main()

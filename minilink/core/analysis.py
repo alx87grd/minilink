@@ -43,66 +43,37 @@ def compute_internal_signals(diagram, traj):
     Adds a dictionary `internal_signals` to the trajectory object containing time-series data
     for every output port of every subsystem.
     """
-    if not hasattr(diagram, "port_execution_plan"):
+    from minilink.core.diagram import DiagramSystem
+
+    if not isinstance(diagram, DiagramSystem):
         return traj
 
-    if not diagram.compiled:
-        diagram.compile()
+    # Always compile a fresh NumPy evaluator for signal reconstruction
+    evaluator = diagram.compile(backend="numpy")
 
     times = traj.t
     n_pts = len(times)
 
     # Initialize the internal_signals dict
-    # Maps "sys_id:port_id" to a numpy array of shape (dim, n_pts)
+    # Maps "sys_id:port_id" -> numpy array of shape (dim, n_pts)
     internal_signals = {}
     for sys_id, sys in diagram.subsystems.items():
         for port_id, port in sys.outputs.items():
             internal_signals[f"{sys_id}:{port_id}"] = np.zeros((port.dim, n_pts))
 
-    # Iterate through each time step
-    for i, t in enumerate(times):
+    # Iterate through each time step and reconstruct signals
+    for i in range(n_pts):
+        t = times[i]
         x_i = traj.x[:, i]
         u_i = traj.u[:, i]
 
-        global_signals = diagram.global_signals
-
-        # 1. Compute all output port signals in topological order
-        for (
-            compute_func,
-            local_x_slice,
-            gather_sources,
-            out_slice,
-            u_dim,
-        ) in diagram.port_execution_plan:
-            local_x = x_i[local_x_slice]
-
-            if u_dim == 0:
-                local_u = np.array([])
-            else:
-                local_u = np.empty(u_dim)
-                idx = 0
-                for src_type, src_val, dim in gather_sources:
-                    if src_type == 2:  # global_signals
-                        local_u[idx : idx + dim] = global_signals[src_val]
-                    elif src_type == 0:  # nominal
-                        local_u[idx : idx + dim] = src_val
-                    elif src_type == 1:  # external_u
-                        local_u[idx : idx + dim] = u_i[src_val]
-                    idx += dim
-
-            # Execute the port's compute function
-            global_signals[out_slice] = compute_func(local_x, local_u, t)
-
-        # Copy the results to internal_signals
-        for sys_id, sys in diagram.subsystems.items():
-            for port_id, port in sys.outputs.items():
-                out_slice = diagram.output_slices[(sys_id, port_id)]
-                internal_signals[f"{sys_id}:{port_id}"][:, i] = global_signals[
-                    out_slice
-                ]
+        step_signals = evaluator.compute_internal_signals_dict(x_i, u_i, t)
+        for key, value in step_signals.items():
+            internal_signals[key][:, i] = value
 
     traj.internal_signals = internal_signals
     return traj
+
 
 
 ######################################################################
@@ -244,10 +215,11 @@ class Simulator:
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
 
-                if hasattr(sys, "f_fast"):
-                    dx = sys.f_fast(x, u, t)
+                if self.evaluator:
+                    dx = self.evaluator.compute_dx(x, u, t)
                 else:
                     dx = sys.f(x, u, t)
+
 
                 if i < n_pts - 1:
                     dt = times[i + 1] - times[i]
@@ -266,10 +238,11 @@ class Simulator:
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
 
-                if hasattr(sys, "f_fast"):
-                    x_next = sys.f_fast(x, u, t)
+                if self.evaluator:
+                    x_next = self.evaluator.compute_dx(x, u, t)
                 else:
                     x_next = sys.f(x, u, t)
+
 
                 if i < n_pts - 1:
                     x_traj[:, i + 1] = x_next

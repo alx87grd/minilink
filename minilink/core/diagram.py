@@ -191,35 +191,41 @@ class DiagramSystem(System):
     ######################################################################
     def check_algebraic_loops(self):
         """
-        Detects cycles that contain only direct feedthrough paths and computes
-        the topological execution order of ports.
-        """
+        Detects algebraic loops and returns the topological port execution order.
 
+        Raises
+        ------
+        RuntimeError
+            If an algebraic loop is found (with full cycle path in the message).
+
+        Returns
+        -------
+        list of (sys_id, port_id)
+            Topologically sorted output-port schedule.
+        """
         from minilink.compile import check_algebraic_loops
 
-        try:
-            port_execution_order = check_algebraic_loops(self)
-        except RuntimeError as e:
-            print(e)
-            port_execution_order = None
-
-        return port_execution_order
+        return check_algebraic_loops(self)  # RuntimeError propagates if loop found
 
     ######################################################################
     def compile(self, backend="numpy"):
         """
-        Compiles the diagram for fast execution.
+        Compiles the diagram into a stateless Evaluator for high-performance simulation.
 
+        Runs algebraic-loop detection internally; raises RuntimeError if a loop is found.
+
+        Parameters
+        ----------
+        backend : str
+            ``'numpy'`` (default) or ``'jax'``.
+
+        Returns
+        -------
+        NumpyEvaluator or JaxEvaluator
         """
-        port_execution_order = self.check_algebraic_loops()
+        from minilink.compile import compile_diagram
 
-        if port_execution_order is None:
-            raise RuntimeError("Algebraic loop detected")
-
-        else:
-            from minilink.compile import compile_diagram
-
-            return compile_diagram(self, backend=backend)
+        return compile_diagram(self, backend=backend)
 
     ######################################################################
     def refresh(self):

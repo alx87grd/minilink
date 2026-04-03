@@ -7,10 +7,9 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 | Component | Status | Next Milestone |
 | :--- | :--- | :--- |
 | **Core Abstractions** | **TRL 9** | Optimization of `global_signals` |
-| **Simulation (Analysis)** | **TRL 2** | Refactor analysis interface and solve_ivp input fix (P0) |
-| **Visualization** | **TRL 2** | Refactor system-to-rendering interface |
-| **JAX Integration** | **TRL 2** | Experimental re-entrancy and tracing support |
-| **Controllers** | **Planned** | Base classes and linear library |
+| **JAX Integration** | **TRL 7** | Finalize jittable ODE solvers |
+| **Backends / Compilation** | **TRL 8** | Unified stateless IR (Validated) |
+| **Simulation (Analysis)** | **TRL 4** | Refactor analysis interface and solve_ivp input fix (P0) |
 | **Planning** | **Planned** | RRT and Direct Collocation ports |
 | **Mechanical Templates** | **Planned** | `MechanicalSystem` base class |
 
@@ -31,9 +30,10 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 
 ### Phase 3: Core Architecture (P1)
 - [x] Decouple Modeling from Graphics/Simulation (Lazy imports).
-- [ ] **Consolidate Compilation Backends**: Refactor into a unified IR with NumPy/JAX classes. See [COMPILATION_REFACTOR.md](COMPILATION_REFACTOR.md) for the detailed plan.
-- [ ] **Eliminate Shared Mutable Buffers**: Move to per-call `global_signals` allocation.
-- [ ] **Standardize Signal Gathering**: Consolidate `src_type` loops into a shared helper.
+- [x] **Consolidate Compilation Backends**: Unified IR with NumPy/JAX classes. (Validated ✅)
+- [x] **Eliminate Shared Mutable Buffers**: Fully stateless per-call `global_signals` allocation.
+- [x] **Standardize Signal Gathering**: Consolidated `src_type` loops into a shared helper.
+- [ ] **Public API Surface**: Finalize consistent method naming in `minilink.compile`.
 - [ ] **Public API Surface**: Populate `minilink/__init__.py`.
 - [ ] **Diagram Validation**: Add wiring guards in `add_subsystem()` and `connect()` (unique names, orphan ports, double-connection detection).
 - [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.

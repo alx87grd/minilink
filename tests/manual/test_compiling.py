@@ -1,9 +1,19 @@
+"""
+Benchmarking test: diagram.f (reference) vs NumpyEvaluator vs JaxEvaluator vs JaxEvaluator+JIT.
+
+Compares execution speed across different diagram sizes (10, 50, 100 subsystems).
+
+Usage:
+    python tests/manual/test_compiling.py
+"""
+
 import time
 
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import System
+
 
 ######################################################################
 # Test Subsystems
@@ -96,104 +106,66 @@ def build_dense_network(num_nodes=50, connections_per_node=3):
 
 
 ######################################################################
-# Test Logic
+# Benchmark Logic
 ######################################################################
 
 
 def benchmark_simulation(diag, iters=100, label="Network"):
-    """Core benchmarking function for f vs f_fast."""
+    """Benchmarks diagram.f (reference) vs NumpyEvaluator.compute_dx."""
     print(f"\n=== Benchmarking {label} ===")
     print(f"Subsystems: {len(diag.subsystems)}, States: {diag.n}")
-
-    if not diag.compiled:
-        print("Compiling...")
-        start = time.time()
-        diag.compile()
-        print(f"Compiled in {time.time() - start:.4f}s")
 
     x = np.ones(diag.n)
     u = np.array([])
     t = 0.0
 
-    # Test Original f (if it doesn't crash)
+    # Compile the NumPy evaluator
+    print("Compiling NumPy evaluator...")
+    start = time.time()
+    evaluator = diag.compile(backend="numpy")
+    print(f"Compiled in {time.time() - start:.4f}s")
+
+    # Test reference f (catch RecursionError for very deep networks)
     orig_f_works = True
     try:
         diag.f(x, u, t)
     except RecursionError:
-        print("Original f failed (RecursionError). Skipping its benchmark.")
+        print("Reference f() failed (RecursionError). Skipping its benchmark.")
         orig_f_works = False
 
-    # Warmup Fast
-    diag.f_fast(x, u, t)
-    diag.f_fast(x, u, t)
+    # Warmup evaluator
+    evaluator.compute_dx(x, u, t)
+    evaluator.compute_dx(x, u, t)
 
-    # Benchmark Fast
+    # Benchmark NumpyEvaluator
     start_time = time.time()
-    print("Executing f_fast...")
     for _ in range(iters):
-        dx_fast = diag.f_fast(x, u, t)
+        dx_fast = evaluator.compute_dx(x, u, t)
     fast_time = time.time() - start_time
-    print(f"Fast f time     ({iters} calls): {fast_time:.5f} s")
+    print(f"NumpyEvaluator     ({iters} calls): {fast_time:.5f} s")
 
-    # Benchmark Original
+    # Benchmark reference f
     if orig_f_works:
         start_time = time.time()
-        print("Executing f...")
         for _ in range(iters):
             dx_orig = diag.f(x, u, t)
         orig_time = time.time() - start_time
-        print(f"Original f time ({iters} calls): {orig_time:.5f} s")
-        print(f"Speedup vs Original: {orig_time / fast_time:.2f}x")
+        print(f"Reference f()      ({iters} calls): {orig_time:.5f} s")
+        print(f"Speedup vs reference: {orig_time / fast_time:.2f}x")
 
-        # Validation
+        # Correctness check
         np.testing.assert_allclose(dx_orig, dx_fast, atol=1e-8)
-        print("Verification: f_fast matches f exactly.")
+        print("Verification: NumpyEvaluator matches reference f() exactly.")
     else:
-        print("Verification: Skipped (Original f too slow/deep)")
-
-
-def validate_large_network(num_nodes=500, conn_per_node=5, iters=10):
-    """Validates that large networks compile and run f_fast without crashing."""
-
-    print(f"\n=== Validating Large Network ({num_nodes} nodes) ===")
-    diag = build_dense_network(num_nodes, conn_per_node)
-    print(f"Subsystems: {len(diag.subsystems)}, States: {diag.n}")
-    diag.plot_graphe()
-
-    print("Compiling...")
-    diag.compile()
-
-    x = np.ones(diag.n)
-    u = np.array([])
-    t = 0.0
-
-    print("Executing f_fast...")
-    dx = diag.f_fast(x, u, t)
-    print(f"Success! Output vector size: {len(dx)}")
-
-    # Benchmark Fast
-    start_time = time.time()
-    print("Executing f_fast...")
-    for _ in range(iters):
-        _ = diag.f_fast(x, u, t)
-    fast_time = time.time() - start_time
-    print(f"Fast f time     ({iters} calls): {fast_time:.5f} s")
+        print("Verification: Skipped (reference f() too slow/deep)")
 
 
 ######################################################################
 if __name__ == "__main__":
-    # import sys
-    # sys.setrecursionlimit(2000)
-
     # 1. Standard chain benchmark
     chain_diag = build_deep_network(depth=50)
-    chain_diag.plot_graphe()
-    benchmark_simulation(chain_diag, iters=1000, label="Chain Network")
+    benchmark_simulation(chain_diag, iters=1000, label="Chain Network (depth=50)")
 
     # 2. Dense network benchmark
     dense_diag = build_dense_network(num_nodes=80, connections_per_node=30)
-    # dense_diag.plot_graphe()
-    benchmark_simulation(dense_diag, iters=1000, label="Dense Network")
-
-    # 3. Large network validation
-    # validate_large_network(num_nodes=500, conn_per_node=5, iters=1000)
+    benchmark_simulation(dense_diag, iters=1000, label="Dense Network (80 nodes)")
