@@ -18,7 +18,14 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 
 ### Main TODO (compilation API)
 
+Full design (frozen `p`, `ParameterLayout`, `rhs_*` / `observe_*` triples, diagram extensions): **[COMPILED_API_PLAN.md](COMPILED_API_PLAN.md)**.
+
 - [ ] **Uniform `compile()` for diagram and non-diagram systems**: Same entry point shape on `DiagramSystem` and leaf `System` subclasses—`compile(backend=…, bind_params=…)`—returning the same evaluator family (`NumpyEvaluator` / `JaxEvaluator`) with consistent `(x, u, t)` and `bound_params` snapshot semantics. A leaf block must not silently use a shrunk I/O story (e.g. diagram-style empty `u` while nominals stand in for real inputs). Implementation approach is TBD (dedicated leaf IR, mirrored diagram ports, or other); cancelled one-node wrapper without I/O parity is not sufficient.
+- [ ] **Compiled API — protocols & bundles** ([COMPILED_API_PLAN.md](COMPILED_API_PLAN.md)): artifact types with `layout`, `p_frozen`, dims, dynamics/observe triples; `ParameterLayout` + pack/unpack from dicts.
+- [ ] **Compiled API — compile pipeline**: pack `p_frozen` at compile time; `rhs_ivp` / `rhs_open` close over `u_frozen` + `p_frozen` as specified; `rhs_param` takes caller `p` (same layout).
+- [ ] **Compiled API — diagram parametric tier**: inject flat `p` into plan ops per DESIGN; until implemented, stub or raise with a clear message.
+- [ ] **Compiled API — evaluators**: implement `rhs_*` / `observe_*` on NumPy/JAX backends (optional `jit`, same signatures); migrate or alias `compute_dx` / `compute_outputs`.
+- [ ] **Compiled API — docs & tests**: update DESIGN.md §4.2; tests for layout round-trip, frozen vs live params, triple parity, SciPy `rhs_ivp`.
 
 ---
 
