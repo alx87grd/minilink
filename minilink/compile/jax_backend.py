@@ -204,8 +204,6 @@ class JaxEvaluator:
             for (sys_id, port_id), sl in self.plan.output_slices.items()
         }
 
-
-
     # ── JIT wrappers ─────────────────────────────────────────────────
 
     def get_jit_compute_dx(self):
@@ -225,9 +223,7 @@ class JaxEvaluator:
 
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
-            local_u = _gather_u_jax(
-                op.gather_sources, op.u_dim, signals, u, jnp, dtype
-            )
+            local_u = _gather_u_jax(op.gather_sources, op.u_dim, signals, u, jnp, dtype)
             y_out = op.compute_func(local_x, local_u, t)
             signals = signals.at[op.out_slice].set(y_out)
         return signals

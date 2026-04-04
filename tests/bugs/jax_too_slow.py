@@ -146,3 +146,5 @@ for _ in range(n_iters):
     f_compiled_jax(x, u)
 dt = time.perf_counter() - t0
 print(f"JAX (not JIT):  {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+
+# Summary: The “error” is really a performance model mismatch: the implementation is intentionally trace-oriented (functional .at[].set, jnp everywhere), which is slow when run eagerly at large len(port_ops) + len(state_ops), and fast when wrapped in jax.jit, exactly as your numbers showed.

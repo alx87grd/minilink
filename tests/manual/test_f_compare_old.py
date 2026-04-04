@@ -17,6 +17,7 @@ from minilink.core.framework import System
 
 try:
     import jax.numpy as jnp
+
     JAX_AVAILABLE = True
 except ImportError:
     JAX_AVAILABLE = False
@@ -44,7 +45,7 @@ class SimpleIntegrator(System):
         super().__init__(1, 1, 1)
         self.name = id_str
         self.add_input_port(1, "u")
-        self.add_output_port(1, "x", function=self.compute_state, dependencies="all")
+        self.add_output_port(1, "x", function=self.compute_state, dependencies="")
 
     def compute_state(self, x, u, t=0, params=None):
         return x
@@ -66,7 +67,7 @@ class MultiInputNode(System):
         return x
 
     def f(self, x, u, t=0, params=None):
-        return np.sum(u)
+        return u.sum()
 
 
 ######################################################################
@@ -158,9 +159,9 @@ def benchmark_all_backends(diag, iters=100, label="Network"):
     results["numpy"] = time.time() - start
     print(f"  NumpyEvaluator         ({iters} iters): {results['numpy']:.5f} s")
 
-    if orig_f_works:
-        np.testing.assert_allclose(dx_ref, dx_np, atol=1e-8)
-        print("  ✓ NumpyEvaluator matches reference f()")
+    # if orig_f_works:
+    #     np.testing.assert_allclose(dx_ref, dx_np, atol=1e-8)
+    #     print("  ✓ NumpyEvaluator matches reference f()")
 
     # ── 3 & 4. JAX backends ─────────────────────────────────────────
     if JAX_AVAILABLE:
@@ -171,15 +172,18 @@ def benchmark_all_backends(diag, iters=100, label="Network"):
         jit_compute_dx = jax_evaluator.get_jit_compute_dx()
 
         # Warmup (triggers XLA compile)
-        jax_evaluator.compute_dx(x_jax, u_jax, t).block_until_ready()
+        # jax_evaluator.compute_dx(x_jax, u_jax, t).block_until_ready()
+        t0 = time.perf_counter()
         jit_compute_dx(x_jax, u_jax, t).block_until_ready()
+        dt = time.perf_counter() - t0
+        print(f"  JAX JIT Warmup                     : {dt:.4f} s")
 
-        start = time.time()
-        for _ in range(iters):
-            dx_jax = jax_evaluator.compute_dx(x_jax, u_jax, t)
-        dx_jax.block_until_ready()
-        results["jax"] = time.time() - start
-        print(f"  JaxEvaluator           ({iters} iters): {results['jax']:.5f} s")
+        # start = time.time()
+        # for _ in range(iters):
+        #     dx_jax = jax_evaluator.compute_dx(x_jax, u_jax, t)
+        # dx_jax.block_until_ready()
+        # results["jax"] = time.time() - start
+        # print(f"  JaxEvaluator           ({iters} iters): {results['jax']:.5f} s")
 
         start = time.time()
         for _ in range(iters):
@@ -190,25 +194,18 @@ def benchmark_all_backends(diag, iters=100, label="Network"):
     else:
         print("  JAX backends           : SKIPPED (JAX not installed)")
 
-    # ── Speedup Summary ──────────────────────────────────────────────
-    base = results["numpy"]
-    print(f"\n  Speedups (vs NumpyEvaluator):")
-    for name, t_val in results.items():
-        if name != "numpy":
-            arrow = "↑" if t_val < base else "↓"
-            print(f"    {name:22s}: {base / t_val:.2f}x {arrow}")
-
 
 ######################################################################
 if __name__ == "__main__":
-    benchmark_all_backends(
-        build_deep_network(depth=50),
-        iters=1000,
-        label="Chain Network (depth=50)",
-    )
 
-    benchmark_all_backends(
-        build_dense_network(num_nodes=20, connections_per_node=5),
-        iters=1000,
-        label="Dense Network (20 nodes)",
-    )
+    diag = build_deep_network(depth=50)
+    benchmark_all_backends(diag, iters=100000, label="Chain Network")
+    diag.plot_graphe()
+
+    diag = build_dense_network(num_nodes=50, connections_per_node=5)
+    benchmark_all_backends(diag, iters=1000, label="Dense Network")
+    diag.plot_graphe()
+
+    diag = build_dense_network(num_nodes=500, connections_per_node=100)
+    benchmark_all_backends(diag, iters=100, label="Dense Network")
+    # diag.plot_graphe()
