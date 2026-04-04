@@ -18,14 +18,18 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 
 ### Main TODO (compilation API)
 
-Full design (frozen `p`, `ParameterLayout`, `rhs_*` / `observe_*` triples, diagram extensions): **[COMPILED_API_PLAN.md](COMPILED_API_PLAN.md)**.
+Full design (frozen `p`, `ParameterLayout`, `rhs_*` / `observe_*` triples, diagram extensions, **JAX PyTrees vs flat `p`**, optional rollout/`vmap` toolbox): **[COMPILED_API_PLAN.md](COMPILED_API_PLAN.md)**.
 
+**Order:** **P0 first** — land the **`DynamicsEvaluator` public interface** (Protocol/ABC + exports + DESIGN pointer, signature-complete stubs) **before** compile pipeline, `p_frozen` wiring, or other backend refactors. See **Implementation priority** in the plan.
+
+- [ ] **P0 — `DynamicsEvaluator` public interface** ([COMPILED_API_PLAN.md](COMPILED_API_PLAN.md)): `DynamicsEvaluator` + `DynamicsEvaluatorBase` with full planned signatures; `minilink.compile` exports; DESIGN.md §4.2 cross-link; default `NotImplementedError` / abstract `rhs_*`/`observe_*` only — **no dependency on completing pack/unpack or diagram parametric work**.
 - [ ] **Uniform `compile()` for diagram and non-diagram systems**: Same entry point shape on `DiagramSystem` and leaf `System` subclasses—`compile(backend=…, bind_params=…)`—returning the same evaluator family (`NumpyEvaluator` / `JaxEvaluator`) with consistent `(x, u, t)` and `bound_params` snapshot semantics. A leaf block must not silently use a shrunk I/O story (e.g. diagram-style empty `u` while nominals stand in for real inputs). Implementation approach is TBD (dedicated leaf IR, mirrored diagram ports, or other); cancelled one-node wrapper without I/O parity is not sufficient.
 - [ ] **Compiled API — protocols & bundles** ([COMPILED_API_PLAN.md](COMPILED_API_PLAN.md)): artifact types with `layout`, `p_frozen`, dims, dynamics/observe triples; `ParameterLayout` + pack/unpack from dicts.
 - [ ] **Compiled API — compile pipeline**: pack `p_frozen` at compile time; `rhs_ivp` / `rhs_open` close over `u_frozen` + `p_frozen` as specified; `rhs_param` takes caller `p` (same layout).
 - [ ] **Compiled API — diagram parametric tier**: inject flat `p` into plan ops per DESIGN; until implemented, stub or raise with a clear message.
 - [ ] **Compiled API — evaluators**: implement `rhs_*` / `observe_*` on NumPy/JAX backends (optional `jit`, same signatures); migrate or alias `compute_dx` / `compute_outputs`.
 - [ ] **Compiled API — docs & tests**: update DESIGN.md §4.2; tests for layout round-trip, frozen vs live params, triple parity, SciPy `rhs_ivp`.
+- [ ] **Compiled API — `DynamicsEvaluator` implementation** ([COMPILED_API_PLAN.md](COMPILED_API_PLAN.md) — after P0): wire **DE-0 … DE-5** (metadata, Euler/RK4, rollouts, trajectory `observe_*`, `Linearization`, Jacobians, JIT/`vmap`, diagram extension **J**).
 
 ---
 
@@ -44,11 +48,10 @@ Full design (frozen `p`, `ParameterLayout`, `rhs_*` / `observe_*` triples, diagr
 - [x] **Consolidate Compilation Backends**: Unified IR with NumPy/JAX classes. (Validated ✅)
 - [x] **Eliminate Shared Mutable Buffers**: Fully stateless per-call `global_signals` allocation.
 - [x] **Standardize Signal Gathering**: Consolidated `src_type` loops into a shared helper.
-- [ ] **Public API Surface**: Finalize consistent method naming in `minilink.compile`.
+- [ ] **Public API Surface**: **`DynamicsEvaluator` P0** first — lock Protocol/ABC + exports per [COMPILED_API_PLAN.md](COMPILED_API_PLAN.md) **Implementation priority** before broader compile refactors; then finalize consistent naming in `minilink.compile`.
 - [ ] **Public API Surface**: Populate `minilink/__init__.py`.
 - [ ] **Unified `compile()` API**: See **Main TODO** above (diagram + leaf `System` parity, same evaluators and I/O semantics). Follow-up: unified dynamic function export for simulator / optimizer once the compile surface is aligned.
 - [ ] **Diagram Validation**: Add wiring guards in `add_subsystem()` and `connect()` (unique names, orphan ports, double-connection detection).
-- [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.
 - [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.
 - [ ] **Context-Based Evaluation**: (Planned Re-evaluation) Transition from `(x, u, t, p)` arguments to a structured `Context` object *only if* hybrid systems (discrete state, modes) are introduced; keep flat textbook-style args for now.
 - [ ] **Parameter Registry & Mapping**: Implement a compile-time map that translates user-friendly parameter names (dict/namespace) into high-performance flat arrays for the engine.
