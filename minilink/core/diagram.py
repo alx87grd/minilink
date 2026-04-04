@@ -208,7 +208,7 @@ class DiagramSystem(System):
         return check_algebraic_loops(self)  # RuntimeError propagates if loop found
 
     ######################################################################
-    def compile(self, backend="numpy"):
+    def compile(self, backend="numpy", bind_params=False):
         """
         Compiles the diagram into a stateless Evaluator for high-performance simulation.
 
@@ -218,6 +218,10 @@ class DiagramSystem(System):
         ----------
         backend : str
             ``'numpy'`` (default) or ``'jax'``.
+        bind_params : bool, optional
+            If ``True``, subsystem ``params`` are deep-copied into the plan at compile
+            time (see :func:`minilink.compile.compile_diagram`). This snapshots only the
+            ``params`` dict, not other subsystem state; see :class:`minilink.core.framework.System`.
 
         Returns
         -------
@@ -225,7 +229,7 @@ class DiagramSystem(System):
         """
         from minilink.compile import compile_diagram
 
-        return compile_diagram(self, backend=backend)
+        return compile_diagram(self, backend=backend, bind_params=bind_params)
 
     ######################################################################
     def refresh(self):

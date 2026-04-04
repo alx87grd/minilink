@@ -19,6 +19,7 @@ This module provides the complete compilation pipeline:
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING
 
 from minilink.compile.execution_plan import (
@@ -37,7 +38,9 @@ if TYPE_CHECKING:
 # ── Public API ───────────────────────────────────────────────────────
 
 
-def compile_diagram(diagram: DiagramSystem, backend: str = "numpy"):
+def compile_diagram(
+    diagram: DiagramSystem, backend: str = "numpy", *, bind_params: bool = False
+):
     """Compile a DiagramSystem into a backend evaluator.
 
     Parameters
@@ -46,6 +49,10 @@ def compile_diagram(diagram: DiagramSystem, backend: str = "numpy"):
         The wired diagram to compile.
     backend : str
         ``'numpy'`` or ``'jax'``.
+    bind_params : bool, optional
+        If ``True``, each plan operation stores a deep copy of that subsystem's
+        ``params`` and evaluators pass it into ``f`` / port ``compute``. If
+        ``False`` (default), ``None`` is passed and blocks use live ``self.params``.
 
     Returns
     -------
@@ -57,8 +64,14 @@ def compile_diagram(diagram: DiagramSystem, backend: str = "numpy"):
     >>> from minilink.compile import compile_diagram
     >>> evaluator = compile_diagram(diagram)
     >>> dx = evaluator.compute_dx(x, u, t)
+
+    Notes
+    -----
+    ``bind_params=True`` snapshots only each subsystem's ``params`` dict into the plan.
+    It does **not** make user ``f`` / port ``compute`` implementations pure if they still
+    read or mutate other instance state; see :class:`minilink.core.framework.System`.
     """
-    plan = build_execution_plan(diagram)
+    plan = build_execution_plan(diagram, bind_params=bind_params)
 
     key = backend.strip().lower()
     if key == "numpy":
@@ -80,7 +93,9 @@ def compile_diagram(diagram: DiagramSystem, backend: str = "numpy"):
         raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
 
 
-def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
+def build_execution_plan(
+    diagram: DiagramSystem, *, bind_params: bool = False
+) -> ExecutionPlan:
     """Build an immutable ExecutionPlan from a DiagramSystem.
 
     This is the core compilation step.  It:
@@ -93,6 +108,10 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
     ----------
     diagram : DiagramSystem
         Must have subsystems added and connections wired.
+    bind_params : bool, optional
+        When ``True``, set :attr:`~minilink.compile.execution_plan.PortOperation.bound_params`
+        / :attr:`~minilink.compile.execution_plan.StateOperation.bound_params` on each row
+        (deep copy of ``subsystem.params`` only; see :func:`compile_diagram` Notes).
 
     Returns
     -------
@@ -131,6 +150,10 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
         # Mapping into the global state vector 'x' for this subsystem's local state
         local_x_slice = _state_slice(diagram, sys_id)
 
+        bound = (
+            copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
+        )
+
         port_ops.append(
             PortOperation(
                 compute_func=port.compute,
@@ -138,6 +161,7 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
                 gather_sources=tuple(gather_sources),
                 out_slice=out_slice,
                 u_dim=u_dim,
+                bound_params=bound,
             )
         )
 
@@ -149,12 +173,16 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
                 diagram, sys_id, output_slices, dependencies="all"
             )
             local_x_slice = _state_slice(diagram, sys_id)
+            bound = (
+                copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
+            )
             state_ops.append(
                 StateOperation(
                     f_func=sys.f,
                     local_x_slice=local_x_slice,
                     gather_sources=tuple(gather_sources),
                     u_dim=u_dim,
+                    bound_params=bound,
                 )
             )
 

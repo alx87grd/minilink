@@ -11,6 +11,8 @@ Each call allocates its own signal buffer, so this evaluator is **thread-safe**
 
 from __future__ import annotations
 
+from typing import Callable
+
 import numpy as np
 
 from minilink.compile.execution_plan import (
@@ -76,7 +78,9 @@ class NumpyEvaluator:
     """Stateless NumPy evaluator for a compiled diagram.
 
     All public methods allocate a fresh signal buffer per call, making
-    concurrent evaluation safe.
+    concurrent evaluation safe. Port and state callables remain **bound methods**
+    on subsystem objects; thread-safety of the buffer does not imply that user
+    ``f`` / ``compute`` are pure (see :class:`minilink.core.framework.System`).
 
     Parameters
     ----------
@@ -122,7 +126,7 @@ class NumpyEvaluator:
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
             local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
-            dx[op.local_x_slice] = op.f_func(local_x, local_u, t)
+            dx[op.local_x_slice] = op.f_func(local_x, local_u, t, op.bound_params)
         return dx
 
     def compute_outputs(
@@ -196,6 +200,25 @@ class NumpyEvaluator:
             for (sys_id, port_id), sl in self.plan.output_slices.items()
         }
 
+    def as_dx_callable(self) -> Callable[..., np.ndarray]:
+        """Return ``(x, u, t) -> dx`` for use with ODEs or optimizers."""
+        return self.compute_dx
+
+    def as_scipy_ivp_fun(
+        self, u: np.ndarray | None = None
+    ) -> Callable[[float, np.ndarray], np.ndarray]:
+        """Return ``(t, x) -> dx`` for :func:`scipy.integrate.solve_ivp`.
+
+        If ``u is None``, uses ``np.array([])``, which is only valid when the
+        diagram has no external inputs; otherwise pass ``u`` with the same
+        layout as :meth:`compute_dx`.
+        """
+        u_arr = np.array([]) if u is None else u
+
+        def rhs(t: float, x: np.ndarray) -> np.ndarray:
+            return self.compute_dx(x, u_arr, t)
+
+        return rhs
 
     # ── Private ──────────────────────────────────────────────────────
 
@@ -210,5 +233,7 @@ class NumpyEvaluator:
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
             local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
-            signals[op.out_slice] = op.compute_func(local_x, local_u, t)
+            signals[op.out_slice] = op.compute_func(
+                local_x, local_u, t, op.bound_params
+            )
         return signals

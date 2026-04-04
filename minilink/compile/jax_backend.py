@@ -14,6 +14,8 @@ operations are traceable and differentiable.
 
 from __future__ import annotations
 
+from typing import Any, Callable
+
 from minilink.compile.execution_plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
@@ -73,6 +75,9 @@ class JaxEvaluator:
 
     All operations use functional array updates so they are traceable
     by JAX's transformation system (``jit``, ``grad``, ``vmap``, etc.).
+    User ``f`` / ``compute`` are still bound methods; JAX tracing may fail or
+    misbehave if they mutate ``self`` or rely on non-traceable Python state
+    (see :class:`minilink.core.framework.System`).
 
     Parameters
     ----------
@@ -139,7 +144,7 @@ class JaxEvaluator:
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
             local_u = _gather_u_jax(op.gather_sources, op.u_dim, signals, u, jnp, dtype)
-            dx_piece = op.f_func(local_x, local_u, t)
+            dx_piece = op.f_func(local_x, local_u, t, op.bound_params)
             dx = dx.at[op.local_x_slice].set(dx_piece)
         return dx
 
@@ -214,6 +219,20 @@ class JaxEvaluator:
         """Return a ``jax.jit``-wrapped version of :meth:`compute_outputs`."""
         return self._jax.jit(self.compute_outputs)
 
+    def as_dx_callable(self) -> Callable[..., Any]:
+        """Return ``(x, u, t) -> dx`` for use with ODEs or optimizers."""
+        return self.compute_dx
+
+    def as_scipy_ivp_fun(self, u=None) -> Callable[[Any, Any], Any]:
+        """Return ``(t, x) -> dx`` for :func:`scipy.integrate.solve_ivp`."""
+        jnp = self._jnp
+        u_arr = jnp.array([]) if u is None else u
+
+        def rhs(t, x):
+            return self.compute_dx(x, u_arr, t)
+
+        return rhs
+
     # ── Private ──────────────────────────────────────────────────────
 
     def _compute_port_signals(self, x, u, t, dtype):
@@ -224,6 +243,6 @@ class JaxEvaluator:
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
             local_u = _gather_u_jax(op.gather_sources, op.u_dim, signals, u, jnp, dtype)
-            y_out = op.compute_func(local_x, local_u, t)
+            y_out = op.compute_func(local_x, local_u, t, op.bound_params)
             signals = signals.at[op.out_slice].set(y_out)
         return signals

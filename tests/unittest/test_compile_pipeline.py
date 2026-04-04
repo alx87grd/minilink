@@ -221,6 +221,59 @@ class TestNumpyEvaluator(unittest.TestCase):
             for port_id in sys.outputs:
                 self.assertIn(f"{sys_id}:{port_id}", signals)
 
+    def test_bind_params_freezes_snapshot(self):
+        """bound_params in plan: mutating subsystem.params does not change dx."""
+        diag = _build_small_closed_loop()
+        plant = diag.subsystems["plant"]
+        x = np.array([0.3])
+        u = np.array([1.0])
+        t = 0.0
+
+        ev = compile_diagram(diag, bind_params=True)
+        dx1 = ev.compute_dx(x, u, t)
+        plant.params["k"] = 99.0
+        dx2 = ev.compute_dx(x, u, t)
+        np.testing.assert_allclose(dx1, dx2, atol=1e-10)
+
+    def test_bind_params_false_follows_live_params(self):
+        """Default compile: dx changes when subsystem.params changes (no recompile)."""
+        diag = _build_small_closed_loop()
+        plant = diag.subsystems["plant"]
+        x = np.array([0.3])
+        u = np.array([1.0])
+        t = 0.0
+
+        ev = compile_diagram(diag, bind_params=False)
+        dx1 = ev.compute_dx(x, u, t)
+        plant.params["k"] = 99.0
+        dx2 = ev.compute_dx(x, u, t)
+        self.assertGreater(np.abs(dx2 - dx1).max(), 1e-6)
+
+    def test_as_dx_callable_matches_compute_dx(self):
+        fn = self.evaluator.as_dx_callable()
+        x = np.array([0.2])
+        u = np.array([0.7])
+        t = 0.05
+        np.testing.assert_allclose(
+            fn(x, u, t), self.evaluator.compute_dx(x, u, t), atol=1e-10
+        )
+
+    def test_as_scipy_ivp_fun_order(self):
+        x = np.array([0.4])
+        u = np.array([1.0])
+        t = 0.15
+        rhs = self.evaluator.as_scipy_ivp_fun(u=u)
+        np.testing.assert_allclose(
+            rhs(t, x), self.evaluator.compute_dx(x, u, t), atol=1e-10
+        )
+
+    def test_build_execution_plan_bind_params_sets_bound_params(self):
+        diag = _build_small_closed_loop()
+        plan_free = build_execution_plan(diag, bind_params=False)
+        plan_bound = build_execution_plan(diag, bind_params=True)
+        self.assertIsNone(plan_free.port_ops[0].bound_params)
+        self.assertIsNotNone(plan_bound.port_ops[0].bound_params)
+
 
 # TODO: add JAX tests with compatible JAX block in a separate test file
 # # ── JAX tests (skipped if JAX not installed) ─────────────────────────

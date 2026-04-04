@@ -16,6 +16,10 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 > [!NOTE]
 > Progress is tracked via **Task Readiness Levels (TRL 1-9)**. See [agent.md](agent.md) for detailed definitions of each level and the **3-Level Testing Strategy** (Automated, Manual, Demo).
 
+### Main TODO (compilation API)
+
+- [ ] **Uniform `compile()` for diagram and non-diagram systems**: Same entry point shape on `DiagramSystem` and leaf `System` subclasses—`compile(backend=…, bind_params=…)`—returning the same evaluator family (`NumpyEvaluator` / `JaxEvaluator`) with consistent `(x, u, t)` and `bound_params` snapshot semantics. A leaf block must not silently use a shrunk I/O story (e.g. diagram-style empty `u` while nominals stand in for real inputs). Implementation approach is TBD (dedicated leaf IR, mirrored diagram ports, or other); cancelled one-node wrapper without I/O parity is not sufficient.
+
 ---
 
 ## 2. Development Phases
@@ -35,7 +39,7 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 - [x] **Standardize Signal Gathering**: Consolidated `src_type` loops into a shared helper.
 - [ ] **Public API Surface**: Finalize consistent method naming in `minilink.compile`.
 - [ ] **Public API Surface**: Populate `minilink/__init__.py`.
-- [ ] **Unified `compile()` API**: Implement a `compile(backend='numpy')` method on all blocks. Basic blocks return their core function directly; `DiagramSystem` executes the full compilation pipeline and returns the evaluator method. A unified dynamic function exporter for simulator and optimizer should be provided.
+- [ ] **Unified `compile()` API**: See **Main TODO** above (diagram + leaf `System` parity, same evaluators and I/O semantics). Follow-up: unified dynamic function export for simulator / optimizer once the compile surface is aligned.
 - [ ] **Diagram Validation**: Add wiring guards in `add_subsystem()` and `connect()` (unique names, orphan ports, double-connection detection).
 - [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.
 - [ ] **Simulation Config**: Create a `SimulationOptions` dataclass to replace ad-hoc `solve_ivp` kwargs.
