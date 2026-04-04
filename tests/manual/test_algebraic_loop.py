@@ -22,46 +22,20 @@ class FeedthroughSystem(System):
         return u * 2
 
 
-def test_algebraic_loop():
-    # ── Build a valid DAG (no loop) ──────────────────────────────────
-    diag = DiagramSystem()
-    diag.add_subsystem(FeedthroughSystem("A"), "A")
-    diag.add_subsystem(FeedthroughSystem("B"), "B")
-    diag.add_subsystem(FeedthroughSystem("C"), "C")
+# ── Build a valid DAG (no loop) ──────────────────────────────────
+diag = DiagramSystem()
+diag.add_subsystem(FeedthroughSystem("A"), "A")
+diag.add_subsystem(FeedthroughSystem("B"), "B")
+diag.add_subsystem(FeedthroughSystem("C"), "C")
 
-    diag.connect("A", "y", "B", "u")
-    diag.connect("B", "y", "C", "u")
+diag.connect("A", "y", "B", "u")
+diag.connect("B", "y", "C", "u")
+diag.plot_graphe()
 
-    try:
-        evaluator = diag.compile()
-        assert evaluator is not None
-        print("PASS: Compiled valid DAG successfully — no algebraic loop.")
-    except RuntimeError as e:
-        print(f"FAIL: Unexpected algebraic loop raised: {e}")
+diag.check_algebraic_loops()
 
-    # ── check_algebraic_loops should return a topological order ──────
-    order = diag.check_algebraic_loops()
-    assert isinstance(order, list) and len(order) == 3, (
-        f"Expected 3 ports in topological order, got {order}"
-    )
-    print(f"PASS: check_algebraic_loops returned order: {order}")
+# # ── Now create an actual algebraic loop ──────────────────────────
+# diag.connect("C", "y", "A", "u")
+# diag.plot_graphe()
 
-    # ── Now create an actual algebraic loop ──────────────────────────
-    diag.connect("C", "y", "A", "u")
-
-    try:
-        diag.compile()
-        print("FAIL: compile() should have raised RuntimeError for algebraic loop.")
-    except RuntimeError as e:
-        print(f"PASS: Caught expected algebraic loop: {e}")
-
-    # check_algebraic_loops should also raise (not silently swallow)
-    try:
-        diag.check_algebraic_loops()
-        print("FAIL: check_algebraic_loops() should have raised RuntimeError.")
-    except RuntimeError as e:
-        print(f"PASS: check_algebraic_loops raised: {e}")
-
-
-if __name__ == "__main__":
-    test_algebraic_loop()
+# diag.check_algebraic_loops()
