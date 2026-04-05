@@ -1,10 +1,21 @@
 """
 JAX Integration Utilities for Minilink Systems.
-This module provides functions to optionally XLA-compile and AutoDiff
-standard minilink blocks.
+
+.. deprecated::
+    This module is deprecated.  Use ``compile(system, backend='jax')`` instead,
+    which provides JAX compatibility checking, JIT compilation, and warm-starting
+    out of the box.
 """
 
+import warnings
+
+
 def get_f_jax(sys):
+    warnings.warn(
+        "get_f_jax() is deprecated. Use compile(system, backend='jax') instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     """
     Returns a JAX-jitted version of the system's dynamic equation f(x,u,t,params).
     If the system explicitly defines a `f_jax` method, it is used.

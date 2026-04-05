@@ -85,6 +85,7 @@ class PortOperation:
     out_slice: slice
     u_dim: int
     bound_params: dict | None = None
+    label: str = ""
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,7 @@ class StateOperation:
     gather_sources: tuple[tuple[int, Any, int], ...]
     u_dim: int
     bound_params: dict | None = None
+    label: str = ""
 
 
 # ── Execution plan ───────────────────────────────────────────────────

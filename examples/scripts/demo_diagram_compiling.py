@@ -95,9 +95,9 @@ u = np.array([])
 
 f_baseline = diagram.f
 
-evaluator_numpy = diagram.compile()
+evaluator_numpy = diagram.compile(verbose=True)
 f_compiled_numpy = evaluator_numpy.f
-evaluator_jax = diagram.compile(backend="jax")
+evaluator_jax = diagram.compile(backend="jax", verbose=True)
 f_compiled_jax = evaluator_jax.f
 f_compiled_jax_jit = evaluator_jax.get_f_jit()
 

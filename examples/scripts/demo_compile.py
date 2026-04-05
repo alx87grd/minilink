@@ -27,8 +27,8 @@ print("outputs:", ev.outputs(x, u, 0))
 print("f_ivp:", ev.f_ivp(x, 0))
 print("f_p:", ev.f_p(x, u, 0, {"g": 0.0, "m": 1.0, "l": 1.0}))
 
-ev_np = compile(sys, backend="numpy")
-ev_jax = compile(sys, backend="jax")
+ev_np = compile(sys, backend="numpy", verbose=True)
+ev_jax = compile(sys, backend="jax", verbose=True)
 
 print("f (numpy):", ev_np.f(x, u, 0))
 print("f (jax):", ev_jax.f(x, u, 0))
