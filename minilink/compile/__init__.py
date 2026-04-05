@@ -1,16 +1,23 @@
 """
-Diagram compilation framework.
+Compilation framework.
 
-Provides tools for analysing diagram topology (algebraic loop detection)
-and compiling diagrams into fast, stateless evaluators.
+Provides tools for compiling systems and diagrams into fast evaluators,
+and analysing diagram topology (algebraic loop detection).
 
-Quick start::
+Quick start (leaf system)::
+
+    from minilink.compile import compile
+
+    eval = compile(pendulum, backend="numpy")
+    dx = eval.f(x, u, t)
+    y  = eval.h(x, u, t)
+
+Quick start (diagram)::
 
     from minilink.compile import compile_diagram
 
     evaluator = compile_diagram(diagram, backend="numpy")
-    dx = evaluator.compute_dx(x, u, t)
-    y  = evaluator.compute_outputs(x, u, t, ports=[("plant", "y")])
+    dx = evaluator.f(x, u, t)
 
 For topology analysis only::
 
@@ -22,33 +29,40 @@ For topology analysis only::
 from minilink.compile.compiler import (
     build_execution_plan,
     check_algebraic_loops,
+    compile,
     compile_diagram,
 )
+from minilink.compile.evaluator import DynamicsEvaluator
 from minilink.compile.execution_plan import (
     ExecutionPlan,
     PortOperation,
     StateOperation,
 )
-from minilink.compile.numpy_backend import NumpyEvaluator
+from minilink.compile.numpy_evaluator import NumpyDiagramEvaluator, NumpyLeafEvaluator
 
-# JaxEvaluator is exported lazily — JAX is optional.
-# Import it here so `from minilink.compile import JaxEvaluator` works when JAX is installed.
+# JAX backends are exported lazily — JAX is optional.
 try:
-    from minilink.compile.jax_backend import JaxEvaluator
+    from minilink.compile.jax_evaluator import JaxDiagramEvaluator, JaxLeafEvaluator
 except ImportError:
-    JaxEvaluator = None  # type: ignore[assignment,misc]
+    JaxDiagramEvaluator = None  # type: ignore[assignment,misc]
+    JaxLeafEvaluator = None  # type: ignore[assignment,misc]
 
 __all__ = [
     # Entry points
+    "compile",
     "compile_diagram",
     "build_execution_plan",
     "check_algebraic_loops",
+    # Public interface
+    "DynamicsEvaluator",
     # Data structures
     "ExecutionPlan",
     "PortOperation",
     "StateOperation",
-    # Backends
-    "NumpyEvaluator",
-    "JaxEvaluator",  # None when JAX is not installed
+    # Leaf evaluators
+    "NumpyLeafEvaluator",
+    "JaxLeafEvaluator",  # None when JAX is not installed
+    # Diagram evaluators
+    "NumpyDiagramEvaluator",
+    "JaxDiagramEvaluator",  # None when JAX is not installed
 ]
-

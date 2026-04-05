@@ -225,7 +225,7 @@ class DiagramSystem(System):
 
         Returns
         -------
-        NumpyEvaluator or JaxEvaluator
+        NumpyDiagramEvaluator or JaxDiagramEvaluator
         """
         from minilink.compile import compile_diagram
 

@@ -60,42 +60,37 @@ Evaluators call ``f(local_x, local_u, t, params)`` and port ``compute(local_x, l
 
 - **Explicit parameter vector** (separate entry point, e.g. ``compile_diagram_parameterized`` in ``minilink.compile.parameterized``): a **second pipeline** builds a flat vector ``p`` and a ``DiagramParameterLayout`` (subsystem id, key, slice, shape). The compiler produces a plan whose operations are ``(x, u, t, p) → …`` so **JAX can differentiate w.r.t. ``p``**. This path reuses ``build_execution_plan`` for topology and gather recipes, then **transforms** the plan (wrap callables); the base ``ExecutionPlan`` builder stays free of parameter-layout logic.
 
-### 4.2 Thin callable API (NumPy / JAX evaluators)
+### 4.2 `DynamicsEvaluator` — Public compiled API
 
-For SciPy ``solve_ivp`` the signature is ``f(t, x)``, while the diagram uses ``dx(x, u, t)``. Evaluators expose:
+All compiled evaluators inherit from the `DynamicsEvaluator` ABC ([`minilink/compile/evaluator.py`](minilink/compile/evaluator.py)). It provides a **three-tier** callable API matching standard math notation:
 
-- **`as_dx_callable()`** → ``(x, u, t) -> dx`` (thin wrapper around ``compute_dx``).
-- **`as_scipy_ivp_fun(u=None)`** → ``(t, x) -> dx`` with a fixed or empty external input vector ``u``.
+| Tier | Dynamics | Output | What's fixed |
+|------|----------|--------|--------------|
+| **Standard** | `f(x, u, t)` | `h(x, u, t)` | params frozen at compile time |
+| **Parametric** | `f_p(x, u, t, params)` | `h_p(x, u, t, params)` | nothing — caller supplies params dict |
+| **IVP** | `f_ivp(x, t)` | `h_ivp(x, t)` | u + params both frozen |
 
-Parameterized evaluators add **`as_dx_callable(p)`** (fixed ``p``, returns ``(x, u, t) -> dx``) and **`get_jit_compute_dx()`** on the JAX parameterized class for ``jit`` over ``(x, u, t, p)``.
+Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of all output ports.
 
-### 4.3 Detailed design: thin API, `bind_params`, and explicit-`p` pipeline
+**Leaf system backends** (single `System`, non-diagram):
+- `NumpyLeafEvaluator` — wraps `System.f`/`System.h` with frozen params + nominal u snapshot.
+- `JaxLeafEvaluator` — same, with core methods pre-JIT-compiled and warm-started at construction.
 
-**Why a separate module for explicit `p` (recommended yes).**  
-`build_execution_plan` should stay focused on topology, slices, and gather recipes. Parameter layout (ordering, flattening shapes, unpacking slices into per-subsystem dicts) is a **second concern**. A dedicated module (e.g. `minilink/compile/parameterized.py`) should:
+**Entry point**: `compile(system, backend="numpy"|"jax")` → returns a `DynamicsEvaluator`.
 
-1. Call `build_execution_plan(diagram)` and `check_algebraic_loops(diagram)` unchanged.
-2. Build `DiagramParameterLayout` by scanning subsystems in **deterministic order** (e.g. sorted `sys_id`, sorted param keys); each entry records `sys_id`, `key`, `slice` into `p`, and original `shape` for `reshape` after read.
-3. Run **`inject_parameter_vector_into_plan`**: clone `PortOperation` / `StateOperation` rows with wrappers `lambda x,u,t,p: base(x,u,t, unpack(p, sys_id))` so existing blocks keep their dict-based `f` / `compute` signatures while the evaluator thread passes one array `p`.
+**Parameter handling**: params are Python `dict` at all tiers. JAX handles dicts natively as pytrees — no flat parameter vector needed. `jax.grad`, `jax.jacobian`, `vmap` all preserve dict structure.
 
-The base `NumpyEvaluator` / `JaxEvaluator` loops stay on the **3-argument** call path; **parameterized** evaluators duplicate the small interpretation loop (or share private helpers) with a **4-argument** call path. That avoids optional `p` branches on every line of the default hot path.
+**Scipy bridge**: `as_scipy_rhs()` → `(t, x) -> dx` using the IVP tier.
 
-**Thin API (concrete behavior).**
+**Future**: Integration utilities (`rk4_step`, `rollout`), differentiation (`jacobian_f_x`, `linearize`), and batch simulation (`vmap_rollout`) are defined in the ABC as `NotImplementedError` stubs, to be implemented incrementally.
 
-| Method | Returns | Notes |
-| :--- | :--- | :--- |
-| `as_dx_callable()` | `Callable[[x,u,t], dx]` | `functools.partial`-style thin wrapper; no closure over mutable diagram state beyond what `compute_dx` already closes. |
-| `as_scipy_ivp_fun(u=None)` | `Callable[[t,x], dx]` | Default `u` to `np.zeros(m)` or `np.array([])` to match current diagram external-input convention; document `m` vs empty. |
+### 4.3 Diagram compilation pipeline
 
-**`bind_params=True` (concrete behavior).**
+The diagram evaluators (`NumpyDiagramEvaluator`, `JaxDiagramEvaluator`) inherit from `DynamicsEvaluator`. Only `f(x, u, t)` maps to the ABC; `h`, `outputs`, and the parametric tier raise `NotImplementedError` (diagrams don't have a single primary output, and per-subsystem params dispatch requires `sys_id` on operations — deferred).
 
-`build_execution_plan(..., bind_params=True)` sets ``bound_params`` on each ``PortOperation`` / ``StateOperation`` to ``copy.deepcopy`` of that subsystem's ``params`` (one copy per operation row). Evaluators pass ``op.bound_params`` as the fourth argument to ``f`` / ``compute``; no closure wrapping.
+Diagram-specific methods are preserved: `compute_outputs(x, u, t, ports)` for port-filtered output selection, `compute_internal_signals_dict(x, u, t)` for all internal subsystem port signals as a dict, and `compute_internal_signals(x, u, t)` for the raw flat signal buffer.
 
-**Explicit `p` (concrete behavior).**
-
-- `pack_from_diagram(diagram)` fills `p` from current `params` for regression tests and initial guesses in optimization.
-- `compile_diagram_parameterized(diagram, backend="numpy"|"jax")` returns a **parameterized evaluator** plus layout on the object (`evaluator.layout`) so callers can `jit(evaluator.compute_dx)` and use `jax.grad` w.r.t. `p` when dynamics are traceable.
-- Non-numeric `params` entries are out of scope until a schema extension defines them.
+`build_execution_plan` stays focused on topology, slices, and gather recipes. `bind_params=True` deep-copies subsystem params into each operation; `bind_params=False` passes `None` so blocks use live `self.params`.
 
 ### JAX Compilation Vision
 Future performance scales via JAX (XLA) by breaking the Python GIL:

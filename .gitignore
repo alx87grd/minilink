@@ -53,6 +53,9 @@ output/
 *.gv
 
 
+# Claude Code #
+.claude/
+
 # Editor Config #
 .vscode/
 .spyproject/

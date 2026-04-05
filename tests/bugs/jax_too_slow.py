@@ -96,10 +96,10 @@ u = np.array([])
 f_baseline = diagram.f
 
 evaluator_numpy = diagram.compile()
-f_compiled_numpy = evaluator_numpy.compute_dx
+f_compiled_numpy = evaluator_numpy.f
 evaluator_jax = diagram.compile(backend="jax")
-f_compiled_jax = evaluator_jax.compute_dx
-f_compiled_jax_jit = evaluator_jax.get_jit_compute_dx()
+f_compiled_jax = evaluator_jax.f
+f_compiled_jax_jit = evaluator_jax.get_f_jit()
 
 
 # ── Benchmarking ─────────────────────────────────────────────────────

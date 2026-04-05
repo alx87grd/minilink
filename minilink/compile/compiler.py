@@ -35,7 +35,52 @@ if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
 
-# ── Public API ───────────────────────────────────────────────────────
+# ── Public API ──────────────────���────────────────────────────────────
+
+
+def compile(system, backend="numpy"):
+    """Compile a System into a :class:`DynamicsEvaluator`.
+
+    For leaf systems (non-diagram), wraps ``f``/``h`` with frozen params
+    and nominal u snapshot, providing the full evaluator API (RK4, rollout,
+    linearize, etc.).
+
+    For diagrams, delegates to :func:`compile_diagram`.
+
+    Parameters
+    ----------
+    system : System or DiagramSystem
+        The system to compile.
+    backend : str
+        ``'numpy'`` or ``'jax'``.
+
+    Returns
+    -------
+    DynamicsEvaluator
+    """
+    from minilink.core.diagram import DiagramSystem
+
+    if isinstance(system, DiagramSystem):
+        return compile_diagram(system, backend=backend)
+
+    key = backend.strip().lower()
+    if key == "numpy":
+        from minilink.compile.numpy_evaluator import NumpyLeafEvaluator
+
+        return NumpyLeafEvaluator(system)
+    elif key == "jax":
+        try:
+            import jax  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "JAX is required for the 'jax' backend. "
+                "Install with: pip install jax jaxlib"
+            )
+        from minilink.compile.jax_evaluator import JaxLeafEvaluator
+
+        return JaxLeafEvaluator(system)
+    else:
+        raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
 
 
 def compile_diagram(
@@ -56,14 +101,14 @@ def compile_diagram(
 
     Returns
     -------
-    NumpyEvaluator or JaxEvaluator
+    NumpyDiagramEvaluator or JaxDiagramEvaluator
         A stateless evaluator that can compute state derivatives and outputs.
 
     Examples
     --------
     >>> from minilink.compile import compile_diagram
     >>> evaluator = compile_diagram(diagram)
-    >>> dx = evaluator.compute_dx(x, u, t)
+    >>> dx = evaluator.f(x, u, t)
 
     Notes
     -----
@@ -75,9 +120,9 @@ def compile_diagram(
 
     key = backend.strip().lower()
     if key == "numpy":
-        from minilink.compile.numpy_backend import NumpyEvaluator
+        from minilink.compile.numpy_evaluator import NumpyDiagramEvaluator
 
-        return NumpyEvaluator(plan)
+        return NumpyDiagramEvaluator(plan, diagram)
     elif key == "jax":
         try:
             import jax  # noqa: F401
@@ -86,9 +131,9 @@ def compile_diagram(
                 "JAX is required for the 'jax' backend. "
                 "Install with: pip install jax jaxlib"
             )
-        from minilink.compile.jax_backend import JaxEvaluator
+        from minilink.compile.jax_evaluator import JaxDiagramEvaluator
 
-        return JaxEvaluator(plan)
+        return JaxDiagramEvaluator(plan, diagram)
     else:
         raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
 

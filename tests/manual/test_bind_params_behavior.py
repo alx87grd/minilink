@@ -40,5 +40,5 @@ t = 0.0
 ev = compile_diagram(diag, bind_params=False)
 # ev = compile_diagram(diag, bind_params=True)
 # ctl.params["Kp"] = 100.0
-dx_a = ev.compute_dx(x, u, t)
-print(f"compute_dx: {dx_a.ravel()}")
+dx_a = ev.f(x, u, t)
+print(f"f: {dx_a.ravel()}")

@@ -1,8 +1,8 @@
-"""Tests for the new compilation pipeline.
+"""Tests for the compilation pipeline.
 
 Validates that:
-- ``compile_diagram()`` produces a working ``NumpyEvaluator``
-- ``compute_dx()`` matches ``diagram.f()`` (the slow recursive reference)
+- ``compile_diagram()`` produces a working ``NumpyDiagramEvaluator``
+- ``f()`` matches ``diagram.f()`` (the slow recursive reference)
 - ``compute_outputs()`` returns correct port signals
 - ``compute_internal_signals()`` exposes the full signal buffer
 - ``check_algebraic_loops()`` detects loops and returns valid order
@@ -16,7 +16,7 @@ import numpy as np
 from minilink.blocks.basic import Integrator, PropController
 from minilink.compile import (
     ExecutionPlan,
-    NumpyEvaluator,
+    NumpyDiagramEvaluator,
     build_execution_plan,
     check_algebraic_loops,
     compile_diagram,
@@ -135,7 +135,7 @@ class TestCompileDiagram(unittest.TestCase):
     def test_returns_numpy_evaluator(self):
         diag = _build_small_closed_loop()
         evaluator = compile_diagram(diag, backend="numpy")
-        self.assertIsInstance(evaluator, NumpyEvaluator)
+        self.assertIsInstance(evaluator, NumpyDiagramEvaluator)
 
     def test_invalid_backend_raises(self):
         diag = _build_small_closed_loop()
@@ -143,30 +143,30 @@ class TestCompileDiagram(unittest.TestCase):
             compile_diagram(diag, backend="unknown")
 
 
-class TestNumpyEvaluator(unittest.TestCase):
-    """Test NumpyEvaluator against the reference diagram.f()."""
+class TestNumpyDiagramEvaluator(unittest.TestCase):
+    """Test NumpyDiagramEvaluator against the reference diagram.f()."""
 
     def setUp(self):
         self.diag = _build_small_closed_loop()
         self.evaluator = compile_diagram(self.diag)
 
-    def test_compute_dx_matches_diagram_f(self):
+    def test_f_matches_diagram_f(self):
         x = np.array([0.3])
         u = np.array([1.2])
         t = 0.1
 
         dx_reference = self.diag.f(x, u, t)
-        dx_compiled = self.evaluator.compute_dx(x, u, t)
+        dx_compiled = self.evaluator.f(x, u, t)
 
         np.testing.assert_allclose(dx_compiled, dx_reference, atol=1e-10)
 
-    def test_compute_dx_multiple_points(self):
+    def test_f_multiple_points(self):
         """Test at several state/input combinations."""
         for x_val, u_val in [(0.0, 0.0), (1.0, 2.0), (-5.0, 10.0)]:
             x = np.array([x_val])
             u = np.array([u_val])
             dx_ref = self.diag.f(x, u, 0.0)
-            dx_comp = self.evaluator.compute_dx(x, u, 0.0)
+            dx_comp = self.evaluator.f(x, u, 0.0)
             np.testing.assert_allclose(dx_comp, dx_ref, atol=1e-10)
 
     def test_compute_outputs_all(self):
@@ -189,7 +189,7 @@ class TestNumpyEvaluator(unittest.TestCase):
         signals = self.evaluator.compute_internal_signals(x, u, 0.0)
         self.assertEqual(signals.shape[0], self.evaluator.plan.signal_dim)
 
-    def test_compute_dx_zero_state(self):
+    def test_f_zero_state(self):
         """Diagram with no dynamic subsystems should return empty dx."""
         diag = DiagramSystem()
         diag.graphe_building_verbose = False
@@ -207,7 +207,7 @@ class TestNumpyEvaluator(unittest.TestCase):
         diag.connect("input", "u", "gain", "u")
 
         evaluator = compile_diagram(diag)
-        dx = evaluator.compute_dx(np.array([]), np.array([3.0]), 0.0)
+        dx = evaluator.f(np.array([]), np.array([3.0]), 0.0)
         self.assertEqual(dx.shape, (0,))
 
     def test_compute_internal_signals_dict(self):
@@ -230,9 +230,9 @@ class TestNumpyEvaluator(unittest.TestCase):
         t = 0.0
 
         ev = compile_diagram(diag, bind_params=True)
-        dx1 = ev.compute_dx(x, u, t)
+        dx1 = ev.f(x, u, t)
         plant.params["k"] = 99.0
-        dx2 = ev.compute_dx(x, u, t)
+        dx2 = ev.f(x, u, t)
         np.testing.assert_allclose(dx1, dx2, atol=1e-10)
 
     def test_bind_params_false_follows_live_params(self):
@@ -244,27 +244,27 @@ class TestNumpyEvaluator(unittest.TestCase):
         t = 0.0
 
         ev = compile_diagram(diag, bind_params=False)
-        dx1 = ev.compute_dx(x, u, t)
+        dx1 = ev.f(x, u, t)
         plant.params["k"] = 99.0
-        dx2 = ev.compute_dx(x, u, t)
+        dx2 = ev.f(x, u, t)
         self.assertGreater(np.abs(dx2 - dx1).max(), 1e-6)
 
-    def test_as_dx_callable_matches_compute_dx(self):
-        fn = self.evaluator.as_dx_callable()
+    def test_f_as_callable(self):
+        fn = self.evaluator.f
         x = np.array([0.2])
         u = np.array([0.7])
         t = 0.05
         np.testing.assert_allclose(
-            fn(x, u, t), self.evaluator.compute_dx(x, u, t), atol=1e-10
+            fn(x, u, t), self.evaluator.f(x, u, t), atol=1e-10
         )
 
-    def test_as_scipy_ivp_fun_order(self):
+    def test_as_scipy_rhs(self):
         x = np.array([0.4])
         u = np.array([1.0])
         t = 0.15
-        rhs = self.evaluator.as_scipy_ivp_fun(u=u)
+        rhs = self.evaluator.as_scipy_rhs()
         np.testing.assert_allclose(
-            rhs(t, x), self.evaluator.compute_dx(x, u, t), atol=1e-10
+            rhs(t, x), self.evaluator.f(x, self.evaluator._u_nominal, t), atol=1e-10
         )
 
     def test_build_execution_plan_bind_params_sets_bound_params(self):
@@ -281,15 +281,15 @@ class TestNumpyEvaluator(unittest.TestCase):
 # try:
 #     import jax
 #     import jax.numpy as jnp
-#     from minilink.compile import JaxEvaluator
+#     from minilink.compile import JaxDiagramEvaluator
 #     _JAX_AVAILABLE = True
 # except ImportError:
 #     _JAX_AVAILABLE = False
 
 
 # @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-# class TestJaxEvaluator(unittest.TestCase):
-#     """Test JaxEvaluator against the reference diagram.f() and for JAX traceability."""
+# class TestJaxDiagramEvaluator(unittest.TestCase):
+#     """Test JaxDiagramEvaluator against the reference diagram.f() and for JAX traceability."""
 
 #     def setUp(self):
 #         self.diag = _build_small_closed_loop()
@@ -298,20 +298,20 @@ class TestNumpyEvaluator(unittest.TestCase):
 #         self.u = jnp.array([1.2], dtype=jnp.float32)
 
 #     def test_returns_jax_evaluator(self):
-#         self.assertIsInstance(self.evaluator, JaxEvaluator)
+#         self.assertIsInstance(self.evaluator, JaxDiagramEvaluator)
 
-#     def test_compute_dx_matches_numpy(self):
-#         """JaxEvaluator.compute_dx must match NumpyEvaluator exactly."""
+#     def test_f_matches_numpy(self):
+#         """JaxDiagramEvaluator.f must match NumpyDiagramEvaluator exactly."""
 #         np_evaluator = compile_diagram(self.diag, backend="numpy")
 #         x_np = np.array([0.3])
 #         u_np = np.array([1.2])
 
-#         dx_numpy = np_evaluator.compute_dx(x_np, u_np, 0.1)
-#         dx_jax = np.array(self.evaluator.compute_dx(self.x, self.u, 0.1))
+#         dx_numpy = np_evaluator.f(x_np, u_np, 0.1)
+#         dx_jax = np.array(self.evaluator.f(self.x, self.u, 0.1))
 
 #         np.testing.assert_allclose(dx_jax, dx_numpy, atol=1e-5)
 
-#     def test_compute_dx_multiple_points(self):
+#     def test_f_multiple_points(self):
 #         """Test at several state/input combinations."""
 #         np_evaluator = compile_diagram(self.diag, backend="numpy")
 #         for x_val, u_val in [(0.0, 0.0), (1.0, 2.0), (-5.0, 10.0)]:
@@ -319,14 +319,14 @@ class TestNumpyEvaluator(unittest.TestCase):
 #             u_np = np.array([u_val])
 #             x_jax = jnp.array(x_np, dtype=jnp.float32)
 #             u_jax = jnp.array(u_np, dtype=jnp.float32)
-#             dx_ref = np_evaluator.compute_dx(x_np, u_np, 0.0)
-#             dx_jax = np.array(self.evaluator.compute_dx(x_jax, u_jax, 0.0))
+#             dx_ref = np_evaluator.f(x_np, u_np, 0.0)
+#             dx_jax = np.array(self.evaluator.f(x_jax, u_jax, 0.0))
 #             np.testing.assert_allclose(dx_jax, dx_ref, atol=1e-5)
 
-#     def test_compute_dx_is_differentiable(self):
-#         """jax.grad must flow through compute_dx."""
+#     def test_f_is_differentiable(self):
+#         """jax.grad must flow through f."""
 #         def dx0_of_u(u0):
-#             return self.evaluator.compute_dx(
+#             return self.evaluator.f(
 #                 self.x, jnp.array([u0], dtype=jnp.float32), 0.0
 #             )[0]
 
@@ -335,7 +335,7 @@ class TestNumpyEvaluator(unittest.TestCase):
 #         self.assertAlmostEqual(abs(grad_val), 1.0, places=4)
 
 #     def test_compute_outputs_specific_port(self):
-#         """JaxEvaluator.compute_outputs with port selection."""
+#         """JaxDiagramEvaluator.compute_outputs with port selection."""
 #         y = self.evaluator.compute_outputs(
 #             self.x, self.u, 0.0, ports=[("plant", "y")]
 #         )
@@ -353,22 +353,13 @@ class TestNumpyEvaluator(unittest.TestCase):
 #         grad_val = float(jax.grad(y_of_x)(jnp.array(0.3, dtype=jnp.float32)))
 #         self.assertAlmostEqual(abs(grad_val), 1.0, places=4)
 
-#     def test_jit_compute_dx(self):
-#         """get_jit_compute_dx returns a callable that matches eager result."""
-#         jit_dx = self.evaluator.get_jit_compute_dx()
-#         dx_eager = self.evaluator.compute_dx(self.x, self.u, 0.0)
+#     def test_get_f_jit(self):
+#         """get_f_jit returns a callable that matches eager result."""
+#         jit_dx = self.evaluator.get_f_jit()
+#         dx_eager = self.evaluator.f(self.x, self.u, 0.0)
 #         dx_jit = jit_dx(self.x, self.u, 0.0)
 #         np.testing.assert_allclose(
 #             np.array(dx_jit), np.array(dx_eager), atol=1e-5
-#         )
-
-#     def test_jit_compute_outputs(self):
-#         """get_jit_compute_outputs returns a callable that matches eager result."""
-#         jit_out = self.evaluator.get_jit_compute_outputs()
-#         y_eager = self.evaluator.compute_outputs(self.x, self.u, 0.0)
-#         y_jit = jit_out(self.x, self.u, 0.0)
-#         np.testing.assert_allclose(
-#             np.array(y_jit), np.array(y_eager), atol=1e-5
 #         )
 
 #     def test_compute_internal_signals_dict(self):
