@@ -14,7 +14,7 @@ This document defines the co-programming preferences and architectural philosoph
 
 ## 2. Coding Standards & Style
 
-- **Python Version**: **3.10+** (LTS stable). Use modern syntax like `|` for unions and structural pattern matching.
+- **Python Version**: **3.10+** (LTS stable) for the moment (not yet fully chosen). Use modern syntax like `|` for unions and structural pattern matching. 
 - **Type Hinting**: **Uniform & Mandatory**. All functions and methods must have clear type hints.
 - **Docstrings**: **NumPy Style**. Required for all public classes and methods.
 - **Naming Patterns (The "Math Rule")**:

@@ -51,6 +51,7 @@ compile/
   evaluator.py         — DynamicsEvaluator ABC
   numpy_evaluator.py   — NumpyLeafEvaluator + NumpyDiagramEvaluator
   jax_evaluator.py     — JaxLeafEvaluator + JaxDiagramEvaluator
+  jax_utils.py         — JAX helpers shared by diagram evaluators
   execution_plan.py    — ExecutionPlan, PortOperation, StateOperation
   compiler.py          — compile(), compile_diagram(), build_execution_plan()
 ```
@@ -110,7 +111,60 @@ compile/
 
 ---
 
-## 4. Pyro 2.0 Migration Strategy
+## 4. Lessons from Drake & Pycollimator
+
+Cross-read of [Drake](https://github.com/RobotLocomotion/drake) (rigorous systems + contexts) and [pycollimator](https://github.com/kuzja111/pycollimator) (Python block diagrams, JAX-first). Full notes: [drake_analysis.md](drake_analysis.md), [pycollimator_analysis.md](pycollimator_analysis.md).
+
+### 4.1 How the frameworks relate
+
+| Idea | Drake | Pycollimator | Minilink today |
+| :--- | :--- | :--- | :--- |
+| **Diagram assembly** | `DiagramBuilder` → immutable `Diagram` | Same pattern (clone of Drake) | `DiagramSystem` + string `connect()`; `connect_new_output_port` ≈ export |
+| **Runtime data** | `Context` per system (state, time, params, cache) | Frozen `Context` PyTrees | Flat `(x, u, t)` + dict `params`; evaluators are stateless w.r.t. model |
+| **Evaluation** | Lazy `Eval*` + ticket invalidation | Lazy ports + dependency tickets | **Compile-once** `ExecutionPlan`; eager topological steps |
+| **AD / types** | `AutoDiffXd`, `Expression` | JAX + `custom_vjp` on simulator | JAX via `JaxLeafEvaluator` / `JaxDiagramEvaluator` |
+
+**Synthesis:** Drake is “rigor first”; pycollimator is “differentiable simulation first”; minilink is “math-readable equations + explicit compilation first.” All three agree that **equations should stay separate from runtime state** and that **diagram-level I/O** should be first-class (export / hierarchy).
+
+### 4.2 What to keep (minilink strengths)
+
+- **Explicit evaluator classes** (NumPy vs JAX at compile time) — avoid pycollimator-style **global backend switches** (`set_backend("jax")`): clearer and thread-safe.
+- **Compiled topological IR** — simpler and often faster than full lazy evaluation + cache graphs at current scale; add **tickets / invalidation** only when discrete events, sample-and-hold, or very expensive blocks demand it.
+- **Flat `f(x, u, t)` as the primary API** — keep for readability; optional frozen `SimState`-style bundles later if JAX `vmap` over structured state becomes a real requirement.
+
+### 4.3 Consolidated borrow list (prioritized)
+
+**Near-term (overlaps Phase 2–3)**
+
+- **Diagram validation**: unique subsystem ids, port existence, no double-connection on inputs (builder-style guards without mandating a separate `DiagramBuilder` class).
+- **`SimulationOptions`**: frozen dataclass for SciPy (and future JAX) solver knobs — replaces ad-hoc `**kwargs` on `solve_ivp`.
+- **Default / disconnected inputs**: clarify semantics (Drake-style defaults) where ports are unconnected.
+
+**Mid-term (overlaps Phase 4–5)**
+
+- **Port exporting / nesting**: ensure inner `DiagramSystem` can present diagram-level ports to a parent (Drake `ExportInput` / `ExportOutput` pattern); align with `export_input` / `export_output` roadmap items.
+- **`StateSpaceSystem`, `TransferFunction`, `PID`**: follow pycollimator-style LTI layout; map feedthrough to explicit output `dependencies` (e.g. from `D` matrix).
+- **`linearize(system, x0, u0)`**: JAX JVP on compiled evaluator when differentiation API lands.
+- **Parameter metadata**: distinguish dynamic vs static parameters for tracing (lighter than full `Parameter` framework at first).
+
+**Long-term / research**
+
+- **Optional `Context` / `SimState`**: bundle `x, u, t, params` for multi-instance sims, checkpointing, and less argument plumbing — conceptual Drake alignment without C++ machinery.
+- **Caching**: `last_t` or `CacheEntry` on hot outputs before a full ticket graph.
+- **Hybrid systems**: periodic discrete updates, zero-crossings, modes — design toward pure `f` / evaluator calls and avoid baking “only `solve_ivp`” into the core.
+- **Symbolic / analytical linearization**: only if needed beyond JAX; Drake-style `Expression` trace is the reference.
+- **Multibody “plant”**: URDF/SDF → dynamics blocks (Drake `MultibodyPlant` direction).
+
+### 4.4 Anti-patterns (explicit non-goals)
+
+- Global mutable math backend selection.
+- Heavy metaclass magic for parameter resolution.
+- Mandatory PyTree-wrapped state before a concrete differentiable-sim use case.
+- Replacing compile-once plans with full lazy evaluation **unless** profiling shows the IR approach is the bottleneck.
+
+---
+
+## 5. Pyro 2.0 Migration Strategy
 
 `minilink` aims to replace the `pyro` robotics toolbox with a more flexible port-based architecture.
 
@@ -136,7 +190,7 @@ compile/
 
 ---
 
-## 5. Future Vision
+## 6. Future Vision
 
 - **JAX-Based Optimization**: Leverage autodiff for trajectory optimization (Direct Collocation). Dict params as JAX pytrees enable `jax.grad` over physical parameters directly.
 - **Full Differentiable Simulation**: `jax.custom_vjp` for the integrator, `lax.scan` rollouts, `vmap` batch simulations.

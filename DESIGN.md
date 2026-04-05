@@ -58,7 +58,7 @@ Evaluators call ``f(local_x, local_u, t, params)`` and port ``compute(local_x, l
 
 - **`compile_diagram(..., bind_params=True)`** (and ``DiagramSystem.compile(..., bind_params=True)``): each ``PortOperation`` / ``StateOperation`` stores a **deep copy** of that subsystem's ``params`` in ``bound_params`` and passes it on every evaluation. Mutating ``subsystem.params`` later does **not** change behavior until you compile again.
 
-- **Explicit parameter vector** (separate entry point, e.g. ``compile_diagram_parameterized`` in ``minilink.compile.parameterized``): a **second pipeline** builds a flat vector ``p`` and a ``DiagramParameterLayout`` (subsystem id, key, slice, shape). The compiler produces a plan whose operations are ``(x, u, t, p) → …`` so **JAX can differentiate w.r.t. ``p``**. This path reuses ``build_execution_plan`` for topology and gather recipes, then **transforms** the plan (wrap callables); the base ``ExecutionPlan`` builder stays free of parameter-layout logic.
+- **Explicit parameter vector** (planned): a separate entry point (e.g. ``compile_diagram_parameterized`` in a future ``minilink.compile.parameterized`` module) would build a flat vector ``p`` and a ``DiagramParameterLayout`` (subsystem id, key, slice, shape). The compiler would produce a plan whose operations are ``(x, u, t, p) → …`` so **JAX can differentiate w.r.t. ``p``**, reusing ``build_execution_plan`` for topology and gather recipes, then transforming the plan; the base ``ExecutionPlan`` builder would stay free of parameter-layout logic. Today, dict ``params`` as JAX pytrees cover most autodiff use cases via the parametric tier on leaf evaluators.
 
 ### 4.2 `DynamicsEvaluator` — Public compiled API
 
@@ -105,7 +105,7 @@ Future performance scales via JAX (XLA) by breaking the Python GIL:
 Following these naming schemes ensures consistency and readability across the codebase.
 
 ### General Standards
-- **Python Version**: **3.10+** (LTS stable). Use modern syntax like `|` for unions and structural pattern matching.
+- **Python Version**: **3.9+** TDB, not yet fully chosen.
 - **Type Hinting**: **Uniform & Mandatory**. All functions and methods must have clear type hints.
 - **Docstrings**: **NumPy Style**. Required for all public classes and methods.
 
