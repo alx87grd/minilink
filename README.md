@@ -4,6 +4,8 @@
 
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
+colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing  
+
 ## ⚡ Key Strengths
 
 -   **MIMO Composable Modeling**: Connect N arbitrary blocks via named ports.
