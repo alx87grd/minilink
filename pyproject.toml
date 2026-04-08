@@ -7,7 +7,7 @@ name = "minilink"
 dynamic = ["version"]
 description = "A block-diagram simulation framework built in Python"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "scipy",

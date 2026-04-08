@@ -109,6 +109,30 @@ class Rectangle(GraphicPrimitive):
         self.fill = fill
 
 
+class Box(GraphicPrimitive):
+    """Axis-aligned rectangular solid in local frame (centered at ``center``).
+
+    Dimensions are **full** lengths along local X, Y, Z. Used for simple vehicle
+    bodies and blocks in 3D renderers (MeshCat box geometry).
+    """
+
+    def __init__(
+        self,
+        length_x: float = 1.0,
+        length_y: float = 1.0,
+        length_z: float = 1.0,
+        center=(0.0, 0.0, 0.0),
+        color="gray",
+        opacity: float = 1.0,
+    ):
+        super().__init__(color)
+        self.length_x = float(length_x)
+        self.length_y = float(length_y)
+        self.length_z = float(length_z)
+        self.center = np.asarray(center, dtype=float).reshape(3)
+        self.opacity = float(opacity)
+
+
 class Arrow(GraphicPrimitive):
     """A 2-D arrow rendered as a polyline (shaft + chevron head).
 

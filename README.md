@@ -7,7 +7,7 @@
 ## ⚡ Key Strengths
 
 -   **MIMO Composable Modeling**: Connect N arbitrary blocks via named ports.
--   **Optimized Execution**: Compiled topological graphs (`f_fast`) for efficient ODE integration.
+-   **Optimized Execution**: Compiled evaluators (`compile` / `compile_diagram`) with flat `ExecutionPlan` execution for ODE integration and JAX.
 -   **Differentiable Simulation**: Functional paths designed for JAX-based tracing and autodiff.
 -   **Headless-First Design**: Pure NumPy core, independent of graphics and simulation backends.
 -   **Pyro Successor**: A flexible, port-based foundation for the [pyro](https://github.com/SherbyRobotics/pyro) robotics toolbox.
@@ -37,9 +37,9 @@ plot_trajectory(diagram, traj)  # or sim.solve(tf=10, show=True)
 
 ## 🛠 Tech Stack
 -   **Core**: NumPy
--   **Simulation**: SciPy (`solve_ivp`)
--   **Visualization**: Matplotlib, Graphviz
--   **Acceleration**: JAX (Optional)
+-   **Simulation**: SciPy (`solve_ivp`); compiled `DynamicsEvaluator` (`f`, `h`, `outputs`, optional JAX JIT)
+-   **Visualization**: Matplotlib, MeshCat, Pygame; Graphviz for diagrams
+-   **Acceleration**: JAX (optional; leaf and diagram evaluators JIT core callables)
 
 ---
 
@@ -51,5 +51,5 @@ plot_trajectory(diagram, traj)  # or sim.solve(tf=10, show=True)
 ---
 
 ## 💡 Examples
--   **Interactive Demos**: See the `examples/` directory for pendulums, controllers, and JAX examples.
+-   **Interactive Demos**: See `examples/scripts/` — diagrams (`demo_diagram_compiling.py`, `demo_internal_signals.py`), JAX physics (`demo_physics_jax_*.py`), animations (`demo_animations.py`).
 -   **Notebooks**: [Colab Tutorial](https://colab.research.google.com/drive/13tnYyZMz4bLFzYLdj88H6cqO6tZg6Xp7?usp=sharing)

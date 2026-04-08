@@ -14,7 +14,7 @@ This document defines the co-programming preferences and architectural philosoph
 
 ## 2. Coding Standards & Style
 
-- **Python Version**: **3.10+** (LTS stable) for the moment (not yet fully chosen). Use modern syntax like `|` for unions and structural pattern matching. 
+- **Python Version**: **3.10+** (LTS stable). Same floor as **`DESIGN.md`** §5 and **`pyproject.toml`** `requires-python`. Update all three together when bumping the minimum. Use modern syntax like `|` for unions and structural pattern matching. 
 - **Type Hinting**: **Uniform & Mandatory**. All functions and methods must have clear type hints.
 - **Docstrings**: **NumPy Style**. Required for all public classes and methods.
 - **Naming Patterns (The "Math Rule")**:
@@ -32,6 +32,13 @@ This document defines the co-programming preferences and architectural philosoph
 - **Hybrid Model**: Use **Inheritance** for defining core system types (`System`, `StaticSystem`, `DynamicSystem`). Use **Composition** for diagram assembly and adding optional behaviors (sensors, noise).
 - **Readability Over Performance**: Prioritize pure readability in the core library. Optimization shifts (like the `compile` package) should remain isolated so core equations stay clean.
 - **JAX Policy**: Support JAX when possible WITHOUT too much complication. If JAX-traceability requires complex code, diverge into specific JAX-optimized tools/subclasses to keep the primary path clean.
+- **Compiled evaluators (`compile/`) — vocabulary** (see `DESIGN.md` §4 for detail):
+    - **`DynamicsEvaluator.outputs()` / `outputs_p()`** = **boundary** ports only. On **leaf** systems, keys are subsystem output port ids (e.g. `"y"`). On **diagram** evaluators, keys are **diagram** output ports created with `connect_new_output_port`; if none were added, this dict is **empty** — that is normal for closed-loop diagrams.
+    - **Subsystem / internal buffer** (diagram evaluators only): **`compute_internal_signals`** (flat buffer) and **`compute_internal_signals_dict`** (`"sys_id:port_id"` keys). This is **not** the same as `outputs()`.
+    - **Do not reintroduce** `compute_outputs(..., ports=...)` — it was removed; index `compute_internal_signals_dict` or slice using `ExecutionPlan.output_slices`.
+    - **`ExecutionPlan`**: carries `output_slices` (all subsystem ports) and **`external_output_slices`** (diagram boundary → buffer slice). Compiler/evaluator changes should keep these aligned.
+    - **JAX**: `JaxLeafEvaluator` / `JaxDiagramEvaluator` JIT core callables at construction with warm-start; preserve traceability of `f` / port `compute`. Diagram exposes **`get_f_jit`**, **`get_outputs_jit`**, **`get_internal_signals_jit`** for hot paths.
+- **Docs sync**: Any change to the evaluator ABC, `ExecutionPlan`, or diagram compile behavior should update **`DESIGN.md`** (and **`ROADMAP.md`** if scope/milestones shift), plus **unit tests** under `tests/unittest/`. Prefer **`examples/scripts/demo_internal_signals.py`** / **`demo_diagram_compiling.py`** patterns for end-to-end checks.
 
 ---
 
@@ -75,6 +82,7 @@ All features must progress through the following **Task Readiness Levels**:
     - Deleting or renaming files.
     - Architectural changes or core logic refactors.
     - Introducing new heavy dependencies.
+    - Changing the public **`DynamicsEvaluator`** API (methods, tiers, semantics) or **`ExecutionPlan`** / **`PortOperation`** / **`StateOperation`** fields — these are stability contracts for `compile()` consumers; coordinate **`DESIGN.md`**, **`ROADMAP.md`**, and tests.
 
 ---
 

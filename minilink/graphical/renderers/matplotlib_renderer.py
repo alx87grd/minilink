@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from itertools import product
+
 import matplotlib.animation as animation
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -9,6 +11,7 @@ import numpy as np
 
 from minilink.graphical.primitives import (
     Arrow,
+    Box,
     Circle,
     CustomLine,
     Plane,
@@ -245,6 +248,53 @@ class MatplotlibCanvas:
                     linestyle=primitive.style,
                 )
             self.drawn_objects.append(obj)
+
+        elif isinstance(primitive, Box):
+            lx, ly, lz = primitive.length_x, primitive.length_y, primitive.length_z
+            c = np.asarray(primitive.center, dtype=float).reshape(3)
+            corners = []
+            for sx, sy, sz in product((-1.0, 1.0), repeat=3):
+                corners.append(
+                    np.array([sx * lx / 2, sy * ly / 2, sz * lz / 2], dtype=float) + c
+                )
+            edges = (
+                (0, 1),
+                (0, 2),
+                (0, 4),
+                (1, 3),
+                (1, 5),
+                (2, 3),
+                (2, 6),
+                (3, 7),
+                (4, 5),
+                (4, 6),
+                (5, 7),
+                (6, 7),
+            )
+            corners_h = np.hstack(
+                (np.array(corners), np.ones((8, 1)))
+            )
+            world_c = (transform_matrix @ corners_h.T).T[:, :3]
+            for i, j in edges:
+                p0, p1 = world_c[i], world_c[j]
+                if self.is_3d:
+                    (seg,) = self.ax.plot(
+                        [p0[0], p1[0]],
+                        [p0[1], p1[1]],
+                        [p0[2], p1[2]],
+                        color=primitive.color,
+                        linewidth=1.5,
+                        linestyle=primitive.style,
+                    )
+                else:
+                    (seg,) = self.ax.plot(
+                        [p0[0], p1[0]],
+                        [p0[1], p1[1]],
+                        color=primitive.color,
+                        linewidth=1.5,
+                        linestyle=primitive.style,
+                    )
+                self.drawn_objects.append(seg)
 
     def clear(self):
         for obj in self.drawn_objects:

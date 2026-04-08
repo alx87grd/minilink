@@ -9,6 +9,7 @@ import numpy as np
 
 from minilink.graphical.primitives import (
     Arrow,
+    Box,
     Circle,
     CustomLine,
     Plane,
@@ -133,6 +134,17 @@ class MeshcatCanvas:
                 str(primitive.color),
                 float(primitive.opacity),
             )
+        if isinstance(primitive, Box):
+            c = tuple(np.asarray(primitive.center, dtype=float).tolist())
+            return (
+                "Box",
+                float(primitive.length_x),
+                float(primitive.length_y),
+                float(primitive.length_z),
+                c,
+                str(primitive.color),
+                float(primitive.opacity),
+            )
         return (primitive.__class__.__name__,)
 
     def _set_static_geometry(self, i: int, primitive):
@@ -182,6 +194,26 @@ class MeshcatCanvas:
                             float(primitive.size),
                             float(primitive.size),
                             float(max(primitive.thickness, 1e-3)),
+                        ]
+                    ),
+                    g.MeshLambertMaterial(
+                        color=hex_color,
+                        transparent=primitive.opacity < 0.999,
+                        opacity=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                    ),
+                )
+            )
+            self._has_head[i] = False
+            return
+
+        if isinstance(primitive, Box):
+            path.set_object(
+                g.Mesh(
+                    g.Box(
+                        [
+                            float(max(primitive.length_x, 1e-6)),
+                            float(max(primitive.length_y, 1e-6)),
+                            float(max(primitive.length_z, 1e-6)),
                         ]
                     ),
                     g.MeshLambertMaterial(
@@ -301,6 +333,12 @@ class MeshcatCanvas:
             T[:3, :3] = R
             T[:3, 3] = center
             path.set_transform(transform_matrix @ T)
+            return
+
+        if isinstance(primitive, Box):
+            c = np.asarray(primitive.center, dtype=float).reshape(3)
+            T_c = self._tf.translation_matrix(c.tolist())
+            path.set_transform(transform_matrix @ T_c)
             return
 
         if isinstance(primitive, TorqueArrow):

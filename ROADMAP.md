@@ -9,11 +9,11 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 | **Core Abstractions** | **TRL 9** | Populate `minilink/__init__.py` |
 | **DynamicsEvaluator ABC** | **TRL 9** | Mother class for all evaluators — done |
 | **Leaf system backends** | **TRL 6** | Implement integration/differentiation methods |
-| **Diagram backends** | **TRL 8** | Implement parametric tier (`f_p`) for diagrams |
-| **JAX Integration** | **TRL 7** | Finalize jittable ODE solvers |
+| **Diagram backends** | **TRL 8** | Parametric tier (`f_p` / `outputs_p`); diagram `h_p` |
+| **JAX Integration** | **TRL 8** | Leaf + diagram: JIT `f`, `h`, `outputs`, `compute_internal_signals`; accessors `get_*_jit` |
 | **Simulation (Analysis)** | **TRL 4** | Fix `solve_ivp` external input + refactor interface |
 | **Planning** | **Planned** | RRT and Direct Collocation ports |
-| **`mechanics` package** (numeric + symbolic multibody) | **TRL 1** | Harden tests, JAX export, docs |
+| **`mechanics` + `physics`** | **TRL 3–4** | Symbolic export + JAX world demos; sphere–plane contact MVP (no sphere–sphere yet) |
 
 > [!NOTE]
 > Progress is tracked via **Task Readiness Levels (TRL 1-9)**. See [agent.md](agent.md) for definitions and the **3-Level Testing Strategy** (Automated, Manual, Demo).
@@ -32,15 +32,17 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 | Parametric | `f_p(x, u, t, params)` | `h_p(x, u, t, params)` | nothing — caller supplies params dict (JAX pytree) |
 | IVP | `f_ivp(x, t)` | `h_ivp(x, t)` | u frozen (nominal ports) + params frozen |
 
-Additional: `outputs(x, u, t)` / `outputs_p(x, u, t, params)` → `dict` of all output ports.
+Additional: `outputs(x, u, t)` / `outputs_p(...)` → `dict` of **boundary** output ports (leaf: port ids; diagram: ports added via `connect_new_output_port`, often empty).
 
 **Leaf system backends** (non-diagram):
 - [`NumpyLeafEvaluator`](minilink/compile/numpy_evaluator.py) — wraps `System.f`/`System.h` with frozen params, nominal u snapshot. Full 3-tier support.
-- [`JaxLeafEvaluator`](minilink/compile/jax_evaluator.py) — same, with core methods **pre-JIT-compiled and warm-started** at construction.
+- [`JaxLeafEvaluator`](minilink/compile/jax_evaluator.py) — `f`/`h`/`outputs`/`outputs_p` (and IVP tier) **JIT-compiled** and warm-started.
 
 **Diagram backends** (compiled `DiagramSystem`):
-- [`NumpyDiagramEvaluator`](minilink/compile/numpy_evaluator.py) — inherits from `DynamicsEvaluator`. `f(x, u, t)` implemented; diagram boundary `outputs`; parametric tier not implemented. Diagram-specific: `compute_internal_signals`, `compute_internal_signals_dict`.
-- [`JaxDiagramEvaluator`](minilink/compile/jax_evaluator.py) — same, JAX-traceable. `get_f_jit()` convenience method.
+- [`NumpyDiagramEvaluator`](minilink/compile/numpy_evaluator.py) — `f`; boundary `outputs` / `h` (single boundary port only); `compute_internal_signals` + `compute_internal_signals_dict` for the **subsystem** buffer. Parametric tier not implemented.
+- [`JaxDiagramEvaluator`](minilink/compile/jax_evaluator.py) — same, with JIT for `f`, boundary `outputs`, and `compute_internal_signals`. **`get_f_jit()`**, **`get_outputs_jit()`**, **`get_internal_signals_jit()`**.
+
+**Removed API:** `compute_outputs(..., ports=...)` — use `compute_internal_signals_dict` and index by `"sys_id:port_id"`, or slice the flat buffer.
 
 **Entry point**: `compile(system, backend="numpy"|"jax")` in [`compiler.py`](minilink/compile/compiler.py). Dispatches to leaf or diagram evaluator.
 
@@ -51,9 +53,8 @@ compile/
   evaluator.py         — DynamicsEvaluator ABC
   numpy_evaluator.py   — NumpyLeafEvaluator + NumpyDiagramEvaluator
   jax_evaluator.py     — JaxLeafEvaluator + JaxDiagramEvaluator
-  jax_utils.py         — JAX helpers shared by diagram evaluators
-  execution_plan.py    — ExecutionPlan, PortOperation, StateOperation
-  compiler.py          — compile(), compile_diagram(), build_execution_plan()
+  execution_plan.py      — ExecutionPlan, PortOperation, StateOperation
+  compiler.py            — compile(), compile_diagram(), build_execution_plan()
 ```
 
 ### Key design decisions
@@ -69,7 +70,7 @@ compile/
 - [ ] **Implement integration methods** in ABC: `rk4_step`/`euler_step`/`rollout` × 3 tiers. NumPy: Python loops. JAX: override with `lax.scan`.
 - [ ] **Implement differentiation** (JAX): `jacobian_f_x`, `jacobian_f_u`, `jacobian_h_x`, `jacobian_h_u`, `linearize`. NumPy: finite differences later.
 - [ ] **Diagram parametric tier** (`f_p`): requires adding `sys_id` to `PortOperation`/`StateOperation` so caller can supply per-subsystem params dict.
-- [ ] **Diagram `h()` / `outputs()`**: define what "diagram output" means (exported ports via `connect_new_output_port`?) and wire through evaluator.
+- [x] **Diagram boundary `outputs()` / `h()`** — wired via `ExecutionPlan.external_output_slices` and `connect_new_output_port` (2026).
 - [ ] **`vmap` batch rollout** (JAX): `vmap_rollout` over `x0_batch`, `u_batch`, or `params_batch`.
 - [ ] **Tests**: full test suite for leaf evaluators (numpy + jax), param freeze, IVP, scipy integration.
 - [ ] **`as_scipy_rhs()`**: already implemented in ABC, needs integration test with `solve_ivp`.
@@ -94,7 +95,7 @@ compile/
 - [x] **Standardize Signal Gathering**: Consolidated `src_type` loops into a shared helper.
 - [x] **`DynamicsEvaluator` ABC**: Public interface for all evaluators (`f`/`h` 3-tier API).
 - [x] **Leaf system `compile()`**: `NumpyLeafEvaluator` + `JaxLeafEvaluator` with frozen params/u.
-- [x] **Port diagram evaluators to `DynamicsEvaluator`**: `NumpyDiagramEvaluator` + `JaxDiagramEvaluator` inherit ABC. `f()` implemented, parametric/output tiers deferred. (2026-04-05)
+- [x] **Port diagram evaluators to `DynamicsEvaluator`**: `NumpyDiagramEvaluator` + `JaxDiagramEvaluator` inherit ABC. `f()` + boundary `outputs()`; internal buffer methods split from boundary outputs; JAX JIT for `outputs` and `compute_internal_signals`. (2026-04-05, refined 2026-04)
 - [x] **Reorganize `compile/` folder**: Fused leaf + diagram evaluators per backend (`numpy_evaluator.py`, `jax_evaluator.py`). (2026-04-05)
 - [ ] **Diagram parametric tier**: Add `sys_id` to operations, implement `f_p` for diagrams.
 - [ ] **Populate `minilink/__init__.py`**: Public exports.

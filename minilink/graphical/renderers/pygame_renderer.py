@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from itertools import product
+
 import numpy as np
 
 import matplotlib.colors as mcolors
 
 from minilink.graphical.primitives import (
     Arrow,
+    Box,
     Circle,
     CustomLine,
     Plane,
@@ -227,6 +230,37 @@ class PygameCanvas:
             p1 = self._to_screen(world[1, 0], world[1, 1])
             lw = max(1, int(round(max(primitive.linewidth, primitive.radius * 10.0))))
             pygame_mod.draw.line(self.surface, _color_to_rgb(primitive.color), p0, p1, lw)
+
+        elif isinstance(primitive, Box):
+            lx, ly, lz = primitive.length_x, primitive.length_y, primitive.length_z
+            c = np.asarray(primitive.center, dtype=float).reshape(3)
+            corners = []
+            for sx, sy, sz in product((-1.0, 1.0), repeat=3):
+                corners.append(
+                    np.array([sx * lx / 2, sy * ly / 2, sz * lz / 2], dtype=float) + c
+                )
+            corners_h = np.hstack((np.array(corners), np.ones((8, 1))))
+            world_c = (transform_matrix @ corners_h.T).T[:, :3]
+            edges = (
+                (0, 1),
+                (0, 2),
+                (0, 4),
+                (1, 3),
+                (1, 5),
+                (2, 3),
+                (2, 6),
+                (3, 7),
+                (4, 5),
+                (4, 6),
+                (5, 7),
+                (6, 7),
+            )
+            col = _color_to_rgb(primitive.color)
+            lw = max(1, int(round(primitive.linewidth)))
+            for i, j in edges:
+                p0 = self._to_screen(world_c[i, 0], world_c[i, 1])
+                p1 = self._to_screen(world_c[j, 0], world_c[j, 1])
+                pygame_mod.draw.line(self.surface, col, p0, p1, lw)
 
 
 class PygameRenderer(AnimationRenderer):
