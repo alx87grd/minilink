@@ -151,6 +151,11 @@ class ExecutionPlan:
         Map from ``(subsystem_id, port_id)`` to the corresponding ``slice``
         in the internal signal buffer.  Used to extract specific port outputs
         after evaluation.
+    external_output_slices : dict[str, slice]
+        Diagram **boundary** outputs only: maps diagram output port id (keys of
+        :attr:`~minilink.core.diagram.DiagramSystem.outputs` on the diagram) to
+        the slice in the internal buffer that holds the connected source
+        subsystem port's signal. Empty when the diagram has no external outputs.
     """
 
     state_dim: int
@@ -158,3 +163,4 @@ class ExecutionPlan:
     port_ops: tuple[PortOperation, ...]
     state_ops: tuple[StateOperation, ...]
     output_slices: dict[tuple[str, str], slice]
+    external_output_slices: dict[str, slice]

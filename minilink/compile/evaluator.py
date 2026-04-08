@@ -46,7 +46,14 @@ class DynamicsEvaluator(ABC):
 
     @abstractmethod
     def outputs(self, x, u, t=0.0) -> dict:
-        """All output ports as {port_id: array}, frozen params."""
+        """All **boundary** output ports as a flat dict, frozen params.
+
+        * **Leaf** systems: keys are output port ids (e.g. ``\"y\"``).
+        * **Diagram** systems: keys are diagram output port ids (same as
+          :attr:`~minilink.core.diagram.DiagramSystem.outputs`).  Empty when no
+          external outputs were added (e.g. no :meth:`~minilink.core.diagram.DiagramSystem.connect_new_output_port` calls).  For every subsystem port in the internal buffer, use
+          :meth:`~minilink.compile.numpy_evaluator.NumpyDiagramEvaluator.compute_internal_signals_dict` instead.
+        """
         ...
 
     # ================================================================
@@ -65,7 +72,7 @@ class DynamicsEvaluator(ABC):
 
     @abstractmethod
     def outputs_p(self, x, u, t, params) -> dict:
-        """All output ports as {port_id: array}, caller-supplied params."""
+        """All output ports as a flat dict; same key convention as :meth:`outputs`."""
         ...
 
     # ================================================================

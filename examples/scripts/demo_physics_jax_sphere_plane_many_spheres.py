@@ -7,45 +7,26 @@ This is a larger scene variant of demo_physics_jax_sphere_plane.py.
 from __future__ import annotations
 
 import time
-
 import numpy as np
 
 from minilink.physics import PhysicsWorldSystem
 from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
 
-# Mix of radii/masses for visual and dynamic variety.
-specs = [
-    (0.25, 1.0),
-    (0.30, 1.4),
-    (0.22, 0.8),
-    (0.35, 1.8),
-    (0.28, 1.2),
-    (0.18, 0.6),
-    (0.32, 1.6),
-    (0.24, 0.9),
-    (0.27, 1.1),
-    (0.20, 0.7),
-    (0.34, 1.7),
-    (0.26, 1.0),
-]
+# 10x larger scene than the 12-sphere MVP: 12x10 grid = 120 spheres.
+nx, ny = 12, 10
+n_spheres = nx * ny
+
+# Smooth radius/mass variation for visual diversity.
+radii = np.linspace(0.18, 0.35, n_spheres)
+masses = np.linspace(0.6, 1.8, n_spheres)
+specs = list(zip(radii, masses))
 spheres = [SphereModel(mass=m, radius=r) for (r, m) in specs]
 
-# 4x3 grid in XY, varied Z heights.
-xy_grid = [
-    (-2.0, -1.2),
-    (-0.7, -1.3),
-    (0.7, -1.1),
-    (2.0, -1.4),
-    (-2.1, 0.0),
-    (-0.6, 0.2),
-    (0.8, -0.1),
-    (2.2, 0.1),
-    (-1.9, 1.3),
-    (-0.8, 1.4),
-    (0.9, 1.2),
-    (2.1, 1.5),
-]
-z_heights = [1.2, 1.8, 2.4, 3.0, 1.5, 2.1, 2.8, 3.3, 1.9, 2.6, 3.4, 4.0]
+# XY layout and varied Z heights.
+x_vals = np.linspace(-6.0, 6.0, nx)
+y_vals = np.linspace(-4.5, 4.5, ny)
+xy_grid = [(x, y) for y in y_vals for x in x_vals]
+z_heights = np.linspace(1.0, 6.0, n_spheres)
 
 world = make_world_model(
     spheres,

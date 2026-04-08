@@ -133,11 +133,12 @@ def _gather_u(
 class NumpyDiagramEvaluator(DynamicsEvaluator):
     """Stateless NumPy evaluator for a compiled diagram.
 
-    Inherits from :class:`DynamicsEvaluator`.  Only ``f`` is mapped to the
-    ABC interface; ``h`` / ``outputs`` and the parametric tier raise
-    ``NotImplementedError``.  Use diagram-specific methods
-    (``compute_outputs``, ``compute_internal_signals``,
-    ``compute_internal_signals_dict``) for port-level access.
+    Inherits from :class:`DynamicsEvaluator`.  Implements ``f`` and
+    :meth:`outputs` for **diagram boundary** ports only (same semantics as
+    :class:`NumpyLeafEvaluator`).  :meth:`compute_internal_signals_dict`
+    exposes every subsystem output in the internal buffer.  :meth:`h` returns
+    the sole external output when exactly one boundary port exists; otherwise
+    it raises.  The parametric tier is not implemented yet.
 
     Parameters
     ----------
@@ -145,20 +146,24 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
         The immutable execution schedule produced by
         :func:`~minilink.compile.compiler.build_execution_plan`.
     diagram : DiagramSystem
-        The source diagram (used only to snapshot ``m`` and ``_u_nominal``).
+        The source diagram (used for ``m``, ``_u_nominal``, and ``p``).
 
     Examples
     --------
     >>> evaluator = compile_diagram(diagram, backend="numpy")
     >>> dx = evaluator.f(x, u, t)
-    >>> y  = evaluator.compute_outputs(x, u, t, ports=[("plant", "y")])
+    >>> plant_y = evaluator.compute_internal_signals_dict(x, u, t)["plant:y"]
     """
 
     def __init__(self, plan: ExecutionPlan, diagram):
         self.plan = plan
         self.n = plan.state_dim
         self.m = diagram.m
-        self.p = plan.signal_dim
+        self.p = (
+            sum(diagram.outputs[pid].dim for pid in plan.external_output_slices)
+            if plan.external_output_slices
+            else 0
+        )
         self.backend = "numpy"
         self._frozen_params = None  # per-op binding, not diagram-level
         self._u_nominal = np.copy(diagram.get_u_from_input_ports(0))
@@ -192,15 +197,21 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
         return dx
 
     def h(self, x, u, t=0.0):
+        out = self.outputs(x, u, t)
+        if len(out) == 1:
+            return next(iter(out.values()))
         raise NotImplementedError(
-            "Diagram h() not supported. Use compute_outputs() for port-level access."
+            "Diagram h() is only defined when exactly one diagram output port "
+            "exists; use outputs()."
         )
 
     def outputs(self, x, u, t=0.0):
-        raise NotImplementedError(
-            "Diagram outputs() not supported. "
-            "Use compute_outputs() or compute_internal_signals_dict()."
-        )
+        """Boundary outputs only — keys match :attr:`DiagramSystem.outputs`."""
+        signals = self._compute_port_signals(x, u, t)
+        return {
+            port_id: signals[sl]
+            for port_id, sl in self.plan.external_output_slices.items()
+        }
 
     # ── ABC: Parametric tier ────────────────────────────────────────
 
@@ -214,43 +225,6 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
         raise NotImplementedError("Parametric tier not supported for diagrams yet.")
 
     # ── Diagram-specific methods ────────────────────────────────────
-
-    def compute_outputs(
-        self,
-        x: np.ndarray,
-        u: np.ndarray,
-        t: float = 0.0,
-        ports: list[tuple[str, str]] | None = None,
-    ) -> np.ndarray:
-        """Evaluate selected output ports and return their concatenation.
-
-        Parameters
-        ----------
-        x : np.ndarray, shape (state_dim,)
-            Global state vector.
-        u : np.ndarray, shape (m,)
-            External input vector.
-        t : float
-            Current time.
-        ports : list of (sys_id, port_id), optional
-            Which ports to return.  If ``None``, returns all ports
-            concatenated in the order they appear in ``output_slices``.
-
-        Returns
-        -------
-        np.ndarray
-            Concatenated output signals.
-        """
-        signals = self._compute_port_signals(x, u, t)
-
-        if ports is None:
-            slices = list(self.plan.output_slices.values())
-        else:
-            slices = [self.plan.output_slices[key] for key in ports]
-
-        if not slices:
-            return np.array([])
-        return np.concatenate([signals[s] for s in slices])
 
     def compute_internal_signals(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0
@@ -273,13 +247,7 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
     def compute_internal_signals_dict(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0
     ) -> dict:
-        """Evaluate all port signals and return as a labelled dict.
-
-        Returns
-        -------
-        dict mapping ``"sys_id:port_id"`` -> ``np.ndarray``
-            One entry per output port in topological order.
-        """
+        """Full internal signal buffer as ``\"sys_id:port_id\"`` → array (diagram-specific)."""
         signals = self._compute_port_signals(x, u, t)
         return {
             f"{sys_id}:{port_id}": signals[sl]

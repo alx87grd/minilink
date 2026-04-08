@@ -286,12 +286,27 @@ def _build_execution_plan_from_order(
                 )
             )
 
+    external_output_slices: dict[str, slice] = {}
+    out_conns = diagram.connections.get("output", {})
+    for out_port_id in diagram.outputs:
+        src = out_conns.get(out_port_id)
+        if src is None:
+            continue
+        source_sys_id, source_port_id = src
+        key = (source_sys_id, source_port_id)
+        if key not in output_slices:
+            raise RuntimeError(
+                f"Diagram output {out_port_id!r} source {key} missing from output_slices"
+            )
+        external_output_slices[out_port_id] = output_slices[key]
+
     return ExecutionPlan(
         state_dim=diagram.n,
         signal_dim=signal_dim,
         port_ops=tuple(port_ops),
         state_ops=tuple(state_ops),
         output_slices=output_slices,
+        external_output_slices=external_output_slices,
     )
 
 

@@ -65,9 +65,9 @@ def _check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
 class JaxLeafEvaluator(DynamicsEvaluator):
     """Compiled evaluator for a single System using JAX.
 
-    Core callables (``f``, ``h``, ``f_p``, ``h_p``, ``f_ivp``, ``h_ivp``)
-    are JIT-compiled at construction and warm-started with dummy data so that
-    the first real call incurs no compilation latency.
+    Core callables (``f``, ``h``, ``outputs``, ``f_p``, ``h_p``, ``f_ivp``,
+    ``h_ivp``, ``outputs_p``) are JIT-compiled at construction and warm-started
+    with dummy data so that the first real call incurs no compilation latency.
 
     Parameters
     ----------
@@ -113,6 +113,16 @@ class JaxLeafEvaluator(DynamicsEvaluator):
                               dummy_t, frozen_p, jax)
         _check_jax_compatible(h_raw, system.name, dummy_x, dummy_u,
                               dummy_t, frozen_p, jax)
+        for port_id, port in system.outputs.items():
+            _check_jax_compatible(
+                port.compute,
+                f"{system.name}:{port_id}",
+                dummy_x,
+                dummy_u,
+                dummy_t,
+                frozen_p,
+                jax,
+            )
 
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
@@ -134,6 +144,23 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         self._jit_f_ivp = jax.jit(lambda x, t: f_raw(x, u_nom, t, frozen_p))
         self._jit_h_ivp = jax.jit(lambda x, t: h_raw(x, u_nom, t, frozen_p))
 
+        output_items = tuple(
+            (pid, port.compute) for pid, port in system.outputs.items()
+        )
+
+        def _outputs_frozen(x, u, t):
+            return {pid: fn(x, u, t, frozen_p) for pid, fn in output_items}
+
+        def _outputs_param(x, u, t, p):
+            return {pid: fn(x, u, t, p) for pid, fn in output_items}
+
+        if output_items:
+            self._jit_outputs = jax.jit(_outputs_frozen)
+            self._jit_outputs_p = jax.jit(_outputs_param)
+        else:
+            self._jit_outputs = jax.jit(lambda x, u, t: {})
+            self._jit_outputs_p = jax.jit(lambda x, u, t, p: {})
+
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
@@ -150,10 +177,12 @@ class JaxLeafEvaluator(DynamicsEvaluator):
             self._jit_h_p(dummy_x, dummy_u, dummy_t, frozen_p)
             self._jit_f_ivp(dummy_x, dummy_t)
             self._jit_h_ivp(dummy_x, dummy_t)
+            self._jit_outputs(dummy_x, dummy_u, dummy_t)
+            self._jit_outputs_p(dummy_x, dummy_u, dummy_t, frozen_p)
         except Exception as e:
             raise RuntimeError(
                 f"\n\nBlock '{system.name}' failed during JAX warm-start.\n"
-                f"Its f()/h() likely performs in-place array mutation "
+                f"Its f()/h()/outputs likely performs in-place array mutation "
                 f"or uses strict NumPy operations incompatible with JAX.\n"
                 f"Rewrite in purely functional style or use backend='numpy'.\n"
                 f"Original JAX error: {e}"
@@ -171,10 +200,7 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         return self._jit_h(x, u, t)
 
     def outputs(self, x, u, t=0.0):
-        result = {}
-        for port_id, port in self._system.outputs.items():
-            result[port_id] = port.compute(x, u, t, self._frozen_params)
-        return result
+        return self._jit_outputs(x, u, t)
 
     # -- Parametric tier (caller-supplied params) -------------------------
 
@@ -185,10 +211,15 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         return self._jit_h_p(x, u, t, params)
 
     def outputs_p(self, x, u, t, params):
-        result = {}
-        for port_id, port in self._system.outputs.items():
-            result[port_id] = port.compute(x, u, t, params)
-        return result
+        return self._jit_outputs_p(x, u, t, params)
+
+    def get_outputs_jit(self):
+        """Return the JIT-compiled ``outputs`` callable (same as :meth:`outputs`)."""
+        return self._jit_outputs
+
+    def get_outputs_p_jit(self):
+        """Return the JIT-compiled parametric ``outputs_p`` callable."""
+        return self._jit_outputs_p
 
     # -- IVP tier (override ABC defaults with JIT versions) ---------------
 
@@ -252,18 +283,18 @@ def _gather_u_jax(gather_sources, u_dim, signals, u, jnp, dtype):
 class JaxDiagramEvaluator(DynamicsEvaluator):
     """JAX-compatible evaluator for a compiled diagram.
 
-    Inherits from :class:`DynamicsEvaluator`.  Only ``f`` is mapped to the
-    ABC interface; ``h`` / ``outputs`` and the parametric tier raise
-    ``NotImplementedError``.  Use diagram-specific methods
-    (``compute_outputs``, ``compute_internal_signals``,
-    ``compute_internal_signals_dict``) for port-level access.
+    Inherits from :class:`DynamicsEvaluator`.  Implements ``f`` and JIT-compiled
+    :meth:`outputs` for **diagram boundary** ports only (same semantics as
+    :class:`JaxLeafEvaluator`).  :meth:`compute_internal_signals_dict` exposes
+    all subsystem outputs in the buffer.  :meth:`h` applies when there is
+    exactly one boundary output.  The parametric tier is not implemented yet.
 
     All operations use functional array updates so they are traceable
     by JAX's transformation system (``jit``, ``grad``, ``vmap``, etc.).
 
-    At construction the evaluator JIT-compiles ``f`` and warm-starts with
-    dummy data, so the first real call incurs no compilation latency —
-    matching the behaviour of :class:`JaxLeafEvaluator`.
+    At construction the evaluator JIT-compiles ``f`` and ``outputs`` and
+    warm-starts with dummy data, so the first real call incurs no compilation
+    latency — matching the behaviour of :class:`JaxLeafEvaluator`.
 
     Parameters
     ----------
@@ -297,7 +328,11 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
 
         self.n = plan.state_dim
         self.m = diagram.m
-        self.p = plan.signal_dim
+        self.p = (
+            sum(diagram.outputs[pid].dim for pid in plan.external_output_slices)
+            if plan.external_output_slices
+            else 0
+        )
         self.backend = "jax"
         self._frozen_params = None  # per-op binding, not diagram-level
         self._u_nominal = jnp.array(diagram.get_u_from_input_ports(0))
@@ -330,6 +365,14 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         u_nom = self._u_nominal
         self._jit_f_ivp = jax.jit(lambda x, t: _f_eager(x, u_nom, t))
 
+        self._jit_outputs = jax.jit(
+            lambda x, u, t: self._external_outputs_eager(x, u, t)
+        )
+
+        self._jit_internal_signals = jax.jit(
+            lambda x, u, t: self._internal_signals_eager(x, u, t)
+        )
+
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
@@ -346,6 +389,8 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         try:
             self._jit_f(dummy_x, dummy_u, dummy_t)
             self._jit_f_ivp(dummy_x, dummy_t)
+            self._jit_outputs(dummy_x, dummy_u, dummy_t)
+            self._jit_internal_signals(dummy_x, dummy_u, dummy_t)
         except Exception as e:
             raise RuntimeError(
                 f"\n\nDiagram failed during JAX warm-start.\n"
@@ -356,6 +401,22 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
 
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
+
+    # ── Diagram boundary outputs (JAX-traceable; same contract as leaf) ─
+
+    def _external_outputs_eager(self, x, u, t):
+        """Boundary outputs only — keys match :attr:`DiagramSystem.outputs`."""
+        dtype = self._infer_dtype(x, u)
+        signals = self._compute_port_signals(x, u, t, dtype)
+        return {
+            port_id: signals[sl]
+            for port_id, sl in self.plan.external_output_slices.items()
+        }
+
+    def _internal_signals_eager(self, x, u, t):
+        """Full internal signal buffer (same graph as :meth:`_compute_port_signals`)."""
+        dtype = self._infer_dtype(x, u)
+        return self._compute_port_signals(x, u, t, dtype)
 
     # ── JAX compatibility pre-flight ────────────────────────────────
 
@@ -430,15 +491,16 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         return dx
 
     def h(self, x, u, t=0.0):
+        out = self.outputs(x, u, t)
+        if len(out) == 1:
+            return next(iter(out.values()))
         raise NotImplementedError(
-            "Diagram h() not supported. Use compute_outputs() for port-level access."
+            "Diagram h() is only defined when exactly one diagram output port "
+            "exists; use outputs()."
         )
 
     def outputs(self, x, u, t=0.0):
-        raise NotImplementedError(
-            "Diagram outputs() not supported. "
-            "Use compute_outputs() or compute_internal_signals_dict()."
-        )
+        return self._jit_outputs(x, u, t)
 
     # ── ABC: Parametric tier ────────────────────────────────────────
 
@@ -462,40 +524,21 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         """Return the JIT-compiled ``f`` callable directly (skips method dispatch)."""
         return self._jit_f
 
+    def get_outputs_jit(self):
+        """Return the JIT-compiled ``outputs`` callable (same as :meth:`outputs`)."""
+        return self._jit_outputs
+
+    def get_internal_signals_jit(self):
+        """Return the JIT-compiled ``compute_internal_signals`` callable."""
+        return self._jit_internal_signals
+
     # ── Diagram-specific methods ────────────────────────────────────
-
-    def compute_outputs(self, x, u, t=0.0, ports=None):
-        """Evaluate selected output ports (JAX-traceable).
-
-        Parameters
-        ----------
-        x : jax array, shape (state_dim,)
-        u : jax array, shape (m,)
-        t : float or jax scalar
-        ports : list of (sys_id, port_id), optional
-
-        Returns
-        -------
-        jax array
-            Concatenated output signals.
-        """
-        jnp = self._jnp
-        dtype = self._infer_dtype(x, u)
-
-        signals = self._compute_port_signals(x, u, t, dtype)
-
-        if ports is None:
-            slices = list(self.plan.output_slices.values())
-        else:
-            slices = [self.plan.output_slices[key] for key in ports]
-
-        if not slices:
-            return jnp.array([], dtype=dtype)
-        out_pieces = [signals[s] for s in slices]
-        return jnp.concatenate(out_pieces, axis=0)
 
     def compute_internal_signals(self, x, u, t=0.0):
         """Evaluate and return the full internal signal buffer (flat JAX array).
+
+        JIT-compiled at evaluator construction (same schedule as ``f``'s port
+        evaluation). Use :meth:`get_internal_signals_jit` for the raw callable.
 
         Parameters
         ----------
@@ -507,19 +550,11 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         -------
         jax array, shape (signal_dim,)
         """
-        dtype = self._infer_dtype(x, u)
-        return self._compute_port_signals(x, u, t, dtype)
+        return self._jit_internal_signals(x, u, t)
 
     def compute_internal_signals_dict(self, x, u, t=0.0):
-        """Evaluate all port signals and return as a labelled dict.
-
-        Returns
-        -------
-        dict mapping ``"sys_id:port_id"`` -> jax array
-            One entry per output port in topological order.
-        """
-        dtype = self._infer_dtype(x, u)
-        signals = self._compute_port_signals(x, u, t, dtype)
+        """Full internal buffer as ``\"sys_id:port_id\"`` → array (diagram-specific)."""
+        signals = self.compute_internal_signals(x, u, t)
         return {
             f"{sys_id}:{port_id}": signals[sl]
             for (sys_id, port_id), sl in self.plan.output_slices.items()

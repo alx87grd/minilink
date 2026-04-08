@@ -39,7 +39,7 @@ Additional: `outputs(x, u, t)` / `outputs_p(x, u, t, params)` → `dict` of all 
 - [`JaxLeafEvaluator`](minilink/compile/jax_evaluator.py) — same, with core methods **pre-JIT-compiled and warm-started** at construction.
 
 **Diagram backends** (compiled `DiagramSystem`):
-- [`NumpyDiagramEvaluator`](minilink/compile/numpy_evaluator.py) — inherits from `DynamicsEvaluator`. `f(x, u, t)` implemented; `h`/`outputs`/parametric tier → `NotImplementedError`. Diagram-specific: `compute_outputs`, `compute_internal_signals`, `compute_internal_signals_dict`.
+- [`NumpyDiagramEvaluator`](minilink/compile/numpy_evaluator.py) — inherits from `DynamicsEvaluator`. `f(x, u, t)` implemented; diagram boundary `outputs`; parametric tier not implemented. Diagram-specific: `compute_internal_signals`, `compute_internal_signals_dict`.
 - [`JaxDiagramEvaluator`](minilink/compile/jax_evaluator.py) — same, JAX-traceable. `get_f_jit()` convenience method.
 
 **Entry point**: `compile(system, backend="numpy"|"jax")` in [`compiler.py`](minilink/compile/compiler.py). Dispatches to leaf or diagram evaluator.
@@ -62,7 +62,7 @@ compile/
 - **Separate methods per tier** (not optional args) — avoids JAX pytree-structure issues when `params` is sometimes `None` vs `dict`.
 - **ABC over Protocol** — children inherit default implementations (integration, differentiation); only `f`/`h`/`outputs` and their `_p` variants are abstract.
 - **IVP tier snapshots `_u_nominal` at compile time** — JIT-safe on all backends (no runtime port reads).
-- **Diagram `h()` / `outputs()` = NotImplementedError** — diagrams don't have a single primary output. Use diagram-specific `compute_outputs(x, u, t, ports)` for port-level access.
+- **Diagram `h()`** — defined only with exactly one boundary output; otherwise use `outputs()` or `compute_internal_signals_dict()` for subsystem ports.
 
 ### TODO — next steps
 

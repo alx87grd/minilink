@@ -3,8 +3,7 @@
 Validates that:
 - ``compile_diagram()`` produces a working ``NumpyDiagramEvaluator``
 - ``f()`` matches ``diagram.f()`` (the slow recursive reference)
-- ``compute_outputs()`` returns correct port signals
-- ``compute_internal_signals()`` exposes the full signal buffer
+- ``compute_internal_signals()`` / ``compute_internal_signals_dict()`` expose the buffer
 - ``check_algebraic_loops()`` detects loops and returns valid order
 - ``build_execution_plan()`` produces a valid ``ExecutionPlan``
 """
@@ -44,6 +43,13 @@ def _build_small_closed_loop():
     diag.connect("input", "ref", "ctl", "ref")
     diag.connect("plant", "y", "ctl", "y")
     diag.connect("ctl", "u", "plant", "u")
+    return diag
+
+
+def _build_closed_loop_with_external_output():
+    """Same as ``_build_small_closed_loop`` plus one diagram output port."""
+    diag = _build_small_closed_loop()
+    diag.connect_new_output_port("plant", "y", "y_meas")
     return diag
 
 
@@ -128,6 +134,20 @@ class TestBuildExecutionPlan(unittest.TestCase):
             for port_id in sys.outputs:
                 self.assertIn((sys_id, port_id), plan.output_slices)
 
+    def test_external_output_slices_empty_without_boundary_outputs(self):
+        diag = _build_small_closed_loop()
+        plan = build_execution_plan(diag)
+        self.assertEqual(plan.external_output_slices, {})
+
+    def test_external_output_slices_with_connect_new_output_port(self):
+        diag = _build_closed_loop_with_external_output()
+        plan = build_execution_plan(diag)
+        self.assertIn("y_meas", plan.external_output_slices)
+        self.assertEqual(
+            plan.external_output_slices["y_meas"],
+            plan.output_slices[("plant", "y")],
+        )
+
 
 class TestCompileDiagram(unittest.TestCase):
     """Test the top-level compile_diagram entry point."""
@@ -169,19 +189,18 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
             dx_comp = self.evaluator.f(x, u, 0.0)
             np.testing.assert_allclose(dx_comp, dx_ref, atol=1e-10)
 
-    def test_compute_outputs_all(self):
+    def test_compute_internal_signals_non_empty(self):
         x = np.array([0.5])
         u = np.array([1.0])
-        y = self.evaluator.compute_outputs(x, u, 0.0)
-        # Should return signals from all output ports
-        self.assertGreater(y.size, 0)
+        buf = self.evaluator.compute_internal_signals(x, u, 0.0)
+        self.assertGreater(buf.size, 0)
 
-    def test_compute_outputs_specific_port(self):
+    def test_compute_internal_signals_dict_plant_y(self):
         x = np.array([0.5])
         u = np.array([1.0])
-        y = self.evaluator.compute_outputs(x, u, 0.0, ports=[("plant", "y")])
+        d = self.evaluator.compute_internal_signals_dict(x, u, 0.0)
         # Plant output y = x for Integrator
-        np.testing.assert_allclose(y, np.array([0.5]), atol=1e-10)
+        np.testing.assert_allclose(d["plant:y"], np.array([0.5]), atol=1e-10)
 
     def test_compute_internal_signals(self):
         x = np.array([0.5])
@@ -220,6 +239,37 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         for sys_id, sys in self.diag.subsystems.items():
             for port_id in sys.outputs:
                 self.assertIn(f"{sys_id}:{port_id}", signals)
+
+    def test_outputs_empty_without_external_boundary_ports(self):
+        """outputs() is boundary-only; closed loop without connect_new_output_port is {}."""
+        x = np.array([0.5])
+        u = np.array([1.0])
+        self.assertEqual(self.evaluator.outputs(x, u, 0.0), {})
+
+    def test_outputs_external_matches_plant_y_measurement(self):
+        """With connect_new_output_port, outputs() maps diagram port id → signal."""
+        diag = _build_closed_loop_with_external_output()
+        ev = compile_diagram(diag)
+        x = np.array([0.5])
+        u = np.array([1.0])
+        y = ev.outputs(x, u, 0.0)
+        self.assertIn("y_meas", y)
+        np.testing.assert_allclose(y["y_meas"], np.array([0.5]), atol=1e-10)
+
+    def test_h_matches_single_boundary_output(self):
+        """h() returns the single external output when exactly one boundary port exists."""
+        diag = _build_closed_loop_with_external_output()
+        ev = compile_diagram(diag)
+        x = np.array([0.5])
+        u = np.array([1.0])
+        np.testing.assert_allclose(ev.h(x, u, 0.0), np.array([0.5]), atol=1e-10)
+
+    def test_h_raises_when_multiple_output_ports(self):
+        """h() is only defined when the diagram exposes exactly one boundary output."""
+        x = np.array([0.5])
+        u = np.array([1.0])
+        with self.assertRaises(NotImplementedError):
+            self.evaluator.h(x, u, 0.0)
 
     def test_bind_params_freezes_snapshot(self):
         """bound_params in plan: mutating subsystem.params does not change dx."""
@@ -275,16 +325,71 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         self.assertIsNotNone(plan_bound.port_ops[0].bound_params)
 
 
-# TODO: add JAX tests with compatible JAX block in a separate test file
-# # ── JAX tests (skipped if JAX not installed) ─────────────────────────
+# ── JAX tests (skipped if JAX not installed) ─────────────────────────
 
-# try:
-#     import jax
-#     import jax.numpy as jnp
-#     from minilink.compile import JaxDiagramEvaluator
-#     _JAX_AVAILABLE = True
-# except ImportError:
-#     _JAX_AVAILABLE = False
+try:
+    import jax.numpy as jnp
+
+    from minilink.compile import JaxDiagramEvaluator
+
+    _JAX_AVAILABLE = True
+except ImportError:
+    _JAX_AVAILABLE = False
+
+
+@unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
+class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
+    """JaxDiagramEvaluator boundary outputs are JIT-compiled and match NumPy."""
+
+    def test_outputs_matches_numpy_no_boundary_ports(self):
+        diag = _build_small_closed_loop()
+        ev_np = compile_diagram(diag, backend="numpy")
+        ev_jax = compile_diagram(diag, backend="jax")
+        self.assertIsInstance(ev_jax, JaxDiagramEvaluator)
+
+        x_np, u_np = np.array([0.5]), np.array([1.0])
+        x_j = jnp.array([0.5], dtype=jnp.float32)
+        u_j = jnp.array([1.0], dtype=jnp.float32)
+        t = 0.0
+
+        d_np = ev_np.outputs(x_np, u_np, t)
+        d_jx = ev_jax.outputs(x_j, u_j, t)
+        self.assertEqual(d_np, {})
+        self.assertEqual(d_jx, {})
+
+    def test_outputs_matches_numpy_with_external_port(self):
+        diag = _build_closed_loop_with_external_output()
+        ev_np = compile_diagram(diag, backend="numpy")
+        ev_jax = compile_diagram(diag, backend="jax")
+        x_j = jnp.array([0.5], dtype=jnp.float32)
+        u_j = jnp.array([1.0], dtype=jnp.float32)
+        t = 0.0
+        d_np = ev_np.outputs(np.array([0.5]), np.array([1.0]), t)
+        d_jx = ev_jax.outputs(x_j, u_j, t)
+        self.assertEqual(set(d_np.keys()), set(d_jx.keys()))
+        for k in d_np:
+            np.testing.assert_allclose(np.asarray(d_jx[k]), d_np[k], atol=1e-5)
+
+    def test_get_outputs_jit_matches_outputs(self):
+        diag = _build_closed_loop_with_external_output()
+        ev = compile_diagram(diag, backend="jax")
+        x_j = jnp.array([0.3], dtype=jnp.float32)
+        u_j = jnp.array([1.2], dtype=jnp.float32)
+        t = 0.1
+        out1 = ev.outputs(x_j, u_j, t)
+        out2 = ev.get_outputs_jit()(x_j, u_j, t)
+        for k in out1:
+            np.testing.assert_allclose(np.asarray(out1[k]), np.asarray(out2[k]), atol=1e-6)
+
+    def test_get_internal_signals_jit_matches_compute_internal_signals(self):
+        diag = _build_small_closed_loop()
+        ev = compile_diagram(diag, backend="jax")
+        x_j = jnp.array([0.3], dtype=jnp.float32)
+        u_j = jnp.array([1.2], dtype=jnp.float32)
+        t = 0.1
+        buf1 = ev.compute_internal_signals(x_j, u_j, t)
+        buf2 = ev.get_internal_signals_jit()(x_j, u_j, t)
+        np.testing.assert_allclose(np.asarray(buf1), np.asarray(buf2), atol=1e-6)
 
 
 # @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
@@ -334,21 +439,19 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
 #         grad_val = float(jax.grad(dx0_of_u)(jnp.array(1.2, dtype=jnp.float32)))
 #         self.assertAlmostEqual(abs(grad_val), 1.0, places=4)
 
-#     def test_compute_outputs_specific_port(self):
-#         """JaxDiagramEvaluator.compute_outputs with port selection."""
-#         y = self.evaluator.compute_outputs(
-#             self.x, self.u, 0.0, ports=[("plant", "y")]
-#         )
-#         # Plant output y = x for Integrator
+#     def test_internal_signals_dict_plant_y(self):
+#         """JaxDiagramEvaluator.compute_internal_signals_dict for one port."""
+#         d = self.evaluator.compute_internal_signals_dict(self.x, self.u, 0.0)
+#         y = d["plant:y"]
 #         self.assertAlmostEqual(float(y[0]), 0.3, places=5)
 
-#     def test_compute_outputs_is_differentiable(self):
-#         """jax.grad must flow through compute_outputs."""
+#     def test_internal_signals_dict_is_differentiable(self):
+#         """jax.grad through compute_internal_signals_dict slice."""
 #         def y_of_x(x0):
-#             return self.evaluator.compute_outputs(
-#                 jnp.array([x0], dtype=jnp.float32),
-#                 self.u, 0.0, ports=[("plant", "y")]
-#             )[0]
+#             d = self.evaluator.compute_internal_signals_dict(
+#                 jnp.array([x0], dtype=jnp.float32), self.u, 0.0
+#             )
+#             return d["plant:y"][0]
 
 #         grad_val = float(jax.grad(y_of_x)(jnp.array(0.3, dtype=jnp.float32)))
 #         self.assertAlmostEqual(abs(grad_val), 1.0, places=4)

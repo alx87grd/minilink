@@ -70,11 +70,11 @@ All compiled evaluators inherit from the `DynamicsEvaluator` ABC ([`minilink/com
 | **Parametric** | `f_p(x, u, t, params)` | `h_p(x, u, t, params)` | nothing — caller supplies params dict |
 | **IVP** | `f_ivp(x, t)` | `h_ivp(x, t)` | u + params both frozen |
 
-Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of all output ports.
+Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of **boundary** output ports. Keys are port ids for **leaf** systems (e.g. `"y"`). For **diagram** evaluators, keys match the diagram’s external output ports only (`DiagramSystem.outputs`); the full internal signal map is `compute_internal_signals_dict` (all subsystem ports).
 
 **Leaf system backends** (single `System`, non-diagram):
 - `NumpyLeafEvaluator` — wraps `System.f`/`System.h` with frozen params + nominal u snapshot.
-- `JaxLeafEvaluator` — same, with core methods pre-JIT-compiled and warm-started at construction.
+- `JaxLeafEvaluator` — same, with `f`/`h`/`outputs`/`outputs_p` pre-JIT-compiled and warm-started at construction.
 
 **Entry point**: `compile(system, backend="numpy"|"jax")` → returns a `DynamicsEvaluator`.
 
@@ -86,9 +86,9 @@ Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of all output 
 
 ### 4.3 Diagram compilation pipeline
 
-The diagram evaluators (`NumpyDiagramEvaluator`, `JaxDiagramEvaluator`) inherit from `DynamicsEvaluator`. Only `f(x, u, t)` maps to the ABC; `h`, `outputs`, and the parametric tier raise `NotImplementedError` (diagrams don't have a single primary output, and per-subsystem params dispatch requires `sys_id` on operations — deferred).
+The diagram evaluators (`NumpyDiagramEvaluator`, `JaxDiagramEvaluator`) implement `f(x, u, t)` and `outputs(x, u, t)` / `outputs_p(...)` for **diagram boundary** ports only (same contract as leaf; often an empty dict when no `connect_new_output_port` was used). `h(x, u, t)` is defined only when there is **exactly one** such external output. The parametric tier is not implemented for diagrams yet (per-subsystem `params` dispatch requires `sys_id` on operations — deferred).
 
-Diagram-specific methods are preserved: `compute_outputs(x, u, t, ports)` for port-filtered output selection, `compute_internal_signals_dict(x, u, t)` for all internal subsystem port signals as a dict, and `compute_internal_signals(x, u, t)` for the raw flat signal buffer.
+Diagram-specific methods: `compute_internal_signals_dict(x, u, t)` maps **subsystem** ports to arrays via `"sys_id:port_id"` keys; `compute_internal_signals(x, u, t)` returns the raw flat buffer (JIT-compiled on the JAX backend). `JaxDiagramEvaluator` JIT-compiles boundary `outputs` separately from `f`.
 
 `build_execution_plan` stays focused on topology, slices, and gather recipes. `bind_params=True` deep-copies subsystem params into each operation; `bind_params=False` passes `None` so blocks use live `self.params`.
 

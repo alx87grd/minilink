@@ -42,7 +42,7 @@ sys.x0 = x0
 # Input is [Fx,Fy,Fz,Tx,Ty,Tz] per body (2 bodies => 12 dims).
 step = Step(
     initial_value=np.zeros(sys.m),
-    final_value=np.array([5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+    final_value=np.array([0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
     step_time=5.0,
 )
 
@@ -50,6 +50,7 @@ diagram = DiagramSystem()
 diagram.add_subsystem(step, "force_cmd")
 diagram.add_subsystem(sys, "world")
 diagram.connect("force_cmd", "y", "world", "u")
+diagram.plot_graphe()
 
 traj = diagram.compute_trajectory(tf=10.0, solver="scipy")
 # print("Simulated points:", traj.time_steps)
