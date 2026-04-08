@@ -1,8 +1,9 @@
-from framework import DynamicSystem, StaticSystem
-from sources import Step, WhiteNoise
-from diagram import DiagramSystem
-from analysis import Simulator, plot_trajectory
 import numpy as np
+
+from minilink.blocks.sources import Step, WhiteNoise
+from minilink.core.analysis import Simulator
+from minilink.core.diagram import DiagramSystem
+from minilink.core.framework import DynamicSystem, StaticSystem
 
 
 ######################################################################
@@ -35,7 +36,7 @@ class Pendulum(DynamicSystem):
 
         g = params["g"]
         m = params["m"]
-        l = params["l"]
+        length = params["l"]
 
         theta = x[0]
 
@@ -45,7 +46,7 @@ class Pendulum(DynamicSystem):
 
         dx = np.zeros(2)
         dx[0] = x[1]
-        dx[1] = -g / l * np.sin(theta) + 1 / (m * l**2) * (u + w)
+        dx[1] = -g / length * np.sin(theta) + 1 / (m * length**2) * (u + w)
 
         return dx
 
@@ -195,7 +196,7 @@ def simulator_test():
 
     traj = sim.solve(show=True)
 
-    plot_trajectory(sys1, traj)
+    # plot_trajectory(sys1, traj)
 
     np.set_printoptions(precision=2, suppress=True)
     print(f"Time vector:\n {traj.t}")
@@ -272,12 +273,12 @@ def diagram_test():
     print("List of connections :\n")
     print(gsys.connections)
 
-    g = gsys.plot_graphe()
+    _ = gsys.plot_graphe()
 
     print("sys.n = ", gsys.n)
     print("sys.m = ", gsys.m)
     print("sys.p = ", gsys.p)
-    print("sys.state_label = ", gsys.state.labels)
+    print("sys.state_labels = ", gsys.state.labels)
 
     return gsys
 
@@ -329,147 +330,6 @@ def pendulum_test():
 
 
 ######################################################################
-def closedloop_pendulum_test():
-
-    # Plant system
-    sys = Pendulum()
-
-    sys.params["m"] = 1.0
-    sys.params["l"] = 5.0
-    sys.x0[0] = 2.0
-
-    # Source input
-    step = Step()
-    step.params["initial_value"] = np.array([0.0])
-    step.params["final_value"] = np.array([1.0])
-    step.params["step_time"] = 10.0
-
-    # Closed loop system
-    ctl = PDController()
-    ctl.params["Kp"] = 1000.0
-    ctl.params["Kd"] = 100.0
-
-    # Diagram
-    diagram2 = DiagramSystem()
-
-    diagram2.add_subsystem(step, "step")
-    diagram2.add_subsystem(ctl, "controller")
-    diagram2.add_subsystem(sys, "plant")
-
-    diagram2.connect("step", "y", "controller", "ref")
-    diagram2.connect("controller", "u", "plant", "u")
-    diagram2.connect("plant", "y", "controller", "y")
-
-    diagram2.plot_graphe()
-
-    sim = Simulator(diagram2, t0=0, tf=20, dt=0.01)
-    sim.solve(show=True)
-
-
-######################################################################
-def closedloop_noisy_pendulum_test():
-
-    # Plant system
-    sys = Pendulum()
-
-    sys.params["m"] = 1.0
-    sys.params["l"] = 5.0
-
-    sys.x0[0] = 2.0
-
-    # Source input
-    step = Step()
-    step.params["initial_value"] = np.array([0.0])
-    step.params["final_value"] = np.array([1.0])
-    step.params["step_time"] = 10.0
-
-    # Noisy input
-    noise = WhiteNoise(1)
-    noise.params["var"] = 1.0
-    noise.params["mean"] = 0.0
-    noise.params["seed"] = 1
-
-    # Noisy measurement
-    noise2 = WhiteNoise(1)
-    noise2.params["var"] = 0.1
-    noise2.params["mean"] = 0.0
-    noise2.params["seed"] = 2
-
-    # Closed loop system
-    ctl = PDController()
-    ctl.params["Kp"] = 1000.0
-    ctl.params["Kd"] = 100.0
-
-    # Diagram
-    diagram2 = DiagramSystem()
-
-    diagram2.add_subsystem(step, "step")
-    diagram2.add_subsystem(ctl, "controller")
-    diagram2.add_subsystem(sys, "plant")
-    diagram2.add_subsystem(noise, "noise")
-    diagram2.add_subsystem(noise2, "noise2")
-
-    diagram2.connect("step", "y", "controller", "ref")
-    diagram2.connect("controller", "u", "plant", "u")
-    diagram2.connect("plant", "y", "controller", "y")
-    # diagram2.connect("noise", "y", "plant", "w")
-    diagram2.connect("noise2", "y", "plant", "v")
-
-    # External input
-    diagram2.add_input_port(1, "w", nominal_value=np.array([0.0]))
-    diagram2.connect("input", "w", "plant", "w")
-
-    diagram2.plot_graphe()
-
-    sim = Simulator(diagram2, t0=0, tf=20, dt=0.01)
-    sim.solver = "euler"
-    sim.solve(show=True)
-
-
-######################################################################
-def cascade_controllers_test():
-
-    # Plant system
-    sys = Integrator()
-    sys.x0[0] = 20.0
-
-    # Controllers
-    ctl1 = PropController()
-    ctl1.params["Kp"] = 1.0
-    ctl2 = PropController()
-    ctl2.params["Kp"] = 1.0
-
-    # Source input
-    step = Step()
-    step.params["initial_value"] = np.array([0.0])
-    step.params["final_value"] = np.array([1.0])
-    step.params["step_time"] = 10.0
-
-    # # Diagram
-    diagram = DiagramSystem()
-
-    diagram.add_subsystem(step, "step")
-    diagram.add_subsystem(ctl1, "controller1")
-    diagram.add_subsystem(ctl2, "controller2")
-    diagram.add_subsystem(sys, "integrator1")
-    diagram.add_subsystem(sys, "integrator2")
-
-    diagram.connect("integrator1", "y", "integrator2", "u")
-    diagram.connect("controller2", "u", "integrator1", "u")
-    diagram.connect("integrator1", "y", "controller2", "y")
-    diagram.connect("controller1", "u", "controller2", "ref")
-    diagram.connect("integrator2", "y", "controller1", "y")
-    diagram.connect("step", "y", "controller1", "ref")
-
-    diagram.plot_graphe()
-
-    sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
-    sim.solve(show=True)
-
-    return diagram
-
-
-######################################################################
 def algebraic_loop():
 
     # Plant system
@@ -503,6 +363,8 @@ def algebraic_loop():
     diagram.connect("step", "y", "controller1", "ref")
 
     diagram.plot_graphe()
+
+    # diagram.check_algebraic_loops()
 
     sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
     sim.solve(show=True)
@@ -593,7 +455,7 @@ def diagram_in_a_diagram(debug_print=False):
     diagram.add_subsystem(sys2, "integrator2")
     diagram.connect("input", "u", "integrator1", "u")
     diagram.connect("integrator1", "y", "integrator2", "u")
-    diagram.connect_new_output_port("integrator2", "y", "y")
+    diagram.connect_new_output_port("integrator2", "y", "y", dependencies=[])
 
     diagram.plot_graphe()
 
@@ -615,14 +477,10 @@ def diagram_in_a_diagram(debug_print=False):
 
 ######################################################################
 if __name__ == "__main__":
-
     # sys = system_test()
     # sim = simulator_test()
     # dia = diagram_test()
-    # pendulum_test()
-    # closedloop_pendulum_test()
-    # closedloop_noisy_pendulum_test()
-    diagram = cascade_controllers_test()
-    # diagram = algebraic_loop()  # TODO: Program auto check for algebraic loops
-    # solver_doing_weird_at_discontinuities()  # TODO: Make fixed step solver for systems with discontinuities
+    pendulum_test()
+    # diagram = algebraic_loop()  # compile() (via f_fast / Simulator) runs check_algebraic_loops()
+    # solver_doing_weird_at_discontinuities()  # use euler / fixed dt; Simulator picks euler when solver_info["discontinuous_behavior"]
     # test, d1, d2 = diagram_in_a_diagram(debug_print=False)

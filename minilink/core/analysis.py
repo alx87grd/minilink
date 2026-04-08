@@ -1,13 +1,11 @@
+import logging
+
 import numpy as np
 from scipy.integrate import solve_ivp
-import logging
-import graphical
-import matplotlib.pyplot as plt
 
 
 ######################################################################
 class Trajectory:
-
     def __init__(self, x, u, t):
         """
         x:  array of dim = ( time-steps , sys.n )
@@ -38,62 +36,44 @@ class Trajectory:
         assert self.u.shape[1] == self.time_steps, "u has the wrong dimension"
 
 
-############################################################
-def plot_trajectory(sys, traj):
+######################################################################
+def compute_internal_signals(diagram, traj):
+    """
+    Reconstructs internal signals of a DiagramSystem from a simulated trajectory.
+    Adds a dictionary `internal_signals` to the trajectory object containing time-series data
+    for every output port of every subsystem.
+    """
+    from minilink.core.diagram import DiagramSystem
 
-    # Extract the system dimensions and labels
-    n = sys.n
-    m = sys.m
-    name = sys.name
-    state_labels, state_units = sys.state.labels, sys.state.units
-    input_labels, input_units = sys.get_all_input_labels_and_units()
+    if not isinstance(diagram, DiagramSystem):
+        return traj
 
-    # Extract the trajectory data
-    t_traj = traj.t
-    x_traj = traj.x
-    u_traj = traj.u
+    # Always compile a fresh NumPy evaluator for signal reconstruction
+    evaluator = diagram.compile(backend="numpy")
 
-    # Compute the number of plots
-    n_plots = n + m
+    times = traj.t
+    n_pts = len(times)
 
-    # Create the figure
-    fig, ax = plt.subplots(
-        n_plots,
-        1,
-        figsize=(10, 2 * n_plots),
-        sharex=True,
-        # dpi=graphical.default_dpi,
-        frameon=True,
-    )
-    fig.canvas.manager.set_window_title("Trajectory for " + name)
-    if n_plots == 1:
-        ax = [ax]
+    # Initialize the internal_signals dict
+    # Maps "sys_id:port_id" -> numpy array of shape (dim, n_pts)
+    internal_signals = {}
+    for sys_id, sys in diagram.subsystems.items():
+        for port_id, port in sys.outputs.items():
+            internal_signals[f"{sys_id}:{port_id}"] = np.zeros((port.dim, n_pts))
 
-    # Plot the signals
-    idx = 0
-    for i in range(n):
-        ax[idx].plot(t_traj, x_traj[i, :], "b")
-        ax[idx].set_ylabel(
-            f"{state_labels[i]}[{state_units[i]}]", fontsize=graphical.default_fontsize
-        )
-        ax[idx].grid()
-        ax[idx].tick_params(labelsize=graphical.default_fontsize)
-        idx += 1
-    for i in range(m):
-        ax[idx].plot(t_traj, u_traj[i, :], "r")
-        ax[idx].set_ylabel(
-            f"{input_labels[i]} {input_units[i]}", fontsize=graphical.default_fontsize
-        )
-        ax[idx].grid()
-        ax[idx].tick_params(labelsize=graphical.default_fontsize)
-        idx += 1
+    # Iterate through each time step and reconstruct signals
+    for i in range(n_pts):
+        t = times[i]
+        x_i = traj.x[:, i]
+        u_i = traj.u[:, i]
 
-    ax[-1].set_xlabel("Time [s]", fontsize=graphical.default_fontsize)
+        step_signals = evaluator.compute_internal_signals_dict(x_i, u_i, t)
+        for key, value in step_signals.items():
+            internal_signals[key][:, i] = value
 
-    # Show the figure
-    plt.show(block=graphical.figure_blocking)
+    traj.internal_signals = internal_signals
+    return traj
 
-    return fig, ax
 
 
 ######################################################################
@@ -113,6 +93,16 @@ class Simulator:
 
         self.solver = self.select_solver(sys, solver)
         self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
+
+        # Auto-compile if the system is a Diagram
+        from minilink.core.diagram import DiagramSystem
+        if isinstance(sys, DiagramSystem):
+            self.evaluator = sys.compile(backend="numpy")
+            if self.verbose:
+                print("System is a Diagram: Auto-compiling for optimized execution.")
+        else:
+            self.evaluator = None
+
 
         if self.verbose:
             print(f"Time steps = {n_steps}, dt={dt} and solver= {self.solver}")
@@ -152,7 +142,7 @@ class Simulator:
             time_vector = np.arange(t0, tf + dt, dt)
 
             if self.verbose:
-                print(f"Automatic dt based on the smallest time constant of the system")
+                print("Automatic dt based on the smallest time constant of the system")
         elif dt is None:
             time_vector = np.linspace(t0, tf, n_steps)
         elif n_steps is None:
@@ -172,6 +162,9 @@ class Simulator:
     ############################################################
     def solve(self, show=False, **solver_args):
 
+        # Refresh the system to reflect changes in parameters
+        self.sys.refresh()
+
         # Local variables names
         sys = self.sys
         times = self.t
@@ -183,10 +176,12 @@ class Simulator:
 
         # Regular ODE system
         if solver == "scipy":
-
             # Define the ODE
             def f(t, x):
+                if self.evaluator:
+                    return self.evaluator.f(x, np.array([]), t)
                 return sys.fsim(t, x)
+
 
             # Solve the ODE
             sol = solve_ivp(
@@ -211,17 +206,20 @@ class Simulator:
 
         # Special need for Euler integration
         elif self.solver == "euler":
-
             t_traj = times
             u_traj = np.zeros((sys.m, n_pts))
             x_traj = np.zeros((sys.n, n_pts))
             x_traj[:, 0] = sys.x0
 
             for i, t in enumerate(times):
-
                 u = sys.get_u_from_input_ports(t)
                 x = x_traj[:, i]
-                dx = sys.f(x, u, t)
+
+                if self.evaluator:
+                    dx = self.evaluator.f(x, u, t)
+                else:
+                    dx = sys.f(x, u, t)
+
 
                 if i < n_pts - 1:
                     dt = times[i + 1] - times[i]
@@ -231,18 +229,23 @@ class Simulator:
                 u_traj[:, i] = u
 
         elif self.solver == "discrete":
-
             t_traj = times
             u_traj = np.zeros((sys.m, n_pts))
             x_traj = np.zeros((sys.n, n_pts))
             x_traj[:, 0] = sys.x0
 
             for i, t in enumerate(times):
-
                 u = sys.get_u_from_input_ports(t)
-                x = x_traj[:, t]
-                x_next = sys.f(x, u, t)
-                x_traj[:, i + 1] = x_next
+                x = x_traj[:, i]
+
+                if self.evaluator:
+                    x_next = self.evaluator.f(x, u, t)
+                else:
+                    x_next = sys.f(x, u, t)
+
+
+                if i < n_pts - 1:
+                    x_traj[:, i + 1] = x_next
 
                 u_traj[:, i] = u
 
@@ -250,6 +253,8 @@ class Simulator:
 
         # Plot the trajectory
         if show:
+            from minilink.graphical.plotting import plot_trajectory
+
             plot_trajectory(sys, traj)
 
         return traj
@@ -257,5 +262,4 @@ class Simulator:
 
 ######################################################################
 if __name__ == "__main__":
-
     pass

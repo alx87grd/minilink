@@ -1,11 +1,10 @@
 import numpy as np
-from framework import System, VectorSignal
-from sources import Source
+
+from minilink.core.framework import System, VectorSignal
 
 
 ######################################################################
 class DiagramSystem(System):
-
     def __init__(self):
 
         self.subsystems = {}  # Nodes
@@ -21,6 +20,9 @@ class DiagramSystem(System):
         self.recompute_input_properties()
 
         self.debug_print = False
+        self.graphe_building_verbose = True
+
+        self.refresh()
 
     ######################################################################
     def add_subsystem(self, sys, sys_id):
@@ -40,7 +42,7 @@ class DiagramSystem(System):
 
         # Compute total number of states
         n = 0
-        state_label = []
+        state_labels = []
         state_units = []
         state_upper_bound = np.array([])
         state_lower_bound = np.array([])
@@ -50,19 +52,18 @@ class DiagramSystem(System):
 
         idx = 0
         for i, (key, sys) in enumerate(self.subsystems.items()):
-
             state_index[key] = (idx, idx + sys.n)
 
             # Update state properties
             n += sys.n
 
             for i in range(sys.n):
-                if sys.state.labels[i] in state_label:
-                    state_label.append(
+                if sys.state.labels[i] in state_labels:
+                    state_labels.append(
                         key + ":" + sys.state.labels[i]
                     )  # Add subsystem id to the label
                 else:
-                    state_label.append(sys.state.labels[i])
+                    state_labels.append(sys.state.labels[i])
             state_units += sys.state.units
             state_upper_bound = np.concatenate(
                 [state_upper_bound, sys.state.upper_bound]
@@ -77,7 +78,7 @@ class DiagramSystem(System):
 
         self.n = n
         self.state = VectorSignal(n, "x")
-        self.state.labels = state_label
+        self.state.labels = state_labels
         self.state.units = state_units
         self.state.upper_bound = state_upper_bound
         self.state.lower_bound = state_lower_bound
@@ -93,19 +94,22 @@ class DiagramSystem(System):
             source_port_id,
         )
 
-        print(
-            "Connected "
-            + source_sys_id
-            + ":"
-            + source_port_id
-            + " to "
-            + target_sys_id
-            + ":"
-            + target_port_id
-        )
+        if self.graphe_building_verbose:
+            print(
+                "Connected "
+                + source_sys_id
+                + ":"
+                + source_port_id
+                + " to "
+                + target_sys_id
+                + ":"
+                + target_port_id
+            )
 
     ######################################################################
-    def connect_new_output_port(self, source_sys_id, source_port_id, output_port_id):
+    def connect_new_output_port(
+        self, source_sys_id, source_port_id, output_port_id, dependencies="all"
+    ):
 
         port = self.subsystems[source_sys_id].outputs[source_port_id]
 
@@ -115,7 +119,7 @@ class DiagramSystem(System):
                 x, u, t, source_sys_id, source_port_id
             )
 
-        self.add_output_port(port.dim, output_port_id, compute)
+        self.add_output_port(port.dim, output_port_id, compute, dependencies)
 
         if "output" not in self.connections:
             self.connections["output"] = {}  # Create the output dictionary
@@ -124,78 +128,9 @@ class DiagramSystem(System):
 
     ######################################################################
     def get_graphe(self):
+        from minilink.graphical.graphe import get_diagram_graphe
 
-        try:
-            import graphviz
-        except ImportError:
-            print("graphviz is not available, cannot plot the diagram")
-            return None
-
-        g = graphviz.Digraph(self.name, engine="dot")
-        g.attr(rankdir="LR")
-
-        # If diagram has external inputs
-        if not len(self.inputs) == 0:
-
-            # Add input node block
-            # This is a hack to use the get_block_html method
-            input_block = System(0, 0, 0)
-            input_block.name = ""
-            input_block.inputs = {}
-            input_block.outputs = self.inputs
-            g.node(
-                "input",
-                shape="none",
-                label="<" + input_block.get_block_html("Inputs") + ">",
-            )
-
-        # Add subsystems nodes
-        for i, (sys_id, sys) in enumerate(self.subsystems.items()):
-
-            label = f"<{sys.get_block_html(sys_id)}>"
-
-            g.node(
-                sys_id,
-                shape="none",
-                label=label,
-            )
-
-        # If diagram has external outputs
-        if not len(self.outputs) == 0:
-            # Add input node block
-            # This is a hack to use the get_block_html method
-            output_block = System(0, 0, 0)
-            output_block.name = ""
-            output_block.inputs = self.outputs
-            output_block.outputs = {}
-            g.node(
-                "output",
-                shape="none",
-                label="<" + output_block.get_block_html("Outputs") + ">",
-            )
-
-        # Add edges
-        for sys_id, sys in self.subsystems.items():
-            for port_id in sys.inputs:
-
-                edge = self.connections[sys_id][port_id]
-
-                if edge is not None:
-                    g.edge(
-                        edge[0] + ":" + edge[1] + ":e",
-                        sys_id + ":" + port_id + ":w",
-                    )
-
-        # Add edges to the output node
-        if "output" in self.connections:
-            for port_id, edge in self.connections["output"].items():
-                if edge is not None:
-                    g.edge(
-                        edge[0] + ":" + edge[1] + ":e",
-                        "output" + ":" + port_id + ":w",
-                    )
-
-        return g
+        return get_diagram_graphe(self)
 
     ######################################################################
     def get_local_state(self, x, sys_id):
@@ -234,7 +169,7 @@ class DiagramSystem(System):
 
         # Check if the source is an external input of the diagram
         if source_sys_id == "input":
-            # Get the value from the diagram gloabl input vector
+            # Get the value from the diagram global input vector
             port_u = self.get_port_values_from_u(u)[source_port_id]
 
         else:
@@ -254,7 +189,62 @@ class DiagramSystem(System):
         return port_u
 
     ######################################################################
-    def get_local_input(self, x, u, t, sys_id, dependencies=None):
+    def check_algebraic_loops(self):
+        """
+        Detects algebraic loops and returns the topological port execution order.
+
+        Raises
+        ------
+        RuntimeError
+            If an algebraic loop is found (with full cycle path in the message).
+
+        Returns
+        -------
+        list of (sys_id, port_id)
+            Topologically sorted output-port schedule.
+        """
+        from minilink.compile import check_algebraic_loops
+
+        return check_algebraic_loops(self)  # RuntimeError propagates if loop found
+
+    ######################################################################
+    def compile(self, backend="numpy", bind_params=False, verbose=False):
+        """
+        Compiles the diagram into a stateless Evaluator for high-performance simulation.
+
+        Runs algebraic-loop detection internally; raises RuntimeError if a loop is found.
+
+        Parameters
+        ----------
+        backend : str
+            ``'numpy'`` (default) or ``'jax'``.
+        bind_params : bool, optional
+            If ``True``, subsystem ``params`` are deep-copied into the plan at compile
+            time (see :func:`minilink.compile.compile_diagram`). This snapshots only the
+            ``params`` dict, not other subsystem state; see :class:`minilink.core.framework.System`.
+        verbose : bool
+            If ``True``, print timed compilation steps.
+
+        Returns
+        -------
+        NumpyDiagramEvaluator or JaxDiagramEvaluator
+        """
+        from minilink.compile import compile_diagram
+
+        return compile_diagram(
+            self, backend=backend, bind_params=bind_params, verbose=verbose
+        )
+
+    ######################################################################
+    def refresh(self):
+        """
+        Refresh all subsystems and rebuild the compiled execution plan.
+        """
+        for _, sys in self.subsystems.items():
+            sys.refresh()
+
+    ######################################################################
+    def get_local_input(self, x, u, t, sys_id, dependencies="all"):
         """
         Get the input signal for a given subsystem
 
@@ -274,23 +264,25 @@ class DiagramSystem(System):
 
         sys = self.subsystems[sys_id]
 
-        local_u = np.array([])
+        local_u_list = []
 
         # For all input ports of the subsystem
         for port_id, port in sys.inputs.items():
-
             # Check if the output port requires getting the signal from the input ports
             # If not required, the u vector is filled with nominal values
-            if dependencies != None and port_id not in dependencies:
+            if dependencies != "all" and port_id not in dependencies:
                 port_u = port.get_signal(t)  # Nominal value
 
             else:
                 # Recursively get the input signal
                 port_u = self.get_subsys_input_port(x, u, t, sys_id, port_id)
 
-            local_u = np.concatenate([local_u, port_u])
+            local_u_list.append(port_u)
 
-        return local_u
+        if len(local_u_list) == 0:
+            return np.array([])
+
+        return np.concatenate(local_u_list)
 
     ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
@@ -301,10 +293,8 @@ class DiagramSystem(System):
 
         # For all subsystems
         for sys_id, sys in self.subsystems.items():
-
             # If the subsystem has states
             if sys.n > 0:
-
                 # Get local input signals of the subsystem
                 sys_u = self.get_local_input(x, u, t, sys_id)
 
@@ -313,7 +303,7 @@ class DiagramSystem(System):
 
                 # Compute local state derivative
                 if self.debug_print:
-                    print(f"Comuting {sys_id} dynamic: dx=f({sys_x},{sys_u},{t})")
+                    print(f"Computing {sys_id} dynamic: dx=f({sys_x},{sys_u},{t})")
 
                 sys_dx = sys.f(sys_x, sys_u, t)
 
@@ -322,8 +312,31 @@ class DiagramSystem(System):
 
         return dx
 
+    ######################################################################
+    # Graphical Animation Engine Defaults for Diagram
+    ######################################################################
+    def get_kinematic_geometry(self):
+        primitives = []
+        for sys_id, sys in self.subsystems.items():
+            primitives.extend(sys.get_kinematic_geometry())
+        return primitives
+
+    def get_kinematic_transforms(self, x, u, t):
+        transforms = []
+        for sys_id, sys in self.subsystems.items():
+            # Get the input values for this specific subsystem at this time
+            if sys.n > 0:
+                local_u = self.get_local_input(x, u, t, sys_id)
+                local_x = self.get_local_state(x, sys_id)
+            else:
+                # If static, it may only need u evaluated.
+                local_u = self.get_local_input(x, u, t, sys_id)
+                local_x = np.array([])
+
+            transforms.extend(sys.get_kinematic_transforms(local_x, local_u, t))
+        return transforms
+
 
 ######################################################################
 if __name__ == "__main__":
-
     diagram = DiagramSystem()

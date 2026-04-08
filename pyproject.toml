@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "minilink"
+dynamic = ["version"]
+description = "A block-diagram simulation framework built in Python"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "graphviz",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+visualization = [
+    "meshcat",
+    "pygame",
+]
+symbolic = [
+    "sympy>=1.12",
+]
+jax = [
+    "jax>=0.4.28",
+    "jaxlib>=0.4.28",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+exclude = [
+    "minilink/_version.py",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests/unittest",
+]
+pythonpath = "."
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "minilink/_version.py"
