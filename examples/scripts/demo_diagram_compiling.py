@@ -95,11 +95,11 @@ u = np.array([])
 
 f_baseline = diagram.f
 
-evaluator_numpy = diagram.compile()
-f_compiled_numpy = evaluator_numpy.compute_dx
-evaluator_jax = diagram.compile(backend="jax")
-f_compiled_jax = evaluator_jax.compute_dx
-f_compiled_jax_jit = evaluator_jax.get_jit_compute_dx()
+evaluator_numpy = diagram.compile(verbose=True)
+f_compiled_numpy = evaluator_numpy.f
+evaluator_jax = diagram.compile(backend="jax", verbose=True)
+f_compiled_jax = evaluator_jax.f
+f_compiled_jax_jit = evaluator_jax.get_f_jit()
 
 dx_baseline = f_baseline(x, u)
 dx_compiled_numpy = f_compiled_numpy(x, u)

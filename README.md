@@ -15,8 +15,11 @@
 ## 🚀 Quick Start
 
 ```python
-import numpy as np
-from minilink import DiagramSystem, Integrator, Step, Simulator
+from minilink.blocks.basic import Integrator
+from minilink.blocks.sources import Step
+from minilink.core.analysis import Simulator
+from minilink.core.diagram import DiagramSystem
+from minilink.graphical.plotting import plot_trajectory
 
 # 1. Assemble a simple integrator system
 diagram = DiagramSystem()
@@ -29,7 +32,7 @@ diagram.connect("source", "y", "plant", "u")
 # 3. Simulate and analyze
 sim = Simulator(diagram)
 traj = sim.solve(tf=10)
-traj.plot_trajectory()
+plot_trajectory(diagram, traj)  # or sim.solve(tf=10, show=True)
 ```
 
 ## 🛠 Tech Stack

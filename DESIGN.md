@@ -39,6 +39,7 @@
 ### System Hierarchy
 
 -   **`System`**: Base class. Holds states, inputs, outputs, and solver hints. Defines `f(x,u,t)` and `h(x,u,t)`.
+-   **User dynamics are not purity-checked:** Python cannot enforce that `f`, `h`, or port `compute` avoid mutating `self` or reading hidden mutable state. The intended contract is documented on `System`; `bind_params=True` only deep-copies the `params` dict into the compiled plan, not arbitrary instance fields. JAX tracing can surface some impure patterns but is not a full guarantee.
 -   **`StaticSystem(System)`**: Pure feedthrough blocks (`n=0`).
 -   **`DynamicSystem(System)`**: Systems with state (`n>0`).
 -   **`DiagramSystem(System)`**: Composite system. Supports `compile()` for flattened execution plans.
@@ -50,6 +51,46 @@
 1.  **`DiagramSystem.compile()`**: Runs DFS-based algebraic-loop detection and builds the execution plan.
 2.  **`f_fast(x,u,t)`**: Iterates over a flat execution plan using array slices to avoid dictionary traversals.
 3.  **`DiagramIR`**: (MVP) Snapshot of the execution plan for multi-backend execution (NumPy, JAX).
+
+### 4.1 Parameters vs compilation (default, bound, explicit vector)
+
+Evaluators call ``f(local_x, local_u, t, params)`` and port ``compute(local_x, local_u, t, params)``. The fourth argument is ``op.bound_params`` from the :class:`~minilink.compile.execution_plan.ExecutionPlan`: ``None`` means blocks use ``params or self.params`` (live ``subsystem.params``); if you change ``params`` after ``compile()`` without ``bind_params``, the next ``compute_dx`` reflects that without recompiling.
+
+- **`compile_diagram(..., bind_params=True)`** (and ``DiagramSystem.compile(..., bind_params=True)``): each ``PortOperation`` / ``StateOperation`` stores a **deep copy** of that subsystem's ``params`` in ``bound_params`` and passes it on every evaluation. Mutating ``subsystem.params`` later does **not** change behavior until you compile again.
+
+- **Explicit parameter vector** (planned): a separate entry point (e.g. ``compile_diagram_parameterized`` in a future ``minilink.compile.parameterized`` module) would build a flat vector ``p`` and a ``DiagramParameterLayout`` (subsystem id, key, slice, shape). The compiler would produce a plan whose operations are ``(x, u, t, p) → …`` so **JAX can differentiate w.r.t. ``p``**, reusing ``build_execution_plan`` for topology and gather recipes, then transforming the plan; the base ``ExecutionPlan`` builder would stay free of parameter-layout logic. Today, dict ``params`` as JAX pytrees cover most autodiff use cases via the parametric tier on leaf evaluators.
+
+### 4.2 `DynamicsEvaluator` — Public compiled API
+
+All compiled evaluators inherit from the `DynamicsEvaluator` ABC ([`minilink/compile/evaluator.py`](minilink/compile/evaluator.py)). It provides a **three-tier** callable API matching standard math notation:
+
+| Tier | Dynamics | Output | What's fixed |
+|------|----------|--------|--------------|
+| **Standard** | `f(x, u, t)` | `h(x, u, t)` | params frozen at compile time |
+| **Parametric** | `f_p(x, u, t, params)` | `h_p(x, u, t, params)` | nothing — caller supplies params dict |
+| **IVP** | `f_ivp(x, t)` | `h_ivp(x, t)` | u + params both frozen |
+
+Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of all output ports.
+
+**Leaf system backends** (single `System`, non-diagram):
+- `NumpyLeafEvaluator` — wraps `System.f`/`System.h` with frozen params + nominal u snapshot.
+- `JaxLeafEvaluator` — same, with core methods pre-JIT-compiled and warm-started at construction.
+
+**Entry point**: `compile(system, backend="numpy"|"jax")` → returns a `DynamicsEvaluator`.
+
+**Parameter handling**: params are Python `dict` at all tiers. JAX handles dicts natively as pytrees — no flat parameter vector needed. `jax.grad`, `jax.jacobian`, `vmap` all preserve dict structure.
+
+**Scipy bridge**: `as_scipy_rhs()` → `(t, x) -> dx` using the IVP tier.
+
+**Future**: Integration utilities (`rk4_step`, `rollout`), differentiation (`jacobian_f_x`, `linearize`), and batch simulation (`vmap_rollout`) are defined in the ABC as `NotImplementedError` stubs, to be implemented incrementally.
+
+### 4.3 Diagram compilation pipeline
+
+The diagram evaluators (`NumpyDiagramEvaluator`, `JaxDiagramEvaluator`) inherit from `DynamicsEvaluator`. Only `f(x, u, t)` maps to the ABC; `h`, `outputs`, and the parametric tier raise `NotImplementedError` (diagrams don't have a single primary output, and per-subsystem params dispatch requires `sys_id` on operations — deferred).
+
+Diagram-specific methods are preserved: `compute_outputs(x, u, t, ports)` for port-filtered output selection, `compute_internal_signals_dict(x, u, t)` for all internal subsystem port signals as a dict, and `compute_internal_signals(x, u, t)` for the raw flat signal buffer.
+
+`build_execution_plan` stays focused on topology, slices, and gather recipes. `bind_params=True` deep-copies subsystem params into each operation; `bind_params=False` passes `None` so blocks use live `self.params`.
 
 ### JAX Compilation Vision
 Future performance scales via JAX (XLA) by breaking the Python GIL:
@@ -64,7 +105,7 @@ Future performance scales via JAX (XLA) by breaking the Python GIL:
 Following these naming schemes ensures consistency and readability across the codebase.
 
 ### General Standards
-- **Python Version**: **3.10+** (LTS stable). Use modern syntax like `|` for unions and structural pattern matching.
+- **Python Version**: **3.9+** TDB, not yet fully chosen.
 - **Type Hinting**: **Uniform & Mandatory**. All functions and methods must have clear type hints.
 - **Docstrings**: **NumPy Style**. Required for all public classes and methods.
 

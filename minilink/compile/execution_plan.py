@@ -7,8 +7,8 @@ in an immutable and flattened form, all the information needed to evaluate a
 or recursive calls.
 
 The plan is consumed by evaluator backends
-(:class:`~minilink.compile.numpy_backend.NumpyEvaluator`,
-:class:`~minilink.compile.jax_backend.JaxEvaluator`) which walk through the
+(:class:`~minilink.compile.numpy_evaluator.NumpyDiagramEvaluator`,
+:class:`~minilink.compile.jax_evaluator.JaxDiagramEvaluator`) which walk through the
 operation lists in topological order to compute state derivatives and outputs.
 """
 
@@ -47,10 +47,10 @@ class PortOperation:
 
     Attributes
     ----------
-    compute_func : Callable[[np.ndarray, np.ndarray, float], np.ndarray]
-        The port's compute function ``h(x, u, t) → y``.
-        This is a direct reference to the original subsystem method
-        (e.g., ``controller.ctl``).
+    compute_func : Callable[..., np.ndarray]
+        The port's compute function ``(x, u, t, params) → y``.
+        ``params`` may be ``None`` (use live ``self.params`` in the block) or a
+        bound snapshot when ``bind_params=True`` at compile time.
     local_x_slice : slice
         Index slice into the global state vector ``x`` that extracts this
         subsystem's local state.  For static systems (``n = 0``): ``slice(0, 0)``.
@@ -72,13 +72,20 @@ class PortOperation:
     u_dim : int
         Total dimension of the assembled local input vector.
         Equal to the sum of all ``dim`` values in ``gather_sources``.
+    bound_params : dict | None
+        If set, a deep copy of the subsystem ``params`` at compile time; passed
+        as the fourth argument to ``compute_func``. If ``None``, evaluators pass
+        ``None`` so blocks use ``params or self.params``. This does not freeze
+        other instance attributes; purity of ``compute_func`` is not enforced.
     """
 
-    compute_func: Callable[[np.ndarray, np.ndarray, float], np.ndarray]
+    compute_func: Callable[..., np.ndarray]
     local_x_slice: slice
     gather_sources: tuple[tuple[int, Any, int], ...]
     out_slice: slice
     u_dim: int
+    bound_params: dict | None = None
+    label: str = ""
 
 
 @dataclass(frozen=True)
@@ -91,8 +98,9 @@ class StateOperation:
 
     Attributes
     ----------
-    f_func : Callable[[np.ndarray, np.ndarray, float], np.ndarray]
-        The subsystem's state-derivative function ``f(x, u, t) → dx``.
+    f_func : Callable[..., np.ndarray]
+        The subsystem's state-derivative function ``(x, u, t, params) → dx``.
+        ``params`` may be ``None`` or a bound snapshot (see :attr:`bound_params`).
     local_x_slice : slice
         Index slice into the global state vector ``x`` and derivative vector
         ``dx`` for this subsystem's local state.
@@ -102,12 +110,17 @@ class StateOperation:
         function always needs **all** inputs (no dependency filtering).
     u_dim : int
         Total dimension of the assembled local input vector.
+    bound_params : dict | None
+        Same semantics as :attr:`PortOperation.bound_params` for ``f_func``
+        (``params`` dict snapshot only; see :class:`minilink.core.framework.System`).
     """
 
-    f_func: Callable[[np.ndarray, np.ndarray, float], np.ndarray]
+    f_func: Callable[..., np.ndarray]
     local_x_slice: slice
     gather_sources: tuple[tuple[int, Any, int], ...]
     u_dim: int
+    bound_params: dict | None = None
+    label: str = ""
 
 
 # ── Execution plan ───────────────────────────────────────────────────

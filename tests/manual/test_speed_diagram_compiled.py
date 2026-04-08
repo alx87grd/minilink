@@ -152,10 +152,10 @@ def benchmark_all_backends(diag, iters=100, label="Network"):
 
     # ── 2. NumpyEvaluator ────────────────────────────────────────────
     np_evaluator = diag.compile(backend="numpy")
-    np_evaluator.compute_dx(x_np, u_np, t)  # warmup
+    np_evaluator.f(x_np, u_np, t)  # warmup
     start = time.time()
     for _ in range(iters):
-        dx_np = np_evaluator.compute_dx(x_np, u_np, t)
+        dx_np = np_evaluator.f(x_np, u_np, t)
     results["numpy"] = time.time() - start
     print(f"  NumpyEvaluator         ({iters} iters): {results['numpy']:.5f} s")
 
@@ -169,7 +169,7 @@ def benchmark_all_backends(diag, iters=100, label="Network"):
         u_jax = jnp.array(u_np)
 
         jax_evaluator = diag.compile(backend="jax")
-        jit_compute_dx = jax_evaluator.get_jit_compute_dx()
+        jit_compute_dx = jax_evaluator.get_f_jit()
 
         # Warmup (triggers XLA compile)
         # jax_evaluator.compute_dx(x_jax, u_jax, t).block_until_ready()

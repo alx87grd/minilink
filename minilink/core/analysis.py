@@ -179,7 +179,7 @@ class Simulator:
             # Define the ODE
             def f(t, x):
                 if self.evaluator:
-                    return self.evaluator.compute_dx(x, np.array([]), t)
+                    return self.evaluator.f(x, np.array([]), t)
                 return sys.fsim(t, x)
 
 
@@ -216,7 +216,7 @@ class Simulator:
                 x = x_traj[:, i]
 
                 if self.evaluator:
-                    dx = self.evaluator.compute_dx(x, u, t)
+                    dx = self.evaluator.f(x, u, t)
                 else:
                     dx = sys.f(x, u, t)
 
@@ -239,7 +239,7 @@ class Simulator:
                 x = x_traj[:, i]
 
                 if self.evaluator:
-                    x_next = self.evaluator.compute_dx(x, u, t)
+                    x_next = self.evaluator.f(x, u, t)
                 else:
                     x_next = sys.f(x, u, t)
 

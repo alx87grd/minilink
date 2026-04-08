@@ -53,6 +53,12 @@ output/
 *.gv
 
 
+# Claude Code #
+.claude/
+
+# Matplotlib (e.g. MPLCONFIGDIR in repo or sandbox)
+.mpl/
+
 # Editor Config #
 .vscode/
 .spyproject/

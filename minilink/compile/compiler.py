@@ -19,6 +19,8 @@ This module provides the complete compilation pipeline:
 
 from __future__ import annotations
 
+import copy
+import time
 from typing import TYPE_CHECKING
 
 from minilink.compile.execution_plan import (
@@ -34,37 +36,41 @@ if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
 
-# ── Public API ───────────────────────────────────────────────────────
+# ── Public API ──────────────────���────────────────────────────────────
 
 
-def compile_diagram(diagram: DiagramSystem, backend: str = "numpy"):
-    """Compile a DiagramSystem into a backend evaluator.
+def compile(system, backend="numpy", verbose=False):
+    """Compile a System into a :class:`DynamicsEvaluator`.
+
+    For leaf systems (non-diagram), wraps ``f``/``h`` with frozen params
+    and nominal u snapshot, providing the full evaluator API (RK4, rollout,
+    linearize, etc.).
+
+    For diagrams, delegates to :func:`compile_diagram`.
 
     Parameters
     ----------
-    diagram : DiagramSystem
-        The wired diagram to compile.
+    system : System or DiagramSystem
+        The system to compile.
     backend : str
         ``'numpy'`` or ``'jax'``.
+    verbose : bool
+        If ``True``, print timed compilation steps.
 
     Returns
     -------
-    NumpyEvaluator or JaxEvaluator
-        A stateless evaluator that can compute state derivatives and outputs.
-
-    Examples
-    --------
-    >>> from minilink.compile import compile_diagram
-    >>> evaluator = compile_diagram(diagram)
-    >>> dx = evaluator.compute_dx(x, u, t)
+    DynamicsEvaluator
     """
-    plan = build_execution_plan(diagram)
+    from minilink.core.diagram import DiagramSystem
+
+    if isinstance(system, DiagramSystem):
+        return compile_diagram(system, backend=backend, verbose=verbose)
 
     key = backend.strip().lower()
     if key == "numpy":
-        from minilink.compile.numpy_backend import NumpyEvaluator
+        from minilink.compile.numpy_evaluator import NumpyLeafEvaluator
 
-        return NumpyEvaluator(plan)
+        return NumpyLeafEvaluator(system)
     elif key == "jax":
         try:
             import jax  # noqa: F401
@@ -73,14 +79,113 @@ def compile_diagram(diagram: DiagramSystem, backend: str = "numpy"):
                 "JAX is required for the 'jax' backend. "
                 "Install with: pip install jax jaxlib"
             )
-        from minilink.compile.jax_backend import JaxEvaluator
+        from minilink.compile.jax_evaluator import JaxLeafEvaluator
 
-        return JaxEvaluator(plan)
+        t_total = time.perf_counter()
+        evaluator = JaxLeafEvaluator(system, verbose=verbose)
+        if verbose:
+            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+        return evaluator
     else:
         raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
 
 
-def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
+def compile_diagram(
+    diagram: DiagramSystem,
+    backend: str = "numpy",
+    *,
+    bind_params: bool = False,
+    verbose: bool = False,
+):
+    """Compile a DiagramSystem into a backend evaluator.
+
+    Parameters
+    ----------
+    diagram : DiagramSystem
+        The wired diagram to compile.
+    backend : str
+        ``'numpy'`` or ``'jax'``.
+    bind_params : bool, optional
+        If ``True``, each plan operation stores a deep copy of that subsystem's
+        ``params`` and evaluators pass it into ``f`` / port ``compute``. If
+        ``False`` (default), ``None`` is passed and blocks use live ``self.params``.
+    verbose : bool
+        If ``True``, print timed compilation steps.
+
+    Returns
+    -------
+    NumpyDiagramEvaluator or JaxDiagramEvaluator
+        A stateless evaluator that can compute state derivatives and outputs.
+
+    Examples
+    --------
+    >>> from minilink.compile import compile_diagram
+    >>> evaluator = compile_diagram(diagram)
+    >>> dx = evaluator.f(x, u, t)
+
+    Notes
+    -----
+    ``bind_params=True`` snapshots only each subsystem's ``params`` dict into the plan.
+    It does **not** make user ``f`` / port ``compute`` implementations pure if they still
+    read or mutate other instance state; see :class:`minilink.core.framework.System`.
+    """
+    t_total = time.perf_counter() if verbose else None
+
+    # --- Step 1: Algebraic loop detection --------------------------------
+    if verbose:
+        t0 = time.perf_counter()
+        print("[compile] Step 1: Checking for algebraic loops...", end="",
+              flush=True)
+
+    port_execution_order = check_algebraic_loops(diagram)
+
+    if verbose:
+        print(f"  ({time.perf_counter() - t0:.3f}s)")
+
+    # --- Step 2: Build execution plan ------------------------------------
+    if verbose:
+        t0 = time.perf_counter()
+        n_ports = len(port_execution_order)
+        n_states = sum(1 for s in diagram.subsystems.values() if s.n > 0)
+        print(f"[compile] Step 2: Building execution plan "
+              f"({n_ports} ports, {n_states} states)...", end="", flush=True)
+
+    plan = _build_execution_plan_from_order(
+        diagram, port_execution_order, bind_params=bind_params
+    )
+
+    if verbose:
+        print(f"  ({time.perf_counter() - t0:.3f}s)")
+
+    # --- Create evaluator (steps 0, 3, 4 handled inside for JAX) ---------
+    key = backend.strip().lower()
+    if key == "numpy":
+        from minilink.compile.numpy_evaluator import NumpyDiagramEvaluator
+
+        evaluator = NumpyDiagramEvaluator(plan, diagram)
+    elif key == "jax":
+        try:
+            import jax  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "JAX is required for the 'jax' backend. "
+                "Install with: pip install jax jaxlib"
+            )
+        from minilink.compile.jax_evaluator import JaxDiagramEvaluator
+
+        evaluator = JaxDiagramEvaluator(plan, diagram, verbose=verbose)
+    else:
+        raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
+
+    if verbose:
+        print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+
+    return evaluator
+
+
+def build_execution_plan(
+    diagram: DiagramSystem, *, bind_params: bool = False
+) -> ExecutionPlan:
     """Build an immutable ExecutionPlan from a DiagramSystem.
 
     This is the core compilation step.  It:
@@ -93,13 +198,33 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
     ----------
     diagram : DiagramSystem
         Must have subsystems added and connections wired.
+    bind_params : bool, optional
+        When ``True``, set :attr:`~minilink.compile.execution_plan.PortOperation.bound_params`
+        / :attr:`~minilink.compile.execution_plan.StateOperation.bound_params` on each row
+        (deep copy of ``subsystem.params`` only; see :func:`compile_diagram` Notes).
 
     Returns
     -------
     ExecutionPlan
     """
     port_execution_order = check_algebraic_loops(diagram)
+    return _build_execution_plan_from_order(
+        diagram, port_execution_order, bind_params=bind_params
+    )
 
+
+def _build_execution_plan_from_order(
+    diagram: DiagramSystem,
+    port_execution_order: list[tuple[str, str]],
+    *,
+    bind_params: bool = False,
+) -> ExecutionPlan:
+    """Build the execution plan given a pre-computed topological order.
+
+    This is the inner implementation of :func:`build_execution_plan`,
+    split out so that :func:`compile_diagram` can time each step
+    individually.
+    """
     # ── 1. Map all output ports to slices in the flat signal buffer ───
     output_slices: dict[tuple[str, str], slice] = {}
     current_idx = 0
@@ -116,20 +241,16 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
         sys = diagram.subsystems[sys_id]
         port = sys.outputs[port_id]
 
-        # Determine the 'recipe' for gathering all inputs required by this output port
-        # This includes mapping which signals come from global 'u', which from the
-        # internal signal buffer, and which use nominal constant values.
-        # gather_sources: list[tuple[int, object, int]] — list of (source_type, source_val, dim)
-        # u_dim: int — total flattened dimension of the local subsystem input vector 'u'
         gather_sources, u_dim = _build_gather_sources(
             diagram, sys_id, output_slices, dependencies=port.dependencies
         )
 
-        # Pre-calculated index in the flat signal buffer where this port writes its result
         out_slice = output_slices[(sys_id, port_id)]
-
-        # Mapping into the global state vector 'x' for this subsystem's local state
         local_x_slice = _state_slice(diagram, sys_id)
+
+        bound = (
+            copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
+        )
 
         port_ops.append(
             PortOperation(
@@ -138,6 +259,8 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
                 gather_sources=tuple(gather_sources),
                 out_slice=out_slice,
                 u_dim=u_dim,
+                bound_params=bound,
+                label=f"{sys_id}:{port_id}",
             )
         )
 
@@ -149,12 +272,17 @@ def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
                 diagram, sys_id, output_slices, dependencies="all"
             )
             local_x_slice = _state_slice(diagram, sys_id)
+            bound = (
+                copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
+            )
             state_ops.append(
                 StateOperation(
                     f_func=sys.f,
                     local_x_slice=local_x_slice,
                     gather_sources=tuple(gather_sources),
                     u_dim=u_dim,
+                    bound_params=bound,
+                    label=sys_id,
                 )
             )
 

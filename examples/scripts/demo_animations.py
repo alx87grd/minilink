@@ -12,10 +12,10 @@ sys.x0[0] = 2.0
 sys.compute_trajectory(tf=10)
 
 
-sys.animate()
+# sys.animate()
 # sys.animate(renderer="meshcat")
 # sys.animate(renderer="pygame")
 
-sys.x0[0] = -1.0
-sys.compute_trajectory(tf=10)
-sys.animate(renderer="meshcat")
+# sys.x0[0] = -1.0
+# sys.compute_trajectory(tf=10)
+# sys.animate(renderer="meshcat")

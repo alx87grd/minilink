@@ -1,18 +1,22 @@
 """
-NumPy evaluation backend for compiled diagrams.
+NumPy evaluation backends for compiled systems.
 
-Provides :class:`NumpyEvaluator`, a stateless evaluator that uses pure NumPy
-to compute state derivatives and output signals from an
-:class:`~minilink.compile.execution_plan.ExecutionPlan`.
+Provides two evaluators:
 
-Each call allocates its own signal buffer, so this evaluator is **thread-safe**
-(concurrent calls do not share mutable state).
+- :class:`NumpyLeafEvaluator` — for a single (non-diagram) System.
+- :class:`NumpyDiagramEvaluator` — for a compiled DiagramSystem.
+
+Both inherit from :class:`~minilink.compile.evaluator.DynamicsEvaluator`.
 """
 
 from __future__ import annotations
 
+import copy
+from typing import Any, Callable
+
 import numpy as np
 
+from minilink.compile.evaluator import DynamicsEvaluator
 from minilink.compile.execution_plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
@@ -21,7 +25,62 @@ from minilink.compile.execution_plan import (
 )
 
 
-# ── Shared helper ────────────────────────────────────────────────────
+# =====================================================================
+# Leaf evaluator
+# =====================================================================
+
+
+class NumpyLeafEvaluator(DynamicsEvaluator):
+    """Compiled evaluator for a single System using NumPy.
+
+    Parameters
+    ----------
+    system : System
+        The system to wrap.  Its ``params`` are deep-copied at construction
+        (frozen), and nominal input port values are snapshotted.
+    """
+
+    def __init__(self, system):
+        self.n = system.n
+        self.m = system.m
+        self.p = system.p
+        self.backend = "numpy"
+        self._system = system
+        self._frozen_params = copy.deepcopy(system.params)
+        self._u_nominal = np.copy(system.get_u_from_input_ports(0))
+
+    # -- Standard tier (frozen params) ------------------------------------
+
+    def f(self, x, u, t=0.0):
+        return self._system.f(x, u, t, self._frozen_params)
+
+    def h(self, x, u, t=0.0):
+        return self._system.h(x, u, t, self._frozen_params)
+
+    def outputs(self, x, u, t=0.0):
+        result = {}
+        for port_id, port in self._system.outputs.items():
+            result[port_id] = port.compute(x, u, t, self._frozen_params)
+        return result
+
+    # -- Parametric tier (caller-supplied params) -------------------------
+
+    def f_p(self, x, u, t, params):
+        return self._system.f(x, u, t, params)
+
+    def h_p(self, x, u, t, params):
+        return self._system.h(x, u, t, params)
+
+    def outputs_p(self, x, u, t, params):
+        result = {}
+        for port_id, port in self._system.outputs.items():
+            result[port_id] = port.compute(x, u, t, params)
+        return result
+
+
+# =====================================================================
+# Shared helper
+# =====================================================================
 
 
 def _gather_u(
@@ -31,9 +90,6 @@ def _gather_u(
     u: np.ndarray,
 ) -> np.ndarray:
     """Assemble the local input vector from pre-mapped sources.
-
-    This is THE single implementation of the signal-gathering dispatch
-    that was previously copy-pasted across the codebase.
 
     Parameters
     ----------
@@ -69,37 +125,47 @@ def _gather_u(
     return local_u
 
 
-# ── Evaluator ────────────────────────────────────────────────────────
+# =====================================================================
+# Diagram evaluator
+# =====================================================================
 
 
-class NumpyEvaluator:
+class NumpyDiagramEvaluator(DynamicsEvaluator):
     """Stateless NumPy evaluator for a compiled diagram.
 
-    All public methods allocate a fresh signal buffer per call, making
-    concurrent evaluation safe.
+    Inherits from :class:`DynamicsEvaluator`.  Only ``f`` is mapped to the
+    ABC interface; ``h`` / ``outputs`` and the parametric tier raise
+    ``NotImplementedError``.  Use diagram-specific methods
+    (``compute_outputs``, ``compute_internal_signals``,
+    ``compute_internal_signals_dict``) for port-level access.
 
     Parameters
     ----------
     plan : ExecutionPlan
         The immutable execution schedule produced by
         :func:`~minilink.compile.compiler.build_execution_plan`.
+    diagram : DiagramSystem
+        The source diagram (used only to snapshot ``m`` and ``_u_nominal``).
 
     Examples
     --------
-    >>> from minilink.compile import compile_diagram
     >>> evaluator = compile_diagram(diagram, backend="numpy")
-    >>> dx = evaluator.compute_dx(x, u, t)
+    >>> dx = evaluator.f(x, u, t)
     >>> y  = evaluator.compute_outputs(x, u, t, ports=[("plant", "y")])
     """
 
-    def __init__(self, plan: ExecutionPlan):
+    def __init__(self, plan: ExecutionPlan, diagram):
         self.plan = plan
+        self.n = plan.state_dim
+        self.m = diagram.m
+        self.p = plan.signal_dim
+        self.backend = "numpy"
+        self._frozen_params = None  # per-op binding, not diagram-level
+        self._u_nominal = np.copy(diagram.get_u_from_input_ports(0))
 
-    # ── Public interface ─────────────────────────────────────────────
+    # ── ABC: Standard tier ──────────────────────────────────────────
 
-    def compute_dx(
-        self, x: np.ndarray, u: np.ndarray, t: float = 0.0
-    ) -> np.ndarray:
+    def f(self, x: np.ndarray, u: np.ndarray, t: float = 0.0) -> np.ndarray:
         """Compute the diagram's state derivative vector.
 
         Parameters
@@ -122,8 +188,32 @@ class NumpyEvaluator:
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
             local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
-            dx[op.local_x_slice] = op.f_func(local_x, local_u, t)
+            dx[op.local_x_slice] = op.f_func(local_x, local_u, t, op.bound_params)
         return dx
+
+    def h(self, x, u, t=0.0):
+        raise NotImplementedError(
+            "Diagram h() not supported. Use compute_outputs() for port-level access."
+        )
+
+    def outputs(self, x, u, t=0.0):
+        raise NotImplementedError(
+            "Diagram outputs() not supported. "
+            "Use compute_outputs() or compute_internal_signals_dict()."
+        )
+
+    # ── ABC: Parametric tier ────────────────────────────────────────
+
+    def f_p(self, x, u, t, params):
+        raise NotImplementedError("Parametric tier not supported for diagrams yet.")
+
+    def h_p(self, x, u, t, params):
+        raise NotImplementedError("Parametric tier not supported for diagrams yet.")
+
+    def outputs_p(self, x, u, t, params):
+        raise NotImplementedError("Parametric tier not supported for diagrams yet.")
+
+    # ── Diagram-specific methods ────────────────────────────────────
 
     def compute_outputs(
         self,
@@ -196,8 +286,7 @@ class NumpyEvaluator:
             for (sys_id, port_id), sl in self.plan.output_slices.items()
         }
 
-
-    # ── Private ──────────────────────────────────────────────────────
+    # ── Private ─────────────────────────────────────────────────────
 
     def _compute_port_signals(
         self, x: np.ndarray, u: np.ndarray, t: float
@@ -210,5 +299,7 @@ class NumpyEvaluator:
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
             local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
-            signals[op.out_slice] = op.compute_func(local_x, local_u, t)
+            signals[op.out_slice] = op.compute_func(
+                local_x, local_u, t, op.bound_params
+            )
         return signals

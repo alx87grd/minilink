@@ -105,7 +105,8 @@ class OutputPort(VectorSignal):
     ----------
     compute : callable
         The function used to compute the signal value based on the inputs, state, time, and parameters.
-        Signature: `compute(x, u, t, param) -> np.ndarray`
+        Signature: ``compute(x, u, t, params=None) -> np.ndarray``.
+        Purity is not enforced by the framework (same contract as :meth:`System.f`).
     dependencies : list of str, tuple, or "all"
         The list of `InputPort` IDs that this output directly depends on for immediate feedthrough.
         - `"all"`: depends on all inputs of the system (safest, but can create false algebraic loops in MIMO systems).
@@ -126,7 +127,7 @@ class OutputPort(VectorSignal):
         self.dependencies = dependencies
 
     ##############################################
-    def default_function(self, x=None, u=None, t=0, param=None) -> np.ndarray:
+    def default_function(self, x=None, u=None, t=0, params=None) -> np.ndarray:
         """
         Default compute function returning the nominal value.
 
@@ -138,7 +139,7 @@ class OutputPort(VectorSignal):
             The input vector of the system.
         t : float, optional
             The current time.
-        param : dict, optional
+        params : dict, optional
             A dictionary of system parameters.
 
         Returns
@@ -157,6 +158,12 @@ class System:
     A System represents a mathematical block with `n` states, `m` inputs (from `InputPort`s),
     and `p` outputs (to `OutputPort`s). It provides methods for state derivatives (`f`)
     and outputs (`h`), which are meant to be overridden by subclasses.
+
+    Notes on dynamics and purity
+    ------------------------------
+    Python cannot enforce that overridden ``f`` / ``h`` (or port ``compute`` callables) are
+    *pure* (no mutation of ``self``, no reliance on hidden mutable instance state, no I/O).
+    The framework **documents a contract** only: all time-varying information should be in ``x`` and ``u``, and avoid mutating ``self`` inside ``f`` / ``h``.
     """
 
     def __init__(self, n=0, m=0, p=1):
@@ -221,6 +228,9 @@ class System:
         """
         Compute the state derivative `dx/dt`.
 
+        Subclasses should treat this as a function of ``(x, u, t, params)`` only; the
+        framework does not verify purity (see :class:`System` class docstring).
+
         Parameters
         ----------
         x : np.ndarray
@@ -244,6 +254,8 @@ class System:
     def h(self, x, u, t=0, params=None) -> np.ndarray:
         """
         Compute the output `y`.
+
+        Same purity / side-effect contract as :meth:`f` (convention only; not enforced).
 
         Parameters
         ----------
