@@ -602,6 +602,27 @@ class System:
         animator = Animator(self)
         animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
 
+    ######################################################################
+    def compile(self, backend="numpy", verbose=False):
+        """
+        Compile this system into a backend evaluator (lazy import).
+
+        Parameters
+        ----------
+        backend : str, optional
+            ``'numpy'`` (default) or ``'jax'``.
+        verbose : bool, optional
+            If ``True``, print timed compilation steps.
+
+        Returns
+        -------
+        DynamicsEvaluator
+            Compiled evaluator exposing ``f``/``h`` and helper methods.
+        """
+        from minilink.compile import compile as compile_system
+
+        return compile_system(self, backend=backend, verbose=verbose)
+
     def animate(
         self,
         traj=None,

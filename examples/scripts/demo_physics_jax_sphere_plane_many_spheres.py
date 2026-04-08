@@ -10,7 +10,6 @@ import time
 
 import numpy as np
 
-from minilink.compile import compile
 from minilink.physics import PhysicsWorldSystem
 from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
 
@@ -76,8 +75,8 @@ sys.animate(renderer="meshcat")
 x = np.asarray(sys.x0)
 u = np.asarray(sys.get_u_from_input_ports(0.0))
 
-# evaluator = sys.compile(backend="jax", verbose=True)
-evaluator = compile(sys, backend="jax", verbose=False)
+evaluator = sys.compile(backend="jax", verbose=True)
+# evaluator = compile(sys, backend="jax", verbose=False)
 
 n_warm = 10
 n_iter = 500
