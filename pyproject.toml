@@ -25,6 +25,9 @@ visualization = [
     "meshcat",
     "pygame",
 ]
+symbolic = [
+    "sympy>=1.12",
+]
 
 [tool.ruff]
 line-length = 88
