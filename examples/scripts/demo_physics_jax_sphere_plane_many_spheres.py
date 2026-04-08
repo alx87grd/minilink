@@ -60,7 +60,7 @@ evaluator = sys.compile(backend="jax", verbose=True)
 # evaluator = compile(sys, backend="jax", verbose=False)
 
 n_warm = 10
-n_iter = 500
+n_iter = 1000
 for _ in range(n_warm):
     sys.f(x, u, 0.0)
     evaluator.f(x, u, 0.0)
@@ -80,3 +80,19 @@ print(
     f"sys.f (native python):   {1e6 * t_pure / n_iter:.1f} us/call,\n"
     f"evaluator.f (jax jit):   {1e6 * t_compiled / n_iter:.1f} us/call, "
 )
+
+
+# auto-diff
+import jax
+
+u = np.zeros(sys.m)
+t = 0.0
+
+fx = lambda x: evaluator.f(x, u, t)
+
+df_dx_func = jax.jacfwd(fx)
+
+x = np.random.randn(sys.n)
+df_dx = df_dx_func(x)
+
+df_dx

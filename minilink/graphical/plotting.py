@@ -10,13 +10,13 @@ import matplotlib.pyplot as plt
 # Use interactive backend
 try:
     # Default usage for interactive mode
-    matplotlib.use("Qt5Agg")
+    # matplotlib.use("Qt5Agg")
     plt.ion()  # Set interactive mode
 
 except Exception:
     try:
         # For MacOSX
-        matplotlib.use("MacOSX")
+        # matplotlib.use("MacOSX")
         plt.ion()
 
     except Exception:
