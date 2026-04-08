@@ -44,6 +44,40 @@ class Circle(GraphicPrimitive):
         self.fill = fill
 
 
+class Sphere(GraphicPrimitive):
+    """A 3D sphere primitive centered at ``center`` in local frame."""
+
+    def __init__(self, radius=1.0, center=[0, 0, 0], color="blue", opacity=1.0):
+        super().__init__(color)
+        self.radius = radius
+        self.center = np.array(center)
+        self.opacity = opacity
+
+
+class Plane(GraphicPrimitive):
+    """
+    A finite square patch representing a plane: n·x = offset.
+
+    The patch is centered at ``offset * normal`` and spans ``size x size``.
+    """
+
+    def __init__(
+        self,
+        normal=[0, 1, 0],
+        offset=0.0,
+        size=10.0,
+        thickness=0.02,
+        color="lightgray",
+        opacity=0.65,
+    ):
+        super().__init__(color)
+        self.normal = np.array(normal, dtype=float)
+        self.offset = float(offset)
+        self.size = float(size)
+        self.thickness = float(thickness)
+        self.opacity = float(opacity)
+
+
 class Rectangle(GraphicPrimitive):
     """A standard axis-aligned rectangle in local frame (XY plane by default)."""
 

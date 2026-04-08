@@ -261,7 +261,8 @@ class Animator:
     def game(
         self,
         *,
-        dt=1 / 30.0,
+        dt=1 / 100.0,
+        dynamics_substeps=1000,
         renderer="pygame",
         is_3d=False,
         x0=None,
@@ -273,9 +274,14 @@ class Animator:
         Prototype real-time interactive mode.
 
         - Poll keyboard using pygame (input only).
-        - Compute dynamics using Euler integration (dx from ``f`` / ``f_fast``).
+        - Compute dynamics using Euler integration
+          optionally with multiple internal substeps per rendered frame.
         - Update the visualization by redrawing transforms every tick.
         """
+        if dynamics_substeps < 1 or int(dynamics_substeps) != dynamics_substeps:
+            raise ValueError("dynamics_substeps must be a positive integer.")
+        dynamics_substeps = int(dynamics_substeps)
+
         # Lazy pygame import: game() should be optional.
         try:
             import pygame
@@ -344,13 +350,14 @@ class Animator:
             u = self._u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
             self._draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
 
-            # Euler step for dynamic systems only.
+            # Euler steps for dynamic systems only (ZOH on u during frame).
             if self.sys.n > 0:
-                if hasattr(self.sys, "f_fast"):
-                    dx = self.sys.f_fast(x, u, t)
-                else:
-                    dx = self.sys.f(x, u, t)
-                x = x + np.asarray(dx, dtype=float) * dt
+                dt_dyn = dt / dynamics_substeps
+                t_dyn = t
+                for _ in range(dynamics_substeps):
+                    dx = self.sys.f(x, u, t_dyn)
+                    x = x + np.asarray(dx, dtype=float) * dt_dyn
+                    t_dyn += dt_dyn
 
             t = t + dt
             step_idx += 1

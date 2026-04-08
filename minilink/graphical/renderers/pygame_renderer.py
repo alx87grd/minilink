@@ -10,7 +10,9 @@ from minilink.graphical.primitives import (
     Arrow,
     Circle,
     CustomLine,
+    Plane,
     Point,
+    Sphere,
     TorqueArrow,
     extract_amplitude,
 )
@@ -184,6 +186,37 @@ class PygameCanvas:
                     pygame_mod.draw.circle(self.surface, col, (cx, cy), r_px)
                 else:
                     pygame_mod.draw.circle(self.surface, col, (cx, cy), r_px, lw)
+
+        elif isinstance(primitive, Sphere):
+            local_center = np.zeros(3)
+            local_center[: len(primitive.center)] = primitive.center
+            world_center = transform_matrix @ np.append(local_center, 1.0)
+            cx, cy = self._to_screen(world_center[0], world_center[1])
+            r_px = max(1, int(round(float(primitive.radius) * self._world_scale())))
+            pygame_mod.draw.circle(
+                self.surface,
+                _color_to_rgb(primitive.color),
+                (cx, cy),
+                r_px,
+            )
+
+        elif isinstance(primitive, Plane):
+            n = np.asarray(primitive.normal, dtype=float)
+            off = float(primitive.offset)
+            half = 0.5 * float(primitive.size)
+            col = _color_to_rgb(primitive.color)
+            lw = max(1, int(round(max(primitive.linewidth, 2))))
+            if abs(n[1]) > 1e-9:
+                x0, x1 = -half, half
+                y0 = (off - n[0] * x0) / n[1]
+                y1 = (off - n[0] * x1) / n[1]
+                p0 = self._to_screen(x0, y0)
+                p1 = self._to_screen(x1, y1)
+            else:
+                x = off / (n[0] + 1e-12)
+                p0 = self._to_screen(x, -half)
+                p1 = self._to_screen(x, half)
+            pygame_mod.draw.line(self.surface, col, p0, p1, lw)
 
 
 class PygameRenderer(AnimationRenderer):

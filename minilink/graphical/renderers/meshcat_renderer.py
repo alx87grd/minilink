@@ -11,7 +11,9 @@ from minilink.graphical.primitives import (
     Arrow,
     Circle,
     CustomLine,
+    Plane,
     Point,
+    Sphere,
     TorqueArrow,
     extract_amplitude,
 )
@@ -32,6 +34,33 @@ def _import_meshcat():
 def _color_to_meshcat_hex(color) -> int:
     r, g, b = mcolors.to_rgb(color)
     return (int(r * 255) << 16) | (int(g * 255) << 8) | int(b * 255)
+
+
+def _rotation_from_a_to_b(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Return 3x3 rotation matrix mapping unit vector a to unit vector b."""
+    a = a / (np.linalg.norm(a) + 1e-12)
+    b = b / (np.linalg.norm(b) + 1e-12)
+    v = np.cross(a, b)
+    c = float(np.clip(np.dot(a, b), -1.0, 1.0))
+    s = np.linalg.norm(v)
+    if s < 1e-12:
+        if c > 0.0:
+            return np.eye(3)
+        # 180deg: pick any orthogonal axis
+        axis = np.array([1.0, 0.0, 0.0])
+        if abs(a[0]) > 0.9:
+            axis = np.array([0.0, 1.0, 0.0])
+        v = np.cross(a, axis)
+        v = v / (np.linalg.norm(v) + 1e-12)
+        K = np.array(
+            [[0.0, -v[2], v[1]], [v[2], 0.0, -v[0]], [-v[1], v[0], 0.0]],
+            dtype=float,
+        )
+        return np.eye(3) + 2.0 * (K @ K)
+    K = np.array(
+        [[0.0, -v[2], v[1]], [v[2], 0.0, -v[0]], [-v[1], v[0], 0.0]], dtype=float
+    )
+    return np.eye(3) + K + K @ K * ((1.0 - c) / (s * s))
 
 
 class MeshcatCanvas:
@@ -167,18 +196,50 @@ class MeshcatCanvas:
                         g.LineBasicMaterial(color=hex_color, linewidth=lw),
                     )
                 )
-            else:
-                th = np.linspace(0, 2 * np.pi, 50)
-                cx = x + primitive.radius * np.cos(th)
-                cy = y + primitive.radius * np.sin(th)
-                cz = np.full_like(th, z)
-                vertices = np.vstack((cx, cy, cz)).astype(np.float32)
-                path.set_object(
-                    g.LineLoop(
-                        g.PointsGeometry(vertices),
-                        g.LineBasicMaterial(color=hex_color, linewidth=lw),
-                    )
+
+        elif isinstance(primitive, Sphere):
+            local_center = np.zeros(3)
+            local_center[: len(primitive.center)] = primitive.center
+            world_center = (transform_matrix @ np.append(local_center, 1.0))[:3]
+            hex_color = _color_to_meshcat_hex(primitive.color)
+            path.set_object(
+                g.Mesh(
+                    g.Sphere(float(primitive.radius)),
+                    g.MeshLambertMaterial(
+                        color=hex_color,
+                        transparent=primitive.opacity < 0.999,
+                        opacity=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                    ),
                 )
+            )
+            path.set_transform(self._tf.translation_matrix(world_center.tolist()))
+
+        elif isinstance(primitive, Plane):
+            n = np.asarray(primitive.normal, dtype=float)
+            n = n / (np.linalg.norm(n) + 1e-12)
+            center = n * float(primitive.offset)
+            R = _rotation_from_a_to_b(np.array([0.0, 0.0, 1.0]), n)
+            T = np.eye(4, dtype=float)
+            T[:3, :3] = R
+            T[:3, 3] = center
+            hex_color = _color_to_meshcat_hex(primitive.color)
+            path.set_object(
+                g.Mesh(
+                    g.Box(
+                        [
+                            float(primitive.size),
+                            float(primitive.size),
+                            float(max(primitive.thickness, 1e-3)),
+                        ]
+                    ),
+                    g.MeshLambertMaterial(
+                        color=hex_color,
+                        transparent=primitive.opacity < 0.999,
+                        opacity=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                    ),
+                )
+            )
+            path.set_transform(transform_matrix @ T)
 
 
 class MeshcatRenderer(AnimationRenderer):

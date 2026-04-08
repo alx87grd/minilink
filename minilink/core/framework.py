@@ -667,6 +667,7 @@ class System:
         self,
         *,
         dt=1 / 30.0,
+        dynamics_substeps=1,
         renderer="pygame",
         is_3d=False,
         x0=None,
@@ -685,6 +686,7 @@ class System:
         animator = Animator(self)
         return animator.game(
             dt=dt,
+            dynamics_substeps=dynamics_substeps,
             renderer=renderer,
             is_3d=is_3d,
             x0=self.x0 if x0 is None else x0,

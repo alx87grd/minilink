@@ -11,7 +11,9 @@ from minilink.graphical.primitives import (
     Arrow,
     Circle,
     CustomLine,
+    Plane,
     Point,
+    Sphere,
     TorqueArrow,
     extract_amplitude,
 )
@@ -177,6 +179,48 @@ class MatplotlibCanvas:
                 )
                 obj = self.ax.add_patch(circ)
                 self.drawn_objects.append(obj)
+
+        elif isinstance(primitive, Sphere):
+            # 2D/3D fallback: draw sphere as a circle in XY.
+            local_center = np.zeros(3)
+            local_center[: len(primitive.center)] = primitive.center
+            world_center = transform_matrix @ np.append(local_center, 1.0)
+            x, y = world_center[0], world_center[1]
+            circ = patches.Circle(
+                (x, y),
+                radius=primitive.radius,
+                ec=primitive.color,
+                fill=True,
+                fc=primitive.color,
+                alpha=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                linewidth=1.5,
+            )
+            obj = self.ax.add_patch(circ)
+            self.drawn_objects.append(obj)
+
+        elif isinstance(primitive, Plane):
+            # 2D fallback: draw XY intersection line of n·x=offset.
+            n = np.asarray(primitive.normal, dtype=float)
+            off = float(primitive.offset)
+            half = 0.5 * float(primitive.size)
+            if abs(n[1]) > 1e-9:
+                x0, x1 = -half, half
+                y0 = (off - n[0] * x0) / n[1]
+                y1 = (off - n[0] * x1) / n[1]
+                local = np.array([[x0, y0, 0.0], [x1, y1, 0.0]])
+            else:
+                x = off / (n[0] + 1e-12)
+                local = np.array([[x, -half, 0.0], [x, half, 0.0]])
+            pts = np.hstack((local, np.ones((2, 1))))
+            world = (transform_matrix @ pts.T).T
+            (obj,) = self.ax.plot(
+                world[:, 0],
+                world[:, 1],
+                color=primitive.color,
+                linewidth=2.0,
+                alpha=float(np.clip(primitive.opacity, 0.0, 1.0)),
+            )
+            self.drawn_objects.append(obj)
 
     def clear(self):
         for obj in self.drawn_objects:
