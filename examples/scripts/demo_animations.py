@@ -13,7 +13,7 @@ sys.compute_trajectory(tf=10)
 
 
 # sys.animate()
-# sys.animate(renderer="meshcat")
+sys.animate(renderer="meshcat")
 # sys.animate(renderer="pygame")
 
 # sys.x0[0] = -1.0

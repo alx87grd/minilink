@@ -12,6 +12,7 @@ from minilink.graphical.primitives import (
     CustomLine,
     Plane,
     Point,
+    Rod,
     Sphere,
     TorqueArrow,
     extract_amplitude,
@@ -217,6 +218,15 @@ class PygameCanvas:
                 p0 = self._to_screen(x, -half)
                 p1 = self._to_screen(x, half)
             pygame_mod.draw.line(self.surface, col, p0, p1, lw)
+
+        elif isinstance(primitive, Rod):
+            local = np.array([[0.0, 0.0, 0.0], [0.0, -primitive.length, 0.0]])
+            local_h = np.hstack((local, np.ones((2, 1))))
+            world = (transform_matrix @ local_h.T).T
+            p0 = self._to_screen(world[0, 0], world[0, 1])
+            p1 = self._to_screen(world[1, 0], world[1, 1])
+            lw = max(1, int(round(max(primitive.linewidth, primitive.radius * 10.0))))
+            pygame_mod.draw.line(self.surface, _color_to_rgb(primitive.color), p0, p1, lw)
 
 
 class PygameRenderer(AnimationRenderer):

@@ -13,6 +13,7 @@ from minilink.graphical.primitives import (
     CustomLine,
     Plane,
     Point,
+    Rod,
     Sphere,
     TorqueArrow,
     extract_amplitude,
@@ -220,6 +221,29 @@ class MatplotlibCanvas:
                 linewidth=2.0,
                 alpha=float(np.clip(primitive.opacity, 0.0, 1.0)),
             )
+            self.drawn_objects.append(obj)
+
+        elif isinstance(primitive, Rod):
+            local = np.array([[0.0, 0.0, 0.0], [0.0, -primitive.length, 0.0]])
+            local_h = np.hstack((local, np.ones((2, 1))))
+            world = (transform_matrix @ local_h.T).T
+            if self.is_3d:
+                (obj,) = self.ax.plot(
+                    world[:, 0],
+                    world[:, 1],
+                    world[:, 2],
+                    color=primitive.color,
+                    linewidth=max(1.0, primitive.radius * 60.0),
+                    linestyle=primitive.style,
+                )
+            else:
+                (obj,) = self.ax.plot(
+                    world[:, 0],
+                    world[:, 1],
+                    color=primitive.color,
+                    linewidth=max(1.0, primitive.radius * 60.0),
+                    linestyle=primitive.style,
+                )
             self.drawn_objects.append(obj)
 
     def clear(self):

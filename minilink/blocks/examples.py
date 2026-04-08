@@ -3,7 +3,7 @@ import numpy as np
 from minilink.core.framework import DynamicSystem, StaticSystem
 from minilink.graphical.primitives import (
     Circle,
-    CustomLine,
+    Rod,
     TorqueArrow,
     pose2d_matrix,
     torque_pose2d_matrix,
@@ -85,10 +85,8 @@ class Pendulum(DynamicSystem):
         primitives.append(
             Circle(radius=radius, center=[0, 0], color="black", fill=True)
         )
-        # Rod (blue line)
-        primitives.append(
-            CustomLine(pts=[[0, 0], [0, -length]], color="black", linewidth=4)
-        )
+        # Rod (rendered as cylinder in meshcat; line fallback elsewhere)
+        primitives.append(Rod(length=length, radius=0.03 * length, color="black"))
         # Bob (red circle)
         primitives.append(
             Circle(radius=radius, center=[0, -length], color="black", fill=True)

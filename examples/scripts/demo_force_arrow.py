@@ -17,4 +17,4 @@ mass.x0 = np.array([0.0, 0.0])
 
 # mass.game()
 mass.game(renderer="matplotlib")
-mass.game(renderer="meshcat")
+# mass.game(renderer="meshcat")

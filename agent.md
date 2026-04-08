@@ -68,6 +68,9 @@ All features must progress through the following **Task Readiness Levels**:
     - Fix typos and grammatical errors.
     - Add missing type hints or NumPy-style docstrings.
     - Cosmetic PEP8 adjustments (outside of math equations).
+- **Demo Script Rule**:
+    - Keep demo scripts flat and directly runnable at module top-level.
+    - Do not wrap demo flow in helper functions unless explicitly requested.
 - **Always Ask**: 
     - Deleting or renaming files.
     - Architectural changes or core logic refactors.

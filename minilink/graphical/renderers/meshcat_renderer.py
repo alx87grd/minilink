@@ -13,6 +13,7 @@ from minilink.graphical.primitives import (
     CustomLine,
     Plane,
     Point,
+    Rod,
     Sphere,
     TorqueArrow,
     extract_amplitude,
@@ -77,131 +78,75 @@ class MeshcatCanvas:
         self.is_3d = is_3d
         self._g = g
         self._tf = tf
-        self._idx = 0
+        self._geom_keys = []
+        self._has_head = []
+        self._n_slots = 0
 
     def clear(self):
         self.scene.delete()
-        self._idx = 0
+        self._geom_keys = []
+        self._has_head = []
+        self._n_slots = 0
 
-    def draw_primitive(self, primitive, transform_matrix):
+    def _base_path(self, i: int):
+        return self.scene[f"p{i}"]
+
+    def _head_path(self, i: int):
+        return self.scene[f"p{i}_head"]
+
+    def _primitive_key(self, primitive):
+        # Conservative key: rebuild when any meaningful visual parameter changes.
+        if isinstance(primitive, Point):
+            return ("Point", float(primitive.size), str(primitive.color))
+        if isinstance(primitive, CustomLine):
+            return (
+                "CustomLine",
+                primitive.pts.shape,
+                tuple(np.asarray(primitive.pts).reshape(-1).tolist()),
+                str(primitive.color),
+                float(primitive.linewidth),
+            )
+        if isinstance(primitive, Arrow):
+            return ("Arrow", primitive.pts.shape, str(primitive.color), float(primitive.linewidth))
+        if isinstance(primitive, TorqueArrow):
+            return ("TorqueArrow", str(primitive.color), float(primitive.linewidth))
+        if isinstance(primitive, Circle):
+            return ("Circle", float(primitive.radius), str(primitive.color), float(primitive.linewidth))
+        if isinstance(primitive, Sphere):
+            return ("Sphere", float(primitive.radius), str(primitive.color), float(primitive.opacity))
+        if isinstance(primitive, Rod):
+            return (
+                "Rod",
+                float(primitive.length),
+                float(primitive.radius),
+                str(primitive.color),
+                float(primitive.opacity),
+            )
+        if isinstance(primitive, Plane):
+            n = tuple(np.asarray(primitive.normal, dtype=float).tolist())
+            return (
+                "Plane",
+                n,
+                float(primitive.offset),
+                float(primitive.size),
+                float(primitive.thickness),
+                str(primitive.color),
+                float(primitive.opacity),
+            )
+        return (primitive.__class__.__name__,)
+
+    def _set_static_geometry(self, i: int, primitive):
         g = self._g
-        path = self.scene[f"p{self._idx}"]
-        self._idx += 1
+        path = self._base_path(i)
+        hex_color = _color_to_meshcat_hex(primitive.color)
 
         if isinstance(primitive, Point):
-            local_pt = np.append(primitive.pt, 1.0)
-            world_pt = transform_matrix @ local_pt
-            x, y, z = world_pt[0], world_pt[1], world_pt[2]
             radius = max(0.02, 0.04 * float(primitive.size))
-            hex_color = _color_to_meshcat_hex(primitive.color)
-            path.set_object(
-                g.Mesh(g.Sphere(radius), g.MeshLambertMaterial(color=hex_color))
-            )
-            path.set_transform(self._tf.translation_matrix([x, y, z]))
+            path.set_object(g.Mesh(g.Sphere(radius), g.MeshLambertMaterial(color=hex_color)))
+            self._has_head[i] = False
+            return
 
-        elif isinstance(primitive, CustomLine):
-            local_pts = primitive.pts
-            if local_pts.shape[1] == 2:
-                local_pts_hom = np.hstack(
-                    (local_pts, np.zeros((local_pts.shape[0], 1)))
-                )
-            else:
-                local_pts_hom = local_pts
-            local_pts_hom = np.hstack((local_pts_hom, np.ones((local_pts.shape[0], 1))))
-            world_pts = (transform_matrix @ local_pts_hom.T).T
-            vertices = np.asarray(world_pts[:, :3], dtype=np.float32).T
-            hex_color = _color_to_meshcat_hex(primitive.color)
-            path.set_object(
-                g.Line(
-                    g.PointsGeometry(vertices),
-                    g.LineBasicMaterial(
-                        color=hex_color,
-                        linewidth=float(primitive.linewidth),
-                    ),
-                )
-            )
-
-        elif isinstance(primitive, Arrow):
-            local_pts = primitive.pts
-            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (transform_matrix @ local_pts_hom.T).T
-            vertices = np.asarray(world_pts[:, :3], dtype=np.float32).T
-            hex_color = _color_to_meshcat_hex(primitive.color)
-            path.set_object(
-                g.Line(
-                    g.PointsGeometry(vertices),
-                    g.LineBasicMaterial(
-                        color=hex_color,
-                        linewidth=float(primitive.linewidth),
-                    ),
-                )
-            )
-
-        elif isinstance(primitive, TorqueArrow):
-            sweep, T_rigid = extract_amplitude(transform_matrix)
-            local_pts = primitive.compute_pts(sweep)
-            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (T_rigid @ local_pts_hom.T).T
-            hex_color = _color_to_meshcat_hex(primitive.color)
-            arc_n = local_pts.shape[0] - 3
-            if arc_n >= 2:
-                arc_verts = np.asarray(world_pts[:arc_n, :3], dtype=np.float32).T
-                path.set_object(
-                    g.Line(
-                        g.PointsGeometry(arc_verts),
-                        g.LineBasicMaterial(
-                            color=hex_color,
-                            linewidth=float(primitive.linewidth),
-                        ),
-                    )
-                )
-                head_path = self.scene[f"p{self._idx}"]
-                self._idx += 1
-                head_verts = np.asarray(world_pts[arc_n:, :3], dtype=np.float32).T
-                head_path.set_object(
-                    g.Line(
-                        g.PointsGeometry(head_verts),
-                        g.LineBasicMaterial(
-                            color=hex_color,
-                            linewidth=float(primitive.linewidth),
-                        ),
-                    )
-                )
-
-        elif isinstance(primitive, Circle):
-            local_center = np.zeros(3)
-            local_center[: len(primitive.center)] = primitive.center
-            local_center = np.append(local_center, 1.0)
-            world_center = transform_matrix @ local_center
-            x, y, z = world_center[0], world_center[1], world_center[2]
-            hex_color = _color_to_meshcat_hex(primitive.color)
-            lw = float(primitive.linewidth)
-
-            if self.is_3d:
-                th = np.linspace(0, 2 * np.pi, 50)
-                pts_z = primitive.center[2] if len(primitive.center) > 2 else 0.0
-                pts = np.vstack(
-                    (
-                        primitive.center[0] + primitive.radius * np.cos(th),
-                        primitive.center[1] + primitive.radius * np.sin(th),
-                        np.full_like(th, pts_z),
-                        np.ones_like(th),
-                    )
-                )
-                world_pts = transform_matrix @ pts
-                vertices = np.asarray(world_pts[:3, :], dtype=np.float32)
-                path.set_object(
-                    g.LineLoop(
-                        g.PointsGeometry(vertices),
-                        g.LineBasicMaterial(color=hex_color, linewidth=lw),
-                    )
-                )
-
-        elif isinstance(primitive, Sphere):
-            local_center = np.zeros(3)
-            local_center[: len(primitive.center)] = primitive.center
-            world_center = (transform_matrix @ np.append(local_center, 1.0))[:3]
-            hex_color = _color_to_meshcat_hex(primitive.color)
+        if isinstance(primitive, Sphere):
             path.set_object(
                 g.Mesh(
                     g.Sphere(float(primitive.radius)),
@@ -212,17 +157,24 @@ class MeshcatCanvas:
                     ),
                 )
             )
-            path.set_transform(self._tf.translation_matrix(world_center.tolist()))
+            self._has_head[i] = False
+            return
 
-        elif isinstance(primitive, Plane):
-            n = np.asarray(primitive.normal, dtype=float)
-            n = n / (np.linalg.norm(n) + 1e-12)
-            center = n * float(primitive.offset)
-            R = _rotation_from_a_to_b(np.array([0.0, 0.0, 1.0]), n)
-            T = np.eye(4, dtype=float)
-            T[:3, :3] = R
-            T[:3, 3] = center
-            hex_color = _color_to_meshcat_hex(primitive.color)
+        if isinstance(primitive, Rod):
+            path.set_object(
+                g.Mesh(
+                    g.Cylinder(float(primitive.length), float(primitive.radius)),
+                    g.MeshLambertMaterial(
+                        color=hex_color,
+                        transparent=primitive.opacity < 0.999,
+                        opacity=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                    ),
+                )
+            )
+            self._has_head[i] = False
+            return
+
+        if isinstance(primitive, Plane):
             path.set_object(
                 g.Mesh(
                     g.Box(
@@ -239,7 +191,145 @@ class MeshcatCanvas:
                     ),
                 )
             )
+            self._has_head[i] = False
+            return
+
+        if isinstance(primitive, Circle):
+            # Interpret 2D circle primitives as volumetric 3D spheres in meshcat.
+            # This makes bodies like pendulum tips and floating masses visible.
+            path.set_object(
+                g.Mesh(
+                    g.Sphere(float(primitive.radius)),
+                    g.MeshLambertMaterial(
+                        color=hex_color,
+                        transparent=not bool(primitive.fill),
+                        opacity=1.0 if bool(primitive.fill) else 0.6,
+                    ),
+                )
+            )
+            self._has_head[i] = False
+            return
+
+        if isinstance(primitive, (CustomLine, Arrow)):
+            pts = primitive.pts
+            if pts.shape[1] == 2:
+                pts = np.hstack((pts, np.zeros((pts.shape[0], 1))))
+            vertices = np.asarray(pts[:, :3], dtype=np.float32).T
+            path.set_object(
+                g.Line(
+                    g.PointsGeometry(vertices),
+                    g.LineBasicMaterial(color=hex_color, linewidth=float(primitive.linewidth)),
+                )
+            )
+            self._has_head[i] = False
+            return
+
+        if isinstance(primitive, TorqueArrow):
+            # Dynamic geometry updated each frame; ensure secondary head path exists.
+            path.set_object(
+                g.Line(
+                    g.PointsGeometry(np.zeros((3, 2), dtype=np.float32)),
+                    g.LineBasicMaterial(color=hex_color, linewidth=float(primitive.linewidth)),
+                )
+            )
+            self._head_path(i).set_object(
+                g.Line(
+                    g.PointsGeometry(np.zeros((3, 2), dtype=np.float32)),
+                    g.LineBasicMaterial(color=hex_color, linewidth=float(primitive.linewidth)),
+                )
+            )
+            self._has_head[i] = True
+            return
+
+    def ensure_objects(self, primitives):
+        n = len(primitives)
+        if n != self._n_slots:
+            self.clear()
+            self._n_slots = n
+            self._geom_keys = [None] * n
+            self._has_head = [False] * n
+
+        for i, primitive in enumerate(primitives):
+            key = self._primitive_key(primitive)
+            if self._geom_keys[i] != key:
+                if i < len(self._has_head) and self._has_head[i]:
+                    self._head_path(i).delete()
+                    self._has_head[i] = False
+                self._set_static_geometry(i, primitive)
+                self._geom_keys[i] = key
+
+    def update_primitive(self, i: int, primitive, transform_matrix):
+        g = self._g
+        path = self._base_path(i)
+
+        if isinstance(primitive, Point):
+            local_pt = np.append(primitive.pt, 1.0)
+            world_pt = transform_matrix @ local_pt
+            path.set_transform(self._tf.translation_matrix(world_pt[:3].tolist()))
+            return
+
+        if isinstance(primitive, (CustomLine, Arrow, Circle)):
+            if isinstance(primitive, Circle):
+                local_center = np.zeros(3)
+                local_center[: len(primitive.center)] = primitive.center
+                world_center = (transform_matrix @ np.append(local_center, 1.0))[:3]
+                path.set_transform(self._tf.translation_matrix(world_center.tolist()))
+            else:
+                path.set_transform(transform_matrix)
+            return
+
+        if isinstance(primitive, Sphere):
+            local_center = np.zeros(3)
+            local_center[: len(primitive.center)] = primitive.center
+            world_center = (transform_matrix @ np.append(local_center, 1.0))[:3]
+            path.set_transform(self._tf.translation_matrix(world_center.tolist()))
+            return
+
+        if isinstance(primitive, Rod):
+            # Cylinder is centered at origin and aligned with local Y in meshcat.
+            # Place rod from hinge (0,0,0) to tip (0,-L,0) via center offset.
+            T_local = self._tf.translation_matrix([0.0, -0.5 * primitive.length, 0.0])
+            path.set_transform(transform_matrix @ T_local)
+            return
+
+        if isinstance(primitive, Plane):
+            n = np.asarray(primitive.normal, dtype=float)
+            n = n / (np.linalg.norm(n) + 1e-12)
+            center = n * float(primitive.offset)
+            R = _rotation_from_a_to_b(np.array([0.0, 0.0, 1.0]), n)
+            T = np.eye(4, dtype=float)
+            T[:3, :3] = R
+            T[:3, 3] = center
             path.set_transform(transform_matrix @ T)
+            return
+
+        if isinstance(primitive, TorqueArrow):
+            sweep, T_rigid = extract_amplitude(transform_matrix)
+            local_pts = primitive.compute_pts(sweep)
+            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
+            world_pts = (T_rigid @ local_pts_hom.T).T
+            hex_color = _color_to_meshcat_hex(primitive.color)
+            arc_n = local_pts.shape[0] - 3
+            if arc_n >= 2:
+                arc_verts = np.asarray(world_pts[:arc_n, :3], dtype=np.float32).T
+                path.set_object(
+                    g.Line(
+                        g.PointsGeometry(arc_verts),
+                        g.LineBasicMaterial(
+                            color=hex_color, linewidth=float(primitive.linewidth)
+                        ),
+                    )
+                )
+                head_verts = np.asarray(world_pts[arc_n:, :3], dtype=np.float32).T
+                self._head_path(i).set_object(
+                    g.Line(
+                        g.PointsGeometry(head_verts),
+                        g.LineBasicMaterial(
+                            color=hex_color, linewidth=float(primitive.linewidth)
+                        ),
+                    )
+                )
+            return
 
 
 class MeshcatRenderer(AnimationRenderer):
@@ -261,9 +351,9 @@ class MeshcatRenderer(AnimationRenderer):
             self.vis.wait()
 
     def draw_frame(self, primitives, transforms, t: float) -> None:
-        self.canvas.clear()
-        for prim, T in zip(primitives, transforms):
-            self.canvas.draw_primitive(prim, T)
+        self.canvas.ensure_objects(primitives)
+        for i, (prim, T) in enumerate(zip(primitives, transforms)):
+            self.canvas.update_primitive(i, prim, T)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:

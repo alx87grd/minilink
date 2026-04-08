@@ -54,6 +54,24 @@ class Sphere(GraphicPrimitive):
         self.opacity = opacity
 
 
+class Rod(GraphicPrimitive):
+    """A slender rigid rod primitive aligned with local -Y axis."""
+
+    def __init__(
+        self,
+        length=1.0,
+        radius=0.05,
+        color="blue",
+        opacity=1.0,
+        linewidth=2,
+        style="-",
+    ):
+        super().__init__(color=color, linewidth=linewidth, style=style)
+        self.length = float(length)
+        self.radius = float(radius)
+        self.opacity = float(opacity)
+
+
 class Plane(GraphicPrimitive):
     """
     A finite square patch representing a plane: n·x = offset.
