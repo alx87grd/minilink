@@ -28,6 +28,10 @@ visualization = [
 symbolic = [
     "sympy>=1.12",
 ]
+jax = [
+    "jax>=0.4.28",
+    "jaxlib>=0.4.28",
+]
 
 [tool.ruff]
 line-length = 88

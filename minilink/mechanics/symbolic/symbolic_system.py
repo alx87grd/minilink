@@ -3,9 +3,9 @@ Symbolic mechanical system in manipulator form (SymPy).
 
     H(q) q̈ + C(q, q̇) q̇ + d(q, q̇) + g(q) = B(q) u
 
-This class lives in ``minilink.mechanics.symbolic`` only. For the NumPy
-simulation block, use :class:`~minilink.mechanics.mechanical.MechanicalSystem`
-or call :meth:`to_minilink`.
+This class lives in ``minilink.mechanics.symbolic`` only. For a numeric block, call
+:meth:`to_minilink` (NumPy :class:`~minilink.mechanics.mechanical.MechanicalSystem`
+or, with ``backend="jax"``, :class:`~minilink.mechanics.mechanical.JaxMechanicalSystem`).
 """
 
 import sympy as sp
@@ -100,11 +100,20 @@ class MechanicalSystem:
         self._f = dq_vec.col_join(ddq)
         self._h = sp.Matrix(list(q) + list(dq))
 
-    def to_minilink(self, parameters=None):
-        """Export to a NumPy :class:`~minilink.mechanics.mechanical.MechanicalSystem`."""
+    def to_minilink(self, parameters=None, *, backend: str = "numpy"):
+        """Export to a numeric mechanical plant (see :func:`.export.create_minilink_system`).
+
+        Parameters
+        ----------
+        parameters : dict, optional
+            Symbol substitutions for numeric values.
+        backend : {"numpy", "jax"}
+            ``"numpy"`` → :class:`~minilink.mechanics.mechanical.MechanicalSystem``.
+            ``"jax"`` → :class:`~minilink.mechanics.mechanical.JaxMechanicalSystem``.
+        """
         from .export import create_minilink_system
 
-        return create_minilink_system(self, parameters)
+        return create_minilink_system(self, parameters, backend=backend)
 
     def __repr__(self):
         h = self.H.shape if self.H is not None else None

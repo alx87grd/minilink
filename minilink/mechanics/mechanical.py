@@ -1,18 +1,35 @@
 """
-Second-order mechanical systems in generalized coordinates (Pyro-style API).
+Second-order mechanical systems in generalized coordinates.
+
+**TRL 1** — numeric template; see package :mod:`minilink.mechanics`.
 
 Equation of motion::
 
     H(q) ddq + C(q, dq) dq + d(q, dq) + g(q) = B(q) u
 
-TODO: Add a JAX-compatible version (or dual NumPy/JAX backend in ``f`` / ``ddq``)
-for ``compile(..., backend="jax")`` / ``JaxLeafEvaluator``; this implementation is
-NumPy-first (e.g. ``q2x`` layout, ``numpy.linalg.solve``).
+* :class:`MechanicalSystem` — **NumPy only** (default simulation path).
+* :class:`JaxMechanicalSystem` — **JAX** (``jit`` / ``grad`` / symbolic export with
+  ``backend="jax"``). JAX is loaded lazily when you call methods on that class.
 """
 
+from __future__ import annotations
+
+import functools
 import numpy as np
 
 from minilink.core.framework import DynamicSystem
+
+
+@functools.lru_cache(maxsize=1)
+def _jax_numpy():
+    """Return ``jax.numpy``; raises if JAX is not installed."""
+    try:
+        import jax.numpy as jnp
+    except ImportError as e:
+        raise ImportError(
+            "JaxMechanicalSystem requires JAX. Install with: pip install jax jaxlib"
+        ) from e
+    return jnp
 
 
 class MechanicalSystem(DynamicSystem):
@@ -23,7 +40,7 @@ class MechanicalSystem(DynamicSystem):
 
     State is stacked as ``x = [q; dq]`` with ``n = 2 * dof`` and default output ``y = x``.
 
-    Subclasses override ``H``, ``C``, ``B``, ``g``, and/or ``d`` to define the plant.
+    **NumPy only.** Subclasses override ``H``, ``C``, ``B``, ``g``, and/or ``d``.
     """
 
     def __init__(self, dof=1, actuators=None):
@@ -63,26 +80,31 @@ class MechanicalSystem(DynamicSystem):
 
     def H(self, q):
         """Inertia matrix, shape (dof, dof). Kinetic energy = 0.5 * dq^T H(q) dq."""
-        return np.diag(np.ones(self.dof))
+        dt = getattr(q, "dtype", None) or np.float64
+        return np.diag(np.ones(self.dof, dtype=dt))
 
     def C(self, q, dq):
         """Coriolis and centrifugal matrix, shape (dof, dof)."""
-        return np.zeros((self.dof, self.dof))
+        dt = getattr(q, "dtype", None) or np.float64
+        return np.zeros((self.dof, self.dof), dtype=dt)
 
     def B(self, q):
         """Actuator matrix, shape (dof, m)."""
-        B = np.zeros((self.dof, self.m))
+        dt = getattr(q, "dtype", None) or np.float64
+        B = np.zeros((self.dof, self.m), dtype=dt)
         for i in range(min(self.m, self.dof)):
             B[i, i] = 1.0
         return B
 
     def g(self, q):
         """Gravitational / conservative forces, shape (dof,)."""
-        return np.zeros(self.dof)
+        dt = getattr(q, "dtype", None) or np.float64
+        return np.zeros(self.dof, dtype=dt)
 
     def d(self, q, dq):
         """Dissipative forces, shape (dof,)."""
-        return np.zeros(self.dof)
+        dt = getattr(q, "dtype", None) or np.float64
+        return np.zeros(self.dof, dtype=dt)
 
     def x2q(self, x):
         """Split state ``x`` into ``q`` and ``dq``."""
@@ -92,10 +114,10 @@ class MechanicalSystem(DynamicSystem):
 
     def q2x(self, q, dq):
         """Stack ``q`` and ``dq`` into state ``x``."""
-        x = np.zeros(self.n)
-        x[0 : self.dof] = q
-        x[self.dof : self.n] = dq
-        return x
+        dt = getattr(q, "dtype", None) or np.float64
+        return np.concatenate(
+            [np.asarray(q, dtype=dt).ravel(), np.asarray(dq, dtype=dt).ravel()]
+        )
 
     def generalized_forces(self, q, dq, ddq, t=0):
         """Generalized forces for a given trajectory ``q, dq, ddq``."""
@@ -115,6 +137,7 @@ class MechanicalSystem(DynamicSystem):
 
     def ddq(self, q, dq, u, t=0):
         """Forward dynamics: generalized accelerations given ``u``."""
+        u = np.asarray(u)
         H = self.H(q)
         C = self.C(q, dq)
         g = self.g(q)
@@ -124,6 +147,130 @@ class MechanicalSystem(DynamicSystem):
         return np.linalg.solve(H, rhs)
 
     def f(self, x, u, t=0, params=None):
+        u = np.asarray(u)
+        q, dq = self.x2q(x)
+        ddq = self.ddq(q, dq, u, t)
+        return self.q2x(dq, ddq)
+
+    def h(self, x, u, t=0, params=None):
+        return x
+
+    def kinetic_energy(self, q, dq):
+        return 0.5 * (dq @ (self.H(q) @ dq))
+
+
+class JaxMechanicalSystem(DynamicSystem):
+    """
+    Same manipulator equation as :class:`MechanicalSystem`, implemented with ``jax.numpy``.
+
+    State is ``x = [q; dq]``, default output ``y = x``. Subclasses should build dynamics
+    with ``jax.numpy`` (see :func:`_jax_numpy`).
+    """
+
+    def __init__(self, dof=1, actuators=None):
+        self.dof = dof
+        if actuators is None:
+            actuators = dof
+
+        n = dof * 2
+        m = actuators
+        p = dof * 2
+
+        super().__init__(n, m, p)
+
+        self.name = f"{dof}DoF Mechanical System"
+
+        lim = 2 * np.pi
+        for i in range(dof):
+            self.state.labels[i] = f"Angle {i}"
+            self.state.units[i] = "[rad]"
+            self.state.upper_bound[i] = lim
+            self.state.lower_bound[i] = -lim
+            j = i + dof
+            self.state.labels[j] = f"Velocity {i}"
+            self.state.units[j] = "[rad/sec]"
+            self.state.upper_bound[j] = lim
+            self.state.lower_bound[j] = -lim
+
+        uport = self.inputs["u"]
+        for i in range(actuators):
+            uport.labels[i] = f"Torque {i}"
+            uport.units[i] = "[Nm]"
+            uport.upper_bound[i] = 5.0
+            uport.lower_bound[i] = -5.0
+
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
+
+    def H(self, q):
+        jnp = _jax_numpy()
+        dt = getattr(q, "dtype", None) or jnp.float32
+        return jnp.diag(jnp.ones(self.dof, dtype=dt))
+
+    def C(self, q, dq):
+        jnp = _jax_numpy()
+        dt = getattr(q, "dtype", None) or jnp.float32
+        return jnp.zeros((self.dof, self.dof), dtype=dt)
+
+    def B(self, q):
+        jnp = _jax_numpy()
+        dt = getattr(q, "dtype", None) or jnp.float32
+        B = jnp.zeros((self.dof, self.m), dtype=dt)
+        for i in range(min(self.m, self.dof)):
+            B = B.at[i, i].set(jnp.asarray(1.0, dtype=dt))
+        return B
+
+    def g(self, q):
+        jnp = _jax_numpy()
+        dt = getattr(q, "dtype", None) or jnp.float32
+        return jnp.zeros(self.dof, dtype=dt)
+
+    def d(self, q, dq):
+        jnp = _jax_numpy()
+        dt = getattr(q, "dtype", None) or jnp.float32
+        return jnp.zeros(self.dof, dtype=dt)
+
+    def x2q(self, x):
+        q = x[0 : self.dof]
+        dq = x[self.dof : self.n]
+        return [q, dq]
+
+    def q2x(self, q, dq):
+        jnp = _jax_numpy()
+        dt = getattr(q, "dtype", None) or jnp.float32
+        return jnp.concatenate(
+            [jnp.asarray(q, dtype=dt).ravel(), jnp.asarray(dq, dtype=dt).ravel()]
+        )
+
+    def generalized_forces(self, q, dq, ddq, t=0):
+        H = self.H(q)
+        C = self.C(q, dq)
+        g = self.g(q)
+        d = self.d(q, dq)
+        return H @ ddq + C @ dq + g + d
+
+    def actuator_forces(self, q, dq, ddq, t=0):
+        if self.dof != self.m:
+            raise NotImplementedError
+        jnp = _jax_numpy()
+        B = self.B(q)
+        forces = self.generalized_forces(q, dq, ddq, t)
+        return jnp.linalg.solve(B, forces)
+
+    def ddq(self, q, dq, u, t=0):
+        jnp = _jax_numpy()
+        u = jnp.asarray(u)
+        H = self.H(q)
+        C = self.C(q, dq)
+        g = self.g(q)
+        d = self.d(q, dq)
+        B = self.B(q)
+        rhs = B @ u - C @ dq - g - d
+        return jnp.linalg.solve(H, rhs)
+
+    def f(self, x, u, t=0, params=None):
+        jnp = _jax_numpy()
+        u = jnp.asarray(u)
         q, dq = self.x2q(x)
         ddq = self.ddq(q, dq, u, t)
         return self.q2x(dq, ddq)

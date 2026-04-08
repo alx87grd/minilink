@@ -16,6 +16,13 @@ try:
 except ImportError:
     HAS_SYMPY = False
 
+try:
+    import jax  # noqa: F401
+
+    HAS_JAX = True
+except ImportError:
+    HAS_JAX = False
+
 
 @unittest.skipUnless(HAS_SYMPY, "sympy not installed")
 class TestSymbolicMechanics(unittest.TestCase):
@@ -89,6 +96,23 @@ class TestSymbolicMechanics(unittest.TestCase):
         prim = num.get_kinematic_geometry()
         T = num.get_kinematic_transforms(np.zeros(2), np.zeros(1), 0.0)
         self.assertEqual(len(prim), len(T))
+
+    @unittest.skipUnless(HAS_SYMPY and HAS_JAX, "sympy and jax required")
+    def test_to_minilink_jax_returns_jax_mechanical_system(self):
+        from minilink.mechanics.mechanical import JaxMechanicalSystem
+
+        m = MechanicalModel("Pendulum")
+        g_sym, mass, length = m.parameters("g m l")
+        q1 = m.coordinates("q1")
+        m.add_dh_chain(
+            [{"theta": q1, "d": 0, "a": length, "alpha": 0}],
+            [{"mass": mass, "inertia": {"Izz": 0}, "com_offset": length / 2}],
+        )
+        m.add_gravity(-g_sym * m.N.y)
+        m._setup_velocities()
+        sys = derive_lagrange(m, simplify=True)
+        num = sys.to_minilink({g_sym: 9.81, mass: 1.0, length: 0.5}, backend="jax")
+        self.assertIsInstance(num, JaxMechanicalSystem)
 
 
 if __name__ == "__main__":

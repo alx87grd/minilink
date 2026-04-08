@@ -13,7 +13,7 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 | **JAX Integration** | **TRL 7** | Finalize jittable ODE solvers |
 | **Simulation (Analysis)** | **TRL 4** | Fix `solve_ivp` external input + refactor interface |
 | **Planning** | **Planned** | RRT and Direct Collocation ports |
-| **Mechanical Templates** | **Planned** | `MechanicalSystem` base class |
+| **`mechanics` package** (numeric + symbolic multibody) | **TRL 1** | Harden tests, JAX export, docs |
 
 > [!NOTE]
 > Progress is tracked via **Task Readiness Levels (TRL 1-9)**. See [agent.md](agent.md) for definitions and the **3-Level Testing Strategy** (Automated, Manual, Demo).
@@ -185,7 +185,8 @@ Cross-read of [Drake](https://github.com/RobotLocomotion/drake) (rigorous system
 | Compiled evaluation (leaf) | `NumpyLeafEvaluator` / `JaxLeafEvaluator` | **TRL 6** |
 | Compiled evaluation (diagram) | `NumpyDiagramEvaluator` / `JaxDiagramEvaluator` | **TRL 8** |
 | `StateSpaceSystem` | `StateSpaceSystem` | Planned |
-| `MechanicalSystem` | `MechanicalSystem` | Planned |
+| `MechanicalSystem` | `mechanics.MechanicalSystem` | **TRL 1** |
+| Symbolic EoM + `MechanicalModel` | `mechanics.symbolic` | **TRL 1** |
 | `Manipulator` | `Manipulator` | Planned |
 
 ---

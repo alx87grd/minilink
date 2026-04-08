@@ -26,7 +26,7 @@ class MechanicalModel:
     2. Add bodies (DH chains and/or manual frames).
     3. Add gravity, springs, dampers, etc.
     4. Call ``derive()`` to obtain a symbolic ``MechanicalSystem`` (SymPy).
-    5. Call ``sys.to_minilink(params)`` for a NumPy :class:`~minilink.mechanics.mechanical.MechanicalSystem`.
+    5. Call ``sys.to_minilink(params)`` for a numeric plant (NumPy or JAX; see :meth:`~minilink.mechanics.symbolic.symbolic_system.MechanicalSystem.to_minilink`).
     """
 
     def __init__(self, name="System"):
@@ -164,9 +164,7 @@ class MechanicalModel:
         if rotation_type == "axis":
             frame.orient_axis(parent, kwargs["axis"], kwargs["angle"])
         elif rotation_type == "body":
-            frame.orient_body_fixed(
-                parent, kwargs["angles"], kwargs["rotation_order"]
-            )
+            frame.orient_body_fixed(parent, kwargs["angles"], kwargs["rotation_order"])
         elif rotation_type == "dcm":
             frame.orient_explicit(parent, kwargs["dcm"])
 
@@ -265,9 +263,7 @@ class MechanicalModel:
             elif hasattr(com_offset, "dot"):
                 com.set_pos(joint_pt, com_offset)
             else:
-                com.set_pos(
-                    parent_origin, d * parent_frame.z + com_offset * inter.x
-                )
+                com.set_pos(parent_origin, d * parent_frame.z + com_offset * inter.x)
             self._points[f"{ln}_cm"] = com
 
             mass = props["mass"]
@@ -306,9 +302,7 @@ class MechanicalModel:
 
         if self._dh_links:
             self._effector_point = parent_origin
-            self._chain_points = [self.O] + [
-                lk["origin"] for lk in self._dh_links
-            ]
+            self._chain_points = [self.O] + [lk["origin"] for lk in self._dh_links]
 
     def set_effector(self, point):
         """Declare *point* as the end-effector (used by FK / Jacobian)."""
@@ -402,11 +396,13 @@ class MechanicalModel:
         result = []
         for pt in self._chain_points:
             pos = pt.pos_from(self.O)
-            fk = sp.Matrix([
-                pos.dot(self.N.x),
-                pos.dot(self.N.y),
-                pos.dot(self.N.z),
-            ])
+            fk = sp.Matrix(
+                [
+                    pos.dot(self.N.x),
+                    pos.dot(self.N.y),
+                    pos.dot(self.N.z),
+                ]
+            )
             if simplify:
                 fk = fk.applyfunc(sp.trigsimp)
             result.append(fk)
@@ -486,9 +482,7 @@ class MechanicalModel:
         if self._gravity_vec is not None:
             for body in self._bodies:
                 if isinstance(body, RigidBody):
-                    forces.append(
-                        (body.masscenter, body.mass * self._gravity_vec)
-                    )
+                    forces.append((body.masscenter, body.mass * self._gravity_vec))
                 else:
                     forces.append((body.point, body.mass * self._gravity_vec))
         # Spring forces
@@ -533,6 +527,4 @@ class MechanicalModel:
         elif method == "kane":
             return derive_kane(self, simplify=simplify)
         else:
-            raise ValueError(
-                f"Unknown method '{method}'. Use 'lagrange' or 'kane'."
-            )
+            raise ValueError(f"Unknown method '{method}'. Use 'lagrange' or 'kane'.")

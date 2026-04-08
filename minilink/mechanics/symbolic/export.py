@@ -1,16 +1,18 @@
 """
-Lambdify a symbolic MechanicalSystem into a NumPy minilink MechanicalSystem.
+Lambdify a symbolic MechanicalSystem into a numeric plant.
+
+* ``backend="numpy"`` → :class:`~minilink.mechanics.mechanical.MechanicalSystem`
+* ``backend="jax"`` → :class:`~minilink.mechanics.mechanical.JaxMechanicalSystem`
+
+Chain kinematics for drawing are always lambdified with NumPy for Matplotlib.
 """
 
 from __future__ import annotations
-
-import copy
 
 import numpy as np
 import sympy as sp
 
 from minilink.graphical.primitives import CustomLine
-from minilink.mechanics.mechanical import MechanicalSystem as NumericMechanicalSystem
 
 
 def _pose2d(px: float, py: float, theta: float, scale_x: float = 1.0) -> np.ndarray:
@@ -22,17 +24,74 @@ def _pose2d(px: float, py: float, theta: float, scale_x: float = 1.0) -> np.ndar
     return t
 
 
-def _lam(expr, args, subs):
-    e = expr.subs(subs) if subs else expr
+def _lambdify_expr(expr, args, subs, backend: str):
+    if isinstance(expr, (list, tuple)):
+        e = [x.subs(subs) if subs else x for x in expr]
+    else:
+        e = expr.subs(subs) if subs else expr
+    if backend == "jax":
+        import jax.numpy as jnp
+
+        return sp.lambdify(args, e, modules=[jnp])
     return sp.lambdify(args, e, modules="numpy")
 
 
-def create_minilink_system(sym_sys, parameters=None):
+def _lambdify_matrix_to_flat_func(matrix_expr, args, subs, backend: str):
     """
-    Build a NumPy :class:`~minilink.mechanics.mechanical.MechanicalSystem` with
-    lambdified ``H``, ``C``, ``g``, ``d``, ``B`` and optional chain kinematics
-    for :meth:`get_kinematic_geometry` / :meth:`get_kinematic_transforms`.
+    Lambdify a SymPy Matrix by flattening to a list of scalar entries.
+
+    Avoids lambdify emitting ``ImmutableDenseMatrix(...)`` in generated code
+    (NameError at runtime). Returns ``(callable, nrows, ncols)``.
     """
+    m = matrix_expr.subs(subs) if subs else matrix_expr
+    M = sp.Matrix(m)
+    rows, cols = M.rows, M.cols
+    flat = [M[i, j] for i in range(rows) for j in range(cols)]
+    f = _lambdify_expr(flat, args, None, backend)
+
+    def eval_matrix(*call_args):
+        out = f(*call_args)
+        if backend == "jax":
+            import jax.numpy as jnp
+
+            flat_arr = jnp.asarray(out, dtype=jnp.float64).reshape(-1)
+        else:
+            flat_arr = np.asarray(out, dtype=float).reshape(-1)
+        return flat_arr, rows, cols
+
+    return eval_matrix, rows, cols
+
+
+def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
+    """
+    Build a numeric mechanical plant with lambdified ``H``, ``C``, ``g``, ``d``, ``B``
+    and optional chain kinematics.
+
+    Parameters
+    ----------
+    sym_sys
+        Symbolic system from ``minilink.mechanics.symbolic``.
+    parameters : dict, optional
+        ``{symbol: value}`` substitution before lambdify.
+    backend : {"numpy", "jax"}
+        ``"numpy"`` → :class:`~minilink.mechanics.mechanical.MechanicalSystem``.
+        ``"jax"`` → :class:`~minilink.mechanics.mechanical.JaxMechanicalSystem``
+        (requires ``jax`` / ``jaxlib``). Chain FK for :meth:`get_kinematic_transforms`
+        is always NumPy-based.
+    """
+    if backend not in ("numpy", "jax"):
+        raise ValueError("backend must be 'numpy' or 'jax'")
+    if backend == "jax":
+        try:
+            import jax.numpy as jnp  # noqa: F401
+        except ImportError as e:
+            raise ImportError(
+                "backend='jax' requires JAX. Install with: pip install jax jaxlib"
+            ) from e
+        from minilink.mechanics.mechanical import JaxMechanicalSystem as NumericMechanicalSystem
+    else:
+        from minilink.mechanics.mechanical import MechanicalSystem as NumericMechanicalSystem
+
     subs = list((parameters or {}).items())
 
     t = sp.Symbol("t")
@@ -41,44 +100,68 @@ def create_minilink_system(sym_sys, parameters=None):
     q_args = list(q)
     qdq_args = list(q) + list(dq_syms)
 
-    def _mk(expr, args):
-        return _lam(expr, args, subs)
-
     dof = sym_sys.dof
     m_act = sym_sys.m
 
-    H_func = _mk(sym_sys.H, q_args)
-    C_func = _mk(sym_sys.C, qdq_args)
-    g_func = _mk(sym_sys.g, q_args)
-    d_func = _mk(sym_sys.d, qdq_args) if sym_sys.d is not None else None
-    B_func = _mk(sym_sys.B, q_args) if sym_sys.B is not None else None
-    B_rows = sym_sys.B.rows if sym_sys.B is not None else dof
-    B_cols = sym_sys.B.cols if sym_sys.B is not None else dof
+    H_eval, _, _ = _lambdify_matrix_to_flat_func(sym_sys.H, q_args, subs, backend)
+    C_eval, _, _ = _lambdify_matrix_to_flat_func(sym_sys.C, qdq_args, subs, backend)
+    g_eval, _, _ = _lambdify_matrix_to_flat_func(sym_sys.g, q_args, subs, backend)
+    if sym_sys.d is not None:
+        d_eval, _, _ = _lambdify_matrix_to_flat_func(
+            sym_sys.d, qdq_args, subs, backend
+        )
+    else:
+        d_eval = None
+    if sym_sys.B is not None:
+        B_eval, _, _ = _lambdify_matrix_to_flat_func(sym_sys.B, q_args, subs, backend)
+    else:
+        B_eval = None
 
     chain_fk_funcs = None
     n_seg = 0
     if sym_sys.chain_fk is not None:
-        chain_fk_funcs = [_mk(fk_pt, q_args) for fk_pt in sym_sys.chain_fk]
+        chain_fk_funcs = []
+        for fk_pt in sym_sys.chain_fk:
+            m = fk_pt.subs(subs) if subs else fk_pt
+            M = sp.Matrix(m)
+            flat = [M[i, j] for i in range(M.rows) for j in range(M.cols)]
+            chain_fk_funcs.append(_lambdify_expr(flat, q_args, None, "numpy"))
         n_seg = max(0, len(chain_fk_funcs) - 1)
 
+    if backend == "jax":
+        import jax.numpy as jnp
+
+        xp = jnp
+    else:
+        xp = np
+
+    def _from_flat(flat_arr, rows, cols):
+        a = xp.asarray(flat_arr, dtype=float).reshape(rows, cols)
+        return a
+
     def _H(qv):
-        return np.asarray(H_func(*qv), dtype=float).reshape(dof, dof)
+        flat_arr, rows, cols = H_eval(*qv)
+        return _from_flat(flat_arr, rows, cols)
 
     def _C(qv, dq_):
-        return np.asarray(C_func(*qv, *dq_), dtype=float).reshape(dof, dof)
+        flat_arr, rows, cols = C_eval(*qv, *dq_)
+        return _from_flat(flat_arr, rows, cols)
 
     def _g(qv):
-        return np.asarray(g_func(*qv), dtype=float).reshape(-1)
+        flat_arr, rows, cols = g_eval(*qv)
+        return xp.reshape(_from_flat(flat_arr, rows, cols), (-1,))
 
     def _d(qv, dq_):
-        if d_func is None:
-            return np.zeros(dof)
-        return np.asarray(d_func(*qv, *dq_), dtype=float).reshape(-1)
+        if d_eval is None:
+            return xp.zeros(dof)
+        flat_arr, rows, cols = d_eval(*qv, *dq_)
+        return xp.reshape(_from_flat(flat_arr, rows, cols), (-1,))
 
     def _B(qv):
-        if B_func is None:
-            return np.eye(dof)
-        return np.asarray(B_func(*qv), dtype=float).reshape(B_rows, B_cols)
+        if B_eval is None:
+            return xp.eye(dof)
+        flat_arr, rows, cols = B_eval(*qv)
+        return _from_flat(flat_arr, rows, cols)
 
     def _chain_pts(qv):
         pts = np.zeros((len(chain_fk_funcs), 3))
@@ -124,7 +207,7 @@ def create_minilink_system(sym_sys, parameters=None):
         def get_kinematic_transforms(self, x, u, t):
             if self._chain_fk_funcs is None or self._n_seg == 0:
                 return super().get_kinematic_transforms(x, u, t)
-            qv = x[: self.dof]
+            qv = np.asarray(x[: self.dof], dtype=float)
             pts = _chain_pts(qv)
             transforms = []
             for i in range(self._n_seg):
@@ -141,6 +224,6 @@ def create_minilink_system(sym_sys, parameters=None):
     return _Generated()
 
 
-def to_minilink(sym_sys, parameters=None):
+def to_minilink(sym_sys, parameters=None, *, backend: str = "numpy"):
     """Alias for :func:`create_minilink_system`."""
-    return create_minilink_system(sym_sys, parameters)
+    return create_minilink_system(sym_sys, parameters, backend=backend)
