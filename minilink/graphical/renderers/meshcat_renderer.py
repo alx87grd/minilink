@@ -385,13 +385,14 @@ class MeshcatRenderer(AnimationRenderer):
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
         if show:
-            try:
-                import google.colab
+            import sys
+            if 'google.colab' in sys.modules:
                 from google.colab import output
                 port = int(self.vis.url().split(":")[-1].split("/")[0])
-                print(f"[Colab] Meshcat visualizer is running on Port {port}.")
-                output.serve_kernel_port_as_window(port, path='/static/')
-            except ImportError:
+                print(f"[Colab] Rendering live Meshcat on Port {port}.")
+                print("If you see a blank white box, you MUST allow Third-Party Cookies in your browser to view Colab iframes.")
+                output.serve_kernel_port_as_iframe(port, path='/static/', height=500)
+            else:
                 self.vis.open()
                 self.vis.wait()
 
@@ -402,6 +403,12 @@ class MeshcatRenderer(AnimationRenderer):
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
+            import sys
+            if 'google.colab' in sys.modules:
+                from IPython.display import display
+                print("Meshcat static frame built. Displaying offline standalone HTML.")
+                display(self.vis.render_static(height=500))
+                return
             print("Meshcat static frame ready.")
             input("Press Enter to exit meshcat viewer...")
         elif self.show and interval_s is not None:
