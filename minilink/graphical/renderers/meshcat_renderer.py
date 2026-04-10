@@ -389,8 +389,8 @@ class MeshcatRenderer(AnimationRenderer):
                 import google.colab
                 from google.colab import output
                 port = int(self.vis.url().split(":")[-1].split("/")[0])
-                print(f"[Colab] Rendering Meshcat Inline (Port {port})...")
-                output.serve_kernel_port_as_iframe(port, path='/static/', height=500)
+                print(f"[Colab] Meshcat visualizer is running on Port {port}.")
+                output.serve_kernel_port_as_window(port, path='/static/')
             except ImportError:
                 self.vis.open()
                 self.vis.wait()
