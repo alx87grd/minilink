@@ -348,7 +348,7 @@ class MeshcatCanvas:
             world_pts = (T_rigid @ local_pts_hom.T).T
             hex_color = _color_to_meshcat_hex(primitive.color)
             arc_n = local_pts.shape[0] - 3
-            if arc_n >= 2:
+            if arc_n >= 2 and hasattr(path, "set_object"):
                 arc_verts = np.asarray(world_pts[:arc_n, :3], dtype=np.float32).T
                 path.set_object(
                     g.Line(
@@ -400,6 +400,40 @@ class MeshcatRenderer(AnimationRenderer):
         self.canvas.ensure_objects(primitives)
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
             self.canvas.update_primitive(i, prim, T)
+
+    def render_inline_animation(self, primitives, frames, schedule):
+        import sys
+        if 'google.colab' not in sys.modules:
+            try:
+                import IPython.display
+            except ImportError:
+                print("html=True requires IPython.display")
+                return None
+
+        import meshcat.animation as anim
+        self.open_scene(is_3d=True, show=False)
+        self.canvas.ensure_objects(primitives)
+        
+        # Build Meshcat Animation
+        fps = max(1, int(1000.0 / schedule.interval_ms))
+        animation = anim.Animation(default_framerate=fps)
+        
+        for frame_idx, frame in enumerate(frames):
+            with animation.at_frame(self.vis, frame_idx) as f:
+                # Temporarily replace scene target to point to animation frame context
+                original_scene = self.canvas.scene
+                self.canvas.scene = f[self.canvas.scene_path]
+                for i, (prim, T) in enumerate(zip(primitives, frame["transforms"])):
+                    self.canvas.update_primitive(i, prim, T)
+                self.canvas.scene = original_scene
+                
+        self.vis.set_animation(animation)
+        
+        print("Meshcat animation built. Displaying offline standalone HTML.")
+        from IPython.display import HTML, display
+        display(self.vis.render_static(height=500))
+        self.close_scene()
+        return None
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
