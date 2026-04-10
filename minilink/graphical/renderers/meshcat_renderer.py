@@ -385,8 +385,13 @@ class MeshcatRenderer(AnimationRenderer):
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
         if show:
-            self.vis.open()
-            self.vis.wait()
+            try:
+                from google.colab.output import eval_js
+                port = int(self.vis.url().split(":")[-1].split("/")[0])
+                print(f"Colab Meshcat URL: {eval_js(f'google.colab.kernel.proxyPort({port})')}static/")
+            except ImportError:
+                self.vis.open()
+                self.vis.wait()
 
     def draw_frame(self, primitives, transforms, t: float) -> None:
         self.canvas.ensure_objects(primitives)
