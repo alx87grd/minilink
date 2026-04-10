@@ -388,7 +388,10 @@ class MeshcatRenderer(AnimationRenderer):
             try:
                 from google.colab.output import eval_js
                 port = int(self.vis.url().split(":")[-1].split("/")[0])
-                print(f"Colab Meshcat URL: {eval_js(f'google.colab.kernel.proxyPort({port})')}static/")
+                proxy_url = eval_js(f"google.colab.kernel.proxyPort({port})")
+                if not proxy_url.endswith("/"):
+                    proxy_url += "/"
+                print(f"Colab Meshcat URL: {proxy_url}static/")
             except ImportError:
                 self.vis.open()
                 self.vis.wait()
