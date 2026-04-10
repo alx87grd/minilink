@@ -348,7 +348,7 @@ class MeshcatCanvas:
             world_pts = (T_rigid @ local_pts_hom.T).T
             hex_color = _color_to_meshcat_hex(primitive.color)
             arc_n = local_pts.shape[0] - 3
-            if arc_n >= 2:
+            if arc_n >= 2 and hasattr(path, "set_object"):
                 arc_verts = np.asarray(world_pts[:arc_n, :3], dtype=np.float32).T
                 path.set_object(
                     g.Line(
@@ -385,16 +385,64 @@ class MeshcatRenderer(AnimationRenderer):
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
         if show:
-            self.vis.open()
-            self.vis.wait()
+            import sys
+            if 'google.colab' in sys.modules:
+                from google.colab import output
+                port = int(self.vis.url().split(":")[-1].split("/")[0])
+                print(f"[Colab] Rendering live Meshcat on Port {port}.")
+                print("If you see a blank white box, you MUST allow Third-Party Cookies in your browser to view Colab iframes.")
+                output.serve_kernel_port_as_iframe(port, path='/static/', height=500)
+            else:
+                self.vis.open()
+                self.vis.wait()
 
     def draw_frame(self, primitives, transforms, t: float) -> None:
         self.canvas.ensure_objects(primitives)
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
             self.canvas.update_primitive(i, prim, T)
 
+    def render_inline_animation(self, primitives, frames, schedule):
+        import sys
+        if 'google.colab' not in sys.modules:
+            try:
+                import IPython.display
+            except ImportError:
+                print("html=True requires IPython.display")
+                return None
+
+        import meshcat.animation as anim
+        self.open_scene(is_3d=True, show=False)
+        self.canvas.ensure_objects(primitives)
+        
+        # Build Meshcat Animation
+        fps = max(1, int(1000.0 / schedule.interval_ms))
+        animation = anim.Animation(default_framerate=fps)
+        
+        for frame_idx, frame in enumerate(frames):
+            with animation.at_frame(self.vis, frame_idx) as f:
+                # Temporarily replace scene target to point to animation frame context
+                original_scene = self.canvas.scene
+                self.canvas.scene = f[self.canvas.scene_path]
+                for i, (prim, T) in enumerate(zip(primitives, frame["transforms"])):
+                    self.canvas.update_primitive(i, prim, T)
+                self.canvas.scene = original_scene
+                
+        self.vis.set_animation(animation)
+        
+        print("Meshcat animation built. Displaying offline standalone HTML.")
+        from IPython.display import HTML, display
+        display(self.vis.render_static(height=500))
+        self.close_scene()
+        return None
+
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
+            import sys
+            if 'google.colab' in sys.modules:
+                from IPython.display import display
+                print("Meshcat static frame built. Displaying offline standalone HTML.")
+                display(self.vis.render_static(height=500))
+                return
             print("Meshcat static frame ready.")
             input("Press Enter to exit meshcat viewer...")
         elif self.show and interval_s is not None:
