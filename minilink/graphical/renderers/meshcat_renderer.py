@@ -386,12 +386,11 @@ class MeshcatRenderer(AnimationRenderer):
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
         if show:
             try:
-                from google.colab.output import eval_js
+                import google.colab
+                from google.colab import output
                 port = int(self.vis.url().split(":")[-1].split("/")[0])
-                proxy_url = eval_js(f"google.colab.kernel.proxyPort({port})")
-                if not proxy_url.endswith("/"):
-                    proxy_url += "/"
-                print(f"Colab Meshcat URL: {proxy_url}static/")
+                print(f"[Colab] Rendering Meshcat Inline (Port {port})...")
+                output.serve_kernel_port_as_iframe(port, path='/static/', height=500)
             except ImportError:
                 self.vis.open()
                 self.vis.wait()
