@@ -10,6 +10,7 @@ Three tiers:
 """
 
 from abc import ABC, abstractmethod
+import numpy as np
 
 
 class DynamicsEvaluator(ABC):
@@ -92,9 +93,21 @@ class DynamicsEvaluator(ABC):
     # Scipy bridge
     # ================================================================
 
+    def f_scipy(self, x, u, t=0.0):
+        """SciPy-friendly ``f`` with numpy in/out."""
+        return np.asarray(self.f(x, u, t))
+
+    def f_ivp_scipy(self, x, t=0.0):
+        """SciPy-friendly ``f_ivp`` with numpy in/out."""
+        return np.asarray(self.f_ivp(x, t))
+
     def as_scipy_rhs(self):
         """Returns ``(t, x) -> dx`` callable for ``scipy.integrate.solve_ivp``."""
-        return lambda t, x: self.f_ivp(x, t)
+        return lambda t, x: self.f_ivp_scipy(x, t)
+
+    def as_scipy_rhs_forced(self, u_of_t):
+        """Returns ``(t, x) -> dx`` callable for forced ``solve_ivp``."""
+        return lambda t, x: self.f_scipy(x, u_of_t(t), t)
 
     # ================================================================
     # Integration — standard tier (frozen params)
@@ -105,8 +118,8 @@ class DynamicsEvaluator(ABC):
         raise NotImplementedError("TODO")
 
     def euler_step(self, x, u, t, dt):
-        """Single Euler step."""
-        raise NotImplementedError("TODO")
+        """Explicit Euler: ``x + dt * f(x, u, t)``."""
+        return x + dt * self.f(x, u, t)
 
     def rollout(self, x0, u_sequence, t0, dt):
         """Forward integrate N steps with frozen params.
@@ -140,8 +153,8 @@ class DynamicsEvaluator(ABC):
         raise NotImplementedError("TODO")
 
     def euler_step_ivp(self, x, t, dt):
-        """Single Euler step with frozen u and params."""
-        raise NotImplementedError("TODO")
+        """Explicit Euler with nominal ``u`` (same as :meth:`f_ivp`)."""
+        return self.euler_step(x, self._u_nominal, t, dt)
 
     def rollout_ivp(self, x0, t0, dt, n_steps):
         """IVP rollout. Returns (n_steps+1, n)."""

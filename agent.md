@@ -24,6 +24,10 @@ This document defines the co-programming preferences and architectural philosoph
     - **dimensions**: Use 'n', 'm', 'p' for dimension, for instance matrix A has dimension (n, n), vector x has dimension (n, 1), vector u has dimension (m, 1), vector y has dimension (p, 1), matrix B has dimension (n, m)...
     - **Math context**: All in all for math context, use name convention as close as possible as standard notation in textbooks.
     - **Non-Math Context**: Follow standard **PEP8** (snake_case for methods, CamelCase for classes).
+- **Readability at a glance (default)**: Prefer **straight, boring code** — explicit loops and locals over clever abstractions, shared one-liners, or tricks whose only goal is to shave lines. **If a tradeoff appears between fewer lines and instant understanding, choose understanding.**
+- **Docstrings (simulation / dynamics layers)**: Math-first: state what `f`, `f_ivp`, or the integral means in plain notation; use short em-dash lines (`evaluator — …`, `times — …`). Avoid long Sphinx cross-links in small modules unless the API is public reference material.
+- **Tests — add only with a clear reason**: Do **not** add or expand automated tests on every internal change, helper, or refactor. Add or update tests when: (1) the change touches a **stable public / student-facing** API, (2) a **TRL / milestone** explicitly calls for regression coverage, (3) **`DESIGN.md` / contracts** require it, or (4) the **user asked** for tests. Internal plumbing and experiments can stay test-light until integration.
+- **Validation and error handling — same bar**: Avoid blanket `try`/`except`, defensive shape checks, and `ValueError` sprawl in **internal** code paths (orchestrators are expected to pass consistent inputs). Add guarding only when: (1) it is a **documented public interface** meant for students or library users who can pass bad data, (2) there is a **real hazard** (I/O, subprocess, FFI), or (3) the **user asked** for it.
 
 ---
 
@@ -38,11 +42,13 @@ This document defines the co-programming preferences and architectural philosoph
     - **Do not reintroduce** `compute_outputs(..., ports=...)` — it was removed; index `compute_internal_signals_dict` or slice using `ExecutionPlan.output_slices`.
     - **`ExecutionPlan`**: carries `output_slices` (all subsystem ports) and **`external_output_slices`** (diagram boundary → buffer slice). Compiler/evaluator changes should keep these aligned.
     - **JAX**: `JaxLeafEvaluator` / `JaxDiagramEvaluator` JIT core callables at construction with warm-start; preserve traceability of `f` / port `compute`. Diagram exposes **`get_f_jit`**, **`get_outputs_jit`**, **`get_internal_signals_jit`** for hot paths.
-- **Docs sync**: Any change to the evaluator ABC, `ExecutionPlan`, or diagram compile behavior should update **`DESIGN.md`** (and **`ROADMAP.md`** if scope/milestones shift), plus **unit tests** under `tests/unittest/`. Prefer **`examples/scripts/demo_internal_signals.py`** / **`demo_diagram_compiling.py`** patterns for end-to-end checks.
+- **Docs sync**: Any change to the evaluator ABC, `ExecutionPlan`, or diagram compile behavior should update **`DESIGN.md`** (and **`ROADMAP.md`** if scope/milestones shift), and add or update **unit tests** when those contracts regress (see **§2 — Tests** for proportionality). Prefer **`examples/scripts/demo_internal_signals.py`** / **`demo_diagram_compiling.py`** patterns for end-to-end checks.
 
 ---
 
 ## 4. 3-Level Testing Strategy
+
+**Scope:** This applies at **feature completion / integration** (see TRL), not as a mandate to add tests on every commit. See **§2 — Tests** for when agents should add tests during day-to-day work.
 
 Every feature must pass through three levels of verification:
 1.  **Automated Unit Test**: Formal `pytest` suite for regression and the AI agent's internal check.

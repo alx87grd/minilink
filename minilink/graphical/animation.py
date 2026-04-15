@@ -217,7 +217,7 @@ class Animator:
             up = bool(keys[pygame.K_UP])
             down = bool(keys[pygame.K_DOWN])
             if up and not down:
-                u[0] = 10.0
+                u[0] = 50.0
             elif down and not up:
                 u[0] = -10.0
 
@@ -225,9 +225,9 @@ class Animator:
             right = bool(keys[pygame.K_RIGHT])
             left = bool(keys[pygame.K_LEFT])
             if right and not left:
-                u[1] = 10.0
-            elif left and not right:
                 u[1] = -10.0
+            elif left and not right:
+                u[1] = +10.0
 
         return u
 

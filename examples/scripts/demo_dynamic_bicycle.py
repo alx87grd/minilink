@@ -9,4 +9,5 @@ from minilink.graphical.animation import Animator
 
 sys = DynamicBicycleCar3D()
 
+
 sys.game(renderer="meshcat")

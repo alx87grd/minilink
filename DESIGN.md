@@ -88,6 +88,12 @@ Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of **boundary*
 
 **Scipy bridge**: `as_scipy_rhs()` → `(t, x) -> dx` using the IVP tier.
 
+**Input-forcing convention (model vs simulation)**:
+
+- If a true time function is part of the **model structure**, represent it with a **Source block** inside a `DiagramSystem`.
+- If forcing is part of a **simulation run setup**, pass it to the simulator as a **discretized array** aligned with the simulation grid (`times`, `u` with shape `(m, n_pts)`).
+- Solver backends may internally reconstruct `u(t)` from that array (ZOH, linear, quadratic, cubic), but the external simulation interface stays grid-based for reproducibility and backend consistency.
+
 **Future**: Integration utilities (`rk4_step`, `rollout`), differentiation (`jacobian_f_x`, `linearize`), and batch simulation (`vmap_rollout`) are defined in the ABC as `NotImplementedError` stubs, to be implemented incrementally.
 
 ### 4.3 Diagram compilation pipeline

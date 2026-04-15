@@ -19,6 +19,7 @@ from __future__ import annotations
 import copy
 import time
 from typing import Any, Callable
+import numpy as np
 
 from minilink.compile.evaluator import DynamicsEvaluator
 from minilink.compile.execution_plan import (
@@ -196,6 +197,11 @@ class JaxLeafEvaluator(DynamicsEvaluator):
     def f(self, x, u, t=0.0):
         return self._jit_f(x, u, t)
 
+    def f_scipy(self, x, u, t=0.0):
+        x = self.jnp.asarray(x)
+        u = self.jnp.asarray(u)
+        return np.asarray(self._jit_f(x, u, t))
+
     def h(self, x, u, t=0.0):
         return self._jit_h(x, u, t)
 
@@ -225,6 +231,10 @@ class JaxLeafEvaluator(DynamicsEvaluator):
 
     def f_ivp(self, x, t=0.0):
         return self._jit_f_ivp(x, t)
+
+    def f_ivp_scipy(self, x, t=0.0):
+        x = self.jnp.asarray(x)
+        return np.asarray(self._jit_f_ivp(x, t))
 
     def h_ivp(self, x, t=0.0):
         return self._jit_h_ivp(x, t)
@@ -457,6 +467,11 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         """ẋ = f(x, u, t) — delegates to the JIT-compiled version."""
         return self._jit_f(x, u, t)
 
+    def f_scipy(self, x, u, t=0.0):
+        x = self._jnp.asarray(x)
+        u = self._jnp.asarray(u)
+        return np.asarray(self._jit_f(x, u, t))
+
     def _f_eager(self, x, u, t=0.0):
         """Compute the diagram's state derivative vector (JAX-traceable).
 
@@ -517,6 +532,10 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
 
     def f_ivp(self, x, t=0.0):
         return self._jit_f_ivp(x, t)
+
+    def f_ivp_scipy(self, x, t=0.0):
+        x = self._jnp.asarray(x)
+        return np.asarray(self._jit_f_ivp(x, t))
 
     # ── JIT convenience ─────────────────────────────────────────────
 
