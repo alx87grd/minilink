@@ -104,6 +104,11 @@ Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of **boundary*
 
 The simulator translates these high-level mode names into low-level solver kwargs (`method`, `rtol`, `atol`, `use_jac`) before calling the backend.
 
+**Practical user note (current benchmark trend)**:
+
+- For short-horizon simulations, `solver="scipy"` with `compile_backend="numpy"` is often a good go-to (fast, no compile overhead, reasonable precision).
+- For long fixed-step rollouts that require many dynamics evaluations, `solver="rk4_fixedsteps"` with `compile_backend="jax"` is often the best speed/precision tradeoff.
+
 **Future**: Integration utilities (`rk4_step`, `rollout`), differentiation (`jacobian_f_x`, `linearize`), and batch simulation (`vmap_rollout`) are defined in the ABC as `NotImplementedError` stubs, to be implemented incrementally.
 
 ### 4.3 Diagram compilation pipeline

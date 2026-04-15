@@ -27,15 +27,20 @@ sys = Pendulum()
 sys.x0[0] = 2.0
 
 t0 = 0.0
-tf = 1000.0
+tf = 100.0
 dt = 0.01
 n_runs = 1
+GROUND_TRUTH = ("scipy_ultra", "jax")
 
 print("\n=== Simulator speed comparison ===")
 print(f"system={sys.name}  t0={t0}  tf={tf}  dt={dt}  runs={n_runs}")
-row_fmt = (
+row_fmt_live = (
     "{solver_mode:<15} {backend:<8} {method:<12} "
     "{mean:>10.6f} {std:>10.6f} {nfev:>6d} {njev:>6d} {nt:>6d} {x0f:>12.6f}"
+)
+row_fmt = (
+    "{solver_mode:<15} {backend:<8} {method:<12} "
+    "{mean:>10.6f} {std:>10.6f} {nfev:>6d} {njev:>6d} {nt:>6d} {x0f:>12.6f} {err:>11.2f}% {speed:>8.2f}x"
 )
 print(
     "\nsolver_mode      backend  scipy_method   mean [s]    std [s]   nfev   njev    n_t     x0_final"
@@ -43,6 +48,7 @@ print(
 print(
     "--------------- -------  ------------  ---------- ---------- ------ ------ ------ ------------"
 )
+# print(f"reference={GROUND_TRUTH[0]} + {GROUND_TRUTH[1]}")
 
 solver_cases = {
     "euler": ["numpy", "jax"],
@@ -52,6 +58,8 @@ solver_cases = {
     "scipy_max": ["numpy", "jax"],
     "scipy_ultra": ["numpy", "jax"],
 }
+
+rows = []
 
 for solver in [
     "euler",
@@ -95,16 +103,71 @@ for solver in [
 
         scipy_method = scipy_methods[0] if solver.startswith("scipy") else "NA"
 
+        rows.append(
+            {
+                "solver_mode": solver,
+                "compile_backend": compile_backend,
+                "backend": backend_label,
+                "method": scipy_method,
+                "mean": np.mean(t_runs),
+                "std": np.std(t_runs),
+                "nfev": int(np.mean(nfev_runs)),
+                "njev": int(np.mean(njev_runs)),
+                "nt": int(np.mean(nt_runs)),
+                "x0f": np.mean(x0f_runs),
+            }
+        )
         print(
-            row_fmt.format(
-                solver_mode=solver,
-                backend=backend_label,
-                method=scipy_method,
-                mean=np.mean(t_runs),
-                std=np.std(t_runs),
-                nfev=int(np.mean(nfev_runs)),
-                njev=int(np.mean(njev_runs)),
-                nt=int(np.mean(nt_runs)),
-                x0f=np.mean(x0f_runs),
+            row_fmt_live.format(
+                solver_mode=rows[-1]["solver_mode"],
+                backend=rows[-1]["backend"],
+                method=rows[-1]["method"],
+                mean=rows[-1]["mean"],
+                std=rows[-1]["std"],
+                nfev=rows[-1]["nfev"],
+                njev=rows[-1]["njev"],
+                nt=rows[-1]["nt"],
+                x0f=rows[-1]["x0f"],
             )
         )
+
+ref_x0f = None
+ref_mean = None
+for row in rows:
+    if (row["solver_mode"], row["compile_backend"]) == GROUND_TRUTH:
+        ref_x0f = row["x0f"]
+        ref_mean = row["mean"]
+        break
+
+if ref_x0f is None:
+    raise ValueError(f"Ground truth row not found: {GROUND_TRUTH}")
+
+print("\n=== Final precision table ===")
+print(
+    "solver_mode      backend  scipy_method   mean [s]    std [s]   nfev   njev    n_t     x0_final   err_vs_ref speed_vs_ref"
+)
+print(
+    "--------------- -------  ------------  ---------- ---------- ------ ------ ------ ------------ ----------- -----------"
+)
+
+for row in rows:
+    if abs(ref_x0f) > 0:
+        row["err"] = 100.0 * abs((row["x0f"] - ref_x0f) / ref_x0f)
+    else:
+        row["err"] = 0.0 if row["x0f"] == ref_x0f else np.inf
+    row["speed"] = ref_mean / row["mean"] if row["mean"] > 0 else np.inf
+    print(
+        row_fmt.format(
+            solver_mode=row["solver_mode"],
+            backend=row["backend"],
+            method=row["method"],
+            mean=row["mean"],
+            std=row["std"],
+            nfev=row["nfev"],
+            njev=row["njev"],
+            nt=row["nt"],
+            x0f=row["x0f"],
+            err=row["err"],
+            speed=row["speed"],
+        )
+    )

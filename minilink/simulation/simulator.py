@@ -140,6 +140,10 @@ class Simulator:
         return traj
 
     def _parse_solver(self, solver):
+        # Practical guidance from current manual benchmarks:
+        # - Short simulations: scipy + numpy (RK45) is often a strong default.
+        # - Long fixed-step rollouts: rk4_fixedsteps + jax is usually the fastest
+        #   while keeping precision close to high-order SciPy references.
         mapping = {
             "scipy": (
                 "scipy",
