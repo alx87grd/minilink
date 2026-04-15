@@ -3,6 +3,7 @@
 from minilink.simulation.input_interpolation import INPUT_INTERP_KEY, build_u_at_t
 from minilink.simulation.solver_backends import (
     EulerSolverBackend,
+    RK4SolverBackend,
     SciPySolverBackend,
     SolverBackend,
 )
@@ -11,6 +12,7 @@ from minilink.simulation.simulator import Simulator
 __all__ = [
     "INPUT_INTERP_KEY",
     "EulerSolverBackend",
+    "RK4SolverBackend",
     "SciPySolverBackend",
     "Simulator",
     "SolverBackend",

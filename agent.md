@@ -83,7 +83,9 @@ All features must progress through the following **Task Readiness Levels**:
     - Cosmetic PEP8 adjustments (outside of math equations).
 - **Demo Script Rule**:
     - Keep demo scripts flat and directly runnable at module top-level.
-    - Do not wrap demo flow in helper functions unless explicitly requested.
+    - Keep manual test scripts (`tests/manual/`) flat the same way.
+    - Prefer explicit top-level sequence over helper wrappers for script flow.
+    - Do not wrap demo/manual flow in helper functions unless explicitly requested.
 - **Always Ask**: 
     - Deleting or renaming files.
     - Architectural changes or core logic refactors.

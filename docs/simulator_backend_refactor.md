@@ -1,18 +1,33 @@
 # Simulator backend refactor
 
-Design plan for refactoring simulation around a **backend-pluggable integration layer** with three supported backends in v1:
+Design plan for refactoring simulation around a **backend-pluggable integration layer**.
 
 - Euler fixed-step
-- **SciPy** — NumPy RHS and `scipy.integrate.solve_ivp` (current behavior).
-- **Hybrid (`jax_scipy`)** — JAX-compiled dynamics RHS with the SciPy integrator (Python bridge).
-- **Full JAX (`jax`)** — JAX-compiled integration (fixed-step first with `lax.scan`).
+- **SciPy family** — `scipy.integrate.solve_ivp` with high-level presets selected by solver mode.
+
+## Current implemented interface (sync)
+
+The current prototype in `minilink/simulation/` exposes a single user-facing selector:
+
+- `solver="euler"`
+- `solver="scipy"`
+- `solver="scipy_stiff"`
+- `solver="scipy_max"`
+- `solver="scipy_ultra"`
+
+`Simulator` translates this high-level key into low-level backend options (`method`, `rtol`, `atol`, `use_jac`) and passes them to `SciPySolverBackend`.
+
+`compile_backend` stays orthogonal:
+
+- `compile_backend="numpy"` or `compile_backend="jax"`
+- for `scipy_stiff`, Jacobian is applied only when `compile_backend="jax"` (via evaluator bridge).
 
 **Priorities:** preserve default `System.compute_trajectory(...)` behavior; optimize the JAX performance path for compiled dynamics; leave clean extension points for batch rollouts and RL-style interactive stepping.
 
 ## Goals
 
 - **Master `Simulator`** class as the single orchestrator (time grid, inputs, `Trajectory`).
-- **`SolverBackend` ABC** for concrete solver implementations (SciPy, hybrid, JAX scan, Euler, discrete).
+- **`SolverBackend` ABC** for concrete solver implementations (SciPy, Euler).
 - Unified integrator selection for the modes above.
 - Stable defaults when backend/options are omitted.
 - Fast path for compiled diagram / system dynamics.
@@ -22,12 +37,11 @@ Design plan for refactoring simulation around a **backend-pluggable integration 
 
 | Name | Meaning |
 |------|---------|
-| **`compile_backend`** | How the **diagram** (or leaf) dynamics are evaluated: `"numpy"` or `"jax"` → `DynamicsEvaluator` from `compile(...)`. Orthogonal to time integration. |
-| **`integrator_backend`** (string / enum) | **Which time integrator family** to use among SciPy ODE, hybrid JAX+SciPy, or full JAX scan: `"scipy"`, `"jax_scipy"`, `"jax"`. |
-| **`solver`** (legacy string) | Today’s `Simulator(..., solver=...)` value: `"scipy"`, `"euler"`, or `"discrete"`. Maps to a **`SolverBackend`** instance; `euler` / `discrete` are not the same axis as `jax_scipy`. |
-| **`SolverBackend`** (ABC) | Python class implementing one stepping strategy; selected by factory from `solver` + `integrator_backend` + `sys.solver_info`. |
+| **`solver`** | High-level user key: `"euler"`, `"scipy"`, `"scipy_stiff"`, `"scipy_max"`, `"scipy_ultra"`. |
+| **`compile_backend`** | Dynamics evaluator backend: `"numpy"` or `"jax"`. |
+| **`SolverBackend`** (ABC) | Python class implementing one stepping strategy (`SciPySolverBackend`, `EulerSolverBackend`). |
 
-**Rule:** `integrator_backend="jax"` does **not** imply `compile_backend="jax"` unless you choose both — you could run NumPy RHS with a JAX-only path only if implemented; the intended fast path is usually **`compile_backend="jax"`** with **`integrator_backend="jax"`**.
+**Rule:** solver selection and compile backend are orthogonal. Example: `solver="scipy_stiff"` can run with either compile backend, but Jacobian acceleration is active only with JAX evaluator.
 
 ## Current context (what we reuse)
 
@@ -54,16 +68,10 @@ flowchart TD
   evalFactory --> jaxEval[JAX evaluator]
 
   solverFactory --> scipySolver[SciPySolverBackend]
-  solverFactory --> jaxScipySolver[HybridJaxScipySolverBackend]
-  solverFactory --> jaxSolver[JaxScanSolverBackend]
   solverFactory --> eulerSolver[EulerSolverBackend]
-  solverFactory --> discreteSolver[DiscreteSolverBackend]
 
   scipySolver --> traj[Trajectory]
-  jaxScipySolver --> traj
-  jaxSolver --> traj
   eulerSolver --> traj
-  discreteSolver --> traj
 
   sim --> post[Optional postprocess]
   post --> internalSig[compute_internal_signals]
@@ -79,8 +87,8 @@ flowchart TD
 |----------------|--------|
 | `sys.refresh()`, `x0` validation | Before integration |
 | Time grid | `select_time_vector` — continuous vs discrete; `t0`, `tf`, `dt`, `n_steps` |
-| Legacy `solver` → backend mapping | e.g. `"scipy"` / `"euler"` / `"discrete"` map to a `SolverBackend` instance (or a small registry) |
-| `integrator_backend` / `compile_backend` | New options: `"scipy" \| "jax_scipy" \| "jax"` and `"numpy" \| "jax"` for diagrams |
+| `solver` → backend+options mapping | `"euler"` and SciPy presets map to backend key + low-level options dict |
+| `compile_backend` | `"numpy" \| "jax"` for evaluator compilation |
 | Build `DynamicsEvaluator` or `None` | `DiagramSystem.compile(...)`; leaf systems may use `sys.f` / `fsim` |
 | **`ExternalInputMode`** (Phase B) | Resolve (a–c) → per-step `u` or closed RHS for SciPy |
 | **Delegate** | `self._solver_backend.integrate(...)` or equivalent |
@@ -119,28 +127,21 @@ class SolverBackend(ABC):
 - **`Simulator`** builds **`u_traj`** / **`Trajectory`** from **`get_u_from_input_ports`** where needed; backends return **state `x` only**.
 - **`SciPySolverBackend`:** may store **`last_solve_ivp_solution`**; **`Simulator`** mirrors **`scipy_last_solution`**.
 
-**Phase B — planned extensions**  
-Add optional **`input_spec: ExternalInputMode | None`** when types exist; when `None`, behavior matches Phase A.
-
-**Concrete subclasses (v1):**
+**Concrete subclasses (current):**
 
 | Class | Behavior |
 |-------|----------|
 | `SciPySolverBackend` | `solve_ivp`; RHS from `evaluator` or `fsim`; supports `input_spec` for closed RHS when needed |
-| `HybridJaxScipySolverBackend` | JAX JIT RHS + same SciPy `solve_ivp` wrapper |
-| `JaxScanSolverBackend` | Fixed-step `lax.scan` / `rollout_fixed_u` path; requires `dt` + grid |
 | `EulerSolverBackend` | Current explicit Euler loop (diagrams may use `evaluator.f`) |
-| `DiscreteSolverBackend` | Current discrete map `x_{k+1} = f(...)` |
 
-**Registry / factory:** `Simulator` (or a module-level `get_solver_backend(name)`) selects the subclass from `solver` + `integrator_backend` + `sys.solver_info` (continuous vs discrete, discontinuous → euler, etc.).
+**Registry / factory:** `Simulator._parse_solver(...)` maps the high-level solver key to `(backend_key, solver_backend_options)` and `_select_backend(...)` instantiates the backend class.
 
 ## Design decisions (v1)
 
 - **Single orchestrator `Simulator`**; variability lives in **`SolverBackend` ABC** subclasses, not in multiple `Simulator` subclasses.
-- Backend enum / config: `"scipy" | "jax_scipy" | "jax"` at the simulation API boundary (alongside legacy `"euler"` / `"discrete"` where needed).
+- High-level solver API: `"euler" | "scipy" | "scipy_stiff" | "scipy_max" | "scipy_ultra"`.
 - RHS construction centralized so backends receive either NumPy-safe or JAX-compiled callables as appropriate.
-- Full-JAX path starts as **deterministic fixed-step** integration (`jax.lax.scan`) for JIT stability and performance.
-- Adaptive / error-controlled integration stays on **SciPy** for `scipy` and `jax_scipy`.
+- Adaptive / error-controlled integration stays on **SciPy**.
 
 ## Interfaces and contracts
 
@@ -165,11 +166,10 @@ Add optional **`input_spec: ExternalInputMode | None`** when types exist; when `
 
 | Operation | Role |
 |-----------|------|
-| `SolverBackend.integrate(...)` + `ExternalInputMode` | Resolves inputs (a–c); SciPy / hybrid / full JAX |
-| SciPy `solve_ivp` wrapper | Inside `SciPySolverBackend` / `HybridJaxScipySolverBackend` |
-| `jax_scipy` | JIT RHS + SciPy; subclass wires `evaluator.f` / closures |
+| `SolverBackend.integrate(...)` + `ExternalInputMode` | Resolves inputs (a–c); SciPy / Euler |
+| SciPy `solve_ivp` wrapper | Inside `SciPySolverBackend` |
 
-**Summary:** high-level `integrate(tf, x0, t0)` is not a method on `JaxDiagramEvaluator` only; **`Simulator` delegates** to **`SolverBackend.integrate`**, while JAX evaluators expose **steps + `rollout_fixed_u`** for `JaxScanSolverBackend` and interactive reuse.
+**Summary:** high-level `integrate(tf, x0, t0)` is not a method on `JaxDiagramEvaluator`; **`Simulator` delegates** to **`SolverBackend.integrate`**.
 
 ### Proposed types (sketch)
 
@@ -194,12 +194,15 @@ class SeriesInputs(ExternalInputMode):
 ```
 
 ```python
-# Backend selection
+# High-level solver selection
 
-class IntegratorBackend:
-    SCIPY = "scipy"           # NumPy RHS, solve_ivp
-    JAX_SCIPY = "jax_scipy"   # JAX JIT RHS, solve_ivp
-    JAX = "jax"               # Full JAX fixed-step first
+solver in {
+    "euler",
+    "scipy",
+    "scipy_stiff",
+    "scipy_max",
+    "scipy_ultra",
+}
 ```
 
 ```python
@@ -211,7 +214,7 @@ class DynamicsEvaluatorProtocol(Protocol):
     def f_ivp(self, x, t=0.0): ...
 ```
 
-Concrete **`SolverBackend`** subclasses: `SciPySolverBackend`, `HybridJaxScipySolverBackend`, `JaxScanSolverBackend`, `EulerSolverBackend`, `DiscreteSolverBackend` (see canonical `integrate` above).
+Concrete **`SolverBackend`** subclasses: `SciPySolverBackend`, `EulerSolverBackend` (see canonical `integrate` above).
 
 ```python
 class JaxEvaluatorExtras(Protocol):
@@ -281,7 +284,7 @@ Using a full diagram **only** to apply a simple forcing (step, sine, schedule) i
 ## Testing strategy
 
 - Extend [`tests/unittest/test_compile_pipeline.py`](../tests/unittest/test_compile_pipeline.py) and add backend-focused tests.
-- Parity: `scipy` vs `jax_scipy`; `jax_scipy` vs `jax` on a **matching fixed grid**.
+- Parity: `scipy` family modes under `compile_backend="numpy"` vs `"jax"` on representative systems.
 - Smoke performance via existing manual scripts under [`tests/manual/`](../tests/manual/).
 
 ## Future hooks (not all in v1)
@@ -299,14 +302,14 @@ Using a full diagram **only** to apply a simple forcing (step, sine, schedule) i
 ## Implementation checklist
 
 **Phase A (first merge)**  
-1. Add **`minilink/simulation/`** with **`SolverBackend` ABC**, `SciPy` / `Euler` / `Discrete` backends, **`get_solver_backend`**, matching **Phase A `integrate`** signature.  
+1. Add **`minilink/simulation/`** with **`SolverBackend` ABC**, `SciPy` / `Euler` backends, matching **Phase A `integrate`** signature.  
 2. Refactor **`Simulator.solve()`** to delegate to the backend; preserve **`Trajectory`** layout and **`Simulator.scipy_last_solution`**.  
 3. Unit tests: same trajectories as before on a few representative systems.
 
 **Phase B (features)**  
-4. Add **`simulation/types.py`**: `ExternalInputMode`, **`integrator_backend`** + **`compile_backend`** options on `Simulator` / `compute_trajectory`.  
-5. Implement **`HybridJaxScipySolverBackend`** and **`JaxScanSolverBackend`**; extend **`JaxDiagramEvaluator`** with JIT steps + `rollout_fixed_u`.  
-6. Parity tests: `scipy` vs `jax_scipy`; `jax_scipy` vs `jax` on a matching fixed grid; performance smoke tests.
+4. Add **`simulation/types.py`**: `ExternalInputMode` typed helpers where needed.  
+5. Keep extending JAX evaluator utilities (`euler_step`, `rollout_fixed_u`) for future acceleration paths.  
+6. Parity tests across solver presets (`scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`) and compile backends.
 
 **Phase C (optional)**  
 7. Non-breaking interactive seam in [`animation.py`](../minilink/graphical/animation.py) for `game()` / future env reuse.

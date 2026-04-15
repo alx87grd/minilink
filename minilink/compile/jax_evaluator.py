@@ -144,6 +144,7 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         self._jit_h_p = jax.jit(lambda x, u, t, p: h_raw(x, u, t, p))
         self._jit_f_ivp = jax.jit(lambda x, t: f_raw(x, u_nom, t, frozen_p))
         self._jit_h_ivp = jax.jit(lambda x, t: h_raw(x, u_nom, t, frozen_p))
+        self._jit_jac_ivp = jax.jit(jax.jacfwd(self._jit_f_ivp, argnums=0))
 
         output_items = tuple(
             (pid, port.compute) for pid, port in system.outputs.items()
@@ -235,6 +236,9 @@ class JaxLeafEvaluator(DynamicsEvaluator):
     def f_ivp_scipy(self, x, t=0.0):
         x = self.jnp.asarray(x)
         return np.asarray(self._jit_f_ivp(x, t))
+
+    def as_scipy_jac(self):
+        return lambda t, x: np.asarray(self._jit_jac_ivp(self.jnp.asarray(x), t))
 
     def h_ivp(self, x, t=0.0):
         return self._jit_h_ivp(x, t)
@@ -374,6 +378,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
 
         u_nom = self._u_nominal
         self._jit_f_ivp = jax.jit(lambda x, t: _f_eager(x, u_nom, t))
+        self._jit_jac_ivp = jax.jit(jax.jacfwd(self._jit_f_ivp, argnums=0))
 
         self._jit_outputs = jax.jit(
             lambda x, u, t: self._external_outputs_eager(x, u, t)
@@ -536,6 +541,9 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
     def f_ivp_scipy(self, x, t=0.0):
         x = self._jnp.asarray(x)
         return np.asarray(self._jit_f_ivp(x, t))
+
+    def as_scipy_jac(self):
+        return lambda t, x: np.asarray(self._jit_jac_ivp(self._jnp.asarray(x), t))
 
     # ── JIT convenience ─────────────────────────────────────────────
 

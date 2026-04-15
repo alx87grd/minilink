@@ -94,6 +94,16 @@ Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of **boundary*
 - If forcing is part of a **simulation run setup**, pass it to the simulator as a **discretized array** aligned with the simulation grid (`times`, `u` with shape `(m, n_pts)`).
 - Solver backends may internally reconstruct `u(t)` from that array (ZOH, linear, quadratic, cubic), but the external simulation interface stays grid-based for reproducibility and backend consistency.
 
+**Simulator solver modes (current prototype)**:
+
+- `solver="euler"` — explicit Euler over the selected `times` grid.
+- `solver="scipy"` — SciPy `RK45` default profile.
+- `solver="scipy_stiff"` — SciPy `Radau` profile; JAX Jacobian path when available.
+- `solver="scipy_max"` — SciPy `DOP853` with tighter tolerances.
+- `solver="scipy_ultra"` — SciPy `DOP853` with very tight tolerances.
+
+The simulator translates these high-level mode names into low-level solver kwargs (`method`, `rtol`, `atol`, `use_jac`) before calling the backend.
+
 **Future**: Integration utilities (`rk4_step`, `rollout`), differentiation (`jacobian_f_x`, `linearize`), and batch simulation (`vmap_rollout`) are defined in the ABC as `NotImplementedError` stubs, to be implemented incrementally.
 
 ### 4.3 Diagram compilation pipeline

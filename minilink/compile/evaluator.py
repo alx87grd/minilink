@@ -109,6 +109,10 @@ class DynamicsEvaluator(ABC):
         """Returns ``(t, x) -> dx`` callable for forced ``solve_ivp``."""
         return lambda t, x: self.f_scipy(x, u_of_t(t), t)
 
+    def as_scipy_jac(self):
+        """Returns ``(t, x) -> df/dx`` callable for nominal ``solve_ivp``."""
+        raise NotImplementedError("Jacobian callable is not available for this evaluator")
+
     # ================================================================
     # Integration — standard tier (frozen params)
     # ================================================================
