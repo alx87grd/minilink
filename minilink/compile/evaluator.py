@@ -119,7 +119,11 @@ class DynamicsEvaluator(ABC):
 
     def rk4_step(self, x, u, t, dt):
         """Single RK4 step: x_{k+1}."""
-        raise NotImplementedError("TODO")
+        k1 = self.f(x, u, t)
+        k2 = self.f(x + 0.5 * dt * k1, u, t + 0.5 * dt)
+        k3 = self.f(x + 0.5 * dt * k2, u, t + 0.5 * dt)
+        k4 = self.f(x + dt * k3, u, t + dt)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
     def euler_step(self, x, u, t, dt):
         """Explicit Euler: ``x + dt * f(x, u, t)``."""
@@ -154,15 +158,26 @@ class DynamicsEvaluator(ABC):
 
     def rk4_step_ivp(self, x, t, dt):
         """Single RK4 step with frozen u and params."""
-        raise NotImplementedError("TODO")
+        k1 = self.f_ivp(x, t)
+        k2 = self.f_ivp(x + 0.5 * dt * k1, t + 0.5 * dt)
+        k3 = self.f_ivp(x + 0.5 * dt * k2, t + 0.5 * dt)
+        k4 = self.f_ivp(x + dt * k3, t + dt)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
     def euler_step_ivp(self, x, t, dt):
         """Explicit Euler with nominal ``u`` (same as :meth:`f_ivp`)."""
         return self.euler_step(x, self._u_nominal, t, dt)
 
-    def rollout_ivp(self, x0, t0, dt, n_steps):
-        """IVP rollout. Returns (n_steps+1, n)."""
-        raise NotImplementedError("TODO")
+    def rk4_rollout_ivp(self, x0, t0, dt, n_steps):
+        """IVP RK4 rollout. Returns (n_steps+1, n)."""
+        x_seq = [x0]
+        x = x0
+        t = t0
+        for _ in range(n_steps):
+            x = self.rk4_step_ivp(x, t, dt)
+            t = t + dt
+            x_seq.append(x)
+        return np.asarray(x_seq)
 
     # ================================================================
     # Differentiation (NotImplementedError by default)

@@ -245,61 +245,12 @@ class RK4SolverBackend(SolverBackend):
         n_pts = times.shape[0]
         n = evaluator.n
 
-        # Degenerate case
-        if n_pts <= 1:
-            x_traj = np.zeros((n, n_pts), dtype=float)
-            if n_pts == 1:
-                x_traj[:, 0] = x0
-            self.last_debug = {
-                "solver": "rk4",
-                "mode": "nominal",
-                "nfev": 0,
-                "njev": 0,
-                "nlu": 0,
-                "n_t": n_pts,
-            }
-            return x_traj
-
-        # JAX fast path
-        if getattr(evaluator, "backend", None) == "jax":
-            jax = getattr(evaluator, "jax", None) or getattr(evaluator, "_jax", None)
-            jnp = getattr(evaluator, "jnp", None) or getattr(evaluator, "_jnp", None)
-            if jax is None or jnp is None:
-                import jax
-                import jax.numpy as jnp
-
-            times_j = jnp.asarray(times)
-            x0_j = jnp.asarray(x0)
-            t_pairs = jnp.stack((times_j[:-1], times_j[1:]), axis=1)
-
-            def body(x, pair):
-                t = pair[0]
-                t_next = pair[1]
-                dt = t_next - t
-                k1 = evaluator.f_ivp(x, t)
-                k2 = evaluator.f_ivp(x + 0.5 * dt * k1, t + 0.5 * dt)
-                k3 = evaluator.f_ivp(x + 0.5 * dt * k2, t + 0.5 * dt)
-                k4 = evaluator.f_ivp(x + dt * k3, t + dt)
-                x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-                return x_next, x_next
-
-            rollout = jax.jit(lambda x0_, pairs_: jax.lax.scan(body, x0_, pairs_))
-            _, xs = rollout(x0_j, t_pairs)
-            x_traj = jnp.concatenate((x0_j[None, :], xs), axis=0).T
-            x_traj = np.asarray(x_traj)
-        else:
-            # NumPy path
-            x_traj = np.zeros((n, n_pts), dtype=float)
-            x_traj[:, 0] = x0
-            for i in range(n_pts - 1):
-                t = times[i]
-                dt = times[i + 1] - times[i]
-                x = x_traj[:, i]
-                k1 = evaluator.f_ivp(x, t)
-                k2 = evaluator.f_ivp(x + 0.5 * dt * k1, t + 0.5 * dt)
-                k3 = evaluator.f_ivp(x + 0.5 * dt * k2, t + 0.5 * dt)
-                k4 = evaluator.f_ivp(x + dt * k3, t + dt)
-                x_traj[:, i + 1] = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        # Fixed-step rollout through evaluator primitive
+        t0 = times[0]
+        dt = times[1] - times[0]
+        n_steps = n_pts - 1
+        x_seq = evaluator.rk4_rollout_ivp(x0, t0, dt, n_steps)  # (n_pts, n)
+        x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # Debug information
         self.last_debug = {

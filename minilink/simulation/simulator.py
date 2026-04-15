@@ -162,13 +162,13 @@ class Simulator:
                 "scipy",
                 {
                     "method": "DOP853",
-                    "rtol": 1e-10,
-                    "atol": 1e-12,
+                    "rtol": 1e-9,
+                    "atol": 1e-11,
                     "use_jac": False,
                 },
             ),
             "euler": ("euler", {}),
-            "rk4": ("rk4", {}),
+            "rk4_fixedsteps": ("rk4", {}),
         }
         if solver not in mapping:
             raise ValueError(f"Unknown solver '{solver}'")
