@@ -565,9 +565,16 @@ class System:
         Trajectory
             An object containing time, state, and input histories.
         """
-        from minilink.core.analysis import Simulator
+        from minilink.simulation import Simulator
 
-        sim = Simulator(self, t0, tf, n_steps, dt, solver)
+        sim = Simulator(
+            self,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            dt=dt,
+            solver=solver,
+        )
         traj = sim.solve(show=show)
 
         self.traj = traj

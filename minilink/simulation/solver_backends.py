@@ -64,6 +64,31 @@ class SciPySolverBackend(SolverBackend):
 
     def __init__(self) -> None:
         self.last_debug = None
+        self.last_solve_ivp_solution = None
+
+    def _finalize_solution(self, sol, *, mode, method, extra_debug=None):
+        self.last_solve_ivp_solution = sol
+        debug = {
+            "solver": "scipy",
+            "mode": mode,
+            "method": method,
+            "success": sol.success,
+            "status": sol.status,
+            "message": sol.message,
+            "nfev": sol.nfev,
+            "njev": sol.njev,
+            "nlu": sol.nlu,
+            "n_t": len(sol.t),
+        }
+        if extra_debug:
+            debug.update(extra_debug)
+        self.last_debug = debug
+        if not sol.success:
+            raise RuntimeError(
+                f"SciPy solver failed in {mode} mode with method "
+                f"{method}: {sol.message}"
+            )
+        return sol.y
 
     def integrate(
         self,
@@ -95,21 +120,12 @@ class SciPySolverBackend(SolverBackend):
 
         # Debug information
         method = kw.get("method", "RK45")
-
-        self.last_debug = {
-            "solver": "scipy",
-            "mode": "nominal",
-            "jac_applied": jac_applied,
-            "method": method,
-            "success": sol.success,
-            "status": sol.status,
-            "message": sol.message,
-            "nfev": sol.nfev,
-            "njev": sol.njev,
-            "nlu": sol.nlu,
-            "n_t": len(sol.t),
-        }
-        return sol.y
+        return self._finalize_solution(
+            sol,
+            mode="nominal",
+            method=method,
+            extra_debug={"jac_applied": jac_applied},
+        )
 
     def integrate_forced(
         self,
@@ -139,20 +155,12 @@ class SciPySolverBackend(SolverBackend):
         sol = solve_ivp(rhs, [t0, tf], x0, t_eval=times, **kw)
 
         # Debug information
-        self.last_debug = {
-            "solver": "scipy",
-            "mode": "forced",
-            "method": method,
-            "interp": scheme,
-            "success": sol.success,
-            "status": sol.status,
-            "message": sol.message,
-            "nfev": sol.nfev,
-            "njev": sol.njev,
-            "nlu": sol.nlu,
-            "n_t": len(sol.t),
-        }
-        return sol.y
+        return self._finalize_solution(
+            sol,
+            mode="forced",
+            method=method,
+            extra_debug={"interp": scheme},
+        )
 
 
 class EulerSolverBackend(SolverBackend):

@@ -21,13 +21,14 @@ class Simulator:
         tf=10,
         n_steps=None,
         dt=None,
-        solver="scipy",
+        solver=None,
         verbose=True,
         compile_backend="numpy",
     ):
         self.verbose = verbose
         self.sys = sys
         self.compile_backend = compile_backend
+        self.scipy_last_solution = None
         self.sys.refresh()
 
         if self.verbose:
@@ -40,8 +41,7 @@ class Simulator:
         self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
         self.times = self.t
         self.n_pts = len(self.times)
-        self.x0 = sys.x0 if x0 is None else x0
-        assert self.x0.shape[0] == sys.n, "x0 has the wrong dimension"
+        self.x0 = self._validate_x0(sys.x0 if x0 is None else x0, sys.n)
 
         self.solver_mode = self.select_solver(sys, solver)
         solver_backend_key, self.solver_backend_options = self._parse_solver(
@@ -58,6 +58,44 @@ class Simulator:
         if self.verbose:
             print(f"Auto-compiling backend={compile_backend}.")
         return sys.compile(backend=compile_backend)
+
+    def _validate_x0(self, x0, state_dim):
+        x0_arr = np.asarray(x0, dtype=float)
+        if x0_arr.ndim != 1:
+            raise ValueError(f"x0 must be a 1-D array with shape ({state_dim},)")
+        if x0_arr.shape[0] != state_dim:
+            raise ValueError(f"x0 must have shape ({state_dim},)")
+        if not np.all(np.isfinite(x0_arr)):
+            raise ValueError("x0 must contain only finite values")
+        return x0_arr
+
+    def _validate_n_steps(self, n_steps):
+        if isinstance(n_steps, bool) or not isinstance(n_steps, (int, np.integer)):
+            raise ValueError("n_steps must be an integer greater than or equal to 2")
+        if n_steps < 2:
+            raise ValueError("n_steps must be greater than or equal to 2")
+
+    def _validate_dt(self, dt, *, label="dt"):
+        if not np.isscalar(dt):
+            raise ValueError(f"{label} must be a positive finite scalar")
+        dt_value = float(dt)
+        if not np.isfinite(dt_value) or dt_value <= 0.0:
+            raise ValueError(f"{label} must be a positive finite scalar")
+        return dt_value
+
+    def _validate_forced_u_traj(self, u_traj):
+        u_arr = np.asarray(u_traj, dtype=float)
+        expected_shape = (self.sys.m, self.n_pts)
+        if u_arr.ndim != 2:
+            raise ValueError(f"u_traj must have shape {expected_shape}")
+        if u_arr.shape != expected_shape:
+            raise ValueError(f"u_traj must have shape {expected_shape}")
+        if not np.all(np.isfinite(u_arr)):
+            raise ValueError("u_traj must contain only finite values")
+        return u_arr
+
+    def _supports_forced_mode(self):
+        return not isinstance(self.solver_backend, RK4SolverBackend)
 
     def _select_backend(self, solver_backend_key):
         if solver_backend_key == "scipy":
@@ -84,28 +122,56 @@ class Simulator:
         return "scipy"
 
     def select_time_vector(self, t0, tf, n_steps, dt, sys):
+        if not np.isscalar(t0) or not np.isscalar(tf):
+            raise ValueError("t0 and tf must be finite scalars")
+        t0 = float(t0)
+        tf = float(tf)
+        if not np.isfinite(t0) or not np.isfinite(tf):
+            raise ValueError("t0 and tf must be finite scalars")
+        if tf <= t0:
+            raise ValueError("tf must be greater than t0")
+
         if n_steps is None and dt is None:
-            dt = sys.solver_info["smallest_time_constant"] * 0.1
+            dt = self._validate_dt(
+                sys.solver_info["smallest_time_constant"] * 0.1,
+                label="automatic dt",
+            )
             time_vector = np.arange(t0, tf + dt, dt)
             if self.verbose:
                 print("Automatic dt based on the smallest time constant of the system")
         elif dt is None:
+            self._validate_n_steps(n_steps)
             time_vector = np.linspace(t0, tf, n_steps)
         elif n_steps is None:
+            dt = self._validate_dt(dt)
             time_vector = np.arange(t0, tf + dt, dt)
         else:
+            self._validate_n_steps(n_steps)
             logging.warning(
                 "You must choose between n_steps and dt: using the specified n_steps"
             )
             time_vector = np.linspace(t0, tf, n_steps)
 
+        if time_vector.size < 2:
+            raise ValueError("Time vector must contain at least two points")
         dt = time_vector[1] - time_vector[0]
         n_steps = len(time_vector)
         return time_vector, dt, n_steps
 
     def solve(self, show=False):
-        x_traj = self.solver_backend.integrate(
-            self.evaluator, self.times, self.x0, args=self.solver_backend_options
+        try:
+            x_traj = self.solver_backend.integrate(
+                self.evaluator, self.times, self.x0, args=self.solver_backend_options
+            )
+        except Exception:
+            self.last_debug = self.solver_backend.last_debug
+            self.scipy_last_solution = getattr(
+                self.solver_backend, "last_solve_ivp_solution", None
+            )
+            raise
+
+        self.scipy_last_solution = getattr(
+            self.solver_backend, "last_solve_ivp_solution", None
         )
 
         # Build the input trajectory
@@ -123,12 +189,28 @@ class Simulator:
         return traj
 
     def solve_forced(self, u_traj, show=False):
-        x_traj = self.solver_backend.integrate_forced(
-            self.evaluator,
-            self.times,
-            u_traj,
-            self.x0,
-            args=self.solver_backend_options,
+        u_traj = self._validate_forced_u_traj(u_traj)
+        if not self._supports_forced_mode():
+            raise ValueError(
+                f"Solver '{self.solver_mode}' does not support forced simulations"
+            )
+        try:
+            x_traj = self.solver_backend.integrate_forced(
+                self.evaluator,
+                self.times,
+                u_traj,
+                self.x0,
+                args=self.solver_backend_options,
+            )
+        except Exception:
+            self.last_debug = self.solver_backend.last_debug
+            self.scipy_last_solution = getattr(
+                self.solver_backend, "last_solve_ivp_solution", None
+            )
+            raise
+
+        self.scipy_last_solution = getattr(
+            self.solver_backend, "last_solve_ivp_solution", None
         )
         self.last_debug = self.solver_backend.last_debug
         traj = Trajectory(x_traj, u_traj, self.times)
