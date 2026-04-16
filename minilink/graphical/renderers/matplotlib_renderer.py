@@ -14,6 +14,7 @@ from minilink.graphical.primitives import (
     Box,
     Circle,
     CustomLine,
+    ExtrudedPolygon,
     Plane,
     Point,
     Rod,
@@ -293,6 +294,31 @@ class MatplotlibCanvas:
                         color=primitive.color,
                         linewidth=1.5,
                         linestyle=primitive.style,
+                    )
+                self.drawn_objects.append(seg)
+
+        elif isinstance(primitive, ExtrudedPolygon):
+            vertices = primitive.vertices_local()
+            vertices_h = np.hstack((vertices, np.ones((vertices.shape[0], 1))))
+            world_v = (transform_matrix @ vertices_h.T).T[:, :3]
+            for i, j in primitive.edges():
+                p0, p1 = world_v[i], world_v[j]
+                if self.is_3d:
+                    (seg,) = self.ax.plot(
+                        [p0[0], p1[0]],
+                        [p0[1], p1[1]],
+                        [p0[2], p1[2]],
+                        color=primitive.color,
+                        linewidth=1.5,
+                        alpha=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                    )
+                else:
+                    (seg,) = self.ax.plot(
+                        [p0[0], p1[0]],
+                        [p0[1], p1[1]],
+                        color=primitive.color,
+                        linewidth=1.5,
+                        alpha=float(np.clip(primitive.opacity, 0.0, 1.0)),
                     )
                 self.drawn_objects.append(seg)
 

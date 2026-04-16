@@ -17,9 +17,12 @@ from minilink.graphical.primitives import (
     Arrow,
     Box,
     CustomLine,
+    ExtrudedPolygon,
     Plane,
     Rod,
+    Sphere,
     pose2d_matrix,
+    rotation_matrix_y,
     scale_pose2d_matrix,
     translation_matrix,
 )
@@ -433,4 +436,749 @@ class DynamicBicycleCar3D(DynamicBicycle):
             _force_arrow(Frx_w, Fry_w, -self.b, -0.5 * tr, self.r_r),
             _force_arrow(Ffx_w, Ffy_w, self.a, 0.5 * tr, self.r_f),
             _force_arrow(Ffx_w, Ffy_w, self.a, -0.5 * tr, self.r_f),
+        ]
+
+
+class DynamicBicycleCar3DRealistic(DynamicBicycleCar3D):
+    """
+    Richer additive 3D body styling for the dynamic bicycle.
+
+    Keeps the same dynamics as :class:`DynamicBicycleCar3D` while composing a
+    more car-like silhouette from layered body shells, aero parts, wheels, and
+    wheel hubs.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "Dynamic Bicycle (3D realistic car)"
+        self.track = 1.82
+        self.ground_plane_size = 140.0
+        self._visual_wheel_width = 0.22
+        self._visual_tire_radius_ratio = 0.62
+        self._hub_radius = 0.11
+        self._body_color = "#c62828"
+        self._carbon_color = "#111111"
+        self._glass_color = "#89aee6"
+
+    def get_kinematic_geometry(self):
+        tire_rad = max(
+            0.05, self._visual_tire_radius_ratio * min(self.r_f, self.r_r)
+        )
+        wheel = Rod(
+            length=self._visual_wheel_width,
+            radius=tire_rad,
+            color=self._carbon_color,
+            opacity=1.0,
+        )
+        hub = Sphere(radius=self._hub_radius, color="#9aa3ad", opacity=1.0)
+
+        ground = Plane(
+            normal=[0.0, 0.0, 1.0],
+            offset=0.0,
+            size=self.ground_plane_size,
+            thickness=0.04,
+            color=[0.72, 0.74, 0.78],
+            opacity=0.5,
+        )
+
+        floor_pan = ExtrudedPolygon(
+            pts_xy=[
+                [-1.18, -0.54],
+                [0.78, -0.54],
+                [1.18, -0.34],
+                [1.28, 0.00],
+                [1.18, 0.34],
+                [0.78, 0.54],
+                [-1.18, 0.54],
+            ],
+            height=0.08,
+            center=(0.0, 0.0, 0.15),
+            color="#20252d",
+            opacity=1.0,
+        )
+        sidepod_l = ExtrudedPolygon(
+            pts_xy=[
+                [-0.94, 0.26],
+                [0.42, 0.26],
+                [0.82, 0.50],
+                [-0.80, 0.66],
+            ],
+            height=0.18,
+            center=(0.0, 0.0, 0.25),
+            color=self._body_color,
+            opacity=1.0,
+        )
+        sidepod_r = ExtrudedPolygon(
+            pts_xy=[
+                [-0.94, -0.26],
+                [-0.80, -0.66],
+                [0.82, -0.50],
+                [0.42, -0.26],
+            ],
+            height=0.18,
+            center=(0.0, 0.0, 0.25),
+            color=self._body_color,
+            opacity=1.0,
+        )
+        cockpit = ExtrudedPolygon(
+            pts_xy=[
+                [-0.80, -0.22],
+                [0.04, -0.22],
+                [0.26, 0.00],
+                [0.04, 0.22],
+                [-0.80, 0.22],
+                [-0.92, 0.00],
+            ],
+            height=0.22,
+            center=(0.0, 0.0, 0.38),
+            color=self._body_color,
+            opacity=1.0,
+        )
+        nose = ExtrudedPolygon(
+            pts_xy=[
+                [0.18, -0.12],
+                [1.22, -0.09],
+                [1.46, 0.00],
+                [1.22, 0.09],
+                [0.18, 0.12],
+                [0.02, 0.00],
+            ],
+            height=0.14,
+            center=(0.0, 0.0, 0.26),
+            color=self._body_color,
+            opacity=1.0,
+        )
+        rear_deck = ExtrudedPolygon(
+            pts_xy=[
+                [-1.42, -0.18],
+                [-0.52, -0.18],
+                [-0.26, 0.00],
+                [-0.52, 0.18],
+                [-1.42, 0.18],
+                [-1.58, 0.00],
+            ],
+            height=0.18,
+            center=(0.0, 0.0, 0.34),
+            color=self._body_color,
+            opacity=1.0,
+        )
+        windshield = Box(
+            length_x=0.24,
+            length_y=0.24,
+            length_z=0.12,
+            center=(-0.06, 0.0, 0.46),
+            color=self._glass_color,
+            opacity=0.48,
+        )
+        front_splitter = Box(
+            length_x=0.34,
+            length_y=0.92,
+            length_z=0.03,
+            center=(1.34, 0.0, 0.07),
+            color=self._carbon_color,
+            opacity=1.0,
+        )
+        rear_wing = Box(
+            length_x=0.20,
+            length_y=0.92,
+            length_z=0.04,
+            center=(-1.20, 0.0, 0.60),
+            color=self._carbon_color,
+            opacity=1.0,
+        )
+        rear_pylon_l = Box(
+            length_x=0.05,
+            length_y=0.05,
+            length_z=0.24,
+            center=(-1.04, 0.16, 0.46),
+            color=self._carbon_color,
+            opacity=1.0,
+        )
+        rear_pylon_r = Box(
+            length_x=0.05,
+            length_y=0.05,
+            length_z=0.24,
+            center=(-1.04, -0.16, 0.46),
+            color=self._carbon_color,
+            opacity=1.0,
+        )
+
+        arr_v = Arrow(color="#1976d2", linewidth=2, origin="base")
+        arr_f = Arrow(color="#d32f2f", linewidth=2, origin="base")
+
+        return [
+            ground,
+            floor_pan,
+            sidepod_l,
+            sidepod_r,
+            cockpit,
+            nose,
+            rear_deck,
+            windshield,
+            front_splitter,
+            rear_wing,
+            rear_pylon_l,
+            rear_pylon_r,
+            wheel,
+            wheel,
+            wheel,
+            wheel,
+            hub,
+            hub,
+            hub,
+            hub,
+            arr_v,
+            arr_v,
+            arr_v,
+            arr_v,
+            arr_f,
+            arr_f,
+            arr_f,
+            arr_f,
+        ]
+
+    def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
+        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+        vb = x[3:6]
+        u_in = np.array(
+            [self.u2input_signal(u, "w_rear")[0], self.u2input_signal(u, "delta")[0]]
+        )
+        delta = float(u_in[1])
+        tr = self.track
+
+        T_wb = pose2d_matrix(X, Y, Theta)
+        T_ground = np.eye(4, dtype=float)
+
+        T_rl = T_wb @ translation_matrix(-self.b, 0.5 * tr, self.r_r)
+        T_rr = T_wb @ translation_matrix(-self.b, -0.5 * tr, self.r_r)
+        R_steer = pose2d_matrix(0.0, 0.0, delta)
+        T_fl = T_wb @ translation_matrix(self.a, 0.5 * tr, self.r_f) @ R_steer
+        T_fr = T_wb @ translation_matrix(self.a, -0.5 * tr, self.r_f) @ R_steer
+
+        v_scale = 0.14
+        f_scale = 0.0008
+
+        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
+        v_f_loc = np.array([uu, vv + self.a * wr])
+        v_r_loc = np.array([uu, vv - self.b * wr])
+
+        c, s = np.cos(Theta), np.sin(Theta)
+        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
+        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
+
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
+        cd, sd = np.cos(delta), np.sin(delta)
+        Fxf_b = Fx_f * cd - Fy_f * sd
+        Fyf_b = Fx_f * sd + Fy_f * cd
+        Ffx_w = c * Fxf_b - s * Fyf_b
+        Ffy_w = s * Fxf_b + c * Fyf_b
+        Frx_w = c * Fx_r - s * Fy_r
+        Fry_w = s * Fx_r + c * Fy_r
+
+        def _body_to_world(bx: float, by: float, bz: float) -> tuple[float, float, float]:
+            wx = X + c * bx - s * by
+            wy = Y + s * bx + c * by
+            return wx, wy, bz
+
+        def _vel_arrow(dx: float, dy: float, bx: float, by: float, bz: float):
+            mag = v_scale * np.hypot(dx, dy)
+            if mag < 1e-9:
+                mag = 1e-9
+            th = np.arctan2(dy, dx)
+            px, py, pz = _body_to_world(bx, by, bz)
+            T = scale_pose2d_matrix(px, py, th, mag)
+            T[2, 3] = pz
+            return T
+
+        def _force_arrow(Fx: float, Fy: float, bx: float, by: float, bz: float):
+            mag = f_scale * np.hypot(Fx, Fy)
+            if mag < 1e-12:
+                mag = 1e-12
+            th = np.arctan2(Fy, Fx)
+            px, py, pz = _body_to_world(bx, by, bz)
+            T = scale_pose2d_matrix(px, py, th, mag)
+            T[2, 3] = pz
+            return T
+
+        body_transforms = [T_wb] * 11
+
+        return [
+            T_ground,
+            *body_transforms,
+            T_rl,
+            T_rr,
+            T_fl,
+            T_fr,
+            T_rl,
+            T_rr,
+            T_fl,
+            T_fr,
+            _vel_arrow(vrx, vry, -self.b, 0.5 * tr, self.r_r + 0.06),
+            _vel_arrow(vrx, vry, -self.b, -0.5 * tr, self.r_r + 0.06),
+            _vel_arrow(vfx, vfy, self.a, 0.5 * tr, self.r_f + 0.06),
+            _vel_arrow(vfx, vfy, self.a, -0.5 * tr, self.r_f + 0.06),
+            _force_arrow(Frx_w, Fry_w, -self.b, 0.5 * tr, self.r_r + 0.02),
+            _force_arrow(Frx_w, Fry_w, -self.b, -0.5 * tr, self.r_r + 0.02),
+            _force_arrow(Ffx_w, Ffy_w, self.a, 0.5 * tr, self.r_f + 0.02),
+            _force_arrow(Ffx_w, Ffy_w, self.a, -0.5 * tr, self.r_f + 0.02),
+        ]
+
+
+class DynamicBicycleOffRoad3D(DynamicBicycleCar3D):
+    """
+    Off-road side-by-side / UTV body style on the dynamic bicycle platform.
+
+    The graphics are inspired by BRP-style off-road vehicles: large tires,
+    exposed suspension, angular body panels, and a visible roll cage.
+    Dynamics stay identical to :class:`DynamicBicycle`.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "Dynamic Bicycle (3D off-road UTV)"
+        self.track = 1.70
+        self.ground_plane_size = 180.0
+        self._visual_wheel_width = 0.28
+        self._visual_tire_radius_ratio = 0.92
+        self._hub_radius = 0.12
+        self._panel_gold = "#b0892d"
+        self._panel_black = "#171717"
+        self._panel_dark = "#252830"
+        self._cage_red = "#c83422"
+        self._glass = "#8ca4bc"
+
+    def get_kinematic_geometry(self):
+        tire_rad = max(
+            0.08, self._visual_tire_radius_ratio * min(self.r_f, self.r_r)
+        )
+        wheel = Rod(
+            length=self._visual_wheel_width,
+            radius=tire_rad,
+            color="#111111",
+            opacity=1.0,
+        )
+        hub = Sphere(radius=self._hub_radius, color="#a4abb3", opacity=1.0)
+
+        ground = Plane(
+            normal=[0.0, 0.0, 1.0],
+            offset=0.0,
+            size=self.ground_plane_size,
+            thickness=0.04,
+            color=[0.72, 0.74, 0.78],
+            opacity=0.5,
+        )
+
+        belly = ExtrudedPolygon(
+            pts_xy=[
+                [-1.02, -0.50],
+                [0.54, -0.50],
+                [0.98, -0.36],
+                [1.10, 0.00],
+                [0.98, 0.36],
+                [0.54, 0.50],
+                [-1.02, 0.50],
+            ],
+            height=0.14,
+            center=(0.0, 0.0, 0.17),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        rocker_l = ExtrudedPolygon(
+            pts_xy=[
+                [-0.96, 0.16],
+                [-0.20, 0.16],
+                [0.08, 0.24],
+                [0.06, 0.58],
+                [-0.86, 0.60],
+                [-1.02, 0.44],
+            ],
+            height=0.24,
+            center=(0.0, 0.0, 0.30),
+            color=self._panel_dark,
+            opacity=1.0,
+        )
+        rocker_r = ExtrudedPolygon(
+            pts_xy=[
+                [-0.96, -0.16],
+                [-1.02, -0.44],
+                [-0.86, -0.60],
+                [0.06, -0.58],
+                [0.08, -0.24],
+                [-0.20, -0.16],
+            ],
+            height=0.24,
+            center=(0.0, 0.0, 0.30),
+            color=self._panel_dark,
+            opacity=1.0,
+        )
+        side_panel_l = ExtrudedPolygon(
+            pts_xy=[
+                [-0.88, 0.18],
+                [-0.30, 0.20],
+                [0.12, 0.28],
+                [0.36, 0.44],
+                [0.16, 0.62],
+                [-0.52, 0.64],
+                [-0.82, 0.46],
+            ],
+            height=0.30,
+            center=(0.0, 0.0, 0.52),
+            color=self._panel_gold,
+            opacity=1.0,
+        )
+        side_panel_r = ExtrudedPolygon(
+            pts_xy=[
+                [-0.88, -0.18],
+                [-0.82, -0.46],
+                [-0.52, -0.64],
+                [0.16, -0.62],
+                [0.36, -0.44],
+                [0.12, -0.28],
+                [-0.30, -0.20],
+            ],
+            height=0.30,
+            center=(0.0, 0.0, 0.52),
+            color=self._panel_gold,
+            opacity=1.0,
+        )
+        door_l = ExtrudedPolygon(
+            pts_xy=[
+                [-0.64, 0.20],
+                [-0.12, 0.22],
+                [0.10, 0.34],
+                [-0.02, 0.54],
+                [-0.58, 0.56],
+                [-0.76, 0.42],
+            ],
+            height=0.22,
+            center=(0.0, 0.0, 0.48),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        door_r = ExtrudedPolygon(
+            pts_xy=[
+                [-0.64, -0.20],
+                [-0.76, -0.42],
+                [-0.58, -0.56],
+                [-0.02, -0.54],
+                [0.10, -0.34],
+                [-0.12, -0.22],
+            ],
+            height=0.22,
+            center=(0.0, 0.0, 0.48),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        hood = ExtrudedPolygon(
+            pts_xy=[
+                [0.02, -0.24],
+                [0.54, -0.22],
+                [0.92, -0.12],
+                [1.04, 0.00],
+                [0.92, 0.12],
+                [0.54, 0.22],
+                [0.02, 0.24],
+                [-0.06, 0.00],
+            ],
+            height=0.12,
+            center=(0.0, 0.0, 0.56),
+            color=self._panel_gold,
+            opacity=1.0,
+        )
+        nose = ExtrudedPolygon(
+            pts_xy=[
+                [0.74, -0.20],
+                [1.06, -0.18],
+                [1.24, -0.08],
+                [1.34, 0.00],
+                [1.24, 0.08],
+                [1.06, 0.18],
+                [0.74, 0.20],
+                [0.58, 0.00],
+            ],
+            height=0.20,
+            center=(0.0, 0.0, 0.34),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        roof = Box(
+            length_x=1.08,
+            length_y=0.96,
+            length_z=0.05,
+            center=(0.0, 0.0, 0.0),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        windshield = Box(
+            length_x=0.04,
+            length_y=0.88,
+            length_z=0.58,
+            center=(0.0, 0.0, 0.0),
+            color=self._glass,
+            opacity=0.22,
+        )
+        rear_window = Box(
+            length_x=0.04,
+            length_y=0.86,
+            length_z=0.44,
+            center=(0.0, 0.0, 0.0),
+            color=self._glass,
+            opacity=0.16,
+        )
+        rear_bulkhead = Box(
+            length_x=0.10,
+            length_y=0.92,
+            length_z=0.44,
+            center=(-0.70, 0.0, 0.68),
+            color=self._panel_black,
+            opacity=0.95,
+        )
+
+        cage_lines = [
+            CustomLine([[0.42, 0.50, 0.44], [0.06, 0.58, 1.14]], color=self._cage_red, linewidth=3),
+            CustomLine([[0.42, -0.50, 0.44], [0.06, -0.58, 1.14]], color=self._cage_red, linewidth=3),
+            CustomLine([[-0.62, 0.56, 0.46], [-0.56, 0.60, 1.12]], color=self._cage_red, linewidth=3),
+            CustomLine([[-0.62, -0.56, 0.46], [-0.56, -0.60, 1.12]], color=self._cage_red, linewidth=3),
+            CustomLine([[0.06, 0.58, 1.14], [-0.56, 0.60, 1.12]], color=self._cage_red, linewidth=3),
+            CustomLine([[0.06, -0.58, 1.14], [-0.56, -0.60, 1.12]], color=self._cage_red, linewidth=3),
+            CustomLine([[0.06, 0.58, 1.14], [0.06, -0.58, 1.14]], color=self._cage_red, linewidth=3),
+            CustomLine([[-0.56, 0.60, 1.12], [-0.56, -0.60, 1.12]], color=self._cage_red, linewidth=3),
+        ]
+
+        suspension_lines = [
+            CustomLine([[0.84, 0.38, 0.18], [1.02, 0.5 * self.track, self.r_f]], color=self._cage_red, linewidth=3),
+            CustomLine([[0.84, -0.38, 0.18], [1.02, -0.5 * self.track, self.r_f]], color=self._cage_red, linewidth=3),
+            CustomLine([[-0.82, 0.36, 0.18], [-0.98, 0.5 * self.track, self.r_r]], color=self._cage_red, linewidth=3),
+            CustomLine([[-0.82, -0.36, 0.18], [-0.98, -0.5 * self.track, self.r_r]], color=self._cage_red, linewidth=3),
+        ]
+
+        front_guard_l = ExtrudedPolygon(
+            pts_xy=[
+                [0.44, 0.30],
+                [0.76, 0.34],
+                [1.00, 0.48],
+                [0.92, 0.62],
+                [0.58, 0.58],
+                [0.38, 0.44],
+            ],
+            height=0.10,
+            center=(0.0, 0.0, 0.58),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        front_guard_r = ExtrudedPolygon(
+            pts_xy=[
+                [0.44, -0.30],
+                [0.38, -0.44],
+                [0.58, -0.58],
+                [0.92, -0.62],
+                [1.00, -0.48],
+                [0.76, -0.34],
+            ],
+            height=0.10,
+            center=(0.0, 0.0, 0.58),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        rear_guard_l = ExtrudedPolygon(
+            pts_xy=[
+                [-1.12, 0.34],
+                [-0.82, 0.34],
+                [-0.64, 0.48],
+                [-0.78, 0.66],
+                [-1.04, 0.64],
+                [-1.20, 0.52],
+            ],
+            height=0.10,
+            center=(0.0, 0.0, 0.62),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        rear_guard_r = ExtrudedPolygon(
+            pts_xy=[
+                [-1.12, -0.34],
+                [-1.20, -0.52],
+                [-1.04, -0.64],
+                [-0.78, -0.66],
+                [-0.64, -0.48],
+                [-0.82, -0.34],
+            ],
+            height=0.10,
+            center=(0.0, 0.0, 0.62),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        bumper = Box(
+            length_x=0.20,
+            length_y=0.68,
+            length_z=0.08,
+            center=(1.18, 0.0, 0.16),
+            color=self._panel_black,
+            opacity=1.0,
+        )
+        skid = Box(
+            length_x=0.42,
+            length_y=0.46,
+            length_z=0.03,
+            center=(1.00, 0.0, 0.07),
+            color=self._panel_dark,
+            opacity=1.0,
+        )
+
+        arr_v = Arrow(color="#1976d2", linewidth=2, origin="base")
+        arr_f = Arrow(color="#d32f2f", linewidth=2, origin="base")
+
+        return [
+            ground,
+            belly,
+            rocker_l,
+            rocker_r,
+            side_panel_l,
+            side_panel_r,
+            door_l,
+            door_r,
+            hood,
+            nose,
+            roof,
+            windshield,
+            rear_window,
+            rear_bulkhead,
+            *cage_lines,
+            *suspension_lines,
+            front_guard_l,
+            front_guard_r,
+            rear_guard_l,
+            rear_guard_r,
+            bumper,
+            skid,
+            wheel,
+            wheel,
+            wheel,
+            wheel,
+            hub,
+            hub,
+            hub,
+            hub,
+            arr_v,
+            arr_v,
+            arr_v,
+            arr_v,
+            arr_f,
+            arr_f,
+            arr_f,
+            arr_f,
+        ]
+
+    def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
+        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+        vb = x[3:6]
+        u_in = np.array(
+            [self.u2input_signal(u, "w_rear")[0], self.u2input_signal(u, "delta")[0]]
+        )
+        delta = float(u_in[1])
+        tr = self.track
+
+        T_wb = pose2d_matrix(X, Y, Theta)
+        T_ground = np.eye(4, dtype=float)
+
+        T_rl = T_wb @ translation_matrix(-self.b, 0.5 * tr, self.r_r)
+        T_rr = T_wb @ translation_matrix(-self.b, -0.5 * tr, self.r_r)
+        R_steer = pose2d_matrix(0.0, 0.0, delta)
+        T_fl = T_wb @ translation_matrix(self.a, 0.5 * tr, self.r_f) @ R_steer
+        T_fr = T_wb @ translation_matrix(self.a, -0.5 * tr, self.r_f) @ R_steer
+        T_roof = T_wb @ translation_matrix(-0.18, 0.0, 1.12)
+        T_windshield = T_wb @ translation_matrix(0.32, 0.0, 0.82) @ rotation_matrix_y(
+            -0.40
+        )
+        T_rear_window = T_wb @ translation_matrix(-0.64, 0.0, 0.84) @ rotation_matrix_y(
+            0.26
+        )
+
+        v_scale = 0.13
+        f_scale = 0.0008
+
+        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
+        v_f_loc = np.array([uu, vv + self.a * wr])
+        v_r_loc = np.array([uu, vv - self.b * wr])
+
+        c, s = np.cos(Theta), np.sin(Theta)
+        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
+        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
+
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
+        cd, sd = np.cos(delta), np.sin(delta)
+        Fxf_b = Fx_f * cd - Fy_f * sd
+        Fyf_b = Fx_f * sd + Fy_f * cd
+        Ffx_w = c * Fxf_b - s * Fyf_b
+        Ffy_w = s * Fxf_b + c * Fyf_b
+        Frx_w = c * Fx_r - s * Fy_r
+        Fry_w = s * Fx_r + c * Fy_r
+
+        def _body_to_world(bx: float, by: float, bz: float) -> tuple[float, float, float]:
+            wx = X + c * bx - s * by
+            wy = Y + s * bx + c * by
+            return wx, wy, bz
+
+        def _vel_arrow(dx: float, dy: float, bx: float, by: float, bz: float):
+            mag = v_scale * np.hypot(dx, dy)
+            if mag < 1e-9:
+                mag = 1e-9
+            th = np.arctan2(dy, dx)
+            px, py, pz = _body_to_world(bx, by, bz)
+            T = scale_pose2d_matrix(px, py, th, mag)
+            T[2, 3] = pz
+            return T
+
+        def _force_arrow(Fx: float, Fy: float, bx: float, by: float, bz: float):
+            mag = f_scale * np.hypot(Fx, Fy)
+            if mag < 1e-12:
+                mag = 1e-12
+            th = np.arctan2(Fy, Fx)
+            px, py, pz = _body_to_world(bx, by, bz)
+            T = scale_pose2d_matrix(px, py, th, mag)
+            T[2, 3] = pz
+            return T
+
+        body_transforms = [
+            T_wb,  # belly
+            T_wb,  # rocker_l
+            T_wb,  # rocker_r
+            T_wb,  # side_panel_l
+            T_wb,  # side_panel_r
+            T_wb,  # door_l
+            T_wb,  # door_r
+            T_wb,  # hood
+            T_wb,  # nose
+            T_roof,
+            T_windshield,
+            T_rear_window,
+            T_wb,  # rear_bulkhead
+            *([T_wb] * (8 + 4)),  # cage + suspension lines
+            T_wb,  # front_guard_l
+            T_wb,  # front_guard_r
+            T_wb,  # rear_guard_l
+            T_wb,  # rear_guard_r
+            T_wb,  # bumper
+            T_wb,  # skid
+        ]
+
+        return [
+            T_ground,
+            *body_transforms,
+            T_rl,
+            T_rr,
+            T_fl,
+            T_fr,
+            T_rl,
+            T_rr,
+            T_fl,
+            T_fr,
+            _vel_arrow(vrx, vry, -self.b, 0.5 * tr, self.r_r + 0.12),
+            _vel_arrow(vrx, vry, -self.b, -0.5 * tr, self.r_r + 0.12),
+            _vel_arrow(vfx, vfy, self.a, 0.5 * tr, self.r_f + 0.12),
+            _vel_arrow(vfx, vfy, self.a, -0.5 * tr, self.r_f + 0.12),
+            _force_arrow(Frx_w, Fry_w, -self.b, 0.5 * tr, self.r_r + 0.06),
+            _force_arrow(Frx_w, Fry_w, -self.b, -0.5 * tr, self.r_r + 0.06),
+            _force_arrow(Ffx_w, Ffy_w, self.a, 0.5 * tr, self.r_f + 0.06),
+            _force_arrow(Ffx_w, Ffy_w, self.a, -0.5 * tr, self.r_f + 0.06),
         ]

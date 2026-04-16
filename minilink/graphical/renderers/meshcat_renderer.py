@@ -12,6 +12,7 @@ from minilink.graphical.primitives import (
     Box,
     Circle,
     CustomLine,
+    ExtrudedPolygon,
     Plane,
     Point,
     Rod,
@@ -145,6 +146,16 @@ class MeshcatCanvas:
                 str(primitive.color),
                 float(primitive.opacity),
             )
+        if isinstance(primitive, ExtrudedPolygon):
+            return (
+                "ExtrudedPolygon",
+                primitive.pts_xy.shape,
+                tuple(np.asarray(primitive.pts_xy).reshape(-1).tolist()),
+                float(primitive.height),
+                tuple(np.asarray(primitive.center, dtype=float).tolist()),
+                str(primitive.color),
+                float(primitive.opacity),
+            )
         return (primitive.__class__.__name__,)
 
     def _set_static_geometry(self, i: int, primitive):
@@ -215,6 +226,24 @@ class MeshcatCanvas:
                             float(max(primitive.length_y, 1e-6)),
                             float(max(primitive.length_z, 1e-6)),
                         ]
+                    ),
+                    g.MeshLambertMaterial(
+                        color=hex_color,
+                        transparent=primitive.opacity < 0.999,
+                        opacity=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                    ),
+                )
+            )
+            self._has_head[i] = False
+            return
+
+        if isinstance(primitive, ExtrudedPolygon):
+            vertices, faces = primitive.mesh_data()
+            path.set_object(
+                g.Mesh(
+                    g.TriangularMeshGeometry(
+                        np.asarray(vertices, dtype=np.float32),
+                        np.asarray(faces, dtype=np.uint32),
                     ),
                     g.MeshLambertMaterial(
                         color=hex_color,
@@ -339,6 +368,10 @@ class MeshcatCanvas:
             c = np.asarray(primitive.center, dtype=float).reshape(3)
             T_c = self._tf.translation_matrix(c.tolist())
             path.set_transform(transform_matrix @ T_c)
+            return
+
+        if isinstance(primitive, ExtrudedPolygon):
+            path.set_transform(transform_matrix)
             return
 
         if isinstance(primitive, TorqueArrow):
