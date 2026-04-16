@@ -6,14 +6,26 @@ This document tracks the evolution of `minilink` towards full **Pyro 2.0** featu
 
 | Component | Status | Next Milestone |
 | :--- | :--- | :--- |
-| **Core Abstractions** | **TRL 9** | Populate `minilink/__init__.py` |
-| **DynamicsEvaluator ABC** | **TRL 9** | Mother class for all evaluators — done |
-| **Leaf system backends** | **TRL 6** | Implement integration/differentiation methods |
-| **Diagram backends** | **TRL 8** | Parametric tier (`f_p` / `outputs_p`); diagram `h_p` |
-| **JAX Integration** | **TRL 8** | Leaf + diagram: JIT `f`, `h`, `outputs`, `compute_internal_signals`; accessors `get_*_jit` |
-| **Simulation (Analysis)** | **TRL 4** | Fix `solve_ivp` external input + refactor interface |
-| **Planning** | **Planned** | RRT and Direct Collocation ports |
-| **`mechanics` + `physics`** | **TRL 3–4** | Symbolic export + JAX world demos; sphere–plane contact MVP (no sphere–sphere yet) |
+| **Core Abstractions** | **TRL 7** | Finalize public exports and validate remaining details around the stable user-facing API |
+| **Compile pipeline** | **TRL 4** | Validate architecture and integrate the evaluator stack more fully across the library |
+| **Leaf evaluators** | **TRL 4** | Validate architecture; add differentiation and richer rollout helpers |
+| **Diagram evaluators** | **TRL 4** | Validate architecture; add parametric tier (`f_p` / `outputs_p`) and diagram `h_p` |
+| **Simulation** | **TRL 4** | Complete the transition away from legacy `core.analysis` simulator code and unify nominal / forced paths |
+| **Graphical** | **TRL 1** | Keep MVP renderers usable while avoiding premature API stabilization |
+| **Mechanics** | **TRL 1** | Keep numeric mechanics path functional; defer maturity claims until user validation begins |
+| **Symbolic mechanics** | **TRL 1** | Keep symbolic derivation/export path functional enough for review and examples |
+| **Physics** | **TRL 1** | Keep JAX contact world demos working; continue sphere-plane MVP |
+| **Blocks library** | **TRL 0** | Decide what belongs in the long-term reusable block library before rating maturity |
+| **Planning** | **TRL 0** | Not started as a rated subsystem |
+| **Control** | **TRL 0** | Not started as a rated subsystem |
+
+## 1.1 Snapshot of the repository today
+
+- **Most mature:** core abstractions and the basic system/diagram composition model.
+- **Architecture still under validation:** compile pipeline, leaf evaluators, diagram evaluators, and simulation.
+- **Very early MVP work:** graphical backends, mechanics, symbolic mechanics, and physics.
+- **Not yet rated as a mature library surface:** blocks, planning, and control.
+- **Still not a stabilized package surface:** top-level package exports (`minilink/__init__.py` is still empty) and several higher-level convenience APIs.
 
 > [!NOTE]
 > Progress is tracked via **Task Readiness Levels (TRL 1-9)**. See [agent.md](agent.md) for definitions and the **3-Level Testing Strategy** (Automated, Manual, Demo).
@@ -97,6 +109,7 @@ compile/
 - [x] **Leaf system `compile()`**: `NumpyLeafEvaluator` + `JaxLeafEvaluator` with frozen params/u.
 - [x] **Port diagram evaluators to `DynamicsEvaluator`**: `NumpyDiagramEvaluator` + `JaxDiagramEvaluator` inherit ABC. `f()` + boundary `outputs()`; internal buffer methods split from boundary outputs; JAX JIT for `outputs` and `compute_internal_signals`. (2026-04-05, refined 2026-04)
 - [x] **Reorganize `compile/` folder**: Fused leaf + diagram evaluators per backend (`numpy_evaluator.py`, `jax_evaluator.py`). (2026-04-05)
+- [x] **Add backend-pluggable simulation package**: `minilink/simulation/` now provides `Simulator`, solver backends, and interpolation helpers. `System.compute_trajectory(...)` delegates to this path. (2026-04)
 - [ ] **Diagram parametric tier**: Add `sys_id` to operations, implement `f_p` for diagrams.
 - [ ] **Populate `minilink/__init__.py`**: Public exports.
 - [ ] **Diagram Validation**: Add wiring guards in `add_subsystem()` and `connect()`.
@@ -182,9 +195,9 @@ Cross-read of [Drake](https://github.com/RobotLocomotion/drake) (rigorous system
 
 | Pyro Feature | Minilink Equivalent | Status |
 | :--- | :--- | :--- |
-| `ContinuousDynamicSystem` | `DynamicSystem` | **TRL 9** |
-| Compiled evaluation (leaf) | `NumpyLeafEvaluator` / `JaxLeafEvaluator` | **TRL 6** |
-| Compiled evaluation (diagram) | `NumpyDiagramEvaluator` / `JaxDiagramEvaluator` | **TRL 8** |
+| `ContinuousDynamicSystem` | `DynamicSystem` | **TRL 7** |
+| Compiled evaluation (leaf) | `NumpyLeafEvaluator` / `JaxLeafEvaluator` | **TRL 4** |
+| Compiled evaluation (diagram) | `NumpyDiagramEvaluator` / `JaxDiagramEvaluator` | **TRL 4** |
 | `StateSpaceSystem` | `StateSpaceSystem` | Planned |
 | `MechanicalSystem` | `mechanics.MechanicalSystem` | **TRL 1** |
 | Symbolic EoM + `MechanicalModel` | `mechanics.symbolic` | **TRL 1** |

@@ -3,10 +3,10 @@ import unittest
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.core.analysis import Simulator, compute_internal_signals
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import DynamicSystem, StaticSystem
 from minilink.graphical.plotting import plot_signals
+from minilink.simulation import Simulator
 
 
 class Integrator(DynamicSystem):
@@ -62,27 +62,26 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.traj = self.sim.solve()
 
     def test_compute_internal_signals(self):
-        # By default, Trajectory doesn't have internal signals
-        self.assertFalse(hasattr(self.traj, "internal_signals"))
+        # By default, the base trajectory does not carry reconstructed signals
+        self.assertFalse(self.traj.has_signal("step:y"))
 
         # Reconstruct signals
-        traj_plus = compute_internal_signals(self.diagram, self.traj)
+        traj_plus = self.diagram.compute_internal_signals(self.traj)
 
-        # Test it successfully created the dictionary
-        self.assertTrue(hasattr(traj_plus, "internal_signals"))
-        self.assertIn("step:y", traj_plus.internal_signals)
-        self.assertIn("ctl:u", traj_plus.internal_signals)
-        self.assertIn("plant:y", traj_plus.internal_signals)
+        # Test it successfully created sampled channels
+        self.assertTrue(traj_plus.has_signal("step:y"))
+        self.assertTrue(traj_plus.has_signal("ctl:u"))
+        self.assertTrue(traj_plus.has_signal("plant:y"))
 
         # Check shapes (dim 1, n_pts time steps)
         n_pts = len(self.traj.t)
-        self.assertEqual(traj_plus.internal_signals["ctl:u"].shape, (1, n_pts))
+        self.assertEqual(traj_plus.get_signal("ctl:u").shape, (1, n_pts))
 
     def test_plot_signals_does_not_crash(self):
         import minilink.graphical.plotting as plotting
 
         plotting.figure_blocking = False
-        traj_plus = compute_internal_signals(self.diagram, self.traj)
+        traj_plus = self.diagram.compute_internal_signals(self.traj)
 
         # Test basic API functionality (we won't check pixel rendering, just execution)
         try:

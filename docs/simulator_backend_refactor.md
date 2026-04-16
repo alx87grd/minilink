@@ -47,7 +47,7 @@ The current prototype in `minilink/simulation/` exposes a single user-facing sel
 
 | Area | Location |
 |------|----------|
-| Offline simulation, `Simulator`, `Trajectory` | [`minilink/core/analysis.py`](../minilink/core/analysis.py) |
+| Offline simulation, `Simulator`, `Trajectory` | [`minilink/simulation/simulator.py`](../minilink/simulation/simulator.py), [`minilink/core/trajectory.py`](../minilink/core/trajectory.py) |
 | `DynamicsEvaluator` and step/rollout hooks | [`minilink/compile/evaluator.py`](../minilink/compile/evaluator.py) |
 | NumPy / JAX evaluators | [`minilink/compile/numpy_evaluator.py`](../minilink/compile/numpy_evaluator.py), [`minilink/compile/jax_evaluator.py`](../minilink/compile/jax_evaluator.py) |
 | Interactive loop (`game`, Euler substeps) | [`minilink/graphical/animation.py`](../minilink/graphical/animation.py) |
@@ -260,22 +260,23 @@ Using a full diagram **only** to apply a simple forcing (step, sine, schedule) i
 
 ## Package layout (prototype → library)
 
-**Preferred:** new package **`minilink/simulation/`** so integration code is grouped and `core` stays smaller.
+**Current state:** the package **`minilink/simulation/`** is the active simulator path, and the canonical `Trajectory` now lives in `minilink/core/trajectory.py`.
 
 | Path | Role |
 |------|------|
-| [`minilink/simulation/__init__.py`](../minilink/simulation/__init__.py) | Public exports: `SolverBackend`, `get_solver_backend`, concrete backends |
-| [`minilink/simulation/solver_backends.py`](../minilink/simulation/solver_backends.py) | **`SolverBackend` ABC**; Phase A implementations + registry |
+| [`minilink/simulation/__init__.py`](../minilink/simulation/__init__.py) | Public exports: `Simulator`, `SolverBackend`, interpolation helpers, concrete backends |
+| [`minilink/simulation/solver_backends.py`](../minilink/simulation/solver_backends.py) | **`SolverBackend` ABC** plus SciPy, Euler, and RK4 implementations |
 | [`minilink/simulation/types.py`](../minilink/simulation/types.py) (new, Phase B) | `ExternalInputMode` hierarchy, `IntegratorBackend` literals / enum |
 
-[`minilink/core/analysis.py`](../minilink/core/analysis.py) imports from **`minilink.simulation`** and delegates `solve()` to the selected backend. Alternative (not preferred): colocate `solver_backends.py` under `minilink/core/` — only if you want zero new package.
+[`minilink/core/framework.py`](../minilink/core/framework.py) now imports **`minilink.simulation.Simulator`** inside `System.compute_trajectory(...)`. Diagram-level signal reconstruction is exposed on [`minilink/core/diagram.py`](../minilink/core/diagram.py), and `Trajectory` is defined in [`minilink/core/trajectory.py`](../minilink/core/trajectory.py).
 
 ## File-level change plan
 
 | File | Change |
 |------|--------|
-| [`minilink/core/analysis.py`](../minilink/core/analysis.py) | **`Simulator`** orchestrator: time grid, evaluator factory; delegate `solve()` to **`SolverBackend`**; set **`scipy_last_solution`** from SciPy backend when applicable; Phase B: `input_spec` / `compile_backend` |
-| **`minilink/simulation/`** (new package) | See table above |
+| [`minilink/core/trajectory.py`](../minilink/core/trajectory.py) | Canonical state-input trajectory object shared by simulation and downstream tools |
+| [`minilink/core/diagram.py`](../minilink/core/diagram.py) | Diagram-owned reconstruction of internal sampled signals |
+| [`minilink/simulation/`](../minilink/simulation/__init__.py) | Active simulator package; Phase B still open for richer external-input typing |
 | [`minilink/compile/evaluator.py`](../minilink/compile/evaluator.py) | Align `f_ivp` / `as_scipy_rhs` with `ExternalInputMode` (Phase B); keep base as dynamics + small hooks |
 | [`minilink/compile/jax_evaluator.py`](../minilink/compile/jax_evaluator.py) | JIT steps + `rollout_fixed_u`; **no** sole ownership of full `integrate` |
 | [`minilink/core/framework.py`](../minilink/core/framework.py) | Extend `compute_trajectory` minimally for backend/options |

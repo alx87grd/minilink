@@ -4,9 +4,8 @@ import jax.numpy as jnp
 
 
 # from minilink.blocks.examples import Pendulum
-from minilink.core.analysis import Simulator as OldSimulator
-from minilink.simulation import Simulator as NewSimulator
 from minilink.core.framework import DynamicSystem
+from minilink.simulation import Simulator
 
 
 class Pendulum(DynamicSystem):
@@ -38,12 +37,14 @@ t0 = 0
 tf = 10
 dt = 0.0001
 
-new_sim = NewSimulator(
+sim_numpy = Simulator(
+    Pendulum, t0=t0, tf=tf, dt=dt, solver=solver, compile_backend="numpy"
+)
+traj_numpy = sim_numpy.solve()
+print(traj_numpy.x[:, -1])
+
+sim_jax = Simulator(
     Pendulum, t0=t0, tf=tf, dt=dt, solver=solver, compile_backend=compile_backend
 )
-new_traj = new_sim.solve()
-print(new_traj.x[:, -1])
-
-old_sim = OldSimulator(Pendulum, t0=t0, tf=tf, dt=dt, solver=solver)
-old_traj = old_sim.solve()
-print(old_traj.x[:, -1])
+traj_jax = sim_jax.solve()
+print(traj_jax.x[:, -1])

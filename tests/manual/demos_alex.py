@@ -1,9 +1,9 @@
 import numpy as np
 
 from minilink.blocks.sources import Step, WhiteNoise
-from minilink.core.analysis import Simulator
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import DynamicSystem, StaticSystem
+from minilink.simulation import Simulator
 
 
 ######################################################################

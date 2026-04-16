@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 
-from minilink.core.analysis import Trajectory
+from minilink.core.trajectory import Trajectory
 from minilink.simulation.solver_backends import (
     EulerSolverBackend,
     RK4SolverBackend,
@@ -184,7 +184,7 @@ class Simulator:
             u_nom = self.evaluator._u_nominal
             u_traj[:, :] = u_nom.reshape(self.sys.m, 1)
 
-        traj = Trajectory(x_traj, u_traj, self.times)
+        traj = Trajectory(t=self.times, x=x_traj, u=u_traj)
 
         # Memory for debugging purposes
         self.last_debug = self.solver_backend.last_debug
@@ -224,7 +224,7 @@ class Simulator:
             self.solver_backend, "last_solve_ivp_solution", None
         )
         self.last_debug = self.solver_backend.last_debug
-        traj = Trajectory(x_traj, u_traj, self.times)
+        traj = Trajectory(t=self.times, x=x_traj, u=u_traj)
 
         # Memory for debugging purposes
         self.last_debug = self.solver_backend.last_debug

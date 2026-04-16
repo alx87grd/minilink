@@ -10,7 +10,7 @@
 4. **Performance:** Compile topological block execution graphs into optimized array-evaluation sequences (`f_fast`).
 5. **Transparency:** Lightweight and transparent, avoiding heavy, black-box legacy dependencies.
 6. **Separation of Concerns:** Modeling core (signals, ports, systems, diagrams) is independent of simulation, visualization, and analysis.
-7. **Pyro Compatibility:** Full feature parity with the [pyro](https://github.com/SherbyRobotics/pyro) toolbox.
+7. **Pyro Compatibility Direction:** `minilink` is being developed toward feature parity with the [pyro](https://github.com/SherbyRobotics/pyro) toolbox, but that migration is still in progress.
 
 ---
 
@@ -19,17 +19,15 @@
 
 | Module       | Status  | Description                                                                                                                                                                  |
 | ------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/`      | **1.0** | Pure modeling abstractions (framework, diagram, analysis).                                                                                                                   |
-| `blocks/`    | **1.0** | Pre-built reusable blocks (integrators, sources, pendulums).                                                                                                                 |
-| `compile/`   | **1.0** | `ExecutionPlan` IR; `DynamicsEvaluator` (leaf + diagram); NumPy/JAX; boundary vs internal outputs; JIT on JAX leaf and diagram (`f`, `outputs`, `compute_internal_signals`). |
-| `graphical/` | MVP     | Animation orchestration; Matplotlib, MeshCat, Pygame backends; kinematic hooks on systems.                                                                                   |
-| `physics/`   | MVP     | JAX contact world (`PhysicsWorldSystem`) + demos; optional dependency on JAX.                                                                                                |
-| `mechanics/` | MVP     | Symbolic multibody + export to `MechanicalSystem` / `JaxMechanicalSystem`.                                                                                                   |
-| `control/`   | Planned | Controller base classes and library.                                                                                                                                         |
-| `planning/`  | Planned | Planners: RRT, direct collocation, DP.                                                                                                                                       |
-| `analysis/`  | Partial | `Simulator` and trajectory utilities; extended cost/phase tooling planned.                                                                                                   |
-
-
+| `core/`      | **TRL 7** | Pure modeling abstractions (`framework`, `diagram`) plus the canonical `Trajectory` object in `trajectory.py`.                                                             |
+| `blocks/`    | **TRL 0** | Early block collection used by examples and experiments; not yet treated as a stabilized library layer.                                                                     |
+| `compile/`   | **TRL 4** | `ExecutionPlan` IR; `DynamicsEvaluator` (leaf + diagram); NumPy/JAX evaluators; boundary vs internal outputs.                                                              |
+| `simulation/`| **TRL 4** | Backend-pluggable simulator (`Simulator`, solver backends, interpolation helpers). Current public simulation entry point, still under integration.                        |
+| `graphical/` | **TRL 1** | Animation orchestration; Matplotlib, MeshCat, Pygame backends; kinematic hooks on systems.                                                                                 |
+| `physics/`   | **TRL 1** | JAX contact world (`PhysicsWorldSystem`) + demos; optional dependency on JAX.                                                                                              |
+| `mechanics/` | **TRL 1** | Numeric and symbolic mechanics layers, including export toward `MechanicalSystem` / `JaxMechanicalSystem`.                                                                 |
+| `control/`   | **TRL 0** | Placeholder for future controller base classes and library.                                                                                                                 |
+| `planning/`  | **TRL 0** | Placeholder for future planners: RRT, direct collocation, DP.                                                                                                               |
 ---
 
 ## 3. Core Abstractions
@@ -94,7 +92,7 @@ Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of **boundary*
 - If forcing is part of a **simulation run setup**, pass it to the simulator as a **discretized array** aligned with the simulation grid (`times`, `u` with shape `(m, n_pts)`).
 - Solver backends may internally reconstruct `u(t)` from that array (ZOH, linear, quadratic, cubic), but the external simulation interface stays grid-based for reproducibility and backend consistency.
 
-**Simulator solver modes (current prototype)**:
+**Simulator solver modes (current prototype in `minilink.simulation`)**:
 
 - `solver="euler"` — explicit Euler over the selected `times` grid.
 - `solver="scipy"` — SciPy `RK45` default profile.
@@ -108,6 +106,8 @@ The simulator translates these high-level mode names into low-level solver kwarg
 
 - For short-horizon simulations, `solver="scipy"` with `compile_backend="numpy"` is often a good go-to (fast, no compile overhead, reasonable precision).
 - For long fixed-step rollouts that require many dynamics evaluations, `solver="rk4_fixedsteps"` with `compile_backend="jax"` is often the best speed/precision tradeoff.
+
+**Current development note:** `System.compute_trajectory(...)` delegates to `minilink.simulation.Simulator`, and diagram signal reconstruction lives on `DiagramSystem`.
 
 **Future**: Integration utilities (`rk4_step`, `rollout`), differentiation (`jacobian_f_x`, `linearize`), and batch simulation (`vmap_rollout`) are defined in the ABC as `NotImplementedError` stubs, to be implemented incrementally.
 
@@ -176,4 +176,3 @@ The top priority is that the code reads like math equations (e.g., `dx = A@x + B
 - All core modeling files (under `core/`) must *only* import `numpy` at the module level.
 - Heavy dependencies (SciPy, Matplotlib, Graphviz) must be lazy-imported within methods.
 - Use Python type hints and docstrings for every public method.
-

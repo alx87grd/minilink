@@ -1,6 +1,7 @@
 import numpy as np
 
 from minilink.core.framework import System, VectorSignal
+from minilink.core.trajectory import Trajectory
 
 
 ######################################################################
@@ -242,6 +243,46 @@ class DiagramSystem(System):
         """
         for _, sys in self.subsystems.items():
             sys.refresh()
+
+    ######################################################################
+    def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
+        """
+        Reconstruct all subsystem output-port trajectories for this diagram.
+
+        Parameters
+        ----------
+        traj : Trajectory
+            State-input trajectory sampled on a time grid.
+
+        Returns
+        -------
+        Trajectory
+            New trajectory enriched with one sampled signal per subsystem
+            output port, keyed as ``"sys_id:port_id"``.
+        """
+        evaluator = self.compile(backend="numpy")
+        internal_signals = {}
+        for sys_id, sys in self.subsystems.items():
+            for port_id, port in sys.outputs.items():
+                internal_signals[f"{sys_id}:{port_id}"] = np.zeros(
+                    (port.dim, traj.n_samples)
+                )
+
+        for i, t in enumerate(traj.t):
+            step_signals = evaluator.compute_internal_signals_dict(
+                traj.x[:, i], traj.u[:, i], t
+            )
+            for key, value in step_signals.items():
+                internal_signals[key][:, i] = value
+
+        return traj.with_signals(internal_signals)
+
+    ######################################################################
+    def compute_internal_signals(self, traj: Trajectory) -> Trajectory:
+        """
+        Compatibility alias for :meth:`reconstruct_internal_signals`.
+        """
+        return self.reconstruct_internal_signals(traj)
 
     ######################################################################
     def get_local_input(self, x, u, t, sys_id, dependencies="all"):

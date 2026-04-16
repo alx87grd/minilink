@@ -215,11 +215,8 @@ def plot_signals(sys, traj, signals):
                             )
 
                     elif key == "output":
-                        if (
-                            hasattr(traj, "internal_signals")
-                            and lookup_item in traj.internal_signals
-                        ):
-                            data = traj.internal_signals[lookup_item]
+                        if traj.has_signal(lookup_item):
+                            data = traj.get_signal(lookup_item)
                             for d in range(data.shape[0]):
                                 label_str = f"{lbl}[{d}]" if data.shape[0] > 1 else lbl
                                 axis.plot(
@@ -231,7 +228,7 @@ def plot_signals(sys, traj, signals):
                                 )
                         else:
                             print(
-                                f"Warning: Output '{lookup_item}' not found in internal_signals."
+                                f"Warning: Output '{lookup_item}' not found in trajectory signals."
                             )
 
                     elif key == "input":
