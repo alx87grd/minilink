@@ -27,7 +27,7 @@ sys = Pendulum()
 sys.x0[0] = 2.0
 
 t0 = 0.0
-tf = 100.0
+tf = 10.0
 dt = 0.01
 n_runs = 1
 GROUND_TRUTH = ("scipy_ultra", "jax")

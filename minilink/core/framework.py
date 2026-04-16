@@ -540,7 +540,16 @@ class System:
 
     ######################################################################
     def compute_trajectory(
-        self, t0=0, tf=10, n_steps=None, dt=None, solver="scipy", show=True
+        self,
+        t0=0,
+        tf=10,
+        n_steps=None,
+        dt=None,
+        solver=None,
+        show=True,
+        x0=None,
+        compile_backend="numpy",
+        verbose=True,
     ):
         """
         Simulate the system and return the computed trajectory.
@@ -556,9 +565,17 @@ class System:
         dt : float, optional
             Time step for fixed-step solvers.
         solver : str, optional
-            The solver to use, e.g., "scipy" or "euler" (default is "scipy").
+            High-level solver mode, e.g. ``"scipy"``, ``"scipy_stiff"``,
+            ``"euler"``, or ``"rk4_fixedsteps"``. If ``None``, the simulator
+            auto-selects based on system properties.
         show : bool, optional
             Whether to display plots after simulation (default is True).
+        x0 : np.ndarray, optional
+            Initial state vector. If ``None``, use ``self.x0``.
+        compile_backend : str, optional
+            Dynamics evaluator backend, ``"numpy"`` (default) or ``"jax"``.
+        verbose : bool, optional
+            Whether the simulator should print configuration details.
 
         Returns
         -------
@@ -569,13 +586,17 @@ class System:
 
         sim = Simulator(
             self,
+            x0=x0,
             t0=t0,
             tf=tf,
             n_steps=n_steps,
             dt=dt,
             solver=solver,
+            show=show,
+            compile_backend=compile_backend,
+            verbose=verbose,
         )
-        traj = sim.solve(show=show)
+        traj = sim.solve()
 
         self.traj = traj
 

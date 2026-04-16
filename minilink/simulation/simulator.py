@@ -24,10 +24,12 @@ class Simulator:
         solver=None,
         verbose=True,
         compile_backend="numpy",
+        show=False,
     ):
         self.verbose = verbose
         self.sys = sys
         self.compile_backend = compile_backend
+        self.show = show
         self.scipy_last_solution = None
         self.sys.refresh()
 
@@ -158,7 +160,9 @@ class Simulator:
         n_steps = len(time_vector)
         return time_vector, dt, n_steps
 
-    def solve(self, show=False):
+    def solve(self, show=None):
+        if show is None:
+            show = self.show
         try:
             x_traj = self.solver_backend.integrate(
                 self.evaluator, self.times, self.x0, args=self.solver_backend_options
@@ -186,9 +190,16 @@ class Simulator:
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
 
+        if show:
+            from minilink.graphical.plotting import plot_trajectory
+
+            plot_trajectory(self.sys, traj)
+
         return traj
 
-    def solve_forced(self, u_traj, show=False):
+    def solve_forced(self, u_traj, show=None):
+        if show is None:
+            show = self.show
         u_traj = self._validate_forced_u_traj(u_traj)
         if not self._supports_forced_mode():
             raise ValueError(
@@ -218,6 +229,11 @@ class Simulator:
         # Memory for debugging purposes
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
+
+        if show:
+            from minilink.graphical.plotting import plot_trajectory
+
+            plot_trajectory(self.sys, traj)
 
         return traj
 
