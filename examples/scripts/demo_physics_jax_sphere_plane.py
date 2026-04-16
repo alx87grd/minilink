@@ -57,7 +57,7 @@ traj = diagram.compute_trajectory(tf=10.0, solver="scipy")
 
 # evaluator = diagram.compile(backend="jax", verbose=True)
 # x = np.asarray(diagram.x0)
-# u = np.asarray(diagram.get_u_from_input_ports(0.0))
+# u = np.asarray(diagram.get_u_from_input_ports())
 # print("diagram.f:", diagram.f(x, u, 0.0))
 # print("evaluator.f:", evaluator.f(x, u, 0.0))
 

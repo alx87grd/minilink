@@ -22,6 +22,23 @@ class StableLinearSystem(DynamicSystem):
         return np.array([x[0]])
 
 
+class TwoPortLinearSystem(DynamicSystem):
+    def __init__(self):
+        super().__init__(1, 0, 1)
+        self.name = "TwoPortLinearSystem"
+        self.inputs = {}
+        self.add_input_port(1, "left", nominal_value=np.array([1.0]))
+        self.add_input_port(1, "right", nominal_value=np.array([2.0]))
+        self.m = 2
+        self.x0 = np.array([0.0])
+
+    def f(self, x, u, t=0, params=None):
+        return np.array([-x[0] + u[0] + 2.0 * u[1]])
+
+    def h(self, x, u, t=0, params=None):
+        return np.array([x[0]])
+
+
 class DiscontinuousLinearSystem(StableLinearSystem):
     def __init__(self):
         super().__init__()
@@ -111,6 +128,38 @@ class TestNewSimulator(unittest.TestCase):
         self.assertEqual(traj.x.shape, (1, 3))
         self.assertEqual(traj.u.shape, (1, 3))
         self.assertEqual(traj.t.shape, (3,))
+
+    def test_wrapper_compute_forced_accepts_full_input_trajectory(self):
+        sys = StableLinearSystem()
+        u_traj = np.array([[0.0, 0.5, 1.0]])
+
+        traj = sys.compute_forced(
+            u_traj,
+            tf=0.2,
+            n_steps=3,
+            solver="euler",
+            show=False,
+            verbose=False,
+        )
+
+        self.assertIs(sys.traj, traj)
+        np.testing.assert_allclose(traj.u, u_traj)
+
+    def test_wrapper_compute_forced_samples_callable_on_one_named_port(self):
+        sys = TwoPortLinearSystem()
+
+        traj = sys.compute_forced(
+            lambda t: 10.0 * t,
+            input_port_id="left",
+            tf=0.2,
+            n_steps=3,
+            solver="euler",
+            show=False,
+            verbose=False,
+        )
+
+        np.testing.assert_allclose(traj.u[0, :], np.array([0.0, 1.0, 2.0]))
+        np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
 
 
 if __name__ == "__main__":

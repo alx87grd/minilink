@@ -109,7 +109,7 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         self.backend = "jax"
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
-        self._u_nominal = jnp.array(system.get_u_from_input_ports(0))
+        self._u_nominal = jnp.array(system.get_u_from_input_ports())
 
         # Store references to the raw system functions
         f_raw = system.f
@@ -386,7 +386,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         )
         self.backend = "jax"
         self._frozen_params = None  # per-op binding, not diagram-level
-        self._u_nominal = jnp.array(diagram.get_u_from_input_ports(0))
+        self._u_nominal = jnp.array(diagram.get_u_from_input_ports())
 
         # --- Step 0 (JAX): Check compatibility of all subsystem blocks ---
         if verbose:

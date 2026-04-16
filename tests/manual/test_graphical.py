@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     # 4. Demonstrate a single frame using show()
     # print("Showing a single static frame initialization...")
-    # initial_u = sys.get_u_from_input_ports(t=0)
+    # initial_u = sys.get_u_from_input_ports()
     # animator.show(x=sys.x0, u=initial_u, t=0, is_3d=False)
 
     # 5. Demonstrate the full playback video

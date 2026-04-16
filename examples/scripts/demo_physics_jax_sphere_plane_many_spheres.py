@@ -54,7 +54,7 @@ sys.animate(renderer="meshcat")
 
 
 x = np.asarray(sys.x0)
-u = np.asarray(sys.get_u_from_input_ports(0.0))
+u = np.asarray(sys.get_u_from_input_ports())
 
 evaluator = sys.compile(backend="jax", verbose=True)
 # evaluator = compile(sys, backend="jax", verbose=False)

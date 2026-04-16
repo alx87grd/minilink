@@ -162,8 +162,8 @@ class DiagramSystem(System):
 
         # Check if the port is not connected
         if source is None:
-            # Return the nominal value of the port
-            return self.subsystems[sys_id].inputs[port_id].get_signal(t)
+            # Return the constant default value of the port
+            return self.subsystems[sys_id].inputs[port_id].get_default_value()
 
         # Source is connected to a system and port
         source_sys_id, source_port_id = source
@@ -309,10 +309,10 @@ class DiagramSystem(System):
 
         # For all input ports of the subsystem
         for port_id, port in sys.inputs.items():
-            # Check if the output port requires getting the signal from the input ports
-            # If not required, the u vector is filled with nominal values
+            # If this input is not required by the current output dependency set,
+            # fill it with its constant default value.
             if dependencies != "all" and port_id not in dependencies:
-                port_u = port.get_signal(t)  # Nominal value
+                port_u = port.get_default_value()
 
             else:
                 # Recursively get the input signal
