@@ -66,14 +66,14 @@ def make_world_model(
     if n == 0:
         raise ValueError("At least one sphere is required.")
 
-    masses = jnp.asarray([s.mass for s in spheres], dtype=jnp.float64)
-    radii = jnp.asarray([s.radius for s in spheres], dtype=jnp.float64)
+    masses = jnp.asarray([s.mass for s in spheres])
+    radii = jnp.asarray([s.radius for s in spheres])
     inertias = 0.4 * masses * radii * radii  # I = 2/5 m r^2
     inv_masses = 1.0 / masses
     inv_inertias = 1.0 / inertias
 
-    nrm = _normalize(jnp.asarray(plane.normal, dtype=jnp.float64))
-    g = jnp.asarray(gravity, dtype=jnp.float64)
+    nrm = _normalize(jnp.asarray(plane.normal))
+    g = jnp.asarray(gravity)
     return WorldModel(
         n_bodies=n,
         masses=masses,
@@ -99,7 +99,7 @@ def pack_state(pos, quat, lin_vel, ang_vel):
 def unpack_state(x, n_bodies: int):
     """Unpack flat state vector (13N,) to arrays."""
     jnp = _jnp()
-    X = jnp.asarray(x, dtype=jnp.float64).reshape((n_bodies, 13))
+    X = jnp.asarray(x).reshape((n_bodies, 13))
     pos = X[:, 0:3]
     quat = X[:, 3:7]
     lin_vel = X[:, 7:10]
@@ -155,7 +155,7 @@ def world_ode(world: WorldModel, x, u):
     pos, quat, lin_vel, ang_vel = unpack_state(x, world.n_bodies)
     quat = normalize_quaternion(quat)
 
-    u = jnp.asarray(u, dtype=jnp.float64).reshape((world.n_bodies, 6))
+    u = jnp.asarray(u).reshape((world.n_bodies, 6))
     force_u = u[:, 0:3]
     torque_u = u[:, 3:6]
 
