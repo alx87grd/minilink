@@ -2,29 +2,14 @@ import time
 
 import numpy as np
 import jax
-import jax.numpy as jnp
 
-from minilink.core.framework import DynamicSystem
+from minilink.blocks.testing.basic import make_pendulum
+from minilink.blocks.testing.network import build_deep_network
 from minilink.simulation import Simulator
 
+sys = make_pendulum(initial_angle=2.0, damping=0.0)
 
-class Pendulum(DynamicSystem):
-    def __init__(self):
-        super().__init__(n=2, m=1, p=2)
-        self.name = "Pendulum"
-
-    def f(self, x, u, t=0, params=None):
-        # Pure JAX implementation
-        gravity = 9.81
-        length = 1.0
-        damping = 0.0
-        q, dq = x[0], x[1]
-        ddq = -(gravity / length) * jnp.sin(q) - damping * dq + u[0]
-        return jnp.array([dq, ddq])
-
-
-sys = Pendulum()
-sys.x0[0] = 2.0
+# sys = build_deep_network(depth=50)
 
 t0 = 0.0
 tf = 10.0

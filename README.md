@@ -55,6 +55,11 @@ plot_trajectory(diagram, traj)
 - **[ROADMAP.md](ROADMAP.md)**: subsystem maturity, priorities, and Pyro migration direction
 - **[agent.md](agent.md)**: project-specific AI collaboration rules and TRL definitions
 
+## Benchmarks
+
+- **API**: `minilink.benchmark` — `benchmark_f_speeds` / `print_f_speed_table` for compiled `f` timing; `benchmark_sim_speed_matrix` / `benchmark_sim_backend` for `Simulator` sweeps (see **§4.6** in [DESIGN.md](DESIGN.md)).
+- **Scripts**: flat runners under `tests/benchmark/` (for example `benchmark_pendulum_f_speed.py`, `benchmark_simulator_speed_matrix.py`); execute with `python tests/benchmark/<script>.py` from the repo root with the package on `PYTHONPATH`.
+
 ## Examples
 
 - **Scripts**: `examples/scripts/` for diagram compilation, internal signals, animations, and JAX physics demos

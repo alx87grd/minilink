@@ -78,6 +78,8 @@ At feature completion, verify through:
 
 Demo and manual scripts should stay flat and directly runnable at module top level.
 
+Benchmark example scripts live under `tests/benchmark/` (same flat style). Prefer `from minilink.benchmark import ...` for `benchmark_f_speeds`, `benchmark_sim_speed_matrix`, and related helpers; see `DESIGN.md` §4.6.
+
 ## 7. Local Environment
 
 Use the `dev-h26` conda environment for local development:

@@ -16,6 +16,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Symbolic mechanics** | **TRL 1** | Keep derivation/export workflows working for examples and review |
 | **Physics** | **TRL 1** | Keep JAX contact demos working and extend the MVP carefully |
 | **Blocks library** | **TRL 0** | Decide what belongs in a real reusable block library |
+| **Benchmark helpers** (`minilink.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; grow exports only when a stable need appears |
 | **Planning** | **TRL 0** | Not started as a rated subsystem |
 | **Control** | **TRL 0** | Not started as a rated subsystem |
 
@@ -29,6 +30,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - **Early MVP work**: graphics, mechanics, symbolic mechanics, physics
 - **Exploratory / not stabilized**: blocks, planning, control
 - **Still needs a clearer top-level package surface**: public exports and import story
+- **Benchmarks**: `minilink.benchmark` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
 
 ## 3. Active Priorities
 

@@ -21,6 +21,7 @@
 | `mechanics/` | **TRL 1** | Numeric and symbolic mechanics paths |
 | `physics/` | **TRL 1** | JAX contact-world MVP and demos |
 | `blocks/` | **TRL 0** | Early reusable blocks, not yet a stabilized library layer |
+| `benchmark/` | **TRL 1** | Optional timing helpers and no core dependency |
 | `planning/` | **TRL 0** | Future planners |
 | `control/` | **TRL 0** | Future controllers |
 
@@ -152,6 +153,17 @@ Current solver modes:
 - `solver="scipy_stiff"`
 - `solver="scipy_max"`
 - `solver="scipy_ultra"`
+
+### 4.6 Benchmark package (`minilink.benchmark`)
+
+Optional helpers for timing and regression-style comparisons. They are **not** part of the core dynamical or simulation contract; scripts may import them for local experiments.
+
+| Module | Purpose |
+| --- | --- |
+| `minilink.benchmark.f_speed` | `benchmark_f_speeds` measures native `system.f`, then `compile("numpy").f` and `compile("jax").f` over a fixed `(x, u, t)`; optional ASCII table via `print_f_speed_table`. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
+| `minilink.benchmark.simulation_speed` | Shared timing helpers (`run_timed`, `summarize_durations`, `relative_l2_error`); `benchmark_sim_backend` compares one `(solver, compile_backend)` `Simulator` run to a baseline; `benchmark_sim_speed_matrix` sweeps explicit or default solver and backend lists and prints a fixed-layout matrix. |
+
+Programmatic imports should use `from minilink.benchmark import ...`. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style).
 
 ## 5. Coding Standards
 
