@@ -161,9 +161,9 @@ Optional helpers for timing and regression-style comparisons. They are **not** p
 | Module | Purpose |
 | --- | --- |
 | `minilink.benchmark.f_speed` | `benchmark_f_speeds` measures native `system.f`, then `compile("numpy").f` and `compile("jax").f` over a fixed `(x, u, t)`; optional ASCII table via `print_f_speed_table`. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
-| `minilink.benchmark.simulation_speed` | Shared timing helpers (`run_timed`, `summarize_durations`, `relative_l2_error`); `benchmark_sim_backend` compares one `(solver, compile_backend)` `Simulator` run to a baseline; `benchmark_sim_speed_matrix` sweeps explicit or default solver and backend lists and prints a fixed-layout matrix. |
+| `minilink.benchmark.simulation_speed` | Shared timing helpers (`run_timed`, `summarize_durations`, `relative_l2_error`); `benchmark_sim_backend` compares one `(solver, compile_backend)` `Simulator` run to a baseline; `benchmark_sim_speed_matrix` sweeps solver×backend lists vs a **truth** pair (defaults `scipy_max` + `numpy` in code, often overridden in scripts), colors rows by ``rel_err_l2 < accuracy_threshold_pct``, prints speed ``truth_mean_time / cell_mean_time``, and optionally reports a distinct **anchor** pair in the header (defaults `rk4_fixedsteps` + ``jax``); ``progress=True`` prints flushed phase and cell lines. |
 
-Programmatic imports should use `from minilink.benchmark import ...`. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style).
+Programmatic imports should use `from minilink.benchmark import ...`. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
 
 ## 5. Coding Standards
 

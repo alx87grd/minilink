@@ -264,7 +264,16 @@ class Simulator:
                 "scipy",
                 {
                     "method": "DOP853",
-                    "rtol": 1e-9,
+                    "rtol": 1e-8,
+                    "atol": 1e-11,
+                    "use_jac": False,
+                },
+            ),
+            "scipy_lsoda": (
+                "scipy",
+                {
+                    "method": "LSODA",
+                    "rtol": 3e-7,
                     "atol": 1e-11,
                     "use_jac": False,
                 },

@@ -1,5 +1,15 @@
 """Manual simulator benchmark across multiple systems/solver/backend options.
 
+Truth for ``rel_err_l2`` and the speed column uses ``scipy_ultra`` + ``numpy`` below.
+Table rows: green if error vs truth is below ``accuracy_threshold_pct``, red otherwise;
+the fastest *mean* time among green rows is bold bright green.
+
+The **anchor** row in the header is ``rk4_fixedsteps`` + ``jax`` (same grid as the matrix);
+it is *not* reused as truth, so you get ``anchor_err_vs_truth`` and ``anchor_mean_t`` for
+comparison. For long grids (e.g. ``tf=100``, ``dt=0.01``), adaptive SciPy ``solve_ivp``
+with dense ``t_eval`` rarely beats RK4+JAX on wall time under the same error cap; see
+``tests/benchmark/tune_scipy_vs_rk4.py`` for a 10-round reproducible search.
+
 Run with:
     python tests/benchmark/benchmark_simulator_speed_matrix.py
 """
@@ -25,12 +35,16 @@ benchmark_sim_speed_matrix(
     make_pendulum,
     case_name="Pendulum",
     t0=0.0,
-    tf=10.0,
+    tf=100.0,
     dt=0.01,
-    n_runs=3,
+    n_runs=1,
     baseline_solver="scipy_ultra",
     baseline_backend="numpy",
+    accuracy_threshold_pct=1.0,
+    anchor_solver="rk4_fixedsteps",
+    anchor_backend="jax",
     precision_note=_precision,
+    progress=True,
 )
 
 # benchmark_sim_speed_matrix(
@@ -42,6 +56,9 @@ benchmark_sim_speed_matrix(
 #     n_runs=3,
 #     baseline_solver="scipy_ultra",
 #     baseline_backend="numpy",
+#     accuracy_threshold_pct=1.0,
+#     anchor_solver="rk4_fixedsteps",
+#     anchor_backend="jax",
 #     precision_note=_precision,
 # )
 
@@ -54,5 +71,8 @@ benchmark_sim_speed_matrix(
 #     n_runs=2,
 #     baseline_solver="scipy_ultra",
 #     baseline_backend="numpy",
+#     accuracy_threshold_pct=1.0,
+#     anchor_solver="rk4_fixedsteps",
+#     anchor_backend="jax",
 #     precision_note=_precision,
 # )
