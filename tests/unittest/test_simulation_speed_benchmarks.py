@@ -11,6 +11,7 @@ from minilink.benchmark import (
     TRUTH_BACKEND,
     benchmark_sim_backend,
     benchmark_sim_speed_matrix,
+    format_benchmark_backend_label,
 )
 from minilink.core.framework import DynamicSystem
 
@@ -35,6 +36,18 @@ class TestSimulationSpeedBenchmark(unittest.TestCase):
     def setUpClass(cls):
         cls._sys = _TinyStable()
         cls._tgrid = dict(t0=0.0, tf=0.1, dt=0.01)
+
+    def test_format_benchmark_backend_label_numpy_unchanged(self):
+        self.assertEqual(format_benchmark_backend_label("numpy"), "numpy")
+
+    def test_format_benchmark_backend_label_jax_shape(self):
+        label = format_benchmark_backend_label("jax")
+        try:
+            import jax  # noqa: F401
+        except ImportError:
+            self.assertEqual(label, "jax")
+        else:
+            self.assertRegex(label, r"^jax\([a-z0-9_]+\)$")
 
     def test_compile_each_run_total_exceeds_split_parts(self):
         r = benchmark_sim_backend(

@@ -7,6 +7,8 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
+from minilink.benchmark.simulation_speed import format_benchmark_backend_label
+
 
 class FSpeedTimings(NamedTuple):
     """Seconds for ``n_calls`` evaluations (compile_* is evaluator construction only)."""
@@ -79,7 +81,7 @@ def print_f_speed_table(
     _row("native", None, ref, native_speedup=True)
     _row("numpy", b.numpy_compile_s, b.numpy_loop_s)
     if b.jax_loop_s is not None:
-        _row("jax", b.jax_compile_s, b.jax_loop_s)
+        _row(format_benchmark_backend_label("jax"), b.jax_compile_s, b.jax_loop_s)
     else:
         print(
             f"  {'jax':<12}  {'-':>10}  {'(no jax)':>11}  {'n/a':>9}  {'n/a':>10}"

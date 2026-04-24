@@ -56,6 +56,37 @@ DEFAULT_SWEEP_PAIRS: tuple[tuple[str, str], ...] = tuple(
     (s, b) for s in DEFAULT_SOLVERS for b in DEFAULT_BACKENDS
 )
 
+
+def format_benchmark_backend_label(compile_backend: str) -> str:
+    """Human-readable backend label for benchmark tables and result structs.
+
+    For ``compile_backend="jax"``, returns ``jax(cpu)``, ``jax(gpu)``, etc., from the
+    active JAX default device. Any other value is returned unchanged.
+    """
+    if compile_backend != "jax":
+        return compile_backend
+    try:
+        import jax
+    except ImportError:
+        return "jax"
+    try:
+        plat = str(jax.default_backend()).lower()
+    except Exception:
+        return "jax"
+    return f"jax({plat})"
+
+
+def _compile_backend_key_for_compare(backend_label: str) -> str:
+    """Map display labels such as ``jax(gpu)`` back to the compile API key ``jax``."""
+    if (
+        len(backend_label) >= 6
+        and backend_label.startswith("jax(")
+        and backend_label.endswith(")")
+    ):
+        return "jax"
+    return backend_label
+
+
 # ---------------------------------------------------------------------------
 # Timing helpers
 # ---------------------------------------------------------------------------
@@ -401,9 +432,9 @@ def benchmark_sim_backend(
     )
     return BenchmarkResult(
         candidate_solver=candidate_solver,
-        candidate_backend=candidate_backend,
+        candidate_backend=format_benchmark_backend_label(candidate_backend),
         truth_solver=truth_solver,
-        truth_backend=truth_backend,
+        truth_backend=format_benchmark_backend_label(truth_backend),
         mean_time=cand.stats.mean,
         std_time=cand.stats.std,
         mean_compile_time=cand.mean_compile_s,
@@ -601,7 +632,8 @@ def _fastest_accurate_row_indices(
 
 
 # --- Matrix: fixed column widths; titles are checked against sample data width.
-_MZ_SOL, _MZ_MET, _MZ_BAK, _MZ_F = 15, 8, 5, 10
+# ``_MZ_BAK`` must fit ``jax(<platform>)`` (see :func:`format_benchmark_backend_label`).
+_MZ_SOL, _MZ_MET, _MZ_BAK, _MZ_F = 15, 8, 10, 10
 
 
 def _row_tail(
@@ -693,7 +725,8 @@ def _print_matrix_row_line(
     """Color: winner (fastest among accurate) > baseline (truth pair) > ok > fail."""
     line = _format_matrix_row_text(row, compile_once=compile_once)
     is_baseline = (
-        row.solver == truth_solver and row.backend == truth_backend
+        row.solver == truth_solver
+        and _compile_backend_key_for_compare(row.backend) == truth_backend
     )
     if is_winner:
         line = _ansi(line, 1, 92)
@@ -718,7 +751,8 @@ def print_sim_matrix_header(result: MatrixResult) -> None:
         )
         print(
             f"t0={result.t0} tf={result.tf} dt={result.dt} runs={result.n_runs} mode={co} "
-            f"truth=({result.truth_solver}, {result.truth_backend}) "
+            f"truth=({result.truth_solver}, "
+            f"{format_benchmark_backend_label(result.truth_backend)}) "
             f"truth_total={truth_total:.6f}s "
             f"truth_solve={result.truth_mean_time:.6f}s "
             f"truth_cmp={result.truth_mean_compile_time:.6f}s "
@@ -730,7 +764,8 @@ def print_sim_matrix_header(result: MatrixResult) -> None:
     else:
         print(
             f"t0={result.t0} tf={result.tf} dt={result.dt} runs={result.n_runs} mode={co} "
-            f"truth=({result.truth_solver}, {result.truth_backend}) "
+            f"truth=({result.truth_solver}, "
+            f"{format_benchmark_backend_label(result.truth_backend)}) "
             f"truth_total={result.truth_mean_time:.6f}s "
             f"truth_cmp={result.truth_mean_compile_time:.6f}s "
             f"truth_slv={result.truth_mean_solve_time:.6f}s "
@@ -912,7 +947,7 @@ def benchmark_sim_speed_matrix(
         row = MatrixRow(
             solver=solver,
             method=integration_method_for_solver_mode(solver),
-            backend=backend,
+            backend=format_benchmark_backend_label(backend),
             mean_time=timed.stats.mean,
             std_time=timed.stats.std,
             mean_compile_time=timed.mean_compile_s,
