@@ -19,7 +19,7 @@ system = make_physics_many_spheres(nx=12, ny=12)
 
 t0 = 0.0
 tf = 2.0
-dt = 0.01
+dt = 0.005
 n_runs = 1
 
 system.compute_trajectory(tf=tf, dt=dt, solver="scipy", show=False)
