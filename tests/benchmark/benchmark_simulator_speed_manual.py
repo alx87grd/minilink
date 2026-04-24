@@ -59,5 +59,4 @@ benchmark_sim_speed_matrix(
     tf=tf,
     dt=dt,
     n_runs=1,
-    progress=True,
 )

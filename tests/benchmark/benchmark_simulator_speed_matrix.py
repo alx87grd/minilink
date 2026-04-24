@@ -24,38 +24,35 @@ from minilink.blocks.testing import (
 USE_X64 = False
 jax.config.update("jax_enable_x64", USE_X64)
 
-system = make_pendulum()
+sys = make_pendulum()
 benchmark_sim_speed_matrix(
-    system,
+    sys,
     case_name="Pendulum",
     pairs=DEFAULT_SWEEP_PAIRS,
     t0=0.0,
     tf=100.0,
     dt=0.01,
-    n_runs=1,
-    progress=True,
+    n_runs=5,
 )
 
-# system = make_dense_network(num_nodes=50, connections_per_node=5)
-# benchmark_sim_speed_matrix(
-#     system,
-#     case_name="Dense network (50 nodes, 5 conn/node)",
-#     pairs=DEFAULT_SWEEP_PAIRS,
-#     t0=0.0,
-#     tf=5.0,
-#     dt=0.1,
-#     n_runs=3,
-#     progress=True,
-# )
+sys = make_dense_network(num_nodes=50, connections_per_node=5)
+benchmark_sim_speed_matrix(
+    sys,
+    case_name="Dense network (50 nodes, 5 conn/node)",
+    pairs=DEFAULT_SWEEP_PAIRS,
+    t0=0.0,
+    tf=5.0,
+    dt=0.1,
+    n_runs=5,
+)
 
-# system = make_physics_many_spheres(nx=6, ny=4)
-# benchmark_sim_speed_matrix(
-#     system,
-#     case_name="PhysicsManySpheres (24 bodies)",
-#     pairs=DEFAULT_SWEEP_PAIRS,
-#     t0=0.0,
-#     tf=1.0,
-#     dt=0.01,
-#     n_runs=2,
-#     progress=True,
-# )
+sys = make_physics_many_spheres(nx=6, ny=4)
+benchmark_sim_speed_matrix(
+    sys,
+    case_name="PhysicsManySpheres (24 bodies)",
+    pairs=DEFAULT_SWEEP_PAIRS,
+    t0=0.0,
+    tf=1.0,
+    dt=0.01,
+    n_runs=5,
+)

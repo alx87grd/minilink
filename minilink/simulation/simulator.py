@@ -9,6 +9,47 @@ from minilink.simulation.solver_backends import (
     SciPySolverBackend,
 )
 
+# (solver backend key, options). Used by :meth:`Simulator._parse_solver`.
+_USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
+    "scipy": (
+        "scipy",
+        {"method": "RK45", "use_jac": False},
+    ),
+    "scipy_stiff": (
+        "scipy",
+        {"method": "Radau", "use_jac": True},
+    ),
+    "scipy_max": (
+        "scipy",
+        {
+            "method": "DOP853",
+            "rtol": 1e-8,
+            "atol": 1e-10,
+            "use_jac": False,
+        },
+    ),
+    "scipy_ultra": (
+        "scipy",
+        {
+            "method": "DOP853",
+            "rtol": 1e-8,
+            "atol": 1e-11,
+            "use_jac": False,
+        },
+    ),
+    "scipy_lsoda": (
+        "scipy",
+        {
+            "method": "LSODA",
+            "rtol": 3e-7,
+            "atol": 1e-11,
+            "use_jac": False,
+        },
+    ),
+    "euler": ("euler", {}),
+    "rk4_fixedsteps": ("rk4", {}),
+}
+
 
 class Simulator:
     """Prototype simulator using pluggable solver backends."""
@@ -24,12 +65,10 @@ class Simulator:
         solver=None,
         verbose=True,
         compile_backend="numpy",
-        show=False,
     ):
         self.verbose = verbose
         self.sys = sys
         self.compile_backend = compile_backend
-        self.show = show
         self.scipy_last_solution = None
         self.sys.refresh()
 
@@ -160,9 +199,7 @@ class Simulator:
         n_steps = len(time_vector)
         return time_vector, dt, n_steps
 
-    def solve(self, show=None):
-        if show is None:
-            show = self.show
+    def solve(self):
         try:
             x_traj = self.solver_backend.integrate(
                 self.evaluator, self.times, self.x0, args=self.solver_backend_options
@@ -190,16 +227,9 @@ class Simulator:
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
 
-        if show:
-            from minilink.graphical.plotting import plot_trajectory
-
-            plot_trajectory(self.sys, traj)
-
         return traj
 
-    def solve_forced(self, u_traj, show=None):
-        if show is None:
-            show = self.show
+    def solve_forced(self, u_traj):
         u_traj = self._validate_forced_u_traj(u_traj)
         if not self._supports_forced_mode():
             raise ValueError(
@@ -230,57 +260,9 @@ class Simulator:
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
 
-        if show:
-            from minilink.graphical.plotting import plot_trajectory
-
-            plot_trajectory(self.sys, traj)
-
         return traj
 
     def _parse_solver(self, solver):
-        # Practical guidance from current manual benchmarks:
-        # - Short simulations: scipy + numpy (RK45) is often a strong default.
-        # - Long fixed-step rollouts: rk4_fixedsteps + jax is usually the fastest
-        #   while keeping precision close to high-order SciPy references.
-        mapping = {
-            "scipy": (
-                "scipy",
-                {"method": "RK45", "use_jac": False},
-            ),
-            "scipy_stiff": (
-                "scipy",
-                {"method": "Radau", "use_jac": True},
-            ),
-            "scipy_max": (
-                "scipy",
-                {
-                    "method": "DOP853",
-                    "rtol": 1e-8,
-                    "atol": 1e-10,
-                    "use_jac": False,
-                },
-            ),
-            "scipy_ultra": (
-                "scipy",
-                {
-                    "method": "DOP853",
-                    "rtol": 1e-8,
-                    "atol": 1e-11,
-                    "use_jac": False,
-                },
-            ),
-            "scipy_lsoda": (
-                "scipy",
-                {
-                    "method": "LSODA",
-                    "rtol": 3e-7,
-                    "atol": 1e-11,
-                    "use_jac": False,
-                },
-            ),
-            "euler": ("euler", {}),
-            "rk4_fixedsteps": ("rk4", {}),
-        }
-        if solver not in mapping:
+        if solver not in _USER_SOLVER_MODES:
             raise ValueError(f"Unknown solver '{solver}'")
-        return mapping[solver]
+        return _USER_SOLVER_MODES[solver]

@@ -7,6 +7,7 @@ Backends live under :mod:`minilink.graphical.renderers`; the animator picks one 
 
 from __future__ import annotations
 
+import sys
 import time
 
 import numpy as np
@@ -27,6 +28,11 @@ __all__ = [
     "MeshcatRenderer",
     "PygameRenderer",
 ]
+
+
+def _is_colab() -> bool:
+    """True when running inside a Google Colab notebook kernel."""
+    return "google.colab" in sys.modules
 
 
 def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:

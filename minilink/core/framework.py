@@ -557,6 +557,7 @@ class System:
         It uses model defaults such as :attr:`x0` and stores the resulting
         trajectory in :attr:`traj` for later convenience.
         """
+        from minilink.graphical.plotting import plot_trajectory
         from minilink.simulation import Simulator
 
         sim = Simulator(
@@ -567,11 +568,12 @@ class System:
             n_steps=n_steps,
             dt=dt,
             solver=solver,
-            show=show,
             compile_backend=compile_backend,
             verbose=verbose,
         )
         traj = sim.solve()
+        if show:
+            plot_trajectory(self, traj)
 
         self.traj = traj
 
@@ -618,6 +620,7 @@ class System:
         Trajectory
             Simulated state-input trajectory.
         """
+        from minilink.graphical.plotting import plot_trajectory
         from minilink.simulation import Simulator
 
         sim = Simulator(
@@ -628,7 +631,6 @@ class System:
             n_steps=n_steps,
             dt=dt,
             solver=solver,
-            show=show,
             compile_backend=compile_backend,
             verbose=verbose,
         )
@@ -687,6 +689,8 @@ class System:
             )
 
         traj = sim.solve_forced(u_traj)
+        if show:
+            plot_trajectory(self, traj)
         self.traj = traj
 
         return traj
