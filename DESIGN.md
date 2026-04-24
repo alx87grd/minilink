@@ -165,6 +165,39 @@ Optional helpers for timing and regression-style comparisons. They are **not** p
 
 Programmatic imports should use `from minilink.benchmark import ...` (re-exports include `STANDARD_SIM_CASES`, `run_standard_sim_suite`, `DEFAULT_SWEEP_PAIRS`, `MatrixResult`, `MatrixRow`). Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
 
+### 4.7 Animation playback (`System.animate` / `Animator.animate_simulation`)
+
+`sys.animate(...)` takes three **orthogonal** keyword arguments that are resolved
+independently:
+
+| kwarg | selects | values |
+| --- | --- | --- |
+| `renderer` | graphics tech | `"matplotlib"`, `"meshcat"`, `"pygame"` |
+| `html` | output channel | `True` = inline notebook object, `False` = local window, `None` = auto (True in Colab, False elsewhere) |
+| `native` | playback engine | `True` = backend's own animation API, `False` = Python frame loop (legacy default) |
+
+Behavior:
+
+- `native=False` (default) keeps the existing per-frame Python loop
+  (`draw_frame` + `present`), unchanged byte-for-byte for backwards
+  compatibility.
+- `native=True` + matplotlib drives `matplotlib.animation.FuncAnimation` and
+  `plt.show(block=True)` for on-screen playback.
+- `native=True` + meshcat builds a `meshcat.animation.Animation` and calls
+  `Visualizer.set_animation(...)`; the browser plays keyframes with no Python
+  loop.
+- `html=True` returns an `IPython.display.HTML` object: matplotlib uses
+  `FuncAnimation.to_jshtml()`; meshcat uses `Visualizer.render_static(...)`
+  around `static_html()` (ideal for Colab cells).
+- `html=None` auto-detects Google Colab via `"google.colab" in sys.modules`
+  and flips to `True` there; explicit `True`/`False` is always honored.
+
+Limitation of meshcat native playback: `meshcat.animation.Animation` only
+keyframes rigid pose (position+quaternion) per path. Primitives whose geometry
+is rebuilt each frame (currently only `TorqueArrow`) are frozen at `t=0` in
+the native path and a one-line notice is printed when any are present. Use
+`native=False` for frame-accurate playback of those primitives.
+
 ## 5. Coding Standards
 
 ### General rules

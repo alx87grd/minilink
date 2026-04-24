@@ -403,8 +403,56 @@ class MeshcatCanvas:
             return
 
 
+def _rigid_effective_transform(primitive, transform_matrix, tf):
+    """
+    Return the 4x4 transform that ``MeshcatCanvas.update_primitive`` would apply
+    for the given rigid primitive, or ``None`` for primitives whose geometry is
+    rebuilt each frame (``TorqueArrow``) and therefore cannot be rigid-keyframed.
+    """
+    if isinstance(primitive, Point):
+        local_pt = np.append(primitive.pt, 1.0)
+        world_pt = transform_matrix @ local_pt
+        return tf.translation_matrix(world_pt[:3].tolist())
+
+    if isinstance(primitive, Circle):
+        local_center = np.zeros(3)
+        local_center[: len(primitive.center)] = primitive.center
+        world_center = (transform_matrix @ np.append(local_center, 1.0))[:3]
+        return tf.translation_matrix(world_center.tolist())
+
+    if isinstance(primitive, Sphere):
+        local_center = np.zeros(3)
+        local_center[: len(primitive.center)] = primitive.center
+        world_center = (transform_matrix @ np.append(local_center, 1.0))[:3]
+        return tf.translation_matrix(world_center.tolist())
+
+    if isinstance(primitive, Rod):
+        T_local = tf.translation_matrix([0.0, -0.5 * primitive.length, 0.0])
+        return transform_matrix @ T_local
+
+    if isinstance(primitive, Plane):
+        n = np.asarray(primitive.normal, dtype=float)
+        n = n / (np.linalg.norm(n) + 1e-12)
+        center = n * float(primitive.offset)
+        R = _rotation_from_a_to_b(np.array([0.0, 0.0, 1.0]), n)
+        T = np.eye(4, dtype=float)
+        T[:3, :3] = R
+        T[:3, 3] = center
+        return transform_matrix @ T
+
+    if isinstance(primitive, Box):
+        c = np.asarray(primitive.center, dtype=float).reshape(3)
+        T_c = tf.translation_matrix(c.tolist())
+        return transform_matrix @ T_c
+
+    if isinstance(primitive, (CustomLine, Arrow, ExtrudedPolygon)):
+        return transform_matrix
+
+    return None
+
+
 class MeshcatRenderer(AnimationRenderer):
-    """Browser-based playback; optional GIF/HTML not supported."""
+    """Browser-based playback and static-HTML snapshots."""
 
     def __init__(self, animator):
         super().__init__(animator)
@@ -436,3 +484,87 @@ class MeshcatRenderer(AnimationRenderer):
     def close_scene(self) -> None:
         self.canvas = None
         self.vis = None
+
+    def _build_meshcat_animation(self, primitives, frames, schedule):
+        """
+        Compile the frame list into a ``meshcat.animation.Animation`` keyframe
+        track per rigid primitive path. Dynamic primitives (``TorqueArrow``) are
+        left frozen at ``t=0`` and a one-line notice is printed if any are
+        present.
+        """
+        import meshcat.animation as mcanim
+
+        self.canvas.ensure_objects(primitives)
+
+        # Draw t=0 once: this sets the (frozen) geometry of TorqueArrow and gives
+        # every rigid primitive a sane starting pose before keyframes kick in.
+        t0_transforms = frames[0]["transforms"]
+        has_dynamic = False
+        for i, (prim, T0) in enumerate(zip(primitives, t0_transforms)):
+            self.canvas.update_primitive(i, prim, T0)
+            if isinstance(prim, TorqueArrow):
+                has_dynamic = True
+
+        animation_obj = mcanim.Animation(default_framerate=schedule.target_fps)
+        tf = self.canvas._tf
+
+        for frame_idx, frame in enumerate(frames):
+            for i, (prim, T) in enumerate(zip(primitives, frame["transforms"])):
+                T_eff = _rigid_effective_transform(prim, T, tf)
+                if T_eff is None:
+                    continue
+                path_vis = self.canvas._base_path(i)
+                with animation_obj.at_frame(path_vis, frame_idx) as frame_vis:
+                    frame_vis.set_transform(np.asarray(T_eff, dtype=float))
+
+        if has_dynamic:
+            print(
+                "Note: meshcat native animation freezes dynamic-geometry "
+                "primitives (e.g. TorqueArrow) at t=0; use native=False for "
+                "frame-accurate playback of those primitives."
+            )
+
+        return animation_obj
+
+    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+        """
+        Drive playback through ``meshcat.animation.Animation`` +
+        ``Visualizer.set_animation`` instead of a Python frame loop. The browser
+        plays keyframes natively; no ``time.sleep`` in Python.
+        """
+        meshcat = _import_meshcat()
+        self.show = True
+        self.vis = meshcat.Visualizer()
+        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        self.vis.open()
+        self.vis.wait()
+
+        animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
+        self.vis.set_animation(animation_obj, play=True, repetitions=1)
+        return animation_obj
+
+    def render_inline_animation(self, primitives, frames, schedule):
+        """
+        Return an ``IPython.display.HTML`` iframe snapshot of the meshcat scene
+        with the animation embedded. Uses ``Visualizer.render_static`` under the
+        hood, which wraps ``static_html()`` in a self-contained ``srcdoc=``.
+        Ideal for Colab: no zmq client, no port forwarding.
+        """
+        meshcat = _import_meshcat()
+        self.show = False
+        self.vis = meshcat.Visualizer()
+        self.canvas = MeshcatCanvas(self.vis, is_3d=False)
+
+        animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
+        self.vis.set_animation(animation_obj, play=True, repetitions=1)
+
+        try:
+            return self.vis.render_static(height=480)
+        except Exception:
+            # Fallback: return the raw static HTML blob wrapped for notebooks.
+            try:
+                from IPython.display import HTML
+
+                return HTML(self.vis.static_html())
+            except ImportError:
+                return self.vis.static_html()

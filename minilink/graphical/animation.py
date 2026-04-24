@@ -88,10 +88,32 @@ class Animator:
         save=False,
         file_name="Animation",
         show=True,
-        html=False,
+        html: bool | None = None,
         renderer="matplotlib",
+        native: bool = False,
     ):
-        """Plays back a full simulation trajectory."""
+        """
+        Plays back a full simulation trajectory.
+
+        The three orthogonal kwargs are:
+
+        - ``renderer``  : graphics tech (``"matplotlib"``, ``"meshcat"``, ``"pygame"``).
+        - ``html``      : output channel. ``None`` auto-detects Colab and defaults to
+          ``True`` there, ``False`` locally. Explicit ``True``/``False`` is honored.
+        - ``native``    : playback engine. ``False`` uses the Python frame loop
+          (legacy path, unchanged). ``True`` drives the backend's own animation
+          engine: ``matplotlib.animation.FuncAnimation`` for matplotlib and
+          ``meshcat.animation.Animation`` + ``set_animation`` for meshcat.
+
+        Notes
+        -----
+        Meshcat native animation only keyframes rigid pose (position+quaternion).
+        Primitives whose geometry changes every frame (``TorqueArrow``) are frozen
+        at ``t=0`` in the native path.
+        """
+        if html is None:
+            html = _is_colab()
+
         backend = _make_renderer(renderer, self)
         primitives = self.sys.get_kinematic_geometry()
         schedule = trajectory_frame_schedule(traj, time_factor_video)
@@ -118,6 +140,17 @@ class Animator:
 
         if not show:
             return None
+
+        if native:
+            try:
+                return backend.play_native(
+                    primitives, frames, schedule, is_3d=is_3d
+                )
+            except NotImplementedError:
+                print(
+                    f"native=True is not supported for renderer={renderer!r}; "
+                    "falling back to the Python-loop path."
+                )
 
         backend.open_scene(is_3d=is_3d, show=show, title=f"Animation: {self.sys.name}")
         for frame in frames:

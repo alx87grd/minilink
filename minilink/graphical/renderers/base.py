@@ -47,3 +47,18 @@ class AnimationRenderer(ABC):
     def export_animation(self, primitives, frames, schedule, file_name: str) -> None:
         """Optional animation export (default: unsupported)."""
         raise NotImplementedError("Animation export is not supported by this renderer.")
+
+    def play_native(
+        self, primitives, frames, schedule, *, is_3d: bool
+    ) -> Any:
+        """
+        Optional native playback using the backend's own animation engine.
+
+        Subclasses that support a native animation API (matplotlib
+        ``FuncAnimation``, meshcat ``Animation`` + ``set_animation``, ...)
+        override this hook. Default raises ``NotImplementedError`` so callers
+        can fall back to the generic per-frame loop.
+        """
+        raise NotImplementedError(
+            "Native playback is not supported by this renderer."
+        )

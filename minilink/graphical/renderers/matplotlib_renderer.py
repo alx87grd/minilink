@@ -391,9 +391,9 @@ class MatplotlibRenderer(AnimationRenderer):
         self.ax = None
         self.canvas = None
 
-    def _build_animation(self, primitives, frames, schedule):
-        fig, ax = self._create_figure_and_ax(is_3d=False)
-        canvas = MatplotlibCanvas(ax, is_3d=False)
+    def _build_animation(self, primitives, frames, schedule, *, is_3d: bool = False):
+        fig, ax = self._create_figure_and_ax(is_3d=is_3d)
+        canvas = MatplotlibCanvas(ax, is_3d=is_3d)
 
         def update(frame_idx):
             frame = frames[frame_idx]
@@ -427,3 +427,23 @@ class MatplotlibRenderer(AnimationRenderer):
         print(f"Saving animation to {file_name}.gif ...")
         ani.save(file_name + ".gif", writer="imagemagick", fps=schedule.target_fps)
         plt.close(fig)
+
+    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+        """
+        Drive playback through ``matplotlib.animation.FuncAnimation`` instead of
+        a Python frame loop. The ``FuncAnimation`` instance must be kept alive
+        for the duration of the window, so it is stored on the renderer.
+        """
+        fig, ani = self._build_animation(
+            primitives, frames, schedule, is_3d=is_3d
+        )
+        self.fig = fig
+        self.ax = fig.axes[0] if fig.axes else None
+        self.canvas = None
+        self._native_animation = ani
+        plt.show(block=True)
+        plt.close(fig)
+        self.fig = None
+        self.ax = None
+        self._native_animation = None
+        return ani

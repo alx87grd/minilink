@@ -760,13 +760,19 @@ class System:
         traj=None,
         time_factor_video=1.0,
         is_3d=False,
-        html=False,
+        html: bool | None = None,
         renderer="matplotlib",
+        native: bool = False,
     ):
         """
         Convenience shortcut to animate a trajectory of this system.
+
+        ``html=None`` auto-detects Colab (``True`` there, ``False`` locally).
+        ``native=True`` opts in to each backend's own animation engine
+        (matplotlib ``FuncAnimation`` / meshcat ``Animation``); the default
+        ``native=False`` keeps the current Python-loop playback path.
         """
-        from minilink.graphical.animation import Animator
+        from minilink.graphical.animation import Animator, _is_colab
 
         if traj is None:
             if self.traj is not None:
@@ -774,26 +780,24 @@ class System:
             else:
                 traj = self.compute_trajectory()
 
+        resolved_html = _is_colab() if html is None else html
+
         animator = Animator(self)
-        show_plot = not (html and renderer == "matplotlib")
+        show_plot = not resolved_html
         ani_obj = animator.animate_simulation(
             traj,
             time_factor_video=time_factor_video,
             is_3d=is_3d,
-            html=html,
+            html=resolved_html,
             show=show_plot,
             renderer=renderer,
+            native=native,
         )
 
-        if html and renderer == "matplotlib":
-            try:
-                import IPython.display as display
-
-                if ani_obj is not None:
-                    display.display(ani_obj)
-            except ImportError:
-                print("IPython is not available to display HTML inline")
-            return ani_obj
+        # For html output, return the IPython.display.HTML object and let the
+        # notebook auto-display it via the standard last-expression rule.
+        # Calling display.display() *and* returning the object renders twice.
+        return ani_obj
 
     ######################################################################
     def game(
