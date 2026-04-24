@@ -762,17 +762,26 @@ class System:
         is_3d=False,
         html: bool | None = None,
         renderer="matplotlib",
-        native: bool = False,
+        native: bool = True,
     ):
         """
         Convenience shortcut to animate a trajectory of this system.
 
-        ``html=None`` auto-detects Colab (``True`` there, ``False`` locally).
-        ``native=True`` opts in to each backend's own animation engine
-        (matplotlib ``FuncAnimation`` / meshcat ``Animation``); the default
-        ``native=False`` keeps the current Python-loop playback path.
+        ``html=None`` auto-resolves via
+        :func:`minilink.graphical.environment.prefers_inline_animation`:
+        ``True`` in Colab and in local Jupyter with a non-interactive
+        matplotlib backend (``inline`` / ``agg``); ``False`` for bare
+        script, IPython REPL, and Jupyter with an interactive backend
+        (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``).
+        ``native=True`` (default) drives each backend's own animation
+        engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
+        Pass ``native=False`` to fall back to the legacy per-frame
+        Python-loop playback (useful for debugging or when the native
+        path's limitations matter — e.g. meshcat freezes dynamic-geometry
+        primitives such as ``TorqueArrow``; see ``DESIGN.md`` §4.7).
         """
-        from minilink.graphical.animation import Animator, _is_colab
+        from minilink.graphical.animation import Animator
+        from minilink.graphical.environment import prefers_inline_animation
 
         if traj is None:
             if self.traj is not None:
@@ -780,7 +789,7 @@ class System:
             else:
                 traj = self.compute_trajectory()
 
-        resolved_html = _is_colab() if html is None else html
+        resolved_html = prefers_inline_animation() if html is None else html
 
         animator = Animator(self)
         show_plot = not resolved_html

@@ -173,30 +173,74 @@ independently:
 | kwarg | selects | values |
 | --- | --- | --- |
 | `renderer` | graphics tech | `"matplotlib"`, `"meshcat"`, `"pygame"` |
-| `html` | output channel | `True` = inline notebook object, `False` = local window, `None` = auto (True in Colab, False elsewhere) |
-| `native` | playback engine | `True` = backend's own animation API, `False` = Python frame loop (legacy default) |
+| `html` | output channel | `True` = inline notebook object, `False` = local window, `None` = auto (see env policy below) |
+| `native` | playback engine | `True` = backend's own animation API (**default**), `False` = legacy per-frame Python loop |
 
 Behavior:
 
-- `native=False` (default) keeps the existing per-frame Python loop
-  (`draw_frame` + `present`), unchanged byte-for-byte for backwards
-  compatibility.
-- `native=True` + matplotlib drives `matplotlib.animation.FuncAnimation` and
-  `plt.show(block=True)` for on-screen playback.
+- `native=True` (default) drives each backend's own animation engine (see
+  below). This is the recommended path for new code: smoother playback,
+  less overhead, clean JSHTML export in notebooks.
+- `native=False` falls back to the legacy per-frame Python loop
+  (`draw_frame` + `present`). Kept unchanged byte-for-byte for debugging
+  and for the meshcat dynamic-geometry case (see limitation at the bottom
+  of this section).
+- `native=True` + matplotlib drives `matplotlib.animation.FuncAnimation`. On
+  the window path (`is_blocking_needed()` True) it calls `plt.show(block=True)`
+  and cleans up after the window closes; otherwise (IPython REPL, Jupyter with
+  an interactive backend) it calls `plt.show(block=False)` and intentionally
+  retains the figure + `FuncAnimation` on the renderer so the event loop drives
+  playback without garbage collection killing the animation.
 - `native=True` + meshcat builds a `meshcat.animation.Animation` and calls
   `Visualizer.set_animation(...)`; the browser plays keyframes with no Python
   loop.
 - `html=True` returns an `IPython.display.HTML` object: matplotlib uses
   `FuncAnimation.to_jshtml()`; meshcat uses `Visualizer.render_static(...)`
   around `static_html()` (ideal for Colab cells).
-- `html=None` auto-detects Google Colab via `"google.colab" in sys.modules`
-  and flips to `True` there; explicit `True`/`False` is always honored.
+
+#### Env policy (`html=None` resolution and blocking)
+
+Env detection lives in a single module, `minilink/graphical/environment.py`,
+and exposes `detect_env()`, `prefers_inline_animation()`, `is_inline_capable()`,
+`is_blocking_needed()`, and `override_env()`. All env-sensitive sites
+(`Animator.animate_simulation`, `System.animate`, `plot_trajectory`,
+`plot_signals`, `MatplotlibRenderer.present` / `play_native`,
+`MeshcatRenderer.present`) read from it.
+
+The matrix below summarizes defaults. Minilink **never** mutates matplotlib
+settings (no `matplotlib.use(...)`, no `%matplotlib ...` magic); it only
+reads `matplotlib.get_backend()` to decide between window and inline HTML
+in Jupyter.
+
+| Env | `detect_env()` | matplotlib backend | `html=None` resolves to | `is_blocking_needed()` | Default matplotlib `native=True` playback |
+| --- | --- | --- | --- | --- | --- |
+| Bare Python script | `script` | any GUI (`macosx` / `qt*` / `tkagg`) | False | True | Window, `plt.show(block=True)`, cleanup |
+| IPython terminal REPL | `ipython` | any GUI | False | False | Window, `plt.show(block=False)`, refs retained |
+| Local Jupyter, `%matplotlib inline` (default) | `jupyter` | `inline` / `agg` | **True** (auto-fallback) | False | Inline `HTML(ani.to_jshtml())` |
+| Local Jupyter, `%matplotlib widget` (`ipympl`) | `jupyter` | `module://ipympl...` | False | False | Inline widget; `plt.show(block=False)` |
+| Local Jupyter, `%matplotlib qt` / `macosx` / `tk` | `jupyter` | `qt*` / `macosx` / `tkagg` | False | False | Pop-up window, `plt.show(block=False)` |
+| Colab | `colab` | `inline` (forced) | True | False | Inline `HTML(ani.to_jshtml())` |
+
+Notes:
+
+- Explicit `html=True` / `html=False` is always honored; only `html=None`
+  consults the env.
+- Jupyter users who want fast native-animation playback can opt into
+  `%matplotlib widget` (requires `ipympl`) or `%matplotlib qt` themselves.
+  Neither is a minilink dependency; the default Jupyter `inline` configuration
+  is fully supported via the HTML fallback.
+- Static figures (`plot_trajectory`, `plot_signals`) use
+  `plt.show(block=is_blocking_needed())`: they block only in script mode;
+  Jupyter / Colab render them inline via the active backend.
+- `override_env("script" | "ipython" | "jupyter" | "colab" | None)` is the
+  testing / CI escape hatch; pass `None` to reset the cache.
 
 Limitation of meshcat native playback: `meshcat.animation.Animation` only
 keyframes rigid pose (position+quaternion) per path. Primitives whose geometry
 is rebuilt each frame (currently only `TorqueArrow`) are frozen at `t=0` in
-the native path and a one-line notice is printed when any are present. Use
-`native=False` for frame-accurate playback of those primitives.
+the native path and a one-line notice is printed when any are present. Pass
+`native=False` (the legacy Python-loop path) for frame-accurate playback of
+those primitives.
 
 ## 5. Coding Standards
 

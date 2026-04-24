@@ -9,6 +9,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 
+from minilink.graphical.environment import is_blocking_needed
 from minilink.graphical.primitives import (
     Arrow,
     Box,
@@ -375,7 +376,10 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
-            plt.show(block=True)
+            # Only actually block in script mode; IPython REPL / Jupyter /
+            # Colab keep the process alive independently.
+            if is_blocking_needed():
+                plt.show(block=True)
             return
         plt.pause(0.001 if interval_s is None else interval_s)
 
@@ -430,9 +434,21 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def play_native(self, primitives, frames, schedule, *, is_3d: bool):
         """
-        Drive playback through ``matplotlib.animation.FuncAnimation`` instead of
-        a Python frame loop. The ``FuncAnimation`` instance must be kept alive
-        for the duration of the window, so it is stored on the renderer.
+        Drive playback through ``matplotlib.animation.FuncAnimation`` instead
+        of a Python frame loop.
+
+        Only the window path lands here: Colab and Jupyter-with-non-interactive
+        backend are routed to ``render_inline_animation`` upstream via
+        :func:`minilink.graphical.environment.prefers_inline_animation`.
+
+        - Bare script (``is_blocking_needed() is True``): block until the user
+          closes the window, then clean up.
+        - IPython terminal REPL or Jupyter with an interactive backend
+          (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``): show the
+          window non-blocking and intentionally retain strong references to
+          the figure and ``FuncAnimation`` on ``self`` so the backend event
+          loop can drive playback without ``FuncAnimation`` being garbage
+          collected.
         """
         fig, ani = self._build_animation(
             primitives, frames, schedule, is_3d=is_3d
@@ -441,9 +457,14 @@ class MatplotlibRenderer(AnimationRenderer):
         self.ax = fig.axes[0] if fig.axes else None
         self.canvas = None
         self._native_animation = ani
-        plt.show(block=True)
-        plt.close(fig)
-        self.fig = None
-        self.ax = None
-        self._native_animation = None
+
+        if is_blocking_needed():
+            plt.show(block=True)
+            plt.close(fig)
+            self.fig = None
+            self.ax = None
+            self._native_animation = None
+        else:
+            plt.show(block=False)
+
         return ani

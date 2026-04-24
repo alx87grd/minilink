@@ -7,11 +7,11 @@ Backends live under :mod:`minilink.graphical.renderers`; the animator picks one 
 
 from __future__ import annotations
 
-import sys
 import time
 
 import numpy as np
 
+from minilink.graphical.environment import prefers_inline_animation
 from minilink.graphical.renderers.base import AnimationRenderer
 from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
 from minilink.graphical.renderers.meshcat_renderer import MeshcatRenderer
@@ -28,11 +28,6 @@ __all__ = [
     "MeshcatRenderer",
     "PygameRenderer",
 ]
-
-
-def _is_colab() -> bool:
-    """True when running inside a Google Colab notebook kernel."""
-    return "google.colab" in sys.modules
 
 
 def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
@@ -90,7 +85,7 @@ class Animator:
         show=True,
         html: bool | None = None,
         renderer="matplotlib",
-        native: bool = False,
+        native: bool = True,
     ):
         """
         Plays back a full simulation trajectory.
@@ -98,12 +93,20 @@ class Animator:
         The three orthogonal kwargs are:
 
         - ``renderer``  : graphics tech (``"matplotlib"``, ``"meshcat"``, ``"pygame"``).
-        - ``html``      : output channel. ``None`` auto-detects Colab and defaults to
-          ``True`` there, ``False`` locally. Explicit ``True``/``False`` is honored.
-        - ``native``    : playback engine. ``False`` uses the Python frame loop
-          (legacy path, unchanged). ``True`` drives the backend's own animation
-          engine: ``matplotlib.animation.FuncAnimation`` for matplotlib and
+        - ``html``      : output channel. ``None`` auto-resolves via
+          :func:`minilink.graphical.environment.prefers_inline_animation`:
+          ``True`` in Colab and in local Jupyter when the active matplotlib
+          backend is non-interactive (``inline`` / ``agg``), ``False`` for
+          bare script, IPython REPL, and Jupyter with an interactive backend
+          (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``). Explicit
+          ``True``/``False`` is honored.
+        - ``native``    : playback engine. ``True`` (default) drives the
+          backend's own animation engine:
+          ``matplotlib.animation.FuncAnimation`` for matplotlib and
           ``meshcat.animation.Animation`` + ``set_animation`` for meshcat.
+          ``False`` falls back to the legacy per-frame Python loop (handy
+          for debugging or when the native path's limitations matter;
+          see Notes below).
 
         Notes
         -----
@@ -112,7 +115,7 @@ class Animator:
         at ``t=0`` in the native path.
         """
         if html is None:
-            html = _is_colab()
+            html = prefers_inline_animation()
 
         backend = _make_renderer(renderer, self)
         primitives = self.sys.get_kinematic_geometry()

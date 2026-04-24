@@ -78,9 +78,10 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertEqual(traj_plus.get_signal("ctl:u").shape, (1, n_pts))
 
     def test_plot_signals_does_not_crash(self):
-        import minilink.graphical.plotting as plotting
+        from minilink.graphical.environment import override_env
 
-        plotting.figure_blocking = False
+        override_env("jupyter")
+        self.addCleanup(override_env, None)
         traj_plus = self.diagram.compute_internal_signals(self.traj)
 
         # Test basic API functionality (we won't check pixel rendering, just execution)

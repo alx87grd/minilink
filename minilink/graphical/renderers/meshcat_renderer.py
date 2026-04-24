@@ -7,6 +7,7 @@ import time
 import matplotlib.colors as mcolors
 import numpy as np
 
+from minilink.graphical.environment import is_blocking_needed
 from minilink.graphical.primitives import (
     Arrow,
     Box,
@@ -477,7 +478,11 @@ class MeshcatRenderer(AnimationRenderer):
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
             print("Meshcat static frame ready.")
-            input("Press Enter to exit meshcat viewer...")
+            # Only gate on `input()` in bare scripts; IPython REPL, Jupyter,
+            # and Colab keep the process / kernel alive so the browser tab
+            # stays reachable without a blocking prompt.
+            if is_blocking_needed():
+                input("Press Enter to exit meshcat viewer...")
         elif self.show and interval_s is not None:
             time.sleep(interval_s)
 
