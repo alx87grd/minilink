@@ -57,8 +57,8 @@ plot_trajectory(diagram, traj)
 
 ## Benchmarks
 
-- **API**: `minilink.benchmark` — `benchmark_f_speeds` / `print_f_speed_table` for compiled `f` timing; `benchmark_sim_speed_matrix` / `benchmark_sim_backend` for `Simulator` sweeps (see **§4.6** in [DESIGN.md](DESIGN.md)).
-- **Scripts**: flat runners under `tests/benchmark/` (for example `benchmark_pendulum_f_speed.py`, `benchmark_simulator_speed_matrix.py`); execute with `python tests/benchmark/<script>.py` from the repo root with the package on `PYTHONPATH`.
+- **API**: `minilink.benchmark` — `benchmark_f_speeds` / `print_f_speed_table` for compiled `f` timing; `benchmark_sim_speed_matrix` (pass a `pairs` list, e.g. `DEFAULT_SWEEP_PAIRS`) and `benchmark_sim_backend` on a built `system`; `run_standard_sim_suite` for the three standard cases (see **§4.6** in [DESIGN.md](DESIGN.md)).
+- **Scripts**: flat runners under `tests/benchmark/` (for example `benchmark_simulator_speed_matrix.py`, `benchmark_simulator_standard.py`); execute with `python tests/benchmark/<script>.py` from the repo root with the package on `PYTHONPATH`.
 
 ## Examples
 
