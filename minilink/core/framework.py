@@ -657,7 +657,9 @@ class System:
 
             if arr.ndim == 0:
                 if expected_dim != 1:
-                    raise ValueError(f"{label} must have shape ({expected_dim}, {n_pts})")
+                    raise ValueError(
+                        f"{label} must have shape ({expected_dim}, {n_pts})"
+                    )
                 return np.full((1, n_pts), float(arr), dtype=float)
 
             if arr.ndim == 1:
@@ -694,6 +696,27 @@ class System:
         self.traj = traj
 
         return traj
+
+    ######################################################################
+    def plot_trajectory(self, traj=None):
+        """
+        Convenience shortcut to plot the trajectory.
+
+        If the trajectory is not computed yet, it is computed using :meth:`compute_trajectory`.
+        If the trajectory is already computed, it is used directly.
+        If the trajectory is provided, it is used directly.
+
+        """
+        from minilink.graphical.plotting import plot_trajectory
+
+        if traj is not None:
+            plot_trajectory(self, traj)
+
+        elif self.traj is not None:
+            plot_trajectory(self, self.traj)
+
+        else:
+            self.compute_trajectory()
 
     ######################################################################
     def get_block_html(self, label="sys1"):
@@ -735,14 +758,21 @@ class System:
         return g._repr_image_svg_xml()
 
     ######################################################################
-    def plot_graphe(self, filename=None):
+    def plot_graphe(self, filename=None, show_inline=None, show_pdf=None):
         """
         Convenience shortcut to render the Graphviz system graph.
+
+        ``show_inline`` and ``show_pdf`` default to ``None`` and auto-resolve
+        via :func:`minilink.graphical.environment.is_inline_capable`:
+        Jupyter / Colab get inline SVG only (no viewer pop-up, no disk write),
+        while bare scripts and IPython REPLs get the legacy render-to-temp-file
+        + open-in-OS-PDF-viewer behavior. Pass explicit booleans to override;
+        pass ``filename`` to force a specific on-disk output.
         """
         from minilink.graphical.graphe import plot_graphviz
 
         g = self.get_graphe()
-        plot_graphviz(g, filename=filename)
+        plot_graphviz(g, show_inline=show_inline, show_pdf=show_pdf, filename=filename)
 
     ######################################################################
     def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
