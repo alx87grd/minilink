@@ -5,7 +5,16 @@ from unittest.mock import patch
 import numpy as np
 
 from minilink.core.framework import DynamicSystem
-from minilink.simulation import Simulator
+from minilink.simulation import COMPILE_BACKEND_AUTO, Simulator
+
+
+def _have_jax() -> bool:
+    try:
+        import jax  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
 
 
 class StableLinearSystem(DynamicSystem):
@@ -48,6 +57,64 @@ class DiscontinuousLinearSystem(StableLinearSystem):
 class TestNewSimulator(unittest.TestCase):
     def test_default_solver_auto_selects_stiff_for_discontinuous_system(self):
         sim = Simulator(DiscontinuousLinearSystem(), tf=1.0, n_steps=5, verbose=False)
+        self.assertEqual(sim.solver_mode, "scipy_stiff")
+
+    def test_large_grid_numpy_stays_scipy(self):
+        sim = Simulator(
+            StableLinearSystem(),
+            tf=1.0,
+            n_steps=10_000,
+            compile_backend="numpy",
+            verbose=False,
+        )
+        self.assertEqual(sim.solver_mode, "scipy")
+
+    def test_default_compile_backend_is_numpy(self):
+        sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
+        self.assertEqual(sim.compile_backend, "numpy")
+
+    @unittest.skipUnless(_have_jax(), "jax not installed")
+    def test_compile_backend_auto_resolves_to_jax_when_available(self):
+        sim = Simulator(
+            StableLinearSystem(),
+            tf=1.0,
+            n_steps=5,
+            compile_backend=COMPILE_BACKEND_AUTO,
+            verbose=False,
+        )
+        self.assertEqual(sim.compile_backend, "jax")
+
+    @unittest.skipUnless(_have_jax(), "jax not installed")
+    def test_auto_selects_rk4_for_large_uniform_grid_with_jax(self):
+        sim = Simulator(
+            StableLinearSystem(),
+            tf=1.0,
+            n_steps=10_000,
+            compile_backend="jax",
+            verbose=False,
+        )
+        self.assertEqual(sim.solver_mode, "rk4_fixedsteps")
+
+    @unittest.skipUnless(_have_jax(), "jax not installed")
+    def test_jax_grid_below_threshold_stays_scipy(self):
+        sim = Simulator(
+            StableLinearSystem(),
+            tf=1.0,
+            n_steps=9999,
+            compile_backend="jax",
+            verbose=False,
+        )
+        self.assertEqual(sim.solver_mode, "scipy")
+
+    @unittest.skipUnless(_have_jax(), "jax not installed")
+    def test_discontinuous_jax_large_grid_stays_stiff(self):
+        sim = Simulator(
+            DiscontinuousLinearSystem(),
+            tf=1.0,
+            n_steps=10_000,
+            compile_backend="jax",
+            verbose=False,
+        )
         self.assertEqual(sim.solver_mode, "scipy_stiff")
 
     def test_invalid_time_grid_arguments_raise_value_error(self):

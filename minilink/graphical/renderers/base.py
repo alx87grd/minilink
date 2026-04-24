@@ -33,7 +33,12 @@ class AnimationRenderer(ABC):
         """Present the currently drawn frame and optionally block/sleep."""
 
     def poll_events(self) -> dict[str, Any]:
-        """Return backend events/state for interactive loops."""
+        """Return backend events/state for interactive loops.
+
+        ROADMAP: live **external input** (beyond quit keys) and optional **live output push**
+        for cosimulation belong in dedicated I/O abstractions; renderers stay draw/present-only
+        where possible—see ``ROADMAP.md`` §7.
+        """
         return {}
 
     @abstractmethod

@@ -9,7 +9,9 @@ sys.params["l"] = 5.0
 sys.x0[0] = 2.0
 
 
-sys.compute_trajectory(tf=10)
+sys.compute_trajectory(tf=10, plot="x")
+# sys.compute_trajectory(tf=10, plot="xu")
+# sys.plot_trajectory
 
 
 # sys.animate()

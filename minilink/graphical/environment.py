@@ -17,6 +17,7 @@ __all__ = [
     "prefers_inline_animation",
     "is_inline_capable",
     "is_blocking_needed",
+    "allow_tall_stacked_figures",
     "override_env",
 ]
 
@@ -102,6 +103,17 @@ def is_blocking_needed() -> bool:
     interpreter alive independently of any GUI event loop.
     """
     return detect_env() == "script"
+
+
+def allow_tall_stacked_figures() -> bool:
+    """
+    True when multi-row trajectory/signal plots can use a tall ``figsize``.
+
+    In Jupyter and Colab, figures usually appear in scrollable cell output. In a
+    bare script or terminal IPython session, figures typically open in a window
+    that should stay within a reasonable screen height.
+    """
+    return detect_env() in ("jupyter", "colab")
 
 
 def override_env(name: EnvName | None) -> None:

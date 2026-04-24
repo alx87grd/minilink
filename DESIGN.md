@@ -242,6 +242,19 @@ the native path and a one-line notice is printed when any are present. Pass
 `native=False` (the legacy Python-loop path) for frame-accurate playback of
 those primitives.
 
+#### Roadmap: interactive integration and live I/O
+
+Real-time paths (`Animator.game`, `Animator.run_interactive`, `System.game`) today combine
+a **fixed Euler** step (with substeps in `game`), **pygame** for live `u`, and the chosen
+**renderer** for geometry. Planned evolution (see `ROADMAP.md` §7, P2, Phase 4):
+
+- **Integrator backends** — base class + multiple schemes (same *idea* as multiple solvers
+  on `Simulator`), so the animator does not hard-code one stepping rule.
+- **Live input backends** — base class + options (keyboard vs **TCP/UDP** or similar for
+  cosimulation, etc.); keep demos thin and hide protocols in `graphical/` or a small helper
+  module.
+- **Live output push** — optional later (stream state/outputs to a peer); no concrete API yet.
+
 ## 5. Coding Standards
 
 ### General rules

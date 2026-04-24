@@ -10,6 +10,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.graphical.environment import is_blocking_needed
+from minilink.graphical.matplotlib_style import (
+    DPI_EXPORT,
+    DPI_FIGURE,
+    FIGSIZE_ANIMATION,
+    FONT_SIZE,
+    style_animation_axes,
+)
 from minilink.graphical.primitives import (
     Arrow,
     Box,
@@ -232,13 +239,14 @@ class MatplotlibCanvas:
             local = np.array([[0.0, 0.0, 0.0], [0.0, -primitive.length, 0.0]])
             local_h = np.hstack((local, np.ones((2, 1))))
             world = (transform_matrix @ local_h.T).T
+            lw = float(primitive.linewidth)
             if self.is_3d:
                 (obj,) = self.ax.plot(
                     world[:, 0],
                     world[:, 1],
                     world[:, 2],
                     color=primitive.color,
-                    linewidth=max(1.0, primitive.radius * 60.0),
+                    linewidth=lw,
                     linestyle=primitive.style,
                 )
             else:
@@ -246,7 +254,7 @@ class MatplotlibCanvas:
                     world[:, 0],
                     world[:, 1],
                     color=primitive.color,
-                    linewidth=max(1.0, primitive.radius * 60.0),
+                    linewidth=lw,
                     linestyle=primitive.style,
                 )
             self.drawn_objects.append(obj)
@@ -340,7 +348,7 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def _create_figure_and_ax(self, is_3d):
         a = self.animator
-        fig = plt.figure(figsize=a.figsize, dpi=a.dpi)
+        fig = plt.figure(figsize=FIGSIZE_ANIMATION, dpi=DPI_FIGURE)
         fig.canvas.manager.set_window_title(f"Animation: {self.sys.name}")
 
         if is_3d:
@@ -357,22 +365,22 @@ class MatplotlibRenderer(AnimationRenderer):
             ax.set_ylim(a.domain[1])
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
-            ax.grid(True)
             ax.set_aspect("equal")
 
+        style_animation_axes(ax, is_3d=is_3d)
         return fig, ax
 
     def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
         self.fig, self.ax = self._create_figure_and_ax(is_3d)
         self.canvas = MatplotlibCanvas(self.ax, is_3d=is_3d)
         if title:
-            self.ax.set_title(title)
+            self.ax.set_title(title, fontsize=FONT_SIZE)
 
     def draw_frame(self, primitives, transforms, t: float) -> None:
         self.canvas.clear()
         for prim, T in zip(primitives, transforms):
             self.canvas.draw_primitive(prim, T)
-        self.ax.set_title(f"Time = {t:.2f} s")
+        self.ax.set_title(f"Time = {t:.2f} s", fontsize=FONT_SIZE)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
@@ -404,7 +412,7 @@ class MatplotlibRenderer(AnimationRenderer):
             canvas.clear()
             for prim, T in zip(primitives, frame["transforms"]):
                 canvas.draw_primitive(prim, T)
-            ax.set_title(f"Time = {frame['t']:.2f} s")
+            ax.set_title(f"Time = {frame['t']:.2f} s", fontsize=FONT_SIZE)
             return canvas.drawn_objects
 
         ani = animation.FuncAnimation(
@@ -429,7 +437,12 @@ class MatplotlibRenderer(AnimationRenderer):
     def export_animation(self, primitives, frames, schedule, file_name: str) -> None:
         fig, ani = self._build_animation(primitives, frames, schedule)
         print(f"Saving animation to {file_name}.gif ...")
-        ani.save(file_name + ".gif", writer="imagemagick", fps=schedule.target_fps)
+        ani.save(
+            file_name + ".gif",
+            writer="imagemagick",
+            fps=schedule.target_fps,
+            dpi=DPI_EXPORT,
+        )
         plt.close(fig)
 
     def play_native(self, primitives, frames, schedule, *, is_3d: bool):

@@ -3,6 +3,16 @@ Trajectory animation orchestration.
 
 Backends live under :mod:`minilink.graphical.renderers`; the animator picks one by name
 (see :func:`_make_renderer`).
+
+Roadmap (not implemented here—see ``ROADMAP.md`` §7 and P2):
+
+- **Interactive integrator backends**: :meth:`Animator.game` / :meth:`Animator.run_interactive`
+  currently own a simple time loop (Euler + substeps in ``game``). These should gain a
+  ``Simulator``-style pluggable **integration** layer (base class + schemes) instead of
+  hard-coding one integrator in the animator.
+- **Live I/O backends**: ``game`` reads ``u`` only via **pygame** today; future **input**
+  backends (e.g. TCP for cosimulation) and optional **live output push** should sit
+  beside that as swappable sources/sinks, keeping renderers focused on drawing.
 """
 
 from __future__ import annotations
@@ -51,16 +61,14 @@ def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
 
 class Animator:
     """
-    Coordinates playback: owns display settings and the simulated system,
-    and delegates drawing to an :class:`AnimationRenderer`.
+    Coordinates playback: owns the simulated system and delegates drawing to an
+    :class:`AnimationRenderer`. Matplotlib figure size and resolution live in
+    :mod:`minilink.graphical.matplotlib_style`.
     """
 
     def __init__(self, sys):
         self.sys = sys
 
-        # Display settings (used by backends such as matplotlib)
-        self.figsize = (8, 6)
-        self.dpi = 100
         self.domain = [[-10, 10], [-10, 10], [-10, 10]]
 
     def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib"):
@@ -222,6 +230,8 @@ class Animator:
         backend.draw_frame(primitives, frame["transforms"], t)
         backend.present(block=False, interval_s=dt)
 
+        # ROADMAP: this loop is a minimal integrator+render tick; a future backend should
+        # own step integration (multiple schemes) like Simulator, not only this while-body.
         while True:
             events = backend.poll_events()
             if events.get("quit", False):
@@ -247,6 +257,9 @@ class Animator:
     def _u_from_keyboard(keys, *, m: int, pygame) -> np.ndarray:
         """
         Map arrow-key state to a signed input vector ``u``.
+
+        This is the **pygame-keyboard** live-input path only; ``ROADMAP.md`` §7 describes
+        additional input backends (e.g. TCP cosimulation) and optional live output push.
 
         MVP mapping:
         - UP / DOWN control ``u[0]`` as +10 / -10 (opposites cancel to 0).
@@ -319,6 +332,10 @@ class Animator:
         - Compute dynamics using Euler integration
           optionally with multiple internal substeps per rendered frame.
         - Update the visualization by redrawing transforms every tick.
+
+        Roadmap: **input** should become pluggable backends (keyboard vs TCP cosimulation,
+        etc.); **integration** should be pluggable backends (not Euler-only here); optional
+        **live output push** is a later sibling—see ``ROADMAP.md`` §7.
         """
         if dynamics_substeps < 1 or int(dynamics_substeps) != dynamics_substeps:
             raise ValueError("dynamics_substeps must be a positive integer.")
@@ -392,6 +409,8 @@ class Animator:
             u = self._u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
             self._draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
 
+            # ROADMAP: Euler + substeps only—replace with interactive integrator backends;
+            # live u should come from an input backend (pygame keys vs TCP, etc.).
             # Euler steps for dynamic systems only (ZOH on u during frame).
             if self.sys.n > 0:
                 dt_dyn = dt / dynamics_substeps

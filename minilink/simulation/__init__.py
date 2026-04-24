@@ -7,9 +7,10 @@ from minilink.simulation.solver_backends import (
     SciPySolverBackend,
     SolverBackend,
 )
-from minilink.simulation.simulator import Simulator
+from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
 
 __all__ = [
+    "COMPILE_BACKEND_AUTO",
     "INPUT_INTERP_KEY",
     "EulerSolverBackend",
     "RK4SolverBackend",

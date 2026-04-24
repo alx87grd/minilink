@@ -2,6 +2,9 @@ import numpy as np
 
 from minilink.blocks.examples import Pendulum
 
+# Interactive loop: today pygame keys + Euler in Animator; see ROADMAP.md §7 for planned
+# integrator backends and live I/O (e.g. TCP cosimulation).
+
 # Plant system
 sys = Pendulum()
 sys.params["m"] = 1.0

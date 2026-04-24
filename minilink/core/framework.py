@@ -546,6 +546,7 @@ class System:
         dt=None,
         solver=None,
         show=True,
+        plot="xu",
         x0=None,
         compile_backend="numpy",
         verbose=True,
@@ -556,6 +557,16 @@ class System:
         This method is a façade over :class:`minilink.simulation.Simulator`.
         It uses model defaults such as :attr:`x0` and stores the resulting
         trajectory in :attr:`traj` for later convenience.
+
+        Parameters
+        ----------
+        plot : {'x', 'u', 'xu'}, optional
+            Passed to :func:`minilink.graphical.plotting.plot_trajectory` when
+            ``show`` is True: states only, inputs only, or both (default).
+        compile_backend : str
+            Passed to :class:`~minilink.simulation.Simulator` (default ``\"numpy\"``).
+            Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            to try JAX then fall back to NumPy.
         """
         from minilink.graphical.plotting import plot_trajectory
         from minilink.simulation import Simulator
@@ -573,7 +584,7 @@ class System:
         )
         traj = sim.solve()
         if show:
-            plot_trajectory(self, traj)
+            plot_trajectory(self, traj, plot=plot)
 
         self.traj = traj
 
@@ -590,6 +601,7 @@ class System:
         dt=None,
         solver=None,
         show=True,
+        plot="xu",
         x0=None,
         compile_backend="numpy",
         verbose=True,
@@ -614,6 +626,11 @@ class System:
         input_port_id : str, optional
             Named input port to force while keeping the others at default
             values.
+        plot : {'x', 'u', 'xu'}, optional
+            Passed to :func:`minilink.graphical.plotting.plot_trajectory` when
+            ``show`` is True.
+        compile_backend : str
+            Same as :meth:`compute_trajectory`.
 
         Returns
         -------
@@ -692,13 +709,13 @@ class System:
 
         traj = sim.solve_forced(u_traj)
         if show:
-            plot_trajectory(self, traj)
+            plot_trajectory(self, traj, plot=plot)
         self.traj = traj
 
         return traj
 
     ######################################################################
-    def plot_trajectory(self, traj=None):
+    def plot_trajectory(self, traj=None, *, plot="xu"):
         """
         Convenience shortcut to plot the trajectory.
 
@@ -706,17 +723,23 @@ class System:
         If the trajectory is already computed, it is used directly.
         If the trajectory is provided, it is used directly.
 
+        Parameters
+        ----------
+        plot : {'x', 'u', 'xu'}, optional
+            States only, inputs only, or both (default); see
+            :func:`minilink.graphical.plotting.plot_trajectory`.
+
         """
         from minilink.graphical.plotting import plot_trajectory
 
         if traj is not None:
-            plot_trajectory(self, traj)
+            plot_trajectory(self, traj, plot=plot)
 
         elif self.traj is not None:
-            plot_trajectory(self, self.traj)
+            plot_trajectory(self, self.traj, plot=plot)
 
         else:
-            self.compute_trajectory()
+            self.compute_trajectory(plot=plot)
 
     ######################################################################
     def get_block_html(self, label="sys1"):
@@ -853,6 +876,9 @@ class System:
     ):
         """
         Convenience shortcut for the prototype interactive game loop.
+
+        See ``Animator.game`` and ``ROADMAP.md`` §7: integrator + live I/O are planned as
+        pluggable backends (today: pygame keyboard + Euler in the animator loop).
         """
         from minilink.graphical.animation import Animator
 

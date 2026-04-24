@@ -11,7 +11,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Leaf evaluators** | **TRL 4** | Add differentiation and richer rollout helpers |
 | **Diagram evaluators** | **TRL 4** | Add diagram parametric tier and finish boundary/internal signal polish |
 | **Simulation** | **TRL 4** | Harden the new simulator path and unify forcing behavior |
-| **Graphical** | **TRL 1** | Keep renderers usable without freezing the API too early |
+| **Graphical** | **TRL 1** | Keep renderers usable; plan **interactive integrator** + **live I/O** backends (see §7) before freezing APIs |
 | **Mechanics** | **TRL 1** | Keep the numeric path functional and ready for user review |
 | **Symbolic mechanics** | **TRL 1** | Keep derivation/export workflows working for examples and review |
 | **Physics** | **TRL 1** | Keep JAX contact demos working and extend the MVP carefully |
@@ -52,6 +52,8 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - Add linearization and differentiation helpers on compiled evaluators
 - Add port export / nesting ergonomics for `DiagramSystem`
 - Extend simulator-level forcing helpers beyond the new `compute_forced(...)` shortcut when richer experiment workflows become clearer
+- **Interactive integrator backends** (see `Animator.game` / `run_interactive` today): factor the fixed-step loop and Euler-only stepping behind a small **base class + pluggable backends**, mirroring the idea of `Simulator` + multiple integration schemes—so real-time loops can swap integrator without rewriting pygame/render glue
+- **Live I/O backends for interactive mode**: today live `u` is read only via **pygame keyboard** inside `Animator.game`; introduce a **base class + backends** (keyboard, **TCP/UDP or similar for cosimulation**, file replay, etc.). **Live output push** (streaming state to a peer) is out of scope for now but should stay easy to add beside the same abstraction—see comments in `minilink/graphical/animation.py` and `ROADMAP.md` §7
 
 ## 4. Development Phases
 
@@ -83,6 +85,8 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - [ ] Linearization tools
 - [ ] Port exporting / nested diagrams
 - [ ] Optional operator overloading / reference-based connection ergonomics
+- [ ] Interactive real-time loop: **integrator backends** (not only Euler in `Animator.game`)
+- [ ] Interactive real-time loop: **live input backends** (not only pygame keys; e.g. cosimulation socket); live output streaming later
 
 ## 5. External Design Lessons
 
@@ -129,3 +133,12 @@ Current mapping:
 - Gymnasium / RL bridges
 - richer real-time interactive control loops
 - multibody plant workflows and model import
+
+### Interactive graphics / cosimulation (planned shape)
+
+Two separate **backend-style** extension points (base class + multiple implementations), analogous to choosing a solver on `Simulator`:
+
+1. **Real-time integrator** — `Animator.game` (and related loops) currently embed a **fixed Euler** inner loop with `dynamics_substeps`. This should become swappable (e.g. RK substep, compiled `f`, or reusing simulator machinery) without entangling pygame or the renderer.
+2. **Live external I/O** — **Input**: today only **pygame keyboard** supplies `u` each frame; other backends could read **TCP/UDP** (cosimulation), shared memory, etc. **Output**: optional **live push** of state or outputs to a socket or sink is a natural sibling API for later; not required for the first cut.
+
+Keep user-facing demos thin; hide protocol and substeps in `graphical/` or a small dedicated submodule when implemented.

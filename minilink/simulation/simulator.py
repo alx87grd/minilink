@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+from typing import Any
 
 import numpy as np
 
@@ -9,11 +12,16 @@ from minilink.simulation.solver_backends import (
     SciPySolverBackend,
 )
 
-# (solver backend key, options). Used by :meth:`Simulator._parse_solver`.
+# (solver backend key, options)
 _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
     "scipy": (
         "scipy",
-        {"method": "RK45", "use_jac": False},
+        {
+            "method": "RK45",
+            "rtol": 1e-4,
+            "atol": 1e-7,
+            "use_jac": False,
+        },
     ),
     "scipy_stiff": (
         "scipy",
@@ -23,8 +31,8 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
         "scipy",
         {
             "method": "DOP853",
-            "rtol": 1e-8,
-            "atol": 1e-10,
+            "rtol": 1e-6,
+            "atol": 1e-8,
             "use_jac": False,
         },
     ),
@@ -33,7 +41,7 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
         {
             "method": "DOP853",
             "rtol": 1e-8,
-            "atol": 1e-11,
+            "atol": 1e-10,
             "use_jac": False,
         },
     ),
@@ -49,6 +57,21 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
     "euler": ("euler", {}),
     "rk4_fixedsteps": ("rk4", {}),
 }
+
+# Nominal rollouts with compile_backend="jax": use fixed-step RK4 (JIT) instead of
+# SciPy when the output grid is long enough — avoids adaptive overhead per point.
+RK4_AUTO_MIN_TIME_POINTS = 10_000
+
+# Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
+COMPILE_BACKEND_AUTO = "auto"
+
+
+def _time_grid_is_uniform(times: np.ndarray) -> bool:
+    """True if ``times`` are evenly spaced (required for :class:`RK4SolverBackend`)."""
+    if times.size < 2:
+        return True
+    d = np.diff(times)
+    return bool(np.allclose(d, d[0]))
 
 
 class Simulator:
@@ -66,9 +89,16 @@ class Simulator:
         verbose=True,
         compile_backend="numpy",
     ):
+        """
+        Parameters
+        ----------
+        compile_backend : str
+            ``\"numpy\"``, ``\"jax\"``, etc., for :meth:`~minilink.core.framework.System.compile`.
+            Default ``\"numpy\"``. Use :data:`COMPILE_BACKEND_AUTO` (``\"auto\"``) to try JAX
+            if importable, then fall back to NumPy on failure.
+        """
         self.verbose = verbose
         self.sys = sys
-        self.compile_backend = compile_backend
         self.scipy_last_solution = None
         self.sys.refresh()
 
@@ -84,21 +114,54 @@ class Simulator:
         self.n_pts = len(self.times)
         self.x0 = self._validate_x0(sys.x0 if x0 is None else x0, sys.n)
 
+        self.compile_backend, self.evaluator = self._resolve_and_build_evaluator(
+            sys, compile_backend
+        )
         self.solver_mode = self.select_solver(sys, solver)
         solver_backend_key, self.solver_backend_options = self._parse_solver(
             self.solver_mode
         )
         self.solver_backend = self._select_backend(solver_backend_key)
-        self.evaluator = self._build_evaluator(sys, compile_backend)
         self.last_debug = None
 
         if self.verbose:
             print(f"Time steps = {n_steps}, dt={dt} and solver= {self.solver_mode}")
 
-    def _build_evaluator(self, sys, compile_backend):
+    def _build_evaluator(self, sys, compile_backend: str) -> Any:
         if self.verbose:
-            print(f"Auto-compiling backend={compile_backend}.")
+            print(f"Compiling with backend={compile_backend!r}.")
         return sys.compile(backend=compile_backend)
+
+    def _resolve_and_build_evaluator(
+        self, sys, compile_backend: str
+    ) -> tuple[str, Any]:
+        """
+        Compile with *compile_backend*, or if it is :data:`COMPILE_BACKEND_AUTO`, try JAX
+        then NumPy.
+        """
+        if compile_backend != COMPILE_BACKEND_AUTO:
+            return compile_backend, self._build_evaluator(sys, compile_backend)
+
+        if self.verbose:
+            print("Compiling: automatic backend (try JAX, fall back to NumPy).")
+        try:
+            import jax  # noqa: F401
+        except ImportError:
+            if self.verbose:
+                print("JAX not installed; using NumPy compile backend.")
+            return "numpy", self._build_evaluator(sys, "numpy")
+        try:
+            return "jax", self._build_evaluator(sys, "jax")
+        except Exception as exc:
+            if self.verbose:
+                print(
+                    f"JAX compile failed ({type(exc).__name__}: {exc}); "
+                    "using NumPy compile backend."
+                )
+            logging.getLogger(__name__).debug(
+                "JAX compile failed, falling back to numpy", exc_info=True
+            )
+            return "numpy", self._build_evaluator(sys, "numpy")
 
     def _validate_x0(self, x0, state_dim):
         x0_arr = np.asarray(x0, dtype=float)
@@ -150,9 +213,14 @@ class Simulator:
     def select_solver(self, sys, user_solver=None):
         """
         Intelligently select the solver backend based on the system's properties.
+
         - If the user has specified a solver, return it.
-        - If the system has discontinuous behavior, return "scipy_stiff".
-        - Otherwise, return "scipy".
+        - If the system has discontinuous behavior, return ``"scipy_stiff"``.
+        - If ``compile_backend`` is ``"jax"``, the time grid is uniform, and the
+          number of evaluation points is at least :data:`RK4_AUTO_MIN_TIME_POINTS`,
+          return ``"rk4_fixedsteps"`` (fast JIT rollout; nominal ``solve`` only —
+          :meth:`solve_forced` still needs a SciPy or Euler solver).
+        - Otherwise, return ``"scipy"``.
         """
         if user_solver is not None:
             return user_solver
@@ -160,6 +228,12 @@ class Simulator:
             raise ValueError("Prototype Simulator does not support discrete solver")
         if sys.solver_info["discontinuous_behavior"]:
             return "scipy_stiff"
+        if (
+            self.compile_backend == "jax"
+            and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
+            and _time_grid_is_uniform(self.times)
+        ):
+            return "rk4_fixedsteps"
         return "scipy"
 
     def select_time_vector(self, t0, tf, n_steps, dt, sys):

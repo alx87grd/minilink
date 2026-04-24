@@ -20,14 +20,19 @@ This file defines the collaboration preferences and architectural expectations f
   - vectors: `x`, `u`, `y`, `q`, `v`, `dq`
   - dimensions: `n`, `m`, `p`
 - **Readability over cleverness**: prefer straight, explicit code
+- **Edits stay on task**: change only what the request needs; no drive-by refactors, unrelated files, or scope creep; every line in the diff should earn its place
+- **Match the neighborhood**: before writing, read surrounding code and align with its naming, types, imports, and documentation density
 - **Tests only when justified**: add or update tests for stable public APIs, TRL milestones, documented contracts, or explicit user requests
 - **Validation in proportion**: avoid defensive error-handling sprawl in internal paths unless the interface is public or the risk is real
+- **Documentation**: do not add new markdown guides or expand unrelated docs unless asked; `DESIGN.md` / `ROADMAP.md` stay in sync when behavior or scope changes (§1, §3)
+- **Imports and “math-first” surfaces**: In tutorials, demos, and other **reader-facing** code, keep the top of the file light—fewer imports and less Python ceremony so the math stays visible. This is **judgment, not dogma**: internal packages (`compile/`, `simulation/`, benchmarks, tests) may use richer imports when the benefit is clear. Prefer moving heavy setup into helpers or modules casual readers do not need to open.
 
 ## 3. Architectural Guidance
 
 - Use **inheritance** for core system types and **composition** for diagrams and optional behaviors.
 - Keep the readable modeling path clean; isolate optimization in `compile/` and `simulation/`.
 - Support JAX when it stays clean; use specialized JAX paths when needed instead of complicating the main path.
+- **KISS and thin surfaces**: Prefer fewer files, fewer lines, and fewer dependencies when a simpler design is enough. When complexity is justified, keep **user-facing scripts and examples** minimal and push mechanics into backend modules or utilities.
 
 Compiled-evaluator vocabulary:
 
@@ -79,6 +84,12 @@ At feature completion, verify through:
 Demo and manual scripts should stay flat and directly runnable at module top level.
 
 Benchmark example scripts live under `tests/benchmark/` (same flat style). Prefer `from minilink.benchmark import ...` for `benchmark_f_speeds`, `benchmark_sim_speed_matrix`, and related helpers; see `DESIGN.md` §4.6.
+
+### Scope: small edits vs larger work
+
+- **Small chat tweaks**: expect a **quick, minimal source change**—not a long autonomous loop (many tool rounds, long terminal sessions, broad refactors) unless the user clearly asked for that depth.
+- **Larger work**: before extended execution (multi-step implementation, heavy CI/debug iteration, wide exploration), write a concise **implementation plan** and wait for **explicit approval** to proceed at that scale.
+- **Scope surprise**: if a “little modif” turns into a **big job** after reading the code, **stop and ask** what slice or outcome they want rather than grinding forward.
 
 ## 7. Local Environment
 

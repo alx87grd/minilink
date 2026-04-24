@@ -1,7 +1,18 @@
+from __future__ import annotations
+
 import matplotlib
 import matplotlib.pyplot as plt
+from typing import Literal
 
-from minilink.graphical.environment import is_blocking_needed
+from minilink.graphical.environment import allow_tall_stacked_figures, is_blocking_needed
+from minilink.graphical.matplotlib_style import (
+    DPI_FIGURE,
+    FIGSIZE_BASE,
+    FONT_SIZE,
+    signal_stack_figsize,
+    style_trajectory_subplot,
+    trajectory_stack_figsize,
+)
 
 ###############################################################################
 #  Note: Modify here matplolib setting to fit your environment
@@ -28,11 +39,11 @@ except Exception:
         plt.ion()  # Set interactive mode
 
 
-# Default figure settings
-default_figsize = (4, 3)
-default_dpi = 150
+# Default figure settings (shared with :mod:`minilink.graphical.matplotlib_style`)
+default_figsize = FIGSIZE_BASE
+default_dpi = DPI_FIGURE
 default_linestyle = "-"
-default_fontsize = 10
+default_fontsize = FONT_SIZE
 
 # Embed font type in PDF when exporting
 matplotlib.rcParams["pdf.fonttype"] = 42
@@ -45,8 +56,33 @@ print("Matplotlib interactive:", matplotlib.is_interactive())
 # # print('Matplotlib list of interactive backends:', matplotlib.rcsetup.interactive_bk)
 
 
+TrajectoryPlotMode = Literal["x", "u", "xu"]
+
+
 ############################################################
-def plot_trajectory(sys, traj):
+def plot_trajectory(
+    sys,
+    traj,
+    *,
+    plot: TrajectoryPlotMode = "xu",
+):
+    """
+    Plot state and/or input time series in a shared-time column of subplots.
+
+    Parameters
+    ----------
+    sys : System
+        Model providing state/input labels and dimensions.
+    traj : Trajectory
+        Simulated trajectory.
+    plot : {'x', 'u', 'xu'}, optional
+        ``'x'`` — states only; ``'u'`` — inputs only; ``'xu'`` — states then inputs
+        (default). Mirrors Pyro-style ``plot`` selection for simple trajectories.
+
+    For arbitrary internal signals, use :func:`plot_signals` instead.
+    """
+    if plot not in ("x", "u", "xu"):
+        raise ValueError("plot must be 'x', 'u', or 'xu'")
 
     # Extract the system dimensions and labels
     n = sys.n
@@ -60,16 +96,24 @@ def plot_trajectory(sys, traj):
     x_traj = traj.x
     u_traj = traj.u
 
-    # Compute the number of plots
-    n_plots = n + m
+    want_x = plot in ("x", "xu")
+    want_u = plot in ("u", "xu")
+    n_plots = (n if want_x else 0) + (m if want_u else 0)
+    if n_plots == 0:
+        raise ValueError(
+            f"Nothing to plot for plot={plot!r} with n={n}, m={m}."
+        )
 
-    # Create the figure
+    # Create the figure (tall stack in notebook/Colab; capped height for pop-up windows)
     fig, ax = plt.subplots(
         n_plots,
         1,
-        figsize=(8, 1.8 * n_plots),
+        figsize=trajectory_stack_figsize(
+            n_plots, allow_tall=allow_tall_stacked_figures()
+        ),
         sharex=True,
         frameon=True,
+        dpi=DPI_FIGURE,
     )
     if fig.canvas and hasattr(fig.canvas, "manager") and fig.canvas.manager:
         try:
@@ -84,39 +128,49 @@ def plot_trajectory(sys, traj):
 
     # Plot the signals
     idx = 0
-    for i in range(n):
-        ax[idx].plot(
-            t_traj, x_traj[i, :], "b", linewidth=1.5, alpha=0.8, label=state_labels[i]
-        )
-        ylabel_text = (
-            f"{state_labels[i]}\n[{state_units[i]}]"
-            if state_units[i]
-            else f"{state_labels[i]}"
-        )
-        ax[idx].set_ylabel(
-            ylabel_text, fontsize=default_fontsize, multialignment="center"
-        )
-        ax[idx].grid(True, linestyle="--", alpha=0.6)
-        ax[idx].tick_params(labelsize=default_fontsize)
-        ax[idx].legend(loc="upper right")
-        idx += 1
+    if want_x:
+        for i in range(n):
+            ax[idx].plot(
+                t_traj,
+                x_traj[i, :],
+                "b",
+                linewidth=1.5,
+                alpha=0.8,
+                label=state_labels[i],
+            )
+            ylabel_text = (
+                f"{state_labels[i]}\n[{state_units[i]}]"
+                if state_units[i]
+                else f"{state_labels[i]}"
+            )
+            ax[idx].set_ylabel(
+                ylabel_text, fontsize=default_fontsize, multialignment="center"
+            )
+            style_trajectory_subplot(ax[idx])
+            ax[idx].legend(loc="upper right")
+            idx += 1
 
-    for i in range(m):
-        ax[idx].plot(
-            t_traj, u_traj[i, :], "r", linewidth=1.5, alpha=0.8, label=input_labels[i]
-        )
-        ylabel_text = (
-            f"{input_labels[i]}\n[{input_units[i]}]"
-            if input_units[i]
-            else f"{input_labels[i]}"
-        )
-        ax[idx].set_ylabel(
-            ylabel_text, fontsize=default_fontsize, multialignment="center"
-        )
-        ax[idx].grid(True, linestyle="--", alpha=0.6)
-        ax[idx].tick_params(labelsize=default_fontsize)
-        ax[idx].legend(loc="upper right")
-        idx += 1
+    if want_u:
+        for i in range(m):
+            ax[idx].plot(
+                t_traj,
+                u_traj[i, :],
+                "r",
+                linewidth=1.5,
+                alpha=0.8,
+                label=input_labels[i],
+            )
+            ylabel_text = (
+                f"{input_labels[i]}\n[{input_units[i]}]"
+                if input_units[i]
+                else f"{input_labels[i]}"
+            )
+            ax[idx].set_ylabel(
+                ylabel_text, fontsize=default_fontsize, multialignment="center"
+            )
+            style_trajectory_subplot(ax[idx])
+            ax[idx].legend(loc="upper right")
+            idx += 1
 
     ax[-1].set_xlabel("Time [s]", fontsize=default_fontsize)
 
@@ -151,7 +205,12 @@ def plot_signals(sys, traj, signals):
         return None, None
 
     fig, ax = plt.subplots(
-        n_plots, 1, figsize=(8, 2.0 * n_plots), sharex=True, frameon=True
+        n_plots,
+        1,
+        figsize=signal_stack_figsize(n_plots, allow_tall=allow_tall_stacked_figures()),
+        sharex=True,
+        frameon=True,
+        dpi=DPI_FIGURE,
     )
     if n_plots == 1:
         ax = [ax]
@@ -239,8 +298,7 @@ def plot_signals(sys, traj, signals):
                                 f"Warning: Input '{lookup_item}' not found in system inputs."
                             )
 
-        axis.grid(True, linestyle="--", alpha=0.6)
-        axis.tick_params(labelsize=default_fontsize)
+        style_trajectory_subplot(axis)
         axis.legend(loc="upper right")
 
     ax[-1].set_xlabel("Time [s]", fontsize=default_fontsize)

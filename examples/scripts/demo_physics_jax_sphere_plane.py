@@ -52,17 +52,8 @@ diagram.add_subsystem(sys, "world")
 diagram.connect("force_cmd", "y", "world", "u")
 diagram.plot_graphe()
 
-traj = diagram.compute_trajectory(tf=10.0, solver="scipy")
-# print("Simulated points:", traj.time_steps)
+traj = diagram.compute_trajectory(tf=10.0, compile_backend="auto")
 
-# evaluator = diagram.compile(backend="jax", verbose=True)
-# x = np.asarray(diagram.x0)
-# u = np.asarray(diagram.get_u_from_input_ports())
-# print("diagram.f:", diagram.f(x, u, 0.0))
-# print("evaluator.f:", evaluator.f(x, u, 0.0))
-
-# diagram.plot_graphe()
-# diagram.animate(renderer="matplotlib")
-diagram.animate(renderer="meshcat")
+# diagram.animate(renderer="meshcat")
 
 # sys.game(renderer="meshcat")

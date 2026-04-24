@@ -103,6 +103,27 @@ class TestAdvancedPlotting(unittest.TestCase):
 
         self.assertTrue(success)
 
+    def test_stacked_figsize_caps_height_for_popup_layout(self):
+        from minilink.graphical.matplotlib_style import (
+            SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP,
+            SIGNAL_PLOT_ROW_HEIGHT,
+            TRAJECTORY_MAX_FIG_HEIGHT_POPUP,
+            TRAJECTORY_ROW_HEIGHT,
+            signal_stack_figsize,
+            trajectory_stack_figsize,
+        )
+
+        n = 20
+        _, h_tall = trajectory_stack_figsize(n, allow_tall=True)
+        self.assertEqual(h_tall, TRAJECTORY_ROW_HEIGHT * n)
+        _, h_cap = trajectory_stack_figsize(n, allow_tall=False)
+        self.assertEqual(h_cap, TRAJECTORY_MAX_FIG_HEIGHT_POPUP)
+
+        _, h_sig = signal_stack_figsize(n, allow_tall=True)
+        self.assertEqual(h_sig, SIGNAL_PLOT_ROW_HEIGHT * n)
+        _, h_sig_cap = signal_stack_figsize(n, allow_tall=False)
+        self.assertEqual(h_sig_cap, SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP)
+
 
 if __name__ == "__main__":
     unittest.main()

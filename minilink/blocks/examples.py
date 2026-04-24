@@ -79,19 +79,24 @@ class Pendulum(DynamicSystem):
         primitives = []
         length = self.params["l"]
 
-        radius = 0.1 * length
+        radius = 0.08 * length
 
-        # Hinge (black circle)
+        # Hinge, rod, bob: blue (Pyro-style); torque arc stays red
         primitives.append(
-            Circle(radius=radius, center=[0, 0], color="black", fill=True)
+            Circle(radius=radius, center=[0, 0], color="blue", fill=True)
         )
-        # Rod (rendered as cylinder in meshcat; line fallback elsewhere)
-        primitives.append(Rod(length=length, radius=0.03 * length, color="black"))
-        # Bob (red circle)
+        # Rod: radius is meshcat cylinder girth; matplotlib uses linewidth for the line
         primitives.append(
-            Circle(radius=radius, center=[0, -length], color="black", fill=True)
+            Rod(
+                length=length,
+                radius=0.03 * length,
+                color="blue",
+                linewidth=2,
+            )
         )
-        # Torque arc arrow at the hinge (radius = 1/5 of rod length, like pyro)
+        primitives.append(
+            Circle(radius=radius, center=[0, -length], color="blue", fill=True)
+        )
         primitives.append(
             TorqueArrow(radius=length / 5.0, head_ratio=0.4, color="red", linewidth=2)
         )
