@@ -3,14 +3,15 @@
 import unittest
 
 import numpy as np
+import pytest
 
 try:
     import sympy as sp
     from sympy.physics.mechanics import dynamicsymbols
 
     from minilink.mechanics.symbolic.derivation import derive_lagrange
-    from minilink.mechanics.symbolic.model import MechanicalModel
     from minilink.mechanics.symbolic.export import create_minilink_system
+    from minilink.mechanics.symbolic.model import MechanicalModel
     from minilink.mechanics.symbolic.symbolic_system import MechanicalSystem
 
     HAS_SYMPY = True
@@ -25,6 +26,8 @@ except ImportError:
     HAS_JAX = False
 
 
+@pytest.mark.optional
+@pytest.mark.symbolic
 @unittest.skipUnless(HAS_SYMPY, "sympy not installed")
 class TestSymbolicMechanics(unittest.TestCase):
     def test_single_link_pendulum_derive_and_export(self):
@@ -107,6 +110,7 @@ class TestSymbolicMechanics(unittest.TestCase):
         T = num.get_kinematic_transforms(np.zeros(2), np.zeros(1), 0.0)
         self.assertEqual(len(prim), len(T))
 
+    @pytest.mark.jax
     @unittest.skipUnless(HAS_SYMPY and HAS_JAX, "sympy and jax required")
     def test_to_minilink_jax_returns_jax_mechanical_system(self):
         from minilink.mechanics.mechanical import JaxMechanicalSystem

@@ -3,20 +3,23 @@
 import unittest
 
 import numpy as np
+import pytest
 
 from minilink.core.diagram import DiagramSystem
 
 try:
     import jax.numpy as jnp
 
-    from minilink.physics.system import PhysicsWorldSystem
     from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
+    from minilink.physics.system import PhysicsWorldSystem
 
     HAS_JAX = True
 except ImportError:
     HAS_JAX = False
 
 
+@pytest.mark.optional
+@pytest.mark.jax
 @unittest.skipUnless(HAS_JAX, "jax not installed")
 class TestPhysicsSystemMinilink(unittest.TestCase):
     def _make_sys(self):

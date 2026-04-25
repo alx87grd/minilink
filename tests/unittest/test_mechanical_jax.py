@@ -3,6 +3,7 @@
 import unittest
 
 import numpy as np
+import pytest
 
 try:
     import jax
@@ -15,6 +16,8 @@ except ImportError:
     HAS_JAX = False
 
 
+@pytest.mark.optional
+@pytest.mark.jax
 @unittest.skipUnless(HAS_JAX, "jax not installed")
 class TestMechanicalSystemJax(unittest.TestCase):
     def test_f_is_jaxpr_traceable(self):
