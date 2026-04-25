@@ -3,6 +3,7 @@
 import unittest
 
 import numpy as np
+import pytest
 
 try:
     import jax
@@ -23,6 +24,8 @@ except ImportError:
     HAS_JAX = False
 
 
+@pytest.mark.optional
+@pytest.mark.jax
 @unittest.skipUnless(HAS_JAX, "jax not installed")
 class TestPhysicsEngineJax(unittest.TestCase):
     def _single_world(self):

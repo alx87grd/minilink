@@ -3,6 +3,7 @@
 import unittest
 
 import numpy as np
+import pytest
 
 try:
     import jax
@@ -13,6 +14,9 @@ try:
     HAS_JAX = True
 except ImportError:
     HAS_JAX = False
+
+
+pytestmark = pytest.mark.jax
 
 
 @unittest.skipUnless(HAS_JAX, "jax not installed")

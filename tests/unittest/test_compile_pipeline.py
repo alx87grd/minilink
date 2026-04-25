@@ -11,6 +11,7 @@ Validates that:
 import unittest
 
 import numpy as np
+import pytest
 
 from minilink.blocks.basic import Integrator, PropController
 from minilink.compile import (
@@ -22,7 +23,6 @@ from minilink.compile import (
 )
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import StaticSystem, System
-
 
 # ── Helper: reusable test diagrams ───────────────────────────────────
 
@@ -170,23 +170,18 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         self.diag = _build_small_closed_loop()
         self.evaluator = compile_diagram(self.diag)
 
-    def test_f_matches_diagram_f(self):
-        x = np.array([0.3])
-        u = np.array([1.2])
-        t = 0.1
-
-        dx_reference = self.diag.f(x, u, t)
-        dx_compiled = self.evaluator.f(x, u, t)
-
-        np.testing.assert_allclose(dx_compiled, dx_reference, atol=1e-10)
-
-    def test_f_multiple_points(self):
-        """Test at several state/input combinations."""
-        for x_val, u_val in [(0.0, 0.0), (1.0, 2.0), (-5.0, 10.0)]:
+    def test_f_matches_diagram_f_for_representative_points(self):
+        """Compiled f matches the recursive reference over several operating points."""
+        for x_val, u_val, t in [
+            (0.3, 1.2, 0.1),
+            (0.0, 0.0, 0.0),
+            (1.0, 2.0, 0.0),
+            (-5.0, 10.0, 0.0),
+        ]:
             x = np.array([x_val])
             u = np.array([u_val])
-            dx_ref = self.diag.f(x, u, 0.0)
-            dx_comp = self.evaluator.f(x, u, 0.0)
+            dx_ref = self.diag.f(x, u, t)
+            dx_comp = self.evaluator.f(x, u, t)
             np.testing.assert_allclose(dx_comp, dx_ref, atol=1e-10)
 
     def test_compute_internal_signals_non_empty(self):
@@ -310,7 +305,6 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
 
     def test_as_scipy_rhs(self):
         x = np.array([0.4])
-        u = np.array([1.0])
         t = 0.15
         rhs = self.evaluator.as_scipy_rhs()
         np.testing.assert_allclose(
@@ -337,38 +331,28 @@ except ImportError:
     _JAX_AVAILABLE = False
 
 
+@pytest.mark.optional
+@pytest.mark.jax
 @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
 class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
     """JaxDiagramEvaluator boundary outputs are JIT-compiled and match NumPy."""
 
-    def test_outputs_matches_numpy_no_boundary_ports(self):
-        diag = _build_small_closed_loop()
-        ev_np = compile_diagram(diag, backend="numpy")
-        ev_jax = compile_diagram(diag, backend="jax")
-        self.assertIsInstance(ev_jax, JaxDiagramEvaluator)
+    def test_outputs_match_numpy_for_boundary_configurations(self):
+        for diag in [_build_small_closed_loop(), _build_closed_loop_with_external_output()]:
+            ev_np = compile_diagram(diag, backend="numpy")
+            ev_jax = compile_diagram(diag, backend="jax")
+            self.assertIsInstance(ev_jax, JaxDiagramEvaluator)
 
-        x_np, u_np = np.array([0.5]), np.array([1.0])
-        x_j = jnp.array([0.5], dtype=jnp.float32)
-        u_j = jnp.array([1.0], dtype=jnp.float32)
-        t = 0.0
+            x_np, u_np = np.array([0.5]), np.array([1.0])
+            x_j = jnp.array([0.5], dtype=jnp.float32)
+            u_j = jnp.array([1.0], dtype=jnp.float32)
+            t = 0.0
 
-        d_np = ev_np.outputs(x_np, u_np, t)
-        d_jx = ev_jax.outputs(x_j, u_j, t)
-        self.assertEqual(d_np, {})
-        self.assertEqual(d_jx, {})
-
-    def test_outputs_matches_numpy_with_external_port(self):
-        diag = _build_closed_loop_with_external_output()
-        ev_np = compile_diagram(diag, backend="numpy")
-        ev_jax = compile_diagram(diag, backend="jax")
-        x_j = jnp.array([0.5], dtype=jnp.float32)
-        u_j = jnp.array([1.0], dtype=jnp.float32)
-        t = 0.0
-        d_np = ev_np.outputs(np.array([0.5]), np.array([1.0]), t)
-        d_jx = ev_jax.outputs(x_j, u_j, t)
-        self.assertEqual(set(d_np.keys()), set(d_jx.keys()))
-        for k in d_np:
-            np.testing.assert_allclose(np.asarray(d_jx[k]), d_np[k], atol=1e-5)
+            d_np = ev_np.outputs(x_np, u_np, t)
+            d_jx = ev_jax.outputs(x_j, u_j, t)
+            self.assertEqual(set(d_np.keys()), set(d_jx.keys()))
+            for key in d_np:
+                np.testing.assert_allclose(np.asarray(d_jx[key]), d_np[key], atol=1e-5)
 
     def test_get_outputs_jit_matches_outputs(self):
         diag = _build_closed_loop_with_external_output()
@@ -390,6 +374,21 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         buf1 = ev.compute_internal_signals(x_j, u_j, t)
         buf2 = ev.get_internal_signals_jit()(x_j, u_j, t)
         np.testing.assert_allclose(np.asarray(buf1), np.asarray(buf2), atol=1e-6)
+
+    def test_f_and_get_f_jit_match_numpy(self):
+        diag = _build_small_closed_loop()
+        ev_np = compile_diagram(diag, backend="numpy")
+        ev_jax = compile_diagram(diag, backend="jax")
+        x_np, u_np = np.array([0.3]), np.array([1.2])
+        x_j = jnp.array(x_np, dtype=jnp.float32)
+        u_j = jnp.array(u_np, dtype=jnp.float32)
+        t = 0.1
+
+        dx_np = ev_np.f(x_np, u_np, t)
+        dx_jax = ev_jax.f(x_j, u_j, t)
+        dx_jit = ev_jax.get_f_jit()(x_j, u_j, t)
+        np.testing.assert_allclose(np.asarray(dx_jax), dx_np, atol=1e-5)
+        np.testing.assert_allclose(np.asarray(dx_jit), dx_np, atol=1e-5)
 
 
 # @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")

@@ -56,6 +56,12 @@ testpaths = [
     "tests/unittest",
 ]
 pythonpath = "."
+markers = [
+    "optional: tests that require optional dependency extras",
+    "jax: tests that require the jax extra",
+    "symbolic: tests that require the symbolic extra",
+    "visualization: tests that require the visualization extra",
+]
 
 [tool.hatch.version]
 source = "vcs"

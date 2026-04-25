@@ -22,18 +22,12 @@ class Integrator(DynamicSystem):
             params = self.params
         k = params["k"]
 
-        dx = np.zeros(self.n)
-        dx[0] = k * u[0]
-
-        return dx
+        return u[: self.n] * k
 
     #######################################################################
     def h(self, x, u, t=0, params=None):
 
-        y = np.zeros(self.p)
-        y[0] = x[0]
-
-        return y
+        return x[: self.p]
 
 
 ######################################################################
@@ -62,11 +56,4 @@ class PropController(StaticSystem):
 
         Kp = params["Kp"]
 
-        r = u[0]
-        y = u[1]
-
-        u = Kp * (r - y)
-
-        u = np.array([u])
-
-        return u
+        return Kp * (u[0:1] - u[1:2])

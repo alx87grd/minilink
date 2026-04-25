@@ -3,6 +3,7 @@
 import unittest
 
 import numpy as np
+import pytest
 
 from minilink.core.diagram import DiagramSystem
 
@@ -17,6 +18,8 @@ except ImportError:
     HAS_JAX = False
 
 
+@pytest.mark.optional
+@pytest.mark.jax
 @unittest.skipUnless(HAS_JAX, "jax not installed")
 class TestPhysicsSystemMinilink(unittest.TestCase):
     def _make_sys(self):
