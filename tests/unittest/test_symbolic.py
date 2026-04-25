@@ -81,6 +81,15 @@ class TestSymbolicMechanics(unittest.TestCase):
         u = np.array([0.0])
         dx = num.f(x, u, 0.0)
         np.testing.assert_allclose(dx, np.array([1.0, 0.0]), rtol=0, atol=1e-9)
+        np.testing.assert_allclose(
+            num.f(x, u, 0.0, params={"ignored": True}),
+            np.array([1.0, 0.0]),
+            rtol=0,
+            atol=1e-9,
+        )
+        np.testing.assert_allclose(
+            num.H(np.array([0.0]), params={"ignored": True}), np.array([[2.0]])
+        )
 
     def test_kinematic_geometry_matches_transforms(self):
         m = MechanicalModel("Pendulum")
