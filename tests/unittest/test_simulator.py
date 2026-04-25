@@ -3,9 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 
-from minilink.jax_utils import array_module
 from minilink.core.framework import DynamicSystem
+from minilink.jax_utils import array_module
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
 
 
@@ -78,6 +79,8 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
         self.assertEqual(sim.compile_backend, "numpy")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_compile_backend_auto_resolves_to_jax_when_available(self):
         sim = Simulator(
@@ -89,6 +92,8 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.compile_backend, "jax")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_auto_selects_rk4_for_large_uniform_grid_with_jax(self):
         sim = Simulator(
@@ -100,6 +105,8 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "rk4_fixedsteps")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_jax_grid_below_threshold_stays_scipy(self):
         sim = Simulator(
@@ -111,6 +118,8 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "scipy")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_discontinuous_jax_large_grid_stays_stiff(self):
         sim = Simulator(

@@ -5,10 +5,11 @@ import io
 import unittest
 
 import numpy as np
+import pytest
 
 from minilink.benchmark.simulation_speed import (
-    TRUTH_SOLVER,
     TRUTH_BACKEND,
+    TRUTH_SOLVER,
     benchmark_sim_backend,
     benchmark_sim_speed_matrix,
     format_benchmark_backend_label,
@@ -40,6 +41,8 @@ class TestSimulationSpeedBenchmark(unittest.TestCase):
     def test_format_benchmark_backend_label_numpy_unchanged(self):
         self.assertEqual(format_benchmark_backend_label("numpy"), "numpy")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     def test_format_benchmark_backend_label_jax_shape(self):
         label = format_benchmark_backend_label("jax")
         try:
