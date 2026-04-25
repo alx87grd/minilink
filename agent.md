@@ -66,6 +66,15 @@ At feature completion, verify through:
 | **TRL 8** | Demo Released | Demo script is created and validated |
 | **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
 
+**Supplemental: recent feature bands (read with the module table in `DESIGN.md` §2 and `ROADMAP.md` §1).** These are not a second scale; they map the same TRL definitions to the latest integration work:
+
+| Area | Effective band | Notes |
+| --- | --- | --- |
+| `matplotlib_style`, stacked-figure policy, `plot` modes on `plot_trajectory` | **TRL 6–7** | Covered by unit tests; user-visible contract; details may still move before a “final” TRL 9 sign-off. |
+| `COMPILE_BACKEND_AUTO` on `Simulator` / `compile_backend` on `System` | **TRL 4–6** | Public API with tests; `"auto"` is opt-in on `Simulator`, default remains NumPy on high-level `System` for predictability. |
+| Auto `rk4_fixedsteps` selection (long uniform grid + JAX + non-stiff) | **TRL 3–5** | Heuristic; `solve_forced` still requires a SciPy or Euler-style path; document and test, but do not treat as immutable policy yet. |
+| `System.plot_trajectory` / `compute_trajectory(..., plot=...)` return behavior | **TRL 6+** | Aligned with plotting API and tests. |
+
 ## 6. Workflow Rules
 
 **Do directly**

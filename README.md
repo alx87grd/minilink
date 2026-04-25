@@ -45,15 +45,16 @@ plot_trajectory(diagram, traj)
 - `core/` is the most mature subsystem and defines the main modeling contract.
 - The official simulation path is `System.compute_trajectory(...)` / `minilink.simulation.Simulator`.
 - The official trajectory object is `minilink.core.trajectory.Trajectory`.
-- The compile pipeline, evaluators, and simulator are in architecture-validation / integration stage.
-- `graphical/`, `mechanics/`, symbolic mechanics, and `physics/` are early MVP work.
+- The compile pipeline, evaluators, and simulator are in architecture-validation / integration stage (`compile_backend` can be `"auto"`; long JAX sims may use an auto fixed-step path when the grid is uniform and non-stiff).
+- `graphical/` has a **stabilizing** matplotlib layer—shared Pyro-style sizing/theming in `matplotlib_style`, notebook-aware stacked plot height, and trajectory **plot** modes—while other renderers and hooks remain early work.
+- `mechanics/`, symbolic mechanics, and `physics/` are early MVP work.
 - `blocks/`, `planning/`, and `control/` are still exploratory rather than stabilized library layers.
 
 ## Documentation Guide
 
 - **[DESIGN.md](DESIGN.md)**: architecture, core contracts, and coding standards
 - **[ROADMAP.md](ROADMAP.md)**: subsystem maturity, priorities, and Pyro migration direction
-- **[agent.md](agent.md)**: project-specific AI collaboration rules and TRL definitions
+- **[agent.md](agent.md)**: project-specific AI collaboration rules, the TRL lifecycle table, and a **supplemental** banding for recent matplotlib and simulation features (read with `DESIGN.md` / `ROADMAP.md`)
 
 ## Benchmarks
 

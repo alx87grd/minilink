@@ -3,7 +3,7 @@ Runtime environment detection for :mod:`minilink.graphical`.
 
 Provides a single cached ``detect_env()`` and derived policy predicates so
 every env-sensitive site (animation HTML default, figure blocking, meshcat
-prompt) reads from the same source of truth.
+prompt, stacked plot height) reads from the same source of truth.
 """
 
 from __future__ import annotations

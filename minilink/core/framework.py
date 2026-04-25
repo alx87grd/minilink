@@ -567,6 +567,11 @@ class System:
             Passed to :class:`~minilink.simulation.Simulator` (default ``\"numpy\"``).
             Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
+
+        Returns
+        -------
+        Trajectory
+            The simulated trajectory, also stored in :attr:`traj`.
         """
         from minilink.graphical.plotting import plot_trajectory
         from minilink.simulation import Simulator
@@ -729,17 +734,21 @@ class System:
             States only, inputs only, or both (default); see
             :func:`minilink.graphical.plotting.plot_trajectory`.
 
+        Returns
+        -------
+        Trajectory or tuple
+            :class:`~minilink.core.trajectory.Trajectory` if a simulation is run; otherwise
+            the ``(fig, ax)`` pair from :func:`minilink.graphical.plotting.plot_trajectory`.
         """
         from minilink.graphical.plotting import plot_trajectory
 
         if traj is not None:
-            plot_trajectory(self, traj, plot=plot)
+            return plot_trajectory(self, traj, plot=plot)
 
-        elif self.traj is not None:
-            plot_trajectory(self, self.traj, plot=plot)
+        if self.traj is not None:
+            return plot_trajectory(self, self.traj, plot=plot)
 
-        else:
-            self.compute_trajectory(plot=plot)
+        return self.compute_trajectory(plot=plot)
 
     ######################################################################
     def get_block_html(self, label="sys1"):

@@ -28,6 +28,10 @@ FIGSIZE_ANIMATION = (6, 4.5)
 # Baseline small figure size (same aspect as Pyro's (4, 3)).
 FIGSIZE_BASE = (4, 3)
 
+DPI_FIGURE = 150
+DPI_EXPORT = 250
+FONT_SIZE = 10
+
 # Stacked ``plot_trajectory``: width × (row height × number of subplots).
 TRAJECTORY_FIG_WIDTH = 6.0
 TRAJECTORY_ROW_HEIGHT = 1.35
@@ -64,11 +68,6 @@ def signal_stack_figsize(
     if not allow_tall:
         h = min(h, SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP)
     return (w, h)
-
-DPI_FIGURE = 150
-DPI_EXPORT = 250
-
-FONT_SIZE = 10
 
 
 def style_animation_axes(ax: Axes, *, is_3d: bool) -> None:

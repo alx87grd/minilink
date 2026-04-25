@@ -16,8 +16,8 @@
 | --- | --- | --- |
 | `core/` | **TRL 7** | Main modeling abstractions plus the canonical `Trajectory` in `trajectory.py` |
 | `compile/` | **TRL 4** | `ExecutionPlan`, `DynamicsEvaluator`, NumPy/JAX evaluator backends |
-| `simulation/` | **TRL 4** | `Simulator`, solver backends, interpolation helpers |
-| `graphical/` | **TRL 1** | Plotting, animation, renderers, and provisional visualization hooks |
+| `simulation/` | **TRL 4** | `Simulator`, solver backends, compile-backend selection (`"auto"` → try JAX, fall back to NumPy), optional auto fixed-step RK4 for long uniform grids with JAX, interpolation helpers |
+| `graphical/` | **TRL 2** | Matplotlib theming (`matplotlib_style`), env-aware layout, animation renderers; kinematic hooks still provisional (see §3.2, §4.7–4.8) |
 | `mechanics/` | **TRL 1** | Numeric and symbolic mechanics paths |
 | `physics/` | **TRL 1** | JAX contact-world MVP and demos |
 | `blocks/` | **TRL 0** | Early reusable blocks, not yet a stabilized library layer |
@@ -146,13 +146,16 @@ Planned ergonomic shortcut:
 - `System.compute_forced(...)` now provides that high-level shortcut for sampled inputs or simple `u(t)` callables
 - richer forcing helpers can still grow on top of the same simulator-level path later
 
-Current solver modes:
+Current solver modes (see `minilink.simulation.simulator` and tests):
 
-- `solver="euler"`
-- `solver="scipy"`
-- `solver="scipy_stiff"`
-- `solver="scipy_max"`
-- `solver="scipy_ultra"`
+- `solver="euler"`, `solver="rk4_fixedsteps"` (fixed step; not available for `solve_forced` today)
+- `solver="scipy"`, `solver="scipy_stiff"`, `solver="scipy_max"`, `solver="scipy_ultra"`
+- `solver="scipy_lsoda"` (alias that selects LSODA; useful for stiff/variable-tolerance cases)
+- **Auto RK4 (heuristic)**: for long, **uniform** time grids, JAX compile backend, and a non-stiff profile, the simulator may select `rk4_fixedsteps` automatically for wall-clock reasons. This is best-effort; defaults remain explicit where conservatism matters.
+
+`Simulator(..., compile_backend=...)` accepts `"numpy"`, `"jax"`, or **`"auto"`** (`minilink.simulation.COMPILE_BACKEND_AUTO`): try JAX, fall back to NumPy on failure. User-facing `System.compute_trajectory` / `compute_forced` default to **`"numpy"`** (predictable, no extra JIT) unless overridden.
+
+**SciPy preset tolerances** (`scipy`, `scipy_stiff`, …) pass explicit `rtol` / `atol` into `solve_ivp` so behavior is not left to global SciPy defaults.
 
 ### 4.6 Benchmark package (`minilink.benchmark`)
 
@@ -202,10 +205,10 @@ Behavior:
 
 Env detection lives in a single module, `minilink/graphical/environment.py`,
 and exposes `detect_env()`, `prefers_inline_animation()`, `is_inline_capable()`,
-`is_blocking_needed()`, and `override_env()`. All env-sensitive sites
+`is_blocking_needed()`, `allow_tall_stacked_figures()`, and `override_env()`. All env-sensitive sites
 (`Animator.animate_simulation`, `System.animate`, `plot_trajectory`,
 `plot_signals`, `MatplotlibRenderer.present` / `play_native`,
-`MeshcatRenderer.present`) read from it.
+`MeshcatRenderer.present`) read from it where applicable.
 
 The matrix below summarizes defaults. Minilink **never** mutates matplotlib
 settings (no `matplotlib.use(...)`, no `%matplotlib ...` magic); it only
@@ -254,6 +257,17 @@ a **fixed Euler** step (with substeps in `game`), **pygame** for live `u`, and t
   cosimulation, etc.); keep demos thin and hide protocols in `graphical/` or a small helper
   module.
 - **Live output push** — optional later (stream state/outputs to a peer); no concrete API yet.
+
+### 4.8 Matplotlib look, figure sizing, and `plot_trajectory` modes
+
+Central policy lives in `minilink/graphical/matplotlib_style.py`:
+
+- **Figure / DPI**: shared `FIGSIZE_ANIMATION`, `DPI_FIGURE`, `DPI_EXPORT` (export uses a higher DPI than on-screen); font size and axis styling helpers `style_animation_axes`, `style_trajectory_subplot`, and related caps.
+- **Stacked x/u plots**: `trajectory_stack_figsize` / `signal_stack_figsize` apply row caps; **tall** stacked layouts in **Jupyter/Colab** are gated by `minilink.graphical.environment.allow_tall_stacked_figures()` (console scripts keep a shorter default so windows stay usable). `plot_trajectory` and `plot_signals` share this policy.
+- **`System.plot_trajectory` / `plot_trajectory`**: `plot=...` selects **state** (`"x"`), **input** (`"u"`), or **both** (`"xu"`) in stacked subplots. `System.compute_trajectory(..., plot=True, plot="xu")` can return a pre-styled `Trajectory` with plotting side effects as documented on `System`.
+- **Animator** does not take per-call `figsize`/`dpi`; the matplotlib renderer and `matplotlib_style` own defaults (Pyro-style consistency).
+
+`MatplotlibRenderer` and trajectory plotting are covered by unit tests; treat them as **more stable than the raw kinematic `get_kinematic_*` API**, but still not frozen at the same level as `core/`.
 
 ## 5. Coding Standards
 

@@ -15,7 +15,7 @@ from minilink.graphical.matplotlib_style import (
 )
 
 ###############################################################################
-#  Note: Modify here matplolib setting to fit your environment
+#  Note: modify matplotlib settings here to fit your environment
 ###############################################################################
 
 # Use interactive backend
@@ -79,6 +79,13 @@ def plot_trajectory(
         ``'x'`` — states only; ``'u'`` — inputs only; ``'xu'`` — states then inputs
         (default). Mirrors Pyro-style ``plot`` selection for simple trajectories.
 
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    ax : list of matplotlib.axes.Axes
+
+    Notes
+    -----
     For arbitrary internal signals, use :func:`plot_signals` instead.
     """
     if plot not in ("x", "u", "xu"):

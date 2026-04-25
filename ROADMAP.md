@@ -10,8 +10,8 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Compile pipeline** | **TRL 4** | Validate architecture and deepen integration across the library |
 | **Leaf evaluators** | **TRL 4** | Add differentiation and richer rollout helpers |
 | **Diagram evaluators** | **TRL 4** | Add diagram parametric tier and finish boundary/internal signal polish |
-| **Simulation** | **TRL 4** | Harden the new simulator path and unify forcing behavior |
-| **Graphical** | **TRL 1** | Keep renderers usable; plan **interactive integrator** + **live I/O** backends (see §7) before freezing APIs |
+| **Simulation** | **TRL 4** | Harden the new simulator path, unify forcing behavior, and keep compile-backend / auto-solver heuristics well-defined |
+| **Graphical** | **TRL 2** | Matplotlib theme and layout policy are converging; keep **interactive integrator** + **live I/O** backends (see §7) before treating graphics as “frozen” like `core/` |
 | **Mechanics** | **TRL 1** | Keep the numeric path functional and ready for user review |
 | **Symbolic mechanics** | **TRL 1** | Keep derivation/export workflows working for examples and review |
 | **Physics** | **TRL 1** | Keep JAX contact demos working and extend the MVP carefully |
@@ -26,8 +26,9 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 ## 2. Repository Snapshot
 
 - **Most mature today**: `core/` and the system/diagram composition model
-- **Architecture under active validation**: compilation, evaluators, and simulation
-- **Early MVP work**: graphics, mechanics, symbolic mechanics, physics
+- **Architecture under active validation**: compilation, evaluators, and simulation (including `compile_backend="auto"` and optional auto-`rk4` path for long JAX runs—see `DESIGN.md` §4.5)
+- **Stabilizing UX layer (still not core-frozen)**: `graphical/` matplotlib look (`matplotlib_style`), env-aware stacked-figure height for notebooks vs console, and `plot_trajectory` / `System.plot_trajectory` **plot** modes (`"x"`, `"u"`, `"xu"`)
+- **Early MVP work**: non-matplotlib render paths, mechanics, symbolic mechanics, physics
 - **Exploratory / not stabilized**: blocks, planning, control
 - **Still needs a clearer top-level package surface**: public exports and import story
 - **Benchmarks**: `minilink.benchmark` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
@@ -76,7 +77,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 
 - [ ] Diagram parametric tier
 - [ ] Top-level public exports in `minilink/__init__.py`
-- [ ] Solver configuration cleanup
+- [ ] Solver configuration cleanup (partial: explicit SciPy `rtol`/`atol` on default presets; `COMPILE_BACKEND_AUTO` and auto-RK4 heuristic in code—still room for a `SimulationOptions`-style object)
 - [ ] Wiring validation and UX polish
 
 ### Phase 4: User-facing library growth
