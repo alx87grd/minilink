@@ -24,7 +24,7 @@
 | `blocks/` | **TRL 0** | Diagram primitives: sources, integrators, lightweight signal blocks — not full plants |
 | `benchmark/` | **TRL 1** | Optional timing helpers (`f_speed`, `simulation_speed`) and no core dependency |
 | `benchmark/scenario/` | **TRL 1** | Shared benchmark **scenarios** (stress systems and builders for timing matrices), not user plants |
-| `planning/` | **TRL 0** | Future planners |
+| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`, planning-owned costs and allowable sets, standard `PlanningSolution`, and solver-family skeletons |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
 ### 2.1 Notes (dynamics + mechanics)
@@ -94,6 +94,26 @@ implementation: subclasses implement `H(q, params=None)`, `C(q, dq, params=None)
 - helper methods such as interpolation and resampling stay generic to sampled signals
 
 Simulation, planning, tracking control, and animation should all share this object where a state-input trajectory is the right abstraction.
+
+### 3.5 Deterministic planning
+
+`minilink.planning` is the architecture MVP for deterministic planning problems.
+It separates the continuous mathematical problem from numerical solver choices:
+
+- `PlanningProblem` owns the system, boundary sets, allowable sets, optional
+  cost, and optional parameter bundle.
+- `CostFunction` uses the textbook notation `g(x, u, t)` for running cost and
+  `h(x, t)` for terminal cost.
+- Set objects model `x(t) in X(t)`, `u(t) in U(x, t)`, `x(0) in X0`, and
+  `x(tf) in Xf` through `contains(...)` and nonnegative `margin(...)`.
+- Solver/planner objects own discretization, transcriptions, compile backend,
+  optimizer backend, sampling settings, and grid settings.
+- `PlanningSolution` is the standard result envelope for trajectories,
+  controllers, search paths/trees, value functions, policies, cost, and stats.
+
+This first pass is intentionally deterministic and high-level. Stochastic
+planning, chance constraints, belief states, and full direct-collocation/RRT/DP
+internals are deferred until the architecture is reviewed.
 
 ## 4. Compile and Simulation Architecture
 
