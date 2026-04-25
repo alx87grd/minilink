@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import jax
 
-from minilink.benchmark import print_standard_sim_suite, run_standard_sim_suite
+from minilink.benchmark.simulation_speed import print_standard_sim_suite, run_standard_sim_suite
 
 USE_X64 = False
 jax.config.update("jax_enable_x64", USE_X64)

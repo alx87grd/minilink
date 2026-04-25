@@ -8,7 +8,7 @@ try:
     import jax
     import jax.numpy as jnp
 
-    from minilink.mechanics import JaxMechanicalSystem, MechanicalSystem
+    from minilink.mechanics.mechanical import JaxMechanicalSystem, MechanicalSystem
 
     HAS_JAX = True
 except ImportError:

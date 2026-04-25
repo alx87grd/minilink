@@ -9,7 +9,7 @@ from minilink.core.diagram import DiagramSystem
 try:
     import jax.numpy as jnp
 
-    from minilink.physics import PhysicsWorldSystem
+    from minilink.physics.system import PhysicsWorldSystem
     from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
 
     HAS_JAX = True

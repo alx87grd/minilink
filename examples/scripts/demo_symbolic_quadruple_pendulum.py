@@ -10,7 +10,7 @@ Symbolic derivation of 4×4 H, C, g can take tens of seconds on first run.
 
 import numpy as np
 
-from minilink.mechanics.symbolic import MechanicalModel
+from minilink.mechanics.symbolic.model import MechanicalModel
 
 
 # ------------------------------------------------------------------

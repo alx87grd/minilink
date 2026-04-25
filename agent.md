@@ -26,6 +26,7 @@ This file defines the collaboration preferences and architectural expectations f
 - **Validation in proportion**: avoid defensive error-handling sprawl in internal paths unless the interface is public or the risk is real
 - **Documentation**: do not add new markdown guides or expand unrelated docs unless asked; `DESIGN.md` / `ROADMAP.md` stay in sync when behavior or scope changes (§1, §3)
 - **Imports and “math-first” surfaces**: In tutorials, demos, and other **reader-facing** code, keep the top of the file light—fewer imports and less Python ceremony so the math stays visible. This is **judgment, not dogma**: internal packages (`compile/`, `simulation/`, benchmarks, tests) may use richer imports when the benefit is clear. Prefer moving heavy setup into helpers or modules casual readers do not need to open.
+- **Package `__init__.py` (entire `minilink`)**: Import from the module that defines each symbol (e.g. `from minilink.compile.compiler import ...`, `from minilink.benchmark.simulation_speed import ...`, `from minilink.blocks.dynamic_bicycle import ...`). Do not use package `__init__` as a barrel re-export layer; those files are namespace markers (module docstring only, optional) unless an explicit API freeze and docs say otherwise. **Keep each `__init__.py` file** so subpackages stay regular packages and the build (Hatch) can discover them reliably; an empty or docstring-only `__init__.py` is fine, but deleting it risks tooling and import edge cases.
 
 ## 3. Architectural Guidance
 
@@ -92,7 +93,7 @@ At feature completion, verify through:
 
 Demo and manual scripts should stay flat and directly runnable at module top level.
 
-Benchmark example scripts live under `tests/benchmark/` (same flat style). Prefer `from minilink.benchmark import ...` for `benchmark_f_speeds`, `benchmark_sim_speed_matrix`, and related helpers; see `DESIGN.md` §4.6.
+Benchmark example scripts live under `tests/benchmark/` (same flat style). Import from `minilink.benchmark.f_speed` or `minilink.benchmark.simulation_speed` as needed (`benchmark_f_speeds`, `benchmark_sim_speed_matrix`, `DEFAULT_SWEEP_PAIRS`, etc.); see `DESIGN.md` §4.6.
 
 ### Scope: small edits vs larger work
 
@@ -102,8 +103,18 @@ Benchmark example scripts live under `tests/benchmark/` (same flat style). Prefe
 
 ## 7. Local Environment
 
-Use the `dev-h26` conda environment for local development:
+**Use the `dev-h26` conda environment** for this repository: run tests, examples, and benchmarks only with that env’s `python` (or equivalent), not system Python or an ad-hoc venv. The project targets **Python 3.10+**; macOS `/usr/bin/python3` is often 3.9 and will not work (e.g. `|` in type hints).
 
 ```bash
 conda activate dev-h26
+# then: python, pytest, etc. from the repo root with PYTHONPATH=. as documented
 ```
+
+On a typical Anaconda install the interpreter is `.../envs/dev-h26/bin/python` (for example `/opt/anaconda3/envs/dev-h26/bin/python` on the maintainer machine). From a fresh shell you can also use:
+
+```bash
+conda run -n dev-h26 python -m pytest
+conda run -n dev-h26 python examples/scripts/demo_animations.py
+```
+
+Reserve `dev-h26` (or a clone of it) for work on `minilink` so optional deps (JAX, SymPy, visualization) stay aligned with the team and with what agents and CI are expected to use.

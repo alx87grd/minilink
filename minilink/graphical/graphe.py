@@ -2,6 +2,10 @@ def plot_graphviz(graphe, show_inline=None, show_pdf=None, filename=None):
     """
     Display a graphviz object.
 
+    If ``graphe`` is ``None`` (e.g. the ``graphviz`` Python package is not
+    installed, :func:`get_system_graphe` / :func:`get_diagram_graphe` return
+    ``None``), this function returns quietly after a short message.
+
     The two display switches auto-resolve based on the current environment via
     :func:`minilink.graphical.environment.is_inline_capable`:
 
@@ -16,6 +20,10 @@ def plot_graphviz(graphe, show_inline=None, show_pdf=None, filename=None):
     or when ``show_pdf`` is true (which requires an on-disk artifact to open).
     Pure-notebook use therefore leaves no ``.gv`` / ``.pdf`` litter behind.
     """
+    if graphe is None:
+        print("No graph to display (graphviz Python package unavailable or graph build failed).")
+        return
+
     from minilink.graphical.environment import is_inline_capable
 
     inline_env = is_inline_capable()

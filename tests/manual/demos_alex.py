@@ -4,7 +4,7 @@ from minilink.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import DynamicSystem, StaticSystem
 from minilink.graphical.plotting import plot_trajectory
-from minilink.simulation import Simulator
+from minilink.simulation.simulator import Simulator
 
 
 ######################################################################

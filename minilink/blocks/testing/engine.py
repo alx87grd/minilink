@@ -7,7 +7,7 @@ import numpy as np
 
 def make_physics_many_spheres(nx=6, ny=4):
     """Build a reduced many-spheres world for speed/precision sweeps."""
-    from minilink.physics import PhysicsWorldSystem
+    from minilink.physics.system import PhysicsWorldSystem
     from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
 
     n_spheres = nx * ny

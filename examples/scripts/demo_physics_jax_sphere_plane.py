@@ -11,7 +11,7 @@ import numpy as np
 
 from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
-from minilink.physics import PhysicsWorldSystem
+from minilink.physics.system import PhysicsWorldSystem
 from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
 
 world = make_world_model(

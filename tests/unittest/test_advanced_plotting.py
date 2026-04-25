@@ -6,7 +6,7 @@ import numpy as np
 from minilink.core.diagram import DiagramSystem
 from minilink.core.framework import DynamicSystem, StaticSystem
 from minilink.graphical.plotting import plot_signals
-from minilink.simulation import Simulator
+from minilink.simulation.simulator import Simulator
 
 
 class Integrator(DynamicSystem):

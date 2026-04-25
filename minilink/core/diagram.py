@@ -204,7 +204,7 @@ class DiagramSystem(System):
         list of (sys_id, port_id)
             Topologically sorted output-port schedule.
         """
-        from minilink.compile import check_algebraic_loops
+        from minilink.compile.compiler import check_algebraic_loops
 
         return check_algebraic_loops(self)  # RuntimeError propagates if loop found
 
@@ -230,7 +230,7 @@ class DiagramSystem(System):
         -------
         NumpyDiagramEvaluator or JaxDiagramEvaluator
         """
-        from minilink.compile import compile_diagram
+        from minilink.compile.compiler import compile_diagram
 
         return compile_diagram(
             self, backend=backend, bind_params=bind_params, verbose=verbose

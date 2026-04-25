@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from minilink.benchmark import (
+from minilink.benchmark.simulation_speed import (
     TRUTH_SOLVER,
     TRUTH_BACKEND,
     benchmark_sim_backend,

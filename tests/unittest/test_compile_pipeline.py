@@ -13,18 +13,89 @@ import unittest
 import numpy as np
 
 from minilink.blocks.basic import Integrator, PropController
-from minilink.compile import (
-    ExecutionPlan,
-    NumpyDiagramEvaluator,
+from minilink.blocks.sources import _array_module
+from minilink.compile.compiler import (
     build_execution_plan,
     check_algebraic_loops,
     compile_diagram,
 )
+from minilink.compile.execution_plan import ExecutionPlan
+from minilink.compile.numpy_evaluator import NumpyDiagramEvaluator
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import StaticSystem, System
+from minilink.core.framework import DynamicSystem, StaticSystem, System
 
 
 # ── Helper: reusable test diagrams ───────────────────────────────────
+
+
+class _JAXFriendlyPropController(StaticSystem):
+    """P controller using NumPy or JAX ops so ``compile(..., backend='jax')`` traces."""
+
+    def __init__(self):
+        super().__init__(2, 1)
+        self.params = {"Kp": 10.0}
+        self.name = "Controller"
+        self.inputs = {}
+        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
+        self.add_input_port(1, "y", nominal_value=np.array([0.0]))
+        self.outputs = {}
+        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
+
+    def ctl(self, x, u, t=0, params=None):
+        if params is None:
+            params = self.params
+        Kp = params["Kp"]
+        xp = _array_module(u)
+        r = u[0]
+        y_ = u[1]
+        return xp.array([Kp * (r - y_)])
+
+
+class _JAXFriendlyIntegrator(DynamicSystem):
+    """``dx = k u`` integrator; mirrors :class:`Integrator` with JAX-friendly arrays."""
+
+    def __init__(self):
+        super().__init__(1, 1, 1)
+        self.params = {"k": 1.0}
+        self.name = "Integrator"
+        self.outputs = {}
+        self.add_output_port(1, "y", function=self.h, dependencies=[])
+
+    def f(self, x, u, t=0, params=None):
+        if params is None:
+            params = self.params
+        k = params["k"]
+        xp = _array_module(x)
+        return xp.array([k * u[0]])
+
+    def h(self, x, u, t=0, params=None):
+        xp = _array_module(x)
+        return xp.array([x[0]])
+
+
+def _build_small_closed_loop_jax():
+    """Same wiring as :func:`_build_small_closed_loop` with JAX-traceable blocks."""
+    diag = DiagramSystem()
+    diag.graphe_building_verbose = False
+
+    ctl = _JAXFriendlyPropController()
+    plant = _JAXFriendlyIntegrator()
+    ctl.params["Kp"] = 2.5
+
+    diag.add_subsystem(ctl, "ctl")
+    diag.add_subsystem(plant, "plant")
+    diag.add_input_port(1, "ref")
+
+    diag.connect("input", "ref", "ctl", "ref")
+    diag.connect("plant", "y", "ctl", "y")
+    diag.connect("ctl", "u", "plant", "u")
+    return diag
+
+
+def _build_closed_loop_with_external_output_jax():
+    diag = _build_small_closed_loop_jax()
+    diag.connect_new_output_port("plant", "y", "y_meas")
+    return diag
 
 
 def _build_small_closed_loop():
@@ -330,7 +401,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
 try:
     import jax.numpy as jnp
 
-    from minilink.compile import JaxDiagramEvaluator
+    from minilink.compile.jax_evaluator import JaxDiagramEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
@@ -342,7 +413,7 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
     """JaxDiagramEvaluator boundary outputs are JIT-compiled and match NumPy."""
 
     def test_outputs_matches_numpy_no_boundary_ports(self):
-        diag = _build_small_closed_loop()
+        diag = _build_small_closed_loop_jax()
         ev_np = compile_diagram(diag, backend="numpy")
         ev_jax = compile_diagram(diag, backend="jax")
         self.assertIsInstance(ev_jax, JaxDiagramEvaluator)
@@ -358,7 +429,7 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         self.assertEqual(d_jx, {})
 
     def test_outputs_matches_numpy_with_external_port(self):
-        diag = _build_closed_loop_with_external_output()
+        diag = _build_closed_loop_with_external_output_jax()
         ev_np = compile_diagram(diag, backend="numpy")
         ev_jax = compile_diagram(diag, backend="jax")
         x_j = jnp.array([0.5], dtype=jnp.float32)
@@ -371,7 +442,7 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
             np.testing.assert_allclose(np.asarray(d_jx[k]), d_np[k], atol=1e-5)
 
     def test_get_outputs_jit_matches_outputs(self):
-        diag = _build_closed_loop_with_external_output()
+        diag = _build_closed_loop_with_external_output_jax()
         ev = compile_diagram(diag, backend="jax")
         x_j = jnp.array([0.3], dtype=jnp.float32)
         u_j = jnp.array([1.2], dtype=jnp.float32)
@@ -382,7 +453,7 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
             np.testing.assert_allclose(np.asarray(out1[k]), np.asarray(out2[k]), atol=1e-6)
 
     def test_get_internal_signals_jit_matches_compute_internal_signals(self):
-        diag = _build_small_closed_loop()
+        diag = _build_small_closed_loop_jax()
         ev = compile_diagram(diag, backend="jax")
         x_j = jnp.array([0.3], dtype=jnp.float32)
         u_j = jnp.array([1.2], dtype=jnp.float32)

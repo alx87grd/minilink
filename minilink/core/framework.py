@@ -533,7 +533,7 @@ class System:
 
         This delegates to :func:`minilink.compile.compile`.
         """
-        from minilink.compile import compile as compile_system
+        from minilink.compile.compiler import compile as compile_system
 
         return compile_system(self, backend=backend, verbose=verbose)
 
@@ -574,7 +574,7 @@ class System:
             The simulated trajectory, also stored in :attr:`traj`.
         """
         from minilink.graphical.plotting import plot_trajectory
-        from minilink.simulation import Simulator
+        from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
             self,
@@ -643,7 +643,7 @@ class System:
             Simulated state-input trajectory.
         """
         from minilink.graphical.plotting import plot_trajectory
-        from minilink.simulation import Simulator
+        from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
             self,
@@ -787,6 +787,8 @@ class System:
         Convenience notebook representation for the system graph.
         """
         g = self.get_graphe()
+        if g is None:
+            return None
         return g._repr_image_svg_xml()
 
     ######################################################################

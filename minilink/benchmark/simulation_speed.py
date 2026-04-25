@@ -10,7 +10,7 @@ from typing import Any, Callable, Sequence, TypeVar
 
 import numpy as np
 
-from minilink.simulation import Simulator
+from minilink.simulation.simulator import Simulator
 
 _T = TypeVar("_T")
 
@@ -468,19 +468,19 @@ class StandardCase:
 
 
 def _pendulum_long() -> Any:
-    from minilink.blocks.testing import make_pendulum
+    from minilink.blocks.testing.basic import make_pendulum
 
     return make_pendulum()
 
 
 def _spheres_short() -> Any:
-    from minilink.blocks.testing import make_physics_many_spheres
+    from minilink.blocks.testing.engine import make_physics_many_spheres
 
     return make_physics_many_spheres(nx=6, ny=4)
 
 
 def _diagram_dense() -> Any:
-    from minilink.blocks.testing import make_dense_network
+    from minilink.blocks.testing.network import make_dense_network
 
     return make_dense_network(num_nodes=50, connections_per_node=5)
 

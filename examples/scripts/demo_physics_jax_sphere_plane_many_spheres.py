@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 import numpy as np
 
-from minilink.physics import PhysicsWorldSystem
+from minilink.physics.system import PhysicsWorldSystem
 from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
 
 # 10x larger scene than the 12-sphere MVP: 12x10 grid = 120 spheres.

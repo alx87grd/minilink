@@ -4,8 +4,9 @@ from unittest.mock import patch
 
 import numpy as np
 
+from minilink.blocks.sources import _array_module
 from minilink.core.framework import DynamicSystem
-from minilink.simulation import COMPILE_BACKEND_AUTO, Simulator
+from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
 
 
 def _have_jax() -> bool:
@@ -25,10 +26,12 @@ class StableLinearSystem(DynamicSystem):
         self.inputs["u"].nominal_value = np.array([0.0])
 
     def f(self, x, u, t=0, params=None):
-        return np.array([-x[0] + u[0]])
+        xp = _array_module(x)
+        return xp.array([-x[0] + u[0]])
 
     def h(self, x, u, t=0, params=None):
-        return np.array([x[0]])
+        xp = _array_module(x)
+        return xp.array([x[0]])
 
 
 class TwoPortLinearSystem(DynamicSystem):
@@ -42,10 +45,12 @@ class TwoPortLinearSystem(DynamicSystem):
         self.x0 = np.array([0.0])
 
     def f(self, x, u, t=0, params=None):
-        return np.array([-x[0] + u[0] + 2.0 * u[1]])
+        xp = _array_module(x)
+        return xp.array([-x[0] + u[0] + 2.0 * u[1]])
 
     def h(self, x, u, t=0, params=None):
-        return np.array([x[0]])
+        xp = _array_module(x)
+        return xp.array([x[0]])
 
 
 class DiscontinuousLinearSystem(StableLinearSystem):

@@ -119,7 +119,7 @@ def compile_diagram(
 
     Examples
     --------
-    >>> from minilink.compile import compile_diagram
+    >>> from minilink.compile.compiler import compile_diagram
     >>> evaluator = compile_diagram(diagram)
     >>> dx = evaluator.f(x, u, t)
 

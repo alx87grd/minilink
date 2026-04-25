@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from minilink.mechanics import MechanicalSystem
+from minilink.mechanics.mechanical import MechanicalSystem
 
 
 class TestMechanicalSystem(unittest.TestCase):

@@ -11,15 +11,13 @@ from __future__ import annotations
 
 import jax
 
-from minilink.benchmark import (
+from minilink.benchmark.simulation_speed import (
     DEFAULT_SWEEP_PAIRS,
     benchmark_sim_speed_matrix,
 )
-from minilink.blocks.testing import (
-    make_dense_network,
-    make_pendulum,
-    make_physics_many_spheres,
-)
+from minilink.blocks.testing.basic import make_pendulum
+from minilink.blocks.testing.engine import make_physics_many_spheres
+from minilink.blocks.testing.network import make_dense_network
 
 USE_X64 = False
 jax.config.update("jax_enable_x64", USE_X64)

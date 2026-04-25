@@ -8,7 +8,8 @@ try:
     import sympy as sp
     from sympy.physics.mechanics import dynamicsymbols
 
-    from minilink.mechanics.symbolic import MechanicalModel, derive_lagrange
+    from minilink.mechanics.symbolic.derivation import derive_lagrange
+    from minilink.mechanics.symbolic.model import MechanicalModel
     from minilink.mechanics.symbolic.export import create_minilink_system
     from minilink.mechanics.symbolic.symbolic_system import MechanicalSystem
 

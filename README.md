@@ -21,7 +21,7 @@ from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.graphical.plotting import plot_trajectory
-from minilink.simulation import Simulator
+from minilink.simulation.simulator import Simulator
 
 diagram = DiagramSystem()
 diagram.add_subsystem(Integrator(), "plant")

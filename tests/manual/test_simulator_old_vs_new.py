@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 # from minilink.blocks.examples import Pendulum
 from minilink.core.framework import DynamicSystem
-from minilink.simulation import Simulator
+from minilink.simulation.simulator import Simulator
 
 
 class Pendulum(DynamicSystem):
