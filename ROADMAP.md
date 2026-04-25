@@ -31,6 +31,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - **Stabilizing UX layer (still not core-frozen)**: `graphical/` matplotlib look (`matplotlib_style`), env-aware stacked-figure height for notebooks vs console, and `plot_trajectory` / `System.plot_trajectory` **plot** modes (`"x"`, `"u"`, `"xu"`)
 - **Early MVP work**: non-matplotlib render paths, mechanics, symbolic mechanics, physics
 - **Exploratory / not stabilized**: `dynamics/`, `blocks/`, `control/`, planning
+- **Pyro-style plant ports (in progress)**: `dynamics/pendulum/` now includes `CartPole` and `DoublePendulum` on `MechanicalSystem` (see `DESIGN.md` §2.1)
 - **Still needs a clearer top-level package surface**: public exports and import story
 - **Benchmarks**: `minilink.benchmark` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
 

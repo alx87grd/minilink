@@ -1,3 +1,14 @@
+"""
+Pyro-ported cart-pole (linear cart, one pole).
+
+Dynamics match SherbyRobotics/pyro ``CartPole`` in ``pyro/dynamic/cartpole.py``.
+
+Kinematics: the ground + cart are drawn in the X–Y plane; the pole is offset
+slightly in ``z`` for volumetric renderers (MeshCat) so the rod cylinder does
+not pass through the cart body while matplotlib's default XY projection stays
+visually the same.
+"""
+
 import numpy as np
 
 from minilink.graphical.primitives import (
@@ -25,6 +36,11 @@ class CartPole(MechanicalSystem):
             "m1": 1.0,
             "m2": 0.1,
             "gravity": 9.81,
+            # Display-only: cart footprint used by kinematic primitives. Not in Pyro.
+            "cart_length": 2.5,
+            "cart_height": 1.5,
+            "cart_depth": 0.8,
+            "ground_half_width": 10.0,
         }
 
         self.state.labels = ["x", "theta", "dx", "dtheta"]
@@ -83,14 +99,20 @@ class CartPole(MechanicalSystem):
         params = self.params
         length = params["l"]
 
-        cart_length = 2.5
-        cart_height = 1.5
-        cart_depth = 0.8
+        cart_length = float(params["cart_length"])
+        cart_height = float(params["cart_height"])
+        cart_depth = float(params["cart_depth"])
         wheel_y = -cart_height / 2.0
+        wheel_dx = cart_length / 4.0
 
         return [
             CustomLine(
-                [[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0]], color="black", style="--"
+                [
+                    [-params["ground_half_width"], 0.0, 0.0],
+                    [params["ground_half_width"], 0.0, 0.0],
+                ],
+                color="black",
+                style="--",
             ),
             Box(
                 length_x=cart_length,
@@ -99,8 +121,8 @@ class CartPole(MechanicalSystem):
                 color="black",
                 opacity=0.85,
             ),
-            Point([0.0, wheel_y, 0.0], color="black", marker="o", size=6),
-            Point([0.0, wheel_y, 0.0], color="black", marker="o", size=6),
+            Point([-wheel_dx, wheel_y, 0.0], color="black", marker="o", size=6),
+            Point([wheel_dx, wheel_y, 0.0], color="black", marker="o", size=6),
             Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
             Arrow(color="red", linewidth=2, origin="tip"),
         ]
@@ -110,9 +132,9 @@ class CartPole(MechanicalSystem):
         theta = x[1]
         F = np.asarray(u)[0]
 
-        cart_length = 2.5
-        cart_height = 1.5
-        cart_depth = 0.8
+        cart_length = float(self.params["cart_length"])
+        cart_height = float(self.params["cart_height"])
+        cart_depth = float(self.params["cart_depth"])
         wheel_dx = cart_length / 4.0
         pivot_y = cart_height / 2.0
         pole_z = cart_depth / 2.0 + 0.1
@@ -136,6 +158,7 @@ class CartPole(MechanicalSystem):
 
 
 def _pose2d_offset_z(x=0.0, y=0.0, theta=0.0, z=0.0):
+    """Like :func:`pose2d_matrix`, but with an extra ``z`` translation (for 3D)."""
     T = pose2d_matrix(x, y, theta)
     T[2, 3] = z
     return T

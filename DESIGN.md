@@ -27,6 +27,17 @@
 | `planning/` | **TRL 0** | Future planners |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
+### 2.1 Notes (dynamics + mechanics)
+
+- **`dynamics/` Pyro ports**: `minilink.dynamics.pendulum.cartpole.CartPole` and
+  `minilink.dynamics.pendulum.double_pendulum.DoublePendulum` are numeric ports of
+  SherbyRobotics/pyro `CartPole` / `DoublePendulum` manipulator equations.
+- **Kinematics vs dynamics**: animation is allowed to add display-only parameters
+  (for example cart footprint sizes) and small out-of-plane offsets for volumetric
+  renderers, without changing the ODE.
+- **`MechanicalSystem` matrix hooks**: `H`, `C`, `B`, `g`, and `d` accept an
+  optional trailing `params` argument, consistent with `f(x, u, t, params)`.
+
 ## 3. Core Contracts
 
 ### 3.1 Signals, ports, and diagrams
@@ -60,6 +71,10 @@
    - `compute_forced()`
    - `render()`, `animate()`, `game()`
    - graph / HTML display helpers
+
+`MechanicalSystem` follows the same `params` story for its split dynamics
+implementation: subclasses implement `H(q, params=None)`, `C(q, dq, params=None)`,
+`B(q, params=None)`, `g(q, params=None)`, and `d(q, dq, params=None)`.
 
 `System` may also cache the last computed trajectory for convenience. That cache is not part of the mathematical model.
 

@@ -1,3 +1,15 @@
+"""
+Pyro-ported double pendulum (2 actuators, 2 links).
+
+This matches SherbyRobotics/pyro ``DoublePendulum`` in ``pyro/dynamic/pendulum.py``:
+* ``q = [theta1, theta2]`` where ``theta1`` is the first joint and ``theta2`` is
+  measured relative to the first link
+* the same ``H``, ``C``, ``B``, ``g``, and linear joint damping in ``d``
+
+Visualization maps Pyro's line-based torque arcs to :class:`TorqueArrow` using
+the same sweep scaling as the tutorial single pendulum in ``pendulum.py``.
+"""
+
 import numpy as np
 
 from minilink.graphical.primitives import (
@@ -12,7 +24,15 @@ from minilink.mechanics.mechanical import MechanicalSystem
 
 
 class DoublePendulum(MechanicalSystem):
-    """Two-link actuated pendulum in Pyro's manipulator-equation convention."""
+    """
+    Two-link actuated pendulum in Pyro's manipulator-equation convention.
+
+    Notes
+    -----
+    The kinematic canvas uses a Pyro-style mapping from joint angles to rod
+    orientations: world rod heading uses ``(pi/2 - theta)`` so the default
+    ``Rod`` (local -Y) matches Pyro's ``forward_kinematic_lines`` convention.
+    """
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
@@ -30,6 +50,7 @@ class DoublePendulum(MechanicalSystem):
             "gravity": 9.81,
             "d1": 0.0,
             "d2": 0.0,
+            "ground_half_width": 10.0,
         }
 
         self.state.labels = ["theta1", "theta2", "dtheta1", "dtheta2"]
@@ -121,7 +142,12 @@ class DoublePendulum(MechanicalSystem):
 
         return [
             CustomLine(
-                [[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0]], color="black", style="--"
+                [
+                    [-params["ground_half_width"], 0.0, 0.0],
+                    [params["ground_half_width"], 0.0, 0.0],
+                ],
+                color="black",
+                style="--",
             ),
             Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2),
             Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
@@ -140,7 +166,8 @@ class DoublePendulum(MechanicalSystem):
         theta12 = np.pi - (q[0] + q[1])
         rod1_angle = np.pi / 2.0 - q[0]
         rod2_angle = np.pi / 2.0 - q[0] - q[1]
-        torque_scale = 2.0 * np.pi / 3.0 / 5.0
+        u_lim = float(self.inputs["u"].upper_bound[0])
+        torque_scale = 2.0 * np.pi / 3.0 / u_lim
 
         return [
             pose2d_matrix(0.0, 0.0, 0.0),

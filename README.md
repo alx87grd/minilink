@@ -49,6 +49,7 @@ plot_trajectory(diagram, traj)
 - `graphical/` has a **stabilizing** matplotlib layer—shared Pyro-style sizing/theming in `matplotlib_style`, notebook-aware stacked plot height, and trajectory **plot** modes—while other renderers and hooks remain early work.
 - `mechanics/`, symbolic mechanics, and `physics/` are early MVP work.
 - `dynamics/` holds reusable plant models; `blocks/` is wiring and signal primitives; `control/` is controller blocks; `planning/` is not started; these layers are still maturing.
+- `dynamics/pendulum/` includes Pyro-ported tutorial plants (`CartPole`, `DoublePendulum`) built on `MechanicalSystem`; see `tests/manual/demo_cartpole_doublependulum.py` for a flat animation smoke script.
 
 ## Documentation Guide
 
@@ -64,4 +65,5 @@ plot_trajectory(diagram, traj)
 ## Examples
 
 - **Scripts**: `examples/scripts/` for diagram compilation, internal signals, animations, and JAX physics demos
+- **Manual**: `tests/manual/demo_cartpole_doublependulum.py` — quick `compute_forced` + `animate` smoke test for the Pyro-style pendulum plants
 - **Notebook**: [Colab Tutorial](https://colab.research.google.com/drive/13tnYyZMz4bLFzYLdj88H6cqO6tZg6Xp7?usp=sharing)

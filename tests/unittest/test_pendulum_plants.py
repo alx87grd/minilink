@@ -57,7 +57,10 @@ class TestCartPole(unittest.TestCase):
         transforms = sys.get_kinematic_transforms(np.zeros(sys.n), np.zeros(sys.m), 0.0)
 
         self.assertIsInstance(primitives[1], Box)
-        self.assertGreater(transforms[4][2, 3], primitives[1].length_z / 2.0)
+        self.assertEqual(primitives[1].length_z, sys.params["cart_depth"])
+        self.assertGreater(
+            transforms[4][2, 3], 0.5 * float(sys.params["cart_depth"])
+        )
         self.assertEqual(len(primitives), len(transforms))
         for T in transforms:
             self.assertEqual(T.shape, (4, 4))

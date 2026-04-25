@@ -90,6 +90,7 @@ At feature completion, verify through:
 - architectural refactors or core logic changes
 - adding heavy dependencies
 - changing the public evaluator or execution-plan contract
+- removing, relocating, or “cleaning up” **user-authored convenience code** the user added locally (for example an `if __name__ == "__main__":` quick test in a module, a scratch print, or a temporary debug hook), unless the user explicitly asked to delete or replace it
 
 Demo and manual scripts should stay flat and directly runnable at module top level.
 
