@@ -177,19 +177,19 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
             self._chain_fk_funcs = chain_fk_funcs
             self._n_seg = n_seg
 
-        def H(self, qv):
+        def H(self, qv, params=None):
             return _H(qv)
 
-        def C(self, qv, dq_):
+        def C(self, qv, dq_, params=None):
             return _C(qv, dq_)
 
-        def g(self, qv):
+        def g(self, qv, params=None):
             return _g(qv)
 
-        def d(self, qv, dq_):
+        def d(self, qv, dq_, params=None):
             return _d(qv, dq_)
 
-        def B(self, qv):
+        def B(self, qv, params=None):
             return _B(qv)
 
         def get_kinematic_geometry(self):

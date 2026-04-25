@@ -19,6 +19,7 @@ from __future__ import annotations
 import copy
 import time
 from typing import Any, Callable
+import numpy as np
 
 from minilink.compile.evaluator import DynamicsEvaluator
 from minilink.compile.execution_plan import (
@@ -57,6 +58,23 @@ def _check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
         ) from e
 
 
+def _build_jit_rk4_rollout_ivp(jax, jnp, f_ivp):
+    def _rk4_rollout_ivp(x0_, t0_, dt_, n_steps_):
+        def body(carry, _):
+            x, t = carry
+            k1 = f_ivp(x, t)
+            k2 = f_ivp(x + 0.5 * dt_ * k1, t + 0.5 * dt_)
+            k3 = f_ivp(x + 0.5 * dt_ * k2, t + 0.5 * dt_)
+            k4 = f_ivp(x + dt_ * k3, t + dt_)
+            x_next = x + (dt_ / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+            return (x_next, t + dt_), x_next
+
+        (_, _), xs = jax.lax.scan(body, (x0_, t0_), jnp.arange(n_steps_))
+        return jnp.concatenate((x0_[None, :], xs), axis=0)
+
+    return jax.jit(_rk4_rollout_ivp, static_argnums=3)
+
+
 # =====================================================================
 # Leaf evaluator
 # =====================================================================
@@ -91,7 +109,7 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         self.backend = "jax"
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
-        self._u_nominal = jnp.array(system.get_u_from_input_ports(0))
+        self._u_nominal = jnp.array(system.get_u_from_input_ports())
 
         # Store references to the raw system functions
         f_raw = system.f
@@ -143,6 +161,11 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         self._jit_h_p = jax.jit(lambda x, u, t, p: h_raw(x, u, t, p))
         self._jit_f_ivp = jax.jit(lambda x, t: f_raw(x, u_nom, t, frozen_p))
         self._jit_h_ivp = jax.jit(lambda x, t: h_raw(x, u_nom, t, frozen_p))
+        self._jit_jac_ivp = jax.jit(jax.jacfwd(self._jit_f_ivp, argnums=0))
+
+        self._jit_rk4_rollout_ivp = _build_jit_rk4_rollout_ivp(
+            jax, jnp, self._jit_f_ivp
+        )
 
         output_items = tuple(
             (pid, port.compute) for pid, port in system.outputs.items()
@@ -196,6 +219,11 @@ class JaxLeafEvaluator(DynamicsEvaluator):
     def f(self, x, u, t=0.0):
         return self._jit_f(x, u, t)
 
+    def f_scipy(self, x, u, t=0.0):
+        x = self.jnp.asarray(x)
+        u = self.jnp.asarray(u)
+        return np.asarray(self._jit_f(x, u, t))
+
     def h(self, x, u, t=0.0):
         return self._jit_h(x, u, t)
 
@@ -226,8 +254,31 @@ class JaxLeafEvaluator(DynamicsEvaluator):
     def f_ivp(self, x, t=0.0):
         return self._jit_f_ivp(x, t)
 
+    def f_ivp_scipy(self, x, t=0.0):
+        x = self.jnp.asarray(x)
+        return np.asarray(self._jit_f_ivp(x, t))
+
+    def as_scipy_jac(self):
+        return lambda t, x: np.asarray(self._jit_jac_ivp(self.jnp.asarray(x), t))
+
     def h_ivp(self, x, t=0.0):
         return self._jit_h_ivp(x, t)
+
+    def rk4_step_ivp(self, x, t, dt):
+        f = self._jit_f_ivp
+        k1 = f(x, t)
+        k2 = f(x + 0.5 * dt * k1, t + 0.5 * dt)
+        k3 = f(x + 0.5 * dt * k2, t + 0.5 * dt)
+        k4 = f(x + dt * k3, t + dt)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+    def rk4_rollout_ivp(self, x0, t0, dt, n_steps):
+        jnp = self.jnp
+
+        x0 = jnp.asarray(x0)
+        t0 = jnp.asarray(t0)
+        dt = jnp.asarray(dt)
+        return self._jit_rk4_rollout_ivp(x0, t0, dt, n_steps)
 
 
 # =====================================================================
@@ -335,7 +386,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         )
         self.backend = "jax"
         self._frozen_params = None  # per-op binding, not diagram-level
-        self._u_nominal = jnp.array(diagram.get_u_from_input_ports(0))
+        self._u_nominal = jnp.array(diagram.get_u_from_input_ports())
 
         # --- Step 0 (JAX): Check compatibility of all subsystem blocks ---
         if verbose:
@@ -364,6 +415,11 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
 
         u_nom = self._u_nominal
         self._jit_f_ivp = jax.jit(lambda x, t: _f_eager(x, u_nom, t))
+        self._jit_jac_ivp = jax.jit(jax.jacfwd(self._jit_f_ivp, argnums=0))
+
+        self._jit_rk4_rollout_ivp = _build_jit_rk4_rollout_ivp(
+            jax, jnp, self._jit_f_ivp
+        )
 
         self._jit_outputs = jax.jit(
             lambda x, u, t: self._external_outputs_eager(x, u, t)
@@ -457,6 +513,11 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         """ẋ = f(x, u, t) — delegates to the JIT-compiled version."""
         return self._jit_f(x, u, t)
 
+    def f_scipy(self, x, u, t=0.0):
+        x = self._jnp.asarray(x)
+        u = self._jnp.asarray(u)
+        return np.asarray(self._jit_f(x, u, t))
+
     def _f_eager(self, x, u, t=0.0):
         """Compute the diagram's state derivative vector (JAX-traceable).
 
@@ -517,6 +578,29 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
 
     def f_ivp(self, x, t=0.0):
         return self._jit_f_ivp(x, t)
+
+    def f_ivp_scipy(self, x, t=0.0):
+        x = self._jnp.asarray(x)
+        return np.asarray(self._jit_f_ivp(x, t))
+
+    def as_scipy_jac(self):
+        return lambda t, x: np.asarray(self._jit_jac_ivp(self._jnp.asarray(x), t))
+
+    def rk4_step_ivp(self, x, t, dt):
+        f = self._jit_f_ivp
+        k1 = f(x, t)
+        k2 = f(x + 0.5 * dt * k1, t + 0.5 * dt)
+        k3 = f(x + 0.5 * dt * k2, t + 0.5 * dt)
+        k4 = f(x + dt * k3, t + dt)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+    def rk4_rollout_ivp(self, x0, t0, dt, n_steps):
+        jnp = self._jnp
+
+        x0 = jnp.asarray(x0)
+        t0 = jnp.asarray(t0)
+        dt = jnp.asarray(dt)
+        return self._jit_rk4_rollout_ivp(x0, t0, dt, n_steps)
 
     # ── JIT convenience ─────────────────────────────────────────────
 

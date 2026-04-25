@@ -6,7 +6,7 @@ applied force ``F`` via the transform matrix's scaling factor.
 
 import numpy as np
 
-from minilink.blocks.examples import FloatingMass1D
+from minilink.dynamics.msd.floating_mass import FloatingMass1D
 
 # ------------------------------------------------------------------
 # Plant: unit mass on a frictionless rail

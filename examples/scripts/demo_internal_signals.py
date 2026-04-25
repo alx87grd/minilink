@@ -1,10 +1,10 @@
 from minilink.graphical.plotting import plot_signals
-from minilink.core.analysis import compute_internal_signals
 
 
 import numpy as np
 
-from minilink.blocks.examples import Pendulum, PendulumPDController
+from minilink.control.pendulum_pd import PendulumPDController
+from minilink.dynamics.pendulum.pendulum import Pendulum
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
 
@@ -61,7 +61,7 @@ diagram.name = "Pendulum with Noise"
 # diagram2.compute_trajectory(tf=20) # takes forever with scipy solver
 traj = diagram.compute_trajectory(tf=20, solver="euler", dt=0.01, show=False)
 
-traj_plus = compute_internal_signals(diagram, traj)
+traj_plus = diagram.compute_internal_signals(traj)
 
 plot_signals(
     diagram,

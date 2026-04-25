@@ -1,6 +1,7 @@
 import numpy as np
 
 from minilink.core.framework import System, VectorSignal
+from minilink.core.trajectory import Trajectory
 
 
 ######################################################################
@@ -161,8 +162,8 @@ class DiagramSystem(System):
 
         # Check if the port is not connected
         if source is None:
-            # Return the nominal value of the port
-            return self.subsystems[sys_id].inputs[port_id].get_signal(t)
+            # Return the constant default value of the port
+            return self.subsystems[sys_id].inputs[port_id].get_default_value()
 
         # Source is connected to a system and port
         source_sys_id, source_port_id = source
@@ -203,7 +204,7 @@ class DiagramSystem(System):
         list of (sys_id, port_id)
             Topologically sorted output-port schedule.
         """
-        from minilink.compile import check_algebraic_loops
+        from minilink.compile.compiler import check_algebraic_loops
 
         return check_algebraic_loops(self)  # RuntimeError propagates if loop found
 
@@ -229,7 +230,7 @@ class DiagramSystem(System):
         -------
         NumpyDiagramEvaluator or JaxDiagramEvaluator
         """
-        from minilink.compile import compile_diagram
+        from minilink.compile.compiler import compile_diagram
 
         return compile_diagram(
             self, backend=backend, bind_params=bind_params, verbose=verbose
@@ -242,6 +243,46 @@ class DiagramSystem(System):
         """
         for _, sys in self.subsystems.items():
             sys.refresh()
+
+    ######################################################################
+    def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
+        """
+        Reconstruct all subsystem output-port trajectories for this diagram.
+
+        Parameters
+        ----------
+        traj : Trajectory
+            State-input trajectory sampled on a time grid.
+
+        Returns
+        -------
+        Trajectory
+            New trajectory enriched with one sampled signal per subsystem
+            output port, keyed as ``"sys_id:port_id"``.
+        """
+        evaluator = self.compile(backend="numpy")
+        internal_signals = {}
+        for sys_id, sys in self.subsystems.items():
+            for port_id, port in sys.outputs.items():
+                internal_signals[f"{sys_id}:{port_id}"] = np.zeros(
+                    (port.dim, traj.n_samples)
+                )
+
+        for i, t in enumerate(traj.t):
+            step_signals = evaluator.compute_internal_signals_dict(
+                traj.x[:, i], traj.u[:, i], t
+            )
+            for key, value in step_signals.items():
+                internal_signals[key][:, i] = value
+
+        return traj.with_signals(internal_signals)
+
+    ######################################################################
+    def compute_internal_signals(self, traj: Trajectory) -> Trajectory:
+        """
+        Compatibility alias for :meth:`reconstruct_internal_signals`.
+        """
+        return self.reconstruct_internal_signals(traj)
 
     ######################################################################
     def get_local_input(self, x, u, t, sys_id, dependencies="all"):
@@ -268,10 +309,10 @@ class DiagramSystem(System):
 
         # For all input ports of the subsystem
         for port_id, port in sys.inputs.items():
-            # Check if the output port requires getting the signal from the input ports
-            # If not required, the u vector is filled with nominal values
+            # If this input is not required by the current output dependency set,
+            # fill it with its constant default value.
             if dependencies != "all" and port_id not in dependencies:
-                port_u = port.get_signal(t)  # Nominal value
+                port_u = port.get_default_value()
 
             else:
                 # Recursively get the input signal

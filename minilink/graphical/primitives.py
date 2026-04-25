@@ -133,6 +133,72 @@ class Box(GraphicPrimitive):
         self.opacity = float(opacity)
 
 
+class ExtrudedPolygon(GraphicPrimitive):
+    """Convex polygon in local XY, extruded symmetrically along local Z.
+
+    This is useful for light-weight 3D body shells such as vehicle noses,
+    cabins, side pods, and tapered covers without introducing a full mesh
+    asset pipeline.
+    """
+
+    def __init__(
+        self,
+        pts_xy,
+        height: float = 1.0,
+        center=(0.0, 0.0, 0.0),
+        color="gray",
+        opacity: float = 1.0,
+    ):
+        super().__init__(color)
+        pts = np.asarray(pts_xy, dtype=float).reshape(-1, 2)
+        if pts.shape[0] < 3:
+            raise ValueError("ExtrudedPolygon requires at least 3 XY points")
+        if np.allclose(pts[0], pts[-1]):
+            pts = pts[:-1]
+        self.pts_xy = pts
+        self.height = float(height)
+        self.center = np.asarray(center, dtype=float).reshape(3)
+        self.opacity = float(opacity)
+
+    def vertices_local(self) -> np.ndarray:
+        """Return local vertices with shape ``(2*n, 3)``."""
+        n = self.pts_xy.shape[0]
+        z0 = self.center[2] - 0.5 * self.height
+        z1 = self.center[2] + 0.5 * self.height
+        xy = self.pts_xy + self.center[:2]
+        bottom = np.column_stack((xy, np.full(n, z0)))
+        top = np.column_stack((xy, np.full(n, z1)))
+        return np.vstack((bottom, top))
+
+    def edges(self) -> tuple[tuple[int, int], ...]:
+        """Return wireframe edges as vertex-index pairs."""
+        n = self.pts_xy.shape[0]
+        edges = []
+        for i in range(n):
+            j = (i + 1) % n
+            edges.append((i, j))
+            edges.append((i + n, j + n))
+            edges.append((i, i + n))
+        return tuple(edges)
+
+    def mesh_data(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return ``(vertices, faces)`` for triangle-mesh renderers."""
+        n = self.pts_xy.shape[0]
+        vertices = self.vertices_local()
+        faces: list[list[int]] = []
+
+        for i in range(1, n - 1):
+            faces.append([0, i + 1, i])
+            faces.append([n, n + i, n + i + 1])
+
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append([i, j, n + i])
+            faces.append([j, n + j, n + i])
+
+        return vertices, np.asarray(faces, dtype=np.uint32)
+
+
 class Arrow(GraphicPrimitive):
     """A 2-D arrow rendered as a polyline (shaft + chevron head).
 
@@ -318,6 +384,39 @@ def pose2d_matrix(x=0.0, y=0.0, theta=0.0):
     T[1, 1] = c
     T[0, 3] = x
     T[1, 3] = y
+    return T
+
+
+def rotation_matrix_x(theta=0.0):
+    """Generate a 4x4 rotation matrix about the X axis."""
+    T = np.eye(4)
+    c, s = np.cos(theta), np.sin(theta)
+    T[1, 1] = c
+    T[1, 2] = -s
+    T[2, 1] = s
+    T[2, 2] = c
+    return T
+
+
+def rotation_matrix_y(theta=0.0):
+    """Generate a 4x4 rotation matrix about the Y axis."""
+    T = np.eye(4)
+    c, s = np.cos(theta), np.sin(theta)
+    T[0, 0] = c
+    T[0, 2] = s
+    T[2, 0] = -s
+    T[2, 2] = c
+    return T
+
+
+def rotation_matrix_z(theta=0.0):
+    """Generate a 4x4 rotation matrix about the Z axis."""
+    T = np.eye(4)
+    c, s = np.cos(theta), np.sin(theta)
+    T[0, 0] = c
+    T[0, 1] = -s
+    T[1, 0] = s
+    T[1, 1] = c
     return T
 
 

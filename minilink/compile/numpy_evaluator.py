@@ -47,7 +47,7 @@ class NumpyLeafEvaluator(DynamicsEvaluator):
         self.backend = "numpy"
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
-        self._u_nominal = np.copy(system.get_u_from_input_ports(0))
+        self._u_nominal = np.copy(system.get_u_from_input_ports())
 
     # -- Standard tier (frozen params) ------------------------------------
 
@@ -166,7 +166,7 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
         )
         self.backend = "numpy"
         self._frozen_params = None  # per-op binding, not diagram-level
-        self._u_nominal = np.copy(diagram.get_u_from_input_ports(0))
+        self._u_nominal = np.copy(diagram.get_u_from_input_ports())
 
     # ── ABC: Standard tier ──────────────────────────────────────────
 

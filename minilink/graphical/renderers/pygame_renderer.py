@@ -13,6 +13,7 @@ from minilink.graphical.primitives import (
     Box,
     Circle,
     CustomLine,
+    ExtrudedPolygon,
     Plane,
     Point,
     Rod,
@@ -261,6 +262,16 @@ class PygameCanvas:
                 p0 = self._to_screen(world_c[i, 0], world_c[i, 1])
                 p1 = self._to_screen(world_c[j, 0], world_c[j, 1])
                 pygame_mod.draw.line(self.surface, col, p0, p1, lw)
+
+        elif isinstance(primitive, ExtrudedPolygon):
+            vertices = primitive.vertices_local()
+            vertices_h = np.hstack((vertices, np.ones((vertices.shape[0], 1))))
+            world_v = (transform_matrix @ vertices_h.T).T[:, :3]
+            col = _color_to_rgb(primitive.color)
+            for i, j in primitive.edges():
+                p0 = self._to_screen(world_v[i, 0], world_v[i, 1])
+                p1 = self._to_screen(world_v[j, 0], world_v[j, 1])
+                pygame_mod.draw.line(self.surface, col, p0, p1, 1)
 
 
 class PygameRenderer(AnimationRenderer):

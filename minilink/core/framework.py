@@ -1,9 +1,10 @@
 """
 Core Framework Definitions
 
-This module defines the foundational classes for the minilink block-diagram simulator.
-It includes base signal representations (VectorSignal, InputPort, OutputPort) and the
-base System class from which all static and dynamic blocks inherit.
+This module defines the foundational modeling classes for minilink.
+It includes base signal representations (`VectorSignal`, `InputPort`,
+`OutputPort`) and the base `System` class from which all static and
+dynamic systems inherit.
 """
 
 import numpy as np
@@ -75,18 +76,13 @@ class VectorSignal:
 ######################################################################
 class InputPort(VectorSignal):
     """
-    A VectorSignal plus a default callback function to get the signal value
+    A vector signal with a constant default value used when unconnected.
     """
 
     ##############################################
-    def get_signal(self, t=0) -> np.ndarray:
+    def get_default_value(self) -> np.ndarray:
         """
-        Get the value of the input signal at a given time.
-
-        Parameters
-        ----------
-        t : float, optional
-            The time at which to evaluate the signal (default is 0).
+        Return the default value of the input port.
 
         Returns
         -------
@@ -153,17 +149,32 @@ class OutputPort(VectorSignal):
 ######################################################################
 class System:
     """
-    The base class for all blocks in the minilink framework.
+    Base class describing a dynamical input-output system.
 
-    A System represents a mathematical block with `n` states, `m` inputs (from `InputPort`s),
-    and `p` outputs (to `OutputPort`s). It provides methods for state derivatives (`f`)
-    and outputs (`h`), which are meant to be overridden by subclasses.
+    A :class:`System` serves several roles at once:
+
+    - **Core dynamical contract**: it defines a functional modeling interface
+      through :meth:`f` and :meth:`h`, intended to describe the system as a
+      function of ``(x, u, t, params)``.
+    - **Structural model description**: it stores dimensions, ports, state
+      metadata, labels, units, bounds, and nominal values.
+    - **Model defaults and metadata**: it carries default parameters
+      (:attr:`params`), default initial condition (:attr:`x0`), and solver
+      hints (:attr:`solver_info`).
+    - **Optional visualization contract**: it may describe forward-kinematic
+      geometry for rendering and animation. This API is still MVP / TRL 1.
+    - **User shortcut façade**: it exposes convenience methods such as
+      :meth:`compile`, :meth:`compute_trajectory`, :meth:`render`,
+      :meth:`animate`, and :meth:`game`.
 
     Notes on dynamics and purity
-    ------------------------------
-    Python cannot enforce that overridden ``f`` / ``h`` (or port ``compute`` callables) are
-    *pure* (no mutation of ``self``, no reliance on hidden mutable instance state, no I/O).
-    The framework **documents a contract** only: all time-varying information should be in ``x`` and ``u``, and avoid mutating ``self`` inside ``f`` / ``h``.
+    ----------------------------
+    The intended dynamical contract is **functional/stateless in intent**:
+    overridden :meth:`f` and :meth:`h` should behave as functions of
+    ``(x, u, t, params)`` only. Python cannot enforce purity, so users should
+    avoid relying on hidden mutable instance state inside dynamics or output
+    functions. The object itself still stores model defaults, metadata, and
+    user convenience state.
     """
 
     def __init__(self, n=0, m=0, p=1):
@@ -179,30 +190,32 @@ class System:
         p : int, optional
             Number of output dimensions (default is 1).
         """
-        # Dimensions
+        # ── Structural model description ────────────────────────────────
         self.n = n
         self.m = m
         self.p = p
 
-        # Name
+        # Human-readable identifier
         self.name = "System"
 
-        # State properties
+        # State metadata
         self.state = VectorSignal(n, "x")
 
-        # Initial state
+        # ── Model defaults and metadata ─────────────────────────────────
+        # Default initial condition used by convenience simulation paths.
         self.x0 = np.zeros(self.n)
 
-        # Inputs and outputs ports
+        # Port structure
         self.inputs = {}
         self.add_input_port(self.m, "u")
         self.outputs = {}
         self.add_output_port(self.p, "y", function=self.h, dependencies="all")
 
-        # Parameters dictionary
+        # Default model parameter set. Explicit ``params=...`` arguments
+        # passed to ``f`` / ``h`` override this default.
         self.params = {}
 
-        # Caracteristics useful to select automatic solver parameters
+        # Solver hints used by high-level simulation shortcuts.
         self.solver_info = {
             "continuous_time_equation": True,
             "smallest_time_constant": 0.001,
@@ -211,8 +224,13 @@ class System:
             "require_building": False,  # If True, the system needs to be built before being simulated
         }
 
-        # Memory for interactive shorcuts
-        self.traj = None  # Store the last computed trajectory
+        # Runtime convenience cache for the last trajectory produced by
+        # ``compute_trajectory``.
+        self.traj = None
+
+    ######################################################################
+    # Core Dynamical Contract
+    ######################################################################
 
     ######################################################################
     def refresh(self):
@@ -277,32 +295,9 @@ class System:
         return y
 
     ######################################################################
-    def fsim(self, t, x) -> np.ndarray:
-        """
-        Compute the state derivative using default input port values.
-
-        Note: This function is used by the solver when the system is simulated alone, i.e. not part of a diagram.
-
-        Parameters
-        ----------
-        t : float
-            The current time.
-        x : np.ndarray
-            The current state vector.
-
-        Returns
-        -------
-        np.ndarray
-            The state derivative vector.
-        """
-        u = self.get_u_from_input_ports(t)
-        dx = self.f(x, u, t)
-        return dx
-
-    ######################################################################
     def compute_state(self, x, u, t=0, params=None):
         """
-        Helper function to output the state vector directly.
+        Convenience output helper returning the state vector directly.
 
         Parameters
         ----------
@@ -321,6 +316,10 @@ class System:
             The state vector.
         """
         return x
+
+    ######################################################################
+    # Structural Model API
+    ######################################################################
 
     ######################################################################
     def add_input_port(self, dim, id, nominal_value=None):
@@ -389,28 +388,23 @@ class System:
         return input_labels, input_units
 
     ######################################################################
-    def get_u_from_input_ports(self, t=0) -> np.ndarray:
+    def get_u_from_input_ports(self) -> np.ndarray:
         """
-        Get the nominal value of all input ports.
+        Get the default value of all input ports.
 
-        This function is called when not part of a diagram.
-
-        Parameters
-        ----------
-        t : float, optional
-            The time at which the input signal is requested.
+        This is the disconnected / nominal fallback used for standalone systems
+        and for the evaluator IVP tier.
 
         Returns
         -------
         np.ndarray
-            The concatenated nominal values of all input ports.
+            The concatenated default values of all input ports.
         """
         u = np.zeros(self.m)
         i = 0
         for key, port in self.inputs.items():
-            # Get the signal value of the port at time t and concatenate it to u
-            # By default, the signal value is the nominal value of the port, but it can be overridden by a custom function
-            u[i : i + port.dim] = port.get_signal(t)
+            # Unconnected input ports contribute their constant default value.
+            u[i : i + port.dim] = port.get_default_value()
             i += port.dim
         return u
 
@@ -437,6 +431,30 @@ class System:
         return input_signals
 
     ######################################################################
+    def get_input_port_slice(self, port_id):
+        """
+        Return the slice of one input port inside the flat input vector ``u``.
+
+        Parameters
+        ----------
+        port_id : str
+            Programmatic input-port identifier.
+
+        Returns
+        -------
+        slice
+            Slice selecting that port inside the concatenated input vector.
+        """
+        i = 0
+        for current_port_id, port in self.inputs.items():
+            port_slice = slice(i, i + port.dim)
+            if current_port_id == port_id:
+                return port_slice
+            i += port.dim
+
+        raise KeyError(f"Unknown input port '{port_id}'")
+
+    ######################################################################
     def u2input_signal(self, u, port_id):
         """
         Extract the signal value for a specific input port from the concatenated input array.
@@ -457,27 +475,285 @@ class System:
         return input_signals[port_id]
 
     ######################################################################
+    # Visualization / Kinematic Contract
     ######################################################################
 
-    # Shortcut functions
+    ######################################################################
+    def get_kinematic_geometry(self):
+        """
+        Return static graphical primitives for this system.
+
+        This visualization contract is intentionally still provisional.
+        By default, the base :class:`System` generates one point per state and
+        one point per input.
+        """
+        from minilink.graphical.primitives import Point
+
+        primitives = []
+        for i in range(self.n):
+            primitives.append(Point(color="blue", marker="o"))
+        for i in range(self.m):
+            primitives.append(Point(color="red", marker="x"))
+        return primitives
+
+    def get_kinematic_transforms(self, x, u, t):
+        """
+        Return transforms corresponding 1-to-1 with the static geometry.
+
+        This visualization contract is intentionally still provisional.
+        By default, states and inputs are mapped to simple translations.
+        """
+        from minilink.graphical.primitives import translation_matrix
+
+        transforms = []
+
+        for i in range(self.n):
+            transforms.append(translation_matrix(dx=x[i], dy=float(i)))
+        for i in range(self.m):
+            transforms.append(translation_matrix(dx=u[i], dy=float(-i - 1)))
+
+        return transforms
+
+    def get_dynamic_geometry(self, x, u, t):
+        """
+        Return frame-specific temporary graphical primitives.
+
+        This visualization contract is intentionally still provisional.
+        """
+        return []
 
     ######################################################################
+    # User Shortcut / Facade API
     ######################################################################
+
+    ######################################################################
+    def compile(self, backend="numpy", verbose=False):
+        """
+        Convenience shortcut to compile the system into a backend evaluator.
+
+        This delegates to :func:`minilink.compile.compile`.
+        """
+        from minilink.compile.compiler import compile as compile_system
+
+        return compile_system(self, backend=backend, verbose=verbose)
+
+    ######################################################################
+    def compute_trajectory(
+        self,
+        t0=0,
+        tf=10,
+        n_steps=None,
+        dt=None,
+        solver=None,
+        show=True,
+        plot="xu",
+        x0=None,
+        compile_backend="numpy",
+        verbose=True,
+    ):
+        """
+        Convenience shortcut to simulate the system and return a trajectory.
+
+        This method is a façade over :class:`minilink.simulation.Simulator`.
+        It uses model defaults such as :attr:`x0` and stores the resulting
+        trajectory in :attr:`traj` for later convenience.
+
+        Parameters
+        ----------
+        plot : {'x', 'u', 'xu'}, optional
+            Passed to :func:`minilink.graphical.plotting.plot_trajectory` when
+            ``show`` is True: states only, inputs only, or both (default).
+        compile_backend : str
+            Passed to :class:`~minilink.simulation.Simulator` (default ``\"numpy\"``).
+            Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            to try JAX then fall back to NumPy.
+
+        Returns
+        -------
+        Trajectory
+            The simulated trajectory, also stored in :attr:`traj`.
+        """
+        from minilink.graphical.plotting import plot_trajectory
+        from minilink.simulation.simulator import Simulator
+
+        sim = Simulator(
+            self,
+            x0=x0,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            dt=dt,
+            solver=solver,
+            compile_backend=compile_backend,
+            verbose=verbose,
+        )
+        traj = sim.solve()
+        if show:
+            plot_trajectory(self, traj, plot=plot)
+
+        self.traj = traj
+
+        return traj
+
+    ######################################################################
+    def compute_forced(
+        self,
+        u,
+        input_port_id=None,
+        t0=0,
+        tf=10,
+        n_steps=None,
+        dt=None,
+        solver=None,
+        show=True,
+        plot="xu",
+        x0=None,
+        compile_backend="numpy",
+        verbose=True,
+    ):
+        """
+        Convenience shortcut to simulate the system under a prescribed input.
+
+        This method is a façade over :class:`minilink.simulation.Simulator`
+        and :meth:`minilink.simulation.Simulator.solve_forced`.
+
+        Parameters
+        ----------
+        u : np.ndarray or callable
+            Forced input description.
+            - If ``input_port_id is None``: either a full input trajectory with
+              shape ``(m, n_pts)`` or a callable ``u(t)`` returning the full
+              input vector.
+            - If ``input_port_id`` is provided: either a trajectory for that
+              port only with shape ``(port_dim, n_pts)`` or a callable
+              returning that port signal. Other ports stay at their default
+              values.
+        input_port_id : str, optional
+            Named input port to force while keeping the others at default
+            values.
+        plot : {'x', 'u', 'xu'}, optional
+            Passed to :func:`minilink.graphical.plotting.plot_trajectory` when
+            ``show`` is True.
+        compile_backend : str
+            Same as :meth:`compute_trajectory`.
+
+        Returns
+        -------
+        Trajectory
+            Simulated state-input trajectory.
+        """
+        from minilink.graphical.plotting import plot_trajectory
+        from minilink.simulation.simulator import Simulator
+
+        sim = Simulator(
+            self,
+            x0=x0,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            dt=dt,
+            solver=solver,
+            compile_backend=compile_backend,
+            verbose=verbose,
+        )
+
+        n_pts = sim.n_pts
+        times = sim.times
+
+        def _sample_callable(fn, expected_dim):
+            samples = np.zeros((expected_dim, n_pts), dtype=float)
+            for i, ti in enumerate(times):
+                value = np.asarray(fn(float(ti)), dtype=float)
+                if expected_dim == 1 and value.ndim == 0:
+                    samples[0, i] = float(value)
+                else:
+                    value = np.asarray(value, dtype=float).reshape(expected_dim)
+                    samples[:, i] = value
+            return samples
+
+        def _coerce_series(data, expected_dim, label):
+            if callable(data):
+                return _sample_callable(data, expected_dim)
+
+            arr = np.asarray(data, dtype=float)
+
+            if arr.ndim == 0:
+                if expected_dim != 1:
+                    raise ValueError(
+                        f"{label} must have shape ({expected_dim}, {n_pts})"
+                    )
+                return np.full((1, n_pts), float(arr), dtype=float)
+
+            if arr.ndim == 1:
+                if expected_dim == 1 and arr.shape[0] == n_pts:
+                    return arr.reshape(1, n_pts)
+                if arr.shape[0] == expected_dim:
+                    return np.repeat(arr.reshape(expected_dim, 1), n_pts, axis=1)
+                raise ValueError(f"{label} must have shape ({expected_dim}, {n_pts})")
+
+            if arr.ndim == 2 and arr.shape == (expected_dim, n_pts):
+                return arr
+
+            raise ValueError(f"{label} must have shape ({expected_dim}, {n_pts})")
+
+        if input_port_id is None:
+            u_traj = _coerce_series(u, self.m, "u")
+        else:
+            port = self.inputs[input_port_id]
+            port_slice = self.get_input_port_slice(input_port_id)
+            u_traj = np.repeat(
+                self.get_u_from_input_ports().reshape(self.m, 1),
+                n_pts,
+                axis=1,
+            )
+            u_traj[port_slice, :] = _coerce_series(
+                u,
+                port.dim,
+                f"u for input port '{input_port_id}'",
+            )
+
+        traj = sim.solve_forced(u_traj)
+        if show:
+            plot_trajectory(self, traj, plot=plot)
+        self.traj = traj
+
+        return traj
+
+    ######################################################################
+    def plot_trajectory(self, traj=None, *, plot="xu"):
+        """
+        Convenience shortcut to plot the trajectory.
+
+        If the trajectory is not computed yet, it is computed using :meth:`compute_trajectory`.
+        If the trajectory is already computed, it is used directly.
+        If the trajectory is provided, it is used directly.
+
+        Parameters
+        ----------
+        plot : {'x', 'u', 'xu'}, optional
+            States only, inputs only, or both (default); see
+            :func:`minilink.graphical.plotting.plot_trajectory`.
+
+        Returns
+        -------
+        Trajectory or tuple
+            :class:`~minilink.core.trajectory.Trajectory` if a simulation is run; otherwise
+            the ``(fig, ax)`` pair from :func:`minilink.graphical.plotting.plot_trajectory`.
+        """
+        from minilink.graphical.plotting import plot_trajectory
+
+        if traj is not None:
+            return plot_trajectory(self, traj, plot=plot)
+
+        if self.traj is not None:
+            return plot_trajectory(self, self.traj, plot=plot)
+
+        return self.compute_trajectory(plot=plot)
 
     ######################################################################
     def get_block_html(self, label="sys1"):
         """
-        Get the HTML representation of the block for the label in the diagram.
-
-        Parameters
-        ----------
-        label : str, optional
-            The label identifying the block in the HTML output (default is "sys1").
-
-        Returns
-        -------
-        str
-            The HTML string for the block.
+        Convenience shortcut returning an HTML block representation.
         """
         from minilink.graphical.graphe import get_system_block_html
 
@@ -486,7 +762,7 @@ class System:
     ######################################################################
     def print_html(self):
         """
-        Render and display the HTML representation of the system in IPython.
+        Convenience shortcut to display the HTML block representation.
         """
         try:
             import IPython.display as display
@@ -499,12 +775,7 @@ class System:
     ######################################################################
     def get_graphe(self):
         """
-        Generate a Graphviz Digraph representation of the system.
-
-        Returns
-        -------
-        graphviz.Digraph
-            The graph representing the system.
+        Convenience shortcut returning the Graphviz graph representation.
         """
         from minilink.graphical.graphe import get_system_graphe
 
@@ -513,89 +784,34 @@ class System:
     ######################################################################
     def _repr_svg_(self):
         """
-        Display the SVG rendered graph in IPython notebooks.
-
-        Returns
-        -------
-        str
-            The SVG XML representation of the system graph.
+        Convenience notebook representation for the system graph.
         """
         g = self.get_graphe()
+        if g is None:
+            return None
         return g._repr_image_svg_xml()
 
     ######################################################################
-    def plot_graphe(self, filename=None):
+    def plot_graphe(self, filename=None, show_inline=None, show_pdf=None):
         """
-        Plot and optionally save the system graph using Graphviz.
+        Convenience shortcut to render the Graphviz system graph.
 
-        Parameters
-        ----------
-        filename : str, optional
-            File path to save the generated graph PDF. If None, it renders without saving.
+        ``show_inline`` and ``show_pdf`` default to ``None`` and auto-resolve
+        via :func:`minilink.graphical.environment.is_inline_capable`:
+        Jupyter / Colab get inline SVG only (no viewer pop-up, no disk write),
+        while bare scripts and IPython REPLs get the legacy render-to-temp-file
+        + open-in-OS-PDF-viewer behavior. Pass explicit booleans to override;
+        pass ``filename`` to force a specific on-disk output.
         """
         from minilink.graphical.graphe import plot_graphviz
 
         g = self.get_graphe()
-        plot_graphviz(g, filename=filename)
-
-    ######################################################################
-    def compute_trajectory(
-        self, t0=0, tf=10, n_steps=None, dt=None, solver="scipy", show=True
-    ):
-        """
-        Simulate the system and return the computed trajectory.
-
-        Parameters
-        ----------
-        t0 : float, optional
-            Initial simulation time (default is 0).
-        tf : float, optional
-            Final simulation time (default is 10).
-        n_steps : int, optional
-            Number of steps for fixed-step solvers or output resolution.
-        dt : float, optional
-            Time step for fixed-step solvers.
-        solver : str, optional
-            The solver to use, e.g., "scipy" or "euler" (default is "scipy").
-        show : bool, optional
-            Whether to display plots after simulation (default is True).
-
-        Returns
-        -------
-        Trajectory
-            An object containing time, state, and input histories.
-        """
-        from minilink.core.analysis import Simulator
-
-        sim = Simulator(self, t0, tf, n_steps, dt, solver)
-        traj = sim.solve(show=show)
-
-        self.traj = traj
-
-        return traj
+        plot_graphviz(g, show_inline=show_inline, show_pdf=show_pdf, filename=filename)
 
     ######################################################################
     def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
         """
-        Render the system's graphical representation for a given state, input, and time.
-
-        Parameters
-        ----------
-        x : np.ndarray
-            The current state vector.
-        u : np.ndarray
-            The current input vector.
-        t : float
-            The current time.
-        is_3d : bool, optional
-            Whether to render in 3D (default is False).
-        renderer : str, optional
-            ``matplotlib``, ``meshcat``, or ``pygame`` (default is ``matplotlib``).
-
-        Returns
-        -------
-        None
-            This function renders the system but does not return any value.
+        Convenience shortcut rendering a single frame of the system.
         """
         from minilink.graphical.animation import Animator
 
@@ -603,57 +819,33 @@ class System:
         animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
 
     ######################################################################
-    def compile(self, backend="numpy", verbose=False):
-        """
-        Compile this system into a backend evaluator (lazy import).
-
-        Parameters
-        ----------
-        backend : str, optional
-            ``'numpy'`` (default) or ``'jax'``.
-        verbose : bool, optional
-            If ``True``, print timed compilation steps.
-
-        Returns
-        -------
-        DynamicsEvaluator
-            Compiled evaluator exposing ``f``/``h`` and helper methods.
-        """
-        from minilink.compile import compile as compile_system
-
-        return compile_system(self, backend=backend, verbose=verbose)
-
     def animate(
         self,
         traj=None,
         time_factor_video=1.0,
         is_3d=False,
-        html=False,
+        html: bool | None = None,
         renderer="matplotlib",
+        native: bool = True,
     ):
         """
-        Animate a given trajectory of the system.
+        Convenience shortcut to animate a trajectory of this system.
 
-        Parameters
-        ----------
-        traj : Trajectory
-            An object containing time, state, and input histories to animate.
-        time_factor_video : float, optional
-            A factor to speed up (>1) or slow down (<1) the video playback (default is 1.0).
-        is_3d : bool, optional
-            Whether to render in 3D (default is False).
-        html : bool, optional
-            Whether to return an interactive HTML rendering for Jupyter notebooks (default is False).
-            Only applies when ``renderer`` is ``matplotlib``.
-        renderer : str, optional
-            ``matplotlib``, ``meshcat``, or ``pygame`` (default is ``matplotlib``).
-
-        Returns
-        -------
-        None or IPython.display.HTML
-            If html=True and renderer is matplotlib, returns the HTML object to display inline.
+        ``html=None`` auto-resolves via
+        :func:`minilink.graphical.environment.prefers_inline_animation`:
+        ``True`` in Colab and in local Jupyter with a non-interactive
+        matplotlib backend (``inline`` / ``agg``); ``False`` for bare
+        script, IPython REPL, and Jupyter with an interactive backend
+        (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``).
+        ``native=True`` (default) drives each backend's own animation
+        engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
+        Pass ``native=False`` to fall back to the legacy per-frame
+        Python-loop playback (useful for debugging or when the native
+        path's limitations matter — e.g. meshcat freezes dynamic-geometry
+        primitives such as ``TorqueArrow``; see ``DESIGN.md`` §4.7).
         """
         from minilink.graphical.animation import Animator
+        from minilink.graphical.environment import prefers_inline_animation
 
         if traj is None:
             if self.traj is not None:
@@ -661,27 +853,24 @@ class System:
             else:
                 traj = self.compute_trajectory()
 
+        resolved_html = prefers_inline_animation() if html is None else html
+
         animator = Animator(self)
-        # We don't want blocking window show when generating matplotlib HTML inline.
-        show_plot = not (html and renderer == "matplotlib")
+        show_plot = not resolved_html
         ani_obj = animator.animate_simulation(
             traj,
             time_factor_video=time_factor_video,
             is_3d=is_3d,
-            html=html,
+            html=resolved_html,
             show=show_plot,
             renderer=renderer,
+            native=native,
         )
 
-        if html and renderer == "matplotlib":
-            try:
-                import IPython.display as display
-
-                if ani_obj is not None:
-                    display.display(ani_obj)
-            except ImportError:
-                print("IPython is not available to display HTML inline")
-            return ani_obj
+        # For html output, return the IPython.display.HTML object and let the
+        # notebook auto-display it via the standard last-expression rule.
+        # Calling display.display() *and* returning the object renders twice.
+        return ani_obj
 
     ######################################################################
     def game(
@@ -697,10 +886,10 @@ class System:
         max_steps=None,
     ):
         """
-        Prototype real-time interactive mode (Euler integration + keyboard).
+        Convenience shortcut for the prototype interactive game loop.
 
-        The keyboard is polled via pygame (input only). Rendering is performed
-        using the selected ``renderer`` backend.
+        See ``Animator.game`` and ``ROADMAP.md`` §7: integrator + live I/O are planned as
+        pluggable backends (today: pygame keyboard + Euler in the animator loop).
         """
         from minilink.graphical.animation import Animator
 
@@ -716,72 +905,12 @@ class System:
             max_steps=max_steps,
         )
 
-    ######################################################################
-    # Graphical Animation Engine Baseline
-    ######################################################################
-    def get_kinematic_geometry(self):
-        """
-        Defines the rigid-body objects initialized once for drawing.
-        By default, the base System generates a point for each state and each input.
-
-        Returns
-        -------
-        list of minilink.graphical.primitives.GraphicPrimitive
-            The list of primitive shapes describing the system.
-        """
-        from minilink.graphical.primitives import Point
-
-        primitives = []
-        for i in range(self.n):
-            primitives.append(Point(color="blue", marker="o"))
-        for i in range(self.m):
-            primitives.append(Point(color="red", marker="x"))
-        return primitives
-
-    def get_kinematic_transforms(self, x, u, t):
-        """
-        Computes the transformation matrices corresponding 1-to-1 to the static geometry.
-        By default, this maps the n states and m inputs to translations along the x-axis.
-
-        Parameters
-        ----------
-        x : np.ndarray
-            The current state vector.
-        u : np.ndarray
-            The current input vector.
-        t : float
-            The current time.
-
-        Returns
-        -------
-        list of np.ndarray
-            A list of 4x4 transformation matrices (for 3D) shifting the points.
-        """
-        from minilink.graphical.primitives import translation_matrix
-
-        transforms = []
-
-        for i in range(self.n):
-            transforms.append(translation_matrix(dx=x[i], dy=float(i)))
-        for i in range(self.m):
-            transforms.append(translation_matrix(dx=u[i], dy=float(-i - 1)))
-
-        return transforms
-
-    def get_dynamic_geometry(self, x, u, t):
-        """
-        Defines temporary graphical primitives that change structure.
-        Only used for dynamic drawing like paths, trails, or shapes that grow vertices over time.
-
-        Returns
-        -------
-        list of minilink.graphical.primitives.GraphicPrimitive
-            The dynamic primitives generated just for this frame.
-        """
-        return []
-
 
 ######################################################################
+# Specialized System Types
+######################################################################
+
+
 class StaticSystem(System):
     """
     A block-diagram system with no internal continuous states (`n=0`).
@@ -811,7 +940,7 @@ class DynamicSystem(System):
     """
 
     # dx = f(x, u, t)
-    # y  = g(x, u, t)
+    # y  = h(x, u, t)
 
     def __init__(self, n, m, p):
         """

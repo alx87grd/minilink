@@ -10,7 +10,7 @@ Symbolic derivation of 4×4 H, C, g can take tens of seconds on first run.
 
 import numpy as np
 
-from minilink.mechanics.symbolic import MechanicalModel
+from minilink.mechanics.symbolic.model import MechanicalModel
 
 
 # ------------------------------------------------------------------
@@ -76,60 +76,3 @@ sys = sym_sys.to_minilink(parameters=params, backend="jax")
 sys.compute_trajectory(tf=10.0)
 
 sys.animate()
-
-
-# Diagram example
-
-
-# from minilink.blocks.sources import Step
-# from minilink.core.diagram import DiagramSystem
-
-# # Source input
-# step = Step(
-#     initial_value=np.array([0.0, 0.0, 0.0, 0.0]),
-#     final_value=np.array([1000.0, 0.0, 0.0, 0.0]),
-#     step_time=3.0,
-# )
-
-# diagram = DiagramSystem()
-# diagram.add_subsystem(step, "step")
-# diagram.add_subsystem(sys, "plant")
-# diagram.connect("step", "y", "plant", "u")
-# diagram.compute_trajectory(tf=20.0)
-# diagram.plot_graphe()
-# diagram.animate()
-
-
-# Diagram compilation example
-
-# import time
-# print(f"\n--- [3/3] Compile diagram ---")
-# t0 = time.perf_counter()
-
-# evaluator = diagram.compile(backend="jax")
-
-# t_compile = time.perf_counter() - t0
-# print(f"  elapsed: {t_compile:.3f} s\n")
-
-
-# x = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-# u = np.array([0.0, 0.0, 0.0, 0.0])
-
-# # print("diagram.f(x,u,0):", diagram.f(x, u, 0))
-# # print("evaluator.f(x,u,0):", evaluator.f(x, u, 0))
-
-# n_iter = 2000
-# t0 = time.perf_counter()
-# for _ in range(n_iter):
-#     diagram.f(x, u, 0)
-# t_diagram = time.perf_counter() - t0
-
-# t0 = time.perf_counter()
-# for _ in range(n_iter):
-#     evaluator.f(x, u, 0)
-# t_eval = time.perf_counter() - t0
-
-# print(
-#     f"\ndiagram.f {1e6 * t_diagram / n_iter:.2f} µs/call, "
-#     f"\nevaluator.f {1e6 * t_eval / n_iter:.2f} µs/call "
-# )

@@ -10,6 +10,7 @@ Three tiers:
 """
 
 from abc import ABC, abstractmethod
+import numpy as np
 
 
 class DynamicsEvaluator(ABC):
@@ -92,9 +93,25 @@ class DynamicsEvaluator(ABC):
     # Scipy bridge
     # ================================================================
 
+    def f_scipy(self, x, u, t=0.0):
+        """SciPy-friendly ``f`` with numpy in/out."""
+        return np.asarray(self.f(x, u, t))
+
+    def f_ivp_scipy(self, x, t=0.0):
+        """SciPy-friendly ``f_ivp`` with numpy in/out."""
+        return np.asarray(self.f_ivp(x, t))
+
     def as_scipy_rhs(self):
         """Returns ``(t, x) -> dx`` callable for ``scipy.integrate.solve_ivp``."""
-        return lambda t, x: self.f_ivp(x, t)
+        return lambda t, x: self.f_ivp_scipy(x, t)
+
+    def as_scipy_rhs_forced(self, u_of_t):
+        """Returns ``(t, x) -> dx`` callable for forced ``solve_ivp``."""
+        return lambda t, x: self.f_scipy(x, u_of_t(t), t)
+
+    def as_scipy_jac(self):
+        """Returns ``(t, x) -> df/dx`` callable for nominal ``solve_ivp``."""
+        raise NotImplementedError("Jacobian callable is not available for this evaluator")
 
     # ================================================================
     # Integration — standard tier (frozen params)
@@ -102,11 +119,15 @@ class DynamicsEvaluator(ABC):
 
     def rk4_step(self, x, u, t, dt):
         """Single RK4 step: x_{k+1}."""
-        raise NotImplementedError("TODO")
+        k1 = self.f(x, u, t)
+        k2 = self.f(x + 0.5 * dt * k1, u, t + 0.5 * dt)
+        k3 = self.f(x + 0.5 * dt * k2, u, t + 0.5 * dt)
+        k4 = self.f(x + dt * k3, u, t + dt)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
     def euler_step(self, x, u, t, dt):
-        """Single Euler step."""
-        raise NotImplementedError("TODO")
+        """Explicit Euler: ``x + dt * f(x, u, t)``."""
+        return x + dt * self.f(x, u, t)
 
     def rollout(self, x0, u_sequence, t0, dt):
         """Forward integrate N steps with frozen params.
@@ -137,15 +158,26 @@ class DynamicsEvaluator(ABC):
 
     def rk4_step_ivp(self, x, t, dt):
         """Single RK4 step with frozen u and params."""
-        raise NotImplementedError("TODO")
+        k1 = self.f_ivp(x, t)
+        k2 = self.f_ivp(x + 0.5 * dt * k1, t + 0.5 * dt)
+        k3 = self.f_ivp(x + 0.5 * dt * k2, t + 0.5 * dt)
+        k4 = self.f_ivp(x + dt * k3, t + dt)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
     def euler_step_ivp(self, x, t, dt):
-        """Single Euler step with frozen u and params."""
-        raise NotImplementedError("TODO")
+        """Explicit Euler with nominal ``u`` (same as :meth:`f_ivp`)."""
+        return self.euler_step(x, self._u_nominal, t, dt)
 
-    def rollout_ivp(self, x0, t0, dt, n_steps):
-        """IVP rollout. Returns (n_steps+1, n)."""
-        raise NotImplementedError("TODO")
+    def rk4_rollout_ivp(self, x0, t0, dt, n_steps):
+        """IVP RK4 rollout. Returns (n_steps+1, n)."""
+        x_seq = [x0]
+        x = x0
+        t = t0
+        for _ in range(n_steps):
+            x = self.rk4_step_ivp(x, t, dt)
+            t = t + dt
+            x_seq.append(x)
+        return np.asarray(x_seq)
 
     # ================================================================
     # Differentiation (NotImplementedError by default)

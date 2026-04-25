@@ -2,14 +2,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 from minilink.core.framework import System
-
-
-def _array_module(a):
-    """Return ``jax.numpy`` if *a* is a JAX tracer/array, else ``numpy``."""
-    if type(a).__module__.startswith("jax"):
-        import jax.numpy as jnp
-        return jnp
-    return np
+from minilink.jax_utils import array_module
 
 
 ######################################################################
@@ -104,7 +97,7 @@ class Step(Source):
         if params is None:
             params = self.params
 
-        xp = _array_module(t)
+        xp = array_module(t)
         return xp.where(
             t < params["step_time"],
             params["initial_value"],

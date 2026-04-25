@@ -1,158 +1,310 @@
 # Minilink Technical Design & Standards
 
-`minilink` is a block-diagram simulation framework built natively in Python. It heavily leverages object-oriented design to represent dynamical systems, mathematical blocks, and their interconnected topological execution graphs.
+`minilink` is a Python-native block-diagram framework for writing dynamical systems in a math-readable way, composing them through ports, compiling them into flat evaluators, and simulating or visualizing the result.
 
-## 1. Core Philosophy
+## 1. Design Principles
 
-1. **Mathematical Readability First**: The primary goal is for the source code to read as close as possible to handwritten mathematical operations (e.g., `dx = A@x + B@u`).
-2. **Readability Over Performance**: Prioritize pure readability in the core library. Optimization shifts (like the `compile` package) should remain isolated so core equations stay clean.
-3. **Expressiveness:** Define custom dynamic systems using standard Python.
-4. **Performance:** Compile topological block execution graphs into optimized array-evaluation sequences (`f_fast`).
-5. **Transparency:** Lightweight and transparent, avoiding heavy, black-box legacy dependencies.
-6. **Separation of Concerns:** Modeling core (signals, ports, systems, diagrams) is independent of simulation, visualization, and analysis.
-7. **Pyro Compatibility:** Full feature parity with the [pyro](https://github.com/SherbyRobotics/pyro) toolbox.
+1. **Math readability first**: code should look close to textbook notation such as `dx = A@x + B@u`.
+2. **Readable core, optimized edges**: keep equations simple in `core/`; isolate performance work in `compile/` and `simulation/`.
+3. **Transparent architecture**: prefer explicit objects and data flow over heavy hidden machinery.
+4. **Separation of concerns**: modeling, compilation, simulation, and visualization are distinct layers.
+5. **Pyro successor direction**: `minilink` is the long-term port-based foundation for future Pyro-style workflows.
 
----
+## 2. Package Map
 
-## 2. Directory Structure
+| Module | Status | Description |
+| --- | --- | --- |
+| `core/` | **TRL 7** | Main modeling abstractions plus the canonical `Trajectory` in `trajectory.py` |
+| `compile/` | **TRL 4** | `ExecutionPlan`, `DynamicsEvaluator`, NumPy/JAX evaluator backends |
+| `simulation/` | **TRL 4** | `Simulator`, solver backends, compile-backend selection (`"auto"` → try JAX, fall back to NumPy), optional auto fixed-step RK4 for long uniform grids with JAX, interpolation helpers |
+| `graphical/` | **TRL 2** | Matplotlib theming (`matplotlib_style`), env-aware layout, animation renderers; kinematic hooks still provisional (see §3.2, §4.7–4.8) |
+| `mechanics/` | **TRL 1** | Numeric and symbolic mechanics paths (framework; concrete plants often live in `dynamics/`) |
+| `physics/` | **TRL 1** | JAX contact-world MVP (`engine_jax`, `PhysicsWorldSystem`); engine-backed dynamics, not folded into `dynamics/` |
+| `dynamics/` | **TRL 0** | Reusable **plant** models as `DynamicSystem` leaves (e.g. `vehicles/`, `msd/`, `pendulum/`) |
+| `blocks/` | **TRL 0** | Diagram primitives: sources, integrators, lightweight signal blocks — not full plants |
+| `benchmark/` | **TRL 1** | Optional timing helpers (`f_speed`, `simulation_speed`) and no core dependency |
+| `benchmark/scenario/` | **TRL 1** | Shared benchmark **scenarios** (stress systems and builders for timing matrices), not user plants |
+| `planning/` | **TRL 0** | Future planners |
+| `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
+### 2.1 Notes (dynamics + mechanics)
 
-| Module       | Status  | Description                                                                                                                                                                  |
-| ------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/`      | **1.0** | Pure modeling abstractions (framework, diagram, analysis).                                                                                                                   |
-| `blocks/`    | **1.0** | Pre-built reusable blocks (integrators, sources, pendulums).                                                                                                                 |
-| `compile/`   | **1.0** | `ExecutionPlan` IR; `DynamicsEvaluator` (leaf + diagram); NumPy/JAX; boundary vs internal outputs; JIT on JAX leaf and diagram (`f`, `outputs`, `compute_internal_signals`). |
-| `graphical/` | MVP     | Animation orchestration; Matplotlib, MeshCat, Pygame backends; kinematic hooks on systems.                                                                                   |
-| `physics/`   | MVP     | JAX contact world (`PhysicsWorldSystem`) + demos; optional dependency on JAX.                                                                                                |
-| `mechanics/` | MVP     | Symbolic multibody + export to `MechanicalSystem` / `JaxMechanicalSystem`.                                                                                                   |
-| `control/`   | Planned | Controller base classes and library.                                                                                                                                         |
-| `planning/`  | Planned | Planners: RRT, direct collocation, DP.                                                                                                                                       |
-| `analysis/`  | Partial | `Simulator` and trajectory utilities; extended cost/phase tooling planned.                                                                                                   |
+- **`dynamics/` Pyro ports**: `minilink.dynamics.pendulum.cartpole.CartPole` and
+  `minilink.dynamics.pendulum.double_pendulum.DoublePendulum` are numeric ports of
+  SherbyRobotics/pyro `CartPole` / `DoublePendulum` manipulator equations.
+- **Kinematics vs dynamics**: animation is allowed to add display-only parameters
+  (for example cart footprint sizes) and small out-of-plane offsets for volumetric
+  renderers, without changing the ODE.
+- **`MechanicalSystem` matrix hooks**: `H`, `C`, `B`, `g`, and `d` accept an
+  optional trailing `params` argument, consistent with `f(x, u, t, params)`.
 
+## 3. Core Contracts
 
----
+### 3.1 Signals, ports, and diagrams
 
-## 3. Core Abstractions
+- `VectorSignal`: named vector metadata with dimension, labels, units, bounds, and nominal value
+- `InputPort(VectorSignal)`: input channel; falls back to nominal value when unconnected
+- `OutputPort(VectorSignal)`: output channel; may declare dependencies for algebraic-loop detection
+- `DiagramSystem`: composite system built by wiring subsystem ports
 
-### Signal and Port Model
+### 3.2 `System` contract
 
-- `**VectorSignal`**: A named vector with dimension, labels, units, bounds, and a nominal value.
-- `**InputPort(VectorSignal)**`: An input channel. Defaults to returning the nominal value if not connected.
-- `**OutputPort(VectorSignal)**`: An output channel. Declares `dependencies` on input ports for algebraic-loop detection.
+`System` intentionally combines four concerns:
 
-### System Hierarchy
+1. **Core dynamical contract**
+   - `f(x, u, t, params)` and `h(x, u, t, params)`
+   - dimensions `n`, `m`, `p`
+   - ports, labels, bounds, and state description
+2. **Model defaults and metadata**
+   - `params`
+   - `x0`
+   - `solver_info`
+   - nominal input values stored on ports
+3. **Visualization / forward-kinematic contract**
+   - `get_kinematic_geometry()`
+   - `get_kinematic_transforms(x, u, t)`
+   - `get_dynamic_geometry(x, u, t)`
+   - This API is still MVP / TRL 1.
+4. **User shortcut facade**
+   - `compile()`
+   - `compute_trajectory()`
+   - `compute_forced()`
+   - `render()`, `animate()`, `game()`
+   - graph / HTML display helpers
 
-- `**System**`: Base class. Holds states, inputs, outputs, and solver hints. Defines `f(x,u,t)` and `h(x,u,t)`.
-- **User dynamics are not purity-checked:** Python cannot enforce that `f`, `h`, or port `compute` avoid mutating `self` or reading hidden mutable state. The intended contract is documented on `System`; `bind_params=True` only deep-copies the `params` dict into the compiled plan, not arbitrary instance fields. JAX tracing can surface some impure patterns but is not a full guarantee.
-- `**StaticSystem(System)**`: Pure feedthrough blocks (`n=0`).
-- `**DynamicSystem(System)**`: Systems with state (`n>0`).
-- `**DiagramSystem(System)**`: Composite system. Supports `compile()` for flattened execution plans.
+`MechanicalSystem` follows the same `params` story for its split dynamics
+implementation: subclasses implement `H(q, params=None)`, `C(q, dq, params=None)`,
+`B(q, params=None)`, `g(q, params=None)`, and `d(q, dq, params=None)`.
 
----
+`System` may also cache the last computed trajectory for convenience. That cache is not part of the mathematical model.
 
-## 4. Execution & Compilation Pipeline
+### 3.3 Functional intent
 
-1. `**DiagramSystem.compile()**` / `**compile_diagram()**`: Algebraic-loop detection (DFS) and construction of an `**ExecutionPlan**`.
-2. **Compiled evaluators**: `evaluator.f(x,u,t)` applies the flat plan (stateless).
-3. `**ExecutionPlan**`: Immutable schedule (`port_ops`, `state_ops`, `output_slices`, `**external_output_slices**`) consumed by NumPy or JAX backends.
+- `f`, `h`, and output-port `compute` callables are intended to behave as functions of `(x, u, t, params)`.
+- The Python object still stores defaults and convenience state, but dynamics code should avoid depending on unrelated mutable instance fields.
+- `self.params` is the default model parameter set; explicit `params=...` arguments override it.
 
-### 4.1 Parameters vs compilation (default, bound, explicit vector)
+### 3.4 Trajectories
 
-Evaluators call `f(local_x, local_u, t, params)` and port `compute(local_x, local_u, t, params)`. The fourth argument is `op.bound_params` from the :class:`~minilink.compile.execution_plan.ExecutionPlan`: `None` means blocks use `params or self.params` (live `subsystem.params`); if you change `params` after `compile()` without `bind_params`, the next `compute_dx` reflects that without recompiling.
+`Trajectory` lives in `minilink.core.trajectory` and is the official sampled **state-input trajectory** object:
 
-- `**compile_diagram(..., bind_params=True)**` (and `DiagramSystem.compile(..., bind_params=True)`): each `PortOperation` / `StateOperation` stores a **deep copy** of that subsystem's `params` in `bound_params` and passes it on every evaluation. Mutating `subsystem.params` later does **not** change behavior until you compile again.
-- **Explicit parameter vector** (planned): a separate entry point (e.g. `compile_diagram_parameterized` in a future `minilink.compile.parameterized` module) would build a flat vector `p` and a `DiagramParameterLayout` (subsystem id, key, slice, shape). The compiler would produce a plan whose operations are `(x, u, t, p) → …` so **JAX can differentiate w.r.t. `p**`, reusing `build_execution_plan` for topology and gather recipes, then transforming the plan; the base `ExecutionPlan` builder would stay free of parameter-layout logic. Today, dict `params` as JAX pytrees cover most autodiff use cases via the parametric tier on leaf evaluators.
+- core fields: `t`, `x`, `u`
+- array convention: sampled signals use shape `(dim, N)`
+- optional extra sampled channels live in `signals`
+- helper methods such as interpolation and resampling stay generic to sampled signals
 
-### 4.2 `DynamicsEvaluator` — Public compiled API
+Simulation, planning, tracking control, and animation should all share this object where a state-input trajectory is the right abstraction.
 
-All compiled evaluators inherit from the `DynamicsEvaluator` ABC (`[minilink/compile/evaluator.py](minilink/compile/evaluator.py)`). It provides a **three-tier** callable API matching standard math notation:
+## 4. Compile and Simulation Architecture
 
+### 4.1 Main workflow layers
 
-| Tier           | Dynamics               | Output                 | What's fixed                          |
-| -------------- | ---------------------- | ---------------------- | ------------------------------------- |
-| **Standard**   | `f(x, u, t)`           | `h(x, u, t)`           | params frozen at compile time         |
-| **Parametric** | `f_p(x, u, t, params)` | `h_p(x, u, t, params)` | nothing — caller supplies params dict |
-| **IVP**        | `f_ivp(x, t)`          | `h_ivp(x, t)`          | u + params both frozen                |
+The intended flow is:
 
+```text
+System / DiagramSystem
+    -> compile()
+    -> DynamicsEvaluator
+    -> Simulator
+    -> Trajectory
+    -> plotting / animation / internal-signal reconstruction
+```
 
-Additional: `outputs(x, u, t)` / `outputs_p(...)` return a `dict` of **boundary** output ports. Keys are port ids for **leaf** systems (e.g. `"y"`). For **diagram** evaluators, keys match the diagram’s external output ports only (`DiagramSystem.outputs`); the full internal signal map is `compute_internal_signals_dict` (all subsystem ports).
+`System.compute_trajectory(...)` is the high-level convenience path and delegates to `minilink.simulation.Simulator`.
 
-**Leaf system backends** (single `System`, non-diagram):
+### 4.2 `ExecutionPlan` and evaluators
 
-- `NumpyLeafEvaluator` — wraps `System.f`/`System.h` with frozen params + nominal u snapshot.
-- `JaxLeafEvaluator` — same, with `f`/`h`/`outputs`/`outputs_p` pre-JIT-compiled and warm-started at construction.
+- `compile(system, backend="numpy"|"jax")` returns a `DynamicsEvaluator`
+- `DiagramSystem.compile()` builds an `ExecutionPlan`
+- the plan stores flat operations and slices for subsystem signals and external outputs
+- NumPy and JAX backends consume the same plan
 
-**Entry point**: `compile(system, backend="numpy"|"jax")` → returns a `DynamicsEvaluator`.
+The `DynamicsEvaluator` public callable tiers are:
 
-**Parameter handling**: params are Python `dict` at all tiers. JAX handles dicts natively as pytrees — no flat parameter vector needed. `jax.grad`, `jax.jacobian`, `vmap` all preserve dict structure.
+| Tier | Dynamics | Output | What is fixed |
+| --- | --- | --- | --- |
+| Standard | `f(x, u, t)` | `h(x, u, t)` | params frozen at compile time |
+| Parametric | `f_p(x, u, t, params)` | `h_p(x, u, t, params)` | caller supplies params |
+| IVP | `f_ivp(x, t)` | `h_ivp(x, t)` | `u` and params frozen |
 
-**Scipy bridge**: `as_scipy_rhs()` → `(t, x) -> dx` using the IVP tier.
+`outputs(...)` returns **boundary** outputs only. For diagram internals, use the diagram-specific internal-signal API instead.
 
-**Future**: Integration utilities (`rk4_step`, `rollout`), differentiation (`jacobian_f_x`, `linearize`), and batch simulation (`vmap_rollout`) are defined in the ABC as `NotImplementedError` stubs, to be implemented incrementally.
+### 4.3 Diagram-specific signals
 
-### 4.3 Diagram compilation pipeline
+Diagram evaluators and diagrams distinguish:
 
-The diagram evaluators (`NumpyDiagramEvaluator`, `JaxDiagramEvaluator`) implement `f(x, u, t)` and `outputs(x, u, t)` / `outputs_p(...)` for **diagram boundary** ports only (same contract as leaf; often an empty dict when no `connect_new_output_port` was used). `h(x, u, t)` is defined only when there is **exactly one** such external output. The parametric tier is not implemented for diagrams yet (per-subsystem `params` dispatch requires `sys_id` on operations — deferred).
+- **boundary outputs**: the external outputs of the diagram
+- **internal signals**: subsystem outputs inside the flattened signal buffer
 
-**Diagram-only accessors (subsystem internal buffer)**  
-These are **not** the same as `outputs()`:
+The official trajectory-level postprocess lives on `DiagramSystem`:
 
-- `**compute_internal_signals(x, u, t)**` — flat vector of length `plan.signal_dim` (all subsystem output ports laid out in compiler order).
-- `**compute_internal_signals_dict(x, u, t)**` — `dict["sys_id:port_id"] → array` for every subsystem output slice in `output_slices`.
+- `diagram.reconstruct_internal_signals(traj)`
+- `diagram.compute_internal_signals(traj)` as a compatibility alias
 
-There is **no** separate `compute_outputs(..., ports=...)` API; pick ports by key from `compute_internal_signals_dict` or slice the flat buffer using `plan.output_slices`.
+There is no `compute_outputs(..., ports=...)` API.
 
-**JAX diagram evaluator** (`JaxDiagramEvaluator`) JIT-compiles `**f**`, boundary `**outputs**`, and `**compute_internal_signals**` independently (each warm-started at construction). Convenience: `**get_f_jit()**`, `**get_outputs_jit()**`, `**get_internal_signals_jit()**`.
+### 4.4 Parameters and compilation
 
-`**ExecutionPlan.external_output_slices**` maps **diagram boundary** output port ids (keys of `DiagramSystem.outputs`) to slices into the **same** internal signal buffer as the connected source port — used solely to implement `**outputs()**` on the diagram evaluator.
+- with `bind_params=False`, compiled operations read live `self.params`
+- with `bind_params=True`, subsystem params are deep-copied into the plan
+- dict params remain the main parameter format and work naturally with JAX pytrees
+- a flat parameter-vector tier is deferred until there is a concrete optimizer-driven need
 
-`build_execution_plan` stays focused on topology, slices, and gather recipes. `bind_params=True` deep-copies subsystem params into each operation; `bind_params=False` passes `None` so blocks use live `self.params`.
+### 4.5 Simulation policy
 
-### JAX Compilation Vision
+- Unconnected input ports contribute a **constant default value** only.
+- Time-varying signals do **not** live in input-port defaults.
+- If a time signal is part of the reusable **model**, represent it with a source block in the diagram.
+- If forcing is part of a **simulation run**, pass sampled `u(t)` data to the simulator.
+- Solver backends may interpolate `u(t)` internally, but the public simulation input remains grid-based.
 
-Future performance scales via JAX (XLA) by breaking the Python GIL:
+Planned ergonomic shortcut:
 
-- **Implicit Tracing**: Using PyTrees and avoiding in-place mutations.
-- **Native Duck-Typing**: Standard `numpy` calls are overridden by JAX.
-- **`f_jax` Fallback**: Optional handwritten functional overrides for complex logic.
+- `System.compute_forced(...)` now provides that high-level shortcut for sampled inputs or simple `u(t)` callables
+- richer forcing helpers can still grow on top of the same simulator-level path later
 
----
+Current solver modes (see `minilink.simulation.simulator` and tests):
 
-## 5. Coding Conventions
+- `solver="euler"`, `solver="rk4_fixedsteps"` (fixed step; not available for `solve_forced` today)
+- `solver="scipy"`, `solver="scipy_stiff"`, `solver="scipy_max"`, `solver="scipy_ultra"`
+- `solver="scipy_lsoda"` (alias that selects LSODA; useful for stiff/variable-tolerance cases)
+- **Auto RK4 (heuristic)**: for long, **uniform** time grids, JAX compile backend, and a non-stiff profile, the simulator may select `rk4_fixedsteps` automatically for wall-clock reasons. This is best-effort; defaults remain explicit where conservatism matters.
 
-Following these naming schemes ensures consistency and readability across the codebase.
+`Simulator(..., compile_backend=...)` accepts `"numpy"`, `"jax"`, or **`"auto"`** (`minilink.simulation.COMPILE_BACKEND_AUTO`): try JAX, fall back to NumPy on failure. User-facing `System.compute_trajectory` / `compute_forced` default to **`"numpy"`** (predictable, no extra JIT) unless overridden.
 
-### General Standards
+**SciPy preset tolerances** (`scipy`, `scipy_stiff`, …) pass explicit `rtol` / `atol` into `solve_ivp` so behavior is not left to global SciPy defaults.
 
-- **Python Version**: **3.10+** (LTS stable). Keep **`agent.md`** §2 in sync when changing the minimum version; update **`pyproject.toml`** `requires-python` accordingly.
-- **Type Hinting**: **Uniform & Mandatory**. All functions and methods must have clear type hints.
-- **Docstrings**: **NumPy Style**. Required for all public classes and methods.
+### 4.6 Benchmark package (`minilink.benchmark`)
 
-### The "Math Rule" (Naming Patterns)
+Optional helpers for timing and regression-style comparisons. They are **not** part of the core dynamical or simulation contract; scripts may import them for local experiments.
 
-The top priority is that the code reads like math equations (e.g., `dx = A@x + B@u`). 
+| Module | Purpose |
+| --- | --- |
+| `minilink.benchmark.f_speed` | `benchmark_f_speeds` measures native `system.f`, then `compile("numpy").f` and `compile("jax").f` over a fixed `(x, u, t)`; optional ASCII table via `print_f_speed_table`. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
+| `minilink.benchmark.simulation_speed` | Timing helpers (`run_timed`, `summarize_durations`, `relative_l2_error`); `benchmark_sim_backend(system, …)` compares one candidate `(solver, compile_backend)` to a **truth** pair (defaults `TRUTH_SOLVER` / `TRUTH_BACKEND`, i.e. `scipy_ultra` + `numpy`) on a given **built** `system`; `benchmark_sim_speed_matrix(system, pairs=…, …)` sweeps an explicit ordered list of `(solver, backend)` pairs vs the same truth pair, colors rows by ``rel_err_l2 < accuracy_threshold_pct``, prints ``speed_vs_truth = truth_mean_time / cell_mean_time``; ``DEFAULT_SWEEP_PAIRS`` is the full product of ``DEFAULT_SOLVERS`` × ``DEFAULT_BACKENDS``. Result rows and printed tables label the JAX compile key as ``jax(cpu)`` / ``jax(gpu)`` / etc. via ``jax.default_backend()`` (`format_benchmark_backend_label`). The same module also owns the fixed benchmark scenarios (`STANDARD_SIM_CASES`) plus `run_standard_sim_suite` / `print_standard_sim_suite`. |
 
-- **Matrices**: Use Uppercase single letters (`A`, `B`, `H`, `M`, `K`).
-- **Vectors**: Use lowercase single letters (`x`, `u`, `y`, `q`, `v`, `dq`).
-- **Dimensions**: Use `n`, `m`, `p` for dimension.
-  - Matrix `A` has dimension `(n, n)`.
-  - Vector `x` has dimension `(n, 1)`.
-  - Vector `u` has dimension `(m, 1)`.
-  - Vector `y` has dimension `(p, 1)`.
-  - Matrix `B` has dimension `(n, m)`.
+Programmatic imports should use the defining modules, e.g. `from minilink.benchmark.simulation_speed import run_standard_sim_suite, DEFAULT_SWEEP_PAIRS, ...` and `from minilink.benchmark.f_speed import ...` as needed. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
 
-### Programmatic Variable Naming (Non-Math Context)
+### 4.7 Animation playback (`System.animate` / `Animator.animate_simulation`)
 
-- `**name**`: **Type of System.** Human-readable string for class/type.
-  - *Examples*: `"Pendulum"`, `"Controller"`, `"Diagram"`.
--  `**xxx_id**`: **Programmatic Identifier.** Keys in dictionaries within a diagram. Always prefix to avoid shadowing built-in `id()`.
-  - *Examples*: `sys_id="plant"`, `port_id="y"`.
-- `**label` / `labels`**: **Display String.** Formatted for plotting and terminal output.
-  - *Examples*: `"theta"`, `"torque"`. Always use the plural `labels` for lists.
+`sys.animate(...)` takes three **orthogonal** keyword arguments that are resolved
+independently:
 
-### File & Module Standards
+| kwarg | selects | values |
+| --- | --- | --- |
+| `renderer` | graphics tech | `"matplotlib"`, `"meshcat"`, `"pygame"` |
+| `html` | output channel | `True` = inline notebook object, `False` = local window, `None` = auto (see env policy below) |
+| `native` | playback engine | `True` = backend's own animation API (**default**), `False` = legacy per-frame Python loop |
 
-- All core modeling files (under `core/`) must *only* import `numpy` at the module level.
-- Heavy dependencies (SciPy, Matplotlib, Graphviz) must be lazy-imported within methods.
-- Use Python type hints and docstrings for every public method.
+Behavior:
 
+- `native=True` (default) drives each backend's own animation engine (see
+  below). This is the recommended path for new code: smoother playback,
+  less overhead, clean JSHTML export in notebooks.
+- `native=False` falls back to the legacy per-frame Python loop
+  (`draw_frame` + `present`). Kept unchanged byte-for-byte for debugging
+  and for the meshcat dynamic-geometry case (see limitation at the bottom
+  of this section).
+- `native=True` + matplotlib drives `matplotlib.animation.FuncAnimation`. On
+  the window path (`is_blocking_needed()` True) it calls `plt.show(block=True)`
+  and cleans up after the window closes; otherwise (IPython REPL, Jupyter with
+  an interactive backend) it calls `plt.show(block=False)` and intentionally
+  retains the figure + `FuncAnimation` on the renderer so the event loop drives
+  playback without garbage collection killing the animation.
+- `native=True` + meshcat builds a `meshcat.animation.Animation` and calls
+  `Visualizer.set_animation(...)`; the browser plays keyframes with no Python
+  loop.
+- `html=True` returns an `IPython.display.HTML` object: matplotlib uses
+  `FuncAnimation.to_jshtml()`; meshcat uses `Visualizer.render_static(...)`
+  around `static_html()` (ideal for Colab cells).
+
+#### Env policy (`html=None` resolution and blocking)
+
+Env detection lives in a single module, `minilink/graphical/environment.py`,
+and exposes `detect_env()`, `prefers_inline_animation()`, `is_inline_capable()`,
+`is_blocking_needed()`, `allow_tall_stacked_figures()`, and `override_env()`. All env-sensitive sites
+(`Animator.animate_simulation`, `System.animate`, `plot_trajectory`,
+`plot_signals`, `MatplotlibRenderer.present` / `play_native`,
+`MeshcatRenderer.present`) read from it where applicable.
+
+The matrix below summarizes defaults. Minilink **never** mutates matplotlib
+settings (no `matplotlib.use(...)`, no `%matplotlib ...` magic); it only
+reads `matplotlib.get_backend()` to decide between window and inline HTML
+in Jupyter.
+
+| Env | `detect_env()` | matplotlib backend | `html=None` resolves to | `is_blocking_needed()` | Default matplotlib `native=True` playback |
+| --- | --- | --- | --- | --- | --- |
+| Bare Python script | `script` | any GUI (`macosx` / `qt*` / `tkagg`) | False | True | Window, `plt.show(block=True)`, cleanup |
+| IPython terminal REPL | `ipython` | any GUI | False | False | Window, `plt.show(block=False)`, refs retained |
+| Local Jupyter, `%matplotlib inline` (default) | `jupyter` | `inline` / `agg` | **True** (auto-fallback) | False | Inline `HTML(ani.to_jshtml())` |
+| Local Jupyter, `%matplotlib widget` (`ipympl`) | `jupyter` | `module://ipympl...` | False | False | Inline widget; `plt.show(block=False)` |
+| Local Jupyter, `%matplotlib qt` / `macosx` / `tk` | `jupyter` | `qt*` / `macosx` / `tkagg` | False | False | Pop-up window, `plt.show(block=False)` |
+| Colab | `colab` | `inline` (forced) | True | False | Inline `HTML(ani.to_jshtml())` |
+
+Notes:
+
+- Explicit `html=True` / `html=False` is always honored; only `html=None`
+  consults the env.
+- Jupyter users who want fast native-animation playback can opt into
+  `%matplotlib widget` (requires `ipympl`) or `%matplotlib qt` themselves.
+  Neither is a minilink dependency; the default Jupyter `inline` configuration
+  is fully supported via the HTML fallback.
+- Static figures (`plot_trajectory`, `plot_signals`) use
+  `plt.show(block=is_blocking_needed())`: they block only in script mode;
+  Jupyter / Colab render them inline via the active backend.
+- `override_env("script" | "ipython" | "jupyter" | "colab" | None)` is the
+  testing / CI escape hatch; pass `None` to reset the cache.
+
+Limitation of meshcat native playback: `meshcat.animation.Animation` only
+keyframes rigid pose (position+quaternion) per path. Primitives whose geometry
+is rebuilt each frame (currently only `TorqueArrow`) are frozen at `t=0` in
+the native path and a one-line notice is printed when any are present. Pass
+`native=False` (the legacy Python-loop path) for frame-accurate playback of
+those primitives.
+
+#### Roadmap: interactive integration and live I/O
+
+Real-time paths (`Animator.game`, `Animator.run_interactive`, `System.game`) today combine
+a **fixed Euler** step (with substeps in `game`), **pygame** for live `u`, and the chosen
+**renderer** for geometry. Planned evolution (see `ROADMAP.md` §7, P2, Phase 4):
+
+- **Integrator backends** — base class + multiple schemes (same *idea* as multiple solvers
+  on `Simulator`), so the animator does not hard-code one stepping rule.
+- **Live input backends** — base class + options (keyboard vs **TCP/UDP** or similar for
+  cosimulation, etc.); keep demos thin and hide protocols in `graphical/` or a small helper
+  module.
+- **Live output push** — optional later (stream state/outputs to a peer); no concrete API yet.
+
+### 4.8 Matplotlib look, figure sizing, and `plot_trajectory` modes
+
+Central policy lives in `minilink/graphical/matplotlib_style.py`:
+
+- **Figure / DPI**: shared `FIGSIZE_ANIMATION`, `DPI_FIGURE`, `DPI_EXPORT` (export uses a higher DPI than on-screen); font size and axis styling helpers `style_animation_axes`, `style_trajectory_subplot`, and related caps.
+- **Stacked x/u plots**: `trajectory_stack_figsize` / `signal_stack_figsize` apply row caps; **tall** stacked layouts in **Jupyter/Colab** are gated by `minilink.graphical.environment.allow_tall_stacked_figures()` (console scripts keep a shorter default so windows stay usable). `plot_trajectory` and `plot_signals` share this policy.
+- **`System.plot_trajectory` / `plot_trajectory`**: `plot=...` selects **state** (`"x"`), **input** (`"u"`), or **both** (`"xu"`) in stacked subplots. `System.compute_trajectory(..., plot=True, plot="xu")` can return a pre-styled `Trajectory` with plotting side effects as documented on `System`.
+- **Animator** does not take per-call `figsize`/`dpi`; the matplotlib renderer and `matplotlib_style` own defaults (Pyro-style consistency).
+
+`MatplotlibRenderer` and trajectory plotting are covered by unit tests; treat them as **more stable than the raw kinematic `get_kinematic_*` API**, but still not frozen at the same level as `core/`.
+
+## 5. Coding Standards
+
+### General rules
+
+- **Python**: 3.10+
+- **Type hints**: required on public APIs
+- **Docstrings**: NumPy style on public classes and methods
+- **Imports**: keep heavy dependencies lazy outside the headless core
+
+### The math rule
+
+The default naming style should read like equations:
+
+- matrices: `A`, `B`, `H`, `M`, `K`
+- vectors: `x`, `u`, `y`, `q`, `v`, `dq`
+- dimensions: `n`, `m`, `p`
+
+For non-math context:
+
+- use `sys_id`, `port_id`, `block_id` for programmatic identifiers
+- use `label` / `labels` for display strings
+- keep the code explicit and boring when that improves readability

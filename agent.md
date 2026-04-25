@@ -1,95 +1,121 @@
 # Minilink AI Agent Instructions
 
-This document defines the co-programming preferences and architectural philosophy for AI agents collaborating on the `minilink` library. It ensures consistency, mathematical readability, and operational transparency across the development lifecycle.
+This file defines the collaboration preferences and architectural expectations for AI agents working on `minilink`.
 
 ## 1. Core Directives
 
-- **Mathematical Readability First**: The primary goal is for the source code to read as close as possible to handwritten mathematical operations (e.g., `dx = A@x + B@u`). This is an educational tool; students should recognize the dynamics and control laws directly in the code.
-- **Minimalist UI**: Prioritize a clean, minimal, and beginner-friendly interface for the main workflow (system creation, diagram wiring, simulation, and animation).
-- **"MVP Prototyping Mode"**: Rapid prototypes are encouraged but must be clearly marked with `TODO: User Architectural Review` to ensure no unverified logic enters the core.
-- **Incremental Refactoring**: Avoid large, sprawling changes. Always ask before deleting or renaming files.
-- **Automated Documentation**: Keep `DESIGN.md` and `ROADMAP.md` in sync with progress. These files are the agent's primary source of project "Truth."
+- **Math readability first**: equations should read like textbook math such as `dx = A@x + B@u`.
+- **Minimalist UX**: keep the main workflow beginner-friendly.
+- **MVP prototyping is allowed**: mark unvalidated architecture with `TODO: User Architectural Review`.
+- **Incremental refactoring**: avoid broad unapproved restructures.
+- **Docs are part of the contract**: keep `DESIGN.md` and `ROADMAP.md` aligned with the code.
 
----
+## 2. Coding Standards
 
-## 2. Coding Standards & Style
+- **Python**: 3.10+; keep `DESIGN.md`, `agent.md`, and `pyproject.toml` in sync
+- **Type hints**: required on public APIs
+- **Docstrings**: NumPy style on public classes and methods
+- **Math naming**:
+  - matrices: `A`, `B`, `H`, `M`, `K`
+  - vectors: `x`, `u`, `y`, `q`, `v`, `dq`
+  - dimensions: `n`, `m`, `p`
+- **Readability over cleverness**: prefer straight, explicit code
+- **Edits stay on task**: change only what the request needs; no drive-by refactors, unrelated files, or scope creep; every line in the diff should earn its place
+- **Match the neighborhood**: before writing, read surrounding code and align with its naming, types, imports, and documentation density
+- **Tests only when justified**: add or update tests for stable public APIs, TRL milestones, documented contracts, or explicit user requests
+- **Validation in proportion**: avoid defensive error-handling sprawl in internal paths unless the interface is public or the risk is real
+- **Documentation**: do not add new markdown guides or expand unrelated docs unless asked; `DESIGN.md` / `ROADMAP.md` stay in sync when behavior or scope changes (§1, §3)
+- **Imports and “math-first” surfaces**: In tutorials, demos, and other **reader-facing** code, keep the top of the file light—fewer imports and less Python ceremony so the math stays visible. This is **judgment, not dogma**: internal packages (`compile/`, `simulation/`, benchmarks, tests) may use richer imports when the benefit is clear. Prefer moving heavy setup into helpers or modules casual readers do not need to open.
+- **Package `__init__.py` (entire `minilink`)**: Import from the module that defines each symbol (e.g. `from minilink.compile.compiler import ...`, `from minilink.benchmark.simulation_speed import ...`, `from minilink.dynamics.vehicles.dynamic_bicycle import ...`). Do not use package `__init__` as a barrel re-export layer; those files are namespace markers (module docstring only, optional) unless an explicit API freeze and docs say otherwise. **Keep each `__init__.py` file** so subpackages stay regular packages and the build (Hatch) can discover them reliably; an empty or docstring-only `__init__.py` is fine, but deleting it risks tooling and import edge cases.
 
-- **Python Version**: **3.10+** (LTS stable). Same floor as **`DESIGN.md`** §5 and **`pyproject.toml`** `requires-python`. Update all three together when bumping the minimum. Use modern syntax like `|` for unions and structural pattern matching. 
-- **Type Hinting**: **Uniform & Mandatory**. All functions and methods must have clear type hints.
-- **Docstrings**: **NumPy Style**. Required for all public classes and methods.
-- **Naming Patterns (The "Math Rule")**:
-    - The top priority is that the code reads like math equations. For example, if you have a state-space system, the code should look like `dx = A@x + B@u`, not 'state_derivative = np.dot(linear_dynamics_matrix, state_vector) + np.dot(input_matrix, input_vector)' the goal is for the code to be readable as a math equation, the same equations in a textbook, for student to understand the code and the math at the same time.
-    - **Matrices**: Use Uppercase single letters (`A`, `B`, `H`, `M`, `K`).
-    - **Vectors**: Use lowercase single letters (`x`, `u`, `y`, `q`, `v`, `dq`).
-    - **dimensions**: Use 'n', 'm', 'p' for dimension, for instance matrix A has dimension (n, n), vector x has dimension (n, 1), vector u has dimension (m, 1), vector y has dimension (p, 1), matrix B has dimension (n, m)...
-    - **Math context**: All in all for math context, use name convention as close as possible as standard notation in textbooks.
-    - **Non-Math Context**: Follow standard **PEP8** (snake_case for methods, CamelCase for classes).
+## 3. Architectural Guidance
 
----
+- Use **inheritance** for core system types and **composition** for diagrams and optional behaviors.
+- Keep the readable modeling path clean; isolate optimization in `compile/` and `simulation/`.
+- Support JAX when it stays clean; use specialized JAX paths when needed instead of complicating the main path.
+- **KISS and thin surfaces**: Prefer fewer files, fewer lines, and fewer dependencies when a simpler design is enough. When complexity is justified, keep **user-facing scripts and examples** minimal and push mechanics into backend modules or utilities.
 
-## 3. Architectural Philosophy
+Compiled-evaluator vocabulary:
 
-- **Hybrid Model**: Use **Inheritance** for defining core system types (`System`, `StaticSystem`, `DynamicSystem`). Use **Composition** for diagram assembly and adding optional behaviors (sensors, noise).
-- **Readability Over Performance**: Prioritize pure readability in the core library. Optimization shifts (like the `compile` package) should remain isolated so core equations stay clean.
-- **JAX Policy**: Support JAX when possible WITHOUT too much complication. If JAX-traceability requires complex code, diverge into specific JAX-optimized tools/subclasses to keep the primary path clean.
-- **Compiled evaluators (`compile/`) — vocabulary** (see `DESIGN.md` §4 for detail):
-    - **`DynamicsEvaluator.outputs()` / `outputs_p()`** = **boundary** ports only. On **leaf** systems, keys are subsystem output port ids (e.g. `"y"`). On **diagram** evaluators, keys are **diagram** output ports created with `connect_new_output_port`; if none were added, this dict is **empty** — that is normal for closed-loop diagrams.
-    - **Subsystem / internal buffer** (diagram evaluators only): **`compute_internal_signals`** (flat buffer) and **`compute_internal_signals_dict`** (`"sys_id:port_id"` keys). This is **not** the same as `outputs()`.
-    - **Do not reintroduce** `compute_outputs(..., ports=...)` — it was removed; index `compute_internal_signals_dict` or slice using `ExecutionPlan.output_slices`.
-    - **`ExecutionPlan`**: carries `output_slices` (all subsystem ports) and **`external_output_slices`** (diagram boundary → buffer slice). Compiler/evaluator changes should keep these aligned.
-    - **JAX**: `JaxLeafEvaluator` / `JaxDiagramEvaluator` JIT core callables at construction with warm-start; preserve traceability of `f` / port `compute`. Diagram exposes **`get_f_jit`**, **`get_outputs_jit`**, **`get_internal_signals_jit`** for hot paths.
-- **Docs sync**: Any change to the evaluator ABC, `ExecutionPlan`, or diagram compile behavior should update **`DESIGN.md`** (and **`ROADMAP.md`** if scope/milestones shift), plus **unit tests** under `tests/unittest/`. Prefer **`examples/scripts/demo_internal_signals.py`** / **`demo_diagram_compiling.py`** patterns for end-to-end checks.
+- `outputs()` / `outputs_p()` means **boundary outputs only**
+- diagram internals belong to the internal-signal APIs, not `outputs()`
+- do not reintroduce `compute_outputs(..., ports=...)`
+- keep `ExecutionPlan.output_slices` and `external_output_slices` aligned
+- preserve JAX traceability of `f` and port compute paths
 
----
+Any change to evaluator contracts, `ExecutionPlan`, or diagram compile behavior should update `DESIGN.md` and, if scope changed, `ROADMAP.md`.
 
-## 4. 3-Level Testing Strategy
+## 4. 3-Level Verification
 
-Every feature must pass through three levels of verification:
-1.  **Automated Unit Test**: Formal `pytest` suite for regression and the AI agent's internal check.
-2.  **User Manual Test**: A minimalist, readable script (usually in `tests/manual/`) for the developer to check hands-on.
-3.  **Demo Script**: A high-level script (in `examples/`) demonstrating the feature to end-users (for major features).
+At feature completion, verify through:
 
----
+1. **Automated tests** with `pytest`
+2. **Manual test script** in `tests/manual/`
+3. **Demo script** in `examples/` for major user-facing features
 
-## 5. Development Lifecycle (TRL)
-
-All features must progress through the following **Task Readiness Levels**:
+## 5. TRL Lifecycle
 
 | Level | Name | Description |
-| :--- | :--- | :--- |
-| **TRL 1** | Agent MVP | Initial code implemented and functionally working. |
-| **TRL 2** | User-check MVP | User performs a high-level functional review. |
-| **TRL 3** | Architecture Validated | High-level architectural choice and logic are approved. |
-| **TRL 4** | Integration Proposed | Agent proposes the final code integration/refactor. |
-| **TRL 5** | Integration Validated | User approves the final integration into the main codebase. |
-| **TRL 6** | Automated Tests Pass | Final `pytest` suite is created and passing. |
-| **TRL 7** | Details Validated | Naming conventions and implementation details are approved. |
-| **TRL 8** | Demo Released | High-level demo script is created and validated. |
-| **TRL 9** | MISSION COMPLETE | All 3 levels of tests pass and the feature is user-approved. |
+| --- | --- | --- |
+| **TRL 1** | Agent MVP | Initial code exists and works |
+| **TRL 2** | User-check MVP | User performs a high-level functional review |
+| **TRL 3** | Architecture Validated | High-level architecture is approved |
+| **TRL 4** | Integration Proposed | Final integration/refactor is proposed |
+| **TRL 5** | Integration Validated | User approves main-codebase integration |
+| **TRL 6** | Automated Tests Pass | Final pytest coverage exists and passes |
+| **TRL 7** | Details Validated | Naming and implementation details are approved |
+| **TRL 8** | Demo Released | Demo script is created and validated |
+| **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
 
----
+**Supplemental: recent feature bands (read with the module table in `DESIGN.md` §2 and `ROADMAP.md` §1).** These are not a second scale; they map the same TRL definitions to the latest integration work:
 
-## 6. Collaboration & Workflow
+| Area | Effective band | Notes |
+| --- | --- | --- |
+| `matplotlib_style`, stacked-figure policy, `plot` modes on `plot_trajectory` | **TRL 6–7** | Covered by unit tests; user-visible contract; details may still move before a “final” TRL 9 sign-off. |
+| `COMPILE_BACKEND_AUTO` on `Simulator` / `compile_backend` on `System` | **TRL 4–6** | Public API with tests; `"auto"` is opt-in on `Simulator`, default remains NumPy on high-level `System` for predictability. |
+| Auto `rk4_fixedsteps` selection (long uniform grid + JAX + non-stiff) | **TRL 3–5** | Heuristic; `solve_forced` still requires a SciPy or Euler-style path; document and test, but do not treat as immutable policy yet. |
+| `System.plot_trajectory` / `compute_trajectory(..., plot=...)` return behavior | **TRL 6+** | Aligned with plotting API and tests. |
 
-- **Just Do It**: 
-    - Fix typos and grammatical errors.
-    - Add missing type hints or NumPy-style docstrings.
-    - Cosmetic PEP8 adjustments (outside of math equations).
-- **Demo Script Rule**:
-    - Keep demo scripts flat and directly runnable at module top-level.
-    - Do not wrap demo flow in helper functions unless explicitly requested.
-- **Always Ask**: 
-    - Deleting or renaming files.
-    - Architectural changes or core logic refactors.
-    - Introducing new heavy dependencies.
-    - Changing the public **`DynamicsEvaluator`** API (methods, tiers, semantics) or **`ExecutionPlan`** / **`PortOperation`** / **`StateOperation`** fields — these are stability contracts for `compile()` consumers; coordinate **`DESIGN.md`**, **`ROADMAP.md`**, and tests.
+## 6. Workflow Rules
 
----
+**Do directly**
 
-## 7. Local Development Environment
+- fix typos and wording
+- add missing type hints or public docstrings
+- make small cosmetic PEP8 cleanups outside math expressions
 
-- **Conda Environment**: Use `dev-h26` for this repository.
-  ```bash
-  conda activate dev-h26
-  ```
-- All commands (pytest, ruff, python scripts, etc.) should be run inside this environment.
+**Always ask first**
+
+- deleting or renaming files
+- architectural refactors or core logic changes
+- adding heavy dependencies
+- changing the public evaluator or execution-plan contract
+- removing, relocating, or “cleaning up” **user-authored convenience code** the user added locally (for example an `if __name__ == "__main__":` quick test in a module, a scratch print, or a temporary debug hook), unless the user explicitly asked to delete or replace it
+
+Demo and manual scripts should stay flat and directly runnable at module top level.
+
+Benchmark example scripts live under `tests/benchmark/` (same flat style). Import from `minilink.benchmark.f_speed` or `minilink.benchmark.simulation_speed` as needed (`benchmark_f_speeds`, `benchmark_sim_speed_matrix`, `DEFAULT_SWEEP_PAIRS`, etc.); see `DESIGN.md` §4.6.
+
+### Scope: small edits vs larger work
+
+- **Small chat tweaks**: expect a **quick, minimal source change**—not a long autonomous loop (many tool rounds, long terminal sessions, broad refactors) unless the user clearly asked for that depth.
+- **Larger work**: before extended execution (multi-step implementation, heavy CI/debug iteration, wide exploration), write a concise **implementation plan** and wait for **explicit approval** to proceed at that scale.
+- **Scope surprise**: if a “little modif” turns into a **big job** after reading the code, **stop and ask** what slice or outcome they want rather than grinding forward.
+
+## 7. Local Environment
+
+**Use the `dev-h26` conda environment** for this repository: run tests, examples, and benchmarks only with that env’s `python` (or equivalent), not system Python or an ad-hoc venv. The project targets **Python 3.10+**; macOS `/usr/bin/python3` is often 3.9 and will not work (e.g. `|` in type hints).
+
+```bash
+conda activate dev-h26
+# then: python, pytest, etc. from the repo root with PYTHONPATH=. as documented
+```
+
+On a typical Anaconda install the interpreter is `.../envs/dev-h26/bin/python` (for example `/opt/anaconda3/envs/dev-h26/bin/python` on the maintainer machine). From a fresh shell you can also use:
+
+```bash
+conda run -n dev-h26 python -m pytest
+conda run -n dev-h26 python examples/scripts/demo_animations.py
+```
+
+Reserve `dev-h26` (or a clone of it) for work on `minilink` so optional deps (JAX, SymPy, visualization) stay aligned with the team and with what agents and CI are expected to use.

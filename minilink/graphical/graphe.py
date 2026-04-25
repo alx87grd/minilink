@@ -1,7 +1,37 @@
-def plot_graphviz(graphe, show_inline=False, show_pdf=True, filename=None):
+def plot_graphviz(graphe, show_inline=None, show_pdf=None, filename=None):
     """
-    Display a graphviz object in the notebook
+    Display a graphviz object.
+
+    If ``graphe`` is ``None`` (e.g. the ``graphviz`` Python package is not
+    installed, :func:`get_system_graphe` / :func:`get_diagram_graphe` return
+    ``None``), this function returns quietly after a short message.
+
+    The two display switches auto-resolve based on the current environment via
+    :func:`minilink.graphical.environment.is_inline_capable`:
+
+    - ``show_inline=None`` defaults to ``True`` in Jupyter / Colab (inline
+      SVG via ``IPython.display``) and ``False`` elsewhere.
+    - ``show_pdf=None`` defaults to ``False`` in Jupyter / Colab (no external
+      viewer pop-up) and ``True`` in bare scripts and IPython REPLs (legacy
+      behavior: render to a temp file and open the OS PDF viewer).
+    - Explicit ``True`` / ``False`` values are always honored.
+
+    A file is only written to disk when ``filename`` is explicitly provided
+    or when ``show_pdf`` is true (which requires an on-disk artifact to open).
+    Pure-notebook use therefore leaves no ``.gv`` / ``.pdf`` litter behind.
     """
+    if graphe is None:
+        print("No graph to display (graphviz Python package unavailable or graph build failed).")
+        return
+
+    from minilink.graphical.environment import is_inline_capable
+
+    inline_env = is_inline_capable()
+    if show_inline is None:
+        show_inline = inline_env
+    if show_pdf is None:
+        show_pdf = not inline_env
+
     if show_inline:
         try:
             import IPython.display as display
@@ -9,6 +39,10 @@ def plot_graphviz(graphe, show_inline=False, show_pdf=True, filename=None):
             display.display(graphe)
         except ImportError:
             print("IPython is not available for inline display")
+
+    need_disk = show_pdf or filename is not None
+    if not need_disk:
+        return
 
     if filename is None:
         import tempfile
