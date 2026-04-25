@@ -165,9 +165,11 @@ class TestNewSimulator(unittest.TestCase):
                 sim.solve()
 
         self.assertIn("integration failed", str(ctx.exception))
-        self.assertIs(sim.scipy_last_solution, failed_solution)
-        self.assertFalse(sim.last_debug["success"])
-        self.assertEqual(sim.last_debug["message"], "integration failed")
+        # Failure path: debug lives on the SciPy backend (no try/finally on Simulator)
+        sb = sim.solver_backend
+        self.assertIs(sb.last_solve_ivp_solution, failed_solution)
+        self.assertFalse(sb.last_debug["success"])
+        self.assertEqual(sb.last_debug["message"], "integration failed")
         self.assertFalse(hasattr(sim, "last_traj"))
 
     def test_solve_populates_last_traj_and_last_debug(self):
