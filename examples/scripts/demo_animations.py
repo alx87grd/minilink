@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.blocks.examples import Pendulum
+from minilink.dynamics.pendulum.pendulum import Pendulum
 
 # Plant system
 sys = Pendulum()

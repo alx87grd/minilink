@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from minilink.blocks.dynamic_bicycle import (
+from minilink.dynamics.vehicles.dynamic_bicycle import (
     DynamicBicycleCar3D,
     DynamicBicycleCar3DRealistic,
 )

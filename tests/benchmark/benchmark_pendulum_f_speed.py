@@ -6,7 +6,7 @@ Run:
 
 import numpy as np
 
-from minilink.blocks.testing.basic import JaxPendulum
+from minilink.benchmark.scenario.basic import JaxPendulum
 from minilink.benchmark.f_speed import benchmark_f_speeds
 
 sys = JaxPendulum(damping=0.5)

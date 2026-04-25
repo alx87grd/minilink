@@ -18,12 +18,14 @@
 | `compile/` | **TRL 4** | `ExecutionPlan`, `DynamicsEvaluator`, NumPy/JAX evaluator backends |
 | `simulation/` | **TRL 4** | `Simulator`, solver backends, compile-backend selection (`"auto"` → try JAX, fall back to NumPy), optional auto fixed-step RK4 for long uniform grids with JAX, interpolation helpers |
 | `graphical/` | **TRL 2** | Matplotlib theming (`matplotlib_style`), env-aware layout, animation renderers; kinematic hooks still provisional (see §3.2, §4.7–4.8) |
-| `mechanics/` | **TRL 1** | Numeric and symbolic mechanics paths |
-| `physics/` | **TRL 1** | JAX contact-world MVP and demos |
-| `blocks/` | **TRL 0** | Early reusable blocks, not yet a stabilized library layer |
-| `benchmark/` | **TRL 1** | Optional timing helpers and no core dependency |
+| `mechanics/` | **TRL 1** | Numeric and symbolic mechanics paths (framework; concrete plants often live in `dynamics/`) |
+| `physics/` | **TRL 1** | JAX contact-world MVP (`engine_jax`, `PhysicsWorldSystem`); engine-backed dynamics, not folded into `dynamics/` |
+| `dynamics/` | **TRL 0** | Reusable **plant** models as `DynamicSystem` leaves (e.g. `vehicles/`, `msd/`, `pendulum/`) |
+| `blocks/` | **TRL 0** | Diagram primitives: sources, integrators, lightweight signal blocks — not full plants |
+| `benchmark/` | **TRL 1** | Optional timing helpers (`f_speed`, `simulation_speed`) and no core dependency |
+| `benchmark/scenario/` | **TRL 1** | Shared benchmark **scenarios** (stress systems and builders for timing matrices), not user plants |
 | `planning/` | **TRL 0** | Future planners |
-| `control/` | **TRL 0** | Future controllers |
+| `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
 ## 3. Core Contracts
 

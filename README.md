@@ -48,7 +48,7 @@ plot_trajectory(diagram, traj)
 - The compile pipeline, evaluators, and simulator are in architecture-validation / integration stage (`compile_backend` can be `"auto"`; long JAX sims may use an auto fixed-step path when the grid is uniform and non-stiff).
 - `graphical/` has a **stabilizing** matplotlib layer—shared Pyro-style sizing/theming in `matplotlib_style`, notebook-aware stacked plot height, and trajectory **plot** modes—while other renderers and hooks remain early work.
 - `mechanics/`, symbolic mechanics, and `physics/` are early MVP work.
-- `blocks/`, `planning/`, and `control/` are still exploratory rather than stabilized library layers.
+- `dynamics/` holds reusable plant models; `blocks/` is wiring and signal primitives; `control/` is controller blocks; `planning/` is not started; these layers are still maturing.
 
 ## Documentation Guide
 

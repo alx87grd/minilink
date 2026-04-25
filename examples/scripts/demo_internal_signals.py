@@ -3,7 +3,8 @@ from minilink.graphical.plotting import plot_signals
 
 import numpy as np
 
-from minilink.blocks.examples import Pendulum, PendulumPDController
+from minilink.control.pendulum_pd import PendulumPDController
+from minilink.dynamics.pendulum.pendulum import Pendulum
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
 

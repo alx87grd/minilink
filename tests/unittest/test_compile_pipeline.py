@@ -13,7 +13,7 @@ import unittest
 import numpy as np
 
 from minilink.blocks.basic import Integrator, PropController
-from minilink.blocks.sources import _array_module
+from minilink.jax_utils import array_module
 from minilink.compile.compiler import (
     build_execution_plan,
     check_algebraic_loops,
@@ -45,7 +45,7 @@ class _JAXFriendlyPropController(StaticSystem):
         if params is None:
             params = self.params
         Kp = params["Kp"]
-        xp = _array_module(u)
+        xp = array_module(u)
         r = u[0]
         y_ = u[1]
         return xp.array([Kp * (r - y_)])
@@ -65,11 +65,11 @@ class _JAXFriendlyIntegrator(DynamicSystem):
         if params is None:
             params = self.params
         k = params["k"]
-        xp = _array_module(x)
+        xp = array_module(x)
         return xp.array([k * u[0]])
 
     def h(self, x, u, t=0, params=None):
-        xp = _array_module(x)
+        xp = array_module(x)
         return xp.array([x[0]])
 
 

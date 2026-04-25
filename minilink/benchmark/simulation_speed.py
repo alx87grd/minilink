@@ -468,19 +468,19 @@ class StandardCase:
 
 
 def _pendulum_long() -> Any:
-    from minilink.blocks.testing.basic import make_pendulum
+    from minilink.benchmark.scenario.basic import make_pendulum
 
     return make_pendulum()
 
 
 def _spheres_short() -> Any:
-    from minilink.blocks.testing.engine import make_physics_many_spheres
+    from minilink.benchmark.scenario.engine import make_physics_many_spheres
 
     return make_physics_many_spheres(nx=6, ny=4)
 
 
 def _diagram_dense() -> Any:
-    from minilink.blocks.testing.network import make_dense_network
+    from minilink.benchmark.scenario.network import make_dense_network
 
     return make_dense_network(num_nodes=50, connections_per_node=5)
 

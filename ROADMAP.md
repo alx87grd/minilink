@@ -15,10 +15,11 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Mechanics** | **TRL 1** | Keep the numeric path functional and ready for user review |
 | **Symbolic mechanics** | **TRL 1** | Keep derivation/export workflows working for examples and review |
 | **Physics** | **TRL 1** | Keep JAX contact demos working and extend the MVP carefully |
-| **Blocks library** | **TRL 0** | Decide what belongs in a real reusable block library |
-| **Benchmark helpers** (`minilink.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; grow exports only when a stable need appears |
+| **Dynamics library** (`minilink.dynamics`) | **TRL 0** | Curated plant models; grow by domain (`vehicles/`, `msd/`, `pendulum/`, …) |
+| **Blocks library** (`minilink.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
+| **Benchmark helpers** (`minilink.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `benchmark/scenario/` holds shared stress scenarios |
 | **Planning** | **TRL 0** | Not started as a rated subsystem |
-| **Control** | **TRL 0** | Not started as a rated subsystem |
+| **Control** (`minilink.control`) | **TRL 0** | Controller blocks (starting with tutorial PD); expand as patterns stabilize |
 
 > [!NOTE]
 > Progress is tracked through **Task Readiness Levels (TRL 1-9)**. See [agent.md](agent.md) for the definitions and the 3-level verification strategy.
@@ -29,7 +30,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - **Architecture under active validation**: compilation, evaluators, and simulation (including `compile_backend="auto"` and optional auto-`rk4` path for long JAX runs—see `DESIGN.md` §4.5)
 - **Stabilizing UX layer (still not core-frozen)**: `graphical/` matplotlib look (`matplotlib_style`), env-aware stacked-figure height for notebooks vs console, and `plot_trajectory` / `System.plot_trajectory` **plot** modes (`"x"`, `"u"`, `"xu"`)
 - **Early MVP work**: non-matplotlib render paths, mechanics, symbolic mechanics, physics
-- **Exploratory / not stabilized**: blocks, planning, control
+- **Exploratory / not stabilized**: `dynamics/`, `blocks/`, `control/`, planning
 - **Still needs a clearer top-level package surface**: public exports and import story
 - **Benchmarks**: `minilink.benchmark` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
 

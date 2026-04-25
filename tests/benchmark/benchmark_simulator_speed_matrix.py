@@ -15,9 +15,9 @@ from minilink.benchmark.simulation_speed import (
     DEFAULT_SWEEP_PAIRS,
     benchmark_sim_speed_matrix,
 )
-from minilink.blocks.testing.basic import make_pendulum
-from minilink.blocks.testing.engine import make_physics_many_spheres
-from minilink.blocks.testing.network import make_dense_network
+from minilink.benchmark.scenario.basic import make_pendulum
+from minilink.benchmark.scenario.engine import make_physics_many_spheres
+from minilink.benchmark.scenario.network import make_dense_network
 
 USE_X64 = False
 jax.config.update("jax_enable_x64", USE_X64)

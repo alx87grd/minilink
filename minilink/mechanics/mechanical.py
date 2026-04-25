@@ -14,22 +14,10 @@ Equation of motion::
 
 from __future__ import annotations
 
-import functools
 import numpy as np
 
 from minilink.core.framework import DynamicSystem
-
-
-@functools.lru_cache(maxsize=1)
-def _jax_numpy():
-    """Return ``jax.numpy``; raises if JAX is not installed."""
-    try:
-        import jax.numpy as jnp
-    except ImportError as e:
-        raise ImportError(
-            "JaxMechanicalSystem requires JAX. Install with: pip install jax jaxlib"
-        ) from e
-    return jnp
+from minilink.jax_utils import require_jax_numpy
 
 
 class MechanicalSystem(DynamicSystem):
@@ -164,7 +152,7 @@ class JaxMechanicalSystem(DynamicSystem):
     Same manipulator equation as :class:`MechanicalSystem`, implemented with ``jax.numpy``.
 
     State is ``x = [q; dq]``, default output ``y = x``. Subclasses should build dynamics
-    with ``jax.numpy`` (see :func:`_jax_numpy`).
+    with ``jax.numpy`` (see :func:`~minilink.jax_utils.require_jax_numpy`).
     """
 
     def __init__(self, dof=1, actuators=None):
@@ -203,17 +191,17 @@ class JaxMechanicalSystem(DynamicSystem):
         self.outputs["y"].units = list(self.state.units)
 
     def H(self, q):
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.diag(jnp.ones(self.dof, dtype=dt))
 
     def C(self, q, dq):
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.zeros((self.dof, self.dof), dtype=dt)
 
     def B(self, q):
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         B = jnp.zeros((self.dof, self.m), dtype=dt)
         for i in range(min(self.m, self.dof)):
@@ -221,12 +209,12 @@ class JaxMechanicalSystem(DynamicSystem):
         return B
 
     def g(self, q):
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.zeros(self.dof, dtype=dt)
 
     def d(self, q, dq):
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.zeros(self.dof, dtype=dt)
 
@@ -236,7 +224,7 @@ class JaxMechanicalSystem(DynamicSystem):
         return [q, dq]
 
     def q2x(self, q, dq):
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.concatenate(
             [jnp.asarray(q, dtype=dt).ravel(), jnp.asarray(dq, dtype=dt).ravel()]
@@ -252,13 +240,13 @@ class JaxMechanicalSystem(DynamicSystem):
     def actuator_forces(self, q, dq, ddq, t=0):
         if self.dof != self.m:
             raise NotImplementedError
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         B = self.B(q)
         forces = self.generalized_forces(q, dq, ddq, t)
         return jnp.linalg.solve(B, forces)
 
     def ddq(self, q, dq, u, t=0):
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         u = jnp.asarray(u)
         H = self.H(q)
         C = self.C(q, dq)
@@ -269,7 +257,7 @@ class JaxMechanicalSystem(DynamicSystem):
         return jnp.linalg.solve(H, rhs)
 
     def f(self, x, u, t=0, params=None):
-        jnp = _jax_numpy()
+        jnp = require_jax_numpy()
         u = jnp.asarray(u)
         q, dq = self.x2q(x)
         ddq = self.ddq(q, dq, u, t)

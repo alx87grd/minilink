@@ -8,9 +8,9 @@ Uses the same truth pair and table style as :file:`benchmark_simulator_speed_mat
 """
 
 from minilink.benchmark.simulation_speed import benchmark_sim_speed_matrix
-from minilink.blocks.testing.basic import make_pendulum
-from minilink.blocks.testing.engine import make_physics_many_spheres
-from minilink.blocks.testing.network import make_dense_network
+from minilink.benchmark.scenario.basic import make_pendulum
+from minilink.benchmark.scenario.engine import make_physics_many_spheres
+from minilink.benchmark.scenario.network import make_dense_network
 
 # (solver, compile_backend) — only these pairs are run (edit freely).
 PAIRS = (

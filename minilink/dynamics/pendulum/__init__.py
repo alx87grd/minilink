@@ -1,0 +1,1 @@
+"""Pendulum-style rotational plants."""

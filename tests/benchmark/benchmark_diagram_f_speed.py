@@ -6,8 +6,8 @@ Run:
 
 import numpy as np
 
-from minilink.blocks.testing.network import build_deep_network
-from minilink.blocks.testing.network import make_dense_network
+from minilink.benchmark.scenario.network import build_deep_network
+from minilink.benchmark.scenario.network import make_dense_network
 from minilink.benchmark.f_speed import benchmark_f_speeds
 
 diag = make_dense_network(num_nodes=50, connections_per_node=5)
