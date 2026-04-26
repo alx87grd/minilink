@@ -19,7 +19,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Blocks library** (`minilink.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
 | **Benchmark helpers** (`minilink.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `benchmark/scenario/` holds shared stress scenarios |
 | **Planning** | **TRL 1** | Review deterministic planning family packages before implementing full solvers |
-| **Optimization** (`minilink.optimization`) | **TRL 1** | Thin backend adapter contracts for finite-dimensional mathematical programs |
+| **Optimization** (`minilink.optimization`) | **TRL 1** | Thin optimizer contracts for finite-dimensional mathematical programs |
 | **Control** (`minilink.control`) | **TRL 0** | Controller blocks (starting with tutorial PD); expand as patterns stabilize |
 
 > [!NOTE]
@@ -61,6 +61,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - Extend simulator-level forcing helpers beyond the new `compute_forced(...)` shortcut when richer experiment workflows become clearer
 - **Interactive integrator backends** (see `Animator.game` / `run_interactive` today): factor the fixed-step loop and Euler-only stepping behind a small **base class + pluggable backends**, mirroring the idea of `Simulator` + multiple integration schemes—so real-time loops can swap integrator without rewriting pygame/render glue
 - **Live I/O backends for interactive mode**: today live `u` is read only via **pygame keyboard** inside `Animator.game`; introduce a **base class + backends** (keyboard, **TCP/UDP or similar for cosimulation**, file replay, etc.). **Live output push** (streaming state to a peer) is out of scope for now but should stay easy to add beside the same abstraction—see comments in `minilink/graphical/animation.py` and `ROADMAP.md` §7
+- **Pluggable layout migration**: align `compile/` (evaluators as domain artifacts, `compilers/` for strategies; slim public façade), `simulation/`, and `graphical/` with [`pluggable_implementations.md`](pluggable_implementations.md) when those areas are refactored
 
 ## 4. Development Phases
 
@@ -85,6 +86,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - [ ] Top-level public exports in `minilink/__init__.py`
 - [ ] Solver configuration cleanup (partial: explicit SciPy `rtol`/`atol` on default presets; `COMPILE_BACKEND_AUTO` and auto-RK4 heuristic in code—still room for a `SimulationOptions`-style object)
 - [ ] Wiring validation and UX polish
+- [ ] Migrate `compile/`, `simulation/`, and `graphical/` package layout to [`pluggable_implementations.md`](pluggable_implementations.md) (evaluators/compilers split for compile; `solvers/` and `renderers/` patterns as documented)
 
 ### Phase 4: User-facing library growth
 

@@ -5,8 +5,8 @@ The optimization layer represents problems in the textbook form
 
 ``minimize J(z) subject to h(z) = 0, g(z) >= 0, lower <= z <= upper``.
 
-Domain packages such as planning own transcription details. Optimization
-backends only see finite-dimensional functions of the decision vector ``z``.
+Domain packages such as planning own transcription details. Optimizers
+only see finite-dimensional functions of the decision vector ``z``.
 """
 
 from __future__ import annotations
@@ -178,7 +178,7 @@ class MathematicalProgram:
 @dataclass(frozen=True)
 class OptimizationResult:
     """
-    Result returned by an optimization backend.
+    Result returned by an :class:`~minilink.optimization.optimizers.optimizer.Optimizer`.
     """
 
     z: np.ndarray

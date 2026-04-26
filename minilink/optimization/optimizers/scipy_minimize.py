@@ -1,5 +1,5 @@
 """
-SciPy optimization backend skeleton.
+SciPy :func:`scipy.optimize.minimize` optimizer skeleton.
 
 The first optimization pass keeps this as a reviewable contract. Full
 SciPy wiring is intentionally deferred until a concrete transcription
@@ -11,14 +11,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from minilink.optimization.backends import OptimizationBackend
-from minilink.optimization.problems import MathematicalProgram, OptimizationResult
+from minilink.optimization.mathematical_program import (
+    MathematicalProgram,
+    OptimizationResult,
+)
+from minilink.optimization.optimizers.optimizer import Optimizer
 
 
 @dataclass(frozen=True)
-class ScipyMinimizeBackend(OptimizationBackend):
+class ScipyMinimizeOptimizer(Optimizer):
     """
-    Skeleton for a future :func:`scipy.optimize.minimize` backend.
+    Skeleton for a future :func:`scipy.optimize.minimize` optimizer.
     """
 
     method: str = "SLSQP"
@@ -32,5 +35,5 @@ class ScipyMinimizeBackend(OptimizationBackend):
         after the deterministic planning architecture is reviewed.
         """
         raise NotImplementedError(
-            "ScipyMinimizeBackend.solve is deferred until architecture review"
+            "ScipyMinimizeOptimizer.solve is deferred until architecture review"
         )

@@ -4,27 +4,22 @@ import numpy as np
 
 from minilink.core.framework import System
 from minilink.core.trajectory import Trajectory
-from minilink.optimization.problems import (
+from minilink.optimization.mathematical_program import (
     EqualityConstraint,
     InequalityConstraint,
     MathematicalProgram,
     VariableBounds,
 )
-from minilink.optimization.scipy import ScipyMinimizeBackend
+from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.planning.costs import QuadraticCost
 from minilink.planning.policy_synthesis.dynamic_programming import (
     DynamicProgrammingPlanner,
 )
-from minilink.planning.policy_synthesis.results import PolicySynthesisResult
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.search.results import SearchResult
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.sets import BallSet, BoxSet, SingletonSet
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationTrajectoryOptimization,
-)
-from minilink.planning.trajectory_optimization.results import (
-    TrajectoryOptimizationResult,
+    DirectCollocationPlanner,
 )
 
 
@@ -48,7 +43,9 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
 
         singleton = SingletonSet(np.array([1.0, 2.0]))
-        np.testing.assert_allclose(singleton.residual(np.array([1.5, 1.0])), [0.5, -1.0])
+        np.testing.assert_allclose(
+            singleton.residual(np.array([1.5, 1.0])), [0.5, -1.0]
+        )
         self.assertTrue(singleton.contains(np.array([1.0, 2.0])))
 
         ball = BallSet(center=np.zeros(2), radius=1.0)
@@ -80,36 +77,18 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(evaluated.has_signal("cost"))
         self.assertGreaterEqual(cost.total_cost(traj), 0.0)
 
-    def test_trajectory_optimization_result_helpers(self):
-        traj = Trajectory(
-            t=np.array([0.0]),
-            x=np.zeros((2, 1)),
-            u=np.zeros((1, 1)),
+    def test_planner_require_result_before_solve(self):
+        sys = self.make_system()
+        cost = QuadraticCost.from_system(sys)
+        problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost)
+        dp = DynamicProgrammingPlanner(
+            problem,
+            x_grid_shape=(5, 5),
+            u_grid_shape=(3,),
+            dt=0.1,
         )
-        result = TrajectoryOptimizationResult.from_trajectory(traj, cost=1.2)
-
-        self.assertTrue(result.success)
-        self.assertTrue(result.has_traj)
-        self.assertIs(result.require_traj(), traj)
-        self.assertEqual(result.cost, 1.2)
-
         with self.assertRaises(ValueError):
-            TrajectoryOptimizationResult().require_traj()
-
-    def test_family_specific_result_helpers(self):
-        search = SearchResult(path=[np.array([0.0, 0.0])], success=True)
-        self.assertTrue(search.has_path)
-        self.assertEqual(len(search.require_path()), 1)
-
-        policy = object()
-        policy_result = PolicySynthesisResult(policy=policy, success=True)
-        self.assertTrue(policy_result.has_policy)
-        self.assertIs(policy_result.require_policy(), policy)
-
-        with self.assertRaises(ValueError):
-            SearchResult().require_path()
-        with self.assertRaises(ValueError):
-            PolicySynthesisResult().require_policy()
+            dp.require_result()
 
     def test_mathematical_program_constraints_are_backend_neutral(self):
         equality = EqualityConstraint(
@@ -131,7 +110,9 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertEqual(program.n_z, 2)
         self.assertEqual(program.objective(np.array([1.0, 2.0])), 5.0)
         np.testing.assert_allclose(equality.residual(np.array([0.25, 0.75])), [0.0])
-        np.testing.assert_allclose(inequality.margin(np.array([0.25, 0.75])), [0.25, 0.75])
+        np.testing.assert_allclose(
+            inequality.margin(np.array([0.25, 0.75])), [0.25, 0.75]
+        )
 
         with self.assertRaises(ValueError):
             MathematicalProgram(
@@ -145,11 +126,11 @@ class TestPlanningArchitecture(unittest.TestCase):
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost)
 
-        to = DirectCollocationTrajectoryOptimization(
+        to = DirectCollocationPlanner(
             problem,
             tf=1.0,
             n_steps=5,
-            optimizer_backend=ScipyMinimizeBackend(),
+            optimizer=ScipyMinimizeOptimizer(),
         )
         self.assertEqual(to.options.n_steps, 5)
 

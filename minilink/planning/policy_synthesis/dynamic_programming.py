@@ -2,8 +2,9 @@
 Dynamic-programming policy-synthesis skeletons.
 
 Dynamic programming consumes a deterministic planning problem and
-solver-owned discretization options, then returns policy/value artifacts
-through a policy-synthesis result.
+solver-owned discretization options. The intended primary artifact is a
+feedback policy packaged as a :class:`~minilink.core.framework.StaticSystem`
+(state in, control out).
 """
 
 from __future__ import annotations
@@ -12,8 +13,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.planning.policy_synthesis.base import PolicySynthesisPlanner
-from minilink.planning.policy_synthesis.results import PolicySynthesisResult
+from minilink.core.framework import StaticSystem
+from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 
 
@@ -57,7 +58,7 @@ class DynamicProgrammingOptions:
         object.__setattr__(self, "dt", dt)
 
 
-class DynamicProgrammingPlanner(PolicySynthesisPlanner):
+class DynamicProgrammingPlanner(Planner[StaticSystem]):
     """
     Skeleton for deterministic dynamic programming.
     """
@@ -78,9 +79,9 @@ class DynamicProgrammingPlanner(PolicySynthesisPlanner):
             dt=dt,
         )
 
-    def compute_solution(self) -> PolicySynthesisResult:
+    def compute_solution(self) -> StaticSystem:
         """
-        Compute a dynamic-programming policy result.
+        Compute a closed-loop policy as a static system.
 
         TODO: User Architectural Review - implement grid construction,
         Bellman updates, and controller reconstruction after the high-level

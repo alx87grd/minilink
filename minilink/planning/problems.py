@@ -3,8 +3,8 @@ Deterministic planning problem definitions.
 
 A :class:`PlanningProblem` describes the continuous mathematical task:
 the system, admissible sets, boundary sets, optional cost, and optional
-parameter bundle. Numerical grids, transcriptions, and solver backends
-belong to planners/solvers rather than to the problem object.
+parameter bundle. Numerical grids, transcriptions, optimizers, and planner
+internals belong to solver packages rather than to the problem object.
 """
 
 from __future__ import annotations

@@ -97,7 +97,9 @@ class CostFunction(ABC):
     ) -> float:
         """Return the trapezoidal running cost plus terminal cost."""
         evaluated = self.evaluate_trajectory(traj, params=params)
-        return float(evaluated.signals["cost"][0, -1] + self.terminal_cost(traj, params))
+        return float(
+            evaluated.signals["cost"][0, -1] + self.terminal_cost(traj, params)
+        )
 
 
 @dataclass(frozen=True)

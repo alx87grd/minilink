@@ -1,9 +1,13 @@
 """
-Base classes shared by deterministic planning families.
+Shared orchestration base for deterministic planners.
 
-Planner classes own the numerical method and return a family-specific
-result object. The :class:`~minilink.planning.problems.PlanningProblem`
-remains declarative and does not solve itself.
+Concrete planners live in family subpackages (``search/``,
+``trajectory_optimization/``, ``policy_synthesis/``). Each family picks a
+result type—typically :class:`~minilink.core.trajectory.Trajectory` for
+path and trajectory optimization, or :class:`~minilink.core.framework.StaticSystem`
+for synthesized feedback policies. The
+:class:`~minilink.planning.problems.PlanningProblem` remains declarative
+and does not solve itself.
 """
 
 from __future__ import annotations
@@ -11,6 +15,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
+from minilink.core.trajectory import Trajectory
 from minilink.planning.costs import CostFunction
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.sets import Set
@@ -20,7 +25,7 @@ ResultT = TypeVar("ResultT")
 
 class Planner(ABC, Generic[ResultT]):
     """
-    Mother class for deterministic planners.
+    Base class for deterministic planners.
 
     Parameters
     ----------
@@ -54,3 +59,19 @@ class Planner(ABC, Generic[ResultT]):
     def require_goal(self) -> Set:
         """Return ``problem.Xf`` or raise a solver-facing error."""
         return self.problem.require_goal()
+
+
+class TrajectoryPlanner(Planner[Trajectory]):
+    """
+    Planner whose primary artifact is a state-input trajectory.
+
+    Adds plotting and animation helpers that delegate to ``problem.sys``.
+    """
+
+    def plot_solution(self, *, plot: str = "xu"):
+        """Plot the latest trajectory with the problem system."""
+        return self.problem.sys.plot_trajectory(self.require_result(), plot=plot)
+
+    def animate_solution(self, **kwargs):
+        """Animate the latest trajectory with the problem system."""
+        return self.problem.sys.animate(self.require_result(), **kwargs)

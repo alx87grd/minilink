@@ -107,12 +107,19 @@ It separates the continuous mathematical problem from numerical solver choices:
   `h(x, t)` for terminal cost.
 - Set objects model `x(t) in X(t)`, `u(t) in U(x, t)`, `x(0) in X0`, and
   `x(tf) in Xf` through `contains(...)` and nonnegative `margin(...)`.
-- Solver/planner families live in subpackages: `search/` for feasibility/path
-  search, `trajectory_optimization/` for optimal trajectory generation, and
-  `policy_synthesis/` for value-function or feedback-policy computation.
-- Each family returns its own result object (`SearchResult`,
-  `TrajectoryOptimizationResult`, or `PolicySynthesisResult`) rather than a
-  wide shared envelope with many optional artifacts.
+- Planner implementations are grouped by family under subpackages: `search/`
+  for feasibility/path search, `trajectory_optimization/` for optimal trajectory
+  generation, and `policy_synthesis/` for feedback-policy computation. This is
+  the same “many implementations, one role” idea as ``optimizers/`` in
+  :mod:`minilink.optimization`, except each family may use a different result
+  type.
+- All families share :class:`~minilink.planning.planner.Planner` as the
+  orchestration base. The generic parameter is family-specific: search and
+  trajectory optimization typically return
+  :class:`~minilink.core.trajectory.Trajectory` via
+  :class:`~minilink.planning.planner.TrajectoryPlanner`; policy synthesis
+  targets a feedback law as :class:`~minilink.core.framework.StaticSystem`
+  (state in, control out).
 - Trajectory-optimization transcriptions may emit generic
   `minilink.optimization` mathematical programs of the form
   `minimize J(z)` subject to `h(z) = 0`, `g(z) >= 0`, and bounds on `z`.
@@ -120,6 +127,15 @@ It separates the continuous mathematical problem from numerical solver choices:
 This first pass is intentionally deterministic and high-level. Stochastic
 planning, chance constraints, belief states, and full direct-collocation/RRT/DP
 internals are deferred until the architecture is reviewed.
+
+### 3.6 Pluggable implementations layout
+
+How `minilink` arranges abstract contracts and concrete implementations
+(``optimization/optimizers``, ``planning/planner.py`` and family packages,
+future simulation solvers, renderers, compilers) is specified in
+[`pluggable_implementations.md`](pluggable_implementations.md). New work in
+`planning/` and `optimization/` follows that document; older packages are
+migrated when touched (see `ROADMAP.md`).
 
 ## 4. Compile and Simulation Architecture
 

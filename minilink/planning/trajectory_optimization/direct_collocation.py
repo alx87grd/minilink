@@ -3,7 +3,7 @@ Direct-collocation trajectory-optimization skeletons.
 
 This module reserves the direct-collocation API shape without implementing
 the nonlinear program. It records where grid/transcription settings and
-optimization backends live, while :class:`PlanningProblem` remains a pure
+finite-dimensional optimizers live, while :class:`PlanningProblem` remains a pure
 deterministic problem description.
 """
 
@@ -14,20 +14,18 @@ from typing import Any
 
 import numpy as np
 
-from minilink.optimization.backends import OptimizationBackend
-from minilink.optimization.scipy import ScipyMinimizeBackend
+from minilink.core.trajectory import Trajectory
+from minilink.optimization.optimizers.optimizer import Optimizer
+from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.planning.costs import CostFunction
+from minilink.planning.planner import TrajectoryPlanner
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.base import TrajectoryOptimizationPlanner
-from minilink.planning.trajectory_optimization.results import (
-    TrajectoryOptimizationResult,
-)
 
 
 @dataclass(frozen=True)
 class DirectCollocationOptions:
     """
-    Grid and backend options for direct-collocation transcriptions.
+    Grid and optimizer options for direct-collocation transcriptions.
 
     These are solver options, not fields on :class:`PlanningProblem`.
     """
@@ -35,9 +33,7 @@ class DirectCollocationOptions:
     tf: float
     n_steps: int
     compile_backend: str = "numpy"
-    optimizer_backend: OptimizationBackend = field(
-        default_factory=ScipyMinimizeBackend
-    )
+    optimizer: Optimizer = field(default_factory=ScipyMinimizeOptimizer)
 
     def __post_init__(self) -> None:
         tf = float(self.tf)
@@ -54,9 +50,9 @@ class DirectCollocationOptions:
         return np.linspace(0.0, self.tf, self.n_steps)
 
 
-class DirectCollocationTrajectoryOptimization(TrajectoryOptimizationPlanner):
+class DirectCollocationPlanner(TrajectoryPlanner):
     """
-    High-level direct-collocation planner skeleton.
+    Direct-collocation trajectory-optimization planner skeleton.
 
     The concrete nonlinear programming implementation is intentionally
     deferred so the planning architecture can be reviewed first.
@@ -68,7 +64,7 @@ class DirectCollocationTrajectoryOptimization(TrajectoryOptimizationPlanner):
         *,
         tf: float,
         n_steps: int,
-        optimizer_backend: OptimizationBackend | None = None,
+        optimizer: Optimizer | None = None,
         compile_backend: str = "numpy",
     ) -> None:
         super().__init__(problem)
@@ -77,11 +73,7 @@ class DirectCollocationTrajectoryOptimization(TrajectoryOptimizationPlanner):
             tf=tf,
             n_steps=n_steps,
             compile_backend=compile_backend,
-            optimizer_backend=(
-                ScipyMinimizeBackend()
-                if optimizer_backend is None
-                else optimizer_backend
-            ),
+            optimizer=(ScipyMinimizeOptimizer() if optimizer is None else optimizer),
         )
 
     @classmethod
@@ -94,9 +86,9 @@ class DirectCollocationTrajectoryOptimization(TrajectoryOptimizationPlanner):
         cost: CostFunction,
         tf: float,
         n_steps: int,
-        optimizer_backend: OptimizationBackend | None = None,
+        optimizer: Optimizer | None = None,
         compile_backend: str = "numpy",
-    ) -> DirectCollocationTrajectoryOptimization:
+    ) -> DirectCollocationPlanner:
         """Convenience constructor building a :class:`PlanningProblem`."""
         problem = PlanningProblem(
             sys=sys,
@@ -108,16 +100,16 @@ class DirectCollocationTrajectoryOptimization(TrajectoryOptimizationPlanner):
             problem,
             tf=tf,
             n_steps=n_steps,
-            optimizer_backend=optimizer_backend,
+            optimizer=optimizer,
             compile_backend=compile_backend,
         )
 
-    def compute_solution(self) -> TrajectoryOptimizationResult:
+    def compute_solution(self) -> Trajectory:
         """
-        Compute a direct-collocation result.
+        Compute a direct-collocation trajectory.
 
         TODO: User Architectural Review - implement decision packing,
-        dynamics residuals, set-to-constraint wrappers, and backend solve
+        dynamics residuals, set-to-constraint wrappers, and optimizer solve
         through a transcription object after reviewing this architecture.
         """
         raise NotImplementedError(

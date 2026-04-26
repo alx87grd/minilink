@@ -12,9 +12,9 @@ from typing import Any
 
 import numpy as np
 
+from minilink.core.trajectory import Trajectory
+from minilink.planning.planner import TrajectoryPlanner
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.search.base import SearchPlanner
-from minilink.planning.search.results import SearchResult
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ class SearchOptions:
         object.__setattr__(self, "max_nodes", int(self.max_nodes))
 
 
-class RRTPlanner(SearchPlanner):
+class RRTPlanner(TrajectoryPlanner):
     """
     Skeleton for a deterministic-problem RRT planner.
     """
@@ -56,12 +56,14 @@ class RRTPlanner(SearchPlanner):
         self.options = SearchOptions(dt=dt, max_nodes=max_nodes, seed=seed)
         self.sampler = sampler
 
-    def compute_solution(self) -> SearchResult:
+    def compute_solution(self) -> Trajectory:
         """
-        Compute an RRT result.
+        Compute a feasible trajectory.
 
         TODO: User Architectural Review - implement sampling, steering,
         nearest-neighbor search, and trajectory reconstruction after the
         high-level deterministic planning architecture is reviewed.
         """
-        raise NotImplementedError("RRT internals are deferred until architecture review")
+        raise NotImplementedError(
+            "RRT internals are deferred until architecture review"
+        )

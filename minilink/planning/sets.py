@@ -293,7 +293,9 @@ class CallableSet(Set):
         """Evaluate the user-supplied margin function."""
         if self.margin_fn is None:
             raise NotImplementedError("This CallableSet has no margin function")
-        return np.asarray(self.margin_fn(np.asarray(z, dtype=float), t, params), dtype=float)
+        return np.asarray(
+            self.margin_fn(np.asarray(z, dtype=float), t, params), dtype=float
+        )
 
     def contains(
         self,
