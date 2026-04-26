@@ -18,7 +18,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.optimization.optimizers.optimizer import Optimizer
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.planning.costs import CostFunction
-from minilink.planning.planner import TrajectoryPlanner
+from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 
 
@@ -50,7 +50,7 @@ class DirectCollocationOptions:
         return np.linspace(0.0, self.tf, self.n_steps)
 
 
-class DirectCollocationPlanner(TrajectoryPlanner):
+class DirectCollocationPlanner(Planner):
     """
     Direct-collocation trajectory-optimization planner skeleton.
 

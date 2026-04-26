@@ -109,17 +109,14 @@ It separates the continuous mathematical problem from numerical solver choices:
   `x(tf) in Xf` through `contains(...)` and nonnegative `margin(...)`.
 - Planner implementations are grouped by family under subpackages: `search/`
   for feasibility/path search, `trajectory_optimization/` for optimal trajectory
-  generation, and `policy_synthesis/` for feedback-policy computation. This is
-  the same “many implementations, one role” idea as ``optimizers/`` in
-  :mod:`minilink.optimization`, except each family may use a different result
-  type.
-- All families share :class:`~minilink.planning.planner.Planner` as the
-  orchestration base. The generic parameter is family-specific: search and
-  trajectory optimization typically return
-  :class:`~minilink.core.trajectory.Trajectory` via
-  :class:`~minilink.planning.planner.TrajectoryPlanner`; policy synthesis
-  targets a feedback law as :class:`~minilink.core.framework.StaticSystem`
-  (state in, control out).
+  generation, and `policy_synthesis/` for feedback-policy computation—parallel
+  in spirit to ``optimizers/`` under :mod:`minilink.optimization`, but with
+  family-specific concrete planners rather than a single swapped interface.
+- All families share one non-generic :class:`~minilink.planning.planner.Planner`
+  orchestration base. The object returned by :meth:`~minilink.planning.planner.Planner.compute_solution`
+  is defined by each concrete planner; there is no shared planning-result
+  envelope type yet. Helpers such as :meth:`~minilink.planning.planner.Planner.plot_solution`
+  assume the stored result is a :class:`~minilink.core.trajectory.Trajectory`.
 - Trajectory-optimization transcriptions may emit generic
   `minilink.optimization` mathematical programs of the form
   `minimize J(z)` subject to `h(z) = 0`, `g(z) >= 0`, and bounds on `z`.

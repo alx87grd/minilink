@@ -58,7 +58,7 @@ class DynamicProgrammingOptions:
         object.__setattr__(self, "dt", dt)
 
 
-class DynamicProgrammingPlanner(Planner[StaticSystem]):
+class DynamicProgrammingPlanner(Planner):
     """
     Skeleton for deterministic dynamic programming.
     """

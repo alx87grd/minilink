@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from minilink.core.trajectory import Trajectory
-from minilink.planning.planner import TrajectoryPlanner
+from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 
 
@@ -37,7 +37,7 @@ class SearchOptions:
         object.__setattr__(self, "max_nodes", int(self.max_nodes))
 
 
-class RRTPlanner(TrajectoryPlanner):
+class RRTPlanner(Planner):
     """
     Skeleton for a deterministic-problem RRT planner.
     """

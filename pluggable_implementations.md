@@ -10,7 +10,7 @@ Design and roadmap may link here; avoid duplicating the full spec elsewhere.
 
 2. **Singular contract module** — The abstract API lives in a module named after the role, not `base.py`:
    - `optimizers/optimizer.py` — ABC for mathematical-program solvers (`Optimizer`).
-   - `planning/planner.py` — shared planning orchestration (`Planner[ResultT]`, plus `TrajectoryPlanner` when the artifact is a trajectory), at the `planning` package root because it spans all planner families.
+   - `planning/planner.py` — shared planning orchestration (`Planner`), at the `planning` package root because it spans all planner families.
 
 3. **One file per concrete implementation** — e.g. `optimizers/scipy_minimize.py` for SciPy’s `minimize` adapter.
 
@@ -46,13 +46,13 @@ minilink/optimization/
 
 ```text
 minilink/planning/
-  planner.py                 # Planner[ResultT], TrajectoryPlanner
+  planner.py                 # Planner
   problems.py
   sets.py
   costs.py
-  search/                    # e.g. RRTPlanner(TrajectoryPlanner)
-  trajectory_optimization/   # e.g. DirectCollocationPlanner(TrajectoryPlanner)
-  policy_synthesis/          # e.g. DynamicProgrammingPlanner(Planner[StaticSystem])
+  search/                    # e.g. RRTPlanner(Planner)
+  trajectory_optimization/   # e.g. DirectCollocationPlanner(Planner)
+  policy_synthesis/          # e.g. DynamicProgrammingPlanner(Planner)
 ```
 
 ## Legacy layouts (migrate when touched)
