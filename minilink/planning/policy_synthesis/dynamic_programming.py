@@ -1,9 +1,9 @@
 """
-Dynamic-programming planner skeletons.
+Dynamic-programming policy-synthesis skeletons.
 
-Dynamic programming consumes a deterministic :class:`PlanningProblem`
-and solver-owned discretization options, then returns policy/value
-artifacts through :class:`~minilink.planning.solutions.PlanningSolution`.
+Dynamic programming consumes a deterministic planning problem and
+solver-owned discretization options, then returns policy/value artifacts
+through a policy-synthesis result.
 """
 
 from __future__ import annotations
@@ -12,9 +12,24 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.planning.planner import PolicyPlanner
+from minilink.planning.policy_synthesis.base import PolicySynthesisPlanner
+from minilink.planning.policy_synthesis.results import PolicySynthesisResult
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.solutions import PlanningSolution
+
+
+@dataclass(frozen=True)
+class GridSpec:
+    """
+    Lightweight grid specification for DP-style solvers.
+    """
+
+    shape: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        shape = tuple(int(v) for v in self.shape)
+        if any(v < 1 for v in shape):
+            raise ValueError("Grid dimensions must be positive")
+        object.__setattr__(self, "shape", shape)
 
 
 @dataclass(frozen=True)
@@ -42,7 +57,7 @@ class DynamicProgrammingOptions:
         object.__setattr__(self, "dt", dt)
 
 
-class DynamicProgrammingPlanner(PolicyPlanner):
+class DynamicProgrammingPlanner(PolicySynthesisPlanner):
     """
     Skeleton for deterministic dynamic programming.
     """
@@ -63,9 +78,9 @@ class DynamicProgrammingPlanner(PolicyPlanner):
             dt=dt,
         )
 
-    def compute_solution(self) -> PlanningSolution:
+    def compute_solution(self) -> PolicySynthesisResult:
         """
-        Compute a dynamic-programming policy solution.
+        Compute a dynamic-programming policy result.
 
         TODO: User Architectural Review - implement grid construction,
         Bellman updates, and controller reconstruction after the high-level

@@ -18,7 +18,8 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Dynamics library** (`minilink.dynamics`) | **TRL 0** | Curated plant models; grow by domain (`vehicles/`, `msd/`, `pendulum/`, …) |
 | **Blocks library** (`minilink.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
 | **Benchmark helpers** (`minilink.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `benchmark/scenario/` holds shared stress scenarios |
-| **Planning** | **TRL 1** | Review deterministic planning architecture MVP before implementing full solvers |
+| **Planning** | **TRL 1** | Review deterministic planning family packages before implementing full solvers |
+| **Optimization** (`minilink.optimization`) | **TRL 1** | Thin backend adapter contracts for finite-dimensional mathematical programs |
 | **Control** (`minilink.control`) | **TRL 0** | Controller blocks (starting with tutorial PD); expand as patterns stabilize |
 
 > [!NOTE]
@@ -30,7 +31,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - **Architecture under active validation**: compilation, evaluators, and simulation (including `compile_backend="auto"` and optional auto-`rk4` path for long JAX runs—see `DESIGN.md` §4.5)
 - **Stabilizing UX layer (still not core-frozen)**: `graphical/` matplotlib look (`matplotlib_style`), env-aware stacked-figure height for notebooks vs console, and `plot_trajectory` / `System.plot_trajectory` **plot** modes (`"x"`, `"u"`, `"xu"`)
 - **Early MVP work**: non-matplotlib render paths, mechanics, symbolic mechanics, physics
-- **Exploratory / not stabilized**: `dynamics/`, `blocks/`, `control`; `planning` now has deterministic architecture contracts awaiting review
+- **Exploratory / not stabilized**: `dynamics/`, `blocks/`, `control`; `planning` now has family-level deterministic architecture contracts awaiting review
 - **Pyro-style plant ports (in progress)**: `dynamics/pendulum/` now includes `CartPole` and `DoublePendulum` on `MechanicalSystem` (see `DESIGN.md` §2.1)
 - **Still needs a clearer top-level package surface**: public exports and import story
 - **Benchmarks**: `minilink.benchmark` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
@@ -49,7 +50,8 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - Introduce a `SimulationOptions` dataclass or equivalent solver-config surface
 - Finish clarifying the high-level public API and top-level exports
 - Review deterministic planning contracts (`PlanningProblem`, sets, costs,
-  `PlanningSolution`) before implementing full direct-collocation/RRT/DP solvers
+  family-specific result types, and trajectory transcriptions) before
+  implementing full direct-collocation/RRT/DP solvers
 
 ### P2
 

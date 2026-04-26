@@ -4,15 +4,27 @@ import numpy as np
 
 from minilink.core.framework import System
 from minilink.core.trajectory import Trajectory
+from minilink.optimization.problems import (
+    EqualityConstraint,
+    InequalityConstraint,
+    MathematicalProgram,
+    VariableBounds,
+)
+from minilink.optimization.scipy import ScipyMinimizeBackend
 from minilink.planning.costs import QuadraticCost
-from minilink.planning.dynamic_programming import DynamicProgrammingPlanner
-from minilink.planning.optimization_backends import ScipyMinimizeBackend
+from minilink.planning.policy_synthesis.dynamic_programming import (
+    DynamicProgrammingPlanner,
+)
+from minilink.planning.policy_synthesis.results import PolicySynthesisResult
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.search import RRTPlanner
+from minilink.planning.search.results import SearchResult
+from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.sets import BallSet, BoxSet, SingletonSet
-from minilink.planning.solutions import PlanningSolution
-from minilink.planning.trajectory_optimization import (
+from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTrajectoryOptimization,
+)
+from minilink.planning.trajectory_optimization.results import (
+    TrajectoryOptimizationResult,
 )
 
 
@@ -68,21 +80,65 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(evaluated.has_signal("cost"))
         self.assertGreaterEqual(cost.total_cost(traj), 0.0)
 
-    def test_planning_solution_helpers(self):
+    def test_trajectory_optimization_result_helpers(self):
         traj = Trajectory(
             t=np.array([0.0]),
             x=np.zeros((2, 1)),
             u=np.zeros((1, 1)),
         )
-        solution = PlanningSolution.from_trajectory(traj, cost=1.2)
+        result = TrajectoryOptimizationResult.from_trajectory(traj, cost=1.2)
 
-        self.assertTrue(solution.success)
-        self.assertTrue(solution.has_traj)
-        self.assertIs(solution.require_traj(), traj)
-        self.assertEqual(solution.cost, 1.2)
+        self.assertTrue(result.success)
+        self.assertTrue(result.has_traj)
+        self.assertIs(result.require_traj(), traj)
+        self.assertEqual(result.cost, 1.2)
 
         with self.assertRaises(ValueError):
-            PlanningSolution().require_traj()
+            TrajectoryOptimizationResult().require_traj()
+
+    def test_family_specific_result_helpers(self):
+        search = SearchResult(path=[np.array([0.0, 0.0])], success=True)
+        self.assertTrue(search.has_path)
+        self.assertEqual(len(search.require_path()), 1)
+
+        policy = object()
+        policy_result = PolicySynthesisResult(policy=policy, success=True)
+        self.assertTrue(policy_result.has_policy)
+        self.assertIs(policy_result.require_policy(), policy)
+
+        with self.assertRaises(ValueError):
+            SearchResult().require_path()
+        with self.assertRaises(ValueError):
+            PolicySynthesisResult().require_policy()
+
+    def test_mathematical_program_constraints_are_backend_neutral(self):
+        equality = EqualityConstraint(
+            h=lambda z: np.array([z[0] + z[1] - 1.0]),
+            name="sum_to_one",
+        )
+        inequality = InequalityConstraint(
+            g=lambda z: np.array([z[0], z[1]]),
+            name="nonnegative",
+        )
+        program = MathematicalProgram(
+            J=lambda z: float(z.T @ z),
+            z0=np.array([0.5, 0.5]),
+            bounds=VariableBounds(lower=np.zeros(2), upper=np.ones(2)),
+            equalities=(equality,),
+            inequalities=(inequality,),
+        )
+
+        self.assertEqual(program.n_z, 2)
+        self.assertEqual(program.objective(np.array([1.0, 2.0])), 5.0)
+        np.testing.assert_allclose(equality.residual(np.array([0.25, 0.75])), [0.0])
+        np.testing.assert_allclose(inequality.margin(np.array([0.25, 0.75])), [0.25, 0.75])
+
+        with self.assertRaises(ValueError):
+            MathematicalProgram(
+                J=lambda z: 0.0,
+                z0=np.zeros(2),
+                bounds=VariableBounds(lower=np.zeros(3)),
+            )
 
     def test_solver_skeletons_validate_architecture_inputs(self):
         sys = self.make_system()

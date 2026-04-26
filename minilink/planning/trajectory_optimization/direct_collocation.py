@@ -1,5 +1,5 @@
 """
-Trajectory-optimization planner skeletons.
+Direct-collocation trajectory-optimization skeletons.
 
 This module reserves the direct-collocation API shape without implementing
 the nonlinear program. It records where grid/transcription settings and
@@ -14,14 +14,14 @@ from typing import Any
 
 import numpy as np
 
+from minilink.optimization.backends import OptimizationBackend
+from minilink.optimization.scipy import ScipyMinimizeBackend
 from minilink.planning.costs import CostFunction
-from minilink.planning.optimization_backends import (
-    OptimizationBackend,
-    ScipyMinimizeBackend,
-)
-from minilink.planning.planner import TrajectoryPlanner
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.solutions import PlanningSolution
+from minilink.planning.trajectory_optimization.base import TrajectoryOptimizationPlanner
+from minilink.planning.trajectory_optimization.results import (
+    TrajectoryOptimizationResult,
+)
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class DirectCollocationOptions:
         return np.linspace(0.0, self.tf, self.n_steps)
 
 
-class DirectCollocationTrajectoryOptimization(TrajectoryPlanner):
+class DirectCollocationTrajectoryOptimization(TrajectoryOptimizationPlanner):
     """
     High-level direct-collocation planner skeleton.
 
@@ -112,13 +112,13 @@ class DirectCollocationTrajectoryOptimization(TrajectoryPlanner):
             compile_backend=compile_backend,
         )
 
-    def compute_solution(self) -> PlanningSolution:
+    def compute_solution(self) -> TrajectoryOptimizationResult:
         """
-        Compute a direct-collocation solution.
+        Compute a direct-collocation result.
 
         TODO: User Architectural Review - implement decision packing,
-        dynamics residuals, set-to-inequality wrappers, and backend solve
-        after reviewing the high-level planning architecture.
+        dynamics residuals, set-to-constraint wrappers, and backend solve
+        through a transcription object after reviewing this architecture.
         """
         raise NotImplementedError(
             "Direct collocation internals are deferred until architecture review"

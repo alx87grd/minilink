@@ -24,7 +24,8 @@
 | `blocks/` | **TRL 0** | Diagram primitives: sources, integrators, lightweight signal blocks — not full plants |
 | `benchmark/` | **TRL 1** | Optional timing helpers (`f_speed`, `simulation_speed`) and no core dependency |
 | `benchmark/scenario/` | **TRL 1** | Shared benchmark **scenarios** (stress systems and builders for timing matrices), not user plants |
-| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`, planning-owned costs and allowable sets, standard `PlanningSolution`, and solver-family skeletons |
+| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`, planning-owned costs and allowable sets, and solver-family packages for search, trajectory optimization, and policy synthesis |
+| `optimization/` | **TRL 1** | Thin finite-dimensional mathematical-program contracts shared by planning and future control workflows |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
 ### 2.1 Notes (dynamics + mechanics)
@@ -106,10 +107,15 @@ It separates the continuous mathematical problem from numerical solver choices:
   `h(x, t)` for terminal cost.
 - Set objects model `x(t) in X(t)`, `u(t) in U(x, t)`, `x(0) in X0`, and
   `x(tf) in Xf` through `contains(...)` and nonnegative `margin(...)`.
-- Solver/planner objects own discretization, transcriptions, compile backend,
-  optimizer backend, sampling settings, and grid settings.
-- `PlanningSolution` is the standard result envelope for trajectories,
-  controllers, search paths/trees, value functions, policies, cost, and stats.
+- Solver/planner families live in subpackages: `search/` for feasibility/path
+  search, `trajectory_optimization/` for optimal trajectory generation, and
+  `policy_synthesis/` for value-function or feedback-policy computation.
+- Each family returns its own result object (`SearchResult`,
+  `TrajectoryOptimizationResult`, or `PolicySynthesisResult`) rather than a
+  wide shared envelope with many optional artifacts.
+- Trajectory-optimization transcriptions may emit generic
+  `minilink.optimization` mathematical programs of the form
+  `minimize J(z)` subject to `h(z) = 0`, `g(z) >= 0`, and bounds on `z`.
 
 This first pass is intentionally deterministic and high-level. Stochastic
 planning, chance constraints, belief states, and full direct-collocation/RRT/DP

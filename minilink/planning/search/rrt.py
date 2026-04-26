@@ -1,8 +1,8 @@
 """
-Search-style deterministic planner skeletons.
+RRT-family deterministic search planner skeletons.
 
-RRT and related planners belong in this family. They may use random
-sampling internally, but the problem statement remains deterministic.
+This module reserves the RRT API shape without implementing sampling,
+steering, nearest-neighbor search, or trajectory reconstruction.
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ from typing import Any
 
 import numpy as np
 
-from minilink.planning.planner import SearchPlanner
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.solutions import PlanningSolution
+from minilink.planning.search.base import SearchPlanner
+from minilink.planning.search.results import SearchResult
 
 
 @dataclass(frozen=True)
@@ -56,9 +56,9 @@ class RRTPlanner(SearchPlanner):
         self.options = SearchOptions(dt=dt, max_nodes=max_nodes, seed=seed)
         self.sampler = sampler
 
-    def compute_solution(self) -> PlanningSolution:
+    def compute_solution(self) -> SearchResult:
         """
-        Compute an RRT solution.
+        Compute an RRT result.
 
         TODO: User Architectural Review - implement sampling, steering,
         nearest-neighbor search, and trajectory reconstruction after the
