@@ -42,12 +42,12 @@ optimizer = ScipyMinimizeOptimizer(
     options={
         "disp": True,
         "maxiter": 500,
-        "ftol": 1e-2,
+        "ftol": 1e-1,
     }
 )
 planner = JaxDirectCollocationPlanner(
     problem,
-    tf=5.0,
+    tf=4.0,
     n_steps=50,
     optimizer=optimizer,
     compile_backend="jax",
