@@ -6,7 +6,7 @@ Usage:
 """
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import System
+from minilink.core.system import System
 
 
 class FeedthroughSystem(System):

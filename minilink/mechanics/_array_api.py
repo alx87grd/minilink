@@ -18,7 +18,7 @@ def array_module(x):
     Parameters
     ----------
     x : array-like
-        Typically the state vector passed to :meth:`~minilink.core.framework.System.f`.
+        Typically the state vector passed to :meth:`~minilink.core.system.System.f`.
 
     Returns
     -------

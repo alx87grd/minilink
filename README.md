@@ -17,8 +17,8 @@ Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/vi
 ## Quick Start
 
 ```python
-from minilink.blocks.basic import Integrator
-from minilink.blocks.sources import Step
+from minilink.core.blocks.basic import Integrator
+from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.graphical.plotting import plot_trajectory
 from minilink.simulation.simulator import Simulator
@@ -48,7 +48,7 @@ plot_trajectory(diagram, traj)
 - The compile pipeline, evaluators, and simulator are in architecture-validation / integration stage (`compile_backend` can be `"auto"`; long JAX sims may use an auto fixed-step path when the grid is uniform and non-stiff).
 - `graphical/` has a **stabilizing** matplotlib layer—`matplotlib_style` sizing and theming, notebook-aware stacked plot height, and trajectory **plot** modes—while other renderers and hooks remain early work.
 - `mechanics/`, symbolic mechanics, and `physics/` are early MVP work.
-- `dynamics/` holds reusable plant models; `blocks/` is wiring and signal primitives; `control/` is controller blocks; `planning/` has early family-level architecture contracts; these layers are still maturing.
+- `dynamics/` holds reusable plant models; `core/blocks/` is wiring and signal primitives; `control/` is controller blocks; `planning/` has early family-level architecture contracts; these layers are still maturing.
 - `dynamics/pendulum/` includes tutorial `CartPole` and `DoublePendulum` on `MechanicalSystem`; see `tests/manual/demo_cartpole_doublependulum.py` for a quick animation smoke script.
 
 ## Documentation Guide

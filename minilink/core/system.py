@@ -1,5 +1,5 @@
 """
-Core Framework Definitions
+System, signals, and ports
 
 This module defines the foundational modeling classes for minilink.
 It includes base signal representations (`VectorSignal`, `InputPort`,
@@ -102,7 +102,7 @@ class OutputPort(VectorSignal):
     compute : callable
         The function used to compute the signal value based on the inputs, state, time, and parameters.
         Signature: ``compute(x, u, t, params=None) -> np.ndarray``.
-        Purity is not enforced by the framework (same contract as :meth:`System.f`).
+        Purity is not enforced by the library (same contract as :meth:`System.f`).
     dependencies : list of str, tuple, or "all"
         The list of `InputPort` IDs that this output directly depends on for immediate feedthrough.
         - `"all"`: depends on all inputs of the system (safest, but can create false algebraic loops in MIMO systems).
@@ -247,7 +247,7 @@ class System:
         Compute the state derivative `dx/dt`.
 
         Subclasses should treat this as a function of ``(x, u, t, params)`` only; the
-        framework does not verify purity (see :class:`System` class docstring).
+        the library does not verify purity (see :class:`System` class docstring).
 
         Parameters
         ----------

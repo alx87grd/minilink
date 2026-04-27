@@ -2,8 +2,8 @@ import unittest
 
 import numpy as np
 
-from minilink.blocks.basic import Integrator, PropController
-from minilink.blocks.sources import Source, Step
+from minilink.core.blocks.basic import Integrator, PropController
+from minilink.core.blocks.sources import Source, Step
 
 
 class TestBlocks(unittest.TestCase):

@@ -112,7 +112,7 @@ class StateOperation:
         Total dimension of the assembled local input vector.
     bound_params : dict | None
         Same semantics as :attr:`PortOperation.bound_params` for ``f_func``
-        (``params`` dict snapshot only; see :class:`minilink.core.framework.System`).
+        (``params`` dict snapshot only; see :class:`minilink.core.system.System`).
     """
 
     f_func: Callable[..., np.ndarray]

@@ -14,7 +14,7 @@ from minilink.benchmark.simulation_speed import (
     benchmark_sim_speed_matrix,
     format_benchmark_backend_label,
 )
-from minilink.core.framework import DynamicSystem
+from minilink.core.system import DynamicSystem
 
 
 class _TinyStable(DynamicSystem):

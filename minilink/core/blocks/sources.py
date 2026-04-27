@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.interpolate import interp1d
 
-from minilink.core.framework import System
+from minilink.core.system import System
 from minilink.jax_utils import array_module
 
 
@@ -175,7 +175,7 @@ class WhiteNoise(Source):
 
         return y
 
-    ###################################################################
+    ######################################################################
 
 
 if __name__ == "__main__":

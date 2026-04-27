@@ -127,7 +127,7 @@ def compile_diagram(
     -----
     ``bind_params=True`` snapshots only each subsystem's ``params`` dict into the plan.
     It does **not** make user ``f`` / port ``compute`` implementations pure if they still
-    read or mutate other instance state; see :class:`minilink.core.framework.System`.
+    read or mutate other instance state; see :class:`minilink.core.system.System`.
     """
     t_total = time.perf_counter() if verbose else None
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.core.framework import DynamicSystem
+from minilink.core.system import DynamicSystem
 
 try:
     import jax.numpy as jnp

@@ -13,7 +13,6 @@ import unittest
 import numpy as np
 import pytest
 
-from minilink.blocks.basic import Integrator, PropController
 from minilink.compile.compiler import (
     build_execution_plan,
     check_algebraic_loops,
@@ -21,8 +20,9 @@ from minilink.compile.compiler import (
 )
 from minilink.compile.execution_plan import ExecutionPlan
 from minilink.compile.numpy_evaluator import NumpyDiagramEvaluator
+from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import DynamicSystem, StaticSystem, System
+from minilink.core.system import DynamicSystem, StaticSystem, System
 from minilink.jax_utils import array_module
 
 # ── Helper: reusable test diagrams ───────────────────────────────────

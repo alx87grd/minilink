@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from minilink.core.framework import System
+from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     EqualityConstraint,

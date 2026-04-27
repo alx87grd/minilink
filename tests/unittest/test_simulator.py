@@ -5,7 +5,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from minilink.core.framework import DynamicSystem
+from minilink.core.system import DynamicSystem
 from minilink.jax_utils import array_module
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
 

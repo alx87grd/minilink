@@ -3,7 +3,7 @@ Dynamic-programming policy-synthesis skeletons.
 
 Dynamic programming consumes a deterministic planning problem and
 solver-owned discretization options. The intended primary artifact is a
-feedback policy packaged as a :class:`~minilink.core.framework.StaticSystem`
+feedback policy packaged as a :class:`~minilink.core.system.StaticSystem`
 (state in, control out).
 """
 
@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.framework import StaticSystem
+from minilink.core.system import StaticSystem
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 

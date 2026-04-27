@@ -1,4 +1,4 @@
-from minilink.blocks.sources import WhiteNoise, Step
+from minilink.core.blocks.sources import WhiteNoise, Step
 import numpy as np
 
 

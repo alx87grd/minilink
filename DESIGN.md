@@ -14,14 +14,13 @@
 
 | Module | Status | Description |
 | --- | --- | --- |
-| `core/` | **TRL 7** | Main modeling abstractions plus the canonical `Trajectory` in `trajectory.py` |
+| `core/` | **TRL 7** | Main modeling abstractions; `core/blocks/` diagram primitives (sources, integrators, lightweight signal blocks—not full plants); canonical `Trajectory` in `trajectory.py` |
 | `compile/` | **TRL 4** | `ExecutionPlan`, `DynamicsEvaluator`, NumPy/JAX evaluator backends |
 | `simulation/` | **TRL 4** | `Simulator`, solver backends, compile-backend selection (`"auto"` → try JAX, fall back to NumPy), optional auto fixed-step RK4 for long uniform grids with JAX, interpolation helpers |
 | `graphical/` | **TRL 2** | Matplotlib theming (`matplotlib_style`), env-aware layout, animation renderers; kinematic hooks still provisional (see §3.2, §4.7–4.8) |
 | `mechanics/` | **TRL 1** | Numeric and symbolic mechanics paths (framework; concrete plants often live in `dynamics/`) |
 | `physics/` | **TRL 1** | JAX contact-world MVP (`engine_jax`, `PhysicsWorldSystem`); engine-backed dynamics, not folded into `dynamics/` |
 | `dynamics/` | **TRL 0** | Reusable **plant** models as `DynamicSystem` leaves (e.g. `vehicles/`, `msd/`, `pendulum/`) |
-| `blocks/` | **TRL 0** | Diagram primitives: sources, integrators, lightweight signal blocks — not full plants |
 | `benchmark/` | **TRL 1** | Optional timing helpers (`f_speed`, `simulation_speed`) and no core dependency |
 | `benchmark/scenario/` | **TRL 1** | Shared benchmark **scenarios** (stress systems and builders for timing matrices), not user plants |
 | `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`, planning-owned costs and allowable sets, and solver-family packages for search, trajectory optimization, and policy synthesis |

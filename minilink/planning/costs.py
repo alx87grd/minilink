@@ -6,7 +6,7 @@ The planning cost follows the textbook optimal-control form
 ``J = integral g(x, u, t) dt + h(x(tf), tf)``.
 
 Costs live in :mod:`minilink.planning`, not on
-:class:`~minilink.core.framework.System`, so the same model can be reused
+:class:`~minilink.core.system.System`, so the same model can be reused
 across many planning problems.
 """
 

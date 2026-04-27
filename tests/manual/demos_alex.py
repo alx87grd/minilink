@@ -1,8 +1,8 @@
 import numpy as np
 
-from minilink.blocks.sources import Step, WhiteNoise
+from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, StaticSystem
 from minilink.graphical.plotting import plot_trajectory
 from minilink.simulation.simulator import Simulator
 

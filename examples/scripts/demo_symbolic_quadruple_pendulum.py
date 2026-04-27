@@ -3,7 +3,7 @@ Quadruple planar pendulum — symbolic derivation (Lagrange / Kane) and minilink
 
 Mirrors the pymotion quadruple_pendulum example: DH chain, derive EoM, export to a
 NumPy :class:`~minilink.mechanics.mechanical.MechanicalSystem`, simulate with
-:meth:`~minilink.core.framework.System.compute_trajectory`.
+:meth:`~minilink.core.system.System.compute_trajectory`.
 
 Symbolic derivation of 4×4 H, C, g can take tens of seconds on first run.
 """

@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.framework import DynamicSystem
+from minilink.core.system import DynamicSystem
 from minilink.graphical.primitives import (
     Circle,
     Rod,

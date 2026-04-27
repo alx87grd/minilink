@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from minilink.core.framework import (
+from minilink.core.system import (
     DynamicSystem,
     StaticSystem,
     System,

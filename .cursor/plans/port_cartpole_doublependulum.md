@@ -16,7 +16,7 @@ Related pyro variants (`RotatingCartPole`, `Acrobot`, `InvertedPendulum`, …) a
 Rationale:
 
 - `minilink/mechanics/mechanical.py` already defines the base `MechanicalSystem` (and `JaxMechanicalSystem`). Concrete subclasses that override `H`, `C`, `B`, `g`, `d` belong right next to it — exactly how pyro keeps `pyro/dynamic/{pendulum,cartpole,manipulator,...}.py` next to `pyro/dynamic/mechanical.py`.
-- `minilink/blocks/` is explicitly documented in `DESIGN.md` as "Early reusable blocks, not yet a stabilized library layer" (TRL 0). It's the right home for sources, controllers, and small reusable I/O blocks, not for full mechanical models.
+- `minilink/core/blocks/` is documented in `DESIGN.md` as diagram primitives (TRL 0). It's the right home for sources, controllers, and small reusable I/O blocks, not for full mechanical models.
 - Keep imports explicit, e.g. `from minilink.mechanics.<defining_module> import CartPole, DoublePendulum` (see `agent.md` for package-`__init__` policy).
 - `blocks/examples.py::Pendulum` and `blocks/dynamic_bicycle.py` predate this convention; leaving them where they are is fine for now. New mechanical systems should default to `mechanics/`.
 

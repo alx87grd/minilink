@@ -16,7 +16,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Symbolic mechanics** | **TRL 1** | Keep derivation/export workflows working for examples and review |
 | **Physics** | **TRL 1** | Keep JAX contact demos working and extend the MVP carefully |
 | **Dynamics library** (`minilink.dynamics`) | **TRL 0** | Curated plant models; grow by domain (`vehicles/`, `msd/`, `pendulum/`, …) |
-| **Blocks library** (`minilink.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
+| **Blocks library** (`minilink.core.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
 | **Benchmark helpers** (`minilink.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `benchmark/scenario/` holds shared stress scenarios |
 | **Planning** | **TRL 1** | Review deterministic planning family packages before implementing full solvers |
 | **Optimization** (`minilink.optimization`) | **TRL 1** | Thin optimizer contracts for finite-dimensional mathematical programs |
@@ -27,11 +27,12 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 
 ## 2. Repository Snapshot
 
+- **Diagram primitives layout**: reusable sources, integrators, and small signal blocks live under **`minilink.core.blocks`** (nested in `core/`), not a top-level `minilink.blocks` package.
 - **Most mature today**: `core/` and the system/diagram composition model
 - **Architecture under active validation**: compilation, evaluators, and simulation (including `compile_backend="auto"` and optional auto-`rk4` path for long JAX runs—see `DESIGN.md` §4.5)
 - **Stabilizing UX layer (still not core-frozen)**: `graphical/` matplotlib look (`matplotlib_style`), env-aware stacked-figure height for notebooks vs console, and `plot_trajectory` / `System.plot_trajectory` **plot** modes (`"x"`, `"u"`, `"xu"`)
 - **Early MVP work**: non-matplotlib render paths, mechanics, symbolic mechanics, physics
-- **Exploratory / not stabilized**: `dynamics/`, `blocks/`, `control`; `planning` now has family-level deterministic architecture contracts awaiting review
+- **Exploratory / not stabilized**: `dynamics/`, `core/blocks/`, `control`; `planning` now has family-level deterministic architecture contracts awaiting review
 - **Pyro-style plant ports (in progress)**: `dynamics/pendulum/` now includes `CartPole` and `DoublePendulum` on `MechanicalSystem` (see `DESIGN.md` §2.1)
 - **Still needs a clearer top-level package surface**: public exports and import story
 - **Benchmarks**: `minilink.benchmark` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
@@ -78,6 +79,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - [x] Add NumPy and JAX diagram evaluators
 - [x] Move simulation to `minilink.simulation`
 - [x] Move the official trajectory object to `minilink.core.trajectory`
+- [x] Move diagram primitives from top-level `blocks/` into `core/blocks/` (import `minilink.core.blocks`)
 - [x] Move internal-signal reconstruction to `DiagramSystem`
 
 ### Phase 3: Integration and API cleanup

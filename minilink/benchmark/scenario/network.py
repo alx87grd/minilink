@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.blocks.sources import Source
+from minilink.core.blocks.sources import Source
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import System
+from minilink.core.system import System
 
 
 class SimpleGain(System):

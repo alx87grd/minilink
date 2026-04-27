@@ -874,7 +874,7 @@ def benchmark_sim_speed_matrix(
     truth_solver, truth_backend
         Reference for error and for the speed column denominator.
     compile_once
-        If ``True`` (default), one :func:`~minilink.core.framework.System.compile` per
+        If ``True`` (default), one :func:`~minilink.core.system.System.compile` per
         **backend** (cached across the matrix) and ``n_runs`` timed solves per cell; table
         columns: ``cmp / solve / std`` (``cmp`` is the one-time cost for that backend in
         this run). If ``False``, full rebuild every timed iteration; table columns:

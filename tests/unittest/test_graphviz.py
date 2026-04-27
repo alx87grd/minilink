@@ -1,6 +1,6 @@
 import unittest
 
-from minilink.blocks.basic import Integrator, PropController
+from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.diagram import DiagramSystem
 from minilink.graphical.graphe import (
     get_diagram_graphe,
