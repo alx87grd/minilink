@@ -13,17 +13,17 @@ import unittest
 import numpy as np
 import pytest
 
-from minilink.blocks.basic import Integrator, PropController
 from minilink.compile.compiler import (
     build_execution_plan,
     check_algebraic_loops,
     compile_diagram,
 )
+from minilink.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
 from minilink.compile.execution_plan import ExecutionPlan
-from minilink.compile.numpy_evaluator import NumpyDiagramEvaluator
+from minilink.compile.jax_utils import array_module
+from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import DynamicSystem, StaticSystem, System
-from minilink.jax_utils import array_module
+from minilink.core.system import DynamicSystem, StaticSystem, System
 
 # ── Helper: reusable test diagrams ───────────────────────────────────
 
@@ -395,7 +395,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
 try:
     import jax.numpy as jnp
 
-    from minilink.compile.jax_evaluator import JaxDiagramEvaluator
+    from minilink.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:

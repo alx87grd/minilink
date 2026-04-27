@@ -35,7 +35,7 @@ jax = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py310"
 exclude = [
     "minilink/_version.py",
 ]

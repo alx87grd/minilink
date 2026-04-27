@@ -7,8 +7,8 @@ in an immutable and flattened form, all the information needed to evaluate a
 or recursive calls.
 
 The plan is consumed by evaluator backends
-(:class:`~minilink.compile.numpy_evaluator.NumpyDiagramEvaluator`,
-:class:`~minilink.compile.jax_evaluator.JaxDiagramEvaluator`) which walk through the
+(:class:`~minilink.compile.evaluators.numpy_evaluator.NumpyDiagramEvaluator`,
+:class:`~minilink.compile.evaluators.jax_evaluator.JaxDiagramEvaluator`) which walk through the
 operation lists in topological order to compute state derivatives and outputs.
 """
 
@@ -18,7 +18,6 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
-
 
 # ── Source-type constants ────────────────────────────────────────────
 # Used in the ``gather_sources`` tuples of PortOperation / StateOperation.
@@ -112,7 +111,7 @@ class StateOperation:
         Total dimension of the assembled local input vector.
     bound_params : dict | None
         Same semantics as :attr:`PortOperation.bound_params` for ``f_func``
-        (``params`` dict snapshot only; see :class:`minilink.core.framework.System`).
+        (``params`` dict snapshot only; see :class:`minilink.core.system.System`).
     """
 
     f_func: Callable[..., np.ndarray]

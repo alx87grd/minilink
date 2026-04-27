@@ -1,5 +1,5 @@
 """
-Time-domain simulation of compiled :class:`~minilink.core.framework.System` models.
+Time-domain simulation of compiled :class:`~minilink.core.system.System` models.
 
 Integrates the ODE ``dx/dt = f(x, u, t)`` (and ``y = h(x, u, t)`` for outputs) along a
 time grid using pluggable solver backends (SciPy, Euler, fixed-step RK4). State
@@ -19,11 +19,9 @@ from typing import Any
 import numpy as np
 
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.solver_backends import (
-    EulerSolverBackend,
-    RK4SolverBackend,
-    SciPySolverBackend,
-)
+from minilink.simulation.solvers.euler import EulerSolverBackend
+from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
+from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
 
 # --- Internal: user-facing solver labels to backend keys and options --------
 
@@ -115,7 +113,7 @@ class Simulator:
     verbose : bool
         Print setup information.
     compile_backend : str
-        Name passed as ``backend`` to :meth:`~minilink.core.framework.System.compile`.
+        Name passed as ``backend`` to :meth:`~minilink.core.system.System.compile`.
         Typical values are ``numpy`` (default) or ``jax``. Use :data:`COMPILE_BACKEND_AUTO`
         (the string ``auto``) to try JAX if importable, then fall back to NumPy.
     """

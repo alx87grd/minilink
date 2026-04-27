@@ -2,8 +2,8 @@ import numpy as np
 import time
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import DynamicSystem, StaticSystem
-from minilink.blocks.sources import Step
+from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.blocks.sources import Step
 
 
 ######################################################################

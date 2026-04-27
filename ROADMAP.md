@@ -12,13 +12,14 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Diagram evaluators** | **TRL 4** | Add diagram parametric tier and finish boundary/internal signal polish |
 | **Simulation** | **TRL 4** | Harden the new simulator path, unify forcing behavior, and keep compile-backend / auto-solver heuristics well-defined |
 | **Graphical** | **TRL 2** | Matplotlib theme and layout policy are converging; keep **interactive integrator** + **live I/O** backends (see §7) before treating graphics as “frozen” like `core/` |
-| **Mechanics** | **TRL 1** | Keep the numeric path functional and ready for user review |
+| **Dynamics abstractions** (`dynamics/abstraction/`) | **TRL 1** | Keep the numeric ladder (e.g. `MechanicalSystem`) functional and ready for user review |
 | **Symbolic mechanics** | **TRL 1** | Keep derivation/export workflows working for examples and review |
 | **Physics** | **TRL 1** | Keep JAX contact demos working and extend the MVP carefully |
-| **Dynamics library** (`minilink.dynamics`) | **TRL 0** | Curated plant models; grow by domain (`vehicles/`, `msd/`, `pendulum/`, …) |
-| **Blocks library** (`minilink.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
-| **Benchmark helpers** (`minilink.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `benchmark/scenario/` holds shared stress scenarios |
-| **Planning** | **TRL 0** | Not started as a rated subsystem |
+| **Dynamics library** (`minilink.dynamics.catalog`) | **TRL 0** | Curated plant models; grow by domain (`vehicles/`, `msd/`, `pendulum/`, …) |
+| **Blocks library** (`minilink.core.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
+| **Benchmark helpers** (`minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `simulation/scenarios/` holds shared stress scenarios |
+| **Planning** | **TRL 1** | Review deterministic planning family packages before implementing full solvers |
+| **Optimization** (`minilink.optimization`) | **TRL 1** | Thin optimizer contracts for finite-dimensional mathematical programs |
 | **Control** (`minilink.control`) | **TRL 0** | Controller blocks (starting with tutorial PD); expand as patterns stabilize |
 
 > [!NOTE]
@@ -26,14 +27,16 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 
 ## 2. Repository Snapshot
 
+- **Diagram primitives layout**: reusable sources, integrators, and small signal blocks live under **`minilink.core.blocks`** (nested in `core/`), not a top-level `minilink.blocks` package.
 - **Most mature today**: `core/` and the system/diagram composition model
 - **Architecture under active validation**: compilation, evaluators, and simulation (including `compile_backend="auto"` and optional auto-`rk4` path for long JAX runs—see `DESIGN.md` §4.5)
 - **Stabilizing UX layer (still not core-frozen)**: `graphical/` matplotlib look (`matplotlib_style`), env-aware stacked-figure height for notebooks vs console, and `plot_trajectory` / `System.plot_trajectory` **plot** modes (`"x"`, `"u"`, `"xu"`)
-- **Early MVP work**: non-matplotlib render paths, mechanics, symbolic mechanics, physics
-- **Exploratory / not stabilized**: `dynamics/`, `blocks/`, `control/`, planning
-- **Pyro-style plant ports (in progress)**: `dynamics/pendulum/` now includes `CartPole` and `DoublePendulum` on `MechanicalSystem` (see `DESIGN.md` §2.1)
+- **Early MVP work**: non-matplotlib render paths, `dynamics/`, `symbolic/mechanics/`, `physics/`
+- **Exploratory / not stabilized**: `dynamics/`, `core/blocks/`, `control`; `planning` now has family-level deterministic architecture contracts awaiting review
+- **Pyro-style plant ports**: `dynamics/catalog/pendulum/` includes `CartPole` and `DoublePendulum` on `MechanicalSystem` (see `DESIGN.md` §2.7)
 - **Still needs a clearer top-level package surface**: public exports and import story
-- **Benchmarks**: `minilink.benchmark` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
+- **Layout and naming**: on-disk `minilink/` tree, pluggable-role file naming, and package boundaries are documented in [DESIGN.md](DESIGN.md) §2
+- **Benchmarks**: `minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
 
 ## 3. Active Priorities
 
@@ -48,6 +51,9 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - Add diagram validation around subsystem ids and port wiring
 - Introduce a `SimulationOptions` dataclass or equivalent solver-config surface
 - Finish clarifying the high-level public API and top-level exports
+- Review deterministic planning contracts (`PlanningProblem`, sets, costs,
+  family-specific result types, and trajectory transcriptions) before
+  implementing full direct-collocation/RRT/DP solvers
 
 ### P2
 
@@ -73,6 +79,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - [x] Add NumPy and JAX diagram evaluators
 - [x] Move simulation to `minilink.simulation`
 - [x] Move the official trajectory object to `minilink.core.trajectory`
+- [x] Move diagram primitives from top-level `blocks/` into `core/blocks/` (import `minilink.core.blocks`)
 - [x] Move internal-signal reconstruction to `DiagramSystem`
 
 ### Phase 3: Integration and API cleanup
@@ -81,6 +88,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - [ ] Top-level public exports in `minilink/__init__.py`
 - [ ] Solver configuration cleanup (partial: explicit SciPy `rtol`/`atol` on default presets; `COMPILE_BACKEND_AUTO` and auto-RK4 heuristic in code—still room for a `SimulationOptions`-style object)
 - [ ] Wiring validation and UX polish
+- [x] Migrate `compile/`, `simulation/`, and `graphical/` package layout: `evaluators/`, `solvers/`, `renderers/renderer.py`, timing modules, `benchmark` package retired; layout rules consolidated in [DESIGN.md](DESIGN.md) §2
 
 ### Phase 4: User-facing library growth
 
@@ -100,7 +108,7 @@ Cross-reading Drake and pycollimator still points to the same high-level conclus
 - prefer explicit backend selection over global mutable backend switches
 - keep the compile-once flat IR unless profiling proves it is the wrong abstraction
 
-Detailed notes remain in [drake_analysis.md](drake_analysis.md) and [pycollimator_analysis.md](pycollimator_analysis.md).
+Ad-hoc design notes are folded into the repository history; no separate analysis docs are required for day-to-day work.
 
 ## 6. Pyro Migration Direction
 
@@ -123,8 +131,8 @@ Current mapping:
 | Compiled leaf dynamics | `NumpyLeafEvaluator` / `JaxLeafEvaluator` | **TRL 4** |
 | Compiled diagram dynamics | `NumpyDiagramEvaluator` / `JaxDiagramEvaluator` | **TRL 4** |
 | `StateSpaceSystem` | planned | Planned |
-| `MechanicalSystem` | `mechanics.MechanicalSystem` | **TRL 1** |
-| Symbolic model export | `mechanics.symbolic` | **TRL 1** |
+| `MechanicalSystem` | `minilink.dynamics.abstraction.mechanical` | **TRL 1** |
+| Symbolic model export | `minilink.symbolic.mechanics` | **TRL 1** |
 | `Manipulator` | planned | Planned |
 
 ## 7. Future Directions

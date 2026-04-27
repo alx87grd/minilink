@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.framework import StaticSystem
+from minilink.core.system import StaticSystem
 
 
 class PendulumPDController(StaticSystem):

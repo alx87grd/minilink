@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`minilink.benchmark.simulation_speed` compile/solve split and ``compile_once``."""
+"""Unit tests for :mod:`minilink.simulation.integration_timing` compile/solve split and ``compile_once``."""
 
 import contextlib
 import io
@@ -7,14 +7,14 @@ import unittest
 import numpy as np
 import pytest
 
-from minilink.benchmark.simulation_speed import (
+from minilink.compile.jax_utils import format_benchmark_backend_label
+from minilink.core.system import DynamicSystem
+from minilink.simulation.integration_timing import (
     TRUTH_BACKEND,
     TRUTH_SOLVER,
     benchmark_sim_backend,
     benchmark_sim_speed_matrix,
-    format_benchmark_backend_label,
 )
-from minilink.core.framework import DynamicSystem
 
 
 class _TinyStable(DynamicSystem):

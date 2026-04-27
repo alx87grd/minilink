@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.framework import System, VectorSignal
+from minilink.core.system import System, VectorSignal
 from minilink.core.trajectory import Trajectory
 
 
@@ -222,7 +222,7 @@ class DiagramSystem(System):
         bind_params : bool, optional
             If ``True``, subsystem ``params`` are deep-copied into the plan at compile
             time (see :func:`minilink.compile.compile_diagram`). This snapshots only the
-            ``params`` dict, not other subsystem state; see :class:`minilink.core.framework.System`.
+            ``params`` dict, not other subsystem state; see :class:`minilink.core.system.System`.
         verbose : bool
             If ``True``, print timed compilation steps.
 

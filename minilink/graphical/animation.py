@@ -17,15 +17,13 @@ Roadmap (not implemented here—see ``ROADMAP.md`` §7 and P2):
 
 from __future__ import annotations
 
-import time
-
 import numpy as np
 
 from minilink.graphical.environment import prefers_inline_animation
-from minilink.graphical.renderers.base import AnimationRenderer
 from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
 from minilink.graphical.renderers.meshcat_renderer import MeshcatRenderer
 from minilink.graphical.renderers.pygame_renderer import PygameRenderer
+from minilink.graphical.renderers.renderer import AnimationRenderer
 from minilink.graphical.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
@@ -44,7 +42,7 @@ def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
     """
     Return a backend instance for *name* (``matplotlib``, ``meshcat``, ``pygame``).
 
-    To add a backend, implement :class:`~minilink.graphical.renderers.base.AnimationRenderer`
+    To add a backend, implement :class:`~minilink.graphical.renderers.renderer.AnimationRenderer`
     and extend this function.
     """
     key = name.strip().lower()

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.blocks.sources import Step
+from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.physics.system import PhysicsWorldSystem
 from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model

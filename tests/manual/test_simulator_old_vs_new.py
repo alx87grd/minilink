@@ -3,8 +3,8 @@ import jax
 import jax.numpy as jnp
 
 
-# from minilink.dynamics.pendulum.pendulum import Pendulum
-from minilink.core.framework import DynamicSystem
+# from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.core.system import DynamicSystem
 from minilink.simulation.simulator import Simulator
 
 

@@ -2,8 +2,8 @@ import unittest
 
 import numpy as np
 
-from minilink.dynamics.pendulum.cartpole import CartPole
-from minilink.dynamics.pendulum.double_pendulum import DoublePendulum
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
 from minilink.graphical.primitives import Box
 
 

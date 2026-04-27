@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.dynamics.pendulum.pendulum import Pendulum
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 # Interactive loop: today pygame keys + Euler in Animator; see ROADMAP.md §7 for planned
 # integrator backends and live I/O (e.g. TCP cosimulation).

@@ -68,7 +68,7 @@ def compile(system, backend="numpy", verbose=False):
 
     key = backend.strip().lower()
     if key == "numpy":
-        from minilink.compile.numpy_evaluator import NumpyLeafEvaluator
+        from minilink.compile.evaluators.numpy_evaluator import NumpyLeafEvaluator
 
         return NumpyLeafEvaluator(system)
     elif key == "jax":
@@ -79,7 +79,7 @@ def compile(system, backend="numpy", verbose=False):
                 "JAX is required for the 'jax' backend. "
                 "Install with: pip install jax jaxlib"
             )
-        from minilink.compile.jax_evaluator import JaxLeafEvaluator
+        from minilink.compile.evaluators.jax_evaluator import JaxLeafEvaluator
 
         t_total = time.perf_counter()
         evaluator = JaxLeafEvaluator(system, verbose=verbose)
@@ -127,7 +127,7 @@ def compile_diagram(
     -----
     ``bind_params=True`` snapshots only each subsystem's ``params`` dict into the plan.
     It does **not** make user ``f`` / port ``compute`` implementations pure if they still
-    read or mutate other instance state; see :class:`minilink.core.framework.System`.
+    read or mutate other instance state; see :class:`minilink.core.system.System`.
     """
     t_total = time.perf_counter() if verbose else None
 
@@ -160,7 +160,7 @@ def compile_diagram(
     # --- Create evaluator (steps 0, 3, 4 handled inside for JAX) ---------
     key = backend.strip().lower()
     if key == "numpy":
-        from minilink.compile.numpy_evaluator import NumpyDiagramEvaluator
+        from minilink.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
 
         evaluator = NumpyDiagramEvaluator(plan, diagram)
     elif key == "jax":
@@ -171,7 +171,7 @@ def compile_diagram(
                 "JAX is required for the 'jax' backend. "
                 "Install with: pip install jax jaxlib"
             )
-        from minilink.compile.jax_evaluator import JaxDiagramEvaluator
+        from minilink.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
 
         evaluator = JaxDiagramEvaluator(plan, diagram, verbose=verbose)
     else:

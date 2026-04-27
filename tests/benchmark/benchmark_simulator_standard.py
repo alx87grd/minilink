@@ -1,7 +1,7 @@
 """Run the three standard simulator cases for one candidate (solver, backend).
 
 Cases: long pendulum, short many-spheres, dense network diagram. Each uses a
-fresh system. Truth is ``scipy_ultra`` + ``numpy`` (``minilink.benchmark``).
+fresh system. Truth is ``scipy_ultra`` + ``numpy`` (see ``minilink.simulation.integration_timing``).
 
     python tests/benchmark/benchmark_simulator_standard.py
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import jax
 
-from minilink.benchmark.simulation_speed import print_standard_sim_suite, run_standard_sim_suite
+from minilink.simulation.integration_timing import print_standard_sim_suite, run_standard_sim_suite
 
 USE_X64 = False
 jax.config.update("jax_enable_x64", USE_X64)
