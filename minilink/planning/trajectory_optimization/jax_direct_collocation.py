@@ -12,20 +12,14 @@ boundaries, and :class:`~minilink.core.sets.BoxSet` /
 variable bounds. Pair with :class:`~minilink.core.costs.JaxQuadraticCost` (not
 :class:`~minilink.core.costs.QuadraticCost`) for the usual quadratic cost.
 
-**TODO: User Architectural Review** — set coverage, whether ``jax_enable_x64``
-is scoped, and the SciPy+JAX split are prototype choices pending approval.
-
-.. note::
-
-    :meth:`JaxDirectCollocationTranscription.transcribe` saves and restores
-    the process-wide ``jax_enable_x64`` flag around transcription so a typical
-    script does not permanently flip global JAX config.
+**TODO: User Architectural Review** — set coverage and the SciPy+JAX split are
+prototype choices pending approval. Configure process-wide JAX precision with
+:func:`minilink.compile.jax_utils.configure_jax` before constructing JAX systems.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
@@ -36,13 +30,13 @@ from minilink.optimization.mathematical_program import (
     EqualityConstraint,
     MathematicalProgram,
 )
-from minilink.optimization.optimizers.optimizer import Optimizer
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
-    _DirectCollocationPlannerBase,
+)
+from minilink.planning.trajectory_optimization.transcription import (
+    TranscriptionContext,
 )
 
 
@@ -59,21 +53,16 @@ class JaxDirectCollocationOptions(DirectCollocationOptions):
     Notes
     -----
     ``use_hessian`` builds a full :math:`n_z \times n_z` objective Hessian and is
-    practical only for small decision vectors. ``enable_x64`` is applied for the
-    duration of :meth:`JaxDirectCollocationTranscription.transcribe` only, then
-    restored (see module docstring).
+    practical only for small decision vectors.
     """
 
-    compile_backend: str | None = "jax"
     use_gradient: bool = True
     use_hessian: bool = False
-    enable_x64: bool = True
 
     def __post_init__(self) -> None:
         super().__post_init__()
         object.__setattr__(self, "use_gradient", bool(self.use_gradient))
         object.__setattr__(self, "use_hessian", bool(self.use_hessian))
-        object.__setattr__(self, "enable_x64", bool(self.enable_x64))
         if self.use_hessian and not self.use_gradient:
             raise ValueError("use_hessian requires use_gradient")
 
@@ -98,23 +87,30 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
                 "QuadraticCost."
             )
 
-    def transcribe(self, problem: PlanningProblem) -> MathematicalProgram:
+    def transcribe(
+        self,
+        problem: PlanningProblem,
+        *,
+        initial_guess: np.ndarray | Trajectory | None = None,
+        context: TranscriptionContext | None = None,
+    ) -> MathematicalProgram:
         """Convert ``problem`` into a differentiable mathematical program."""
         import jax
-
         import jax.numpy as jnp
 
         cost = problem.require_cost()
         self._validate_jax_traceable_quadratic_pairing(cost)
         self._check_supported_sets(problem)
 
-        cost_params = problem.params.cost
-        prev_x64 = jax.config.jax_enable_x64
-        try:
-            jax.config.update("jax_enable_x64", bool(self.options.enable_x64))
-            return self._transcribe_core(problem, jax, jnp, cost, cost_params)
-        finally:
-            jax.config.update("jax_enable_x64", prev_x64)
+        return self._transcribe_core(
+            problem,
+            jax,
+            jnp,
+            cost,
+            problem.params.cost,
+            initial_guess=initial_guess,
+            context=TranscriptionContext("jax") if context is None else context,
+        )
 
     def _transcribe_core(
         self,
@@ -123,12 +119,15 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
         jnp,
         cost: CostFunction,
         cost_params,
+        *,
+        initial_guess: np.ndarray | Trajectory | None,
+        context: TranscriptionContext,
     ) -> MathematicalProgram:
         t = jnp.asarray(self.options.t)
         dt = jnp.asarray(self.options.dt)
         n = int(problem.sys.n)
         n_steps = int(self.options.n_steps)
-        f = self._make_jax_dynamics(problem)
+        f = self._make_jax_dynamics(problem, context.compile_backend)
 
         def unpack_jax(z):
             x = z[: n * n_steps].reshape(n, n_steps)
@@ -196,7 +195,7 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
 
         return MathematicalProgram(
             J=self._to_numpy_scalar(objective_jit, jnp),
-            z0=self.initial_guess(problem),
+            z0=self._pack_initial_guess(problem, initial_guess),
             bounds=self.variable_bounds(problem),
             equalities=tuple(equalities),
             inequalities=(),
@@ -210,7 +209,7 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
                 "input_dim": int(problem.sys.m),
                 "use_gradient": self.options.use_gradient,
                 "use_hessian": self.options.use_hessian,
-                "enable_x64": self.options.enable_x64,
+                "compile_backend": context.compile_backend,
             },
             grad=(
                 self._to_numpy_vector(objective_grad_jit, jnp)
@@ -224,8 +223,8 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
             ),
         )
 
-    def _make_jax_dynamics(self, problem: PlanningProblem):
-        backend = self.options.compile_backend
+    def _make_jax_dynamics(self, problem: PlanningProblem, compile_backend: str | None):
+        backend = compile_backend
         params = problem.params.system
 
         if backend == "jax":
@@ -312,80 +311,3 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
                 "JAX direct collocation currently supports only BoxInputSet input "
                 "path constraints through variable bounds"
             )
-
-
-class JaxDirectCollocationPlanner(_DirectCollocationPlannerBase):
-    """
-    Planner for JAX-backed direct collocation (SciPy outer loop, JAX ``jit``/AD).
-
-    Use :class:`~minilink.core.costs.JaxQuadraticCost` for quadratic running and
-    terminal cost. Initial and terminal state constraints are limited to
-    :class:`~minilink.core.sets.SingletonSet` in the JAX path; for richer set
-    margins, use :class:`~minilink.planning.trajectory_optimization.direct_collocation.DirectCollocationPlanner`
-    (NumPy transcription).
-    """
-
-    def __init__(
-        self,
-        problem: PlanningProblem,
-        *,
-        tf: float,
-        n_steps: int,
-        optimizer: Optimizer | None = None,
-        compile_backend: str | None = "jax",
-        initial_guess: np.ndarray | Trajectory | None = None,
-        use_gradient: bool = True,
-        use_hessian: bool = False,
-        enable_x64: bool = True,
-    ) -> None:
-        options = JaxDirectCollocationOptions(
-            tf=tf,
-            n_steps=n_steps,
-            compile_backend=compile_backend,
-            optimizer=(ScipyMinimizeOptimizer() if optimizer is None else optimizer),
-            initial_guess=initial_guess,
-            use_gradient=use_gradient,
-            use_hessian=use_hessian,
-            enable_x64=enable_x64,
-        )
-        super().__init__(
-            problem,
-            options=options,
-            transcription_cls=JaxDirectCollocationTranscription,
-        )
-
-    @classmethod
-    def from_system(
-        cls,
-        sys: Any,
-        *,
-        x_start: np.ndarray,
-        x_goal: np.ndarray,
-        cost: CostFunction,
-        tf: float,
-        n_steps: int,
-        optimizer: Optimizer | None = None,
-        compile_backend: str | None = "jax",
-        initial_guess: np.ndarray | Trajectory | None = None,
-        use_gradient: bool = True,
-        use_hessian: bool = False,
-        enable_x64: bool = True,
-    ) -> JaxDirectCollocationPlanner:
-        """Convenience constructor building a :class:`PlanningProblem`."""
-        problem = PlanningProblem(
-            sys=sys,
-            x_start=x_start,
-            x_goal=x_goal,
-            cost=cost,
-        )
-        return cls(
-            problem,
-            tf=tf,
-            n_steps=n_steps,
-            optimizer=optimizer,
-            compile_backend=compile_backend,
-            initial_guess=initial_guess,
-            use_gradient=use_gradient,
-            use_hessian=use_hessian,
-            enable_x64=enable_x64,
-        )

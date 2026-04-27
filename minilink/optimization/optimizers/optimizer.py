@@ -9,6 +9,7 @@ transcription internals.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any, Callable
 
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -22,6 +23,11 @@ class Optimizer(ABC):
     """
 
     @abstractmethod
-    def solve(self, program: MathematicalProgram) -> OptimizationResult:
+    def solve(
+        self,
+        program: MathematicalProgram,
+        *,
+        callback: Callable[[Any], None] | None = None,
+    ) -> OptimizationResult:
         """Solve a finite-dimensional mathematical program."""
         ...

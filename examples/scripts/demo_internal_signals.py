@@ -1,12 +1,10 @@
-from minilink.graphical.plotting import plot_signals
-
-
 import numpy as np
 
 from minilink.control.pendulum_pd import PendulumPDController
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.graphical.plotting import plot_signals
 
 # Plant system
 sys = Pendulum()

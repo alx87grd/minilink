@@ -7,10 +7,12 @@ This is a larger scene variant of demo_physics_jax_sphere_plane.py.
 from __future__ import annotations
 
 import time
+
+import jax
 import numpy as np
 
-from minilink.physics.system import PhysicsWorldSystem
 from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
+from minilink.physics.system import PhysicsWorldSystem
 
 # 10x larger scene than the 12-sphere MVP: 12x10 grid = 120 spheres.
 nx, ny = 12, 10
@@ -83,12 +85,12 @@ print(
 
 
 # auto-diff
-import jax
-
 u = np.zeros(sys.m)
 t = 0.0
 
-fx = lambda x: evaluator.f(x, u, t)
+def fx(x):
+    return evaluator.f(x, u, t)
+
 
 df_dx_func = jax.jacfwd(fx)
 

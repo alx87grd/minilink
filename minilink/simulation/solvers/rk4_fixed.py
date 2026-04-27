@@ -35,7 +35,7 @@ class RK4SolverBackend(SolverBackend):
 
         # Debug information
         self.last_debug = {
-            "solver": "rk4",
+            "solver": "rk4_fixedsteps",
             "mode": "nominal",
             "nfev": 4 * max(n_pts - 1, 0),
             "njev": 0,
@@ -52,4 +52,18 @@ class RK4SolverBackend(SolverBackend):
         x0: np.ndarray,
         args: dict[str, Any] | None = None,
     ) -> np.ndarray:
-        raise NotImplementedError("RK4SolverBackend supports nominal mode only for now")
+        n_pts = times.shape[0]
+        t0 = times[0]
+        dt = times[1] - times[0]
+        x_seq = evaluator.rk4_rollout_forced(x0, u.T, t0, dt)
+        x_traj = np.asarray(x_seq).T
+
+        self.last_debug = {
+            "solver": "rk4_fixedsteps",
+            "mode": "forced",
+            "nfev": 4 * max(n_pts - 1, 0),
+            "njev": 0,
+            "nlu": 0,
+            "n_t": n_pts,
+        }
+        return x_traj

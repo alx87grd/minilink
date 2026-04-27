@@ -130,6 +130,44 @@ class DynamicsEvaluator(ABC):
         """Explicit Euler: ``x + dt * f(x, u, t)``."""
         return x + dt * self.f(x, u, t)
 
+    def rk4_rollout_forced(self, x0, u_knots, t0, dt):
+        """Fixed-step RK4 rollout with sampled forced inputs.
+
+        ``u_knots`` has shape ``(N, m)`` and the result has shape ``(N, n)``.
+        Step ``k`` uses ``u[k]``, ``0.5 * (u[k] + u[k + 1])``, and
+        ``u[k + 1]`` at the RK4 stages.
+        """
+        x = np.asarray(x0, dtype=float).reshape(self.n)
+        u = np.asarray(u_knots, dtype=float)
+        if u.ndim != 2 or u.shape[1] != self.m:
+            raise ValueError(f"u_knots must have shape (N, {self.m})")
+        if u.shape[0] < 1:
+            raise ValueError("u_knots must contain at least one sample")
+
+        x_seq = [x.copy()]
+        t = float(t0)
+        dt = float(dt)
+        for k in range(u.shape[0] - 1):
+            u0 = u[k]
+            u1 = u[k + 1]
+            umid = 0.5 * (u0 + u1)
+            k1 = np.asarray(self.f(x, u0, t), dtype=float).reshape(self.n)
+            k2 = np.asarray(
+                self.f(x + 0.5 * dt * k1, umid, t + 0.5 * dt),
+                dtype=float,
+            ).reshape(self.n)
+            k3 = np.asarray(
+                self.f(x + 0.5 * dt * k2, umid, t + 0.5 * dt),
+                dtype=float,
+            ).reshape(self.n)
+            k4 = np.asarray(self.f(x + dt * k3, u1, t + dt), dtype=float).reshape(
+                self.n
+            )
+            x = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+            t = t + dt
+            x_seq.append(np.asarray(x, dtype=float).reshape(self.n).copy())
+        return np.asarray(x_seq)
+
     def rollout(self, x0, u_sequence, t0, dt):
         """Forward integrate N steps with frozen params.
 

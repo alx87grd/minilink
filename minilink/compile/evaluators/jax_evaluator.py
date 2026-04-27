@@ -74,6 +74,29 @@ def _build_jit_rk4_rollout_ivp(jax, jnp, f_ivp):
     return jax.jit(_rk4_rollout_ivp, static_argnums=3)
 
 
+def _build_jit_rk4_rollout_forced(jax, jnp, f):
+    def _rk4_rollout_forced(x0_, u_knots_, t0_, dt_):
+        def body(carry, u_pair):
+            x, t = carry
+            u0, u1 = u_pair
+            umid = 0.5 * (u0 + u1)
+            k1 = f(x, u0, t)
+            k2 = f(x + 0.5 * dt_ * k1, umid, t + 0.5 * dt_)
+            k3 = f(x + 0.5 * dt_ * k2, umid, t + 0.5 * dt_)
+            k4 = f(x + dt_ * k3, u1, t + dt_)
+            x_next = x + (dt_ / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+            return (x_next, t + dt_), x_next
+
+        (_, _), xs = jax.lax.scan(
+            body,
+            (x0_, t0_),
+            (u_knots_[:-1], u_knots_[1:]),
+        )
+        return jnp.concatenate((x0_[None, :], xs), axis=0)
+
+    return jax.jit(_rk4_rollout_forced)
+
+
 # =====================================================================
 # Leaf evaluator
 # =====================================================================
@@ -164,6 +187,9 @@ class JaxLeafEvaluator(DynamicsEvaluator):
 
         self._jit_rk4_rollout_ivp = _build_jit_rk4_rollout_ivp(
             jax, jnp, self._jit_f_ivp
+        )
+        self._jit_rk4_rollout_forced = _build_jit_rk4_rollout_forced(
+            jax, jnp, self._jit_f
         )
 
         output_items = tuple(
@@ -278,6 +304,15 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         t0 = jnp.asarray(t0)
         dt = jnp.asarray(dt)
         return self._jit_rk4_rollout_ivp(x0, t0, dt, n_steps)
+
+    def rk4_rollout_forced(self, x0, u_knots, t0, dt):
+        jnp = self.jnp
+
+        x0 = jnp.asarray(x0)
+        u_knots = jnp.asarray(u_knots)
+        t0 = jnp.asarray(t0)
+        dt = jnp.asarray(dt)
+        return self._jit_rk4_rollout_forced(x0, u_knots, t0, dt)
 
 
 # =====================================================================
@@ -418,6 +453,9 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
 
         self._jit_rk4_rollout_ivp = _build_jit_rk4_rollout_ivp(
             jax, jnp, self._jit_f_ivp
+        )
+        self._jit_rk4_rollout_forced = _build_jit_rk4_rollout_forced(
+            jax, jnp, self._jit_f
         )
 
         self._jit_outputs = jax.jit(
@@ -600,6 +638,15 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         t0 = jnp.asarray(t0)
         dt = jnp.asarray(dt)
         return self._jit_rk4_rollout_ivp(x0, t0, dt, n_steps)
+
+    def rk4_rollout_forced(self, x0, u_knots, t0, dt):
+        jnp = self._jnp
+
+        x0 = jnp.asarray(x0)
+        u_knots = jnp.asarray(u_knots)
+        t0 = jnp.asarray(t0)
+        dt = jnp.asarray(dt)
+        return self._jit_rk4_rollout_forced(x0, u_knots, t0, dt)
 
     # ── JIT convenience ─────────────────────────────────────────────
 

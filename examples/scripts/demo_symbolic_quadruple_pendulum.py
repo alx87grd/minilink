@@ -8,10 +8,8 @@ NumPy :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`, simul
 Symbolic derivation of 4×4 H, C, g can take tens of seconds on first run.
 """
 
-import numpy as np
 
 from minilink.symbolic.mechanics.model import MechanicalModel
-
 
 # ------------------------------------------------------------------
 # Build the symbolic model

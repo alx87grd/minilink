@@ -14,25 +14,37 @@ import time
 
 import numpy as np
 
+from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import JaxQuadraticCost, QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationPlanner,
+    DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
+)
+from minilink.planning.trajectory_optimization.transcription import (
+    TranscriptionContext,
 )
 
 try:
     from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
     from minilink.planning.trajectory_optimization.jax_direct_collocation import (
-        JaxDirectCollocationPlanner,
+        JaxDirectCollocationOptions,
+        JaxDirectCollocationTranscription,
     )
 
     HAS_JAX_CODE = True
 except ImportError:
     JaxCartPole = None
-    JaxDirectCollocationPlanner = None
+    JaxDirectCollocationOptions = None
+    JaxDirectCollocationTranscription = None
     HAS_JAX_CODE = False
 
 
@@ -79,37 +91,42 @@ def make_cartpole_problem(sys, *, jax_cost: bool) -> PlanningProblem:
     )
 
 
-def make_optimizer() -> ScipyMinimizeOptimizer:
+def make_optimizer(variant: dict[str, object]) -> ScipyMinimizeOptimizer:
     return ScipyMinimizeOptimizer(
         options={
             "disp": False,
             "maxiter": int(args.maxiter),
-            "ftol": float(args.ftol),
+            "ftol": float(variant.get("ftol", args.ftol)),
         }
     )
 
 
-def build_planner(variant: dict[str, str]):
+def build_planner(variant: dict[str, object]):
     if variant["backend"] == "numpy":
-        return DirectCollocationPlanner(
+        return TrajectoryOptimizationPlanner(
             make_cartpole_problem(CartPole(), jax_cost=False),
-            tf=args.tf,
-            n_steps=args.steps,
-            optimizer=make_optimizer(),
-            compile_backend="numpy",
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(tf=args.tf, n_steps=args.steps)
+            ),
+            optimizer=make_optimizer(variant),
+            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
 
     if not jax_available():
         raise ModuleNotFoundError("JAX is not installed")
 
-    return JaxDirectCollocationPlanner(
+    configure_jax(enable_x64=variant["x64"] == "yes")
+    return TrajectoryOptimizationPlanner(
         make_cartpole_problem(JaxCartPole(), jax_cost=True),
-        tf=args.tf,
-        n_steps=args.steps,
-        optimizer=make_optimizer(),
-        compile_backend="jax",
-        use_gradient=variant["gradient"] == "jax",
-        enable_x64=variant["x64"] == "yes",
+        transcription=JaxDirectCollocationTranscription(
+            JaxDirectCollocationOptions(
+                tf=args.tf,
+                n_steps=args.steps,
+                use_gradient=variant["gradient"] == "jax",
+            )
+        ),
+        optimizer=make_optimizer(variant),
+        options=TrajectoryOptimizationOptions(compile_backend="jax"),
     )
 
 
@@ -147,16 +164,25 @@ def constraint_metrics(
     return max_eq, min_ineq, max_bound
 
 
-def run_once(variant: dict[str, str]) -> dict[str, object]:
+def run_once(variant: dict[str, object]) -> dict[str, object]:
     t0 = time.perf_counter()
     planner = build_planner(variant)
 
     transcribe_t0 = time.perf_counter()
-    program = planner.transcription.transcribe(planner.problem)
+    context = TranscriptionContext(compile_backend=planner.options.compile_backend)
+    guess = default_initial_trajectory(
+        planner.problem,
+        planner.transcription.initial_guess_time_grid(planner.problem),
+    )
+    program = planner.transcription.transcribe(
+        planner.problem,
+        initial_guess=guess,
+        context=context,
+    )
     transcribe_s = time.perf_counter() - transcribe_t0
 
     solve_t0 = time.perf_counter()
-    result = planner.options.optimizer.solve(program)
+    result = planner.optimizer.solve(program)
     solve_s = time.perf_counter() - solve_t0
 
     max_eq, min_ineq, max_bound = constraint_metrics(program, result.z)
@@ -191,7 +217,7 @@ def mean_int_or_none(values) -> int | None:
     return int(round(value))
 
 
-def summarize(variant: dict[str, str], runs: list[dict[str, object]]) -> dict[str, object]:
+def summarize(variant: dict[str, object], runs: list[dict[str, object]]) -> dict[str, object]:
     last = runs[-1]
     return {
         **variant,
@@ -227,10 +253,17 @@ if jax_available():
                 "x64": "yes",
             },
             {
-                "name": "jax-slsqp-grad-f32",
+                "name": "jax-slsqp-grad-f32-strict",
                 "backend": "jax",
                 "gradient": "jax",
                 "x64": "no",
+            },
+            {
+                "name": "jax-slsqp-grad-f32-relaxed",
+                "backend": "jax",
+                "gradient": "jax",
+                "x64": "no",
+                "ftol": max(float(args.ftol), 1e-5),
             },
             {
                 "name": "jax-slsqp-fd-x64",
@@ -250,32 +283,37 @@ for variant in variants:
         print(f"  skipped: {type(exc).__name__}: {exc}")
 
 print()
-print("-" * 116)
+name_width = max([21, *(len(str(row["name"])) for row in rows)])
+rule_width = name_width + 95
+print("-" * rule_width)
 print(
     "trajectory optimization benchmark "
     f"case={args.case} tf={args.tf:g} steps={args.steps} "
     f"maxiter={args.maxiter} runs={args.runs}"
 )
-print("-" * 116)
+print("-" * rule_width)
 print(
-    f"{'variant':<21} {'backend':<7} {'grad':<11} {'x64':<4} "
+    f"{'variant':<{name_width}} {'backend':<7} {'grad':<11} {'x64':<4} "
     f"{'ok':>3} {'total':>8} {'trans':>8} {'solve':>8} "
     f"{'nit':>5} {'nfev':>6} {'njev':>6} {'cost':>11} "
     f"{'eq_inf':>10} {'bound':>9}"
 )
-print("-" * 116)
+print("-" * rule_width)
 for row in rows:
     cost = "n/a" if row["cost"] is None else f"{row['cost']:11.4g}"
     nit = "n/a" if row["nit"] is None else str(row["nit"])
     nfev = "n/a" if row["nfev"] is None else str(row["nfev"])
     njev = "n/a" if row["njev"] is None else str(row["njev"])
     print(
-        f"{row['name']:<21} {row['backend']:<7} {row['gradient']:<11} "
+        f"{row['name']:<{name_width}} {row['backend']:<7} {row['gradient']:<11} "
         f"{row['x64']:<4} {str(row['ok']):>3} {row['total']:8.3f} "
         f"{row['transcribe']:8.3f} {row['solve']:8.3f} "
         f"{nit:>5} {nfev:>6} {njev:>6} {cost} "
         f"{row['eq_inf']:10.2e} {row['bound']:9.2e}"
     )
-print("-" * 116)
+print("-" * rule_width)
 if not jax_available():
     print("JAX variants skipped because JAX is not installed.")
+for row in rows:
+    if not row["ok"]:
+        print(f"{row['name']} failed: {row['message']}")

@@ -14,17 +14,36 @@ from minilink.optimization.mathematical_program import (
     VariableBounds,
 )
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
-from minilink.planning.initial_guess import mechanical_cubic_initial_trajectory
+from minilink.planning.initial_guess import (
+    default_initial_trajectory,
+    mechanical_cubic_initial_trajectory,
+)
 from minilink.planning.policy_synthesis.dynamic_programming import (
     DynamicProgrammingPlanner,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationPlanner,
+    DirectCollocationOptions,
+    DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.jax_direct_collocation import (
     JaxDirectCollocationOptions,
+)
+from minilink.planning.trajectory_optimization.live_plot import (
+    LiveTrajectoryPlotCallback,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationIteration,
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
+)
+from minilink.planning.trajectory_optimization.shooting import (
+    ShootingOptions,
+    ShootingTranscription,
+)
+from minilink.planning.trajectory_optimization.transcription import (
+    TranscriptionContext,
 )
 
 
@@ -54,6 +73,21 @@ class TestPlanningArchitecture(unittest.TestCase):
                 return x
 
         return SingleIntegrator()
+
+    def make_single_integrator_problem(self):
+        sys = self.make_single_integrator()
+        cost = QuadraticCost.from_system(
+            sys,
+            Q=np.zeros((1, 1)),
+            R=np.eye(1),
+            S=np.zeros((1, 1)),
+        )
+        return PlanningProblem(
+            sys=sys,
+            x_start=np.array([0.0]),
+            x_goal=np.array([1.0]),
+            cost=cost,
+        )
 
     def test_box_and_boundary_sets(self):
         box = BoxSet(lower=np.array([-1.0, -2.0]), upper=np.array([1.0, 2.0]))
@@ -168,14 +202,25 @@ class TestPlanningArchitecture(unittest.TestCase):
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost)
 
-        to = DirectCollocationPlanner(
+        to = TrajectoryOptimizationPlanner(
             problem,
-            tf=1.0,
-            n_steps=5,
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(tf=1.0, n_steps=5)
+            ),
             optimizer=ScipyMinimizeOptimizer(),
+            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
-        self.assertEqual(to.options.n_steps, 5)
-        program = to.transcription.transcribe(problem)
+        self.assertEqual(to.transcription.options.n_steps, 5)
+        self.assertEqual(to.options.compile_backend, "numpy")
+        guess = default_initial_trajectory(
+            problem,
+            to.transcription.initial_guess_time_grid(problem),
+        )
+        program = to.transcription.transcribe(
+            problem,
+            initial_guess=guess,
+            context=TranscriptionContext(to.options.compile_backend),
+        )
         self.assertEqual(program.n_z, 15)
         self.assertEqual(len(program.equalities), 3)
 
@@ -191,24 +236,14 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertEqual(dp.options.x_grid_shape, (5, 5))
 
     def test_direct_collocation_solves_single_integrator(self):
-        sys = self.make_single_integrator()
-        cost = QuadraticCost.from_system(
-            sys,
-            Q=np.zeros((1, 1)),
-            R=np.eye(1),
-            S=np.zeros((1, 1)),
-        )
-        problem = PlanningProblem(
-            sys=sys,
-            x_start=np.array([0.0]),
-            x_goal=np.array([1.0]),
-            cost=cost,
-        )
-        planner = DirectCollocationPlanner(
+        problem = self.make_single_integrator_problem()
+        planner = TrajectoryOptimizationPlanner(
             problem,
-            tf=1.0,
-            n_steps=5,
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(tf=1.0, n_steps=5)
+            ),
             optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
 
         traj = planner.compute_solution()
@@ -224,6 +259,154 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertLess(residual_norm, 1e-6)
         self.assertTrue(traj.has_signal("dx"))
         self.assertTrue(traj.has_signal("cost"))
+
+    def test_generic_trajopt_planner_solves_single_integrator(self):
+        problem = self.make_single_integrator_problem()
+        transcription = DirectCollocationTranscription(
+            DirectCollocationOptions(tf=1.0, n_steps=5)
+        )
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            transcription=transcription,
+            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="direct",
+                record_history=True,
+            ),
+        )
+
+        traj = planner.compute_solution()
+        warm_started = planner.compute_solution(warm_start=True)
+
+        self.assertTrue(planner.last_optimization_result.success)
+        self.assertEqual(planner.last_program.metadata["compile_backend"], "direct")
+        self.assertGreater(len(planner.iteration_history), 0)
+        np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
+        np.testing.assert_allclose(warm_started.x[:, -1], [1.0], atol=1e-7)
+
+    def test_shooting_solves_single_integrator(self):
+        problem = self.make_single_integrator_problem()
+        transcription = ShootingTranscription(ShootingOptions(tf=1.0, n_steps=5))
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            transcription=transcription,
+            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+        )
+
+        traj = planner.compute_solution()
+
+        self.assertTrue(planner.last_optimization_result.success)
+        self.assertEqual(planner.last_program.metadata["compile_backend"], "numpy")
+        self.assertEqual(planner.last_program.n_z, problem.sys.m * 5)
+        np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
+        np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
+        self.assertTrue(traj.has_signal("dx"))
+        self.assertTrue(traj.has_signal("cost"))
+
+    def test_shooting_packs_trajectory_guess_as_inputs_only(self):
+        problem = self.make_single_integrator_problem()
+        transcription = ShootingTranscription(ShootingOptions(tf=1.0, n_steps=5))
+        guess = default_initial_trajectory(
+            problem,
+            transcription.initial_guess_time_grid(problem),
+        )
+        program = transcription.transcribe(
+            problem,
+            initial_guess=guess,
+            context=TranscriptionContext("direct"),
+        )
+
+        self.assertEqual(program.n_z, 5)
+        np.testing.assert_allclose(program.z0, guess.u.reshape(-1))
+        self.assertEqual(program.metadata["compile_backend"], "direct")
+
+    def test_evaluator_forced_rk4_rollout_matches_integrator(self):
+        sys = self.make_single_integrator()
+        evaluator = sys.compile(backend="numpy", verbose=False)
+
+        x = evaluator.rk4_rollout_forced(
+            np.array([0.0]),
+            np.ones((5, 1)),
+            0.0,
+            0.25,
+        )
+
+        np.testing.assert_allclose(x.reshape(-1), np.linspace(0.0, 1.0, 5))
+
+    def test_live_trajectory_plot_callback_reuses_artists(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+
+        sys = self.make_single_integrator()
+        traj0 = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[1.0, 1.0]]),
+        )
+        traj1 = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 0.9]]),
+            u=np.array([[0.9, 0.9]]),
+        )
+        callback = LiveTrajectoryPlotCallback(sys, plot="xu", pause=0.0)
+
+        callback(
+            TrajectoryOptimizationIteration(
+                iteration=0,
+                z=np.zeros(1),
+                trajectory=traj0,
+                cost=1.0,
+                max_eq=0.0,
+                min_ineq=None,
+            )
+        )
+        fig_id = id(callback.fig)
+        line_ids = [id(line) for line in callback.lines]
+        callback(
+            TrajectoryOptimizationIteration(
+                iteration=1,
+                z=np.zeros(1),
+                trajectory=traj1,
+                cost=0.5,
+                max_eq=0.0,
+                min_ineq=None,
+            )
+        )
+
+        self.assertEqual(id(callback.fig), fig_id)
+        self.assertEqual([id(line) for line in callback.lines], line_ids)
+
+    def test_trajopt_warm_start_passes_previous_trajectory(self):
+        class RecordingTranscription(DirectCollocationTranscription):
+            def __init__(self, options):
+                super().__init__(options)
+                object.__setattr__(self, "guesses", [])
+
+            def transcribe(self, problem, *, initial_guess=None, context=None):
+                self.guesses.append(initial_guess)
+                return super().transcribe(
+                    problem,
+                    initial_guess=initial_guess,
+                    context=context,
+                )
+
+        problem = self.make_single_integrator_problem()
+        transcription = RecordingTranscription(
+            DirectCollocationOptions(tf=1.0, n_steps=5)
+        )
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            transcription=transcription,
+            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            options=TrajectoryOptimizationOptions(warm_start=True),
+        )
+
+        first = planner.compute_solution()
+        planner.compute_solution()
+
+        self.assertIs(transcription.guesses[1], first)
 
 
 if __name__ == "__main__":

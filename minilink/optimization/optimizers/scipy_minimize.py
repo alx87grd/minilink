@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 from scipy.optimize import minimize
@@ -29,7 +29,12 @@ class ScipyMinimizeOptimizer(Optimizer):
     method: str = "SLSQP"
     options: dict[str, Any] = field(default_factory=dict)
 
-    def solve(self, program: MathematicalProgram) -> OptimizationResult:
+    def solve(
+        self,
+        program: MathematicalProgram,
+        *,
+        callback: Callable[[Any], None] | None = None,
+    ) -> OptimizationResult:
         """Solve ``program`` with SciPy and return a backend-neutral result."""
         constraints = [
             {
@@ -62,6 +67,14 @@ class ScipyMinimizeOptimizer(Optimizer):
             )
             bounds = list(zip(lower, upper))
 
+        scipy_callback = None
+        if callback is not None:
+            def scipy_callback(xk=None, state=None, *, intermediate_result=None):
+                payload = intermediate_result
+                if payload is None:
+                    payload = state if state is not None else xk
+                callback(payload)
+
         raw_result = minimize(
             program.objective,
             program.z0,
@@ -70,6 +83,7 @@ class ScipyMinimizeOptimizer(Optimizer):
             hess=program.hessian if self._uses_hessian() and program.hess else None,
             bounds=bounds,
             constraints=constraints,
+            callback=scipy_callback,
             options=dict(self.options),
         )
 

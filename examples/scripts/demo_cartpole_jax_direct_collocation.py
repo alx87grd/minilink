@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
-import argparse
-
 import numpy as np
 
+from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import JaxQuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.jax_direct_collocation import (
-    JaxDirectCollocationPlanner,
+    JaxDirectCollocationOptions,
+    JaxDirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
+configure_jax(enable_x64=False)
+# configure_jax(enable_x64=True)
 
 sys = JaxCartPole()
 
@@ -42,18 +48,21 @@ optimizer = ScipyMinimizeOptimizer(
     options={
         "disp": True,
         "maxiter": 500,
-        "ftol": 1e-1,
+        "ftol": 1e-2,
     }
 )
-planner = JaxDirectCollocationPlanner(
+planner = TrajectoryOptimizationPlanner(
     problem,
-    tf=4.0,
-    n_steps=50,
+    transcription=JaxDirectCollocationTranscription(
+        JaxDirectCollocationOptions(
+            tf=4.0,
+            n_steps=50,
+            use_gradient=True,
+            use_hessian=False,
+        )
+    ),
     optimizer=optimizer,
-    compile_backend="jax",
-    use_gradient=True,
-    use_hessian=False,
-    enable_x64=True,
+    options=TrajectoryOptimizationOptions(compile_backend="jax"),
 )
 
 traj = planner.compute_solution()

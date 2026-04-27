@@ -9,7 +9,12 @@ from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationPlanner,
+    DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 sys = CartPole()
@@ -39,17 +44,18 @@ optimizer = ScipyMinimizeOptimizer(
     options={
         "disp": True,
         "maxiter": int(1000),
-        "ftol": 1e-6,
+        "ftol": 1e-2,
     }
 )
 
 
-planner = DirectCollocationPlanner(
+planner = TrajectoryOptimizationPlanner(
     problem,
-    tf=5.0,
-    n_steps=50,
+    transcription=DirectCollocationTranscription(
+        DirectCollocationOptions(tf=5.0, n_steps=50)
+    ),
     optimizer=optimizer,
-    compile_backend="numpy",
+    options=TrajectoryOptimizationOptions(compile_backend="numpy"),
 )
 
 

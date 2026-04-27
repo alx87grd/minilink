@@ -1,10 +1,10 @@
-import numpy as np
 import time
 
+import numpy as np
+
+from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem
-from minilink.core.blocks.sources import Step
-
 
 ######################################################################
 # Custom blocks

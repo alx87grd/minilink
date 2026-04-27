@@ -71,7 +71,7 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
     "rk4_fixedsteps": ("rk4", {}),
 }
 
-# Nominal rollouts ti use fixed-step RK4 (JIT) instead of
+# Long uniform rollouts can use fixed-step RK4 (JIT) instead of
 # SciPy when the output grid is long enough
 RK4_AUTO_MIN_TIME_POINTS = 10_000
 
@@ -229,8 +229,7 @@ class Simulator:
         - If the system has discontinuous behavior, return ``"scipy_stiff"``.
         - If ``compile_backend`` is ``"jax"``, the time grid is uniform, and the
           number of evaluation points is at least :data:`RK4_AUTO_MIN_TIME_POINTS`,
-          return ``"rk4_fixedsteps"`` (fast JIT rollout; nominal :meth:`solve` only —
-          :meth:`solve_forced` still needs a SciPy or Euler solver).
+          return ``"rk4_fixedsteps"`` (fast JIT rollout).
         - Otherwise, return ``"scipy"``.
         """
         if user_solver is not None:
@@ -395,7 +394,7 @@ class Simulator:
         return u
 
     def _supports_forced_mode(self):
-        return not isinstance(self.solver_backend, RK4SolverBackend)
+        return True
 
     def _select_backend(self, solver_backend_key):
         if solver_backend_key == "scipy":

@@ -27,7 +27,7 @@ The table below is the on-disk layout and TRL. **Structural rules**, **pluggable
 | `compile/evaluator_timing` | **TRL 1** | Optional compiled-`f` timing (`benchmark_f_speeds`, `print_f_speed_table`); not part of the core contract |
 | `simulation/integration_timing` | **TRL 1** | Optional simulator timing sweeps, `STANDARD_SIM_CASES`, and helpers (`run_timed`, …) |
 | `simulation/scenarios/` | **TRL 1** | Shared **stress** scenarios for timing matrices, not user plants |
-| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization includes NumPy+SciPy direct collocation (`trajectory_optimization/direct_collocation.py`) and an optional **JAX-derivative** path (`trajectory_optimization/jax_direct_collocation.py`, still narrower than the NumPy transcription—see §3.5) |
+| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization uses a generic `TrajectoryOptimizationPlanner` plus method-specific transcriptions; direct collocation has a NumPy+SciPy path and an optional **JAX-derivative** path (`trajectory_optimization/jax_direct_collocation.py`, still narrower than the NumPy transcription—see §3.5) |
 | `optimization/` | **TRL 1** | Thin finite-dimensional mathematical-program contracts (`MathematicalProgram` with optional objective `grad` / `hess` and per-constraint Jacobians) shared by planning and future control workflows |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
@@ -90,7 +90,11 @@ minilink/planning/
   search/
   trajectory_optimization/
     direct_collocation.py
+    fixed_grid.py
     jax_direct_collocation.py
+    live_plot.py
+    planner.py
+    shooting.py
     transcription.py
   policy_synthesis/
 ```
@@ -380,13 +384,22 @@ It separates the continuous mathematical problem from numerical solver choices:
   assume the stored result is a :class:`~minilink.core.trajectory.Trajectory`.
 - Generic initial-trajectory guesses live in ``planning/initial_guess.py`` and
   are prepared by planners before transcription.
-- Trajectory-optimization transcriptions may emit generic
-  `minilink.optimization` mathematical programs of the form
-  `minimize J(z)` subject to `h(z) = 0`, `g(z) >= 0`, and bounds on `z`.
+- `TrajectoryOptimizationPlanner` owns the generic trajectory-optimization
+  workflow: initial guess and optional warm start, transcription, optimization,
+  reconstruction, last-result storage, and optional iteration-history/callback
+  plumbing for future live trajectory visualization.
+- Trajectory-optimization transcriptions own method-specific decision-vector
+  layout and may emit generic `minilink.optimization` mathematical programs of
+  the form `minimize J(z)` subject to `h(z) = 0`, `g(z) >= 0`, and bounds on
+  `z`. The generic trajectory-optimization options carry execution policy such
+  as `compile_backend`; method options carry only method/grid data.
 - **Direct collocation** — `trajectory_optimization.direct_collocation` transcribes
   a trapezoidal direct-collocation NLP with an optional NumPy- or
   ``compile``-backed dynamics residual; the SciPy-based optimizer is the
   default outer loop.
+- **Single shooting** — `trajectory_optimization.shooting` optimizes only input
+  knots and reconstructs states with the shared fixed-step RK4 forced-rollout
+  evaluator primitive.
 - **JAX direct collocation (prototype)** —
   `trajectory_optimization.jax_direct_collocation` also targets SciPy, but
   uses JAX-``jit``/``jacfwd``/optional Hessian to supply objective and constraint
@@ -396,11 +409,13 @@ It separates the continuous mathematical problem from numerical solver choices:
   Supported sets are **narrower** than the NumPy path: :class:`~minilink.core.sets.SingletonSet`
   for :math:`X_0` / :math:`X_f` and box-style path sets via
   :class:`~minilink.core.sets.BoxSet` / :class:`~minilink.core.sets.BoxInputSet`;
-  general set margins remain on the NumPy transcription until reviewed.
+  general set margins remain on the NumPy transcription until reviewed. JAX
+  precision is process-wide compile configuration via
+  :func:`minilink.compile.jax_utils.configure_jax`, not a planning option.
 
 This first pass is intentionally deterministic and high-level. Stochastic
-planning, chance constraints, belief states, and full direct-collocation/RRT/DP
-internals are deferred until the architecture is reviewed.
+planning, chance constraints, belief states, and broader RRT/DP/trajopt coverage
+are deferred until the architecture is reviewed.
 
 ### 3.6 Pluggable implementations layout
 
@@ -481,7 +496,7 @@ Planned ergonomic shortcut:
 
 Current solver modes (see `minilink.simulation.simulator` and tests):
 
-- `solver="euler"`, `solver="rk4_fixedsteps"` (fixed step; not available for `solve_forced` today)
+- `solver="euler"`, `solver="rk4_fixedsteps"` (fixed step; both nominal and forced)
 - `solver="scipy"`, `solver="scipy_stiff"`, `solver="scipy_max"`, `solver="scipy_ultra"`
 - `solver="scipy_lsoda"` (alias that selects LSODA; useful for stiff/variable-tolerance cases)
 - **Auto RK4 (heuristic)**: for long, **uniform** time grids, JAX compile backend, and a non-stiff profile, the simulator may select `rk4_fixedsteps` automatically for wall-clock reasons. This is best-effort; defaults remain explicit where conservatism matters.

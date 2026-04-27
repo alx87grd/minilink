@@ -21,6 +21,20 @@ def require_jax_numpy() -> types.ModuleType:
     return jnp
 
 
+def configure_jax(*, enable_x64: bool | None = None) -> types.ModuleType:
+    """Configure process-wide JAX options used by Minilink JAX code paths."""
+    try:
+        import jax
+    except ImportError as e:
+        raise ImportError(
+            "JAX is required for this code path. Install with: pip install jax jaxlib"
+        ) from e
+
+    if enable_x64 is not None:
+        jax.config.update("jax_enable_x64", bool(enable_x64))
+    return jax
+
+
 def array_module(a: Any) -> types.ModuleType:
     """Return ``jax.numpy`` if *a* is a JAX array/tracer, else ``numpy``."""
     if type(a).__module__.startswith("jax"):

@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
-from minilink.core.costs import CostFunction
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -17,48 +16,18 @@ from minilink.optimization.mathematical_program import (
     OptimizationResult,
     VariableBounds,
 )
-from minilink.optimization.optimizers.optimizer import Optimizer
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
-from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.transcription import Transcription
+from minilink.planning.trajectory_optimization.fixed_grid import FixedGridOptions
+from minilink.planning.trajectory_optimization.transcription import (
+    Transcription,
+    TranscriptionContext,
+)
 
 
-@dataclass(frozen=True)
-class DirectCollocationOptions:
+class DirectCollocationOptions(FixedGridOptions):
     """
-    Grid and optimizer options for direct-collocation transcriptions.
-
-    These are solver options, not fields on :class:`PlanningProblem`.
+    Grid options for direct-collocation transcriptions.
     """
-
-    tf: float
-    n_steps: int
-    compile_backend: str | None = "numpy"
-    optimizer: Optimizer = field(default_factory=ScipyMinimizeOptimizer)
-    initial_guess: np.ndarray | Trajectory | None = None
-
-    def __post_init__(self) -> None:
-        tf = float(self.tf)
-        if not np.isfinite(tf) or tf <= 0.0:
-            raise ValueError("tf must be a positive finite scalar")
-        if isinstance(self.n_steps, bool) or int(self.n_steps) < 2:
-            raise ValueError("n_steps must be an integer greater than or equal to 2")
-        object.__setattr__(self, "tf", tf)
-        object.__setattr__(self, "n_steps", int(self.n_steps))
-        if self.compile_backend is not None:
-            object.__setattr__(self, "compile_backend", str(self.compile_backend))
-
-    @property
-    def t(self) -> np.ndarray:
-        """Uniform transcription time grid."""
-        return np.linspace(0.0, self.tf, self.n_steps)
-
-    @property
-    def dt(self) -> float:
-        """Uniform time step between collocation knots."""
-        return self.tf / float(self.n_steps - 1)
 
 
 @dataclass(frozen=True)
@@ -74,10 +43,17 @@ class DirectCollocationTranscription(Transcription):
 
     options: DirectCollocationOptions
 
-    def transcribe(self, problem: PlanningProblem) -> MathematicalProgram:
+    def transcribe(
+        self,
+        problem: PlanningProblem,
+        *,
+        initial_guess: np.ndarray | Trajectory | None = None,
+        context: TranscriptionContext | None = None,
+    ) -> MathematicalProgram:
         """Convert ``problem`` into a finite-dimensional nonlinear program."""
         problem.require_cost()
-        dynamics = self._make_dynamics(problem)
+        context = TranscriptionContext() if context is None else context
+        dynamics = self._make_dynamics(problem, context.compile_backend)
 
         equalities = [
             EqualityConstraint(
@@ -97,7 +73,7 @@ class DirectCollocationTranscription(Transcription):
 
         return MathematicalProgram(
             J=lambda z: self._objective(z, problem),
-            z0=self.initial_guess(problem),
+            z0=self._pack_initial_guess(problem, initial_guess),
             bounds=self.variable_bounds(problem),
             equalities=tuple(equalities),
             inequalities=tuple(inequalities),
@@ -109,6 +85,7 @@ class DirectCollocationTranscription(Transcription):
                 "n_steps": self.options.n_steps,
                 "state_dim": int(problem.sys.n),
                 "input_dim": int(problem.sys.m),
+                "compile_backend": context.compile_backend,
             },
         )
 
@@ -118,10 +95,12 @@ class DirectCollocationTranscription(Transcription):
         *,
         problem: PlanningProblem,
         metadata: dict[str, Any] | None = None,
+        context: TranscriptionContext | None = None,
     ) -> Trajectory:
         """Convert an optimizer result back into a sampled trajectory."""
+        context = TranscriptionContext() if context is None else context
         x, u = self.unpack(result.z, problem)
-        dynamics = self._make_dynamics(problem)
+        dynamics = self._make_dynamics(problem, context.compile_backend)
         dx = np.zeros_like(x)
         for k, t_k in enumerate(self.options.t):
             dx[:, k] = dynamics(x[:, k], u[:, k], float(t_k))
@@ -173,9 +152,12 @@ class DirectCollocationTranscription(Transcription):
         u = z_arr[split:].reshape(m, n_steps)
         return x, u
 
-    def initial_guess(self, problem: PlanningProblem) -> np.ndarray:
+    def _pack_initial_guess(
+        self,
+        problem: PlanningProblem,
+        guess: np.ndarray | Trajectory | None,
+    ) -> np.ndarray:
         """Return a packed initial guess for the mathematical program."""
-        guess = self.options.initial_guess
         if guess is None:
             raise ValueError(
                 "DirectCollocationTranscription requires an initial guess prepared "
@@ -191,6 +173,10 @@ class DirectCollocationTranscription(Transcription):
         if guess_arr.shape != (expected,):
             raise ValueError(f"initial_guess must have shape ({expected},)")
         return guess_arr.copy()
+
+    def initial_guess_time_grid(self, problem: PlanningProblem) -> np.ndarray:
+        """Return the collocation time grid."""
+        return self.options.t
 
     def variable_bounds(self, problem: PlanningProblem) -> VariableBounds:
         """Build box bounds on the packed decision vector when sets expose boxes."""
@@ -212,9 +198,9 @@ class DirectCollocationTranscription(Transcription):
 
         return VariableBounds(lower=lower, upper=upper)
 
-    def _make_dynamics(self, problem: PlanningProblem):
+    def _make_dynamics(self, problem: PlanningProblem, compile_backend: str | None):
         params = problem.params.system
-        backend = self.options.compile_backend
+        backend = compile_backend
 
         if params is not None or backend is None or backend == "direct":
             return lambda x, u, t: np.asarray(
@@ -338,106 +324,3 @@ class DirectCollocationTranscription(Transcription):
             inequalities.append(
                 InequalityConstraint(g=input_margins, name="input_path")
             )
-
-
-def _with_default_initial_guess(
-    problem: PlanningProblem,
-    options: DirectCollocationOptions,
-) -> DirectCollocationOptions:
-    if options.initial_guess is not None:
-        return options
-    return replace(
-        options,
-        initial_guess=default_initial_trajectory(problem, options.t),
-    )
-
-
-class _DirectCollocationPlannerBase(Planner):
-    """Shared orchestration for direct-collocation planner variants."""
-
-    def __init__(
-        self,
-        problem: PlanningProblem,
-        *,
-        options: DirectCollocationOptions,
-        transcription_cls: type[DirectCollocationTranscription],
-    ) -> None:
-        super().__init__(problem)
-        self.require_cost()
-        self.options = _with_default_initial_guess(problem, options)
-        self.transcription = transcription_cls(self.options)
-        self.last_program: MathematicalProgram | None = None
-        self.last_optimization_result: OptimizationResult | None = None
-
-    def compute_solution(self) -> Trajectory:
-        """Compute and store a direct-collocation trajectory."""
-        program = self.transcription.transcribe(self.problem)
-        optimization_result = self.options.optimizer.solve(program)
-        trajectory = self.transcription.reconstruct_result(
-            optimization_result,
-            problem=self.problem,
-            metadata=program.metadata,
-        )
-
-        self.last_program = program
-        self.last_optimization_result = optimization_result
-        return self._store_result(trajectory)
-
-
-class DirectCollocationPlanner(_DirectCollocationPlannerBase):
-    """
-    Direct-collocation trajectory-optimization planner.
-    """
-
-    def __init__(
-        self,
-        problem: PlanningProblem,
-        *,
-        tf: float,
-        n_steps: int,
-        optimizer: Optimizer | None = None,
-        compile_backend: str | None = "numpy",
-        initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> None:
-        options = DirectCollocationOptions(
-            tf=tf,
-            n_steps=n_steps,
-            compile_backend=compile_backend,
-            optimizer=(ScipyMinimizeOptimizer() if optimizer is None else optimizer),
-            initial_guess=initial_guess,
-        )
-        super().__init__(
-            problem,
-            options=options,
-            transcription_cls=DirectCollocationTranscription,
-        )
-
-    @classmethod
-    def from_system(
-        cls,
-        sys: Any,
-        *,
-        x_start: np.ndarray,
-        x_goal: np.ndarray,
-        cost: CostFunction,
-        tf: float,
-        n_steps: int,
-        optimizer: Optimizer | None = None,
-        compile_backend: str | None = "numpy",
-        initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> DirectCollocationPlanner:
-        """Convenience constructor building a :class:`PlanningProblem`."""
-        problem = PlanningProblem(
-            sys=sys,
-            x_start=x_start,
-            x_goal=x_goal,
-            cost=cost,
-        )
-        return cls(
-            problem,
-            tf=tf,
-            n_steps=n_steps,
-            optimizer=optimizer,
-            compile_backend=compile_backend,
-            initial_guess=initial_guess,
-        )

@@ -188,7 +188,7 @@ class TestNewSimulator(unittest.TestCase):
         with self.assertRaises(ValueError):
             sim.solve_forced(bad_u)
 
-    def test_solve_forced_rejects_unsupported_solver(self):
+    def test_solve_forced_supports_fixed_step_rk4(self):
         sim = Simulator(
             StableLinearSystem(),
             tf=0.2,
@@ -198,10 +198,12 @@ class TestNewSimulator(unittest.TestCase):
         )
         u_traj = np.zeros((1, 3))
 
-        with self.assertRaises(ValueError) as ctx:
-            sim.solve_forced(u_traj)
+        traj = sim.solve_forced(u_traj)
 
-        self.assertIn("does not support forced simulations", str(ctx.exception))
+        self.assertEqual(sim.last_debug["solver"], "rk4_fixedsteps")
+        np.testing.assert_allclose(traj.u, u_traj)
+        np.testing.assert_allclose(traj.x[:, 0], [1.0])
+        self.assertLess(traj.x[0, -1], 1.0)
 
     def test_wrapper_compute_trajectory_uses_new_simulator_path(self):
         sys = StableLinearSystem()
