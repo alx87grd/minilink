@@ -14,10 +14,10 @@ from typing import Any
 
 import numpy as np
 
+from minilink.core.costs import CostFunction
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.optimizers.optimizer import Optimizer
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
-from minilink.planning.costs import CostFunction
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 

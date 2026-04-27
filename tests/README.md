@@ -1,4 +1,4 @@
- # Test suite organization
+# Test suite organization
 
 The default pytest discovery lives in `tests/unittest`.
 

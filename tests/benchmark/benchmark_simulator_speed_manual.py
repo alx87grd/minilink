@@ -7,10 +7,10 @@ Run from repo root::
 Uses the same truth pair and table style as :file:`benchmark_simulator_speed_matrix.py`.
 """
 
-from minilink.benchmark.simulation_speed import benchmark_sim_speed_matrix
-from minilink.benchmark.scenario.basic import make_pendulum
-from minilink.benchmark.scenario.engine import make_physics_many_spheres
-from minilink.benchmark.scenario.network import make_dense_network
+from minilink.simulation.integration_timing import benchmark_sim_speed_matrix
+from minilink.simulation.scenarios.basic import make_pendulum
+from minilink.simulation.scenarios.engine import make_physics_many_spheres
+from minilink.simulation.scenarios.network import make_dense_network
 
 # (solver, compile_backend) — only these pairs are run (edit freely).
 PAIRS = (

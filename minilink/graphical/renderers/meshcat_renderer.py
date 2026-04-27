@@ -21,7 +21,7 @@ from minilink.graphical.primitives import (
     TorqueArrow,
     extract_amplitude,
 )
-from minilink.graphical.renderers.base import AnimationRenderer
+from minilink.graphical.renderers.renderer import AnimationRenderer
 
 
 def _import_meshcat():

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-import matplotlib
-import matplotlib.pyplot as plt
 from typing import Literal
 
-from minilink.graphical.environment import allow_tall_stacked_figures, is_blocking_needed
+import matplotlib
+import matplotlib.pyplot as plt
+
+from minilink.graphical.environment import (
+    allow_tall_stacked_figures,
+    is_blocking_needed,
+)
 from minilink.graphical.matplotlib_style import (
     DPI_FIGURE,
     FIGSIZE_BASE,

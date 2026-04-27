@@ -5,8 +5,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
+from minilink.compile.jax_utils import array_module
 from minilink.core.system import DynamicSystem
-from minilink.jax_utils import array_module
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
 
 
@@ -158,7 +158,7 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
 
         with patch(
-            "minilink.simulation.solver_backends.solve_ivp",
+            "minilink.simulation.solvers.scipy_ivp.solve_ivp",
             return_value=failed_solution,
         ):
             with self.assertRaises(RuntimeError) as ctx:

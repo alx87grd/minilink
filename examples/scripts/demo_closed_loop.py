@@ -1,7 +1,7 @@
 import numpy as np
 
 from minilink.control.pendulum_pd import PendulumPDController
-from minilink.dynamics.pendulum.pendulum import Pendulum
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 

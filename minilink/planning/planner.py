@@ -14,9 +14,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from minilink.planning.costs import CostFunction
+from minilink.core.costs import CostFunction
+from minilink.core.sets import Set
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.sets import Set
 
 
 class Planner(ABC):

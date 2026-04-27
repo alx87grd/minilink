@@ -19,11 +19,9 @@ from typing import Any
 import numpy as np
 
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.solver_backends import (
-    EulerSolverBackend,
-    RK4SolverBackend,
-    SciPySolverBackend,
-)
+from minilink.simulation.solvers.euler import EulerSolverBackend
+from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
+from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
 
 # --- Internal: user-facing solver labels to backend keys and options --------
 

@@ -12,25 +12,282 @@
 
 ## 2. Package Map
 
+The table below is the on-disk layout and TRL. **Structural rules**, **pluggable file naming**, and the **reference tree** for new modules are in §2.1–2.6.
+
 | Module | Status | Description |
 | --- | --- | --- |
 | `core/` | **TRL 7** | Main modeling abstractions; `core/blocks/` diagram primitives (sources, integrators, lightweight signal blocks—not full plants); canonical `Trajectory` in `trajectory.py` |
 | `compile/` | **TRL 4** | `ExecutionPlan`, `DynamicsEvaluator`, NumPy/JAX evaluator backends |
 | `simulation/` | **TRL 4** | `Simulator`, solver backends, compile-backend selection (`"auto"` → try JAX, fall back to NumPy), optional auto fixed-step RK4 for long uniform grids with JAX, interpolation helpers |
 | `graphical/` | **TRL 2** | Matplotlib theming (`matplotlib_style`), env-aware layout, animation renderers; kinematic hooks still provisional (see §3.2, §4.7–4.8) |
-| `mechanics/` | **TRL 1** | Numeric and symbolic mechanics paths (framework; concrete plants often live in `dynamics/`) |
-| `physics/` | **TRL 1** | JAX contact-world MVP (`engine_jax`, `PhysicsWorldSystem`); engine-backed dynamics, not folded into `dynamics/` |
-| `dynamics/` | **TRL 0** | Reusable **plant** models as `DynamicSystem` leaves (e.g. `vehicles/`, `msd/`, `pendulum/`) |
-| `benchmark/` | **TRL 1** | Optional timing helpers (`f_speed`, `simulation_speed`) and no core dependency |
-| `benchmark/scenario/` | **TRL 1** | Shared benchmark **scenarios** (stress systems and builders for timing matrices), not user plants |
-| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`, planning-owned costs and allowable sets, and solver-family packages for search, trajectory optimization, and policy synthesis |
+| `symbolic/` | **TRL 1** | Optional SymPy stack under `symbolic/mechanics/`; must not be required to import `minilink.dynamics` |
+| `dynamics/abstraction/` | **TRL 1** | Inheritance abstractions (e.g. `MechanicalSystem` in `mechanical.py`) |
+| `physics/` | **TRL 1** | JAX contact-world MVP (`engine_jax`, `PhysicsWorldSystem`); engine-backed dynamics, not folded into analytic `dynamics/` |
+| `dynamics/catalog/` | **TRL 0** | Reusable **plant** models as `DynamicSystem` leaves (`pendulum/`, `vehicles/`, `msd/`, …) |
+| `compile/evaluator_timing` | **TRL 1** | Optional compiled-`f` timing (`benchmark_f_speeds`, `print_f_speed_table`); not part of the core contract |
+| `simulation/integration_timing` | **TRL 1** | Optional simulator timing sweeps, `STANDARD_SIM_CASES`, and helpers (`run_timed`, …) |
+| `simulation/scenarios/` | **TRL 1** | Shared **stress** scenarios for timing matrices, not user plants |
+| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis |
 | `optimization/` | **TRL 1** | Thin finite-dimensional mathematical-program contracts shared by planning and future control workflows |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
-### 2.1 Notes (dynamics + mechanics)
+### 2.1 Structural principles (on-disk)
 
-- **`dynamics/` Pyro ports**: `minilink.dynamics.pendulum.cartpole.CartPole` and
-  `minilink.dynamics.pendulum.double_pendulum.DoublePendulum` are numeric ports of
+1. **Dependency direction** — Generic types (`Trajectory`, costs, sets, ports) live in `core/` so other packages do not import `planning/` just to score or constrain trajectories.
+2. **Language vs solvers** — *What* the system is → `core/`, `dynamics/`, `physics/`. *How* you integrate, compile, or optimize → `simulation/`, `optimization/`, `compile/`, `planning/`.
+3. **Pluggable backends** — Use role-named subpackages and contract modules; naming details in §2.2.
+4. **Inheritance ladders** (`MechanicalSystem`, …) — `dynamics/abstraction/` only; this is a different pattern from swappable solvers or renderers.
+5. **Optional heavy dependencies** — SymPy (`symbolic/`), renderers (`graphical/`), future engines—prefer `pyproject` extras where practical.
+
+### 2.2 Pluggable roles and file naming
+
+When a package supports **multiple swappable mechanisms** (optimizers, solvers, evaluators, renderers):
+
+1. **Role-specific folders** — Prefer `optimizers/`, `solvers/`, `renderers/`, `evaluators/`, and planning family packages (`search/`, …) over a generic `backends/` name. A type that orchestrates all families in a package may sit at the package root (e.g. `planning/planner.py`).
+2. **Singular contract module** — The abstract API lives in a module named for the role, not `base.py`—e.g. `optimizers/optimizer.py`, `planning/planner.py`, `graphical/renderers/renderer.py`, `compile/evaluators/evaluator.py`.
+3. **One file per concrete implementation** — e.g. `optimizers/scipy_minimize.py`; `renderers/matplotlib_renderer.py` (use `*_renderer.py` for third-party library clarity, not a bare `matplotlib.py`).
+4. **Long, explicit names under `compile/evaluators/`** — `numpy_evaluator.py`, `jax_evaluator.py` (not `numpy.py` / `jax.py`) so imports do not clash with libraries.
+5. **No barrel re-exports** — Import from the module that defines each symbol; package `__init__.py` files are namespace markers (docstring-only) unless a future API freeze says otherwise. See `agent.md`.
+6. **Domain types at package root** — e.g. `mathematical_program.py` for `MathematicalProgram`; it is not an “optimizer” module.
+7. **Compile orchestration** — `compiler.py` is the only orchestrator (plan, dispatch, return evaluator). Do **not** add `compile/compilers/`; the name collides. Per-backend construction lives in `compile/evaluators/*_evaluator.py` and small helpers next to `compiler.py`.
+
+**Layout template:**
+
+```text
+minilink/<package>/
+  <core_types>.py
+  <role>/
+    __init__.py              # docstring only
+    <role_singular>.py       # ABC / protocol
+    <impl>.py                # one primary mechanism per file
+```
+
+**Pluggable area map**
+
+| Area | On-disk |
+| --- | --- |
+| `minilink/compile` | `compiler.py`, `execution_plan.py`, `jax_utils.py` (JAX + `format_benchmark_backend_label`), `evaluators/*`, `evaluator_timing.py` |
+| `minilink/simulation` | `simulator.py`, `solvers/`, `integration_timing.py`, `scenarios/` |
+| `minilink/graphical` | `renderers/renderer.py` + `*_renderer.py` |
+| Timing and stress | No top-level `benchmark/` package; use `compile/evaluator_timing`, `simulation/integration_timing`, `simulation/scenarios` |
+
+`CostFunction` and set types live in `minilink.core` (`core/costs.py`, `core/sets.py`).
+
+**Reference snippets** (implemented layout):
+
+```text
+minilink/optimization/
+  mathematical_program.py
+  optimizers/
+    __init__.py
+    optimizer.py
+    scipy_minimize.py
+
+minilink/planning/
+  planner.py
+  problems.py
+  search/
+  trajectory_optimization/
+  policy_synthesis/
+```
+
+```text
+minilink/compile/
+  compiler.py
+  execution_plan.py
+  jax_utils.py
+  evaluator_timing.py
+  evaluators/
+    evaluator.py
+    numpy_evaluator.py
+    jax_evaluator.py
+
+minilink/simulation/
+  solvers/
+    solver.py
+    scipy_ivp.py
+    euler.py
+    rk4_fixed.py
+  simulator.py
+  input_interpolation.py
+  integration_timing.py
+  scenarios/
+
+minilink/graphical/renderers/
+  __init__.py
+  renderer.py
+  timing.py
+  matplotlib_renderer.py
+  meshcat_renderer.py
+  pygame_renderer.py
+```
+
+| Concern | Subpackage | Contract module |
+| --- | --- | --- |
+| Finite-dimensional programs | `optimizers/` | `optimizer.py` |
+| Planning across families | `planning/` (root) | `planner.py` |
+| ODE / IVP / fixed step | `solvers/` | `solver.py` |
+| Compiled dynamics | `evaluators/` | `evaluator.py` |
+| Draw / animate | `renderers/` | `renderer.py` |
+| Compile orchestration | `compile/` (root) | `compiler.py` (not `compilers/`) |
+
+### 2.3 Canonical `minilink/` tree (reference)
+
+`compiler.py` is the **orchestrator** (build or accept an `ExecutionPlan`, dispatch, return an evaluator). There is **no** `compile/compilers/`. `jax_utils.py` sits under `compile/` (JAX and evaluator-adjacent helpers); `tools/` is for **external** bridges, not that sugar.
+
+**Naming:** Long, explicit evaluator modules under `evaluators/`, e.g. `numpy_evaluator.py`, `jax_evaluator.py` (not bare `numpy.py` / `jax.py`).
+
+```text
+minilink/
+├── __init__.py
+│
+├── core/                           # modeling — no ODE/IVP or compile evaluators here
+│   ├── __init__.py
+│   ├── system.py
+│   ├── diagram.py
+│   ├── trajectory.py
+│   ├── costs.py
+│   ├── sets.py
+│   └── blocks/
+│       ├── __init__.py
+│       ├── basic.py
+│       └── sources.py
+│
+├── symbolic/
+│   ├── __init__.py
+│   └── mechanics/
+│       └── ...
+│
+├── dynamics/
+│   ├── __init__.py
+│   ├── abstraction/
+│   │   ├── __init__.py
+│   │   ├── mechanical.py
+│   │   └── ...
+│   └── catalog/
+│       ├── __init__.py
+│       ├── pendulum/
+│       ├── vehicles/
+│       ├── msd/
+│       └── equations/
+│
+├── physics/
+│   ├── __init__.py
+│   ├── engine_jax.py
+│   └── system.py
+│
+├── compile/
+│   ├── __init__.py
+│   ├── compiler.py
+│   ├── execution_plan.py
+│   ├── jax_utils.py
+│   ├── evaluator_timing.py
+│   └── evaluators/
+│       ├── __init__.py
+│       ├── evaluator.py
+│       ├── numpy_evaluator.py
+│       └── jax_evaluator.py
+│
+├── simulation/
+│   ├── __init__.py
+│   ├── simulator.py
+│   ├── input_interpolation.py
+│   ├── integration_timing.py
+│   ├── scenarios/
+│   │   ├── __init__.py
+│   │   └── ...
+│   └── solvers/
+│       ├── __init__.py
+│       ├── solver.py
+│       ├── scipy_ivp.py
+│       ├── euler.py
+│       └── rk4_fixed.py
+│
+├── estimation/
+│   └── __init__.py
+│
+├── control/
+│   ├── __init__.py
+│   └── ...
+│
+├── planning/
+│   ├── __init__.py
+│   ├── planner.py
+│   ├── problems.py
+│   ├── search/
+│   ├── trajectory_optimization/
+│   └── policy_synthesis/
+│
+├── optimization/
+│   ├── __init__.py
+│   ├── mathematical_program.py
+│   └── optimizers/
+│       ├── __init__.py
+│       ├── optimizer.py
+│       └── scipy_minimize.py
+│
+├── analysis/
+│   └── __init__.py
+│
+├── graphical/
+│   ├── __init__.py
+│   ├── plotting.py
+│   ├── animation.py
+│   ├── environment.py
+│   ├── primitives.py
+│   ├── matplotlib_style.py
+│   ├── graphe.py
+│   └── renderers/
+│       ├── __init__.py
+│       ├── renderer.py
+│       ├── timing.py
+│       ├── matplotlib_renderer.py
+│       ├── meshcat_renderer.py
+│       └── pygame_renderer.py
+│
+└── tools/                          # external only: Gym, URDF, MuJoCo, …
+    └── __init__.py
+```
+
+### 2.4 Package roles (quick reference)
+
+| Package | Role |
+| --- | --- |
+| `core/` | Diagram algebra, ports, `System` hierarchy, `Trajectory`, `costs.py`, `sets.py`, `blocks/`. |
+| `symbolic/` | CAS; must not be required to `import minilink.dynamics`. |
+| `dynamics/` | `abstraction/` + `catalog/`. |
+| `physics/` | Engine-backed worlds; peer of `dynamics/`. |
+| `compile/` | `compiler.py`, `execution_plan.py`, `evaluators/`, `jax_utils.py`, `evaluator_timing.py`. |
+| `simulation/` | `simulator.py`, `solvers/`, `input_interpolation.py`, `integration_timing.py`, `scenarios/`. |
+| `estimation/` | Observers, filters, sensor models. |
+| `control/` | Feedback laws, RL policy wrappers as `StaticSystem`. |
+| `planning/` | `PlanningProblem`, `planner.py`, families under `search/`, `trajectory_optimization/`, `policy_synthesis/`, … |
+| `optimization/` | `MathematicalProgram`, `optimizers/`. |
+| `analysis/` | Diagnostics and numerics (arrays, structured results), not “how to plot.” |
+| `graphical/` | Plotting, animation, `renderers/renderer.py` and backends. |
+| `tools/` | External ecosystem bridges; not internal JAX compile helpers. |
+
+### 2.5 Scope, vocabulary, and boundaries
+
+- **Typical dependency flow** — `core` ← (`dynamics`, `physics`, `estimation`, `control`, `planning`, …); `symbolic` → `dynamics`; `compile` consumes `core`; `simulation` consumes `compile` + `core`; `analysis` consumes trajectories or linearizations; `graphical` consumes results from anywhere.
+- **`compile/` vs `simulation/`** — *Compile* answers: given a model and a diagram schedule, what **closed-form callable** is `f` / boundary outputs? *Simulation* answers: given an evaluator, how do we **advance time** to a `Trajectory`? `compiler.py` dispatches to `evaluators/*_evaluator.py`. `simulator.py` uses `solvers/`.
+- **Benchmarks** — Optional timing lives in `compile/evaluator_timing` and `simulation/integration_timing`; stress graphs in `simulation/scenarios/`. Table labels for JAX use `format_benchmark_backend_label` in `compile/jax_utils.py`.
+- **`analysis/` vs `graphical/`** — Reusable numerics and diagnostics → `analysis/`. Producing figures and animations → `graphical/`. Routines that are *only* plotting belong in `graphical/`. Multi-plot and diagram-export backends are deferred until a second implementation is real; keep `plotting.py` and `graphe.py` as the single stack for now.
+- **`estimation/` vs `planning/`** — State reconstruction and filters live in `estimation/`; avoid duplicating that under `planning/`. Planning **uses** `core` costs and sets.
+- **`control/` vs `planning/` (RL angle)** — Training or synthesis in `planning/` (or a dedicated family later); a **deployed** policy as a block → `control/`.
+- **Core and “solvers”** — “No solvers in `core`” means no IVP stack and no compile *evaluators*—not “no NumPy.” `costs` and `sets` may use NumPy.
+- **Placeholders** — `estimation/`, `analysis/`, and `tools/` grow as first modules land. Repository-level `examples/` and `tests/` sit outside `minilink/` and are not shown in the tree.
+
+### 2.6 Pyro alignment (conceptual)
+
+- Pyro `dynamic/*` → `core/blocks` + `dynamics/abstraction` + `dynamics/catalog`
+- Pyro `analysis/*` → `analysis/` + `graphical/` + `simulation/` + `core/costs` / `core/sets`
+- Pyro `planning/*`, `control/*`, `tools/*` → same-named packages here
+
+### 2.7 Notes (dynamics + mechanics)
+
+- **`dynamics/` Pyro ports**: `minilink.dynamics.catalog.pendulum.cartpole.CartPole` and
+  `minilink.dynamics.catalog.pendulum.double_pendulum.DoublePendulum` are numeric ports of
   SherbyRobotics/pyro `CartPole` / `DoublePendulum` manipulator equations.
 - **Kinematics vs dynamics**: animation is allowed to add display-only parameters
   (for example cart footprint sizes) and small out-of-plane offsets for volumetric
@@ -128,10 +385,10 @@ internals are deferred until the architecture is reviewed.
 
 How `minilink` arranges abstract contracts and concrete implementations
 (``optimization/optimizers``, ``planning/planner.py`` and family packages,
-future simulation solvers, renderers, compilers) is specified in
-[`pluggable_implementations.md`](pluggable_implementations.md). New work in
-`planning/` and `optimization/` follows that document; older packages are
-migrated when touched (see `ROADMAP.md`).
+simulation solvers, renderers, and compile evaluators) follows **§2.1–2.2** (structural
+principles and pluggable file naming) and the **reference tree in §2.3**. New
+work in `planning/` and `optimization/` should match those rules; other packages
+should converge when touched (see [ROADMAP.md](ROADMAP.md)).
 
 ## 4. Compile and Simulation Architecture
 
@@ -212,16 +469,16 @@ Current solver modes (see `minilink.simulation.simulator` and tests):
 
 **SciPy preset tolerances** (`scipy`, `scipy_stiff`, …) pass explicit `rtol` / `atol` into `solve_ivp` so behavior is not left to global SciPy defaults.
 
-### 4.6 Benchmark package (`minilink.benchmark`)
+### 4.6 Benchmark package (`minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing`)
 
-Optional helpers for timing and regression-style comparisons. They are **not** part of the core dynamical or simulation contract; scripts may import them for local experiments.
+Optional helpers for timing and regression-style comparisons. They are **not** part of the core dynamical or simulation contract; scripts may import them for local experiments. Stress builders live under `minilink.simulation.scenarios` (imported from timing scripts when needed).
 
 | Module | Purpose |
 | --- | --- |
-| `minilink.benchmark.f_speed` | `benchmark_f_speeds` measures native `system.f`, then `compile("numpy").f` and `compile("jax").f` over a fixed `(x, u, t)`; optional ASCII table via `print_f_speed_table`. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
-| `minilink.benchmark.simulation_speed` | Timing helpers (`run_timed`, `summarize_durations`, `relative_l2_error`); `benchmark_sim_backend(system, …)` compares one candidate `(solver, compile_backend)` to a **truth** pair (defaults `TRUTH_SOLVER` / `TRUTH_BACKEND`, i.e. `scipy_ultra` + `numpy`) on a given **built** `system`; `benchmark_sim_speed_matrix(system, pairs=…, …)` sweeps an explicit ordered list of `(solver, backend)` pairs vs the same truth pair, colors rows by ``rel_err_l2 < accuracy_threshold_pct``, prints ``speed_vs_truth = truth_mean_time / cell_mean_time``; ``DEFAULT_SWEEP_PAIRS`` is the full product of ``DEFAULT_SOLVERS`` × ``DEFAULT_BACKENDS``. Result rows and printed tables label the JAX compile key as ``jax(cpu)`` / ``jax(gpu)`` / etc. via ``jax.default_backend()`` (`format_benchmark_backend_label`). The same module also owns the fixed benchmark scenarios (`STANDARD_SIM_CASES`) plus `run_standard_sim_suite` / `print_standard_sim_suite`. |
+| `minilink.compile.evaluator_timing` | `benchmark_f_speeds` measures native `system.f`, then `compile("numpy").f` and `compile("jax").f` over a fixed `(x, u, t)`; optional ASCII table via `print_f_speed_table`. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
+| `minilink.simulation.integration_timing` | Timing helpers (`run_timed`, `summarize_durations`, `relative_l2_error`); `benchmark_sim_backend(system, …)` compares one candidate `(solver, compile_backend)` to a **truth** pair (defaults `TRUTH_SOLVER` / `TRUTH_BACKEND`, i.e. `scipy_ultra` + `numpy`) on a given **built** `system`; `benchmark_sim_speed_matrix(system, pairs=…, …)` sweeps an explicit ordered list of `(solver, backend)` pairs vs the same truth pair, colors rows by ``rel_err_l2 < accuracy_threshold_pct``, prints ``speed_vs_truth = truth_mean_time / cell_mean_time``; ``DEFAULT_SWEEP_PAIRS`` is the full product of ``DEFAULT_SOLVERS`` × ``DEFAULT_BACKENDS``. Result rows and printed tables label the JAX compile key as ``jax(cpu)`` / ``jax(gpu)`` / etc. via ``jax.default_backend()`` (`format_benchmark_backend_label`). The same module also owns the fixed benchmark scenarios (`STANDARD_SIM_CASES`) plus `run_standard_sim_suite` / `print_standard_sim_suite`. |
 
-Programmatic imports should use the defining modules, e.g. `from minilink.benchmark.simulation_speed import run_standard_sim_suite, DEFAULT_SWEEP_PAIRS, ...` and `from minilink.benchmark.f_speed import ...` as needed. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
+Programmatic imports should use the defining modules, e.g. `from minilink.simulation.integration_timing import run_standard_sim_suite, DEFAULT_SWEEP_PAIRS, ...` and `from minilink.compile.evaluator_timing import ...` as needed. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
 
 ### 4.7 Animation playback (`System.animate` / `Animator.animate_simulation`)
 

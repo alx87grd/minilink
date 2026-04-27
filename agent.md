@@ -8,7 +8,7 @@ This file defines the collaboration preferences and architectural expectations f
 - **Minimalist UX**: keep the main workflow beginner-friendly.
 - **MVP prototyping is allowed**: mark unvalidated architecture with `TODO: User Architectural Review`.
 - **Incremental refactoring**: avoid broad unapproved restructures.
-- **Docs are part of the contract**: keep `DESIGN.md` and `ROADMAP.md` aligned with the code.
+- **Docs are part of the contract**: keep `DESIGN.md` and `ROADMAP.md` aligned with the code. For **on-disk package layout, folder names, and pluggable *role* naming**, follow `DESIGN.md` §2; update §2 if you move or rename packages.
 
 ## 2. Coding Standards
 
@@ -29,9 +29,9 @@ This file defines the collaboration preferences and architectural expectations f
 - **Match the neighborhood**: before writing, read surrounding code and align with its naming, types, imports, and documentation density
 - **Tests only when justified**: add or update tests for stable public APIs, TRL milestones, documented contracts, or explicit user requests
 - **Validation in proportion**: avoid defensive error-handling sprawl in internal paths unless the interface is public or the risk is real
-- **Documentation**: do not add new markdown guides or expand unrelated docs unless asked; `DESIGN.md` / `ROADMAP.md` stay in sync when behavior or scope changes (§1, §3)
+- **Documentation**: do not add new markdown guides or expand unrelated docs unless asked; `DESIGN.md` / `ROADMAP.md` (and §2 when the tree changes) stay in sync with the code and each other (§1, §3)
 - **Imports and “math-first” surfaces**: In tutorials, demos, and other **reader-facing** code, keep the top of the file light—fewer imports and less Python ceremony so the math stays visible. This is **judgment, not dogma**: internal packages (`compile/`, `simulation/`, benchmarks, tests) may use richer imports when the benefit is clear. Prefer moving heavy setup into helpers or modules casual readers do not need to open.
-- **Package `__init__.py` (entire `minilink`)**: Import from the module that defines each symbol (e.g. `from minilink.compile.compiler import ...`, `from minilink.benchmark.simulation_speed import ...`, `from minilink.dynamics.vehicles.dynamic_bicycle import ...`). Do not use package `__init__` as a barrel re-export layer; those files are namespace markers (module docstring only, optional) unless an explicit API freeze and docs say otherwise. **Keep each `__init__.py` file** so subpackages stay regular packages and the build (Hatch) can discover them reliably; an empty or docstring-only `__init__.py` is fine, but deleting it risks tooling and import edge cases.
+- **Package `__init__.py` (entire `minilink`)**: Import from the module that defines each symbol (e.g. `from minilink.compile.compiler import ...`, `from minilink.simulation.integration_timing import ...`, `from minilink.dynamics.catalog.vehicles.dynamic_bicycle import ...`). Do not use package `__init__` as a barrel re-export layer; those files are namespace markers (module docstring only, optional) unless an explicit API freeze and docs say otherwise. **Keep each `__init__.py` file** so subpackages stay regular packages and the build (Hatch) can discover them reliably; an empty or docstring-only `__init__.py` is fine, but deleting it risks tooling and import edge cases.
 
 ## 3. Architectural Guidance
 
@@ -99,7 +99,7 @@ At feature completion, verify through:
 
 Demo and manual scripts should stay flat and directly runnable at module top level.
 
-Benchmark example scripts live under `tests/benchmark/` (same flat style). Import from `minilink.benchmark.f_speed` or `minilink.benchmark.simulation_speed` as needed (`benchmark_f_speeds`, `benchmark_sim_speed_matrix`, `DEFAULT_SWEEP_PAIRS`, etc.); see `DESIGN.md` §4.6.
+Benchmark example scripts live under `tests/benchmark/` (same flat style). Import from `minilink.compile.evaluator_timing` or `minilink.simulation.integration_timing` as needed (`benchmark_f_speeds`, `benchmark_sim_speed_matrix`, `DEFAULT_SWEEP_PAIRS`, etc.); see `DESIGN.md` §4.6.
 
 ### Scope: small edits vs larger work
 

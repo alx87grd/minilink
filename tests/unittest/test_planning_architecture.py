@@ -2,6 +2,8 @@ import unittest
 
 import numpy as np
 
+from minilink.core.costs import QuadraticCost
+from minilink.core.sets import BallSet, BoxSet, SingletonSet
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -11,13 +13,11 @@ from minilink.optimization.mathematical_program import (
     VariableBounds,
 )
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
-from minilink.planning.costs import QuadraticCost
 from minilink.planning.policy_synthesis.dynamic_programming import (
     DynamicProgrammingPlanner,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.rrt import RRTPlanner
-from minilink.planning.sets import BallSet, BoxSet, SingletonSet
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationPlanner,
 )

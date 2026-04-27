@@ -1,8 +1,8 @@
 import numpy as np
 from scipy.interpolate import interp1d
 
+from minilink.compile.jax_utils import array_module
 from minilink.core.system import System
-from minilink.jax_utils import array_module
 
 
 ######################################################################
@@ -41,9 +41,22 @@ class Source(System):
         n_pts : int, optional
             Number of evaluation points used for plotting.
         ax : matplotlib.axes.Axes, optional
-            Existing axis to draw on. If None, a new figure is created.
+            Existing axis to draw on. If None, a new figure is created and shown
+            (same policy as :func:`minilink.graphical.plotting.plot_trajectory`);
+            if an axis is passed, the caller controls display.
         """
         import matplotlib.pyplot as plt
+
+        from minilink.graphical.environment import (
+            allow_tall_stacked_figures,
+            is_blocking_needed,
+        )
+        from minilink.graphical.matplotlib_style import (
+            DPI_FIGURE,
+            FONT_SIZE,
+            signal_stack_figsize,
+            style_trajectory_subplot,
+        )
 
         self.refresh()
 
@@ -57,20 +70,36 @@ class Source(System):
         t = np.linspace(t0, tf, int(n_pts))
         y = np.array([self.h(np.array([]), np.array([]), ti) for ti in t]).T
 
-        if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=(8, 3))
+        _created = ax is None
+        if _created:
+            fig, ax = plt.subplots(
+                1,
+                1,
+                figsize=signal_stack_figsize(
+                    1, allow_tall=allow_tall_stacked_figures()
+                ),
+                dpi=DPI_FIGURE,
+                frameon=True,
+            )
+            if fig.canvas and hasattr(fig.canvas, "manager") and fig.canvas.manager:
+                try:
+                    fig.canvas.manager.set_window_title("Signal: " + self.name)
+                except Exception:
+                    pass
         else:
             fig = ax.figure
 
         for i in range(self.p):
             label = f"{self.name}[{i}]" if self.p > 1 else self.name
-            ax.plot(t, y[i, :], linewidth=1.2, label=label)
+            ax.plot(t, y[i, :], "b", linewidth=1.5, alpha=0.8, label=label)
 
-        ax.set_xlabel("time [s]")
-        ax.set_ylabel("value")
-        ax.set_title(f"{self.name} signal")
-        ax.grid(True, alpha=0.3)
-        ax.legend(loc="best")
+        ax.set_ylabel("value", fontsize=FONT_SIZE, multialignment="center")
+        style_trajectory_subplot(ax)
+        ax.legend(loc="upper right")
+        ax.set_xlabel("Time [s]", fontsize=FONT_SIZE)
+        ax.set_title(f"{self.name} signal", fontsize=FONT_SIZE)
+        if _created:
+            plt.show(block=is_blocking_needed())
 
         return fig, ax
 

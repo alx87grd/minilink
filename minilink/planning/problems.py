@@ -15,8 +15,8 @@ from typing import Any
 
 import numpy as np
 
-from minilink.planning.costs import CostFunction
-from minilink.planning.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
+from minilink.core.costs import CostFunction
+from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,7 @@ class ProblemParameters:
         Parameters for system dynamics. First-pass solvers may freeze these
         at compile time until parametric evaluator tiers are mature.
     cost : object, optional
-        Parameters passed to :class:`~minilink.planning.costs.CostFunction`.
+        Parameters passed to :class:`~minilink.core.costs.CostFunction`.
     sets : object, optional
         Parameters passed to allowable set objects.
     """

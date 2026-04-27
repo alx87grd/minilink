@@ -47,23 +47,23 @@ plot_trajectory(diagram, traj)
 - The official trajectory object is `minilink.core.trajectory.Trajectory`.
 - The compile pipeline, evaluators, and simulator are in architecture-validation / integration stage (`compile_backend` can be `"auto"`; long JAX sims may use an auto fixed-step path when the grid is uniform and non-stiff).
 - `graphical/` has a **stabilizing** matplotlib layer—`matplotlib_style` sizing and theming, notebook-aware stacked plot height, and trajectory **plot** modes—while other renderers and hooks remain early work.
-- `mechanics/`, symbolic mechanics, and `physics/` are early MVP work.
-- `dynamics/` holds reusable plant models; `core/blocks/` is wiring and signal primitives; `control/` is controller blocks; `planning/` has early family-level architecture contracts; these layers are still maturing.
-- `dynamics/pendulum/` includes tutorial `CartPole` and `DoublePendulum` on `MechanicalSystem`; see `tests/manual/demo_cartpole_doublependulum.py` for a quick animation smoke script.
+- `symbolic/mechanics/`, `dynamics/`, and `physics/` are early MVP work.
+- Curated plants live under `dynamics/catalog/`; inheritance abstractions under `dynamics/abstraction/`. `core/blocks/` is wiring and signal primitives; `control/` is controller blocks; `planning/` has early family-level architecture contracts; these layers are still maturing.
+- `dynamics/catalog/pendulum/` includes tutorial `CartPole` and `DoublePendulum` on `MechanicalSystem`. For a quick smoke path, run `python minilink/dynamics/catalog/pendulum/cartpole.py` or `python minilink/dynamics/catalog/pendulum/double_pendulum.py` from the repo root (each module has a small `__main__` using `compute_forced` + `animate`), or see `tests/unittest/test_pendulum_plants.py`.
 
 ## Documentation Guide
 
-- **[DESIGN.md](DESIGN.md)**: architecture, core contracts, and coding standards
+- **[DESIGN.md](DESIGN.md)**: architecture, core contracts, **on-disk package layout and module naming (§2)**, and coding standards
 - **[ROADMAP.md](ROADMAP.md)**: subsystem maturity and priorities
 - **[agent.md](agent.md)**: project-specific AI collaboration rules, the TRL lifecycle table, and a **supplemental** banding for recent matplotlib and simulation features (read with `DESIGN.md` / `ROADMAP.md`)
 
 ## Benchmarks
 
-- **API**: `minilink.benchmark` — `benchmark_f_speeds` / `print_f_speed_table` for compiled `f` timing; `benchmark_sim_speed_matrix` (pass a `pairs` list, e.g. `DEFAULT_SWEEP_PAIRS`) and `benchmark_sim_backend` on a built `system`; `run_standard_sim_suite` for the three standard cases; optional stress systems in `benchmark/scenario/` (see [DESIGN.md](DESIGN.md)).
+- **API**: `minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing` — `benchmark_f_speeds` / `print_f_speed_table` for compiled `f` timing; `benchmark_sim_speed_matrix` (pass a `pairs` list, e.g. `DEFAULT_SWEEP_PAIRS`) and `benchmark_sim_backend` on a built `system`; `run_standard_sim_suite` for the three standard cases; optional stress systems in `minilink/simulation/scenarios/` (see [DESIGN.md](DESIGN.md)).
 - **Scripts**: flat runners under `tests/benchmark/` (for example `benchmark_simulator_speed_matrix.py`, `benchmark_simulator_standard.py`); execute with `python tests/benchmark/<script>.py` from the repo root with the package on `PYTHONPATH`.
 
 ## Examples
 
 - **Scripts**: `examples/scripts/` for diagram compilation, internal signals, animations, and JAX physics demos
-- **Manual**: `tests/manual/demo_cartpole_doublependulum.py` — quick `compute_forced` + `animate` smoke test for the pendulum demos
+- **Manual**: `tests/manual/` for one-off experiments (pendulum `compute_forced` + `animate` smokes: see **Current State** above)
 - **Notebook**: [Colab Tutorial](https://colab.research.google.com/drive/13tnYyZMz4bLFzYLdj88H6cqO6tZg6Xp7?usp=sharing)

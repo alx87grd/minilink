@@ -9,7 +9,10 @@ try:
     import jax
     import jax.numpy as jnp
 
-    from minilink.mechanics.mechanical import JaxMechanicalSystem, MechanicalSystem
+    from minilink.dynamics.abstraction.mechanical import (
+        JaxMechanicalSystem,
+        MechanicalSystem,
+    )
 
     HAS_JAX = True
 except ImportError:

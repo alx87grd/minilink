@@ -1,13 +1,13 @@
 """Flat script: JaxPendulum — time ``f`` native / numpy evaluator / jax evaluator.
 
 Run:
-    python tests/benchmark/benchmark_pendulum_f_compile.py
+    python tests/benchmark/benchmark_pendulum_f_speed.py
 """
 
 import numpy as np
 
-from minilink.benchmark.scenario.basic import JaxPendulum
-from minilink.benchmark.f_speed import benchmark_f_speeds
+from minilink.simulation.scenarios.basic import JaxPendulum
+from minilink.compile.evaluator_timing import benchmark_f_speeds
 
 sys = JaxPendulum(damping=0.5)
 sys.x0[0] = 1.0

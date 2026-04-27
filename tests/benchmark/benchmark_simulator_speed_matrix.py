@@ -4,20 +4,20 @@ Run from repo root (package on ``PYTHONPATH``)::
 
     python tests/benchmark/benchmark_simulator_speed_matrix.py
 
-Truth for error and speed is ``scipy_ultra`` + ``numpy`` (see ``minilink.benchmark``).
+Truth for error and speed is ``scipy_ultra`` + ``numpy`` (see integration timing / evaluator timing modules in ``minilink.simulation`` / ``minilink.compile``).
 """
 
 from __future__ import annotations
 
 import jax
 
-from minilink.benchmark.simulation_speed import (
+from minilink.simulation.integration_timing import (
     DEFAULT_SWEEP_PAIRS,
     benchmark_sim_speed_matrix,
 )
-from minilink.benchmark.scenario.basic import make_pendulum
-from minilink.benchmark.scenario.engine import make_physics_many_spheres
-from minilink.benchmark.scenario.network import make_dense_network
+from minilink.simulation.scenarios.basic import make_pendulum
+from minilink.simulation.scenarios.engine import make_physics_many_spheres
+from minilink.simulation.scenarios.network import make_dense_network
 
 USE_X64 = False
 jax.config.update("jax_enable_x64", USE_X64)
