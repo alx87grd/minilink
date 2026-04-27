@@ -1,0 +1,391 @@
+"""JAX-backed direct-collocation trajectory optimization.
+
+This module builds a trapezoidal direct-collocation ``MathematicalProgram`` whose
+objective and equality residuals are ``jax.jit``-compatible. SciPy remains the
+outer optimizer; JAX supplies derivatives for the objective and constraints.
+
+**Supported problems** are a strict subset of
+:class:`~minilink.planning.trajectory_optimization.direct_collocation.DirectCollocationTranscription`:
+use :class:`~minilink.core.sets.SingletonSet` for initial and terminal state
+boundaries, and :class:`~minilink.core.sets.BoxSet` /
+:class:`~minilink.core.sets.BoxInputSet` for path constraints expressed as
+variable bounds. Pair with :class:`~minilink.core.costs.JaxQuadraticCost` (not
+:class:`~minilink.core.costs.QuadraticCost`) for the usual quadratic cost.
+
+**TODO: User Architectural Review** — set coverage, whether ``jax_enable_x64``
+is scoped, and the SciPy+JAX split are prototype choices pending approval.
+
+.. note::
+
+    :meth:`JaxDirectCollocationTranscription.transcribe` saves and restores
+    the process-wide ``jax_enable_x64`` flag around transcription so a typical
+    script does not permanently flip global JAX config.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
+
+from minilink.core.costs import CostFunction, JaxQuadraticCost, QuadraticCost
+from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
+from minilink.core.trajectory import Trajectory
+from minilink.optimization.mathematical_program import (
+    EqualityConstraint,
+    MathematicalProgram,
+)
+from minilink.optimization.optimizers.optimizer import Optimizer
+from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.planning.problems import PlanningProblem
+from minilink.planning.trajectory_optimization.direct_collocation import (
+    DirectCollocationOptions,
+    DirectCollocationTranscription,
+    _DirectCollocationPlannerBase,
+)
+
+
+@dataclass(frozen=True)
+class JaxDirectCollocationOptions(DirectCollocationOptions):
+    """
+    Options for JAX-backed direct collocation.
+
+    ``use_gradient`` supplies SciPy with JAX objective/constraint Jacobians.
+    ``use_hessian`` also attaches a dense JAX objective Hessian for SciPy
+    methods that consume it (``dogleg``, ``trust-*``, ``trust-constr``;
+    see :class:`~minilink.optimization.optimizers.scipy_minimize.ScipyMinimizeOptimizer`).
+
+    Notes
+    -----
+    ``use_hessian`` builds a full :math:`n_z \times n_z` objective Hessian and is
+    practical only for small decision vectors. ``enable_x64`` is applied for the
+    duration of :meth:`JaxDirectCollocationTranscription.transcribe` only, then
+    restored (see module docstring).
+    """
+
+    compile_backend: str | None = "jax"
+    use_gradient: bool = True
+    use_hessian: bool = False
+    enable_x64: bool = True
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        object.__setattr__(self, "use_gradient", bool(self.use_gradient))
+        object.__setattr__(self, "use_hessian", bool(self.use_hessian))
+        object.__setattr__(self, "enable_x64", bool(self.enable_x64))
+        if self.use_hessian and not self.use_gradient:
+            raise ValueError("use_hessian requires use_gradient")
+
+
+@dataclass(frozen=True)
+class JaxDirectCollocationTranscription(DirectCollocationTranscription):
+    """
+    Direct-collocation transcription with JAX-derived first (and optional
+    second) derivatives. See the module docstring for supported sets and the
+    :class:`~minilink.core.costs.JaxQuadraticCost` requirement for quadratic
+    running/terminal cost.
+    """
+
+    options: JaxDirectCollocationOptions
+
+    @staticmethod
+    def _validate_jax_traceable_quadratic_pairing(cost: CostFunction) -> None:
+        if isinstance(cost, QuadraticCost) and not isinstance(cost, JaxQuadraticCost):
+            raise ValueError(
+                "JAX direct collocation needs JAX-traceable cost functions in the "
+                "objective; for quadratic costs use JaxQuadraticCost instead of "
+                "QuadraticCost."
+            )
+
+    def transcribe(self, problem: PlanningProblem) -> MathematicalProgram:
+        """Convert ``problem`` into a differentiable mathematical program."""
+        import jax
+
+        import jax.numpy as jnp
+
+        cost = problem.require_cost()
+        self._validate_jax_traceable_quadratic_pairing(cost)
+        self._check_supported_sets(problem)
+
+        cost_params = problem.params.cost
+        prev_x64 = jax.config.jax_enable_x64
+        try:
+            jax.config.update("jax_enable_x64", bool(self.options.enable_x64))
+            return self._transcribe_core(problem, jax, jnp, cost, cost_params)
+        finally:
+            jax.config.update("jax_enable_x64", prev_x64)
+
+    def _transcribe_core(
+        self,
+        problem: PlanningProblem,
+        jax,
+        jnp,
+        cost: CostFunction,
+        cost_params,
+    ) -> MathematicalProgram:
+        t = jnp.asarray(self.options.t)
+        dt = jnp.asarray(self.options.dt)
+        n = int(problem.sys.n)
+        n_steps = int(self.options.n_steps)
+        f = self._make_jax_dynamics(problem)
+
+        def unpack_jax(z):
+            x = z[: n * n_steps].reshape(n, n_steps)
+            u = z[n * n_steps :].reshape(problem.sys.m, n_steps)
+            return x, u
+
+        def objective_jax(z):
+            x, u = unpack_jax(z)
+            running = jax.vmap(
+                lambda x_k, u_k, t_k: cost.g(
+                    x_k,
+                    u_k,
+                    t_k,
+                    params=cost_params,
+                ),
+                in_axes=(1, 1, 0),
+            )(x, u, t)
+            integral = jnp.sum(0.5 * dt * (running[:-1] + running[1:]))
+            terminal = cost.h(x[:, -1], t[-1], params=cost_params)
+            return integral + terminal
+
+        def dynamics_residual_jax(z):
+            x, u = unpack_jax(z)
+            dx = jax.vmap(f, in_axes=(1, 1, 0), out_axes=1)(x, u, t)
+            residuals = x[:, 1:] - x[:, :-1] - 0.5 * dt * (
+                dx[:, :-1] + dx[:, 1:]
+            )
+            return residuals.reshape(-1)
+
+        objective_jit = jax.jit(objective_jax)
+        dynamics_residual_jit = jax.jit(dynamics_residual_jax)
+        objective_grad_jit = (
+            jax.jit(jax.grad(objective_jax)) if self.options.use_gradient else None
+        )
+        dynamics_jac_jit = (
+            jax.jit(jax.jacfwd(dynamics_residual_jax))
+            if self.options.use_gradient
+            else None
+        )
+        objective_hess_jit = (
+            jax.jit(jax.hessian(objective_jax))
+            if self.options.use_hessian
+            else None
+        )
+
+        equalities = [
+            EqualityConstraint(
+                h=self._to_numpy_vector(dynamics_residual_jit, jnp),
+                jac=(
+                    self._to_numpy_matrix(dynamics_jac_jit, jnp)
+                    if dynamics_jac_jit is not None
+                    else None
+                ),
+                name="jax_direct_collocation_dynamics",
+                metadata={"scheme": "trapezoidal", "backend": "jax"},
+            )
+        ]
+        self._add_jax_boundary_constraints(
+            problem,
+            equalities=equalities,
+            jax=jax,
+            jnp=jnp,
+            unpack_jax=unpack_jax,
+        )
+
+        return MathematicalProgram(
+            J=self._to_numpy_scalar(objective_jit, jnp),
+            z0=self.initial_guess(problem),
+            bounds=self.variable_bounds(problem),
+            equalities=tuple(equalities),
+            inequalities=(),
+            metadata={
+                "transcription": "jax_direct_collocation",
+                "integration_scheme": "trapezoidal",
+                "tf": self.options.tf,
+                "dt": self.options.dt,
+                "n_steps": self.options.n_steps,
+                "state_dim": int(problem.sys.n),
+                "input_dim": int(problem.sys.m),
+                "use_gradient": self.options.use_gradient,
+                "use_hessian": self.options.use_hessian,
+                "enable_x64": self.options.enable_x64,
+            },
+            grad=(
+                self._to_numpy_vector(objective_grad_jit, jnp)
+                if objective_grad_jit is not None
+                else None
+            ),
+            hess=(
+                self._to_numpy_matrix(objective_hess_jit, jnp)
+                if objective_hess_jit is not None
+                else None
+            ),
+        )
+
+    def _make_jax_dynamics(self, problem: PlanningProblem):
+        backend = self.options.compile_backend
+        params = problem.params.system
+
+        if backend == "jax":
+            evaluator = problem.sys.compile(backend="jax", verbose=False)
+            return lambda x, u, t: evaluator.f(x, u, t)
+
+        if backend is None or backend == "direct":
+            return lambda x, u, t: problem.sys.f(x, u, t, params)
+
+        raise ValueError(
+            "JaxDirectCollocationTranscription requires compile_backend='jax', "
+            "None, or 'direct'"
+        )
+
+    @staticmethod
+    def _to_numpy_scalar(fn, jnp):
+        return lambda z: float(np.asarray(fn(jnp.asarray(z))))
+
+    @staticmethod
+    def _to_numpy_vector(fn, jnp):
+        return lambda z: np.asarray(fn(jnp.asarray(z)), dtype=float).reshape(-1)
+
+    @staticmethod
+    def _to_numpy_matrix(fn, jnp):
+        return lambda z: np.asarray(fn(jnp.asarray(z)), dtype=float)
+
+    def _add_jax_boundary_constraints(
+        self,
+        problem: PlanningProblem,
+        *,
+        equalities: list[EqualityConstraint],
+        jax,
+        jnp,
+        unpack_jax,
+    ) -> None:
+        for name, boundary, index in (
+            ("initial_state", problem.X0, 0),
+            ("terminal_state", problem.Xf, -1),
+        ):
+            if boundary is None:
+                continue
+            point = jnp.asarray(boundary.point)
+
+            def residual_jax(z, index=index, point=point):
+                x, _ = unpack_jax(z)
+                return x[:, index] - point
+
+            residual_jit = jax.jit(residual_jax)
+            residual_jac_jit = (
+                jax.jit(jax.jacfwd(residual_jax))
+                if self.options.use_gradient
+                else None
+            )
+            equalities.append(
+                EqualityConstraint(
+                    h=self._to_numpy_vector(residual_jit, jnp),
+                    jac=(
+                        self._to_numpy_matrix(residual_jac_jit, jnp)
+                        if residual_jac_jit is not None
+                        else None
+                    ),
+                    name=name,
+                    metadata={"backend": "jax"},
+                )
+            )
+
+    @staticmethod
+    def _check_supported_sets(problem: PlanningProblem) -> None:
+        for label, boundary in (("X0", problem.X0), ("Xf", problem.Xf)):
+            if boundary is not None and not isinstance(boundary, SingletonSet):
+                raise NotImplementedError(
+                    f"JAX direct collocation currently supports only SingletonSet "
+                    f"boundaries; got {label}={type(boundary).__name__}"
+                )
+
+        if problem.X is not None and not isinstance(problem.X, BoxSet):
+            raise NotImplementedError(
+                "JAX direct collocation currently supports only BoxSet state "
+                "path constraints through variable bounds"
+            )
+
+        if problem.U is not None and not isinstance(problem.U, BoxInputSet):
+            raise NotImplementedError(
+                "JAX direct collocation currently supports only BoxInputSet input "
+                "path constraints through variable bounds"
+            )
+
+
+class JaxDirectCollocationPlanner(_DirectCollocationPlannerBase):
+    """
+    Planner for JAX-backed direct collocation (SciPy outer loop, JAX ``jit``/AD).
+
+    Use :class:`~minilink.core.costs.JaxQuadraticCost` for quadratic running and
+    terminal cost. Initial and terminal state constraints are limited to
+    :class:`~minilink.core.sets.SingletonSet` in the JAX path; for richer set
+    margins, use :class:`~minilink.planning.trajectory_optimization.direct_collocation.DirectCollocationPlanner`
+    (NumPy transcription).
+    """
+
+    def __init__(
+        self,
+        problem: PlanningProblem,
+        *,
+        tf: float,
+        n_steps: int,
+        optimizer: Optimizer | None = None,
+        compile_backend: str | None = "jax",
+        initial_guess: np.ndarray | Trajectory | None = None,
+        use_gradient: bool = True,
+        use_hessian: bool = False,
+        enable_x64: bool = True,
+    ) -> None:
+        options = JaxDirectCollocationOptions(
+            tf=tf,
+            n_steps=n_steps,
+            compile_backend=compile_backend,
+            optimizer=(ScipyMinimizeOptimizer() if optimizer is None else optimizer),
+            initial_guess=initial_guess,
+            use_gradient=use_gradient,
+            use_hessian=use_hessian,
+            enable_x64=enable_x64,
+        )
+        super().__init__(
+            problem,
+            options=options,
+            transcription_cls=JaxDirectCollocationTranscription,
+        )
+
+    @classmethod
+    def from_system(
+        cls,
+        sys: Any,
+        *,
+        x_start: np.ndarray,
+        x_goal: np.ndarray,
+        cost: CostFunction,
+        tf: float,
+        n_steps: int,
+        optimizer: Optimizer | None = None,
+        compile_backend: str | None = "jax",
+        initial_guess: np.ndarray | Trajectory | None = None,
+        use_gradient: bool = True,
+        use_hessian: bool = False,
+        enable_x64: bool = True,
+    ) -> JaxDirectCollocationPlanner:
+        """Convenience constructor building a :class:`PlanningProblem`."""
+        problem = PlanningProblem(
+            sys=sys,
+            x_start=x_start,
+            x_goal=x_goal,
+            cost=cost,
+        )
+        return cls(
+            problem,
+            tf=tf,
+            n_steps=n_steps,
+            optimizer=optimizer,
+            compile_backend=compile_backend,
+            initial_guess=initial_guess,
+            use_gradient=use_gradient,
+            use_hessian=use_hessian,
+            enable_x64=enable_x64,
+        )

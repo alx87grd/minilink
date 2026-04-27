@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
 
 from minilink.core.costs import CostFunction
-from minilink.core.sets import BoxInputSet, BoxSet, Set, SingletonSet
+from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     EqualityConstraint,
@@ -19,6 +19,7 @@ from minilink.optimization.mathematical_program import (
 )
 from minilink.optimization.optimizers.optimizer import Optimizer
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.transcription import Transcription
@@ -176,7 +177,10 @@ class DirectCollocationTranscription(Transcription):
         """Return a packed initial guess for the mathematical program."""
         guess = self.options.initial_guess
         if guess is None:
-            return self._linear_initial_guess(problem)
+            raise ValueError(
+                "DirectCollocationTranscription requires an initial guess prepared "
+                "by the planner"
+            )
 
         if isinstance(guess, Trajectory):
             resampled = guess.resample(t_new=self.options.t)
@@ -207,28 +211,6 @@ class DirectCollocationTranscription(Transcription):
             upper[start:] = np.repeat(problem.U.box.upper, n_steps)
 
         return VariableBounds(lower=lower, upper=upper)
-
-    def _linear_initial_guess(self, problem: PlanningProblem) -> np.ndarray:
-        x0 = self._singleton_point(problem.X0)
-        if x0 is None:
-            x0 = problem.x_start
-        xf = self._singleton_point(problem.Xf)
-        if xf is None:
-            xf = x0 if problem.x_goal is None else problem.x_goal
-
-        x = np.linspace(x0, xf, self.options.n_steps).T
-        if hasattr(problem.sys, "get_u_from_input_ports"):
-            u0 = problem.sys.get_u_from_input_ports()
-        else:
-            u0 = np.zeros(problem.sys.m)
-        u = np.repeat(np.asarray(u0, dtype=float).reshape(-1, 1), x.shape[1], axis=1)
-        return self.pack(x, u, problem)
-
-    @staticmethod
-    def _singleton_point(set_: Set | None) -> np.ndarray | None:
-        if isinstance(set_, SingletonSet):
-            return set_.point.copy()
-        return None
 
     def _make_dynamics(self, problem: PlanningProblem):
         params = problem.params.system
@@ -358,7 +340,51 @@ class DirectCollocationTranscription(Transcription):
             )
 
 
-class DirectCollocationPlanner(Planner):
+def _with_default_initial_guess(
+    problem: PlanningProblem,
+    options: DirectCollocationOptions,
+) -> DirectCollocationOptions:
+    if options.initial_guess is not None:
+        return options
+    return replace(
+        options,
+        initial_guess=default_initial_trajectory(problem, options.t),
+    )
+
+
+class _DirectCollocationPlannerBase(Planner):
+    """Shared orchestration for direct-collocation planner variants."""
+
+    def __init__(
+        self,
+        problem: PlanningProblem,
+        *,
+        options: DirectCollocationOptions,
+        transcription_cls: type[DirectCollocationTranscription],
+    ) -> None:
+        super().__init__(problem)
+        self.require_cost()
+        self.options = _with_default_initial_guess(problem, options)
+        self.transcription = transcription_cls(self.options)
+        self.last_program: MathematicalProgram | None = None
+        self.last_optimization_result: OptimizationResult | None = None
+
+    def compute_solution(self) -> Trajectory:
+        """Compute and store a direct-collocation trajectory."""
+        program = self.transcription.transcribe(self.problem)
+        optimization_result = self.options.optimizer.solve(program)
+        trajectory = self.transcription.reconstruct_result(
+            optimization_result,
+            problem=self.problem,
+            metadata=program.metadata,
+        )
+
+        self.last_program = program
+        self.last_optimization_result = optimization_result
+        return self._store_result(trajectory)
+
+
+class DirectCollocationPlanner(_DirectCollocationPlannerBase):
     """
     Direct-collocation trajectory-optimization planner.
     """
@@ -373,18 +399,18 @@ class DirectCollocationPlanner(Planner):
         compile_backend: str | None = "numpy",
         initial_guess: np.ndarray | Trajectory | None = None,
     ) -> None:
-        super().__init__(problem)
-        self.require_cost()
-        self.options = DirectCollocationOptions(
+        options = DirectCollocationOptions(
             tf=tf,
             n_steps=n_steps,
             compile_backend=compile_backend,
             optimizer=(ScipyMinimizeOptimizer() if optimizer is None else optimizer),
             initial_guess=initial_guess,
         )
-        self.transcription = DirectCollocationTranscription(self.options)
-        self.last_program: MathematicalProgram | None = None
-        self.last_optimization_result: OptimizationResult | None = None
+        super().__init__(
+            problem,
+            options=options,
+            transcription_cls=DirectCollocationTranscription,
+        )
 
     @classmethod
     def from_system(
@@ -415,17 +441,3 @@ class DirectCollocationPlanner(Planner):
             compile_backend=compile_backend,
             initial_guess=initial_guess,
         )
-
-    def compute_solution(self) -> Trajectory:
-        """Compute and store a direct-collocation trajectory."""
-        program = self.transcription.transcribe(self.problem)
-        optimization_result = self.options.optimizer.solve(program)
-        trajectory = self.transcription.reconstruct_result(
-            optimization_result,
-            problem=self.problem,
-            metadata=program.metadata,
-        )
-
-        self.last_program = program
-        self.last_optimization_result = optimization_result
-        return self._store_result(trajectory)

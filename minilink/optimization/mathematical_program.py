@@ -146,6 +146,10 @@ class MathematicalProgram:
         Inequality constraints ``g(z) >= 0``.
     metadata : dict
         Optional transcription metadata for debugging.
+    grad : callable, optional
+        Objective gradient ``grad(z) -> np.ndarray``.
+    hess : callable, optional
+        Objective Hessian ``hess(z) -> np.ndarray``.
     """
 
     J: ScalarFunction
@@ -154,6 +158,8 @@ class MathematicalProgram:
     equalities: tuple[EqualityConstraint, ...] = ()
     inequalities: tuple[InequalityConstraint, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
+    grad: ArrayFunction | None = None
+    hess: ArrayFunction | None = None
 
     def __post_init__(self) -> None:
         z0 = np.asarray(self.z0, dtype=float).reshape(-1).copy()
@@ -173,6 +179,25 @@ class MathematicalProgram:
     def objective(self, z: np.ndarray) -> float:
         """Return ``J(z)`` as a scalar float."""
         return float(self.J(np.asarray(z, dtype=float)))
+
+    def gradient(self, z: np.ndarray) -> np.ndarray:
+        """Return the objective gradient or raise if none is available."""
+        if self.grad is None:
+            raise ValueError("This mathematical program has no objective gradient")
+        return np.asarray(self.grad(np.asarray(z, dtype=float)), dtype=float).reshape(
+            self.n_z
+        )
+
+    def hessian(self, z: np.ndarray) -> np.ndarray:
+        """Return the objective Hessian or raise if none is available."""
+        if self.hess is None:
+            raise ValueError("This mathematical program has no objective Hessian")
+        arr = np.asarray(self.hess(np.asarray(z, dtype=float)), dtype=float)
+        if arr.shape != (self.n_z, self.n_z):
+            raise ValueError(
+                f"objective Hessian must have shape ({self.n_z}, {self.n_z})"
+            )
+        return arr
 
 
 @dataclass(frozen=True)

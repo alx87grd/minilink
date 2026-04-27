@@ -18,8 +18,8 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Dynamics library** (`minilink.dynamics.catalog`) | **TRL 0** | Curated plant models; grow by domain (`vehicles/`, `msd/`, `pendulum/`, …) |
 | **Blocks library** (`minilink.core.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
 | **Benchmark helpers** (`minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `simulation/scenarios/` holds shared stress scenarios |
-| **Planning** | **TRL 1** | Review deterministic planning family packages before implementing full solvers |
-| **Optimization** (`minilink.optimization`) | **TRL 1** | Thin optimizer contracts for finite-dimensional mathematical programs |
+| **Planning** | **TRL 1** | Deterministic planning architecture; NumPy+SciPy direct collocation plus **JAX-derivative** direct collocation (`jax_direct_collocation`) as a narrower, reviewed prototype (see [DESIGN.md](DESIGN.md) §3.5) |
+| **Optimization** (`minilink.optimization`) | **TRL 1** | Thin `MathematicalProgram` + optimizer contracts (objective/constraint Jacobians, optional objective Hessian for SciPy trust-region methods) |
 | **Control** (`minilink.control`) | **TRL 0** | Controller blocks (starting with tutorial PD); expand as patterns stabilize |
 
 > [!NOTE]
@@ -53,7 +53,9 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - Finish clarifying the high-level public API and top-level exports
 - Review deterministic planning contracts (`PlanningProblem`, sets, costs,
   family-specific result types, and trajectory transcriptions) before
-  implementing full direct-collocation/RRT/DP solvers
+  implementing full direct-collocation/RRT/DP solvers; **JAX direct
+  collocation** is explicitly a subset of the NumPy feature surface until
+  set/cost coverage matches or the API is split deliberately
 
 ### P2
 
@@ -137,7 +139,7 @@ Current mapping:
 
 ## 7. Future Directions
 
-- JAX-based optimization and trajectory optimization
+- mature JAX-based optimization and trajectory optimization
 - fully differentiable simulation with scan- or custom-VJP-based rollouts
 - hybrid systems and event handling
 - differentiable LQR / control tooling

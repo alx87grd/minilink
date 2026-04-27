@@ -35,6 +35,7 @@ class ScipyMinimizeOptimizer(Optimizer):
             {
                 "type": "eq",
                 "fun": equality.residual,
+                **({"jac": equality.jac} if equality.jac is not None else {}),
             }
             for equality in program.equalities
         ]
@@ -42,6 +43,7 @@ class ScipyMinimizeOptimizer(Optimizer):
             {
                 "type": "ineq",
                 "fun": inequality.margin,
+                **({"jac": inequality.jac} if inequality.jac is not None else {}),
             }
             for inequality in program.inequalities
         )
@@ -64,6 +66,8 @@ class ScipyMinimizeOptimizer(Optimizer):
             program.objective,
             program.z0,
             method=self.method,
+            jac=program.gradient if program.grad is not None else None,
+            hess=program.hessian if self._uses_hessian() and program.hess else None,
             bounds=bounds,
             constraints=constraints,
             options=dict(self.options),
@@ -82,3 +86,13 @@ class ScipyMinimizeOptimizer(Optimizer):
             stats=stats,
             raw_result=raw_result,
         )
+
+    def _uses_hessian(self) -> bool:
+        method = self.method.lower()
+        return method in {
+            "dogleg",
+            "trust-ncg",
+            "trust-exact",
+            "trust-krylov",
+            "trust-constr",
+        }

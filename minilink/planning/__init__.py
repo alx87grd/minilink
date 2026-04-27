@@ -1,1 +1,1 @@
-"""Deterministic planning architecture primitives and solver skeletons."""
+"""Deterministic planning architecture primitives and solvers."""

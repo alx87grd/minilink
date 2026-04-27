@@ -27,8 +27,8 @@ The table below is the on-disk layout and TRL. **Structural rules**, **pluggable
 | `compile/evaluator_timing` | **TRL 1** | Optional compiled-`f` timing (`benchmark_f_speeds`, `print_f_speed_table`); not part of the core contract |
 | `simulation/integration_timing` | **TRL 1** | Optional simulator timing sweeps, `STANDARD_SIM_CASES`, and helpers (`run_timed`, …) |
 | `simulation/scenarios/` | **TRL 1** | Shared **stress** scenarios for timing matrices, not user plants |
-| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis |
-| `optimization/` | **TRL 1** | Thin finite-dimensional mathematical-program contracts shared by planning and future control workflows |
+| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization includes NumPy+SciPy direct collocation (`trajectory_optimization/direct_collocation.py`) and an optional **JAX-derivative** path (`trajectory_optimization/jax_direct_collocation.py`, still narrower than the NumPy transcription—see §3.5) |
+| `optimization/` | **TRL 1** | Thin finite-dimensional mathematical-program contracts (`MathematicalProgram` with optional objective `grad` / `hess` and per-constraint Jacobians) shared by planning and future control workflows |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
 ### 2.1 Structural principles (on-disk)
@@ -84,10 +84,14 @@ minilink/optimization/
     scipy_minimize.py
 
 minilink/planning/
+  initial_guess.py
   planner.py
   problems.py
   search/
   trajectory_optimization/
+    direct_collocation.py
+    jax_direct_collocation.py
+    transcription.py
   policy_synthesis/
 ```
 
@@ -212,6 +216,7 @@ minilink/
 │
 ├── planning/
 │   ├── __init__.py
+│   ├── initial_guess.py
 │   ├── planner.py
 │   ├── problems.py
 │   ├── search/
@@ -373,9 +378,25 @@ It separates the continuous mathematical problem from numerical solver choices:
   is defined by each concrete planner; there is no shared planning-result
   envelope type yet. Helpers such as :meth:`~minilink.planning.planner.Planner.plot_solution`
   assume the stored result is a :class:`~minilink.core.trajectory.Trajectory`.
+- Generic initial-trajectory guesses live in ``planning/initial_guess.py`` and
+  are prepared by planners before transcription.
 - Trajectory-optimization transcriptions may emit generic
   `minilink.optimization` mathematical programs of the form
   `minimize J(z)` subject to `h(z) = 0`, `g(z) >= 0`, and bounds on `z`.
+- **Direct collocation** — `trajectory_optimization.direct_collocation` transcribes
+  a trapezoidal direct-collocation NLP with an optional NumPy- or
+  ``compile``-backed dynamics residual; the SciPy-based optimizer is the
+  default outer loop.
+- **JAX direct collocation (prototype)** —
+  `trajectory_optimization.jax_direct_collocation` also targets SciPy, but
+  uses JAX-``jit``/``jacfwd``/optional Hessian to supply objective and constraint
+  derivatives. The cost must be JAX-traceable in the objective (use
+  :class:`~minilink.core.costs.JaxQuadraticCost` instead of
+  :class:`~minilink.core.costs.QuadraticCost` for the common quadratic case).
+  Supported sets are **narrower** than the NumPy path: :class:`~minilink.core.sets.SingletonSet`
+  for :math:`X_0` / :math:`X_f` and box-style path sets via
+  :class:`~minilink.core.sets.BoxSet` / :class:`~minilink.core.sets.BoxInputSet`;
+  general set margins remain on the NumPy transcription until reviewed.
 
 This first pass is intentionally deterministic and high-level. Stochastic
 planning, chance constraints, belief states, and full direct-collocation/RRT/DP

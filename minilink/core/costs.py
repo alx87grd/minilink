@@ -195,3 +195,49 @@ class QuadraticCost(CostFunction):
         x_arr = np.asarray(x, dtype=float).reshape(self.xbar.shape)
         dx = x_arr - self.xbar
         return float(dx.T @ self.S @ dx)
+
+
+class JaxQuadraticCost(QuadraticCost):
+    """
+    JAX-traceable quadratic running and terminal cost.
+
+    Uses the same data contract as :class:`QuadraticCost`, but keeps ``g`` and
+    ``h`` differentiable by avoiding NumPy casts inside traced calls.
+
+    Notes
+    -----
+    For JAX direct collocation, use this class (not :class:`QuadraticCost`) so
+    the running and terminal terms in the objective are JAX-differentiable; see
+    :class:`~minilink.planning.trajectory_optimization.jax_direct_collocation.JaxDirectCollocationTranscription`.
+    """
+
+    def g(
+        self,
+        x: np.ndarray,
+        u: np.ndarray,
+        t: float = 0.0,
+        params: Any | None = None,
+    ):
+        """Return the quadratic running cost as a JAX scalar."""
+        from minilink.compile.jax_utils import require_jax_numpy
+
+        jnp = require_jax_numpy()
+        x_arr = jnp.asarray(x).reshape(self.xbar.shape)
+        u_arr = jnp.asarray(u).reshape(self.ubar.shape)
+        dx = x_arr - jnp.asarray(self.xbar)
+        du = u_arr - jnp.asarray(self.ubar)
+        return dx.T @ jnp.asarray(self.Q) @ dx + du.T @ jnp.asarray(self.R) @ du
+
+    def h(
+        self,
+        x: np.ndarray,
+        t: float = 0.0,
+        params: Any | None = None,
+    ):
+        """Return the quadratic terminal cost as a JAX scalar."""
+        from minilink.compile.jax_utils import require_jax_numpy
+
+        jnp = require_jax_numpy()
+        x_arr = jnp.asarray(x).reshape(self.xbar.shape)
+        dx = x_arr - jnp.asarray(self.xbar)
+        return dx.T @ jnp.asarray(self.S) @ dx

@@ -11,7 +11,11 @@ visually the same.
 
 import numpy as np
 
-from minilink.dynamics.abstraction.mechanical import MechanicalSystem
+from minilink.compile.jax_utils import require_jax_numpy
+from minilink.dynamics.abstraction.mechanical import (
+    JaxMechanicalSystem,
+    MechanicalSystem,
+)
 from minilink.graphical.primitives import (
     Arrow,
     Box,
@@ -23,37 +27,43 @@ from minilink.graphical.primitives import (
 )
 
 
+def _cartpole_params():
+    return {
+        "l": 3.0,
+        "lcg": 0.5,
+        "m1": 1.0,
+        "m2": 0.1,
+        "gravity": 9.81,
+        "cart_length": 2.5,
+        "cart_height": 1.5,
+        "cart_depth": 0.8,
+        "ground_half_width": 10.0,
+    }
+
+
+def _configure_cartpole_metadata(sys, *, name: str) -> None:
+    sys.name = name
+    sys.params = _cartpole_params()
+
+    sys.state.labels = ["x", "theta", "dx", "dtheta"]
+    sys.state.units = ["m", "rad", "m/s", "rad/s"]
+
+    uport = sys.inputs["u"]
+    uport.labels = ["F"]
+    uport.units = ["N"]
+    uport.lower_bound[0] = -10.0
+    uport.upper_bound[0] = 10.0
+
+    sys.outputs["y"].labels = list(sys.state.labels)
+    sys.outputs["y"].units = list(sys.state.units)
+
+
 class CartPole(MechanicalSystem):
     """Linear cart with one unactuated pendulum pole."""
 
     def __init__(self):
         super().__init__(dof=2, actuators=1)
-
-        self.name = "Cart Pole"
-        self.params = {
-            "l": 3.0,
-            "lcg": 0.5,
-            "m1": 1.0,
-            "m2": 0.1,
-            "gravity": 9.81,
-            # Display-only: cart footprint used by kinematic primitives. Not in Pyro.
-            "cart_length": 2.5,
-            "cart_height": 1.5,
-            "cart_depth": 0.8,
-            "ground_half_width": 10.0,
-        }
-
-        self.state.labels = ["x", "theta", "dx", "dtheta"]
-        self.state.units = ["m", "rad", "m/s", "rad/s"]
-
-        uport = self.inputs["u"]
-        uport.labels = ["F"]
-        uport.units = ["N"]
-        uport.lower_bound[0] = -10.0
-        uport.upper_bound[0] = 10.0
-
-        self.outputs["y"].labels = list(self.state.labels)
-        self.outputs["y"].units = list(self.state.units)
+        _configure_cartpole_metadata(self, name="Cart Pole")
 
     def H(self, q, params=None):
         params = params or self.params
@@ -155,6 +165,62 @@ class CartPole(MechanicalSystem):
             _pose2d_offset_z(pos, pivot_y, theta, pole_z),
             scale_pose2d_matrix(force_x, pivot_y, force_theta, force_len),
         ]
+
+
+class JaxCartPole(JaxMechanicalSystem):
+    """JAX-traceable linear cart with one unactuated pendulum pole."""
+
+    def __init__(self):
+        super().__init__(dof=2, actuators=1)
+        _configure_cartpole_metadata(self, name="JAX Cart Pole")
+
+    def H(self, q, params=None):
+        params = params or self.params
+        jnp = require_jax_numpy()
+        theta = q[1]
+        m1 = params["m1"]
+        m2 = params["m2"]
+        lcg = params["lcg"]
+        h01 = m2 * lcg * jnp.cos(theta)
+        return jnp.array(
+            [
+                [m1 + m2, h01],
+                [h01, m2 * lcg**2],
+            ]
+        )
+
+    def C(self, q, dq, params=None):
+        params = params or self.params
+        jnp = require_jax_numpy()
+        theta = q[1]
+        dtheta = dq[1]
+        m2 = params["m2"]
+        lcg = params["lcg"]
+        c01 = -m2 * lcg * jnp.sin(theta) * dtheta
+        return jnp.array(
+            [
+                [0.0, c01],
+                [0.0, 0.0],
+            ]
+        )
+
+    def B(self, q, params=None):
+        jnp = require_jax_numpy()
+        return jnp.array([[1.0], [0.0]])
+
+    def g(self, q, params=None):
+        params = params or self.params
+        jnp = require_jax_numpy()
+        theta = q[1]
+        tau_g = params["m2"] * params["gravity"] * params["lcg"] * jnp.sin(theta)
+        return jnp.array([0.0, tau_g])
+
+    def d(self, q, dq, params=None):
+        jnp = require_jax_numpy()
+        return jnp.zeros(self.dof)
+
+    get_kinematic_geometry = CartPole.get_kinematic_geometry
+    get_kinematic_transforms = CartPole.get_kinematic_transforms
 
 
 def _pose2d_offset_z(x=0.0, y=0.0, theta=0.0, z=0.0):

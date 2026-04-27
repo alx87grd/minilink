@@ -6,6 +6,7 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.sets import BallSet, BoxSet, SingletonSet
 from minilink.core.system import DynamicSystem, System
 from minilink.core.trajectory import Trajectory
+from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.optimization.mathematical_program import (
     EqualityConstraint,
     InequalityConstraint,
@@ -13,6 +14,7 @@ from minilink.optimization.mathematical_program import (
     VariableBounds,
 )
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.planning.initial_guess import mechanical_cubic_initial_trajectory
 from minilink.planning.policy_synthesis.dynamic_programming import (
     DynamicProgrammingPlanner,
 )
@@ -20,6 +22,9 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationPlanner,
+)
+from minilink.planning.trajectory_optimization.jax_direct_collocation import (
+    JaxDirectCollocationOptions,
 )
 
 
@@ -93,6 +98,26 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(evaluated.has_signal("cost_rate"))
         self.assertTrue(evaluated.has_signal("cost"))
         self.assertGreaterEqual(cost.total_cost(traj), 0.0)
+
+    def test_mechanical_initial_guess_respects_boundary_state(self):
+        sys = MechanicalSystem(dof=1)
+        x_start = np.array([0.0, 0.5])
+        x_goal = np.array([1.0, -0.25])
+        problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal)
+
+        guess = mechanical_cubic_initial_trajectory(problem, np.linspace(0.0, 2.0, 5))
+
+        np.testing.assert_allclose(guess.x[:, 0], x_start)
+        np.testing.assert_allclose(guess.x[:, -1], x_goal)
+
+    def test_jax_collocation_options_validate_derivative_request(self):
+        with self.assertRaises(ValueError):
+            JaxDirectCollocationOptions(
+                tf=1.0,
+                n_steps=3,
+                use_gradient=False,
+                use_hessian=True,
+            )
 
     def test_planner_require_result_before_solve(self):
         sys = self.make_system()
