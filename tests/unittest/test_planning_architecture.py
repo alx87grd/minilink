@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.core.costs import QuadraticCost
 from minilink.core.sets import BallSet, BoxSet, SingletonSet
-from minilink.core.system import System
+from minilink.core.system import DynamicSystem, System
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     EqualityConstraint,
@@ -32,6 +32,23 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys.inputs["u"].upper_bound = np.array([4.0])
         sys.x0 = np.array([0.1, -0.2])
         return sys
+
+    def make_single_integrator(self):
+        class SingleIntegrator(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=1, m=1, p=1)
+                self.state.lower_bound = np.array([-10.0])
+                self.state.upper_bound = np.array([10.0])
+                self.inputs["u"].lower_bound = np.array([-10.0])
+                self.inputs["u"].upper_bound = np.array([10.0])
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([u[0]])
+
+            def h(self, x, u, t=0, params=None):
+                return x
+
+        return SingleIntegrator()
 
     def test_box_and_boundary_sets(self):
         box = BoxSet(lower=np.array([-1.0, -2.0]), upper=np.array([1.0, 2.0]))
@@ -133,6 +150,9 @@ class TestPlanningArchitecture(unittest.TestCase):
             optimizer=ScipyMinimizeOptimizer(),
         )
         self.assertEqual(to.options.n_steps, 5)
+        program = to.transcription.transcribe(problem)
+        self.assertEqual(program.n_z, 15)
+        self.assertEqual(len(program.equalities), 3)
 
         rrt = RRTPlanner(problem, dt=0.1)
         self.assertEqual(rrt.options.max_nodes, 2000)
@@ -145,8 +165,40 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         self.assertEqual(dp.options.x_grid_shape, (5, 5))
 
-        with self.assertRaises(NotImplementedError):
-            to.compute_solution()
+    def test_direct_collocation_solves_single_integrator(self):
+        sys = self.make_single_integrator()
+        cost = QuadraticCost.from_system(
+            sys,
+            Q=np.zeros((1, 1)),
+            R=np.eye(1),
+            S=np.zeros((1, 1)),
+        )
+        problem = PlanningProblem(
+            sys=sys,
+            x_start=np.array([0.0]),
+            x_goal=np.array([1.0]),
+            cost=cost,
+        )
+        planner = DirectCollocationPlanner(
+            problem,
+            tf=1.0,
+            n_steps=5,
+            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+        )
+
+        traj = planner.compute_solution()
+
+        self.assertTrue(planner.last_optimization_result.success)
+        np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
+        np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
+        residual_norm = np.linalg.norm(
+            planner.last_program.equalities[0].residual(
+                planner.last_optimization_result.z
+            )
+        )
+        self.assertLess(residual_norm, 1e-6)
+        self.assertTrue(traj.has_signal("dx"))
+        self.assertTrue(traj.has_signal("cost"))
 
 
 if __name__ == "__main__":
