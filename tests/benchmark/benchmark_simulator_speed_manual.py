@@ -1,4 +1,4 @@
-"""Ad-hoc simulator matrix: set ``PAIRS`` (solver, backend), ``system``, and time grid at the top.
+"""Ad-hoc simulator matrix: set variants, ``system``, and time grid at the top.
 
 Run from repo root::
 
@@ -7,31 +7,32 @@ Run from repo root::
 Uses the same truth pair and table style as :file:`benchmark_simulator_speed_matrix.py`.
 """
 
-from minilink.simulation.integration_timing import benchmark_sim_speed_matrix
-from minilink.simulation.scenarios.basic import make_pendulum
-from minilink.simulation.scenarios.engine import make_physics_many_spheres
-from minilink.simulation.scenarios.network import make_dense_network
-
-# (solver, compile_backend) — only these pairs are run (edit freely).
-PAIRS = (
-    ("euler", "numpy"),
-    ("euler", "jax"),
-    ("rk4_fixedsteps", "numpy"),
-    ("rk4_fixedsteps", "jax"),
-    ("scipy", "numpy"),
-    ("scipy", "jax"),
-    ("scipy_stiff", "numpy"),
-    ("scipy_stiff", "jax"),
-    ("scipy_lsoda", "numpy"),
-    ("scipy_lsoda", "jax"),
-    ("scipy_max", "numpy"),
-    ("scipy_max", "jax"),
-    ("scipy_ultra", "numpy"),
-    ("scipy_ultra", "jax"),
-)
-
-# Set up JAX for double precision.
 import jax
+
+from minilink.simulation.benchmark import (
+    SimulationBenchmarkVariant,
+    benchmark_simulation_matrix,
+    print_simulation_matrix_benchmark,
+)
+from minilink.simulation.scenarios.basic import make_pendulum
+
+# Only these variants are run (edit freely).
+VARIANTS = (
+    SimulationBenchmarkVariant("euler", "numpy"),
+    SimulationBenchmarkVariant("euler", "jax"),
+    SimulationBenchmarkVariant("rk4_fixedsteps", "numpy"),
+    SimulationBenchmarkVariant("rk4_fixedsteps", "jax"),
+    SimulationBenchmarkVariant("scipy", "numpy"),
+    SimulationBenchmarkVariant("scipy", "jax"),
+    SimulationBenchmarkVariant("scipy_stiff", "numpy"),
+    SimulationBenchmarkVariant("scipy_stiff", "jax"),
+    SimulationBenchmarkVariant("scipy_lsoda", "numpy"),
+    SimulationBenchmarkVariant("scipy_lsoda", "jax"),
+    SimulationBenchmarkVariant("scipy_max", "numpy"),
+    SimulationBenchmarkVariant("scipy_max", "jax"),
+    SimulationBenchmarkVariant("scipy_ultra", "numpy"),
+    SimulationBenchmarkVariant("scipy_ultra", "jax"),
+)
 
 USE_X64 = True
 jax.config.update("jax_enable_x64", USE_X64)
@@ -49,12 +50,13 @@ t0, tf, dt = 0.0, 100.0, 0.01
 # case_name = "Dense network"
 # t0, tf, dt = 0.0, 5.0, 0.1
 
-benchmark_sim_speed_matrix(
+result = benchmark_simulation_matrix(
     system,
     case_name=case_name,
-    pairs=PAIRS,
+    variants=VARIANTS,
     t0=t0,
     tf=tf,
     dt=dt,
     n_runs=1,
 )
+print_simulation_matrix_benchmark(result)

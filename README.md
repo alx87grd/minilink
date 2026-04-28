@@ -59,7 +59,7 @@ plot_trajectory(diagram, traj)
 
 ## Benchmarks
 
-- **API**: `minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing` — `benchmark_f_speeds` / `print_f_speed_table` for compiled `f` timing; `benchmark_sim_speed_matrix` (pass a `pairs` list, e.g. `DEFAULT_SWEEP_PAIRS`) and `benchmark_sim_backend` on a built `system`; `run_standard_sim_suite` for the three standard cases; optional stress systems in `minilink/simulation/scenarios/` (see [DESIGN.md](DESIGN.md)).
+- **API**: `minilink.compile.benchmark` / `minilink.simulation.benchmark` / `minilink.planning.trajectory_optimization.benchmark` — benchmark functions return structured results and print helpers format tables; optional stress systems live in `minilink/simulation/scenarios/` (see [DESIGN.md](DESIGN.md)).
 - **Scripts**: flat runners under `tests/benchmark/` (for example `benchmark_simulator_speed_matrix.py`, `benchmark_simulator_standard.py`); execute with `python tests/benchmark/<script>.py` from the repo root with the package on `PYTHONPATH`.
 
 ## Examples

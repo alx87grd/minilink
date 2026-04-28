@@ -1,4 +1,4 @@
-"""Simulation benchmark utilities: single-pair, matrix, and standard-case suites."""
+"""Benchmarks for simulator solver and compile-backend combinations."""
 
 from __future__ import annotations
 
@@ -34,12 +34,15 @@ def integration_method_for_solver_mode(solver_mode: str) -> str:
     raise ValueError(f"Unknown solver mode {solver_mode!r}")
 
 
-# ---------------------------------------------------------------------------
-# Defaults (truth for error and speed ratio in matrix / single-pair benchmarks)
-# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class SimulationBenchmarkVariant:
+    """One simulator solver and compile-backend option."""
 
-TRUTH_SOLVER = "scipy_ultra"
-TRUTH_BACKEND = "numpy"
+    solver: str
+    compile_backend: str
+
+
+TRUTH_SIMULATION_VARIANT = SimulationBenchmarkVariant("scipy_ultra", "numpy")
 
 DEFAULT_SOLVERS: tuple[str, ...] = (
     "euler",
@@ -52,9 +55,10 @@ DEFAULT_SOLVERS: tuple[str, ...] = (
 )
 DEFAULT_BACKENDS: tuple[str, ...] = ("numpy", "jax")
 
-# Full solver×backend grid for scripts that do not need a custom list.
-DEFAULT_SWEEP_PAIRS: tuple[tuple[str, str], ...] = tuple(
-    (s, b) for s in DEFAULT_SOLVERS for b in DEFAULT_BACKENDS
+DEFAULT_SIMULATION_VARIANTS: tuple[SimulationBenchmarkVariant, ...] = tuple(
+    SimulationBenchmarkVariant(solver, backend)
+    for solver in DEFAULT_SOLVERS
+    for backend in DEFAULT_BACKENDS
 )
 
 
@@ -69,20 +73,15 @@ def _compile_backend_key_for_compare(backend_label: str) -> str:
     return backend_label
 
 
-# ---------------------------------------------------------------------------
-# Timing helpers
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
-class TimingStats:
+class _RuntimeStats:
     mean: float
     std: float
     min: float
     max: float
 
 
-def run_timed(func: Callable[[], _T], n_runs: int = 3) -> tuple[list[float], list[_T]]:
+def _run_timed(func: Callable[[], _T], n_runs: int = 3) -> tuple[list[float], list[_T]]:
     """Run a callable multiple times; return wall times (s) and return values per run."""
     durations: list[float] = []
     outputs: list[_T] = []
@@ -94,9 +93,9 @@ def run_timed(func: Callable[[], _T], n_runs: int = 3) -> tuple[list[float], lis
     return durations, outputs
 
 
-def summarize_durations(durations) -> TimingStats:
+def _runtime_stats(durations) -> _RuntimeStats:
     arr = np.asarray(durations, dtype=float)
-    return TimingStats(
+    return _RuntimeStats(
         mean=float(np.mean(arr)),
         std=float(np.std(arr)),
         min=float(np.min(arr)),
@@ -104,7 +103,7 @@ def summarize_durations(durations) -> TimingStats:
     )
 
 
-def relative_l2_error(candidate, reference) -> float:
+def _relative_l2_error(candidate, reference) -> float:
     """Return percentage relative L2 error of candidate against reference."""
     candidate_arr = np.asarray(candidate, dtype=float)
     reference_arr = np.asarray(reference, dtype=float)
@@ -194,8 +193,8 @@ def _new_timed_sim(
 
 
 @dataclass(frozen=True)
-class _PairTimingResult:
-    stats: TimingStats
+class _SimulationRun:
+    stats: _RuntimeStats
     mean_compile_s: float
     mean_solve_s: float
     x_mean: np.ndarray
@@ -221,7 +220,7 @@ def _resolve_backend_compile_time(
     return float(first_compile_s_by_backend.get(backend, compile_s))
 
 
-def _run_compile_once_pair(
+def _run_compile_once_variant(
     system: Any,
     *,
     t0: float,
@@ -232,7 +231,7 @@ def _run_compile_once_pair(
     n_runs: int,
     evaluator_cache: dict[tuple[int, str], Any] | None,
     first_compile_s_by_backend: dict[str, float] | None,
-) -> _PairTimingResult:
+) -> _SimulationRun:
     sim = _new_timed_sim(
         system,
         t0,
@@ -252,10 +251,10 @@ def _run_compile_once_pair(
         traj = sim.solve()
         return np.asarray(traj.x[:, -1], dtype=float), sim.last_debug
 
-    durs, outs = run_timed(_solve_once, n_runs=n_runs)
-    stats = summarize_durations(durs)
+    durs, outs = _run_timed(_solve_once, n_runs=n_runs)
+    stats = _runtime_stats(durs)
     x_mean, dbg = _mean_state_and_debug(outs)
-    return _PairTimingResult(
+    return _SimulationRun(
         stats=stats,
         mean_compile_s=mean_comp,
         mean_solve_s=stats.mean,
@@ -264,7 +263,7 @@ def _run_compile_once_pair(
     )
 
 
-def _run_compile_each_pair(
+def _run_compile_each_variant(
     system: Any,
     *,
     t0: float,
@@ -273,20 +272,20 @@ def _run_compile_each_pair(
     sol: str,
     back: str,
     n_runs: int,
-) -> _PairTimingResult:
+) -> _SimulationRun:
     def _run_once() -> tuple[np.ndarray, dict[str, Any], float, float]:
         sim = _new_timed_sim(system, t0, tf, dt, sol, back)
         traj = sim.solve()
         x_end = np.asarray(traj.x[:, -1], dtype=float)
         return x_end, sim.last_debug, sim._last_compile_s, sim._last_solve_s
 
-    durs, outs = run_timed(_run_once, n_runs=n_runs)
-    stats = summarize_durations(durs)
+    durs, outs = _run_timed(_run_once, n_runs=n_runs)
+    stats = _runtime_stats(durs)
     x_mean = np.mean(np.stack([o[0] for o in outs], axis=0), axis=0)
     dbg = outs[-1][1]
     compile_times = [o[2] for o in outs]
     solve_times = [o[3] for o in outs]
-    return _PairTimingResult(
+    return _SimulationRun(
         stats=stats,
         mean_compile_s=float(np.mean(compile_times)),
         mean_solve_s=float(np.mean(solve_times)),
@@ -295,7 +294,7 @@ def _run_compile_each_pair(
     )
 
 
-def _run_timed_one_pair(
+def _run_simulation_variant(
     system: Any,
     *,
     t0: float,
@@ -307,10 +306,10 @@ def _run_timed_one_pair(
     compile_once: bool,
     evaluator_cache: dict[tuple[int, str], Any] | None = None,
     first_compile_s_by_backend: dict[str, float] | None = None,
-) -> _PairTimingResult:
-    """Return timing stats, compile/solve means, mean final state, and last debug."""
+) -> _SimulationRun:
+    """Return runtime stats, compile/solve means, mean final state, and last debug."""
     if compile_once:
-        return _run_compile_once_pair(
+        return _run_compile_once_variant(
             system,
             t0=t0,
             tf=tf,
@@ -321,7 +320,7 @@ def _run_timed_one_pair(
             evaluator_cache=evaluator_cache,
             first_compile_s_by_backend=first_compile_s_by_backend,
         )
-    return _run_compile_each_pair(
+    return _run_compile_each_variant(
         system,
         t0=t0,
         tf=tf,
@@ -338,11 +337,9 @@ def _run_timed_one_pair(
 
 
 @dataclass(frozen=True)
-class BenchmarkResult:
-    candidate_solver: str
-    candidate_backend: str
-    truth_solver: str
-    truth_backend: str
+class SimulationBackendBenchmarkResult:
+    candidate: SimulationBenchmarkVariant
+    truth: SimulationBenchmarkVariant
     mean_time: float
     std_time: float
     mean_compile_time: float
@@ -357,19 +354,17 @@ class BenchmarkResult:
     n_t: int
 
 
-def benchmark_sim_backend(
+def benchmark_simulation_backend(
     system: Any,
     *,
-    candidate_solver: str,
-    candidate_backend: str,
-    truth_solver: str = TRUTH_SOLVER,
-    truth_backend: str = TRUTH_BACKEND,
+    candidate: SimulationBenchmarkVariant,
+    truth: SimulationBenchmarkVariant = TRUTH_SIMULATION_VARIANT,
     t0: float = 0.0,
     tf: float = 10.0,
     dt: float = 0.01,
     n_runs: int = 3,
     compile_once: bool = True,
-) -> BenchmarkResult:
+) -> SimulationBackendBenchmarkResult:
     """Benchmark one ``(solver, compile_backend)`` against a truth configuration on ``system``.
 
     Parameters
@@ -385,45 +380,44 @@ def benchmark_sim_backend(
         slightly larger than their sum due to other ``__init__`` work).
     """
 
-    cand = _run_timed_one_pair(
+    cand = _run_simulation_variant(
         system,
         t0=t0,
         tf=tf,
         dt=dt,
-        sol=candidate_solver,
-        back=candidate_backend,
+        sol=candidate.solver,
+        back=candidate.compile_backend,
         n_runs=n_runs,
         compile_once=compile_once,
     )
-    truth = _run_timed_one_pair(
+    truth_variant = truth
+    truth_run = _run_simulation_variant(
         system,
         t0=t0,
         tf=tf,
         dt=dt,
-        sol=truth_solver,
-        back=truth_backend,
+        sol=truth_variant.solver,
+        back=truth_variant.compile_backend,
         n_runs=n_runs,
         compile_once=compile_once,
     )
 
-    rel_err = relative_l2_error(cand.x_mean, truth.x_mean)
+    rel_err = _relative_l2_error(cand.x_mean, truth_run.x_mean)
     speedup = (
-        truth.stats.mean / cand.stats.mean
+        truth_run.stats.mean / cand.stats.mean
         if cand.stats.mean > 0
         else float("inf")
     )
-    return BenchmarkResult(
-        candidate_solver=candidate_solver,
-        candidate_backend=format_benchmark_backend_label(candidate_backend),
-        truth_solver=truth_solver,
-        truth_backend=format_benchmark_backend_label(truth_backend),
+    return SimulationBackendBenchmarkResult(
+        candidate=candidate,
+        truth=truth_variant,
         mean_time=cand.stats.mean,
         std_time=cand.stats.std,
         mean_compile_time=cand.mean_compile_s,
         mean_solve_time=cand.mean_solve_s,
-        truth_mean_time=truth.stats.mean,
-        truth_mean_compile_time=truth.mean_compile_s,
-        truth_mean_solve_time=truth.mean_solve_s,
+        truth_mean_time=truth_run.stats.mean,
+        truth_mean_compile_time=truth_run.mean_compile_s,
+        truth_mean_solve_time=truth_run.mean_solve_s,
         speedup_vs_truth=speedup,
         rel_err_l2=rel_err,
         nfev=int(cand.debug["nfev"]),
@@ -438,7 +432,7 @@ def benchmark_sim_backend(
 
 
 @dataclass(frozen=True)
-class StandardCase:
+class SimulationBenchmarkCase:
     """One named scenario: build a system, time grid, and a short table label."""
 
     id: str
@@ -467,35 +461,35 @@ def _diagram_dense() -> Any:
     return make_dense_network(num_nodes=50, connections_per_node=5)
 
 
-STANDARD_SIM_CASES: tuple[StandardCase, ...] = (
-    StandardCase("pendulum_long", "Pendulum (long)", 0.0, 100.0, 0.01, _pendulum_long),
-    StandardCase("spheres_short", "ManySpheres (short)", 0.0, 1.0, 0.01, _spheres_short),
-    StandardCase("diagram_dense", "Dense network", 0.0, 5.0, 0.1, _diagram_dense),
+STANDARD_SIMULATION_CASES: tuple[SimulationBenchmarkCase, ...] = (
+    SimulationBenchmarkCase(
+        "pendulum_long", "Pendulum (long)", 0.0, 100.0, 0.01, _pendulum_long
+    ),
+    SimulationBenchmarkCase(
+        "spheres_short", "ManySpheres (short)", 0.0, 1.0, 0.01, _spheres_short
+    ),
+    SimulationBenchmarkCase("diagram_dense", "Dense network", 0.0, 5.0, 0.1, _diagram_dense),
 )
 
 
-def run_standard_sim_suite(
-    candidate_solver: str,
-    candidate_backend: str,
+def benchmark_standard_simulation_suite(
+    candidate: SimulationBenchmarkVariant,
     *,
-    truth_solver: str = TRUTH_SOLVER,
-    truth_backend: str = TRUTH_BACKEND,
+    truth: SimulationBenchmarkVariant = TRUTH_SIMULATION_VARIANT,
     n_runs: int = 1,
     compile_once: bool = True,
-    cases: Sequence[StandardCase] = STANDARD_SIM_CASES,
-) -> list[tuple[str, BenchmarkResult]]:
-    """Run :func:`benchmark_sim_backend` on each standard case (fresh system per case)."""
-    results: list[tuple[str, BenchmarkResult]] = []
+    cases: Sequence[SimulationBenchmarkCase] = STANDARD_SIMULATION_CASES,
+) -> list[tuple[str, SimulationBackendBenchmarkResult]]:
+    """Run one simulator benchmark variant on each standard case."""
+    results: list[tuple[str, SimulationBackendBenchmarkResult]] = []
     for case in cases:
         results.append(
             (
                 case.label,
-                benchmark_sim_backend(
+                benchmark_simulation_backend(
                     case.build(),
-                    candidate_solver=candidate_solver,
-                    candidate_backend=candidate_backend,
-                    truth_solver=truth_solver,
-                    truth_backend=truth_backend,
+                    candidate=candidate,
+                    truth=truth,
                     t0=case.t0,
                     tf=case.tf,
                     dt=case.dt,
@@ -507,11 +501,14 @@ def run_standard_sim_suite(
     return results
 
 
-def print_standard_sim_suite(results: list[tuple[str, BenchmarkResult]]) -> None:
+def print_standard_simulation_benchmark(
+    results: list[tuple[str, SimulationBackendBenchmarkResult]],
+) -> None:
     """Print a compact table: case, mean_s, speedup, rel_err %."""
+    truth = results[0][1].truth if results else TRUTH_SIMULATION_VARIANT
     print("\n=== Standard simulator suite ===")
     print(
-        f"truth=({TRUTH_SOLVER}, {TRUTH_BACKEND})  "
+        f"truth=({truth.solver}, {truth.compile_backend})  "
         "speedup = truth_mean_time / candidate_mean_time  err = L2% vs truth final x"
     )
     print(
@@ -520,7 +517,8 @@ def print_standard_sim_suite(results: list[tuple[str, BenchmarkResult]]) -> None
     )
     print("-" * 80)
     for label, result in results:
-        candidate = f"{result.candidate_solver}+{result.candidate_backend}"
+        backend = format_benchmark_backend_label(result.candidate.compile_backend)
+        candidate = f"{result.candidate.solver}+{backend}"
         print(
             f"{label:<22} {result.mean_time:>10.5f} {result.speedup_vs_truth:>9.2f} "
             f"{result.rel_err_l2:>10.4f}  {candidate:<18}"
@@ -528,12 +526,12 @@ def print_standard_sim_suite(results: list[tuple[str, BenchmarkResult]]) -> None
 
 
 # ---------------------------------------------------------------------------
-# Matrix: list of (solver, backend) vs one truth
+# Matrix: many variants vs one truth
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class MatrixRow:
+class SimulationBenchmarkRow:
     """One cell: time, error vs truth, accuracy gate, speed vs truth time."""
 
     solver: str
@@ -553,7 +551,7 @@ class MatrixRow:
 
 
 @dataclass(frozen=True)
-class MatrixResult:
+class SimulationBenchmarkResult:
     """All rows for one ``system`` and time grid."""
 
     case_name: str
@@ -562,39 +560,23 @@ class MatrixResult:
     dt: float
     n_runs: int
     compile_once: bool
-    truth_solver: str
-    truth_backend: str
+    truth: SimulationBenchmarkVariant
     truth_mean_time: float
     truth_mean_compile_time: float
     truth_mean_solve_time: float
     accuracy_threshold_pct: float
-    rows: tuple[MatrixRow, ...]
+    rows: tuple[SimulationBenchmarkRow, ...]
 
 
 def _stdout_color() -> bool:
-    """Use ANSI colors when output is a TTY, when ``FORCE_COLOR`` is set, or in IPython/Jupyter.
-
-    Respects https://no-color.org/ via ``NO_COLOR``. Notebooks often have a non-tty
-    ``sys.stdout`` but still render escape codes in the cell output.
-    """
+    """Use ANSI colors when output is a TTY or color is forced."""
     if os.environ.get("NO_COLOR", "").strip():
         return False
     if os.environ.get("FORCE_COLOR", "").strip() or os.environ.get(
         "CLICOLOR_FORCE", ""
     ).strip():
         return True
-    if sys.stdout.isatty():
-        return True
-    try:
-        from IPython import get_ipython
-    except ImportError:
-        return False
-    try:
-        if get_ipython() is not None:
-            return True
-    except Exception:
-        pass
-    return False
+    return sys.stdout.isatty()
 
 
 def _ansi(s: str, *codes: int) -> str:
@@ -604,7 +586,7 @@ def _ansi(s: str, *codes: int) -> str:
 
 
 def _fastest_accurate_row_indices(
-    rows: tuple[MatrixRow, ...], threshold: float
+    rows: tuple[SimulationBenchmarkRow, ...], threshold: float
 ) -> set[int]:
     acc = [i for i, r in enumerate(rows) if r.rel_err_l2 < threshold]
     if not acc:
@@ -613,8 +595,6 @@ def _fastest_accurate_row_indices(
     return {i for i in acc if rows[i].speed_vs_truth >= best - 1e-15}
 
 
-# --- Matrix: fixed column widths; titles are checked against sample data width.
-# ``_MZ_BAK`` must fit ``jax(<platform>)`` (see :func:`format_benchmark_backend_label`).
 _MZ_SOL, _MZ_MET, _MZ_BAK, _MZ_F = 15, 8, 10, 10
 
 
@@ -649,31 +629,20 @@ def _matrix_titles(compile_once: bool) -> str:
             f"{'cmp [s]':>{_MZ_F}} {'solve [s]':>{_MZ_F}} {'std [s]':>{_MZ_F}} "
             f"{'total [s]':>{_MZ_F}}"
         )
-        p_sol, p_met, p_b = "0" * _MZ_SOL, "0" * _MZ_MET, "0" * _MZ_BAK
-        sample = (
-            f"{p_sol:<{_MZ_SOL}} {p_met:<{_MZ_MET}} {p_b:<{_MZ_BAK}} "
-            f"{0.0:>{_MZ_F}.6f} {0.0:>{_MZ_F}.6f} {0.0:>{_MZ_F}.6f} {0.0:>{_MZ_F}.6f}"
-        ) + _row_tail(0, 0, 0, 0.0, "Y", 0.0)
     else:
         h = (
             f"{'solver':<{_MZ_SOL}} {'metho':<{_MZ_MET}} {'back':<{_MZ_BAK}} "
             f"{'total [s]':>{_MZ_F}} {'std [s]':>{_MZ_F}} "
             f"{'cmp [s]':>{_MZ_F}} {'slv [s]':>{_MZ_F}}"
         )
-        p_sol, p_met, p_b = "0" * _MZ_SOL, "0" * _MZ_MET, "0" * _MZ_BAK
-        sample = (
-            f"{p_sol:<{_MZ_SOL}} {p_met:<{_MZ_MET}} {p_b:<{_MZ_BAK}} "
-            f"{0.0:>{_MZ_F}.6f} {0.0:>{_MZ_F}.6f} {0.0:>{_MZ_F}.6f} {0.0:>{_MZ_F}.6f}"
-        ) + _row_tail(0, 0, 0, 0.0, "Y", 0.0)
-    line = h + t
-    if len(line) != len(sample):
-        raise RuntimeError(
-            f"matrix title width {len(line)} != data width {len(sample)} (compile_once={compile_once})"
-        )
-    return line
+    return h + t
 
 
-def _format_matrix_row_text(row: MatrixRow, *, compile_once: bool) -> str:
+def _format_matrix_row_text(
+    row: SimulationBenchmarkRow,
+    *,
+    compile_once: bool,
+) -> str:
     """Table columns: ``total [s]`` is wall time (``compile + n_runs * mean solve`` when
     ``compile_once``, else mean time per full iteration). ``slv`` is solve-only slice.
     """
@@ -696,19 +665,18 @@ def _format_matrix_row_text(row: MatrixRow, *, compile_once: bool) -> str:
 
 
 def _print_matrix_row_line(
-    row: MatrixRow,
+    row: SimulationBenchmarkRow,
     *,
     compile_once: bool,
-    truth_solver: str,
-    truth_backend: str,
+    truth: SimulationBenchmarkVariant,
     is_winner: bool = False,
     flush: bool = False,
 ) -> None:
     """Color: winner (fastest among accurate) > baseline (truth pair) > ok > fail."""
     line = _format_matrix_row_text(row, compile_once=compile_once)
     is_baseline = (
-        row.solver == truth_solver
-        and _compile_backend_key_for_compare(row.backend) == truth_backend
+        row.solver == truth.solver
+        and _compile_backend_key_for_compare(row.backend) == truth.compile_backend
     )
     if is_winner:
         line = _ansi(line, 1, 92)
@@ -721,7 +689,7 @@ def _print_matrix_row_line(
     print(line, flush=flush)
 
 
-def print_sim_matrix_header(result: MatrixResult) -> None:
+def print_simulation_matrix_header(result: SimulationBenchmarkResult) -> None:
     """Print title, truth summary, and column headings (no data rows)."""
     th = result.accuracy_threshold_pct
     co = "compile_once" if result.compile_once else "compile_each_run"
@@ -733,8 +701,8 @@ def print_sim_matrix_header(result: MatrixResult) -> None:
         )
         print(
             f"t0={result.t0} tf={result.tf} dt={result.dt} runs={result.n_runs} mode={co} "
-            f"truth=({result.truth_solver}, "
-            f"{format_benchmark_backend_label(result.truth_backend)}) "
+            f"truth=({result.truth.solver}, "
+            f"{format_benchmark_backend_label(result.truth.compile_backend)}) "
             f"truth_total={truth_total:.6f}s "
             f"truth_solve={result.truth_mean_time:.6f}s "
             f"truth_cmp={result.truth_mean_compile_time:.6f}s "
@@ -746,8 +714,8 @@ def print_sim_matrix_header(result: MatrixResult) -> None:
     else:
         print(
             f"t0={result.t0} tf={result.tf} dt={result.dt} runs={result.n_runs} mode={co} "
-            f"truth=({result.truth_solver}, "
-            f"{format_benchmark_backend_label(result.truth_backend)}) "
+            f"truth=({result.truth.solver}, "
+            f"{format_benchmark_backend_label(result.truth.compile_backend)}) "
             f"truth_total={result.truth_mean_time:.6f}s "
             f"truth_cmp={result.truth_mean_compile_time:.6f}s "
             f"truth_slv={result.truth_mean_solve_time:.6f}s "
@@ -759,11 +727,10 @@ def print_sim_matrix_header(result: MatrixResult) -> None:
 
 
 def _print_repeated_winner_rows(
-    rows: tuple[MatrixRow, ...],
+    rows: tuple[SimulationBenchmarkRow, ...],
     *,
     compile_once: bool,
-    truth_solver: str,
-    truth_backend: str,
+    truth: SimulationBenchmarkVariant,
     th: float,
 ) -> None:
     """After a streamed table, reprint the fastest accurate row(s) in bold green only."""
@@ -777,14 +744,16 @@ def _print_repeated_winner_rows(
         _print_matrix_row_line(
             rows[i],
             compile_once=compile_once,
-            truth_solver=truth_solver,
-            truth_backend=truth_backend,
+            truth=truth,
             is_winner=True,
             flush=True,
         )
 
 
-def _print_fastest_accurate_footer(rows: tuple[MatrixRow, ...], th: float) -> None:
+def _print_fastest_accurate_footer(
+    rows: tuple[SimulationBenchmarkRow, ...],
+    th: float,
+) -> None:
     """One-line summary of tied fastest accurate rows (for streamed tables)."""
     fast_idx = _fastest_accurate_row_indices(rows, th)
     if not fast_idx:
@@ -798,89 +767,58 @@ def _print_fastest_accurate_footer(rows: tuple[MatrixRow, ...], th: float) -> No
     print(_ansi(msg, 1, 92), flush=True)
 
 
-def print_sim_matrix_table(result: MatrixResult) -> None:
+def print_simulation_matrix_benchmark(result: SimulationBenchmarkResult) -> None:
     """Print the full matrix: header plus all rows; winner=bold green, baseline=cyan."""
     co = result.compile_once
-    print_sim_matrix_header(result)
+    print_simulation_matrix_header(result)
     th = result.accuracy_threshold_pct
     fast_idx = _fastest_accurate_row_indices(result.rows, th)
     for i, row in enumerate(result.rows):
         _print_matrix_row_line(
             row,
             compile_once=co,
-            truth_solver=result.truth_solver,
-            truth_backend=result.truth_backend,
+            truth=result.truth,
             is_winner=(i in fast_idx),
         )
+    _print_repeated_winner_rows(
+        result.rows,
+        compile_once=co,
+        truth=result.truth,
+        th=th,
+    )
+    _print_fastest_accurate_footer(result.rows, th)
 
 
-def benchmark_sim_speed_matrix(
+def benchmark_simulation_matrix(
     system: Any,
     *,
     case_name: str,
-    pairs: Sequence[tuple[str, str]],
+    variants: Sequence[SimulationBenchmarkVariant],
     t0: float = 0.0,
     tf: float = 10.0,
     dt: float = 0.01,
     n_runs: int = 3,
-    truth_solver: str = TRUTH_SOLVER,
-    truth_backend: str = TRUTH_BACKEND,
+    truth: SimulationBenchmarkVariant = TRUTH_SIMULATION_VARIANT,
     accuracy_threshold_pct: float = 1.0,
     compile_once: bool = True,
-) -> MatrixResult:
-    """Benchmark each ``(solver, compile_backend)`` in ``pairs`` against one truth run on ``system``.
-
-    Prints a live table: header after the truth run, one row per cell as it finishes
-    (baseline cyan, accuracy green/red), then the fastest accurate cell is **reprinted
-    in bold green** on one extra line, followed by a short text summary. If any accurate
-    row exists, :func:`print_sim_matrix_table` on the result reproduces the same layout
-    in one pass.
-
-    The truth pair sets the reference final state. ``speed_vs_truth`` is
-    ``truth_mean_time / cell_mean_time`` where both times use the same convention:
-    **solve-only** means when ``compile_once=True`` (default); full (build + solve) per
-    run when ``compile_once=False`` (see :func:`benchmark_sim_backend`).
-
-    A row is ``ok`` when ``rel_err_l2 < accuracy_threshold_pct`` (default 1%).
-
-    Parameters
-    ----------
-    system
-        A built system (same object used for every timed solve in this run).
-    case_name
-        Title for the printed table.
-    pairs
-        Ordered list of ``(solver, compile_backend)`` to benchmark. If the truth pair
-        appears in this list, it is run and printed **first** so the baseline row is
-        at the top of the table.
-    truth_solver, truth_backend
-        Reference for error and for the speed column denominator.
-    compile_once
-        If ``True`` (default), one :func:`~minilink.core.system.System.compile` per
-        **backend** (cached across the matrix) and ``n_runs`` timed solves per cell; table
-        columns: ``cmp / solve / std`` (``cmp`` is the one-time cost for that backend in
-        this run). If ``False``, full rebuild every timed iteration; table columns:
-        ``total / std / cmp / slv``.
-    """
-    pair_list = list(pairs)
-    _tk = (truth_solver, truth_backend)
-    if _tk in pair_list:
-        pair_list = [_tk] + [p for p in pair_list if p != _tk]
+) -> SimulationBenchmarkResult:
+    """Benchmark simulator variants against one truth variant on a built system."""
+    variant_list = list(variants)
+    if truth in variant_list:
+        variant_list = [truth] + [v for v in variant_list if v != truth]
 
     # Matrix run only: reuse compiled evaluator for the same (system, compile_backend).
     _eval_cache: dict[tuple[int, str], Any] = {}
     _first_cmp_by_backend: dict[str, float] = {}
 
-    def _run_timed_pair(
-        sol: str, back: str
-    ) -> _PairTimingResult:
-        return _run_timed_one_pair(
+    def _benchmark_variant(variant: SimulationBenchmarkVariant) -> _SimulationRun:
+        return _run_simulation_variant(
             system,
             t0=t0,
             tf=tf,
             dt=dt,
-            sol=sol,
-            back=back,
+            sol=variant.solver,
+            back=variant.compile_backend,
             n_runs=n_runs,
             compile_once=compile_once,
             evaluator_cache=_eval_cache if compile_once else None,
@@ -889,35 +827,17 @@ def benchmark_sim_speed_matrix(
             else None,
         )
 
-    truth = _run_timed_pair(truth_solver, truth_backend)
-    truth_time = float(truth.stats.mean)
+    truth_timed = _benchmark_variant(truth)
+    truth_time = float(truth_timed.stats.mean)
 
-    print_sim_matrix_header(
-        MatrixResult(
-            case_name=case_name,
-            t0=t0,
-            tf=tf,
-            dt=dt,
-            n_runs=n_runs,
-            compile_once=compile_once,
-            truth_solver=truth_solver,
-            truth_backend=truth_backend,
-            truth_mean_time=truth_time,
-            truth_mean_compile_time=truth.mean_compile_s,
-            truth_mean_solve_time=truth.mean_solve_s,
-            accuracy_threshold_pct=accuracy_threshold_pct,
-            rows=(),
-        )
-    )
-
-    rows: list[MatrixRow] = []
-    for solver, backend in pair_list:
-        if solver == truth_solver and backend == truth_backend:
-            timed = truth
+    rows: list[SimulationBenchmarkRow] = []
+    for variant in variant_list:
+        if variant == truth:
+            timed = truth_timed
         else:
-            timed = _run_timed_pair(solver, backend)
+            timed = _benchmark_variant(variant)
 
-        rel = float(relative_l2_error(timed.x_mean, truth.x_mean))
+        rel = float(_relative_l2_error(timed.x_mean, truth_timed.x_mean))
         accuracy_ok = rel < accuracy_threshold_pct
         speed_vs = (
             truth_time / timed.stats.mean if timed.stats.mean > 0 else float("inf")
@@ -926,10 +846,10 @@ def benchmark_sim_speed_matrix(
             total_s = timed.mean_compile_s + n_runs * timed.mean_solve_s
         else:
             total_s = float(timed.stats.mean)
-        row = MatrixRow(
-            solver=solver,
-            method=integration_method_for_solver_mode(solver),
-            backend=format_benchmark_backend_label(backend),
+        row = SimulationBenchmarkRow(
+            solver=variant.solver,
+            method=integration_method_for_solver_mode(variant.solver),
+            backend=format_benchmark_backend_label(variant.compile_backend),
             mean_time=timed.stats.mean,
             std_time=timed.stats.std,
             mean_compile_time=timed.mean_compile_s,
@@ -943,36 +863,18 @@ def benchmark_sim_speed_matrix(
             speed_vs_truth=speed_vs,
         )
         rows.append(row)
-        _print_matrix_row_line(
-            row,
-            compile_once=compile_once,
-            truth_solver=truth_solver,
-            truth_backend=truth_backend,
-            is_winner=False,
-            flush=True,
-        )
 
-    out = MatrixResult(
+    return SimulationBenchmarkResult(
         case_name=case_name,
         t0=t0,
         tf=tf,
         dt=dt,
         n_runs=n_runs,
         compile_once=compile_once,
-        truth_solver=truth_solver,
-        truth_backend=truth_backend,
+        truth=truth,
         truth_mean_time=truth_time,
-        truth_mean_compile_time=truth.mean_compile_s,
-        truth_mean_solve_time=truth.mean_solve_s,
+        truth_mean_compile_time=truth_timed.mean_compile_s,
+        truth_mean_solve_time=truth_timed.mean_solve_s,
         accuracy_threshold_pct=accuracy_threshold_pct,
         rows=tuple(rows),
     )
-    _print_repeated_winner_rows(
-        out.rows,
-        compile_once=compile_once,
-        truth_solver=truth_solver,
-        truth_backend=truth_backend,
-        th=accuracy_threshold_pct,
-    )
-    _print_fastest_accurate_footer(out.rows, accuracy_threshold_pct)
-    return out

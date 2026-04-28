@@ -17,7 +17,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Physics** | **TRL 1** | Keep JAX contact demos working and extend the MVP carefully |
 | **Dynamics library** (`minilink.dynamics.catalog`) | **TRL 0** | Curated plant models; grow by domain (`vehicles/`, `msd/`, `pendulum/`, …) |
 | **Blocks library** (`minilink.core.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
-| **Benchmark helpers** (`minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `simulation/scenarios/` holds shared stress scenarios |
+| **Benchmark helpers** (`minilink.compile.benchmark` / `minilink.simulation.benchmark` / `minilink.planning.trajectory_optimization.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `simulation/scenarios/` holds shared stress scenarios |
 | **Planning** | **TRL 1** | Deterministic planning architecture; generic trajectory-optimization planner plus direct collocation, single shooting, live-plot callback hooks, and **JAX-derivative** direct collocation (`jax_direct_collocation`) as a narrower, reviewed prototype (see [DESIGN.md](DESIGN.md) §3.5) |
 | **Optimization** (`minilink.optimization`) | **TRL 1** | Thin `MathematicalProgram` + optimizer contracts (objective/constraint Jacobians, optional objective Hessian for SciPy trust-region methods) |
 | **Control** (`minilink.control`) | **TRL 0** | Controller blocks (starting with tutorial PD); expand as patterns stabilize |
@@ -36,7 +36,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - **Pyro-style plant ports**: `dynamics/catalog/pendulum/` includes `CartPole` and `DoublePendulum` on `MechanicalSystem` (see `DESIGN.md` §2.7)
 - **Still needs a clearer top-level package surface**: public exports and import story
 - **Layout and naming**: on-disk `minilink/` tree, pluggable-role file naming, and package boundaries are documented in [DESIGN.md](DESIGN.md) §2
-- **Benchmarks**: `minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing` + `tests/benchmark/` for optional timing workflows (documented in `DESIGN.md` §4.6)
+- **Benchmarks**: subsystem-local `benchmark.py` modules + `tests/benchmark/` for optional benchmark workflows (documented in `DESIGN.md` §4.6)
 
 ## 3. Active Priorities
 
@@ -90,7 +90,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 - [ ] Top-level public exports in `minilink/__init__.py`
 - [ ] Solver configuration cleanup (partial: explicit SciPy `rtol`/`atol` on default presets; `COMPILE_BACKEND_AUTO` and auto-RK4 heuristic in code—still room for a `SimulationOptions`-style object)
 - [ ] Wiring validation and UX polish
-- [x] Migrate `compile/`, `simulation/`, and `graphical/` package layout: `evaluators/`, `solvers/`, `renderers/renderer.py`, timing modules, `benchmark` package retired; layout rules consolidated in [DESIGN.md](DESIGN.md) §2
+- [x] Migrate `compile/`, `simulation/`, and `graphical/` package layout: `evaluators/`, `solvers/`, `renderers/renderer.py`, subsystem-local benchmark modules, no top-level benchmark package; layout rules consolidated in [DESIGN.md](DESIGN.md) §2
 
 ### Phase 4: User-facing library growth
 

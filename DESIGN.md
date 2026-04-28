@@ -24,9 +24,9 @@ The table below is the on-disk layout and TRL. **Structural rules**, **pluggable
 | `dynamics/abstraction/` | **TRL 1** | Inheritance abstractions (e.g. `MechanicalSystem` in `mechanical.py`) |
 | `physics/` | **TRL 1** | JAX contact-world MVP (`engine_jax`, `PhysicsWorldSystem`); engine-backed dynamics, not folded into analytic `dynamics/` |
 | `dynamics/catalog/` | **TRL 0** | Reusable **plant** models as `DynamicSystem` leaves (`pendulum/`, `vehicles/`, `msd/`, …) |
-| `compile/evaluator_timing` | **TRL 1** | Optional compiled-`f` timing (`benchmark_f_speeds`, `print_f_speed_table`); not part of the core contract |
-| `simulation/integration_timing` | **TRL 1** | Optional simulator timing sweeps, `STANDARD_SIM_CASES`, and helpers (`run_timed`, …) |
-| `simulation/scenarios/` | **TRL 1** | Shared **stress** scenarios for timing matrices, not user plants |
+| `compile/benchmark` | **TRL 1** | Optional compiled-`f` evaluator benchmarks; not part of the core contract |
+| `simulation/benchmark` | **TRL 1** | Optional simulator solver/backend benchmark sweeps and standard cases |
+| `simulation/scenarios/` | **TRL 1** | Shared **stress** scenarios for benchmark matrices, not user plants |
 | `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization uses a generic `TrajectoryOptimizationPlanner` plus method-specific transcriptions, with NumPy/SciPy and narrower JAX-derivative prototypes for direct collocation and shooting methods. |
 | `optimization/` | **TRL 1** | Thin finite-dimensional mathematical-program contracts (`MathematicalProgram` with optional objective `grad` / `hess` and per-constraint Jacobians) shared by planning and future control workflows |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
@@ -66,10 +66,10 @@ minilink/<package>/
 
 | Area | On-disk |
 | --- | --- |
-| `minilink/compile` | `compiler.py`, `execution_plan.py`, `jax_utils.py` (JAX + `format_benchmark_backend_label`), `evaluators/*`, `evaluator_timing.py` |
-| `minilink/simulation` | `simulator.py`, `solvers/`, `integration_timing.py`, `scenarios/` |
+| `minilink/compile` | `compiler.py`, `execution_plan.py`, `jax_utils.py` (JAX + `format_benchmark_backend_label`), `evaluators/*`, `benchmark.py` |
+| `minilink/simulation` | `simulator.py`, `solvers/`, `benchmark.py`, `scenarios/` |
 | `minilink/graphical` | `renderers/renderer.py` + `*_renderer.py` |
-| Timing and stress | No top-level `benchmark/` package; use `compile/evaluator_timing`, `simulation/integration_timing`, `simulation/scenarios` |
+| Benchmarks and stress | No top-level `benchmark/` package; use subsystem-local `benchmark.py` modules and `simulation/scenarios` |
 
 `CostFunction` and set types live in `minilink.core` (`core/costs.py`, `core/sets.py`).
 
@@ -106,7 +106,7 @@ minilink/compile/
   compiler.py
   execution_plan.py
   jax_utils.py
-  evaluator_timing.py
+  benchmark.py
   evaluators/
     evaluator.py
     numpy_evaluator.py
@@ -120,7 +120,7 @@ minilink/simulation/
     rk4_fixed.py
   simulator.py
   input_interpolation.py
-  integration_timing.py
+  benchmark.py
   scenarios/
 
 minilink/graphical/renderers/
@@ -191,7 +191,7 @@ minilink/
 │   ├── compiler.py
 │   ├── execution_plan.py
 │   ├── jax_utils.py
-│   ├── evaluator_timing.py
+│   ├── benchmark.py
 │   └── evaluators/
 │       ├── __init__.py
 │       ├── evaluator.py
@@ -202,7 +202,7 @@ minilink/
 │   ├── __init__.py
 │   ├── simulator.py
 │   ├── input_interpolation.py
-│   ├── integration_timing.py
+│   ├── benchmark.py
 │   ├── scenarios/
 │   │   ├── __init__.py
 │   │   └── ...
@@ -268,8 +268,8 @@ minilink/
 | `symbolic/` | CAS; must not be required to `import minilink.dynamics`. |
 | `dynamics/` | `abstraction/` + `catalog/`. |
 | `physics/` | Engine-backed worlds; peer of `dynamics/`. |
-| `compile/` | `compiler.py`, `execution_plan.py`, `evaluators/`, `jax_utils.py`, `evaluator_timing.py`. |
-| `simulation/` | `simulator.py`, `solvers/`, `input_interpolation.py`, `integration_timing.py`, `scenarios/`. |
+| `compile/` | `compiler.py`, `execution_plan.py`, `evaluators/`, `jax_utils.py`, `benchmark.py`. |
+| `simulation/` | `simulator.py`, `solvers/`, `input_interpolation.py`, `benchmark.py`, `scenarios/`. |
 | `estimation/` | Observers, filters, sensor models. |
 | `control/` | Feedback laws, RL policy wrappers as `StaticSystem`. |
 | `planning/` | `PlanningProblem`, `planner.py`, families under `search/`, `trajectory_optimization/`, `policy_synthesis/`, … |
@@ -282,7 +282,7 @@ minilink/
 
 - **Typical dependency flow** — `core` ← (`dynamics`, `physics`, `estimation`, `control`, `planning`, …); `symbolic` → `dynamics`; `compile` consumes `core`; `simulation` consumes `compile` + `core`; `analysis` consumes trajectories or linearizations; `graphical` consumes results from anywhere.
 - **`compile/` vs `simulation/`** — *Compile* answers: given a model and a diagram schedule, what **closed-form callable** is `f` / boundary outputs? *Simulation* answers: given an evaluator, how do we **advance time** to a `Trajectory`? `compiler.py` dispatches to `evaluators/*_evaluator.py`. `simulator.py` uses `solvers/`.
-- **Benchmarks** — Optional timing lives in `compile/evaluator_timing` and `simulation/integration_timing`; stress graphs in `simulation/scenarios/`. Table labels for JAX use `format_benchmark_backend_label` in `compile/jax_utils.py`.
+- **Benchmarks** — Optional benchmark utilities live in subsystem-local `benchmark.py` modules; stress graphs live in `simulation/scenarios/`. Table labels for JAX use `format_benchmark_backend_label` in `compile/jax_utils.py`.
 - **`analysis/` vs `graphical/`** — Reusable numerics and diagnostics → `analysis/`. Producing figures and animations → `graphical/`. Routines that are *only* plotting belong in `graphical/`. Multi-plot and diagram-export backends are deferred until a second implementation is real; keep `plotting.py` and `graphe.py` as the single stack for now.
 - **`estimation/` vs `planning/`** — State reconstruction and filters live in `estimation/`; avoid duplicating that under `planning/`. Planning **uses** `core` costs and sets.
 - **`control/` vs `planning/` (RL angle)** — Training or synthesis in `planning/` (or a dedicated family later); a **deployed** policy as a block → `control/`.
@@ -521,16 +521,17 @@ Current solver modes (see `minilink.simulation.simulator` and tests):
 
 **SciPy preset tolerances** (`scipy`, `scipy_stiff`, …) pass explicit `rtol` / `atol` into `solve_ivp` so behavior is not left to global SciPy defaults.
 
-### 4.6 Benchmark package (`minilink.compile.evaluator_timing` / `minilink.simulation.integration_timing`)
+### 4.6 Benchmark modules
 
-Optional helpers for timing and regression-style comparisons. They are **not** part of the core dynamical or simulation contract; scripts may import them for local experiments. Stress builders live under `minilink.simulation.scenarios` (imported from timing scripts when needed).
+Optional helpers for benchmark and regression-style comparisons. They are **not** part of the core dynamical, simulation, or planning contract; scripts may import them for local experiments. Stress builders live under `minilink.simulation.scenarios`.
 
 | Module | Purpose |
 | --- | --- |
-| `minilink.compile.evaluator_timing` | `benchmark_f_speeds` measures native `system.f`, then `compile("numpy").f` and `compile("jax").f` over a fixed `(x, u, t)`; optional ASCII table via `print_f_speed_table`. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
-| `minilink.simulation.integration_timing` | Timing helpers (`run_timed`, `summarize_durations`, `relative_l2_error`); `benchmark_sim_backend(system, …)` compares one candidate `(solver, compile_backend)` to a **truth** pair (defaults `TRUTH_SOLVER` / `TRUTH_BACKEND`, i.e. `scipy_ultra` + `numpy`) on a given **built** `system`; `benchmark_sim_speed_matrix(system, pairs=…, …)` sweeps an explicit ordered list of `(solver, backend)` pairs vs the same truth pair, colors rows by ``rel_err_l2 < accuracy_threshold_pct``, prints ``speed_vs_truth = truth_mean_time / cell_mean_time``; ``DEFAULT_SWEEP_PAIRS`` is the full product of ``DEFAULT_SOLVERS`` × ``DEFAULT_BACKENDS``. Result rows and printed tables label the JAX compile key as ``jax(cpu)`` / ``jax(gpu)`` / etc. via ``jax.default_backend()`` (`format_benchmark_backend_label`). The same module also owns the fixed benchmark scenarios (`STANDARD_SIM_CASES`) plus `run_standard_sim_suite` / `print_standard_sim_suite`. |
+| `minilink.compile.benchmark` | `benchmark_f_evaluators` returns rows for native `system.f`, compiled NumPy, and compiled JAX evaluators over a fixed `(x, u, t)` sample; `print_f_benchmark` formats the result. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
+| `minilink.simulation.benchmark` | `benchmark_simulation_backend(system, candidate=...)` compares one `SimulationBenchmarkVariant` to `TRUTH_SIMULATION_VARIANT`; `benchmark_simulation_matrix(system, variants=...)` sweeps explicit variants such as `DEFAULT_SIMULATION_VARIANTS`; `print_simulation_matrix_benchmark` formats rows and highlights the fastest accurate variant. |
+| `minilink.planning.trajectory_optimization.benchmark` | `benchmark_trajectory_optimization` compares transcription, compile backend, derivative mode, precision, cold/warm start, optimizer backend, optimizer method, and optimizer options; `print_trajectory_optimization_benchmark` formats the result. |
 
-Programmatic imports should use the defining modules, e.g. `from minilink.simulation.integration_timing import run_standard_sim_suite, DEFAULT_SWEEP_PAIRS, ...` and `from minilink.compile.evaluator_timing import ...` as needed. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
+Programmatic imports should use the defining modules, e.g. `from minilink.simulation.benchmark import benchmark_simulation_matrix, DEFAULT_SIMULATION_VARIANTS` or `from minilink.compile.benchmark import benchmark_f_evaluators`. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
 
 ### 4.7 Animation playback (`System.animate` / `Animator.animate_simulation`)
 

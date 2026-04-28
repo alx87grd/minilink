@@ -1,19 +1,21 @@
-"""Unit tests for :mod:`minilink.simulation.integration_timing` compile/solve split and ``compile_once``."""
+"""Unit tests for simulator benchmark compile/solve split and ``compile_once``."""
 
 import contextlib
 import io
 import unittest
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from minilink.compile.jax_utils import format_benchmark_backend_label
 from minilink.core.system import DynamicSystem
-from minilink.simulation.integration_timing import (
-    TRUTH_BACKEND,
-    TRUTH_SOLVER,
-    benchmark_sim_backend,
-    benchmark_sim_speed_matrix,
+from minilink.simulation.benchmark import (
+    TRUTH_SIMULATION_VARIANT,
+    SimulationBenchmarkVariant,
+    benchmark_simulation_backend,
+    benchmark_simulation_matrix,
+    print_simulation_matrix_benchmark,
 )
 
 
@@ -53,12 +55,10 @@ class TestSimulationSpeedBenchmark(unittest.TestCase):
             self.assertRegex(label, r"^jax\([a-z0-9_]+\)$")
 
     def test_compile_each_run_total_exceeds_split_parts(self):
-        r = benchmark_sim_backend(
+        r = benchmark_simulation_backend(
             self._sys,
-            candidate_solver="euler",
-            candidate_backend="numpy",
-            truth_solver=TRUTH_SOLVER,
-            truth_backend=TRUTH_BACKEND,
+            candidate=SimulationBenchmarkVariant("euler", "numpy"),
+            truth=TRUTH_SIMULATION_VARIANT,
             n_runs=2,
             compile_once=False,
             **self._tgrid,
@@ -70,12 +70,10 @@ class TestSimulationSpeedBenchmark(unittest.TestCase):
         )
 
     def test_compile_once_mean_time_is_solve_only(self):
-        r = benchmark_sim_backend(
+        r = benchmark_simulation_backend(
             self._sys,
-            candidate_solver="euler",
-            candidate_backend="numpy",
-            truth_solver=TRUTH_SOLVER,
-            truth_backend=TRUTH_BACKEND,
+            candidate=SimulationBenchmarkVariant("euler", "numpy"),
+            truth=TRUTH_SIMULATION_VARIANT,
             n_runs=2,
             **self._tgrid,
         )
@@ -85,19 +83,26 @@ class TestSimulationSpeedBenchmark(unittest.TestCase):
         self.assertGreater(r.mean_solve_time, 0.0)
 
     def test_matrix_reuses_truth_row_and_has_compile_solve(self):
-        pairs = (("euler", "numpy"), (TRUTH_SOLVER, TRUTH_BACKEND))
+        variants = (
+            SimulationBenchmarkVariant("euler", "numpy"),
+            TRUTH_SIMULATION_VARIANT,
+        )
+        m = benchmark_simulation_matrix(
+            self._sys,
+            case_name="unit",
+            variants=variants,
+            n_runs=1,
+            **self._tgrid,
+        )
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            m = benchmark_sim_speed_matrix(
-                self._sys,
-                case_name="unit",
-                pairs=pairs,
-                n_runs=1,
-                **self._tgrid,
-            )
+            print_simulation_matrix_benchmark(m)
         r0, r1 = m.rows[0], m.rows[1]
-        # Truth pair is listed first when present in ``pairs``.
-        self.assertEqual((r0.solver, r0.backend), (TRUTH_SOLVER, TRUTH_BACKEND))
+        # Truth variant is listed first when present in ``variants``.
+        self.assertEqual(
+            (r0.solver, r0.backend),
+            (TRUTH_SIMULATION_VARIANT.solver, TRUTH_SIMULATION_VARIANT.compile_backend),
+        )
         self.assertEqual(
             (r0.mean_time, r0.mean_compile_time, r0.mean_solve_time),
             (
@@ -110,6 +115,19 @@ class TestSimulationSpeedBenchmark(unittest.TestCase):
         self.assertTrue(m.compile_once)
         self.assertIsInstance(r0.mean_compile_time, float)
         self.assertIsInstance(r0.mean_solve_time, float)
+
+    def test_old_timing_modules_are_not_imported_by_python_sources(self):
+        root = Path(__file__).resolve().parents[2]
+        old_compile = "evaluator_" "timing"
+        old_simulation = "integration_" "timing"
+        offenders = []
+        for path in root.rglob("*.py"):
+            if "__pycache__" in path.parts:
+                continue
+            text = path.read_text()
+            if old_compile in text or old_simulation in text:
+                offenders.append(path.relative_to(root).as_posix())
+        self.assertEqual(offenders, [])
 
 
 if __name__ == "__main__":
