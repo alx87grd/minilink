@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
 
@@ -17,10 +17,10 @@ from minilink.optimization.mathematical_program import (
     VariableBounds,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.fixed_grid import FixedGridOptions
 from minilink.planning.trajectory_optimization.transcription import (
+    FixedGridOptions,
     Transcription,
-    TranscriptionContext,
+    dynamics_function,
 )
 
 
@@ -28,7 +28,7 @@ class ShootingOptions(FixedGridOptions):
     """Grid options for fixed-step single shooting."""
 
 
-@dataclass(frozen=True)
+@dataclass
 class ShootingTranscription(Transcription):
     """
     Fixed-grid single-shooting transcription.
@@ -44,12 +44,11 @@ class ShootingTranscription(Transcription):
         problem: PlanningProblem,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
-        context: TranscriptionContext | None = None,
+        compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
-        """Convert ``problem`` into an input-only nonlinear program."""
+        """Build the input-knot nonlinear program."""
         problem.require_cost()
-        context = TranscriptionContext() if context is None else context
-        rollout = self._make_rollout(problem, context)
+        rollout = self._make_rollout(problem, compile_backend)
         equalities: list[EqualityConstraint] = []
         inequalities: list[InequalityConstraint] = []
 
@@ -69,13 +68,7 @@ class ShootingTranscription(Transcription):
             inequalities=tuple(inequalities),
             metadata={
                 "transcription": "shooting",
-                "integration_scheme": "rk4",
-                "tf": self.options.tf,
-                "dt": self.options.dt,
-                "n_steps": self.options.n_steps,
-                "state_dim": int(problem.sys.n),
-                "input_dim": int(problem.sys.m),
-                "compile_backend": context.compile_backend,
+                "compile_backend": compile_backend,
             },
         )
 
@@ -84,13 +77,11 @@ class ShootingTranscription(Transcription):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        metadata: dict[str, Any] | None = None,
-        context: TranscriptionContext | None = None,
+        compile_backend: str | None = "numpy",
     ) -> Trajectory:
-        """Roll out the optimized input sequence into a trajectory."""
-        context = TranscriptionContext() if context is None else context
-        rollout = self._make_rollout(problem, context)
-        dynamics = self._make_dynamics(problem, context)
+        """Roll out the optimized input sequence."""
+        rollout = self._make_rollout(problem, compile_backend)
+        dynamics = dynamics_function(problem, compile_backend)
         u = self.unpack(result.z, problem)
         x = rollout(u)
         dx = np.zeros_like(x)
@@ -112,22 +103,11 @@ class ShootingTranscription(Transcription):
 
     def pack(self, u: np.ndarray, problem: PlanningProblem) -> np.ndarray:
         """Pack sampled input knots into one decision vector."""
-        m = int(problem.sys.m)
-        n_steps = self.options.n_steps
-        u_arr = np.asarray(u, dtype=float)
-        if u_arr.shape != (m, n_steps):
-            raise ValueError(f"u must have shape ({m}, {n_steps})")
-        return u_arr.reshape(-1)
+        return u.reshape(-1)
 
     def unpack(self, z: np.ndarray, problem: PlanningProblem) -> np.ndarray:
         """Unpack a decision vector into sampled input knots."""
-        m = int(problem.sys.m)
-        n_steps = self.options.n_steps
-        z_arr = np.asarray(z, dtype=float).reshape(-1)
-        expected = self.decision_dimension(problem)
-        if z_arr.size != expected:
-            raise ValueError(f"z must have shape ({expected},)")
-        return z_arr.reshape(m, n_steps)
+        return z.reshape(problem.sys.m, self.options.n_steps)
 
     def variable_bounds(self, problem: PlanningProblem) -> VariableBounds:
         """Build box bounds for input-knot decision variables."""
@@ -145,64 +125,44 @@ class ShootingTranscription(Transcription):
         guess: np.ndarray | Trajectory | None,
     ) -> np.ndarray:
         if guess is None:
-            raise ValueError(
-                "ShootingTranscription requires an initial guess prepared by the planner"
-            )
+            raise ValueError("Shooting requires an initial input guess")
 
         if isinstance(guess, Trajectory):
             resampled = guess.resample(t_new=self.options.t)
             return self.pack(resampled.u, problem)
 
-        guess_arr = np.asarray(guess, dtype=float).reshape(-1)
-        expected = self.decision_dimension(problem)
-        if guess_arr.shape != (expected,):
-            raise ValueError(f"initial_guess must have shape ({expected},)")
-        return guess_arr.copy()
+        return guess.reshape(-1)
 
     def _initial_state(self, problem: PlanningProblem) -> np.ndarray:
         if isinstance(problem.X0, SingletonSet):
-            return problem.X0.point.copy()
-        return np.asarray(problem.x_start, dtype=float).reshape(problem.sys.n).copy()
+            return problem.X0.point
+        return problem.x_start
 
     def _make_rollout(
         self,
         problem: PlanningProblem,
-        context: TranscriptionContext,
+        compile_backend: str | None,
     ) -> Callable[[np.ndarray], np.ndarray]:
         x0 = self._initial_state(problem)
-        backend = context.compile_backend
-        if problem.params.system is not None or backend is None or backend == "direct":
+        if (
+            problem.params.system is not None
+            or compile_backend is None
+            or compile_backend == "direct"
+        ):
             return lambda u: self._rollout_direct(problem, u, x0)
 
-        evaluator = problem.sys.compile(backend=backend, verbose=False)
+        evaluator = problem.sys.compile(backend=compile_backend, verbose=False)
 
         def rollout(u):
             x_samples = evaluator.rk4_rollout_forced(
                 x0,
-                np.asarray(u, dtype=float).T,
+                u.T,
                 float(self.options.t[0]),
                 self.options.dt,
             )
-            return np.asarray(x_samples, dtype=float).T
+            return np.asarray(x_samples).T
 
         return rollout
-
-    def _make_dynamics(
-        self,
-        problem: PlanningProblem,
-        context: TranscriptionContext,
-    ) -> Callable[[np.ndarray, np.ndarray, float], np.ndarray]:
-        backend = context.compile_backend
-        params = problem.params.system
-        if params is not None or backend is None or backend == "direct":
-            return lambda x, u, t: np.asarray(
-                problem.sys.f(x, u, t, params), dtype=float
-            ).reshape(problem.sys.n)
-
-        evaluator = problem.sys.compile(backend=backend, verbose=False)
-        return lambda x, u, t: np.asarray(evaluator.f(x, u, t), dtype=float).reshape(
-            problem.sys.n
-        )
 
     def _rollout_direct(
         self,
@@ -223,21 +183,25 @@ class ShootingTranscription(Transcription):
             umid = 0.5 * (u0 + u1)
             x_k = x[:, k]
             t_k = float(t[k])
-            k1 = np.asarray(problem.sys.f(x_k, u0, t_k, params), dtype=float).reshape(
-                n
+            k1 = problem.sys.f(x_k, u0, t_k, params)
+            k2 = problem.sys.f(
+                x_k + 0.5 * dt * k1,
+                umid,
+                t_k + 0.5 * dt,
+                params,
             )
-            k2 = np.asarray(
-                problem.sys.f(x_k + 0.5 * dt * k1, umid, t_k + 0.5 * dt, params),
-                dtype=float,
-            ).reshape(n)
-            k3 = np.asarray(
-                problem.sys.f(x_k + 0.5 * dt * k2, umid, t_k + 0.5 * dt, params),
-                dtype=float,
-            ).reshape(n)
-            k4 = np.asarray(
-                problem.sys.f(x_k + dt * k3, u1, t_k + dt, params),
-                dtype=float,
-            ).reshape(n)
+            k3 = problem.sys.f(
+                x_k + 0.5 * dt * k2,
+                umid,
+                t_k + 0.5 * dt,
+                params,
+            )
+            k4 = problem.sys.f(
+                x_k + dt * k3,
+                u1,
+                t_k + dt,
+                params,
+            )
             x[:, k + 1] = x_k + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
         return x
 
@@ -257,7 +221,7 @@ class ShootingTranscription(Transcription):
         for k in range(self.options.n_steps - 1):
             g0 = cost.g(x[:, k], u[:, k], float(t[k]), params=params)
             g1 = cost.g(x[:, k + 1], u[:, k + 1], float(t[k + 1]), params=params)
-            total += 0.5 * self.options.dt * (float(g0) + float(g1))
+            total += 0.5 * self.options.dt * (g0 + g1)
 
         total += float(cost.h(x[:, -1], float(t[-1]), params=params))
         return float(total)

@@ -1,4 +1,4 @@
-"""Cart-pole swing-up with direct-collocation trajectory optimization."""
+"""Trajectory optimization with an in-place live trajectory plot."""
 
 from __future__ import annotations
 
@@ -12,6 +12,9 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
 )
+from minilink.planning.trajectory_optimization.live_plot import (
+    LiveTrajectoryPlotCallback,
+)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
@@ -23,7 +26,6 @@ sys.inputs["u"].upper_bound[0] = 10.0
 
 x_start = np.array([-2.0, 1.0, 0.0, 0.0])
 x_goal = np.array([0.0, np.pi, 0.0, 0.0])
-
 cost = QuadraticCost.from_system(
     sys,
     Q=np.diag([1.0, 1.0, 0.0, 0.0]),
@@ -39,21 +41,22 @@ problem = PlanningProblem(
     cost=cost,
 )
 
-optimizer = ScipyMinimizeOptimizer(
-    options={
-        "disp": True,
-        "maxiter": 1000,
-        "ftol": 1e-2,
-    }
-)
-
 planner = TrajectoryOptimizationPlanner(
     problem,
     transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(tf=5.0, n_steps=50)
+        DirectCollocationOptions(tf=5.0, n_steps=30)
     ),
-    optimizer=optimizer,
-    options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+    optimizer=ScipyMinimizeOptimizer(
+        options={
+            "disp": True,
+            "maxiter": 300,
+            "ftol": 1e-3,
+        }
+    ),
+    options=TrajectoryOptimizationOptions(
+        compile_backend="numpy",
+        callback=LiveTrajectoryPlotCallback(sys, plot="xu", every=1, pause=0.001),
+    ),
 )
 
 traj = planner.compute_solution()

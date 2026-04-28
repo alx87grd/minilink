@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
@@ -17,10 +16,10 @@ from minilink.optimization.mathematical_program import (
     VariableBounds,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.fixed_grid import FixedGridOptions
 from minilink.planning.trajectory_optimization.transcription import (
+    FixedGridOptions,
     Transcription,
-    TranscriptionContext,
+    dynamics_function,
 )
 
 
@@ -30,7 +29,7 @@ class DirectCollocationOptions(FixedGridOptions):
     """
 
 
-@dataclass(frozen=True)
+@dataclass
 class DirectCollocationTranscription(Transcription):
     """
     Fixed-time-grid trapezoidal direct-collocation transcription.
@@ -48,18 +47,16 @@ class DirectCollocationTranscription(Transcription):
         problem: PlanningProblem,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
-        context: TranscriptionContext | None = None,
+        compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
-        """Convert ``problem`` into a finite-dimensional nonlinear program."""
+        """Build the trapezoidal collocation nonlinear program."""
         problem.require_cost()
-        context = TranscriptionContext() if context is None else context
-        dynamics = self._make_dynamics(problem, context.compile_backend)
+        dynamics = dynamics_function(problem, compile_backend)
 
         equalities = [
             EqualityConstraint(
                 h=lambda z: self._dynamics_residual(z, problem, dynamics),
                 name="direct_collocation_dynamics",
-                metadata={"scheme": "trapezoidal"},
             )
         ]
         inequalities = []
@@ -79,13 +76,7 @@ class DirectCollocationTranscription(Transcription):
             inequalities=tuple(inequalities),
             metadata={
                 "transcription": "direct_collocation",
-                "integration_scheme": "trapezoidal",
-                "tf": self.options.tf,
-                "dt": self.options.dt,
-                "n_steps": self.options.n_steps,
-                "state_dim": int(problem.sys.n),
-                "input_dim": int(problem.sys.m),
-                "compile_backend": context.compile_backend,
+                "compile_backend": compile_backend,
             },
         )
 
@@ -94,13 +85,11 @@ class DirectCollocationTranscription(Transcription):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        metadata: dict[str, Any] | None = None,
-        context: TranscriptionContext | None = None,
+        compile_backend: str | None = "numpy",
     ) -> Trajectory:
-        """Convert an optimizer result back into a sampled trajectory."""
-        context = TranscriptionContext() if context is None else context
+        """Read ``(x, u)`` from the optimizer result."""
         x, u = self.unpack(result.z, problem)
-        dynamics = self._make_dynamics(problem, context.compile_backend)
+        dynamics = dynamics_function(problem, compile_backend)
         dx = np.zeros_like(x)
         for k, t_k in enumerate(self.options.t):
             dx[:, k] = dynamics(x[:, k], u[:, k], float(t_k))
@@ -123,16 +112,7 @@ class DirectCollocationTranscription(Transcription):
 
     def pack(self, x: np.ndarray, u: np.ndarray, problem: PlanningProblem) -> np.ndarray:
         """Pack sampled state and input matrices into one decision vector."""
-        n = int(problem.sys.n)
-        m = int(problem.sys.m)
-        n_steps = self.options.n_steps
-        x_arr = np.asarray(x, dtype=float)
-        u_arr = np.asarray(u, dtype=float)
-        if x_arr.shape != (n, n_steps):
-            raise ValueError(f"x must have shape ({n}, {n_steps})")
-        if u_arr.shape != (m, n_steps):
-            raise ValueError(f"u must have shape ({m}, {n_steps})")
-        return np.concatenate((x_arr.reshape(-1), u_arr.reshape(-1)))
+        return np.concatenate((x.reshape(-1), u.reshape(-1)))
 
     def unpack(
         self,
@@ -143,13 +123,9 @@ class DirectCollocationTranscription(Transcription):
         n = int(problem.sys.n)
         m = int(problem.sys.m)
         n_steps = self.options.n_steps
-        z_arr = np.asarray(z, dtype=float).reshape(-1)
-        expected = self.decision_dimension(problem)
-        if z_arr.size != expected:
-            raise ValueError(f"z must have shape ({expected},)")
         split = n * n_steps
-        x = z_arr[:split].reshape(n, n_steps)
-        u = z_arr[split:].reshape(m, n_steps)
+        x = z[:split].reshape(n, n_steps)
+        u = z[split:].reshape(m, n_steps)
         return x, u
 
     def _pack_initial_guess(
@@ -159,20 +135,13 @@ class DirectCollocationTranscription(Transcription):
     ) -> np.ndarray:
         """Return a packed initial guess for the mathematical program."""
         if guess is None:
-            raise ValueError(
-                "DirectCollocationTranscription requires an initial guess prepared "
-                "by the planner"
-            )
+            raise ValueError("Direct collocation requires an initial guess")
 
         if isinstance(guess, Trajectory):
             resampled = guess.resample(t_new=self.options.t)
             return self.pack(resampled.x, resampled.u, problem)
 
-        guess_arr = np.asarray(guess, dtype=float).reshape(-1)
-        expected = self.decision_dimension(problem)
-        if guess_arr.shape != (expected,):
-            raise ValueError(f"initial_guess must have shape ({expected},)")
-        return guess_arr.copy()
+        return guess.reshape(-1)
 
     def initial_guess_time_grid(self, problem: PlanningProblem) -> np.ndarray:
         """Return the collocation time grid."""
@@ -198,20 +167,6 @@ class DirectCollocationTranscription(Transcription):
 
         return VariableBounds(lower=lower, upper=upper)
 
-    def _make_dynamics(self, problem: PlanningProblem, compile_backend: str | None):
-        params = problem.params.system
-        backend = compile_backend
-
-        if params is not None or backend is None or backend == "direct":
-            return lambda x, u, t: np.asarray(
-                problem.sys.f(x, u, t, params), dtype=float
-            ).reshape(problem.sys.n)
-
-        evaluator = problem.sys.compile(backend=backend, verbose=False)
-        return lambda x, u, t: np.asarray(evaluator.f(x, u, t), dtype=float).reshape(
-            problem.sys.n
-        )
-
     def _objective(self, z: np.ndarray, problem: PlanningProblem) -> float:
         cost = problem.require_cost()
         x, u = self.unpack(z, problem)
@@ -222,7 +177,7 @@ class DirectCollocationTranscription(Transcription):
         for k in range(self.options.n_steps - 1):
             g0 = cost.g(x[:, k], u[:, k], float(t[k]), params=params)
             g1 = cost.g(x[:, k + 1], u[:, k + 1], float(t[k + 1]), params=params)
-            total += 0.5 * self.options.dt * (float(g0) + float(g1))
+            total += 0.5 * self.options.dt * (g0 + g1)
 
         total += float(cost.h(x[:, -1], float(t[-1]), params=params))
         return float(total)

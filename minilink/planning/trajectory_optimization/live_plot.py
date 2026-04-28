@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import numpy as np
-
 
 @dataclass
 class LiveTrajectoryPlotCallback:
@@ -103,7 +101,7 @@ class LiveTrajectoryPlotCallback:
         if len(channels) == 1:
             axes = [axes]
         else:
-            axes = list(np.asarray(axes).reshape(-1))
+            axes = list(axes)
         fig.subplots_adjust(hspace=0.15)
 
         lines = []
@@ -134,11 +132,8 @@ class LiveTrajectoryPlotCallback:
         import matplotlib.pyplot as plt
 
         traj = iteration.trajectory
-        for line, ax, (kind, index, *_rest) in zip(
-            self.lines,
-            self.axes,
-            self._channels(),
-        ):
+        for line, ax, channel in zip(self.lines, self.axes, self._channels()):
+            kind, index = channel[:2]
             line.set_xdata(traj.t)
             line.set_ydata(traj.x[index, :] if kind == "x" else traj.u[index, :])
             ax.relim()

@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 
 import numpy as np
@@ -30,8 +31,18 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
 from minilink.planning.trajectory_optimization.jax_direct_collocation import (
     JaxDirectCollocationOptions,
 )
+from minilink.planning.trajectory_optimization.jax_multiple_shooting import (
+    JaxMultipleShootingOptions,
+)
+from minilink.planning.trajectory_optimization.jax_shooting import (
+    JaxShootingOptions,
+)
 from minilink.planning.trajectory_optimization.live_plot import (
     LiveTrajectoryPlotCallback,
+)
+from minilink.planning.trajectory_optimization.multiple_shooting import (
+    MultipleShootingOptions,
+    MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationIteration,
@@ -41,9 +52,6 @@ from minilink.planning.trajectory_optimization.planner import (
 from minilink.planning.trajectory_optimization.shooting import (
     ShootingOptions,
     ShootingTranscription,
-)
-from minilink.planning.trajectory_optimization.transcription import (
-    TranscriptionContext,
 )
 
 
@@ -133,6 +141,24 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(evaluated.has_signal("cost"))
         self.assertGreaterEqual(cost.total_cost(traj), 0.0)
 
+    def test_trajectory_save_load_roundtrip(self):
+        traj = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[1.0, 1.0]]),
+            signals={"dx": np.array([[1.0, 1.0]])},
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = f"{tmp}/traj.npz"
+            traj.save(path)
+            loaded = Trajectory.load(path)
+
+        np.testing.assert_allclose(loaded.t, traj.t)
+        np.testing.assert_allclose(loaded.x, traj.x)
+        np.testing.assert_allclose(loaded.u, traj.u)
+        np.testing.assert_allclose(loaded.signals["dx"], traj.signals["dx"])
+
     def test_mechanical_initial_guess_respects_boundary_state(self):
         sys = MechanicalSystem(dof=1)
         x_start = np.array([0.0, 0.5])
@@ -147,6 +173,24 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_jax_collocation_options_validate_derivative_request(self):
         with self.assertRaises(ValueError):
             JaxDirectCollocationOptions(
+                tf=1.0,
+                n_steps=3,
+                use_gradient=False,
+                use_hessian=True,
+            )
+
+    def test_jax_shooting_options_validate_derivative_request(self):
+        with self.assertRaises(ValueError):
+            JaxShootingOptions(
+                tf=1.0,
+                n_steps=3,
+                use_gradient=False,
+                use_hessian=True,
+            )
+
+    def test_jax_multiple_shooting_options_validate_derivative_request(self):
+        with self.assertRaises(ValueError):
+            JaxMultipleShootingOptions(
                 tf=1.0,
                 n_steps=3,
                 use_gradient=False,
@@ -219,7 +263,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         program = to.transcription.transcribe(
             problem,
             initial_guess=guess,
-            context=TranscriptionContext(to.options.compile_backend),
+            compile_backend=to.options.compile_backend,
         )
         self.assertEqual(program.n_z, 15)
         self.assertEqual(len(program.equalities), 3)
@@ -304,6 +348,28 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(traj.has_signal("dx"))
         self.assertTrue(traj.has_signal("cost"))
 
+    def test_multiple_shooting_solves_single_integrator(self):
+        problem = self.make_single_integrator_problem()
+        transcription = MultipleShootingTranscription(
+            MultipleShootingOptions(tf=1.0, n_steps=5)
+        )
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            transcription=transcription,
+            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+        )
+
+        traj = planner.compute_solution()
+
+        self.assertTrue(planner.last_optimization_result.success)
+        self.assertEqual(planner.last_program.metadata["compile_backend"], "numpy")
+        self.assertEqual(planner.last_program.n_z, (problem.sys.n + problem.sys.m) * 5)
+        np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
+        np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
+        self.assertTrue(traj.has_signal("dx"))
+        self.assertTrue(traj.has_signal("cost"))
+
     def test_shooting_packs_trajectory_guess_as_inputs_only(self):
         problem = self.make_single_integrator_problem()
         transcription = ShootingTranscription(ShootingOptions(tf=1.0, n_steps=5))
@@ -314,7 +380,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         program = transcription.transcribe(
             problem,
             initial_guess=guess,
-            context=TranscriptionContext("direct"),
+            compile_backend="direct",
         )
 
         self.assertEqual(program.n_z, 5)
@@ -382,14 +448,14 @@ class TestPlanningArchitecture(unittest.TestCase):
         class RecordingTranscription(DirectCollocationTranscription):
             def __init__(self, options):
                 super().__init__(options)
-                object.__setattr__(self, "guesses", [])
+                self.guesses = []
 
-            def transcribe(self, problem, *, initial_guess=None, context=None):
+            def transcribe(self, problem, *, initial_guess=None, compile_backend="numpy"):
                 self.guesses.append(initial_guess)
                 return super().transcribe(
                     problem,
                     initial_guess=initial_guess,
-                    context=context,
+                    compile_backend=compile_backend,
                 )
 
         problem = self.make_single_integrator_problem()

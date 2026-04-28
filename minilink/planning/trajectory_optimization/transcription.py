@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
+
+import numpy as np
 
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -20,15 +22,42 @@ from minilink.optimization.mathematical_program import (
 from minilink.planning.problems import PlanningProblem
 
 
-@dataclass(frozen=True)
-class TranscriptionContext:
-    """Execution context shared by a trajopt planner and transcription."""
+@dataclass
+class FixedGridOptions:
+    """Uniform fixed-time-grid options."""
 
-    compile_backend: str | None = "numpy"
+    tf: float
+    n_steps: int
 
     def __post_init__(self) -> None:
-        if self.compile_backend is not None:
-            object.__setattr__(self, "compile_backend", str(self.compile_backend))
+        tf = float(self.tf)
+        if not np.isfinite(tf) or tf <= 0.0:
+            raise ValueError("tf must be positive and finite")
+        if self.n_steps < 2:
+            raise ValueError("n_steps must be at least 2")
+        self.tf = tf
+        self.n_steps = int(self.n_steps)
+
+    @property
+    def t(self) -> np.ndarray:
+        return np.linspace(0.0, self.tf, self.n_steps)
+
+    @property
+    def dt(self) -> float:
+        return self.tf / (self.n_steps - 1)
+
+
+def dynamics_function(
+    problem: PlanningProblem,
+    compile_backend: str | None,
+) -> Callable:
+    """Return ``(x, u, t) -> f(x, u, t)`` for a transcription."""
+    params = problem.params.system
+    if params is not None or compile_backend is None or compile_backend == "direct":
+        return lambda x, u, t: problem.sys.f(x, u, t, params)
+
+    evaluator = problem.sys.compile(backend=compile_backend, verbose=False)
+    return lambda x, u, t: evaluator.f(x, u, t)
 
 
 class Transcription(ABC):
@@ -42,7 +71,7 @@ class Transcription(ABC):
         problem: PlanningProblem,
         *,
         initial_guess: Any | None = None,
-        context: TranscriptionContext | None = None,
+        compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
         """Convert ``problem`` into a finite-dimensional mathematical program."""
         ...
@@ -53,8 +82,7 @@ class Transcription(ABC):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        metadata: dict[str, Any] | None = None,
-        context: TranscriptionContext | None = None,
+        compile_backend: str | None = "numpy",
     ) -> Trajectory:
         """Convert an optimizer result back into a trajectory."""
         ...

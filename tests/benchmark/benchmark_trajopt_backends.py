@@ -2,7 +2,7 @@
 
 Run from the repository root::
 
-    python tests/benchmark/benchmark_trajopt_backends.py --case cartpole
+    python tests/benchmark/benchmark_trajopt_backends.py --case cartpole --starts both
 
 JAX variants are skipped when JAX is not installed.
 """
@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import argparse
 import time
+from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 
 from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import JaxQuadraticCost, QuadraticCost
+from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
@@ -25,12 +28,17 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
 )
+from minilink.planning.trajectory_optimization.multiple_shooting import (
+    MultipleShootingOptions,
+    MultipleShootingTranscription,
+)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
-from minilink.planning.trajectory_optimization.transcription import (
-    TranscriptionContext,
+from minilink.planning.trajectory_optimization.shooting import (
+    ShootingOptions,
+    ShootingTranscription,
 )
 
 try:
@@ -39,12 +47,24 @@ try:
         JaxDirectCollocationOptions,
         JaxDirectCollocationTranscription,
     )
+    from minilink.planning.trajectory_optimization.jax_multiple_shooting import (
+        JaxMultipleShootingOptions,
+        JaxMultipleShootingTranscription,
+    )
+    from minilink.planning.trajectory_optimization.jax_shooting import (
+        JaxShootingOptions,
+        JaxShootingTranscription,
+    )
 
     HAS_JAX_CODE = True
 except ImportError:
     JaxCartPole = None
     JaxDirectCollocationOptions = None
     JaxDirectCollocationTranscription = None
+    JaxMultipleShootingOptions = None
+    JaxMultipleShootingTranscription = None
+    JaxShootingOptions = None
+    JaxShootingTranscription = None
     HAS_JAX_CODE = False
 
 
@@ -53,8 +73,10 @@ parser.add_argument("--case", choices=["cartpole"], default="cartpole")
 parser.add_argument("--tf", type=float, default=5.0)
 parser.add_argument("--steps", type=int, default=20)
 parser.add_argument("--maxiter", type=int, default=200)
-parser.add_argument("--ftol", type=float, default=1e-6)
+parser.add_argument("--ftol", type=float, default=1e-2)
 parser.add_argument("--runs", type=int, default=1)
+parser.add_argument("--starts", choices=["cold", "warm", "both"], default="both")
+parser.add_argument("--warm-guess-path", default="")
 args = parser.parse_args()
 
 
@@ -101,32 +123,134 @@ def make_optimizer(variant: dict[str, object]) -> ScipyMinimizeOptimizer:
     )
 
 
+def make_warm_optimizer() -> ScipyMinimizeOptimizer:
+    return ScipyMinimizeOptimizer(
+        options={
+            "disp": False,
+            "maxiter": max(int(args.maxiter), 200),
+            "ftol": float(args.ftol),
+        }
+    )
+
+
+@lru_cache(maxsize=1)
+def warm_initial_trajectory() -> Trajectory:
+    if args.warm_guess_path:
+        path = Path(args.warm_guess_path)
+        if path.exists():
+            return Trajectory.load(path)
+
+    if jax_available():
+        configure_jax(enable_x64=True)
+        problem = make_cartpole_problem(JaxCartPole(), jax_cost=True)
+        transcription = JaxDirectCollocationTranscription(
+            JaxDirectCollocationOptions(tf=args.tf, n_steps=args.steps)
+        )
+        compile_backend = "jax"
+    else:
+        problem = make_cartpole_problem(CartPole(), jax_cost=False)
+        transcription = DirectCollocationTranscription(
+            DirectCollocationOptions(tf=args.tf, n_steps=args.steps)
+        )
+        compile_backend = "numpy"
+
+    planner = TrajectoryOptimizationPlanner(
+        problem,
+        transcription=transcription,
+        optimizer=make_warm_optimizer(),
+        options=TrajectoryOptimizationOptions(compile_backend=compile_backend),
+    )
+    traj = planner.compute_solution()
+    if args.warm_guess_path:
+        traj.save(args.warm_guess_path)
+    return traj
+
+
 def build_planner(variant: dict[str, object]):
-    if variant["backend"] == "numpy":
+    method = variant["method"]
+
+    if method == "shooting":
+        if variant["backend"] == "jax":
+            if not jax_available():
+                raise ModuleNotFoundError("JAX is not installed")
+
+            configure_jax(enable_x64=variant["x64"] == "yes")
+            return TrajectoryOptimizationPlanner(
+                make_cartpole_problem(JaxCartPole(), jax_cost=True),
+                transcription=JaxShootingTranscription(
+                    JaxShootingOptions(
+                        tf=args.tf,
+                        n_steps=args.steps,
+                        use_gradient=variant["gradient"] == "jax",
+                    )
+                ),
+                optimizer=make_optimizer(variant),
+                options=TrajectoryOptimizationOptions(compile_backend="jax"),
+            )
+
         return TrajectoryOptimizationPlanner(
             make_cartpole_problem(CartPole(), jax_cost=False),
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(tf=args.tf, n_steps=args.steps)
+            transcription=ShootingTranscription(
+                ShootingOptions(tf=args.tf, n_steps=args.steps)
             ),
             optimizer=make_optimizer(variant),
             options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
 
-    if not jax_available():
-        raise ModuleNotFoundError("JAX is not installed")
+    if method == "multiple-shooting":
+        if variant["backend"] == "jax":
+            if not jax_available():
+                raise ModuleNotFoundError("JAX is not installed")
 
-    configure_jax(enable_x64=variant["x64"] == "yes")
-    return TrajectoryOptimizationPlanner(
-        make_cartpole_problem(JaxCartPole(), jax_cost=True),
-        transcription=JaxDirectCollocationTranscription(
+            configure_jax(enable_x64=variant["x64"] == "yes")
+            return TrajectoryOptimizationPlanner(
+                make_cartpole_problem(JaxCartPole(), jax_cost=True),
+                transcription=JaxMultipleShootingTranscription(
+                    JaxMultipleShootingOptions(
+                        tf=args.tf,
+                        n_steps=args.steps,
+                        use_gradient=variant["gradient"] == "jax",
+                    )
+                ),
+                optimizer=make_optimizer(variant),
+                options=TrajectoryOptimizationOptions(compile_backend="jax"),
+            )
+
+        return TrajectoryOptimizationPlanner(
+            make_cartpole_problem(CartPole(), jax_cost=False),
+            transcription=MultipleShootingTranscription(
+                MultipleShootingOptions(tf=args.tf, n_steps=args.steps)
+            ),
+            optimizer=make_optimizer(variant),
+            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+        )
+
+    if variant["backend"] == "numpy":
+        transcription = DirectCollocationTranscription(
+            DirectCollocationOptions(tf=args.tf, n_steps=args.steps)
+        )
+        problem = make_cartpole_problem(CartPole(), jax_cost=False)
+        compile_backend = "numpy"
+    else:
+        if not jax_available():
+            raise ModuleNotFoundError("JAX is not installed")
+
+        configure_jax(enable_x64=variant["x64"] == "yes")
+        transcription = JaxDirectCollocationTranscription(
             JaxDirectCollocationOptions(
                 tf=args.tf,
                 n_steps=args.steps,
                 use_gradient=variant["gradient"] == "jax",
             )
-        ),
+        )
+        problem = make_cartpole_problem(JaxCartPole(), jax_cost=True)
+        compile_backend = "jax"
+
+    return TrajectoryOptimizationPlanner(
+        problem,
+        transcription=transcription,
         optimizer=make_optimizer(variant),
-        options=TrajectoryOptimizationOptions(compile_backend="jax"),
+        options=TrajectoryOptimizationOptions(compile_backend=compile_backend),
     )
 
 
@@ -165,19 +289,23 @@ def constraint_metrics(
 
 
 def run_once(variant: dict[str, object]) -> dict[str, object]:
-    t0 = time.perf_counter()
-    planner = build_planner(variant)
+    warm_guess = warm_initial_trajectory() if variant["start"] == "warm" else None
 
+    planner = build_planner(variant)
+    if warm_guess is None:
+        guess = default_initial_trajectory(
+            planner.problem,
+            planner.transcription.initial_guess_time_grid(planner.problem),
+        )
+    else:
+        guess = warm_guess
+
+    t0 = time.perf_counter()
     transcribe_t0 = time.perf_counter()
-    context = TranscriptionContext(compile_backend=planner.options.compile_backend)
-    guess = default_initial_trajectory(
-        planner.problem,
-        planner.transcription.initial_guess_time_grid(planner.problem),
-    )
     program = planner.transcription.transcribe(
         planner.problem,
         initial_guess=guess,
-        context=context,
+        compile_backend=planner.options.compile_backend,
     )
     transcribe_s = time.perf_counter() - transcribe_t0
 
@@ -217,7 +345,9 @@ def mean_int_or_none(values) -> int | None:
     return int(round(value))
 
 
-def summarize(variant: dict[str, object], runs: list[dict[str, object]]) -> dict[str, object]:
+def summarize(
+    variant: dict[str, object], runs: list[dict[str, object]]
+) -> dict[str, object]:
     last = runs[-1]
     return {
         **variant,
@@ -238,28 +368,60 @@ def summarize(variant: dict[str, object], runs: list[dict[str, object]]) -> dict
 variants = [
     {
         "name": "numpy-slsqp",
+        "method": "collocation",
         "backend": "numpy",
         "gradient": "finite-diff",
         "x64": "n/a",
-    }
+    },
+    {
+        "name": "numpy-shooting-slsqp",
+        "method": "shooting",
+        "backend": "numpy",
+        "gradient": "finite-diff",
+        "x64": "n/a",
+    },
+    {
+        "name": "numpy-multiple-slsqp",
+        "method": "multiple-shooting",
+        "backend": "numpy",
+        "gradient": "finite-diff",
+        "x64": "n/a",
+    },
 ]
 if jax_available():
     variants.extend(
         [
             {
                 "name": "jax-slsqp-grad-x64",
+                "method": "collocation",
+                "backend": "jax",
+                "gradient": "jax",
+                "x64": "yes",
+            },
+            {
+                "name": "jax-shooting-grad-x64",
+                "method": "shooting",
+                "backend": "jax",
+                "gradient": "jax",
+                "x64": "yes",
+            },
+            {
+                "name": "jax-multiple-grad-x64",
+                "method": "multiple-shooting",
                 "backend": "jax",
                 "gradient": "jax",
                 "x64": "yes",
             },
             {
                 "name": "jax-slsqp-grad-f32-strict",
+                "method": "collocation",
                 "backend": "jax",
                 "gradient": "jax",
                 "x64": "no",
             },
             {
                 "name": "jax-slsqp-grad-f32-relaxed",
+                "method": "collocation",
                 "backend": "jax",
                 "gradient": "jax",
                 "x64": "no",
@@ -267,6 +429,7 @@ if jax_available():
             },
             {
                 "name": "jax-slsqp-fd-x64",
+                "method": "collocation",
                 "backend": "jax",
                 "gradient": "finite-diff",
                 "x64": "yes",
@@ -274,9 +437,20 @@ if jax_available():
         ]
     )
 
+if args.starts == "cold":
+    variants = [{**variant, "start": "cold"} for variant in variants]
+elif args.starts == "warm":
+    variants = [{**variant, "start": "warm"} for variant in variants]
+else:
+    variants = [
+        {**variant, "start": start}
+        for variant in variants
+        for start in ("cold", "warm")
+    ]
+
 rows = []
 for variant in variants:
-    print(f"running {variant['name']}...", flush=True)
+    print(f"running {variant['name']} {variant['start']}...", flush=True)
     try:
         rows.append(summarize(variant, [run_once(variant) for _ in range(args.runs)]))
     except Exception as exc:
@@ -284,16 +458,19 @@ for variant in variants:
 
 print()
 name_width = max([21, *(len(str(row["name"])) for row in rows)])
-rule_width = name_width + 95
+method_width = max([11, *(len(str(row["method"])) for row in rows)])
+start_width = max([5, *(len(str(row["start"])) for row in rows)])
+rule_width = name_width + method_width + start_width + 97
 print("-" * rule_width)
 print(
     "trajectory optimization benchmark "
     f"case={args.case} tf={args.tf:g} steps={args.steps} "
-    f"maxiter={args.maxiter} runs={args.runs}"
+    f"maxiter={args.maxiter} starts={args.starts} runs={args.runs}"
 )
 print("-" * rule_width)
 print(
-    f"{'variant':<{name_width}} {'backend':<7} {'grad':<11} {'x64':<4} "
+    f"{'variant':<{name_width}} {'method':<{method_width}} "
+    f"{'start':<{start_width}} {'backend':<7} {'grad':<11} {'x64':<4} "
     f"{'ok':>3} {'total':>8} {'trans':>8} {'solve':>8} "
     f"{'nit':>5} {'nfev':>6} {'njev':>6} {'cost':>11} "
     f"{'eq_inf':>10} {'bound':>9}"
@@ -305,7 +482,8 @@ for row in rows:
     nfev = "n/a" if row["nfev"] is None else str(row["nfev"])
     njev = "n/a" if row["njev"] is None else str(row["njev"])
     print(
-        f"{row['name']:<{name_width}} {row['backend']:<7} {row['gradient']:<11} "
+        f"{row['name']:<{name_width}} {row['method']:<{method_width}} "
+        f"{row['start']:<{start_width}} {row['backend']:<7} {row['gradient']:<11} "
         f"{row['x64']:<4} {str(row['ok']):>3} {row['total']:8.3f} "
         f"{row['transcribe']:8.3f} {row['solve']:8.3f} "
         f"{nit:>5} {nfev:>6} {njev:>6} {cost} "
@@ -316,4 +494,4 @@ if not jax_available():
     print("JAX variants skipped because JAX is not installed.")
 for row in rows:
     if not row["ok"]:
-        print(f"{row['name']} failed: {row['message']}")
+        print(f"{row['name']} {row['start']} failed: {row['message']}")

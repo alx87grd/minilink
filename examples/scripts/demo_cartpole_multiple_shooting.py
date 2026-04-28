@@ -1,4 +1,4 @@
-"""Cart-pole swing-up with direct-collocation trajectory optimization."""
+"""Cart-pole swing-up with multiple shooting."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
+from minilink.planning.trajectory_optimization.multiple_shooting import (
+    MultipleShootingOptions,
+    MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
@@ -39,20 +39,18 @@ problem = PlanningProblem(
     cost=cost,
 )
 
-optimizer = ScipyMinimizeOptimizer(
-    options={
-        "disp": True,
-        "maxiter": 1000,
-        "ftol": 1e-2,
-    }
-)
-
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(tf=5.0, n_steps=50)
+    transcription=MultipleShootingTranscription(
+        MultipleShootingOptions(tf=5.0, n_steps=50)
     ),
-    optimizer=optimizer,
+    optimizer=ScipyMinimizeOptimizer(
+        options={
+            "disp": True,
+            "maxiter": 1000,
+            "ftol": 1e-2,
+        }
+    ),
     options=TrajectoryOptimizationOptions(compile_backend="numpy"),
 )
 

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
 
-from minilink.core.costs import CostFunction
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -20,7 +19,6 @@ from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
-    TranscriptionContext,
 )
 
 
@@ -36,7 +34,7 @@ class TrajectoryOptimizationIteration:
     min_ineq: float | None
 
 
-@dataclass(frozen=True)
+@dataclass
 class TrajectoryOptimizationOptions:
     """Generic trajectory-optimization workflow options."""
 
@@ -45,12 +43,6 @@ class TrajectoryOptimizationOptions:
     warm_start: bool = False
     record_history: bool = False
     callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
-
-    def __post_init__(self) -> None:
-        if self.compile_backend is not None:
-            object.__setattr__(self, "compile_backend", str(self.compile_backend))
-        object.__setattr__(self, "warm_start", bool(self.warm_start))
-        object.__setattr__(self, "record_history", bool(self.record_history))
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -79,32 +71,6 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimization_result: OptimizationResult | None = None
         self.iteration_history: list[TrajectoryOptimizationIteration] = []
 
-    @classmethod
-    def from_system(
-        cls,
-        sys: Any,
-        *,
-        x_start: np.ndarray,
-        x_goal: np.ndarray,
-        cost: CostFunction,
-        transcription: Transcription,
-        optimizer: Optimizer | None = None,
-        options: TrajectoryOptimizationOptions | None = None,
-    ) -> TrajectoryOptimizationPlanner:
-        """Convenience constructor building a :class:`PlanningProblem`."""
-        problem = PlanningProblem(
-            sys=sys,
-            x_start=x_start,
-            x_goal=x_goal,
-            cost=cost,
-        )
-        return cls(
-            problem,
-            transcription=transcription,
-            optimizer=optimizer,
-            options=options,
-        )
-
     def compute_solution(
         self,
         *,
@@ -112,24 +78,23 @@ class TrajectoryOptimizationPlanner(Planner):
         warm_start: bool | None = None,
     ) -> Trajectory:
         """Compute and store a trajectory-optimization solution."""
-        context = TranscriptionContext(compile_backend=self.options.compile_backend)
+        compile_backend = self.options.compile_backend
         guess = self._resolve_initial_guess(initial_guess, warm_start)
         program = self.transcription.transcribe(
             self.problem,
             initial_guess=guess,
-            context=context,
+            compile_backend=compile_backend,
         )
 
         self.iteration_history = []
         optimization_result = self.optimizer.solve(
             program,
-            callback=self._make_callback(program, context),
+            callback=self._make_callback(program, compile_backend),
         )
         trajectory = self.transcription.reconstruct_result(
             optimization_result,
             problem=self.problem,
-            metadata=program.metadata,
-            context=context,
+            compile_backend=compile_backend,
         )
 
         self.last_program = program
@@ -157,8 +122,8 @@ class TrajectoryOptimizationPlanner(Planner):
     def _make_callback(
         self,
         program: MathematicalProgram,
-        context: TranscriptionContext,
-    ) -> Callable[[Any], None] | None:
+        compile_backend: str | None,
+    ) -> Callable[[object], None] | None:
         if not self.options.record_history and self.options.callback is None:
             return None
 
@@ -170,7 +135,7 @@ class TrajectoryOptimizationPlanner(Planner):
             iteration = self._iteration_from_z(
                 program,
                 z_arr,
-                context,
+                compile_backend,
                 iteration_index,
             )
             if self.options.record_history:
@@ -185,7 +150,7 @@ class TrajectoryOptimizationPlanner(Planner):
         self,
         program: MathematicalProgram,
         z: np.ndarray,
-        context: TranscriptionContext,
+        compile_backend: str | None,
         iteration_index: int,
     ) -> TrajectoryOptimizationIteration:
         """Build one planning-aware optimizer iteration payload."""
@@ -193,8 +158,7 @@ class TrajectoryOptimizationPlanner(Planner):
         trajectory = self.transcription.reconstruct_result(
             OptimizationResult(z=z, success=False, cost=cost),
             problem=self.problem,
-            metadata=program.metadata,
-            context=context,
+            compile_backend=compile_backend,
         )
         max_eq, min_ineq = self._constraint_metrics(program, z)
         return TrajectoryOptimizationIteration(

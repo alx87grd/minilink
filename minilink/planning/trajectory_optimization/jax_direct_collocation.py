@@ -12,8 +12,7 @@ boundaries, and :class:`~minilink.core.sets.BoxSet` /
 variable bounds. Pair with :class:`~minilink.core.costs.JaxQuadraticCost` (not
 :class:`~minilink.core.costs.QuadraticCost`) for the usual quadratic cost.
 
-**TODO: User Architectural Review** — set coverage and the SciPy+JAX split are
-prototype choices pending approval. Configure process-wide JAX precision with
+Configure process-wide JAX precision with
 :func:`minilink.compile.jax_utils.configure_jax` before constructing JAX systems.
 """
 
@@ -35,12 +34,9 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
 )
-from minilink.planning.trajectory_optimization.transcription import (
-    TranscriptionContext,
-)
 
 
-@dataclass(frozen=True)
+@dataclass
 class JaxDirectCollocationOptions(DirectCollocationOptions):
     """
     Options for JAX-backed direct collocation.
@@ -61,13 +57,13 @@ class JaxDirectCollocationOptions(DirectCollocationOptions):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        object.__setattr__(self, "use_gradient", bool(self.use_gradient))
-        object.__setattr__(self, "use_hessian", bool(self.use_hessian))
+        self.use_gradient = bool(self.use_gradient)
+        self.use_hessian = bool(self.use_hessian)
         if self.use_hessian and not self.use_gradient:
             raise ValueError("use_hessian requires use_gradient")
 
 
-@dataclass(frozen=True)
+@dataclass
 class JaxDirectCollocationTranscription(DirectCollocationTranscription):
     """
     Direct-collocation transcription with JAX-derived first (and optional
@@ -92,9 +88,9 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
         problem: PlanningProblem,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
-        context: TranscriptionContext | None = None,
+        compile_backend: str | None = "jax",
     ) -> MathematicalProgram:
-        """Convert ``problem`` into a differentiable mathematical program."""
+        """Build the JAX-differentiable collocation program."""
         import jax
         import jax.numpy as jnp
 
@@ -109,7 +105,7 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
             cost,
             problem.params.cost,
             initial_guess=initial_guess,
-            context=TranscriptionContext("jax") if context is None else context,
+            compile_backend=compile_backend,
         )
 
     def _transcribe_core(
@@ -121,13 +117,13 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
         cost_params,
         *,
         initial_guess: np.ndarray | Trajectory | None,
-        context: TranscriptionContext,
+        compile_backend: str | None,
     ) -> MathematicalProgram:
         t = jnp.asarray(self.options.t)
         dt = jnp.asarray(self.options.dt)
         n = int(problem.sys.n)
         n_steps = int(self.options.n_steps)
-        f = self._make_jax_dynamics(problem, context.compile_backend)
+        f = self._make_jax_dynamics(problem, compile_backend)
 
         def unpack_jax(z):
             x = z[: n * n_steps].reshape(n, n_steps)
@@ -182,7 +178,6 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
                     else None
                 ),
                 name="jax_direct_collocation_dynamics",
-                metadata={"scheme": "trapezoidal", "backend": "jax"},
             )
         ]
         self._add_jax_boundary_constraints(
@@ -201,15 +196,9 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
             inequalities=(),
             metadata={
                 "transcription": "jax_direct_collocation",
-                "integration_scheme": "trapezoidal",
-                "tf": self.options.tf,
-                "dt": self.options.dt,
-                "n_steps": self.options.n_steps,
-                "state_dim": int(problem.sys.n),
-                "input_dim": int(problem.sys.m),
                 "use_gradient": self.options.use_gradient,
                 "use_hessian": self.options.use_hessian,
-                "compile_backend": context.compile_backend,
+                "compile_backend": compile_backend,
             },
             grad=(
                 self._to_numpy_vector(objective_grad_jit, jnp)
@@ -287,7 +276,6 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
                         else None
                     ),
                     name=name,
-                    metadata={"backend": "jax"},
                 )
             )
 

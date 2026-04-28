@@ -184,6 +184,27 @@ class Trajectory:
             signals={name: values.copy() for name, values in self.signals.items()},
         )
 
+    def save(self, path) -> None:
+        """Save the sampled trajectory to an ``.npz`` file."""
+        signal_names = list(self.signals)
+        arrays = {
+            "t": self.t,
+            "x": self.x,
+            "u": self.u,
+            "signal_names": np.asarray(signal_names),
+        }
+        for i, name in enumerate(signal_names):
+            arrays[f"signal_{i}"] = self.signals[name]
+        np.savez(path, **arrays)
+
+    @classmethod
+    def load(cls, path) -> Trajectory:
+        """Load a trajectory saved with :meth:`save`."""
+        with np.load(path, allow_pickle=False) as data:
+            names = [str(name) for name in data["signal_names"]]
+            signals = {name: data[f"signal_{i}"] for i, name in enumerate(names)}
+            return cls(t=data["t"], x=data["x"], u=data["u"], signals=signals)
+
     def resample(
         self,
         *,

@@ -27,7 +27,7 @@ The table below is the on-disk layout and TRL. **Structural rules**, **pluggable
 | `compile/evaluator_timing` | **TRL 1** | Optional compiled-`f` timing (`benchmark_f_speeds`, `print_f_speed_table`); not part of the core contract |
 | `simulation/integration_timing` | **TRL 1** | Optional simulator timing sweeps, `STANDARD_SIM_CASES`, and helpers (`run_timed`, …) |
 | `simulation/scenarios/` | **TRL 1** | Shared **stress** scenarios for timing matrices, not user plants |
-| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization uses a generic `TrajectoryOptimizationPlanner` plus method-specific transcriptions; direct collocation has a NumPy+SciPy path and an optional **JAX-derivative** path (`trajectory_optimization/jax_direct_collocation.py`, still narrower than the NumPy transcription—see §3.5) |
+| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization uses a generic `TrajectoryOptimizationPlanner` plus method-specific transcriptions, with NumPy/SciPy and narrower JAX-derivative prototypes for direct collocation and shooting methods. |
 | `optimization/` | **TRL 1** | Thin finite-dimensional mathematical-program contracts (`MathematicalProgram` with optional objective `grad` / `hess` and per-constraint Jacobians) shared by planning and future control workflows |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
@@ -90,9 +90,11 @@ minilink/planning/
   search/
   trajectory_optimization/
     direct_collocation.py
-    fixed_grid.py
     jax_direct_collocation.py
+    jax_multiple_shooting.py
+    jax_shooting.py
     live_plot.py
+    multiple_shooting.py
     planner.py
     shooting.py
     transcription.py
@@ -358,6 +360,7 @@ implementation: subclasses implement `H(q, params=None)`, `C(q, dq, params=None)
 - array convention: sampled signals use shape `(dim, N)`
 - optional extra sampled channels live in `signals`
 - helper methods such as interpolation and resampling stay generic to sampled signals
+- simple `.npz` save/load helpers preserve `t`, `x`, `u`, and sampled signals
 
 Simulation, planning, tracking control, and animation should all share this object where a state-input trajectory is the right abstraction.
 
@@ -400,6 +403,9 @@ It separates the continuous mathematical problem from numerical solver choices:
 - **Single shooting** — `trajectory_optimization.shooting` optimizes only input
   knots and reconstructs states with the shared fixed-step RK4 forced-rollout
   evaluator primitive.
+- **Multiple shooting** — `trajectory_optimization.multiple_shooting` uses the
+  same state-input decision vector as collocation, but enforces neighboring
+  state knots with RK4 shooting defects.
 - **JAX direct collocation (prototype)** —
   `trajectory_optimization.jax_direct_collocation` also targets SciPy, but
   uses JAX-``jit``/``jacfwd``/optional Hessian to supply objective and constraint
@@ -412,6 +418,16 @@ It separates the continuous mathematical problem from numerical solver choices:
   general set margins remain on the NumPy transcription until reviewed. JAX
   precision is process-wide compile configuration via
   :func:`minilink.compile.jax_utils.configure_jax`, not a planning option.
+- **JAX single shooting (prototype)** —
+  `trajectory_optimization.jax_shooting` keeps the same input-knot decision
+  vector as single shooting, rolls states forward through JAX-traceable RK4,
+  and supplies objective gradients plus terminal/path constraint Jacobians to
+  SciPy. It follows the same JAX cost and set limitations as the JAX
+  collocation prototype.
+- **JAX multiple shooting (prototype)** —
+  `trajectory_optimization.jax_multiple_shooting` differentiates the RK4
+  shooting defects and objective with JAX while keeping the same public planner
+  and optimizer contract.
 
 This first pass is intentionally deterministic and high-level. Stochastic
 planning, chance constraints, belief states, and broader RRT/DP/trajopt coverage

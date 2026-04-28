@@ -1,4 +1,4 @@
-"""Cart-pole swing-up with JAX-backed direct collocation."""
+"""Cart-pole stabilization with JAX-backed single shooting."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from minilink.core.costs import JaxQuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.jax_direct_collocation import (
-    JaxDirectCollocationOptions,
-    JaxDirectCollocationTranscription,
+from minilink.planning.trajectory_optimization.jax_shooting import (
+    JaxShootingOptions,
+    JaxShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
@@ -21,17 +21,17 @@ from minilink.planning.trajectory_optimization.planner import (
 configure_jax(enable_x64=True)
 
 sys = JaxCartPole()
-sys.inputs["u"].lower_bound[0] = -10.0
-sys.inputs["u"].upper_bound[0] = 10.0
+sys.inputs["u"].lower_bound[0] = -20.0
+sys.inputs["u"].upper_bound[0] = 20.0
 
-x_start = np.array([-2.0, 1.0, 0.0, 0.0])
-x_goal = np.array([0.0, np.pi, 0.0, 0.0])
+x_start = np.array([0.0, 0.2, 0.0, 0.0])
+x_goal = np.zeros(sys.n)
 
 cost = JaxQuadraticCost.from_system(
     sys,
-    Q=np.diag([1.0, 1.0, 0.0, 0.0]),
+    Q=np.diag([1.0, 20.0, 0.1, 0.1]),
     R=np.diag([0.01]),
-    S=np.zeros((sys.n, sys.n)),
+    S=np.diag([20.0, 80.0, 1.0, 1.0]),
     xbar=x_goal,
     ubar=np.zeros(sys.m),
 )
@@ -42,24 +42,22 @@ problem = PlanningProblem(
     cost=cost,
 )
 
-optimizer = ScipyMinimizeOptimizer(
-    options={
-        "disp": True,
-        "maxiter": 500,
-        "ftol": 1e-2,
-    }
-)
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=JaxDirectCollocationTranscription(
-        JaxDirectCollocationOptions(
-            tf=4.0,
-            n_steps=50,
+    transcription=JaxShootingTranscription(
+        JaxShootingOptions(
+            tf=2.0,
+            n_steps=31,
             use_gradient=True,
-            use_hessian=False,
         )
     ),
-    optimizer=optimizer,
+    optimizer=ScipyMinimizeOptimizer(
+        options={
+            "disp": True,
+            "maxiter": 200,
+            "ftol": 1e-7,
+        }
+    ),
     options=TrajectoryOptimizationOptions(compile_backend="jax"),
 )
 
@@ -68,8 +66,7 @@ result = planner.last_optimization_result
 
 print(f"success: {result.success}")
 print(f"message: {result.message}")
-if result.cost is not None:
-    print(f"cost: {result.cost:.6g}")
+print(f"cost: {result.cost:.6g}")
 
 planner.plot_solution(plot="xu")
 planner.problem.sys.animate(traj)
