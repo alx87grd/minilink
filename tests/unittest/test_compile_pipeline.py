@@ -25,9 +25,8 @@ from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem, System
 
-# ── Helper: reusable test diagrams ───────────────────────────────────
 
-
+# Helper: reusable test diagrams
 class _JAXFriendlyPropController(StaticSystem):
     """P controller using NumPy or JAX ops so ``compile(..., backend='jax')`` traces."""
 
@@ -151,9 +150,7 @@ def _build_feedthrough_loop():
     return diag
 
 
-# ── Tests ────────────────────────────────────────────────────────────
-
-
+# Tests
 class TestCheckAlgebraicLoops(unittest.TestCase):
     """Test standalone algebraic loop detection."""
 
@@ -370,9 +367,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         x = np.array([0.2])
         u = np.array([0.7])
         t = 0.05
-        np.testing.assert_allclose(
-            fn(x, u, t), self.evaluator.f(x, u, t), atol=1e-10
-        )
+        np.testing.assert_allclose(fn(x, u, t), self.evaluator.f(x, u, t), atol=1e-10)
 
     def test_as_scipy_rhs(self):
         x = np.array([0.4])
@@ -390,8 +385,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         self.assertIsNotNone(plan_bound.port_ops[0].bound_params)
 
 
-# ── JAX tests (skipped if JAX not installed) ─────────────────────────
-
+# JAX tests (skipped if JAX not installed)
 try:
     import jax.numpy as jnp
 
@@ -454,7 +448,9 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         out1 = ev.outputs(x_j, u_j, t)
         out2 = ev.get_outputs_jit()(x_j, u_j, t)
         for k in out1:
-            np.testing.assert_allclose(np.asarray(out1[k]), np.asarray(out2[k]), atol=1e-6)
+            np.testing.assert_allclose(
+                np.asarray(out1[k]), np.asarray(out2[k]), atol=1e-6
+            )
 
     def test_get_internal_signals_jit_matches_compute_internal_signals(self):
         diag = _build_small_closed_loop_jax()

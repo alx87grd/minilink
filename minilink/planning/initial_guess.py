@@ -1,9 +1,5 @@
 """Initial trajectory guesses for planning problems."""
 
-from __future__ import annotations
-
-from typing import Any
-
 import numpy as np
 
 from minilink.core.sets import SingletonSet
@@ -11,14 +7,14 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import PlanningProblem
 
 
-def boundary_point(set_: Any | None) -> np.ndarray | None:
+def boundary_point(set_: object | None) -> np.ndarray | None:
     """Return the point for singleton boundary sets, else ``None``."""
     if isinstance(set_, SingletonSet):
         return set_.point.copy()
     return None
 
 
-def nominal_input(sys: Any, n_samples: int) -> np.ndarray:
+def nominal_input(sys: object, n_samples: int) -> np.ndarray:
     """Return the system nominal input repeated on a time grid."""
     if hasattr(sys, "get_u_from_input_ports"):
         u0 = sys.get_u_from_input_ports()

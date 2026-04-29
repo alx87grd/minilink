@@ -112,14 +112,17 @@ class MatplotlibCanvas:
             if self.is_3d:
                 z = world_pts[:, 2]
                 (obj,) = self.ax.plot(
-                    x, y, z,
+                    x,
+                    y,
+                    z,
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
                 )
             else:
                 (obj,) = self.ax.plot(
-                    x, y,
+                    x,
+                    y,
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
@@ -135,14 +138,16 @@ class MatplotlibCanvas:
             arc_n = local_pts.shape[0] - 3
             if arc_n >= 2:
                 (arc_obj,) = self.ax.plot(
-                    world_pts[:arc_n, 0], world_pts[:arc_n, 1],
+                    world_pts[:arc_n, 0],
+                    world_pts[:arc_n, 1],
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
                 )
                 self.drawn_objects.append(arc_obj)
                 (head_obj,) = self.ax.plot(
-                    world_pts[arc_n:, 0], world_pts[arc_n:, 1],
+                    world_pts[arc_n:, 0],
+                    world_pts[arc_n:, 1],
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle="-",
@@ -281,9 +286,7 @@ class MatplotlibCanvas:
                 (5, 7),
                 (6, 7),
             )
-            corners_h = np.hstack(
-                (np.array(corners), np.ones((8, 1)))
-            )
+            corners_h = np.hstack((np.array(corners), np.ones((8, 1))))
             world_c = (transform_matrix @ corners_h.T).T[:, :3]
             for i, j in edges:
                 p0, p1 = world_c[i], world_c[j]
@@ -463,9 +466,7 @@ class MatplotlibRenderer(AnimationRenderer):
           loop can drive playback without ``FuncAnimation`` being garbage
           collected.
         """
-        fig, ani = self._build_animation(
-            primitives, frames, schedule, is_3d=is_3d
-        )
+        fig, ani = self._build_animation(primitives, frames, schedule, is_3d=is_3d)
         self.fig = fig
         self.ax = fig.axes[0] if fig.axes else None
         self.canvas = None

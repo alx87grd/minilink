@@ -118,8 +118,8 @@ class TestSimulationSpeedBenchmark(unittest.TestCase):
 
     def test_old_timing_modules_are_not_imported_by_python_sources(self):
         root = Path(__file__).resolve().parents[2]
-        old_compile = "evaluator_" "timing"
-        old_simulation = "integration_" "timing"
+        old_compile = "_".join(("evaluator", "timing"))
+        old_simulation = "_".join(("integration", "timing"))
         offenders = []
         for path in root.rglob("*.py"):
             if "__pycache__" in path.parts:

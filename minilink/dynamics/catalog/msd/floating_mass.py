@@ -42,8 +42,7 @@ class FloatingMass1D(DynamicSystem):
     def h(self, x, u, t=0, params=None):
         return np.array([x[0]])
 
-    # -- Graphics ----------------------------------------------------------
-
+    # Graphics
     def get_kinematic_geometry(self):
         from minilink.graphical.primitives import Arrow, Circle
 

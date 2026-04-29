@@ -32,8 +32,8 @@ def inertia_cylinder(mass, radius, length, frame, axis="z"):
 
 def inertia_sphere(mass, radius, frame):
     """Solid sphere about its center."""
-    I = sp.Rational(2, 5) * mass * radius**2
-    return inertia_tensor(frame, I, I, I)
+    inertia_value = sp.Rational(2, 5) * mass * radius**2
+    return inertia_tensor(frame, inertia_value, inertia_value, inertia_value)
 
 
 def inertia_box(mass, lx, ly, lz, frame):

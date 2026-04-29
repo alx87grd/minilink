@@ -21,7 +21,9 @@ def plot_graphviz(graphe, show_inline=None, show_pdf=None, filename=None):
     Pure-notebook use therefore leaves no ``.gv`` / ``.pdf`` litter behind.
     """
     if graphe is None:
-        print("No graph to display (graphviz Python package unavailable or graph build failed).")
+        print(
+            "No graph to display (graphviz Python package unavailable or graph build failed)."
+        )
         return
 
     from minilink.graphical.environment import is_inline_capable

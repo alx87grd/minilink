@@ -5,7 +5,6 @@ from minilink.compile.jax_utils import array_module
 from minilink.core.system import System
 
 
-######################################################################
 class Source(System):
     def __init__(self, p):
 
@@ -18,16 +17,10 @@ class Source(System):
         self.outputs = {}
         self.add_output_port(self.p, "y", function=self.h)
 
-    ###################################################################
     def h(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        return params["value"]
 
-        if params is None:
-            params = self.params
-
-        y = params["value"]
-        return y
-
-    ###################################################################
     def show_signal(self, t0=None, tf=None, n_pts=1000, ax=None):
         """
         Plot the source output signal over a time range.
@@ -81,11 +74,10 @@ class Source(System):
                 dpi=DPI_FIGURE,
                 frameon=True,
             )
-            if fig.canvas and hasattr(fig.canvas, "manager") and fig.canvas.manager:
-                try:
-                    fig.canvas.manager.set_window_title("Signal: " + self.name)
-                except Exception:
-                    pass
+            manager = getattr(fig.canvas, "manager", None)
+            set_window_title = getattr(manager, "set_window_title", None)
+            if callable(set_window_title):
+                set_window_title("Signal: " + self.name)
         else:
             fig = ax.figure
 
@@ -104,7 +96,6 @@ class Source(System):
         return fig, ax
 
 
-######################################################################
 class Step(Source):
     def __init__(
         self, initial_value=np.zeros(1), final_value=np.zeros(1), step_time=1.0
@@ -120,11 +111,8 @@ class Step(Source):
             "step_time": step_time,
         }
 
-    ###################################################################
     def h(self, x, u, t=0, params=None):
-
-        if params is None:
-            params = self.params
+        params = self.params if params is None else params
 
         xp = array_module(t)
         return xp.where(
@@ -134,7 +122,6 @@ class Step(Source):
         )
 
 
-######################################################################
 class WhiteNoise(Source):
     def __init__(self, p=1):
 
@@ -153,7 +140,6 @@ class WhiteNoise(Source):
         # Keep source ready to use without an explicit refresh() call.
         self.refresh()
 
-    ###################################################################
     def refresh(self):
         t0 = float(self.params["t0"])
         tf = float(self.params["tf"])
@@ -190,9 +176,7 @@ class WhiteNoise(Source):
             for i in range(self.p)
         ]
 
-    ###################################################################
     def h(self, x, u, t=0, params=None):
-
         if params is None:
             params = self.params
         else:
@@ -203,8 +187,6 @@ class WhiteNoise(Source):
         y = np.array([interp(float(t)) for interp in self._interpolators])
 
         return y
-
-    ######################################################################
 
 
 if __name__ == "__main__":

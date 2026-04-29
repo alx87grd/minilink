@@ -6,10 +6,7 @@ every env-sensitive site (animation HTML default, figure blocking, meshcat
 prompt, stacked plot height) reads from the same source of truth.
 """
 
-from __future__ import annotations
-
 import sys
-from typing import Literal
 
 __all__ = [
     "EnvName",
@@ -21,12 +18,12 @@ __all__ = [
     "override_env",
 ]
 
-EnvName = Literal["script", "ipython", "jupyter", "colab"]
+EnvName = str
 
-_CACHE: EnvName | None = None
+_CACHE = None
 
 
-def detect_env() -> EnvName:
+def detect_env():
     """
     Return one of ``"script"``, ``"ipython"``, ``"jupyter"``, ``"colab"``.
 
@@ -116,7 +113,7 @@ def allow_tall_stacked_figures() -> bool:
     return detect_env() in ("jupyter", "colab")
 
 
-def override_env(name: EnvName | None) -> None:
+def override_env(name) -> None:
     """
     Test/CI hook to force a specific env.
 

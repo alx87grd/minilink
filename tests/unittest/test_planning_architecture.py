@@ -450,7 +450,9 @@ class TestPlanningArchitecture(unittest.TestCase):
                 super().__init__(options)
                 self.guesses = []
 
-            def transcribe(self, problem, *, initial_guess=None, compile_backend="numpy"):
+            def transcribe(
+                self, problem, *, initial_guess=None, compile_backend="numpy"
+            ):
                 self.guesses.append(initial_guess)
                 return super().transcribe(
                     problem,

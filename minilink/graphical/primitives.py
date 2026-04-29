@@ -234,20 +234,24 @@ def _arrow_local_pts(head_ratio=0.15, origin="base"):
     """Unit-length arrow polyline (5 pts) along +X in the local frame."""
     d = head_ratio
     if origin == "tip":
-        return np.array([
-            [-1.0,  0.0, 0.0],
-            [ 0.0,  0.0, 0.0],
-            [ -d,    d,  0.0],
-            [ 0.0,  0.0, 0.0],
-            [ -d,   -d,  0.0],
-        ])
-    return np.array([
-        [0.0,    0.0, 0.0],
-        [1.0,    0.0, 0.0],
-        [1.0-d,   d,  0.0],
-        [1.0,    0.0, 0.0],
-        [1.0-d,  -d,  0.0],
-    ])
+        return np.array(
+            [
+                [-1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+                [-d, d, 0.0],
+                [0.0, 0.0, 0.0],
+                [-d, -d, 0.0],
+            ]
+        )
+    return np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0 - d, d, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0 - d, -d, 0.0],
+        ]
+    )
 
 
 class TorqueArrow(GraphicPrimitive):
@@ -310,33 +314,37 @@ class TorqueArrow(GraphicPrimitive):
 
         n_pts = max(3, int(abs(sweep) / (2 * np.pi) * self.n_arc_pts))
         angles = np.linspace(0, sweep, n_pts)
-        arc = np.column_stack([
-            r * np.cos(angles),
-            r * np.sin(angles),
-            np.zeros(n_pts),
-        ])
+        arc = np.column_stack(
+            [
+                r * np.cos(angles),
+                r * np.sin(angles),
+                np.zeros(n_pts),
+            ]
+        )
 
         tip_c = np.cos(sweep)
         tip_s = np.sin(sweep)
         tip = np.array([r * tip_c, r * tip_s, 0.0])
 
         if sweep > 0:
-            barb1 = tip + np.array([-d/2*tip_c + d/2*tip_s,
-                                    -d/2*tip_s - d/2*tip_c, 0.0])
-            barb2 = tip + np.array([ d/2*tip_c + d/2*tip_s,
-                                     d/2*tip_s - d/2*tip_c, 0.0])
+            barb1 = tip + np.array(
+                [-d / 2 * tip_c + d / 2 * tip_s, -d / 2 * tip_s - d / 2 * tip_c, 0.0]
+            )
+            barb2 = tip + np.array(
+                [d / 2 * tip_c + d / 2 * tip_s, d / 2 * tip_s - d / 2 * tip_c, 0.0]
+            )
         else:
-            barb1 = tip + np.array([-d/2*tip_c - d/2*tip_s,
-                                    -d/2*tip_s + d/2*tip_c, 0.0])
-            barb2 = tip + np.array([ d/2*tip_c - d/2*tip_s,
-                                     d/2*tip_s + d/2*tip_c, 0.0])
+            barb1 = tip + np.array(
+                [-d / 2 * tip_c - d / 2 * tip_s, -d / 2 * tip_s + d / 2 * tip_c, 0.0]
+            )
+            barb2 = tip + np.array(
+                [d / 2 * tip_c - d / 2 * tip_s, d / 2 * tip_s + d / 2 * tip_c, 0.0]
+            )
 
         return np.vstack([arc, np.array([barb1, tip, barb2])])
 
 
-######################################################################
 # Transformation Matrix Helpers
-######################################################################
 
 
 def translation_matrix(dx=0.0, dy=0.0, dz=0.0):

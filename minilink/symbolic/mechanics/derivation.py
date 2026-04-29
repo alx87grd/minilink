@@ -64,8 +64,7 @@ def _attach_fk(result, mechanical_model, simplify=True):
             active = [
                 i
                 for i in range(fk_full.rows)
-                if fk_full[i] != 0
-                or any(fk_full[i].diff(qi) != 0 for qi in q)
+                if fk_full[i] != 0 or any(fk_full[i].diff(qi) != 0 for qi in q)
             ]
             fk = sp.Matrix([fk_full[r] for r in active]) if active else fk_full
             result.fk = fk

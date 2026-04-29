@@ -36,9 +36,7 @@ if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
 
-# ── Public API ──────────────────���────────────────────────────────────
-
-
+# Public API
 def compile(system, backend="numpy", verbose=False):
     """Compile a System into a :class:`DynamicsEvaluator`.
 
@@ -131,24 +129,27 @@ def compile_diagram(
     """
     t_total = time.perf_counter() if verbose else None
 
-    # --- Step 1: Algebraic loop detection --------------------------------
+    # Step 1: Algebraic loop detection
     if verbose:
         t0 = time.perf_counter()
-        print("[compile] Step 1: Checking for algebraic loops...", end="",
-              flush=True)
+        print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
 
     port_execution_order = check_algebraic_loops(diagram)
 
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # --- Step 2: Build execution plan ------------------------------------
+    # Step 2: Build execution plan
     if verbose:
         t0 = time.perf_counter()
         n_ports = len(port_execution_order)
         n_states = sum(1 for s in diagram.subsystems.values() if s.n > 0)
-        print(f"[compile] Step 2: Building execution plan "
-              f"({n_ports} ports, {n_states} states)...", end="", flush=True)
+        print(
+            f"[compile] Step 2: Building execution plan "
+            f"({n_ports} ports, {n_states} states)...",
+            end="",
+            flush=True,
+        )
 
     plan = _build_execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
@@ -157,7 +158,7 @@ def compile_diagram(
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # --- Create evaluator (steps 0, 3, 4 handled inside for JAX) ---------
+    # Create evaluator (steps 0, 3, 4 handled inside for JAX)
     key = backend.strip().lower()
     if key == "numpy":
         from minilink.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
@@ -225,7 +226,7 @@ def _build_execution_plan_from_order(
     split out so that :func:`compile_diagram` can time each step
     individually.
     """
-    # ── 1. Map all output ports to slices in the flat signal buffer ───
+    # 1. Map all output ports to slices in the flat signal buffer
     output_slices: dict[tuple[str, str], slice] = {}
     current_idx = 0
     for sys_id, sys in diagram.subsystems.items():
@@ -235,7 +236,7 @@ def _build_execution_plan_from_order(
             current_idx += dim
     signal_dim = current_idx
 
-    # ── 2. Build PortOperation list (output ports, topological order) ─
+    # 2. Build PortOperation list (output ports, topological order)
     port_ops: list[PortOperation] = []
     for sys_id, port_id in port_execution_order:
         sys = diagram.subsystems[sys_id]
@@ -248,9 +249,7 @@ def _build_execution_plan_from_order(
         out_slice = output_slices[(sys_id, port_id)]
         local_x_slice = _state_slice(diagram, sys_id)
 
-        bound = (
-            copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
-        )
+        bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
 
         port_ops.append(
             PortOperation(
@@ -264,7 +263,7 @@ def _build_execution_plan_from_order(
             )
         )
 
-    # ── 3. Build StateOperation list (subsystems with state) ─────────
+    # 3. Build StateOperation list (subsystems with state)
     state_ops: list[StateOperation] = []
     for sys_id, sys in diagram.subsystems.items():
         if sys.n > 0:
@@ -272,9 +271,7 @@ def _build_execution_plan_from_order(
                 diagram, sys_id, output_slices, dependencies="all"
             )
             local_x_slice = _state_slice(diagram, sys_id)
-            bound = (
-                copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
-            )
+            bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
             state_ops.append(
                 StateOperation(
                     f_func=sys.f,
@@ -403,7 +400,7 @@ def check_algebraic_loops(
         # optimized sequence where every signal is calculated before it's needed.
         order.append(node)
 
-    # --- STARTING POINT: EXPLORE ALL OUTPUT PORTS ---
+    # STARTING POINT: EXPLORE ALL OUTPUT PORTS
     # Initiate the recursive depth-first search from every subsystem output port.
     for sys_id, sys in diagram.subsystems.items():
         for port_id in sys.outputs:
@@ -412,9 +409,7 @@ def check_algebraic_loops(
     return order
 
 
-# ── Private helpers ──────────────────────────────────────────────────
-
-
+# Private helpers
 def _build_gather_sources(
     diagram: DiagramSystem,
     sys_id: str,

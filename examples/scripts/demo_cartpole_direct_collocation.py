@@ -1,7 +1,5 @@
 """Cart-pole swing-up with direct-collocation trajectory optimization."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.core.costs import QuadraticCost

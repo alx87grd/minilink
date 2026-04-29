@@ -1,7 +1,5 @@
 """Engine-heavy synthetic systems for benchmark workloads."""
 
-from __future__ import annotations
-
 import numpy as np
 
 

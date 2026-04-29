@@ -1,7 +1,3 @@
-from __future__ import annotations
-
-from typing import Literal
-
 import matplotlib
 import matplotlib.pyplot as plt
 
@@ -18,29 +14,10 @@ from minilink.graphical.matplotlib_style import (
     trajectory_stack_figsize,
 )
 
-###############################################################################
 #  Note: modify matplotlib settings here to fit your environment
-###############################################################################
 
 # Use interactive backend
-try:
-    # Default usage for interactive mode
-    # matplotlib.use("Qt5Agg")
-    plt.ion()  # Set interactive mode
-
-except Exception:
-    try:
-        # For MacOSX
-        # matplotlib.use("MacOSX")
-        plt.ion()
-
-    except Exception:
-        print("Warning: Could not load validated backend mode for matplotlib")
-        print(
-            "Matplotlib list of interactive backends:",
-            matplotlib.rcsetup.interactive_bk,
-        )
-        plt.ion()  # Set interactive mode
+plt.ion()
 
 
 # Default figure settings (shared with :mod:`minilink.graphical.matplotlib_style`)
@@ -60,15 +37,11 @@ print("Matplotlib interactive:", matplotlib.is_interactive())
 # # print('Matplotlib list of interactive backends:', matplotlib.rcsetup.interactive_bk)
 
 
-TrajectoryPlotMode = Literal["x", "u", "xu"]
-
-
-############################################################
 def plot_trajectory(
     sys,
     traj,
     *,
-    plot: TrajectoryPlotMode = "xu",
+    plot="xu",
 ):
     """
     Plot state and/or input time series in a shared-time column of subplots.
@@ -111,9 +84,7 @@ def plot_trajectory(
     want_u = plot in ("u", "xu")
     n_plots = (n if want_x else 0) + (m if want_u else 0)
     if n_plots == 0:
-        raise ValueError(
-            f"Nothing to plot for plot={plot!r} with n={n}, m={m}."
-        )
+        raise ValueError(f"Nothing to plot for plot={plot!r} with n={n}, m={m}.")
 
     # Create the figure (tall stack in notebook/Colab; capped height for pop-up windows)
     fig, ax = plt.subplots(
@@ -191,7 +162,6 @@ def plot_trajectory(
     return fig, ax
 
 
-############################################################
 def plot_signals(sys, traj, signals):
     """
     Plots specifically requested internal or external signals on a dynamic number of subplots.

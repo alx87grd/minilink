@@ -7,8 +7,6 @@ feedback policy packaged as a :class:`~minilink.core.system.StaticSystem`
 (state in, control out).
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import numpy as np

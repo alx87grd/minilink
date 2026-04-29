@@ -64,7 +64,9 @@ def benchmark_f_evaluators(
             native_loop_s = row.loop_s
             rows.append(row)
             continue
-        rows.append(_benchmark_compiled(system, variant, x, u, t, n_calls, native_loop_s))
+        rows.append(
+            _benchmark_compiled(system, variant, x, u, t, n_calls, native_loop_s)
+        )
 
     return FEvaluatorBenchmarkResult(
         system_name=str(getattr(system, "name", type(system).__name__)),
@@ -94,10 +96,7 @@ def print_f_benchmark(result: FEvaluatorBenchmarkResult) -> None:
     print("-" * width)
 
 
-# ---------------------------------------------------------------------------
 # Evaluator Runs
-# ---------------------------------------------------------------------------
-
 def _benchmark_native(
     system,
     variant: FEvaluatorBenchmarkVariant,
@@ -216,11 +215,7 @@ def _row(
     )
 
 
-# ---------------------------------------------------------------------------
 # Table Formatting
-# ---------------------------------------------------------------------------
-
-
 def _format_f_row(row: FEvaluatorBenchmarkRow) -> str:
     backend = row.variant.name
     if row.variant.backend == "jax" and not row.message:

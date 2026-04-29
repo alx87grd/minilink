@@ -9,10 +9,7 @@ The :class:`~minilink.planning.problems.PlanningProblem` remains
 declarative and does not solve itself.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
-from typing import Any
 
 from minilink.core.costs import CostFunction
 from minilink.core.sets import Set
@@ -31,18 +28,18 @@ class Planner(ABC):
 
     def __init__(self, problem: PlanningProblem) -> None:
         self.problem = problem
-        self.last_result: Any | None = None
+        self.last_result = None
 
     @abstractmethod
-    def compute_solution(self) -> Any:
+    def compute_solution(self):
         """Compute and return a planning result (shape defined by the concrete planner)."""
         ...
 
-    def _store_result(self, result: Any) -> Any:
+    def _store_result(self, result):
         self.last_result = result
         return result
 
-    def require_result(self) -> Any:
+    def require_result(self):
         """Return the latest result or raise a clear error."""
         if self.last_result is None:
             raise ValueError("No planning result has been computed yet")

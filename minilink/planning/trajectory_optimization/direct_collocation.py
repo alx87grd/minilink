@@ -1,9 +1,5 @@
 """Direct-collocation trajectory optimization."""
 
-from __future__ import annotations
-
-from dataclasses import dataclass
-
 import numpy as np
 
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
@@ -29,7 +25,6 @@ class DirectCollocationOptions(FixedGridOptions):
     """
 
 
-@dataclass
 class DirectCollocationTranscription(Transcription):
     """
     Fixed-time-grid trapezoidal direct-collocation transcription.
@@ -40,7 +35,8 @@ class DirectCollocationTranscription(Transcription):
     ``z = [x[0, :], ..., x[n-1, :], u[0, :], ..., u[m-1, :]]``.
     """
 
-    options: DirectCollocationOptions
+    def __init__(self, options: DirectCollocationOptions):
+        self.options = options
 
     def transcribe(
         self,
@@ -110,7 +106,9 @@ class DirectCollocationTranscription(Transcription):
         """Return the packed decision-vector dimension for ``problem``."""
         return int((problem.sys.n + problem.sys.m) * self.options.n_steps)
 
-    def pack(self, x: np.ndarray, u: np.ndarray, problem: PlanningProblem) -> np.ndarray:
+    def pack(
+        self, x: np.ndarray, u: np.ndarray, problem: PlanningProblem
+    ) -> np.ndarray:
         """Pack sampled state and input matrices into one decision vector."""
         return np.concatenate((x.reshape(-1), u.reshape(-1)))
 
@@ -245,16 +243,15 @@ class DirectCollocationTranscription(Transcription):
 
             def state_margins(z):
                 x, _ = self.unpack(z, problem)
-                return np.concatenate(
-                    [
-                        problem.X.margin(
-                            x[:, k],
-                            t=float(t_k),
-                            params=problem.params.sets,
-                        ).reshape(-1)
-                        for k, t_k in enumerate(self.options.t)
-                    ]
-                )
+                margins = []
+                for k, t_k in enumerate(self.options.t):
+                    margin = problem.X.margin(
+                        x[:, k],
+                        t=float(t_k),
+                        params=problem.params.sets,
+                    )
+                    margins.append(margin.reshape(-1))
+                return np.concatenate(margins)
 
             inequalities.append(
                 InequalityConstraint(g=state_margins, name="state_path")
@@ -264,17 +261,16 @@ class DirectCollocationTranscription(Transcription):
 
             def input_margins(z):
                 x, u = self.unpack(z, problem)
-                return np.concatenate(
-                    [
-                        problem.U.margin(
-                            u[:, k],
-                            x=x[:, k],
-                            t=float(t_k),
-                            params=problem.params.sets,
-                        ).reshape(-1)
-                        for k, t_k in enumerate(self.options.t)
-                    ]
-                )
+                margins = []
+                for k, t_k in enumerate(self.options.t):
+                    margin = problem.U.margin(
+                        u[:, k],
+                        x=x[:, k],
+                        t=float(t_k),
+                        params=problem.params.sets,
+                    )
+                    margins.append(margin.reshape(-1))
+                return np.concatenate(margins)
 
             inequalities.append(
                 InequalityConstraint(g=input_margins, name="input_path")

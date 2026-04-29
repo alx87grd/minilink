@@ -110,13 +110,28 @@ class MeshcatCanvas:
                 float(primitive.linewidth),
             )
         if isinstance(primitive, Arrow):
-            return ("Arrow", primitive.pts.shape, str(primitive.color), float(primitive.linewidth))
+            return (
+                "Arrow",
+                primitive.pts.shape,
+                str(primitive.color),
+                float(primitive.linewidth),
+            )
         if isinstance(primitive, TorqueArrow):
             return ("TorqueArrow", str(primitive.color), float(primitive.linewidth))
         if isinstance(primitive, Circle):
-            return ("Circle", float(primitive.radius), str(primitive.color), float(primitive.linewidth))
+            return (
+                "Circle",
+                float(primitive.radius),
+                str(primitive.color),
+                float(primitive.linewidth),
+            )
         if isinstance(primitive, Sphere):
-            return ("Sphere", float(primitive.radius), str(primitive.color), float(primitive.opacity))
+            return (
+                "Sphere",
+                float(primitive.radius),
+                str(primitive.color),
+                float(primitive.opacity),
+            )
         if isinstance(primitive, Rod):
             return (
                 "Rod",
@@ -166,7 +181,9 @@ class MeshcatCanvas:
 
         if isinstance(primitive, Point):
             radius = max(0.02, 0.04 * float(primitive.size))
-            path.set_object(g.Mesh(g.Sphere(radius), g.MeshLambertMaterial(color=hex_color)))
+            path.set_object(
+                g.Mesh(g.Sphere(radius), g.MeshLambertMaterial(color=hex_color))
+            )
             self._has_head[i] = False
             return
 
@@ -280,7 +297,9 @@ class MeshcatCanvas:
             path.set_object(
                 g.Line(
                     g.PointsGeometry(vertices),
-                    g.LineBasicMaterial(color=hex_color, linewidth=float(primitive.linewidth)),
+                    g.LineBasicMaterial(
+                        color=hex_color, linewidth=float(primitive.linewidth)
+                    ),
                 )
             )
             self._has_head[i] = False
@@ -291,13 +310,17 @@ class MeshcatCanvas:
             path.set_object(
                 g.Line(
                     g.PointsGeometry(np.zeros((3, 2), dtype=np.float32)),
-                    g.LineBasicMaterial(color=hex_color, linewidth=float(primitive.linewidth)),
+                    g.LineBasicMaterial(
+                        color=hex_color, linewidth=float(primitive.linewidth)
+                    ),
                 )
             )
             self._head_path(i).set_object(
                 g.Line(
                     g.PointsGeometry(np.zeros((3, 2), dtype=np.float32)),
-                    g.LineBasicMaterial(color=hex_color, linewidth=float(primitive.linewidth)),
+                    g.LineBasicMaterial(
+                        color=hex_color, linewidth=float(primitive.linewidth)
+                    ),
                 )
             )
             self._has_head[i] = True

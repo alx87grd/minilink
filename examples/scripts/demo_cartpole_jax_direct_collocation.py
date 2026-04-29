@@ -1,7 +1,5 @@
 """Cart-pole swing-up with JAX-backed direct collocation."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.compile.jax_utils import configure_jax

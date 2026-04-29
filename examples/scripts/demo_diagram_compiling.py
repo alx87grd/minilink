@@ -6,14 +6,11 @@ from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem
 
-######################################################################
 # Custom blocks
-######################################################################
 
 
 class Integrator(DynamicSystem):
     def __init__(self):
-
         super().__init__(1, 1, 1)
         self.name = "Integrator"
         self.outputs = {}
@@ -39,18 +36,14 @@ class PropController(StaticSystem):
         self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
 
     def ctl(self, x, u, t=0, params=None):
-
         r = u[0]
         y = u[1]
 
-        u = 10.0 * (r - y)
+        u_cmd = 10.0 * (r - y)
+        return [u_cmd]
 
-        return [u]
 
-
-######################################################################
 # Custom diagram
-######################################################################
 
 # Plant system
 sys1 = Integrator()
@@ -70,7 +63,7 @@ step.params["initial_value"] = np.array([0.0])
 step.params["final_value"] = np.array([20.0])
 step.params["step_time"] = 10.0
 
-# # Diagram
+# Diagram
 diagram = DiagramSystem()
 
 diagram.add_subsystem(step, "step")
@@ -113,8 +106,7 @@ print("Compiled (jax):", dx_compiled_jax)
 print("Compiled (jax jit):", dx_compiled_jax_jit)
 
 
-# ── Benchmarking ─────────────────────────────────────────────────────
-
+# Benchmarking
 n_iters = 1000000
 print(f"\nBenchmarking {n_iters} iterations:")
 
@@ -123,14 +115,14 @@ t0 = time.perf_counter()
 for _ in range(n_iters):
     f_baseline(x, u)
 dt = time.perf_counter() - t0
-print(f"Baseline:       {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"Baseline:       {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 # NumPy Compiled
 t0 = time.perf_counter()
 for _ in range(n_iters):
     f_compiled_numpy(x, u)
 dt = time.perf_counter() - t0
-print(f"NumPy Compiled: {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"NumPy Compiled: {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 # Jax (not JIT)
 
@@ -153,4 +145,4 @@ t0 = time.perf_counter()
 for _ in range(n_iters):
     f_compiled_jax_jit(x, u).block_until_ready()
 dt = time.perf_counter() - t0
-print(f"JAX JIT:        {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"JAX JIT:        {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")

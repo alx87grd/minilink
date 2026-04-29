@@ -6,8 +6,6 @@ use :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem` (NumPy) 
 :class:`~minilink.dynamics.abstraction.mechanical.JaxMechanicalSystem` (JAX) explicitly.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 

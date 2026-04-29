@@ -12,8 +12,6 @@ Equation of motion::
   ``backend="jax"``). JAX is loaded lazily when you call methods on that class.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.compile.jax_utils import require_jax_numpy
@@ -68,31 +66,26 @@ class MechanicalSystem(DynamicSystem):
 
     def H(self, q, params=None):
         """Inertia matrix, shape (dof, dof). Kinetic energy = 0.5 * dq^T H(q) dq."""
-        dt = getattr(q, "dtype", None) or np.float64
-        return np.diag(np.ones(self.dof, dtype=dt))
+        return np.eye(self.dof)
 
     def C(self, q, dq, params=None):
         """Coriolis and centrifugal matrix, shape (dof, dof)."""
-        dt = getattr(q, "dtype", None) or np.float64
-        return np.zeros((self.dof, self.dof), dtype=dt)
+        return np.zeros((self.dof, self.dof))
 
     def B(self, q, params=None):
         """Actuator matrix, shape (dof, m)."""
-        dt = getattr(q, "dtype", None) or np.float64
-        B = np.zeros((self.dof, self.m), dtype=dt)
+        B = np.zeros((self.dof, self.m))
         for i in range(min(self.m, self.dof)):
             B[i, i] = 1.0
         return B
 
     def g(self, q, params=None):
         """Gravitational / conservative forces, shape (dof,)."""
-        dt = getattr(q, "dtype", None) or np.float64
-        return np.zeros(self.dof, dtype=dt)
+        return np.zeros(self.dof)
 
     def d(self, q, dq, params=None):
         """Dissipative forces, shape (dof,)."""
-        dt = getattr(q, "dtype", None) or np.float64
-        return np.zeros(self.dof, dtype=dt)
+        return np.zeros(self.dof)
 
     def x2q(self, x):
         """Split state ``x`` into ``q`` and ``dq``."""
@@ -102,10 +95,7 @@ class MechanicalSystem(DynamicSystem):
 
     def q2x(self, q, dq):
         """Stack ``q`` and ``dq`` into state ``x``."""
-        dt = getattr(q, "dtype", None) or np.float64
-        return np.concatenate(
-            [np.asarray(q, dtype=dt).ravel(), np.asarray(dq, dtype=dt).ravel()]
-        )
+        return np.concatenate([q, dq])
 
     def generalized_forces(self, q, dq, ddq, t=0, params=None):
         """Generalized forces for a given trajectory ``q, dq, ddq``."""
@@ -128,7 +118,6 @@ class MechanicalSystem(DynamicSystem):
     def ddq(self, q, dq, u, t=0, params=None):
         """Forward dynamics: generalized accelerations given ``u``."""
         params = params or self.params
-        u = np.asarray(u)
         H = self.H(q, params)
         C = self.C(q, dq, params)
         g = self.g(q, params)
@@ -139,7 +128,6 @@ class MechanicalSystem(DynamicSystem):
 
     def f(self, x, u, t=0, params=None):
         params = params or self.params
-        u = np.asarray(u)
         q, dq = self.x2q(x)
         ddq = self.ddq(q, dq, u, t, params)
         return self.q2x(dq, ddq)

@@ -4,8 +4,6 @@ Demo: JAX physics world with many spheres at varied initial heights.
 This is a larger scene variant of demo_physics_jax_sphere_plane.py.
 """
 
-from __future__ import annotations
-
 import time
 
 import jax
@@ -87,6 +85,7 @@ print(
 # auto-diff
 u = np.zeros(sys.m)
 t = 0.0
+
 
 def fx(x):
     return evaluator.f(x, u, t)

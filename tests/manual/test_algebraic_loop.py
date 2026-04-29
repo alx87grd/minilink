@@ -22,7 +22,7 @@ class FeedthroughSystem(System):
         return u * 2
 
 
-# ── Build a valid DAG (no loop) ──────────────────────────────────
+# Build a valid DAG (no loop)
 diag = DiagramSystem()
 diag.add_subsystem(FeedthroughSystem("A"), "A")
 diag.add_subsystem(FeedthroughSystem("B"), "B")

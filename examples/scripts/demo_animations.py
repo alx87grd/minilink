@@ -1,4 +1,3 @@
-
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 # Plant system

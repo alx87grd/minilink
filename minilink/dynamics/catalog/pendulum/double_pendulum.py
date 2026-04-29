@@ -158,8 +158,7 @@ class DoublePendulum(MechanicalSystem):
         ]
 
     def get_kinematic_transforms(self, x, u, t):
-        q = np.asarray(x[: self.dof])
-        u = np.asarray(u)
+        q = x[: self.dof]
         p0, p1, p2 = self._joint_positions(q)
 
         theta1 = np.pi - q[0]
@@ -181,7 +180,6 @@ class DoublePendulum(MechanicalSystem):
 
 
 if __name__ == "__main__":
-
     double_pendulum = DoublePendulum()
     double_pendulum.x0 = np.array([0.2, -0.15, 0.0, 0.0])
     double_traj = double_pendulum.compute_forced(

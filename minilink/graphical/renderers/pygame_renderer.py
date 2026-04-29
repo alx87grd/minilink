@@ -143,11 +143,15 @@ class PygameCanvas:
             col = _color_to_rgb(primitive.color)
             lw = max(1, int(round(primitive.linewidth)))
             if arc_n >= 2:
-                arc_screen = [self._to_screen(world_pts[i, 0], world_pts[i, 1])
-                              for i in range(arc_n)]
+                arc_screen = [
+                    self._to_screen(world_pts[i, 0], world_pts[i, 1])
+                    for i in range(arc_n)
+                ]
                 pygame_mod.draw.lines(self.surface, col, False, arc_screen, lw)
-                head_screen = [self._to_screen(world_pts[i, 0], world_pts[i, 1])
-                               for i in range(arc_n, world_pts.shape[0])]
+                head_screen = [
+                    self._to_screen(world_pts[i, 0], world_pts[i, 1])
+                    for i in range(arc_n, world_pts.shape[0])
+                ]
                 pygame_mod.draw.lines(self.surface, col, False, head_screen, lw)
 
         elif isinstance(primitive, Circle):
@@ -229,7 +233,9 @@ class PygameCanvas:
             p0 = self._to_screen(world[0, 0], world[0, 1])
             p1 = self._to_screen(world[1, 0], world[1, 1])
             lw = max(1, int(round(max(primitive.linewidth, primitive.radius * 10.0))))
-            pygame_mod.draw.line(self.surface, _color_to_rgb(primitive.color), p0, p1, lw)
+            pygame_mod.draw.line(
+                self.surface, _color_to_rgb(primitive.color), p0, p1, lw
+            )
 
         elif isinstance(primitive, Box):
             lx, ly, lz = primitive.length_x, primitive.length_y, primitive.length_z

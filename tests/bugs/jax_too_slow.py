@@ -1,14 +1,12 @@
-import numpy as np
 import time
 
+import numpy as np
+
+from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem
-from minilink.core.blocks.sources import Step
 
-
-######################################################################
 # Custom blocks
-######################################################################
 
 
 class Integrator(DynamicSystem):
@@ -48,9 +46,7 @@ class PropController(StaticSystem):
         return [u]
 
 
-######################################################################
 # Custom diagram
-######################################################################
 
 # Plant system
 sys1 = Integrator()
@@ -102,8 +98,7 @@ f_compiled_jax = evaluator_jax.f
 f_compiled_jax_jit = evaluator_jax.get_f_jit()
 
 
-# ── Benchmarking ─────────────────────────────────────────────────────
-
+# Benchmarking
 n_iters = 10000
 print(f"\nBenchmarking {n_iters} iterations:")
 
@@ -112,14 +107,14 @@ t0 = time.perf_counter()
 for _ in range(n_iters):
     f_baseline(x, u)
 dt = time.perf_counter() - t0
-print(f"Baseline:       {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"Baseline:       {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 # NumPy Compiled
 t0 = time.perf_counter()
 for _ in range(n_iters):
     f_compiled_numpy(x, u)
 dt = time.perf_counter() - t0
-print(f"NumPy Compiled: {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"NumPy Compiled: {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 
 # JAX JIT
@@ -131,7 +126,7 @@ t0 = time.perf_counter()
 for _ in range(n_iters):
     f_compiled_jax_jit(x, u).block_until_ready()
 dt = time.perf_counter() - t0
-print(f"JAX JIT:        {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"JAX JIT:        {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 
 # Jax (not JIT)
@@ -145,6 +140,6 @@ t0 = time.perf_counter()
 for _ in range(n_iters):
     f_compiled_jax(x, u)
 dt = time.perf_counter() - t0
-print(f"JAX (not JIT):  {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"JAX (not JIT):  {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 # Summary: The “error” is really a performance model mismatch: the implementation is intentionally trace-oriented (functional .at[].set, jnp everywhere), which is slow when run eagerly at large len(port_ops) + len(state_ops), and fast when wrapped in jax.jit, exactly as your numbers showed.

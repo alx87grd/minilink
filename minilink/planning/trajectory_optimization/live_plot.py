@@ -1,28 +1,19 @@
 """Live trajectory-optimization plotting callbacks."""
 
-from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Literal
-
-
-@dataclass
 class LiveTrajectoryPlotCallback:
     """In-place matplotlib trajectory update callback."""
 
-    sys: Any
-    plot: Literal["x", "u", "xu"] = "xu"
-    every: int = 1
-    pause: float = 0.001
-    fig: Any = field(default=None, init=False)
-    axes: list[Any] = field(default_factory=list, init=False)
-    lines: list[Any] = field(default_factory=list, init=False)
-
-    def __post_init__(self) -> None:
-        if self.plot not in ("x", "u", "xu"):
+    def __init__(self, sys, plot="xu", every=1, pause=0.001):
+        if plot not in ("x", "u", "xu"):
             raise ValueError("plot must be 'x', 'u', or 'xu'")
-        self.every = max(1, int(self.every))
-        self.pause = float(self.pause)
+        self.sys = sys
+        self.plot = plot
+        self.every = max(1, int(every))
+        self.pause = float(pause)
+        self.fig = None
+        self.axes = []
+        self.lines = []
 
     def __call__(self, iteration) -> None:
         if iteration.iteration % self.every != 0:
@@ -40,14 +31,10 @@ class LiveTrajectoryPlotCallback:
 
         if self.plot in ("x", "xu"):
             for i in range(int(self.sys.n)):
-                channels.append(
-                    ("x", i, state_labels[i], state_units[i], "tab:blue")
-                )
+                channels.append(("x", i, state_labels[i], state_units[i], "tab:blue"))
         if self.plot in ("u", "xu"):
             for i in range(int(self.sys.m)):
-                channels.append(
-                    ("u", i, input_labels[i], input_units[i], "tab:red")
-                )
+                channels.append(("u", i, input_labels[i], input_units[i], "tab:red"))
         if not channels:
             raise ValueError(
                 f"Nothing to plot for plot={self.plot!r} with "

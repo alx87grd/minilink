@@ -140,7 +140,7 @@ class CartPole(MechanicalSystem):
     def get_kinematic_transforms(self, x, u, t):
         pos = x[0]
         theta = x[1]
-        F = np.asarray(u)[0]
+        F = u[0]
 
         cart_length = float(self.params["cart_length"])
         cart_height = float(self.params["cart_height"])
@@ -231,7 +231,6 @@ def _pose2d_offset_z(x=0.0, y=0.0, theta=0.0, z=0.0):
 
 
 if __name__ == "__main__":
-
     cartpole = CartPole()
     cartpole.x0 = np.array([0.0, 0.25, 0.0, 0.0])
     cart_traj = cartpole.compute_forced(

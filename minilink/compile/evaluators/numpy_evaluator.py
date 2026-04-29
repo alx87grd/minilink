@@ -9,8 +9,6 @@ Provides two evaluators:
 Both inherit from :class:`~minilink.compile.evaluators.evaluator.DynamicsEvaluator`.
 """
 
-from __future__ import annotations
-
 import copy
 
 import numpy as np
@@ -23,11 +21,8 @@ from minilink.compile.execution_plan import (
     ExecutionPlan,
 )
 
-# =====================================================================
+
 # Leaf evaluator
-# =====================================================================
-
-
 class NumpyLeafEvaluator(DynamicsEvaluator):
     """Compiled evaluator for a single System using NumPy.
 
@@ -47,8 +42,7 @@ class NumpyLeafEvaluator(DynamicsEvaluator):
         self._frozen_params = copy.deepcopy(system.params)
         self._u_nominal = np.copy(system.get_u_from_input_ports())
 
-    # -- Standard tier (frozen params) ------------------------------------
-
+    # Standard tier (frozen params)
     def f(self, x, u, t=0.0):
         return self._system.f(x, u, t, self._frozen_params)
 
@@ -61,8 +55,7 @@ class NumpyLeafEvaluator(DynamicsEvaluator):
             result[port_id] = port.compute(x, u, t, self._frozen_params)
         return result
 
-    # -- Parametric tier (caller-supplied params) -------------------------
-
+    # Parametric tier (caller-supplied params)
     def f_p(self, x, u, t, params):
         return self._system.f(x, u, t, params)
 
@@ -76,11 +69,7 @@ class NumpyLeafEvaluator(DynamicsEvaluator):
         return result
 
 
-# =====================================================================
 # Shared helper
-# =====================================================================
-
-
 def _gather_u(
     gather_sources: tuple[tuple[int, object, int], ...],
     u_dim: int,
@@ -123,11 +112,7 @@ def _gather_u(
     return local_u
 
 
-# =====================================================================
 # Diagram evaluator
-# =====================================================================
-
-
 class NumpyDiagramEvaluator(DynamicsEvaluator):
     """Stateless NumPy evaluator for a compiled diagram.
 
@@ -166,8 +151,7 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
         self._frozen_params = None  # per-op binding, not diagram-level
         self._u_nominal = np.copy(diagram.get_u_from_input_ports())
 
-    # ── ABC: Standard tier ──────────────────────────────────────────
-
+    # ABC: Standard tier
     def f(self, x: np.ndarray, u: np.ndarray, t: float = 0.0) -> np.ndarray:
         """Compute the diagram's state derivative vector.
 
@@ -211,8 +195,7 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
             for port_id, sl in self.plan.external_output_slices.items()
         }
 
-    # ── ABC: Parametric tier ────────────────────────────────────────
-
+    # ABC: Parametric tier
     def f_p(self, x, u, t, params):
         raise NotImplementedError("Parametric tier not supported for diagrams yet.")
 
@@ -222,8 +205,7 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
     def outputs_p(self, x, u, t, params):
         raise NotImplementedError("Parametric tier not supported for diagrams yet.")
 
-    # ── Diagram-specific methods ────────────────────────────────────
-
+    # Diagram-specific methods
     def compute_internal_signals(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0
     ) -> np.ndarray:
@@ -252,8 +234,7 @@ class NumpyDiagramEvaluator(DynamicsEvaluator):
             for (sys_id, port_id), sl in self.plan.output_slices.items()
         }
 
-    # ── Private ─────────────────────────────────────────────────────
-
+    # Private
     def _compute_port_signals(
         self, x: np.ndarray, u: np.ndarray, t: float
     ) -> np.ndarray:

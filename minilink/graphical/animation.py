@@ -152,9 +152,7 @@ class Animator:
 
         if native:
             try:
-                return backend.play_native(
-                    primitives, frames, schedule, is_3d=is_3d
-                )
+                return backend.play_native(primitives, frames, schedule, is_3d=is_3d)
             except NotImplementedError:
                 print(
                     f"native=True is not supported for renderer={renderer!r}; "

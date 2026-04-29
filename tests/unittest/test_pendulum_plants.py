@@ -58,9 +58,7 @@ class TestCartPole(unittest.TestCase):
 
         self.assertIsInstance(primitives[1], Box)
         self.assertEqual(primitives[1].length_z, sys.params["cart_depth"])
-        self.assertGreater(
-            transforms[4][2, 3], 0.5 * float(sys.params["cart_depth"])
-        )
+        self.assertGreater(transforms[4][2, 3], 0.5 * float(sys.params["cart_depth"]))
         self.assertEqual(len(primitives), len(transforms))
         for T in transforms:
             self.assertEqual(T.shape, (4, 4))

@@ -8,12 +8,9 @@ NumPy :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`, simul
 Symbolic derivation of 4×4 H, C, g can take tens of seconds on first run.
 """
 
-
 from minilink.symbolic.mechanics.model import MechanicalModel
 
-# ------------------------------------------------------------------
 # Build the symbolic model
-# ------------------------------------------------------------------
 m = MechanicalModel("QuadruplePendulum")
 N_LINKS = 4
 
@@ -47,15 +44,12 @@ link_properties = [
 m.add_dh_chain(dh_table, link_properties)
 m.add_gravity(-g_sym * m.N.y)
 
-# ------------------------------------------------------------------
 # Derive the symbolic equations of motion
-# -----------------------------------------------------------------
 print("Deriving the symbolic equations of motion...")
 
 sym_sys = m.derive(method="lagrange", simplify=True)
 
 
-###########################################################
 # Basic minilink ecosystem class
 # #########################################################
 

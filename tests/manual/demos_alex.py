@@ -7,7 +7,6 @@ from minilink.graphical.plotting import plot_trajectory
 from minilink.simulation.simulator import Simulator
 
 
-######################################################################
 class Pendulum(DynamicSystem):
     def __init__(self):
         super().__init__(2, 1, 2)
@@ -29,7 +28,6 @@ class Pendulum(DynamicSystem):
         self.outputs = {}
         self.add_output_port(self.p, "y", function=self.h, dependencies=["v"])
 
-    ######################################################################
     def f(self, x, u, t=0, params=None):
 
         if params is None:
@@ -51,7 +49,6 @@ class Pendulum(DynamicSystem):
 
         return dx
 
-    ######################################################################
     def h(self, x, u, t=0, params=None):
 
         signals = self.get_port_values_from_u(u)
@@ -65,7 +62,6 @@ class Pendulum(DynamicSystem):
         return y
 
 
-######################################################################
 class PDController(StaticSystem):
     def __init__(self):
         super().__init__(3, 1)
@@ -88,7 +84,6 @@ class PDController(StaticSystem):
         self.outputs["u"].labels = ["torque"]
         self.outputs["u"].units = ["Nm"]
 
-    ######################################################################
     def ctl(self, x, u, t=0, params=None):
 
         if params is None:
@@ -108,7 +103,6 @@ class PDController(StaticSystem):
         return u
 
 
-######################################################################
 class Integrator(DynamicSystem):
     def __init__(self):
         super().__init__(1, 1, 1)
@@ -139,7 +133,6 @@ class Integrator(DynamicSystem):
         return y
 
 
-######################################################################
 class PropController(StaticSystem):
     def __init__(self):
         super().__init__(2, 1)
@@ -157,7 +150,6 @@ class PropController(StaticSystem):
         self.outputs = {}
         self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
 
-    ######################################################################
     def ctl(self, x, u, t=0, params=None):
 
         if params is None:
@@ -175,13 +167,7 @@ class PropController(StaticSystem):
         return u
 
 
-######################################################################
-######################################################################
-######################################################################
 # Tests functions
-######################################################################
-######################################################################
-######################################################################
 
 
 def simulator_test():
@@ -208,7 +194,6 @@ def simulator_test():
     return sim
 
 
-######################################################################
 def system_test():
 
     sys1 = DynamicSystem(2, 1, 1)
@@ -238,7 +223,6 @@ def system_test():
     return sys1
 
 
-######################################################################
 def diagram_test():
 
     sys1 = DynamicSystem(2, 1, 1)
@@ -285,7 +269,6 @@ def diagram_test():
     return gsys
 
 
-######################################################################
 def pendulum_test():
 
     # Plant system
@@ -331,7 +314,6 @@ def pendulum_test():
     return sim
 
 
-######################################################################
 def algebraic_loop():
 
     # Plant system
@@ -374,7 +356,6 @@ def algebraic_loop():
     return diagram
 
 
-######################################################################
 def solver_doing_weird_at_discontinuities():
 
     # Plant system
@@ -413,7 +394,6 @@ def solver_doing_weird_at_discontinuities():
     test.compute_trajectory(solver="euler")
 
 
-######################################################################
 def diagram_in_a_diagram(debug_print=False):
 
     # Plant system
@@ -477,7 +457,6 @@ def diagram_in_a_diagram(debug_print=False):
     return test, diagram, diagram2
 
 
-######################################################################
 if __name__ == "__main__":
     # sys = system_test()
     # sim = simulator_test()

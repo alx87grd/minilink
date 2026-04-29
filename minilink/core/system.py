@@ -10,7 +10,6 @@ dynamic systems inherit.
 import numpy as np
 
 
-######################################################################
 class VectorSignal:
     """
     A class representing a generic vector signal.
@@ -43,7 +42,6 @@ class VectorSignal:
         self.lower_bound = -np.inf * np.ones(self.dim)
         self.set_nominal_value(nominal_value)
 
-    ######################################################################
     def set_nominal_value(self, nominal_value=None):
         """
         Set the nominal (default) value of the vector signal.
@@ -60,7 +58,6 @@ class VectorSignal:
         else:
             self.nominal_value = np.zeros(self.dim)
 
-    ##########################################
     def __repr__(self):
         """
         Return a string representation of the VectorSignal.
@@ -73,13 +70,11 @@ class VectorSignal:
         return f"VectorSignal: dim={self.dim}, nominal={self.nominal_value}"
 
 
-######################################################################
 class InputPort(VectorSignal):
     """
     A vector signal with a constant default value used when unconnected.
     """
 
-    ##############################################
     def get_default_value(self) -> np.ndarray:
         """
         Return the default value of the input port.
@@ -92,7 +87,6 @@ class InputPort(VectorSignal):
         return self.nominal_value
 
 
-######################################################################
 class OutputPort(VectorSignal):
     """
     An output signal port containing a callback function to compute its value dynamically.
@@ -110,7 +104,6 @@ class OutputPort(VectorSignal):
         - `empty list/tuple`: depends only on the state `x` or internal time, no direct feedthrough from inputs.
     """
 
-    ##############################################
     def __init__(self, dim=1, id="y", function=None, dependencies="all"):
 
         VectorSignal.__init__(self, dim=dim, id=id)
@@ -122,7 +115,6 @@ class OutputPort(VectorSignal):
 
         self.dependencies = dependencies
 
-    ##############################################
     def default_function(self, x=None, u=None, t=0, params=None) -> np.ndarray:
         """
         Default compute function returning the nominal value.
@@ -146,7 +138,6 @@ class OutputPort(VectorSignal):
         return self.nominal_value
 
 
-######################################################################
 class System:
     """
     Base class describing a dynamical input-output system.
@@ -190,7 +181,7 @@ class System:
         p : int, optional
             Number of output dimensions (default is 1).
         """
-        # ── Structural model description ────────────────────────────────
+        # Structural model description
         self.n = n
         self.m = m
         self.p = p
@@ -201,7 +192,7 @@ class System:
         # State metadata
         self.state = VectorSignal(n, "x")
 
-        # ── Model defaults and metadata ─────────────────────────────────
+        # Model defaults and metadata
         # Default initial condition used by convenience simulation paths.
         self.x0 = np.zeros(self.n)
 
@@ -228,11 +219,8 @@ class System:
         # ``compute_trajectory``.
         self.traj = None
 
-    ######################################################################
     # Core Dynamical Contract
-    ######################################################################
 
-    ######################################################################
     def refresh(self):
         """
         Recompute derived internals from current parameters/topology.
@@ -241,7 +229,6 @@ class System:
         """
         return
 
-    ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
         """
         Compute the state derivative `dx/dt`.
@@ -268,7 +255,6 @@ class System:
         dx = np.zeros(self.n)
         return dx
 
-    ######################################################################
     def h(self, x, u, t=0, params=None) -> np.ndarray:
         """
         Compute the output `y`.
@@ -294,7 +280,6 @@ class System:
         y = np.zeros(self.p)
         return y
 
-    ######################################################################
     def compute_state(self, x, u, t=0, params=None):
         """
         Convenience output helper returning the state vector directly.
@@ -317,11 +302,8 @@ class System:
         """
         return x
 
-    ######################################################################
     # Structural Model API
-    ######################################################################
 
-    ######################################################################
     def add_input_port(self, dim, id, nominal_value=None):
         """
         Add a new input port to the system.
@@ -338,7 +320,6 @@ class System:
         self.inputs[id] = InputPort(dim, id, nominal_value)
         self.recompute_input_properties()
 
-    ######################################################################
     def add_output_port(self, dim, id, function=None, dependencies="all"):
         """
         Add a new output port to the system.
@@ -356,7 +337,6 @@ class System:
         """
         self.outputs[id] = OutputPort(dim, id, function, dependencies)
 
-    ######################################################################
     def recompute_input_properties(self):
         """
         Recalculate the total input dimension `m` based on all input ports.
@@ -365,7 +345,6 @@ class System:
         for key, port in self.inputs.items():
             self.m += port.dim
 
-    ######################################################################
     def get_all_input_labels_and_units(self):
         """
         Retrieve a flattened list of all input labels and units across all ports.
@@ -387,7 +366,6 @@ class System:
 
         return input_labels, input_units
 
-    ######################################################################
     def get_u_from_input_ports(self) -> np.ndarray:
         """
         Get the default value of all input ports.
@@ -408,7 +386,6 @@ class System:
             i += port.dim
         return u
 
-    ######################################################################
     def get_port_values_from_u(self, u):
         """
         Get the values of all input ports from a concatenated array.
@@ -430,7 +407,6 @@ class System:
             i += port.dim
         return input_signals
 
-    ######################################################################
     def get_input_port_slice(self, port_id):
         """
         Return the slice of one input port inside the flat input vector ``u``.
@@ -454,7 +430,6 @@ class System:
 
         raise KeyError(f"Unknown input port '{port_id}'")
 
-    ######################################################################
     def u2input_signal(self, u, port_id):
         """
         Extract the signal value for a specific input port from the concatenated input array.
@@ -474,11 +449,8 @@ class System:
         input_signals = self.get_port_values_from_u(u)
         return input_signals[port_id]
 
-    ######################################################################
     # Visualization / Kinematic Contract
-    ######################################################################
 
-    ######################################################################
     def get_kinematic_geometry(self):
         """
         Return static graphical primitives for this system.
@@ -522,11 +494,8 @@ class System:
         """
         return []
 
-    ######################################################################
     # User Shortcut / Facade API
-    ######################################################################
 
-    ######################################################################
     def compile(self, backend="numpy", verbose=False):
         """
         Convenience shortcut to compile the system into a backend evaluator.
@@ -537,7 +506,6 @@ class System:
 
         return compile_system(self, backend=backend, verbose=verbose)
 
-    ######################################################################
     def compute_trajectory(
         self,
         t0=0,
@@ -595,7 +563,6 @@ class System:
 
         return traj
 
-    ######################################################################
     def compute_forced(
         self,
         u,
@@ -719,7 +686,6 @@ class System:
 
         return traj
 
-    ######################################################################
     def plot_trajectory(self, traj=None, *, plot="xu"):
         """
         Convenience shortcut to plot the trajectory.
@@ -750,7 +716,6 @@ class System:
 
         return self.compute_trajectory(plot=plot)
 
-    ######################################################################
     def get_block_html(self, label="sys1"):
         """
         Convenience shortcut returning an HTML block representation.
@@ -759,7 +724,6 @@ class System:
 
         return get_system_block_html(self, label)
 
-    ######################################################################
     def print_html(self):
         """
         Convenience shortcut to display the HTML block representation.
@@ -772,7 +736,6 @@ class System:
             print("IPython is not available")
             return
 
-    ######################################################################
     def get_graphe(self):
         """
         Convenience shortcut returning the Graphviz graph representation.
@@ -781,7 +744,6 @@ class System:
 
         return get_system_graphe(self)
 
-    ######################################################################
     def _repr_svg_(self):
         """
         Convenience notebook representation for the system graph.
@@ -791,7 +753,6 @@ class System:
             return None
         return g._repr_image_svg_xml()
 
-    ######################################################################
     def plot_graphe(self, filename=None, show_inline=None, show_pdf=None):
         """
         Convenience shortcut to render the Graphviz system graph.
@@ -808,7 +769,6 @@ class System:
         g = self.get_graphe()
         plot_graphviz(g, show_inline=show_inline, show_pdf=show_pdf, filename=filename)
 
-    ######################################################################
     def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
         """
         Convenience shortcut rendering a single frame of the system.
@@ -818,7 +778,6 @@ class System:
         animator = Animator(self)
         animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
 
-    ######################################################################
     def animate(
         self,
         traj=None,
@@ -872,7 +831,6 @@ class System:
         # Calling display.display() *and* returning the object renders twice.
         return ani_obj
 
-    ######################################################################
     def game(
         self,
         *,
@@ -906,9 +864,7 @@ class System:
         )
 
 
-######################################################################
 # Specialized System Types
-######################################################################
 
 
 class StaticSystem(System):
@@ -932,7 +888,6 @@ class StaticSystem(System):
         self.name = "StaticSystem"
 
 
-######################################################################
 class DynamicSystem(System):
     """
     A block-diagram system with continuous states (`n > 0`).
@@ -966,7 +921,6 @@ class DynamicSystem(System):
         self.add_output_port(self.n, "x", function=self.compute_state)
 
 
-######################################################################
 if __name__ == "__main__":
     x = VectorSignal(2, "x")
 

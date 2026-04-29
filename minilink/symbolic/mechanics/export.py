@@ -111,9 +111,7 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
     C_eval, _, _ = _lambdify_matrix_to_flat_func(sym_sys.C, qdq_args, subs, backend)
     g_eval, _, _ = _lambdify_matrix_to_flat_func(sym_sys.g, q_args, subs, backend)
     if sym_sys.d is not None:
-        d_eval, _, _ = _lambdify_matrix_to_flat_func(
-            sym_sys.d, qdq_args, subs, backend
-        )
+        d_eval, _, _ = _lambdify_matrix_to_flat_func(sym_sys.d, qdq_args, subs, backend)
     else:
         d_eval = None
     if sym_sys.B is not None:

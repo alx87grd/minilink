@@ -1,9 +1,5 @@
 """Multiple-shooting trajectory optimization."""
 
-from __future__ import annotations
-
-from dataclasses import dataclass
-
 import numpy as np
 
 from minilink.core.trajectory import Trajectory
@@ -24,7 +20,6 @@ class MultipleShootingOptions(FixedGridOptions):
     """Grid options for fixed-step multiple shooting."""
 
 
-@dataclass
 class MultipleShootingTranscription(DirectCollocationTranscription):
     """
     Fixed-grid multiple-shooting transcription.
@@ -34,7 +29,8 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     Dynamics are enforced by RK4 shooting defects between neighboring knots.
     """
 
-    options: MultipleShootingOptions
+    def __init__(self, options: MultipleShootingOptions):
+        self.options = options
 
     def transcribe(
         self,
@@ -76,6 +72,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     def _make_step(self, problem: PlanningProblem, compile_backend: str | None):
         params = problem.params.system
         if params is not None or compile_backend is None or compile_backend == "direct":
+
             def f(x, u, t):
                 return problem.sys.f(x, u, t, params)
         else:

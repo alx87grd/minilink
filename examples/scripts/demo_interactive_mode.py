@@ -8,9 +8,7 @@ import numpy as np
 
 from minilink.dynamics.catalog.msd.floating_mass import FloatingMass1D
 
-# ------------------------------------------------------------------
 # Plant: unit mass on a frictionless rail
-# ------------------------------------------------------------------
 mass = FloatingMass1D()
 mass.params["m"] = 1.0
 mass.x0 = np.array([0.0, 0.0])

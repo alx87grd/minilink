@@ -11,10 +11,7 @@ control automatic compile backend selection and optional fixed-step RK4 on long
 uniform grids when using the JAX compiler.
 """
 
-from __future__ import annotations
-
 import logging
-from typing import Any
 
 import numpy as np
 
@@ -23,8 +20,7 @@ from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
 
-# --- Internal: user-facing solver labels to backend keys and options --------
-
+# Internal: user-facing solver labels to backend keys and options
 # (solver backend key, options)
 _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
     "scipy": (
@@ -246,9 +242,7 @@ class Simulator:
             return "rk4_fixedsteps"
         return "scipy"
 
-    ###########################################################################
     # Core methods for integration
-    ###########################################################################
 
     def solve(self):
         """
@@ -261,17 +255,13 @@ class Simulator:
             State and input time series, ``(n, n_pts)`` and ``(m, n_pts)``.
         """
 
-        ###########################################################################
         # Integrate the system using the selected solver backend
-        ###########################################################################
 
         x_traj = self.solver_backend.integrate(
             self.evaluator, self.times, self.x0, args=self.solver_backend_options
         )
 
-        ###########################################################################
         # Build the input trajectory
-        ###########################################################################
 
         m = self.sys.m
         u_traj = np.zeros((m, self.n_pts))
@@ -279,9 +269,7 @@ class Simulator:
             u_bar = self.evaluator._u_nominal
             u_traj[:, :] = u_bar.reshape(m, 1)
 
-        ###########################################################################
         # Build the trajectory object
-        ###########################################################################
 
         traj = Trajectory(t=self.times, x=x_traj, u=u_traj)
 
@@ -319,16 +307,13 @@ class Simulator:
 
         return traj
 
-    # --- Private: compile, validation, and backend wiring -------------------
-
-    def _build_evaluator(self, sys, compile_backend: str) -> Any:
+    # Private: compile, validation, and backend wiring
+    def _build_evaluator(self, sys, compile_backend):
         if self.verbose:
             print(f"Compiling with backend={compile_backend!r}.")
         return sys.compile(backend=compile_backend)
 
-    def _resolve_and_build_evaluator(
-        self, sys, compile_backend: str
-    ) -> tuple[str, Any]:
+    def _resolve_and_build_evaluator(self, sys, compile_backend):
         """
         Compile with *compile_backend*, or if it is :data:`COMPILE_BACKEND_AUTO`, try JAX
         then NumPy.

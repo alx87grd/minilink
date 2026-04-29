@@ -1,7 +1,5 @@
 """DynamicSystem wrapper for the JAX physics engine world."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.core.system import DynamicSystem

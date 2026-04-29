@@ -8,8 +8,6 @@ Current features:
 - pure functional ODE API suitable for JIT/grad.
 """
 
-from __future__ import annotations
-
 from typing import NamedTuple
 
 
@@ -117,7 +115,7 @@ def quat_derivative(q, w):
     """Quaternion kinematics: qdot = 0.5 * omega(w) @ q."""
     jnp = _jnp()
     wx, wy, wz = w[..., 0], w[..., 1], w[..., 2]
-    O = jnp.stack(
+    omega_matrix = jnp.stack(
         [
             jnp.stack([0.0 * wx, -wx, -wy, -wz], axis=-1),
             jnp.stack([wx, 0.0 * wx, wz, -wy], axis=-1),
@@ -126,7 +124,7 @@ def quat_derivative(q, w):
         ],
         axis=-2,
     )
-    return 0.5 * jnp.einsum("nij,nj->ni", O, q)
+    return 0.5 * jnp.einsum("nij,nj->ni", omega_matrix, q)
 
 
 def plane_contact_force(world: WorldModel, pos, lin_vel):

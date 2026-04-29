@@ -8,8 +8,6 @@ Inputs ``u = [w_rear, delta]``: rear wheel spin rate [rad/s], steer angle [rad].
 :class:`DynamicBicycleCar3D` subclasses this model with identical dynamics and richer 3D graphics.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.core.system import DynamicSystem

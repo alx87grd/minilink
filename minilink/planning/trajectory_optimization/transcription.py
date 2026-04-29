@@ -6,11 +6,8 @@ mathematical program, then reconstructs a trajectory from the optimizer
 output.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable
 
 import numpy as np
 
@@ -50,7 +47,7 @@ class FixedGridOptions:
 def dynamics_function(
     problem: PlanningProblem,
     compile_backend: str | None,
-) -> Callable:
+):
     """Return ``(x, u, t) -> f(x, u, t)`` for a transcription."""
     params = problem.params.system
     if params is not None or compile_backend is None or compile_backend == "direct":
@@ -70,7 +67,7 @@ class Transcription(ABC):
         self,
         problem: PlanningProblem,
         *,
-        initial_guess: Any | None = None,
+        initial_guess=None,
         compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
         """Convert ``problem`` into a finite-dimensional mathematical program."""
@@ -88,6 +85,6 @@ class Transcription(ABC):
         ...
 
     @abstractmethod
-    def initial_guess_time_grid(self, problem: PlanningProblem) -> Any:
+    def initial_guess_time_grid(self, problem: PlanningProblem):
         """Return the time grid used by generic trajectory guesses."""
         ...

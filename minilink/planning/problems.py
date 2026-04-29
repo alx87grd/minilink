@@ -7,11 +7,8 @@ parameter bundle. Numerical grids, transcriptions, optimizers, and planner
 internals belong to solver packages rather than to the problem object.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
 
 import numpy as np
 
@@ -35,9 +32,9 @@ class ProblemParameters:
         Parameters passed to allowable set objects.
     """
 
-    system: Any | None = None
-    cost: Any | None = None
-    sets: Any | None = None
+    system: object | None = None
+    cost: object | None = None
+    sets: object | None = None
 
 
 @dataclass(frozen=True)
@@ -71,7 +68,7 @@ class PlanningProblem:
         Explicit parameter bundle for system, cost, and set evaluation.
     """
 
-    sys: Any
+    sys: object
     x_start: np.ndarray | None = None
     x_goal: np.ndarray | None = None
     cost: CostFunction | None = None
@@ -80,7 +77,7 @@ class PlanningProblem:
     X0: Set | None = None
     Xf: Set | None = None
     params: ProblemParameters | None = None
-    metadata: dict[str, Any] | None = None
+    metadata: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
         n = int(self.sys.n)
@@ -115,7 +112,7 @@ class PlanningProblem:
 
     @staticmethod
     def _coerce_state(
-        x: Any,
+        x: object,
         *,
         label: str,
         required: bool,
@@ -127,7 +124,7 @@ class PlanningProblem:
         return np.asarray(x, dtype=float).reshape(-1).copy()
 
     @staticmethod
-    def _default_input_set(sys: Any) -> BoxInputSet:
+    def _default_input_set(sys: object) -> BoxInputSet:
         lower = np.zeros(sys.m)
         upper = np.zeros(sys.m)
         i = 0

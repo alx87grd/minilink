@@ -7,11 +7,9 @@ search-style planners and nonnegative margins for optimization-style
 transcriptions.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
 
 import numpy as np
 
@@ -30,7 +28,7 @@ class Set(ABC):
         self,
         z: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Return nonnegative feasibility margins for ``z``."""
         ...
@@ -39,7 +37,7 @@ class Set(ABC):
         self,
         z: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> bool:
         """Return ``True`` when ``z`` belongs to the set."""
         return bool(np.all(self.margin(z, t=t, params=params) >= 0.0))
@@ -48,7 +46,7 @@ class Set(ABC):
         self,
         rng: np.random.Generator | None = None,
         n: int = 1,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """
         Draw samples from the set when supported.
@@ -75,7 +73,7 @@ class InputSet(ABC):
         u: np.ndarray,
         x: np.ndarray | None = None,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Return nonnegative feasibility margins for ``u``."""
         ...
@@ -85,7 +83,7 @@ class InputSet(ABC):
         u: np.ndarray,
         x: np.ndarray | None = None,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> bool:
         """Return ``True`` when ``u`` is admissible at ``(x, t)``."""
         return bool(np.all(self.margin(u, x=x, t=t, params=params) >= 0.0))
@@ -96,7 +94,7 @@ class InputSet(ABC):
         n: int = 1,
         x: np.ndarray | None = None,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Draw input samples when supported."""
         raise NotImplementedError("Sampling is not available for this input set")
@@ -132,7 +130,7 @@ class BoxSet(Set):
         return int(self.lower.size)
 
     @classmethod
-    def from_system_state(cls, sys: Any) -> BoxSet:
+    def from_system_state(cls, sys) -> "BoxSet":
         """Create a state box from ``sys.state`` metadata."""
         return cls(sys.state.lower_bound, sys.state.upper_bound)
 
@@ -140,7 +138,7 @@ class BoxSet(Set):
         self,
         z: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Return lower and upper bound margins."""
         z_arr = np.asarray(z, dtype=float).reshape(self.dim)
@@ -150,7 +148,7 @@ class BoxSet(Set):
         self,
         rng: np.random.Generator | None = None,
         n: int = 1,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Draw uniformly from a finite box."""
         if n < 1:
@@ -170,7 +168,7 @@ class BoxInputSet(InputSet):
     box: BoxSet
 
     @classmethod
-    def from_bounds(cls, lower: np.ndarray, upper: np.ndarray) -> BoxInputSet:
+    def from_bounds(cls, lower: np.ndarray, upper: np.ndarray) -> "BoxInputSet":
         """Create an input box from lower and upper arrays."""
         return cls(BoxSet(lower, upper))
 
@@ -179,7 +177,7 @@ class BoxInputSet(InputSet):
         u: np.ndarray,
         x: np.ndarray | None = None,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Return lower and upper input-bound margins."""
         return self.box.margin(u, t=t, params=params)
@@ -190,7 +188,7 @@ class BoxInputSet(InputSet):
         n: int = 1,
         x: np.ndarray | None = None,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Draw uniformly from the input box."""
         return self.box.sample(rng=rng, n=n, params=params)
@@ -225,7 +223,7 @@ class SingletonSet(Set):
         self,
         z: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Return zero only when ``z`` equals the singleton point."""
         return -np.abs(self.residual(z))
@@ -257,14 +255,13 @@ class BallSet(Set):
         self,
         z: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Return the signed distance margin to the ball boundary."""
         z_arr = np.asarray(z, dtype=float).reshape(self.dim)
         return np.array([self.radius - np.linalg.norm(z_arr - self.center)])
 
 
-@dataclass(frozen=True)
 class CallableSet(Set):
     """
     Set backed by user callables.
@@ -277,10 +274,14 @@ class CallableSet(Set):
         Function ``contains_fn(z, t, params) -> bool``.
     """
 
-    margin_fn: Callable[[np.ndarray, float, Any | None], np.ndarray] | None = None
-    contains_fn: Callable[[np.ndarray, float, Any | None], bool] | None = None
-
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        margin_fn: Callable[[np.ndarray, float, object | None], np.ndarray]
+        | None = None,
+        contains_fn: Callable[[np.ndarray, float, object | None], bool] | None = None,
+    ) -> None:
+        self.margin_fn = margin_fn
+        self.contains_fn = contains_fn
         if self.margin_fn is None and self.contains_fn is None:
             raise ValueError("Provide at least one of margin_fn or contains_fn")
 
@@ -288,7 +289,7 @@ class CallableSet(Set):
         self,
         z: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Evaluate the user-supplied margin function."""
         if self.margin_fn is None:
@@ -301,7 +302,7 @@ class CallableSet(Set):
         self,
         z: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> bool:
         """Evaluate membership through the supplied callable when present."""
         if self.contains_fn is not None:
@@ -309,7 +310,6 @@ class CallableSet(Set):
         return super().contains(z, t=t, params=params)
 
 
-@dataclass(frozen=True)
 class IntersectionSet(Set):
     """
     Intersection of multiple sets.
@@ -318,18 +318,16 @@ class IntersectionSet(Set):
     collision-free domains without introducing a separate constraint layer.
     """
 
-    sets: tuple[Set, ...]
-
     def __init__(self, sets: tuple[Set, ...] | list[Set]) -> None:
         if not sets:
             raise ValueError("IntersectionSet requires at least one set")
-        object.__setattr__(self, "sets", tuple(sets))
+        self.sets = tuple(sets)
 
     def margin(
         self,
         z: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> np.ndarray:
         """Concatenate margins from all member sets."""
         return np.concatenate(

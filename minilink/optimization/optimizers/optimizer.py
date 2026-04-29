@@ -6,10 +6,8 @@ instances. They do not know about planning systems, trajectories, or
 transcription internals.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from collections.abc import Callable
 
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -27,7 +25,7 @@ class Optimizer(ABC):
         self,
         program: MathematicalProgram,
         *,
-        callback: Callable[[Any], None] | None = None,
+        callback: Callable[[object], None] | None = None,
     ) -> OptimizationResult:
         """Solve a finite-dimensional mathematical program."""
         ...

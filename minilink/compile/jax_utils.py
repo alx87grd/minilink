@@ -1,10 +1,7 @@
 """Small helpers for optional JAX in otherwise NumPy-first code paths."""
 
-from __future__ import annotations
-
 import functools
 import types
-from typing import Any
 
 import numpy as np
 
@@ -35,7 +32,7 @@ def configure_jax(*, enable_x64: bool | None = None) -> types.ModuleType:
     return jax
 
 
-def array_module(a: Any) -> types.ModuleType:
+def array_module(a) -> types.ModuleType:
     """Return ``jax.numpy`` if *a* is a JAX array/tracer, else ``numpy``."""
     if type(a).__module__.startswith("jax"):
         import jax.numpy as jnp

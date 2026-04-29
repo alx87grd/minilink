@@ -11,6 +11,8 @@ from minilink.graphical.primitives import (
 
 
 class Pendulum(DynamicSystem):
+    """Simple pendulum with torque, disturbance, and sensor-noise ports."""
+
     def __init__(self):
         super().__init__(2, 1, 2)
 
@@ -36,41 +38,34 @@ class Pendulum(DynamicSystem):
         # The output is the state with noise added to angular position
         self.add_output_port(self.p, "y", function=self.h, dependencies=["v"])
 
-    ######################################################################
     def f(self, x, u, t=0, params=None):
-
-        if params is None:
-            params = self.params
+        params = self.params if params is None else params
 
         g = params["g"]
         m = params["m"]
         length = params["l"]
-
         theta = x[0]
 
         input_signals = self.get_port_values_from_u(u)
-        u = input_signals["u"][0]
+        tau = input_signals["u"][0]
         w = input_signals["w"][0]
 
         dx = np.zeros(2)
         dx[0] = x[1]
-        dx[1] = -g / length * np.sin(theta) + 1 / (m * length**2) * (u + w)
+        dx[1] = -g / length * np.sin(theta) + (tau + w) / (m * length**2)
 
         return dx
 
-    ######################################################################
     def h(self, x, u, t=0, params=None):
-
         v = self.u2input_signal(u, "v")
 
         y = np.zeros(self.p)
-
         y[0] = x[0]
         y[1] = x[1] + v[0]
 
         return y
 
-    ######################################################################
+    # Graphics
     def get_kinematic_geometry(self):
         primitives = []
         length = self.params["l"]
@@ -78,9 +73,7 @@ class Pendulum(DynamicSystem):
         radius = 0.08 * length
 
         # Hinge, rod, bob: blue (Pyro-style); torque arc stays red
-        primitives.append(
-            Circle(radius=radius, center=[0, 0], color="blue", fill=True)
-        )
+        primitives.append(Circle(radius=radius, center=[0, 0], color="blue", fill=True))
         # Rod: radius is meshcat cylinder girth; matplotlib uses linewidth for the line
         primitives.append(
             Rod(
@@ -99,22 +92,16 @@ class Pendulum(DynamicSystem):
 
         return primitives
 
-    ######################################################################
     def get_kinematic_transforms(self, x, u, t):
-        transforms = []
         theta = x[0]
-        # Hinge is static
-        transforms.append(pose2d_matrix(0, 0, 0))
-        # Rod rotates around hinge by theta
-        transforms.append(pose2d_matrix(0, 0, theta))
-        # Bob rotates around hinge by theta
-        transforms.append(pose2d_matrix(0, 0, theta))
-
-        # Torque arrow: arc at hinge, starting on the rod
         torque = self.u2input_signal(u, "u")[0]
         rod_angle = theta - np.pi / 2
         max_torque = 10.0
         sweep = torque * (2 * np.pi / 3) / max_torque
-        transforms.append(torque_pose2d_matrix(0, 0, rod_angle, sweep))
 
-        return transforms
+        return [
+            pose2d_matrix(0, 0, 0),
+            pose2d_matrix(0, 0, theta),
+            pose2d_matrix(0, 0, theta),
+            torque_pose2d_matrix(0, 0, rod_angle, sweep),
+        ]

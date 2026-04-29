@@ -5,10 +5,7 @@ This module reserves the RRT API shape without implementing sampling,
 steering, nearest-neighbor search, or trajectory reconstruction.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
@@ -49,7 +46,7 @@ class RRTPlanner(Planner):
         dt: float,
         max_nodes: int = 2_000,
         seed: int | None = None,
-        sampler: Any | None = None,
+        sampler=None,
     ) -> None:
         super().__init__(problem)
         self.require_goal()

@@ -67,10 +67,7 @@ class MechanicalModel:
         self._effector_point = None
         self._chain_points = []
 
-    # ------------------------------------------------------------------
     # Variable management
-    # ------------------------------------------------------------------
-
     def parameters(self, names, **assumptions):
         """
         Create symbolic constants (masses, lengths, gravity ...).
@@ -145,10 +142,7 @@ class MechanicalModel:
         """Degrees of freedom (number of coordinates)."""
         return len(self._coordinates)
 
-    # ------------------------------------------------------------------
     # Frame / point helpers
-    # ------------------------------------------------------------------
-
     def add_frame(self, name, parent=None, rotation_type="axis", **kwargs):
         """
         Add a reference frame oriented relative to *parent*.
@@ -181,10 +175,7 @@ class MechanicalModel:
         self._points[name] = pt
         return pt
 
-    # ------------------------------------------------------------------
     # Bodies
-    # ------------------------------------------------------------------
-
     def add_body(self, name, mass, inertia=None, frame=None, com=None):
         """
         Add a rigid body.
@@ -214,10 +205,7 @@ class MechanicalModel:
         self._bodies.append(particle)
         return particle
 
-    # ------------------------------------------------------------------
     # Denavit-Hartenberg chain builder
-    # ------------------------------------------------------------------
-
     def add_dh_chain(self, dh_table, link_properties):
         """
         Build a serial kinematic chain from a DH parameter table.
@@ -319,10 +307,7 @@ class MechanicalModel:
         """
         self._chain_points = list(points)
 
-    # ------------------------------------------------------------------
     # Forces & torques
-    # ------------------------------------------------------------------
-
     def add_gravity(self, accel_vector):
         """Set gravitational acceleration.  Example: ``-g * model.N.y``."""
         self._gravity_vec = accel_vector
@@ -356,10 +341,7 @@ class MechanicalModel:
         """Provide the actuator matrix B(q) directly as a SymPy Matrix."""
         self._B_matrix = B
 
-    # ------------------------------------------------------------------
     # Forward kinematics
-    # ------------------------------------------------------------------
-
     def forward_kinematics(self, point=None, simplify=True):
         """
         Symbolic position of *point* (default: end-effector) in the N frame.
@@ -410,10 +392,7 @@ class MechanicalModel:
             result.append(fk)
         return result
 
-    # ------------------------------------------------------------------
     # Internal helpers (used by derivation)
-    # ------------------------------------------------------------------
-
     def _setup_velocities(self):
         """Set velocities of every body in the Newtonian frame."""
         for body in self._bodies:
@@ -502,10 +481,7 @@ class MechanicalModel:
             forces.append((pt_b, -b * vel_rel))
         return forces, torques
 
-    # ------------------------------------------------------------------
     # EOM derivation
-    # ------------------------------------------------------------------
-
     def derive(self, method="lagrange", simplify=True):
         """
         Derive equations of motion.

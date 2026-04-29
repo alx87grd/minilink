@@ -1,7 +1,5 @@
 """Network-style synthetic systems for benchmark workloads."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.core.blocks.sources import Source

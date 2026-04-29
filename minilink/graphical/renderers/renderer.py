@@ -1,12 +1,6 @@
 """Abstract animation backend."""
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from minilink.graphical.animation import Animator
 
 
 class AnimationRenderer(ABC):
@@ -15,7 +9,7 @@ class AnimationRenderer(ABC):
     trajectory playback. Subclasses own all library-specific setup and I/O.
     """
 
-    def __init__(self, animator: Animator):
+    def __init__(self, animator):
         self.animator = animator
         self.sys = animator.sys
 
@@ -31,7 +25,7 @@ class AnimationRenderer(ABC):
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         """Present the currently drawn frame and optionally block/sleep."""
 
-    def poll_events(self) -> dict[str, Any]:
+    def poll_events(self):
         """Return backend events/state for interactive loops.
 
         ROADMAP: live **external input** (beyond quit keys) and optional **live output push**
@@ -44,7 +38,7 @@ class AnimationRenderer(ABC):
     def close_scene(self) -> None:
         """Release/close backend resources for the current session."""
 
-    def render_inline_animation(self, primitives, frames, schedule) -> Any:
+    def render_inline_animation(self, primitives, frames, schedule):
         """Optional notebook inline output (default: unsupported)."""
         raise NotImplementedError("Inline animation is not supported by this renderer.")
 
@@ -52,9 +46,7 @@ class AnimationRenderer(ABC):
         """Optional animation export (default: unsupported)."""
         raise NotImplementedError("Animation export is not supported by this renderer.")
 
-    def play_native(
-        self, primitives, frames, schedule, *, is_3d: bool
-    ) -> Any:
+    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
         """
         Optional native playback using the backend's own animation engine.
 
@@ -63,6 +55,4 @@ class AnimationRenderer(ABC):
         override this hook. Default raises ``NotImplementedError`` so callers
         can fall back to the generic per-frame loop.
         """
-        raise NotImplementedError(
-            "Native playback is not supported by this renderer."
-        )
+        raise NotImplementedError("Native playback is not supported by this renderer.")

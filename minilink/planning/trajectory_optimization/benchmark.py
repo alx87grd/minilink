@@ -1,11 +1,9 @@
 """Benchmarks for trajectory-optimization transcriptions and optimizers."""
 
-from __future__ import annotations
-
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping
 
 import numpy as np
 
@@ -251,11 +249,7 @@ def print_trajectory_optimization_benchmark(
             print(f"{row.variant.name} {row.variant.start} failed: {row.message}")
 
 
-# ---------------------------------------------------------------------------
 # TrajOpt Run
-# ---------------------------------------------------------------------------
-
-
 def _run_trajopt_variant(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
@@ -375,11 +369,7 @@ def _constraint_metrics(
     return max_eq, min_ineq, max_bound
 
 
-# ---------------------------------------------------------------------------
 # Planner Construction
-# ---------------------------------------------------------------------------
-
-
 def _planner(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
@@ -425,7 +415,9 @@ def _transcription(
                     use_gradient=use_gradient,
                 )
             )
-        return ShootingTranscription(ShootingOptions(tf=config.tf, n_steps=config.n_steps))
+        return ShootingTranscription(
+            ShootingOptions(tf=config.tf, n_steps=config.n_steps)
+        )
     if variant.transcription == "multiple_shooting":
         if variant.compile_backend == "jax":
             return JaxMultipleShootingTranscription(
@@ -446,7 +438,9 @@ def _optimizer(
     config: TrajectoryOptimizationBenchmarkConfig,
 ) -> ScipyMinimizeOptimizer:
     if variant.optimizer_backend != "scipy":
-        raise NotImplementedError(f"Unknown optimizer backend {variant.optimizer_backend!r}")
+        raise NotImplementedError(
+            f"Unknown optimizer backend {variant.optimizer_backend!r}"
+        )
 
     options = {
         "disp": False,
@@ -457,7 +451,9 @@ def _optimizer(
     return ScipyMinimizeOptimizer(method=variant.optimizer_method, options=options)
 
 
-def _warm_initial_trajectory(config: TrajectoryOptimizationBenchmarkConfig) -> Trajectory:
+def _warm_initial_trajectory(
+    config: TrajectoryOptimizationBenchmarkConfig,
+) -> Trajectory:
     if config.warm_guess_path:
         path = Path(config.warm_guess_path)
         if path.exists():
@@ -489,7 +485,9 @@ def _warm_initial_trajectory(config: TrajectoryOptimizationBenchmarkConfig) -> T
     return traj
 
 
-def _warm_optimizer(config: TrajectoryOptimizationBenchmarkConfig) -> ScipyMinimizeOptimizer:
+def _warm_optimizer(
+    config: TrajectoryOptimizationBenchmarkConfig,
+) -> ScipyMinimizeOptimizer:
     return ScipyMinimizeOptimizer(
         options={
             "disp": False,
@@ -544,11 +542,7 @@ def _with_starts(
     )
 
 
-# ---------------------------------------------------------------------------
 # Table Formatting
-# ---------------------------------------------------------------------------
-
-
 def _trajopt_table_widths(
     rows: tuple[TrajectoryOptimizationBenchmarkRow, ...],
 ) -> dict[str, int]:

@@ -25,21 +25,14 @@ class PendulumPDController(StaticSystem):
         self.outputs["u"].labels = ["torque"]
         self.outputs["u"].units = ["Nm"]
 
-    ######################################################################
     def ctl(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
 
-        if params is None:
-            params = self.params
-
+        r = u[0]
+        theta = u[1]
+        theta_dot = u[2]
         Kp = params["Kp"]
         Kd = params["Kd"]
 
-        ref = u[0]
-        theta = u[1]
-        theta_dot = u[2]
-
-        torque = Kp * (ref - theta) - Kd * theta_dot
-
-        u = np.array([torque])
-
-        return u
+        tau = Kp * (r - theta) - Kd * theta_dot
+        return np.array([tau])

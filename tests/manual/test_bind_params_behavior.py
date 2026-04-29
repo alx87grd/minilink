@@ -12,8 +12,8 @@ the old gain until you call ``compile()`` again.
 
 import numpy as np
 
-from minilink.core.blocks.basic import Integrator, PropController
 from minilink.compile.compiler import compile_diagram
+from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.diagram import DiagramSystem
 
 diag = DiagramSystem()

@@ -32,10 +32,7 @@ class DynamicsEvaluator(ABC):
         _u_nominal         — nominal input snapshot (from port values at t=0)
     """
 
-    # ================================================================
     # Standard tier — frozen params
-    # ================================================================
-
     @abstractmethod
     def f(self, x, u, t=0.0):
         """ẋ = f(x, u, t) with frozen params."""
@@ -58,10 +55,7 @@ class DynamicsEvaluator(ABC):
         """
         ...
 
-    # ================================================================
     # Parametric tier — caller supplies params dict
-    # ================================================================
-
     @abstractmethod
     def f_p(self, x, u, t, params):
         """ẋ = f(x, u, t, p) with caller-supplied params dict."""
@@ -77,11 +71,8 @@ class DynamicsEvaluator(ABC):
         """All output ports as a flat dict; same key convention as :meth:`outputs`."""
         ...
 
-    # ================================================================
     # IVP tier — frozen u (from nominal port values) + frozen params
     # Snapshotted at compile time → JIT-safe on all backends
-    # ================================================================
-
     def f_ivp(self, x, t=0.0):
         """ẋ = f(x, t) with frozen u and frozen params."""
         return self.f(x, self._u_nominal, t)
@@ -90,10 +81,7 @@ class DynamicsEvaluator(ABC):
         """y = h(x, t) with frozen u and frozen params."""
         return self.h(x, self._u_nominal, t)
 
-    # ================================================================
     # Scipy bridge
-    # ================================================================
-
     def f_scipy(self, x, u, t=0.0):
         """SciPy-friendly ``f`` with numpy in/out."""
         return np.asarray(self.f(x, u, t))
@@ -112,12 +100,11 @@ class DynamicsEvaluator(ABC):
 
     def as_scipy_jac(self):
         """Returns ``(t, x) -> df/dx`` callable for nominal ``solve_ivp``."""
-        raise NotImplementedError("Jacobian callable is not available for this evaluator")
+        raise NotImplementedError(
+            "Jacobian callable is not available for this evaluator"
+        )
 
-    # ================================================================
     # Integration — standard tier (frozen params)
-    # ================================================================
-
     def rk4_step(self, x, u, t, dt):
         """Single RK4 step: x_{k+1}."""
         k1 = self.f(x, u, t)
@@ -162,10 +149,7 @@ class DynamicsEvaluator(ABC):
         """
         raise NotImplementedError("TODO")
 
-    # ================================================================
     # Integration — parametric tier (caller-supplied params)
-    # ================================================================
-
     def rk4_step_p(self, x, u, t, dt, params):
         """Single RK4 step with caller-supplied params."""
         raise NotImplementedError("TODO")
@@ -178,10 +162,7 @@ class DynamicsEvaluator(ABC):
         """Parametric rollout. (N, m) → (N+1, n)."""
         raise NotImplementedError("TODO")
 
-    # ================================================================
     # Integration — IVP tier (frozen u + frozen params)
-    # ================================================================
-
     def rk4_step_ivp(self, x, t, dt):
         """Single RK4 step with frozen u and params."""
         k1 = self.f_ivp(x, t)
@@ -205,11 +186,8 @@ class DynamicsEvaluator(ABC):
             x_seq.append(x)
         return np.asarray(x_seq)
 
-    # ================================================================
     # Differentiation (NotImplementedError by default)
     # Could be implemented with finite differences for numpy later
-    # ================================================================
-
     def jacobian_f_x(self, x, u, t=0.0):
         """∂f/∂x → (n, n). JAX backends override."""
         raise NotImplementedError("TODO")

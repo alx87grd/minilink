@@ -1,7 +1,5 @@
 """JAX-backed multiple-shooting transcription."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import numpy as np
@@ -35,11 +33,11 @@ class JaxMultipleShootingOptions(MultipleShootingOptions):
             raise ValueError("use_hessian requires use_gradient")
 
 
-@dataclass
 class JaxMultipleShootingTranscription(MultipleShootingTranscription):
     """Multiple shooting with JAX objective and constraint derivatives."""
 
-    options: JaxMultipleShootingOptions
+    def __init__(self, options: JaxMultipleShootingOptions):
+        self.options = options
 
     def transcribe(
         self,
@@ -112,9 +110,7 @@ class JaxMultipleShootingTranscription(MultipleShootingTranscription):
             else None
         )
         objective_hess = (
-            jax.jit(jax.hessian(objective_jax))
-            if self.options.use_hessian
-            else None
+            jax.jit(jax.hessian(objective_jax)) if self.options.use_hessian else None
         )
 
         equalities = [
@@ -183,9 +179,7 @@ class JaxMultipleShootingTranscription(MultipleShootingTranscription):
 
             residual = jax.jit(residual_jax)
             residual_jac = (
-                jax.jit(jax.jacfwd(residual_jax))
-                if self.options.use_gradient
-                else None
+                jax.jit(jax.jacfwd(residual_jax)) if self.options.use_gradient else None
             )
             equalities.append(
                 EqualityConstraint(

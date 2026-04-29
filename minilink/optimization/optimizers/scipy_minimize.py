@@ -1,9 +1,6 @@
 """SciPy :func:`scipy.optimize.minimize` optimizer."""
 
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from collections.abc import Callable
 
 import numpy as np
 from scipy.optimize import minimize
@@ -15,7 +12,6 @@ from minilink.optimization.mathematical_program import (
 from minilink.optimization.optimizers.optimizer import Optimizer
 
 
-@dataclass(frozen=True)
 class ScipyMinimizeOptimizer(Optimizer):
     """
     Optimizer adapter for :func:`scipy.optimize.minimize`.
@@ -26,14 +22,15 @@ class ScipyMinimizeOptimizer(Optimizer):
     convention.
     """
 
-    method: str = "SLSQP"
-    options: dict[str, Any] = field(default_factory=dict)
+    def __init__(self, method="SLSQP", options=None):
+        self.method = method
+        self.options = {} if options is None else dict(options)
 
     def solve(
         self,
         program: MathematicalProgram,
         *,
-        callback: Callable[[Any], None] | None = None,
+        callback: Callable[[object], None] | None = None,
     ) -> OptimizationResult:
         """Solve ``program`` with SciPy and return a backend-neutral result."""
         constraints = [
@@ -69,6 +66,7 @@ class ScipyMinimizeOptimizer(Optimizer):
 
         scipy_callback = None
         if callback is not None:
+
             def scipy_callback(xk=None, state=None, *, intermediate_result=None):
                 payload = intermediate_result
                 if payload is None:

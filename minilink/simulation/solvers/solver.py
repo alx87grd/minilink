@@ -1,9 +1,6 @@
 """Abstract ODE integrator (solver) backend for :class:`Simulator`."""
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
-from typing import Any
 
 import numpy as np
 
@@ -16,10 +13,10 @@ class SolverBackend(ABC):
     @abstractmethod
     def integrate(
         self,
-        evaluator: Any,
+        evaluator,
         times: np.ndarray,
         x0: np.ndarray,
-        args: dict[str, Any] | None = None,
+        args=None,
     ) -> np.ndarray:
         """
         Nominal u: x(t) = x0 + int f_ivp(x(s), s) ds with f_ivp(x, t) = f(x, u_nom, t).
@@ -36,11 +33,11 @@ class SolverBackend(ABC):
     @abstractmethod
     def integrate_forced(
         self,
-        evaluator: Any,
+        evaluator,
         times: np.ndarray,
         u: np.ndarray,
         x0: np.ndarray,
-        args: dict[str, Any] | None = None,
+        args=None,
     ) -> np.ndarray:
         """
         Forced u: x(t) = x0 + int f(x(s), u(s), s) ds.

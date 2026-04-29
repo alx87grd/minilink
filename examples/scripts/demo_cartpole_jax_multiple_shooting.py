@@ -1,7 +1,5 @@
 """Cart-pole swing-up with JAX-backed multiple shooting."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.compile.jax_utils import configure_jax

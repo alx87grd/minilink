@@ -1,10 +1,5 @@
 """Single-shooting trajectory optimization."""
 
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Callable
-
 import numpy as np
 
 from minilink.core.sets import BoxInputSet, SingletonSet
@@ -28,7 +23,6 @@ class ShootingOptions(FixedGridOptions):
     """Grid options for fixed-step single shooting."""
 
 
-@dataclass
 class ShootingTranscription(Transcription):
     """
     Fixed-grid single-shooting transcription.
@@ -37,7 +31,8 @@ class ShootingTranscription(Transcription):
     ``z = [u[0, :], ..., u[m-1, :]]``. States are reconstructed by RK4 rollout.
     """
 
-    options: ShootingOptions
+    def __init__(self, options: ShootingOptions):
+        self.options = options
 
     def transcribe(
         self,
@@ -142,7 +137,7 @@ class ShootingTranscription(Transcription):
         self,
         problem: PlanningProblem,
         compile_backend: str | None,
-    ) -> Callable[[np.ndarray], np.ndarray]:
+    ):
         x0 = self._initial_state(problem)
         if (
             problem.params.system is not None
@@ -209,7 +204,7 @@ class ShootingTranscription(Transcription):
         self,
         z: np.ndarray,
         problem: PlanningProblem,
-        rollout: Callable[[np.ndarray], np.ndarray],
+        rollout,
     ) -> float:
         cost = problem.require_cost()
         u = self.unpack(z, problem)
@@ -230,7 +225,7 @@ class ShootingTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        rollout: Callable[[np.ndarray], np.ndarray],
+        rollout,
         equalities: list[EqualityConstraint],
         inequalities: list[InequalityConstraint],
     ) -> None:
@@ -261,23 +256,22 @@ class ShootingTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        rollout: Callable[[np.ndarray], np.ndarray],
+        rollout,
         inequalities: list[InequalityConstraint],
     ) -> None:
         if problem.X is not None:
 
             def state_margins(z):
                 x = rollout(self.unpack(z, problem))
-                return np.concatenate(
-                    [
-                        problem.X.margin(
-                            x[:, k],
-                            t=float(t_k),
-                            params=problem.params.sets,
-                        ).reshape(-1)
-                        for k, t_k in enumerate(self.options.t)
-                    ]
-                )
+                margins = []
+                for k, t_k in enumerate(self.options.t):
+                    margin = problem.X.margin(
+                        x[:, k],
+                        t=float(t_k),
+                        params=problem.params.sets,
+                    )
+                    margins.append(margin.reshape(-1))
+                return np.concatenate(margins)
 
             inequalities.append(
                 InequalityConstraint(g=state_margins, name="state_path")
@@ -288,17 +282,16 @@ class ShootingTranscription(Transcription):
             def input_margins(z):
                 u = self.unpack(z, problem)
                 x = rollout(u)
-                return np.concatenate(
-                    [
-                        problem.U.margin(
-                            u[:, k],
-                            x=x[:, k],
-                            t=float(t_k),
-                            params=problem.params.sets,
-                        ).reshape(-1)
-                        for k, t_k in enumerate(self.options.t)
-                    ]
-                )
+                margins = []
+                for k, t_k in enumerate(self.options.t):
+                    margin = problem.U.margin(
+                        u[:, k],
+                        x=x[:, k],
+                        t=float(t_k),
+                        params=problem.params.sets,
+                    )
+                    margins.append(margin.reshape(-1))
+                return np.concatenate(margins)
 
             inequalities.append(
                 InequalityConstraint(g=input_margins, name="input_path")

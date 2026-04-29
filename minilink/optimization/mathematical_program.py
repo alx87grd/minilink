@@ -9,10 +9,8 @@ Domain packages such as planning own transcription details. Optimizers
 only see finite-dimensional functions of the decision vector ``z``.
 """
 
-from __future__ import annotations
-
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
 
 import numpy as np
 
@@ -83,7 +81,7 @@ class EqualityConstraint:
     h: ArrayFunction
     jac: ArrayFunction | None = None
     name: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", dict(self.metadata))
@@ -113,7 +111,7 @@ class InequalityConstraint:
     g: ArrayFunction
     jac: ArrayFunction | None = None
     name: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", dict(self.metadata))
@@ -157,7 +155,7 @@ class MathematicalProgram:
     bounds: VariableBounds | None = None
     equalities: tuple[EqualityConstraint, ...] = ()
     inequalities: tuple[InequalityConstraint, ...] = ()
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
     grad: ArrayFunction | None = None
     hess: ArrayFunction | None = None
 
@@ -210,8 +208,8 @@ class OptimizationResult:
     success: bool
     cost: float | None = None
     message: str = ""
-    stats: dict[str, Any] = field(default_factory=dict)
-    raw_result: Any | None = None
+    stats: dict[str, object] = field(default_factory=dict)
+    raw_result: object | None = None
 
     def __post_init__(self) -> None:
         z = np.asarray(self.z, dtype=float).reshape(-1).copy()

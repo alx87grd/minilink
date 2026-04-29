@@ -1,7 +1,5 @@
 """Trajectory optimization with an in-place live trajectory plot."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.core.costs import QuadraticCost

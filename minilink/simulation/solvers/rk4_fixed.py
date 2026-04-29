@@ -1,9 +1,5 @@
 """Fixed-step fourth-order Runge–Kutta on the simulation time grid."""
 
-from __future__ import annotations
-
-from typing import Any
-
 import numpy as np
 
 from minilink.simulation.solvers.solver import SolverBackend
@@ -17,10 +13,10 @@ class RK4SolverBackend(SolverBackend):
 
     def integrate(
         self,
-        evaluator: Any,
+        evaluator,
         times: np.ndarray,
         x0: np.ndarray,
-        args: dict[str, Any] | None = None,
+        args=None,
     ) -> np.ndarray:
 
         # Get trajectory dimensions
@@ -46,11 +42,11 @@ class RK4SolverBackend(SolverBackend):
 
     def integrate_forced(
         self,
-        evaluator: Any,
+        evaluator,
         times: np.ndarray,
         u: np.ndarray,
         x0: np.ndarray,
-        args: dict[str, Any] | None = None,
+        args=None,
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]

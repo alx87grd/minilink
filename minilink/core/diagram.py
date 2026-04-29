@@ -4,7 +4,6 @@ from minilink.core.system import System, VectorSignal
 from minilink.core.trajectory import Trajectory
 
 
-######################################################################
 class DiagramSystem(System):
     def __init__(self):
 
@@ -25,7 +24,6 @@ class DiagramSystem(System):
 
         self.refresh()
 
-    ######################################################################
     def add_subsystem(self, sys, sys_id):
 
         self.subsystems[sys_id] = sys
@@ -36,7 +34,6 @@ class DiagramSystem(System):
 
         self.compute_state_properties()
 
-    ######################################################################
     def compute_state_properties(self):
 
         self.n_sys = len(self.subsystems)
@@ -87,7 +84,6 @@ class DiagramSystem(System):
         self.x0 = x0
         self.state_index = state_index
 
-    ######################################################################
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
 
         self.connections[target_sys_id][target_port_id] = (
@@ -107,7 +103,6 @@ class DiagramSystem(System):
                 + target_port_id
             )
 
-    ######################################################################
     def connect_new_output_port(
         self, source_sys_id, source_port_id, output_port_id, dependencies="all"
     ):
@@ -127,19 +122,16 @@ class DiagramSystem(System):
 
         self.connect(source_sys_id, source_port_id, "output", output_port_id)
 
-    ######################################################################
     def get_graphe(self):
         from minilink.graphical.graphe import get_diagram_graphe
 
         return get_diagram_graphe(self)
 
-    ######################################################################
     def get_local_state(self, x, sys_id):
 
         idx = self.state_index[sys_id]
         return x[idx[0] : idx[1]]
 
-    ######################################################################
     def compute_subsys_output_port(self, x, u, t, sys_id, port_id):
 
         # Get the subsystem output port
@@ -154,7 +146,6 @@ class DiagramSystem(System):
 
         return port_y
 
-    ######################################################################
     def get_subsys_input_port(self, x, u, t, sys_id, port_id):
 
         # Get the source of the signal
@@ -189,7 +180,6 @@ class DiagramSystem(System):
 
         return port_u
 
-    ######################################################################
     def check_algebraic_loops(self):
         """
         Detects algebraic loops and returns the topological port execution order.
@@ -208,7 +198,6 @@ class DiagramSystem(System):
 
         return check_algebraic_loops(self)  # RuntimeError propagates if loop found
 
-    ######################################################################
     def compile(self, backend="numpy", bind_params=False, verbose=False):
         """
         Compiles the diagram into a stateless Evaluator for high-performance simulation.
@@ -236,7 +225,6 @@ class DiagramSystem(System):
             self, backend=backend, bind_params=bind_params, verbose=verbose
         )
 
-    ######################################################################
     def refresh(self):
         """
         Refresh all subsystems and rebuild the compiled execution plan.
@@ -244,7 +232,6 @@ class DiagramSystem(System):
         for _, sys in self.subsystems.items():
             sys.refresh()
 
-    ######################################################################
     def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
         """
         Reconstruct all subsystem output-port trajectories for this diagram.
@@ -277,14 +264,12 @@ class DiagramSystem(System):
 
         return traj.with_signals(internal_signals)
 
-    ######################################################################
     def compute_internal_signals(self, traj: Trajectory) -> Trajectory:
         """
         Compatibility alias for :meth:`reconstruct_internal_signals`.
         """
         return self.reconstruct_internal_signals(traj)
 
-    ######################################################################
     def get_local_input(self, x, u, t, sys_id, dependencies="all"):
         """
         Get the input signal for a given subsystem
@@ -325,7 +310,6 @@ class DiagramSystem(System):
 
         return np.concatenate(local_u_list)
 
-    ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
 
         dx = np.zeros(self.n)
@@ -353,9 +337,7 @@ class DiagramSystem(System):
 
         return dx
 
-    ######################################################################
     # Graphical Animation Engine Defaults for Diagram
-    ######################################################################
     def get_kinematic_geometry(self):
         primitives = []
         for sys_id, sys in self.subsystems.items():
@@ -378,6 +360,5 @@ class DiagramSystem(System):
         return transforms
 
 
-######################################################################
 if __name__ == "__main__":
     diagram = DiagramSystem()

@@ -10,11 +10,8 @@ Costs live in :mod:`minilink.core` (not on
 across many planning problems.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
@@ -37,7 +34,7 @@ class CostFunction(ABC):
         x: np.ndarray,
         u: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> float:
         """Return the running cost density ``g(x, u, t)``."""
         ...
@@ -47,7 +44,7 @@ class CostFunction(ABC):
         self,
         x: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> float:
         """Return the terminal cost ``h(x, t)``."""
         ...
@@ -55,7 +52,7 @@ class CostFunction(ABC):
     def evaluate_trajectory(
         self,
         traj: Trajectory,
-        params: Any | None = None,
+        params=None,
     ) -> Trajectory:
         """
         Return ``traj`` with sampled running and cumulative costs.
@@ -85,7 +82,7 @@ class CostFunction(ABC):
     def terminal_cost(
         self,
         traj: Trajectory,
-        params: Any | None = None,
+        params=None,
     ) -> float:
         """Return ``h`` evaluated at the final state of ``traj``."""
         return float(self.h(traj.x[:, -1], traj.tf, params=params))
@@ -93,7 +90,7 @@ class CostFunction(ABC):
     def total_cost(
         self,
         traj: Trajectory,
-        params: Any | None = None,
+        params=None,
     ) -> float:
         """Return the trapezoidal running cost plus terminal cost."""
         evaluated = self.evaluate_trajectory(traj, params=params)
@@ -143,14 +140,14 @@ class QuadraticCost(CostFunction):
     @classmethod
     def from_system(
         cls,
-        sys: Any,
+        sys,
         *,
         Q: np.ndarray | None = None,
         R: np.ndarray | None = None,
         S: np.ndarray | None = None,
         xbar: np.ndarray | None = None,
         ubar: np.ndarray | None = None,
-    ) -> QuadraticCost:
+    ):
         """
         Create a default quadratic cost from a Minilink system.
 
@@ -176,7 +173,7 @@ class QuadraticCost(CostFunction):
         x: np.ndarray,
         u: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> float:
         """Return the quadratic running cost."""
         x_arr = np.asarray(x, dtype=float).reshape(self.xbar.shape)
@@ -189,7 +186,7 @@ class QuadraticCost(CostFunction):
         self,
         x: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ) -> float:
         """Return the quadratic terminal cost."""
         x_arr = np.asarray(x, dtype=float).reshape(self.xbar.shape)
@@ -216,7 +213,7 @@ class JaxQuadraticCost(QuadraticCost):
         x: np.ndarray,
         u: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ):
         """Return the quadratic running cost as a JAX scalar."""
         from minilink.compile.jax_utils import require_jax_numpy
@@ -232,7 +229,7 @@ class JaxQuadraticCost(QuadraticCost):
         self,
         x: np.ndarray,
         t: float = 0.0,
-        params: Any | None = None,
+        params=None,
     ):
         """Return the quadratic terminal cost as a JAX scalar."""
         from minilink.compile.jax_utils import require_jax_numpy

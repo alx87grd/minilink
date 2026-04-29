@@ -16,8 +16,6 @@ Configure process-wide JAX precision with
 :func:`minilink.compile.jax_utils.configure_jax` before constructing JAX systems.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import numpy as np
@@ -63,7 +61,6 @@ class JaxDirectCollocationOptions(DirectCollocationOptions):
             raise ValueError("use_hessian requires use_gradient")
 
 
-@dataclass
 class JaxDirectCollocationTranscription(DirectCollocationTranscription):
     """
     Direct-collocation transcription with JAX-derived first (and optional
@@ -72,7 +69,8 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
     running/terminal cost.
     """
 
-    options: JaxDirectCollocationOptions
+    def __init__(self, options: JaxDirectCollocationOptions):
+        self.options = options
 
     @staticmethod
     def _validate_jax_traceable_quadratic_pairing(cost: CostFunction) -> None:
@@ -148,9 +146,7 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
         def dynamics_residual_jax(z):
             x, u = unpack_jax(z)
             dx = jax.vmap(f, in_axes=(1, 1, 0), out_axes=1)(x, u, t)
-            residuals = x[:, 1:] - x[:, :-1] - 0.5 * dt * (
-                dx[:, :-1] + dx[:, 1:]
-            )
+            residuals = x[:, 1:] - x[:, :-1] - 0.5 * dt * (dx[:, :-1] + dx[:, 1:])
             return residuals.reshape(-1)
 
         objective_jit = jax.jit(objective_jax)
@@ -164,9 +160,7 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
             else None
         )
         objective_hess_jit = (
-            jax.jit(jax.hessian(objective_jax))
-            if self.options.use_hessian
-            else None
+            jax.jit(jax.hessian(objective_jax)) if self.options.use_hessian else None
         )
 
         equalities = [
@@ -263,9 +257,7 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
 
             residual_jit = jax.jit(residual_jax)
             residual_jac_jit = (
-                jax.jit(jax.jacfwd(residual_jax))
-                if self.options.use_gradient
-                else None
+                jax.jit(jax.jacfwd(residual_jax)) if self.options.use_gradient else None
             )
             equalities.append(
                 EqualityConstraint(

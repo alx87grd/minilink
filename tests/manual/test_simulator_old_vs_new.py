@@ -1,7 +1,4 @@
-import numpy as np
-import jax
 import jax.numpy as jnp
-
 
 # from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.core.system import DynamicSystem

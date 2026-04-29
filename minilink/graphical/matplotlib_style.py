@@ -16,13 +16,6 @@ Pyro uses ``default_fontsize = 5`` for dense print figures; Minilink uses a larg
 default for notebook readability. Adjust :data:`FONT_SIZE` if you need print density.
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from matplotlib.axes import Axes
-
 # 4:3 animation canvas (1.5× Pyro's (4, 3) inches); smaller than (8, 6) for laptops.
 FIGSIZE_ANIMATION = (6, 4.5)
 # Baseline small figure size (same aspect as Pyro's (4, 3)).
@@ -70,7 +63,7 @@ def signal_stack_figsize(
     return (w, h)
 
 
-def style_animation_axes(ax: Axes, *, is_3d: bool) -> None:
+def style_animation_axes(ax, *, is_3d: bool) -> None:
     """Tick labels, grid, and axis label sizes for animation/static kinematic views."""
     ax.tick_params(axis="both", which="both", labelsize=FONT_SIZE)
     ax.grid(True)
@@ -80,7 +73,7 @@ def style_animation_axes(ax: Axes, *, is_3d: bool) -> None:
         ax.zaxis.label.set_fontsize(FONT_SIZE)
 
 
-def style_trajectory_subplot(ax: Axes) -> None:
+def style_trajectory_subplot(ax) -> None:
     """Grid and ticks for stacked trajectory / signal plots."""
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.tick_params(labelsize=FONT_SIZE)

@@ -5,8 +5,6 @@ The physics world is wrapped in a DynamicSystem so it can be simulated,
 compiled, and animated in the standard minilink ecosystem.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.core.blocks.sources import Step

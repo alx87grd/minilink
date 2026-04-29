@@ -29,11 +29,8 @@ from minilink.compile.execution_plan import (
     ExecutionPlan,
 )
 
-# =====================================================================
+
 # JAX compatibility checking
-# =====================================================================
-
-
 def _check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
     """Test if *func* is JAX-traceable via ``jax.make_jaxpr``.
 
@@ -42,9 +39,7 @@ def _check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
     from jax.errors import ConcretizationTypeError
 
     try:
-        jax.make_jaxpr(lambda x, u, t: func(x, u, t, params))(
-            dummy_x, dummy_u, dummy_t
-        )
+        jax.make_jaxpr(lambda x, u, t: func(x, u, t, params))(dummy_x, dummy_u, dummy_t)
     except (ConcretizationTypeError, TypeError, Exception) as e:
         raise RuntimeError(
             f"\n\nBlock '{label}' is not JAX-traceable.\n"
@@ -97,11 +92,7 @@ def _build_jit_rk4_rollout_forced(jax, jnp, f):
     return jax.jit(_rk4_rollout_forced)
 
 
-# =====================================================================
 # Leaf evaluator
-# =====================================================================
-
-
 class JaxLeafEvaluator(DynamicsEvaluator):
     """Compiled evaluator for a single System using JAX.
 
@@ -143,16 +134,21 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         dummy_u = jnp.zeros(self.m)
         dummy_t = 0.0
 
-        # --- Step 0: JAX compatibility check -----------------------------
+        # Step 0: JAX compatibility check
         if verbose:
             t0 = time.perf_counter()
-            print(f"[compile] Step 0: Checking JAX compatibility of "
-                  f"'{system.name}'...", end="", flush=True)
+            print(
+                f"[compile] Step 0: Checking JAX compatibility of '{system.name}'...",
+                end="",
+                flush=True,
+            )
 
-        _check_jax_compatible(f_raw, system.name, dummy_x, dummy_u,
-                              dummy_t, frozen_p, jax)
-        _check_jax_compatible(h_raw, system.name, dummy_x, dummy_u,
-                              dummy_t, frozen_p, jax)
+        _check_jax_compatible(
+            f_raw, system.name, dummy_x, dummy_u, dummy_t, frozen_p, jax
+        )
+        _check_jax_compatible(
+            h_raw, system.name, dummy_x, dummy_u, dummy_t, frozen_p, jax
+        )
         for port_id, port in system.outputs.items():
             _check_jax_compatible(
                 port.compute,
@@ -167,15 +163,18 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        # --- Step 1: JIT-compile core callables --------------------------
+        # Step 1: JIT-compile core callables
         # Frozen-params tier: params baked into closure, JAX never sees them
         # as an argument — no static_argnames needed.
         # Parametric tier: params passed as arg and expected to vary — also
         # no static_argnames (caller controls recompilation).
         if verbose:
             t0 = time.perf_counter()
-            print(f"[compile] Step 1: JIT-compiling to XLA on "
-                  f"{jax.default_backend()}...", end="", flush=True)
+            print(
+                f"[compile] Step 1: JIT-compiling to XLA on {jax.default_backend()}...",
+                end="",
+                flush=True,
+            )
 
         self._jit_f = jax.jit(lambda x, u, t: f_raw(x, u, t, frozen_p))
         self._jit_h = jax.jit(lambda x, u, t: h_raw(x, u, t, frozen_p))
@@ -212,11 +211,10 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        # --- Step 2: Warm-start with dummy data --------------------------
+        # Step 2: Warm-start with dummy data
         if verbose:
             t0 = time.perf_counter()
-            print("[compile] Step 2: Warm-starting JIT cache...", end="",
-                  flush=True)
+            print("[compile] Step 2: Warm-starting JIT cache...", end="", flush=True)
 
         try:
             self._jit_f(dummy_x, dummy_u, dummy_t)
@@ -239,8 +237,7 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # -- Standard tier (frozen params) ------------------------------------
-
+    # Standard tier (frozen params)
     def f(self, x, u, t=0.0):
         return self._jit_f(x, u, t)
 
@@ -255,8 +252,7 @@ class JaxLeafEvaluator(DynamicsEvaluator):
     def outputs(self, x, u, t=0.0):
         return self._jit_outputs(x, u, t)
 
-    # -- Parametric tier (caller-supplied params) -------------------------
-
+    # Parametric tier (caller-supplied params)
     def f_p(self, x, u, t, params):
         return self._jit_f_p(x, u, t, params)
 
@@ -274,8 +270,7 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         """Return the JIT-compiled parametric ``outputs_p`` callable."""
         return self._jit_outputs_p
 
-    # -- IVP tier (override ABC defaults with JIT versions) ---------------
-
+    # IVP tier (override ABC defaults with JIT versions)
     def f_ivp(self, x, t=0.0):
         return self._jit_f_ivp(x, t)
 
@@ -315,11 +310,7 @@ class JaxLeafEvaluator(DynamicsEvaluator):
         return self._jit_rk4_rollout_forced(x0, u_knots, t0, dt)
 
 
-# =====================================================================
 # JAX signal gathering
-# =====================================================================
-
-
 def _gather_u_jax(gather_sources, u_dim, signals, u, jnp, dtype):
     """Assemble the local input vector using JAX operations.
 
@@ -360,11 +351,7 @@ def _gather_u_jax(gather_sources, u_dim, signals, u, jnp, dtype):
     return jnp.concatenate(pieces, axis=0) if pieces else jnp.array([], dtype=dtype)
 
 
-# =====================================================================
 # Diagram evaluator
-# =====================================================================
-
-
 class JaxDiagramEvaluator(DynamicsEvaluator):
     """JAX-compatible evaluator for a compiled diagram.
 
@@ -422,23 +409,29 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         self._frozen_params = None  # per-op binding, not diagram-level
         self._u_nominal = jnp.array(diagram.get_u_from_input_ports())
 
-        # --- Step 0 (JAX): Check compatibility of all subsystem blocks ---
+        # Step 0 (JAX): Check compatibility of all subsystem blocks
         if verbose:
             t0 = time.perf_counter()
             n_blocks = len(diagram.subsystems)
-            print(f"[compile] Step 0: Checking JAX compatibility of "
-                  f"{n_blocks} blocks...", end="", flush=True)
+            print(
+                f"[compile] Step 0: Checking JAX compatibility of {n_blocks} blocks...",
+                end="",
+                flush=True,
+            )
 
         self._check_jax_compatibility(diagram, jax, jnp)
 
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        # --- Step 3 (JAX): JIT-compile to XLA ----------------------------
+        # Step 3 (JAX): JIT-compile to XLA
         if verbose:
             t0 = time.perf_counter()
-            print(f"[compile] Step 3: JIT-compiling to XLA on "
-                  f"{jax.default_backend()}...", end="", flush=True)
+            print(
+                f"[compile] Step 3: JIT-compiling to XLA on {jax.default_backend()}...",
+                end="",
+                flush=True,
+            )
 
         # Store reference to the eager (traceable) implementation, then JIT.
         # Params are captured at trace time: if bind_params=False, subsystem
@@ -469,11 +462,10 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        # --- Step 4 (JAX): Warm-start JIT cache --------------------------
+        # Step 4 (JAX): Warm-start JIT cache
         if verbose:
             t0 = time.perf_counter()
-            print("[compile] Step 4: Warm-starting JIT cache...", end="",
-                  flush=True)
+            print("[compile] Step 4: Warm-starting JIT cache...", end="", flush=True)
 
         dummy_x = jnp.zeros(self.n)
         dummy_u = jnp.zeros(self.m)
@@ -495,8 +487,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # ── Diagram boundary outputs (JAX-traceable; same contract as leaf) ─
-
+    # Diagram boundary outputs (JAX-traceable; same contract as leaf)
     def _external_outputs_eager(self, x, u, t):
         """Boundary outputs only — keys match :attr:`DiagramSystem.outputs`."""
         dtype = self._infer_dtype(x, u)
@@ -511,8 +502,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         dtype = self._infer_dtype(x, u)
         return self._compute_port_signals(x, u, t, dtype)
 
-    # ── JAX compatibility pre-flight ────────────────────────────────
-
+    # JAX compatibility pre-flight
     def _check_jax_compatibility(self, diagram, jax, jnp):
         """Test each subsystem's f() and port compute() for JAX traceability."""
         for sys_id, sys in diagram.subsystems.items():
@@ -524,19 +514,28 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
             # Check f() for dynamic systems
             if sys.n > 0:
                 _check_jax_compatible(
-                    sys.f, f"{sys_id} ({sys.name})",
-                    dummy_x, dummy_u, dummy_t, params, jax,
+                    sys.f,
+                    f"{sys_id} ({sys.name})",
+                    dummy_x,
+                    dummy_u,
+                    dummy_t,
+                    params,
+                    jax,
                 )
 
             # Check each output port compute()
             for port_id, port in sys.outputs.items():
                 _check_jax_compatible(
-                    port.compute, f"{sys_id}:{port_id} ({sys.name})",
-                    dummy_x, dummy_u, dummy_t, params, jax,
+                    port.compute,
+                    f"{sys_id}:{port_id} ({sys.name})",
+                    dummy_x,
+                    dummy_u,
+                    dummy_t,
+                    params,
+                    jax,
                 )
 
-    # ── Dtype inference ──────────────────────────────────────────────
-
+    # Dtype inference
     def _infer_dtype(self, x, u):
         """Best-effort dtype inference from input arrays."""
         jnp = self._jnp
@@ -544,8 +543,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         dtype = getattr(sample, "dtype", None)
         return dtype if dtype is not None else jnp.float32
 
-    # ── Eager f implementation (JAX-traceable, used by jit) ──────────
-
+    # Eager f implementation (JAX-traceable, used by jit)
     def f(self, x, u, t=0.0):
         """ẋ = f(x, u, t) — delegates to the JIT-compiled version."""
         return self._jit_f(x, u, t)
@@ -600,8 +598,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
     def outputs(self, x, u, t=0.0):
         return self._jit_outputs(x, u, t)
 
-    # ── ABC: Parametric tier ────────────────────────────────────────
-
+    # ABC: Parametric tier
     def f_p(self, x, u, t, params):
         raise NotImplementedError("Parametric tier not supported for diagrams yet.")
 
@@ -611,8 +608,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
     def outputs_p(self, x, u, t, params):
         raise NotImplementedError("Parametric tier not supported for diagrams yet.")
 
-    # ── IVP tier ────────────────────────────────────────────────────
-
+    # IVP tier
     def f_ivp(self, x, t=0.0):
         return self._jit_f_ivp(x, t)
 
@@ -648,8 +644,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         dt = jnp.asarray(dt)
         return self._jit_rk4_rollout_forced(x0, u_knots, t0, dt)
 
-    # ── JIT convenience ─────────────────────────────────────────────
-
+    # JIT convenience
     def get_f_jit(self):
         """Return the JIT-compiled ``f`` callable directly (skips method dispatch)."""
         return self._jit_f
@@ -662,8 +657,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
         """Return the JIT-compiled ``compute_internal_signals`` callable."""
         return self._jit_internal_signals
 
-    # ── Diagram-specific methods ────────────────────────────────────
-
+    # Diagram-specific methods
     def compute_internal_signals(self, x, u, t=0.0):
         """Evaluate and return the full internal signal buffer (flat JAX array).
 
@@ -690,8 +684,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator):
             for (sys_id, port_id), sl in self.plan.output_slices.items()
         }
 
-    # ── Private ──────────────────────────────────────────────────────
-
+    # Private
     def _compute_port_signals(self, x, u, t, dtype):
         """Evaluate all port signals in topological order (JAX-traceable)."""
         jnp = self._jnp

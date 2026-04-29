@@ -1,9 +1,5 @@
 """SciPy :func:`scipy.integrate.solve_ivp` integrator backend."""
 
-from __future__ import annotations
-
-from typing import Any
-
 import numpy as np
 from scipy.integrate import solve_ivp
 
@@ -44,10 +40,10 @@ class SciPySolverBackend(SolverBackend):
 
     def integrate(
         self,
-        evaluator: Any,
+        evaluator,
         times: np.ndarray,
         x0: np.ndarray,
-        args: dict[str, Any] | None = None,
+        args=None,
     ) -> np.ndarray:
 
         # Get the time interval
@@ -81,11 +77,11 @@ class SciPySolverBackend(SolverBackend):
 
     def integrate_forced(
         self,
-        evaluator: Any,
+        evaluator,
         times: np.ndarray,
         u: np.ndarray,
         x0: np.ndarray,
-        args: dict[str, Any] | None = None,
+        args=None,
     ) -> np.ndarray:
 
         # Get the integration parameters

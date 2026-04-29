@@ -142,7 +142,13 @@ class TestNewSimulator(unittest.TestCase):
 
     def test_invalid_x0_shape_raises_value_error(self):
         with self.assertRaises(ValueError):
-            Simulator(StableLinearSystem(), x0=np.array([[1.0]]), tf=1.0, n_steps=5, verbose=False)
+            Simulator(
+                StableLinearSystem(),
+                x0=np.array([[1.0]]),
+                tf=1.0,
+                n_steps=5,
+                verbose=False,
+            )
 
     def test_scipy_failure_raises_and_keeps_debug_information(self):
         failed_solution = SimpleNamespace(
@@ -173,7 +179,9 @@ class TestNewSimulator(unittest.TestCase):
         self.assertFalse(hasattr(sim, "last_traj"))
 
     def test_solve_populates_last_traj_and_last_debug(self):
-        sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False)
+        sim = Simulator(
+            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
         traj = sim.solve()
 
         self.assertIs(sim.last_traj, traj)
@@ -182,7 +190,9 @@ class TestNewSimulator(unittest.TestCase):
         self.assertEqual(traj.u.shape, (1, 3))
 
     def test_solve_forced_validates_shape(self):
-        sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False)
+        sim = Simulator(
+            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
         bad_u = np.zeros((3, 1))
 
         with self.assertRaises(ValueError):

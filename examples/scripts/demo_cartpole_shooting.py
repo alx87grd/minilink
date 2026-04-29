@@ -1,7 +1,5 @@
 """Cart-pole swing-up with single shooting."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from minilink.core.costs import QuadraticCost

@@ -345,11 +345,7 @@ def print_simulation_matrix_header(result: SimulationBenchmarkResult) -> None:
     print("-" * len(titles))
 
 
-# ---------------------------------------------------------------------------
 # Standard Cases
-# ---------------------------------------------------------------------------
-
-
 def _pendulum_long() -> Any:
     from minilink.simulation.scenarios.basic import make_pendulum
 
@@ -396,11 +392,7 @@ STANDARD_SIMULATION_CASES: tuple[SimulationBenchmarkCase, ...] = (
 )
 
 
-# ---------------------------------------------------------------------------
 # Simulation Runs
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class _RuntimeStats:
     mean: float
@@ -442,7 +434,9 @@ class _TimedSimulator(Simulator):
 class _CachedCompileTimedSimulator(_TimedSimulator):
     """Timed simulator with a benchmark-local evaluator cache."""
 
-    def __init__(self, *args: Any, _eval_cache: dict[tuple[int, str], Any], **kwargs: Any):
+    def __init__(
+        self, *args: Any, _eval_cache: dict[tuple[int, str], Any], **kwargs: Any
+    ):
         self._eval_cache = _eval_cache
         super().__init__(*args, **kwargs)
 
@@ -540,7 +534,12 @@ def _run_compile_each(
     def run_once() -> tuple[np.ndarray, dict[str, Any], float, float]:
         sim = _new_timed_sim(system, t0, tf, dt, variant)
         traj = sim.solve()
-        return traj.x[:, -1].copy(), sim.last_debug, sim._last_compile_s, sim._last_solve_s
+        return (
+            traj.x[:, -1].copy(),
+            sim.last_debug,
+            sim._last_compile_s,
+            sim._last_solve_s,
+        )
 
     durations, outputs = _run_timed(run_once, n_runs=n_runs)
     stats = _runtime_stats(durations)
@@ -670,11 +669,7 @@ def _truth_first(
     return (truth, *(variant for variant in variants if variant != truth))
 
 
-# ---------------------------------------------------------------------------
 # Table Formatting
-# ---------------------------------------------------------------------------
-
-
 def _compile_backend_key_for_compare(backend_label: str) -> str:
     if backend_label.startswith("jax(") and backend_label.endswith(")"):
         return "jax"
@@ -742,14 +737,12 @@ def _format_matrix_row(row: SimulationBenchmarkRow, *, compile_once: bool) -> st
         return (
             f"{head}{row.mean_compile_time:>{_MZ_F}.6f} "
             f"{row.mean_solve_time:>{_MZ_F}.6f} "
-            f"{row.std_time:>{_MZ_F}.6f} {row.total_s:>{_MZ_F}.6f}"
-            + tail
+            f"{row.std_time:>{_MZ_F}.6f} {row.total_s:>{_MZ_F}.6f}" + tail
         )
     return (
         f"{head}{row.total_s:>{_MZ_F}.6f} {row.std_time:>{_MZ_F}.6f} "
         f"{row.mean_compile_time:>{_MZ_F}.6f} "
-        f"{row.mean_solve_time:>{_MZ_F}.6f}"
-        + tail
+        f"{row.mean_solve_time:>{_MZ_F}.6f}" + tail
     )
 
 
