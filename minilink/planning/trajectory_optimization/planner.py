@@ -34,13 +34,19 @@ class TrajectoryOptimizationIteration:
 
 @dataclass
 class TrajectoryOptimizationOptions:
-    """Generic trajectory-optimization workflow options."""
+    """Generic trajectory-optimization workflow options.
+
+    ``solve_disp`` maps to :meth:`~minilink.optimization.optimizers.optimizer.Optimizer.solve`
+    ``disp=…`` (Minilink text report, not SciPy's ``options['disp']``).
+    """
 
     compile_backend: str | None = "numpy"
     initial_guess: np.ndarray | Trajectory | None = None
     warm_start: bool = False
     record_history: bool = False
     callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
+    record_solve_time: bool = False
+    solve_disp: bool = False
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -88,6 +94,8 @@ class TrajectoryOptimizationPlanner(Planner):
         optimization_result = self.optimizer.solve(
             program,
             callback=self._make_callback(program, compile_backend),
+            record_solve_time=self.options.record_solve_time,
+            disp=self.options.solve_disp,
         )
         trajectory = self.transcription.reconstruct_result(
             optimization_result,

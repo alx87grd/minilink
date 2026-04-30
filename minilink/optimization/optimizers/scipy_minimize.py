@@ -26,30 +26,31 @@ class ScipyMinimizeOptimizer(Optimizer):
         self.method = method
         self.options = {} if options is None else dict(options)
 
-    def solve(
+    def _solve_impl(
         self,
         program: MathematicalProgram,
         *,
         callback: Callable[[object], None] | None = None,
     ) -> OptimizationResult:
         """Solve ``program`` with SciPy and return a backend-neutral result."""
-        constraints = [
-            {
-                "type": "eq",
-                "fun": equality.residual,
-                **({"jac": equality.jac} if equality.jac is not None else {}),
-            }
-            for equality in program.equalities
-        ]
-        constraints.extend(
-            {
-                "type": "ineq",
-                "fun": inequality.margin,
-                **({"jac": inequality.jac} if inequality.jac is not None else {}),
-            }
-            for inequality in program.inequalities
-        )
 
+        constraints = []
+
+        # Equality constraints
+        for equality in program.equalities:
+            entry = {"type": "eq", "fun": equality.residual}
+            if equality.jac is not None:
+                entry["jac"] = equality.jac
+            constraints.append(entry)
+
+        # Inequality constraints
+        for inequality in program.inequalities:
+            entry = {"type": "ineq", "fun": inequality.margin}
+            if inequality.jac is not None:
+                entry["jac"] = inequality.jac
+            constraints.append(entry)
+
+        # Box bounds
         bounds = None
         if program.bounds is not None:
             lower = (
@@ -85,11 +86,11 @@ class ScipyMinimizeOptimizer(Optimizer):
             options=dict(self.options),
         )
 
-        stats = {
-            name: getattr(raw_result, name)
-            for name in ("nit", "nfev", "njev", "status")
-            if hasattr(raw_result, name)
-        }
+        stats = {}
+        for name in ("nit", "nfev", "njev", "status"):
+            if hasattr(raw_result, name):
+                stats[name] = getattr(raw_result, name)
+
         return OptimizationResult(
             z=np.asarray(raw_result.x, dtype=float),
             success=bool(raw_result.success),

@@ -202,6 +202,14 @@ class MathematicalProgram:
 class OptimizationResult:
     """
     Result returned by an :class:`~minilink.optimization.optimizers.optimizer.Optimizer`.
+
+    Parameters
+    ----------
+    solve_time_s : float, optional
+        Wall-clock time in seconds for the backend solver only, when the caller
+        requested timing on :meth:`~minilink.optimization.optimizers.optimizer.Optimizer.solve`
+        (``record_solve_time=True``) or a summary report (``disp=True``).
+        ``None`` means not measured.
     """
 
     z: np.ndarray
@@ -210,8 +218,11 @@ class OptimizationResult:
     message: str = ""
     stats: dict[str, object] = field(default_factory=dict)
     raw_result: object | None = None
+    solve_time_s: float | None = None
 
     def __post_init__(self) -> None:
         z = np.asarray(self.z, dtype=float).reshape(-1).copy()
         object.__setattr__(self, "z", z)
         object.__setattr__(self, "stats", dict(self.stats))
+        if self.solve_time_s is not None:
+            object.__setattr__(self, "solve_time_s", float(self.solve_time_s))
