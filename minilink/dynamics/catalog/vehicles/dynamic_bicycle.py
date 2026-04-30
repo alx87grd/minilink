@@ -6,10 +6,13 @@ State ``x = [x, y, theta, u, v, r]``: world pose and body velocities (surge, swa
 Inputs ``u = [w_rear, delta]``: rear wheel spin rate [rad/s], steer angle [rad].
 
 :class:`DynamicBicycleCar3D` subclasses this model with identical dynamics and richer 3D graphics.
+:class:`JaxDynamicBicycle` is a JAX-traceable variant of the same dynamics, suitable for
+gradient-based trajectory optimization.
 """
 
 import numpy as np
 
+from minilink.compile.jax_utils import require_jax_numpy
 from minilink.core.system import DynamicSystem
 from minilink.graphical.primitives import (
     Arrow,
@@ -725,3 +728,149 @@ class DynamicBicycleCar3DRealistic(DynamicBicycleCar3D):
             _force_arrow(Ffx_w, Ffy_w, self.a, 0.5 * tr, self.r_f + 0.02),
             _force_arrow(Ffx_w, Ffy_w, self.a, -0.5 * tr, self.r_f + 0.02),
         ]
+
+
+# === JAX-traceable variant ===================================================
+#
+# Same equations as :class:`DynamicBicycle`, but written so the dynamics ``f``
+# trace through ``jax.numpy``. The branch in :meth:`LinearTire.vel2forces`
+# becomes a smooth ``where`` so the model is differentiable end-to-end and
+# usable by the JAX trajectory-optimization transcriptions in
+# :mod:`minilink.planning.trajectory_optimization`.
+
+
+class JaxLinearTire:
+    """JAX-traceable counterpart of :class:`LinearTire`."""
+
+    def __init__(self, Ca: float = 60000.0, Ck: float = 100000.0, mu: float = 1.0):
+        self.v_min_epsilon = 0.1
+        self.Ca = Ca
+        self.Ck = Ck
+        self.mu = mu
+
+    def vel2slip(self, vx, vy, w, R):
+        jnp = require_jax_numpy()
+        vx_adj = jnp.abs(vx) + self.v_min_epsilon
+        alpha = -jnp.arctan(vy / vx_adj)
+        kappa = (w * R - vx) / vx_adj
+        return alpha, kappa
+
+    def vel2forces(self, vx, vy, w, R, Fz):
+        jnp = require_jax_numpy()
+        alpha, kappa = self.vel2slip(vx, vy, w, R)
+        Fx = self.Ck * kappa
+        Fy = self.Ca * alpha
+        F_max = self.mu * Fz
+        F_total = jnp.sqrt(Fx**2 + Fy**2)
+        # Saturate to the friction circle without a Python branch.
+        ratio = jnp.where(F_total > F_max, F_max / (F_total + 1e-12), 1.0)
+        return Fx * ratio, Fy * ratio
+
+
+class JaxDynamicBicycle(DynamicBicycle):
+    """JAX-traceable :class:`DynamicBicycle`.
+
+    Inherits the geometry and visualization contract from
+    :class:`DynamicBicycle` and only overrides the equations of motion so that
+    ``f(x, u, t)`` traces through ``jax.numpy``. Useful with
+    :class:`~minilink.planning.trajectory_optimization.jax_direct_collocation.JaxDirectCollocationTranscription`
+    and the other JAX-backed transcriptions for analytic-gradient trajectory
+    optimization.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "JAX Dynamic Bicycle"
+        self.tire_model_f = JaxLinearTire()
+        self.tire_model_r = JaxLinearTire()
+
+    # --- Equations of motion (JAX) ---
+
+    def M_mat(self, q):
+        jnp = require_jax_numpy()
+        return jnp.diag(jnp.array([self.mass, self.mass, self.inertia], dtype=float))
+
+    def C_mat(self, q, v):
+        jnp = require_jax_numpy()
+        w = v[2]
+        return jnp.array(
+            [
+                [0.0, -self.mass * w, 0.0],
+                [self.mass * w, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+            ]
+        )
+
+    def N_mat(self, q):
+        jnp = require_jax_numpy()
+        theta = q[2]
+        c, s = jnp.cos(theta), jnp.sin(theta)
+        return jnp.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+
+    def compute_wheel_velocities(self, v_body, u_inputs):
+        jnp = require_jax_numpy()
+        u = v_body[0]
+        v = v_body[1]
+        r = v_body[2]
+        delta = u_inputs[1]
+
+        vx_f_b = u
+        vy_f_b = v + self.a * r
+        vx_r_b = u
+        vy_r_b = v - self.b * r
+
+        c_d, s_d = jnp.cos(delta), jnp.sin(delta)
+        vx_f = c_d * vx_f_b + s_d * vy_f_b
+        vy_f = -s_d * vx_f_b + c_d * vy_f_b
+        vx_r = vx_r_b
+        vy_r = vy_r_b
+
+        w_r = u_inputs[0]
+        w_f = vx_f / self.r_f
+        return vx_f, vy_f, w_f, vx_r, vy_r, w_r
+
+    def compute_tire_physics(self, v_body, u_inputs):
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
+            v_body, u_inputs
+        )
+        Fz_f = self.mass * self.gravity * (self.b / self.L)
+        Fz_r = self.mass * self.gravity * (self.a / self.L)
+        Fx_f, Fy_f = self.tire_model_f.vel2forces(vx_f, vy_f, w_f, self.r_f, Fz_f)
+        Fx_r, Fy_r = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
+        return Fx_f, Fy_f, Fx_r, Fy_r
+
+    def generalized_d(self, q, v, u_in):
+        jnp = require_jax_numpy()
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v, u_in)
+        delta = u_in[1]
+        c_d, s_d = jnp.cos(delta), jnp.sin(delta)
+        Fx_f_b = Fx_f * c_d - Fy_f * s_d
+        Fy_f_b = Fx_f * s_d + Fy_f * c_d
+        Fx_r_b = Fx_r
+        Fy_r_b = Fy_r
+        Sum_Fx = Fx_f_b + Fx_r_b
+        Sum_Fy = Fy_f_b + Fy_r_b
+        Sum_Mz = self.a * Fy_f_b - self.b * Fy_r_b
+        F_aero = 0.5 * self.rho * self.CdA * v[0] * jnp.abs(v[0])
+        Sum_Fx = Sum_Fx - F_aero
+        F_ext = jnp.array([Sum_Fx, Sum_Fy, Sum_Mz])
+        return -F_ext
+
+    def f(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        q = x[0:3]
+        v = x[3:6]
+        u_in = jnp.array(
+            [self.u2input_signal(u, "w_rear")[0], self.u2input_signal(u, "delta")[0]]
+        )
+
+        M = self.M_mat(q)
+        C = self.C_mat(q, v)
+        d_vec = self.generalized_d(q, v, u_in)
+        dv = jnp.linalg.solve(M, -C @ v - d_vec)
+        dq = self.N_mat(q) @ v
+        return jnp.concatenate([dq, dv])
+
+    def h(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        return jnp.asarray(x)
