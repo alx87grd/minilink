@@ -3,18 +3,27 @@ Trajectory animation orchestration.
 
 Backends live under :mod:`minilink.graphical.renderers`; the animator picks one by name
 (see :func:`_make_renderer`).
+
+Roadmap (not implemented here—see ``ROADMAP.md`` §7 and P2):
+
+- **Interactive integrator backends**: :meth:`Animator.game` / :meth:`Animator.run_interactive`
+  currently own a simple time loop (Euler + substeps in ``game``). These should gain a
+  ``Simulator``-style pluggable **integration** layer (base class + schemes) instead of
+  hard-coding one integrator in the animator.
+- **Live I/O backends**: ``game`` reads ``u`` only via **pygame** today; future **input**
+  backends (e.g. TCP for cosimulation) and optional **live output push** should sit
+  beside that as swappable sources/sinks, keeping renderers focused on drawing.
 """
 
 from __future__ import annotations
 
-import time
-
 import numpy as np
 
-from minilink.graphical.renderers.base import AnimationRenderer
+from minilink.graphical.environment import prefers_inline_animation
 from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
 from minilink.graphical.renderers.meshcat_renderer import MeshcatRenderer
 from minilink.graphical.renderers.pygame_renderer import PygameRenderer
+from minilink.graphical.renderers.renderer import AnimationRenderer
 from minilink.graphical.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
@@ -33,7 +42,7 @@ def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
     """
     Return a backend instance for *name* (``matplotlib``, ``meshcat``, ``pygame``).
 
-    To add a backend, implement :class:`~minilink.graphical.renderers.base.AnimationRenderer`
+    To add a backend, implement :class:`~minilink.graphical.renderers.renderer.AnimationRenderer`
     and extend this function.
     """
     key = name.strip().lower()
@@ -50,16 +59,14 @@ def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
 
 class Animator:
     """
-    Coordinates playback: owns display settings and the simulated system,
-    and delegates drawing to an :class:`AnimationRenderer`.
+    Coordinates playback: owns the simulated system and delegates drawing to an
+    :class:`AnimationRenderer`. Matplotlib figure size and resolution live in
+    :mod:`minilink.graphical.matplotlib_style`.
     """
 
     def __init__(self, sys):
         self.sys = sys
 
-        # Display settings (used by backends such as matplotlib)
-        self.figsize = (8, 6)
-        self.dpi = 100
         self.domain = [[-10, 10], [-10, 10], [-10, 10]]
 
     def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib"):
@@ -82,10 +89,40 @@ class Animator:
         save=False,
         file_name="Animation",
         show=True,
-        html=False,
+        html: bool | None = None,
         renderer="matplotlib",
+        native: bool = True,
     ):
-        """Plays back a full simulation trajectory."""
+        """
+        Plays back a full simulation trajectory.
+
+        The three orthogonal kwargs are:
+
+        - ``renderer``  : graphics tech (``"matplotlib"``, ``"meshcat"``, ``"pygame"``).
+        - ``html``      : output channel. ``None`` auto-resolves via
+          :func:`minilink.graphical.environment.prefers_inline_animation`:
+          ``True`` in Colab and in local Jupyter when the active matplotlib
+          backend is non-interactive (``inline`` / ``agg``), ``False`` for
+          bare script, IPython REPL, and Jupyter with an interactive backend
+          (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``). Explicit
+          ``True``/``False`` is honored.
+        - ``native``    : playback engine. ``True`` (default) drives the
+          backend's own animation engine:
+          ``matplotlib.animation.FuncAnimation`` for matplotlib and
+          ``meshcat.animation.Animation`` + ``set_animation`` for meshcat.
+          ``False`` falls back to the legacy per-frame Python loop (handy
+          for debugging or when the native path's limitations matter;
+          see Notes below).
+
+        Notes
+        -----
+        Meshcat native animation only keyframes rigid pose (position+quaternion).
+        Primitives whose geometry changes every frame (``TorqueArrow``) are frozen
+        at ``t=0`` in the native path.
+        """
+        if html is None:
+            html = prefers_inline_animation()
+
         backend = _make_renderer(renderer, self)
         primitives = self.sys.get_kinematic_geometry()
         schedule = trajectory_frame_schedule(traj, time_factor_video)
@@ -116,6 +153,15 @@ class Animator:
 
         if not show:
             return None
+
+        if native:
+            try:
+                return backend.play_native(primitives, frames, schedule, is_3d=is_3d)
+            except NotImplementedError:
+                print(
+                    f"native=True is not supported for renderer={renderer!r}; "
+                    "falling back to the Python-loop path."
+                )
 
         backend.open_scene(is_3d=is_3d, show=show, title=f"Animation: {self.sys.name}")
         for frame in frames:
@@ -184,6 +230,8 @@ class Animator:
         backend.draw_frame(primitives, frame["transforms"], t)
         backend.present(block=False, interval_s=dt)
 
+        # ROADMAP: this loop is a minimal integrator+render tick; a future backend should
+        # own step integration (multiple schemes) like Simulator, not only this while-body.
         while True:
             events = backend.poll_events()
             if events.get("quit", False):
@@ -210,6 +258,9 @@ class Animator:
         """
         Map arrow-key state to a signed input vector ``u``.
 
+        This is the **pygame-keyboard** live-input path only; ``ROADMAP.md`` §7 describes
+        additional input backends (e.g. TCP cosimulation) and optional live output push.
+
         MVP mapping:
         - UP / DOWN control ``u[0]`` as +10 / -10 (opposites cancel to 0).
         - LEFT / RIGHT control ``u[1]`` as -10 / +10 (opposites cancel to 0).
@@ -221,7 +272,7 @@ class Animator:
             up = bool(keys[pygame.K_UP])
             down = bool(keys[pygame.K_DOWN])
             if up and not down:
-                u[0] = 10.0
+                u[0] = 50.0
             elif down and not up:
                 u[0] = -10.0
 
@@ -229,9 +280,9 @@ class Animator:
             right = bool(keys[pygame.K_RIGHT])
             left = bool(keys[pygame.K_LEFT])
             if right and not left:
-                u[1] = 10.0
-            elif left and not right:
                 u[1] = -10.0
+            elif left and not right:
+                u[1] = +10.0
 
         return u
 
@@ -281,6 +332,10 @@ class Animator:
         - Compute dynamics using Euler integration
           optionally with multiple internal substeps per rendered frame.
         - Update the visualization by redrawing transforms every tick.
+
+        Roadmap: **input** should become pluggable backends (keyboard vs TCP cosimulation,
+        etc.); **integration** should be pluggable backends (not Euler-only here); optional
+        **live output push** is a later sibling—see ``ROADMAP.md`` §7.
         """
         if dynamics_substeps < 1 or int(dynamics_substeps) != dynamics_substeps:
             raise ValueError("dynamics_substeps must be a positive integer.")
@@ -354,6 +409,8 @@ class Animator:
             u = self._u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
             self._draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
 
+            # ROADMAP: Euler + substeps only—replace with interactive integrator backends;
+            # live u should come from an input backend (pygame keys vs TCP, etc.).
             # Euler steps for dynamic systems only (ZOH on u during frame).
             if self.sys.n > 0:
                 dt_dyn = dt / dynamics_substeps

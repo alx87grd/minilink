@@ -3,10 +3,10 @@ import unittest
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.core.analysis import Simulator, compute_internal_signals
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, StaticSystem
 from minilink.graphical.plotting import plot_signals
+from minilink.simulation.simulator import Simulator
 
 
 class Integrator(DynamicSystem):
@@ -62,27 +62,27 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.traj = self.sim.solve()
 
     def test_compute_internal_signals(self):
-        # By default, Trajectory doesn't have internal signals
-        self.assertFalse(hasattr(self.traj, "internal_signals"))
+        # By default, the base trajectory does not carry reconstructed signals
+        self.assertFalse(self.traj.has_signal("step:y"))
 
         # Reconstruct signals
-        traj_plus = compute_internal_signals(self.diagram, self.traj)
+        traj_plus = self.diagram.compute_internal_signals(self.traj)
 
-        # Test it successfully created the dictionary
-        self.assertTrue(hasattr(traj_plus, "internal_signals"))
-        self.assertIn("step:y", traj_plus.internal_signals)
-        self.assertIn("ctl:u", traj_plus.internal_signals)
-        self.assertIn("plant:y", traj_plus.internal_signals)
+        # Test it successfully created sampled channels
+        self.assertTrue(traj_plus.has_signal("step:y"))
+        self.assertTrue(traj_plus.has_signal("ctl:u"))
+        self.assertTrue(traj_plus.has_signal("plant:y"))
 
         # Check shapes (dim 1, n_pts time steps)
         n_pts = len(self.traj.t)
-        self.assertEqual(traj_plus.internal_signals["ctl:u"].shape, (1, n_pts))
+        self.assertEqual(traj_plus.get_signal("ctl:u").shape, (1, n_pts))
 
     def test_plot_signals_does_not_crash(self):
-        import minilink.graphical.plotting as plotting
+        from minilink.graphical.environment import override_env
 
-        plotting.figure_blocking = False
-        traj_plus = compute_internal_signals(self.diagram, self.traj)
+        override_env("jupyter")
+        self.addCleanup(override_env, None)
+        traj_plus = self.diagram.compute_internal_signals(self.traj)
 
         # Test basic API functionality (we won't check pixel rendering, just execution)
         try:
@@ -102,6 +102,27 @@ class TestAdvancedPlotting(unittest.TestCase):
             self.fail(f"plot_signals raised an exception: {e}")
 
         self.assertTrue(success)
+
+    def test_stacked_figsize_caps_height_for_popup_layout(self):
+        from minilink.graphical.matplotlib_style import (
+            SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP,
+            SIGNAL_PLOT_ROW_HEIGHT,
+            TRAJECTORY_MAX_FIG_HEIGHT_POPUP,
+            TRAJECTORY_ROW_HEIGHT,
+            signal_stack_figsize,
+            trajectory_stack_figsize,
+        )
+
+        n = 20
+        _, h_tall = trajectory_stack_figsize(n, allow_tall=True)
+        self.assertEqual(h_tall, TRAJECTORY_ROW_HEIGHT * n)
+        _, h_cap = trajectory_stack_figsize(n, allow_tall=False)
+        self.assertEqual(h_cap, TRAJECTORY_MAX_FIG_HEIGHT_POPUP)
+
+        _, h_sig = signal_stack_figsize(n, allow_tall=True)
+        self.assertEqual(h_sig, SIGNAL_PLOT_ROW_HEIGHT * n)
+        _, h_sig_cap = signal_stack_figsize(n, allow_tall=False)
+        self.assertEqual(h_sig_cap, SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP)
 
 
 if __name__ == "__main__":

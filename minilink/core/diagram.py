@@ -1,9 +1,9 @@
 import numpy as np
 
-from minilink.core.framework import System, VectorSignal
+from minilink.core.system import System, VectorSignal
+from minilink.core.trajectory import Trajectory
 
 
-######################################################################
 class DiagramSystem(System):
     def __init__(self):
 
@@ -24,7 +24,6 @@ class DiagramSystem(System):
 
         self.refresh()
 
-    ######################################################################
     def add_subsystem(self, sys, sys_id):
 
         self.subsystems[sys_id] = sys
@@ -35,7 +34,6 @@ class DiagramSystem(System):
 
         self.compute_state_properties()
 
-    ######################################################################
     def compute_state_properties(self):
 
         self.n_sys = len(self.subsystems)
@@ -86,7 +84,6 @@ class DiagramSystem(System):
         self.x0 = x0
         self.state_index = state_index
 
-    ######################################################################
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
 
         self.connections[target_sys_id][target_port_id] = (
@@ -106,7 +103,6 @@ class DiagramSystem(System):
                 + target_port_id
             )
 
-    ######################################################################
     def connect_new_output_port(
         self, source_sys_id, source_port_id, output_port_id, dependencies="all"
     ):
@@ -126,19 +122,16 @@ class DiagramSystem(System):
 
         self.connect(source_sys_id, source_port_id, "output", output_port_id)
 
-    ######################################################################
     def get_graphe(self):
         from minilink.graphical.graphe import get_diagram_graphe
 
         return get_diagram_graphe(self)
 
-    ######################################################################
     def get_local_state(self, x, sys_id):
 
         idx = self.state_index[sys_id]
         return x[idx[0] : idx[1]]
 
-    ######################################################################
     def compute_subsys_output_port(self, x, u, t, sys_id, port_id):
 
         # Get the subsystem output port
@@ -153,7 +146,6 @@ class DiagramSystem(System):
 
         return port_y
 
-    ######################################################################
     def get_subsys_input_port(self, x, u, t, sys_id, port_id):
 
         # Get the source of the signal
@@ -161,8 +153,8 @@ class DiagramSystem(System):
 
         # Check if the port is not connected
         if source is None:
-            # Return the nominal value of the port
-            return self.subsystems[sys_id].inputs[port_id].get_signal(t)
+            # Return the constant default value of the port
+            return self.subsystems[sys_id].inputs[port_id].get_default_value()
 
         # Source is connected to a system and port
         source_sys_id, source_port_id = source
@@ -188,7 +180,6 @@ class DiagramSystem(System):
 
         return port_u
 
-    ######################################################################
     def check_algebraic_loops(self):
         """
         Detects algebraic loops and returns the topological port execution order.
@@ -203,11 +194,10 @@ class DiagramSystem(System):
         list of (sys_id, port_id)
             Topologically sorted output-port schedule.
         """
-        from minilink.compile import check_algebraic_loops
+        from minilink.compile.compiler import check_algebraic_loops
 
         return check_algebraic_loops(self)  # RuntimeError propagates if loop found
 
-    ######################################################################
     def compile(self, backend="numpy", bind_params=False, verbose=False):
         """
         Compiles the diagram into a stateless Evaluator for high-performance simulation.
@@ -221,7 +211,7 @@ class DiagramSystem(System):
         bind_params : bool, optional
             If ``True``, subsystem ``params`` are deep-copied into the plan at compile
             time (see :func:`minilink.compile.compile_diagram`). This snapshots only the
-            ``params`` dict, not other subsystem state; see :class:`minilink.core.framework.System`.
+            ``params`` dict, not other subsystem state; see :class:`minilink.core.system.System`.
         verbose : bool
             If ``True``, print timed compilation steps.
 
@@ -229,13 +219,12 @@ class DiagramSystem(System):
         -------
         NumpyDiagramEvaluator or JaxDiagramEvaluator
         """
-        from minilink.compile import compile_diagram
+        from minilink.compile.compiler import compile_diagram
 
         return compile_diagram(
             self, backend=backend, bind_params=bind_params, verbose=verbose
         )
 
-    ######################################################################
     def refresh(self):
         """
         Refresh all subsystems and rebuild the compiled execution plan.
@@ -243,7 +232,44 @@ class DiagramSystem(System):
         for _, sys in self.subsystems.items():
             sys.refresh()
 
-    ######################################################################
+    def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
+        """
+        Reconstruct all subsystem output-port trajectories for this diagram.
+
+        Parameters
+        ----------
+        traj : Trajectory
+            State-input trajectory sampled on a time grid.
+
+        Returns
+        -------
+        Trajectory
+            New trajectory enriched with one sampled signal per subsystem
+            output port, keyed as ``"sys_id:port_id"``.
+        """
+        evaluator = self.compile(backend="numpy")
+        internal_signals = {}
+        for sys_id, sys in self.subsystems.items():
+            for port_id, port in sys.outputs.items():
+                internal_signals[f"{sys_id}:{port_id}"] = np.zeros(
+                    (port.dim, traj.n_samples)
+                )
+
+        for i, t in enumerate(traj.t):
+            step_signals = evaluator.compute_internal_signals_dict(
+                traj.x[:, i], traj.u[:, i], t
+            )
+            for key, value in step_signals.items():
+                internal_signals[key][:, i] = value
+
+        return traj.with_signals(internal_signals)
+
+    def compute_internal_signals(self, traj: Trajectory) -> Trajectory:
+        """
+        Compatibility alias for :meth:`reconstruct_internal_signals`.
+        """
+        return self.reconstruct_internal_signals(traj)
+
     def get_local_input(self, x, u, t, sys_id, dependencies="all"):
         """
         Get the input signal for a given subsystem
@@ -268,10 +294,10 @@ class DiagramSystem(System):
 
         # For all input ports of the subsystem
         for port_id, port in sys.inputs.items():
-            # Check if the output port requires getting the signal from the input ports
-            # If not required, the u vector is filled with nominal values
+            # If this input is not required by the current output dependency set,
+            # fill it with its constant default value.
             if dependencies != "all" and port_id not in dependencies:
-                port_u = port.get_signal(t)  # Nominal value
+                port_u = port.get_default_value()
 
             else:
                 # Recursively get the input signal
@@ -284,7 +310,6 @@ class DiagramSystem(System):
 
         return np.concatenate(local_u_list)
 
-    ######################################################################
     def f(self, x, u, t=0, params=None) -> np.ndarray:
 
         dx = np.zeros(self.n)
@@ -312,9 +337,7 @@ class DiagramSystem(System):
 
         return dx
 
-    ######################################################################
     # Graphical Animation Engine Defaults for Diagram
-    ######################################################################
     def get_kinematic_geometry(self):
         primitives = []
         for sys_id, sys in self.subsystems.items():
@@ -337,6 +360,5 @@ class DiagramSystem(System):
         return transforms
 
 
-######################################################################
 if __name__ == "__main__":
     diagram = DiagramSystem()

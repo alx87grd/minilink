@@ -7,20 +7,17 @@ in an immutable and flattened form, all the information needed to evaluate a
 or recursive calls.
 
 The plan is consumed by evaluator backends
-(:class:`~minilink.compile.numpy_evaluator.NumpyDiagramEvaluator`,
-:class:`~minilink.compile.jax_evaluator.JaxDiagramEvaluator`) which walk through the
+(:class:`~minilink.compile.evaluators.numpy_evaluator.NumpyDiagramEvaluator`,
+:class:`~minilink.compile.evaluators.jax_evaluator.JaxDiagramEvaluator`) which walk through the
 operation lists in topological order to compute state derivatives and outputs.
 """
 
-from __future__ import annotations
-
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
 
 import numpy as np
 
-
-# ── Source-type constants ────────────────────────────────────────────
+# Source-type constants
 # Used in the ``gather_sources`` tuples of PortOperation / StateOperation.
 
 NOMINAL = 0
@@ -33,9 +30,7 @@ INTERNAL_SIGNAL = 2
 """Source is an output from another subsystem (from the internal signal buffer)."""
 
 
-# ── Operation dataclasses ────────────────────────────────────────────
-
-
+# Operation dataclasses
 @dataclass(frozen=True)
 class PortOperation:
     """One output-port evaluation step in topological order.
@@ -81,7 +76,7 @@ class PortOperation:
 
     compute_func: Callable[..., np.ndarray]
     local_x_slice: slice
-    gather_sources: tuple[tuple[int, Any, int], ...]
+    gather_sources: tuple[tuple[int, object, int], ...]
     out_slice: slice
     u_dim: int
     bound_params: dict | None = None
@@ -112,20 +107,18 @@ class StateOperation:
         Total dimension of the assembled local input vector.
     bound_params : dict | None
         Same semantics as :attr:`PortOperation.bound_params` for ``f_func``
-        (``params`` dict snapshot only; see :class:`minilink.core.framework.System`).
+        (``params`` dict snapshot only; see :class:`minilink.core.system.System`).
     """
 
     f_func: Callable[..., np.ndarray]
     local_x_slice: slice
-    gather_sources: tuple[tuple[int, Any, int], ...]
+    gather_sources: tuple[tuple[int, object, int], ...]
     u_dim: int
     bound_params: dict | None = None
     label: str = ""
 
 
-# ── Execution plan ───────────────────────────────────────────────────
-
-
+# Execution plan
 @dataclass(frozen=True)
 class ExecutionPlan:
     """Immutable flattened execution schedule for a compiled diagram.

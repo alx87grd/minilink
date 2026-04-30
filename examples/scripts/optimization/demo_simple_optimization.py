@@ -1,0 +1,150 @@
+import numpy as np
+
+from minilink.optimization.mathematical_program import (
+    InequalityConstraint,
+    MathematicalProgram,
+)
+from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+
+Z0 = 2.0
+
+# --- Visualization / callback ---
+SHOW_FIGURE = True
+TRACE_ITERATES = True
+# Minilink text report from :meth:`Optimizer.solve` (not SciPy ``options["disp"]``).
+DISP_SOLVE = True
+FIGSIZE_SQUARE = (6.0, 6.0)
+z_lo = 0.6
+z_hi = 2.05
+
+opt = ScipyMinimizeOptimizer(
+    method="SLSQP",
+    options={
+        "disp": False,
+        "maxiter": 200,
+        "ftol": 1e-12,
+    },
+)
+
+
+def J_1d_values(z: np.ndarray) -> np.ndarray:
+    """Same cost as :func:`J_1d`, vectorized for plotting (any shape ``z``)."""
+    x = np.asarray(z, dtype=float)
+    return x**3 + x * x + np.sin(5.0 * np.pi * x) + 0.12 * np.sin(15.0 * np.pi * x)
+
+
+def J_1d(z: np.ndarray) -> float:
+    """Non-convex: cubic + quadratic envelope + two sine ridges."""
+    x = np.asarray(z, dtype=float).reshape(-1)
+    return float(J_1d_values(x)[0])
+
+
+def grad_1d(z: np.ndarray) -> np.ndarray:
+    x = float(np.asarray(z, dtype=float).reshape(-1)[0])
+    d = (
+        3.0 * x * x
+        + 2.0 * x
+        + 5.0 * np.pi * np.cos(5.0 * np.pi * x)
+        + 0.12 * 15.0 * np.pi * np.cos(15.0 * np.pi * x)
+    )
+    return np.array([d], dtype=float)
+
+
+def g_box(z: np.ndarray) -> np.ndarray:
+    x = float(np.asarray(z, dtype=float).reshape(-1)[0])
+    return np.array([x - z_lo, z_hi - x], dtype=float)
+
+
+def jac_box(z: np.ndarray) -> np.ndarray:
+    return np.array([[1.0], [-1.0]], dtype=float)
+
+
+prog = MathematicalProgram(
+    J=J_1d,
+    z0=np.array([Z0]),
+    grad=grad_1d,
+    inequalities=(InequalityConstraint(g=g_box, jac=jac_box, name="interval"),),
+)
+
+iterates_z: list[float] = []
+iterates_J: list[float] = []
+
+
+def record_iterate(payload: object) -> None:
+    if isinstance(payload, np.ndarray):
+        zz = float(np.asarray(payload, dtype=float).reshape(-1)[0])
+        iterates_z.append(zz)
+        iterates_J.append(J_1d(payload))
+        return
+    if hasattr(payload, "x") and isinstance(getattr(payload, "x"), np.ndarray):
+        zz = float(np.asarray(payload.x, dtype=float).reshape(-1)[0])
+        iterates_z.append(zz)
+        iterates_J.append(J_1d(payload.x))
+
+
+out = opt.solve(
+    prog,
+    callback=record_iterate if TRACE_ITERATES else None,
+    disp=DISP_SOLVE,
+)
+
+if SHOW_FIGURE:
+    import matplotlib.pyplot as plt
+
+    from minilink.graphical.environment import is_blocking_needed
+    from minilink.graphical.matplotlib_style import (
+        DPI_FIGURE,
+        FONT_SIZE,
+        style_trajectory_subplot,
+    )
+
+    z_plot = np.linspace(z_lo - 0.12, z_hi + 0.12, 1200)
+    J_plot = J_1d_values(z_plot)
+
+    # Square canvas (this plot is not a stacked trajectory strip).
+    fig, ax = plt.subplots(
+        1,
+        1,
+        figsize=FIGSIZE_SQUARE,
+        dpi=DPI_FIGURE,
+        frameon=True,
+    )
+    manager = getattr(fig.canvas, "manager", None)
+    set_window_title = getattr(manager, "set_window_title", None)
+    if callable(set_window_title):
+        set_window_title("Optimization demo: 1-D cost vs. z")
+
+    ax.axvspan(z_lo, z_hi, alpha=0.2, color="C2", label="feasible (g(z)≥0)")
+
+    ax.plot(z_plot, J_plot, color="C0", lw=1.5, alpha=0.8, label=r"$J(z)$")
+
+    ax.axvline(
+        z_lo, color="C3", ls="--", lw=1.0, label=r"$z_{\mathrm{lo}}, z_{\mathrm{hi}}$"
+    )
+    ax.axvline(z_hi, color="C3", ls="--", lw=1.0)
+
+    z0 = float(prog.z0.flat[0])
+    J0 = J_1d(prog.z0)
+    ax.plot(z0, J0, "mo", ms=8, label=r"$z_0$")
+
+    path_z = [z0] + iterates_z
+    path_J = [J0] + iterates_J
+    if len(path_z) > 1:
+        ax.plot(path_z, path_J, "r.-", ms=6, lw=1.0, label="SLSQP iterates")
+
+    zf = float(out.z.flat[0])
+    ax.plot(
+        zf,
+        float(out.cost) if out.cost is not None else J_1d(out.z),
+        "g*",
+        ms=16,
+        label=r"$z^\star$",
+    )
+
+    ax.set_xlabel(r"$z$ (decision, 1-D)", fontsize=FONT_SIZE)
+    ax.set_ylabel(r"$J(z)$ (cost)", fontsize=FONT_SIZE)
+    ax.set_title("Non-convex 1-D cost with interval constraints", fontsize=FONT_SIZE)
+    style_trajectory_subplot(ax)
+    ax.legend(loc="best", fontsize=FONT_SIZE)
+    fig.tight_layout()
+    plt.show(block=is_blocking_needed())

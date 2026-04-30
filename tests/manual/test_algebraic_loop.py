@@ -6,7 +6,7 @@ Usage:
 """
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import System
+from minilink.core.system import System
 
 
 class FeedthroughSystem(System):
@@ -22,7 +22,7 @@ class FeedthroughSystem(System):
         return u * 2
 
 
-# ── Build a valid DAG (no loop) ──────────────────────────────────
+# Build a valid DAG (no loop)
 diag = DiagramSystem()
 diag.add_subsystem(FeedthroughSystem("A"), "A")
 diag.add_subsystem(FeedthroughSystem("B"), "B")

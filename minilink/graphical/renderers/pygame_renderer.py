@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from itertools import product
 
-import numpy as np
-
 import matplotlib.colors as mcolors
+import numpy as np
 
 from minilink.graphical.primitives import (
     Arrow,
     Box,
     Circle,
     CustomLine,
+    ExtrudedPolygon,
     Plane,
     Point,
     Rod,
@@ -20,7 +20,7 @@ from minilink.graphical.primitives import (
     TorqueArrow,
     extract_amplitude,
 )
-from minilink.graphical.renderers.base import AnimationRenderer
+from minilink.graphical.renderers.renderer import AnimationRenderer
 
 
 def _import_pygame():
@@ -143,11 +143,15 @@ class PygameCanvas:
             col = _color_to_rgb(primitive.color)
             lw = max(1, int(round(primitive.linewidth)))
             if arc_n >= 2:
-                arc_screen = [self._to_screen(world_pts[i, 0], world_pts[i, 1])
-                              for i in range(arc_n)]
+                arc_screen = [
+                    self._to_screen(world_pts[i, 0], world_pts[i, 1])
+                    for i in range(arc_n)
+                ]
                 pygame_mod.draw.lines(self.surface, col, False, arc_screen, lw)
-                head_screen = [self._to_screen(world_pts[i, 0], world_pts[i, 1])
-                               for i in range(arc_n, world_pts.shape[0])]
+                head_screen = [
+                    self._to_screen(world_pts[i, 0], world_pts[i, 1])
+                    for i in range(arc_n, world_pts.shape[0])
+                ]
                 pygame_mod.draw.lines(self.surface, col, False, head_screen, lw)
 
         elif isinstance(primitive, Circle):
@@ -229,7 +233,9 @@ class PygameCanvas:
             p0 = self._to_screen(world[0, 0], world[0, 1])
             p1 = self._to_screen(world[1, 0], world[1, 1])
             lw = max(1, int(round(max(primitive.linewidth, primitive.radius * 10.0))))
-            pygame_mod.draw.line(self.surface, _color_to_rgb(primitive.color), p0, p1, lw)
+            pygame_mod.draw.line(
+                self.surface, _color_to_rgb(primitive.color), p0, p1, lw
+            )
 
         elif isinstance(primitive, Box):
             lx, ly, lz = primitive.length_x, primitive.length_y, primitive.length_z
@@ -261,6 +267,16 @@ class PygameCanvas:
                 p0 = self._to_screen(world_c[i, 0], world_c[i, 1])
                 p1 = self._to_screen(world_c[j, 0], world_c[j, 1])
                 pygame_mod.draw.line(self.surface, col, p0, p1, lw)
+
+        elif isinstance(primitive, ExtrudedPolygon):
+            vertices = primitive.vertices_local()
+            vertices_h = np.hstack((vertices, np.ones((vertices.shape[0], 1))))
+            world_v = (transform_matrix @ vertices_h.T).T[:, :3]
+            col = _color_to_rgb(primitive.color)
+            for i, j in primitive.edges():
+                p0 = self._to_screen(world_v[i, 0], world_v[i, 1])
+                p1 = self._to_screen(world_v[j, 0], world_v[j, 1])
+                pygame_mod.draw.line(self.surface, col, p0, p1, 1)
 
 
 class PygameRenderer(AnimationRenderer):

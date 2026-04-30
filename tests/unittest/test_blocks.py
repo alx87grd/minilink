@@ -2,7 +2,8 @@ import unittest
 
 import numpy as np
 
-from minilink.blocks.sources import Source, Step
+from minilink.core.blocks.basic import Integrator, PropController
+from minilink.core.blocks.sources import Source, Step
 
 
 class TestBlocks(unittest.TestCase):
@@ -20,6 +21,28 @@ class TestBlocks(unittest.TestCase):
         y_after = step.h(x=[], u=[], t=3.0)
         np.testing.assert_array_equal(y_before, np.array([0.0]))
         np.testing.assert_array_equal(y_after, np.array([1.0]))
+
+    def test_integrator_dynamics_and_output(self):
+        plant = Integrator()
+        plant.params["k"] = 2.0
+
+        np.testing.assert_array_equal(
+            plant.f(np.array([3.0]), np.array([4.0])),
+            np.array([8.0]),
+        )
+        np.testing.assert_array_equal(
+            plant.h(np.array([3.0]), np.array([4.0])),
+            np.array([3.0]),
+        )
+
+    def test_prop_controller_scales_tracking_error(self):
+        controller = PropController()
+        controller.params["Kp"] = 2.5
+
+        np.testing.assert_array_equal(
+            controller.ctl(np.array([]), np.array([3.0, 1.0])),
+            np.array([5.0]),
+        )
 
 
 if __name__ == "__main__":

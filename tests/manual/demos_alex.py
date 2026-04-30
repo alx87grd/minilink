@@ -1,12 +1,12 @@
 import numpy as np
 
-from minilink.blocks.sources import Step, WhiteNoise
-from minilink.core.analysis import Simulator
+from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.graphical.plotting import plot_trajectory
+from minilink.simulation.simulator import Simulator
 
 
-######################################################################
 class Pendulum(DynamicSystem):
     def __init__(self):
         super().__init__(2, 1, 2)
@@ -28,7 +28,6 @@ class Pendulum(DynamicSystem):
         self.outputs = {}
         self.add_output_port(self.p, "y", function=self.h, dependencies=["v"])
 
-    ######################################################################
     def f(self, x, u, t=0, params=None):
 
         if params is None:
@@ -50,7 +49,6 @@ class Pendulum(DynamicSystem):
 
         return dx
 
-    ######################################################################
     def h(self, x, u, t=0, params=None):
 
         signals = self.get_port_values_from_u(u)
@@ -64,7 +62,6 @@ class Pendulum(DynamicSystem):
         return y
 
 
-######################################################################
 class PDController(StaticSystem):
     def __init__(self):
         super().__init__(3, 1)
@@ -87,7 +84,6 @@ class PDController(StaticSystem):
         self.outputs["u"].labels = ["torque"]
         self.outputs["u"].units = ["Nm"]
 
-    ######################################################################
     def ctl(self, x, u, t=0, params=None):
 
         if params is None:
@@ -107,7 +103,6 @@ class PDController(StaticSystem):
         return u
 
 
-######################################################################
 class Integrator(DynamicSystem):
     def __init__(self):
         super().__init__(1, 1, 1)
@@ -138,7 +133,6 @@ class Integrator(DynamicSystem):
         return y
 
 
-######################################################################
 class PropController(StaticSystem):
     def __init__(self):
         super().__init__(2, 1)
@@ -156,7 +150,6 @@ class PropController(StaticSystem):
         self.outputs = {}
         self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
 
-    ######################################################################
     def ctl(self, x, u, t=0, params=None):
 
         if params is None:
@@ -174,13 +167,7 @@ class PropController(StaticSystem):
         return u
 
 
-######################################################################
-######################################################################
-######################################################################
 # Tests functions
-######################################################################
-######################################################################
-######################################################################
 
 
 def simulator_test():
@@ -194,7 +181,8 @@ def simulator_test():
 
     sim = Simulator(sys1, t0=0, tf=25)
 
-    traj = sim.solve(show=True)
+    traj = sim.solve()
+    plot_trajectory(sys1, traj)
 
     # plot_trajectory(sys1, traj)
 
@@ -206,7 +194,6 @@ def simulator_test():
     return sim
 
 
-######################################################################
 def system_test():
 
     sys1 = DynamicSystem(2, 1, 1)
@@ -236,7 +223,6 @@ def system_test():
     return sys1
 
 
-######################################################################
 def diagram_test():
 
     sys1 = DynamicSystem(2, 1, 1)
@@ -283,7 +269,6 @@ def diagram_test():
     return gsys
 
 
-######################################################################
 def pendulum_test():
 
     # Plant system
@@ -324,12 +309,11 @@ def pendulum_test():
     diagram.plot_graphe()
 
     sim = Simulator(diagram, t0=0, tf=20, dt=0.01, solver="euler")
-    sim.solve(show=True)
+    plot_trajectory(diagram, sim.solve())
 
     return sim
 
 
-######################################################################
 def algebraic_loop():
 
     # Plant system
@@ -367,12 +351,11 @@ def algebraic_loop():
     # diagram.check_algebraic_loops()
 
     sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
-    sim.solve(show=True)
+    plot_trajectory(diagram, sim.solve())
 
     return diagram
 
 
-######################################################################
 def solver_doing_weird_at_discontinuities():
 
     # Plant system
@@ -411,7 +394,6 @@ def solver_doing_weird_at_discontinuities():
     test.compute_trajectory(solver="euler")
 
 
-######################################################################
 def diagram_in_a_diagram(debug_print=False):
 
     # Plant system
@@ -475,7 +457,6 @@ def diagram_in_a_diagram(debug_print=False):
     return test, diagram, diagram2
 
 
-######################################################################
 if __name__ == "__main__":
     # sys = system_test()
     # sim = simulator_test()

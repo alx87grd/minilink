@@ -1,8 +1,9 @@
 import numpy as np
 
-from minilink.blocks.examples import Pendulum, PendulumPDController
-from minilink.blocks.sources import Step, WhiteNoise
+from minilink.control.pendulum_pd import PendulumPDController
+from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 # Plant system
 sys = Pendulum()

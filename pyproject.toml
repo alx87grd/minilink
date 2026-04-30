@@ -32,10 +32,13 @@ jax = [
     "jax>=0.4.28",
     "jaxlib>=0.4.28",
 ]
+ipopt = [
+    "cyipopt>=1.3",
+]
 
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py310"
 exclude = [
     "minilink/_version.py",
 ]
@@ -56,6 +59,12 @@ testpaths = [
     "tests/unittest",
 ]
 pythonpath = "."
+markers = [
+    "optional: tests that require optional dependency extras",
+    "jax: tests that require the jax extra",
+    "symbolic: tests that require the symbolic extra",
+    "visualization: tests that require the visualization extra",
+]
 
 [tool.hatch.version]
 source = "vcs"

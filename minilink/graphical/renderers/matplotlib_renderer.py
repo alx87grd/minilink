@@ -9,11 +9,20 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 
+from minilink.graphical.environment import is_blocking_needed
+from minilink.graphical.matplotlib_style import (
+    DPI_EXPORT,
+    DPI_FIGURE,
+    FIGSIZE_ANIMATION,
+    FONT_SIZE,
+    style_animation_axes,
+)
 from minilink.graphical.primitives import (
     Arrow,
     Box,
     Circle,
     CustomLine,
+    ExtrudedPolygon,
     Plane,
     Point,
     Rod,
@@ -21,7 +30,7 @@ from minilink.graphical.primitives import (
     TorqueArrow,
     extract_amplitude,
 )
-from minilink.graphical.renderers.base import AnimationRenderer
+from minilink.graphical.renderers.renderer import AnimationRenderer
 
 
 class MatplotlibCanvas:
@@ -103,14 +112,17 @@ class MatplotlibCanvas:
             if self.is_3d:
                 z = world_pts[:, 2]
                 (obj,) = self.ax.plot(
-                    x, y, z,
+                    x,
+                    y,
+                    z,
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
                 )
             else:
                 (obj,) = self.ax.plot(
-                    x, y,
+                    x,
+                    y,
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
@@ -126,14 +138,16 @@ class MatplotlibCanvas:
             arc_n = local_pts.shape[0] - 3
             if arc_n >= 2:
                 (arc_obj,) = self.ax.plot(
-                    world_pts[:arc_n, 0], world_pts[:arc_n, 1],
+                    world_pts[:arc_n, 0],
+                    world_pts[:arc_n, 1],
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
                 )
                 self.drawn_objects.append(arc_obj)
                 (head_obj,) = self.ax.plot(
-                    world_pts[arc_n:, 0], world_pts[arc_n:, 1],
+                    world_pts[arc_n:, 0],
+                    world_pts[arc_n:, 1],
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle="-",
@@ -230,13 +244,14 @@ class MatplotlibCanvas:
             local = np.array([[0.0, 0.0, 0.0], [0.0, -primitive.length, 0.0]])
             local_h = np.hstack((local, np.ones((2, 1))))
             world = (transform_matrix @ local_h.T).T
+            lw = float(primitive.linewidth)
             if self.is_3d:
                 (obj,) = self.ax.plot(
                     world[:, 0],
                     world[:, 1],
                     world[:, 2],
                     color=primitive.color,
-                    linewidth=max(1.0, primitive.radius * 60.0),
+                    linewidth=lw,
                     linestyle=primitive.style,
                 )
             else:
@@ -244,7 +259,7 @@ class MatplotlibCanvas:
                     world[:, 0],
                     world[:, 1],
                     color=primitive.color,
-                    linewidth=max(1.0, primitive.radius * 60.0),
+                    linewidth=lw,
                     linestyle=primitive.style,
                 )
             self.drawn_objects.append(obj)
@@ -271,9 +286,7 @@ class MatplotlibCanvas:
                 (5, 7),
                 (6, 7),
             )
-            corners_h = np.hstack(
-                (np.array(corners), np.ones((8, 1)))
-            )
+            corners_h = np.hstack((np.array(corners), np.ones((8, 1))))
             world_c = (transform_matrix @ corners_h.T).T[:, :3]
             for i, j in edges:
                 p0, p1 = world_c[i], world_c[j]
@@ -296,6 +309,31 @@ class MatplotlibCanvas:
                     )
                 self.drawn_objects.append(seg)
 
+        elif isinstance(primitive, ExtrudedPolygon):
+            vertices = primitive.vertices_local()
+            vertices_h = np.hstack((vertices, np.ones((vertices.shape[0], 1))))
+            world_v = (transform_matrix @ vertices_h.T).T[:, :3]
+            for i, j in primitive.edges():
+                p0, p1 = world_v[i], world_v[j]
+                if self.is_3d:
+                    (seg,) = self.ax.plot(
+                        [p0[0], p1[0]],
+                        [p0[1], p1[1]],
+                        [p0[2], p1[2]],
+                        color=primitive.color,
+                        linewidth=1.5,
+                        alpha=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                    )
+                else:
+                    (seg,) = self.ax.plot(
+                        [p0[0], p1[0]],
+                        [p0[1], p1[1]],
+                        color=primitive.color,
+                        linewidth=1.5,
+                        alpha=float(np.clip(primitive.opacity, 0.0, 1.0)),
+                    )
+                self.drawn_objects.append(seg)
+
     def clear(self):
         for obj in self.drawn_objects:
             obj.remove()
@@ -313,7 +351,7 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def _create_figure_and_ax(self, is_3d):
         a = self.animator
-        fig = plt.figure(figsize=a.figsize, dpi=a.dpi)
+        fig = plt.figure(figsize=FIGSIZE_ANIMATION, dpi=DPI_FIGURE)
         fig.canvas.manager.set_window_title(f"Animation: {self.sys.name}")
 
         if is_3d:
@@ -330,26 +368,29 @@ class MatplotlibRenderer(AnimationRenderer):
             ax.set_ylim(a.domain[1])
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
-            ax.grid(True)
             ax.set_aspect("equal")
 
+        style_animation_axes(ax, is_3d=is_3d)
         return fig, ax
 
     def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
         self.fig, self.ax = self._create_figure_and_ax(is_3d)
         self.canvas = MatplotlibCanvas(self.ax, is_3d=is_3d)
         if title:
-            self.ax.set_title(title)
+            self.ax.set_title(title, fontsize=FONT_SIZE)
 
     def draw_frame(self, primitives, transforms, t: float) -> None:
         self.canvas.clear()
         for prim, T in zip(primitives, transforms):
             self.canvas.draw_primitive(prim, T)
-        self.ax.set_title(f"Time = {t:.2f} s")
+        self.ax.set_title(f"Time = {t:.2f} s", fontsize=FONT_SIZE)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
-            plt.show(block=True)
+            # Only actually block in script mode; IPython REPL / Jupyter /
+            # Colab keep the process alive independently.
+            if is_blocking_needed():
+                plt.show(block=True)
             return
         plt.pause(0.001 if interval_s is None else interval_s)
 
@@ -365,16 +406,16 @@ class MatplotlibRenderer(AnimationRenderer):
         self.ax = None
         self.canvas = None
 
-    def _build_animation(self, primitives, frames, schedule):
-        fig, ax = self._create_figure_and_ax(is_3d=False)
-        canvas = MatplotlibCanvas(ax, is_3d=False)
+    def _build_animation(self, primitives, frames, schedule, *, is_3d: bool = False):
+        fig, ax = self._create_figure_and_ax(is_3d=is_3d)
+        canvas = MatplotlibCanvas(ax, is_3d=is_3d)
 
         def update(frame_idx):
             frame = frames[frame_idx]
             canvas.clear()
             for prim, T in zip(primitives, frame["transforms"]):
                 canvas.draw_primitive(prim, T)
-            ax.set_title(f"Time = {frame['t']:.2f} s")
+            ax.set_title(f"Time = {frame['t']:.2f} s", fontsize=FONT_SIZE)
             return canvas.drawn_objects
 
         ani = animation.FuncAnimation(
@@ -399,5 +440,45 @@ class MatplotlibRenderer(AnimationRenderer):
     def export_animation(self, primitives, frames, schedule, file_name: str) -> None:
         fig, ani = self._build_animation(primitives, frames, schedule)
         print(f"Saving animation to {file_name}.gif ...")
-        ani.save(file_name + ".gif", writer="imagemagick", fps=schedule.target_fps)
+        ani.save(
+            file_name + ".gif",
+            writer="imagemagick",
+            fps=schedule.target_fps,
+            dpi=DPI_EXPORT,
+        )
         plt.close(fig)
+
+    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+        """
+        Drive playback through ``matplotlib.animation.FuncAnimation`` instead
+        of a Python frame loop.
+
+        Only the window path lands here: Colab and Jupyter-with-non-interactive
+        backend are routed to ``render_inline_animation`` upstream via
+        :func:`minilink.graphical.environment.prefers_inline_animation`.
+
+        - Bare script (``is_blocking_needed() is True``): block until the user
+          closes the window, then clean up.
+        - IPython terminal REPL or Jupyter with an interactive backend
+          (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``): show the
+          window non-blocking and intentionally retain strong references to
+          the figure and ``FuncAnimation`` on ``self`` so the backend event
+          loop can drive playback without ``FuncAnimation`` being garbage
+          collected.
+        """
+        fig, ani = self._build_animation(primitives, frames, schedule, is_3d=is_3d)
+        self.fig = fig
+        self.ax = fig.axes[0] if fig.axes else None
+        self.canvas = None
+        self._native_animation = ani
+
+        if is_blocking_needed():
+            plt.show(block=True)
+            plt.close(fig)
+            self.fig = None
+            self.ax = None
+            self._native_animation = None
+        else:
+            plt.show(block=False)
+
+        return ani
