@@ -66,6 +66,50 @@ Borrow the **scientific object model** and equation readability of the legacy Py
 - Support JAX when it stays clean; use specialized JAX paths when needed instead of complicating the main path.
 - **KISS and thin surfaces**: Prefer fewer files, fewer lines, and fewer dependencies when a simpler design is enough. When complexity is justified, keep **user-facing scripts and examples** minimal and push mechanics into backend modules or utilities.
 
+### 3.1 JAX vs NumPy coexistence (five rules)
+
+`pip install minilink` (no extras) gives a fully working **NumPy pipeline**;
+`pip install minilink[jax]` unlocks JAX-traced plants, JIT rollouts, and
+analytic gradients. Five rules keep that contract honest. The strategic
+background and trade-offs are in `plan.md`; the per-PR migration plan is in
+`implementation_plan.md`.
+
+1. **Plants and costs use twin classes (NumPy + `Jax<X>` subclass).** The JAX
+   class lives in the **same module** as the NumPy class, **subclasses** it,
+   and overrides only the equation methods (`H`, `C`, `B`, `g`, `d`, `f`,
+   `h`, custom force terms). Geometry, parameter dataclasses, port labels,
+   bounds, and visualization are inherited. References:
+   `JaxDynamicBicycle(DynamicBicycle)`, `JaxCartPole(JaxMechanicalSystem)`,
+   `JaxMechanicalSystem(MechanicalSystem)`, `JaxPendulum(NumpyPendulum)`,
+   `JaxQuadraticCost(QuadraticCost)`.
+2. **Backend roles use one ABC + two implementations.** Evaluators
+   (`compile/evaluators/{numpy_evaluator.py, jax_evaluator.py}` behind
+   `evaluator.py`) and trajectory-optimization transcriptions
+   (`direct_collocation.py` / `jax_direct_collocation.py`, etc.) follow this
+   shape. Backend selection goes through the constants in
+   `minilink.compile.backend_policy`; do not hard-code `"numpy"` /
+   `"jax"` / `"auto"` / `"direct"` strings elsewhere.
+3. **Thin helpers and blocks use array-module dispatch.** Code in
+   `core/blocks/*` and other small math helpers writes one body and
+   dispatches on the runtime input type via
+   `minilink.compile.jax_utils.array_module(t)`. Do **not** use
+   array-module dispatch inside complex plant `f`; plants get the twin-class
+   treatment.
+4. **Optional-import policy is two patterns, no more.** In library code,
+   either call `require_jax_numpy()` (or `require_jax_backend()` from
+   `compile.backend_policy`) lazily inside JAX-only methods, or use
+   `array_module(...)` for hybrid code. Never `import jax` at module level
+   in `minilink/`. Module-level `try/except ImportError + _HAS_JAX` is
+   reserved for **tests** and **runner scripts**, plus the documented
+   exception in `minilink/planning/trajectory_optimization/benchmark.py`
+   (its public contract is "skip JAX rows when JAX is missing").
+5. **Backend strings live in one place.** `BACKEND_NUMPY`, `BACKEND_JAX`,
+   `BACKEND_AUTO`, `BACKEND_DIRECT`, `normalize_backend(...)`, and
+   `require_jax_backend()` are defined in `minilink.compile.backend_policy`.
+   The `JaxQuadraticCost` rule is documented and enforced by
+   `minilink.core.costs.require_jax_traceable_cost`. JAX trajopt
+   transcriptions delegate; they do not re-implement either rule.
+
 Compiled-evaluator vocabulary:
 
 - `outputs()` / `outputs_p()` means **boundary outputs only**
@@ -83,6 +127,15 @@ At feature completion, verify through:
 1. **Automated tests** with `pytest`
 2. **Manual test script** in `tests/manual/`
 3. **Demo script** in `examples/` for major user-facing features
+
+**JAX twin plants** must additionally include a canonical
+`<plant>_jax_matches_numpy` test pair: one nominal / linear-regime
+match and one non-trivial regime check (custom inertia, gravity, damping,
+or a saturating force) so the JAX trace and the NumPy reference disagree
+at most by ULP-level rounding (with `configure_jax(enable_x64=True)`).
+References: `tests/unittest/test_jax_dynamic_bicycle.py`,
+`tests/unittest/test_jax_pendulum_subclass.py`,
+`tests/unittest/test_mechanical_jax.py::test_f_matches_numpy_2dof_nontrivial_regime`.
 
 ## 5. TRL Lifecycle
 

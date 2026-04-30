@@ -67,3 +67,7 @@ plot_trajectory(diagram, traj)
 - **Scripts**: `examples/scripts/` for diagram compilation, internal signals, animations, and JAX physics demos
 - **Manual**: `tests/manual/` for one-off experiments (pendulum `compute_forced` + `animate` smokes: see **Current State** above)
 - **Notebook**: [Colab Tutorial](https://colab.research.google.com/drive/13tnYyZMz4bLFzYLdj88H6cqO6tZg6Xp7?usp=sharing)
+
+### JAX vs NumPy
+
+Minilink runs end-to-end on NumPy alone. JAX is an optional accelerator: install with `pip install minilink[jax]` to unlock JAX-traced plants (`Jax<X>` classes), JIT-compiled simulator rollouts (`Simulator(..., compile_backend="jax"|"auto")`), and analytic gradients in trajectory optimization (`Jax*Transcription`). Without JAX, those classes still **import**; only their methods raise. The strategic background, twin-class rule, and migration roadmap live in [`plan.md`](plan.md) and [`implementation_plan.md`](implementation_plan.md); the five operational rules are summarized in [`agent.md`](agent.md) §3.1.
