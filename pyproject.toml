@@ -32,6 +32,9 @@ jax = [
     "jax>=0.4.28",
     "jaxlib>=0.4.28",
 ]
+ipopt = [
+    "cyipopt>=1.3",
+]
 
 [tool.ruff]
 line-length = 88
