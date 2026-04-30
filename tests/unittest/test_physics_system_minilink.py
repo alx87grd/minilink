@@ -7,20 +7,20 @@ import pytest
 
 from minilink.core.diagram import DiagramSystem
 
-try:
-    import jax.numpy as jnp
+pytest.importorskip("jax")
 
-    from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
-    from minilink.physics.system import PhysicsWorldSystem
+import jax.numpy as jnp  # noqa: E402
 
-    HAS_JAX = True
-except ImportError:
-    HAS_JAX = False
+from minilink.physics.engine_jax import (  # noqa: E402
+    PlaneModel,
+    SphereModel,
+    make_world_model,
+)
+from minilink.physics.system import PhysicsWorldSystem  # noqa: E402
 
 
 @pytest.mark.optional
 @pytest.mark.jax
-@unittest.skipUnless(HAS_JAX, "jax not installed")
 class TestPhysicsSystemMinilink(unittest.TestCase):
     def _make_sys(self):
         world = make_world_model(
