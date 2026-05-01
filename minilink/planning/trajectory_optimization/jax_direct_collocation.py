@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.costs import CostFunction, JaxQuadraticCost, QuadraticCost
+from minilink.core.costs import CostFunction, require_jax_traceable_cost
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -72,15 +72,6 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
     def __init__(self, options: JaxDirectCollocationOptions):
         self.options = options
 
-    @staticmethod
-    def _validate_jax_traceable_quadratic_pairing(cost: CostFunction) -> None:
-        if isinstance(cost, QuadraticCost) and not isinstance(cost, JaxQuadraticCost):
-            raise ValueError(
-                "JAX direct collocation needs JAX-traceable cost functions in the "
-                "objective; for quadratic costs use JaxQuadraticCost instead of "
-                "QuadraticCost."
-            )
-
     def transcribe(
         self,
         problem: PlanningProblem,
@@ -93,7 +84,7 @@ class JaxDirectCollocationTranscription(DirectCollocationTranscription):
         import jax.numpy as jnp
 
         cost = problem.require_cost()
-        self._validate_jax_traceable_quadratic_pairing(cost)
+        require_jax_traceable_cost(cost)
         self._check_supported_sets(problem)
 
         return self._transcribe_core(
