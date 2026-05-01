@@ -17,9 +17,7 @@ from minilink.dynamics.catalog.pendulum.cartpole import (  # noqa: E402
     CartPole,
     JaxCartPole,
 )
-from minilink.optimization.optimizers.scipy_minimize import (
-    ScipyMinimizeOptimizer,  # noqa: E402
-)
+from minilink.optimization.optimizer import Optimizer  # noqa: E402
 from minilink.planning.initial_guess import default_initial_trajectory  # noqa: E402
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.jax_direct_collocation import (  # noqa: E402
@@ -98,7 +96,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
             transcription=JaxDirectCollocationTranscription(
                 JaxDirectCollocationOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(compile_backend="jax"),
         )
 
@@ -127,7 +125,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
             transcription=JaxShootingTranscription(
                 JaxShootingOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(compile_backend="jax"),
         )
 
@@ -158,7 +156,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
             transcription=JaxMultipleShootingTranscription(
                 JaxMultipleShootingOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(compile_backend="jax"),
         )
 

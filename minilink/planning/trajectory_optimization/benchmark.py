@@ -12,7 +12,7 @@ from minilink.core.costs import JaxQuadraticCost, QuadraticCost
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.mathematical_program import MathematicalProgram
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -436,7 +436,7 @@ def _transcription(
 def _optimizer(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
-) -> ScipyMinimizeOptimizer:
+) -> Optimizer:
     if variant.optimizer_backend != "scipy":
         raise NotImplementedError(
             f"Unknown optimizer backend {variant.optimizer_backend!r}"
@@ -448,7 +448,7 @@ def _optimizer(
         "ftol": float(config.ftol),
         **dict(variant.optimizer_options),
     }
-    return ScipyMinimizeOptimizer(method=variant.optimizer_method, options=options)
+    return Optimizer(backend="scipy", method=variant.optimizer_method, options=options)
 
 
 def _warm_initial_trajectory(
@@ -487,13 +487,14 @@ def _warm_initial_trajectory(
 
 def _warm_optimizer(
     config: TrajectoryOptimizationBenchmarkConfig,
-) -> ScipyMinimizeOptimizer:
-    return ScipyMinimizeOptimizer(
+) -> Optimizer:
+    return Optimizer(
+        backend="scipy",
         options={
             "disp": False,
             "maxiter": max(int(config.maxiter), 200),
             "ftol": float(config.ftol),
-        }
+        },
     )
 
 

@@ -35,8 +35,7 @@ from minilink.optimization.mathematical_program import (
     OptimizationResult,
     VariableBounds,
 )
-from minilink.optimization.optimizers.optimizer import Optimizer
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 
 # --- Variant / Case / Result records ---------------------------------------
 
@@ -380,13 +379,13 @@ def _run_case(
 def _make_optimizer(variant: OptimizerBenchmarkVariant) -> Optimizer:
     if variant.backend == "scipy":
         method = variant.method or "SLSQP"
-        return ScipyMinimizeOptimizer(method=method, options=dict(variant.options))
+        return Optimizer(backend="scipy", method=method, options=dict(variant.options))
     if variant.backend == "ipopt":
-        from minilink.optimization.optimizers.ipopt import IpoptOptimizer
-
         opts = dict(variant.options)
-        tol = opts.pop("tol", None)
-        return IpoptOptimizer(options=opts, tol=tol)
+        kwargs: dict = {"options": opts}
+        if "tol" in opts:
+            kwargs["tol"] = opts.pop("tol")
+        return Optimizer(backend="ipopt", **kwargs)
     raise ValueError(f"Unknown optimizer backend {variant.backend!r}")
 
 

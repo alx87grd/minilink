@@ -14,7 +14,7 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     VariableBounds,
 )
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 from minilink.planning.initial_guess import (
     default_initial_trajectory,
     mechanical_cubic_initial_trajectory,
@@ -251,7 +251,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=ScipyMinimizeOptimizer(),
+            optimizer=Optimizer(backend="scipy"),
             options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
         self.assertEqual(to.transcription.options.n_steps, 5)
@@ -286,7 +286,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
 
@@ -312,7 +312,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(
                 compile_backend="direct",
                 record_history=True,
@@ -334,7 +334,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
 
@@ -356,7 +356,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
 
@@ -467,7 +467,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            optimizer=ScipyMinimizeOptimizer(options={"maxiter": 100, "ftol": 1e-9}),
+            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(warm_start=True),
         )
 

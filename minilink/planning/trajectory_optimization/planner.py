@@ -11,8 +11,7 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.optimization.optimizers.optimizer import Optimizer
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
@@ -37,7 +36,7 @@ class TrajectoryOptimizationIteration:
 class TrajectoryOptimizationOptions:
     """Generic trajectory-optimization workflow options.
 
-    ``solve_disp`` maps to :meth:`~minilink.optimization.optimizers.optimizer.Optimizer.solve`
+    ``solve_disp`` maps to :meth:`~minilink.optimization.optimizer.Optimizer.solve`
     ``disp=…`` (Minilink text report, not SciPy's ``options['disp']``).
     """
 
@@ -70,7 +69,7 @@ class TrajectoryOptimizationPlanner(Planner):
         super().__init__(problem)
         self.require_cost()
         self.transcription = transcription
-        self.optimizer = ScipyMinimizeOptimizer() if optimizer is None else optimizer
+        self.optimizer = Optimizer() if optimizer is None else optimizer
         self.options = TrajectoryOptimizationOptions() if options is None else options
         self.last_program: MathematicalProgram | None = None
         self.last_optimization_result: OptimizationResult | None = None

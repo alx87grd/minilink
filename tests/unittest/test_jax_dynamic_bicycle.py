@@ -15,7 +15,7 @@ try:
         DynamicBicycle,
         JaxDynamicBicycle,
     )
-    from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+    from minilink.optimization.optimizer import Optimizer
     from minilink.planning.problems import PlanningProblem
     from minilink.planning.trajectory_optimization.jax_direct_collocation import (
         JaxDirectCollocationOptions,
@@ -101,8 +101,9 @@ class TestJaxDynamicBicycle(unittest.TestCase):
             transcription=JaxDirectCollocationTranscription(
                 JaxDirectCollocationOptions(tf=tf, n_steps=10, use_gradient=True)
             ),
-            optimizer=ScipyMinimizeOptimizer(
-                options={"maxiter": 60, "ftol": 1e-2, "disp": False}
+            optimizer=Optimizer(
+                backend="scipy",
+                options={"maxiter": 60, "ftol": 1e-2, "disp": False},
             ),
             options=TrajectoryOptimizationOptions(compile_backend="jax"),
         )

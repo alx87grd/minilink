@@ -1,8 +1,8 @@
 """Cyipopt :func:`cyipopt.minimize_ipopt` optimizer.
 
 Wraps the COIN-OR Ipopt interior-point solver behind the same generic
-:class:`~minilink.optimization.optimizers.optimizer.Optimizer` contract used by
-:class:`~minilink.optimization.optimizers.scipy_minimize.ScipyMinimizeOptimizer`,
+:class:`~minilink.optimization.optimizers.optimizer.OptimizerBackend` contract
+used by :class:`~minilink.optimization.optimizers.scipy_minimize.ScipyMinimizeOptimizer`,
 so a :class:`~minilink.optimization.mathematical_program.MathematicalProgram`
 can switch between the SciPy and Ipopt backends with no other code changes.
 
@@ -22,10 +22,10 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.optimization.optimizers.optimizer import Optimizer
+from minilink.optimization.optimizers.optimizer import OptimizerBackend
 
 
-class IpoptOptimizer(Optimizer):
+class IpoptOptimizer(OptimizerBackend):
     """
     Optimizer adapter for :func:`cyipopt.minimize_ipopt`.
 
@@ -50,7 +50,7 @@ class IpoptOptimizer(Optimizer):
         self.options = {} if options is None else dict(options)
         self.tol = tol
 
-    def _solve_impl(
+    def solve(
         self,
         program: MathematicalProgram,
         *,

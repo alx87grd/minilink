@@ -4,7 +4,7 @@ from minilink.optimization.mathematical_program import (
     InequalityConstraint,
     MathematicalProgram,
 )
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 
 Z0 = 2.0
 
@@ -17,8 +17,8 @@ FIGSIZE_SQUARE = (6.0, 6.0)
 z_lo = 0.6
 z_hi = 2.05
 
-opt = ScipyMinimizeOptimizer(
-    method="SLSQP",
+opt = Optimizer(
+    backend="scipy",
     options={
         "disp": False,
         "maxiter": 200,
@@ -26,11 +26,11 @@ opt = ScipyMinimizeOptimizer(
     },
 )
 
-# opt = IpoptOptimizer(
+# opt = Optimizer(
+#     backend="ipopt",
 #     options={
 #         "disp": False,
 #         "maxiter": 200,
-#         # "ftol": 1e-12,
 #     },
 # )
 

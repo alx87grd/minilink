@@ -3,11 +3,11 @@
 import numpy as np
 
 from minilink.optimization.mathematical_program import MathematicalProgram
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 
 
 def test_scipy_minimize_record_solve_time_default_none():
-    opt = ScipyMinimizeOptimizer(method="SLSQP", options={"disp": False, "maxiter": 50})
+    opt = Optimizer(backend="scipy", options={"disp": False, "maxiter": 50})
 
     def J(z: np.ndarray) -> float:
         return float(z[0] ** 2)
@@ -21,7 +21,7 @@ def test_scipy_minimize_record_solve_time_default_none():
 
 
 def test_scipy_minimize_record_solve_time_sets_duration():
-    opt = ScipyMinimizeOptimizer(method="SLSQP", options={"disp": False, "maxiter": 50})
+    opt = Optimizer(backend="scipy", options={"disp": False, "maxiter": 50})
 
     def J(z: np.ndarray) -> float:
         return float(z[0] ** 2)
@@ -38,7 +38,7 @@ def test_scipy_minimize_record_solve_time_sets_duration():
 
 
 def test_scipy_minimize_disp_prints_report(capsys):
-    opt = ScipyMinimizeOptimizer(method="SLSQP", options={"disp": False, "maxiter": 50})
+    opt = Optimizer(backend="scipy", options={"disp": False, "maxiter": 50})
 
     def J(z: np.ndarray) -> float:
         return float(z[0] ** 2)

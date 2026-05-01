@@ -1,4 +1,4 @@
-"""Unit tests for :class:`IpoptOptimizer`.
+"""Unit tests for the ipopt optimizer backend.
 
 These tests require the optional ``cyipopt`` package and are skipped when it
 is not installed.
@@ -16,7 +16,7 @@ from minilink.optimization.mathematical_program import (
 
 cyipopt = pytest.importorskip("cyipopt")
 
-from minilink.optimization.optimizers.ipopt import IpoptOptimizer  # noqa: E402
+from minilink.optimization.optimizer import Optimizer  # noqa: E402
 
 _QUIET = {"print_level": 0, "max_iter": 200}
 
@@ -29,7 +29,7 @@ def test_ipopt_unconstrained_quadratic():
         return z - np.array([1.0, 2.0])
 
     prog = MathematicalProgram(J=J, grad=grad, z0=np.zeros(2))
-    out = IpoptOptimizer(options=_QUIET).solve(prog)
+    out = Optimizer(backend="ipopt", options=_QUIET).solve(prog)
     assert out.success
     assert np.allclose(out.z, [1.0, 2.0], atol=1e-6)
     assert out.cost is not None and out.cost < 1e-10
@@ -44,7 +44,7 @@ def test_ipopt_box_bounds():
 
     bounds = VariableBounds(lower=np.ones(3), upper=np.full(3, np.inf))
     prog = MathematicalProgram(J=J, grad=grad, z0=2.0 * np.ones(3), bounds=bounds)
-    out = IpoptOptimizer(options=_QUIET).solve(prog)
+    out = Optimizer(backend="ipopt", options=_QUIET).solve(prog)
     assert out.success
     assert np.allclose(out.z, np.ones(3), atol=1e-6)
 
@@ -65,7 +65,7 @@ def test_ipopt_equality_constraint():
     prog = MathematicalProgram(
         J=J, grad=grad, z0=np.array([-0.5, -0.5]), equalities=(eq,)
     )
-    out = IpoptOptimizer(options=_QUIET).solve(prog)
+    out = Optimizer(backend="ipopt", options=_QUIET).solve(prog)
     assert out.success
     assert np.allclose(out.z, [-1.0 / np.sqrt(2.0), -1.0 / np.sqrt(2.0)], atol=1e-5)
 
@@ -91,7 +91,7 @@ def test_ipopt_inequality_with_bounds():
         bounds=bounds,
         inequalities=(ineq,),
     )
-    out = IpoptOptimizer(options=_QUIET).solve(prog)
+    out = Optimizer(backend="ipopt", options=_QUIET).solve(prog)
     assert out.success
     assert np.allclose(out.z, [1.0, 0.0], atol=1e-4)
 
@@ -104,7 +104,7 @@ def test_ipopt_record_solve_time():
         return np.array([2.0 * float(z[0])])
 
     prog = MathematicalProgram(J=J, grad=grad, z0=np.array([1.0]))
-    opt = IpoptOptimizer(options=_QUIET)
+    opt = Optimizer(backend="ipopt", options=_QUIET)
     out = opt.solve(prog, record_solve_time=True)
     assert out.success
     assert out.solve_time_s is not None and out.solve_time_s >= 0.0

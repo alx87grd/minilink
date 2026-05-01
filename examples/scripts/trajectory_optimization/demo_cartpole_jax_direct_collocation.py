@@ -5,7 +5,7 @@ import numpy as np
 from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import JaxQuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.jax_direct_collocation import (
     JaxDirectCollocationOptions,
@@ -40,12 +40,13 @@ problem = PlanningProblem(
     cost=cost,
 )
 
-optimizer = ScipyMinimizeOptimizer(
+optimizer = Optimizer(
+    backend="scipy",
     options={
         "disp": True,
         "maxiter": 500,
         "ftol": 1e-2,
-    }
+    },
 )
 planner = TrajectoryOptimizationPlanner(
     problem,

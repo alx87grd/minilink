@@ -9,10 +9,10 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.optimization.optimizers.optimizer import Optimizer
+from minilink.optimization.optimizers.optimizer import OptimizerBackend
 
 
-class ScipyMinimizeOptimizer(Optimizer):
+class ScipyMinimizeOptimizer(OptimizerBackend):
     """
     Optimizer adapter for :func:`scipy.optimize.minimize`.
 
@@ -26,7 +26,7 @@ class ScipyMinimizeOptimizer(Optimizer):
         self.method = method
         self.options = {} if options is None else dict(options)
 
-    def _solve_impl(
+    def solve(
         self,
         program: MathematicalProgram,
         *,

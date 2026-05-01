@@ -78,10 +78,11 @@ minilink/<package>/
 ```text
 minilink/optimization/
   mathematical_program.py
+  optimizer.py            # Optimizer orchestrator (selects backend by string)
   benchmark.py
   optimizers/
     __init__.py
-    optimizer.py
+    optimizer.py          # OptimizerBackend abstract contract
     scipy_minimize.py
     ipopt.py
 
@@ -136,7 +137,7 @@ minilink/graphical/renderers/
 
 | Concern | Subpackage | Contract module |
 | --- | --- | --- |
-| Finite-dimensional programs | `optimizers/` | `optimizer.py` |
+| Finite-dimensional programs | `optimizers/` | `optimizer.py` (`OptimizerBackend`); `optimization/optimizer.py` (`Optimizer` orchestrator) |
 | Planning across families | `planning/` (root) | `planner.py` |
 | ODE / IVP / fixed step | `solvers/` | `solver.py` |
 | Compiled dynamics | `evaluators/` | `evaluator.py` |

@@ -11,7 +11,7 @@ import numpy as np
 from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import JaxQuadraticCost
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import JaxDynamicBicycle
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.jax_direct_collocation import (
     JaxDirectCollocationOptions,
@@ -74,12 +74,13 @@ planner = TrajectoryOptimizationPlanner(
             use_hessian=False,
         )
     ),
-    optimizer=ScipyMinimizeOptimizer(
+    optimizer=Optimizer(
+        backend="scipy",
         options={
             "disp": True,
             "maxiter": 500,
             "ftol": 1e-2,
-        }
+        },
     ),
     options=TrajectoryOptimizationOptions(compile_backend="jax"),
 )

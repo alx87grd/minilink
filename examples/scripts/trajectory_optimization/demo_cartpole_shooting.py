@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizer import Optimizer
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
@@ -40,12 +40,13 @@ problem = PlanningProblem(
 planner = TrajectoryOptimizationPlanner(
     problem,
     transcription=ShootingTranscription(ShootingOptions(tf=5.0, n_steps=51)),
-    optimizer=ScipyMinimizeOptimizer(
+    optimizer=Optimizer(
+        backend="scipy",
         options={
             "disp": True,
             "maxiter": 500,
             "ftol": 1e-2,
-        }
+        },
     ),
     options=TrajectoryOptimizationOptions(compile_backend="numpy"),
 )
