@@ -132,9 +132,10 @@ class Animator:
         ]
 
         import sys
-        if 'google.colab' in sys.modules and renderer.strip().lower() == "meshcat":
+
+        if "google.colab" in sys.modules and renderer.strip().lower() == "meshcat":
             html = True
-            
+
         if html:
             try:
                 return backend.render_inline_animation(primitives, frames, schedule)

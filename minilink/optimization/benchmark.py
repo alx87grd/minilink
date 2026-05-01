@@ -38,7 +38,6 @@ from minilink.optimization.mathematical_program import (
 from minilink.optimization.optimizers.optimizer import Optimizer
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 
-
 # --- Variant / Case / Result records ---------------------------------------
 
 

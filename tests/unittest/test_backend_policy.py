@@ -1,6 +1,7 @@
 """Tests for :mod:`minilink.compile.backend_policy`."""
 
 import importlib
+
 import pytest
 
 from minilink.compile.backend_policy import (

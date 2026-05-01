@@ -41,6 +41,7 @@ line-length = 88
 target-version = "py310"
 exclude = [
     "minilink/_version.py",
+    "**/*.ipynb",
 ]
 
 [tool.ruff.lint]
@@ -50,7 +51,8 @@ select = [
     "F",  # pyflakes
     "I",  # isort
 ]
-ignore = ["E501"]
+# E741 flags one-letter names that resemble 1/I/O; disabled for textbook symbols (e.g. link length ``l``).
+ignore = ["E501", "E741"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

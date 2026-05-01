@@ -59,16 +59,20 @@ class TestMechanicalSystemJax(unittest.TestCase):
                 m1, m2, l = 1.5, 0.7, 0.4
                 c2 = np.cos(q[1])
                 return np.array(
-                    [[m1 + m2 + 2 * m2 * l * c2, m2 + m2 * l * c2],
-                     [m2 + m2 * l * c2,           m2]],
+                    [
+                        [m1 + m2 + 2 * m2 * l * c2, m2 + m2 * l * c2],
+                        [m2 + m2 * l * c2, m2],
+                    ],
                 )
 
             def C(self, q, dq, params=None):
                 m2, l = 0.7, 0.4
                 s2 = np.sin(q[1])
                 return np.array(
-                    [[-m2 * l * s2 * dq[1], -m2 * l * s2 * (dq[0] + dq[1])],
-                     [m2 * l * s2 * dq[0], 0.0]],
+                    [
+                        [-m2 * l * s2 * dq[1], -m2 * l * s2 * (dq[0] + dq[1])],
+                        [m2 * l * s2 * dq[0], 0.0],
+                    ],
                 )
 
             def g(self, q, params=None):
@@ -82,16 +86,20 @@ class TestMechanicalSystemJax(unittest.TestCase):
                 m1, m2, l = 1.5, 0.7, 0.4
                 c2 = jnp.cos(q[1])
                 return jnp.array(
-                    [[m1 + m2 + 2 * m2 * l * c2, m2 + m2 * l * c2],
-                     [m2 + m2 * l * c2,           m2]],
+                    [
+                        [m1 + m2 + 2 * m2 * l * c2, m2 + m2 * l * c2],
+                        [m2 + m2 * l * c2, m2],
+                    ],
                 )
 
             def C(self, q, dq, params=None):
                 m2, l = 0.7, 0.4
                 s2 = jnp.sin(q[1])
                 return jnp.array(
-                    [[-m2 * l * s2 * dq[1], -m2 * l * s2 * (dq[0] + dq[1])],
-                     [m2 * l * s2 * dq[0], 0.0]],
+                    [
+                        [-m2 * l * s2 * dq[1], -m2 * l * s2 * (dq[0] + dq[1])],
+                        [m2 * l * s2 * dq[0], 0.0],
+                    ],
                 )
 
             def g(self, q, params=None):

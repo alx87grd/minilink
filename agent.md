@@ -70,9 +70,7 @@ Borrow the **scientific object model** and equation readability of the legacy Py
 
 `pip install minilink` (no extras) gives a fully working **NumPy pipeline**;
 `pip install minilink[jax]` unlocks JAX-traced plants, JIT rollouts, and
-analytic gradients. Five rules keep that contract honest. The strategic
-background and trade-offs are in `plan.md`; the per-PR migration plan is in
-`implementation_plan.md`.
+analytic gradients. Five rules keep that contract honest:
 
 1. **Plants and costs use twin classes (NumPy + `Jax<X>` subclass).** The JAX
    class lives in the **same module** as the NumPy class, **subclasses** it,
@@ -109,6 +107,23 @@ background and trade-offs are in `plan.md`; the per-PR migration plan is in
    The `JaxQuadraticCost` rule is documented and enforced by
    `minilink.core.costs.require_jax_traceable_cost`. JAX trajopt
    transcriptions delegate; they do not re-implement either rule.
+
+**When to add a `Jax<X>` twin.** New plants default to **NumPy-only**. Add a
+JAX subclass when a concrete use case needs traceable dynamics: JAX trajectory
+optimization (gradients through `f`), simulator use of `jit` / batched rollouts,
+or differentiable physics. Calling `compile(..., backend="jax")` on a NumPy plant
+already uses the JAX evaluator and does **not**, by itself, require a separate
+`Jax<Plant>` class.
+
+**Non-goals.** No global NumPy/JAX toggle (prefer explicit `compile_backend` on
+call sites); no replacing hand-written twins with codegen or AST tooling; no
+typing layers whose only purpose is to abstract twins; no new top-level
+`minilink.jax` package. Larger roadmap items (e.g. scan rollouts, more catalog
+twins) live in `ROADMAP.md`.
+
+**Verification.** A **NumPy-only** install must run `pytest tests/unittest/`
+with JAX-marked tests **skipped**, not failing at **collection**. With
+`minilink[jax]`, those tests run.
 
 Compiled-evaluator vocabulary:
 

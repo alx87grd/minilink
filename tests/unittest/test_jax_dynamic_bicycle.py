@@ -95,15 +95,11 @@ class TestJaxDynamicBicycle(unittest.TestCase):
             xbar=x_goal,
             ubar=ubar,
         )
-        problem = PlanningProblem(
-            sys=sys, x_start=x_start, x_goal=x_goal, cost=cost
-        )
+        problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal, cost=cost)
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=JaxDirectCollocationTranscription(
-                JaxDirectCollocationOptions(
-                    tf=tf, n_steps=10, use_gradient=True
-                )
+                JaxDirectCollocationOptions(tf=tf, n_steps=10, use_gradient=True)
             ),
             optimizer=ScipyMinimizeOptimizer(
                 options={"maxiter": 60, "ftol": 1e-2, "disp": False}

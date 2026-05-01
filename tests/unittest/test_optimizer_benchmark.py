@@ -3,8 +3,8 @@
 import numpy as np
 
 from minilink.optimization.benchmark import (
-    OptimizerBenchmarkVariant,
     STANDARD_OPTIMIZATION_CASES,
+    OptimizerBenchmarkVariant,
     benchmark_optimizer_backends,
     print_optimizer_benchmark,
 )

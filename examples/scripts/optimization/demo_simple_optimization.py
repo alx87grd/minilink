@@ -5,7 +5,6 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
 )
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
-from minilink.optimization.optimizers.ipopt import IpoptOptimizer
 
 Z0 = 2.0
 

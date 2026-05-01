@@ -24,7 +24,6 @@ import time
 from typing import TYPE_CHECKING
 
 from minilink.compile.backend_policy import (
-    BACKEND_JAX,
     BACKEND_NUMPY,
     normalize_backend,
     require_jax_backend,

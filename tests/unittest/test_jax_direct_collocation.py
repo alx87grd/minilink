@@ -13,8 +13,13 @@ import jax.numpy as jnp  # noqa: E402
 from minilink.compile.jax_utils import configure_jax  # noqa: E402
 from minilink.core.costs import JaxQuadraticCost, QuadraticCost  # noqa: E402
 from minilink.core.system import DynamicSystem  # noqa: E402
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole, JaxCartPole  # noqa: E402
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer  # noqa: E402
+from minilink.dynamics.catalog.pendulum.cartpole import (  # noqa: E402
+    CartPole,
+    JaxCartPole,
+)
+from minilink.optimization.optimizers.scipy_minimize import (
+    ScipyMinimizeOptimizer,  # noqa: E402
+)
 from minilink.planning.initial_guess import default_initial_trajectory  # noqa: E402
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.jax_direct_collocation import (  # noqa: E402

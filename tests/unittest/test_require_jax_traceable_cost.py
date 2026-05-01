@@ -47,4 +47,6 @@ def test_accepts_non_quadratic_cost():
         def h(self, x, t=0.0, params=None):
             return 0.0
 
-    require_jax_traceable_cost(NoOpCost())  # must not raise (rule only gates QuadraticCost)
+    require_jax_traceable_cost(
+        NoOpCost()
+    )  # must not raise (rule only gates QuadraticCost)

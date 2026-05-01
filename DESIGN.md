@@ -12,7 +12,7 @@
 
 ## 2. Package Map
 
-The table below is the on-disk layout and TRL. **Structural rules**, **pluggable file naming**, and the **reference tree** for new modules are in §2.1–2.6.
+The table below is the on-disk layout and TRL. **Structural rules**, **pluggable file naming**, and the **reference tree** for new modules are in §2.1–2.8.
 
 | Module | Status | Description |
 | --- | --- | --- |
@@ -149,8 +149,9 @@ minilink/graphical/renderers/
 it, and overrides only the equation methods (`H`, `C`, `B`, `g`, `d`, `f`,
 `h`, custom force terms). JAX is loaded lazily via
 `minilink.compile.jax_utils.require_jax_numpy()`; importing the module stays
-free without the `minilink[jax]` extra. See `agent.md` §3.1 for the full
-five-rule policy and `plan.md` for the strategy background.
+free without the `minilink[jax]` extra. Full rules, on-demand twin policy,
+import hygiene, non-goals, and verification expectations are in `agent.md`
+§3.1.
 
 ### 2.3 Canonical `minilink/` tree (reference)
 
@@ -318,6 +319,19 @@ minilink/
   renderers, without changing the ODE.
 - **`MechanicalSystem` matrix hooks**: `H`, `C`, `B`, `g`, and `d` accept an
   optional trailing `params` argument, consistent with `f(x, u, t, params)`.
+
+### 2.8 JAX / NumPy maintenance contract
+
+- **On-demand JAX twins**: new catalog plants default to NumPy-only; add
+  `Jax<Plant>` when a real use case needs a traceable `f` (trajectory
+  optimization, fast JAX rollouts, differentiable physics). See `agent.md`
+  §3.1.
+- **`compile(..., backend="jax")`** uses the JAX evaluator on the existing
+  NumPy plant dynamics and does not by itself mandate a separate plant-level
+  JAX twin.
+- **Stretch work** (broader catalog coverage, scan-based rollouts,
+  differentiable-simulation helpers) belongs in `ROADMAP.md`, not one-off
+  architectural churn.
 
 ## 3. Core Contracts
 
