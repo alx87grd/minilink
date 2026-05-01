@@ -78,10 +78,12 @@ minilink/<package>/
 ```text
 minilink/optimization/
   mathematical_program.py
+  benchmark.py
   optimizers/
     __init__.py
     optimizer.py
     scipy_minimize.py
+    ipopt.py
 
 minilink/planning/
   initial_guess.py
@@ -232,10 +234,12 @@ minilink/
 ├── optimization/
 │   ├── __init__.py
 │   ├── mathematical_program.py
+│   ├── benchmark.py
 │   └── optimizers/
 │       ├── __init__.py
 │       ├── optimizer.py
-│       └── scipy_minimize.py
+│       ├── scipy_minimize.py
+│       └── ipopt.py
 │
 ├── analysis/
 │   └── __init__.py
@@ -530,6 +534,7 @@ Optional helpers for benchmark and regression-style comparisons. They are **not*
 | `minilink.compile.benchmark` | `benchmark_f_evaluators` returns rows for native `system.f`, compiled NumPy, and compiled JAX evaluators over a fixed `(x, u, t)` sample; `print_f_benchmark` formats the result. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
 | `minilink.simulation.benchmark` | `benchmark_simulation_backend(system, candidate=...)` compares one `SimulationBenchmarkVariant` to `TRUTH_SIMULATION_VARIANT`; `benchmark_simulation_matrix(system, variants=...)` sweeps explicit variants such as `DEFAULT_SIMULATION_VARIANTS`; `print_simulation_matrix_benchmark` formats rows and highlights the fastest accurate variant. |
 | `minilink.planning.trajectory_optimization.benchmark` | `benchmark_trajectory_optimization` compares transcription, compile backend, derivative mode, precision, cold/warm start, optimizer backend, optimizer method, and optimizer options; `print_trajectory_optimization_benchmark` formats the result. |
+| `minilink.optimization.benchmark` | `benchmark_optimizer_backends` sweeps a list of `OptimizerBenchmarkVariant` (SciPy ``minimize`` and Ipopt via ``cyipopt``) over a small set of textbook nonlinear-program test cases (`STANDARD_OPTIMIZATION_CASES`: unconstrained quadratic, Rosenbrock, box-constrained QP, equality circle, inequality QP) and reports solve time, iteration counts, cost / decision error, and constraint feasibility; `print_optimizer_benchmark` formats the result. |
 
 Programmatic imports should use the defining modules, e.g. `from minilink.simulation.benchmark import benchmark_simulation_matrix, DEFAULT_SIMULATION_VARIANTS` or `from minilink.compile.benchmark import benchmark_f_evaluators`. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
 

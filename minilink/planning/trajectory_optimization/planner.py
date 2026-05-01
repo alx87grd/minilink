@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from minilink.compile.backend_policy import BACKEND_NUMPY
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -40,7 +41,7 @@ class TrajectoryOptimizationOptions:
     ``disp=…`` (Minilink text report, not SciPy's ``options['disp']``).
     """
 
-    compile_backend: str | None = "numpy"
+    compile_backend: str | None = BACKEND_NUMPY
     initial_guess: np.ndarray | Trajectory | None = None
     warm_start: bool = False
     record_history: bool = False

@@ -23,6 +23,12 @@ import copy
 import time
 from typing import TYPE_CHECKING
 
+from minilink.compile.backend_policy import (
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+    normalize_backend,
+    require_jax_backend,
+)
 from minilink.compile.execution_plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
@@ -37,7 +43,7 @@ if TYPE_CHECKING:
 
 
 # Public API
-def compile(system, backend="numpy", verbose=False):
+def compile(system, backend=BACKEND_NUMPY, verbose=False):
     """Compile a System into a :class:`DynamicsEvaluator`.
 
     For leaf systems (non-diagram), wraps ``f``/``h`` with frozen params
@@ -64,33 +70,24 @@ def compile(system, backend="numpy", verbose=False):
     if isinstance(system, DiagramSystem):
         return compile_diagram(system, backend=backend, verbose=verbose)
 
-    key = backend.strip().lower()
-    if key == "numpy":
+    key = normalize_backend(backend)
+    if key == BACKEND_NUMPY:
         from minilink.compile.evaluators.numpy_evaluator import NumpyLeafEvaluator
 
         return NumpyLeafEvaluator(system)
-    elif key == "jax":
-        try:
-            import jax  # noqa: F401
-        except ImportError:
-            raise ImportError(
-                "JAX is required for the 'jax' backend. "
-                "Install with: pip install jax jaxlib"
-            )
-        from minilink.compile.evaluators.jax_evaluator import JaxLeafEvaluator
+    require_jax_backend()
+    from minilink.compile.evaluators.jax_evaluator import JaxLeafEvaluator
 
-        t_total = time.perf_counter()
-        evaluator = JaxLeafEvaluator(system, verbose=verbose)
-        if verbose:
-            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
-        return evaluator
-    else:
-        raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
+    t_total = time.perf_counter()
+    evaluator = JaxLeafEvaluator(system, verbose=verbose)
+    if verbose:
+        print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+    return evaluator
 
 
 def compile_diagram(
     diagram: DiagramSystem,
-    backend: str = "numpy",
+    backend: str = BACKEND_NUMPY,
     *,
     bind_params: bool = False,
     verbose: bool = False,
@@ -159,24 +156,17 @@ def compile_diagram(
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
     # Create evaluator (steps 0, 3, 4 handled inside for JAX)
-    key = backend.strip().lower()
-    if key == "numpy":
+    key = normalize_backend(backend)
+    if key == BACKEND_NUMPY:
         from minilink.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
 
         evaluator = NumpyDiagramEvaluator(plan, diagram)
-    elif key == "jax":
-        try:
-            import jax  # noqa: F401
-        except ImportError:
-            raise ImportError(
-                "JAX is required for the 'jax' backend. "
-                "Install with: pip install jax jaxlib"
-            )
+    else:
+        # key == BACKEND_JAX (normalize_backend already validated)
+        require_jax_backend()
         from minilink.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
 
         evaluator = JaxDiagramEvaluator(plan, diagram, verbose=verbose)
-    else:
-        raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
 
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")

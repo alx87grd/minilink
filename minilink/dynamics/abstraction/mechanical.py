@@ -140,48 +140,21 @@ class MechanicalSystem(DynamicSystem):
         return 0.5 * (dq @ (self.H(q, params) @ dq))
 
 
-class JaxMechanicalSystem(DynamicSystem):
+class JaxMechanicalSystem(MechanicalSystem):
     """
-    Same manipulator equation as :class:`MechanicalSystem`, implemented with ``jax.numpy``.
+    JAX-traceable counterpart of :class:`MechanicalSystem`.
 
-    State is ``x = [q; dq]``, default output ``y = x``. Subclasses should build dynamics
-    with ``jax.numpy`` (see :func:`~minilink.compile.jax_utils.require_jax_numpy`).
+    Inherits port labels, bounds, ``__init__``, ``x2q`` / ``h``, and the
+    ``generalized_forces`` formula from :class:`MechanicalSystem`. Overrides
+    only the matrix builders (:meth:`H`, :meth:`C`, :meth:`B`, :meth:`g`,
+    :meth:`d`), the state-stacking helper :meth:`q2x`, and the methods that
+    call ``np.linalg.solve`` (:meth:`actuator_forces`, :meth:`ddq`,
+    :meth:`f`) so the dynamics trace through ``jax.numpy``.
+
+    JAX is loaded lazily inside each method via
+    :func:`~minilink.compile.jax_utils.require_jax_numpy`, so importing this
+    module stays free without the ``minilink[jax]`` extra.
     """
-
-    def __init__(self, dof=1, actuators=None):
-        self.dof = dof
-        if actuators is None:
-            actuators = dof
-
-        n = dof * 2
-        m = actuators
-        p = dof * 2
-
-        super().__init__(n, m, p)
-
-        self.name = f"{dof}DoF Mechanical System"
-
-        lim = 2 * np.pi
-        for i in range(dof):
-            self.state.labels[i] = f"Angle {i}"
-            self.state.units[i] = "[rad]"
-            self.state.upper_bound[i] = lim
-            self.state.lower_bound[i] = -lim
-            j = i + dof
-            self.state.labels[j] = f"Velocity {i}"
-            self.state.units[j] = "[rad/sec]"
-            self.state.upper_bound[j] = lim
-            self.state.lower_bound[j] = -lim
-
-        uport = self.inputs["u"]
-        for i in range(actuators):
-            uport.labels[i] = f"Torque {i}"
-            uport.units[i] = "[Nm]"
-            uport.upper_bound[i] = 5.0
-            uport.lower_bound[i] = -5.0
-
-        self.outputs["y"].labels = list(self.state.labels)
-        self.outputs["y"].units = list(self.state.units)
 
     def H(self, q, params=None):
         jnp = require_jax_numpy()
@@ -211,25 +184,12 @@ class JaxMechanicalSystem(DynamicSystem):
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.zeros(self.dof, dtype=dt)
 
-    def x2q(self, x):
-        q = x[0 : self.dof]
-        dq = x[self.dof : self.n]
-        return [q, dq]
-
     def q2x(self, q, dq):
         jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.concatenate(
             [jnp.asarray(q, dtype=dt).ravel(), jnp.asarray(dq, dtype=dt).ravel()]
         )
-
-    def generalized_forces(self, q, dq, ddq, t=0, params=None):
-        params = params or self.params
-        H = self.H(q, params)
-        C = self.C(q, dq, params)
-        g = self.g(q, params)
-        d = self.d(q, dq, params)
-        return H @ ddq + C @ dq + g + d
 
     def actuator_forces(self, q, dq, ddq, t=0, params=None):
         if self.dof != self.m:
@@ -259,9 +219,6 @@ class JaxMechanicalSystem(DynamicSystem):
         q, dq = self.x2q(x)
         ddq = self.ddq(q, dq, u, t, params)
         return self.q2x(dq, ddq)
-
-    def h(self, x, u, t=0, params=None):
-        return x
 
     def kinetic_energy(self, q, dq, params=None):
         params = params or self.params

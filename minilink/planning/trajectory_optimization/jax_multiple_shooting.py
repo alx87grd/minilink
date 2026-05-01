@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.costs import CostFunction, JaxQuadraticCost, QuadraticCost
+from minilink.core.costs import CostFunction, require_jax_traceable_cost
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -207,12 +207,7 @@ class JaxMultipleShootingTranscription(MultipleShootingTranscription):
 
     @staticmethod
     def _check_supported_problem(problem: PlanningProblem, cost: CostFunction) -> None:
-        if isinstance(cost, QuadraticCost) and not isinstance(cost, JaxQuadraticCost):
-            raise ValueError(
-                "JAX multiple shooting needs JAX-traceable cost functions in the "
-                "objective; for quadratic costs use JaxQuadraticCost instead of "
-                "QuadraticCost."
-            )
+        require_jax_traceable_cost(cost)
 
         for label, boundary in (("X0", problem.X0), ("Xf", problem.Xf)):
             if boundary is not None and not isinstance(boundary, SingletonSet):

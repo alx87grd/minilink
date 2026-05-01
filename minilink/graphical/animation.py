@@ -131,6 +131,10 @@ class Animator:
             for frame_idx in range(schedule.n_frames)
         ]
 
+        import sys
+        if 'google.colab' in sys.modules and renderer.strip().lower() == "meshcat":
+            html = True
+            
         if html:
             try:
                 return backend.render_inline_animation(primitives, frames, schedule)

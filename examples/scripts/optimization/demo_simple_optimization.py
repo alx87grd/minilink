@@ -5,6 +5,7 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
 )
 from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+from minilink.optimization.optimizers.ipopt import IpoptOptimizer
 
 Z0 = 2.0
 
@@ -25,6 +26,14 @@ opt = ScipyMinimizeOptimizer(
         "ftol": 1e-12,
     },
 )
+
+# opt = IpoptOptimizer(
+#     options={
+#         "disp": False,
+#         "maxiter": 200,
+#         # "ftol": 1e-12,
+#     },
+# )
 
 
 def J_1d_values(z: np.ndarray) -> np.ndarray:

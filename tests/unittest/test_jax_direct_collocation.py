@@ -5,56 +5,53 @@ import unittest
 import numpy as np
 import pytest
 
-try:
-    import jax
-    import jax.numpy as jnp
+pytest.importorskip("jax")
 
-    from minilink.compile.jax_utils import configure_jax
-    from minilink.core.costs import JaxQuadraticCost, QuadraticCost
-    from minilink.core.system import DynamicSystem
-    from minilink.dynamics.catalog.pendulum.cartpole import CartPole, JaxCartPole
-    from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
-    from minilink.planning.initial_guess import default_initial_trajectory
-    from minilink.planning.problems import PlanningProblem
-    from minilink.planning.trajectory_optimization.jax_direct_collocation import (
-        JaxDirectCollocationOptions,
-        JaxDirectCollocationTranscription,
-    )
-    from minilink.planning.trajectory_optimization.jax_multiple_shooting import (
-        JaxMultipleShootingOptions,
-        JaxMultipleShootingTranscription,
-    )
-    from minilink.planning.trajectory_optimization.jax_shooting import (
-        JaxShootingOptions,
-        JaxShootingTranscription,
-    )
-    from minilink.planning.trajectory_optimization.planner import (
-        TrajectoryOptimizationOptions,
-        TrajectoryOptimizationPlanner,
-    )
+import jax  # noqa: E402
+import jax.numpy as jnp  # noqa: E402
 
-    class JaxSingleIntegrator(DynamicSystem):
-        def __init__(self):
-            super().__init__(n=1, m=1, p=1)
-            self.state.lower_bound = np.array([-10.0])
-            self.state.upper_bound = np.array([10.0])
-            self.inputs["u"].lower_bound = np.array([-10.0])
-            self.inputs["u"].upper_bound = np.array([10.0])
+from minilink.compile.jax_utils import configure_jax  # noqa: E402
+from minilink.core.costs import JaxQuadraticCost, QuadraticCost  # noqa: E402
+from minilink.core.system import DynamicSystem  # noqa: E402
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole, JaxCartPole  # noqa: E402
+from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer  # noqa: E402
+from minilink.planning.initial_guess import default_initial_trajectory  # noqa: E402
+from minilink.planning.problems import PlanningProblem  # noqa: E402
+from minilink.planning.trajectory_optimization.jax_direct_collocation import (  # noqa: E402
+    JaxDirectCollocationOptions,
+    JaxDirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.jax_multiple_shooting import (  # noqa: E402
+    JaxMultipleShootingOptions,
+    JaxMultipleShootingTranscription,
+)
+from minilink.planning.trajectory_optimization.jax_shooting import (  # noqa: E402
+    JaxShootingOptions,
+    JaxShootingTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (  # noqa: E402
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
+)
 
-        def f(self, x, u, t=0, params=None):
-            return jnp.array([u[0]])
 
-        def h(self, x, u, t=0, params=None):
-            return x
+class JaxSingleIntegrator(DynamicSystem):
+    def __init__(self):
+        super().__init__(n=1, m=1, p=1)
+        self.state.lower_bound = np.array([-10.0])
+        self.state.upper_bound = np.array([10.0])
+        self.inputs["u"].lower_bound = np.array([-10.0])
+        self.inputs["u"].upper_bound = np.array([10.0])
 
-    HAS_JAX = True
-except ImportError:
-    HAS_JAX = False
+    def f(self, x, u, t=0, params=None):
+        return jnp.array([u[0]])
+
+    def h(self, x, u, t=0, params=None):
+        return x
 
 
 @pytest.mark.optional
 @pytest.mark.jax
-@unittest.skipUnless(HAS_JAX, "jax not installed")
 class TestJaxDirectCollocation(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)

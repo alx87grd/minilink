@@ -238,3 +238,23 @@ class JaxQuadraticCost(QuadraticCost):
         x_arr = jnp.asarray(x).reshape(self.xbar.shape)
         dx = x_arr - jnp.asarray(self.xbar)
         return dx.T @ jnp.asarray(self.S) @ dx
+
+
+def require_jax_traceable_cost(cost: CostFunction) -> None:
+    """
+    Raise :class:`ValueError` if *cost* is a quadratic cost but not JAX-traceable.
+
+    JAX trajectory-optimization transcriptions need cost functions whose
+    ``g`` / ``h`` trace through ``jax.numpy``. The plain
+    :class:`QuadraticCost` materializes Python floats and breaks the trace;
+    use :class:`JaxQuadraticCost` instead.
+
+    This is the single source of truth for the rule; the JAX trajopt
+    transcriptions all delegate here.
+    """
+    if isinstance(cost, QuadraticCost) and not isinstance(cost, JaxQuadraticCost):
+        raise ValueError(
+            "JAX trajectory optimization needs JAX-traceable cost functions in "
+            "the objective; for quadratic costs use JaxQuadraticCost instead "
+            "of QuadraticCost."
+        )

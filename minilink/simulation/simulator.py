@@ -15,6 +15,11 @@ import logging
 
 import numpy as np
 
+from minilink.compile.backend_policy import (
+    BACKEND_AUTO,
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+)
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
@@ -72,7 +77,9 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
 RK4_AUTO_MIN_TIME_POINTS = 10_000
 
 # Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
-COMPILE_BACKEND_AUTO = "auto"
+# Re-exported from :mod:`minilink.compile.backend_policy` so legacy callers
+# importing it from the simulator keep working.
+COMPILE_BACKEND_AUTO = BACKEND_AUTO
 
 
 def _time_grid_is_uniform(times: np.ndarray) -> bool:
@@ -124,7 +131,7 @@ class Simulator:
         dt=None,
         solver=None,
         verbose=True,
-        compile_backend="numpy",
+        compile_backend=BACKEND_NUMPY,
     ):
         self.verbose = verbose
         self.sys = sys
@@ -235,7 +242,7 @@ class Simulator:
         if sys.solver_info["discontinuous_behavior"]:
             return "scipy_stiff"
         if (
-            self.compile_backend == "jax"
+            self.compile_backend == BACKEND_JAX
             and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
             and _time_grid_is_uniform(self.times)
         ):
@@ -318,7 +325,7 @@ class Simulator:
         Compile with *compile_backend*, or if it is :data:`COMPILE_BACKEND_AUTO`, try JAX
         then NumPy.
         """
-        if compile_backend != COMPILE_BACKEND_AUTO:
+        if compile_backend != BACKEND_AUTO:
             return compile_backend, self._build_evaluator(sys, compile_backend)
 
         if self.verbose:
@@ -328,9 +335,9 @@ class Simulator:
         except ImportError:
             if self.verbose:
                 print("JAX not installed; using NumPy compile backend.")
-            return "numpy", self._build_evaluator(sys, "numpy")
+            return BACKEND_NUMPY, self._build_evaluator(sys, BACKEND_NUMPY)
         try:
-            return "jax", self._build_evaluator(sys, "jax")
+            return BACKEND_JAX, self._build_evaluator(sys, BACKEND_JAX)
         except Exception as exc:
             if self.verbose:
                 print(
@@ -340,7 +347,7 @@ class Simulator:
             logging.getLogger(__name__).debug(
                 "JAX compile failed, falling back to numpy", exc_info=True
             )
-            return "numpy", self._build_evaluator(sys, "numpy")
+            return BACKEND_NUMPY, self._build_evaluator(sys, BACKEND_NUMPY)
 
     def _validate_x0(self, x0, n):
         x0_arr = np.asarray(x0, dtype=float)
