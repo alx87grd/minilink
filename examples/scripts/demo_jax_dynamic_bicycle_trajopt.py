@@ -25,9 +25,9 @@ from minilink.planning.trajectory_optimization.planner import (
 configure_jax(enable_x64=True)
 
 # --- Problem setup ---
-TF = 4.0
-N_STEPS = 30
-U_TARGET = 15.0
+TF = 5.0
+N_STEPS = 20
+U_TARGET = 5.0
 Y_GOAL = 3.5
 W_REAR_MAX = 80.0
 DELTA_MAX = 0.6
@@ -38,7 +38,7 @@ sys.inputs["w_rear"].upper_bound[0] = W_REAR_MAX
 sys.inputs["delta"].lower_bound[0] = -DELTA_MAX
 sys.inputs["delta"].upper_bound[0] = DELTA_MAX
 
-x_start = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0])
+x_start = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
 # Reference state used by the running and terminal cost. The lane change is
 # encouraged by the cost, not enforced by an equality terminal set.
 x_ref = np.array([U_TARGET * TF, Y_GOAL, 0.0, U_TARGET, 0.0, 0.0])
@@ -78,7 +78,7 @@ planner = TrajectoryOptimizationPlanner(
         options={
             "disp": True,
             "maxiter": 500,
-            "ftol": 1e-3,
+            "ftol": 1e-2,
         }
     ),
     options=TrajectoryOptimizationOptions(compile_backend="jax"),
@@ -93,4 +93,5 @@ if result.cost is not None:
     print(f"cost: {result.cost:.6g}")
 
 planner.plot_solution(plot="xu")
-planner.problem.sys.animate(traj)
+sys.traj = traj
+sys.animate(renderer="meshcat")
