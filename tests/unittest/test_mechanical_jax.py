@@ -5,23 +5,19 @@ import unittest
 import numpy as np
 import pytest
 
-try:
-    import jax
-    import jax.numpy as jnp
+pytest.importorskip("jax")
 
-    from minilink.dynamics.abstraction.mechanical import (
-        JaxMechanicalSystem,
-        MechanicalSystem,
-    )
+import jax  # noqa: E402
+import jax.numpy as jnp  # noqa: E402
 
-    HAS_JAX = True
-except ImportError:
-    HAS_JAX = False
+from minilink.dynamics.abstraction.mechanical import (  # noqa: E402
+    JaxMechanicalSystem,
+    MechanicalSystem,
+)
 
 
 @pytest.mark.optional
 @pytest.mark.jax
-@unittest.skipUnless(HAS_JAX, "jax not installed")
 class TestMechanicalSystemJax(unittest.TestCase):
     def test_f_is_jaxpr_traceable(self):
         sys = JaxMechanicalSystem(dof=2)
