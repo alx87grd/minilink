@@ -142,6 +142,15 @@ minilink/graphical/renderers/
 | Compiled dynamics | `evaluators/` | `evaluator.py` |
 | Draw / animate | `renderers/` | `renderer.py` |
 | Compile orchestration | `compile/` (root) | `compiler.py` (not `compilers/`) |
+| Backend strings (`"numpy"` / `"jax"` / `"auto"` / `"direct"`) | `compile/` (root) | `backend_policy.py` |
+
+**JAX twin classes.** When a plant or cost has a JAX-traceable counterpart
+(`Jax<X>`), it lives in the **same module** as the NumPy class, **subclasses**
+it, and overrides only the equation methods (`H`, `C`, `B`, `g`, `d`, `f`,
+`h`, custom force terms). JAX is loaded lazily via
+`minilink.compile.jax_utils.require_jax_numpy()`; importing the module stays
+free without the `minilink[jax]` extra. See `agent.md` §3.1 for the full
+five-rule policy and `plan.md` for the strategy background.
 
 ### 2.3 Canonical `minilink/` tree (reference)
 
@@ -413,11 +422,13 @@ It separates the continuous mathematical problem from numerical solver choices:
 - **JAX direct collocation (prototype)** —
   `trajectory_optimization.jax_direct_collocation` also targets SciPy, but
   uses JAX-``jit``/``jacfwd``/optional Hessian to supply objective and constraint
-  derivatives. The cost must be JAX-traceable in the objective (use
-  :class:`~minilink.core.costs.JaxQuadraticCost` instead of
-  :class:`~minilink.core.costs.QuadraticCost` for the common quadratic case).
-  Supported sets are **narrower** than the NumPy path: :class:`~minilink.core.sets.SingletonSet`
-  for :math:`X_0` / :math:`X_f` and box-style path sets via
+  derivatives. The cost must be JAX-traceable in the objective; the rule is
+  enforced by :func:`minilink.core.costs.require_jax_traceable_cost`, which
+  the three JAX transcriptions all delegate to. For the common quadratic
+  case use :class:`~minilink.core.costs.JaxQuadraticCost` instead of
+  :class:`~minilink.core.costs.QuadraticCost`. Supported sets are **narrower**
+  than the NumPy path: :class:`~minilink.core.sets.SingletonSet` for
+  :math:`X_0` / :math:`X_f` and box-style path sets via
   :class:`~minilink.core.sets.BoxSet` / :class:`~minilink.core.sets.BoxInputSet`;
   general set margins remain on the NumPy transcription until reviewed. JAX
   precision is process-wide compile configuration via
@@ -521,7 +532,7 @@ Current solver modes (see `minilink.simulation.simulator` and tests):
 - `solver="scipy_lsoda"` (alias that selects LSODA; useful for stiff/variable-tolerance cases)
 - **Auto RK4 (heuristic)**: for long, **uniform** time grids, JAX compile backend, and a non-stiff profile, the simulator may select `rk4_fixedsteps` automatically for wall-clock reasons. This is best-effort; defaults remain explicit where conservatism matters.
 
-`Simulator(..., compile_backend=...)` accepts `"numpy"`, `"jax"`, or **`"auto"`** (`minilink.simulation.COMPILE_BACKEND_AUTO`): try JAX, fall back to NumPy on failure. User-facing `System.compute_trajectory` / `compute_forced` default to **`"numpy"`** (predictable, no extra JIT) unless overridden.
+`Simulator(..., compile_backend=...)` accepts `"numpy"`, `"jax"`, or **`"auto"`**: try JAX, fall back to NumPy on failure. The string vocabulary is centralized in :mod:`minilink.compile.backend_policy` (constants `BACKEND_NUMPY`, `BACKEND_JAX`, `BACKEND_AUTO`, `BACKEND_DIRECT`; helpers `normalize_backend`, `require_jax_backend`); `minilink.simulation.COMPILE_BACKEND_AUTO` is a re-export of `BACKEND_AUTO` kept for back-compat. User-facing `System.compute_trajectory` / `compute_forced` default to **`"numpy"`** (predictable, no extra JIT) unless overridden.
 
 **SciPy preset tolerances** (`scipy`, `scipy_stiff`, …) pass explicit `rtol` / `atol` into `solve_ivp` so behavior is not left to global SciPy defaults.
 
