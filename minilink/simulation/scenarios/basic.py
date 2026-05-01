@@ -2,15 +2,8 @@
 
 import numpy as np
 
+from minilink.compile.jax_utils import require_jax_numpy
 from minilink.core.system import DynamicSystem
-
-try:
-    import jax.numpy as jnp
-
-    _HAS_JAX = True
-except ImportError:  # pragma: no cover - exercised in non-jax environments
-    jnp = None
-    _HAS_JAX = False
 
 
 class NumpyPendulum(DynamicSystem):
@@ -29,22 +22,21 @@ class NumpyPendulum(DynamicSystem):
         return np.array([dq, ddq])
 
 
-class JaxPendulum(DynamicSystem):
-    """Pendulum using JAX ops in `f`."""
+class JaxPendulum(NumpyPendulum):
+    """Pendulum using JAX ops in `f`.
+
+    Inherits the port layout, parameter attributes, and ``__init__`` of
+    :class:`NumpyPendulum`; overrides only the dynamics so ``f`` traces
+    through ``jax.numpy``. JAX is loaded lazily on the first ``f`` call so
+    importing this module stays free without the ``minilink[jax]`` extra.
+    """
 
     def __init__(self, *, gravity=9.81, length=1.0, damping=0.0):
-        if not _HAS_JAX:
-            raise ModuleNotFoundError(
-                "JAX is required for JaxPendulum. Install `minilink[jax]` "
-                "or use NumpyPendulum instead."
-            )
-        super().__init__(n=2, m=1, p=2)
+        super().__init__(gravity=gravity, length=length, damping=damping)
         self.name = "JaxPendulum"
-        self.gravity = gravity
-        self.length = length
-        self.damping = damping
 
     def f(self, x, u, t=0, params=None):
+        jnp = require_jax_numpy()
         q, dq = x[0], x[1]
         ddq = -(self.gravity / self.length) * jnp.sin(q) - self.damping * dq + u[0]
         return jnp.array([dq, ddq])
