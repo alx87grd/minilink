@@ -1,25 +1,11 @@
-"""Cyipopt :func:`cyipopt.minimize_ipopt` optimizer.
-
-Wraps the COIN-OR Ipopt interior-point solver behind the same generic
-:class:`~minilink.optimization.optimizers.optimizer_backend.OptimizerBackend` contract
-used by :class:`~minilink.optimization.optimizers.scipy_minimize.ScipyMinimizeOptimizer`,
-so a :class:`~minilink.optimization.mathematical_program.MathematicalProgram`
-can switch between the SciPy and Ipopt backends with no other code changes.
-
-Equality constraints ``h(z) = 0`` and inequality constraints ``g(z) >= 0`` are
-forwarded as ``type='eq'`` and ``type='ineq'`` dictionaries, matching the
-SciPy-style interface that ``minimize_ipopt`` accepts.
-
-The optional dependency ``cyipopt`` (PyPI name ``cyipopt``) provides the Ipopt
-binding; install with ``pip install cyipopt`` or via the ``ipopt`` extra.
-"""
+"""Cyipopt :func:`cyipopt.minimize_ipopt` optimizer adapter."""
 
 import numpy as np
 
-from minilink.optimization.mathematical_program import (
-    MathematicalProgram,
-    OptimizationResult,
+from minilink.optimization.evaluators.program_evaluator import (
+    MathematicalProgramEvaluator,
 )
+from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
     OptimizerBackend,
@@ -30,25 +16,9 @@ class IpoptOptimizer(OptimizerBackend):
     """
     Optimizer adapter for :func:`cyipopt.minimize_ipopt`.
 
-    Parameters
-    ----------
-    options : dict, optional
-        Ipopt options forwarded to :func:`cyipopt.minimize_ipopt`. The ``disp``
-        and ``maxiter`` keys are remapped to ``print_level`` / ``max_iter`` by
-        cyipopt; any other key is passed straight through to Ipopt (see
-        https://coin-or.github.io/Ipopt/OPTIONS.html).
-    tol : float, optional
-        Relative convergence tolerance forwarded to Ipopt as the ``tol`` option.
-
-    Notes
-    -----
     Ipopt expects ``g(x) >= 0`` for inequality constraints, the same convention
-    used by :class:`~minilink.optimization.mathematical_program.MathematicalProgram`,
-    so margins are passed through unchanged.
-
-    Per-iterate callbacks are not supported on cyipopt's native Ipopt path;
-    :meth:`solve` raises ``NotImplementedError`` if ``callback`` is not
-    ``None``.
+    used by :class:`~minilink.optimization.mathematical_program.MathematicalProgram`.
+    Per-iterate callbacks are not supported by cyipopt's native path.
     """
 
     def __init__(self, options: dict | None = None, tol: float | None = None):
@@ -57,16 +27,17 @@ class IpoptOptimizer(OptimizerBackend):
 
     def solve(
         self,
-        program: MathematicalProgram,
+        program_evaluator: MathematicalProgramEvaluator,
+        z0: np.ndarray,
         *,
         callback: BackendIterateCallback | None = None,
     ) -> OptimizationResult:
-        """Solve ``program`` with Ipopt and return a backend-neutral result."""
+        """Solve ``program_evaluator`` with Ipopt and return a backend-neutral result."""
         if callback is not None:
             raise NotImplementedError(
                 "IpoptOptimizer does not support solve(callback=...): cyipopt's "
                 "native Ipopt path does not run a Python callback each iteration. "
-                "Use a SciPy optimizer label (e.g. 'scipy') or omit callback."
+                "Use a SciPy optimizer method (e.g. 'scipy_slsqp') or omit callback."
             )
         try:
             from cyipopt import minimize_ipopt
@@ -78,41 +49,24 @@ class IpoptOptimizer(OptimizerBackend):
 
         constraints = []
 
-        # Equality constraints
-        for equality in program.equalities:
-            entry = {"type": "eq", "fun": equality.residual}
-            if equality.jac is not None:
-                entry["jac"] = equality.jac
+        if program_evaluator.n_h > 0:
+            entry = {"type": "eq", "fun": program_evaluator.equality_residual}
+            if program_evaluator.has_jacobian_h:
+                entry["jac"] = program_evaluator.jacobian_h
             constraints.append(entry)
 
-        # Inequality constraints
-        for inequality in program.inequalities:
-            entry = {"type": "ineq", "fun": inequality.margin}
-            if inequality.jac is not None:
-                entry["jac"] = inequality.jac
+        if program_evaluator.n_g > 0:
+            entry = {"type": "ineq", "fun": program_evaluator.inequality_margin}
+            if program_evaluator.has_jacobian_g:
+                entry["jac"] = program_evaluator.jacobian_g
             constraints.append(entry)
-
-        # Box bounds
-        bounds = None
-        if program.bounds is not None:
-            lower = (
-                np.full(program.n_z, -np.inf)
-                if program.bounds.lower is None
-                else program.bounds.lower
-            )
-            upper = (
-                np.full(program.n_z, np.inf)
-                if program.bounds.upper is None
-                else program.bounds.upper
-            )
-            bounds = list(zip(lower, upper))
 
         raw_result = minimize_ipopt(
-            program.objective,
-            program.z0,
-            jac=program.gradient if program.grad is not None else None,
-            hess=program.hessian if program.hess is not None else None,
-            bounds=bounds,
+            program_evaluator.objective,
+            np.asarray(z0, dtype=float).reshape(program_evaluator.n_z),
+            jac=program_evaluator.gradient if program_evaluator.has_gradient else None,
+            hess=program_evaluator.hessian if program_evaluator.has_hessian else None,
+            bounds=program_evaluator.scipy_bounds(),
             constraints=constraints,
             tol=self.tol,
             options=dict(self.options),

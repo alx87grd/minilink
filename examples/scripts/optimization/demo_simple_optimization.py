@@ -1,38 +1,16 @@
 import numpy as np
 
-from minilink.optimization.mathematical_program import (
-    InequalityConstraint,
-    MathematicalProgram,
-)
+from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.optimization.optimizer import Optimizer
 
+# Test parameters
 Z0 = 2.0
-
-# --- Visualization / callback ---
 SHOW_FIGURE = True
 TRACE_ITERATES = True
-# Minilink text report from :meth:`Optimizer.solve` (not SciPy ``options["disp"]``).
 DISP_SOLVE = True
 FIGSIZE_SQUARE = (6.0, 6.0)
 z_lo = 0.6
 z_hi = 2.05
-
-opt = Optimizer(
-    backend="scipy",
-    options={
-        "disp": False,
-        "maxiter": 200,
-        "ftol": 1e-12,
-    },
-)
-
-# opt = Optimizer(
-#     backend="ipopt",
-#     options={
-#         "disp": False,
-#         "maxiter": 200,
-#     },
-# )
 
 
 def J_1d_values(z: np.ndarray) -> np.ndarray:
@@ -68,24 +46,46 @@ def jac_box(z: np.ndarray) -> np.ndarray:
 
 
 prog = MathematicalProgram(
+    n_z=1,
     J=J_1d,
-    z0=np.array([Z0]),
-    grad=grad_1d,
-    inequalities=(InequalityConstraint(g=g_box, jac=jac_box, name="interval"),),
+    grad_J=grad_1d,
+    g=g_box,
+    jac_g=jac_box,
 )
+
+opt = Optimizer(
+    prog,
+    z0=np.array([Z0]),
+    method="scipy_slsqp",
+    options={
+        "disp": False,
+        "maxiter": 200,
+        "ftol": 1e-12,
+    },
+)
+
+# opt = Optimizer(
+#     prog,
+#     z0=np.array([Z0]),
+#     method="ipopt",
+#     options={
+#         "disp": False,
+#         "maxiter": 200,
+#     },
+# )
 
 iterates_z: list[float] = []
 iterates_J: list[float] = []
 
 
-def record_iterate(z: np.ndarray, J: float, _t: float) -> None:
+def record_iterate(z: np.ndarray, J: float, t: float) -> None:
     zz = float(np.asarray(z, dtype=float).reshape(-1)[0])
     iterates_z.append(zz)
     iterates_J.append(J)
+    print(f"z: {zz}, J: {J}, t: {t}")
 
 
 out = opt.solve(
-    prog,
     callback=record_iterate if TRACE_ITERATES else None,
     disp=DISP_SOLVE,
 )
@@ -125,8 +125,8 @@ if SHOW_FIGURE:
     )
     ax.axvline(z_hi, color="C3", ls="--", lw=1.0)
 
-    z0 = float(prog.z0.flat[0])
-    J0 = J_1d(prog.z0)
+    z0 = float(opt.z0.flat[0])
+    J0 = J_1d(opt.z0)
     ax.plot(z0, J0, "mo", ms=8, label=r"$z_0$")
 
     path_z = [z0] + iterates_z

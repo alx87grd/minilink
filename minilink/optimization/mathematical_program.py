@@ -1,12 +1,14 @@
 """
 Generic finite-dimensional mathematical programs.
 
-The optimization layer represents problems in the textbook form
+The optimization layer represents problems in the textbook NLP form
 
 ``minimize J(z) subject to h(z) = 0, g(z) >= 0, lower <= z <= upper``.
 
-Domain packages such as planning own transcription details. Optimizers
-only see finite-dimensional functions of the decision vector ``z``.
+The :class:`MathematicalProgram` itself stays close to that math: it stores
+pure callables of the decision vector ``z`` and no solver state such as an
+initial guess. Backend-specific casting, JAX compilation, and SciPy-friendly
+wrappers live outside this object on program evaluators owned by optimizers.
 """
 
 from collections.abc import Callable
@@ -19,112 +21,9 @@ ScalarFunction = Callable[[np.ndarray], float]
 
 
 @dataclass(frozen=True)
-class VariableBounds:
-    """
-    Box bounds on the decision vector ``z``.
-
-    Parameters
-    ----------
-    lower, upper : array_like, optional
-        Lower and upper bounds. ``None`` means unbounded on that side.
-    """
-
-    lower: np.ndarray | None = None
-    upper: np.ndarray | None = None
-
-    def __post_init__(self) -> None:
-        lower = (
-            None
-            if self.lower is None
-            else np.asarray(self.lower, dtype=float).reshape(-1).copy()
-        )
-        upper = (
-            None
-            if self.upper is None
-            else np.asarray(self.upper, dtype=float).reshape(-1).copy()
-        )
-        if lower is not None and upper is not None:
-            if lower.shape != upper.shape:
-                raise ValueError("lower and upper bounds must have the same shape")
-            if np.any(lower > upper):
-                raise ValueError(
-                    "lower bounds must be less than or equal to upper bounds"
-                )
-        object.__setattr__(self, "lower", lower)
-        object.__setattr__(self, "upper", upper)
-
-    def validate_dim(self, n_z: int) -> None:
-        """Raise if the bounds do not match decision dimension ``n_z``."""
-        if self.lower is not None and self.lower.shape != (n_z,):
-            raise ValueError(f"lower bounds must have shape ({n_z},)")
-        if self.upper is not None and self.upper.shape != (n_z,):
-            raise ValueError(f"upper bounds must have shape ({n_z},)")
-
-
-@dataclass(frozen=True)
-class EqualityConstraint:
-    """
-    Vector equality constraint ``h(z) = 0``.
-
-    Parameters
-    ----------
-    h : callable
-        Function returning equality residuals.
-    jac : callable, optional
-        Function returning the Jacobian ``dh/dz``.
-    name : str
-        Human-readable label for diagnostics.
-    metadata : dict
-        Optional transcription metadata for debugging.
-    """
-
-    h: ArrayFunction
-    jac: ArrayFunction | None = None
-    name: str = ""
-    metadata: dict[str, object] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "metadata", dict(self.metadata))
-
-    def residual(self, z: np.ndarray) -> np.ndarray:
-        """Return ``h(z)`` as a flat residual vector."""
-        return np.asarray(self.h(np.asarray(z, dtype=float)), dtype=float).reshape(-1)
-
-
-@dataclass(frozen=True)
-class InequalityConstraint:
-    """
-    Vector inequality constraint ``g(z) >= 0``.
-
-    Parameters
-    ----------
-    g : callable
-        Function returning nonnegative feasibility margins.
-    jac : callable, optional
-        Function returning the Jacobian ``dg/dz``.
-    name : str
-        Human-readable label for diagnostics.
-    metadata : dict
-        Optional transcription metadata for debugging.
-    """
-
-    g: ArrayFunction
-    jac: ArrayFunction | None = None
-    name: str = ""
-    metadata: dict[str, object] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "metadata", dict(self.metadata))
-
-    def margin(self, z: np.ndarray) -> np.ndarray:
-        """Return ``g(z)`` as a flat nonnegative margin vector."""
-        return np.asarray(self.g(np.asarray(z, dtype=float)), dtype=float).reshape(-1)
-
-
-@dataclass(frozen=True)
 class MathematicalProgram:
     """
-    Finite-dimensional mathematical program passed to a backend.
+    Pure finite-dimensional nonlinear program description.
 
     The generic form is
     ``minimize J(z)`` subject to ``h(z) = 0``, ``g(z) >= 0``, and optional
@@ -132,77 +31,69 @@ class MathematicalProgram:
 
     Parameters
     ----------
+    n_z : int
+        Dimension of the decision vector ``z``.
     J : callable
-        Objective function ``J(z) -> float``.
-    z0 : np.ndarray
-        Initial decision vector.
-    bounds : VariableBounds, optional
-        Box bounds on the decision vector.
-    equalities : tuple
-        Equality constraints ``h(z) = 0``.
-    inequalities : tuple
-        Inequality constraints ``g(z) >= 0``.
+        Objective function ``J(z) -> scalar``.
+    h : callable, optional
+        Equality residual ``h(z) -> array``. Missing means no equalities.
+    g : callable, optional
+        Inequality margin ``g(z) -> array`` with convention ``g(z) >= 0``.
+        Missing means no inequalities.
+    lower, upper : array_like, optional
+        Lower and upper box bounds on ``z``. ``None`` means unbounded on that
+        side.
+    grad_J : callable, optional
+        Objective gradient ``grad_J(z) -> np.ndarray``.
+    hess_J : callable, optional
+        Objective Hessian ``hess_J(z) -> np.ndarray``.
+    jac_h, jac_g : callable, optional
+        Constraint Jacobians ``dh/dz`` and ``dg/dz``.
     metadata : dict
-        Optional transcription metadata for debugging.
-    grad : callable, optional
-        Objective gradient ``grad(z) -> np.ndarray``.
-    hess : callable, optional
-        Objective Hessian ``hess(z) -> np.ndarray``.
+        Optional transcription or diagnostic metadata.
     """
 
+    n_z: int
     J: ScalarFunction
-    z0: np.ndarray
-    bounds: VariableBounds | None = None
-    equalities: tuple[EqualityConstraint, ...] = ()
-    inequalities: tuple[InequalityConstraint, ...] = ()
+    h: ArrayFunction | None = None
+    g: ArrayFunction | None = None
+    lower: np.ndarray | None = None
+    upper: np.ndarray | None = None
+    grad_J: ArrayFunction | None = None
+    hess_J: ArrayFunction | None = None
+    jac_h: ArrayFunction | None = None
+    jac_g: ArrayFunction | None = None
     metadata: dict[str, object] = field(default_factory=dict)
-    grad: ArrayFunction | None = None
-    hess: ArrayFunction | None = None
+
+    problem_class: str = "nlp"
 
     def __post_init__(self) -> None:
-        z0 = np.asarray(self.z0, dtype=float).reshape(-1).copy()
-        bounds = self.bounds
-        if bounds is not None:
-            bounds.validate_dim(int(z0.size))
-        object.__setattr__(self, "z0", z0)
-        object.__setattr__(self, "equalities", tuple(self.equalities))
-        object.__setattr__(self, "inequalities", tuple(self.inequalities))
+        n_z = int(self.n_z)
+        if n_z <= 0:
+            raise ValueError("n_z must be a positive integer")
+        lower = _as_vector_or_none("lower", self.lower, n_z)
+        upper = _as_vector_or_none("upper", self.upper, n_z)
+        if lower is not None and upper is not None and np.any(lower > upper):
+            raise ValueError("lower bounds must be less than or equal to upper bounds")
+        object.__setattr__(self, "n_z", n_z)
+        object.__setattr__(self, "lower", lower)
+        object.__setattr__(self, "upper", upper)
         object.__setattr__(self, "metadata", dict(self.metadata))
 
-    @property
-    def n_z(self) -> int:
-        """Dimension of the decision vector ``z``."""
-        return int(self.z0.size)
 
-    def objective(self, z: np.ndarray) -> float:
-        """Return ``J(z)`` as a scalar float."""
-        return float(self.J(np.asarray(z, dtype=float)))
-
-    def gradient(self, z: np.ndarray) -> np.ndarray:
-        """Return the objective gradient or raise if none is available."""
-        if self.grad is None:
-            raise ValueError("This mathematical program has no objective gradient")
-        return np.asarray(self.grad(np.asarray(z, dtype=float)), dtype=float).reshape(
-            self.n_z
-        )
-
-    def hessian(self, z: np.ndarray) -> np.ndarray:
-        """Return the objective Hessian or raise if none is available."""
-        if self.hess is None:
-            raise ValueError("This mathematical program has no objective Hessian")
-        arr = np.asarray(self.hess(np.asarray(z, dtype=float)), dtype=float)
-        if arr.shape != (self.n_z, self.n_z):
-            raise ValueError(
-                f"objective Hessian must have shape ({self.n_z}, {self.n_z})"
-            )
-        return arr
+def _as_vector_or_none(name: str, value, n_z: int) -> np.ndarray | None:
+    if value is None:
+        return None
+    arr = np.asarray(value, dtype=float).reshape(-1).copy()
+    if arr.shape != (n_z,):
+        raise ValueError(f"{name} bounds must have shape ({n_z},)")
+    return arr
 
 
 @dataclass(frozen=True)
 class OptimizationResult:
     """
-    Result returned by an :class:`~minilink.optimization.optimizer.Optimizer`
-    (or a backend-specific raw result wrapped into this type).
+    Result returned by an :class:`~minilink.optimization.optimizer.Optimizer`.
 
     Parameters
     ----------

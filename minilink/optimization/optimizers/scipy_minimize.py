@@ -1,12 +1,12 @@
-"""SciPy :func:`scipy.optimize.minimize` optimizer."""
+"""SciPy :func:`scipy.optimize.minimize` optimizer adapter."""
 
 import numpy as np
 from scipy.optimize import minimize
 
-from minilink.optimization.mathematical_program import (
-    MathematicalProgram,
-    OptimizationResult,
+from minilink.optimization.evaluators.program_evaluator import (
+    MathematicalProgramEvaluator,
 )
+from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
     OptimizerBackend,
@@ -39,54 +39,37 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
     """
     Optimizer adapter for :func:`scipy.optimize.minimize`.
 
-    Equality constraints are passed as ``type='eq'`` residuals and
-    inequality constraints are passed as ``type='ineq'`` nonnegative margins, matching
-    the generic :class:`~minilink.optimization.mathematical_program.MathematicalProgram`
-    convention.
+    Equality constraints are passed as ``type='eq'`` residuals and inequality
+    constraints as ``type='ineq'`` nonnegative margins, matching Minilink's
+    mathematical-program convention.
     """
 
-    def __init__(self, method="SLSQP", options=None):
-        self.method = method
+    def __init__(self, scipy_method="SLSQP", options=None):
+        self.scipy_method = scipy_method
         self.options = {} if options is None else dict(options)
 
     def solve(
         self,
-        program: MathematicalProgram,
+        program_evaluator: MathematicalProgramEvaluator,
+        z0: np.ndarray,
         *,
         callback: BackendIterateCallback | None = None,
     ) -> OptimizationResult:
-        """Solve ``program`` with SciPy and return a backend-neutral result."""
+        """Solve ``program_evaluator`` with SciPy and return a backend-neutral result."""
 
         constraints = []
 
-        # Equality constraints
-        for equality in program.equalities:
-            entry = {"type": "eq", "fun": equality.residual}
-            if equality.jac is not None:
-                entry["jac"] = equality.jac
+        if program_evaluator.n_h > 0:
+            entry = {"type": "eq", "fun": program_evaluator.equality_residual}
+            if program_evaluator.has_jacobian_h:
+                entry["jac"] = program_evaluator.jacobian_h
             constraints.append(entry)
 
-        # Inequality constraints
-        for inequality in program.inequalities:
-            entry = {"type": "ineq", "fun": inequality.margin}
-            if inequality.jac is not None:
-                entry["jac"] = inequality.jac
+        if program_evaluator.n_g > 0:
+            entry = {"type": "ineq", "fun": program_evaluator.inequality_margin}
+            if program_evaluator.has_jacobian_g:
+                entry["jac"] = program_evaluator.jacobian_g
             constraints.append(entry)
-
-        # Box bounds
-        bounds = None
-        if program.bounds is not None:
-            lower = (
-                np.full(program.n_z, -np.inf)
-                if program.bounds.lower is None
-                else program.bounds.lower
-            )
-            upper = (
-                np.full(program.n_z, np.inf)
-                if program.bounds.upper is None
-                else program.bounds.upper
-            )
-            bounds = list(zip(lower, upper))
 
         scipy_callback = None
         if callback is not None:
@@ -98,12 +81,16 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
                 callback(z_step)
 
         raw_result = minimize(
-            program.objective,
-            program.z0,
-            method=self.method,
-            jac=program.gradient if program.grad is not None else None,
-            hess=program.hessian if self._uses_hessian() and program.hess else None,
-            bounds=bounds,
+            program_evaluator.objective,
+            np.asarray(z0, dtype=float).reshape(program_evaluator.n_z),
+            method=self.scipy_method,
+            jac=program_evaluator.gradient if program_evaluator.has_gradient else None,
+            hess=(
+                program_evaluator.hessian
+                if self._uses_hessian() and program_evaluator.has_hessian
+                else None
+            ),
+            bounds=program_evaluator.scipy_bounds(),
             constraints=constraints,
             callback=scipy_callback,
             options=dict(self.options),
@@ -124,8 +111,8 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
         )
 
     def _uses_hessian(self) -> bool:
-        """Check if the method uses the Hessian."""
-        method = self.method.lower()
+        """Check if the SciPy method uses the Hessian."""
+        method = self.scipy_method.lower()
         return method in {
             "dogleg",
             "trust-ncg",

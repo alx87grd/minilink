@@ -1,23 +1,9 @@
 """Benchmarks for finite-dimensional :class:`MathematicalProgram` solvers.
 
-Sweep a list of optimizer backends (currently SciPy ``minimize`` and Ipopt via
-``cyipopt``) over a set of textbook nonlinear-program test cases and compare
-solve time, iteration counts, final cost, and constraint feasibility. Mirrors
-the layout of :mod:`minilink.simulation.benchmark` and
-:mod:`minilink.compile.benchmark`.
-
-Usage::
-
-    from minilink.optimization.benchmark import (
-        benchmark_optimizer_backends,
-        default_optimizer_variants,
-        print_optimizer_benchmark,
-        STANDARD_OPTIMIZATION_CASES,
-    )
-
-    variants = default_optimizer_variants()
-    result = benchmark_optimizer_backends(STANDARD_OPTIMIZATION_CASES, variants)
-    print_optimizer_benchmark(result)
+Sweep optimizer method presets over textbook nonlinear-program test cases and
+compare solve time, iteration counts, final cost, and constraint feasibility.
+The mathematical program is compiled when each :class:`Optimizer` is built;
+the reported ``solve_s`` measures the backend solve only.
 """
 
 from __future__ import annotations
@@ -28,12 +14,12 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from minilink.optimization.evaluators.program_evaluator import (
+    MathematicalProgramEvaluator,
+)
 from minilink.optimization.mathematical_program import (
-    EqualityConstraint,
-    InequalityConstraint,
     MathematicalProgram,
     OptimizationResult,
-    VariableBounds,
 )
 from minilink.optimization.optimizer import Optimizer
 
@@ -42,49 +28,21 @@ from minilink.optimization.optimizer import Optimizer
 
 @dataclass(frozen=True)
 class OptimizerBenchmarkVariant:
-    """One optimizer backend configuration to benchmark.
-
-    Parameters
-    ----------
-    name : str
-        Short label used in the benchmark table.
-    backend : str
-        Backend identifier, ``"scipy"`` or ``"ipopt"``.
-    method : str
-        Backend-specific method (e.g. SciPy ``"SLSQP"``, ``"trust-constr"``).
-        Ignored by Ipopt (which uses interior-point).
-    options : Mapping
-        Backend-specific options dictionary.
-    """
+    """One optimizer method configuration to benchmark."""
 
     name: str
-    backend: str
-    method: str = ""
+    method: str
     options: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class OptimizerBenchmarkCase:
-    """One named mathematical-program test problem.
-
-    Parameters
-    ----------
-    id : str
-        Short machine-readable id.
-    label : str
-        Human-readable label for tables.
-    build : callable
-        Returns a fresh :class:`MathematicalProgram` (built per run so internal
-        state is never shared between solvers).
-    z_star : np.ndarray, optional
-        Known optimum used to report a relative ``z`` error. ``None`` skips it.
-    cost_star : float, optional
-        Known optimal cost. ``None`` skips the cost-error column.
-    """
+    """One named mathematical-program test problem."""
 
     id: str
     label: str
     build: Callable[[], MathematicalProgram]
+    z0: np.ndarray
     z_star: np.ndarray | None = None
     cost_star: float | None = None
 
@@ -133,14 +91,12 @@ def default_optimizer_variants(
     variants: list[OptimizerBenchmarkVariant] = [
         OptimizerBenchmarkVariant(
             name="scipy-SLSQP",
-            backend="scipy",
-            method="SLSQP",
+            method="scipy_slsqp",
             options={"maxiter": int(maxiter), "ftol": float(ftol), "disp": False},
         ),
         OptimizerBenchmarkVariant(
             name="scipy-trust-constr",
-            backend="scipy",
-            method="trust-constr",
+            method="scipy_trust_constr",
             options={"maxiter": int(maxiter), "xtol": float(ftol), "disp": False},
         ),
     ]
@@ -148,7 +104,6 @@ def default_optimizer_variants(
         variants.append(
             OptimizerBenchmarkVariant(
                 name="ipopt",
-                backend="ipopt",
                 method="ipopt",
                 options={"max_iter": int(maxiter), "tol": float(tol), "print_level": 0},
             )
@@ -166,13 +121,6 @@ def ipopt_optimizer_available() -> bool:
         return False
 
 
-# --- Standard test problems (textbook NLPs) --------------------------------
-#
-# Small, well-known nonlinear programs for solver comparison. The problems are
-# defined explicitly with gradients so SciPy and Ipopt receive identical
-# information.
-
-
 def _quadratic_problem() -> MathematicalProgram:
     # min 0.5 (z - c)^T (z - c)  with c = [1, 2, 3]; z* = c, cost* = 0
     c = np.array([1.0, 2.0, 3.0])
@@ -180,10 +128,10 @@ def _quadratic_problem() -> MathematicalProgram:
     def J(z: np.ndarray) -> float:
         return 0.5 * float(np.sum((z - c) ** 2))
 
-    def grad(z: np.ndarray) -> np.ndarray:
+    def grad_J(z: np.ndarray) -> np.ndarray:
         return z - c
 
-    return MathematicalProgram(J=J, grad=grad, z0=np.zeros(3))
+    return MathematicalProgram(n_z=3, J=J, grad_J=grad_J)
 
 
 def _rosenbrock_problem(n: int = 5) -> MathematicalProgram:
@@ -191,15 +139,13 @@ def _rosenbrock_problem(n: int = 5) -> MathematicalProgram:
     def J(z: np.ndarray) -> float:
         return float(np.sum(100.0 * (z[1:] - z[:-1] ** 2) ** 2 + (1.0 - z[:-1]) ** 2))
 
-    def grad(z: np.ndarray) -> np.ndarray:
-        g = np.zeros_like(z)
-        g[:-1] = -400.0 * z[:-1] * (z[1:] - z[:-1] ** 2) - 2.0 * (1.0 - z[:-1])
-        g[1:] += 200.0 * (z[1:] - z[:-1] ** 2)
-        return g
+    def grad_J(z: np.ndarray) -> np.ndarray:
+        dJ = np.zeros_like(z)
+        dJ[:-1] = -400.0 * z[:-1] * (z[1:] - z[:-1] ** 2) - 2.0 * (1.0 - z[:-1])
+        dJ[1:] += 200.0 * (z[1:] - z[:-1] ** 2)
+        return dJ
 
-    z0 = -1.2 * np.ones(n)
-    z0[1::2] = 1.0
-    return MathematicalProgram(J=J, grad=grad, z0=z0)
+    return MathematicalProgram(n_z=n, J=J, grad_J=grad_J)
 
 
 def _box_constrained_quadratic_problem() -> MathematicalProgram:
@@ -209,11 +155,16 @@ def _box_constrained_quadratic_problem() -> MathematicalProgram:
     def J(z: np.ndarray) -> float:
         return 0.5 * float(np.sum(z**2))
 
-    def grad(z: np.ndarray) -> np.ndarray:
+    def grad_J(z: np.ndarray) -> np.ndarray:
         return z
 
-    bounds = VariableBounds(lower=np.ones(n), upper=np.full(n, np.inf))
-    return MathematicalProgram(J=J, grad=grad, z0=2.0 * np.ones(n), bounds=bounds)
+    return MathematicalProgram(
+        n_z=n,
+        J=J,
+        grad_J=grad_J,
+        lower=np.ones(n),
+        upper=np.full(n, np.inf),
+    )
 
 
 def _equality_circle_problem() -> MathematicalProgram:
@@ -222,7 +173,7 @@ def _equality_circle_problem() -> MathematicalProgram:
     def J(z: np.ndarray) -> float:
         return float(z[0] + z[1])
 
-    def grad(z: np.ndarray) -> np.ndarray:
+    def grad_J(z: np.ndarray) -> np.ndarray:
         return np.array([1.0, 1.0])
 
     def h(z: np.ndarray) -> np.ndarray:
@@ -231,13 +182,7 @@ def _equality_circle_problem() -> MathematicalProgram:
     def jac_h(z: np.ndarray) -> np.ndarray:
         return np.array([[2.0 * z[0], 2.0 * z[1]]])
 
-    eq = EqualityConstraint(h=h, jac=jac_h, name="unit_circle")
-    return MathematicalProgram(
-        J=J,
-        grad=grad,
-        z0=np.array([-0.5, -0.5]),
-        equalities=(eq,),
-    )
+    return MathematicalProgram(n_z=2, J=J, h=h, grad_J=grad_J, jac_h=jac_h)
 
 
 def _inequality_quadratic_problem() -> MathematicalProgram:
@@ -246,7 +191,7 @@ def _inequality_quadratic_problem() -> MathematicalProgram:
     def J(z: np.ndarray) -> float:
         return float((z[0] - 2.0) ** 2 + (z[1] - 1.0) ** 2)
 
-    def grad(z: np.ndarray) -> np.ndarray:
+    def grad_J(z: np.ndarray) -> np.ndarray:
         return np.array([2.0 * (z[0] - 2.0), 2.0 * (z[1] - 1.0)])
 
     def g(z: np.ndarray) -> np.ndarray:
@@ -255,14 +200,14 @@ def _inequality_quadratic_problem() -> MathematicalProgram:
     def jac_g(z: np.ndarray) -> np.ndarray:
         return np.array([[-1.0, -1.0]])
 
-    ineq = InequalityConstraint(g=g, jac=jac_g, name="sum_le_one")
-    bounds = VariableBounds(lower=np.zeros(2), upper=np.full(2, np.inf))
     return MathematicalProgram(
+        n_z=2,
         J=J,
-        grad=grad,
-        z0=np.array([0.5, 0.5]),
-        bounds=bounds,
-        inequalities=(ineq,),
+        g=g,
+        grad_J=grad_J,
+        jac_g=jac_g,
+        lower=np.zeros(2),
+        upper=np.full(2, np.inf),
     )
 
 
@@ -271,6 +216,7 @@ STANDARD_OPTIMIZATION_CASES: tuple[OptimizerBenchmarkCase, ...] = (
         id="quadratic",
         label="Unconstrained quadratic",
         build=_quadratic_problem,
+        z0=np.zeros(3),
         z_star=np.array([1.0, 2.0, 3.0]),
         cost_star=0.0,
     ),
@@ -278,6 +224,7 @@ STANDARD_OPTIMIZATION_CASES: tuple[OptimizerBenchmarkCase, ...] = (
         id="rosenbrock",
         label="Rosenbrock (n=5)",
         build=lambda: _rosenbrock_problem(5),
+        z0=np.array([-1.2, 1.0, -1.2, 1.0, -1.2]),
         z_star=np.ones(5),
         cost_star=0.0,
     ),
@@ -285,6 +232,7 @@ STANDARD_OPTIMIZATION_CASES: tuple[OptimizerBenchmarkCase, ...] = (
         id="box_qp",
         label="Box-constrained QP",
         build=_box_constrained_quadratic_problem,
+        z0=2.0 * np.ones(4),
         z_star=np.ones(4),
         cost_star=0.5 * 4,
     ),
@@ -292,6 +240,7 @@ STANDARD_OPTIMIZATION_CASES: tuple[OptimizerBenchmarkCase, ...] = (
         id="circle_eq",
         label="Equality circle",
         build=_equality_circle_problem,
+        z0=np.array([-0.5, -0.5]),
         z_star=np.array([-1.0, -1.0]) / np.sqrt(2.0),
         cost_star=-np.sqrt(2.0),
     ),
@@ -299,6 +248,7 @@ STANDARD_OPTIMIZATION_CASES: tuple[OptimizerBenchmarkCase, ...] = (
         id="ineq_qp",
         label="Inequality QP",
         build=_inequality_quadratic_problem,
+        z0=np.array([0.5, 0.5]),
         # KKT solution: project (2, 1) onto z[0] + z[1] = 1 with z >= 0
         z_star=np.array([1.0, 0.0]),
         cost_star=(1.0 - 2.0) ** 2 + (0.0 - 1.0) ** 2,
@@ -315,11 +265,7 @@ def benchmark_optimizer_backends(
     *,
     n_runs: int = 1,
 ) -> OptimizerBenchmarkResult:
-    """Run each variant on each case and return a flat row table.
-
-    The mathematical program is rebuilt for every (case, variant, run) so
-    optimizers do not see warmed-up internal state.
-    """
+    """Run each variant on each case and return a flat row table."""
     variant_tuple = (
         default_optimizer_variants() if variants is None else tuple(variants)
     )
@@ -343,20 +289,22 @@ def _run_case(
     *,
     n_runs: int,
 ) -> OptimizerBenchmarkRow:
-    optimizer = _make_optimizer(variant)
-
     durations: list[float] = []
     last_result: OptimizationResult | None = None
-    last_program: MathematicalProgram | None = None
+    last_program_evaluator: MathematicalProgramEvaluator | None = None
     for _ in range(int(n_runs)):
         program = case.build()
-        last_program = program
+        optimizer = _make_optimizer(variant, program, case.z0)
+        last_program_evaluator = optimizer.program_evaluator
         t0 = time.perf_counter()
-        last_result = optimizer.solve(program)
+        last_result = optimizer.solve()
         durations.append(time.perf_counter() - t0)
 
-    assert last_result is not None and last_program is not None
-    eq_inf, min_ineq, bound_inf = _constraint_metrics(last_program, last_result.z)
+    assert last_result is not None and last_program_evaluator is not None
+    eq_inf, min_ineq, bound_inf = _constraint_metrics(
+        last_program_evaluator,
+        last_result.z,
+    )
     return OptimizerBenchmarkRow(
         case_id=case.id,
         case_label=case.label,
@@ -376,51 +324,52 @@ def _run_case(
     )
 
 
-def _make_optimizer(variant: OptimizerBenchmarkVariant) -> Optimizer:
-    if variant.backend == "scipy":
-        method = variant.method or "SLSQP"
-        return Optimizer(backend="scipy", method=method, options=dict(variant.options))
-    if variant.backend == "ipopt":
-        opts = dict(variant.options)
-        kwargs: dict = {"options": opts}
-        if "tol" in opts:
-            kwargs["tol"] = opts.pop("tol")
-        return Optimizer(backend="ipopt", **kwargs)
-    raise ValueError(f"Unknown optimizer backend {variant.backend!r}")
+def _make_optimizer(
+    variant: OptimizerBenchmarkVariant,
+    program: MathematicalProgram,
+    z0: np.ndarray,
+) -> Optimizer:
+    opts = dict(variant.options)
+    kwargs = {}
+    if variant.method == "ipopt" and "tol" in opts:
+        kwargs["tol"] = opts.pop("tol")
+    return Optimizer(
+        program,
+        z0=z0,
+        method=variant.method,
+        options=opts,
+        **kwargs,
+    )
 
 
 # --- Metrics ---------------------------------------------------------------
 
 
 def _constraint_metrics(
-    program: MathematicalProgram,
+    program_evaluator: MathematicalProgramEvaluator,
     z: np.ndarray,
 ) -> tuple[float, float | None, float]:
     eq_inf = 0.0
-    if program.equalities:
-        eq_inf = max(
-            float(np.max(np.abs(equality.residual(z))))
-            for equality in program.equalities
-        )
+    if program_evaluator.n_h:
+        eq_inf = float(np.max(np.abs(program_evaluator.equality_residual(z))))
 
     min_ineq: float | None = None
-    if program.inequalities:
-        min_ineq = min(
-            float(np.min(inequality.margin(z))) for inequality in program.inequalities
-        )
+    if program_evaluator.n_g:
+        min_ineq = float(np.min(program_evaluator.inequality_margin(z)))
 
     bound_inf = 0.0
-    if program.bounds is not None:
-        if program.bounds.lower is not None:
-            bound_inf = max(
-                bound_inf,
-                float(np.max(np.maximum(program.bounds.lower - z, 0.0))),
-            )
-        if program.bounds.upper is not None:
-            bound_inf = max(
-                bound_inf,
-                float(np.max(np.maximum(z - program.bounds.upper, 0.0))),
-            )
+    lower = program_evaluator.program.lower
+    upper = program_evaluator.program.upper
+    if lower is not None:
+        bound_inf = max(
+            bound_inf,
+            float(np.max(np.maximum(lower - z, 0.0))),
+        )
+    if upper is not None:
+        bound_inf = max(
+            bound_inf,
+            float(np.max(np.maximum(z - upper, 0.0))),
+        )
     return eq_inf, min_ineq, bound_inf
 
 

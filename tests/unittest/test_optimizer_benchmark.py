@@ -14,8 +14,7 @@ def test_standard_cases_build_and_run_with_scipy():
     variants = (
         OptimizerBenchmarkVariant(
             name="scipy-SLSQP",
-            backend="scipy",
-            method="SLSQP",
+            method="scipy_slsqp",
             options={"maxiter": 200, "ftol": 1e-9, "disp": False},
         ),
     )
@@ -31,8 +30,7 @@ def test_print_optimizer_benchmark_does_not_crash(capsys):
     variants = (
         OptimizerBenchmarkVariant(
             name="scipy-SLSQP",
-            backend="scipy",
-            method="SLSQP",
+            method="scipy_slsqp",
             options={"maxiter": 200, "ftol": 1e-9, "disp": False},
         ),
     )

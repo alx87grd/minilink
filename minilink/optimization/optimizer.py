@@ -1,21 +1,17 @@
 """
 Orchestrator for finite-dimensional mathematical-program solvers.
 
-:class:`Optimizer` selects a concrete
-:class:`~minilink.optimization.optimizers.optimizer_backend.OptimizerBackend` by string
-label and owns all wrapping concerns (wall-clock timing, ``disp`` reports,
-default options). The backend itself exposes only
-:meth:`~minilink.optimization.optimizers.optimizer_backend.OptimizerBackend.solve`.
-
-Modelled on :class:`~minilink.simulation.simulator.Simulator`'s
-pluggable-solver pattern: each user-facing label in
-:data:`_USER_OPTIMIZER_MODES` resolves to a backend key plus preset
-constructor kwargs. Extra keyword arguments override the preset.
+:class:`Optimizer` is a bound solver object: it owns one
+:class:`~minilink.optimization.mathematical_program.MathematicalProgram`, a
+compiled program evaluator, a default initial guess ``z0``, and a
+solver method preset. Calling :meth:`solve` runs the already-compiled program
+from either the default ``z0`` or a one-off override.
 
 Typical use::
 
-    opt = Optimizer(backend="scipy", options={"maxiter": 200, "ftol": 1e-12})
-    result = opt.solve(program, disp=True)
+    program = MathematicalProgram(n_z=2, J=J, grad_J=grad_J)
+    opt = Optimizer(program, z0=[0.0, 0.0], method="scipy_slsqp")
+    result = opt.solve(disp=True)
 
 Optional progress hook: ``callback(z, J, t)`` on :meth:`Optimizer.solve` with
 ``t`` = elapsed wall seconds; see :data:`OptimizationProgressCallback`.
@@ -27,6 +23,8 @@ from dataclasses import replace
 
 import numpy as np
 
+from minilink.compile.backend_policy import BACKEND_NUMPY
+from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
@@ -44,54 +42,80 @@ _DISP_LINE_WIDTH = 60
 _DISP_RULE_MAIN = "=" * _DISP_LINE_WIDTH
 _DISP_RULE_DIV = "-" * _DISP_LINE_WIDTH
 
-# User-facing optimizer labels mapped to (backend_key, default_constructor_kwargs).
-_USER_OPTIMIZER_MODES: dict[str, tuple[str, dict]] = {
-    "scipy": ("scipy_minimize", {"method": "SLSQP", "options": {}}),
-    "scipy_trust": ("scipy_minimize", {"method": "trust-constr", "options": {}}),
+# User-facing optimizer methods mapped to (backend_key, default_constructor_kwargs).
+_USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
+    "scipy_slsqp": ("scipy_minimize", {"scipy_method": "SLSQP", "options": {}}),
+    "scipy_trust_constr": (
+        "scipy_minimize",
+        {"scipy_method": "trust-constr", "options": {}},
+    ),
     "ipopt": ("ipopt", {"options": {}, "tol": 1e-8}),
 }
 
 
 class Optimizer:
     """
-    Pluggable orchestrator over :class:`OptimizerBackend`.
+    Bound optimizer for one mathematical program.
 
     Parameters
     ----------
-    backend : str, optional
-        Optimizer label. One of ``"scipy"``, ``"scipy_trust"``, ``"ipopt"``;
-        see :data:`_USER_OPTIMIZER_MODES`.
+    program : MathematicalProgram
+        Pure NLP description to compile and solve.
+    z0 : array_like
+        Default initial decision vector for :meth:`solve`.
+    method : str, optional
+        Optimizer method preset. One of ``"scipy_slsqp"``,
+        ``"scipy_trust_constr"``, or ``"ipopt"``.
+    compile_backend : str, optional
+        Mathematical-program evaluator backend, ``"numpy"`` or ``"jax"``.
+    use_hessian : bool, optional
+        For JAX program evaluators, auto-generate a dense objective Hessian
+        when no ``hess_J`` is supplied.
     options : dict, optional
         Solver options merged into the preset's ``options`` dict (user keys win).
-    **backend_kwargs
+    **method_kwargs
         Extra keyword arguments override the preset's top-level kwargs and are
-        forwarded to the backend constructor (e.g. ``method="L-BFGS-B"`` for the
-        scipy backend, ``tol=1e-9`` for ipopt).
+        forwarded to the backend constructor.
     """
 
     def __init__(
         self,
-        backend: str = "scipy",
+        program: MathematicalProgram,
+        z0,
         *,
+        method: str = "scipy_slsqp",
+        compile_backend: str = BACKEND_NUMPY,
+        use_hessian: bool = False,
         options: dict | None = None,
-        **backend_kwargs,
+        **method_kwargs,
     ):
-        if backend not in _USER_OPTIMIZER_MODES:
-            valid = ", ".join(sorted(_USER_OPTIMIZER_MODES))
+        if method not in _USER_OPTIMIZER_METHODS:
+            valid = ", ".join(sorted(_USER_OPTIMIZER_METHODS))
             raise ValueError(
-                f"Unknown optimizer backend {backend!r}. Expected one of: {valid}."
+                f"Unknown optimizer method {method!r}. Expected one of: {valid}."
             )
-        backend_key, preset = _USER_OPTIMIZER_MODES[backend]
+
+        self.program = program
+        self.z0 = self._decision_vector(z0, program.n_z)
+        self.method = method
+        self.compile_backend = compile_backend
+        self.program_evaluator = compile_program_evaluator(
+            program,
+            backend=compile_backend,
+            sample_z=self.z0,
+            use_hessian=use_hessian,
+        )
+
+        backend_key, preset = _USER_OPTIMIZER_METHODS[method]
         kwargs = {}
         for key, value in preset.items():
             kwargs[key] = dict(value) if isinstance(value, dict) else value
-        kwargs.update(backend_kwargs)
+        kwargs.update(method_kwargs)
 
         if options is not None:
             existing = kwargs.get("options", {})
             kwargs["options"] = {**existing, **options}
 
-        self.backend_label = backend
         self.backend = self._select_backend(backend_key, kwargs)
 
     @staticmethod
@@ -108,7 +132,7 @@ class Optimizer:
         if backend_key == "ipopt":
 
             try:
-                import cyipopt
+                import cyipopt  # noqa: F401
             except ImportError:
                 raise ImportError(
                     "IpoptOptimizer requires the optional 'cyipopt' package."
@@ -122,17 +146,20 @@ class Optimizer:
 
     def solve(
         self,
-        program: MathematicalProgram,
         *,
+        z0=None,
         callback: OptimizationProgressCallback | None = None,
         record_solve_time: bool = False,
         disp: bool = False,
     ) -> OptimizationResult:
         """
-        Solve a finite-dimensional mathematical program.
+        Solve the bound finite-dimensional mathematical program.
 
         Parameters
         ----------
+        z0 : array_like, optional
+            One-off initial decision vector. If omitted, use the default ``z0``
+            supplied to :class:`Optimizer`.
         record_solve_time : bool, optional
             If True, set
             :attr:`~minilink.optimization.mathematical_program.OptimizationResult.solve_time_s`
@@ -146,17 +173,13 @@ class Optimizer:
             (one extra objective call per iterate). Not supported by the Ipopt
             backend (native path); use SciPy or omit.
         disp : bool, optional
-            If True, print one framed ``disp`` panel: a **Before solve** section
-            (``n_z``, ``z0``, backend settings), a divider, then **After solve**
-            (``z``, outcome, ``stats``, wall-clock time when available).
-            Independent of backend-specific flags such as SciPy
-            ``options["disp"]``. Implies timing so the panel always includes
-            ``solve_time_s``.
+            If True, print one framed ``disp`` panel.
         """
+        z_start = self.z0 if z0 is None else self._decision_vector(z0, self.program.n_z)
         time_solve = record_solve_time or disp
 
         if disp:
-            self._print_solve_preamble(program)
+            self._print_solve_preamble(z_start)
         if time_solve:
             t0 = time.perf_counter()
 
@@ -165,14 +188,18 @@ class Optimizer:
             t_cb0 = time.perf_counter()
 
             def backend_cb(z: np.ndarray) -> None:
-                z_arr = np.asarray(z, dtype=float).reshape(-1)
-                J = program.objective(z_arr)
+                z_arr = self._decision_vector(z, self.program.n_z)
+                J = self.program_evaluator.objective(z_arr)
                 t_elapsed = time.perf_counter() - t_cb0
                 callback(z_arr.copy(), J, t_elapsed)
 
         ##############################################################
         # --- Backend solve ---
-        result = self.backend.solve(program, callback=backend_cb)
+        result = self.backend.solve(
+            self.program_evaluator,
+            z_start,
+            callback=backend_cb,
+        )
         ##############################################################
 
         if time_solve:
@@ -180,40 +207,47 @@ class Optimizer:
             result = replace(result, solve_time_s=elapsed)
 
         if disp:
-            self._print_solve_report(program, result)
+            self._print_solve_report(result)
 
         return result
 
-    def _preview_z(self, z: np.ndarray, nz: int) -> str:
-        """Compact string for a length-``nz`` slice of ``z`` (used when ``disp=True``)."""
-        if nz <= 8:
+    @staticmethod
+    def _decision_vector(z, n_z: int) -> np.ndarray:
+        arr = np.asarray(z, dtype=float).reshape(-1)
+        if arr.shape != (int(n_z),):
+            raise ValueError(f"decision vector must have shape ({int(n_z)},)")
+        return arr
+
+    def _preview_z(self, z: np.ndarray, n_z: int) -> str:
+        """Compact string for a length-``n_z`` slice of ``z`` (used when ``disp=True``)."""
+        if n_z <= 8:
             return np.array2string(z, precision=6, max_line_width=96)
         head = np.array2string(z[:4], precision=6, max_line_width=96)
-        return f"{head} ... ({nz} values)"
+        return f"{head} ... ({n_z} values)"
 
-    def _print_solve_preamble(self, program: MathematicalProgram) -> None:
+    def _print_solve_preamble(self, z0: np.ndarray) -> None:
         print()
         print(_DISP_RULE_MAIN)
-        print(f"===               Optimization Program                   ===")
+        print("===               Optimization Program                   ===")
         print(_DISP_RULE_MAIN)
-        print("n_z:", int(program.n_z))
-        print("z0:", self._preview_z(program.z0, int(program.n_z)))
-        print(f"backend={self.backend_label!r}")
+        print("problem_class:", self.program.problem_class)
+        print("n_z:", int(self.program.n_z))
+        print("z0:", self._preview_z(z0, int(self.program.n_z)))
+        print(f"method={self.method!r}")
+        print(f"compile_backend={self.program_evaluator.backend!r}")
         print("options:", getattr(self.backend, "options", {}))
         print(_DISP_RULE_DIV)
-        # print("Running solver...", end=" ", flush=True)
         print("Running solver...")
 
     def _print_solve_report(
         self,
-        program: MathematicalProgram,
         result: OptimizationResult,
     ) -> None:
         """Print the **After solve** section and close the ``disp`` panel."""
         print("Completed in", result.solve_time_s, "seconds")
         print(_DISP_RULE_DIV)
         print("success:", result.success)
-        print("z*:", self._preview_z(result.z, int(program.n_z)))
+        print("z*:", self._preview_z(result.z, int(self.program.n_z)))
         print("J*:", result.cost)
         print("stats:", result.stats)
         print(_DISP_RULE_MAIN)
@@ -221,16 +255,28 @@ class Optimizer:
 
 if __name__ == "__main__":
 
-    from minilink.optimization.mathematical_program import (
-        MathematicalProgram,
-        InequalityConstraint,
-    )
+    from minilink.optimization.mathematical_program import MathematicalProgram
 
     z_lo = 0.6
     z_hi = 2.05
 
+    def J(z: np.ndarray) -> float:
+        y = z**3 + z * z + np.sin(5.0 * np.pi * z) + 0.12 * np.sin(15.0 * np.pi * z)
+        return float(y[0])
+
+    def g(z: np.ndarray) -> np.ndarray:
+        return np.array([z[0] - z_lo, z_hi - z[0]], dtype=float)
+
+    prog = MathematicalProgram(
+        n_z=1,
+        J=J,
+        g=g,
+    )
+
     opt = Optimizer(
-        backend="scipy",
+        prog,
+        z0=np.array([0.0]),
+        method="scipy_slsqp",
         options={
             "disp": False,
             "maxiter": 200,
@@ -238,25 +284,11 @@ if __name__ == "__main__":
         },
     )
 
-    def J(z: np.ndarray) -> float:
-        y = z**3 + z * z + np.sin(5.0 * np.pi * z) + 0.12 * np.sin(15.0 * np.pi * z)
-        return float(y[0])
-
-    def g(z: np.ndarray) -> np.ndarray:
-        return np.array([z - z_lo, z_hi - z], dtype=float)
-
-    prog = MathematicalProgram(
-        J=J,
-        z0=np.array([0.0]),
-        grad=None,
-        inequalities=(InequalityConstraint(g=g, jac=None, name="interval"),),
-    )
-
     def callback(z: np.ndarray, J: float, t: float) -> None:
         print(f"z: {z}, J: {J}, t: {t}")
 
     out = opt.solve(
-        prog,
         callback=callback,
         disp=True,
     )
+    print(out)

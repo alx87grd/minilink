@@ -28,7 +28,7 @@ The table below is the on-disk layout and TRL. **Structural rules**, **pluggable
 | `simulation/benchmark` | **TRL 1** | Optional simulator solver/backend benchmark sweeps and standard cases |
 | `simulation/scenarios/` | **TRL 1** | Shared **stress** scenarios for benchmark matrices, not user plants |
 | `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization uses a generic `TrajectoryOptimizationPlanner` plus method-specific transcriptions, with NumPy/SciPy and narrower JAX-derivative prototypes for direct collocation and shooting methods. |
-| `optimization/` | **TRL 1** | Thin finite-dimensional mathematical-program contracts (`MathematicalProgram` with optional objective `grad` / `hess` and per-constraint Jacobians) shared by planning and future control workflows |
+| `optimization/` | **TRL 1** | Pure finite-dimensional NLP contracts (`MathematicalProgram` with `J`, optional aggregate `h` / `g`, and optional `grad_J` / `hess_J` / constraint Jacobians), NumPy/JAX program evaluators, and solver adapters shared by planning and future control workflows |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
 ### 2.1 Structural principles (on-disk)
@@ -78,8 +78,14 @@ minilink/<package>/
 ```text
 minilink/optimization/
   mathematical_program.py
-  optimizer.py            # Optimizer orchestrator (selects backend by string)
+  optimizer.py            # Bound Optimizer orchestrator (method preset + program evaluator)
   benchmark.py
+  evaluators/
+    __init__.py
+    compiler.py           # compile_program_evaluator(...)
+    program_evaluator.py  # MathematicalProgramEvaluator abstract contract
+    numpy_evaluator.py
+    jax_evaluator.py
   optimizers/
     __init__.py
     optimizer_backend.py  # OptimizerBackend abstract contract
@@ -288,7 +294,7 @@ minilink/
 | `estimation/` | Observers, filters, sensor models. |
 | `control/` | Feedback laws, RL policy wrappers as `StaticSystem`. |
 | `planning/` | `PlanningProblem`, `planner.py`, families under `search/`, `trajectory_optimization/`, `policy_synthesis/`, … |
-| `optimization/` | `MathematicalProgram`, `optimizers/`. |
+| `optimization/` | `MathematicalProgram`, `evaluators/`, `optimizers/`. |
 | `analysis/` | Diagnostics and numerics (arrays, structured results), not “how to plot.” |
 | `graphical/` | Plotting, animation, `renderers/renderer.py` and backends. |
 | `tools/` | External ecosystem bridges; not internal JAX compile helpers. |
@@ -560,7 +566,7 @@ Optional helpers for benchmark and regression-style comparisons. They are **not*
 | `minilink.compile.benchmark` | `benchmark_f_evaluators` returns rows for native `system.f`, compiled NumPy, and compiled JAX evaluators over a fixed `(x, u, t)` sample; `print_f_benchmark` formats the result. Native timing is skipped on `RecursionError` so deep recursive diagrams can still benchmark compiled paths. |
 | `minilink.simulation.benchmark` | `benchmark_simulation_backend(system, candidate=...)` compares one `SimulationBenchmarkVariant` to `TRUTH_SIMULATION_VARIANT`; `benchmark_simulation_matrix(system, variants=...)` sweeps explicit variants such as `DEFAULT_SIMULATION_VARIANTS`; `print_simulation_matrix_benchmark` formats rows and highlights the fastest accurate variant. |
 | `minilink.planning.trajectory_optimization.benchmark` | `benchmark_trajectory_optimization` compares transcription, compile backend, derivative mode, precision, cold/warm start, optimizer backend, optimizer method, and optimizer options; `print_trajectory_optimization_benchmark` formats the result. |
-| `minilink.optimization.benchmark` | `benchmark_optimizer_backends` sweeps a list of `OptimizerBenchmarkVariant` (SciPy ``minimize`` and Ipopt via ``cyipopt``) over a small set of textbook nonlinear-program test cases (`STANDARD_OPTIMIZATION_CASES`: unconstrained quadratic, Rosenbrock, box-constrained QP, equality circle, inequality QP) and reports solve time, iteration counts, cost / decision error, and constraint feasibility; `print_optimizer_benchmark` formats the result. |
+| `minilink.optimization.benchmark` | `benchmark_optimizer_backends` sweeps a list of optimizer method presets (`scipy_slsqp`, `scipy_trust_constr`, optional `ipopt`) over textbook nonlinear-program test cases (`STANDARD_OPTIMIZATION_CASES`: unconstrained quadratic, Rosenbrock, box-constrained QP, equality circle, inequality QP) and reports solve time, iteration counts, cost / decision error, and constraint feasibility; `print_optimizer_benchmark` formats the result. |
 
 Programmatic imports should use the defining modules, e.g. `from minilink.simulation.benchmark import benchmark_simulation_matrix, DEFAULT_SIMULATION_VARIANTS` or `from minilink.compile.benchmark import benchmark_f_evaluators`. Runnable examples are flat scripts under `tests/benchmark/` (see `agent.md` for manual script style). Optional helper ``tests/benchmark/tune_scipy_vs_rk4.py`` runs ten ``solve_ivp`` search rounds against an RK4+JAX wall-time bar.
 

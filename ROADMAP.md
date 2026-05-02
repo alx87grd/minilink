@@ -19,7 +19,7 @@ This document tracks subsystem maturity, active priorities, and the longer-term 
 | **Blocks library** (`minilink.core.blocks`) | **TRL 0** | Wiring and signal primitives only; not the home for full plants |
 | **Benchmark helpers** (`minilink.compile.benchmark` / `minilink.simulation.benchmark` / `minilink.planning.trajectory_optimization.benchmark`) | **TRL 1** | Keep `tests/benchmark/` scripts runnable; `simulation/scenarios/` holds shared stress scenarios |
 | **Planning** | **TRL 1** | Deterministic planning architecture; generic trajectory-optimization planner plus direct collocation, single shooting, live-plot callback hooks, and **JAX-derivative** direct collocation (`jax_direct_collocation`) as a narrower, reviewed prototype (see [DESIGN.md](DESIGN.md) §3.5) |
-| **Optimization** (`minilink.optimization`) | **TRL 1** | Thin `MathematicalProgram` + optimizer contracts (objective/constraint Jacobians, optional objective Hessian for SciPy trust-region methods) |
+| **Optimization** (`minilink.optimization`) | **TRL 1** | Pure `MathematicalProgram` NLP description plus NumPy/JAX program evaluators and bound optimizer method presets; trajectory optimization still needs migration to the new aggregate `h` / `g` contract |
 | **Control** (`minilink.control`) | **TRL 0** | Controller blocks (starting with tutorial PD); expand as patterns stabilize |
 
 > [!NOTE]
