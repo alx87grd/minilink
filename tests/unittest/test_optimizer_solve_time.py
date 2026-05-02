@@ -49,9 +49,9 @@ def test_scipy_minimize_disp_prints_report(capsys):
     prog = MathematicalProgram(J=J, z0=np.array([1.0]), grad=grad)
     out = opt.solve(prog, disp=True)
     captured = capsys.readouterr()
-    assert "Before solve" in captured.out
-    assert "After solve" in captured.out
-    assert "Optimization — Optimizer" in captured.out
-    assert "solve_time_s" in captured.out
+    assert "Optimization (backend=" in captured.out
+    assert "Running solver" in captured.out
+    assert "Result:" in captured.out
+    assert "completed in" in captured.out
     assert out.solve_time_s is not None
     assert out.success

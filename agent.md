@@ -41,6 +41,15 @@ This file defines the collaboration preferences and architectural expectations f
 
 Prioritize **readability** over compact Python in glue layers (third-party APIs, I/O, callbacks). Avoid **unnecessary** list/dict comprehensions and `**`-unpack tricks when a plain loop is clearer—engineering readers may not parse dense Python idioms quickly.
 
+### Console diagnostics (`disp`, debug traces)
+
+Optional **human-only** output (e.g. `disp=True`, solver banners, quick progress lines) should stay **trivial to read in source**: mostly sequential `print(...)` with values already in hand.
+
+- **Do:** `print("n_z:", nz)`, `print("stats:", result.stats)`, one-off `getattr(obj, "options", {})` when an attribute may be missing—still one line per fact.
+- **Avoid:** accumulating rows in lists of tuples, conditional “add field if present” builders, sorting dicts or computing column widths for alignment, or small helper stacks whose only job is to **format** ad hoc text—unless a stable, documented ASCII report is an explicit product requirement.
+
+**Reference style:** `_print_solve_preamble` and `_print_solve_report` on `Optimizer` in `minilink/optimization/optimizer.py` (plain separators, then labeled prints; no join/format layer).
+
 ### Textbook-first style, thin interfaces, and minimal ceremony (Pyro-informed)
 
 Borrow the **scientific object model** and equation readability of the legacy Pyro toolbox where it helps. Do **not** copy Pyro's outdated Python style: old file headers, excessive hash banners, typo-prone public strings, weak public contracts, legacy compatibility branches, or `np.linalg.inv(...)` in places where a direct solve is clearer. Minilink code should feel like a robotics/control textbook with a thin Python skin.

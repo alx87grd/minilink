@@ -86,16 +86,29 @@ class Optimizer:
 
     @staticmethod
     def _select_backend(backend_key: str, kwargs: dict) -> OptimizerBackend:
+
         if backend_key == "scipy_minimize":
+
             from minilink.optimization.optimizers.scipy_minimize import (
                 ScipyMinimizeOptimizer,
             )
 
             return ScipyMinimizeOptimizer(**kwargs)
+
         if backend_key == "ipopt":
+
+            try:
+                import cyipopt
+            except ImportError:
+                raise ImportError(
+                    "IpoptOptimizer requires the optional 'cyipopt' package; "
+                    "install with `pip install cyipopt`."
+                )
+
             from minilink.optimization.optimizers.ipopt import IpoptOptimizer
 
             return IpoptOptimizer(**kwargs)
+
         raise ValueError(f"Unknown optimizer backend key {backend_key!r}.")
 
     def solve(
@@ -153,51 +166,18 @@ class Optimizer:
         head = np.array2string(z[:4], precision=6, max_line_width=96)
         return f"{head} ... ({nz} values)"
 
-    @staticmethod
-    def _disp_sorted_dict_lines(mapping: object) -> list[str]:
-        """Sorted ``key : value`` lines with a four-space indent (used under ``disp`` headings)."""
-        if isinstance(mapping, dict) and mapping:
-            keyw = max(len(str(k)) for k in mapping)
-            return [
-                f"    {str(k).ljust(keyw)} : {v}"
-                for k, v in sorted(mapping.items(), key=lambda kv: str(kv[0]))
-            ]
-        return ["    (empty)"]
-
-    def _disp_banner_title(self) -> str:
-        backend_name = type(self.backend).__name__
-        return f"Optimization (backend={self.backend_label!r}) "
-
     def _print_solve_preamble(self, program: MathematicalProgram) -> None:
         """Open the ``disp`` panel and print the **Before solve** section."""
-        nz = int(program.n_z)
-        z_str = self._preview_z(program.z0, nz)
-        backend = self.backend
-        fields: list[tuple[str, str]] = [
-            ("n_z", str(nz)),
-            ("z0", z_str),
-        ]
-        if hasattr(backend, "method"):
-            fields.append(("method", str(getattr(backend, "method"))))
-        tol = getattr(backend, "tol", None)
-        if tol is not None:
-            fields.append(("tol", str(tol)))
-        keyw = max(len(k) for k, _ in fields)
-
-        lines = [
-            "",
-            _DISP_RULE_MAIN,
-            self._disp_banner_title(),
-            _DISP_RULE_MAIN,
-            " Running solver...",
-        ]
-        for key, value in fields:
-            lines.append(f"  {key.ljust(keyw)} : {value}")
-        lines.append("  options:")
-        lines.extend(self._disp_sorted_dict_lines(getattr(backend, "options", None)))
-        lines.append("")
-        lines.append(_DISP_RULE_DIV)
-        print("\n".join(lines))
+        print()
+        print(_DISP_RULE_MAIN)
+        print(f"===               Optimization Program                   ===")
+        print(_DISP_RULE_MAIN)
+        print("n_z:", int(program.n_z))
+        print("z0:", self._preview_z(program.z0, int(program.n_z)))
+        print(f"backend={self.backend_label!r}")
+        print("options:", getattr(self.backend, "options", {}))
+        print(_DISP_RULE_DIV)
+        print("Running solver...", end=" ", flush=True)
 
     def _print_solve_report(
         self,
@@ -205,34 +185,50 @@ class Optimizer:
         result: OptimizationResult,
     ) -> None:
         """Print the **After solve** section and close the ``disp`` panel."""
-        nz = int(program.n_z)
-        z_str = self._preview_z(result.z, nz)
+        print("completed in", result.solve_time_s, "seconds")
+        print(_DISP_RULE_DIV)
+        # print("Result:")
+        print("success:", result.success)
+        print("z*:", self._preview_z(result.z, int(program.n_z)))
+        print("J*:", result.cost)
+        print("stats:", result.stats)
+        print(_DISP_RULE_MAIN)
 
-        if result.cost is None:
-            cost_str = "(none)"
-        else:
-            cost_str = f"{result.cost:.12g}"
-        if result.solve_time_s is not None:
-            time_str = f"{result.solve_time_s:.6g}"
-        else:
-            time_str = "(not recorded)"
 
-        outcome: list[tuple[str, str]] = [
-            ("z* (optimal)", z_str),
-            ("J* (optimal)", cost_str),
-            ("success", str(result.success)),
-            # ("message", str(result.message)),
-            ("solve_time_s", time_str),
-        ]
-        keyw = max(len(k) for k, _ in outcome)
+if __name__ == "__main__":
 
-        lines = [
-            "Result:",
-        ]
-        for key, value in outcome:
-            lines.append(f"  {key.ljust(keyw)} : {value}")
-        lines.append("  stats:")
-        lines.extend(self._disp_sorted_dict_lines(result.stats))
-        lines.append("")
-        lines.append(_DISP_RULE_MAIN)
-        print("\n".join(lines))
+    from minilink.optimization.mathematical_program import (
+        MathematicalProgram,
+        InequalityConstraint,
+    )
+
+    z_lo = 0.6
+    z_hi = 2.05
+
+    opt = Optimizer(
+        backend="scipy",
+        options={
+            "disp": False,
+            "maxiter": 200,
+            "ftol": 1e-12,
+        },
+    )
+
+    def J(z: np.ndarray) -> float:
+        y = z**3 + z * z + np.sin(5.0 * np.pi * z) + 0.12 * np.sin(15.0 * np.pi * z)
+        return float(y[0])
+
+    def g(z: np.ndarray) -> np.ndarray:
+        return np.array([z - z_lo, z_hi - z], dtype=float)
+
+    prog = MathematicalProgram(
+        J=J,
+        z0=np.array([0.0]),
+        grad=None,
+        inequalities=(InequalityConstraint(g=g, jac=None, name="interval"),),
+    )
+
+    out = opt.solve(
+        prog,
+        disp=True,
+    )
