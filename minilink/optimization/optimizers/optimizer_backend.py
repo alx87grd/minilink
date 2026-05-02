@@ -16,10 +16,15 @@ adapters whose only contract is :meth:`solve`.
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
+import numpy as np
+
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
+
+# Called by backends with the current iterate ``z`` only; the orchestrator adds ``J`` and elapsed time.
+BackendIterateCallback = Callable[[np.ndarray], None]
 
 
 class OptimizerBackend(ABC):
@@ -36,7 +41,10 @@ class OptimizerBackend(ABC):
         self,
         program: MathematicalProgram,
         *,
-        callback: Callable[[object], None] | None = None,
+        callback: BackendIterateCallback | None = None,
     ) -> OptimizationResult:
-        """Run the backend solver; called by :meth:`Optimizer.solve`."""
+        """Run the backend solver; called by :meth:`Optimizer.solve`.
+
+        ``callback`` receives only the current decision vector ``z`` (1-D float).
+        """
         ...

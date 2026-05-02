@@ -44,7 +44,7 @@ The table below is the on-disk layout and TRL. **Structural rules**, **pluggable
 When a package supports **multiple swappable mechanisms** (optimizers, solvers, evaluators, renderers):
 
 1. **Role-specific folders** — Prefer `optimizers/`, `solvers/`, `renderers/`, `evaluators/`, and planning family packages (`search/`, …) over a generic `backends/` name. A type that orchestrates all families in a package may sit at the package root (e.g. `planning/planner.py`).
-2. **Singular contract module** — The abstract API lives in a module named for the role, not `base.py`—e.g. `optimizers/optimizer.py`, `planning/planner.py`, `graphical/renderers/renderer.py`, `compile/evaluators/evaluator.py`.
+2. **Singular contract module** — The abstract API lives in a module named for the role, not `base.py`—e.g. `optimizers/optimizer_backend.py`, `planning/planner.py`, `graphical/renderers/renderer.py`, `compile/evaluators/evaluator.py`.
 3. **One file per concrete implementation** — e.g. `optimizers/scipy_minimize.py`; `renderers/matplotlib_renderer.py` (use `*_renderer.py` for third-party library clarity, not a bare `matplotlib.py`).
 4. **Long, explicit names under `compile/evaluators/`** — `numpy_evaluator.py`, `jax_evaluator.py` (not `numpy.py` / `jax.py`) so imports do not clash with libraries.
 5. **No barrel re-exports** — Import from the module that defines each symbol; package `__init__.py` files are namespace markers (docstring-only) unless a future API freeze says otherwise. See `agent.md`.
@@ -82,7 +82,7 @@ minilink/optimization/
   benchmark.py
   optimizers/
     __init__.py
-    optimizer.py          # OptimizerBackend abstract contract
+    optimizer_backend.py  # OptimizerBackend abstract contract
     scipy_minimize.py
     ipopt.py
 
@@ -137,7 +137,7 @@ minilink/graphical/renderers/
 
 | Concern | Subpackage | Contract module |
 | --- | --- | --- |
-| Finite-dimensional programs | `optimizers/` | `optimizer.py` (`OptimizerBackend`); `optimization/optimizer.py` (`Optimizer` orchestrator) |
+| Finite-dimensional programs | `optimizers/` | `optimizer_backend.py` (`OptimizerBackend`); `optimization/optimizer.py` (`Optimizer` orchestrator) |
 | Planning across families | `planning/` (root) | `planner.py` |
 | ODE / IVP / fixed step | `solvers/` | `solver.py` |
 | Compiled dynamics | `evaluators/` | `evaluator.py` |

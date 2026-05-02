@@ -78,16 +78,10 @@ iterates_z: list[float] = []
 iterates_J: list[float] = []
 
 
-def record_iterate(payload: object) -> None:
-    if isinstance(payload, np.ndarray):
-        zz = float(np.asarray(payload, dtype=float).reshape(-1)[0])
-        iterates_z.append(zz)
-        iterates_J.append(J_1d(payload))
-        return
-    if hasattr(payload, "x") and isinstance(getattr(payload, "x"), np.ndarray):
-        zz = float(np.asarray(payload.x, dtype=float).reshape(-1)[0])
-        iterates_z.append(zz)
-        iterates_J.append(J_1d(payload.x))
+def record_iterate(z: np.ndarray, J: float, _t: float) -> None:
+    zz = float(np.asarray(z, dtype=float).reshape(-1)[0])
+    iterates_z.append(zz)
+    iterates_J.append(J)
 
 
 out = opt.solve(

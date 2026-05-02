@@ -1,7 +1,7 @@
 """Cyipopt :func:`cyipopt.minimize_ipopt` optimizer.
 
 Wraps the COIN-OR Ipopt interior-point solver behind the same generic
-:class:`~minilink.optimization.optimizers.optimizer.OptimizerBackend` contract
+:class:`~minilink.optimization.optimizers.optimizer_backend.OptimizerBackend` contract
 used by :class:`~minilink.optimization.optimizers.scipy_minimize.ScipyMinimizeOptimizer`,
 so a :class:`~minilink.optimization.mathematical_program.MathematicalProgram`
 can switch between the SciPy and Ipopt backends with no other code changes.
@@ -14,15 +14,16 @@ The optional dependency ``cyipopt`` (PyPI name ``cyipopt``) provides the Ipopt
 binding; install with ``pip install cyipopt`` or via the ``ipopt`` extra.
 """
 
-from collections.abc import Callable
-
 import numpy as np
 
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.optimization.optimizers.optimizer import OptimizerBackend
+from minilink.optimization.optimizers.optimizer_backend import (
+    BackendIterateCallback,
+    OptimizerBackend,
+)
 
 
 class IpoptOptimizer(OptimizerBackend):
@@ -44,6 +45,10 @@ class IpoptOptimizer(OptimizerBackend):
     Ipopt expects ``g(x) >= 0`` for inequality constraints, the same convention
     used by :class:`~minilink.optimization.mathematical_program.MathematicalProgram`,
     so margins are passed through unchanged.
+
+    Per-iterate callbacks are not supported on cyipopt's native Ipopt path;
+    :meth:`solve` raises ``NotImplementedError`` if ``callback`` is not
+    ``None``.
     """
 
     def __init__(self, options: dict | None = None, tol: float | None = None):
@@ -54,9 +59,15 @@ class IpoptOptimizer(OptimizerBackend):
         self,
         program: MathematicalProgram,
         *,
-        callback: Callable[[object], None] | None = None,
+        callback: BackendIterateCallback | None = None,
     ) -> OptimizationResult:
         """Solve ``program`` with Ipopt and return a backend-neutral result."""
+        if callback is not None:
+            raise NotImplementedError(
+                "IpoptOptimizer does not support solve(callback=...): cyipopt's "
+                "native Ipopt path does not run a Python callback each iteration. "
+                "Use a SciPy optimizer label (e.g. 'scipy') or omit callback."
+            )
         try:
             from cyipopt import minimize_ipopt
         except ImportError as exc:  # pragma: no cover - optional dep

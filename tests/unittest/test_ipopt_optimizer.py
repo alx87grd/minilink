@@ -108,3 +108,20 @@ def test_ipopt_record_solve_time():
     out = opt.solve(prog, record_solve_time=True)
     assert out.success
     assert out.solve_time_s is not None and out.solve_time_s >= 0.0
+
+
+def test_ipopt_solve_callback_not_supported():
+    def J(z: np.ndarray) -> float:
+        return float(z[0] ** 2)
+
+    def grad(z: np.ndarray) -> np.ndarray:
+        return np.array([2.0 * float(z[0])])
+
+    prog = MathematicalProgram(J=J, grad=grad, z0=np.array([1.0]))
+    opt = Optimizer(backend="ipopt", options=_QUIET)
+
+    def _cb(z: np.ndarray, _J: float, _t: float) -> None:
+        del z, _J, _t
+
+    with pytest.raises(NotImplementedError, match="does not support solve\\(callback"):
+        opt.solve(prog, callback=_cb)

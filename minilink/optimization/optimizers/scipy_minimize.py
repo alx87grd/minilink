@@ -1,7 +1,5 @@
 """SciPy :func:`scipy.optimize.minimize` optimizer."""
 
-from collections.abc import Callable
-
 import numpy as np
 from scipy.optimize import minimize
 
@@ -9,7 +7,32 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.optimization.optimizers.optimizer import OptimizerBackend
+from minilink.optimization.optimizers.optimizer_backend import (
+    BackendIterateCallback,
+    OptimizerBackend,
+)
+
+
+def _z_from_scipy_minimize_callback(
+    xk=None,
+    state=None,
+    *,
+    intermediate_result=None,
+) -> np.ndarray:
+    """Recover decision ``z`` from :func:`scipy.optimize.minimize` callback variants."""
+    for obj in (intermediate_result, state, xk):
+        if obj is None:
+            continue
+        if isinstance(obj, np.ndarray):
+            return np.asarray(obj, dtype=float).reshape(-1).copy()
+        x = getattr(obj, "x", None)
+        if x is not None:
+            return np.asarray(x, dtype=float).reshape(-1).copy()
+    msg = (
+        "SciPy minimize callback did not provide a usable decision vector "
+        "(expected an ndarray or an object with attribute ``x``)."
+    )
+    raise RuntimeError(msg)
 
 
 class ScipyMinimizeOptimizer(OptimizerBackend):
@@ -17,7 +40,7 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
     Optimizer adapter for :func:`scipy.optimize.minimize`.
 
     Equality constraints are passed as ``type='eq'`` residuals and
-    inequality constraints as ``type='ineq'`` nonnegative margins, matching
+    inequality constraints are passed as ``type='ineq'`` nonnegative margins, matching
     the generic :class:`~minilink.optimization.mathematical_program.MathematicalProgram`
     convention.
     """
@@ -30,7 +53,7 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
         self,
         program: MathematicalProgram,
         *,
-        callback: Callable[[object], None] | None = None,
+        callback: BackendIterateCallback | None = None,
     ) -> OptimizationResult:
         """Solve ``program`` with SciPy and return a backend-neutral result."""
 
@@ -69,10 +92,10 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
         if callback is not None:
 
             def scipy_callback(xk=None, state=None, *, intermediate_result=None):
-                payload = intermediate_result
-                if payload is None:
-                    payload = state if state is not None else xk
-                callback(payload)
+                z_step = _z_from_scipy_minimize_callback(
+                    xk, state, intermediate_result=intermediate_result
+                )
+                callback(z_step)
 
         raw_result = minimize(
             program.objective,
@@ -101,6 +124,7 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
         )
 
     def _uses_hessian(self) -> bool:
+        """Check if the method uses the Hessian."""
         method = self.method.lower()
         return method in {
             "dogleg",

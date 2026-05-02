@@ -11,7 +11,10 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.optimization.optimizer import Optimizer
+from minilink.optimization.optimizer import (
+    OptimizationProgressCallback,
+    Optimizer,
+)
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
@@ -129,20 +132,21 @@ class TrajectoryOptimizationPlanner(Planner):
         self,
         program: MathematicalProgram,
         compile_backend: str | None,
-    ) -> Callable[[object], None] | None:
+    ) -> OptimizationProgressCallback | None:
         if not self.options.record_history and self.options.callback is None:
             return None
 
         iteration_index = 0
 
-        def callback(z) -> None:
+        def planner_progress(z: np.ndarray, J: float, _t: float) -> None:
             nonlocal iteration_index
-            z_arr = np.asarray(getattr(z, "x", z), dtype=float).reshape(-1)
+            z_arr = np.asarray(z, dtype=float).reshape(-1)
             iteration = self._iteration_from_z(
                 program,
                 z_arr,
                 compile_backend,
                 iteration_index,
+                cost=J,
             )
             if self.options.record_history:
                 self.iteration_history.append(iteration)
@@ -150,7 +154,7 @@ class TrajectoryOptimizationPlanner(Planner):
                 self.options.callback(iteration)
             iteration_index += 1
 
-        return callback
+        return planner_progress
 
     def _iteration_from_z(
         self,
@@ -158,9 +162,12 @@ class TrajectoryOptimizationPlanner(Planner):
         z: np.ndarray,
         compile_backend: str | None,
         iteration_index: int,
+        *,
+        cost: float | None = None,
     ) -> TrajectoryOptimizationIteration:
         """Build one planning-aware optimizer iteration payload."""
-        cost = program.objective(z)
+        if cost is None:
+            cost = program.objective(z)
         trajectory = self.transcription.reconstruct_result(
             OptimizationResult(z=z, success=False, cost=cost),
             problem=self.problem,

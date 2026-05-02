@@ -2,10 +2,10 @@
 Orchestrator for finite-dimensional mathematical-program solvers.
 
 :class:`Optimizer` selects a concrete
-:class:`~minilink.optimization.optimizers.optimizer.OptimizerBackend` by string
+:class:`~minilink.optimization.optimizers.optimizer_backend.OptimizerBackend` by string
 label and owns all wrapping concerns (wall-clock timing, ``disp`` reports,
 default options). The backend itself exposes only
-:meth:`~minilink.optimization.optimizers.optimizer.OptimizerBackend.solve`.
+:meth:`~minilink.optimization.optimizers.optimizer_backend.OptimizerBackend.solve`.
 
 Modelled on :class:`~minilink.simulation.simulator.Simulator`'s
 pluggable-solver pattern: each user-facing label in
@@ -16,6 +16,9 @@ Typical use::
 
     opt = Optimizer(backend="scipy", options={"maxiter": 200, "ftol": 1e-12})
     result = opt.solve(program, disp=True)
+
+Optional progress hook: ``callback(z, J, t)`` on :meth:`Optimizer.solve` with
+``t`` = elapsed wall seconds; see :data:`OptimizationProgressCallback`.
 """
 
 import time
@@ -28,7 +31,13 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.optimization.optimizers.optimizer import OptimizerBackend
+from minilink.optimization.optimizers.optimizer_backend import (
+    BackendIterateCallback,
+    OptimizerBackend,
+)
+
+# User progress hook: current ``z``, objective ``J``, elapsed wall time ``t`` (seconds since solve start).
+OptimizationProgressCallback = Callable[[np.ndarray, float, float], None]
 
 # Human-readable ``disp=True`` panel (preamble + report share one frame).
 _DISP_LINE_WIDTH = 60
@@ -36,7 +45,6 @@ _DISP_RULE_MAIN = "=" * _DISP_LINE_WIDTH
 _DISP_RULE_DIV = "-" * _DISP_LINE_WIDTH
 
 # User-facing optimizer labels mapped to (backend_key, default_constructor_kwargs).
-# Mirrors :data:`minilink.simulation.simulator._USER_SOLVER_MODES` in spirit.
 _USER_OPTIMIZER_MODES: dict[str, tuple[str, dict]] = {
     "scipy": ("scipy_minimize", {"method": "SLSQP", "options": {}}),
     "scipy_trust": ("scipy_minimize", {"method": "trust-constr", "options": {}}),
@@ -78,9 +86,11 @@ class Optimizer:
         for key, value in preset.items():
             kwargs[key] = dict(value) if isinstance(value, dict) else value
         kwargs.update(backend_kwargs)
+
         if options is not None:
             existing = kwargs.get("options", {})
             kwargs["options"] = {**existing, **options}
+
         self.backend_label = backend
         self.backend = self._select_backend(backend_key, kwargs)
 
@@ -101,8 +111,7 @@ class Optimizer:
                 import cyipopt
             except ImportError:
                 raise ImportError(
-                    "IpoptOptimizer requires the optional 'cyipopt' package; "
-                    "install with `pip install cyipopt`."
+                    "IpoptOptimizer requires the optional 'cyipopt' package."
                 )
 
             from minilink.optimization.optimizers.ipopt import IpoptOptimizer
@@ -115,7 +124,7 @@ class Optimizer:
         self,
         program: MathematicalProgram,
         *,
-        callback: Callable[[object], None] | None = None,
+        callback: OptimizationProgressCallback | None = None,
         record_solve_time: bool = False,
         disp: bool = False,
     ) -> OptimizationResult:
@@ -129,6 +138,13 @@ class Optimizer:
             :attr:`~minilink.optimization.mathematical_program.OptimizationResult.solve_time_s`
             to the wall-clock duration (seconds) of the backend solve only,
             measured with :func:`time.perf_counter`.
+        callback : callable, optional
+            If not ``None``, called during the solve as ``callback(z, J, t)``:
+            current decision ``z`` (1-D :class:`~numpy.ndarray`), objective
+            :math:`J(z)`, and ``t`` elapsed wall time (seconds) since the
+            backend solve started. Each invocation evaluates ``J(z)`` again
+            (one extra objective call per iterate). Not supported by the Ipopt
+            backend (native path); use SciPy or omit.
         disp : bool, optional
             If True, print one framed ``disp`` panel: a **Before solve** section
             (``n_z``, ``z0``, backend settings), a divider, then **After solve**
@@ -144,9 +160,19 @@ class Optimizer:
         if time_solve:
             t0 = time.perf_counter()
 
+        backend_cb: BackendIterateCallback | None = None
+        if callback is not None:
+            t_cb0 = time.perf_counter()
+
+            def backend_cb(z: np.ndarray) -> None:
+                z_arr = np.asarray(z, dtype=float).reshape(-1)
+                J = program.objective(z_arr)
+                t_elapsed = time.perf_counter() - t_cb0
+                callback(z_arr.copy(), J, t_elapsed)
+
         ##############################################################
         # --- Backend solve ---
-        result = self.backend.solve(program, callback=callback)
+        result = self.backend.solve(program, callback=backend_cb)
         ##############################################################
 
         if time_solve:
@@ -158,8 +184,7 @@ class Optimizer:
 
         return result
 
-    @staticmethod
-    def _preview_z(z: np.ndarray, nz: int) -> str:
+    def _preview_z(self, z: np.ndarray, nz: int) -> str:
         """Compact string for a length-``nz`` slice of ``z`` (used when ``disp=True``)."""
         if nz <= 8:
             return np.array2string(z, precision=6, max_line_width=96)
@@ -167,7 +192,6 @@ class Optimizer:
         return f"{head} ... ({nz} values)"
 
     def _print_solve_preamble(self, program: MathematicalProgram) -> None:
-        """Open the ``disp`` panel and print the **Before solve** section."""
         print()
         print(_DISP_RULE_MAIN)
         print(f"===               Optimization Program                   ===")
@@ -177,7 +201,8 @@ class Optimizer:
         print(f"backend={self.backend_label!r}")
         print("options:", getattr(self.backend, "options", {}))
         print(_DISP_RULE_DIV)
-        print("Running solver...", end=" ", flush=True)
+        # print("Running solver...", end=" ", flush=True)
+        print("Running solver...")
 
     def _print_solve_report(
         self,
@@ -185,9 +210,8 @@ class Optimizer:
         result: OptimizationResult,
     ) -> None:
         """Print the **After solve** section and close the ``disp`` panel."""
-        print("completed in", result.solve_time_s, "seconds")
+        print("Completed in", result.solve_time_s, "seconds")
         print(_DISP_RULE_DIV)
-        # print("Result:")
         print("success:", result.success)
         print("z*:", self._preview_z(result.z, int(program.n_z)))
         print("J*:", result.cost)
@@ -228,7 +252,11 @@ if __name__ == "__main__":
         inequalities=(InequalityConstraint(g=g, jac=None, name="interval"),),
     )
 
+    def callback(z: np.ndarray, J: float, t: float) -> None:
+        print(f"z: {z}, J: {J}, t: {t}")
+
     out = opt.solve(
         prog,
+        callback=callback,
         disp=True,
     )

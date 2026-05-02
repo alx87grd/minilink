@@ -201,13 +201,14 @@ class MathematicalProgram:
 @dataclass(frozen=True)
 class OptimizationResult:
     """
-    Result returned by an :class:`~minilink.optimization.optimizers.optimizer.Optimizer`.
+    Result returned by an :class:`~minilink.optimization.optimizer.Optimizer`
+    (or a backend-specific raw result wrapped into this type).
 
     Parameters
     ----------
     solve_time_s : float, optional
         Wall-clock time in seconds for the backend solver only, when the caller
-        requested timing on :meth:`~minilink.optimization.optimizers.optimizer.Optimizer.solve`
+        requested timing on :meth:`~minilink.optimization.optimizer.Optimizer.solve`
         (``record_solve_time=True``) or a summary report (``disp=True``).
         ``None`` means not measured.
     """
