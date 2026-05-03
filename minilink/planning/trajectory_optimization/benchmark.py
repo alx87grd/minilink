@@ -11,8 +11,9 @@ from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import JaxQuadraticCost, QuadraticCost
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
-from minilink.optimization.mathematical_program import MathematicalProgram
-from minilink.optimization.optimizer import Optimizer
+from minilink.optimization.evaluators.program_evaluator import (
+    MathematicalProgramEvaluator,
+)
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -34,28 +35,10 @@ from minilink.planning.trajectory_optimization.shooting import (
 
 try:
     from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
-    from minilink.planning.trajectory_optimization.jax_direct_collocation import (
-        JaxDirectCollocationOptions,
-        JaxDirectCollocationTranscription,
-    )
-    from minilink.planning.trajectory_optimization.jax_multiple_shooting import (
-        JaxMultipleShootingOptions,
-        JaxMultipleShootingTranscription,
-    )
-    from minilink.planning.trajectory_optimization.jax_shooting import (
-        JaxShootingOptions,
-        JaxShootingTranscription,
-    )
 
     HAS_JAX_TRAJOPT = True
 except ImportError:
     JaxCartPole = None
-    JaxDirectCollocationOptions = None
-    JaxDirectCollocationTranscription = None
-    JaxMultipleShootingOptions = None
-    JaxMultipleShootingTranscription = None
-    JaxShootingOptions = None
-    JaxShootingTranscription = None
     HAS_JAX_TRAJOPT = False
 
 
@@ -83,7 +66,7 @@ class TrajectoryOptimizationBenchmarkVariant:
     precision: str = "n/a"
     start: str = "cold"
     optimizer_backend: str = "scipy"
-    optimizer_method: str = "SLSQP"
+    optimizer_method: str = "scipy_slsqp"
     optimizer_options: Mapping[str, object] = field(default_factory=dict)
 
 
@@ -184,13 +167,6 @@ def default_trajectory_optimization_variants(
                 precision="f32",
                 optimizer_options={"ftol": max(float(ftol), 1e-5)},
             ),
-            TrajectoryOptimizationBenchmarkVariant(
-                name="jax-collocation-fd-x64",
-                transcription="collocation",
-                compile_backend="jax",
-                derivative="finite-diff",
-                precision="x64",
-            ),
         ]
 
     return _with_starts(variants, starts)
@@ -262,16 +238,20 @@ def _run_trajopt_variant(
     transcribe_t0 = time.perf_counter()
     program = planner.transcription.transcribe(
         planner.problem,
-        initial_guess=guess,
         compile_backend=planner.options.compile_backend,
     )
+    z0 = planner.transcription.pack_initial_guess(planner.problem, guess)
     transcribe_s = time.perf_counter() - transcribe_t0
 
     solve_t0 = time.perf_counter()
-    solution = planner.optimizer.solve(program)
+    optimizer = planner._make_optimizer(program, z0)
+    solution = optimizer.solve()
     solve_s = time.perf_counter() - solve_t0
 
-    max_eq, min_ineq, max_bound = _constraint_metrics(program, solution.z)
+    max_eq, min_ineq, max_bound = _constraint_metrics(
+        optimizer.program_evaluator,
+        solution.z,
+    )
     return TrajectoryOptimizationBenchmarkRow(
         variant=variant,
         success=bool(solution.success),
@@ -337,34 +317,29 @@ def _mean_int_or_none(values) -> int | None:
 
 
 def _constraint_metrics(
-    program: MathematicalProgram,
+    program_evaluator: MathematicalProgramEvaluator,
     z: np.ndarray,
 ) -> tuple[float, float | None, float]:
     max_eq = 0.0
-    if program.equalities:
-        max_eq = max(
-            float(np.max(np.abs(equality.residual(z))))
-            for equality in program.equalities
-        )
+    if program_evaluator.n_h:
+        max_eq = float(np.max(np.abs(program_evaluator.equality_residual(z))))
 
     min_ineq = None
-    if program.inequalities:
-        min_ineq = min(
-            float(np.min(inequality.margin(z))) for inequality in program.inequalities
-        )
+    if program_evaluator.n_g:
+        min_ineq = float(np.min(program_evaluator.inequality_margin(z)))
 
     max_bound = 0.0
-    if program.bounds is not None:
-        if program.bounds.lower is not None:
-            max_bound = max(
-                max_bound,
-                float(np.max(np.maximum(program.bounds.lower - z, 0.0))),
-            )
-        if program.bounds.upper is not None:
-            max_bound = max(
-                max_bound,
-                float(np.max(np.maximum(z - program.bounds.upper, 0.0))),
-            )
+    program = program_evaluator.program
+    if program.lower is not None:
+        max_bound = max(
+            max_bound,
+            float(np.max(np.maximum(program.lower - z, 0.0))),
+        )
+    if program.upper is not None:
+        max_bound = max(
+            max_bound,
+            float(np.max(np.maximum(z - program.upper, 0.0))),
+        )
 
     return max_eq, min_ineq, max_bound
 
@@ -377,8 +352,11 @@ def _planner(
     return TrajectoryOptimizationPlanner(
         _problem(variant),
         transcription=_transcription(variant, config),
-        optimizer=_optimizer(variant, config),
-        options=TrajectoryOptimizationOptions(compile_backend=variant.compile_backend),
+        options=TrajectoryOptimizationOptions(
+            compile_backend=variant.compile_backend,
+            optimizer_method=variant.optimizer_method,
+            optimizer_options=_optimizer_options(variant, config),
+        ),
     )
 
 
@@ -393,62 +371,36 @@ def _transcription(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
 ):
-    use_gradient = variant.derivative == "jax"
     if variant.transcription == "collocation":
-        if variant.compile_backend == "jax":
-            return JaxDirectCollocationTranscription(
-                JaxDirectCollocationOptions(
-                    tf=config.tf,
-                    n_steps=config.n_steps,
-                    use_gradient=use_gradient,
-                )
-            )
         return DirectCollocationTranscription(
             DirectCollocationOptions(tf=config.tf, n_steps=config.n_steps)
         )
     if variant.transcription == "shooting":
-        if variant.compile_backend == "jax":
-            return JaxShootingTranscription(
-                JaxShootingOptions(
-                    tf=config.tf,
-                    n_steps=config.n_steps,
-                    use_gradient=use_gradient,
-                )
-            )
         return ShootingTranscription(
             ShootingOptions(tf=config.tf, n_steps=config.n_steps)
         )
     if variant.transcription == "multiple_shooting":
-        if variant.compile_backend == "jax":
-            return JaxMultipleShootingTranscription(
-                JaxMultipleShootingOptions(
-                    tf=config.tf,
-                    n_steps=config.n_steps,
-                    use_gradient=use_gradient,
-                )
-            )
         return MultipleShootingTranscription(
             MultipleShootingOptions(tf=config.tf, n_steps=config.n_steps)
         )
     raise NotImplementedError(f"Unknown transcription {variant.transcription!r}")
 
 
-def _optimizer(
+def _optimizer_options(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
-) -> Optimizer:
+) -> dict[str, object]:
     if variant.optimizer_backend != "scipy":
         raise NotImplementedError(
             f"Unknown optimizer backend {variant.optimizer_backend!r}"
         )
 
-    options = {
+    return {
         "disp": False,
         "maxiter": int(config.maxiter),
         "ftol": float(config.ftol),
         **dict(variant.optimizer_options),
     }
-    return Optimizer(backend="scipy", method=variant.optimizer_method, options=options)
 
 
 def _warm_initial_trajectory(
@@ -462,8 +414,8 @@ def _warm_initial_trajectory(
     if jax_trajopt_available():
         configure_jax(enable_x64=True)
         problem = _cartpole_problem(JaxCartPole(), jax_cost=True)
-        transcription = JaxDirectCollocationTranscription(
-            JaxDirectCollocationOptions(tf=config.tf, n_steps=config.n_steps)
+        transcription = DirectCollocationTranscription(
+            DirectCollocationOptions(tf=config.tf, n_steps=config.n_steps)
         )
         compile_backend = "jax"
     else:
@@ -476,8 +428,10 @@ def _warm_initial_trajectory(
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=transcription,
-        optimizer=_warm_optimizer(config),
-        options=TrajectoryOptimizationOptions(compile_backend=compile_backend),
+        options=TrajectoryOptimizationOptions(
+            compile_backend=compile_backend,
+            optimizer_options=_warm_optimizer_options(config),
+        ),
     )
     traj = planner.compute_solution()
     if config.warm_guess_path:
@@ -485,17 +439,14 @@ def _warm_initial_trajectory(
     return traj
 
 
-def _warm_optimizer(
+def _warm_optimizer_options(
     config: TrajectoryOptimizationBenchmarkConfig,
-) -> Optimizer:
-    return Optimizer(
-        backend="scipy",
-        options={
-            "disp": False,
-            "maxiter": max(int(config.maxiter), 200),
-            "ftol": float(config.ftol),
-        },
-    )
+) -> dict[str, object]:
+    return {
+        "disp": False,
+        "maxiter": max(int(config.maxiter), 200),
+        "ftol": float(config.ftol),
+    }
 
 
 def _cartpole_problem(sys, *, jax_cost: bool) -> PlanningProblem:

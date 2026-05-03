@@ -125,8 +125,8 @@ def _quadratic_problem() -> MathematicalProgram:
     # min 0.5 (z - c)^T (z - c)  with c = [1, 2, 3]; z* = c, cost* = 0
     c = np.array([1.0, 2.0, 3.0])
 
-    def J(z: np.ndarray) -> float:
-        return 0.5 * float(np.sum((z - c) ** 2))
+    def J(z: np.ndarray):
+        return 0.5 * np.sum((z - c) ** 2)
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return z - c
@@ -136,8 +136,10 @@ def _quadratic_problem() -> MathematicalProgram:
 
 def _rosenbrock_problem(n: int = 5) -> MathematicalProgram:
     # Classic Rosenbrock; z* = ones(n), cost* = 0
-    def J(z: np.ndarray) -> float:
-        return float(np.sum(100.0 * (z[1:] - z[:-1] ** 2) ** 2 + (1.0 - z[:-1]) ** 2))
+    def J(z: np.ndarray):
+        return np.sum(
+            100.0 * (z[1:] - z[:-1] ** 2) ** 2 + (1.0 - z[:-1]) ** 2
+        )
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         dJ = np.zeros_like(z)
@@ -152,8 +154,8 @@ def _box_constrained_quadratic_problem() -> MathematicalProgram:
     # min 0.5 z^T z subject to z >= 1; z* = ones, cost* = 0.5 * n
     n = 4
 
-    def J(z: np.ndarray) -> float:
-        return 0.5 * float(np.sum(z**2))
+    def J(z: np.ndarray):
+        return 0.5 * np.sum(z**2)
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return z
@@ -170,8 +172,8 @@ def _box_constrained_quadratic_problem() -> MathematicalProgram:
 def _equality_circle_problem() -> MathematicalProgram:
     # min z[0] + z[1]  s.t.  z[0]^2 + z[1]^2 = 1
     # KKT optimum at z* = (-1, -1) / sqrt(2), cost* = -sqrt(2)
-    def J(z: np.ndarray) -> float:
-        return float(z[0] + z[1])
+    def J(z: np.ndarray):
+        return z[0] + z[1]
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return np.array([1.0, 1.0])
@@ -188,8 +190,8 @@ def _equality_circle_problem() -> MathematicalProgram:
 def _inequality_quadratic_problem() -> MathematicalProgram:
     # min (z[0] - 2)^2 + (z[1] - 1)^2  s.t.  z[0] + z[1] <= 1, z >= 0
     # i.e. g1(z) = 1 - z[0] - z[1] >= 0, g2(z) = z >= 0 (as box bounds)
-    def J(z: np.ndarray) -> float:
-        return float((z[0] - 2.0) ** 2 + (z[1] - 1.0) ** 2)
+    def J(z: np.ndarray):
+        return (z[0] - 2.0) ** 2 + (z[1] - 1.0) ** 2
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return np.array([2.0 * (z[0] - 2.0), 2.0 * (z[1] - 1.0)])

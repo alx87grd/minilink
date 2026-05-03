@@ -2,20 +2,20 @@
 
 import numpy as np
 
+from minilink.core.costs import require_jax_traceable_cost
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
-    EqualityConstraint,
-    InequalityConstraint,
     MathematicalProgram,
     OptimizationResult,
-    VariableBounds,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.transcription import (
+    ConstraintFunction,
     FixedGridOptions,
     Transcription,
     dynamics_function,
+    stack_constraints,
 )
 
 
@@ -42,20 +42,19 @@ class DirectCollocationTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        initial_guess: np.ndarray | Trajectory | None = None,
         compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
         """Build the trapezoidal collocation nonlinear program."""
+        if compile_backend == "jax":
+            return self._transcribe_jax(problem, compile_backend=compile_backend)
+
         problem.require_cost()
         dynamics = dynamics_function(problem, compile_backend)
 
-        equalities = [
-            EqualityConstraint(
-                h=lambda z: self._dynamics_residual(z, problem, dynamics),
-                name="direct_collocation_dynamics",
-            )
+        equalities: list[ConstraintFunction] = [
+            lambda z: self._dynamics_residual(z, problem, dynamics)
         ]
-        inequalities = []
+        inequalities: list[ConstraintFunction] = []
 
         self._add_boundary_constraints(
             problem,
@@ -63,16 +62,99 @@ class DirectCollocationTranscription(Transcription):
             inequalities=inequalities,
         )
         self._add_path_constraints(problem, inequalities=inequalities)
+        lower, upper = self.decision_bounds(problem)
 
         return MathematicalProgram(
+            n_z=self.decision_dimension(problem),
             J=lambda z: self._objective(z, problem),
-            z0=self._pack_initial_guess(problem, initial_guess),
-            bounds=self.variable_bounds(problem),
-            equalities=tuple(equalities),
-            inequalities=tuple(inequalities),
+            h=stack_constraints(equalities),
+            g=stack_constraints(inequalities),
+            lower=lower,
+            upper=upper,
             metadata={
                 "transcription": "direct_collocation",
                 "compile_backend": compile_backend,
+                "program_backend": "numpy",
+            },
+        )
+
+    def _transcribe_jax(
+        self,
+        problem: PlanningProblem,
+        *,
+        compile_backend: str | None,
+    ) -> MathematicalProgram:
+        """Build a JAX-traceable collocation program."""
+        import jax
+        import jax.numpy as jnp
+
+        cost = problem.require_cost()
+        require_jax_traceable_cost(cost)
+        self._check_jax_supported_sets(problem)
+
+        t = jnp.asarray(self.options.t)
+        dt = jnp.asarray(self.options.dt)
+        n = int(problem.sys.n)
+        m = int(problem.sys.m)
+        n_steps = int(self.options.n_steps)
+        params = problem.params.system
+
+        def f(x, u, t_k):
+            return problem.sys.f(x, u, t_k, params)
+
+        def unpack_jax(z):
+            split = n * n_steps
+            x = z[:split].reshape(n, n_steps)
+            u = z[split:].reshape(m, n_steps)
+            return x, u
+
+        def J(z):
+            x, u = unpack_jax(z)
+            running = jax.vmap(
+                lambda x_k, u_k, t_k: cost.g(
+                    x_k,
+                    u_k,
+                    t_k,
+                    params=problem.params.cost,
+                ),
+                in_axes=(1, 1, 0),
+            )(x, u, t)
+            integral = jnp.sum(0.5 * dt * (running[:-1] + running[1:]))
+            terminal = cost.h(x[:, -1], t[-1], params=problem.params.cost)
+            return integral + terminal
+
+        def dynamics_residual(z):
+            x, u = unpack_jax(z)
+            dx = jax.vmap(f, in_axes=(1, 1, 0), out_axes=1)(x, u, t)
+            residuals = x[:, 1:] - x[:, :-1] - 0.5 * dt * (dx[:, :-1] + dx[:, 1:])
+            return residuals.reshape(-1)
+
+        equalities = [dynamics_residual]
+        for boundary, index in ((problem.X0, 0), (problem.Xf, -1)):
+            if boundary is None:
+                continue
+            point = jnp.asarray(boundary.point)
+
+            def boundary_residual(z, index=index, point=point):
+                x, _ = unpack_jax(z)
+                return x[:, index] - point
+
+            equalities.append(boundary_residual)
+
+        def h(z):
+            return jnp.concatenate([residual(z).reshape(-1) for residual in equalities])
+
+        lower, upper = self.decision_bounds(problem)
+        return MathematicalProgram(
+            n_z=self.decision_dimension(problem),
+            J=J,
+            h=h,
+            lower=lower,
+            upper=upper,
+            metadata={
+                "transcription": "direct_collocation",
+                "compile_backend": compile_backend,
+                "program_backend": "jax",
             },
         )
 
@@ -126,7 +208,7 @@ class DirectCollocationTranscription(Transcription):
         u = z[split:].reshape(m, n_steps)
         return x, u
 
-    def _pack_initial_guess(
+    def pack_initial_guess(
         self,
         problem: PlanningProblem,
         guess: np.ndarray | Trajectory | None,
@@ -145,7 +227,7 @@ class DirectCollocationTranscription(Transcription):
         """Return the collocation time grid."""
         return self.options.t
 
-    def variable_bounds(self, problem: PlanningProblem) -> VariableBounds:
+    def decision_bounds(self, problem: PlanningProblem) -> tuple[np.ndarray, np.ndarray]:
         """Build box bounds on the packed decision vector when sets expose boxes."""
         n = int(problem.sys.n)
         n_steps = self.options.n_steps
@@ -163,9 +245,9 @@ class DirectCollocationTranscription(Transcription):
             lower[start:] = np.repeat(problem.U.box.lower, n_steps)
             upper[start:] = np.repeat(problem.U.box.upper, n_steps)
 
-        return VariableBounds(lower=lower, upper=upper)
+        return lower, upper
 
-    def _objective(self, z: np.ndarray, problem: PlanningProblem) -> float:
+    def _objective(self, z: np.ndarray, problem: PlanningProblem):
         cost = problem.require_cost()
         x, u = self.unpack(z, problem)
         t = self.options.t
@@ -177,8 +259,8 @@ class DirectCollocationTranscription(Transcription):
             g1 = cost.g(x[:, k + 1], u[:, k + 1], float(t[k + 1]), params=params)
             total += 0.5 * self.options.dt * (g0 + g1)
 
-        total += float(cost.h(x[:, -1], float(t[-1]), params=params))
-        return float(total)
+        total += cost.h(x[:, -1], float(t[-1]), params=params)
+        return total
 
     def _dynamics_residual(
         self,
@@ -203,8 +285,8 @@ class DirectCollocationTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        equalities: list[EqualityConstraint],
-        inequalities: list[InequalityConstraint],
+        equalities: list[ConstraintFunction],
+        inequalities: list[ConstraintFunction],
     ) -> None:
         for name, boundary, index in (
             ("initial_state", problem.X0, 0),
@@ -220,7 +302,7 @@ class DirectCollocationTranscription(Transcription):
                     x, _ = self.unpack(z, problem)
                     return boundary.residual(x[:, index])
 
-                equalities.append(EqualityConstraint(h=residual, name=name))
+                equalities.append(residual)
             else:
 
                 def margin(z, boundary=boundary, index=index, t_i=t_i):
@@ -231,13 +313,13 @@ class DirectCollocationTranscription(Transcription):
                         params=problem.params.sets,
                     )
 
-                inequalities.append(InequalityConstraint(g=margin, name=name))
+                inequalities.append(margin)
 
     def _add_path_constraints(
         self,
         problem: PlanningProblem,
         *,
-        inequalities: list[InequalityConstraint],
+        inequalities: list[ConstraintFunction],
     ) -> None:
         if problem.X is not None and not isinstance(problem.X, BoxSet):
 
@@ -253,9 +335,7 @@ class DirectCollocationTranscription(Transcription):
                     margins.append(margin.reshape(-1))
                 return np.concatenate(margins)
 
-            inequalities.append(
-                InequalityConstraint(g=state_margins, name="state_path")
-            )
+            inequalities.append(state_margins)
 
         if problem.U is not None and not isinstance(problem.U, BoxInputSet):
 
@@ -272,6 +352,25 @@ class DirectCollocationTranscription(Transcription):
                     margins.append(margin.reshape(-1))
                 return np.concatenate(margins)
 
-            inequalities.append(
-                InequalityConstraint(g=input_margins, name="input_path")
+            inequalities.append(input_margins)
+
+    @staticmethod
+    def _check_jax_supported_sets(problem: PlanningProblem) -> None:
+        for label, boundary in (("X0", problem.X0), ("Xf", problem.Xf)):
+            if boundary is not None and not isinstance(boundary, SingletonSet):
+                raise NotImplementedError(
+                    "JAX direct collocation currently supports only SingletonSet "
+                    f"boundaries; got {label}={type(boundary).__name__}"
+                )
+
+        if problem.X is not None and not isinstance(problem.X, BoxSet):
+            raise NotImplementedError(
+                "JAX direct collocation currently supports only BoxSet state "
+                "path constraints through variable bounds"
+            )
+
+        if problem.U is not None and not isinstance(problem.U, BoxInputSet):
+            raise NotImplementedError(
+                "JAX direct collocation currently supports only BoxInputSet input "
+                "path constraints through variable bounds"
             )

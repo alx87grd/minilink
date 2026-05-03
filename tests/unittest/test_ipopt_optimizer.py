@@ -17,8 +17,8 @@ _QUIET = {"print_level": 0, "max_iter": 200}
 
 
 def test_ipopt_unconstrained_quadratic():
-    def J(z: np.ndarray) -> float:
-        return float(0.5 * np.sum((z - np.array([1.0, 2.0])) ** 2))
+    def J(z: np.ndarray):
+        return 0.5 * np.sum((z - np.array([1.0, 2.0])) ** 2)
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return z - np.array([1.0, 2.0])
@@ -31,8 +31,8 @@ def test_ipopt_unconstrained_quadratic():
 
 
 def test_ipopt_box_bounds():
-    def J(z: np.ndarray) -> float:
-        return float(0.5 * np.sum(z**2))
+    def J(z: np.ndarray):
+        return 0.5 * np.sum(z**2)
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return z
@@ -56,8 +56,8 @@ def test_ipopt_box_bounds():
 
 def test_ipopt_equality_constraint():
     # min z0 + z1 s.t. z0^2 + z1^2 = 1  =>  z* = (-1,-1)/sqrt(2)
-    def J(z: np.ndarray) -> float:
-        return float(z[0] + z[1])
+    def J(z: np.ndarray):
+        return z[0] + z[1]
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return np.array([1.0, 1.0])
@@ -81,8 +81,8 @@ def test_ipopt_equality_constraint():
 
 def test_ipopt_inequality_with_bounds():
     # min (z0-2)^2 + (z1-1)^2 s.t. z0 + z1 <= 1, z >= 0  =>  z* = (1, 0)
-    def J(z: np.ndarray) -> float:
-        return float((z[0] - 2.0) ** 2 + (z[1] - 1.0) ** 2)
+    def J(z: np.ndarray):
+        return (z[0] - 2.0) ** 2 + (z[1] - 1.0) ** 2
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return np.array([2.0 * (z[0] - 2.0), 2.0 * (z[1] - 1.0)])
@@ -113,11 +113,11 @@ def test_ipopt_inequality_with_bounds():
 
 
 def test_ipopt_record_solve_time():
-    def J(z: np.ndarray) -> float:
-        return float(z[0] ** 2)
+    def J(z: np.ndarray):
+        return z[0] ** 2
 
     def grad_J(z: np.ndarray) -> np.ndarray:
-        return np.array([2.0 * float(z[0])])
+        return np.array([2.0 * z[0]])
 
     prog = MathematicalProgram(n_z=1, J=J, grad_J=grad_J)
     opt = Optimizer(prog, z0=np.array([1.0]), method="ipopt", options=_QUIET)
@@ -127,11 +127,11 @@ def test_ipopt_record_solve_time():
 
 
 def test_ipopt_solve_callback_not_supported():
-    def J(z: np.ndarray) -> float:
-        return float(z[0] ** 2)
+    def J(z: np.ndarray):
+        return z[0] ** 2
 
     def grad_J(z: np.ndarray) -> np.ndarray:
-        return np.array([2.0 * float(z[0])])
+        return np.array([2.0 * z[0]])
 
     prog = MathematicalProgram(n_z=1, J=J, grad_J=grad_J)
     opt = Optimizer(prog, z0=np.array([1.0]), method="ipopt", options=_QUIET)

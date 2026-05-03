@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
-from minilink.optimization.optimizer import Optimizer
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -44,16 +43,13 @@ planner = TrajectoryOptimizationPlanner(
     transcription=DirectCollocationTranscription(
         DirectCollocationOptions(tf=5.0, n_steps=30)
     ),
-    optimizer=Optimizer(
-        backend="scipy",
-        options={
+    options=TrajectoryOptimizationOptions(
+        compile_backend="numpy",
+        optimizer_options={
             "disp": True,
             "maxiter": 300,
             "ftol": 1e-3,
         },
-    ),
-    options=TrajectoryOptimizationOptions(
-        compile_backend="numpy",
         callback=LiveTrajectoryPlotCallback(sys, plot="xu", every=1, pause=0.001),
     ),
 )

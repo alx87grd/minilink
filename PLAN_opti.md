@@ -11,7 +11,8 @@ program = MathematicalProgram(
     J=J,
     h=h,
     g=g,
-    bounds=bounds,
+    lower=lower,
+    upper=upper,
     grad_J=grad_J,
     hess_J=hess_J,
     jac_h=jac_h,
@@ -34,12 +35,12 @@ This pass intentionally focuses only on the optimization module. Trajectory opti
 ## Key Changes
 - Make `MathematicalProgram` a pure finite-dimensional NLP:
   - required: `n_z`, `J`
-  - optional: `h`, `g`, `bounds`, `grad_J`, `hess_J`, `jac_h`, `jac_g`, `metadata`
+  - optional: `h`, `g`, `lower`, `upper`, `grad_J`, `hess_J`, `jac_h`, `jac_g`, `metadata`
   - no `z0`
   - no solver-facing wrappers
   - no `EqualityConstraint` / `InequalityConstraint`
-- Add `MathematicalProgram.compile(backend="numpy", sample_z=None, use_hessian=False, verbose=False)`.
-  - Actual evaluator classes live under `minilink.optimization.evaluators`.
+- Add `compile_program_evaluator(program, backend="numpy", sample_z=None, use_hessian=False, verbose=False)`.
+  - Evaluator classes live under `minilink.optimization.evaluators`.
   - `sample_z` defaults to `zeros(n_z)` for manual compile calls; `Optimizer` passes its `z0`.
 - Add evaluator API:
   - backend-native math methods: `J(z)`, `h(z)`, `g(z)`
@@ -79,7 +80,9 @@ This pass intentionally focuses only on the optimization module. Trajectory opti
   - `solve(z0=...)` override without rebuilding optimizer
   - optional Ipopt if `cyipopt` is installed
 - Update optimization demo and benchmark to the new clean API.
-- Do not require full repo tests to pass in this pass; trajectory optimization is out of scope.
+- Trajectory optimization now uses the same aggregate `h` / `g` contract:
+  transcriptions return pure programs and expose `pack_initial_guess(...)`
+  separately for `z0`.
 
 ## Assumptions
 - `h(z) = 0`, `g(z) >= 0`, and variable bounds remain the core NLP convention.

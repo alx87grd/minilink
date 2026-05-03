@@ -8,8 +8,8 @@ from minilink.optimization.mathematical_program import MathematicalProgram
 
 
 def test_mathematical_program_is_pure_description_without_z0():
-    def J(z: np.ndarray) -> float:
-        return float(z @ z)
+    def J(z: np.ndarray):
+        return z @ z
 
     program = MathematicalProgram(
         n_z=2,
@@ -27,7 +27,7 @@ def test_mathematical_program_validates_bounds_dimension():
     with pytest.raises(ValueError, match="lower bounds must have shape"):
         MathematicalProgram(
             n_z=2,
-            J=lambda z: 0.0,
+            J=lambda z: z @ z,
             lower=np.zeros(3),
         )
 
@@ -36,15 +36,15 @@ def test_mathematical_program_validates_bounds_order():
     with pytest.raises(ValueError, match="lower bounds must be less"):
         MathematicalProgram(
             n_z=1,
-            J=lambda z: 0.0,
+            J=lambda z: z[0] * z[0],
             lower=np.array([2.0]),
             upper=np.array([1.0]),
         )
 
 
 def test_numpy_evaluator_objective_constraints_and_derivatives():
-    def J(z: np.ndarray) -> float:
-        return float(z[0] ** 2 + z[1] ** 2)
+    def J(z: np.ndarray):
+        return z[0] ** 2 + z[1] ** 2
 
     def grad_J(z: np.ndarray) -> np.ndarray:
         return 2.0 * z
@@ -98,7 +98,7 @@ def test_numpy_evaluator_objective_constraints_and_derivatives():
 
 
 def test_numpy_evaluator_empty_constraints():
-    program = MathematicalProgram(n_z=1, J=lambda z: float(z[0] ** 2))
+    program = MathematicalProgram(n_z=1, J=lambda z: z[0] ** 2)
     program_evaluator = compile_program_evaluator(program, sample_z=np.array([1.0]))
 
     assert program_evaluator.n_h == 0
@@ -112,7 +112,7 @@ def test_numpy_evaluator_empty_constraints():
 def test_numpy_evaluator_reports_bad_constraint_shape():
     program = MathematicalProgram(
         n_z=2,
-        J=lambda z: 0.0,
+        J=lambda z: z @ z,
         h=lambda z: np.array([z[0]]),
     )
     program_evaluator = compile_program_evaluator(

@@ -2,8 +2,8 @@
 
 Drives the planar :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycle`
 from one straight lane to a parallel lane offset by ``Y_GOAL`` while keeping a
-target longitudinal speed. Uses :class:`JaxDirectCollocationTranscription` so
-the optimizer receives analytic gradients/Jacobians from JAX.
+target longitudinal speed. Uses direct collocation with ``compile_backend="jax"``
+so the optimizer receives analytic gradients/Jacobians from the program evaluator.
 """
 
 import numpy as np
@@ -11,11 +11,10 @@ import numpy as np
 from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import JaxQuadraticCost
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import JaxDynamicBicycle
-from minilink.optimization.optimizer import Optimizer
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.jax_direct_collocation import (
-    JaxDirectCollocationOptions,
-    JaxDirectCollocationTranscription,
+from minilink.planning.trajectory_optimization.direct_collocation import (
+    DirectCollocationOptions,
+    DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
@@ -66,23 +65,20 @@ problem = PlanningProblem(
 
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=JaxDirectCollocationTranscription(
-        JaxDirectCollocationOptions(
+    transcription=DirectCollocationTranscription(
+        DirectCollocationOptions(
             tf=TF,
             n_steps=N_STEPS,
-            use_gradient=True,
-            use_hessian=False,
         )
     ),
-    optimizer=Optimizer(
-        backend="scipy",
-        options={
+    options=TrajectoryOptimizationOptions(
+        compile_backend="jax",
+        optimizer_options={
             "disp": True,
             "maxiter": 500,
             "ftol": 1e-2,
         },
     ),
-    options=TrajectoryOptimizationOptions(compile_backend="jax"),
 )
 
 traj = planner.compute_solution()

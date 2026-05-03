@@ -1,12 +1,15 @@
 """Generic trajectory-optimization planner orchestration."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
 from minilink.compile.backend_policy import BACKEND_NUMPY
 from minilink.core.trajectory import Trajectory
+from minilink.optimization.evaluators.program_evaluator import (
+    MathematicalProgramEvaluator,
+)
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
@@ -46,6 +49,9 @@ class TrajectoryOptimizationOptions:
     compile_backend: str | None = BACKEND_NUMPY
     initial_guess: np.ndarray | Trajectory | None = None
     warm_start: bool = False
+    optimizer_method: str = "scipy_slsqp"
+    optimizer_options: dict[str, object] = field(default_factory=dict)
+    use_hessian: bool = False
     record_history: bool = False
     callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
     record_solve_time: bool = False
@@ -66,15 +72,14 @@ class TrajectoryOptimizationPlanner(Planner):
         problem: PlanningProblem,
         *,
         transcription: Transcription,
-        optimizer: Optimizer | None = None,
         options: TrajectoryOptimizationOptions | None = None,
     ) -> None:
         super().__init__(problem)
         self.require_cost()
         self.transcription = transcription
-        self.optimizer = Optimizer() if optimizer is None else optimizer
         self.options = TrajectoryOptimizationOptions() if options is None else options
         self.last_program: MathematicalProgram | None = None
+        self.last_optimizer: Optimizer | None = None
         self.last_optimization_result: OptimizationResult | None = None
         self.iteration_history: list[TrajectoryOptimizationIteration] = []
 
@@ -89,14 +94,14 @@ class TrajectoryOptimizationPlanner(Planner):
         guess = self._resolve_initial_guess(initial_guess, warm_start)
         program = self.transcription.transcribe(
             self.problem,
-            initial_guess=guess,
             compile_backend=compile_backend,
         )
+        z0 = self.transcription.pack_initial_guess(self.problem, guess)
+        optimizer = self._make_optimizer(program, z0)
 
         self.iteration_history = []
-        optimization_result = self.optimizer.solve(
-            program,
-            callback=self._make_callback(program, compile_backend),
+        optimization_result = optimizer.solve(
+            callback=self._make_callback(optimizer, compile_backend),
             record_solve_time=self.options.record_solve_time,
             disp=self.options.solve_disp,
         )
@@ -107,8 +112,20 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
         self.last_program = program
+        self.last_optimizer = optimizer
         self.last_optimization_result = optimization_result
         return self._store_result(trajectory)
+
+    def _make_optimizer(self, program: MathematicalProgram, z0: np.ndarray) -> Optimizer:
+        program_backend = str(program.metadata.get("program_backend", BACKEND_NUMPY))
+        return Optimizer(
+            program,
+            z0=z0,
+            method=self.options.optimizer_method,
+            compile_backend=program_backend,
+            use_hessian=self.options.use_hessian,
+            options=dict(self.options.optimizer_options),
+        )
 
     def _resolve_initial_guess(
         self,
@@ -130,7 +147,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
     def _make_callback(
         self,
-        program: MathematicalProgram,
+        optimizer: Optimizer,
         compile_backend: str | None,
     ) -> OptimizationProgressCallback | None:
         if not self.options.record_history and self.options.callback is None:
@@ -142,7 +159,7 @@ class TrajectoryOptimizationPlanner(Planner):
             nonlocal iteration_index
             z_arr = np.asarray(z, dtype=float).reshape(-1)
             iteration = self._iteration_from_z(
-                program,
+                optimizer,
                 z_arr,
                 compile_backend,
                 iteration_index,
@@ -158,7 +175,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
     def _iteration_from_z(
         self,
-        program: MathematicalProgram,
+        optimizer: Optimizer,
         z: np.ndarray,
         compile_backend: str | None,
         iteration_index: int,
@@ -167,13 +184,13 @@ class TrajectoryOptimizationPlanner(Planner):
     ) -> TrajectoryOptimizationIteration:
         """Build one planning-aware optimizer iteration payload."""
         if cost is None:
-            cost = program.objective(z)
+            cost = optimizer.program_evaluator.objective(z)
         trajectory = self.transcription.reconstruct_result(
             OptimizationResult(z=z, success=False, cost=cost),
             problem=self.problem,
             compile_backend=compile_backend,
         )
-        max_eq, min_ineq = self._constraint_metrics(program, z)
+        max_eq, min_ineq = self._constraint_metrics(optimizer.program_evaluator, z)
         return TrajectoryOptimizationIteration(
             iteration=iteration_index,
             z=z.copy(),
@@ -185,21 +202,14 @@ class TrajectoryOptimizationPlanner(Planner):
 
     @staticmethod
     def _constraint_metrics(
-        program: MathematicalProgram,
+        program_evaluator: MathematicalProgramEvaluator,
         z: np.ndarray,
     ) -> tuple[float, float | None]:
-        if program.equalities:
-            max_eq = max(
-                float(np.max(np.abs(equality.residual(z))))
-                for equality in program.equalities
-            )
-        else:
-            max_eq = 0.0
+        max_eq = 0.0
+        if program_evaluator.n_h:
+            max_eq = float(np.max(np.abs(program_evaluator.equality_residual(z))))
 
         min_ineq = None
-        if program.inequalities:
-            min_ineq = min(
-                float(np.min(inequality.margin(z)))
-                for inequality in program.inequalities
-            )
+        if program_evaluator.n_g:
+            min_ineq = float(np.min(program_evaluator.inequality_margin(z)))
         return max_eq, min_ineq

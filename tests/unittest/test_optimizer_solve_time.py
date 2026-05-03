@@ -8,11 +8,11 @@ from minilink.optimization.optimizer import Optimizer
 
 
 def _quadratic_program() -> MathematicalProgram:
-    def J(z: np.ndarray) -> float:
-        return float(z[0] ** 2)
+    def J(z: np.ndarray):
+        return z[0] ** 2
 
     def grad_J(z: np.ndarray) -> np.ndarray:
-        return np.array([2.0 * float(z[0])])
+        return np.array([2.0 * z[0]])
 
     return MathematicalProgram(n_z=1, J=J, grad_J=grad_J)
 

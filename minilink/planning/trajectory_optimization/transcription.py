@@ -7,6 +7,7 @@ output.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -17,6 +18,8 @@ from minilink.optimization.mathematical_program import (
     OptimizationResult,
 )
 from minilink.planning.problems import PlanningProblem
+
+ConstraintFunction = Callable[[np.ndarray], np.ndarray]
 
 
 @dataclass
@@ -67,10 +70,18 @@ class Transcription(ABC):
         self,
         problem: PlanningProblem,
         *,
-        initial_guess=None,
         compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
         """Convert ``problem`` into a finite-dimensional mathematical program."""
+        ...
+
+    @abstractmethod
+    def pack_initial_guess(
+        self,
+        problem: PlanningProblem,
+        guess: np.ndarray | Trajectory | None,
+    ) -> np.ndarray:
+        """Pack a trajectory or array guess into the transcription decision vector."""
         ...
 
     @abstractmethod
@@ -85,6 +96,20 @@ class Transcription(ABC):
         ...
 
     @abstractmethod
-    def initial_guess_time_grid(self, problem: PlanningProblem):
+    def initial_guess_time_grid(self, problem: PlanningProblem) -> np.ndarray:
         """Return the time grid used by generic trajectory guesses."""
         ...
+
+
+def stack_constraints(
+    constraints: list[ConstraintFunction],
+) -> ConstraintFunction | None:
+    """Return one NumPy constraint vector function from a list of vector functions."""
+    if not constraints:
+        return None
+
+    def stacked(z: np.ndarray) -> np.ndarray:
+        values = [constraint(z).reshape(-1) for constraint in constraints]
+        return np.concatenate(values)
+
+    return stacked

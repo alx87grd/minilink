@@ -8,13 +8,8 @@ from minilink.core.sets import BallSet, BoxSet, SingletonSet
 from minilink.core.system import DynamicSystem, System
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.optimization.mathematical_program import (
-    EqualityConstraint,
-    InequalityConstraint,
-    MathematicalProgram,
-    VariableBounds,
-)
-from minilink.optimization.optimizer import Optimizer
+from minilink.optimization.evaluators.compiler import compile_program_evaluator
+from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.initial_guess import (
     default_initial_trajectory,
     mechanical_cubic_initial_trajectory,
@@ -27,15 +22,6 @@ from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.jax_direct_collocation import (
-    JaxDirectCollocationOptions,
-)
-from minilink.planning.trajectory_optimization.jax_multiple_shooting import (
-    JaxMultipleShootingOptions,
-)
-from minilink.planning.trajectory_optimization.jax_shooting import (
-    JaxShootingOptions,
 )
 from minilink.planning.trajectory_optimization.live_plot import (
     LiveTrajectoryPlotCallback,
@@ -170,33 +156,6 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(guess.x[:, 0], x_start)
         np.testing.assert_allclose(guess.x[:, -1], x_goal)
 
-    def test_jax_collocation_options_validate_derivative_request(self):
-        with self.assertRaises(ValueError):
-            JaxDirectCollocationOptions(
-                tf=1.0,
-                n_steps=3,
-                use_gradient=False,
-                use_hessian=True,
-            )
-
-    def test_jax_shooting_options_validate_derivative_request(self):
-        with self.assertRaises(ValueError):
-            JaxShootingOptions(
-                tf=1.0,
-                n_steps=3,
-                use_gradient=False,
-                use_hessian=True,
-            )
-
-    def test_jax_multiple_shooting_options_validate_derivative_request(self):
-        with self.assertRaises(ValueError):
-            JaxMultipleShootingOptions(
-                tf=1.0,
-                n_steps=3,
-                use_gradient=False,
-                use_hessian=True,
-            )
-
     def test_planner_require_result_before_solve(self):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
@@ -211,34 +170,35 @@ class TestPlanningArchitecture(unittest.TestCase):
             dp.require_result()
 
     def test_mathematical_program_constraints_are_backend_neutral(self):
-        equality = EqualityConstraint(
-            h=lambda z: np.array([z[0] + z[1] - 1.0]),
-            name="sum_to_one",
-        )
-        inequality = InequalityConstraint(
-            g=lambda z: np.array([z[0], z[1]]),
-            name="nonnegative",
-        )
         program = MathematicalProgram(
-            J=lambda z: float(z.T @ z),
-            z0=np.array([0.5, 0.5]),
-            bounds=VariableBounds(lower=np.zeros(2), upper=np.ones(2)),
-            equalities=(equality,),
-            inequalities=(inequality,),
+            n_z=2,
+            J=lambda z: z.T @ z,
+            h=lambda z: np.array([z[0] + z[1] - 1.0]),
+            g=lambda z: np.array([z[0], z[1]]),
+            lower=np.zeros(2),
+            upper=np.ones(2),
+        )
+        program_evaluator = compile_program_evaluator(
+            program,
+            sample_z=np.array([0.5, 0.5]),
         )
 
         self.assertEqual(program.n_z, 2)
-        self.assertEqual(program.objective(np.array([1.0, 2.0])), 5.0)
-        np.testing.assert_allclose(equality.residual(np.array([0.25, 0.75])), [0.0])
+        self.assertEqual(program_evaluator.objective(np.array([1.0, 2.0])), 5.0)
         np.testing.assert_allclose(
-            inequality.margin(np.array([0.25, 0.75])), [0.25, 0.75]
+            program_evaluator.equality_residual(np.array([0.25, 0.75])),
+            [0.0],
+        )
+        np.testing.assert_allclose(
+            program_evaluator.inequality_margin(np.array([0.25, 0.75])),
+            [0.25, 0.75],
         )
 
         with self.assertRaises(ValueError):
             MathematicalProgram(
-                J=lambda z: 0.0,
-                z0=np.zeros(2),
-                bounds=VariableBounds(lower=np.zeros(3)),
+                n_z=2,
+                J=lambda z: z @ z,
+                lower=np.zeros(3),
             )
 
     def test_solver_skeletons_validate_architecture_inputs(self):
@@ -251,7 +211,6 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=Optimizer(backend="scipy"),
             options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
         self.assertEqual(to.transcription.options.n_steps, 5)
@@ -262,11 +221,12 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         program = to.transcription.transcribe(
             problem,
-            initial_guess=guess,
             compile_backend=to.options.compile_backend,
         )
+        z0 = to.transcription.pack_initial_guess(problem, guess)
+        program_evaluator = compile_program_evaluator(program, sample_z=z0)
         self.assertEqual(program.n_z, 15)
-        self.assertEqual(len(program.equalities), 3)
+        self.assertEqual(program_evaluator.n_h, 12)
 
         rrt = RRTPlanner(problem, dt=0.1)
         self.assertEqual(rrt.options.max_nodes, 2000)
@@ -286,8 +246,10 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
-            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="numpy",
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
+            ),
         )
 
         traj = planner.compute_solution()
@@ -296,7 +258,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
         residual_norm = np.linalg.norm(
-            planner.last_program.equalities[0].residual(
+            planner.last_optimizer.program_evaluator.equality_residual(
                 planner.last_optimization_result.z
             )
         )
@@ -312,9 +274,9 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
             options=TrajectoryOptimizationOptions(
                 compile_backend="direct",
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
                 record_history=True,
             ),
         )
@@ -334,8 +296,10 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
-            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="numpy",
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
+            ),
         )
 
         traj = planner.compute_solution()
@@ -356,8 +320,10 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
-            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="numpy",
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
+            ),
         )
 
         traj = planner.compute_solution()
@@ -379,12 +345,12 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         program = transcription.transcribe(
             problem,
-            initial_guess=guess,
             compile_backend="direct",
         )
+        z0 = transcription.pack_initial_guess(problem, guess)
 
         self.assertEqual(program.n_z, 5)
-        np.testing.assert_allclose(program.z0, guess.u.reshape(-1))
+        np.testing.assert_allclose(z0, guess.u.reshape(-1))
         self.assertEqual(program.metadata["compile_backend"], "direct")
 
     def test_evaluator_forced_rk4_rollout_matches_integrator(self):
@@ -450,15 +416,9 @@ class TestPlanningArchitecture(unittest.TestCase):
                 super().__init__(options)
                 self.guesses = []
 
-            def transcribe(
-                self, problem, *, initial_guess=None, compile_backend="numpy"
-            ):
-                self.guesses.append(initial_guess)
-                return super().transcribe(
-                    problem,
-                    initial_guess=initial_guess,
-                    compile_backend=compile_backend,
-                )
+            def pack_initial_guess(self, problem, guess):
+                self.guesses.append(guess)
+                return super().pack_initial_guess(problem, guess)
 
         problem = self.make_single_integrator_problem()
         transcription = RecordingTranscription(
@@ -467,8 +427,10 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
-            options=TrajectoryOptimizationOptions(warm_start=True),
+            options=TrajectoryOptimizationOptions(
+                warm_start=True,
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
+            ),
         )
 
         first = planner.compute_solution()

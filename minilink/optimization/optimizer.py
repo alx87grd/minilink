@@ -260,9 +260,9 @@ if __name__ == "__main__":
     z_lo = 0.6
     z_hi = 2.05
 
-    def J(z: np.ndarray) -> float:
+    def J(z: np.ndarray):
         y = z**3 + z * z + np.sin(5.0 * np.pi * z) + 0.12 * np.sin(15.0 * np.pi * z)
-        return float(y[0])
+        return y
 
     def g(z: np.ndarray) -> np.ndarray:
         return np.array([z[0] - z_lo, z_hi - z[0]], dtype=float)

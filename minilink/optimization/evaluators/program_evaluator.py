@@ -19,7 +19,8 @@ class MathematicalProgramEvaluator(ABC):
     Base class for compiled mathematical-program evaluators.
 
     Subclasses provide backend-native ``J`` / ``h`` / ``g`` methods. The base
-    class defines small SciPy/Ipopt bridge helpers and shared shape utilities.
+    class defines SciPy/Ipopt bridge helpers that convert native scalar and
+    array expressions to Python ``float`` / flat NumPy arrays.
     """
 
     def __init__(self, program: MathematicalProgram, sample_z=None):
@@ -34,17 +35,17 @@ class MathematicalProgramEvaluator(ABC):
 
     @abstractmethod
     def J(self, z):
-        """Return backend-native objective value ``J(z)``."""
+        """Return backend-native objective scalar expression ``J(z)``."""
         ...
 
     @abstractmethod
     def h(self, z):
-        """Return backend-native equality residual ``h(z)``."""
+        """Return backend-native equality residual array ``h(z)``."""
         ...
 
     @abstractmethod
     def g(self, z):
-        """Return backend-native inequality margin ``g(z)``."""
+        """Return backend-native inequality margin array ``g(z)``."""
         ...
 
     @property

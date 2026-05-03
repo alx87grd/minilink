@@ -17,24 +17,26 @@ from minilink.dynamics.catalog.pendulum.cartpole import (  # noqa: E402
     CartPole,
     JaxCartPole,
 )
-from minilink.optimization.optimizer import Optimizer  # noqa: E402
+from minilink.optimization.evaluators.compiler import (  # noqa: E402
+    compile_program_evaluator,
+)
 from minilink.planning.initial_guess import default_initial_trajectory  # noqa: E402
 from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.jax_direct_collocation import (  # noqa: E402
-    JaxDirectCollocationOptions,
-    JaxDirectCollocationTranscription,
+from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
+    DirectCollocationOptions,
+    DirectCollocationTranscription,
 )
-from minilink.planning.trajectory_optimization.jax_multiple_shooting import (  # noqa: E402
-    JaxMultipleShootingOptions,
-    JaxMultipleShootingTranscription,
-)
-from minilink.planning.trajectory_optimization.jax_shooting import (  # noqa: E402
-    JaxShootingOptions,
-    JaxShootingTranscription,
+from minilink.planning.trajectory_optimization.multiple_shooting import (  # noqa: E402
+    MultipleShootingOptions,
+    MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (  # noqa: E402
     TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
+)
+from minilink.planning.trajectory_optimization.shooting import (  # noqa: E402
+    ShootingOptions,
+    ShootingTranscription,
 )
 
 
@@ -93,11 +95,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=JaxDirectCollocationTranscription(
-                JaxDirectCollocationOptions(tf=1.0, n_steps=5)
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
-            options=TrajectoryOptimizationOptions(compile_backend="jax"),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
+            ),
         )
 
         guess = default_initial_trajectory(
@@ -106,11 +110,16 @@ class TestJaxDirectCollocation(unittest.TestCase):
         )
         program = planner.transcription.transcribe(
             problem,
-            initial_guess=guess,
             compile_backend="jax",
         )
-        self.assertIsNotNone(program.grad)
-        self.assertIsNotNone(program.equalities[0].jac)
+        z0 = planner.transcription.pack_initial_guess(problem, guess)
+        program_evaluator = compile_program_evaluator(
+            program,
+            backend=program.metadata["program_backend"],
+            sample_z=z0,
+        )
+        self.assertTrue(program_evaluator.has_gradient)
+        self.assertTrue(program_evaluator.has_jacobian_h)
 
         traj = planner.compute_solution()
 
@@ -122,11 +131,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=JaxShootingTranscription(
-                JaxShootingOptions(tf=1.0, n_steps=5)
+            transcription=ShootingTranscription(
+                ShootingOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
-            options=TrajectoryOptimizationOptions(compile_backend="jax"),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
+            ),
         )
 
         guess = default_initial_trajectory(
@@ -135,13 +146,18 @@ class TestJaxDirectCollocation(unittest.TestCase):
         )
         program = planner.transcription.transcribe(
             problem,
-            initial_guess=guess,
             compile_backend="jax",
         )
+        z0 = planner.transcription.pack_initial_guess(problem, guess)
+        program_evaluator = compile_program_evaluator(
+            program,
+            backend=program.metadata["program_backend"],
+            sample_z=z0,
+        )
         self.assertEqual(program.n_z, problem.sys.m * 5)
-        self.assertIsNotNone(program.grad)
-        self.assertIsNotNone(program.equalities[0].jac)
-        self.assertIsNotNone(program.inequalities[0].jac)
+        self.assertTrue(program_evaluator.has_gradient)
+        self.assertTrue(program_evaluator.has_jacobian_h)
+        self.assertTrue(program_evaluator.has_jacobian_g)
 
         traj = planner.compute_solution()
 
@@ -153,11 +169,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=JaxMultipleShootingTranscription(
-                JaxMultipleShootingOptions(tf=1.0, n_steps=5)
+            transcription=MultipleShootingTranscription(
+                MultipleShootingOptions(tf=1.0, n_steps=5)
             ),
-            optimizer=Optimizer(backend="scipy", options={"maxiter": 100, "ftol": 1e-9}),
-            options=TrajectoryOptimizationOptions(compile_backend="jax"),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
+            ),
         )
 
         guess = default_initial_trajectory(
@@ -166,12 +184,17 @@ class TestJaxDirectCollocation(unittest.TestCase):
         )
         program = planner.transcription.transcribe(
             problem,
-            initial_guess=guess,
             compile_backend="jax",
         )
+        z0 = planner.transcription.pack_initial_guess(problem, guess)
+        program_evaluator = compile_program_evaluator(
+            program,
+            backend=program.metadata["program_backend"],
+            sample_z=z0,
+        )
         self.assertEqual(program.n_z, (problem.sys.n + problem.sys.m) * 5)
-        self.assertIsNotNone(program.grad)
-        self.assertIsNotNone(program.equalities[0].jac)
+        self.assertTrue(program_evaluator.has_gradient)
+        self.assertTrue(program_evaluator.has_jacobian_h)
 
         traj = planner.compute_solution()
 
@@ -181,20 +204,15 @@ class TestJaxDirectCollocation(unittest.TestCase):
 
     def test_rejects_numpy_quadratic_cost(self):
         problem = self.make_single_integrator_problem(QuadraticCost)
-        opts = JaxDirectCollocationOptions(
+        opts = DirectCollocationOptions(
             tf=1.0,
             n_steps=5,
         )
-        tr = JaxDirectCollocationTranscription(opts)
-        guess = default_initial_trajectory(
-            problem,
-            tr.initial_guess_time_grid(problem),
-        )
+        tr = DirectCollocationTranscription(opts)
         with self.assertRaisesRegex(ValueError, "JaxQuadraticCost"):
             tr.transcribe(
                 problem,
-                initial_guess=guess,
-                compile_backend="direct",
+                compile_backend="jax",
             )
 
     def test_jax_evaluator_forced_rk4_rollout_smoke(self):

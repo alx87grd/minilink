@@ -13,11 +13,16 @@ wrappers live outside this object on program evaluators owned by optimizers.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any, TypeAlias
 
 import numpy as np
 
-ArrayFunction = Callable[[np.ndarray], np.ndarray]
-ScalarFunction = Callable[[np.ndarray], float]
+# These stay loose on purpose: the runtime contract is native-backend behavior
+# plus shape checks in evaluators, without making JAX a core dependency.
+NativeArray: TypeAlias = Any
+NativeScalarExpression: TypeAlias = Any
+ObjectiveFunction: TypeAlias = Callable[[NativeArray], NativeScalarExpression]
+ArrayFunction: TypeAlias = Callable[[NativeArray], NativeArray]
 
 
 @dataclass(frozen=True)
@@ -29,32 +34,52 @@ class MathematicalProgram:
     ``minimize J(z)`` subject to ``h(z) = 0``, ``g(z) >= 0``, and optional
     box bounds on ``z``.
 
+    Native function contract
+    ------------------------
+    The mathematical callables are backend-native functions. With NumPy input,
+    they should return NumPy scalar/array expressions; with JAX input, they
+    should return JAX scalar/array expressions. Do not cast with ``float(...)``
+    or force NumPy arrays inside these functions if JAX tracing may be used.
+
+    Shapes are:
+
+    ``J : (n_z,) -> scalar`` (0-D scalar expression),
+    ``h : (n_z,) -> (n_h,)``,
+    ``g : (n_z,) -> (n_g,)``.
+
     Parameters
     ----------
     n_z : int
         Dimension of the decision vector ``z``.
     J : callable
-        Objective function ``J(z) -> scalar``.
+        Objective function ``J(z) -> scalar``. The input and output should stay
+        native to the active array backend: with NumPy input, return a NumPy
+        scalar expression; with JAX input, return a JAX scalar expression.
+        Prefer code like ``return z @ z`` over ``return float(z @ z)``.
     h : callable, optional
-        Equality residual ``h(z) -> array``. Missing means no equalities.
+        Equality residual ``h(z) -> array`` with shape ``(n_h,)``. The returned
+        array should be native to the active backend. Missing means no
+        equalities.
     g : callable, optional
-        Inequality margin ``g(z) -> array`` with convention ``g(z) >= 0``.
-        Missing means no inequalities.
+        Inequality margin ``g(z) -> array`` with shape ``(n_g,)`` and
+        convention ``g(z) >= 0``. The returned array should be native to the
+        active backend. Missing means no inequalities.
     lower, upper : array_like, optional
         Lower and upper box bounds on ``z``. ``None`` means unbounded on that
         side.
     grad_J : callable, optional
-        Objective gradient ``grad_J(z) -> np.ndarray``.
+        Objective gradient ``grad_J(z) -> array`` with shape ``(n_z,)``.
     hess_J : callable, optional
-        Objective Hessian ``hess_J(z) -> np.ndarray``.
+        Objective Hessian ``hess_J(z) -> array`` with shape ``(n_z, n_z)``.
     jac_h, jac_g : callable, optional
-        Constraint Jacobians ``dh/dz`` and ``dg/dz``.
+        Constraint Jacobians ``dh/dz`` and ``dg/dz`` with shapes
+        ``(n_h, n_z)`` and ``(n_g, n_z)``.
     metadata : dict
         Optional transcription or diagnostic metadata.
     """
 
     n_z: int
-    J: ScalarFunction
+    J: ObjectiveFunction
     h: ArrayFunction | None = None
     g: ArrayFunction | None = None
     lower: np.ndarray | None = None

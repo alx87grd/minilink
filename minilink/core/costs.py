@@ -204,8 +204,7 @@ class JaxQuadraticCost(QuadraticCost):
     Notes
     -----
     For JAX direct collocation, use this class (not :class:`QuadraticCost`) so
-    the running and terminal terms in the objective are JAX-differentiable; see
-    :class:`~minilink.planning.trajectory_optimization.jax_direct_collocation.JaxDirectCollocationTranscription`.
+    the running and terminal terms in the objective are JAX-differentiable.
     """
 
     def g(

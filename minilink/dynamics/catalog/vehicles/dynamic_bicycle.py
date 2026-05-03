@@ -772,10 +772,8 @@ class JaxDynamicBicycle(DynamicBicycle):
 
     Inherits the geometry and visualization contract from
     :class:`DynamicBicycle` and only overrides the equations of motion so that
-    ``f(x, u, t)`` traces through ``jax.numpy``. Useful with
-    :class:`~minilink.planning.trajectory_optimization.jax_direct_collocation.JaxDirectCollocationTranscription`
-    and the other JAX-backed transcriptions for analytic-gradient trajectory
-    optimization.
+    ``f(x, u, t)`` traces through ``jax.numpy``. Useful with trajectory
+    optimization run with ``compile_backend="jax"``.
     """
 
     def __init__(self):

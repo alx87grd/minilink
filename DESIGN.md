@@ -27,7 +27,7 @@ The table below is the on-disk layout and TRL. **Structural rules**, **pluggable
 | `compile/benchmark` | **TRL 1** | Optional compiled-`f` evaluator benchmarks; not part of the core contract |
 | `simulation/benchmark` | **TRL 1** | Optional simulator solver/backend benchmark sweeps and standard cases |
 | `simulation/scenarios/` | **TRL 1** | Shared **stress** scenarios for benchmark matrices, not user plants |
-| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization uses a generic `TrajectoryOptimizationPlanner` plus method-specific transcriptions, with NumPy/SciPy and narrower JAX-derivative prototypes for direct collocation and shooting methods. |
+| `planning/` | **TRL 1** | Deterministic planning architecture MVP: pure `PlanningProblem`; costs and sets live in `core/`; solver-family packages for search, trajectory optimization, and policy synthesis. Trajectory optimization uses a generic `TrajectoryOptimizationPlanner` plus method-specific transcriptions, with NumPy/SciPy and narrower JAX-traceable prototypes for direct collocation and shooting methods. |
 | `optimization/` | **TRL 1** | Pure finite-dimensional NLP contracts (`MathematicalProgram` with `J`, optional aggregate `h` / `g`, and optional `grad_J` / `hess_J` / constraint Jacobians), NumPy/JAX program evaluators, and solver adapters shared by planning and future control workflows |
 | `control/` | **TRL 0** | Controller and static law blocks (e.g. PD), separate from `dynamics/` plants |
 
@@ -98,10 +98,8 @@ minilink/planning/
   problems.py
   search/
   trajectory_optimization/
+    benchmark.py
     direct_collocation.py
-    jax_direct_collocation.py
-    jax_multiple_shooting.py
-    jax_shooting.py
     live_plot.py
     multiple_shooting.py
     planner.py
@@ -424,46 +422,43 @@ It separates the continuous mathematical problem from numerical solver choices:
 - `TrajectoryOptimizationPlanner` owns the generic trajectory-optimization
   workflow: initial guess and optional warm start, transcription, optimization,
   reconstruction, last-result storage, and optional iteration-history/callback
-  plumbing for future live trajectory visualization.
+  plumbing for future live trajectory visualization. It constructs the bound
+  :class:`~minilink.optimization.optimizer.Optimizer` after transcription from
+  the packed initial decision vector and optimizer method/options.
 - Trajectory-optimization transcriptions own method-specific decision-vector
-  layout and may emit generic `minilink.optimization` mathematical programs of
-  the form `minimize J(z)` subject to `h(z) = 0`, `g(z) >= 0`, and bounds on
-  `z`. The generic trajectory-optimization options carry execution policy such
-  as `compile_backend`; method options carry only method/grid data.
+  layout. They expose two separate steps: `transcribe(problem)` emits a pure
+  `minilink.optimization` mathematical program of the form `minimize J(z)`
+  subject to aggregate `h(z) = 0`, aggregate `g(z) >= 0`, and box bounds on
+  `z`; `pack_initial_guess(problem, guess)` packs a trajectory or array guess
+  into the solver initial vector. The generic trajectory-optimization options
+  carry execution policy such as `compile_backend`, optimizer method, and solver
+  options; method options carry only method/grid data.
 - **Direct collocation** — `trajectory_optimization.direct_collocation` transcribes
-  a trapezoidal direct-collocation NLP with an optional NumPy- or
-  ``compile``-backed dynamics residual; the SciPy-based optimizer is the
-  default outer loop.
+  a trapezoidal direct-collocation NLP. With `compile_backend="numpy"` or
+  `"direct"` it emits NumPy-callable equations; with `compile_backend="jax"`
+  it emits JAX-traceable equations for compatible systems and costs.
 - **Single shooting** — `trajectory_optimization.shooting` optimizes only input
-  knots and reconstructs states with the shared fixed-step RK4 forced-rollout
-  evaluator primitive.
+  knots and reconstructs states with fixed-step RK4 rollout. The same
+  transcription has NumPy and JAX-traceable program paths.
 - **Multiple shooting** — `trajectory_optimization.multiple_shooting` uses the
   same state-input decision vector as collocation, but enforces neighboring
-  state knots with RK4 shooting defects.
-- **JAX direct collocation (prototype)** —
-  `trajectory_optimization.jax_direct_collocation` also targets SciPy, but
-  uses JAX-``jit``/``jacfwd``/optional Hessian to supply objective and constraint
-  derivatives. The cost must be JAX-traceable in the objective; the rule is
-  enforced by :func:`minilink.core.costs.require_jax_traceable_cost`, which
-  the three JAX transcriptions all delegate to. For the common quadratic
-  case use :class:`~minilink.core.costs.JaxQuadraticCost` instead of
-  :class:`~minilink.core.costs.QuadraticCost`. Supported sets are **narrower**
-  than the NumPy path: :class:`~minilink.core.sets.SingletonSet` for
-  :math:`X_0` / :math:`X_f` and box-style path sets via
-  :class:`~minilink.core.sets.BoxSet` / :class:`~minilink.core.sets.BoxInputSet`;
-  general set margins remain on the NumPy transcription until reviewed. JAX
-  precision is process-wide compile configuration via
+  state knots with RK4 shooting defects. The same transcription has NumPy and
+  JAX-traceable program paths.
+- **JAX trajopt path** — JAX is selected through `compile_backend="jax"` on
+  :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationOptions`,
+  not through separate transcription classes. Transcriptions emit traceable
+  `J` / `h` / `g`; the `MathematicalProgram` evaluator performs JAX `jit`,
+  objective gradients, constraint Jacobians, and optional dense Hessian
+  generation. The cost must be JAX-traceable in the objective; for the common
+  quadratic case use :class:`~minilink.core.costs.JaxQuadraticCost` instead of
+  :class:`~minilink.core.costs.QuadraticCost`. Supported JAX sets are currently
+  narrower than the NumPy path: :class:`~minilink.core.sets.SingletonSet` for
+  direct-collocation and multiple-shooting boundaries, terminal
+  :class:`~minilink.core.sets.SingletonSet` or :class:`~minilink.core.sets.BoxSet`
+  for shooting, and box-style path sets through
+  :class:`~minilink.core.sets.BoxSet` / :class:`~minilink.core.sets.BoxInputSet`.
+  JAX precision is process-wide compile configuration via
   :func:`minilink.compile.jax_utils.configure_jax`, not a planning option.
-- **JAX single shooting (prototype)** —
-  `trajectory_optimization.jax_shooting` keeps the same input-knot decision
-  vector as single shooting, rolls states forward through JAX-traceable RK4,
-  and supplies objective gradients plus terminal/path constraint Jacobians to
-  SciPy. It follows the same JAX cost and set limitations as the JAX
-  collocation prototype.
-- **JAX multiple shooting (prototype)** —
-  `trajectory_optimization.jax_multiple_shooting` differentiates the RK4
-  shooting defects and objective with JAX while keeping the same public planner
-  and optimizer contract.
 
 This first pass is intentionally deterministic and high-level. Stochastic
 planning, chance constraints, belief states, and broader RRT/DP/trajopt coverage

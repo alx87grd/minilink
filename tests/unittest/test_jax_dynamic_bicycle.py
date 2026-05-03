@@ -15,11 +15,10 @@ try:
         DynamicBicycle,
         JaxDynamicBicycle,
     )
-    from minilink.optimization.optimizer import Optimizer
     from minilink.planning.problems import PlanningProblem
-    from minilink.planning.trajectory_optimization.jax_direct_collocation import (
-        JaxDirectCollocationOptions,
-        JaxDirectCollocationTranscription,
+    from minilink.planning.trajectory_optimization.direct_collocation import (
+        DirectCollocationOptions,
+        DirectCollocationTranscription,
     )
     from minilink.planning.trajectory_optimization.planner import (
         TrajectoryOptimizationOptions,
@@ -98,14 +97,13 @@ class TestJaxDynamicBicycle(unittest.TestCase):
         problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal, cost=cost)
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=JaxDirectCollocationTranscription(
-                JaxDirectCollocationOptions(tf=tf, n_steps=10, use_gradient=True)
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(tf=tf, n_steps=10)
             ),
-            optimizer=Optimizer(
-                backend="scipy",
-                options={"maxiter": 60, "ftol": 1e-2, "disp": False},
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                optimizer_options={"maxiter": 60, "ftol": 1e-2, "disp": False},
             ),
-            options=TrajectoryOptimizationOptions(compile_backend="jax"),
         )
         traj = planner.compute_solution()
         # Boundary conditions are enforced as equality constraints, so the

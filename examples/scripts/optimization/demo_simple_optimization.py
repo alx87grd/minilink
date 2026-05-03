@@ -19,10 +19,10 @@ def J_1d_values(z: np.ndarray) -> np.ndarray:
     return x**3 + x * x + np.sin(5.0 * np.pi * x) + 0.12 * np.sin(15.0 * np.pi * x)
 
 
-def J_1d(z: np.ndarray) -> float:
+def J_1d(z: np.ndarray):
     """Non-convex: cubic + quadratic envelope + two sine ridges."""
-    x = np.asarray(z, dtype=float).reshape(-1)
-    return float(J_1d_values(x)[0])
+    x = z.reshape(-1)[0]
+    return x**3 + x * x + np.sin(5.0 * np.pi * x) + 0.12 * np.sin(15.0 * np.pi * x)
 
 
 def grad_1d(z: np.ndarray) -> np.ndarray:

@@ -5,15 +5,14 @@ import numpy as np
 from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import JaxQuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
-from minilink.optimization.optimizer import Optimizer
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.jax_shooting import (
-    JaxShootingOptions,
-    JaxShootingTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
+)
+from minilink.planning.trajectory_optimization.shooting import (
+    ShootingOptions,
+    ShootingTranscription,
 )
 
 configure_jax(enable_x64=True)
@@ -42,22 +41,20 @@ problem = PlanningProblem(
 
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=JaxShootingTranscription(
-        JaxShootingOptions(
+    transcription=ShootingTranscription(
+        ShootingOptions(
             tf=2.0,
             n_steps=31,
-            use_gradient=True,
         )
     ),
-    optimizer=Optimizer(
-        backend="scipy",
-        options={
+    options=TrajectoryOptimizationOptions(
+        compile_backend="jax",
+        optimizer_options={
             "disp": True,
             "maxiter": 200,
             "ftol": 1e-7,
         },
     ),
-    options=TrajectoryOptimizationOptions(compile_backend="jax"),
 )
 
 traj = planner.compute_solution()
