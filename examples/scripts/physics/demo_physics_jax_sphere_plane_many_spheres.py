@@ -12,6 +12,9 @@ import numpy as np
 from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
 from minilink.physics.system import PhysicsWorldSystem
 
+# Demo controls.
+PRINT_COMPILE_REPORT = True  # Print JAX compile timing diagnostics.
+
 # 10x larger scene than the 12-sphere MVP: 12x10 grid = 120 spheres.
 nx, ny = 12, 10
 n_spheres = nx * ny
@@ -56,8 +59,7 @@ sys.animate(renderer="meshcat")
 x = np.asarray(sys.x0)
 u = np.asarray(sys.get_u_from_input_ports())
 
-evaluator = sys.compile(backend="jax", verbose=True)
-# evaluator = compile(sys, backend="jax", verbose=False)
+evaluator = sys.compile(backend="jax", verbose=PRINT_COMPILE_REPORT)
 
 n_warm = 10
 n_iter = 1000

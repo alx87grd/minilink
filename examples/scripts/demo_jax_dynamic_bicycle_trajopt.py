@@ -24,6 +24,9 @@ from minilink.planning.trajectory_optimization.planner import (
 configure_jax(enable_x64=True)
 
 # --- Problem setup ---
+PRINT_SOLVE_REPORT = True  # Print the Minilink TrajOpt pre/post solve report.
+PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT  # Print compact success/cost fallback.
+SCIPY_DISP = False  # Keep SciPy's own backend text off; use PRINT_SOLVE_REPORT.
 TF = 5.0
 N_STEPS = 20
 U_TARGET = 5.0
@@ -73,8 +76,9 @@ planner = TrajectoryOptimizationPlanner(
     ),
     options=TrajectoryOptimizationOptions(
         compile_backend="jax",
+        solve_disp=PRINT_SOLVE_REPORT,
         optimizer_options={
-            "disp": True,
+            "disp": SCIPY_DISP,
             "maxiter": 500,
             "ftol": 1e-2,
         },
@@ -84,10 +88,11 @@ planner = TrajectoryOptimizationPlanner(
 traj = planner.compute_solution()
 result = planner.last_optimization_result
 
-print(f"success: {result.success}")
-print(f"message: {result.message}")
-if result.cost is not None:
-    print(f"cost: {result.cost:.6g}")
+if PRINT_RESULT_SUMMARY:
+    print(f"success: {result.success}")
+    print(f"message: {result.message}")
+    if result.cost is not None:
+        print(f"cost: {result.cost:.6g}")
 
 planner.plot_solution(plot="xu")
 sys.traj = traj

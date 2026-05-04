@@ -14,6 +14,11 @@ from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 
+# Demo controls.
+PRINT_SOLVE_REPORT = True  # Print the Minilink TrajOpt pre/post solve report.
+PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT  # Print compact success/cost fallback.
+SCIPY_DISP = False  # Keep SciPy's own backend text off; use PRINT_SOLVE_REPORT.
+
 sys = CartPole()
 sys.inputs["u"].lower_bound[0] = -10.0
 sys.inputs["u"].upper_bound[0] = 10.0
@@ -43,8 +48,9 @@ planner = TrajectoryOptimizationPlanner(
     ),
     options=TrajectoryOptimizationOptions(
         compile_backend="numpy",
+        solve_disp=PRINT_SOLVE_REPORT,
         optimizer_options={
-            "disp": True,
+            "disp": SCIPY_DISP,
             "maxiter": 1000,
             "ftol": 1e-2,
         },
@@ -54,9 +60,10 @@ planner = TrajectoryOptimizationPlanner(
 traj = planner.compute_solution()
 result = planner.last_optimization_result
 
-print(f"success: {result.success}")
-print(f"message: {result.message}")
-print(f"cost: {result.cost:.6g}")
+if PRINT_RESULT_SUMMARY:
+    print(f"success: {result.success}")
+    print(f"message: {result.message}")
+    print(f"cost: {result.cost:.6g}")
 
 planner.plot_solution(plot="xu")
 planner.problem.sys.animate(traj)

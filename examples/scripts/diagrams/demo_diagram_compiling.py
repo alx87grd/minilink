@@ -6,6 +6,9 @@ from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem
 
+# Demo controls.
+PRINT_COMPILE_REPORT = True  # Print compile timing diagnostics.
+
 # Custom blocks
 
 
@@ -88,9 +91,9 @@ u = np.array([])
 
 f_baseline = diagram.f
 
-evaluator_numpy = diagram.compile(verbose=True)
+evaluator_numpy = diagram.compile(verbose=PRINT_COMPILE_REPORT)
 f_compiled_numpy = evaluator_numpy.f
-evaluator_jax = diagram.compile(backend="jax", verbose=True)
+evaluator_jax = diagram.compile(backend="jax", verbose=PRINT_COMPILE_REPORT)
 f_compiled_jax = evaluator_jax.f
 f_compiled_jax_jit = evaluator_jax.get_f_jit()
 

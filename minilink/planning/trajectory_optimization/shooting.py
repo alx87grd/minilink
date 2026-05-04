@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.compile.backend_policy import BACKEND_JAX
 from minilink.compile.jax_utils import array_module
 from minilink.core.sets import BoxInputSet, SingletonSet
 from minilink.core.trajectory import Trajectory
@@ -45,6 +46,9 @@ class ShootingTranscription(Transcription):
         compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
         """Build the input-knot nonlinear program."""
+        if transcription_backend_key(compile_backend) == BACKEND_JAX:
+            return self._transcribe_jax(problem, compile_backend=compile_backend)
+
         problem.require_cost()
         rollout = self._make_rollout(problem, compile_backend)
         equalities: list[ConstraintFunction] = []
@@ -70,6 +74,103 @@ class ShootingTranscription(Transcription):
                 "transcription": "shooting",
                 "compile_backend": compile_backend,
                 "program_backend": program_backend_for_compile(compile_backend),
+            },
+        )
+
+    def _transcribe_jax(
+        self,
+        problem: PlanningProblem,
+        *,
+        compile_backend: str | None,
+    ) -> MathematicalProgram:
+        """Build a JAX scan-based single-shooting program."""
+        import jax
+        import jax.numpy as jnp
+
+        cost = problem.require_cost()
+        t = jnp.asarray(self.options.t)
+        dt = jnp.asarray(self.options.dt)
+        n_steps = int(self.options.n_steps)
+        m = int(problem.sys.m)
+        x0 = jnp.asarray(self._initial_state(problem))
+        system_params = problem.params.system
+        cost_params = problem.params.cost
+
+        def unpack_jax(z):
+            return z.reshape(m, n_steps)
+
+        def rollout(u):
+            def body(x, inputs):
+                u0, u1, t_k = inputs
+                umid = 0.5 * (u0 + u1)
+                k1 = problem.sys.f(x, u0, t_k, system_params)
+                k2 = problem.sys.f(
+                    x + 0.5 * dt * k1,
+                    umid,
+                    t_k + 0.5 * dt,
+                    system_params,
+                )
+                k3 = problem.sys.f(
+                    x + 0.5 * dt * k2,
+                    umid,
+                    t_k + 0.5 * dt,
+                    system_params,
+                )
+                k4 = problem.sys.f(
+                    x + dt * k3,
+                    u1,
+                    t_k + dt,
+                    system_params,
+                )
+                x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+                return x_next, x_next
+
+            _, xs = jax.lax.scan(
+                body,
+                x0,
+                (u[:, :-1].T, u[:, 1:].T, t[:-1]),
+            )
+            return jnp.concatenate((x0[:, None], xs.T), axis=1)
+
+        def J(z):
+            u = unpack_jax(z)
+            x = rollout(u)
+            running = jax.vmap(
+                lambda x_k, u_k, t_k: cost.g(
+                    x_k,
+                    u_k,
+                    t_k,
+                    params=cost_params,
+                ),
+                in_axes=(1, 1, 0),
+            )(x, u, t)
+            integral = jnp.sum(0.5 * dt * (running[:-1] + running[1:]))
+            terminal = cost.h(x[:, -1], t[-1], params=cost_params)
+            return integral + terminal
+
+        equalities: list[ConstraintFunction] = []
+        inequalities: list[ConstraintFunction] = []
+
+        self._add_terminal_constraints(
+            problem,
+            rollout=rollout,
+            equalities=equalities,
+            inequalities=inequalities,
+        )
+        self._add_path_constraints(problem, rollout=rollout, inequalities=inequalities)
+        lower, upper = self.decision_bounds(problem)
+
+        return MathematicalProgram(
+            n_z=self.decision_dimension(problem),
+            J=J,
+            h=stack_constraints(equalities),
+            g=stack_constraints(inequalities),
+            lower=lower,
+            upper=upper,
+            metadata={
+                "transcription": "shooting",
+                "compile_backend": compile_backend,
+                "program_backend": BACKEND_JAX,
             },
         )
 

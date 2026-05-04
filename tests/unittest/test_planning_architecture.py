@@ -1,3 +1,5 @@
+import contextlib
+import io
 import tempfile
 import unittest
 
@@ -339,6 +341,31 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertLess(residual_norm, 1e-6)
         self.assertTrue(traj.has_signal("dx"))
         self.assertTrue(traj.has_signal("cost"))
+
+    def test_trajopt_solve_disp_prints_planning_report(self):
+        problem = self.make_single_integrator_problem()
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(tf=1.0, n_steps=5)
+            ),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="numpy",
+                optimizer_options={"maxiter": 100, "ftol": 1e-9},
+                solve_disp=True,
+            ),
+        )
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            planner.compute_solution()
+
+        report = stdout.getvalue()
+        self.assertIn("Trajectory Optimization Program", report)
+        self.assertIn("transcription: DirectCollocationTranscription", report)
+        self.assertIn("method='scipy_slsqp'", report)
+        self.assertNotIn("===               Optimization Program", report)
+        self.assertIn("terminal_error_inf:", report)
 
     def test_generic_trajopt_planner_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()

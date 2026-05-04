@@ -3,11 +3,12 @@ import numpy as np
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.optimization.optimizer import Optimizer
 
-# Test parameters
+# Demo controls.
 Z0 = 2.0
-SHOW_FIGURE = True
-TRACE_ITERATES = True
-DISP_SOLVE = True
+SHOW_FIGURE = True  # Show the final matplotlib figure.
+TRACE_ITERATES = True  # Print one callback line for each optimizer iterate.
+PRINT_SOLVE_REPORT = True  # Print the Minilink Optimizer pre/post solve report.
+SCIPY_DISP = False  # Keep SciPy's own backend text off; use PRINT_SOLVE_REPORT.
 FIGSIZE_SQUARE = (6.0, 6.0)
 z_lo = 0.6
 z_hi = 2.05
@@ -58,7 +59,7 @@ opt = Optimizer(
     z0=np.array([Z0]),
     method="scipy_slsqp",
     options={
-        "disp": False,
+        "disp": SCIPY_DISP,
         "maxiter": 200,
         "ftol": 1e-12,
     },
@@ -69,7 +70,7 @@ opt = Optimizer(
 #     z0=np.array([Z0]),
 #     method="ipopt",
 #     options={
-#         "disp": False,
+#         "disp": SCIPY_DISP,
 #         "maxiter": 200,
 #     },
 # )
@@ -87,7 +88,7 @@ def record_iterate(z: np.ndarray, J: float, t: float) -> None:
 
 out = opt.solve(
     callback=record_iterate if TRACE_ITERATES else None,
-    disp=DISP_SOLVE,
+    disp=PRINT_SOLVE_REPORT,
 )
 
 if SHOW_FIGURE:

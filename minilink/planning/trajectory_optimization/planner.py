@@ -1,5 +1,6 @@
 """Generic trajectory-optimization planner orchestration."""
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -25,6 +26,11 @@ from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
 )
 
+# Human-readable ``solve_disp=True`` panel.
+_DISP_LINE_WIDTH = 60
+_DISP_RULE_MAIN = "=" * _DISP_LINE_WIDTH
+_DISP_RULE_DIV = "-" * _DISP_LINE_WIDTH
+
 
 @dataclass(frozen=True)
 class TrajectoryOptimizationIteration:
@@ -42,8 +48,8 @@ class TrajectoryOptimizationIteration:
 class TrajectoryOptimizationOptions:
     """Generic trajectory-optimization workflow options.
 
-    ``solve_disp`` maps to :meth:`~minilink.optimization.optimizer.Optimizer.solve`
-    ``disp=…`` (Minilink text report, not SciPy's ``options['disp']``).
+    ``solve_disp`` prints a Minilink trajectory-optimization preamble and
+    report. It is separate from SciPy's ``options['disp']``.
     """
 
     compile_backend: str | None = BACKEND_NUMPY
@@ -90,31 +96,64 @@ class TrajectoryOptimizationPlanner(Planner):
         warm_start: bool | None = None,
     ) -> Trajectory:
         """Compute and store a trajectory-optimization solution."""
+        workflow_t0 = time.perf_counter()
         compile_backend = self.options.compile_backend
         guess = self._resolve_initial_guess(initial_guess, warm_start)
+
+        transcribe_t0 = time.perf_counter()
         program = self.transcription.transcribe(
             self.problem,
             compile_backend=compile_backend,
         )
+        transcribe_s = time.perf_counter() - transcribe_t0
         z0 = self.transcription.pack_initial_guess(self.problem, guess)
+
+        compile_t0 = time.perf_counter()
         optimizer = self._make_optimizer(program, z0)
+        compile_s = time.perf_counter() - compile_t0
+
+        if self.options.solve_disp:
+            self._print_solve_preamble(
+                program=program,
+                optimizer=optimizer,
+                z0=z0,
+                transcribe_s=transcribe_s,
+                compile_s=compile_s,
+            )
 
         self.iteration_history = []
         optimization_result = optimizer.solve(
             callback=self._make_callback(optimizer, compile_backend),
-            record_solve_time=self.options.record_solve_time,
-            disp=self.options.solve_disp,
+            record_solve_time=self.options.record_solve_time
+            or self.options.solve_disp,
+            disp=False,
         )
+        reconstruct_t0 = time.perf_counter()
         trajectory = self.transcription.reconstruct_result(
             optimization_result,
             problem=self.problem,
             compile_backend=compile_backend,
         )
+        reconstruct_s = time.perf_counter() - reconstruct_t0
+        total_s = time.perf_counter() - workflow_t0
 
         self.last_program = program
         self.last_optimizer = optimizer
         self.last_optimization_result = optimization_result
-        return self._store_result(trajectory)
+        stored = self._store_result(trajectory)
+
+        if self.options.solve_disp:
+            self._print_solve_report(
+                optimizer=optimizer,
+                result=optimization_result,
+                trajectory=stored,
+                transcribe_s=transcribe_s,
+                compile_s=compile_s,
+                reconstruct_s=reconstruct_s,
+                total_s=total_s,
+            )
+
+        return stored
 
     def _make_optimizer(self, program: MathematicalProgram, z0: np.ndarray) -> Optimizer:
         program_backend = str(program.metadata.get("program_backend", BACKEND_NUMPY))
@@ -213,3 +252,125 @@ class TrajectoryOptimizationPlanner(Planner):
         if program_evaluator.n_g:
             min_ineq = float(np.min(program_evaluator.inequality_margin(z)))
         return max_eq, min_ineq
+
+    def _print_solve_preamble(
+        self,
+        *,
+        program: MathematicalProgram,
+        optimizer: Optimizer,
+        z0: np.ndarray,
+        transcribe_s: float,
+        compile_s: float,
+    ) -> None:
+        problem = self.problem
+        sys = problem.sys
+        print()
+        print(_DISP_RULE_MAIN)
+        print("===          Trajectory Optimization Program             ===")
+        print(_DISP_RULE_MAIN)
+        print("system:", getattr(sys, "name", type(sys).__name__))
+        print(f"dimensions: n={int(sys.n)}, m={int(sys.m)}, p={int(sys.p)}")
+        print("x_start:", self._preview_vector(problem.x_start))
+        print("x_goal:", self._preview_vector(problem.x_goal))
+        print("X:", self._class_name(problem.X))
+        print("U:", self._class_name(problem.U))
+        print("X0:", self._class_name(problem.X0))
+        print("Xf:", self._class_name(problem.Xf))
+        print("cost:", self._class_name(problem.cost))
+        print(_DISP_RULE_DIV)
+        print("transcription:", type(self.transcription).__name__)
+        print("transcription_options:", self._transcription_options())
+        print(f"compile_backend={self.options.compile_backend!r}")
+        print(f"program_backend={optimizer.program_evaluator.backend!r}")
+        print("n_z:", int(program.n_z))
+        print(
+            f"constraints: n_h={optimizer.program_evaluator.n_h}, "
+            f"n_g={optimizer.program_evaluator.n_g}"
+        )
+        print("z0:", self._preview_vector(z0))
+        print(_DISP_RULE_DIV)
+        print(f"method={self.options.optimizer_method!r}")
+        print("options:", getattr(optimizer.backend, "options", {}))
+        print(f"setup: transcribe={transcribe_s:.6g}s compile={compile_s:.6g}s")
+        print(_DISP_RULE_DIV)
+        print("Running trajectory optimization...")
+
+    def _print_solve_report(
+        self,
+        *,
+        optimizer: Optimizer,
+        result: OptimizationResult,
+        trajectory: Trajectory,
+        transcribe_s: float,
+        compile_s: float,
+        reconstruct_s: float,
+        total_s: float,
+    ) -> None:
+        max_eq, min_ineq = self._constraint_metrics(
+            optimizer.program_evaluator,
+            result.z,
+        )
+        max_bound = self._bound_violation(optimizer.program, result.z)
+
+        print("Completed in", result.solve_time_s, "seconds")
+        print(_DISP_RULE_DIV)
+        print("success:", result.success)
+        print("message:", result.message)
+        print("J*:", result.cost)
+        print("stats:", result.stats)
+        print("max_eq:", max_eq)
+        print("min_ineq:", min_ineq)
+        print("max_bound:", max_bound)
+        print("x(0):", self._preview_vector(trajectory.x[:, 0]))
+        print("x(tf):", self._preview_vector(trajectory.x[:, -1]))
+        if self.problem.x_goal is not None:
+            terminal_error = trajectory.x[:, -1] - self.problem.x_goal
+            print("terminal_error_inf:", float(np.max(np.abs(terminal_error))))
+        print(
+            "timing:",
+            {
+                "transcribe_s": transcribe_s,
+                "compile_s": compile_s,
+                "solve_s": result.solve_time_s,
+                "reconstruct_s": reconstruct_s,
+                "total_s": total_s,
+            },
+        )
+        print(_DISP_RULE_MAIN)
+
+    def _transcription_options(self) -> dict[str, object]:
+        options = getattr(self.transcription, "options", None)
+        if options is None:
+            return {}
+        return dict(vars(options))
+
+    @staticmethod
+    def _class_name(value: object | None) -> str | None:
+        if value is None:
+            return None
+        return type(value).__name__
+
+    @staticmethod
+    def _preview_vector(value) -> str | None:
+        if value is None:
+            return None
+        arr = np.asarray(value, dtype=float).reshape(-1)
+        if arr.size <= 8:
+            return np.array2string(arr, precision=6, max_line_width=96)
+        head = np.array2string(arr[:4], precision=6, max_line_width=96)
+        return f"{head} ... ({arr.size} values)"
+
+    @staticmethod
+    def _bound_violation(program: MathematicalProgram, z: np.ndarray) -> float:
+        max_bound = 0.0
+        if program.lower is not None:
+            max_bound = max(
+                max_bound,
+                float(np.max(np.maximum(program.lower - z, 0.0))),
+            )
+        if program.upper is not None:
+            max_bound = max(
+                max_bound,
+                float(np.max(np.maximum(z - program.upper, 0.0))),
+            )
+        return max_bound
