@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from minilink.compile.jax_utils import configure_jax
-from minilink.core.costs import JaxQuadraticCost, QuadraticCost
+from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.evaluators.program_evaluator import (
@@ -363,8 +363,8 @@ def _planner(
 def _problem(variant: TrajectoryOptimizationBenchmarkVariant) -> PlanningProblem:
     if variant.compile_backend == "jax":
         _configure_jax(variant)
-        return _cartpole_problem(JaxCartPole(), jax_cost=True)
-    return _cartpole_problem(CartPole(), jax_cost=False)
+        return _cartpole_problem(JaxCartPole())
+    return _cartpole_problem(CartPole())
 
 
 def _transcription(
@@ -413,13 +413,13 @@ def _warm_initial_trajectory(
 
     if jax_trajopt_available():
         configure_jax(enable_x64=True)
-        problem = _cartpole_problem(JaxCartPole(), jax_cost=True)
+        problem = _cartpole_problem(JaxCartPole())
         transcription = DirectCollocationTranscription(
             DirectCollocationOptions(tf=config.tf, n_steps=config.n_steps)
         )
         compile_backend = "jax"
     else:
-        problem = _cartpole_problem(CartPole(), jax_cost=False)
+        problem = _cartpole_problem(CartPole())
         transcription = DirectCollocationTranscription(
             DirectCollocationOptions(tf=config.tf, n_steps=config.n_steps)
         )
@@ -449,14 +449,13 @@ def _warm_optimizer_options(
     }
 
 
-def _cartpole_problem(sys, *, jax_cost: bool) -> PlanningProblem:
+def _cartpole_problem(sys) -> PlanningProblem:
     sys.inputs["u"].lower_bound[0] = -10.0
     sys.inputs["u"].upper_bound[0] = 10.0
 
     x_start = np.array([-2.0, 1.0, 0.0, 0.0])
     x_goal = np.array([0.0, np.pi, 0.0, 0.0])
-    cost_cls = JaxQuadraticCost if jax_cost else QuadraticCost
-    cost = cost_cls.from_system(
+    cost = QuadraticCost.from_system(
         sys,
         Q=np.diag([1.0, 1.0, 0.0, 0.0]),
         R=np.diag([1.0]),

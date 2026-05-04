@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from minilink.core.costs import require_jax_traceable_cost
-from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
+from minilink.core.sets import BoxInputSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -83,8 +82,6 @@ class ShootingTranscription(Transcription):
         import jax.numpy as jnp
 
         cost = problem.require_cost()
-        require_jax_traceable_cost(cost)
-        self._check_jax_supported_problem(problem)
 
         t = jnp.asarray(self.options.t)
         dt = jnp.asarray(self.options.dt)
@@ -133,35 +130,57 @@ class ShootingTranscription(Transcription):
 
         equalities = []
         if isinstance(problem.Xf, SingletonSet):
-            target = jnp.asarray(problem.Xf.point)
 
             def terminal_residual(z):
                 x = rollout(unpack_jax(z))
-                return x[:, -1] - target
+                return problem.Xf.residual(x[:, -1])
 
             equalities.append(terminal_residual)
 
         inequalities = []
-        if isinstance(problem.Xf, BoxSet):
-            lower = jnp.asarray(problem.Xf.lower)
-            upper = jnp.asarray(problem.Xf.upper)
+        if problem.Xf is not None and not isinstance(problem.Xf, SingletonSet):
 
             def terminal_margin(z):
                 x = rollout(unpack_jax(z))
-                x_f = x[:, -1]
-                return jnp.concatenate((x_f - lower, upper - x_f))
+                return problem.Xf.margin(
+                    x[:, -1],
+                    t=t[-1],
+                    params=problem.params.sets,
+                )
 
             inequalities.append(terminal_margin)
 
-        if isinstance(problem.X, BoxSet):
-            lower = jnp.asarray(problem.X.lower)
-            upper = jnp.asarray(problem.X.upper)
+        if problem.X is not None:
 
             def state_margin(z):
                 x = rollout(unpack_jax(z)).T
-                return jnp.concatenate((x - lower, upper - x), axis=1).reshape(-1)
+                margins = jax.vmap(
+                    lambda x_k, t_k: problem.X.margin(
+                        x_k,
+                        t=t_k,
+                        params=problem.params.sets,
+                    )
+                )(x, t)
+                return margins.reshape(-1)
 
             inequalities.append(state_margin)
+
+        if problem.U is not None and not isinstance(problem.U, BoxInputSet):
+
+            def input_margin(z):
+                u = unpack_jax(z)
+                x = rollout(u).T
+                margins = jax.vmap(
+                    lambda u_k, x_k, t_k: problem.U.margin(
+                        u_k,
+                        x=x_k,
+                        t=t_k,
+                        params=problem.params.sets,
+                    )
+                )(u.T, x, t)
+                return margins.reshape(-1)
+
+            inequalities.append(input_margin)
 
         def h(z):
             return jnp.concatenate([residual(z).reshape(-1) for residual in equalities])
@@ -169,14 +188,14 @@ class ShootingTranscription(Transcription):
         def g(z):
             return jnp.concatenate([margin(z).reshape(-1) for margin in inequalities])
 
-        lower, upper = self.decision_bounds(problem)
+        decision_lower, decision_upper = self.decision_bounds(problem)
         return MathematicalProgram(
             n_z=self.decision_dimension(problem),
             J=J,
             h=h if equalities else None,
             g=g if inequalities else None,
-            lower=lower,
-            upper=upper,
+            lower=decision_lower,
+            upper=decision_upper,
             metadata={
                 "transcription": "shooting",
                 "compile_backend": compile_backend,
@@ -409,24 +428,3 @@ class ShootingTranscription(Transcription):
                 return np.concatenate(margins)
 
             inequalities.append(input_margins)
-
-    @staticmethod
-    def _check_jax_supported_problem(problem: PlanningProblem) -> None:
-        if problem.Xf is not None and not isinstance(
-            problem.Xf,
-            (SingletonSet, BoxSet),
-        ):
-            raise NotImplementedError(
-                "JAX shooting currently supports only SingletonSet or BoxSet "
-                "terminal constraints"
-            )
-
-        if problem.X is not None and not isinstance(problem.X, BoxSet):
-            raise NotImplementedError(
-                "JAX shooting currently supports only BoxSet state path constraints"
-            )
-
-        if problem.U is not None and not isinstance(problem.U, BoxInputSet):
-            raise NotImplementedError(
-                "JAX shooting currently supports only BoxInputSet input constraints"
-            )

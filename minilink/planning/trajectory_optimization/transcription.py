@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from minilink.compile.jax_utils import array_module
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -104,12 +105,13 @@ class Transcription(ABC):
 def stack_constraints(
     constraints: list[ConstraintFunction],
 ) -> ConstraintFunction | None:
-    """Return one NumPy constraint vector function from a list of vector functions."""
+    """Return one native-array constraint vector from a list of vector functions."""
     if not constraints:
         return None
 
     def stacked(z: np.ndarray) -> np.ndarray:
+        xp = array_module(z)
         values = [constraint(z).reshape(-1) for constraint in constraints]
-        return np.concatenate(values)
+        return xp.concatenate(values)
 
     return stacked

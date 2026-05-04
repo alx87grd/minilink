@@ -9,7 +9,7 @@ so the optimizer receives analytic gradients/Jacobians from the program evaluato
 import numpy as np
 
 from minilink.compile.jax_utils import configure_jax
-from minilink.core.costs import JaxQuadraticCost
+from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import JaxDynamicBicycle
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -49,7 +49,7 @@ ubar = np.array([U_TARGET / sys.r_r, 0.0])
 R = np.diag([1e-4, 50.0])
 S = np.diag([0.0, 50.0, 50.0, 1.0, 10.0, 10.0])
 
-cost = JaxQuadraticCost.from_system(
+cost = QuadraticCost.from_system(
     sys,
     Q=Q,
     R=R,

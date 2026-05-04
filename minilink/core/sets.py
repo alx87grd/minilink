@@ -5,6 +5,11 @@ Sets model constraints such as ``x(t) in X(t)``, ``u(t) in U(x, t)``,
 and terminal goals ``x(tf) in Xf``. They expose boolean membership for
 search-style planners and nonnegative margins for optimization-style
 transcriptions.
+
+Construction, membership checks, and sampling are NumPy/Python boundary
+utilities. The equation methods ``margin`` and ``residual`` are native-array
+math paths: with NumPy input they return NumPy arrays, and with JAX input they
+return JAX arrays when the set formula is traceable.
 """
 
 from abc import ABC, abstractmethod
@@ -12,6 +17,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
+
+from minilink.compile.jax_utils import array_module
 
 
 class Set(ABC):
@@ -40,7 +47,9 @@ class Set(ABC):
         params=None,
     ) -> bool:
         """Return ``True`` when ``z`` belongs to the set."""
-        return bool(np.all(self.margin(z, t=t, params=params) >= 0.0))
+        z_arr = np.asarray(z, dtype=float).reshape(-1)
+        margin = np.asarray(self.margin(z_arr, t=t, params=params), dtype=float)
+        return bool(np.all(margin >= 0.0))
 
     def sample(
         self,
@@ -86,7 +95,13 @@ class InputSet(ABC):
         params=None,
     ) -> bool:
         """Return ``True`` when ``u`` is admissible at ``(x, t)``."""
-        return bool(np.all(self.margin(u, x=x, t=t, params=params) >= 0.0))
+        u_arr = np.asarray(u, dtype=float).reshape(-1)
+        x_arr = None if x is None else np.asarray(x, dtype=float).reshape(-1)
+        margin = np.asarray(
+            self.margin(u_arr, x=x_arr, t=t, params=params),
+            dtype=float,
+        )
+        return bool(np.all(margin >= 0.0))
 
     def sample(
         self,
@@ -141,8 +156,8 @@ class BoxSet(Set):
         params=None,
     ) -> np.ndarray:
         """Return lower and upper bound margins."""
-        z_arr = np.asarray(z, dtype=float).reshape(self.dim)
-        return np.concatenate((z_arr - self.lower, self.upper - z_arr))
+        xp = array_module(z)
+        return xp.concatenate((z - self.lower, self.upper - z))
 
     def sample(
         self,
@@ -217,7 +232,7 @@ class SingletonSet(Set):
 
     def residual(self, z: np.ndarray) -> np.ndarray:
         """Return equality residual ``z - point``."""
-        return np.asarray(z, dtype=float).reshape(self.dim) - self.point
+        return z - self.point
 
     def margin(
         self,
@@ -226,7 +241,8 @@ class SingletonSet(Set):
         params=None,
     ) -> np.ndarray:
         """Return zero only when ``z`` equals the singleton point."""
-        return -np.abs(self.residual(z))
+        xp = array_module(z)
+        return -xp.abs(self.residual(z))
 
 
 @dataclass(frozen=True)
@@ -258,8 +274,8 @@ class BallSet(Set):
         params=None,
     ) -> np.ndarray:
         """Return the signed distance margin to the ball boundary."""
-        z_arr = np.asarray(z, dtype=float).reshape(self.dim)
-        return np.array([self.radius - np.linalg.norm(z_arr - self.center)])
+        xp = array_module(z)
+        return xp.reshape(self.radius - xp.linalg.norm(z - self.center), (1,))
 
 
 class CallableSet(Set):
@@ -294,9 +310,7 @@ class CallableSet(Set):
         """Evaluate the user-supplied margin function."""
         if self.margin_fn is None:
             raise NotImplementedError("This CallableSet has no margin function")
-        return np.asarray(
-            self.margin_fn(np.asarray(z, dtype=float), t, params), dtype=float
-        )
+        return self.margin_fn(z, t, params)
 
     def contains(
         self,
@@ -330,6 +344,7 @@ class IntersectionSet(Set):
         params=None,
     ) -> np.ndarray:
         """Concatenate margins from all member sets."""
-        return np.concatenate(
+        xp = array_module(z)
+        return xp.concatenate(
             [set_.margin(z, t=t, params=params).reshape(-1) for set_ in self.sets]
         )

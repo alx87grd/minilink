@@ -449,14 +449,11 @@ It separates the continuous mathematical problem from numerical solver choices:
   not through separate transcription classes. Transcriptions emit traceable
   `J` / `h` / `g`; the `MathematicalProgram` evaluator performs JAX `jit`,
   objective gradients, constraint Jacobians, and optional dense Hessian
-  generation. The cost must be JAX-traceable in the objective; for the common
-  quadratic case use :class:`~minilink.core.costs.JaxQuadraticCost` instead of
-  :class:`~minilink.core.costs.QuadraticCost`. Supported JAX sets are currently
-  narrower than the NumPy path: :class:`~minilink.core.sets.SingletonSet` for
-  direct-collocation and multiple-shooting boundaries, terminal
-  :class:`~minilink.core.sets.SingletonSet` or :class:`~minilink.core.sets.BoxSet`
-  for shooting, and box-style path sets through
-  :class:`~minilink.core.sets.BoxSet` / :class:`~minilink.core.sets.BoxInputSet`.
+  generation. Simple algebraic costs and sets keep one class with native-array
+  equation methods, so :class:`~minilink.core.costs.QuadraticCost` and set
+  margins can be used from NumPy or JAX paths when their user callables are
+  traceable. Box-style path sets still become solver bounds when that is the
+  cleaner NLP representation.
   JAX precision is process-wide compile configuration via
   :func:`minilink.compile.jax_utils.configure_jax`, not a planning option.
 

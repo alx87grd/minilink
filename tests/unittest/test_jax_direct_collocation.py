@@ -11,7 +11,8 @@ import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
 from minilink.compile.jax_utils import configure_jax  # noqa: E402
-from minilink.core.costs import JaxQuadraticCost, QuadraticCost  # noqa: E402
+from minilink.core.costs import QuadraticCost  # noqa: E402
+from minilink.core.sets import BallSet  # noqa: E402
 from minilink.core.system import DynamicSystem  # noqa: E402
 from minilink.dynamics.catalog.pendulum.cartpole import (  # noqa: E402
     CartPole,
@@ -61,7 +62,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
 
-    def make_single_integrator_problem(self, cost_cls=JaxQuadraticCost):
+    def make_single_integrator_problem(self, cost_cls=QuadraticCost):
         sys = JaxSingleIntegrator()
         cost = cost_cls.from_system(
             sys,
@@ -202,18 +203,28 @@ class TestJaxDirectCollocation(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
 
-    def test_rejects_numpy_quadratic_cost(self):
-        problem = self.make_single_integrator_problem(QuadraticCost)
-        opts = DirectCollocationOptions(
-            tf=1.0,
-            n_steps=5,
+    def test_jax_direct_collocation_accepts_traceable_terminal_set(self):
+        base = self.make_single_integrator_problem()
+        problem = PlanningProblem(
+            sys=base.sys,
+            x_start=np.array([0.0]),
+            Xf=BallSet(center=np.array([1.0]), radius=0.1),
+            cost=base.cost,
         )
-        tr = DirectCollocationTranscription(opts)
-        with self.assertRaisesRegex(ValueError, "JaxQuadraticCost"):
-            tr.transcribe(
-                problem,
-                compile_backend="jax",
-            )
+        tr = DirectCollocationTranscription(
+            DirectCollocationOptions(tf=1.0, n_steps=5)
+        )
+        guess = default_initial_trajectory(problem, tr.initial_guess_time_grid(problem))
+        program = tr.transcribe(problem, compile_backend="jax")
+        z0 = tr.pack_initial_guess(problem, guess)
+        program_evaluator = compile_program_evaluator(
+            program,
+            backend=program.metadata["program_backend"],
+            sample_z=z0,
+        )
+
+        self.assertEqual(program_evaluator.n_g, 1)
+        self.assertTrue(program_evaluator.has_jacobian_g)
 
     def test_jax_evaluator_forced_rk4_rollout_smoke(self):
         sys = JaxSingleIntegrator()

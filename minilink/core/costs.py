@@ -8,14 +8,23 @@ The planning cost follows the textbook optimal-control form
 Costs live in :mod:`minilink.core` (not on
 :class:`~minilink.core.system.System`) so the same model can be reused
 across many planning problems.
+
+The equation methods ``g`` and ``h`` are native-array math paths. They should
+return scalar expressions that stay native to the input backend: NumPy scalar
+expressions for NumPy inputs, JAX scalar expressions for JAX inputs. Reporting
+helpers such as :meth:`CostFunction.total_cost` convert those expressions to
+Python floats at the boundary.
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any, TypeAlias
 
 import numpy as np
 
 from minilink.core.trajectory import Trajectory
+
+NativeScalarExpression: TypeAlias = Any
 
 
 class CostFunction(ABC):
@@ -35,8 +44,8 @@ class CostFunction(ABC):
         u: np.ndarray,
         t: float = 0.0,
         params=None,
-    ) -> float:
-        """Return the running cost density ``g(x, u, t)``."""
+    ) -> NativeScalarExpression:
+        """Return the native scalar running cost density ``g(x, u, t)``."""
         ...
 
     @abstractmethod
@@ -45,8 +54,8 @@ class CostFunction(ABC):
         x: np.ndarray,
         t: float = 0.0,
         params=None,
-    ) -> float:
-        """Return the terminal cost ``h(x, t)``."""
+    ) -> NativeScalarExpression:
+        """Return the native scalar terminal cost ``h(x, t)``."""
         ...
 
     def evaluate_trajectory(
@@ -174,86 +183,18 @@ class QuadraticCost(CostFunction):
         u: np.ndarray,
         t: float = 0.0,
         params=None,
-    ) -> float:
+    ) -> NativeScalarExpression:
         """Return the quadratic running cost."""
-        x_arr = np.asarray(x, dtype=float).reshape(self.xbar.shape)
-        u_arr = np.asarray(u, dtype=float).reshape(self.ubar.shape)
-        dx = x_arr - self.xbar
-        du = u_arr - self.ubar
-        return float(dx.T @ self.Q @ dx + du.T @ self.R @ du)
+        dx = x - self.xbar
+        du = u - self.ubar
+        return dx.T @ self.Q @ dx + du.T @ self.R @ du
 
     def h(
         self,
         x: np.ndarray,
         t: float = 0.0,
         params=None,
-    ) -> float:
+    ) -> NativeScalarExpression:
         """Return the quadratic terminal cost."""
-        x_arr = np.asarray(x, dtype=float).reshape(self.xbar.shape)
-        dx = x_arr - self.xbar
-        return float(dx.T @ self.S @ dx)
-
-
-class JaxQuadraticCost(QuadraticCost):
-    """
-    JAX-traceable quadratic running and terminal cost.
-
-    Uses the same data contract as :class:`QuadraticCost`, but keeps ``g`` and
-    ``h`` differentiable by avoiding NumPy casts inside traced calls.
-
-    Notes
-    -----
-    For JAX direct collocation, use this class (not :class:`QuadraticCost`) so
-    the running and terminal terms in the objective are JAX-differentiable.
-    """
-
-    def g(
-        self,
-        x: np.ndarray,
-        u: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ):
-        """Return the quadratic running cost as a JAX scalar."""
-        from minilink.compile.jax_utils import require_jax_numpy
-
-        jnp = require_jax_numpy()
-        x_arr = jnp.asarray(x).reshape(self.xbar.shape)
-        u_arr = jnp.asarray(u).reshape(self.ubar.shape)
-        dx = x_arr - jnp.asarray(self.xbar)
-        du = u_arr - jnp.asarray(self.ubar)
-        return dx.T @ jnp.asarray(self.Q) @ dx + du.T @ jnp.asarray(self.R) @ du
-
-    def h(
-        self,
-        x: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ):
-        """Return the quadratic terminal cost as a JAX scalar."""
-        from minilink.compile.jax_utils import require_jax_numpy
-
-        jnp = require_jax_numpy()
-        x_arr = jnp.asarray(x).reshape(self.xbar.shape)
-        dx = x_arr - jnp.asarray(self.xbar)
-        return dx.T @ jnp.asarray(self.S) @ dx
-
-
-def require_jax_traceable_cost(cost: CostFunction) -> None:
-    """
-    Raise :class:`ValueError` if *cost* is a quadratic cost but not JAX-traceable.
-
-    JAX trajectory-optimization transcriptions need cost functions whose
-    ``g`` / ``h`` trace through ``jax.numpy``. The plain
-    :class:`QuadraticCost` materializes Python floats and breaks the trace;
-    use :class:`JaxQuadraticCost` instead.
-
-    This is the single source of truth for the rule; the JAX trajopt
-    transcriptions all delegate here.
-    """
-    if isinstance(cost, QuadraticCost) and not isinstance(cost, JaxQuadraticCost):
-        raise ValueError(
-            "JAX trajectory optimization needs JAX-traceable cost functions in "
-            "the objective; for quadratic costs use JaxQuadraticCost instead "
-            "of QuadraticCost."
-        )
+        dx = x - self.xbar
+        return dx.T @ self.S @ dx

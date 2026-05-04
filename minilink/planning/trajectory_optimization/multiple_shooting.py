@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.core.costs import require_jax_traceable_cost
+from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -81,8 +81,6 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         import jax.numpy as jnp
 
         cost = problem.require_cost()
-        require_jax_traceable_cost(cost)
-        self._check_jax_supported_sets(problem)
 
         t = jnp.asarray(self.options.t)
         dt = jnp.asarray(self.options.dt)
@@ -134,25 +132,73 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             return (x[:, 1:] - x_next).reshape(-1)
 
         equalities = [dynamics_residual]
+        inequalities = []
         for boundary, index in ((problem.X0, 0), (problem.Xf, -1)):
             if boundary is None:
                 continue
-            point = jnp.asarray(boundary.point)
+            t_i = t[index]
+            if isinstance(boundary, SingletonSet):
 
-            def boundary_residual(z, index=index, point=point):
+                def boundary_residual(z, boundary=boundary, index=index):
+                    x, _ = unpack_jax(z)
+                    return boundary.residual(x[:, index])
+
+                equalities.append(boundary_residual)
+            else:
+
+                def boundary_margin(z, boundary=boundary, index=index, t_i=t_i):
+                    x, _ = unpack_jax(z)
+                    return boundary.margin(
+                        x[:, index],
+                        t=t_i,
+                        params=problem.params.sets,
+                    )
+
+                inequalities.append(boundary_margin)
+
+        if problem.X is not None and not isinstance(problem.X, BoxSet):
+
+            def state_margins(z):
                 x, _ = unpack_jax(z)
-                return x[:, index] - point
+                margins = jax.vmap(
+                    lambda x_k, t_k: problem.X.margin(
+                        x_k,
+                        t=t_k,
+                        params=problem.params.sets,
+                    )
+                )(x.T, t)
+                return margins.reshape(-1)
 
-            equalities.append(boundary_residual)
+            inequalities.append(state_margins)
+
+        if problem.U is not None and not isinstance(problem.U, BoxInputSet):
+
+            def input_margins(z):
+                x, u = unpack_jax(z)
+                margins = jax.vmap(
+                    lambda u_k, x_k, t_k: problem.U.margin(
+                        u_k,
+                        x=x_k,
+                        t=t_k,
+                        params=problem.params.sets,
+                    )
+                )(u.T, x.T, t)
+                return margins.reshape(-1)
+
+            inequalities.append(input_margins)
 
         def h(z):
             return jnp.concatenate([residual(z).reshape(-1) for residual in equalities])
+
+        def g(z):
+            return jnp.concatenate([margin(z).reshape(-1) for margin in inequalities])
 
         lower, upper = self.decision_bounds(problem)
         return MathematicalProgram(
             n_z=self.decision_dimension(problem),
             J=J,
             h=h,
+            g=g if inequalities else None,
             lower=lower,
             upper=upper,
             metadata={

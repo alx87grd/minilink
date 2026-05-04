@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink.compile.jax_utils import configure_jax
-from minilink.core.costs import JaxQuadraticCost
+from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import (
@@ -24,7 +24,7 @@ sys.inputs["u"].upper_bound[0] = 20.0
 x_start = np.array([0.0, 0.2, 0.0, 0.0])
 x_goal = np.zeros(sys.n)
 
-cost = JaxQuadraticCost.from_system(
+cost = QuadraticCost.from_system(
     sys,
     Q=np.diag([1.0, 20.0, 0.1, 0.1]),
     R=np.diag([0.01]),

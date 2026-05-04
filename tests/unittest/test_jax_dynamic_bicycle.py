@@ -10,7 +10,7 @@ try:
     import jax.numpy as jnp
 
     from minilink.compile.jax_utils import configure_jax
-    from minilink.core.costs import JaxQuadraticCost
+    from minilink.core.costs import QuadraticCost
     from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
         DynamicBicycle,
         JaxDynamicBicycle,
@@ -86,7 +86,7 @@ class TestJaxDynamicBicycle(unittest.TestCase):
         x_goal = np.array([u_target * tf, 1.5, 0.0, u_target, 0.0, 0.0])
         ubar = np.array([u_target / sys.r_r, 0.0])
 
-        cost = JaxQuadraticCost.from_system(
+        cost = QuadraticCost.from_system(
             sys,
             Q=np.diag([0.0, 4.0, 5.0, 0.1, 1.0, 1.0]),
             R=np.diag([1e-4, 50.0]),
