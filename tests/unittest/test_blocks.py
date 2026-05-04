@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+import pytest
 
 from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.blocks.sources import Source, Step
@@ -43,6 +44,23 @@ class TestBlocks(unittest.TestCase):
             controller.ctl(np.array([]), np.array([3.0, 1.0])),
             np.array([5.0]),
         )
+
+    def test_basic_blocks_are_jax_jittable(self):
+        jax = pytest.importorskip("jax")
+        import jax.numpy as jnp
+
+        plant = Integrator()
+        plant.params["k"] = 2.0
+        controller = PropController()
+        controller.params["Kp"] = 2.5
+
+        dx = jax.jit(plant.f)(jnp.asarray([3.0]), jnp.asarray([4.0]))
+        y = jax.jit(plant.h)(jnp.asarray([3.0]), jnp.asarray([4.0]))
+        u_cmd = jax.jit(controller.ctl)(jnp.asarray([]), jnp.asarray([3.0, 1.0]))
+
+        np.testing.assert_allclose(np.asarray(dx), [8.0])
+        np.testing.assert_allclose(np.asarray(y), [3.0])
+        np.testing.assert_allclose(np.asarray(u_cmd), [5.0])
 
 
 if __name__ == "__main__":

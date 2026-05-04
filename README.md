@@ -1,18 +1,27 @@
 # minilink
 
-`minilink` is a Python-native block-diagram framework for modeling, compiling, simulating, and visualizing dynamical systems.
+`minilink` is a Python-native block-diagram framework for modeling,
+compiling, simulating, optimizing, and visualizing dynamical systems.
 
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
 Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing
 
-## Key Strengths
+## What It Is
 
-- **Composable MIMO modeling** with named ports and diagrams
-- **Compiled execution** through flat `ExecutionPlan` evaluators for NumPy and JAX (`compile_backend` can be `"auto"`)
-- **Differentiable-friendly design** with functional `f(x, u, t)` style APIs
-- **Headless-first core** decoupled from graphics and solver backends
-- **Canonical `Trajectory` and `compute_forced`** for run-level inputs alongside `Simulator`
+- **Readable dynamical systems**: write equations as `f(x, u, t, params)` and
+  outputs as `h(x, u, t, params)`.
+- **Named-port diagrams**: compose MIMO blocks with explicit input and output
+  ports.
+- **Compiled evaluators**: turn leaves and diagrams into flat NumPy or JAX
+  `DynamicsEvaluator` objects through `ExecutionPlan`.
+- **Simulation and trajectories**: use `Simulator` or `System.compute_trajectory`
+  to produce the canonical `Trajectory(t, x, u, signals)`.
+- **Optimization and planning**: describe finite-dimensional NLPs with pure
+  `MathematicalProgram` objects; trajectory optimization transcribes planning
+  problems into that same optimization layer.
+- **Visualization**: plot, animate, render, and inspect diagrams through the
+  optional graphical layer.
 
 ## Quick Start
 
@@ -32,42 +41,74 @@ traj = Simulator(diagram, tf=10.0).solve()
 plot_trajectory(diagram, traj)
 ```
 
-## Tech Stack
+## Install
 
-- **Core**: NumPy
-- **Simulation**: `minilink.simulation` with SciPy and fixed-step backends
-- **Compilation**: `DynamicsEvaluator` on NumPy or JAX
-- **Visualization**: multiple rendering backends (Matplotlib, MeshCat, Pygame) for animation; Graphviz for diagram graphs
-- **Acceleration**: optional JAX JIT and autodiff
+Core install:
 
-## Current State
+```bash
+pip install minilink
+```
 
-- `core/` is the most mature subsystem and defines the main modeling contract.
-- The official simulation path is `System.compute_trajectory(...)` / `minilink.simulation.Simulator`.
-- The official trajectory object is `minilink.core.trajectory.Trajectory`.
-- The compile pipeline, evaluators, and simulator are in architecture-validation / integration stage (`compile_backend` can be `"auto"`; long JAX sims may use an auto fixed-step path when the grid is uniform and non-stiff).
-- `graphical/` has a **stabilizing** matplotlib layer—`matplotlib_style` sizing and theming, notebook-aware stacked plot height, and trajectory **plot** modes—while other renderers and hooks remain early work.
-- `symbolic/mechanics/`, `dynamics/`, and `physics/` are early MVP work.
-- Curated plants live under `dynamics/catalog/`; inheritance abstractions under `dynamics/abstraction/`. `core/blocks/` is wiring and signal primitives; `control/` is controller blocks; `planning/` has early family-level architecture contracts; these layers are still maturing.
-- `dynamics/catalog/pendulum/` includes tutorial `CartPole` and `DoublePendulum` on `MechanicalSystem`. For a quick smoke path, run `python minilink/dynamics/catalog/pendulum/cartpole.py` or `python minilink/dynamics/catalog/pendulum/double_pendulum.py` from the repo root (each module has a small `__main__` using `compute_forced` + `animate`), or see `tests/unittest/test_pendulum_plants.py`.
+Optional extras:
 
-## Documentation Guide
+```bash
+pip install "minilink[jax]"            # JAX evaluators, JIT, autodiff
+pip install "minilink[visualization]"  # meshcat / pygame renderers
+pip install "minilink[symbolic]"       # SymPy mechanics helpers
+pip install "minilink[ipopt]"          # Ipopt optimizer adapter
+```
 
-- **[DESIGN.md](DESIGN.md)**: architecture, core contracts, **on-disk package layout and module naming (§2)**, and coding standards
-- **[ROADMAP.md](ROADMAP.md)**: subsystem maturity and priorities
-- **[agent.md](agent.md)**: project-specific AI collaboration rules, the TRL lifecycle table, and a **supplemental** banding for recent matplotlib and simulation features (read with `DESIGN.md` / `ROADMAP.md`)
+## Current Design Rules
 
-## Benchmarks
+- NumPy is the baseline. JAX is optional and selected explicitly through
+  `compile_backend="jax"` or `"auto"` where supported.
+- Equation paths should preserve the active array backend: `System.f`,
+  `System.h`, output-port `compute`, set margins, cost `g/h`, transcriptions,
+  and `MathematicalProgram.J/h/g` are native-array in and native-array out when
+  the formula is traceable.
+- Python `float(...)`, forced NumPy conversion, and reporting reshapes belong at
+  boundaries such as evaluators, solvers, plotting, `contains`, `sample`, and
+  trajectory/cost reporting helpers.
+- Simple algebraic helpers such as sets, costs, and trajectory-optimization
+  transcriptions should use one backend-native class when the math can be
+  written as ordinary array operations.
+- Explicit `Jax<X>` twin classes are reserved for complex dynamics or plants
+  where a separate JAX implementation keeps the equations readable.
+- `System` keeps user convenience methods such as `compile`,
+  `compute_trajectory`, `compute_forced`, `render`, and `animate`, but the
+  mathematical contract remains `f`, `h`, and output-port
+  `compute(x, u, t, params)`.
+- `params is None` means "use object defaults"; any non-`None` `params` value is
+  an explicit caller-supplied parameter set.
 
-- **API**: `minilink.compile.benchmark` / `minilink.simulation.benchmark` / `minilink.planning.trajectory_optimization.benchmark` — benchmark functions return structured results and print helpers format tables; optional stress systems live in `minilink/simulation/scenarios/` (see [DESIGN.md](DESIGN.md)).
-- **Scripts**: flat runners under `tests/benchmark/` (for example `benchmark_simulator_speed_matrix.py`, `benchmark_simulator_standard.py`); execute with `python tests/benchmark/<script>.py` from the repo root with the package on `PYTHONPATH`.
+## Main Packages
 
-## Examples
+- `minilink.core`: `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs,
+  and basic blocks.
+- `minilink.compile`: `ExecutionPlan`, backend policy, NumPy/JAX dynamics
+  evaluators.
+- `minilink.simulation`: `Simulator`, solver backends, forced-input utilities,
+  simulation benchmarks.
+- `minilink.optimization`: pure `MathematicalProgram`, program evaluators, and
+  optimizer method presets such as `scipy_slsqp`, `scipy_trust_constr`, and
+  `ipopt`.
+- `minilink.planning`: deterministic planning problems, initial guesses, search,
+  policy synthesis, and trajectory optimization.
+- `minilink.dynamics`: reusable plant abstractions and catalog models.
+- `minilink.graphical`: plotting, animation, graph display, and renderer
+  backends.
 
-- **Scripts**: `examples/scripts/` for diagram compilation, internal signals, animations, and JAX physics demos
-- **Manual**: `tests/manual/` for one-off experiments (pendulum `compute_forced` + `animate` smokes: see **Current State** above)
-- **Notebook**: [Colab Tutorial](https://colab.research.google.com/drive/13tnYyZMz4bLFzYLdj88H6cqO6tZg6Xp7?usp=sharing)
+## Documentation
 
-### JAX vs NumPy
+- [DESIGN.md](DESIGN.md): current architecture and public contracts.
+- [ROADMAP.md](ROADMAP.md): active priorities and subsystem maturity.
+- [agent.md](agent.md): maintainer and AI-agent contribution rules.
 
-Minilink runs end-to-end on NumPy alone. JAX is an optional accelerator: install with `pip install minilink[jax]` to unlock JAX-traced plants (`Jax<X>` classes), JIT-compiled simulator rollouts (`Simulator(..., compile_backend="jax"|"auto")`), and analytic gradients in trajectory optimization (`Jax*Transcription`). Without JAX, those classes still **import**; only their methods raise. Maintainer-facing rules and expectations (twin pattern, backends, tests without JAX at collection time) are in [`agent.md`](agent.md) §3.1 and [`DESIGN.md`](DESIGN.md) §2.8 / §3.5.
+## Examples And Benchmarks
+
+- `examples/scripts/`: runnable demos for diagrams, compilation, animation, and
+  JAX physics.
+- `tests/manual/`: one-off smoke tests and exploratory checks.
+- `tests/benchmark/`: flat benchmark runners using subsystem-local benchmark
+  helpers such as `minilink.simulation.benchmark` and
+  `minilink.optimization.benchmark`.

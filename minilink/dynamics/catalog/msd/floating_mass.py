@@ -34,7 +34,7 @@ class FloatingMass1D(DynamicSystem):
         self.add_output_port(1, "y", function=self.h, dependencies=[])
 
     def f(self, x, u, t=0, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         m = params["m"]
         F = self.u2input_signal(u, "F")[0]
         return np.array([x[1], F / m])

@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.compile.jax_utils import array_module
 from minilink.core.sets import BoxInputSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -14,7 +15,11 @@ from minilink.planning.trajectory_optimization.transcription import (
     FixedGridOptions,
     Transcription,
     dynamics_function,
+    native_concatenate,
+    program_backend_for_compile,
     stack_constraints,
+    transcription_backend_key,
+    uses_direct_dynamics,
 )
 
 
@@ -40,9 +45,6 @@ class ShootingTranscription(Transcription):
         compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
         """Build the input-knot nonlinear program."""
-        if compile_backend == "jax":
-            return self._transcribe_jax(problem, compile_backend=compile_backend)
-
         problem.require_cost()
         rollout = self._make_rollout(problem, compile_backend)
         equalities: list[ConstraintFunction] = []
@@ -67,139 +69,7 @@ class ShootingTranscription(Transcription):
             metadata={
                 "transcription": "shooting",
                 "compile_backend": compile_backend,
-                "program_backend": "numpy",
-            },
-        )
-
-    def _transcribe_jax(
-        self,
-        problem: PlanningProblem,
-        *,
-        compile_backend: str | None,
-    ) -> MathematicalProgram:
-        """Build a JAX-traceable single-shooting program."""
-        import jax
-        import jax.numpy as jnp
-
-        cost = problem.require_cost()
-
-        t = jnp.asarray(self.options.t)
-        dt = jnp.asarray(self.options.dt)
-        n_steps = int(self.options.n_steps)
-        m = int(problem.sys.m)
-        x0 = jnp.asarray(self._initial_state(problem))
-        params = problem.params.system
-
-        def unpack_jax(z):
-            return z.reshape(m, n_steps)
-
-        def rollout(u):
-            def body(carry, u_pair):
-                x, t_k = carry
-                u0, u1 = u_pair
-                umid = 0.5 * (u0 + u1)
-                k1 = problem.sys.f(x, u0, t_k, params)
-                k2 = problem.sys.f(x + 0.5 * dt * k1, umid, t_k + 0.5 * dt, params)
-                k3 = problem.sys.f(x + 0.5 * dt * k2, umid, t_k + 0.5 * dt, params)
-                k4 = problem.sys.f(x + dt * k3, u1, t_k + dt, params)
-                x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-                return (x_next, t_k + dt), x_next
-
-            (_, _), xs = jax.lax.scan(
-                body,
-                (x0, t[0]),
-                (u[:, :-1].T, u[:, 1:].T),
-            )
-            return jnp.concatenate((x0[:, None], xs.T), axis=1)
-
-        def J(z):
-            u = unpack_jax(z)
-            x = rollout(u)
-            running = jax.vmap(
-                lambda x_k, u_k, t_k: cost.g(
-                    x_k,
-                    u_k,
-                    t_k,
-                    params=problem.params.cost,
-                ),
-                in_axes=(1, 1, 0),
-            )(x, u, t)
-            integral = jnp.sum(0.5 * dt * (running[:-1] + running[1:]))
-            terminal = cost.h(x[:, -1], t[-1], params=problem.params.cost)
-            return integral + terminal
-
-        equalities = []
-        if isinstance(problem.Xf, SingletonSet):
-
-            def terminal_residual(z):
-                x = rollout(unpack_jax(z))
-                return problem.Xf.residual(x[:, -1])
-
-            equalities.append(terminal_residual)
-
-        inequalities = []
-        if problem.Xf is not None and not isinstance(problem.Xf, SingletonSet):
-
-            def terminal_margin(z):
-                x = rollout(unpack_jax(z))
-                return problem.Xf.margin(
-                    x[:, -1],
-                    t=t[-1],
-                    params=problem.params.sets,
-                )
-
-            inequalities.append(terminal_margin)
-
-        if problem.X is not None:
-
-            def state_margin(z):
-                x = rollout(unpack_jax(z)).T
-                margins = jax.vmap(
-                    lambda x_k, t_k: problem.X.margin(
-                        x_k,
-                        t=t_k,
-                        params=problem.params.sets,
-                    )
-                )(x, t)
-                return margins.reshape(-1)
-
-            inequalities.append(state_margin)
-
-        if problem.U is not None and not isinstance(problem.U, BoxInputSet):
-
-            def input_margin(z):
-                u = unpack_jax(z)
-                x = rollout(u).T
-                margins = jax.vmap(
-                    lambda u_k, x_k, t_k: problem.U.margin(
-                        u_k,
-                        x=x_k,
-                        t=t_k,
-                        params=problem.params.sets,
-                    )
-                )(u.T, x, t)
-                return margins.reshape(-1)
-
-            inequalities.append(input_margin)
-
-        def h(z):
-            return jnp.concatenate([residual(z).reshape(-1) for residual in equalities])
-
-        def g(z):
-            return jnp.concatenate([margin(z).reshape(-1) for margin in inequalities])
-
-        decision_lower, decision_upper = self.decision_bounds(problem)
-        return MathematicalProgram(
-            n_z=self.decision_dimension(problem),
-            J=J,
-            h=h if equalities else None,
-            g=g if inequalities else None,
-            lower=decision_lower,
-            upper=decision_upper,
-            metadata={
-                "transcription": "shooting",
-                "compile_backend": compile_backend,
-                "program_backend": "jax",
+                "program_backend": program_backend_for_compile(compile_backend),
             },
         )
 
@@ -275,14 +145,11 @@ class ShootingTranscription(Transcription):
         compile_backend: str | None,
     ):
         x0 = self._initial_state(problem)
-        if (
-            problem.params.system is not None
-            or compile_backend is None
-            or compile_backend == "direct"
-        ):
+        if uses_direct_dynamics(problem, compile_backend):
             return lambda u: self._rollout_direct(problem, u, x0)
 
-        evaluator = problem.sys.compile(backend=compile_backend, verbose=False)
+        backend = transcription_backend_key(compile_backend)
+        evaluator = problem.sys.compile(backend=backend, verbose=False)
 
         def rollout(u):
             x_samples = evaluator.rk4_rollout_forced(
@@ -291,7 +158,7 @@ class ShootingTranscription(Transcription):
                 float(self.options.t[0]),
                 self.options.dt,
             )
-            return np.asarray(x_samples).T
+            return x_samples.T
 
         return rollout
 
@@ -306,35 +173,36 @@ class ShootingTranscription(Transcription):
         t = self.options.t
         dt = self.options.dt
         params = problem.params.system
-        x = np.zeros((n, n_steps))
-        x[:, 0] = x0
+        xp = array_module(u)
+        x = xp.asarray(x0).reshape(n)
+        x_samples = [x]
         for k in range(n_steps - 1):
             u0 = u[:, k]
             u1 = u[:, k + 1]
             umid = 0.5 * (u0 + u1)
-            x_k = x[:, k]
             t_k = float(t[k])
-            k1 = problem.sys.f(x_k, u0, t_k, params)
+            k1 = problem.sys.f(x, u0, t_k, params)
             k2 = problem.sys.f(
-                x_k + 0.5 * dt * k1,
+                x + 0.5 * dt * k1,
                 umid,
                 t_k + 0.5 * dt,
                 params,
             )
             k3 = problem.sys.f(
-                x_k + 0.5 * dt * k2,
+                x + 0.5 * dt * k2,
                 umid,
                 t_k + 0.5 * dt,
                 params,
             )
             k4 = problem.sys.f(
-                x_k + dt * k3,
+                x + dt * k3,
                 u1,
                 t_k + dt,
                 params,
             )
-            x[:, k + 1] = x_k + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-        return x
+            x = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+            x_samples.append(x)
+        return xp.stack(x_samples, axis=1)
 
     def _objective(
         self,
@@ -407,7 +275,7 @@ class ShootingTranscription(Transcription):
                         params=problem.params.sets,
                     )
                     margins.append(margin.reshape(-1))
-                return np.concatenate(margins)
+                return native_concatenate(margins, z)
 
             inequalities.append(state_margins)
 
@@ -425,6 +293,6 @@ class ShootingTranscription(Transcription):
                         params=problem.params.sets,
                     )
                     margins.append(margin.reshape(-1))
-                return np.concatenate(margins)
+                return native_concatenate(margins, z)
 
             inequalities.append(input_margins)

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from minilink.compile.backend_policy import BACKEND_DIRECT, BACKEND_JAX, BACKEND_NUMPY
 from minilink.compile.jax_utils import array_module
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -21,6 +22,41 @@ from minilink.optimization.mathematical_program import (
 from minilink.planning.problems import PlanningProblem
 
 ConstraintFunction = Callable[[np.ndarray], np.ndarray]
+
+
+def transcription_backend_key(compile_backend: str | None) -> str | None:
+    """Normalize a transcription compile-backend string.
+
+    ``None`` is preserved because transcriptions use it as an explicit
+    "evaluate system.f directly" escape hatch.
+    """
+    if compile_backend is None:
+        return None
+    return str(compile_backend).strip().lower()
+
+
+def program_backend_for_compile(compile_backend: str | None) -> str:
+    """Return the mathematical-program evaluator backend for a transcription."""
+    return (
+        BACKEND_JAX
+        if transcription_backend_key(compile_backend) == BACKEND_JAX
+        else BACKEND_NUMPY
+    )
+
+
+def uses_direct_dynamics(
+    problem: PlanningProblem,
+    compile_backend: str | None,
+) -> bool:
+    """Return true when a transcription should call ``system.f`` directly."""
+    key = transcription_backend_key(compile_backend)
+    return problem.params.system is not None or key is None or key == BACKEND_DIRECT
+
+
+def native_concatenate(values, like):
+    """Concatenate vector pieces with the array module used by ``like``."""
+    xp = array_module(like)
+    return xp.concatenate([value.reshape(-1) for value in values])
 
 
 @dataclass
@@ -54,10 +90,11 @@ def dynamics_function(
 ):
     """Return ``(x, u, t) -> f(x, u, t)`` for a transcription."""
     params = problem.params.system
-    if params is not None or compile_backend is None or compile_backend == "direct":
+    key = transcription_backend_key(compile_backend)
+    if uses_direct_dynamics(problem, compile_backend):
         return lambda x, u, t: problem.sys.f(x, u, t, params)
 
-    evaluator = problem.sys.compile(backend=compile_backend, verbose=False)
+    evaluator = problem.sys.compile(backend=key, verbose=False)
     return lambda x, u, t: evaluator.f(x, u, t)
 
 

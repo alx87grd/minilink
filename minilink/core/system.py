@@ -35,7 +35,9 @@ class VectorSignal:
     def __init__(self, dim=1, id="x", nominal_value=None):
 
         self.id = id
-        self.dim = dim
+        self.dim = int(dim)
+        if self.dim < 0:
+            raise ValueError("dim must be nonnegative")
         self.labels = [f"{id}[{i}]" for i in range(self.dim)]
         self.units = [""] * self.dim
         self.upper_bound = np.inf * np.ones(self.dim)
@@ -53,8 +55,13 @@ class VectorSignal:
             If None, defaults to an array of zeros.
         """
         if nominal_value is not None:
-            assert len(nominal_value) == self.dim, "Nominal value has wrong dimensions"
-            self.nominal_value = np.array(nominal_value)
+            value = np.asarray(nominal_value, dtype=float).reshape(-1)
+            if value.shape != (self.dim,):
+                raise ValueError(
+                    f"nominal_value must have shape ({self.dim},), "
+                    f"got {value.shape}"
+                )
+            self.nominal_value = value.copy()
         else:
             self.nominal_value = np.zeros(self.dim)
 
@@ -182,9 +189,11 @@ class System:
             Number of output dimensions (default is 1).
         """
         # Structural model description
-        self.n = n
-        self.m = m
-        self.p = p
+        self.n = int(n)
+        self.m = int(m)
+        self.p = int(p)
+        if self.n < 0 or self.m < 0 or self.p < 0:
+            raise ValueError("System dimensions n, m, and p must be nonnegative")
 
         # Human-readable identifier
         self.name = "System"

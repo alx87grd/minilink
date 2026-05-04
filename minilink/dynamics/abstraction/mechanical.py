@@ -99,7 +99,7 @@ class MechanicalSystem(DynamicSystem):
 
     def generalized_forces(self, q, dq, ddq, t=0, params=None):
         """Generalized forces for a given trajectory ``q, dq, ddq``."""
-        params = params or self.params
+        params = self.params if params is None else params
         H = self.H(q, params)
         C = self.C(q, dq, params)
         g = self.g(q, params)
@@ -110,14 +110,14 @@ class MechanicalSystem(DynamicSystem):
         """Inverse dynamics: actuator forces given ``q, dq, ddq`` (square ``B`` only)."""
         if self.dof != self.m:
             raise NotImplementedError
-        params = params or self.params
+        params = self.params if params is None else params
         B = self.B(q, params)
         forces = self.generalized_forces(q, dq, ddq, t, params)
         return np.linalg.solve(B, forces)
 
     def ddq(self, q, dq, u, t=0, params=None):
         """Forward dynamics: generalized accelerations given ``u``."""
-        params = params or self.params
+        params = self.params if params is None else params
         H = self.H(q, params)
         C = self.C(q, dq, params)
         g = self.g(q, params)
@@ -127,7 +127,7 @@ class MechanicalSystem(DynamicSystem):
         return np.linalg.solve(H, rhs)
 
     def f(self, x, u, t=0, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         q, dq = self.x2q(x)
         ddq = self.ddq(q, dq, u, t, params)
         return self.q2x(dq, ddq)
@@ -136,7 +136,7 @@ class MechanicalSystem(DynamicSystem):
         return x
 
     def kinetic_energy(self, q, dq, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         return 0.5 * (dq @ (self.H(q, params) @ dq))
 
 
@@ -194,14 +194,14 @@ class JaxMechanicalSystem(MechanicalSystem):
     def actuator_forces(self, q, dq, ddq, t=0, params=None):
         if self.dof != self.m:
             raise NotImplementedError
-        params = params or self.params
+        params = self.params if params is None else params
         jnp = require_jax_numpy()
         B = self.B(q, params)
         forces = self.generalized_forces(q, dq, ddq, t, params)
         return jnp.linalg.solve(B, forces)
 
     def ddq(self, q, dq, u, t=0, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         jnp = require_jax_numpy()
         u = jnp.asarray(u)
         H = self.H(q, params)
@@ -213,7 +213,7 @@ class JaxMechanicalSystem(MechanicalSystem):
         return jnp.linalg.solve(H, rhs)
 
     def f(self, x, u, t=0, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         jnp = require_jax_numpy()
         u = jnp.asarray(u)
         q, dq = self.x2q(x)
@@ -221,5 +221,5 @@ class JaxMechanicalSystem(MechanicalSystem):
         return self.q2x(dq, ddq)
 
     def kinetic_energy(self, q, dq, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         return 0.5 * (dq @ (self.H(q, params) @ dq))

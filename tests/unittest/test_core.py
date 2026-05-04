@@ -16,6 +16,14 @@ class TestCoreComponents(unittest.TestCase):
         self.assertEqual(v.dim, 2)
         np.testing.assert_array_equal(v.nominal_value, np.array([1.0, 2.0]))
 
+    def test_vector_signal_rejects_wrong_nominal_shape(self):
+        with self.assertRaises(ValueError):
+            VectorSignal(2, "test", nominal_value=[1.0, 2.0, 3.0])
+
+    def test_vector_signal_rejects_negative_dimension(self):
+        with self.assertRaises(ValueError):
+            VectorSignal(-1, "test")
+
     def test_system_initialization(self):
         sys = System(n=2, m=1, p=3)
         self.assertEqual(sys.n, 2)
@@ -25,6 +33,10 @@ class TestCoreComponents(unittest.TestCase):
         self.assertIn("y", sys.outputs)
         # Verify default dependencies for base System
         self.assertEqual(sys.outputs["y"].dependencies, "all")
+
+    def test_system_rejects_negative_dimension(self):
+        with self.assertRaises(ValueError):
+            System(n=-1, m=1, p=1)
 
     def test_static_system(self):
         sys = StaticSystem(m=2, p=2)

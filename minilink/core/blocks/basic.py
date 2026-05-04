@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.compile.jax_utils import array_module
 from minilink.core.system import DynamicSystem, StaticSystem
 
 
@@ -17,13 +18,12 @@ class Integrator(DynamicSystem):
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         k = params["k"]
-
-        dx = np.zeros(self.n)
-        dx[0] = k * u[0]
-        return dx
+        xp = array_module(u)
+        return xp.array([k * u[0]])
 
     def h(self, x, u, t=0, params=None):
-        return np.array([x[0]])
+        xp = array_module(x)
+        return xp.array([x[0]])
 
 
 class PropController(StaticSystem):
@@ -52,4 +52,5 @@ class PropController(StaticSystem):
         y = u[1]
 
         u_cmd = Kp * (r - y)
-        return np.array([u_cmd])
+        xp = array_module(u)
+        return xp.array([u_cmd])

@@ -66,7 +66,7 @@ class CartPole(MechanicalSystem):
         _configure_cartpole_metadata(self, name="Cart Pole")
 
     def H(self, q, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         theta = q[1]
         m1 = params["m1"]
         m2 = params["m2"]
@@ -80,7 +80,7 @@ class CartPole(MechanicalSystem):
         return H
 
     def C(self, q, dq, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         theta = q[1]
         dtheta = dq[1]
         m2 = params["m2"]
@@ -96,7 +96,7 @@ class CartPole(MechanicalSystem):
         return B
 
     def g(self, q, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         theta = q[1]
         g = np.zeros(self.dof)
         g[1] = params["m2"] * params["gravity"] * params["lcg"] * np.sin(theta)
@@ -175,7 +175,7 @@ class JaxCartPole(JaxMechanicalSystem):
         _configure_cartpole_metadata(self, name="JAX Cart Pole")
 
     def H(self, q, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         jnp = require_jax_numpy()
         theta = q[1]
         m1 = params["m1"]
@@ -190,7 +190,7 @@ class JaxCartPole(JaxMechanicalSystem):
         )
 
     def C(self, q, dq, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         jnp = require_jax_numpy()
         theta = q[1]
         dtheta = dq[1]
@@ -209,7 +209,7 @@ class JaxCartPole(JaxMechanicalSystem):
         return jnp.array([[1.0], [0.0]])
 
     def g(self, q, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         jnp = require_jax_numpy()
         theta = q[1]
         tau_g = params["m2"] * params["gravity"] * params["lcg"] * jnp.sin(theta)

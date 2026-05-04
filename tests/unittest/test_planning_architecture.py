@@ -17,7 +17,7 @@ from minilink.planning.initial_guess import (
 from minilink.planning.policy_synthesis.dynamic_programming import (
     DynamicProgrammingPlanner,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, ProblemParameters
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -112,6 +112,80 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertFalse(problem.U.contains(np.array([10.0])))
         self.assertTrue(problem.has_goal)
         self.assertFalse(problem.has_cost)
+
+    def test_planning_problem_open_boundary_sets_use_representatives(self):
+        sys = self.make_system()
+        X0 = BallSet(center=np.zeros(2), radius=0.5)
+        Xf = BallSet(center=np.array([0.5, 0.0]), radius=0.25)
+        x_start = np.array([0.1, -0.1])
+        x_goal = np.array([0.5, 0.0])
+
+        problem = PlanningProblem(
+            sys=sys,
+            x_start=x_start,
+            x_goal=x_goal,
+            X0=X0,
+            Xf=Xf,
+        )
+
+        self.assertIs(problem.X0, X0)
+        self.assertIs(problem.Xf, Xf)
+        np.testing.assert_allclose(problem.x_start, x_start)
+        np.testing.assert_allclose(problem.x_goal, x_goal)
+
+    def test_planning_problem_derives_representatives_from_singleton_sets(self):
+        sys = self.make_system()
+        x_start = np.array([0.25, -0.5])
+        x_goal = np.array([0.75, 0.5])
+
+        problem = PlanningProblem(
+            sys=sys,
+            X0=SingletonSet(x_start),
+            Xf=SingletonSet(x_goal),
+        )
+
+        np.testing.assert_allclose(problem.x_start, x_start)
+        np.testing.assert_allclose(problem.x_goal, x_goal)
+
+    def test_planning_problem_rejects_representatives_outside_boundary_sets(self):
+        sys = self.make_system()
+
+        with self.assertRaisesRegex(ValueError, "x_start must belong to X0"):
+            PlanningProblem(
+                sys=sys,
+                x_start=np.array([1.0, 0.0]),
+                X0=BallSet(center=np.zeros(2), radius=0.25),
+            )
+
+        with self.assertRaisesRegex(ValueError, "x_goal must belong to Xf"):
+            PlanningProblem(
+                sys=sys,
+                x_goal=np.array([1.0, 0.0]),
+                Xf=BallSet(center=np.zeros(2), radius=0.25),
+            )
+
+    def test_planning_problem_boundary_types_are_validated(self):
+        sys = self.make_system()
+        params = ProblemParameters(
+            system={"mass": 1.0},
+            cost={"weight": 2.0},
+            sets={"radius": 0.25},
+        )
+        problem = PlanningProblem(
+            sys=sys,
+            x_goal=np.array([0.0, 0.0]),
+            params=params,
+            metadata={"tag": "demo"},
+        )
+
+        self.assertIs(problem.params, params)
+        self.assertEqual(problem.metadata["tag"], "demo")
+        with self.assertRaises(TypeError):
+            problem.metadata["tag"] = "changed"
+        with self.assertRaisesRegex(TypeError, "params must be"):
+            PlanningProblem(sys=sys, params={"system": {}})
+        with self.assertRaisesRegex(TypeError, "metadata must be"):
+            PlanningProblem(sys=sys, metadata=[("tag", "demo")])
 
     def test_quadratic_cost_evaluates_trajectory(self):
         sys = self.make_system()

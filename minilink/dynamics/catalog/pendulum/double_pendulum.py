@@ -68,7 +68,7 @@ class DoublePendulum(MechanicalSystem):
         return c1, s1, c2, s2, c12, s12
 
     def H(self, q, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         _, _, c2, _, _, _ = self._trig(q)
 
         l1 = params["l1"]
@@ -87,7 +87,7 @@ class DoublePendulum(MechanicalSystem):
         return H
 
     def C(self, q, dq, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         _, _, _, s2, _, _ = self._trig(q)
 
         h = params["m2"] * params["l1"] * params["lc2"] * s2
@@ -103,7 +103,7 @@ class DoublePendulum(MechanicalSystem):
         return np.eye(self.dof)
 
     def g(self, q, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         _, s1, _, _, _, s12 = self._trig(q)
 
         g1 = (params["m1"] * params["lc1"] + params["m2"] * params["l1"]) * params[
@@ -117,12 +117,12 @@ class DoublePendulum(MechanicalSystem):
         return G
 
     def d(self, q, dq, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         D = np.diag([params["d1"], params["d2"]])
         return D @ dq
 
     def _joint_positions(self, q, params=None):
-        params = params or self.params
+        params = self.params if params is None else params
         l1 = params["l1"]
         l2 = params["l2"]
         _, s1, _, _, c12, s12 = self._trig(q)

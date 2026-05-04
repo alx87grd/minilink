@@ -42,7 +42,7 @@ planner = TrajectoryOptimizationPlanner(
         DirectCollocationOptions(tf=5.0, n_steps=50)
     ),
     options=TrajectoryOptimizationOptions(
-        compile_backend="numpy",
+        # compile_backend="jax",
         optimizer_options={
             "disp": True,
             "maxiter": 1000,

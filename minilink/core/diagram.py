@@ -1,5 +1,8 @@
+from collections.abc import Mapping
+
 import numpy as np
 
+from minilink.compile.jax_utils import array_module
 from minilink.core.system import System, VectorSignal
 from minilink.core.trajectory import Trajectory
 
@@ -110,9 +113,9 @@ class DiagramSystem(System):
         port = self.subsystems[source_sys_id].outputs[source_port_id]
 
         # Define the compute function for the output port
-        def compute(x, u, t):
+        def compute(x, u, t, params=None):
             return self.compute_subsys_output_port(
-                x, u, t, source_sys_id, source_port_id
+                x, u, t, source_sys_id, source_port_id, params=params
             )
 
         self.add_output_port(port.dim, output_port_id, compute, dependencies)
@@ -132,21 +135,42 @@ class DiagramSystem(System):
         idx = self.state_index[sys_id]
         return x[idx[0] : idx[1]]
 
-    def compute_subsys_output_port(self, x, u, t, sys_id, port_id):
+    def _subsystem_params(self, params, sys_id):
+        if params is None:
+            return None
+        if isinstance(params, Mapping) and sys_id in params:
+            return params[sys_id]
+        return params
+
+    def _array_module_for(self, *values):
+        for value in values:
+            xp = array_module(value)
+            if xp is not np:
+                return xp
+        return np
+
+    def compute_subsys_output_port(self, x, u, t, sys_id, port_id, params=None):
 
         # Get the subsystem output port
         port = self.subsystems[sys_id].outputs[port_id]
 
         # Collect signals needed to compute the output
         local_x = self.get_local_state(x, sys_id)
-        local_u = self.get_local_input(x, u, t, sys_id, port.dependencies)
+        local_u = self.get_local_input(
+            x, u, t, sys_id, port.dependencies, params=params
+        )
 
         # Compute the output signal of the port
-        port_y = port.compute(local_x, local_u, t)
+        port_y = port.compute(
+            local_x,
+            local_u,
+            t,
+            self._subsystem_params(params, sys_id),
+        )
 
         return port_y
 
-    def get_subsys_input_port(self, x, u, t, sys_id, port_id):
+    def get_subsys_input_port(self, x, u, t, sys_id, port_id, params=None):
 
         # Get the source of the signal
         source = self.connections[sys_id][port_id]
@@ -167,7 +191,7 @@ class DiagramSystem(System):
         else:
             # Else, the source is an output port of another subsystem
             source_y = self.compute_subsys_output_port(
-                x, u, t, source_sys_id, source_port_id
+                x, u, t, source_sys_id, source_port_id, params=params
             )
 
             # The signal at the input port is the output signal of the source port
@@ -270,7 +294,7 @@ class DiagramSystem(System):
         """
         return self.reconstruct_internal_signals(traj)
 
-    def get_local_input(self, x, u, t, sys_id, dependencies="all"):
+    def get_local_input(self, x, u, t, sys_id, dependencies="all", params=None):
         """
         Get the input signal for a given subsystem
 
@@ -301,27 +325,29 @@ class DiagramSystem(System):
 
             else:
                 # Recursively get the input signal
-                port_u = self.get_subsys_input_port(x, u, t, sys_id, port_id)
+                port_u = self.get_subsys_input_port(
+                    x, u, t, sys_id, port_id, params=params
+                )
 
             local_u_list.append(port_u)
 
         if len(local_u_list) == 0:
-            return np.array([])
+            xp = self._array_module_for(x, u)
+            return xp.array([])
 
-        return np.concatenate(local_u_list)
+        xp = self._array_module_for(x, u, *local_u_list)
+        return xp.concatenate([xp.asarray(port_u).reshape(-1) for port_u in local_u_list])
 
     def f(self, x, u, t=0, params=None) -> np.ndarray:
 
-        dx = np.zeros(self.n)
-
-        idx = 0
+        dx_pieces = []
 
         # For all subsystems
         for sys_id, sys in self.subsystems.items():
             # If the subsystem has states
             if sys.n > 0:
                 # Get local input signals of the subsystem
-                sys_u = self.get_local_input(x, u, t, sys_id)
+                sys_u = self.get_local_input(x, u, t, sys_id, params=params)
 
                 # Get local state of the subsystem
                 sys_x = self.get_local_state(x, sys_id)
@@ -330,12 +356,19 @@ class DiagramSystem(System):
                 if self.debug_print:
                     print(f"Computing {sys_id} dynamic: dx=f({sys_x},{sys_u},{t})")
 
-                sys_dx = sys.f(sys_x, sys_u, t)
+                sys_dx = sys.f(
+                    sys_x,
+                    sys_u,
+                    t,
+                    self._subsystem_params(params, sys_id),
+                )
 
-                dx[idx : idx + sys.n] = sys_dx
-                idx += sys.n
+                dx_pieces.append(sys_dx)
 
-        return dx
+        xp = self._array_module_for(x, u, *dx_pieces)
+        if not dx_pieces:
+            return xp.array([])
+        return xp.concatenate([xp.asarray(dx).reshape(-1) for dx in dx_pieces])
 
     # Graphical Animation Engine Defaults for Diagram
     def get_kinematic_geometry(self):

@@ -70,8 +70,9 @@ class PortOperation:
     bound_params : dict | None
         If set, a deep copy of the subsystem ``params`` at compile time; passed
         as the fourth argument to ``compute_func``. If ``None``, evaluators pass
-        ``None`` so blocks use ``params or self.params``. This does not freeze
-        other instance attributes; purity of ``compute_func`` is not enforced.
+        ``None`` so blocks use their default ``self.params``. This does not
+        freeze other instance attributes; purity of ``compute_func`` is not
+        enforced.
     """
 
     compute_func: Callable[..., np.ndarray]

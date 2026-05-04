@@ -252,6 +252,20 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
             dx_comp = self.evaluator.f(x, u, t)
             np.testing.assert_allclose(dx_comp, dx_ref, atol=1e-10)
 
+    def test_reference_path_forwards_explicit_subsystem_params(self):
+        """The recursive reference path honors explicit per-subsystem params."""
+        diag = _build_small_closed_loop()
+        x = np.array([0.5])
+        u = np.array([2.0])
+        params = {
+            "ctl": {"Kp": 4.0},
+            "plant": {"k": 3.0},
+        }
+
+        dx = diag.f(x, u, 0.0, params=params)
+
+        np.testing.assert_allclose(dx, np.array([18.0]), atol=1e-10)
+
     def test_compute_internal_signals_non_empty(self):
         x = np.array([0.5])
         u = np.array([1.0])
@@ -387,6 +401,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
 
 # JAX tests (skipped if JAX not installed)
 try:
+    import jax
     import jax.numpy as jnp
 
     from minilink.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
@@ -461,6 +476,23 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         buf1 = ev.compute_internal_signals(x_j, u_j, t)
         buf2 = ev.get_internal_signals_jit()(x_j, u_j, t)
         np.testing.assert_allclose(np.asarray(buf1), np.asarray(buf2), atol=1e-6)
+
+    def test_reference_diagram_f_is_jittable(self):
+        diag = _build_small_closed_loop_jax()
+        ev_np = compile_diagram(diag, backend="numpy")
+        x_np = np.array([0.3])
+        u_np = np.array([1.2])
+        x_j = jnp.array(x_np, dtype=jnp.float32)
+        u_j = jnp.array(u_np, dtype=jnp.float32)
+        t = 0.1
+
+        dx_jit = jax.jit(lambda xx, uu: diag.f(xx, uu, t))(x_j, u_j)
+
+        np.testing.assert_allclose(
+            np.asarray(dx_jit),
+            ev_np.f(x_np, u_np, t),
+            atol=1e-5,
+        )
 
 
 # @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")

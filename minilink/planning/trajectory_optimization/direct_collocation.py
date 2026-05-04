@@ -14,6 +14,8 @@ from minilink.planning.trajectory_optimization.transcription import (
     FixedGridOptions,
     Transcription,
     dynamics_function,
+    native_concatenate,
+    program_backend_for_compile,
     stack_constraints,
 )
 
@@ -44,9 +46,6 @@ class DirectCollocationTranscription(Transcription):
         compile_backend: str | None = "numpy",
     ) -> MathematicalProgram:
         """Build the trapezoidal collocation nonlinear program."""
-        if compile_backend == "jax":
-            return self._transcribe_jax(problem, compile_backend=compile_backend)
-
         problem.require_cost()
         dynamics = dynamics_function(problem, compile_backend)
 
@@ -73,133 +72,7 @@ class DirectCollocationTranscription(Transcription):
             metadata={
                 "transcription": "direct_collocation",
                 "compile_backend": compile_backend,
-                "program_backend": "numpy",
-            },
-        )
-
-    def _transcribe_jax(
-        self,
-        problem: PlanningProblem,
-        *,
-        compile_backend: str | None,
-    ) -> MathematicalProgram:
-        """Build a JAX-traceable collocation program."""
-        import jax
-        import jax.numpy as jnp
-
-        cost = problem.require_cost()
-
-        t = jnp.asarray(self.options.t)
-        dt = jnp.asarray(self.options.dt)
-        n = int(problem.sys.n)
-        m = int(problem.sys.m)
-        n_steps = int(self.options.n_steps)
-        params = problem.params.system
-
-        def f(x, u, t_k):
-            return problem.sys.f(x, u, t_k, params)
-
-        def unpack_jax(z):
-            split = n * n_steps
-            x = z[:split].reshape(n, n_steps)
-            u = z[split:].reshape(m, n_steps)
-            return x, u
-
-        def J(z):
-            x, u = unpack_jax(z)
-            running = jax.vmap(
-                lambda x_k, u_k, t_k: cost.g(
-                    x_k,
-                    u_k,
-                    t_k,
-                    params=problem.params.cost,
-                ),
-                in_axes=(1, 1, 0),
-            )(x, u, t)
-            integral = jnp.sum(0.5 * dt * (running[:-1] + running[1:]))
-            terminal = cost.h(x[:, -1], t[-1], params=problem.params.cost)
-            return integral + terminal
-
-        def dynamics_residual(z):
-            x, u = unpack_jax(z)
-            dx = jax.vmap(f, in_axes=(1, 1, 0), out_axes=1)(x, u, t)
-            residuals = x[:, 1:] - x[:, :-1] - 0.5 * dt * (dx[:, :-1] + dx[:, 1:])
-            return residuals.reshape(-1)
-
-        equalities = [dynamics_residual]
-        inequalities = []
-        for boundary, index in ((problem.X0, 0), (problem.Xf, -1)):
-            if boundary is None:
-                continue
-            t_i = t[index]
-            if isinstance(boundary, SingletonSet):
-
-                def boundary_residual(z, boundary=boundary, index=index):
-                    x, _ = unpack_jax(z)
-                    return boundary.residual(x[:, index])
-
-                equalities.append(boundary_residual)
-            else:
-
-                def boundary_margin(z, boundary=boundary, index=index, t_i=t_i):
-                    x, _ = unpack_jax(z)
-                    return boundary.margin(
-                        x[:, index],
-                        t=t_i,
-                        params=problem.params.sets,
-                    )
-
-                inequalities.append(boundary_margin)
-
-        if problem.X is not None and not isinstance(problem.X, BoxSet):
-
-            def state_margins(z):
-                x, _ = unpack_jax(z)
-                margins = jax.vmap(
-                    lambda x_k, t_k: problem.X.margin(
-                        x_k,
-                        t=t_k,
-                        params=problem.params.sets,
-                    )
-                )(x.T, t)
-                return margins.reshape(-1)
-
-            inequalities.append(state_margins)
-
-        if problem.U is not None and not isinstance(problem.U, BoxInputSet):
-
-            def input_margins(z):
-                x, u = unpack_jax(z)
-                margins = jax.vmap(
-                    lambda u_k, x_k, t_k: problem.U.margin(
-                        u_k,
-                        x=x_k,
-                        t=t_k,
-                        params=problem.params.sets,
-                    )
-                )(u.T, x.T, t)
-                return margins.reshape(-1)
-
-            inequalities.append(input_margins)
-
-        def h(z):
-            return jnp.concatenate([residual(z).reshape(-1) for residual in equalities])
-
-        def g(z):
-            return jnp.concatenate([margin(z).reshape(-1) for margin in inequalities])
-
-        lower, upper = self.decision_bounds(problem)
-        return MathematicalProgram(
-            n_z=self.decision_dimension(problem),
-            J=J,
-            h=h,
-            g=g if inequalities else None,
-            lower=lower,
-            upper=upper,
-            metadata={
-                "transcription": "direct_collocation",
-                "compile_backend": compile_backend,
-                "program_backend": "jax",
+                "program_backend": program_backend_for_compile(compile_backend),
             },
         )
 
@@ -315,16 +188,15 @@ class DirectCollocationTranscription(Transcription):
     ) -> np.ndarray:
         x, u = self.unpack(z, problem)
         t = self.options.t
-        residuals = np.zeros((problem.sys.n, self.options.n_steps - 1))
-
+        residuals = []
         for k in range(self.options.n_steps - 1):
             f0 = dynamics(x[:, k], u[:, k], float(t[k]))
             f1 = dynamics(x[:, k + 1], u[:, k + 1], float(t[k + 1]))
             dx_num = x[:, k + 1] - x[:, k]
             dx_col = 0.5 * self.options.dt * (f0 + f1)
-            residuals[:, k] = dx_num - dx_col
+            residuals.append(dx_num - dx_col)
 
-        return residuals.reshape(-1)
+        return native_concatenate(residuals, z)
 
     def _add_boundary_constraints(
         self,
@@ -378,7 +250,7 @@ class DirectCollocationTranscription(Transcription):
                         params=problem.params.sets,
                     )
                     margins.append(margin.reshape(-1))
-                return np.concatenate(margins)
+                return native_concatenate(margins, z)
 
             inequalities.append(state_margins)
 
@@ -395,6 +267,6 @@ class DirectCollocationTranscription(Transcription):
                         params=problem.params.sets,
                     )
                     margins.append(margin.reshape(-1))
-                return np.concatenate(margins)
+                return native_concatenate(margins, z)
 
             inequalities.append(input_margins)
