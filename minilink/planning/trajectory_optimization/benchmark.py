@@ -1,5 +1,7 @@
 """Benchmarks for trajectory-optimization transcriptions and optimizers."""
 
+import os
+import sys
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -68,6 +70,7 @@ class TrajectoryOptimizationBenchmarkVariant:
     optimizer_backend: str = "scipy"
     optimizer_method: str = "scipy_slsqp"
     optimizer_options: Mapping[str, object] = field(default_factory=dict)
+    use_hessian: bool = False
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,16 @@ class TrajectoryOptimizationBenchmarkResult:
 def jax_trajopt_available() -> bool:
     """Return whether JAX trajectory-optimization variants can run."""
     return HAS_JAX_TRAJOPT
+
+
+def ipopt_trajopt_available() -> bool:
+    """Return whether Ipopt trajectory-optimization variants can run."""
+    try:
+        import cyipopt  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
 
 
 def default_trajectory_optimization_variants(
@@ -172,6 +185,85 @@ def default_trajectory_optimization_variants(
     return _with_starts(variants, starts)
 
 
+def default_trajectory_optimization_solver_variants(
+    *,
+    starts: tuple[str, ...] = ("cold",),
+    ftol: float = 1e-2,
+    include_trust_constr: bool = True,
+    include_ipopt: bool = True,
+) -> tuple[TrajectoryOptimizationBenchmarkVariant, ...]:
+    """Return a compact direct-collocation solver-preset sweep.
+
+    The default sweep keeps the benchmark tractable: one transcription
+    (direct collocation), cold start only, and a small set of solver presets.
+    JAX variants use the JAX program evaluator for analytic derivatives.
+    """
+    variants = [
+        TrajectoryOptimizationBenchmarkVariant(
+            name="numpy-collocation-slsqp",
+            transcription="collocation",
+            compile_backend="numpy",
+            derivative="finite-diff",
+            optimizer_backend="scipy",
+            optimizer_method="scipy_slsqp",
+        ),
+    ]
+
+    if jax_trajopt_available():
+        variants.append(
+            TrajectoryOptimizationBenchmarkVariant(
+                name="jax-collocation-slsqp",
+                transcription="collocation",
+                compile_backend="jax",
+                derivative="jax",
+                precision="x64",
+                optimizer_backend="scipy",
+                optimizer_method="scipy_slsqp",
+            )
+        )
+        if include_trust_constr:
+            variants.append(
+                TrajectoryOptimizationBenchmarkVariant(
+                    name="jax-collocation-trust",
+                    transcription="collocation",
+                    compile_backend="jax",
+                    derivative="jax",
+                    precision="x64",
+                    optimizer_backend="scipy",
+                    optimizer_method="scipy_trust_constr",
+                    use_hessian=True,
+                )
+            )
+        if include_ipopt and ipopt_trajopt_available():
+            variants.append(
+                TrajectoryOptimizationBenchmarkVariant(
+                    name="jax-collocation-ipopt",
+                    transcription="collocation",
+                    compile_backend="jax",
+                    derivative="jax",
+                    precision="x64",
+                    optimizer_backend="ipopt",
+                    optimizer_method="ipopt",
+                    optimizer_options={"tol": float(ftol)},
+                    use_hessian=False,
+                )
+            )
+    elif include_ipopt and ipopt_trajopt_available():
+        variants.append(
+            TrajectoryOptimizationBenchmarkVariant(
+                name="numpy-collocation-ipopt",
+                transcription="collocation",
+                compile_backend="numpy",
+                derivative="finite-diff",
+                optimizer_backend="ipopt",
+                optimizer_method="ipopt",
+                optimizer_options={"tol": float(ftol)},
+            )
+        )
+
+    return _with_starts(variants, starts)
+
+
 def benchmark_trajectory_optimization(
     config: TrajectoryOptimizationBenchmarkConfig,
     variants: tuple[TrajectoryOptimizationBenchmarkVariant, ...] | None = None,
@@ -204,22 +296,26 @@ def print_trajectory_optimization_benchmark(
 ) -> None:
     """Print a compact table for a trajectory-optimization benchmark result."""
     widths = _trajopt_table_widths(result.rows)
-    rule_width = widths["name"] + widths["transcription"] + widths["start"] + 126
+    rule_width = widths["name"] + widths["transcription"] + widths["start"] + 131
     c = result.config
+    fast_idx = _fastest_successful_row_indices(result.rows)
 
     print()
     print("-" * rule_width)
     print(
         "trajectory optimization benchmark "
         f"case={c.case} tf={c.tf:g} steps={c.n_steps} "
-        f"maxiter={c.maxiter} runs={c.n_runs}"
+        f"maxiter={c.maxiter} runs={c.n_runs} "
+        "green=success red=failure bold-green=fastest-success"
     )
     print("-" * rule_width)
     print(_trajopt_table_header(widths))
     print("-" * rule_width)
-    for row in result.rows:
-        print(_trajopt_table_row(row, widths))
+    for i, row in enumerate(result.rows):
+        _print_trajopt_table_row(row, widths, is_winner=i in fast_idx)
     print("-" * rule_width)
+    _print_repeated_winner_rows(result, widths, fast_idx)
+    _print_fastest_successful_footer(result.rows, fast_idx)
     for row in result.rows:
         if not row.success:
             print(f"{row.variant.name} {row.variant.start} failed: {row.message}")
@@ -355,6 +451,7 @@ def _planner(
         options=TrajectoryOptimizationOptions(
             compile_backend=variant.compile_backend,
             optimizer_method=variant.optimizer_method,
+            use_hessian=variant.use_hessian,
             optimizer_options=_optimizer_options(variant, config),
         ),
     )
@@ -390,9 +487,27 @@ def _optimizer_options(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
 ) -> dict[str, object]:
-    if variant.optimizer_backend != "scipy":
+    if variant.optimizer_method == "scipy_trust_constr":
+        return {
+            "maxiter": int(config.maxiter),
+            "xtol": float(config.ftol),
+            "gtol": float(config.ftol),
+            "barrier_tol": float(config.ftol),
+            "verbose": 0,
+            **dict(variant.optimizer_options),
+        }
+
+    if variant.optimizer_method == "ipopt":
+        return {
+            "print_level": 0,
+            "max_iter": int(config.maxiter),
+            "tol": float(config.ftol),
+            **dict(variant.optimizer_options),
+        }
+
+    if variant.optimizer_method != "scipy_slsqp":
         raise NotImplementedError(
-            f"Unknown optimizer backend {variant.optimizer_backend!r}"
+            f"Unknown optimizer method {variant.optimizer_method!r}"
         )
 
     return {
@@ -487,6 +602,7 @@ def _with_starts(
             optimizer_backend=variant.optimizer_backend,
             optimizer_method=variant.optimizer_method,
             optimizer_options=variant.optimizer_options,
+            use_hessian=variant.use_hessian,
         )
         for variant in variants
         for start in starts
@@ -494,6 +610,32 @@ def _with_starts(
 
 
 # Table Formatting
+def _stdout_color() -> bool:
+    if os.environ.get("NO_COLOR", "").strip():
+        return False
+    if os.environ.get("FORCE_COLOR", "").strip():
+        return True
+    if os.environ.get("CLICOLOR_FORCE", "").strip():
+        return True
+    return sys.stdout.isatty()
+
+
+def _ansi(text: str, *codes: int) -> str:
+    if not _stdout_color() or not codes:
+        return text
+    return f"\033[{';'.join(str(code) for code in codes)}m{text}\033[0m"
+
+
+def _fastest_successful_row_indices(
+    rows: tuple[TrajectoryOptimizationBenchmarkRow, ...],
+) -> set[int]:
+    successful = [i for i, row in enumerate(rows) if row.success]
+    if not successful:
+        return set()
+    best = min(rows[i].total_s for i in successful)
+    return {i for i in successful if rows[i].total_s <= best + 1e-15}
+
+
 def _trajopt_table_widths(
     rows: tuple[TrajectoryOptimizationBenchmarkRow, ...],
 ) -> dict[str, int]:
@@ -509,7 +651,7 @@ def _trajopt_table_header(widths: dict[str, int]) -> str:
         f"{'variant':<{widths['name']}} "
         f"{'transcription':<{widths['transcription']}} "
         f"{'start':<{widths['start']}} {'backend':<7} {'deriv':<11} {'prec':<4} "
-        f"{'opt':<7} {'method':<12} "
+        f"{'hess':<4} {'opt':<7} {'method':<12} "
         f"{'ok':>3} {'total':>8} {'trans':>8} {'solve':>8} "
         f"{'nit':>5} {'nfev':>6} {'njev':>6} {'cost':>11} "
         f"{'eq_inf':>10} {'bound':>9}"
@@ -530,9 +672,58 @@ def _trajopt_table_row(
         f"{variant.transcription:<{widths['transcription']}} "
         f"{variant.start:<{widths['start']}} {variant.compile_backend:<7} "
         f"{variant.derivative:<11} {variant.precision:<4} "
+        f"{str(variant.use_hessian):<4} "
         f"{variant.optimizer_backend:<7} {variant.optimizer_method:<12} "
         f"{str(row.success):>3} {row.total_s:8.3f} "
         f"{row.transcribe_s:8.3f} {row.solve_s:8.3f} "
         f"{nit:>5} {nfev:>6} {njev:>6} {cost} "
         f"{row.eq_inf:10.2e} {row.bound_inf:9.2e}"
     )
+
+
+def _print_trajopt_table_row(
+    row: TrajectoryOptimizationBenchmarkRow,
+    widths: dict[str, int],
+    *,
+    is_winner: bool = False,
+    flush: bool = False,
+) -> None:
+    line = _trajopt_table_row(row, widths)
+    if is_winner:
+        line = _ansi(line, 1, 92)
+    elif row.success:
+        line = _ansi(line, 32)
+    else:
+        line = _ansi(line, 31)
+    print(line, flush=flush)
+
+
+def _print_repeated_winner_rows(
+    result: TrajectoryOptimizationBenchmarkResult,
+    widths: dict[str, int],
+    fast_idx: set[int],
+) -> None:
+    if not fast_idx:
+        return
+    print(flush=True)
+    label = "Winner row" if len(fast_idx) == 1 else "Tied winner rows"
+    print(_ansi(f"-- {label} (repeated) --", 90), flush=True)
+    for i in sorted(fast_idx):
+        _print_trajopt_table_row(
+            result.rows[i],
+            widths,
+            is_winner=True,
+            flush=True,
+        )
+
+
+def _print_fastest_successful_footer(
+    rows: tuple[TrajectoryOptimizationBenchmarkRow, ...],
+    fast_idx: set[int],
+) -> None:
+    if not fast_idx:
+        return
+    best = min(rows[i].total_s for i in fast_idx)
+    labels = ", ".join(rows[i].variant.name for i in sorted(fast_idx))
+    msg = f"Fastest successful total_s: {labels}  total={best:.3f}s"
+    print(_ansi(msg, 1, 92), flush=True)

@@ -76,6 +76,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
     options=TrajectoryOptimizationOptions(
         compile_backend="jax",
+        # optimizer_method="ipopt",
         solve_disp=PRINT_SOLVE_REPORT,
         optimizer_options={
             "disp": SCIPY_DISP,
@@ -86,13 +87,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 traj = planner.compute_solution()
-result = planner.last_optimization_result
 
-if PRINT_RESULT_SUMMARY:
-    print(f"success: {result.success}")
-    print(f"message: {result.message}")
-    if result.cost is not None:
-        print(f"cost: {result.cost:.6g}")
 
 planner.plot_solution(plot="xu")
 sys.traj = traj

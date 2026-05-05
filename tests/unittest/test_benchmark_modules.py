@@ -13,6 +13,7 @@ from minilink.planning.trajectory_optimization.benchmark import (
     TrajectoryOptimizationBenchmarkConfig,
     TrajectoryOptimizationBenchmarkVariant,
     benchmark_trajectory_optimization,
+    default_trajectory_optimization_solver_variants,
 )
 
 
@@ -61,6 +62,16 @@ class TestBenchmarkModules(unittest.TestCase):
         result = benchmark_trajectory_optimization(config, (variant,))
         self.assertEqual(len(result.rows), 1)
         self.assertEqual(result.rows[0].variant.optimizer_backend, "scipy")
+
+    def test_trajopt_solver_benchmark_variants_are_compact(self):
+        variants = default_trajectory_optimization_solver_variants(
+            starts=("cold",),
+            include_trust_constr=False,
+            include_ipopt=False,
+        )
+        self.assertEqual(variants[0].transcription, "collocation")
+        self.assertEqual(variants[0].start, "cold")
+        self.assertLessEqual(len(variants), 2)
 
 
 if __name__ == "__main__":

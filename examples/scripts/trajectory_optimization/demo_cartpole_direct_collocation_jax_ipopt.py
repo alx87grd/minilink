@@ -1,13 +1,14 @@
-"""Cart-pole swing-up with multiple shooting."""
+"""Cart-pole swing-up with JAX-backed direct collocation."""
 
 import numpy as np
 
+from minilink.compile.jax_utils import configure_jax
 from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.multiple_shooting import (
-    MultipleShootingOptions,
-    MultipleShootingTranscription,
+from minilink.planning.trajectory_optimization.direct_collocation import (
+    DirectCollocationOptions,
+    DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
@@ -19,7 +20,9 @@ PRINT_SOLVE_REPORT = True  # Print the Minilink TrajOpt pre/post solve report.
 PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT  # Print compact success/cost fallback.
 SCIPY_DISP = False  # Keep SciPy's own backend text off; use PRINT_SOLVE_REPORT.
 
-sys = CartPole()
+configure_jax(enable_x64=True)
+
+sys = JaxCartPole()
 sys.inputs["u"].lower_bound[0] = -10.0
 sys.inputs["u"].upper_bound[0] = 10.0
 
@@ -29,7 +32,7 @@ x_goal = np.array([0.0, np.pi, 0.0, 0.0])
 cost = QuadraticCost.from_system(
     sys,
     Q=np.diag([1.0, 1.0, 0.0, 0.0]),
-    R=np.diag([1.0]),
+    R=np.diag([0.01]),
     S=np.zeros((sys.n, sys.n)),
     xbar=x_goal,
     ubar=np.zeros(sys.m),
@@ -43,27 +46,22 @@ problem = PlanningProblem(
 
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=MultipleShootingTranscription(
-        MultipleShootingOptions(tf=5.0, n_steps=50)
+    transcription=DirectCollocationTranscription(
+        DirectCollocationOptions(
+            tf=4.0,
+            n_steps=50,
+        )
     ),
     options=TrajectoryOptimizationOptions(
-        compile_backend="numpy",
+        compile_backend="jax",
+        optimizer_method="ipopt",
+        # optimizer_method="scipy_slsqp",
+        # optimizer_options={"maxiter": 500, "ftol": 1e-2},
         solve_disp=PRINT_SOLVE_REPORT,
-        optimizer_options={
-            "disp": SCIPY_DISP,
-            "maxiter": 1000,
-            "ftol": 1e-2,
-        },
     ),
 )
 
 traj = planner.compute_solution()
-result = planner.last_optimization_result
-
-if PRINT_RESULT_SUMMARY:
-    print(f"success: {result.success}")
-    print(f"message: {result.message}")
-    print(f"cost: {result.cost:.6g}")
 
 planner.plot_solution(plot="xu")
 planner.problem.sys.animate(traj)

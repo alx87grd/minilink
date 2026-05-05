@@ -13,11 +13,16 @@ from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
+from minilink.planning.trajectory_optimization.live_plot import (
+    LiveTrajectoryPlotCallback,
+)
 
 # Demo controls.
 PRINT_SOLVE_REPORT = True  # Print the Minilink TrajOpt pre/post solve report.
 PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT  # Print compact success/cost fallback.
 SCIPY_DISP = False  # Keep SciPy's own backend text off; use PRINT_SOLVE_REPORT.
+LIVE_PLOT = True
+
 
 sys = CartPole()
 sys.inputs["u"].lower_bound[0] = -10.0
@@ -41,10 +46,15 @@ problem = PlanningProblem(
     cost=cost,
 )
 
+if LIVE_PLOT:
+    callback = LiveTrajectoryPlotCallback(sys, plot="xu", every=1, pause=0.001)
+else:
+    callback = None
+
 planner = TrajectoryOptimizationPlanner(
     problem,
     transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(tf=5.0, n_steps=50)
+        DirectCollocationOptions(tf=4.0, n_steps=50)
     ),
     options=TrajectoryOptimizationOptions(
         # compile_backend="jax",
@@ -54,16 +64,10 @@ planner = TrajectoryOptimizationPlanner(
             "maxiter": 1000,
             "ftol": 1e-2,
         },
+        callback=callback,
     ),
 )
 
 traj = planner.compute_solution()
-result = planner.last_optimization_result
-
-if PRINT_RESULT_SUMMARY:
-    print(f"success: {result.success}")
-    print(f"message: {result.message}")
-    print(f"cost: {result.cost:.6g}")
-
-planner.plot_solution(plot="xu")
+# planner.plot_solution(plot="xu")
 planner.problem.sys.animate(traj)
