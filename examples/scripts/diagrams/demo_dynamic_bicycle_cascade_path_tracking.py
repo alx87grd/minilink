@@ -362,7 +362,7 @@ def plot_xy_vs_path(px, py, t, a_amp: float, wavelength: float):
 
 
 vehicle = DynamicBicycleCar3D()
-vehicle.x0 = np.array([-10.0, 0.4, 0.05, U_REF, 0.0, 0.0], dtype=float)
+vehicle.x0 = np.array([-10.0, 0.4, 0.05, 0.0, 0.0, 0.0], dtype=float)
 
 task = SinusoidalCruiseTask(U_REF, A, LAMBDA)
 pure_pursuit = SinusoidalPursuit(A, LAMBDA, LD)
