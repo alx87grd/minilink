@@ -49,13 +49,13 @@ planner = TrajectoryOptimizationPlanner(
     transcription=DirectCollocationTranscription(
         DirectCollocationOptions(
             tf=4.0,
-            n_steps=50,
+            n_steps=20,
         )
     ),
     options=TrajectoryOptimizationOptions(
         compile_backend="jax",
-        optimizer_method="ipopt",
-        # optimizer_method="scipy_slsqp",
+        # optimizer_method="ipopt",
+        optimizer_method="scipy_slsqp",
         # optimizer_options={"maxiter": 500, "ftol": 1e-2},
         solve_disp=PRINT_SOLVE_REPORT,
     ),

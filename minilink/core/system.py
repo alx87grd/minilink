@@ -880,6 +880,10 @@ class StaticSystem(System):
     """
     A block-diagram system with no internal continuous states (`n=0`).
     Outputs depend strictly on inputs and time.
+
+    Static blocks do not inherit the base :meth:`~System.get_kinematic_geometry`
+    point cloud (one marker per input); they default to no kinematic primitives so
+    diagram animation shows only dynamic plants unless a subclass opts in.
     """
 
     def __init__(self, m, p):
@@ -895,6 +899,12 @@ class StaticSystem(System):
         """
         System.__init__(self, 0, m, p)
         self.name = "StaticSystem"
+
+    def get_kinematic_geometry(self):
+        return []
+
+    def get_kinematic_transforms(self, x, u, t):
+        return []
 
 
 class DynamicSystem(System):
