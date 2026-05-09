@@ -60,26 +60,17 @@ pip install "minilink[ipopt]"          # Ipopt optimizer adapter
 
 ## Current Design Rules
 
-- NumPy is the baseline. JAX is optional and selected explicitly through
-  `compile_backend="jax"` or `"auto"` where supported.
-- Equation paths should preserve the active array backend: `System.f`,
-  `System.h`, output-port `compute`, set margins, cost `g/h`, transcriptions,
-  and `MathematicalProgram.J/h/g` are native-array in and native-array out when
-  the formula is traceable.
-- Python `float(...)`, forced NumPy conversion, and reporting reshapes belong at
-  boundaries such as evaluators, solvers, plotting, `contains`, `sample`, and
-  trajectory/cost reporting helpers.
-- Simple algebraic helpers such as sets, costs, and trajectory-optimization
-  transcriptions should use one backend-native class when the math can be
-  written as ordinary array operations.
-- Explicit `Jax<X>` twin classes are reserved for complex dynamics or plants
-  where a separate JAX implementation keeps the equations readable.
-- `System` keeps user convenience methods such as `compile`,
-  `compute_trajectory`, `compute_forced`, `render`, and `animate`, but the
-  mathematical contract remains `f`, `h`, and output-port
-  `compute(x, u, t, params)`.
-- `params is None` means "use object defaults"; any non-`None` `params` value is
-  an explicit caller-supplied parameter set.
+Short summary—details and edge cases are in [DESIGN.md](DESIGN.md).
+
+- **NumPy baseline, JAX optional**: choose backends explicitly (`compile_backend`,
+  evaluator backends); vocabulary in `minilink.compile.backend_policy`.
+- **Native-array equation paths** (`System`, ports, sets/costs, programs):
+  preserve the active backend; Python floats and forced NumPy conversion belong at
+  boundaries (evaluators, solvers, plotting, sampling helpers).
+- **Prefer one readable class** for simple algebra; optional `Jax<X>` twins only
+  when one implementation cannot stay traceable for both backends.
+- **`params is None`** uses object defaults; any other `params` value overrides—
+  never treat empty dicts as falsy for “use defaults.”
 
 ## Main Packages
 

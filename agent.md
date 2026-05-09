@@ -60,75 +60,41 @@ unless the helper is a public boundary.
 - Do not add new markdown guides unless asked. Prefer updating `README.md`,
   `DESIGN.md`, `ROADMAP.md`, or this file.
 
-## 3. Core Architecture Rules
+## 3. Architecture And Contracts
 
-- A `System` is dynamics and outputs: `f(x, u, t, params)`,
-  `h(x, u, t, params)`, ports, dimensions, defaults, and optional visualization
-  hooks.
-- `System.f`, `System.h`, and output-port compute functions are native-array
-  equation paths. NumPy-like inputs should produce NumPy-compatible expressions;
-  JAX inputs should produce JAX-compatible expressions when the formula is meant
-  to be traceable.
-- `System` may expose convenience methods such as `compile`,
-  `compute_trajectory`, `compute_forced`, `render`, and `animate`; these are
-  boundary facades over compile/simulation/graphics modules.
-- `params is None` means use object defaults. Any non-`None` `params` value is
-  explicit and must override defaults.
-- A `Trajectory` is sampled time/state/input data plus optional sampled signals.
-- `PlanningProblem.X0/Xf` are authoritative boundary sets. `x_start/x_goal` are
-  representative points and shortcuts; when both a set and a representative are
-  supplied, the representative must belong to the set.
-- `Set.margin`, `SingletonSet.residual`, and `CostFunction.g/h` are native-array
-  math paths. Boundary helpers such as constructors, `contains`, `sample`, and
-  reporting methods may convert to NumPy/Python.
-- `MathematicalProgram` is pure NLP data: `J`, aggregate `h`, aggregate `g`,
-  bounds, optional derivatives, metadata, and no initial guess or solver state.
-- Keep `float(...)`, forced `np.asarray(...)`, and Python reporting conversion
-  out of equation paths unless the object is explicitly NumPy-only. Put those
-  conversions in evaluators, solvers, plotting/reporting helpers, or other
-  public boundaries.
-- `Optimizer` is the bound method-preset interface. It owns one program, one
-  compiled program evaluator, `z0`, and a method such as `scipy_slsqp`,
-  `scipy_trust_constr`, or `ipopt`.
+Canonical contracts (`System`, `DiagramSystem`, `Trajectory`, sets/costs,
+compilation, simulation, optimization, planning) live in [DESIGN.md](DESIGN.md)
+§3–5. Update those sections when you change public behavior.
 
-## 4. JAX And NumPy Rules
+Quick reminders (details in DESIGN):
 
-NumPy is the baseline. JAX is optional. A NumPy-only install must import the
-library and collect tests without JAX failures.
+- Equation paths (`f`, `h`, ports, sets/costs, programs, transcriptions) stay
+  **native-array**; conversions belong at boundaries (evaluators, solvers,
+  plotting, `contains`, …).
+- `params is None` uses object defaults; any other `params` overrides—never
+  `params or self.params`.
 
-Six rules keep backend behavior clean:
+## 4. NumPy And JAX
 
-1. **Complex plants use optional twins**: add a `Jax<Plant>` subclass only when a
-   concrete use case needs traceable plant dynamics.
-2. **Simple algebra uses one class**: sets, costs, and transcriptions should use
-   backend-native array math where possible.
-3. **Backend choice is explicit**: use `compile_backend` or optimizer/program
-   evaluator backend arguments, not global switches.
-4. **Backend strings live in one module**: use constants and helpers from
-   `minilink.compile.backend_policy`.
-5. **JAX imports are lazy**: call `require_jax_numpy()` or backend-policy helpers
-   inside JAX-only methods; do not import `jax` at module import time in library
-   code.
-6. **Use `array_module` only for small hybrid math**: do not hide complex plant
-   differences behind generic dispatch if a twin class would be clearer.
-
-Do not create a top-level `minilink.jax` package, global NumPy/JAX mode, or twin
-classes whose only purpose is to wrap simple traceable algebra.
+Library-wide policy is under [DESIGN.md §1](DESIGN.md#numpy-and-jax) (NumPy and
+JAX). When implementing: explicit backend arguments (`compile_backend`, evaluator
+backends), vocabulary from `minilink.compile.backend_policy`, lazy JAX imports, and
+no `minilink.jax` package or global NumPy/JAX mode.
 
 ## 5. Package And File Layout
 
-- Import symbols from the module that defines them; package `__init__.py` files
-  are namespace markers unless a future public API freeze says otherwise.
+- Import symbols from the module that defines them; package `__init__.py` files are
+  namespace markers unless a future public API freeze says otherwise.
 - Swappable roles use role-specific folders and singular contract modules:
   `compile/evaluators/evaluator.py`, `simulation/solvers/solver.py`,
-  `graphical/renderers/renderer.py`, and
+  `graphical/renderers/renderer.py`,
   `optimization/optimizers/optimizer_backend.py`.
-- `compile/compiler.py` is the compile orchestrator. Do not add
-  `compile/compilers/`.
-- Benchmarks live beside the subsystem they measure, with runnable scripts under
-  `tests/benchmark/`.
-- Demo and manual scripts should stay flat, direct, and runnable from the repo
-  root.
+- `compile/compiler.py` is the compile orchestrator—do not add `compile/compilers/`.
+- Benchmark helpers live beside their subsystem; runners live under
+  `tests/benchmark/`. Import from defining packages (for example
+  `minilink.compile.benchmark`, `minilink.simulation.benchmark`)—there is no
+  top-level `minilink.benchmark` package.
+- Demo and manual scripts stay flat and runnable from the repo root.
 
 ## 6. Verification
 
@@ -163,21 +129,41 @@ Ask first:
 If a small request turns into a large job after inspection, stop and explain the
 smallest useful slice.
 
-## 8. Local Environment
+## 8. TRL Lifecycle
 
-Use the `dev-h26` conda environment for tests, examples, and benchmarks.
+Readiness levels are an internal maturity scale for planning and review—not a
+release process by themselves.
+
+| Level | Name | Description |
+| --- | --- | --- |
+| **TRL 1** | Agent MVP | Initial code exists and works |
+| **TRL 2** | User-check MVP | User performs a high-level functional review |
+| **TRL 3** | Architecture Validated | High-level architecture is approved |
+| **TRL 4** | Integration Proposed | Final integration/refactor is proposed |
+| **TRL 5** | Integration Validated | User approves main-codebase integration |
+| **TRL 6** | Automated Tests Pass | Final pytest coverage exists and passes |
+| **TRL 7** | Details Validated | Naming and implementation details are approved |
+| **TRL 8** | Demo Released | Demo script is created and validated |
+| **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
+
+Subsystem maturity in [ROADMAP.md](ROADMAP.md) uses these definitions.
+
+## 9. Local Environment
+
+Target **Python 3.10+** with optional extras from `pyproject.toml` (JAX, SymPy,
+visualization, Ipopt). Do not rely on macOS `/usr/bin/python3` when it is older
+than 3.10.
+
+Maintainers often use a conda env for local work (for example `dev-h26`). That
+name is **not contractual**—any conda/venv with Python 3.10+ and the extras you
+need is fine; align versions with CI or teammates when running tests and examples.
 
 ```bash
-conda activate dev-h26
+conda activate dev-h26   # or your own env
 python -m pytest
 ```
 
-From a fresh shell:
-
 ```bash
 conda run -n dev-h26 python -m pytest
-conda run -n dev-h26 python examples/scripts/demo_animations.py
+conda run -n dev-h26 python examples/scripts/animation/demo_animations.py
 ```
-
-Do not use macOS system Python for this repo; it may be too old for the project
-type syntax and optional dependency set.
