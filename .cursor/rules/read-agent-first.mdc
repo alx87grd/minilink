@@ -11,4 +11,4 @@ alwaysApply: true
 - Exclude notebooks from normal review/style passes unless the task is only to update renamed imports/API names or the user explicitly asks for notebook cleanup. Never review notebook outputs by default.
 - If instructions in chat conflict with `agent.md`, ask for clarification before proceeding.
 - Avoid adding new guideline documents if the same guidance already exists in `agent.md`.
-- For terminal commands in this repo (tests, `examples/scripts`, benchmarks), use the **`dev-h26` conda** environment; see `agent.md` §7. Do not assume `/usr/bin/python3` is sufficient.
+- For terminal commands in this repo (tests, `examples/scripts`, benchmarks), use Python **3.10+** with the extras your task needs (`pyproject.toml`). Shared conda environment names are informal; see `agent.md` section 9 (Local Environment). Do not assume `/usr/bin/python3` is sufficient.
