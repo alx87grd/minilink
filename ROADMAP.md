@@ -13,7 +13,7 @@ This document tracks active priorities and maturity. Design contracts live in
 | Simulation | TRL 4 | Clarify solver options and forcing behavior. |
 | Optimization | TRL 1 | Harden generic NLP pipeline with SciPy/Ipopt and NumPy/JAX evaluators. |
 | Planning/trajopt | TRL 1 | Validate deterministic planning API and grow method coverage carefully. |
-| Graphical | TRL 2 | Stabilize render/interactive loops after core contracts settle. |
+| Graphical | TRL 2 | Standard `get_camera_transform(x, u, t)` camera contract added (DESIGN.md §7); stabilize render/interactive loops after core contracts settle. |
 | Dynamics catalog | TRL 0-1 | Grow reviewed plants by domain. |
 | Symbolic/physics/control | TRL 0-1 | Keep MVP examples working; expand only behind clear use cases. |
 

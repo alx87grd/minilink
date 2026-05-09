@@ -446,6 +446,79 @@ def scale_pose2d_matrix(x=0.0, y=0.0, theta=0.0, scale=1.0):
     return T
 
 
+def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0, R=None):
+    """Standard 4x4 camera transform.
+
+    The matrix doubles as the camera's pose in the world frame **and** the
+    renderer projection knob. The amplitude channel ``T[3, 3]`` carries the
+    view scale (same side-channel convention as :func:`torque_pose2d_matrix`
+    and :func:`extract_amplitude`).
+
+    Slot meaning
+    ------------
+    * ``T[:3, 3]`` — look-at target in world (point at the center of the view).
+    * ``T[:3, 0]`` — world direction shown as **plot horizontal** axis.
+    * ``T[:3, 1]`` — world direction shown as **plot vertical** axis.
+    * ``T[:3, 2]`` — camera view-out direction (projected away in 2D / ortho;
+      eye-out in 3D perspective).
+    * ``T[3, 3]`` — view scale (orthographic half-extent in world units for
+      matplotlib / pygame; perspective camera distance for meshcat).
+
+    Parameters
+    ----------
+    target : array-like of length 3, optional
+        Look-at point in world coordinates.
+    plot_axes : tuple of two ints in {0, 1, 2}, optional
+        World axis indices used as plot-X (``i``) and plot-Y (``j``).
+        ``R`` is built so its columns are ``(e_i, e_j, e_i x e_j)``.
+        Default ``(0, 1)`` is the canonical top-down view.
+    scale : float, optional
+        View half-extent (orthographic) or camera distance (perspective).
+    R : array-like 3x3, optional
+        Explicit rotation; columns must be the world directions of camera-X,
+        camera-Y, camera-Z. Overrides ``plot_axes`` when given (use this for
+        orbit, isometric, or arbitrary view orientations).
+
+    Returns
+    -------
+    np.ndarray
+        4x4 camera transform.
+    """
+    T = np.eye(4)
+    if R is not None:
+        T[:3, :3] = np.asarray(R, dtype=float).reshape(3, 3)
+    else:
+        i, j = plot_axes
+        if i == j or i not in (0, 1, 2) or j not in (0, 1, 2):
+            raise ValueError(
+                "plot_axes must be two distinct world axis indices in {0, 1, 2}; "
+                f"got {plot_axes!r}."
+            )
+        e = np.eye(3)
+        T[:3, 0] = e[i]
+        T[:3, 1] = e[j]
+        T[:3, 2] = np.cross(e[i], e[j])
+    T[:3, 3] = np.asarray(target, dtype=float).reshape(3)
+    T[3, 3] = float(scale)
+    return T
+
+
+def world_to_camera(camera):
+    """Return the world-to-camera (view) 4x4 matrix.
+
+    Inverts the rigid part of *camera* (target translation + ``R``); the
+    amplitude channel ``T[3, 3]`` is reset to 1 so the result is a regular
+    rigid transform suitable for pre-multiplying body transforms before
+    orthographic 2D rendering.
+    """
+    R = camera[:3, :3]
+    target = camera[:3, 3]
+    W = np.eye(4)
+    W[:3, :3] = R.T
+    W[:3, 3] = -R.T @ target
+    return W
+
+
 def torque_pose2d_matrix(x=0.0, y=0.0, start_angle=0.0, sweep=0.0):
     """4x4 matrix for :class:`TorqueArrow`.
 

@@ -126,7 +126,8 @@ Boundary conveniences:
 
 - model defaults: `params`, `x0`, port nominal values, and `solver_info`;
 - visualization hooks: `get_kinematic_geometry`,
-  `get_kinematic_transforms(x, u, t)`, and `get_dynamic_geometry(x, u, t)`;
+  `get_kinematic_transforms(x, u, t)`, `get_dynamic_geometry(x, u, t)`, and
+  `get_camera_transform(x, u, t)` (standard 4x4 camera matrix; see §7);
 - facade methods: `compile`, `compute_trajectory`, `compute_forced`, `render`,
   `animate`, `game`, plotting, and graph helpers.
 
@@ -366,6 +367,29 @@ Graphics:
   methods;
 - kinematic geometry hooks are useful but still provisional;
 - matplotlib style and environment policy are centralized in `graphical`.
+
+Camera / framing contract:
+
+- `System.get_camera_transform(x, u, t) -> (4, 4) ndarray` is the standard
+  camera matrix consumed by every renderer. There is one matrix and one method:
+  2D rendering is always an orthographic projection of the same 3D camera (no
+  separate 2D pipeline). Built by `minilink.graphical.primitives.camera_matrix`:
+  - `T[:3, 3]` look-at target in world (the view re-centers each frame);
+  - columns of `T[:3, :3]` are world directions of camera-X (plot horizontal),
+    camera-Y (plot vertical), camera-Z (view-out); built from `plot_axes=(i, j)`
+    as `(e_i, e_j, e_i × e_j)` or supplied directly via `R=`;
+  - `T[3, 3]` is the view scale (amplitude-channel convention, same as
+    `torque_pose2d_matrix`): orthographic half-extent for matplotlib 2D/3D and
+    pygame; perspective camera distance for meshcat.
+- Renderers consume only the slots they understand and ignore the rest:
+  matplotlib 2D / pygame pre-multiply body transforms by `world_to_camera(camera)`
+  so primitive XY ends up in camera frame, with `xlim/ylim = ±T[3,3]` and axis
+  labels auto-derived from the dominant world axis; matplotlib 3D decodes
+  `view_init(elev, azim)` from `R[:,2]` and re-centers `xlim/ylim/zlim` each
+  frame; meshcat best-effort applies the orbit pivot per frame and the eye
+  distance once at scene open.
+- Intentional non-knobs (KISS): anisotropic per-axis zoom and field-of-view are
+  not in the contract; `aspect='equal'` is enforced everywhere.
 
 Benchmarks:
 

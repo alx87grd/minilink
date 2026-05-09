@@ -475,6 +475,31 @@ def _rigid_effective_transform(primitive, transform_matrix, tf):
     return None
 
 
+def _apply_meshcat_camera_target(vis, camera) -> None:
+    """Aim meshcat's orbit pivot at ``camera`` look-at target. Best-effort, swallows errors."""
+    try:
+        target = np.asarray(camera[:3, 3], dtype=float).reshape(3)
+        T = np.eye(4)
+        T[:3, 3] = target
+        vis["/Cameras/default"].set_transform(T)
+    except Exception:
+        pass
+
+
+def _apply_meshcat_camera(vis, camera) -> None:
+    """Set initial orbit target and eye distance from a camera matrix. Best-effort."""
+    _apply_meshcat_camera_target(vis, camera)
+    try:
+        scale = float(camera[3, 3])
+        # Place the eye at distance ``scale`` along the camera-Z (view-out) direction
+        # in the rotated camera frame; meshcat then orbits around the target.
+        vis["/Cameras/default/rotated/<object>"].set_property(
+            "position", [0.0, 0.0, float(scale)]
+        )
+    except Exception:
+        pass
+
+
 class MeshcatRenderer(AnimationRenderer):
     """Browser-based playback and static-HTML snapshots."""
 
@@ -484,11 +509,19 @@ class MeshcatRenderer(AnimationRenderer):
         self.canvas = None
         self.show = True
 
-    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
+    def open_scene(
+        self,
+        *,
+        is_3d: bool,
+        show: bool,
+        camera,
+        title: str | None = None,
+    ) -> None:
         meshcat = _import_meshcat()
         self.show = show
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        _apply_meshcat_camera(self.vis, camera)
         if show:
             import sys
 
@@ -505,10 +538,14 @@ class MeshcatRenderer(AnimationRenderer):
                 self.vis.open()
                 self.vis.wait()
 
-    def draw_frame(self, primitives, transforms, t: float) -> None:
+    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         self.canvas.ensure_objects(primitives)
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
             self.canvas.update_primitive(i, prim, T)
+        # Best-effort follow-camera: re-aim the orbit pivot at the look-at target
+        # so meshcat tracks moving systems. Eye distance / orientation set once at
+        # open_scene; users keep their interactive control via the browser.
+        _apply_meshcat_camera_target(self.vis, camera)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
@@ -584,6 +621,7 @@ class MeshcatRenderer(AnimationRenderer):
         self.show = True
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        _apply_meshcat_camera(self.vis, frames[0]["camera"])
         self.vis.open()
         self.vis.wait()
 
@@ -602,6 +640,7 @@ class MeshcatRenderer(AnimationRenderer):
         self.show = False
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=False)
+        _apply_meshcat_camera(self.vis, frames[0]["camera"])
 
         animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
         self.vis.set_animation(animation_obj, play=True, repetitions=1)

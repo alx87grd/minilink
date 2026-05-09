@@ -19,6 +19,7 @@ from minilink.graphical.primitives import (
     Sphere,
     TorqueArrow,
     extract_amplitude,
+    world_to_camera,
 )
 from minilink.graphical.renderers.renderer import AnimationRenderer
 
@@ -40,17 +41,21 @@ def _color_to_rgb(color) -> tuple[int, int, int]:
 
 
 class PygameCanvas:
-    """Maps primitives to pygame draws (world X/Y → screen, Y flipped)."""
+    """Maps primitives to pygame draws (camera-frame X/Y → screen, Y flipped).
 
-    def __init__(self, surface, animator, is_3d: bool):
+    Body transforms are expected to already be expressed in the camera frame
+    (the pygame renderer pre-multiplies them by ``world_to_camera(camera)``);
+    this class then maps the camera-frame square ``[-scale, +scale]^2`` to the
+    visible window.
+    """
+
+    def __init__(self, surface, scale: float, is_3d: bool):
         self.surface = surface
-        self.animator = animator
         self.is_3d = is_3d
-        self.domain = animator.domain
         self.margin = 40
         self.w, self.h = surface.get_size()
-        self._xmin, self._xmax = self.domain[0]
-        self._ymin, self._ymax = self.domain[1]
+        self._xmin, self._xmax = -float(scale), float(scale)
+        self._ymin, self._ymax = -float(scale), float(scale)
 
     def _to_screen(self, wx: float, wy: float) -> tuple[int, int]:
         m = self.margin
@@ -290,17 +295,25 @@ class PygameRenderer(AnimationRenderer):
         self.is_3d = False
         self.show = True
 
-    def _paint_frame(self, primitives, transforms, t: float):
+    def _paint_frame(self, primitives, transforms, t: float, camera):
         pygame_mod = self.pygame
         screen = self.screen
         pygame_mod.display.set_caption(f"{self.sys.name} — t = {t:.2f} s")
-        canvas = PygameCanvas(screen, self.animator, is_3d=self.is_3d)
+        canvas = PygameCanvas(screen, scale=float(camera[3, 3]), is_3d=self.is_3d)
         screen.fill((250, 250, 250))
+        W = world_to_camera(camera)
         for prim, T in zip(primitives, transforms):
-            canvas.draw_primitive(prim, T, pygame_mod)
+            canvas.draw_primitive(prim, W @ T, pygame_mod)
         pygame_mod.display.flip()
 
-    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
+    def open_scene(
+        self,
+        *,
+        is_3d: bool,
+        show: bool,
+        camera,
+        title: str | None = None,
+    ) -> None:
         self.pygame = _import_pygame()
         self.pygame.init()
         self.is_3d = is_3d
@@ -310,10 +323,10 @@ class PygameRenderer(AnimationRenderer):
             if title:
                 self.pygame.display.set_caption(title)
 
-    def draw_frame(self, primitives, transforms, t: float) -> None:
+    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         if not self.show or self.screen is None:
             return
-        self._paint_frame(primitives, transforms, t)
+        self._paint_frame(primitives, transforms, t, camera)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if not self.show:
