@@ -1,10 +1,14 @@
 """Camera customization basics: zoom, 2D projection plane, look-at target, 3D orientation.
 
-Quick tweak for every recipe below: edit :data:`USER_CAMERA` (merged into each demo).
+Quick tweaks:
 
-Constant-framing cameras use :func:`~minilink.graphical.primitives.attach_standard_camera`,
-which wires ``get_camera_transform`` to :func:`~minilink.graphical.primitives.camera_matrix`
-without repeating a full method implementation.
+- Edit :data:`USER_CAMERA` (merged into each recipe via ``attach_standard_camera``), or
+- Assign ``sys.camera_scale``, ``sys.camera_target``, ``sys.camera_plot_axes``, or
+  ``sys.camera_R`` — the default :meth:`~minilink.core.system.System.get_camera_transform`
+  reads these attributes.
+
+:func:`~minilink.graphical.primitives.attach_standard_camera` updates those same fields;
+it does not replace ``get_camera_transform``.
 
 Renderer slots (see DESIGN.md §6):
 
@@ -49,7 +53,7 @@ _AXES_MAP = {
 
 
 def apply_demo_camera(sys: Pendulum, **recipe) -> None:
-    """Merge :data:`USER_CAMERA` with *recipe* and attach ``get_camera_transform``."""
+    """Merge :data:`USER_CAMERA` with *recipe* into ``sys`` camera fields."""
     kw = {**USER_CAMERA, **recipe}
     attach_standard_camera(sys, **kw)
 

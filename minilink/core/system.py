@@ -58,8 +58,7 @@ class VectorSignal:
             value = np.asarray(nominal_value, dtype=float).reshape(-1)
             if value.shape != (self.dim,):
                 raise ValueError(
-                    f"nominal_value must have shape ({self.dim},), "
-                    f"got {value.shape}"
+                    f"nominal_value must have shape ({self.dim},), got {value.shape}"
                 )
             self.nominal_value = value.copy()
         else:
@@ -160,7 +159,8 @@ class System:
       (:attr:`params`), default initial condition (:attr:`x0`), and solver
       hints (:attr:`solver_info`).
     - **Optional visualization contract**: it may describe forward-kinematic
-      geometry for rendering and animation. This API is still MVP / TRL 1.
+      geometry for rendering and animation (still MVP / TRL 1). Default
+      ``camera_*`` fields configure :meth:`get_camera_transform`; see that method.
     - **User shortcut façade**: it exposes convenience methods such as
       :meth:`compile`, :meth:`compute_trajectory`, :meth:`render`,
       :meth:`animate`, and :meth:`game`.
@@ -227,6 +227,13 @@ class System:
         # Runtime convenience cache for the last trajectory produced by
         # ``compute_trajectory``.
         self.traj = None
+
+        # Standard camera (:meth:`get_camera_transform`): edit these fields or call
+        # :func:`~minilink.graphical.primitives.attach_standard_camera`.
+        self.camera_target = np.zeros(3, dtype=float)
+        self.camera_plot_axes = (0, 1)
+        self.camera_scale = 10.0
+        self.camera_R = None
 
     # Core Dynamical Contract
 
@@ -517,16 +524,42 @@ class System:
         scale 10.0, matching minilink's previous implicit framing. Override to
         follow a body, change projection axes, zoom, or orbit.
 
-        For a **fixed** camera defined only by
-        :func:`~minilink.graphical.primitives.camera_matrix` keyword arguments,
-        assign via :func:`~minilink.graphical.primitives.attach_standard_camera`
-        instead of duplicating this method.
+        For a **fixed** camera defined only by :func:`~minilink.graphical.primitives.camera_matrix`
+        keyword arguments, set :attr:`camera_target`, :attr:`camera_plot_axes`,
+        :attr:`camera_scale`, and optionally :attr:`camera_R`, or call
+        :func:`~minilink.graphical.primitives.attach_standard_camera` instead of
+        overriding this method.
+
+        Notes
+        -----
+        The base implementation reads ``camera_target``, ``camera_plot_axes``,
+        ``camera_scale``, and ``camera_R`` on ``self`` (defaults match
+        :func:`~minilink.graphical.primitives.camera_matrix`). Assign those fields
+        directly for quick tweaks, or call
+        :func:`~minilink.graphical.primitives.attach_standard_camera`.
+
+        - ``camera_target`` — ndarray (3,), world look-at point.
+        - ``camera_plot_axes`` — axis indices ``(i, j)`` for plot horizontal /
+          vertical when ``camera_R`` is ``None``.
+        - ``camera_scale`` — orthographic half-extent / meshcat eye distance.
+        - ``camera_R`` — optional explicit ``(3, 3)`` basis (camera X,Y,Z in world);
+          when set, overrides ``camera_plot_axes``.
 
         TODO: User Architectural Review (visualization contract is TRL 1).
         """
         from minilink.graphical.primitives import camera_matrix
 
-        return camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0)
+        if self.camera_R is not None:
+            return camera_matrix(
+                target=self.camera_target,
+                scale=self.camera_scale,
+                R=self.camera_R,
+            )
+        return camera_matrix(
+            target=self.camera_target,
+            plot_axes=self.camera_plot_axes,
+            scale=self.camera_scale,
+        )
 
     # User Shortcut / Facade API
 

@@ -86,8 +86,19 @@ class TestSystemDefaultCamera(unittest.TestCase):
         s = DynamicSystem(2, 1, 1)
         attach_standard_camera(s, scale=4.5, plot_axes=(0, 2))
         T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
+        np.testing.assert_array_equal(T, camera_matrix(scale=4.5, plot_axes=(0, 2)))
+        self.assertEqual(s.camera_scale, 4.5)
+        self.assertEqual(s.camera_plot_axes, (0, 2))
+
+    def test_camera_attributes_override_without_attach(self):
+        s = DynamicSystem(2, 1, 1)
+        s.camera_scale = 2.0
+        s.camera_plot_axes = (1, 2)
+        s.camera_target[:] = (1.0, -1.0, 0.5)
+        T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
         np.testing.assert_array_equal(
-            T, camera_matrix(scale=4.5, plot_axes=(0, 2))
+            T,
+            camera_matrix(target=(1.0, -1.0, 0.5), plot_axes=(1, 2), scale=2.0),
         )
 
 
