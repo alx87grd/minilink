@@ -503,6 +503,26 @@ class System:
         """
         return []
 
+    def get_camera_transform(self, x, u, t):
+        """
+        Return the standard 4x4 camera transform for this system.
+
+        The matrix follows :func:`minilink.graphical.primitives.camera_matrix`:
+        ``T[:3, 3]`` is the look-at target in world, the columns of ``T[:3, :3]``
+        are the world directions of camera-X (plot horizontal), camera-Y
+        (plot vertical), and camera-Z (view-out), and ``T[3, 3]`` is the view
+        scale (orthographic half-extent / perspective camera distance).
+
+        The default returns the canonical top-down view at the origin with
+        scale 10.0, matching minilink's previous implicit framing. Override to
+        follow a body, change projection axes, zoom, or orbit.
+
+        TODO: User Architectural Review (visualization contract is TRL 1).
+        """
+        from minilink.graphical.primitives import camera_matrix
+
+        return camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0)
+
     # User Shortcut / Facade API
 
     def compile(self, backend="numpy", verbose=False):

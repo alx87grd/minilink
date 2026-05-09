@@ -69,10 +69,7 @@ class TestPygameOptionalSmoke(unittest.TestCase):
         pygame.init()
         try:
             surface = pygame.Surface((100, 100))
-            animator = type(
-                "AnimatorStub", (), {"domain": ((-1.0, 1.0), (-1.0, 1.0))}
-            )()
-            canvas = PygameCanvas(surface, animator, is_3d=False)
+            canvas = PygameCanvas(surface, scale=1.0, is_3d=False)
             self.assertEqual(canvas._to_screen(0.0, 0.0), (50, 50))
         finally:
             pygame.quit()
@@ -83,10 +80,7 @@ class TestPygameOptionalSmoke(unittest.TestCase):
         pygame.init()
         try:
             surface = pygame.Surface((100, 100))
-            animator = type(
-                "AnimatorStub", (), {"domain": ((-1.0, 1.0), (-1.0, 1.0))}
-            )()
-            canvas = PygameCanvas(surface, animator, is_3d=False)
+            canvas = PygameCanvas(surface, scale=1.0, is_3d=False)
             canvas.draw_primitive(Point([0.0, 0.0, 0.0]), np.eye(4), pygame)
         finally:
             pygame.quit()

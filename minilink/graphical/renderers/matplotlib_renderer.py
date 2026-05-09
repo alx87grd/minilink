@@ -29,8 +29,37 @@ from minilink.graphical.primitives import (
     Sphere,
     TorqueArrow,
     extract_amplitude,
+    world_to_camera,
 )
 from minilink.graphical.renderers.renderer import AnimationRenderer
+
+
+_AXIS_LABEL_BY_INDEX = ("X", "Y", "Z")
+
+
+def _axis_label_from_column(col):
+    """Return ``"X" / "Y" / "Z"`` if *col* is (close to) an axis-aligned unit vector, else ``""``."""
+    col = np.asarray(col, dtype=float).reshape(3)
+    abs_col = np.abs(col)
+    i = int(np.argmax(abs_col))
+    if abs_col[i] < 0.999:
+        return ""
+    other = np.delete(abs_col, i)
+    if np.any(other > 1e-3):
+        return ""
+    return ("-" if col[i] < 0 else "") + _AXIS_LABEL_BY_INDEX[i]
+
+
+def _camera_3d_view_init(camera):
+    """Decode matplotlib ``view_init(elev, azim)`` from camera-Z (view-out direction)."""
+    view_out = np.asarray(camera[:3, 2], dtype=float).reshape(3)
+    n = np.linalg.norm(view_out)
+    if n < 1e-12:
+        return None
+    v = view_out / n
+    elev = float(np.degrees(np.arcsin(np.clip(v[2], -1.0, 1.0))))
+    azim = float(np.degrees(np.arctan2(v[1], v[0])))
+    return elev, azim
 
 
 class MatplotlibCanvas:
@@ -349,40 +378,67 @@ class MatplotlibRenderer(AnimationRenderer):
         self.ax = None
         self.canvas = None
 
-    def _create_figure_and_ax(self, is_3d):
-        a = self.animator
+    def _apply_camera(self, ax, camera, is_3d):
+        """Apply view limits, labels, and (3D) view orientation from *camera*."""
+        target = np.asarray(camera[:3, 3], dtype=float).reshape(3)
+        scale = float(camera[3, 3])
+        if is_3d:
+            ax.set_xlim3d(target[0] - scale, target[0] + scale)
+            ax.set_ylim3d(target[1] - scale, target[1] + scale)
+            ax.set_zlim3d(target[2] - scale, target[2] + scale)
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.set_zlabel("Z")
+            view = _camera_3d_view_init(camera)
+            if view is not None:
+                ax.view_init(elev=view[0], azim=view[1])
+        else:
+            ax.set_xlim(-scale, scale)
+            ax.set_ylim(-scale, scale)
+            ax.set_xlabel(_axis_label_from_column(camera[:3, 0]))
+            ax.set_ylabel(_axis_label_from_column(camera[:3, 1]))
+            ax.set_aspect("equal")
+
+    def _create_figure_and_ax(self, is_3d, camera):
         fig = plt.figure(figsize=FIGSIZE_ANIMATION, dpi=DPI_FIGURE)
         fig.canvas.manager.set_window_title(f"Animation: {self.sys.name}")
 
         if is_3d:
             ax = fig.add_subplot(111, projection="3d")
-            ax.set_xlim3d(a.domain[0])
-            ax.set_ylim3d(a.domain[1])
-            ax.set_zlim3d(a.domain[2])
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.set_zlabel("Z")
         else:
             ax = fig.add_subplot(111)
-            ax.set_xlim(a.domain[0])
-            ax.set_ylim(a.domain[1])
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.set_aspect("equal")
 
+        self._apply_camera(ax, camera, is_3d)
         style_animation_axes(ax, is_3d=is_3d)
         return fig, ax
 
-    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
-        self.fig, self.ax = self._create_figure_and_ax(is_3d)
+    def open_scene(
+        self,
+        *,
+        is_3d: bool,
+        show: bool,
+        camera,
+        title: str | None = None,
+    ) -> None:
+        self.fig, self.ax = self._create_figure_and_ax(is_3d, camera)
         self.canvas = MatplotlibCanvas(self.ax, is_3d=is_3d)
         if title:
             self.ax.set_title(title, fontsize=FONT_SIZE)
 
-    def draw_frame(self, primitives, transforms, t: float) -> None:
+    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         self.canvas.clear()
-        for prim, T in zip(primitives, transforms):
+        # 2D path uses an orthographic projection onto the camera plane: pre-multiply
+        # body transforms by world-to-camera so primitive XY is already in camera frame.
+        # 3D matplotlib keeps world coordinates; ``_apply_camera`` updates view limits
+        # and ``view_init`` to match the camera per frame (supports follow / orbit).
+        if self.canvas.is_3d:
+            draw_transforms = transforms
+        else:
+            W = world_to_camera(camera)
+            draw_transforms = [W @ T for T in transforms]
+        for prim, T in zip(primitives, draw_transforms):
             self.canvas.draw_primitive(prim, T)
+        self._apply_camera(self.ax, camera, self.canvas.is_3d)
         self.ax.set_title(f"Time = {t:.2f} s", fontsize=FONT_SIZE)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
@@ -407,14 +463,21 @@ class MatplotlibRenderer(AnimationRenderer):
         self.canvas = None
 
     def _build_animation(self, primitives, frames, schedule, *, is_3d: bool = False):
-        fig, ax = self._create_figure_and_ax(is_3d=is_3d)
+        fig, ax = self._create_figure_and_ax(is_3d=is_3d, camera=frames[0]["camera"])
         canvas = MatplotlibCanvas(ax, is_3d=is_3d)
 
         def update(frame_idx):
             frame = frames[frame_idx]
             canvas.clear()
-            for prim, T in zip(primitives, frame["transforms"]):
+            camera = frame["camera"]
+            if is_3d:
+                draw_transforms = frame["transforms"]
+            else:
+                W = world_to_camera(camera)
+                draw_transforms = [W @ T for T in frame["transforms"]]
+            for prim, T in zip(primitives, draw_transforms):
                 canvas.draw_primitive(prim, T)
+            self._apply_camera(ax, camera, is_3d)
             ax.set_title(f"Time = {frame['t']:.2f} s", fontsize=FONT_SIZE)
             return canvas.drawn_objects
 
