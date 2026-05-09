@@ -85,6 +85,13 @@ minilink/
     initial_guess.py
     search/
     trajectory_optimization/
+      benchmark.py
+      direct_collocation.py
+      live_plot.py
+      multiple_shooting.py
+      planner.py
+      shooting.py
+      transcription.py
     policy_synthesis/
   dynamics/
     abstraction/
@@ -98,8 +105,17 @@ minilink/
     matplotlib_style.py
     renderers/
   symbolic/
+    mechanics/
+      derivation.py
+      export.py
+      model.py
+      symbolic_system.py
+      utils.py
   physics/
+    engine_jax.py
+    system.py
   control/
+    pendulum_pd.py
 ```
 
 ## 3. Core Object Contracts
@@ -370,8 +386,8 @@ Graphics:
 Benchmarks:
 
 - benchmark helpers live beside the subsystem they measure, for example
-  `compile/benchmark.py`, `simulation/benchmark.py`, and
-  `optimization/benchmark.py`;
+  `compile/benchmark.py`, `simulation/benchmark.py`,
+  `optimization/benchmark.py`, and `planning/trajectory_optimization/benchmark.py`;
 - runnable benchmark scripts live under `tests/benchmark/`;
 - benchmark helpers are not core contracts.
 

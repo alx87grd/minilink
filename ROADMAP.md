@@ -17,7 +17,7 @@ This document tracks active priorities and maturity. Design contracts live in
 | Dynamics catalog | TRL 0-1 | Grow reviewed plants by domain. |
 | Symbolic/physics/control | TRL 0-1 | Keep MVP examples working; expand only behind clear use cases. |
 
-TRL definitions are in [agent.md](agent.md).
+TRL definitions are in [agent.md (section 8)](agent.md#8-trl-lifecycle).
 
 ## 2. Completed Architecture Work
 

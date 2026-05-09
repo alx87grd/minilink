@@ -126,7 +126,9 @@ classes whose only purpose is to wrap simple traceable algebra.
 - `compile/compiler.py` is the compile orchestrator. Do not add
   `compile/compilers/`.
 - Benchmarks live beside the subsystem they measure, with runnable scripts under
-  `tests/benchmark/`.
+  `tests/benchmark/`. Import timing helpers from the defining package (for example
+  `minilink.compile.benchmark` or `minilink.simulation.benchmark`); there is no
+  top-level `minilink.benchmark` package.
 - Demo and manual scripts should stay flat, direct, and runnable from the repo
   root.
 
@@ -163,12 +165,41 @@ Ask first:
 If a small request turns into a large job after inspection, stop and explain the
 smallest useful slice.
 
-## 8. Local Environment
+## 8. TRL Lifecycle
 
-Use the `dev-h26` conda environment for tests, examples, and benchmarks.
+Readiness levels are an internal maturity scale for planning and review. They
+are not a release process by themselves.
+
+| Level | Name | Description |
+| --- | --- | --- |
+| **TRL 1** | Agent MVP | Initial code exists and works |
+| **TRL 2** | User-check MVP | User performs a high-level functional review |
+| **TRL 3** | Architecture Validated | High-level architecture is approved |
+| **TRL 4** | Integration Proposed | Final integration/refactor is proposed |
+| **TRL 5** | Integration Validated | User approves main-codebase integration |
+| **TRL 6** | Automated Tests Pass | Final pytest coverage exists and passes |
+| **TRL 7** | Details Validated | Naming and implementation details are approved |
+| **TRL 8** | Demo Released | Demo script is created and validated |
+| **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
+
+The subsystem maturity matrix in `ROADMAP.md` uses these definitions.
+
+## 9. Local Environment
+
+The project targets **Python 3.10+** with optional extras for JAX, SymPy,
+visualization, and Ipopt (`pyproject.toml`). Do not rely on macOS
+`/usr/bin/python3` when it is older than 3.10 (for example `|` in type hints).
+
+Maintainers often use a **conda** environment for local development (for example
+named `dev-h26` on some machines). That environment name is **not contractual**:
+any equivalent setup—conda, venv, or another tool—with Python 3.10+ and the
+extras you need for the task is acceptable. Align optional dependency versions
+with CI or teammates when running tests, examples, and benchmarks.
+
+Example with conda (substitute your environment name):
 
 ```bash
-conda activate dev-h26
+conda activate dev-h26   # or your own env
 python -m pytest
 ```
 
@@ -176,8 +207,5 @@ From a fresh shell:
 
 ```bash
 conda run -n dev-h26 python -m pytest
-conda run -n dev-h26 python examples/scripts/demo_animations.py
+conda run -n dev-h26 python examples/scripts/animation/demo_animations.py
 ```
-
-Do not use macOS system Python for this repo; it may be too old for the project
-type syntax and optional dependency set.
