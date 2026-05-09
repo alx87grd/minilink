@@ -394,6 +394,10 @@ Camera / framing contract:
   `view_init(elev, azim)` from `R[:,2]` and re-centers `xlim/ylim/zlim` each
   frame; meshcat best-effort applies the orbit pivot per frame and the eye
   distance once at scene open.
+- For a constant camera (no dependence on `x, u, t`), use
+  `attach_standard_camera(system, **camera_matrix_kwargs)` in
+  `minilink.graphical.primitives` to assign `get_camera_transform` from
+  `camera_matrix`.
 - Intentional non-knobs (KISS): anisotropic per-axis zoom and field-of-view are
   not in the contract; `aspect='equal'` is enforced everywhere.
 

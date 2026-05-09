@@ -1,16 +1,17 @@
 """Camera customization basics: zoom, 2D projection plane, look-at target, 3D orientation.
 
-``DynamicSystem.get_camera_transform(x, u, t)`` returns a standard 4×4 matrix built
-with :func:`~minilink.graphical.primitives.camera_matrix`. Renderers read:
+Quick tweak for every recipe below: edit :data:`USER_CAMERA` (merged into each demo).
 
-- ``T[:3, 3]`` — look-at target (world point at the center of the view for the **initial**
-  frame in 3D / meshcat; still drives **per-frame** orthographic projection in 2D).
-- ``T[:3, :3]`` — camera basis: plot horizontal, plot vertical, view-out (see DESIGN.md §6).
-- ``T[3, 3]`` — **scale**: orthographic half-extent (matplotlib 2D/3D, pygame) or eye
-  distance (meshcat).
+Constant-framing cameras use :func:`~minilink.graphical.primitives.attach_standard_camera`,
+which wires ``get_camera_transform`` to :func:`~minilink.graphical.primitives.camera_matrix`
+without repeating a full method implementation.
 
-After playback starts, interactive **matplotlib 3D** and **meshcat** leave orbit/zoom to
-the UI; override ``get_camera_transform`` to set the **starting** viewpoint.
+Renderer slots (see DESIGN.md §6):
+
+- ``T[:3, 3]`` — look-at target (initial framing for interactive 3D / meshcat; still drives
+  **per-frame** orthographic projection in 2D).
+- ``T[:3, :3]`` — camera basis (plot horizontal, plot vertical, view-out).
+- ``T[3, 3]`` — scale (orthographic half-extent; meshcat eye distance).
 
 Run from the repository root::
 
@@ -30,17 +31,33 @@ Optional::
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 import numpy as np
 
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.graphical.primitives import camera_matrix
+from minilink.graphical.primitives import attach_standard_camera
+
+# --- Defaults merged into every demo (override scale, plot_axes, target, R, …). ---
+USER_CAMERA: dict[str, Any] = {}
 
 _AXES_MAP = {
     "xy": (0, 1),
     "xz": (0, 2),
     "yz": (1, 2),
 }
+
+
+def apply_demo_camera(sys: Pendulum, **recipe) -> None:
+    """Merge :data:`USER_CAMERA` with *recipe* and attach ``get_camera_transform``."""
+    kw = {**USER_CAMERA, **recipe}
+    attach_standard_camera(sys, **kw)
+
+
+def rotation_yaw_about_world_z(angle_rad: float) -> np.ndarray:
+    c = np.cos(angle_rad)
+    s = np.sin(angle_rad)
+    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=float)
 
 
 def make_system(*, with_trajectory: bool = True) -> Pendulum:
@@ -54,74 +71,40 @@ def make_system(*, with_trajectory: bool = True) -> Pendulum:
 
 
 def run_zoom(sys: Pendulum, renderer: str, native: bool) -> None:
-    """Tighter framing via smaller orthographic half-extent / shorter meshcat eye distance."""
-    sys.get_camera_transform = lambda x, u, t: camera_matrix(scale=3.0)
+    """Smaller ``scale`` ⇒ tighter 2D box / closer meshcat eye."""
+    apply_demo_camera(sys, scale=3.0)
     sys.animate(renderer=renderer, native=native)
 
 
 def run_projection(sys: Pendulum, plane: str, renderer: str, native: bool) -> None:
-    """Choose which world axes map to plot horizontal / vertical (2D ortho projection)."""
-    axes = _AXES_MAP[plane]
-    sys.get_camera_transform = lambda x, u, t: camera_matrix(
-        target=(0.0, 0.0, 0.0),
-        plot_axes=axes,
-        scale=10.0,
-    )
+    """Pick world axes for plot horizontal / vertical (2D orthographic projection)."""
+    apply_demo_camera(sys, plot_axes=_AXES_MAP[plane], scale=10.0)
     sys.animate(renderer=renderer, native=native)
 
 
 def run_target(sys: Pendulum, renderer: str, native: bool) -> None:
-    """Offset look-at target so the diagram is centered away from the origin."""
-    sys.get_camera_transform = lambda x, u, t: camera_matrix(
-        target=(2.0, 0.5, 0.0),
-        plot_axes=(0, 1),
-        scale=8.0,
-    )
+    """Shift look-at center (world point framed in the view)."""
+    apply_demo_camera(sys, target=(2.0, 0.5, 0.0), plot_axes=(0, 1), scale=8.0)
     sys.animate(renderer=renderer, native=native)
 
 
 def run_orientation_3d(sys: Pendulum, renderer: str, native: bool) -> None:
-    """3D window: initial elev/azim come from ``camera_matrix`` once at scene open.
-
-    ``plot_axes=(0, 2)`` is a common side view (world X horizontal, Z vertical).
-    """
-    sys.get_camera_transform = lambda x, u, t: camera_matrix(
-        target=(0.0, 0.0, 0.0),
-        plot_axes=(0, 2),
-        scale=12.0,
-    )
+    """``plot_axes=(0, 2)``: common side view (X horizontal, Z vertical) for ``is_3d``."""
+    apply_demo_camera(sys, plot_axes=(0, 2), scale=12.0)
     sys.animate(is_3d=True, renderer=renderer, native=native)
 
 
 def run_static(sys: Pendulum, plane: str, renderer: str) -> None:
-    """Single frame via :meth:`~minilink.core.system.DynamicSystem.render` (no animation)."""
-    axes = _AXES_MAP[plane]
-    sys.get_camera_transform = lambda x, u, t: camera_matrix(
-        target=(0.0, 0.0, 0.0),
-        plot_axes=axes,
-        scale=8.0,
-    )
+    """Single frame via ``render`` (no trajectory)."""
+    apply_demo_camera(sys, plot_axes=_AXES_MAP[plane], scale=8.0)
     u0 = sys.get_u_from_input_ports()
     sys.render(sys.x0, u0, 0.0, is_3d=False, renderer=renderer)
 
 
 def run_explicit_rotation(sys: Pendulum, renderer: str, native: bool) -> None:
-    """Supply an explicit orthonormal ``R`` (camera X,Y,Z in world) instead of ``plot_axes``."""
-    theta = np.deg2rad(28.0)
-    c, s = np.cos(theta), np.sin(theta)
-    R = np.array(
-        [
-            [c, -s, 0.0],
-            [s, c, 0.0],
-            [0.0, 0.0, 1.0],
-        ],
-        dtype=float,
-    )
-    sys.get_camera_transform = lambda x, u, t: camera_matrix(
-        target=(0.0, 0.0, 0.0),
-        R=R,
-        scale=10.0,
-    )
+    """Orthonormal ``R`` columns = camera X, Y, Z expressed in world coordinates."""
+    R = rotation_yaw_about_world_z(np.deg2rad(28.0))
+    apply_demo_camera(sys, R=R, scale=10.0)
     sys.animate(renderer=renderer, native=native)
 
 
@@ -146,7 +129,7 @@ def main() -> None:
         "--plane",
         choices=list(_AXES_MAP.keys()),
         default="xy",
-        help="For `projection`: world axes shown as horizontal / vertical.",
+        help="For `projection` / `static`: world axes as horizontal / vertical.",
     )
     parser.add_argument(
         "--renderer",

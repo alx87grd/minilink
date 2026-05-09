@@ -517,6 +517,11 @@ class System:
         scale 10.0, matching minilink's previous implicit framing. Override to
         follow a body, change projection axes, zoom, or orbit.
 
+        For a **fixed** camera defined only by
+        :func:`~minilink.graphical.primitives.camera_matrix` keyword arguments,
+        assign via :func:`~minilink.graphical.primitives.attach_standard_camera`
+        instead of duplicating this method.
+
         TODO: User Architectural Review (visualization contract is TRL 1).
         """
         from minilink.graphical.primitives import camera_matrix

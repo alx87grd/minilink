@@ -14,6 +14,7 @@ from minilink.core.system import DynamicSystem
 from minilink.graphical.animation import Animator
 from minilink.graphical.environment import override_env
 from minilink.graphical.primitives import (
+    attach_standard_camera,
     camera_matrix,
     world_to_camera,
 )
@@ -80,6 +81,14 @@ class TestSystemDefaultCamera(unittest.TestCase):
         s = DynamicSystem(2, 1, 1)
         T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
         np.testing.assert_array_equal(T, camera_matrix())
+
+    def test_attach_standard_camera_forwards_kwargs(self):
+        s = DynamicSystem(2, 1, 1)
+        attach_standard_camera(s, scale=4.5, plot_axes=(0, 2))
+        T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
+        np.testing.assert_array_equal(
+            T, camera_matrix(scale=4.5, plot_axes=(0, 2))
+        )
 
 
 class TestAnimatorPipesCameraToRenderer(unittest.TestCase):

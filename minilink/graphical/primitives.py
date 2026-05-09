@@ -503,6 +503,32 @@ def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0, R=None):
     return T
 
 
+def attach_standard_camera(system, **camera_matrix_kwargs):
+    """
+    Set ``system.get_camera_transform`` from constant :func:`camera_matrix` kwargs.
+
+    Use when framing does not depend on ``(x, u, t)``. Keyword arguments are forwarded
+    to :func:`camera_matrix`; omitting them matches the factory defaults (same as
+    :meth:`~minilink.core.system.DynamicSystem.get_camera_transform`).
+
+    For time-varying cameras (tracking bodies), assign ``get_camera_transform``
+    to a custom callable instead.
+
+    Parameters
+    ----------
+    system
+        Object whose ``get_camera_transform`` attribute is replaced (typically a
+        :class:`~minilink.core.system.DynamicSystem`).
+    camera_matrix_kwargs
+        Passed through to :func:`camera_matrix`.
+    """
+
+    def get_camera_transform(x, u, t):
+        return camera_matrix(**camera_matrix_kwargs)
+
+    system.get_camera_transform = get_camera_transform
+
+
 def world_to_camera(camera):
     """Return the world-to-camera (view) 4x4 matrix.
 
