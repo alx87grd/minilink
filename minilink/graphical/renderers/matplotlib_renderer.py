@@ -33,7 +33,6 @@ from minilink.graphical.primitives import (
 )
 from minilink.graphical.renderers.renderer import AnimationRenderer
 
-
 _AXIS_LABEL_BY_INDEX = ("X", "Y", "Z")
 
 
@@ -429,8 +428,8 @@ class MatplotlibRenderer(AnimationRenderer):
         self.canvas.clear()
         # 2D path uses an orthographic projection onto the camera plane: pre-multiply
         # body transforms by world-to-camera so primitive XY is already in camera frame.
-        # 3D matplotlib keeps world coordinates; ``_apply_camera`` updates view limits
-        # and ``view_init`` to match the camera per frame (supports follow / orbit).
+        # 3D matplotlib keeps world coordinates; limits and ``view_init`` come from the
+        # camera once at ``open_scene``, then the interactive UI owns the viewpoint.
         if self.canvas.is_3d:
             draw_transforms = transforms
         else:
@@ -438,7 +437,11 @@ class MatplotlibRenderer(AnimationRenderer):
             draw_transforms = [W @ T for T in transforms]
         for prim, T in zip(primitives, draw_transforms):
             self.canvas.draw_primitive(prim, T)
-        self._apply_camera(self.ax, camera, self.canvas.is_3d)
+        # 2D: refresh orthographic limits and axis labels from *camera* each frame.
+        # 3D: *camera* was applied once in ``open_scene``; keep mpl toolbars / mouse
+        # orbit from being reset every frame.
+        if not self.canvas.is_3d:
+            self._apply_camera(self.ax, camera, False)
         self.ax.set_title(f"Time = {t:.2f} s", fontsize=FONT_SIZE)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
@@ -477,7 +480,8 @@ class MatplotlibRenderer(AnimationRenderer):
                 draw_transforms = [W @ T for T in frame["transforms"]]
             for prim, T in zip(primitives, draw_transforms):
                 canvas.draw_primitive(prim, T)
-            self._apply_camera(ax, camera, is_3d)
+            if not is_3d:
+                self._apply_camera(ax, camera, False)
             ax.set_title(f"Time = {frame['t']:.2f} s", fontsize=FONT_SIZE)
             return canvas.drawn_objects
 

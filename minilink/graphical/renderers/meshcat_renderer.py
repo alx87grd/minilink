@@ -542,10 +542,8 @@ class MeshcatRenderer(AnimationRenderer):
         self.canvas.ensure_objects(primitives)
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
             self.canvas.update_primitive(i, prim, T)
-        # Best-effort follow-camera: re-aim the orbit pivot at the look-at target
-        # so meshcat tracks moving systems. Eye distance / orientation set once at
-        # open_scene; users keep their interactive control via the browser.
-        _apply_meshcat_camera_target(self.vis, camera)
+        # Camera matrix is applied only in ``open_scene`` / native-animation setup
+        # so the browser orbit controls are not overwritten each frame.
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
