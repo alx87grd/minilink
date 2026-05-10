@@ -4,7 +4,7 @@
 
 ### Project overview
 
-minilink is a pure Python library (no external services, databases, or web servers). See `README.md` for capabilities and `DESIGN.md` for architecture.
+minilink is a pure Python library (no external services, databases, or web servers in the core package). Optional examples under `examples/` may include a local-only dev server (see `examples/diagram_editor_web/README.md`). See `README.md` for capabilities and `DESIGN.md` for architecture.
 
 ### Environment
 
@@ -12,6 +12,7 @@ minilink is a pure Python library (no external services, databases, or web serve
 - System `graphviz` package must be installed (`apt install graphviz`) for the Python `graphviz` bindings to work.
 - Install dev dependencies: `pip install -e ".[dev]"` from the repo root.
 - Optional extras: `.[jax]`, `.[symbolic]`, `.[visualization]` — JAX tests are skipped gracefully if not installed.
+- Optional **diagram web editor** (not part of the library runtime): `pip install -e ".[diagram-editor]"` plus `npm install` / `npm run build` in `examples/diagram_editor_web/` (see that folder’s `README.md`).
 
 ### Running tests and lint
 

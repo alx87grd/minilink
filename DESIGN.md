@@ -32,7 +32,7 @@ backend switch or a `minilink.jax` package.
 
 | Package | Status | Role |
 | --- | --- | --- |
-| `core/` | TRL 7 | `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs, and lightweight blocks. |
+| `core/` | TRL 7 | `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs, lightweight blocks, and JSON diagram topology helpers (`diagram_topology.py`, MVP). |
 | `compile/` | TRL 4 | Backend policy, `ExecutionPlan`, and NumPy/JAX `DynamicsEvaluator` implementations. |
 | `simulation/` | TRL 4 | `Simulator`, solver backends, forced-input handling, simulation benchmarks. |
 | `optimization/` | TRL 1 | Pure `MathematicalProgram`, program evaluators, optimizer method presets, and NLP benchmarks. |
@@ -50,6 +50,7 @@ minilink/
   core/
     system.py
     diagram.py
+    diagram_topology.py
     trajectory.py
     costs.py
     sets.py
