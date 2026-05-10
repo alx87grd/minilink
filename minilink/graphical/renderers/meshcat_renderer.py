@@ -475,36 +475,6 @@ def _rigid_effective_transform(primitive, transform_matrix, tf):
     return None
 
 
-def _rh_world_target_and_eye(camera) -> tuple[np.ndarray, np.ndarray]:
-    """
-    World-frame look-at target and camera eye from a standard :func:`camera_matrix`
-    / :meth:`~minilink.core.system.System.get_camera_transform` value.
-
-    Column 2 is the camera view-out axis; the eye lies ``scale`` units along that
-    direction from the target (same side-channel ``camera[3, 3]`` convention).
-    """
-    target = np.asarray(camera[:3, 3], dtype=float).reshape(3)
-    z_out = np.asarray(camera[:3, 2], dtype=float).reshape(3)
-    zn = float(np.linalg.norm(z_out))
-    if zn < 1e-12:
-        z_out = np.array([0.0, 0.0, 1.0], dtype=float)
-    else:
-        z_out = z_out / zn
-    scale = float(np.asarray(camera[3, 3], dtype=float))
-    eye = target + scale * z_out
-    return target, eye
-
-
-def _apply_meshcat_camera(vis, camera) -> None:
-    """Set orbit pivot and eye via meshcat's RH camera APIs (handedness fix inside meshcat)."""
-    try:
-        target, eye = _rh_world_target_and_eye(camera)
-        vis.set_cam_target(target.tolist())
-        vis.set_cam_pos(eye.tolist())
-    except Exception:
-        pass
-
-
 class MeshcatRenderer(AnimationRenderer):
     """Browser-based playback and static-HTML snapshots."""
 
@@ -526,7 +496,6 @@ class MeshcatRenderer(AnimationRenderer):
         self.show = show
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
-        _apply_meshcat_camera(self.vis, camera)
         if show:
             import sys
 
@@ -547,8 +516,7 @@ class MeshcatRenderer(AnimationRenderer):
         self.canvas.ensure_objects(primitives)
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
             self.canvas.update_primitive(i, prim, T)
-        # Camera matrix is applied only in ``open_scene`` / native-animation setup
-        # so the browser orbit controls are not overwritten each frame.
+        # Meshcat uses the viewer default camera; ``camera`` is ignored.
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
@@ -624,7 +592,6 @@ class MeshcatRenderer(AnimationRenderer):
         self.show = True
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
-        _apply_meshcat_camera(self.vis, frames[0]["camera"])
         self.vis.open()
         self.vis.wait()
 
@@ -643,7 +610,6 @@ class MeshcatRenderer(AnimationRenderer):
         self.show = False
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=False)
-        _apply_meshcat_camera(self.vis, frames[0]["camera"])
 
         animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
         self.vis.set_animation(animation_obj, play=True, repetitions=1)

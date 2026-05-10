@@ -21,7 +21,6 @@ from minilink.graphical.renderers.matplotlib_renderer import (
     _axis_label_from_column,
     _camera_3d_view_init,
 )
-from minilink.graphical.renderers.meshcat_renderer import _rh_world_target_and_eye
 
 
 class TestCameraMatrix(unittest.TestCase):
@@ -59,20 +58,6 @@ class TestCameraMatrix(unittest.TestCase):
             camera_matrix(plot_axes=(0, 0))
         with self.assertRaises(ValueError):
             camera_matrix(plot_axes=(0, 5))
-
-    def test_meshcat_eye_along_view_out_from_target(self):
-        T = camera_matrix(scale=5.0)
-        target, eye = _rh_world_target_and_eye(T)
-        np.testing.assert_allclose(target, [0.0, 0.0, 0.0])
-        np.testing.assert_allclose(eye, [0.0, 0.0, 5.0])
-
-    def test_meshcat_eye_respects_target_and_rotated_axes(self):
-        T = camera_matrix(target=(1.0, 0.0, 0.0), plot_axes=(0, 2), scale=2.0)
-        target, eye = _rh_world_target_and_eye(T)
-        np.testing.assert_allclose(target, [1.0, 0.0, 0.0])
-        z = np.asarray(T[:3, 2], dtype=float)
-        z = z / np.linalg.norm(z)
-        np.testing.assert_allclose(eye, target + 2.0 * z)
 
     def test_world_to_camera_is_inverse_of_pose(self):
         T = camera_matrix(target=(2.0, -1.0, 3.0), plot_axes=(0, 2), scale=7.0)
