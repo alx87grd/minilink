@@ -380,7 +380,8 @@ Camera / framing contract:
   camera matrix consumed by every renderer. There is one matrix and one method:
   2D rendering is always an orthographic projection of the same 3D camera (no
   separate 2D pipeline). Built by `minilink.graphical.primitives.camera_matrix`:
-  - `T[:3, 3]` look-at target in world (the view re-centers each frame);
+  - `T[:3, 3]` look-at target in world (each frame for 2D projection; initial
+    framing for interactive 3D);
   - columns of `T[:3, :3]` are world directions of camera-X (plot horizontal),
     camera-Y (plot vertical), camera-Z (view-out); built from `plot_axes=(i, j)`
     as `(e_i, e_j, e_i × e_j)` or supplied directly via `R=`;
@@ -391,9 +392,9 @@ Camera / framing contract:
   matplotlib 2D / pygame pre-multiply body transforms by `world_to_camera(camera)`
   so primitive XY ends up in camera frame, with `xlim/ylim = ±T[3,3]` and axis
   labels auto-derived from the dominant world axis; matplotlib 3D decodes
-  `view_init(elev, azim)` from `R[:,2]` and re-centers `xlim/ylim/zlim` each
-  frame; meshcat best-effort applies the orbit pivot per frame and the eye
-  distance once at scene open.
+  `view_init(elev, azim)` from `R[:,2]` and sets `xlim/ylim/zlim` once at scene
+  open, then leaves the interactive camera to the UI; meshcat sets orbit pivot
+  and eye distance once at scene open (same interactive-camera rule).
 - Intentional non-knobs (KISS): anisotropic per-axis zoom and field-of-view are
   not in the contract; `aspect='equal'` is enforced everywhere.
 
