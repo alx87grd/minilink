@@ -12,11 +12,11 @@ sys.compute_trajectory(tf=10)
 
 
 # sys.animate()
-# sys.animate(renderer="matplotlib")
+sys.animate(renderer="matplotlib")
 # sys.animate(renderer="matplotlib", native=True)
 # sys.animate(renderer="matplotlib", native=True, html=True)
 
-sys.animate(renderer="meshcat")
+# sys.animate(renderer="meshcat")
 # sys.animate(renderer="meshcat", native=True)
 # sys.animate(renderer="meshcat", native=True, html=True)
 
