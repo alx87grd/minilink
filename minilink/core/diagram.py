@@ -125,10 +125,10 @@ class DiagramSystem(System):
 
         self.connect(source_sys_id, source_port_id, "output", output_port_id)
 
-    def get_graphe(self):
+    def get_graphe(self, *, port_links: bool = False):
         from minilink.graphical.graphe import get_diagram_graphe
 
-        return get_diagram_graphe(self)
+        return get_diagram_graphe(self, port_links=port_links)
 
     def get_local_state(self, x, sys_id):
 
@@ -336,7 +336,9 @@ class DiagramSystem(System):
             return xp.array([])
 
         xp = self._array_module_for(x, u, *local_u_list)
-        return xp.concatenate([xp.asarray(port_u).reshape(-1) for port_u in local_u_list])
+        return xp.concatenate(
+            [xp.asarray(port_u).reshape(-1) for port_u in local_u_list]
+        )
 
     def f(self, x, u, t=0, params=None) -> np.ndarray:
 

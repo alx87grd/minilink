@@ -6,8 +6,8 @@ Run from the repository root::
 
     python examples/diagram_editor_mvp/server.py
 
-Then open http://127.0.0.1:8765 in a browser. Wiring uses two port pickers plus
-Connect (Graphviz image is a live preview, not a hit target in this MVP).
+Then open http://127.0.0.1:8765 in a browser. **Click an output port, then an
+input port** on the Graphviz SVG to add a connection (inline SVG, not an ``<img>``).
 
 Requires the ``graphviz`` Python package and system Graphviz (``dot``), same as
 ``minilink.graphical.graphe``.
@@ -54,7 +54,9 @@ _INDEX_HTML = dedent(
         .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; margin-top: 0.5rem; }
         .row > div { flex: 1; min-width: 120px; }
         pre { background: #11111b; padding: 0.75rem; overflow: auto; font-size: 0.8rem; border-radius: 6px; border: 1px solid #3b4261; }
-        #preview { width: 100%; min-height: 200px; border: 1px dashed #414868; border-radius: 6px; background: #fff; }
+        #svgWrap { width: 100%; min-height: 200px; border: 1px dashed #414868; border-radius: 6px; background: #fff; overflow: auto; }
+        #svgWrap svg { display: block; max-width: 100%; height: auto; }
+        #svgWrap a { cursor: crosshair; }
         ul.edges { list-style: none; padding: 0; margin: 0; }
         ul.edges li { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid #2a2e3f; font-size: 0.9rem; }
         .muted { color: #565f89; font-size: 0.8rem; }
@@ -63,7 +65,8 @@ _INDEX_HTML = dedent(
     <body>
       <main>
         <h1>Diagram topology MVP</h1>
-        <p class="muted">JSON spec + Graphviz preview. Connect an output to an input with the pickers below.</p>
+        <p class="muted">Click an <strong>output</strong> port (right column), then an <strong>input</strong> port (left column) on another block.</p>
+        <p id="status" class="muted" style="margin-top:0.5rem;"></p>
         <section>
           <h2 style="margin-top:0;font-size:1rem;">Add block</h2>
           <div class="row">
@@ -74,22 +77,15 @@ _INDEX_HTML = dedent(
           <p class="muted">Params use defaults; edit JSON below for <code>Kp</code>, <code>x0</code>, etc.</p>
         </section>
         <section>
-          <h2 style="margin-top:0;font-size:1rem;">New connection</h2>
-          <div class="row">
-            <div><label>From (output)</label><select id="srcNode"></select></div>
-            <div><label>Port</label><select id="srcPort"></select></div>
-            <div><label>To (input)</label><select id="dstNode"></select></div>
-            <div><label>Port</label><select id="dstPort"></select></div>
-            <div><button type="button" id="btnWire">Connect</button></div>
-          </div>
-        </section>
-        <section>
           <h2 style="margin-top:0;font-size:1rem;">Edges</h2>
           <ul class="edges" id="edgeList"></ul>
         </section>
         <section>
-          <h2 style="margin-top:0;font-size:1rem;">Graphviz preview</h2>
-          <img id="preview" alt="diagram preview" />
+          <h2 style="margin-top:0;font-size:1rem;">Diagram (click to wire)</h2>
+          <div class="row" style="margin-bottom:0.5rem;">
+            <button type="button" class="secondary" id="btnClearPick">Clear port pick</button>
+          </div>
+          <div id="svgWrap"></div>
         </section>
         <section>
           <h2 style="margin-top:0;font-size:1rem;">JSON</h2>
@@ -103,55 +99,93 @@ _INDEX_HTML = dedent(
       </main>
       <script>
     const state = { spec: null, catalog: null };
+    let wireSrc = null;
+    function setStatus(t) {
+      document.getElementById('status').textContent = t;
+    }
     function portLists(kind, direction) {
       const sig = state.catalog[kind];
       if (!sig) return [];
       return [...sig[direction]];
     }
-    function refreshPortSelects() {
-      const nodes = state.spec.nodes;
-      const sel = (id) => document.getElementById(id);
-      const fillNodes = (el) => {
-        el.innerHTML = '';
-        for (const n of nodes) {
-          const o = document.createElement('option');
-          o.value = n.id; o.textContent = n.id + ' (' + n.kind + ')';
-          el.appendChild(o);
+    function parsePortHref(h) {
+      if (!h || h[0] !== '#') return null;
+      const raw = h.slice(1);
+      const q = raw.indexOf('?');
+      if (q < 0 || raw.slice(0, 2) !== 'ml') return null;
+      const params = new URLSearchParams(raw.slice(q + 1));
+      const dir = params.get('dir');
+      const sys = decodeURIComponent(params.get('sys') || '');
+      const port = decodeURIComponent(params.get('port') || '');
+      if (!dir || !sys || !port) return null;
+      return { dir, sys, port };
+    }
+    function onSvgWrapClick(e) {
+      const a = e.target.closest('a');
+      if (!a) return;
+      const h = a.getAttribute('href') || a.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+      const p = parsePortHref(h);
+      if (!p) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const node = state.spec.nodes.find((x) => x.id === p.sys);
+      if (!node) {
+        setStatus('Unknown block in diagram');
+        return;
+      }
+      if (p.dir === 'out') {
+        const outs = portLists(node.kind, 'outputs');
+        if (!outs.includes(p.port)) {
+          setStatus('That cell is not an output for this block');
+          return;
         }
-      };
-      fillNodes(sel('srcNode'));
-      fillNodes(sel('dstNode'));
-      const syncOut = () => {
-        const n = nodes.find((x) => x.id === sel('srcNode').value);
-        sel('srcPort').innerHTML = '';
-        if (!n) return;
-        for (const p of portLists(n.kind, 'outputs')) {
-          const o = document.createElement('option');
-          o.value = p; o.textContent = p;
-          sel('srcPort').appendChild(o);
+        wireSrc = { sys: p.sys, port: p.port };
+        setStatus('Picked output ' + p.sys + ':' + p.port + ' — click an input port');
+        return;
+      }
+      if (p.dir === 'in') {
+        const ins = portLists(node.kind, 'inputs');
+        if (!ins.includes(p.port)) {
+          setStatus('That cell is not an input for this block');
+          return;
         }
-      };
-      const syncIn = () => {
-        const n = nodes.find((x) => x.id === sel('dstNode').value);
-        sel('dstPort').innerHTML = '';
-        if (!n) return;
-        for (const p of portLists(n.kind, 'inputs')) {
-          const o = document.createElement('option');
-          o.value = p; o.textContent = p;
-          sel('dstPort').appendChild(o);
+        if (!wireSrc) {
+          setStatus('Click an output port first');
+          return;
         }
-      };
-      sel('srcNode').onchange = () => { syncOut(); };
-      sel('dstNode').onchange = () => { syncIn(); };
-      syncOut();
-      syncIn();
+        if (wireSrc.sys === p.sys) {
+          setStatus('Pick an input on a different block');
+          return;
+        }
+        const edge = {
+          source_sys: wireSrc.sys,
+          source_port: wireSrc.port,
+          target_sys: p.sys,
+          target_port: p.port,
+        };
+        const dup = state.spec.edges.some(
+          (x) => x.target_sys === edge.target_sys && x.target_port === edge.target_port,
+        );
+        if (dup) {
+          setStatus('That input already has a connection');
+          wireSrc = null;
+          return;
+        }
+        state.spec.edges.push(edge);
+        wireSrc = null;
+        setStatus(
+          'Connected ' + edge.source_sys + ':' + edge.source_port + ' → ' + edge.target_sys + ':' + edge.target_port,
+        );
+        push();
+      }
     }
     function kindSelect() {
       const sel = document.getElementById('nkind');
       sel.innerHTML = '';
       for (const k of Object.keys(state.catalog).sort()) {
         const o = document.createElement('option');
-        o.value = k; o.textContent = k;
+        o.value = k;
+        o.textContent = k;
         sel.appendChild(o);
       }
     }
@@ -175,6 +209,12 @@ _INDEX_HTML = dedent(
         ul.appendChild(li);
       });
     }
+    async function loadInlineSvg() {
+      const host = document.getElementById('svgWrap');
+      const r = await fetch('/api/graph.svg?_=' + Date.now());
+      const txt = await r.text();
+      host.innerHTML = txt;
+    }
     async function pull() {
       const r = await fetch('/api/spec');
       state.spec = await r.json();
@@ -184,38 +224,47 @@ _INDEX_HTML = dedent(
         state.catalog = await c.json();
         kindSelect();
       }
-      refreshPortSelects();
       renderEdges();
-      document.getElementById('preview').src = '/api/graph.svg?_=' + Date.now();
+      await loadInlineSvg();
+      setStatus(
+        wireSrc
+          ? 'Picked output ' + wireSrc.sys + ':' + wireSrc.port + ' — click an input'
+          : 'Click an output port, then an input port',
+      );
     }
     async function push() {
       document.getElementById('json').value = JSON.stringify(state.spec, null, 2);
-      const r = await fetch('/api/spec', { method: 'POST', body: JSON.stringify(state.spec), headers: { 'Content-Type': 'application/json' } });
+      const r = await fetch('/api/spec', {
+        method: 'POST',
+        body: JSON.stringify(state.spec),
+        headers: { 'Content-Type': 'application/json' },
+      });
       const j = await r.json();
-      if (!j.ok) { alert(j.error || 'save failed'); return; }
-      refreshPortSelects();
+      if (!j.ok) {
+        alert(j.error || 'save failed');
+        return;
+      }
       renderEdges();
-      document.getElementById('preview').src = '/api/graph.svg?_=' + Date.now();
+      await loadInlineSvg();
     }
+    document.getElementById('svgWrap').addEventListener('click', onSvgWrapClick, true);
+    document.getElementById('btnClearPick').onclick = () => {
+      wireSrc = null;
+      setStatus('Cleared — click an output port, then an input');
+    };
     document.getElementById('btnAdd').onclick = () => {
       const id = document.getElementById('nid').value.trim();
       const kind = document.getElementById('nkind').value;
-      if (!id) { alert('id required'); return; }
-      if (state.spec.nodes.some((n) => n.id === id)) { alert('duplicate id'); return; }
+      if (!id) {
+        alert('id required');
+        return;
+      }
+      if (state.spec.nodes.some((n) => n.id === id)) {
+        alert('duplicate id');
+        return;
+      }
       state.spec.nodes.push({ id, kind, params: {} });
       document.getElementById('nid').value = '';
-      push();
-    };
-    document.getElementById('btnWire').onclick = () => {
-      const srcNode = document.getElementById('srcNode').value;
-      const srcPort = document.getElementById('srcPort').value;
-      const dstNode = document.getElementById('dstNode').value;
-      const dstPort = document.getElementById('dstPort').value;
-      if (srcNode === dstNode) { alert('choose distinct blocks'); return; }
-      const edge = { source_sys: srcNode, source_port: srcPort, target_sys: dstNode, target_port: dstPort };
-      const dup = state.spec.edges.some((e) => e.target_sys === edge.target_sys && e.target_port === edge.target_port);
-      if (dup) { alert('that input is already driven'); return; }
-      state.spec.edges.push(edge);
       push();
     };
     document.getElementById('btnApply').onclick = async () => {
@@ -322,7 +371,7 @@ def _diagram_from_state() -> DiagramTopology:
 def _svg_bytes() -> bytes:
     top = _diagram_from_state()
     diagram = build_diagram_from_topology(top, default_mvp_catalog())
-    graphe = diagram.get_graphe()
+    graphe = diagram.get_graphe(port_links=True)
     if graphe is None:
         return b"<!-- graphviz unavailable -->"
     return graphe.pipe(format="svg")
