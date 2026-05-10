@@ -41,3 +41,5 @@ npm run dev
 Open the Vite URL (usually `http://127.0.0.1:5173`); `/api` is proxied to the FastAPI server.
 
 Use **Download JSON…** to save `{ "spec", "layout" }` to a file, and **Load JSON file…** to apply a saved file (server validates `spec` then refreshes the canvas).
+
+The **right sidebar** edits the diagram name, fits the view, and when a block is selected shows port names, numeric parameters for MVP kinds (`integrator`, `prop_controller`, `step`), **Apply block parameters**, and **Delete block**.

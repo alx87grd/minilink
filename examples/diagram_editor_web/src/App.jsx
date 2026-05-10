@@ -13,6 +13,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BlockNode } from "./BlockNode";
+import { UtilitySidebar } from "./UtilitySidebar.jsx";
 
 const nodeTypes = { block: BlockNode };
 
@@ -23,7 +24,7 @@ function handleToPort(handleId) {
   return handleId;
 }
 
-function specToFlow(spec, catalog, layout) {
+function specToFlow(spec, catalog, layout, selectedId) {
   const nodes = spec.nodes.map((n, i) => {
     const sig = catalog[n.kind] || { inputs: [], outputs: [] };
     const pos = layout[n.id] || {
@@ -34,6 +35,7 @@ function specToFlow(spec, catalog, layout) {
       id: n.id,
       type: "block",
       position: pos,
+      selected: n.id === selectedId,
       data: {
         id: n.id,
         kind: n.kind,
@@ -67,6 +69,7 @@ function EditorCanvas() {
   const [layout, setLayout] = useState({});
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const rf = useReactFlow();
 
   const reload = useCallback(async () => {
@@ -80,10 +83,15 @@ function EditorCanvas() {
     setSpec(body.spec);
     const lay = body.layout || {};
     setLayout(lay);
-    const { nodes: n, edges: e } = specToFlow(body.spec, c, lay);
+    const keep =
+      selectedId && body.spec.nodes.some((n) => n.id === selectedId)
+        ? selectedId
+        : null;
+    setSelectedId(keep);
+    const { nodes: n, edges: e } = specToFlow(body.spec, c, lay, keep);
     setNodes(n);
     setEdges(e);
-  }, [setEdges, setNodes]);
+  }, [selectedId, setEdges, setNodes]);
 
   useEffect(() => {
     reload();
@@ -190,12 +198,13 @@ function EditorCanvas() {
       };
       setSpec(next);
       setLayout(nextLayout);
-      const { nodes: n, edges: e } = specToFlow(next, catalog, nextLayout);
+      setSelectedId(id);
+      const { nodes: n, edges: e } = specToFlow(next, catalog, nextLayout, id);
       setNodes(n);
       setEdges(e);
       persist(next, nextLayout);
     },
-    [catalog, persist, rf, setEdges, setNodes, spec],
+    [catalog, persist, rf, setEdges, setNodes, setSelectedId, spec],
   );
 
   const ready = catalog && spec;
@@ -253,13 +262,93 @@ function EditorCanvas() {
     [reload],
   );
 
+  const onFitView = useCallback(() => {
+    rf.fitView({ padding: 0.15 });
+  }, [rf]);
+
+  const onNodeClick = useCallback(
+    (_, node) => {
+      setSelectedId(node.id);
+      setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === node.id })));
+    },
+    [setNodes],
+  );
+
+  const onPaneClick = useCallback(() => {
+    setSelectedId(null);
+    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+  }, [setNodes]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedId(null);
+    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+  }, [setNodes]);
+
+  const applyBlockParams = useCallback(
+    (nodeId, params) => {
+      if (!spec) return;
+      const next = {
+        ...spec,
+        nodes: spec.nodes.map((n) =>
+          n.id === nodeId ? { ...n, params } : n,
+        ),
+      };
+      const positions = layoutFromNodes(rf);
+      setLayout(positions);
+      setSpec(next);
+      const { nodes: n, edges: e } = specToFlow(next, catalog, positions, nodeId);
+      setNodes(n);
+      setEdges(e);
+      persist(next, positions);
+    },
+    [catalog, persist, rf, setEdges, setNodes, spec],
+  );
+
+  const renameDiagram = useCallback(
+    (name) => {
+      if (!spec) return;
+      const next = { ...spec, name };
+      const positions = layoutFromNodes(rf);
+      setSpec(next);
+      persist(next, positions);
+    },
+    [persist, rf, spec],
+  );
+
+  const deleteBlock = useCallback(
+    (nodeId) => {
+      if (!spec) return;
+      if (!window.confirm(`Delete block "${nodeId}" and all attached wires?`)) {
+        return;
+      }
+      const next = {
+        ...spec,
+        nodes: spec.nodes.filter((n) => n.id !== nodeId),
+        edges: spec.edges.filter(
+          (e) => e.source_sys !== nodeId && e.target_sys !== nodeId,
+        ),
+      };
+      const positions = layoutFromNodes(rf);
+      const nextLayout = { ...positions };
+      delete nextLayout[nodeId];
+      setLayout(nextLayout);
+      setSelectedId(null);
+      setSpec(next);
+      const { nodes: n, edges: e } = specToFlow(next, catalog, nextLayout, null);
+      setNodes(n);
+      setEdges(e);
+      persist(next, nextLayout);
+    },
+    [catalog, persist, rf, setEdges, setNodes, spec],
+  );
+
   const kindKeys = catalog ? Object.keys(catalog).sort() : [];
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="toolbar">
         <span style={{ opacity: 0.85 }}>
-          Drag from an output (right) to an input (left). Delete edges with Backspace.
+          Click a block for the sidebar. Drag outputs → inputs. Delete edges with Backspace.
         </span>
         <input id="new-id" placeholder="new block id" />
         <select id="new-kind" defaultValue={kindKeys[0] || ""}>
@@ -300,25 +389,41 @@ function EditorCanvas() {
           onChange={onPickJsonFile}
         />
       </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "row" }}>
         {ready ? (
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onEdgesDelete={onEdgesDelete}
-            onNodeDragStop={onNodeDragStop}
-            nodeTypes={nodeTypes}
-            fitView
-            snapToGrid
-            defaultEdgeOptions={defaultEdgeOptions}
-          >
-            <Background />
-            <Controls />
-            <MiniMap />
-          </ReactFlow>
+          <>
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onEdgesDelete={onEdgesDelete}
+                onNodeDragStop={onNodeDragStop}
+                onNodeClick={onNodeClick}
+                onPaneClick={onPaneClick}
+                nodeTypes={nodeTypes}
+                fitView
+                snapToGrid
+                defaultEdgeOptions={defaultEdgeOptions}
+              >
+                <Background />
+                <Controls />
+                <MiniMap />
+              </ReactFlow>
+            </div>
+            <UtilitySidebar
+              spec={spec}
+              catalog={catalog}
+              selectedId={selectedId}
+              onClearSelection={clearSelection}
+              onApplyParams={applyBlockParams}
+              onRenameDiagram={renameDiagram}
+              onDeleteBlock={deleteBlock}
+              onFitView={onFitView}
+            />
+          </>
         ) : (
           <div style={{ padding: 16 }}>Loading…</div>
         )}
