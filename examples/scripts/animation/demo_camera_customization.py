@@ -1,5 +1,24 @@
 """Camera customization basics: zoom, 2D projection plane, look-at target, 3D orientation.
 
+Public interface (what this script demonstrates)
+-------------------------------------------------
+
+**Minilink library**
+
+- ``sys.camera_target``, ``sys.camera_plot_axes``, ``sys.camera_scale``, ``sys.camera_R``
+  — stored on every :class:`~minilink.core.system.System`; the default
+  :meth:`~minilink.core.system.System.get_camera_transform` builds
+  :func:`~minilink.graphical.primitives.camera_matrix` from these fields.
+- ``attach_standard_camera(sys, target=..., plot_axes=..., scale=..., R=...)``
+  — updates those same fields (subset of ``camera_matrix`` keyword arguments).
+- ``camera_matrix(...)`` — underlying 4×4 factory (import elsewhere if you compose matrices yourself).
+
+**This file only**
+
+- :data:`USER_CAMERA` — optional dict merged into every recipe (same keys as ``camera_matrix``).
+- ``apply_demo_camera(sys, **recipe)`` — ``{**USER_CAMERA, **recipe}`` then ``attach_standard_camera``.
+- CLI: positional demo name + ``--plane``, ``--renderer``, ``--legacy-loop`` (see commands below).
+
 Quick tweaks:
 
 - Edit :data:`USER_CAMERA` (merged into each recipe via ``attach_standard_camera``), or
