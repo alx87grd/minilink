@@ -1,8 +1,7 @@
-"""Single frame with ``render`` (uses the same ``camera_*`` fields / ``get_camera_transform``)."""
-
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.graphical.primitives import attach_standard_camera
 
+# Single frame: render() uses the same get_camera_transform / camera_* fields
 sys = Pendulum()
 sys.params["m"] = 1.0
 sys.params["l"] = 5.0
