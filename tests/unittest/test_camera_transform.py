@@ -81,6 +81,17 @@ class TestSystemDefaultCamera(unittest.TestCase):
         T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
         np.testing.assert_array_equal(T, camera_matrix())
 
+    def test_camera_attributes_match_camera_matrix(self):
+        s = DynamicSystem(2, 1, 1)
+        s.camera_scale = 2.0
+        s.camera_plot_axes = (1, 2)
+        s.camera_target[:] = (1.0, -1.0, 0.5)
+        T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
+        np.testing.assert_array_equal(
+            T,
+            camera_matrix(target=(1.0, -1.0, 0.5), plot_axes=(1, 2), scale=2.0),
+        )
+
 
 class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
     def setUp(self):
