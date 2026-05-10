@@ -475,27 +475,32 @@ def _rigid_effective_transform(primitive, transform_matrix, tf):
     return None
 
 
-def _apply_meshcat_camera_target(vis, camera) -> None:
-    """Aim meshcat's orbit pivot at ``camera`` look-at target. Best-effort, swallows errors."""
-    try:
-        target = np.asarray(camera[:3, 3], dtype=float).reshape(3)
-        T = np.eye(4)
-        T[:3, 3] = target
-        vis["/Cameras/default"].set_transform(T)
-    except Exception:
-        pass
+def _rh_world_target_and_eye(camera) -> tuple[np.ndarray, np.ndarray]:
+    """
+    World-frame look-at target and camera eye from a standard :func:`camera_matrix`
+    / :meth:`~minilink.core.system.System.get_camera_transform` value.
+
+    Column 2 is the camera view-out axis; the eye lies ``scale`` units along that
+    direction from the target (same side-channel ``camera[3, 3]`` convention).
+    """
+    target = np.asarray(camera[:3, 3], dtype=float).reshape(3)
+    z_out = np.asarray(camera[:3, 2], dtype=float).reshape(3)
+    zn = float(np.linalg.norm(z_out))
+    if zn < 1e-12:
+        z_out = np.array([0.0, 0.0, 1.0], dtype=float)
+    else:
+        z_out = z_out / zn
+    scale = float(np.asarray(camera[3, 3], dtype=float))
+    eye = target + scale * z_out
+    return target, eye
 
 
 def _apply_meshcat_camera(vis, camera) -> None:
-    """Set initial orbit target and eye distance from a camera matrix. Best-effort."""
-    _apply_meshcat_camera_target(vis, camera)
+    """Set orbit pivot and eye via meshcat's RH camera APIs (handedness fix inside meshcat)."""
     try:
-        scale = float(camera[3, 3])
-        # Place the eye at distance ``scale`` along the camera-Z (view-out) direction
-        # in the rotated camera frame; meshcat then orbits around the target.
-        vis["/Cameras/default/rotated/<object>"].set_property(
-            "position", [0.0, 0.0, float(scale)]
-        )
+        target, eye = _rh_world_target_and_eye(camera)
+        vis.set_cam_target(target.tolist())
+        vis.set_cam_pos(eye.tolist())
     except Exception:
         pass
 
