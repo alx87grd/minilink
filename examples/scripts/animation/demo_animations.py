@@ -12,7 +12,7 @@ sys.compute_trajectory(tf=10, show=False)
 
 # sys.animate()
 sys.animate(renderer="matplotlib")
-
+sys.animate(renderer="matplotlib", is_3d=True)
 sys.animate(renderer="pygame")
 
 sys.animate(renderer="meshcat")
