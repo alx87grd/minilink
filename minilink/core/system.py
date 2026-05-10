@@ -228,8 +228,7 @@ class System:
         # ``compute_trajectory``.
         self.traj = None
 
-        # Standard camera (:meth:`get_camera_transform`): edit these fields or call
-        # :func:`~minilink.graphical.primitives.attach_standard_camera`.
+        # Standard camera for :meth:`get_camera_transform`: ``camera_*`` fields below.
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 10.0
@@ -520,30 +519,10 @@ class System:
         (plot vertical), and camera-Z (view-out), and ``T[3, 3]`` is the view
         scale (orthographic half-extent / perspective camera distance).
 
-        The default returns the canonical top-down view at the origin with
-        scale 10.0, matching minilink's previous implicit framing. Override to
-        follow a body, change projection axes, zoom, or orbit.
-
-        For a **fixed** camera defined only by :func:`~minilink.graphical.primitives.camera_matrix`
-        keyword arguments, set :attr:`camera_target`, :attr:`camera_plot_axes`,
-        :attr:`camera_scale`, and optionally :attr:`camera_R`, or call
-        :func:`~minilink.graphical.primitives.attach_standard_camera` instead of
-        overriding this method.
-
-        Notes
-        -----
-        The base implementation reads ``camera_target``, ``camera_plot_axes``,
-        ``camera_scale``, and ``camera_R`` on ``self`` (defaults match
-        :func:`~minilink.graphical.primitives.camera_matrix`). Assign those fields
-        directly for quick tweaks, or call
-        :func:`~minilink.graphical.primitives.attach_standard_camera`.
-
-        - ``camera_target`` — ndarray (3,), world look-at point.
-        - ``camera_plot_axes`` — axis indices ``(i, j)`` for plot horizontal /
-          vertical when ``camera_R`` is ``None``.
-        - ``camera_scale`` — orthographic half-extent / meshcat eye distance.
-        - ``camera_R`` — optional explicit ``(3, 3)`` basis (camera X,Y,Z in world);
-          when set, overrides ``camera_plot_axes``.
+        The default matches ``camera_matrix()`` via ``camera_target``,
+        ``camera_plot_axes``, ``camera_scale``, and optional ``camera_R`` on
+        ``self``. Edit those attributes for a fixed view, or override this method
+        for a time-varying camera.
 
         TODO: User Architectural Review (visualization contract is TRL 1).
         """

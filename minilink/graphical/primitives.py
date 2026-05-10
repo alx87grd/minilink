@@ -503,47 +503,6 @@ def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0, R=None):
     return T
 
 
-def attach_standard_camera(system, **kwargs):
-    """
-    Update :class:`~minilink.core.system.System` camera fields used by the default
-    :meth:`~minilink.core.system.System.get_camera_transform`.
-
-    Arguments match :func:`camera_matrix`. Omitted keys leave stored fields unchanged.
-    Passing ``plot_axes`` clears :attr:`~minilink.core.system.System.camera_R`
-    unless ``R`` is included in the same call.
-
-    Parameters
-    ----------
-    system
-        A :class:`~minilink.core.system.System` instance (has ``camera_*`` fields).
-    kwargs
-        Subset of ``target``, ``plot_axes``, ``scale``, ``R`` for :func:`camera_matrix`.
-
-    Notes
-    -----
-    Subclasses that override ``get_camera_transform`` are unaffected unless they
-    call ``super()`` or read the ``camera_*`` attributes.
-    """
-    if not hasattr(system, "camera_scale"):
-        raise AttributeError(
-            "attach_standard_camera expects a System with camera_target / "
-            "camera_plot_axes / camera_scale / camera_R attributes."
-        )
-    if "target" in kwargs:
-        system.camera_target = np.asarray(kwargs["target"], dtype=float).reshape(3)
-    if "scale" in kwargs:
-        system.camera_scale = float(kwargs["scale"])
-    if "plot_axes" in kwargs:
-        system.camera_plot_axes = tuple(kwargs["plot_axes"])
-    if "R" in kwargs:
-        R = kwargs["R"]
-        system.camera_R = (
-            None if R is None else np.asarray(R, dtype=float).reshape(3, 3)
-        )
-    elif "plot_axes" in kwargs:
-        system.camera_R = None
-
-
 def world_to_camera(camera):
     """Return the world-to-camera (view) 4x4 matrix.
 
