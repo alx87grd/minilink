@@ -35,6 +35,11 @@ jax = [
 ipopt = [
     "cyipopt>=1.3",
 ]
+# Parallel web diagram editor (examples/diagram_editor_web): FastAPI + static Vite build.
+diagram-editor = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+]
 
 [tool.ruff]
 line-length = 88
@@ -42,6 +47,8 @@ target-version = "py310"
 exclude = [
     "minilink/_version.py",
     "**/*.ipynb",
+    "examples/diagram_editor_web/node_modules",
+    "examples/diagram_editor_web/dist",
 ]
 
 [tool.ruff.lint]

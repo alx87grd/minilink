@@ -1,0 +1,103 @@
+:root {
+  font-family: system-ui, sans-serif;
+  background: #1a1b26;
+  color: #c0caf5;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.block-node {
+  border: 1px solid #565f89;
+  border-radius: 8px;
+  background: #24283b;
+  min-width: 160px;
+  color: #c0caf5;
+  font-size: 12px;
+}
+
+.block-title {
+  padding: 6px 8px;
+  border-bottom: 1px solid #414868;
+  font-weight: 600;
+}
+
+.block-title small {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.block-ports {
+  display: flex;
+  padding: 4px 0;
+}
+
+.block-in,
+.block-out {
+  flex: 1;
+}
+
+.block-out {
+  text-align: right;
+}
+
+.port-row {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.block-in .port-row {
+  padding-left: 14px;
+}
+
+.block-out .port-row {
+  justify-content: flex-end;
+  padding-right: 14px;
+}
+
+.port-handle {
+  width: 10px !important;
+  height: 10px !important;
+  border-width: 2px !important;
+}
+
+.block-in .port-handle {
+  left: -6px !important;
+}
+
+.block-out .port-handle {
+  right: -6px !important;
+  left: auto !important;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #16161e;
+  border-bottom: 1px solid #3b4261;
+}
+
+.toolbar input,
+.toolbar select,
+.toolbar button {
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #565f89;
+  background: #24283b;
+  color: #c0caf5;
+}
+
+.toolbar button {
+  cursor: pointer;
+  background: #414868;
+  border-color: #7aa2f7;
+}

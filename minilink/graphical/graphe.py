@@ -60,52 +60,14 @@ def plot_graphviz(graphe, show_inline=None, show_pdf=None, filename=None):
         print(f"Warning: Could not render graph. Is Graphviz installed? Error: {e}")
 
 
-def _port_link_href(graphe_node_id: str, side: str, port_id: str) -> str:
+def get_system_block_html(sys, html_id="sys1"):
     """
-    Build an HTML ``HREF`` fragment for a subsystem port (editor / SVG hit target).
-
-    The fragment uses ``#ml?dir=...`` so special characters in ids are query-encoded
-    and the client can parse with ``URLSearchParams``.
-    """
-    from html import escape
-    from urllib.parse import quote
-
-    nid = quote(str(graphe_node_id), safe="")
-    pid = quote(str(port_id), safe="")
-    href_value = f"ml?dir={side}&sys={nid}&port={pid}"
-    return ' HREF="#' + escape(href_value, quote=True) + '"'
-
-
-def get_system_block_html(
-    sys,
-    html_id="sys1",
-    *,
-    port_links: bool = False,
-    graphe_node_id: str | None = None,
-):
-    """
-    Get the HTML representation of the block for the label in the diagram.
-
-    Parameters
-    ----------
-    sys
-        Block whose port rows are rendered.
-    html_id
-        Subsystem id shown in the header row (``name::html_id``).
-    port_links
-        If ``True``, add ``HREF`` on each port cell so SVG output can expose
-        click targets (for example a diagram editor).
-    graphe_node_id
-        Graphviz node name used in ``HREF`` fragments. Defaults to ``html_id``.
-        Use this when the display ``html_id`` differs from the graph node id
-        (for example the external input node uses ``html_id="Inputs"`` but the
-        node key is ``"input"``).
+    Get the HTML representation of the block for the label in the diagram
     """
     import numpy as np
 
     n_ports_out = len(sys.outputs)
     n_ports_in = len(sys.inputs)
-    nid = graphe_node_id if graphe_node_id is not None else html_id
 
     html = (
         f'<TABLE BORDER="0" CELLSPACING="0">\n'
@@ -119,27 +81,19 @@ def get_system_block_html(
 
         if j < n_ports_in and j < n_ports_out:
             port_id = list(sys.inputs.keys())[j]
-            href = _port_link_href(nid, "in", port_id) if port_links else ""
-            html += (
-                f'<TD PORT="{port_id}"{href} align="left" BORDER="1">{port_id}</TD>\n'
-            )
+            html += f'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
             port_id = list(sys.outputs.keys())[j]
-            href = _port_link_href(nid, "out", port_id) if port_links else ""
-            html += f'<TD PORT="{port_id}"{href} BORDER="1">{port_id}</TD>\n'
+            html += f'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
 
         elif j < n_ports_in:
             port_id = list(sys.inputs.keys())[j]
-            href = _port_link_href(nid, "in", port_id) if port_links else ""
-            html += (
-                f'<TD PORT="{port_id}"{href} align="left" BORDER="1">{port_id}</TD>\n'
-            )
+            html += f'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
             html += '<TD BORDER="1"> </TD>\n'
 
         elif j < n_ports_out:
             port_id = list(sys.outputs.keys())[j]
             html += '<TD BORDER="1"> </TD>\n'
-            href = _port_link_href(nid, "out", port_id) if port_links else ""
-            html += f'<TD PORT="{port_id}"{href} BORDER="1">{port_id}</TD>\n'
+            html += f'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
 
         html += "</TR>\n"
     html += "</TABLE>"
@@ -169,17 +123,9 @@ def get_system_graphe(sys):
     return g
 
 
-def get_diagram_graphe(diagram, *, port_links: bool = False):
+def get_diagram_graphe(diagram):
     """
-    Get the Graphviz representation of a diagram.
-
-    Parameters
-    ----------
-    diagram
-        Diagram to render.
-    port_links
-        If ``True``, emit ``HREF`` on port table cells so SVG viewers can use
-        port-level anchors (for example click-to-connect editors).
+    Get the Graphviz representation of a diagram
     """
     try:
         import graphviz
@@ -204,19 +150,12 @@ def get_diagram_graphe(diagram, *, port_links: bool = False):
         g.node(
             "input",
             shape="none",
-            label="<"
-            + get_system_block_html(
-                input_block,
-                "Inputs",
-                port_links=port_links,
-                graphe_node_id="input",
-            )
-            + ">",
+            label="<" + get_system_block_html(input_block, "Inputs") + ">",
         )
 
     # Add subsystems nodes
     for sys_id, sys in diagram.subsystems.items():
-        label = f"<{get_system_block_html(sys, sys_id, port_links=port_links)}>"
+        label = f"<{get_system_block_html(sys, sys_id)}>"
         g.node(
             sys_id,
             shape="none",
@@ -229,14 +168,7 @@ def get_diagram_graphe(diagram, *, port_links: bool = False):
         g.node(
             "output",
             shape="none",
-            label="<"
-            + get_system_block_html(
-                output_block,
-                "Outputs",
-                port_links=port_links,
-                graphe_node_id="output",
-            )
-            + ">",
+            label="<" + get_system_block_html(output_block, "Outputs") + ">",
         )
 
     # Add edges

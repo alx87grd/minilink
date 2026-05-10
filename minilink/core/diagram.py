@@ -125,10 +125,10 @@ class DiagramSystem(System):
 
         self.connect(source_sys_id, source_port_id, "output", output_port_id)
 
-    def get_graphe(self, *, port_links: bool = False):
+    def get_graphe(self):
         from minilink.graphical.graphe import get_diagram_graphe
 
-        return get_diagram_graphe(self, port_links=port_links)
+        return get_diagram_graphe(self)
 
     def get_local_state(self, x, sys_id):
 
