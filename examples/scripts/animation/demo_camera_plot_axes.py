@@ -1,7 +1,6 @@
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.graphical.primitives import attach_standard_camera
 
-# 2D projection plane: plot_axes = which world axes map to plot X / plot Y
+# Which world axes appear as plot horizontal / vertical (when camera_R is None).
 sys = Pendulum()
 sys.params["m"] = 1.0
 sys.params["l"] = 5.0
@@ -9,5 +8,6 @@ sys.x0[0] = 2.0
 
 sys.compute_trajectory(tf=10.0)
 
-attach_standard_camera(sys, plot_axes=(0, 2), scale=10.0)
+sys.camera_plot_axes = (0, 2)
+sys.camera_scale = 10.0
 sys.animate()
