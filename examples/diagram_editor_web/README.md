@@ -39,3 +39,5 @@ npm run dev
 ```
 
 Open the Vite URL (usually `http://127.0.0.1:5173`); `/api` is proxied to the FastAPI server.
+
+Use **Download JSON…** to save `{ "spec", "layout" }` to a file, and **Load JSON file…** to apply a saved file (server validates `spec` then refreshes the canvas).

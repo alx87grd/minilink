@@ -11,7 +11,7 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BlockNode } from "./BlockNode";
 
 const nodeTypes = { block: BlockNode };
@@ -205,6 +205,54 @@ function EditorCanvas() {
     [],
   );
 
+  const fileInputRef = useRef(null);
+
+  const downloadJson = useCallback(() => {
+    if (!spec) return;
+    const positions = layoutFromNodes(rf);
+    const payload = { spec, layout: positions };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "minilink-diagram.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [rf, spec]);
+
+  const onPickJsonFile = useCallback(
+    async (event) => {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = "";
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const body = JSON.parse(text);
+        if (!body.spec) {
+          window.alert("JSON must contain a top-level \"spec\" object.");
+          return;
+        }
+        const layoutIn = body.layout && typeof body.layout === "object" ? body.layout : {};
+        const r = await fetch("/api/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ spec: body.spec, layout: layoutIn }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          window.alert(err.detail || "Server rejected this file");
+          return;
+        }
+        await reload();
+      } catch (e) {
+        window.alert(`Could not load file: ${e}`);
+      }
+    },
+    [reload],
+  );
+
   const kindKeys = catalog ? Object.keys(catalog).sort() : [];
 
   return (
@@ -233,8 +281,24 @@ function EditorCanvas() {
           Add block
         </button>
         <button type="button" onClick={() => reload()}>
-          Reload
+          Reload from server
         </button>
+        <button type="button" onClick={downloadJson}>
+          Download JSON…
+        </button>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+        >
+          Load JSON file…
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: "none" }}
+          onChange={onPickJsonFile}
+        />
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         {ready ? (
