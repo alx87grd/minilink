@@ -61,6 +61,15 @@ def _camera_3d_view_init(camera):
     return elev, azim
 
 
+def _camera_is_world_xy(camera) -> bool:
+    """True when 2D drawing can stay in world XY and move only axis limits."""
+    R_xy = np.asarray(camera[:3, :2], dtype=float)
+    return bool(
+        np.allclose(R_xy[:, 0], [1.0, 0.0, 0.0])
+        and np.allclose(R_xy[:, 1], [0.0, 1.0, 0.0])
+    )
+
+
 class MatplotlibCanvas:
     """Maps primitives to matplotlib artists (internal drawing layer)."""
 
@@ -392,8 +401,12 @@ class MatplotlibRenderer(AnimationRenderer):
             if view is not None:
                 ax.view_init(elev=view[0], azim=view[1])
         else:
-            ax.set_xlim(-scale, scale)
-            ax.set_ylim(-scale, scale)
+            if _camera_is_world_xy(camera):
+                ax.set_xlim(target[0] - scale, target[0] + scale)
+                ax.set_ylim(target[1] - scale, target[1] + scale)
+            else:
+                ax.set_xlim(-scale, scale)
+                ax.set_ylim(-scale, scale)
             ax.set_xlabel(_axis_label_from_column(camera[:3, 0]))
             ax.set_ylabel(_axis_label_from_column(camera[:3, 1]))
             ax.set_aspect("equal")
@@ -426,11 +439,12 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         self.canvas.clear()
-        # 2D path uses an orthographic projection onto the camera plane: pre-multiply
-        # body transforms by world-to-camera so primitive XY is already in camera frame.
+        # Normal 2D XY views keep geometry in world coordinates and move only the
+        # axis limits, matching Pyro's dynamic-domain behavior. Other 2D axis
+        # pairs still project onto the selected camera plane.
         # 3D matplotlib keeps world coordinates; limits and ``view_init`` come from the
         # camera once at ``open_scene``, then the interactive UI owns the viewpoint.
-        if self.canvas.is_3d:
+        if self.canvas.is_3d or _camera_is_world_xy(camera):
             draw_transforms = transforms
         else:
             W = world_to_camera(camera)
@@ -473,7 +487,7 @@ class MatplotlibRenderer(AnimationRenderer):
             frame = frames[frame_idx]
             canvas.clear()
             camera = frame["camera"]
-            if is_3d:
+            if is_3d or _camera_is_world_xy(camera):
                 draw_transforms = frame["transforms"]
             else:
                 W = world_to_camera(camera)

@@ -48,11 +48,6 @@ class TestCameraMatrix(unittest.TestCase):
         np.testing.assert_array_equal(T[:3, 3], [2.0, -1.0, 3.0])
         self.assertEqual(T[3, 3], 4.0)
 
-    def test_explicit_R_overrides_plot_axes(self):
-        R = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
-        T = camera_matrix(plot_axes=(0, 2), R=R)
-        np.testing.assert_array_equal(T[:3, :3], R)
-
     def test_invalid_plot_axes_raises(self):
         with self.assertRaises(ValueError):
             camera_matrix(plot_axes=(0, 0))
@@ -117,6 +112,25 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         self.assertEqual(backend.ax.get_ylabel(), "Y")
         plt.close(backend.fig)
 
+    def test_xy_follow_camera_keeps_2d_geometry_in_world_coordinates(self):
+        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.primitives import Point, camera_matrix, translation_matrix
+
+        s = DynamicSystem(0, 0, 0)
+        a = Animator(s)
+        backend = MatplotlibRenderer(a)
+        camera = camera_matrix(target=(10.0, 3.0, 0.0), scale=4.0)
+
+        backend.open_scene(is_3d=False, show=False, camera=camera)
+        backend.draw_frame([Point()], [translation_matrix(10.0, 3.0, 0.0)], 0.0, camera)
+
+        self.assertEqual(backend.ax.get_xlim(), (6.0, 14.0))
+        self.assertEqual(backend.ax.get_ylim(), (-1.0, 7.0))
+        point_line = backend.canvas.drawn_objects[0]
+        np.testing.assert_allclose(point_line.get_xdata(), np.array([10.0]))
+        np.testing.assert_allclose(point_line.get_ydata(), np.array([3.0]))
+        plt.close(backend.fig)
+
     def test_xz_camera_sets_z_as_vertical_axis(self):
         s = DynamicSystem(2, 1, 1)
         s.get_camera_transform = lambda x, u, t: camera_matrix(
@@ -169,7 +183,7 @@ class TestRendererHelpers(unittest.TestCase):
         self.assertEqual(_axis_label_from_column(v), "")
 
     def test_view_init_decode_default_top_down(self):
-        T = camera_matrix()  # R = I → view-out = +Z
+        T = camera_matrix()  # identity orientation means view-out = +Z
         elev, azim = _camera_3d_view_init(T)
         self.assertAlmostEqual(elev, 90.0)
         self.assertAlmostEqual(azim, 0.0)

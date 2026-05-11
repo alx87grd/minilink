@@ -22,6 +22,7 @@ from minilink.graphical.primitives import (
     Plane,
     Rod,
     Sphere,
+    camera_matrix,
     pose2d_matrix,
     scale_pose2d_matrix,
     translation_matrix,
@@ -119,6 +120,7 @@ class DynamicBicycle(DynamicSystem):
 
         self.wheel_len = 0.6
         self.wheel_width = 0.2
+        self.camera_follow_vehicle = True
 
     def M_mat(self, q: np.ndarray) -> np.ndarray:
         return np.diag(np.array([self.mass, self.mass, self.inertia], dtype=float))
@@ -209,6 +211,24 @@ class DynamicBicycle(DynamicSystem):
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
     ) -> np.ndarray:
         return x.copy()
+
+    def get_camera_transform(self, x, u, t):
+        """Return a camera centered on the vehicle pose by default.
+
+        ``camera_target`` is treated as an offset from the vehicle position
+        when ``camera_follow_vehicle`` is true. Set ``camera_follow_vehicle`` to
+        false to use the base fixed-camera interpretation of ``camera_target``.
+        """
+        target = np.asarray(self.camera_target, dtype=float).reshape(3).copy()
+        if self.camera_follow_vehicle:
+            target[0] += float(x[0])
+            target[1] += float(x[1])
+
+        return camera_matrix(
+            target=target,
+            plot_axes=self.camera_plot_axes,
+            scale=self.camera_scale,
+        )
 
     def get_kinematic_geometry(self):
         wl, ww = self.wheel_len, self.wheel_width

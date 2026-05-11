@@ -20,6 +20,8 @@ diagram.add_input_port(1, "u_cmd", nominal_value=np.array([1.0]))
 diagram.connect("input", "u_cmd", "plant", "u")
 diagram.connect_new_output_port("plant", "y", "y")
 
+diagram.plot_graphe()
+
 traj = diagram.compute_trajectory(
     tf=5.0,
     dt=0.05,

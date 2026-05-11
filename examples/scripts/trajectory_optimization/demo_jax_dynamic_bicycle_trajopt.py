@@ -91,4 +91,6 @@ traj = planner.compute_solution()
 
 planner.plot_solution(signals=("x", "u"))
 sys.traj = traj
-sys.animate(renderer="meshcat")
+# sys.animate(renderer="meshcat")
+sys.animate()
+sys.animate(renderer="plotly")

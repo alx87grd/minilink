@@ -446,7 +446,7 @@ def scale_pose2d_matrix(x=0.0, y=0.0, theta=0.0, scale=1.0):
     return T
 
 
-def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0, R=None):
+def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0):
     """Standard 4x4 camera transform.
 
     The matrix doubles as the camera's pose in the world frame **and** the
@@ -474,30 +474,22 @@ def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0, R=None):
         Default ``(0, 1)`` is the canonical top-down view.
     scale : float, optional
         View half-extent (orthographic) or camera distance (perspective).
-    R : array-like 3x3, optional
-        Explicit rotation; columns must be the world directions of camera-X,
-        camera-Y, camera-Z. Overrides ``plot_axes`` when given (use this for
-        orbit, isometric, or arbitrary view orientations).
-
     Returns
     -------
     np.ndarray
         4x4 camera transform.
     """
     T = np.eye(4)
-    if R is not None:
-        T[:3, :3] = np.asarray(R, dtype=float).reshape(3, 3)
-    else:
-        i, j = plot_axes
-        if i == j or i not in (0, 1, 2) or j not in (0, 1, 2):
-            raise ValueError(
-                "plot_axes must be two distinct world axis indices in {0, 1, 2}; "
-                f"got {plot_axes!r}."
-            )
-        e = np.eye(3)
-        T[:3, 0] = e[i]
-        T[:3, 1] = e[j]
-        T[:3, 2] = np.cross(e[i], e[j])
+    i, j = plot_axes
+    if i == j or i not in (0, 1, 2) or j not in (0, 1, 2):
+        raise ValueError(
+            "plot_axes must be two distinct world axis indices in {0, 1, 2}; "
+            f"got {plot_axes!r}."
+        )
+    e = np.eye(3)
+    T[:3, 0] = e[i]
+    T[:3, 1] = e[j]
+    T[:3, 2] = np.cross(e[i], e[j])
     T[:3, 3] = np.asarray(target, dtype=float).reshape(3)
     T[3, 3] = float(scale)
     return T

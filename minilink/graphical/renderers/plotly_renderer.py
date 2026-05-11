@@ -184,6 +184,35 @@ def _camera_ranges(camera):
     return tuple([float(c - scale), float(c + scale)] for c in target)
 
 
+def _camera_is_world_xy(camera) -> bool:
+    """True when 2D drawing can stay in world XY and move only axis ranges."""
+    R_xy = np.asarray(camera[:3, :2], dtype=float)
+    return bool(
+        np.allclose(R_xy[:, 0], [1.0, 0.0, 0.0])
+        and np.allclose(R_xy[:, 1], [0.0, 1.0, 0.0])
+    )
+
+
+def _has_dynamic_world_xy_camera(frames) -> bool:
+    if not frames or not all(_camera_is_world_xy(frame["camera"]) for frame in frames):
+        return False
+    first = frames[0]["camera"]
+    first_state = np.array(
+        [first[0, 3], first[1, 3], first[3, 3]],
+        dtype=float,
+    )
+    return any(
+        not np.allclose(
+            np.array(
+                [frame["camera"][0, 3], frame["camera"][1, 3], frame["camera"][3, 3]],
+                dtype=float,
+            ),
+            first_state,
+        )
+        for frame in frames[1:]
+    )
+
+
 def _circle_points(radius: float, center, *, n: int = 72) -> np.ndarray:
     center = np.asarray(center, dtype=float)
     if center.size == 2:
@@ -364,9 +393,12 @@ class PlotlyRenderer(AnimationRenderer):
         )
         fig.update_layout(**self._fixed_animation_layout(frame_traces, frames))
 
+        dynamic_xy_layout = (not self.is_3d) and _has_dynamic_world_xy_camera(frames)
+
         plotly_frames = []
         for i, traces in enumerate(frame_traces):
-            plotly_frames.append(go.Frame(data=traces, name=str(i)))
+            layout = self._xy_layout(frames[i]["camera"]) if dynamic_xy_layout else None
+            plotly_frames.append(go.Frame(data=traces, layout=layout, name=str(i)))
         fig.frames = tuple(plotly_frames)
 
         frame_duration = max(1, int(round(schedule.interval_ms)))
@@ -466,11 +498,18 @@ class PlotlyRenderer(AnimationRenderer):
 
     def _xy_layout(self, camera, *, extent: float | None = None):
         scale = float(camera[3, 3]) if extent is None else float(extent)
+        target = np.asarray(camera[:3, 3], dtype=float).reshape(3)
         x_label = _axis_label_from_column(camera[:3, 0])
         y_label = _axis_label_from_column(camera[:3, 1])
+        if _camera_is_world_xy(camera):
+            x_range = [float(target[0] - scale), float(target[0] + scale)]
+            y_range = [float(target[1] - scale), float(target[1] + scale)]
+        else:
+            x_range = [-scale, scale]
+            y_range = [-scale, scale]
         return {
             "xaxis": {
-                "range": [-scale, scale],
+                "range": x_range,
                 "autorange": False,
                 "title": {"text": x_label},
                 "zeroline": True,
@@ -478,7 +517,7 @@ class PlotlyRenderer(AnimationRenderer):
                 "scaleratio": 1,
             },
             "yaxis": {
-                "range": [-scale, scale],
+                "range": y_range,
                 "autorange": False,
                 "title": {"text": y_label},
                 "zeroline": True,
@@ -545,7 +584,7 @@ class PlotlyRenderer(AnimationRenderer):
 
     def _traces_for_frame(self, primitives, transforms, camera):
         go = _import_plotly()
-        if self.is_3d:
+        if self.is_3d or _camera_is_world_xy(camera):
             draw_transforms = transforms
         else:
             W = world_to_camera(camera)

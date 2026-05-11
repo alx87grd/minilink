@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation import Animator, _make_renderer
+from minilink.graphical.primitives import Point, camera_matrix, translation_matrix
 from minilink.graphical.plotly_style import (
     PLOTLY_ANIMATION_2D_MARGIN,
     PLOTLY_ANIMATION_HEIGHT,
@@ -81,6 +83,31 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertEqual(tuple(fig.layout.xaxis.range), (-10.0, 10.0))
         self.assertEqual(tuple(fig.layout.yaxis.range), (-10.0, 10.0))
 
+    def test_static_xy_camera_keeps_geometry_in_world_coordinates(self):
+        sys = DynamicSystem(0, 0, 0)
+        animator = Animator(sys)
+        backend = PlotlyRenderer(animator)
+        camera = camera_matrix(target=(10.0, 3.0, 0.0), scale=4.0)
+
+        backend.open_scene(
+            is_3d=False,
+            show=False,
+            camera=camera,
+            title="Plotly camera",
+        )
+        backend.draw_frame(
+            [Point()],
+            [translation_matrix(10.0, 3.0, 0.0)],
+            0.0,
+            camera,
+        )
+        fig = backend.present(block=False)
+
+        self.assertEqual(tuple(fig.layout.xaxis.range), (6.0, 14.0))
+        self.assertEqual(tuple(fig.layout.yaxis.range), (-1.0, 7.0))
+        np.testing.assert_allclose(np.asarray(fig.data[0].x, dtype=float), [10.0])
+        np.testing.assert_allclose(np.asarray(fig.data[0].y, dtype=float), [3.0])
+
     def test_static_3d_frame_builds_scatter3d(self):
         sys = DynamicSystem(1, 1, 1)
         animator = Animator(sys)
@@ -147,6 +174,42 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertFalse(fig.layout.xaxis.autorange)
         self.assertFalse(fig.layout.yaxis.autorange)
         self.assertIsNone(fig.frames[0].layout.xaxis.range)
+
+    def test_inline_animation_updates_xy_camera_axis_ranges(self):
+        sys = DynamicSystem(0, 0, 0)
+        backend = PlotlyRenderer(Animator(sys))
+        frames = [
+            {
+                "t": 0.0,
+                "transforms": [translation_matrix(0.0, 0.0, 0.0)],
+                "camera": camera_matrix(target=(0.0, 0.0, 0.0), scale=2.0),
+            },
+            {
+                "t": 0.1,
+                "transforms": [translation_matrix(10.0, 3.0, 0.0)],
+                "camera": camera_matrix(target=(10.0, 3.0, 0.0), scale=2.0),
+            },
+        ]
+
+        fig = backend.render_inline_animation(
+            [Point()],
+            frames,
+            SimpleNamespace(interval_ms=50),
+            is_3d=False,
+        )
+
+        self.assertEqual(tuple(fig.layout.xaxis.range), (-2.0, 2.0))
+        self.assertEqual(tuple(fig.layout.yaxis.range), (-2.0, 2.0))
+        self.assertEqual(tuple(fig.frames[1].layout.xaxis.range), (8.0, 12.0))
+        self.assertEqual(tuple(fig.frames[1].layout.yaxis.range), (1.0, 5.0))
+        np.testing.assert_allclose(
+            np.asarray(fig.frames[1].data[0].x, dtype=float),
+            [10.0],
+        )
+        np.testing.assert_allclose(
+            np.asarray(fig.frames[1].data[0].y, dtype=float),
+            [3.0],
+        )
 
     def test_plotly_native_false_html_false_raises(self):
         sys = DynamicSystem(1, 1, 1)

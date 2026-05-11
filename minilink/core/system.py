@@ -232,7 +232,6 @@ class System:
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 10.0
-        self.camera_R = None
 
     # Core Dynamical Contract
 
@@ -520,20 +519,14 @@ class System:
         scale (orthographic half-extent / perspective camera distance).
 
         The default matches ``camera_matrix()`` via ``camera_target``,
-        ``camera_plot_axes``, ``camera_scale``, and optional ``camera_R`` on
-        ``self``. Edit those attributes for a fixed view, or override this method
-        for a time-varying camera.
+        ``camera_plot_axes``, and ``camera_scale`` on ``self``. Edit those
+        attributes for a fixed view, or override this method for a time-varying
+        camera.
 
         TODO: User Architectural Review (visualization contract is TRL 1).
         """
         from minilink.graphical.primitives import camera_matrix
 
-        if self.camera_R is not None:
-            return camera_matrix(
-                target=self.camera_target,
-                scale=self.camera_scale,
-                R=self.camera_R,
-            )
         return camera_matrix(
             target=self.camera_target,
             plot_axes=self.camera_plot_axes,

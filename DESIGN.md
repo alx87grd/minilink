@@ -398,19 +398,23 @@ Camera / framing contract:
     framing for interactive 3D);
   - columns of `T[:3, :3]` are world directions of camera-X (plot horizontal),
     camera-Y (plot vertical), camera-Z (view-out); built from `plot_axes=(i, j)`
-    as `(e_i, e_j, e_i × e_j)` or supplied directly via `R=`;
+    as `(e_i, e_j, e_i × e_j)`;
   - `T[3, 3]` is the view scale (amplitude-channel convention, same as
     `torque_pose2d_matrix`): orthographic half-extent for matplotlib 2D/3D and
     pygame; perspective camera distance for meshcat.
 - Renderers consume only the slots they understand and ignore the rest:
-  matplotlib 2D / pygame pre-multiply body transforms by `world_to_camera(camera)`
-  so primitive XY ends up in camera frame, with `xlim/ylim = ±T[3,3]` and axis
-  labels auto-derived from the dominant world axis; matplotlib 3D decodes
-  `view_init(elev, azim)` from `R[:,2]` and sets `xlim/ylim/zlim` once at scene
-  open, then leaves the interactive camera to the UI; meshcat sets orbit pivot
-  and eye distance once at scene open (same interactive-camera rule).
-- Intentional non-knobs (KISS): anisotropic per-axis zoom and field-of-view are
-  not in the contract; `aspect='equal'` is enforced everywhere.
+  matplotlib 2D keeps ordinary top-down XY views in world coordinates and moves
+  only `xlim/ylim = target ± T[3,3]`, so grid ticks remain world-fixed under
+  following cameras; non-XY 2D projections pre-multiply body transforms by
+  `world_to_camera(camera)` so primitive XY ends up in camera frame; matplotlib
+  3D decodes `view_init(elev, azim)` from `T[:3,2]` and sets
+  `xlim/ylim/zlim` once at scene open, then leaves the interactive camera to the
+  UI; meshcat sets orbit pivot and eye distance once at scene open (same
+  interactive-camera rule).
+- Intentional non-knobs (KISS): explicit arbitrary camera rotation,
+  anisotropic per-axis zoom, and field-of-view are not in the default camera
+  helper; override `get_camera_transform` directly when a system needs a custom
+  camera. `aspect='equal'` is enforced everywhere.
 
 Repository conventions: Python 3.10+; type hints and NumPy-style docstrings on
 public APIs; lazy optional imports; equation code stays explicit and math-close;
