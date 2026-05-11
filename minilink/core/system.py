@@ -678,62 +678,7 @@ class System:
             verbose=verbose,
         )
 
-        n_pts = sim.n_pts
-        times = sim.times
-
-        def _sample_callable(fn, expected_dim):
-            samples = np.zeros((expected_dim, n_pts), dtype=float)
-            for i, ti in enumerate(times):
-                value = np.asarray(fn(float(ti)), dtype=float)
-                if expected_dim == 1 and value.ndim == 0:
-                    samples[0, i] = float(value)
-                else:
-                    value = np.asarray(value, dtype=float).reshape(expected_dim)
-                    samples[:, i] = value
-            return samples
-
-        def _coerce_series(data, expected_dim, label):
-            if callable(data):
-                return _sample_callable(data, expected_dim)
-
-            arr = np.asarray(data, dtype=float)
-
-            if arr.ndim == 0:
-                if expected_dim != 1:
-                    raise ValueError(
-                        f"{label} must have shape ({expected_dim}, {n_pts})"
-                    )
-                return np.full((1, n_pts), float(arr), dtype=float)
-
-            if arr.ndim == 1:
-                if expected_dim == 1 and arr.shape[0] == n_pts:
-                    return arr.reshape(1, n_pts)
-                if arr.shape[0] == expected_dim:
-                    return np.repeat(arr.reshape(expected_dim, 1), n_pts, axis=1)
-                raise ValueError(f"{label} must have shape ({expected_dim}, {n_pts})")
-
-            if arr.ndim == 2 and arr.shape == (expected_dim, n_pts):
-                return arr
-
-            raise ValueError(f"{label} must have shape ({expected_dim}, {n_pts})")
-
-        if input_port_id is None:
-            u_traj = _coerce_series(u, self.m, "u")
-        else:
-            port = self.inputs[input_port_id]
-            port_slice = self.get_input_port_slice(input_port_id)
-            u_traj = np.repeat(
-                self.get_u_from_input_ports().reshape(self.m, 1),
-                n_pts,
-                axis=1,
-            )
-            u_traj[port_slice, :] = _coerce_series(
-                u,
-                port.dim,
-                f"u for input port '{input_port_id}'",
-            )
-
-        traj = sim.solve_forced(u_traj)
+        traj = sim.solve_forced(u, input_port_id=input_port_id)
         if show:
             plot_time_signals(self, traj, signals=signals, backend=plot_backend)
         self.traj = traj

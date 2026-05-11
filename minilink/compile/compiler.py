@@ -327,72 +327,46 @@ def check_algebraic_loops(
         If an algebraic loop is detected, with the full cycle path in the
         error message.
     """
-    # Tracks ports that have been FULLY explored (including all dependencies)
     visited: set[tuple[str, str]] = set()
-    # Path of the current recursion to provide a trace if a loop is found
     stack: list[tuple[str, str]] = []
-    # Set mirror of stack for O(1) cycle detection
     stack_set: set[tuple[str, str]] = set()
-    # The resulting topological order
     order: list[tuple[str, str]] = []
 
     def visit_port(sys_id: str, port_id: str) -> None:
         node = (sys_id, port_id)
 
-        # 1. Algebraic loop detection: if node is already on the recursion stack
         if node in stack_set:
             cycle_start_idx = stack.index(node)
             cycle_path = stack[cycle_start_idx:] + [node]
             cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
             raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
 
-        # 2. End-Point A: if we've already fully analyzed this node, stop here (Memoization)
         if node in visited:
             return
 
-        # 3. Mark as currently visiting
         stack.append(node)
         stack_set.add(node)
 
-        # 4. Explore dependencies (upstream crawl)
-        # Get the specific output port object we are visiting
         port = diagram.subsystems[sys_id].outputs.get(port_id)
         if port is not None:
-            # Get the list of input ports that this output depends on (feedthrough)
             deps = port.dependencies
             sys_inputs = diagram.subsystems[sys_id].inputs
-            # If "all", this output depends on every input port of the subsystem
             input_deps = sys_inputs.keys() if deps == "all" else deps
 
-            # Iterate over all input ports that this output depends on
             for in_port_id in input_deps:
-                # Find what is connected to this input port (the 'source')
                 source = diagram.connections[sys_id].get(in_port_id)
-                # End-Point B: if not connected, the chain ends here
                 if source is not None:
-                    # A source is a tuple: (source_subsystem_id, source_output_port_id)
                     src_sys_id, src_port_id = source
-                    # Recursively visit source subsystem if it's not a diagram input
-                    # End-Point C: Diagram inputs are terminal nodes for this search
                     if src_sys_id != "input":
                         visit_port(src_sys_id, src_port_id)
 
-        # 5. Finishing node: backtrack and finalize the execution order
-        # Remove the current node from the path list; we've finished this branch
         stack.pop()
-        # Remove from set; this node is no longer part of the "active" path
         stack_set.remove(node)
-        # Mark as visited; ensures we never waste time re-exploring this port
         visited.add(node)
-        # Store result; adding it LAST means all its dependencies are already
-        # in the 'order' list. This transforms a complex graph into a simple,
-        # optimized sequence where every signal is calculated before it's needed.
         order.append(node)
 
-    # STARTING POINT: EXPLORE ALL OUTPUT PORTS
-    # Initiate the recursive depth-first search from every subsystem output port.
-    for sys_id, sys in diagram.subsystems.items():
-        for port_id in sys.outputs:
+    for sys_id, subsystem in diagram.subsystems.items():
+        for port_id in subsystem.outputs:
             visit_port(sys_id, port_id)
 
     return order
@@ -445,18 +419,14 @@ def _build_gather_sources(
             else:
                 src_sys_id, src_port_id = source
                 if src_sys_id == "input":
-                    # External diagram input → slice into u
                     source_type = EXTERNAL_INPUT
                     u_idx = 0
                     for input_port_id, input_port in diagram.inputs.items():
-                        # We found the matching diagram input port.
-                        # Calculate its 'slice' in the flat global input vector 'u'
                         if input_port_id == src_port_id:
                             source_val = slice(u_idx, u_idx + input_port.dim)
                             break
                         u_idx += input_port.dim
                 else:
-                    # Internal connection → slice into signal buffer
                     source_type = INTERNAL_SIGNAL
                     source_val = output_slices[(src_sys_id, src_port_id)]
 

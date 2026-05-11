@@ -147,20 +147,52 @@ class DynamicsEvaluator(ABC):
 
         u_sequence: (N, m) → returns (N+1, n) including x0.
         """
-        raise NotImplementedError("TODO")
+        u_sequence = np.asarray(u_sequence)
+        if u_sequence.ndim != 2 or u_sequence.shape[1] != self.m:
+            raise ValueError(f"u_sequence must have shape (N, {self.m})")
+
+        x = np.asarray(x0).reshape(self.n)
+        x_samples = np.zeros((u_sequence.shape[0] + 1, self.n))
+        x_samples[0] = x
+
+        t = t0
+        for k, u_k in enumerate(u_sequence):
+            x = self.rk4_step(x, u_k, t, dt)
+            t = t + dt
+            x_samples[k + 1] = x
+
+        return x_samples
 
     # Integration — parametric tier (caller-supplied params)
     def rk4_step_p(self, x, u, t, dt, params):
         """Single RK4 step with caller-supplied params."""
-        raise NotImplementedError("TODO")
+        k1 = self.f_p(x, u, t, params)
+        k2 = self.f_p(x + 0.5 * dt * k1, u, t + 0.5 * dt, params)
+        k3 = self.f_p(x + 0.5 * dt * k2, u, t + 0.5 * dt, params)
+        k4 = self.f_p(x + dt * k3, u, t + dt, params)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
     def euler_step_p(self, x, u, t, dt, params):
         """Single Euler step with caller-supplied params."""
-        raise NotImplementedError("TODO")
+        return x + dt * self.f_p(x, u, t, params)
 
     def rollout_p(self, x0, u_sequence, t0, dt, params):
         """Parametric rollout. (N, m) → (N+1, n)."""
-        raise NotImplementedError("TODO")
+        u_sequence = np.asarray(u_sequence)
+        if u_sequence.ndim != 2 or u_sequence.shape[1] != self.m:
+            raise ValueError(f"u_sequence must have shape (N, {self.m})")
+
+        x = np.asarray(x0).reshape(self.n)
+        x_samples = np.zeros((u_sequence.shape[0] + 1, self.n))
+        x_samples[0] = x
+
+        t = t0
+        for k, u_k in enumerate(u_sequence):
+            x = self.rk4_step_p(x, u_k, t, dt, params)
+            t = t + dt
+            x_samples[k + 1] = x
+
+        return x_samples
 
     # Integration — IVP tier (frozen u + frozen params)
     def rk4_step_ivp(self, x, t, dt):
@@ -190,19 +222,19 @@ class DynamicsEvaluator(ABC):
     # Could be implemented with finite differences for numpy later
     def jacobian_f_x(self, x, u, t=0.0):
         """∂f/∂x → (n, n). JAX backends override."""
-        raise NotImplementedError("TODO")
+        raise NotImplementedError("jacobian_f_x is not available for this evaluator")
 
     def jacobian_f_u(self, x, u, t=0.0):
         """∂f/∂u → (n, m). JAX backends override."""
-        raise NotImplementedError("TODO")
+        raise NotImplementedError("jacobian_f_u is not available for this evaluator")
 
     def jacobian_h_x(self, x, u, t=0.0):
         """∂h/∂x → (p, n). JAX backends override."""
-        raise NotImplementedError("TODO")
+        raise NotImplementedError("jacobian_h_x is not available for this evaluator")
 
     def jacobian_h_u(self, x, u, t=0.0):
         """∂h/∂u → (p, m). JAX backends override."""
-        raise NotImplementedError("TODO")
+        raise NotImplementedError("jacobian_h_u is not available for this evaluator")
 
     def linearize(self, x_eq, u_eq, t=0.0):
         """(A, B, C, D) linearization at equilibrium.
@@ -214,4 +246,8 @@ class DynamicsEvaluator(ABC):
         C : (p, n) — ∂h/∂x
         D : (p, m) — ∂h/∂u
         """
-        raise NotImplementedError("TODO")
+        A = self.jacobian_f_x(x_eq, u_eq, t)
+        B = self.jacobian_f_u(x_eq, u_eq, t)
+        C = self.jacobian_h_x(x_eq, u_eq, t)
+        D = self.jacobian_h_u(x_eq, u_eq, t)
+        return A, B, C, D

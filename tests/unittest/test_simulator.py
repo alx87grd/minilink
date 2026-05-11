@@ -198,6 +198,42 @@ class TestNewSimulator(unittest.TestCase):
         with self.assertRaises(ValueError):
             sim.solve_forced(bad_u)
 
+    def test_solve_forced_accepts_callable_full_input(self):
+        sim = Simulator(
+            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
+
+        traj = sim.solve_forced(lambda t: 10.0 * t)
+
+        np.testing.assert_allclose(traj.u, np.array([[0.0, 1.0, 2.0]]))
+
+    def test_solve_forced_accepts_constant_vector(self):
+        sim = Simulator(
+            TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
+
+        traj = sim.solve_forced(np.array([3.0, 4.0]))
+
+        np.testing.assert_allclose(
+            traj.u,
+            np.array(
+                [
+                    [3.0, 3.0, 3.0],
+                    [4.0, 4.0, 4.0],
+                ]
+            ),
+        )
+
+    def test_solve_forced_accepts_scalar_on_one_named_port(self):
+        sim = Simulator(
+            TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
+
+        traj = sim.solve_forced(5.0, input_port_id="left")
+
+        np.testing.assert_allclose(traj.u[0, :], np.array([5.0, 5.0, 5.0]))
+        np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
+
     def test_solve_forced_supports_fixed_step_rk4(self):
         sim = Simulator(
             StableLinearSystem(),

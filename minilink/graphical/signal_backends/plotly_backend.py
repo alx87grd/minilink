@@ -8,6 +8,13 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from minilink.graphical.environment import detect_env
+from minilink.graphical.plotly_style import (
+    PLOTLY_FIG_WIDTH,
+    PLOTLY_SIGNAL_MARGIN,
+    PLOTLY_SIGNAL_MIN_HEIGHT,
+    PLOTLY_SIGNAL_ROW_HEIGHT,
+    PLOTLY_TEMPLATE,
+)
 from minilink.graphical.time_signals import (
     LivePlotHandle,
     PlotResult,
@@ -247,7 +254,11 @@ def _create_figure(spec: SignalPlotSpec, **kwargs):
     go, make_subplots = _import_plotly()
 
     kwargs = dict(kwargs)
-    height = kwargs.pop("height", max(300, 170 * len(spec.traces)))
+    width = kwargs.pop("width", PLOTLY_FIG_WIDTH)
+    height = kwargs.pop(
+        "height",
+        max(PLOTLY_SIGNAL_MIN_HEIGHT, PLOTLY_SIGNAL_ROW_HEIGHT * len(spec.traces)),
+    )
     # Forwarded from live/open paths for Matplotlib; not valid Plotly layout keys.
     kwargs.pop("pause", None)
     kwargs.pop("block", None)
@@ -276,9 +287,12 @@ def _create_figure(spec: SignalPlotSpec, **kwargs):
     fig.update_xaxes(title_text="Time [s]", row=len(spec.traces), col=1)
     fig.update_layout(
         title=spec.title,
+        width=width,
         height=height,
         showlegend=False,
-        margin={"l": 70, "r": 20, "t": 50, "b": 45},
+        margin=dict(PLOTLY_SIGNAL_MARGIN),
+        template=PLOTLY_TEMPLATE,
+        hovermode="x unified",
     )
     if kwargs:
         fig.update_layout(**kwargs)

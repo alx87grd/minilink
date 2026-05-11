@@ -137,9 +137,26 @@ class Animator:
         Meshcat native animation only keyframes rigid pose (position+quaternion).
         Primitives whose geometry changes every frame (``TorqueArrow``) are frozen
         at ``t=0`` in the native path.
+
+        Plotly does not support the legacy per-frame Python loop
+        (``native=False`` with ``html=False``): use ``native=True`` or
+        ``html=True`` for inline/browser-frame playback.
         """
         if html is None:
             html = prefers_inline_animation()
+
+        import sys
+
+        if "google.colab" in sys.modules and renderer.strip().lower() == "meshcat":
+            html = True
+
+        renderer_key = renderer.strip().lower()
+        if renderer_key == "plotly" and not native and show and not html:
+            raise ValueError(
+                "renderer='plotly' with native=False is not supported when html=False "
+                "(Plotly has no working per-frame redraw loop). "
+                "Use native=True, or use html=True for inline framed playback."
+            )
 
         backend = _make_renderer(renderer, self)
         primitives = self.sys.get_kinematic_geometry()
@@ -148,11 +165,6 @@ class Animator:
             self._prepare_frame(traj, frame_idx, schedule, primitives=primitives)
             for frame_idx in range(schedule.n_frames)
         ]
-
-        import sys
-
-        if "google.colab" in sys.modules and renderer.strip().lower() == "meshcat":
-            html = True
 
         if html:
             try:

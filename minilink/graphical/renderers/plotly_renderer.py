@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import types
+
 import matplotlib.colors as mcolors
 import numpy as np
 
+from minilink.graphical.plotly_style import (
+    PLOTLY_2D_MARGIN,
+    PLOTLY_3D_MARGIN,
+    PLOTLY_ANIMATION_2D_MARGIN,
+    PLOTLY_ANIMATION_3D_MARGIN,
+    PLOTLY_ANIMATION_HEIGHT,
+    PLOTLY_FIG_WIDTH,
+    PLOTLY_TEMPLATE,
+)
 from minilink.graphical.primitives import (
     Arrow,
     Box,
@@ -48,6 +59,56 @@ def _import_plotly():
             "pip install 'minilink[plotting]'",
         ) from exc
     return go
+
+
+def _attach_plotly_animation_ipython_display(fig) -> None:
+    """
+    Attach IPython display logic so framed animations autoplay per figure.
+
+    JupyterLab / VS Code default to the ``plotly_mimetype`` renderer, which serializes
+    JSON only and never runs Plotly's HTML ``auto_play`` bootstrap. When that renderer
+    is active, force ``notebook_connected`` (HTML + CDN Plotly.js) with
+    ``auto_play=True``. Classic notebook stacks use ``pio.show(..., auto_play=True)``
+    on the default renderer chain instead.
+
+    ``fig._minilink_plotly_animation_opts`` must be set before calling this function so
+    autoplay uses the same frame timing as the Play control (Plotly's default
+    ``Plotly.animate(..., null)`` pacing is much slower).
+    """
+
+    def _ipython_display_(self):
+        import plotly.io as pio
+
+        if not (pio.renderers.render_on_display and pio.renderers.default):
+            print(repr(self))
+            return
+
+        default = (pio.renderers.default or "").strip()
+        tokens = [s.strip() for s in default.split("+") if s.strip()] if default else []
+
+        uses_plotly_mimetype = False
+        for name in tokens:
+            try:
+                renderer = pio.renderers[name]
+            except Exception:
+                continue
+            if type(renderer).__name__ == "PlotlyRenderer":
+                uses_plotly_mimetype = True
+                break
+
+        anim_opts = getattr(self, "_minilink_plotly_animation_opts", None)
+
+        if uses_plotly_mimetype:
+            pio.show(
+                self,
+                renderer="notebook_connected",
+                auto_play=True,
+                animation_opts=anim_opts,
+            )
+        else:
+            pio.show(self, auto_play=True, animation_opts=anim_opts)
+
+    fig._ipython_display_ = types.MethodType(_ipython_display_, fig)
 
 
 def _axis_label_from_column(col) -> str:
@@ -275,7 +336,10 @@ class PlotlyRenderer(AnimationRenderer):
     def play_native(self, primitives, frames, schedule, *, is_3d: bool):
         self.is_3d = is_3d
         fig = self._build_animation_figure(primitives, frames, schedule)
-        fig.show()
+        fig.show(
+            auto_play=True,
+            animation_opts=getattr(fig, "_minilink_plotly_animation_opts", None),
+        )
         self.fig = fig
         return fig
 
@@ -306,6 +370,13 @@ class PlotlyRenderer(AnimationRenderer):
         fig.frames = tuple(plotly_frames)
 
         frame_duration = max(1, int(round(schedule.interval_ms)))
+        # Plotly HTML autoplay calls Plotly.animate(gd, null, opts). Without opts,
+        # plotly.js uses a slow default step duration; match the Play button / FuncAnimation pacing.
+        fig._minilink_plotly_animation_opts = {
+            "frame": {"duration": frame_duration, "redraw": True},
+            "fromcurrent": True,
+            "transition": {"duration": 0},
+        }
         slider_steps = [
             {
                 "args": [
@@ -322,14 +393,17 @@ class PlotlyRenderer(AnimationRenderer):
             for i, frame in enumerate(frames)
         ]
         fig.update_layout(
+            margin=self._animation_margin(),
             updatemenus=[
                 {
                     "type": "buttons",
                     "showactive": False,
                     "x": 0.0,
-                    "y": -0.12,
+                    "y": -0.08,
                     "xanchor": "left",
                     "yanchor": "top",
+                    "direction": "left",
+                    "pad": {"r": 10, "t": 0},
                     "buttons": [
                         {
                             "label": "Play",
@@ -365,11 +439,12 @@ class PlotlyRenderer(AnimationRenderer):
                 {
                     "active": 0,
                     "currentvalue": {"prefix": "t = ", "suffix": " s"},
-                    "pad": {"t": 45},
+                    "pad": {"t": 35, "b": 5},
                     "steps": slider_steps,
                 }
             ],
         )
+        _attach_plotly_animation_ipython_display(fig)
         return fig
 
     def _build_figure(self, traces, camera, *, title: str):
@@ -414,10 +489,10 @@ class PlotlyRenderer(AnimationRenderer):
         fig.update_layout(
             title=title,
             showlegend=False,
-            margin={"l": 55, "r": 25, "t": 50, "b": 50},
-            template="plotly_white",
-            width=700,
-            height=560,
+            margin=dict(PLOTLY_2D_MARGIN),
+            template=PLOTLY_TEMPLATE,
+            width=PLOTLY_FIG_WIDTH,
+            height=PLOTLY_ANIMATION_HEIGHT,
             **self._xy_layout(camera),
         )
 
@@ -425,12 +500,17 @@ class PlotlyRenderer(AnimationRenderer):
         fig.update_layout(
             title=title,
             showlegend=False,
-            margin={"l": 0, "r": 0, "t": 45, "b": 0},
-            template="plotly_white",
-            width=700,
-            height=560,
+            margin=dict(PLOTLY_3D_MARGIN),
+            template=PLOTLY_TEMPLATE,
+            width=PLOTLY_FIG_WIDTH,
+            height=PLOTLY_ANIMATION_HEIGHT,
             scene=self._scene_layout(camera),
         )
+
+    def _animation_margin(self) -> dict:
+        if self.is_3d:
+            return dict(PLOTLY_ANIMATION_3D_MARGIN)
+        return dict(PLOTLY_ANIMATION_2D_MARGIN)
 
     def _scene_layout(self, camera, *, ranges=None):
         if ranges is None:

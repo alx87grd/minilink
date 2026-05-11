@@ -6,6 +6,11 @@ import pytest
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation import Animator, _make_renderer
+from minilink.graphical.plotly_style import (
+    PLOTLY_ANIMATION_2D_MARGIN,
+    PLOTLY_ANIMATION_HEIGHT,
+    PLOTLY_FIG_WIDTH,
+)
 from minilink.graphical.renderers.plotly_renderer import PlotlyRenderer, _import_plotly
 
 
@@ -71,6 +76,8 @@ class TestPlotlyRenderer(unittest.TestCase):
 
         self.assertEqual(len(fig.data), 2)
         self.assertEqual(fig.data[0].type, "scatter")
+        self.assertEqual(fig.layout.width, PLOTLY_FIG_WIDTH)
+        self.assertEqual(fig.layout.height, PLOTLY_ANIMATION_HEIGHT)
         self.assertEqual(tuple(fig.layout.xaxis.range), (-10.0, 10.0))
         self.assertEqual(tuple(fig.layout.yaxis.range), (-10.0, 10.0))
 
@@ -116,6 +123,9 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertEqual(len(fig.data), 2)
         self.assertEqual(len(fig.frames), 3)
         self.assertEqual(len(fig.frames[0].data), 2)
+        self.assertEqual(fig.layout.width, PLOTLY_FIG_WIDTH)
+        self.assertEqual(fig.layout.height, PLOTLY_ANIMATION_HEIGHT)
+        self.assertEqual(fig.layout.margin.b, PLOTLY_ANIMATION_2D_MARGIN["b"])
 
     def test_inline_animation_uses_fixed_camera_2d_axes(self):
         sys = DynamicSystem(1, 0, 1)
@@ -137,6 +147,38 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertFalse(fig.layout.xaxis.autorange)
         self.assertFalse(fig.layout.yaxis.autorange)
         self.assertIsNone(fig.frames[0].layout.xaxis.range)
+
+    def test_plotly_native_false_html_false_raises(self):
+        sys = DynamicSystem(1, 1, 1)
+        traj = Trajectory(
+            t=np.array([0.0, 0.1]),
+            x=np.array([[0.0, 0.1]]),
+            u=np.array([[1.0, 1.0]]),
+        )
+        with self.assertRaisesRegex(ValueError, "renderer='plotly'.*native=False"):
+            Animator(sys).animate_simulation(
+                traj,
+                renderer="plotly",
+                html=False,
+                native=False,
+                show=True,
+            )
+
+    def test_plotly_native_false_html_true_allowed(self):
+        sys = DynamicSystem(1, 1, 1)
+        traj = Trajectory(
+            t=np.array([0.0, 0.1]),
+            x=np.array([[0.0, 0.1]]),
+            u=np.array([[1.0, 1.0]]),
+        )
+        fig = Animator(sys).animate_simulation(
+            traj,
+            renderer="plotly",
+            html=True,
+            native=False,
+            show=False,
+        )
+        self.assertEqual(len(fig.frames), 2)
 
 
 if __name__ == "__main__":

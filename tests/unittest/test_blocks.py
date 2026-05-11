@@ -36,6 +36,30 @@ class TestBlocks(unittest.TestCase):
             np.array([3.0]),
         )
 
+    def test_integrator_compiled_rollout(self):
+        plant = Integrator()
+        evaluator = plant.compile()
+
+        u_sequence = np.ones((3, 1))
+        x = evaluator.rollout(np.array([0.0]), u_sequence, t0=0.0, dt=0.1)
+
+        np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.1, 0.2, 0.3]))
+
+    def test_integrator_compiled_parametric_rollout(self):
+        plant = Integrator()
+        evaluator = plant.compile()
+
+        u_sequence = np.ones((2, 1))
+        x = evaluator.rollout_p(
+            np.array([0.0]),
+            u_sequence,
+            t0=0.0,
+            dt=0.1,
+            params={"k": 2.0},
+        )
+
+        np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.2, 0.4]))
+
     def test_prop_controller_scales_tracking_error(self):
         controller = PropController()
         controller.params["Kp"] = 2.5

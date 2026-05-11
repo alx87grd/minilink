@@ -75,7 +75,40 @@ algebra for simple sets and costs; `Jax<Plant>` twins only when one readable
 implementation cannot serve both NumPy and JAX. Frame limits around traceability
 and diagram params, not legacy parallel JAX layers.
 
-## 5. Future Directions
+## 5. Phase B Review Queue
+
+These are larger simplification or contract moves identified during the Phase A
+cleanup pass. They need maintainer review before implementation.
+
+- Split the `System` facade from the math contract: keep `f`, `h`, ports,
+  params, and state metadata central; move plotting, graph, animation, and game
+  shortcuts behind a small facade/mixin layer only if the public API stays
+  equally readable.
+- Freeze top-level public exports in `minilink/__init__.py`; decide whether the
+  package should stay namespace-only or expose a tiny textbook API such as
+  `System`, `DiagramSystem`, `Simulator`, `Trajectory`, and common blocks.
+- Decide whether diagram validation belongs in a separate debug/check function
+  rather than in the plain wiring methods. The default source path should stay
+  readable and direct.
+- Design the diagram parametric evaluator tier (`f_p`, `h_p`, `outputs_p`) so
+  NumPy and JAX diagram params have one explicit contract instead of today’s
+  bind-or-recompile limitation.
+- Consolidate trajectory-optimization transcription internals: direct
+  collocation, shooting, and multiple shooting repeat objective integration,
+  path constraints, boundary constraints, and result reconstruction.
+- Split the large dynamic bicycle module into reviewed math, tire, graphics, and
+  JAX-specific sections or modules without changing the user-facing plant names.
+- Decide what to do with placeholder planning modules (`search/rrt.py` and
+  `policy_synthesis/dynamic_programming.py`): implement behind minimal contracts
+  or mark them clearly as non-public prototypes.
+- Introduce the planned solver-options object for simulation so `Simulator`,
+  `compute_trajectory`, and forced-input paths do not grow more keyword
+  ceremony.
+- Review the graphics contract after core stabilizes: camera/framing is now
+  useful but still provisional, and renderers share enough behavior to justify a
+  focused consolidation pass.
+
+## 6. Future Directions
 
 - differentiable simulation rollouts;
 - hybrid/event systems;

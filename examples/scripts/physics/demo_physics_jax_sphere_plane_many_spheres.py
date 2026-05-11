@@ -28,7 +28,10 @@ spheres = [SphereModel(mass=m, radius=r) for (r, m) in specs]
 # XY layout and varied Z heights.
 x_vals = np.linspace(-6.0, 6.0, nx)
 y_vals = np.linspace(-4.5, 4.5, ny)
-xy_grid = [(x, y) for y in y_vals for x in x_vals]
+xy_grid = []
+for y in y_vals:
+    for x in x_vals:
+        xy_grid.append((x, y))
 z_heights = np.linspace(1.0, 6.0, n_spheres)
 
 world = make_world_model(

@@ -10,6 +10,7 @@ import pytest
 from minilink.core.diagram import DiagramSystem
 from minilink.core.trajectory import Trajectory
 from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.graphical.plotly_style import PLOTLY_FIG_WIDTH
 from minilink.graphical.plotting import (
     build_signal_plot_spec,
     open_time_signal_plot,
@@ -189,6 +190,7 @@ class TestPlotlySignalBackend(unittest.TestCase):
             show=False,
         )
         self.assertEqual(len(result.figure.data), 2)
+        self.assertEqual(result.figure.layout.width, PLOTLY_FIG_WIDTH)
 
         handle = open_time_signal_plot(
             sys,

@@ -46,7 +46,10 @@ def _lambdify_matrix_to_flat_func(matrix_expr, args, subs, backend: str):
     m = matrix_expr.subs(subs) if subs else matrix_expr
     M = sp.Matrix(m)
     rows, cols = M.rows, M.cols
-    flat = [M[i, j] for i in range(rows) for j in range(cols)]
+    flat = []
+    for i in range(rows):
+        for j in range(cols):
+            flat.append(M[i, j])
     f = _lambdify_expr(flat, args, None, backend)
 
     def eval_matrix(*call_args):
@@ -126,7 +129,10 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
         for fk_pt in sym_sys.chain_fk:
             m = fk_pt.subs(subs) if subs else fk_pt
             M = sp.Matrix(m)
-            flat = [M[i, j] for i in range(M.rows) for j in range(M.cols)]
+            flat = []
+            for i in range(M.rows):
+                for j in range(M.cols):
+                    flat.append(M[i, j])
             chain_fk_funcs.append(_lambdify_expr(flat, q_args, None, "numpy"))
         n_seg = max(0, len(chain_fk_funcs) - 1)
 

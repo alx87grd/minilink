@@ -61,7 +61,13 @@ class Source(System):
             raise ValueError("n_pts must be >= 2")
 
         t = np.linspace(t0, tf, int(n_pts))
-        y = np.array([self.h(np.array([]), np.array([]), ti) for ti in t]).T
+        y = np.zeros((self.p, t.size), dtype=float)
+        empty_x = np.array([])
+        empty_u = np.array([])
+        for i, ti in enumerate(t):
+            y[:, i] = np.asarray(self.h(empty_x, empty_u, ti), dtype=float).reshape(
+                self.p
+            )
 
         _created = ax is None
         if _created:
@@ -98,8 +104,17 @@ class Source(System):
 
 class Step(Source):
     def __init__(
-        self, initial_value=np.zeros(1), final_value=np.zeros(1), step_time=1.0
+        self, initial_value=None, final_value=None, step_time=1.0
     ):
+        if initial_value is None:
+            initial_value = np.zeros(1)
+        if final_value is None:
+            final_value = np.zeros(1)
+
+        initial_value = np.asarray(initial_value, dtype=float).reshape(-1)
+        final_value = np.asarray(final_value, dtype=float).reshape(-1)
+        if final_value.shape != initial_value.shape:
+            raise ValueError("initial_value and final_value must have the same shape")
 
         p = initial_value.shape[0]
         Source.__init__(self, p)
@@ -164,8 +179,9 @@ class WhiteNoise(Source):
         white[:, 0] = mean
         white[:, -1] = mean
 
-        self._interpolators = [
-            interp1d(
+        self._interpolators = []
+        for i in range(self.p):
+            interpolator = interp1d(
                 noise_time,
                 white[i, :],
                 kind="linear",
@@ -173,8 +189,7 @@ class WhiteNoise(Source):
                 fill_value=(mean, mean),
                 assume_sorted=True,
             )
-            for i in range(self.p)
-        ]
+            self._interpolators.append(interpolator)
 
     def h(self, x, u, t=0, params=None):
         if params is None:
@@ -184,7 +199,9 @@ class WhiteNoise(Source):
                 "The block needs to be refreshed to reflect changes in parameters"
             )
 
-        y = np.array([interp(float(t)) for interp in self._interpolators])
+        y = np.zeros(self.p)
+        for i, interpolator in enumerate(self._interpolators):
+            y[i] = float(interpolator(float(t)))
 
         return y
 

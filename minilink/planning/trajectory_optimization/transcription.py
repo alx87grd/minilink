@@ -56,7 +56,14 @@ def uses_direct_dynamics(
 def native_concatenate(values, like):
     """Concatenate vector pieces with the array module used by ``like``."""
     xp = array_module(like)
-    return xp.concatenate([value.reshape(-1) for value in values])
+    pieces = []
+    for value in values:
+        pieces.append(value.reshape(-1))
+
+    if not pieces:
+        return xp.array([])
+
+    return xp.concatenate(pieces)
 
 
 @dataclass
@@ -148,7 +155,9 @@ def stack_constraints(
 
     def stacked(z: np.ndarray) -> np.ndarray:
         xp = array_module(z)
-        values = [constraint(z).reshape(-1) for constraint in constraints]
+        values = []
+        for constraint in constraints:
+            values.append(constraint(z).reshape(-1))
         return xp.concatenate(values)
 
     return stacked
