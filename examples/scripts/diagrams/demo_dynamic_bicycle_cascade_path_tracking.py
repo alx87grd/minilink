@@ -403,5 +403,5 @@ print(
 
 plot_xy_vs_path(px, py, diagram.traj.t, A, LAMBDA)
 
-diagram.animate()
+# diagram.animate()
 # diagram.animate(renderer="meshcat")
