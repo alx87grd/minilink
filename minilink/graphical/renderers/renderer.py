@@ -14,12 +14,25 @@ class AnimationRenderer(ABC):
         self.sys = animator.sys
 
     @abstractmethod
-    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
-        """Initialize backend resources for one render session."""
+    def open_scene(
+        self,
+        *,
+        is_3d: bool,
+        show: bool,
+        camera,
+        title: str | None = None,
+    ) -> None:
+        """Initialize backend resources for one render session.
+
+        ``camera`` is a 4x4 :func:`~minilink.graphical.primitives.camera_matrix`
+        used to set up initial framing. Renderers consume the slots they
+        understand (target, projection-axis columns, view scale, view-out
+        direction) and ignore the rest; see ``DESIGN.md`` §4.7.
+        """
 
     @abstractmethod
-    def draw_frame(self, primitives, transforms, t: float) -> None:
-        """Draw one frame from precomputed transforms."""
+    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
+        """Draw one frame from precomputed transforms and camera."""
 
     @abstractmethod
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
@@ -39,7 +52,11 @@ class AnimationRenderer(ABC):
         """Release/close backend resources for the current session."""
 
     def render_inline_animation(self, primitives, frames, schedule):
-        """Optional notebook inline output (default: unsupported)."""
+        """Optional notebook inline output (default: unsupported).
+
+        ``frames`` entries each carry ``"transforms"`` and ``"camera"``
+        (see :meth:`minilink.graphical.animation.Animator._prepare_transforms`).
+        """
         raise NotImplementedError("Inline animation is not supported by this renderer.")
 
     def export_animation(self, primitives, frames, schedule, file_name: str) -> None:

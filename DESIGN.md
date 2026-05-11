@@ -18,6 +18,16 @@ visualization.
 5. **Specialize only when it clarifies**: complex plants may use explicit
    `Jax<X>` twins when a separate implementation keeps the equations readable.
 
+### NumPy and JAX
+
+NumPy is always required; JAX is optional (`minilink[jax]`) and must be imported
+lazily—use `require_jax_numpy()` or helpers from `minilink.compile.backend_policy`,
+not top-level `import jax` in library modules. Use `array_module` only for small
+hybrid algebra. Prefer one backend-native class for sets, costs, and transcriptions;
+add a `Jax<Plant>` twin in the same module only when trajectory optimization, JIT
+rollouts, or differentiable physics need traceable dynamics. Do not add a global
+backend switch or a `minilink.jax` package.
+
 ## 2. Package Map
 
 | Package | Status | Role |
@@ -85,6 +95,13 @@ minilink/
     initial_guess.py
     search/
     trajectory_optimization/
+      benchmark.py
+      direct_collocation.py
+      live_plot.py
+      multiple_shooting.py
+      planner.py
+      shooting.py
+      transcription.py
     policy_synthesis/
   dynamics/
     abstraction/
@@ -98,8 +115,17 @@ minilink/
     matplotlib_style.py
     renderers/
   symbolic/
+    mechanics/
+      derivation.py
+      export.py
+      model.py
+      symbolic_system.py
+      utils.py
   physics/
+    engine_jax.py
+    system.py
   control/
+    pendulum_pd.py
 ```
 
 ## 3. Core Object Contracts
@@ -126,7 +152,8 @@ Boundary conveniences:
 
 - model defaults: `params`, `x0`, port nominal values, and `solver_info`;
 - visualization hooks: `get_kinematic_geometry`,
-  `get_kinematic_transforms(x, u, t)`, and `get_dynamic_geometry(x, u, t)`;
+  `get_kinematic_transforms(x, u, t)`, `get_dynamic_geometry(x, u, t)`, and
+  `get_camera_transform(x, u, t)` (standard 4x4 camera matrix; see §7);
 - facade methods: `compile`, `compute_trajectory`, `compute_forced`, `render`,
   `animate`, `game`, plotting, and graph helpers.
 
@@ -336,50 +363,42 @@ There are no parallel JAX transcription classes. Direct collocation, shooting,
 and multiple shooting should stay single public transcription classes whenever
 their equations can be written backend-natively.
 
-## 6. JAX And NumPy Policy
+## 6. Graphics, Benchmarks, And Style
 
-NumPy is the baseline. A NumPy-only install must import the library and run
-non-JAX tests. JAX is optional and must be imported lazily.
+Graphics: plotting and animation in `graphical`; `System.render` / `animate` /
+`game` are facades; kinematic hooks are provisional; matplotlib style policy lives
+in `graphical`.
 
-Use one of two patterns:
+Benchmarks: helpers live next to the measured subsystem (`compile/benchmark.py`,
+`simulation/benchmark.py`, `optimization/benchmark.py`,
+`planning/trajectory_optimization/benchmark.py`); runners under `tests/benchmark/`;
+they are not core contracts.
 
-- `array_module(x)` for small hybrid algebraic math;
-- `require_jax_numpy()` / backend-policy helpers inside JAX-only methods.
+Camera / framing contract:
 
-Complex plant twins:
+- `System.get_camera_transform(x, u, t) -> (4, 4) ndarray` is the standard
+  camera matrix consumed by every renderer. There is one matrix and one method:
+  2D rendering is always an orthographic projection of the same 3D camera (no
+  separate 2D pipeline). Built by `minilink.graphical.primitives.camera_matrix`:
+  - `T[:3, 3]` look-at target in world (each frame for 2D projection; initial
+    framing for interactive 3D);
+  - columns of `T[:3, :3]` are world directions of camera-X (plot horizontal),
+    camera-Y (plot vertical), camera-Z (view-out); built from `plot_axes=(i, j)`
+    as `(e_i, e_j, e_i × e_j)` or supplied directly via `R=`;
+  - `T[3, 3]` is the view scale (amplitude-channel convention, same as
+    `torque_pose2d_matrix`): orthographic half-extent for matplotlib 2D/3D and
+    pygame; perspective camera distance for meshcat.
+- Renderers consume only the slots they understand and ignore the rest:
+  matplotlib 2D / pygame pre-multiply body transforms by `world_to_camera(camera)`
+  so primitive XY ends up in camera frame, with `xlim/ylim = ±T[3,3]` and axis
+  labels auto-derived from the dominant world axis; matplotlib 3D decodes
+  `view_init(elev, azim)` from `R[:,2]` and sets `xlim/ylim/zlim` once at scene
+  open, then leaves the interactive camera to the UI; meshcat sets orbit pivot
+  and eye distance once at scene open (same interactive-camera rule).
+- Intentional non-knobs (KISS): anisotropic per-axis zoom and field-of-view are
+  not in the contract; `aspect='equal'` is enforced everywhere.
 
-- new plants start NumPy-only;
-- add `Jax<Plant>` only when JAX trajectory optimization, JIT rollouts, or
-  differentiable physics need traceable dynamics;
-- place the twin in the same module, subclass the NumPy class, and override only
-  equation methods.
-
-Do not add a global NumPy/JAX mode, a top-level `minilink.jax` package, or twin
-classes for simple sets/costs/transcriptions.
-
-## 7. Graphics, Benchmarks, And Style
-
-Graphics:
-
-- plotting and animation live in `graphical`;
-- `System.render`, `System.animate`, and `System.game` are convenience facade
-  methods;
-- kinematic geometry hooks are useful but still provisional;
-- matplotlib style and environment policy are centralized in `graphical`.
-
-Benchmarks:
-
-- benchmark helpers live beside the subsystem they measure, for example
-  `compile/benchmark.py`, `simulation/benchmark.py`, and
-  `optimization/benchmark.py`;
-- runnable benchmark scripts live under `tests/benchmark/`;
-- benchmark helpers are not core contracts.
-
-Coding standards:
-
-- Python 3.10+;
-- public APIs use type hints and NumPy-style docstrings;
-- keep heavy optional imports lazy;
-- keep equation code explicit, readable, and close to the math;
-- use package `__init__.py` files as namespace markers, not broad barrel
-  re-export layers, unless a future API freeze deliberately changes that.
+Repository conventions: Python 3.10+; type hints and NumPy-style docstrings on
+public APIs; lazy optional imports; equation code stays explicit and math-close;
+package `__init__.py` files are namespace markers, not barrel re-exports, unless an
+API freeze says otherwise.

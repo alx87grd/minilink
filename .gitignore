@@ -23,6 +23,9 @@ share/python-wheels/
 .installed.cfg
 MANIFEST
 
+# Hatch VCS version file (generated; see pyproject.toml hatch.build.hooks.vcs)
+minilink/_version.py
+
 
 # Data etc #
 ############################

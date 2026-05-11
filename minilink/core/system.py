@@ -58,8 +58,7 @@ class VectorSignal:
             value = np.asarray(nominal_value, dtype=float).reshape(-1)
             if value.shape != (self.dim,):
                 raise ValueError(
-                    f"nominal_value must have shape ({self.dim},), "
-                    f"got {value.shape}"
+                    f"nominal_value must have shape ({self.dim},), got {value.shape}"
                 )
             self.nominal_value = value.copy()
         else:
@@ -160,7 +159,8 @@ class System:
       (:attr:`params`), default initial condition (:attr:`x0`), and solver
       hints (:attr:`solver_info`).
     - **Optional visualization contract**: it may describe forward-kinematic
-      geometry for rendering and animation. This API is still MVP / TRL 1.
+      geometry for rendering and animation (still MVP / TRL 1). Default
+      ``camera_*`` fields configure :meth:`get_camera_transform`; see that method.
     - **User shortcut façade**: it exposes convenience methods such as
       :meth:`compile`, :meth:`compute_trajectory`, :meth:`render`,
       :meth:`animate`, and :meth:`game`.
@@ -227,6 +227,12 @@ class System:
         # Runtime convenience cache for the last trajectory produced by
         # ``compute_trajectory``.
         self.traj = None
+
+        # Standard camera for :meth:`get_camera_transform`: ``camera_*`` fields below.
+        self.camera_target = np.zeros(3, dtype=float)
+        self.camera_plot_axes = (0, 1)
+        self.camera_scale = 10.0
+        self.camera_R = None
 
     # Core Dynamical Contract
 
@@ -502,6 +508,37 @@ class System:
         This visualization contract is intentionally still provisional.
         """
         return []
+
+    def get_camera_transform(self, x, u, t):
+        """
+        Return the standard 4x4 camera transform for this system.
+
+        The matrix follows :func:`minilink.graphical.primitives.camera_matrix`:
+        ``T[:3, 3]`` is the look-at target in world, the columns of ``T[:3, :3]``
+        are the world directions of camera-X (plot horizontal), camera-Y
+        (plot vertical), and camera-Z (view-out), and ``T[3, 3]`` is the view
+        scale (orthographic half-extent / perspective camera distance).
+
+        The default matches ``camera_matrix()`` via ``camera_target``,
+        ``camera_plot_axes``, ``camera_scale``, and optional ``camera_R`` on
+        ``self``. Edit those attributes for a fixed view, or override this method
+        for a time-varying camera.
+
+        TODO: User Architectural Review (visualization contract is TRL 1).
+        """
+        from minilink.graphical.primitives import camera_matrix
+
+        if self.camera_R is not None:
+            return camera_matrix(
+                target=self.camera_target,
+                scale=self.camera_scale,
+                R=self.camera_R,
+            )
+        return camera_matrix(
+            target=self.camera_target,
+            plot_axes=self.camera_plot_axes,
+            scale=self.camera_scale,
+        )
 
     # User Shortcut / Facade API
 

@@ -484,7 +484,14 @@ class MeshcatRenderer(AnimationRenderer):
         self.canvas = None
         self.show = True
 
-    def open_scene(self, *, is_3d: bool, show: bool, title: str | None = None) -> None:
+    def open_scene(
+        self,
+        *,
+        is_3d: bool,
+        show: bool,
+        camera,
+        title: str | None = None,
+    ) -> None:
         meshcat = _import_meshcat()
         self.show = show
         self.vis = meshcat.Visualizer()
@@ -505,10 +512,11 @@ class MeshcatRenderer(AnimationRenderer):
                 self.vis.open()
                 self.vis.wait()
 
-    def draw_frame(self, primitives, transforms, t: float) -> None:
+    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         self.canvas.ensure_objects(primitives)
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
             self.canvas.update_primitive(i, prim, T)
+        # Meshcat uses the viewer default camera; ``camera`` is ignored.
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
