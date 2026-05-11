@@ -8,6 +8,10 @@ sys.x0[0] = 2.0
 
 sys.compute_trajectory(tf=10, show=False)
 
+sys.plot_trajectory()
+sys.plot_trajectory(signals=("x"), backend="plotly")
+
+
 # sys.animate()
 # sys.animate(renderer="matplotlib")
 # sys.animate(renderer="matplotlib", is_3d=True)
