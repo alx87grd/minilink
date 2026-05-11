@@ -4,7 +4,6 @@ from minilink.control.pendulum_pd import PendulumPDController
 from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.graphical.plotting import plot_signals
 
 # Plant system
 sys = Pendulum()
@@ -57,19 +56,9 @@ diagram.plot_graphe()
 diagram.name = "Pendulum with Noise"
 
 # diagram2.compute_trajectory(tf=20) # takes forever with scipy solver
-traj = diagram.compute_trajectory(tf=20, solver="euler", dt=0.01, show=False)
+diagram.compute_trajectory(tf=20, solver="euler", dt=0.01, show=False)
 
-traj_plus = diagram.compute_internal_signals(traj)
-
-plot_signals(
-    diagram,
-    traj_plus,
-    [
-        {"sys": "step", "output": "y", "label": "ref"},
-        {"sys": "plant", "state": "x", "label": "theta"},
-        {"sys": "plant", "output": "y", "label": "y"},
-        {"sys": "controller", "output": "u", "label": "u"},
-        {"sys": "noise", "output": "y", "label": "w"},
-        {"sys": "noise2", "output": "y", "label": "v"},
-    ],
+diagram.plot_trajectory(
+    signals=("step:y", "x", "plant:y", "controller:u", "noise:y", "noise2:y"),
+    backend="matplotlib",
 )

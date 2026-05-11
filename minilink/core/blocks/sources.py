@@ -35,7 +35,7 @@ class Source(System):
             Number of evaluation points used for plotting.
         ax : matplotlib.axes.Axes, optional
             Existing axis to draw on. If None, a new figure is created and shown
-            (same policy as :func:`minilink.graphical.plotting.plot_trajectory`);
+            (same policy as :func:`minilink.graphical.plotting.plot_time_signals`);
             if an axis is passed, the caller controls display.
         """
         import matplotlib.pyplot as plt

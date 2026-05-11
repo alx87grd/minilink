@@ -560,7 +560,8 @@ class System:
         dt=None,
         solver=None,
         show=True,
-        plot="xu",
+        signals=("x", "u"),
+        plot_backend="matplotlib",
         x0=None,
         compile_backend="numpy",
         verbose=True,
@@ -574,9 +575,12 @@ class System:
 
         Parameters
         ----------
-        plot : {'x', 'u', 'xu'}, optional
-            Passed to :func:`minilink.graphical.plotting.plot_trajectory` when
-            ``show`` is True: states only, inputs only, or both (default).
+        signals : tuple of str, optional
+            Sampled signals passed to
+            :func:`minilink.graphical.plotting.plot_time_signals` when ``show``
+            is True. The default plots states and inputs.
+        plot_backend : str, optional
+            Time-signal plotting backend used when ``show`` is True.
         compile_backend : str
             Passed to :class:`~minilink.simulation.Simulator` (default ``\"numpy\"``).
             Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
@@ -587,7 +591,7 @@ class System:
         Trajectory
             The simulated trajectory, also stored in :attr:`traj`.
         """
-        from minilink.graphical.plotting import plot_trajectory
+        from minilink.graphical.plotting import plot_time_signals
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -603,7 +607,7 @@ class System:
         )
         traj = sim.solve()
         if show:
-            plot_trajectory(self, traj, plot=plot)
+            plot_time_signals(self, traj, signals=signals, backend=plot_backend)
 
         self.traj = traj
 
@@ -619,7 +623,8 @@ class System:
         dt=None,
         solver=None,
         show=True,
-        plot="xu",
+        signals=("x", "u"),
+        plot_backend="matplotlib",
         x0=None,
         compile_backend="numpy",
         verbose=True,
@@ -644,9 +649,12 @@ class System:
         input_port_id : str, optional
             Named input port to force while keeping the others at default
             values.
-        plot : {'x', 'u', 'xu'}, optional
-            Passed to :func:`minilink.graphical.plotting.plot_trajectory` when
-            ``show`` is True.
+        signals : tuple of str, optional
+            Sampled signals passed to
+            :func:`minilink.graphical.plotting.plot_time_signals` when ``show``
+            is True.
+        plot_backend : str, optional
+            Time-signal plotting backend used when ``show`` is True.
         compile_backend : str
             Same as :meth:`compute_trajectory`.
 
@@ -655,7 +663,7 @@ class System:
         Trajectory
             Simulated state-input trajectory.
         """
-        from minilink.graphical.plotting import plot_trajectory
+        from minilink.graphical.plotting import plot_time_signals
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -727,14 +735,21 @@ class System:
 
         traj = sim.solve_forced(u_traj)
         if show:
-            plot_trajectory(self, traj, plot=plot)
+            plot_time_signals(self, traj, signals=signals, backend=plot_backend)
         self.traj = traj
 
         return traj
 
-    def plot_trajectory(self, traj=None, *, plot="xu"):
+    def plot_time_signals(
+        self,
+        traj=None,
+        *,
+        signals=("x", "u"),
+        backend="matplotlib",
+        show=True,
+    ):
         """
-        Convenience shortcut to plot the trajectory.
+        Convenience shortcut to plot sampled time signals.
 
         If the trajectory is not computed yet, it is computed using :meth:`compute_trajectory`.
         If the trajectory is already computed, it is used directly.
@@ -742,25 +757,51 @@ class System:
 
         Parameters
         ----------
-        plot : {'x', 'u', 'xu'}, optional
-            States only, inputs only, or both (default); see
-            :func:`minilink.graphical.plotting.plot_trajectory`.
+        signals : tuple of str, optional
+            Signal names to plot; see
+            :func:`minilink.graphical.plotting.plot_time_signals`.
 
         Returns
         -------
-        Trajectory or tuple
+        Trajectory or PlotResult
             :class:`~minilink.core.trajectory.Trajectory` if a simulation is run; otherwise
-            the ``(fig, ax)`` pair from :func:`minilink.graphical.plotting.plot_trajectory`.
+            the plot result from :func:`minilink.graphical.plotting.plot_time_signals`.
         """
-        from minilink.graphical.plotting import plot_trajectory
+        from minilink.graphical.plotting import plot_time_signals
 
         if traj is not None:
-            return plot_trajectory(self, traj, plot=plot)
+            return plot_time_signals(
+                self, traj, signals=signals, backend=backend, show=show
+            )
 
         if self.traj is not None:
-            return plot_trajectory(self, self.traj, plot=plot)
+            return plot_time_signals(
+                self, self.traj, signals=signals, backend=backend, show=show
+            )
 
-        return self.compute_trajectory(plot=plot)
+        return self.compute_trajectory(signals=signals, plot_backend=backend, show=show)
+
+    def plot_trajectory(
+        self,
+        traj=None,
+        *,
+        signals=("x", "u"),
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot trajectory time signals.
+
+        This is the object-level ergonomic alias for
+        :meth:`plot_time_signals`; use ``signals=(...)`` to select sampled
+        channels and ``backend=...`` to choose matplotlib or Plotly.
+        """
+        return self.plot_time_signals(
+            traj,
+            signals=signals,
+            backend=backend,
+            show=show,
+        )
 
     def get_block_html(self, label="sys1"):
         """

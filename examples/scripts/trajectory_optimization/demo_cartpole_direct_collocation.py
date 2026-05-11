@@ -47,14 +47,20 @@ problem = PlanningProblem(
 )
 
 if LIVE_PLOT:
-    callback = LiveTrajectoryPlotCallback(sys, plot="xu", every=1, pause=0.001)
+    callback = LiveTrajectoryPlotCallback(
+        sys,
+        signals=("x", "u"),
+        every=1,
+        pause=0.001,
+        backend="plotly",
+    )
 else:
     callback = None
 
 planner = TrajectoryOptimizationPlanner(
     problem,
     transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(tf=4.0, n_steps=50)
+        DirectCollocationOptions(tf=5.0, n_steps=50)
     ),
     options=TrajectoryOptimizationOptions(
         # compile_backend="jax",
@@ -69,5 +75,5 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 traj = planner.compute_solution()
-# planner.plot_solution(plot="xu")
+# planner.plot_solution(signals=("x", "u"), backend="plotly")
 planner.problem.sys.animate(traj)

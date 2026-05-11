@@ -117,5 +117,5 @@ diagram.connect("tracker", "delta", "vehicle", "delta")
 
 diagram.plot_graphe()
 diagram.compute_trajectory(tf=5.0, dt=0.02, show=False, verbose=False)
-diagram.plot_trajectory()
+diagram.plot_trajectory(signals=("x", "u"), backend="matplotlib")
 diagram.animate(renderer="meshcat")

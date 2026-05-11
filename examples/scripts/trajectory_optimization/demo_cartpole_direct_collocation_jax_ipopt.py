@@ -54,8 +54,8 @@ planner = TrajectoryOptimizationPlanner(
     ),
     options=TrajectoryOptimizationOptions(
         compile_backend="jax",
-        # optimizer_method="ipopt",
-        optimizer_method="scipy_slsqp",
+        optimizer_method="ipopt",
+        # optimizer_method="scipy_slsqp",
         # optimizer_options={"maxiter": 500, "ftol": 1e-2},
         solve_disp=PRINT_SOLVE_REPORT,
     ),
@@ -63,5 +63,5 @@ planner = TrajectoryOptimizationPlanner(
 
 traj = planner.compute_solution()
 
-planner.plot_solution(plot="xu")
+planner.plot_solution(signals=("x", "u"))
 planner.problem.sys.animate(traj)

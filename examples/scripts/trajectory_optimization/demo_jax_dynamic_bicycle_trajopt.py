@@ -89,6 +89,6 @@ planner = TrajectoryOptimizationPlanner(
 traj = planner.compute_solution()
 
 
-planner.plot_solution(plot="xu")
+planner.plot_solution(signals=("x", "u"))
 sys.traj = traj
 sys.animate(renderer="meshcat")

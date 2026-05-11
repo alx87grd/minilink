@@ -1,11 +1,20 @@
+import contextlib
+import importlib
+import io
 import unittest
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 
 from minilink.core.diagram import DiagramSystem
+from minilink.core.trajectory import Trajectory
 from minilink.core.system import DynamicSystem, StaticSystem
-from minilink.graphical.plotting import plot_signals
+from minilink.graphical.plotting import (
+    build_signal_plot_spec,
+    open_time_signal_plot,
+    plot_time_signals,
+)
 from minilink.simulation.simulator import Simulator
 
 
@@ -61,6 +70,16 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.sim = Simulator(self.diagram, t0=0, tf=2.0, dt=0.1, verbose=False)
         self.traj = self.sim.solve()
 
+    def test_plotting_import_is_quiet(self):
+        import minilink.graphical.plotting as plotting
+
+        interactive = plt.isinteractive()
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            importlib.reload(plotting)
+        self.assertEqual(stream.getvalue(), "")
+        self.assertEqual(plt.isinteractive(), interactive)
+
     def test_compute_internal_signals(self):
         # By default, the base trajectory does not carry reconstructed signals
         self.assertFalse(self.traj.has_signal("step:y"))
@@ -77,31 +96,109 @@ class TestAdvancedPlotting(unittest.TestCase):
         n_pts = len(self.traj.t)
         self.assertEqual(traj_plus.get_signal("ctl:u").shape, (1, n_pts))
 
-    def test_plot_signals_does_not_crash(self):
+    def test_plot_time_signals_does_not_crash(self):
         from minilink.graphical.environment import override_env
 
         override_env("jupyter")
         self.addCleanup(override_env, None)
-        traj_plus = self.diagram.compute_internal_signals(self.traj)
 
-        # Test basic API functionality (we won't check pixel rendering, just execution)
+        result = plot_time_signals(
+            self.diagram,
+            self.traj,
+            signals=("x", "ctl:u", "plant:y"),
+            show=False,
+        )
+        self.assertIsNotNone(result.figure)
+        plt.close(result.figure)
+
+    def test_signal_spec_resolves_core_and_extra_signals(self):
+        traj = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[1.0, 1.0]]),
+            signals={"extra": np.ones((2, 2))},
+        )
+        spec = build_signal_plot_spec(
+            self.sys,
+            traj,
+            signals=("x", "u", "extra"),
+        )
+        labels = [trace.label for trace in spec.traces]
+        self.assertIn("x[0]", labels)
+        self.assertIn("u[0]", labels)
+        self.assertIn("extra[0]", labels)
+        self.assertIn("extra[1]", labels)
+
+    def test_unknown_signal_reports_available_names(self):
+        with self.assertRaisesRegex(ValueError, "ctl:u"):
+            build_signal_plot_spec(self.diagram, self.traj, signals=("missing",))
+
+    def test_live_time_signal_plot_reuses_artists(self):
+        traj0 = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[1.0, 1.0]]),
+        )
+        traj1 = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 0.5]]),
+            u=np.array([[0.5, 0.5]]),
+        )
+        handle = open_time_signal_plot(
+            self.sys,
+            traj0,
+            signals=("x", "u"),
+            show=False,
+        )
         try:
-            fig, ax = plot_signals(
-                self.diagram,
-                traj_plus,
-                [
-                    {"sys": "plant", "state": "x[0]", "label": "Plant State"},
-                    {"sys": "ctl", "output": "u", "label": "Control Effort"},
-                ],
+            fig_id = id(handle.fig)
+            line_ids = [id(line) for line in handle.lines]
+            handle.update(traj1)
+            self.assertEqual(id(handle.fig), fig_id)
+            self.assertEqual([id(line) for line in handle.lines], line_ids)
+            np.testing.assert_allclose(
+                handle.lines[0].get_ydata(),
+                np.array([0.0, 0.5]),
             )
-            self.assertIsNotNone(fig)
-            plt.close(fig)
-            success = True
-        except Exception as e:
-            success = False
-            self.fail(f"plot_signals raised an exception: {e}")
+        finally:
+            handle.close()
 
-        self.assertTrue(success)
+
+@pytest.mark.optional
+class TestPlotlySignalBackend(unittest.TestCase):
+    def test_plotly_static_and_live_update(self):
+        pytest.importorskip("plotly")
+
+        sys = Integrator()
+        traj0 = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[1.0, 1.0]]),
+        )
+        traj1 = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 0.25]]),
+            u=np.array([[0.25, 0.25]]),
+        )
+
+        result = plot_time_signals(
+            sys,
+            traj0,
+            signals=("x", "u"),
+            backend="plotly",
+            show=False,
+        )
+        self.assertEqual(len(result.figure.data), 2)
+
+        handle = open_time_signal_plot(
+            sys,
+            traj0,
+            signals=("x", "u"),
+            backend="plotly",
+            show=False,
+        )
+        handle.update(traj1)
+        np.testing.assert_allclose(handle.fig.data[0].y, np.array([0.0, 0.25]))
 
     def test_stacked_figsize_caps_height_for_popup_layout(self):
         from minilink.graphical.matplotlib_style import (

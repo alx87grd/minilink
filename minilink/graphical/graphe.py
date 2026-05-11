@@ -1,24 +1,16 @@
+"""Graph display compatibility helpers."""
+
+from minilink.graphical.diagram_backends.graphviz_exporter import block_html
+from minilink.graphical.diagram_export import export_diagram_topology
+from minilink.graphical.topology import build_diagram_topology
+
+
 def plot_graphviz(graphe, show_inline=None, show_pdf=None, filename=None):
     """
     Display a graphviz object.
 
-    If ``graphe`` is ``None`` (e.g. the ``graphviz`` Python package is not
-    installed, :func:`get_system_graphe` / :func:`get_diagram_graphe` return
-    ``None``), this function returns quietly after a short message.
-
-    The two display switches auto-resolve based on the current environment via
-    :func:`minilink.graphical.environment.is_inline_capable`:
-
-    - ``show_inline=None`` defaults to ``True`` in Jupyter / Colab (inline
-      SVG via ``IPython.display``) and ``False`` elsewhere.
-    - ``show_pdf=None`` defaults to ``False`` in Jupyter / Colab (no external
-      viewer pop-up) and ``True`` in bare scripts and IPython REPLs (legacy
-      behavior: render to a temp file and open the OS PDF viewer).
-    - Explicit ``True`` / ``False`` values are always honored.
-
-    A file is only written to disk when ``filename`` is explicitly provided
-    or when ``show_pdf`` is true (which requires an on-disk artifact to open).
-    Pure-notebook use therefore leaves no ``.gv`` / ``.pdf`` litter behind.
+    ``show_inline=None`` defaults to inline display in Jupyter / Colab.
+    ``show_pdf=None`` defaults to external PDF display in bare scripts.
     """
     if graphe is None:
         print(
@@ -61,136 +53,32 @@ def plot_graphviz(graphe, show_inline=None, show_pdf=None, filename=None):
 
 
 def get_system_block_html(sys, html_id="sys1"):
-    """
-    Get the HTML representation of the block for the label in the diagram
-    """
-    import numpy as np
+    """Return the Graphviz HTML-like block label for a system."""
+    topology = build_diagram_topology(sys)
+    node = topology.nodes[0]
+    if html_id != node.display_id:
+        from dataclasses import replace
 
-    n_ports_out = len(sys.outputs)
-    n_ports_in = len(sys.inputs)
-
-    html = (
-        f'<TABLE BORDER="0" CELLSPACING="0">\n'
-        f"<TR>\n"
-        f'<TD align="left" BORDER="1" COLSPAN="2">{sys.name}::{html_id}</TD>\n'
-        f"</TR>\n"
-    )
-
-    for j in range(np.max((n_ports_out, n_ports_in))):
-        html += "<TR>\n"
-
-        if j < n_ports_in and j < n_ports_out:
-            port_id = list(sys.inputs.keys())[j]
-            html += f'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
-            port_id = list(sys.outputs.keys())[j]
-            html += f'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
-
-        elif j < n_ports_in:
-            port_id = list(sys.inputs.keys())[j]
-            html += f'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
-            html += '<TD BORDER="1"> </TD>\n'
-
-        elif j < n_ports_out:
-            port_id = list(sys.outputs.keys())[j]
-            html += '<TD BORDER="1"> </TD>\n'
-            html += f'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
-
-        html += "</TR>\n"
-    html += "</TABLE>"
-
-    return html
+        node = replace(node, display_id=html_id)
+    return block_html(node)
 
 
 def get_system_graphe(sys):
-    """
-    Get the Graphviz object for a single system
-    """
+    """Return the Graphviz object for a single system."""
     try:
-        import graphviz
+        return export_diagram_topology(sys, backend="graphviz")
     except ImportError:
         print("graphviz is not available")
         return None
 
-    g = graphviz.Digraph(sys.name, engine="dot")
-    g.attr(rankdir="LR")
-
-    g.node(
-        sys.name,
-        shape="none",
-        label=f"<{get_system_block_html(sys)}>",
-    )
-
-    return g
-
 
 def get_diagram_graphe(diagram):
-    """
-    Get the Graphviz representation of a diagram
-    """
+    """Return the Graphviz representation of a diagram."""
     try:
-        import graphviz
+        return export_diagram_topology(diagram, backend="graphviz")
     except ImportError:
         print("graphviz is not available, cannot plot the diagram")
         return None
-
-    g = graphviz.Digraph(diagram.name, engine="dot")
-    g.attr(rankdir="LR")
-
-    class _PortStub:
-        """Lightweight stand-in for System so get_system_block_html can render I/O nodes."""
-
-        def __init__(self, name, inputs, outputs):
-            self.name = name
-            self.inputs = inputs
-            self.outputs = outputs
-
-    # If diagram has external inputs
-    if len(diagram.inputs) != 0:
-        input_block = _PortStub("", {}, diagram.inputs)
-        g.node(
-            "input",
-            shape="none",
-            label="<" + get_system_block_html(input_block, "Inputs") + ">",
-        )
-
-    # Add subsystems nodes
-    for sys_id, sys in diagram.subsystems.items():
-        label = f"<{get_system_block_html(sys, sys_id)}>"
-        g.node(
-            sys_id,
-            shape="none",
-            label=label,
-        )
-
-    # If diagram has external outputs
-    if len(diagram.outputs) != 0:
-        output_block = _PortStub("", diagram.outputs, {})
-        g.node(
-            "output",
-            shape="none",
-            label="<" + get_system_block_html(output_block, "Outputs") + ">",
-        )
-
-    # Add edges
-    for sys_id, sys in diagram.subsystems.items():
-        for port_id in sys.inputs:
-            edge = diagram.connections[sys_id][port_id]
-            if edge is not None:
-                g.edge(
-                    edge[0] + ":" + edge[1] + ":e",
-                    sys_id + ":" + port_id + ":w",
-                )
-
-    # Add edges to the output node
-    if "output" in diagram.connections:
-        for port_id, edge in diagram.connections["output"].items():
-            if edge is not None:
-                g.edge(
-                    edge[0] + ":" + edge[1] + ":e",
-                    "output" + ":" + port_id + ":w",
-                )
-
-    return g
 
 
 if __name__ == "__main__":

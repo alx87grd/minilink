@@ -20,8 +20,8 @@ Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/vi
 - **Optimization and planning**: describe finite-dimensional NLPs with pure
   `MathematicalProgram` objects; trajectory optimization transcribes planning
   problems into that same optimization layer.
-- **Visualization**: plot, animate, render, and inspect diagrams through the
-  optional graphical layer.
+- **Visualization**: plot sampled time signals, animate, render, and inspect
+  diagrams through the optional graphical layer.
 
 ## Quick Start
 
@@ -29,7 +29,6 @@ Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/vi
 from minilink.core.blocks.basic import Integrator
 from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
-from minilink.graphical.plotting import plot_trajectory
 from minilink.simulation.simulator import Simulator
 
 diagram = DiagramSystem()
@@ -38,7 +37,7 @@ diagram.add_subsystem(Step(), "source")
 diagram.connect("source", "y", "plant", "u")
 
 traj = Simulator(diagram, tf=10.0).solve()
-plot_trajectory(diagram, traj)
+diagram.plot_trajectory(traj, signals=("x", "u"), backend="matplotlib")
 ```
 
 ## Install
@@ -54,6 +53,7 @@ Optional extras:
 ```bash
 pip install "minilink[jax]"            # JAX evaluators, JIT, autodiff
 pip install "minilink[visualization]"  # meshcat / pygame renderers
+pip install "minilink[plotting]"       # plotly signal plotting backend
 pip install "minilink[symbolic]"       # SymPy mechanics helpers
 pip install "minilink[ipopt]"          # Ipopt optimizer adapter
 ```
@@ -86,8 +86,8 @@ Short summary—details and edge cases are in [DESIGN.md](DESIGN.md).
 - `minilink.planning`: deterministic planning problems, initial guesses, search,
   policy synthesis, and trajectory optimization.
 - `minilink.dynamics`: reusable plant abstractions and catalog models.
-- `minilink.graphical`: plotting, animation, graph display, and renderer
-  backends.
+- `minilink.graphical`: time-signal plotting, animation, diagram topology
+  export, graph display, and renderer backends.
 
 ## Documentation
 
@@ -98,7 +98,8 @@ Short summary—details and edge cases are in [DESIGN.md](DESIGN.md).
 ## Examples And Benchmarks
 
 - `examples/scripts/`: runnable demos for diagrams, compilation, animation, and
-  JAX physics.
+  JAX physics. See `examples/scripts/diagrams/demo_graphical_backends.py` for
+  the signal/topology backend options.
 - `tests/manual/`: one-off smoke tests and exploratory checks.
 - `tests/benchmark/`: flat benchmark runners using subsystem-local benchmark
   helpers such as `minilink.simulation.benchmark` and

@@ -25,13 +25,13 @@ DPI_FIGURE = 150
 DPI_EXPORT = 250
 FONT_SIZE = 10
 
-# Stacked ``plot_trajectory``: width × (row height × number of subplots).
+# Stacked time-signal plots: width × (row height × number of subplots).
 TRAJECTORY_FIG_WIDTH = 6.0
 TRAJECTORY_ROW_HEIGHT = 1.35
 # Cap total figure height (inches) for console / pop-up windows; no cap in notebooks.
 TRAJECTORY_MAX_FIG_HEIGHT_POPUP = 8.0
 
-# Stacked ``plot_signals``.
+# Stacked specialized signal plots.
 SIGNAL_PLOT_FIG_WIDTH = 6.0
 SIGNAL_PLOT_ROW_HEIGHT = 1.5
 SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP = 8.0

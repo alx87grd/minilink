@@ -3,7 +3,6 @@ import numpy as np
 from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem
-from minilink.graphical.plotting import plot_trajectory
 from minilink.simulation.simulator import Simulator
 
 
@@ -182,9 +181,9 @@ def simulator_test():
     sim = Simulator(sys1, t0=0, tf=25)
 
     traj = sim.solve()
-    plot_trajectory(sys1, traj)
+    sys1.plot_trajectory(traj, signals=("x", "u"), backend="matplotlib")
 
-    # plot_trajectory(sys1, traj)
+    # sys1.plot_trajectory(traj, signals=("x", "u"), backend="matplotlib")
 
     np.set_printoptions(precision=2, suppress=True)
     print(f"Time vector:\n {traj.t}")
@@ -309,7 +308,7 @@ def pendulum_test():
     diagram.plot_graphe()
 
     sim = Simulator(diagram, t0=0, tf=20, dt=0.01, solver="euler")
-    plot_trajectory(diagram, sim.solve())
+    diagram.plot_trajectory(sim.solve(), signals=("x", "u"), backend="matplotlib")
 
     return sim
 
@@ -351,7 +350,7 @@ def algebraic_loop():
     # diagram.check_algebraic_loops()
 
     sim = Simulator(diagram, t0=0, tf=20, n_steps=10000)
-    plot_trajectory(diagram, sim.solve())
+    diagram.plot_trajectory(sim.solve(), signals=("x", "u"), backend="matplotlib")
 
     return diagram
 

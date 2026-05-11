@@ -53,14 +53,18 @@ class Planner(ABC):
         """Return ``problem.Xf`` or raise a solver-facing error."""
         return self.problem.require_goal()
 
-    def plot_solution(self, *, plot: str = "xu"):
+    def plot_solution(self, *, signals=("x", "u"), backend="matplotlib"):
         """
         Plot the latest result as a trajectory with the problem system.
 
         Only valid when :meth:`require_result` returns a
         :class:`~minilink.core.trajectory.Trajectory`.
         """
-        return self.problem.sys.plot_trajectory(self.require_result(), plot=plot)
+        return self.problem.sys.plot_time_signals(
+            self.require_result(),
+            signals=signals,
+            backend=backend,
+        )
 
     def animate_solution(self, **kwargs):
         """

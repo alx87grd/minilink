@@ -483,7 +483,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             x=np.array([[0.0, 0.9]]),
             u=np.array([[0.9, 0.9]]),
         )
-        callback = LiveTrajectoryPlotCallback(sys, plot="xu", pause=0.0)
+        callback = LiveTrajectoryPlotCallback(sys, signals=("x", "u"), pause=0.0)
 
         callback(
             TrajectoryOptimizationIteration(

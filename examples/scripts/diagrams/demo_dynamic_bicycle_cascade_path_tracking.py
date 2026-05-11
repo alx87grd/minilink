@@ -391,7 +391,7 @@ diagram.connect("yaw_rate_loop", "delta", "vehicle", "delta")
 
 diagram.plot_graphe()
 diagram.compute_trajectory(tf=20.0, dt=0.02, show=False, verbose=False)
-diagram.plot_trajectory()
+diagram.plot_trajectory(signals=("x", "u"), backend="matplotlib")
 
 i0, i1 = diagram.state_index["vehicle"]
 xv = diagram.traj.x[i0:i1, :]
@@ -404,4 +404,4 @@ print(
 plot_xy_vs_path(px, py, diagram.traj.t, A, LAMBDA)
 
 # diagram.animate()
-# diagram.animate(renderer="meshcat")
+diagram.animate(renderer="meshcat")

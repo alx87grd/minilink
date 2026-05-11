@@ -25,6 +25,9 @@ visualization = [
     "meshcat",
     "pygame",
 ]
+plotting = [
+    "plotly",
+]
 symbolic = [
     "sympy>=1.12",
 ]

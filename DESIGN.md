@@ -108,11 +108,16 @@ minilink/
     catalog/
   graphical/
     plotting.py
+    time_signals.py
+    topology.py
+    diagram_export.py
     animation.py
     environment.py
     primitives.py
     graphe.py
     matplotlib_style.py
+    signal_backends/
+    diagram_backends/
     renderers/
   symbolic/
     mechanics/
@@ -154,8 +159,9 @@ Boundary conveniences:
 - visualization hooks: `get_kinematic_geometry`,
   `get_kinematic_transforms(x, u, t)`, `get_dynamic_geometry(x, u, t)`, and
   `get_camera_transform(x, u, t)` (standard 4x4 camera matrix; see §7);
-- facade methods: `compile`, `compute_trajectory`, `compute_forced`, `render`,
-  `animate`, `game`, plotting, and graph helpers.
+- facade methods: `compile`, `compute_trajectory`, `compute_forced`, time-signal
+  plotting with `signals=("x", "u")`, `render`, `animate`, `game`, and graph
+  helpers.
 
 The facade methods may import simulation or graphics lazily. They do not change
 the math contract of `f`, `h`, or output-port compute functions.
@@ -365,9 +371,14 @@ their equations can be written backend-natively.
 
 ## 6. Graphics, Benchmarks, And Style
 
-Graphics: plotting and animation in `graphical`; `System.render` / `animate` /
-`game` are facades; kinematic hooks are provisional; matplotlib style policy lives
-in `graphical`.
+Graphics: time-signal plotting, diagram topology export, and animation live in
+`graphical`; `System.render` / `animate` / `game` are facades. Time plots use
+explicit signal names such as `signals=("x", "u")`. Backends consume derived
+views (`SampledSignals` / `SignalPlotSpec` for time data and `DiagramTopology`
+for display topology) so `Trajectory` and `DiagramSystem` remain the source
+objects. Matplotlib and Graphviz are default backends; Plotly is optional under
+the `plotting` extra; Mermaid export is dependency-free text. Kinematic hooks
+are provisional; matplotlib style policy lives in `graphical`.
 
 Benchmarks: helpers live next to the measured subsystem (`compile/benchmark.py`,
 `simulation/benchmark.py`, `optimization/benchmark.py`,
