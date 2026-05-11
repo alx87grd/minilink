@@ -741,6 +741,59 @@ class System:
             show=show,
         )
 
+    def plot_phase_plane(
+        self,
+        traj=None,
+        *,
+        x_axis=0,
+        y_axis=None,
+        backend="matplotlib",
+        show=True,
+        **kwargs,
+    ):
+        """
+        Convenience shortcut to plot a phase-plane vector field.
+
+        If ``traj`` is provided, or if :attr:`traj` contains a previous
+        simulation result, the sampled state path is overlaid on the vector
+        field. Otherwise only the vector field is plotted.
+        """
+        from minilink.graphical.plotting import plot_phase_plane
+
+        # if traj is None:
+        #     traj = self.traj
+        return plot_phase_plane(
+            self,
+            traj,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            backend=backend,
+            show=show,
+            **kwargs,
+        )
+
+    def plot_phase_plane_trajectory(
+        self,
+        traj=None,
+        *,
+        x_axis=0,
+        y_axis=None,
+        backend="matplotlib",
+        show=True,
+        **kwargs,
+    ):
+        """
+        Pyro-friendly alias for :meth:`plot_phase_plane` with trajectory overlay.
+        """
+        return self.plot_phase_plane(
+            traj,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            backend=backend,
+            show=show,
+            **kwargs,
+        )
+
     def get_block_html(self, label="sys1"):
         """
         Convenience shortcut returning an HTML block representation.

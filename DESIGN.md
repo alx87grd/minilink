@@ -371,14 +371,15 @@ their equations can be written backend-natively.
 
 ## 6. Graphics, Benchmarks, And Style
 
-Graphics: time-signal plotting, diagram topology export, and animation live in
-`graphical`; `System.render` / `animate` / `game` are facades. Time plots use
-explicit signal names such as `signals=("x", "u")`. Backends consume derived
-views (`SampledSignals` / `SignalPlotSpec` for time data and `DiagramTopology`
-for display topology) so `Trajectory` and `DiagramSystem` remain the source
-objects. Matplotlib and Graphviz are default backends; Plotly is optional under
-the `plotting` extra for signal plots plus static/precomputed notebook
-rendering; Mermaid export is dependency-free text. Plotly rendering is an
+Graphics: time-signal plotting, phase-plane plotting, diagram topology export,
+and animation live in `graphical`; `System.render` / `animate` / `game` are
+facades. Time plots use explicit signal names such as `signals=("x", "u")`.
+Backends consume derived views (`SampledSignals` / `SignalPlotSpec` for time
+data, `PhasePlaneSpec` for phase-plane vector fields, and `DiagramTopology` for
+display topology) so `Trajectory` and `DiagramSystem` remain the source objects.
+Matplotlib and Graphviz are default backends; Plotly is optional under the
+`plotting` extra for signal plots plus static/precomputed notebook rendering;
+Mermaid export is dependency-free text. Plotly rendering is an
 artifact/playback backend, not the high-frequency live loop for `game()` or
 trajectory-optimization iteration updates. Kinematic hooks are provisional;
 matplotlib style policy lives in `graphical`.

@@ -51,6 +51,8 @@ The native-array equation rule applies across those paths (see DESIGN §3).
 
 ### P2
 
+- Add phase-plane vector-field plotting with trajectory overlays as a small
+  Pyro-parity graphics feature.
 - Add reusable core blocks such as state-space, transfer-function, and PID
   blocks once the API shape is stable.
 - Add linearization and differentiation helpers on compiled evaluators.
@@ -116,3 +118,85 @@ cleanup pass. They need maintainer review before implementation.
 - Gymnasium/RL bridges;
 - richer interactive/cosimulation loops;
 - multibody plant workflows and model import.
+
+## 7. Phase-Plane Plot Plan
+
+Phase-plane plotting is the next small Pyro-parity graphics feature. Pyro's
+`PhasePlot` builds a 2D grid over two selected state coordinates, evaluates
+`f(x, u, t)` at each grid point with all other state components held at a
+nominal value, and renders the selected derivative components as a quiver or
+stream plot. Minilink should keep the same user value while fitting the current
+graphics contracts.
+
+### Scope
+
+- Implement 2D phase-plane vector fields for any `System` with at least one
+  state.
+- Support selecting `x_axis` and `y_axis`; allow the same state index on both
+  axes for one-state systems, matching Pyro's simple-integrator demos.
+- Support optional trajectory overlays with start/end markers using Minilink's
+  canonical `Trajectory` shape `(n, N)`.
+- Support `show=False` for tests and headless notebooks.
+- Use matplotlib first. Plotly and 3D phase plots are follow-up features.
+
+### Public API
+
+- Add `minilink.graphical.phase_plane` with:
+  - `PhasePlaneSpec`: backend-neutral grid, vector field, labels, units,
+    bounds, title, and optional trajectory-overlay data.
+  - `build_phase_plane_spec(sys, traj=None, *, x_axis=0, y_axis=None, u=None,
+    x_ref=None, t=0.0, bounds=None, grid_shape=(21, 21), params=None)`.
+  - `plot_phase_plane(sys, traj=None, *, x_axis=0, y_axis=None, u=None,
+    x_ref=None, t=0.0, bounds=None, grid_shape=(21, 21), streamplot=False,
+    show=True, **kwargs)`.
+- Export the new helpers through `minilink.graphical.plotting`.
+- Add `System.plot_phase_plane(...)` as the object-level facade. If `traj` is
+  omitted and `self.traj` exists, overlay it; otherwise plot only the vector
+  field.
+- Add `System.plot_phase_plane_trajectory(...)` only as a Pyro-friendly alias if
+  the facade remains simple; internally it should call `plot_phase_plane`.
+
+### Data And Defaults
+
+- Default `x_ref` to `sys.state.nominal_value` when available, otherwise zeros.
+- Default `u` to `sys.get_u_from_input_ports()` so named-port systems respect
+  input-port nominal values.
+- Default `bounds` to finite `sys.state.lower_bound` / `upper_bound` for the two
+  selected axes.
+- If selected bounds are infinite, derive bounds from the overlay trajectory
+  with padding; if no trajectory is available, use a conservative centered
+  fallback such as `[-10, 10]`.
+- Validate axis indices, grid dimensions, vector dimensions, and finite plotting
+  bounds with clear `ValueError` messages.
+
+### Rendering
+
+- Keep vector-field construction NumPy boundary code. It can call `sys.f` in a
+  simple nested loop; no compiled/vectorized path is needed for the first
+  implementation.
+- Render with `Axes.quiver` by default and `Axes.streamplot` when requested.
+- Label axes from `sys.state.labels` and `sys.state.units`.
+- Return the existing `PlotResult` shape (`backend`, `payload`, `figure`,
+  `axes`) for consistency with time-signal plots.
+- Follow existing matplotlib environment behavior: set PDF/PS font embedding,
+  avoid blocking when `show=False`, and rely on style helpers where they fit.
+
+### Tests And Demo
+
+- Add unit tests covering:
+  - vector-field values for a simple two-state test system;
+  - one-state same-axis behavior;
+  - finite state-bound defaults and infinite-bound fallback;
+  - trajectory overlay shape/orientation;
+  - `show=False` matplotlib rendering under Agg.
+- Add `examples/scripts/plots/demo_phase_plane.py` with `Pendulum` and
+  `FloatingMass1D` examples.
+- Update README/DESIGN graphics text after the API lands.
+
+### Follow-Ups
+
+- 3D phase plots.
+- Open-loop versus closed-loop dual vector-field overlays.
+- Plotly rendering.
+- Compiled/vectorized evaluator acceleration for dense grids.
+- Cost-to-go/policy overlays once dynamic programming is implemented.

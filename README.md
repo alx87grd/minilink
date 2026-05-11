@@ -20,8 +20,8 @@ Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/vi
 - **Optimization and planning**: describe finite-dimensional NLPs with pure
   `MathematicalProgram` objects; trajectory optimization transcribes planning
   problems into that same optimization layer.
-- **Visualization**: plot sampled time signals, animate, render, and inspect
-  diagrams through the optional graphical layer.
+- **Visualization**: plot sampled time signals and phase-plane vector fields,
+  animate, render, and inspect diagrams through the optional graphical layer.
 
 ## Quick Start
 
