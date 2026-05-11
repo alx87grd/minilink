@@ -599,7 +599,7 @@ class MeshcatRenderer(AnimationRenderer):
         self.vis.set_animation(animation_obj, play=True, repetitions=1)
         return animation_obj
 
-    def render_inline_animation(self, primitives, frames, schedule):
+    def render_inline_animation(self, primitives, frames, schedule, *, is_3d: bool):
         """
         Return an ``IPython.display.HTML`` iframe snapshot of the meshcat scene
         with the animation embedded. Uses ``Visualizer.render_static`` under the
@@ -609,7 +609,7 @@ class MeshcatRenderer(AnimationRenderer):
         meshcat = _import_meshcat()
         self.show = False
         self.vis = meshcat.Visualizer()
-        self.canvas = MeshcatCanvas(self.vis, is_3d=False)
+        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
 
         animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
         self.vis.set_animation(animation_obj, play=True, repetitions=1)

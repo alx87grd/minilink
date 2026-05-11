@@ -863,7 +863,7 @@ class System:
         from minilink.graphical.animation import Animator
 
         animator = Animator(self)
-        animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
+        return animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
 
     def animate(
         self,

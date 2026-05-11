@@ -1,1 +1,1 @@
-"""Animation backends (matplotlib, meshcat, pygame stub)."""
+"""Animation backends (matplotlib, meshcat, plotly, pygame)."""

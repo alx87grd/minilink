@@ -494,8 +494,13 @@ class MatplotlibRenderer(AnimationRenderer):
         )
         return fig, ani
 
-    def render_inline_animation(self, primitives, frames, schedule):
-        fig, ani = self._build_animation(primitives, frames, schedule)
+    def render_inline_animation(self, primitives, frames, schedule, *, is_3d: bool):
+        fig, ani = self._build_animation(
+            primitives,
+            frames,
+            schedule,
+            is_3d=is_3d,
+        )
         plt.close(fig)
         try:
             from IPython.display import HTML

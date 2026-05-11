@@ -53,7 +53,7 @@ Optional extras:
 ```bash
 pip install "minilink[jax]"            # JAX evaluators, JIT, autodiff
 pip install "minilink[visualization]"  # meshcat / pygame renderers
-pip install "minilink[plotting]"       # plotly signal plotting backend
+pip install "minilink[plotting]"       # Plotly signal plots and notebook renderer
 pip install "minilink[symbolic]"       # SymPy mechanics helpers
 pip install "minilink[ipopt]"          # Ipopt optimizer adapter
 ```

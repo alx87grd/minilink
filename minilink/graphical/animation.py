@@ -22,6 +22,7 @@ import numpy as np
 from minilink.graphical.environment import prefers_inline_animation
 from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
 from minilink.graphical.renderers.meshcat_renderer import MeshcatRenderer
+from minilink.graphical.renderers.plotly_renderer import PlotlyRenderer
 from minilink.graphical.renderers.pygame_renderer import PygameRenderer
 from minilink.graphical.renderers.renderer import AnimationRenderer
 from minilink.graphical.renderers.timing import (
@@ -34,13 +35,14 @@ __all__ = [
     "AnimationRenderer",
     "MatplotlibRenderer",
     "MeshcatRenderer",
+    "PlotlyRenderer",
     "PygameRenderer",
 ]
 
 
 def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
     """
-    Return a backend instance for *name* (``matplotlib``, ``meshcat``, ``pygame``).
+    Return a backend instance for *name*.
 
     To add a backend, implement :class:`~minilink.graphical.renderers.renderer.AnimationRenderer`
     and extend this function.
@@ -50,11 +52,23 @@ def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
         return MatplotlibRenderer(animator)
     if key == "meshcat":
         return MeshcatRenderer(animator)
+    if key == "plotly":
+        return PlotlyRenderer(animator)
     if key == "pygame":
         return PygameRenderer(animator)
     raise ValueError(
-        f"Unknown renderer {name!r}. Expected 'matplotlib', 'meshcat', or 'pygame'."
+        "Unknown renderer "
+        f"{name!r}. Expected 'matplotlib', 'meshcat', 'plotly', or 'pygame'."
     )
+
+
+def _require_interactive_renderer(name: str, renderer: AnimationRenderer) -> None:
+    if not renderer.supports_interactive:
+        raise ValueError(
+            f"renderer={name!r} does not support "
+            "interactive loops; use it with render() or animate() on a "
+            "precomputed trajectory."
+        )
 
 
 class Animator:
@@ -79,8 +93,9 @@ class Animator:
             title=f"{self.sys.name} — t = {t:.2f} s",
         )
         backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
-        backend.present(block=True)
+        result = backend.present(block=True)
         backend.close_scene()
+        return result
 
     def animate_simulation(
         self,
@@ -99,7 +114,8 @@ class Animator:
 
         The three orthogonal kwargs are:
 
-        - ``renderer``  : graphics tech (``"matplotlib"``, ``"meshcat"``, ``"pygame"``).
+        - ``renderer``  : graphics tech
+          (``"matplotlib"``, ``"meshcat"``, ``"plotly"``, ``"pygame"``).
         - ``html``      : output channel. ``None`` auto-resolves via
           :func:`minilink.graphical.environment.prefers_inline_animation`:
           ``True`` in Colab and in local Jupyter when the active matplotlib
@@ -109,8 +125,9 @@ class Animator:
           ``True``/``False`` is honored.
         - ``native``    : playback engine. ``True`` (default) drives the
           backend's own animation engine:
-          ``matplotlib.animation.FuncAnimation`` for matplotlib and
-          ``meshcat.animation.Animation`` + ``set_animation`` for meshcat.
+          ``matplotlib.animation.FuncAnimation`` for matplotlib,
+          ``meshcat.animation.Animation`` + ``set_animation`` for meshcat,
+          and browser-side Plotly frames for plotly.
           ``False`` falls back to the legacy per-frame Python loop (handy
           for debugging or when the native path's limitations matter;
           see Notes below).
@@ -139,7 +156,12 @@ class Animator:
 
         if html:
             try:
-                return backend.render_inline_animation(primitives, frames, schedule)
+                return backend.render_inline_animation(
+                    primitives,
+                    frames,
+                    schedule,
+                    is_3d=is_3d,
+                )
             except NotImplementedError:
                 print(
                     f"html=True is not supported for renderer={renderer!r}; ignoring html."
@@ -228,6 +250,7 @@ class Animator:
             new_x, new_u, should_stop = update_callback(x, u, t, step_idx, events)
         """
         backend = _make_renderer(renderer, self)
+        _require_interactive_renderer(renderer, backend)
         primitives = self.sys.get_kinematic_geometry()
 
         x = np.asarray(x0)
@@ -357,6 +380,8 @@ class Animator:
         if dynamics_substeps < 1 or int(dynamics_substeps) != dynamics_substeps:
             raise ValueError("dynamics_substeps must be a positive integer.")
         dynamics_substeps = int(dynamics_substeps)
+        backend = _make_renderer(renderer, self)
+        _require_interactive_renderer(renderer, backend)
 
         # Lazy pygame import: game() should be optional.
         try:
@@ -378,7 +403,6 @@ class Animator:
                 f"minilink game — keyboard (focus here) — {self.sys.name}"
             )
 
-        backend = _make_renderer(renderer, self)
         primitives = self.sys.get_kinematic_geometry()
 
         x = np.asarray(self.sys.x0 if x0 is None else x0, dtype=float).copy()

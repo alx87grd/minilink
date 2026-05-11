@@ -9,6 +9,8 @@ class AnimationRenderer(ABC):
     trajectory playback. Subclasses own all library-specific setup and I/O.
     """
 
+    supports_interactive = True
+
     def __init__(self, animator):
         self.animator = animator
         self.sys = animator.sys
@@ -51,7 +53,7 @@ class AnimationRenderer(ABC):
     def close_scene(self) -> None:
         """Release/close backend resources for the current session."""
 
-    def render_inline_animation(self, primitives, frames, schedule):
+    def render_inline_animation(self, primitives, frames, schedule, *, is_3d: bool):
         """Optional notebook inline output (default: unsupported).
 
         ``frames`` entries each carry ``"transforms"`` and ``"camera"``
