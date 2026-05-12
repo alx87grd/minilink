@@ -760,8 +760,8 @@ class System:
         """
         from minilink.graphical.plotting import plot_phase_plane
 
-        # if traj is None:
-        #     traj = self.traj
+        if traj is None:
+            traj = self.traj
         return plot_phase_plane(
             self,
             traj,

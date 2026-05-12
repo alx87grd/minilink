@@ -43,6 +43,33 @@ backend switch or a `minilink.jax` package.
 | `graphical/` | TRL 2 | Plotting, animation, graph display, renderer backends, and matplotlib style policy. |
 | `control/` | TRL 0 | Controller/static-law blocks. |
 
+### Dynamics Abstraction Tree
+
+The executable root for continuous plants is still
+`minilink.core.system.DynamicSystem`, whose contract is `dx = f(x, u, t)` and
+`y = h(x, u, t)`. Reusable dynamics base classes live in
+`minilink.dynamics.abstraction`; catalog plants keep short domain names such as
+`Pendulum`, `CartPole`, and `DynamicBicycle`.
+
+First-pass reusable bases:
+
+- `StateSpaceSystem`: exact native-array LTI form, `dx = A @ x + B @ u`,
+  `y = C @ x + D @ u`; not a local-linearization container.
+- `MechanicalSystem`: generalized-coordinate mechanics with state
+  `x = [q, dq]`; default hooks are native-array, while concrete subclasses are
+  JAX-traceable only if their overridden equations are also native-array.
+- `GeneralizedMechanicalSystem`: generalized/body-velocity mechanics with state
+  `x = [q, v]` and kinematics `qdot = N(q) @ v`; default hooks follow the same
+  native-array rule.
+
+Heterogeneous inputs such as steering angles, elevator angles, tire laws,
+aerodynamic surfaces, and propulsor maps should be modeled with named input
+ports plus an explicit force/allocation hook on the concrete system. Do not add
+Pyro-style `WithPositionInputs` inheritance branches.
+
+Backburner abstractions: `KinematicSystem`, `ManipulatorSystem`, and analysis
+helpers such as linearization and task-space/manipulability tools.
+
 Current on-disk shape:
 
 ```text

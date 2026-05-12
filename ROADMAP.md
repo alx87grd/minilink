@@ -53,9 +53,11 @@ The native-array equation rule applies across those paths (see DESIGN §3).
 
 - Add phase-plane vector-field plotting with trajectory overlays as a small
   Pyro-parity graphics feature.
-- Add reusable core blocks such as state-space, transfer-function, and PID
-  blocks once the API shape is stable.
-- Add linearization and differentiation helpers on compiled evaluators.
+- Add remaining reusable control/core blocks such as transfer-function and PID
+  once the API shape is stable; exact state-space lives under dynamics
+  abstractions.
+- Add linearization and differentiation helpers after the first-pass dynamics
+  abstraction tree is stable.
 - Improve diagram port exporting and nested-diagram ergonomics.
 - Extend simulator-level forced-input helpers only after current workflows are
   stable.
@@ -76,6 +78,26 @@ choice; generic NLP remains the fallback.
 algebra for simple sets and costs; `Jax<Plant>` twins only when one readable
 implementation cannot serve both NumPy and JAX. Frame limits around traceability
 and diagram params, not legacy parallel JAX layers.
+
+**Dynamics abstraction tree** — Keep the executable root at `DynamicSystem`.
+Reusable dynamics bases live in `dynamics/abstraction`; catalog plants keep short
+domain names such as `Pendulum`, `CartPole`, and `DynamicBicycle`.
+
+First-pass bases:
+
+- `StateSpaceSystem`: exact LTI `dx = A @ x + B @ u`, `y = C @ x + D @ u`.
+- `MechanicalSystem`: generalized-coordinate mechanics with `x = [q, dq]`;
+  default hooks are native-array, but concrete subclass traceability depends on
+  the overridden equations.
+- `GeneralizedMechanicalSystem`: generalized/body-velocity mechanics with
+  `x = [q, v]`, `qdot = N(q) @ v`, and native-array default hooks.
+
+Use named input ports plus explicit force/allocation hooks for mixed input
+semantics such as steering, elevator angles, tire forces, aerodynamic surfaces,
+and propulsors. Do not add `WithPositionInputs` inheritance branches.
+
+Backburner items: `KinematicSystem`, `ManipulatorSystem`, linearization, and
+analysis helpers such as task-space dynamics and manipulability tools.
 
 ## 5. Phase B Review Queue
 

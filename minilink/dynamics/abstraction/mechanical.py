@@ -7,14 +7,15 @@ Equation of motion::
 
     H(q) ddq + C(q, dq) dq + d(q, dq) + g(q) = B(q) u
 
-* :class:`MechanicalSystem` — **NumPy only** (default simulation path).
-* :class:`JaxMechanicalSystem` — **JAX** (``jit`` / ``grad`` / symbolic export with
-  ``backend="jax"``). JAX is loaded lazily when you call methods on that class.
+* :class:`MechanicalSystem` — native-array default template. Concrete subclasses
+  remain JAX-traceable only if their hooks use JAX-compatible math.
+* :class:`JaxMechanicalSystem` — compatibility/convenience base for explicit JAX
+  plant variants. JAX is loaded lazily when you call methods on that class.
 """
 
 import numpy as np
 
-from minilink.compile.jax_utils import require_jax_numpy
+from minilink.compile.jax_utils import array_module, require_jax_numpy
 from minilink.core.system import DynamicSystem
 
 
@@ -26,7 +27,9 @@ class MechanicalSystem(DynamicSystem):
 
     State is stacked as ``x = [q; dq]`` with ``n = 2 * dof`` and default output ``y = x``.
 
-    **NumPy only.** Subclasses override ``H``, ``C``, ``B``, ``g``, and/or ``d``.
+    Subclasses override ``H``, ``C``, ``B``, ``g``, and/or ``d``. The default
+    hooks follow Minilink's native-array rule; a concrete subclass is
+    JAX-traceable only if its overridden hooks do the same.
     """
 
     def __init__(self, dof=1, actuators=None):
@@ -66,26 +69,28 @@ class MechanicalSystem(DynamicSystem):
 
     def H(self, q, params=None):
         """Inertia matrix, shape (dof, dof). Kinetic energy = 0.5 * dq^T H(q) dq."""
-        return np.eye(self.dof)
+        xp = array_module(q)
+        return xp.eye(self.dof)
 
     def C(self, q, dq, params=None):
         """Coriolis and centrifugal matrix, shape (dof, dof)."""
-        return np.zeros((self.dof, self.dof))
+        xp = array_module(q)
+        return xp.zeros((self.dof, self.dof))
 
     def B(self, q, params=None):
         """Actuator matrix, shape (dof, m)."""
-        B = np.zeros((self.dof, self.m))
-        for i in range(min(self.m, self.dof)):
-            B[i, i] = 1.0
-        return B
+        xp = array_module(q)
+        return xp.eye(self.dof, self.m)
 
     def g(self, q, params=None):
         """Gravitational / conservative forces, shape (dof,)."""
-        return np.zeros(self.dof)
+        xp = array_module(q)
+        return xp.zeros(self.dof)
 
     def d(self, q, dq, params=None):
         """Dissipative forces, shape (dof,)."""
-        return np.zeros(self.dof)
+        xp = array_module(q)
+        return xp.zeros(self.dof)
 
     def x2q(self, x):
         """Split state ``x`` into ``q`` and ``dq``."""
@@ -95,7 +100,8 @@ class MechanicalSystem(DynamicSystem):
 
     def q2x(self, q, dq):
         """Stack ``q`` and ``dq`` into state ``x``."""
-        return np.concatenate([q, dq])
+        xp = array_module(q)
+        return xp.concatenate([q, dq])
 
     def generalized_forces(self, q, dq, ddq, t=0, params=None):
         """Generalized forces for a given trajectory ``q, dq, ddq``."""
@@ -113,7 +119,8 @@ class MechanicalSystem(DynamicSystem):
         params = self.params if params is None else params
         B = self.B(q, params)
         forces = self.generalized_forces(q, dq, ddq, t, params)
-        return np.linalg.solve(B, forces)
+        xp = array_module(forces)
+        return xp.linalg.solve(B, forces)
 
     def ddq(self, q, dq, u, t=0, params=None):
         """Forward dynamics: generalized accelerations given ``u``."""
@@ -124,7 +131,8 @@ class MechanicalSystem(DynamicSystem):
         d = self.d(q, dq, params)
         B = self.B(q, params)
         rhs = B @ u - C @ dq - g - d
-        return np.linalg.solve(H, rhs)
+        xp = array_module(rhs)
+        return xp.linalg.solve(H, rhs)
 
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
