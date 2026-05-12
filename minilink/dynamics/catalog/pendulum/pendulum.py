@@ -38,6 +38,11 @@ class Pendulum(DynamicSystem):
         # The output is the state with noise added to angular position
         self.add_output_port(self.p, "y", function=self.h, dependencies=["v"])
 
+        # Default camera target and plot axes
+        self.camera_target = np.array([0, 0, 0.0])
+        self.camera_plot_axes = (0, 1)
+        self.camera_scale = 2.0
+
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
@@ -96,7 +101,7 @@ class Pendulum(DynamicSystem):
         theta = x[0]
         torque = self.u2input_signal(u, "u")[0]
         rod_angle = theta - np.pi / 2
-        max_torque = 10.0
+        max_torque = self.inputs["u"].upper_bound[0]
         sweep = torque * (2 * np.pi / 3) / max_torque
 
         return [
@@ -105,3 +110,15 @@ class Pendulum(DynamicSystem):
             pose2d_matrix(0, 0, theta),
             torque_pose2d_matrix(0, 0, rod_angle, sweep),
         ]
+
+
+if __name__ == "__main__":
+
+    pendulum = Pendulum()
+    pendulum.plot_graphe()
+    pendulum.plot_phase_plane()
+
+    pendulum.x0[0] = np.pi / 2
+    pendulum.compute_trajectory(tf=10.0, show=True)
+    pendulum.plot_phase_plane(pendulum.traj)
+    pendulum.animate()
