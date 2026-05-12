@@ -552,9 +552,7 @@ class System:
         n_steps=None,
         dt=None,
         solver=None,
-        show=True,
-        signals=("x", "u"),
-        plot_backend="matplotlib",
+        show=False,
         x0=None,
         compile_backend="numpy",
         verbose=True,
@@ -568,12 +566,6 @@ class System:
 
         Parameters
         ----------
-        signals : tuple of str, optional
-            Sampled signals passed to
-            :func:`minilink.graphical.plotting.plot_time_signals` when ``show``
-            is True. The default plots states and inputs.
-        plot_backend : str, optional
-            Time-signal plotting backend used when ``show`` is True.
         compile_backend : str
             Passed to :class:`~minilink.simulation.Simulator` (default ``\"numpy\"``).
             Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
@@ -599,8 +591,9 @@ class System:
             verbose=verbose,
         )
         traj = sim.solve()
+
         if show:
-            plot_time_signals(self, traj, signals=signals, backend=plot_backend)
+            plot_time_signals(self, traj)
 
         self.traj = traj
 
@@ -615,9 +608,7 @@ class System:
         n_steps=None,
         dt=None,
         solver=None,
-        show=True,
-        signals=("x", "u"),
-        plot_backend="matplotlib",
+        show=False,
         x0=None,
         compile_backend="numpy",
         verbose=True,
@@ -642,14 +633,6 @@ class System:
         input_port_id : str, optional
             Named input port to force while keeping the others at default
             values.
-        signals : tuple of str, optional
-            Sampled signals passed to
-            :func:`minilink.graphical.plotting.plot_time_signals` when ``show``
-            is True.
-        plot_backend : str, optional
-            Time-signal plotting backend used when ``show`` is True.
-        compile_backend : str
-            Same as :meth:`compute_trajectory`.
 
         Returns
         -------
@@ -672,13 +655,15 @@ class System:
         )
 
         traj = sim.solve_forced(u, input_port_id=input_port_id)
+
         if show:
-            plot_time_signals(self, traj, signals=signals, backend=plot_backend)
+            plot_time_signals(self, traj)
+
         self.traj = traj
 
         return traj
 
-    def plot_time_signals(
+    def plot_trajectory(
         self,
         traj=None,
         *,
@@ -719,28 +704,6 @@ class System:
 
         return self.compute_trajectory(signals=signals, plot_backend=backend, show=show)
 
-    def plot_trajectory(
-        self,
-        traj=None,
-        *,
-        signals=("x", "u"),
-        backend="matplotlib",
-        show=True,
-    ):
-        """
-        Convenience shortcut to plot trajectory time signals.
-
-        This is the object-level ergonomic alias for
-        :meth:`plot_time_signals`; use ``signals=(...)`` to select sampled
-        channels and ``backend=...`` to choose matplotlib or Plotly.
-        """
-        return self.plot_time_signals(
-            traj,
-            signals=signals,
-            backend=backend,
-            show=show,
-        )
-
     def plot_phase_plane(
         self,
         traj=None,
@@ -764,28 +727,6 @@ class System:
             traj = self.traj
         return plot_phase_plane(
             self,
-            traj,
-            x_axis=x_axis,
-            y_axis=y_axis,
-            backend=backend,
-            show=show,
-            **kwargs,
-        )
-
-    def plot_phase_plane_trajectory(
-        self,
-        traj=None,
-        *,
-        x_axis=0,
-        y_axis=None,
-        backend="matplotlib",
-        show=True,
-        **kwargs,
-    ):
-        """
-        Pyro-friendly alias for :meth:`plot_phase_plane` with trajectory overlay.
-        """
-        return self.plot_phase_plane(
             traj,
             x_axis=x_axis,
             y_axis=y_axis,

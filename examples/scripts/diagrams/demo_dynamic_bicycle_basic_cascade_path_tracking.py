@@ -1,12 +1,13 @@
 """Cascade path tracking: pure pursuit, heading / yaw-rate loops, and velocity PID.
 
 Tracks a sinusoidal lane ``y(x) = A sin(2 pi x / lambda)`` with
-:class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycleCar3D`.
-Diagram: PathPlanner → ``path`` → Tracking + ``y`` ``→ theta_ref``; planner ``u_ref``
-→ velocity PID ``→ w_rear``; heading / yaw-rate loops ``→ delta``. Run from repo root::
+:class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycle`
+(planar graphics; same dynamics as :class:`DynamicBicycleCar3D`). Diagram:
+PathPlanner → ``path`` signal → Tracking + ``y`` ``→ theta_ref``; planner ``u_ref`` → velocity PID ``→ w_rear``;
+heading / yaw-rate loops ``→ delta``. Run from repo root::
 
     conda run -n dev-h26 python \\
-        examples/scripts/diagrams/demo_dynamic_bicycle_cascade_path_tracking.py
+        examples/scripts/diagrams/demo_dynamic_bicycle_basic_cascade_path_tracking.py
 
 For meshcat instead of the default renderer, call ``diagram.animate(renderer="meshcat")``.
 
@@ -14,15 +15,18 @@ Animation overlays (world frame): reference sinusoid, pure-pursuit chord, headin
 arc, and steer arc (velocity loop has no drawing primitives).
 """
 
+import types
+
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem, System
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.graphical.primitives import (
     Arrow,
     CustomLine,
     TorqueArrow,
+    camera_matrix,
     scale_pose2d_matrix,
     torque_pose2d_matrix,
 )
@@ -37,6 +41,39 @@ U_REF = 5.0
 # Reference path polyline extent for animation (world x, meters)
 _PATH_X0 = -8.0
 _PATH_X1 = 95.0
+
+
+def attach_vehicle_centered_diagram_camera(
+    diagram_sys, plant, *, plant_sys_id: str = "vehicle"
+) -> None:
+    """Animate the composed diagram using a camera target on the plant's ``(x, y)``.
+
+    Uses ``plant.camera_target`` offset and ``camera_plot_axes`` /
+    ``camera_scale`` copied onto the diagram—same framing as the plant's
+    :meth:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycle.get_camera_transform`,
+    but reads ``plant`` pose from ``diagram_sys``'s aggregated state ``x``.
+    """
+
+    ix = diagram_sys.state_index[plant_sys_id][0]
+
+    def get_camera_transform(self, x, _u, _t):
+        target = np.asarray(plant.camera_target, dtype=float).reshape(3).copy()
+        target[0] += float(x[ix])
+        target[1] += float(x[ix + 1])
+        return camera_matrix(
+            target=target,
+            plot_axes=self.camera_plot_axes,
+            scale=self.camera_scale,
+        )
+
+    diagram_sys.camera_plot_axes = tuple(plant.camera_plot_axes)
+    diagram_sys.camera_scale = float(plant.camera_scale)
+    diagram_sys.camera_target = (
+        np.asarray(plant.camera_target, dtype=float).reshape(3).copy()
+    )
+    diagram_sys.get_camera_transform = types.MethodType(
+        get_camera_transform, diagram_sys
+    )
 
 
 class PathPlanner(System):
@@ -372,12 +409,12 @@ def plot_xy_vs_path(px, py, t, a_amp: float, wavelength: float):
     ax.legend(loc="upper right")
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
-    ax.set_title(f"Cascade path tracking (t_final = {t_final:.2f} s)")
+    ax.set_title(f"Cascade path tracking — DynamicBicycle (t_final = {t_final:.2f} s)")
     fig.tight_layout()
     plt.show()
 
 
-vehicle = DynamicBicycleCar3D()
+vehicle = DynamicBicycle()
 vehicle.x0 = np.array([-10.0, 0.4, 0.05, 0.0, 0.0, 0.0], dtype=float)
 
 planner = PathPlanner(U_REF, path_a=A, path_lambda=LAMBDA)
@@ -387,7 +424,7 @@ yaw_rate_loop = YawRateLoop()
 vel_pid = VelocityPID(vehicle.r_r)
 
 diagram = DiagramSystem()
-diagram.name = "Cascade sinusoid tracking"
+diagram.name = "Cascade sinusoid tracking (basic bicycle)"
 diagram.add_subsystem(planner, "planner")
 diagram.add_subsystem(tracking, "tracking")
 diagram.add_subsystem(heading_loop, "heading_loop")
@@ -420,7 +457,10 @@ print(
 
 plot_xy_vs_path(px, py, diagram.traj.t, A, LAMBDA)
 
+
+attach_vehicle_centered_diagram_camera(diagram, vehicle)
+
 # diagram.animate()
-diagram.animate(renderer="meshcat")
+# diagram.animate(renderer="meshcat")
 diagram.animate(renderer="matplotlib")
-diagram.animate(renderer="plotly")
+# diagram.animate(renderer="plotly")
