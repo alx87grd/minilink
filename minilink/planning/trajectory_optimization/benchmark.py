@@ -16,6 +16,7 @@ from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.evaluators.program_evaluator import (
     MathematicalProgramEvaluator,
 )
+from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -55,6 +56,9 @@ class TrajectoryOptimizationBenchmarkConfig:
     ftol: float = 1e-2
     n_runs: int = 1
     warm_guess_path: str | Path | None = None
+    #: If true, print :class:`~minilink.optimization.mathematical_program.MathematicalProgram`
+    #: details once per distinct ``(transcription, compile_backend, n_steps, tf)``.
+    print_mathematical_program_details: bool = False
 
 
 @dataclass(frozen=True)
@@ -119,8 +123,14 @@ def default_trajectory_optimization_variants(
     *,
     starts: tuple[str, ...] = ("cold", "warm"),
     ftol: float = 1e-2,
+    include_ipopt: bool = True,
 ) -> tuple[TrajectoryOptimizationBenchmarkVariant, ...]:
-    """Return the default cartpole trajopt benchmark sweep."""
+    """Return the default cartpole trajopt benchmark sweep.
+
+    When ``include_ipopt`` is true and ``cyipopt`` is importable, appends Ipopt
+    variants for each transcription, using JAX analytic derivatives if JAX is
+    available and otherwise NumPy finite differences.
+    """
     variants = [
         TrajectoryOptimizationBenchmarkVariant(
             name="numpy-collocation-slsqp",
@@ -179,6 +189,73 @@ def default_trajectory_optimization_variants(
                 derivative="jax",
                 precision="f32",
                 optimizer_options={"ftol": max(float(ftol), 1e-5)},
+            ),
+        ]
+
+        if include_ipopt and ipopt_trajopt_available():
+            variants += [
+                TrajectoryOptimizationBenchmarkVariant(
+                    name="jax-collocation-ipopt",
+                    transcription="collocation",
+                    compile_backend="jax",
+                    derivative="jax",
+                    precision="x64",
+                    optimizer_backend="ipopt",
+                    optimizer_method="ipopt",
+                    optimizer_options={"tol": float(ftol)},
+                    use_hessian=False,
+                ),
+                TrajectoryOptimizationBenchmarkVariant(
+                    name="jax-shooting-ipopt",
+                    transcription="shooting",
+                    compile_backend="jax",
+                    derivative="jax",
+                    precision="x64",
+                    optimizer_backend="ipopt",
+                    optimizer_method="ipopt",
+                    optimizer_options={"tol": float(ftol)},
+                    use_hessian=False,
+                ),
+                TrajectoryOptimizationBenchmarkVariant(
+                    name="jax-multiple-ipopt",
+                    transcription="multiple_shooting",
+                    compile_backend="jax",
+                    derivative="jax",
+                    precision="x64",
+                    optimizer_backend="ipopt",
+                    optimizer_method="ipopt",
+                    optimizer_options={"tol": float(ftol)},
+                    use_hessian=False,
+                ),
+            ]
+    elif include_ipopt and ipopt_trajopt_available():
+        variants += [
+            TrajectoryOptimizationBenchmarkVariant(
+                name="numpy-collocation-ipopt",
+                transcription="collocation",
+                compile_backend="numpy",
+                derivative="finite-diff",
+                optimizer_backend="ipopt",
+                optimizer_method="ipopt",
+                optimizer_options={"tol": float(ftol)},
+            ),
+            TrajectoryOptimizationBenchmarkVariant(
+                name="numpy-shooting-ipopt",
+                transcription="shooting",
+                compile_backend="numpy",
+                derivative="finite-diff",
+                optimizer_backend="ipopt",
+                optimizer_method="ipopt",
+                optimizer_options={"tol": float(ftol)},
+            ),
+            TrajectoryOptimizationBenchmarkVariant(
+                name="numpy-multiple-ipopt",
+                transcription="multiple_shooting",
+                compile_backend="numpy",
+                derivative="finite-diff",
+                optimizer_backend="ipopt",
+                optimizer_method="ipopt",
+                optimizer_options={"tol": float(ftol)},
             ),
         ]
 
@@ -278,11 +355,20 @@ def benchmark_trajectory_optimization(
     if any(variant.start == "warm" for variant in variants):
         warm_guess = _warm_initial_trajectory(config)
 
+    program_detail_keys: set[tuple[str, str, int, float]] | None = (
+        set() if config.print_mathematical_program_details else None
+    )
+
     rows = tuple(
         _summarize(
             variant,
             [
-                _run_trajopt_variant(variant, config, warm_guess)
+                _run_trajopt_variant(
+                    variant,
+                    config,
+                    warm_guess,
+                    program_detail_keys=program_detail_keys,
+                )
                 for _ in range(config.n_runs)
             ],
         )
@@ -321,11 +407,83 @@ def print_trajectory_optimization_benchmark(
             print(f"{row.variant.name} {row.variant.start} failed: {row.message}")
 
 
+def _mathematical_program_detail_key(
+    variant: TrajectoryOptimizationBenchmarkVariant,
+    config: TrajectoryOptimizationBenchmarkConfig,
+) -> tuple[str, str, int, float]:
+    return (
+        variant.transcription,
+        str(variant.compile_backend),
+        int(config.n_steps),
+        float(config.tf),
+    )
+
+
+def _mathematical_program_bounds_summary(program: MathematicalProgram) -> str:
+    lo, up = program.lower, program.upper
+    if lo is None and up is None:
+        return "box_bounds: none"
+    parts: list[str] = []
+    if lo is not None:
+        lo_arr = np.asarray(lo, dtype=float)
+        parts.append(
+            f"lower len={lo_arr.size} min={float(np.min(lo_arr)):.4g} "
+            f"max={float(np.max(lo_arr)):.4g}"
+        )
+    if up is not None:
+        up_arr = np.asarray(up, dtype=float)
+        parts.append(
+            f"upper len={up_arr.size} min={float(np.min(up_arr)):.4g} "
+            f"max={float(np.max(up_arr)):.4g}"
+        )
+    return "box_bounds: " + "; ".join(parts)
+
+
+def _print_mathematical_program_details(
+    program: MathematicalProgram,
+    ev: MathematicalProgramEvaluator,
+    *,
+    variant: TrajectoryOptimizationBenchmarkVariant,
+    config: TrajectoryOptimizationBenchmarkConfig,
+) -> None:
+    print()
+    print("=" * 72)
+    print(
+        "MathematicalProgram detail (once per transcription / compile_backend / grid)"
+    )
+    print("=" * 72)
+    print(f"representative variant: {variant.name!r} start={variant.start!r}")
+    print(
+        f"transcription={variant.transcription!r} "
+        f"compile_backend={variant.compile_backend!r}"
+    )
+    print(f"grid: tf={config.tf:g} n_steps={config.n_steps}")
+    print(f"problem_class={program.problem_class!r}")
+    print(f"n_z={program.n_z}")
+    print(f"n_h={ev.n_h} n_g={ev.n_g}")
+    print(f"program_evaluator.backend={ev.backend!r}")
+    print(_mathematical_program_bounds_summary(program))
+    print(
+        "analytic callbacks on program: "
+        f"grad_J={program.grad_J is not None} "
+        f"hess_J={program.hess_J is not None} "
+        f"jac_h={program.jac_h is not None} "
+        f"jac_g={program.jac_g is not None}"
+    )
+    if program.metadata:
+        print("metadata:")
+        for key in sorted(program.metadata, key=str):
+            print(f"  {key!r}: {program.metadata[key]!r}")
+    print("=" * 72)
+
+
 # TrajOpt Run
 def _run_trajopt_variant(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
     warm_guess: Trajectory | None,
+    *,
+    program_detail_keys: set[tuple[str, str, int, float]] | None = None,
 ) -> TrajectoryOptimizationBenchmarkRow:
     planner = _planner(variant, config)
     guess = _initial_guess(planner, variant, warm_guess)
@@ -341,6 +499,16 @@ def _run_trajopt_variant(
 
     solve_t0 = time.perf_counter()
     optimizer = planner._make_optimizer(program, z0)
+    if program_detail_keys is not None:
+        key = _mathematical_program_detail_key(variant, config)
+        if key not in program_detail_keys:
+            program_detail_keys.add(key)
+            _print_mathematical_program_details(
+                program,
+                optimizer.program_evaluator,
+                variant=variant,
+                config=config,
+            )
     solution = optimizer.solve()
     solve_s = time.perf_counter() - solve_t0
 

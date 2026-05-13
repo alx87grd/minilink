@@ -28,7 +28,7 @@ PRINT_SOLVE_REPORT = True  # Print the Minilink TrajOpt pre/post solve report.
 PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT  # Print compact success/cost fallback.
 SCIPY_DISP = False  # Keep SciPy's own backend text off; use PRINT_SOLVE_REPORT.
 TF = 5.0
-N_STEPS = 20
+N_STEPS = 50
 U_TARGET = 5.0
 Y_GOAL = 3.5
 W_REAR_MAX = 80.0
@@ -40,7 +40,7 @@ sys.inputs["w_rear"].upper_bound[0] = W_REAR_MAX
 sys.inputs["delta"].lower_bound[0] = -DELTA_MAX
 sys.inputs["delta"].upper_bound[0] = DELTA_MAX
 
-x_start = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+x_start = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0])
 # Reference state used by the running and terminal cost. The lane change is
 # encouraged by the cost, not enforced by an equality terminal set.
 x_ref = np.array([U_TARGET * TF, Y_GOAL, 0.0, U_TARGET, 0.0, 0.0])

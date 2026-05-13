@@ -60,7 +60,7 @@ class Planner(ABC):
         Only valid when :meth:`require_result` returns a
         :class:`~minilink.core.trajectory.Trajectory`.
         """
-        return self.problem.sys.plot_time_signals(
+        return self.problem.sys.plot_trajectory(
             self.require_result(),
             signals=signals,
             backend=backend,
