@@ -41,16 +41,15 @@ sys.inputs["delta"].lower_bound[0] = -DELTA_MAX
 sys.inputs["delta"].upper_bound[0] = DELTA_MAX
 
 x_start = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0])
-# Reference state used by the running and terminal cost. The lane change is
-# encouraged by the cost, not enforced by an equality terminal set.
-x_ref = np.array([U_TARGET * TF, Y_GOAL, 0.0, U_TARGET, 0.0, 0.0])
+x_ref = np.array([0.0, 5.0, np.pi, U_TARGET, 0.0, 0.0])
 
-# State weights penalize deviation in lateral position, heading, and body slip.
-Q = np.diag([0.0, 4.0, 5.0, 0.1, 1.0, 1.0])
-# Penalize deviation from the cruise input (rear wheel ω that holds U_TARGET).
-ubar = np.array([U_TARGET / sys.r_r, 0.0])
+
+Q = np.diag([1.0, 0.1, 5.0, 0.1, 0.1, 0.1])
 R = np.diag([1e-4, 50.0])
-S = np.diag([0.0, 50.0, 50.0, 1.0, 10.0, 10.0])
+S = np.diag([50.0, 50.0, 50.0, 1.0, 1.0, 10.0])
+
+ubar = np.array([U_TARGET / sys.r_r, 0.0])
+
 
 cost = QuadraticCost.from_system(
     sys,
@@ -76,12 +75,12 @@ planner = TrajectoryOptimizationPlanner(
     ),
     options=TrajectoryOptimizationOptions(
         compile_backend="jax",
-        # optimizer_method="ipopt",
+        optimizer_method="ipopt",
         solve_disp=PRINT_SOLVE_REPORT,
         optimizer_options={
             "disp": SCIPY_DISP,
-            "maxiter": 500,
-            "ftol": 1e-2,
+            "maxiter": 2000,
+            # "ftol": 1e-2,
         },
     ),
 )

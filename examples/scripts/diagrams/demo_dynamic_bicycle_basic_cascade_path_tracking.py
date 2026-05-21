@@ -233,16 +233,6 @@ class HeadingLoop(StaticSystem):
         r_ref = np.clip(r_ref, -p["r_max"], p["r_max"])
         return np.array([r_ref], dtype=float)
 
-    def get_kinematic_geometry(self):
-        return [TorqueArrow(radius=1.15, color="mediumpurple", linewidth=2.0)]
-
-    def get_kinematic_transforms(self, x, u, t):
-        theta_ref, theta = float(u[0]), float(u[3])
-        px, py = float(u[1]), float(u[2])
-        e_psi = theta_ref - theta
-        e_psi = (e_psi + np.pi) % (2.0 * np.pi) - np.pi
-        return [torque_pose2d_matrix(px, py, theta, e_psi)]
-
 
 class YawRateLoop(StaticSystem):
     """P loop: yaw-rate error → steer angle ``delta`` [rad].
