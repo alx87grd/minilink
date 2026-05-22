@@ -14,7 +14,10 @@ import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, System
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleMagicForces
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
+    DynamicBicycleMagicForces,
+    Pacejka,
+)
 from minilink.graphical.primitives import camera_matrix
 
 U_REF = 5.0  # m/s
@@ -234,6 +237,9 @@ class ConstantSteering(System):
 def main():
     vehicle = DynamicBicycleMagicForces()
 
+    vehicle.tire_model_f = Pacejka()
+    vehicle.tire_model_r = Pacejka()
+
     # State convention:
     # x = [X, Y, theta, u, v, r]
     vehicle.x0 = np.array(
@@ -243,7 +249,7 @@ def main():
 
     speed_ref = SpeedReference(U_REF)
     vel_pid = VelocityPID()
-    steering = ConstantSteering(delta=0.5)
+    steering = ConstantSteering(delta=0.0)
 
     diagram = DiagramSystem()
     diagram.name = "Velocity PID force control - DynamicBicycleMagicForces"

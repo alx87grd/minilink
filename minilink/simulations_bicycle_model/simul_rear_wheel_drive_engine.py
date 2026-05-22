@@ -17,11 +17,12 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycleRearWheelDriveEngine,
+    Pacejka,
 )
 from minilink.graphical.primitives import camera_matrix
 
 THR_REF = 1.0  # Normalized throttle [0, 1]
-DELTA_REF = 0.5  # rad
+DELTA_REF = 0.0  # rad
 
 
 def attach_vehicle_centered_diagram_camera(
@@ -101,6 +102,9 @@ class ConstantVehicleInput(System):
 
 def main():
     vehicle = DynamicBicycleRearWheelDriveEngine()
+
+    vehicle.tire_model_f = Pacejka()
+    vehicle.tire_model_r = Pacejka()
 
     # State convention for DynamicBicycleRearWheelDrive:
     # x = [X, Y, theta, phi_rear, phi_front, vx, vy, r, w_rear, w_front]

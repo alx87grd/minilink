@@ -32,20 +32,6 @@ def max_torque_curve(rpm):
 
 torque_full = max_torque_curve(rpm)
 
-# EXEMPLE DE GESTION DE THROTTLE
-
-# rpm = 4000
-# max_torque = 260.0  # Nm at 4000 rpm
-# throttle = 0.5
-
-# engine_torque = throttle * max_torque
-
-# rpm_targ = 4000
-
-# idx = int(round((rpm_targ - rpm_min) / (rpm_max - rpm_min) * (resolution - 1)))
-
-# print(f"Torque at rpm={rpm_targ}: {torque_full[idx]:.2f} Nm")
-
 
 # Power equation:
 # P [W] = torque [Nm] * angular_speed [rad/s]

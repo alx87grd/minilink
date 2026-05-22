@@ -17,6 +17,7 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycleRearWheelDrive,
+    Pacejka,
 )
 from minilink.graphical.primitives import camera_matrix
 
@@ -94,6 +95,9 @@ class ConstantVehicleInput(System):
 
 def main():
     vehicle = DynamicBicycleRearWheelDrive()
+
+    vehicle.tire_model_f = Pacejka()
+    vehicle.tire_model_r = Pacejka()
 
     # State convention for DynamicBicycleRearWheelDrive:
     # x = [X, Y, theta, phi_rear, phi_front, vx, vy, r, w_rear, w_front]
