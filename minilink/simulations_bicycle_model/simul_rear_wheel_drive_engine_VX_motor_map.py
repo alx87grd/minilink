@@ -26,7 +26,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
 from minilink.graphical.primitives import camera_matrix
 
 ACC_REF = 1.0
-VX_REF = 1.0
+VX_REF = 5.0  # m/s
 DELTA_REF = 0.0  # rad
 
 
@@ -222,9 +222,8 @@ class PID(DynamicSystem):
             p["cmd_min"],
             p["cmd_max"],
         )
-        cmd = ref
         # DEBUG
-        # print(f"acc_cmd={cmd}")
+        # print(f"acc_cmd={cmd}, e={e}")
 
         # Log signals
         self.t_hist.append(float(t))
@@ -243,7 +242,7 @@ class PID(DynamicSystem):
 class ConstantReference(System):
     """Constant scalar reference signal."""
 
-    def __init__(self, ref: float = ACC_REF, name: str | None = None):
+    def __init__(self, ref: float = 1.0, name: str | None = None):
         super().__init__(0, 0, 1)
 
         self.name = name if name is not None else "Not named :("
@@ -623,17 +622,6 @@ def main():
     # Moteur HD9
     vehicle.engine_power_peak = 48470.5  # Watts from 65 HP
 
-    goal_torque_at_max_speed = 1.0  # Nm
-    max_speed = 27.78  # m/s
-    wheel_circumference = vehicle.r_r * 2 * np.pi  # m
-    # print(f"wheel_circumference: {wheel_circumference}")
-    wheel_speed_at_max_speed = max_speed / wheel_circumference  # rotations/s
-    # print(f"wheel_speed_at_max_speed: {wheel_speed_at_max_speed}")
-    engine_speed_at_max_speed = (
-        vehicle.engine_power_peak / goal_torque_at_max_speed
-    )  # rotations/s
-    # print(f"engine_speed_at_max_speed: {engine_speed_at_max_speed}")
-
     vehicle.transmission_ratio = 1.0
     # print(f"transmission_ratio: {vehicle.transmission_ratio}")
 
@@ -697,14 +685,26 @@ def main():
     )
 
     v_pid = PID(
+        Kp=0.8,
+        Ki=0.01,
+        Kd=0.0,
+        tau=0.1,
+        cmd_min=-10.0,
+        cmd_max=10.0,
+        i_min=-5.0,
+        i_max=5.0,
+        name="Speed PID",
+    )
+
+    x_pos_pid = PID(
         Kp=1.0,
         Ki=0.0,
         Kd=0.0,
         tau=0.1,
-        cmd_min=-1000000.0,
-        cmd_max=1000000.0,
-        i_min=-1000000.0,
-        i_max=1000000.0,
+        cmd_min=-10.0,
+        cmd_max=10.0,
+        i_min=-5.0,
+        i_max=5.0,
         name="Speed PID",
     )
 
@@ -715,9 +715,9 @@ def main():
     diagram = DiagramSystem()
     diagram.name = "Acceleration PID - DynamicBicycleRearWheelDriveEngine"
 
-    diagram.add_subsystem(acc_ref, "acc_ref")
-    diagram.add_subsystem(acc_pid, "acc_pid")
-    diagram.add_subsystem(acc_meas, "acc_meas")
+    # diagram.add_subsystem(acc_ref, "acc_ref")
+    # diagram.add_subsystem(acc_pid, "acc_pid")
+    # diagram.add_subsystem(acc_meas, "acc_meas")
     diagram.add_subsystem(acc_to_force, "acc_to_force")
     diagram.add_subsystem(thr_map, "thr_map")
 
@@ -731,27 +731,20 @@ def main():
     # diagram.add_subsystem(speed_meas, "speed_meas")
 
     # Reference acceleration into PID
-    diagram.connect("acc_ref", "ref", "acc_to_force", "acc_targ")
-    diagram.connect("acc_ref", "ref", "acc_pid", "ref")
-    # diagram.connect("v_ref", "ref", "v_pid", "ref")
-    # diagram.connect("v_pid", "cmd", "acc_pid", "ref")
+    diagram.connect("v_ref", "ref", "v_pid", "ref")
+    diagram.connect("speed_meas", "meas", "v_pid", "meas")
+    diagram.connect("v_pid", "cmd", "acc_to_force", "acc_targ")
 
     # Vehicle output vector into acceleration measurement block
-    diagram.connect("vehicle", "y", "acc_meas", "y")
     diagram.connect("vehicle", "y", "speed_meas", "y")
 
     # Scalar measured acceleration into PID
-    diagram.connect("acc_meas", "meas", "acc_pid", "meas")
-    # diagram.connect("speed_meas", "meas", "v_pid", "meas")
-
     diagram.connect("vehicle", "y", "rear_speed_meas", "y")
 
     diagram.connect("rear_speed_meas", "meas", "thr_map", "w_rear")
 
     # PID command drives throttle
-    # diagram.connect("acc_pid", "cmd", "acc_to_force", "acc_targ")
     diagram.connect("acc_to_force", "F_rear", "thr_map", "F_rear")
-    # diagram.connect("acc_pid", "cmd", "thr_map", "F_rear")
     diagram.connect("thr_map", "thr", "vehicle", "thr")
 
     # Constant steering command
@@ -770,19 +763,17 @@ def main():
 
     print("Trajectory computation done.")
 
-    diagram.plot_trajectory(
-        signals=("x", "u"),
-        backend="matplotlib",
-    )
+    # diagram.plot_trajectory(
+    #     signals=("x", "u"),
+    #     backend="matplotlib",
+    # )
 
     # Plot acceleration tracking
     import matplotlib.pyplot as plt
 
-    pid_to_plot = acc_pid
-
-    t = np.array(pid_to_plot.t_hist)
-    ref = np.array(pid_to_plot.ref_hist)
-    meas = np.array(pid_to_plot.meas_hist)
+    t = np.array(v_pid.t_hist)
+    ref = np.array(v_pid.ref_hist)
+    meas = np.array(v_pid.meas_hist)
 
     # Sort (important for solver calls)
     idx = np.argsort(t)
@@ -797,11 +788,11 @@ def main():
     t = t_unique
 
     plt.figure()
-    plt.plot(t, ref, label="Reference acc")
-    plt.plot(t, meas, label="Measured acc")
+    plt.plot(t, ref, label="Reference speed")
+    plt.plot(t, meas, label="Measured speed")
     plt.xlabel("Time [s]")
-    plt.ylabel("Acceleration [m/s²]")
-    plt.title("Acceleration tracking")
+    plt.ylabel("Speed [m/s]")
+    plt.title("Speed tracking")
     plt.legend()
     plt.grid(True)
     plt.show()
