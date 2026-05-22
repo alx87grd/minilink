@@ -1,14 +1,26 @@
+"""Open-loop demo for DynamicBicycleRearWheelDrive.
+
+No controller.
+No velocity PID.
+No path tracking.
+
+The vehicle receives constant open-loop inputs:
+- throotle: Normalized throttle [0, 1]
+- delta: front steering angle [rad]
+"""
+
 import numpy as np
 from vehicule_helper import attach_vehicle_centered_diagram_camera, create_vehicle
 
 from minilink.control.constant_ref import ConstantReference
-from minilink.control.generic_meas import Measurement
+from minilink.control.generic_meas import AccelerationMeasurement, Measurement
 from minilink.control.generic_pid import PID
 from minilink.control.motor_map import AccToRearForce, ThrMap
 from minilink.core.diagram import DiagramSystem
 
-VX_REF = 5.0
-DELTA_REF = 0.0
+ACC_REF = 1.0
+VX_REF = 5.0  # m/s
+DELTA_REF = 0.0  # rad
 
 
 def create_diagram(vx_ref=VX_REF):
@@ -22,11 +34,7 @@ def create_diagram(vx_ref=VX_REF):
         index=5,
     )
 
-    rear_speed_meas = Measurement(
-        name="Rear wheel speed",
-        y_size=12,
-        index=8,
-    )
+    rear_speed_ref = ConstantReference(ref=14.5, name="Rear wheel speed")
 
     v_pid = PID(
         Kp=0.8,
@@ -52,24 +60,28 @@ def create_diagram(vx_ref=VX_REF):
 
     diagram.add_subsystem(v_ref, "v_ref")
     diagram.add_subsystem(v_pid, "v_pid")
-    diagram.add_subsystem(rear_speed_meas, "rear_speed_meas")
+    diagram.add_subsystem(rear_speed_ref, "rear_speed_ref")
     diagram.add_subsystem(speed_meas, "speed_meas")
 
     diagram.add_subsystem(steering, "steering")
     diagram.add_subsystem(vehicle, "vehicle")
 
+    # Reference acceleration into PID
     diagram.connect("v_ref", "ref", "v_pid", "ref")
     diagram.connect("speed_meas", "meas", "v_pid", "meas")
     diagram.connect("v_pid", "cmd", "acc_to_force", "acc_targ")
 
+    # Vehicle output vector into acceleration measurement block
     diagram.connect("vehicle", "y", "speed_meas", "y")
-    diagram.connect("vehicle", "y", "rear_speed_meas", "y")
 
-    diagram.connect("rear_speed_meas", "meas", "thr_map", "w_rear")
+    # Scalar measured acceleration into PID
+    diagram.connect("rear_speed_ref", "ref", "thr_map", "w_rear")
 
+    # PID command drives throttle
     diagram.connect("acc_to_force", "F_rear", "thr_map", "F_rear")
     diagram.connect("thr_map", "thr", "vehicle", "thr")
 
+    # Constant steering command
     diagram.connect("steering", "ref", "vehicle", "delta")
 
     return diagram, vehicle, v_pid
