@@ -21,7 +21,10 @@ from simul_rear_wheel_drive_engine_VX_motor_map import (
 )
 
 # Optional, only needed if you still want animations
-from vehicule_helper import attach_vehicle_centered_diagram_camera, create_vehicle
+from minilink.simulations_bicycle_model.vehicule_helper import (
+    attach_vehicle_centered_diagram_camera,
+    create_vehicle,
+)
 
 DELTA_REF = 0.0  # rad
 

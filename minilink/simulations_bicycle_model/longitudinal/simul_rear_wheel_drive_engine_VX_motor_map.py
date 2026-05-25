@@ -1,5 +1,4 @@
 import numpy as np
-from vehicule_helper import attach_vehicle_centered_diagram_camera, create_vehicle
 
 from minilink.control.constant_ref import ConstantReference
 from minilink.control.generic_meas import Measurement
@@ -9,6 +8,10 @@ from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycleRearWheelDriveEngine,
     Pacejka,
+)
+from minilink.simulations_bicycle_model.vehicule_helper import (
+    attach_vehicle_centered_diagram_camera,
+    create_vehicle,
 )
 
 VX_REF = 5.0

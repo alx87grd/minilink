@@ -163,6 +163,7 @@ class Pacejka(TireModel):
         Fy = Fy_0
 
         if mode == "w":
+            # TODO: Verif
             Fx = Fx_0 * self.Gxa(alpha)
             Fy = Fy_0 * self.Gyk(kappa)
         elif mode == "c":
