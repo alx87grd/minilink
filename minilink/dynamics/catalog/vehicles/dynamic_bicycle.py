@@ -14,6 +14,11 @@ import numpy as np
 
 from minilink.compile.jax_utils import require_jax_numpy
 from minilink.core.system import DynamicSystem
+from minilink.dynamics.catalog.vehicles.tire_models import (
+    LinearTire,
+    Pacejka,
+    TireModel,
+)
 from minilink.graphical.primitives import (
     Arrow,
     Box,
@@ -27,83 +32,6 @@ from minilink.graphical.primitives import (
     scale_pose2d_matrix,
     translation_matrix,
 )
-
-
-class TireModel:
-    """Base Strategy for Tire-Road Interaction"""
-
-    def __init__(self):
-        self.v_min_epsilon = 0.1
-
-    def vel2slip(self, vx, vy, w, R):
-        """Compute longitudinal and lateral slip"""
-
-        # Adjusted longitudinal velocity to avoid division by zero
-        vx_adj = np.abs(vx) + self.v_min_epsilon
-
-        # Lateral slip angle (alpha)
-        alpha = -np.arctan(vy / vx_adj)
-
-        # Longitudinal slip ratio (kappa)
-        kappa = (w * R - vx) / vx_adj
-
-        return alpha, kappa
-
-    def slip2forces(self, alpha, kappa, Fz):
-        """Convert slip values to forces using the tire model"""
-        raise NotImplementedError
-
-    def vel2forces(self, vx, vy, w, R, Fz):
-        """Compute forces directly from velocities"""
-        alpha, kappa = self.vel2slip(vx, vy, w, R)
-        return self.slip2forces(alpha, kappa, Fz)
-
-
-class LinearTire(TireModel):
-    def __init__(self, Ca=60000, Ck=100000, mu=1.0):
-
-        TireModel.__init__(self)
-
-        self.Ca, self.Ck = Ca, Ck
-        self.mu = mu
-
-    def slip2forces(self, alpha, kappa, Fz):
-        # Forces brutes
-        Fx = self.Ck * kappa
-        Fy = self.Ca * alpha
-
-        # Saturation circulaire simple (Friction circle)
-        F_max = self.mu * Fz
-        F_total = np.sqrt(Fx**2 + Fy**2)
-
-        if F_total > F_max:
-            ratio = F_max / F_total
-            Fx *= ratio
-            Fy *= ratio
-
-        return Fx, Fy
-
-
-class Pacejka(TireModel):
-    """Magic Formula'"""
-
-    def __init__(self, B=10.0, C=1.3, D=1.0, E=0.97):
-        TireModel.__init__(self)
-        self.B, self.C, self.D, self.E = B, C, D, E
-
-    def slip2forces(self, alpha, kappa, Fz):
-        # Fonction magique
-        def mf(x, fz):
-            D_scaled = self.D * fz
-            return D_scaled * np.sin(
-                self.C
-                * np.arctan(self.B * x - self.E * (self.B * x - np.arctan(self.B * x)))
-            )
-
-        Fx = mf(kappa, Fz)
-        Fy = mf(alpha, Fz)
-
-        return Fx, Fy
 
 
 def _wheel_rectangle_pts(wl: float, ww: float) -> np.ndarray:
@@ -583,12 +511,11 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
             v_body, u_inputs
         )
 
-        # TODO: VERIFIER REPARTISSION DE MASSE
-        Fz_l = 0.5 * self.mass * self.gravity
-        Fz_r = 0.5 * self.mass * self.gravity
+        Fz_f = self.mass * self.gravity * (self.b / self.L)
+        Fz_r = self.mass * self.gravity * (self.a / self.L)
 
         Fx_front, Fy_front = self.tire_model_f.vel2forces(
-            vx_f, vy_f, w_f, self.r_f, Fz_l
+            vx_f, vy_f, w_f, self.r_f, Fz_f
         )
         # TODO: Pas sur de comprendre a 100%
         Fx_front = 0.0
@@ -994,38 +921,6 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         vy_r = vy_r_b
 
         return vx_f, vy_f, w_front, vx_r, vy_r, w_rear
-
-    def compute_tire_physics(
-        self, v_body: np.ndarray, u_inputs: np.ndarray
-    ) -> tuple[float, float, float, float]:
-        """
-        Compute tire forces from generalized state
-        """
-        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
-            v_body, u_inputs
-        )
-
-        # TODO: VERIFIER REPARTISSION DE MASSE
-        Fz_l = 0.5 * self.mass * self.gravity
-        Fz_r = 0.5 * self.mass * self.gravity
-
-        Fx_front, Fy_front = self.tire_model_f.vel2forces(
-            vx_f, vy_f, w_f, self.r_f, Fz_l
-        )
-
-        Fx_front = 0.0
-
-        Fx_rear, Fy_rear = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
-
-        # F_l = np.sqrt(Fx_front**2 + Fy_front**2)
-        # F_r = np.sqrt(Fx_rear**2 + Fy_rear**2)
-
-        # print(
-        #     f"Fx_l={Fx_l:.3f}, Fy_l={Fy_l:.3f}, |F_l|={F_l:.3f}, "
-        #     f"Fx_r={Fx_r:.3f}, Fy_r={Fy_r:.3f}, |F_r|={F_r:.3f}"
-        # )
-
-        return Fx_front, Fy_front, Fx_rear, Fy_rear
 
     def generalized_d(
         self, q: np.ndarray, v: np.ndarray, u_in: np.ndarray

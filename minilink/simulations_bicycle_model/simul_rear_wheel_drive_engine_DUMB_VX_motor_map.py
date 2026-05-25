@@ -17,14 +17,18 @@ from minilink.control.generic_meas import AccelerationMeasurement, Measurement
 from minilink.control.generic_pid import PID
 from minilink.control.motor_map import AccToRearForce, ThrMap
 from minilink.core.diagram import DiagramSystem
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
+    DynamicBicycleRearWheelDriveEngine,
+    Pacejka,
+)
 
 ACC_REF = 1.0
 VX_REF = 5.0  # m/s
 DELTA_REF = 0.0  # rad
 
 
-def create_diagram(vx_ref=VX_REF):
-    vehicle = create_vehicle()
+def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
+    # vehicle = create_vehicle()
 
     v_ref = ConstantReference(ref=vx_ref, name="Speed reference")
 
@@ -84,59 +88,93 @@ def create_diagram(vx_ref=VX_REF):
     # Constant steering command
     diagram.connect("steering", "ref", "vehicle", "delta")
 
-    return diagram, vehicle, v_pid
+    return diagram, v_pid
 
 
 def main():
-    diagram, vehicle, v_pid = create_diagram()
+    vehicle = create_vehicle()
+    vehicle.tire_model_r = Pacejka(logs=True)
+    diagram, v_pid = create_diagram(vehicle)
 
-    diagram.plot_graphe()
+    # diagram.plot_graphe()
 
     print("Starting trajectory computation...")
 
     diagram.compute_trajectory(
         tf=10.0,
-        dt=0.02,
+        dt=0.005,
         show=False,
         verbose=False,
     )
 
     print("Trajectory computation done.")
 
+    tire = vehicle.tire_model_r
+
+    kappa_sim = np.array(tire.kappa)
+    alpha_sim = np.array(tire.alpha)
+    Fx_sim = np.array(tire.Fx_log)
+
+    x = np.linspace(np.min(kappa_sim), np.max(kappa_sim), 20000)
+
+    Fx_model = (
+        tire.Dx
+        * tire.Fz
+        * np.sin(
+            tire.Cx
+            * np.arctan(tire.Bx * x - tire.Ex * (tire.Bx * x - np.arctan(tire.Bx * x)))
+        )
+    )
+
+    import matplotlib.pyplot as plt
+
+    plt.figure()
+
+    # Magic Formula curve
+    plt.plot(x, Fx_model, label="Magic Formula", linewidth=1, color="red")
+
+    # Simulation data
+    plt.scatter(kappa_sim, Fx_sim, s=5, alpha=0.3, label="Simulation")
+
+    plt.xlabel("Slip ratio κ")
+    plt.ylabel("Longitudinal Force Fx")
+    plt.title("Slip vs Magic Formula Comparison")
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
     diagram.plot_trajectory(
         signals=("x", "u"),
         backend="matplotlib",
     )
 
-    import matplotlib.pyplot as plt
+    # t = np.array(v_pid.t_hist)
+    # ref = np.array(v_pid.ref_hist)
+    # meas = np.array(v_pid.meas_hist)
 
-    t = np.array(v_pid.t_hist)
-    ref = np.array(v_pid.ref_hist)
-    meas = np.array(v_pid.meas_hist)
+    # idx = np.argsort(t)
+    # t = t[idx]
+    # ref = ref[idx]
+    # meas = meas[idx]
 
-    idx = np.argsort(t)
-    t = t[idx]
-    ref = ref[idx]
-    meas = meas[idx]
+    # t_unique, unique_idx = np.unique(t, return_index=True)
+    # ref = ref[unique_idx]
+    # meas = meas[unique_idx]
+    # t = t_unique
 
-    t_unique, unique_idx = np.unique(t, return_index=True)
-    ref = ref[unique_idx]
-    meas = meas[unique_idx]
-    t = t_unique
+    # plt.figure()
+    # plt.plot(t, ref, label="Reference speed")
+    # plt.plot(t, meas, label="Measured speed")
+    # plt.xlabel("Time [s]")
+    # plt.ylabel("Speed [m/s]")
+    # plt.title("Speed tracking")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
 
-    plt.figure()
-    plt.plot(t, ref, label="Reference speed")
-    plt.plot(t, meas, label="Measured speed")
-    plt.xlabel("Time [s]")
-    plt.ylabel("Speed [m/s]")
-    plt.title("Speed tracking")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    # attach_vehicle_centered_diagram_camera(diagram, vehicle)
 
-    attach_vehicle_centered_diagram_camera(diagram, vehicle)
-
-    diagram.animate(renderer="matplotlib")
+    # diagram.animate(renderer="matplotlib")
 
 
 if __name__ == "__main__":
