@@ -36,7 +36,7 @@ def attach_vehicle_centered_diagram_camera(
     )
 
 
-def create_vehicle():
+def create_vehicle(X=0.0, Y=0.0, theta=0.0, vx=0.0, vy=0.0, r=0.0):
     vehicle = DynamicBicycleRearWheelDriveEngine()
 
     vehicle.r_f = 0.3429
@@ -80,16 +80,16 @@ def create_vehicle():
 
     vehicle.x0 = np.array(
         [
-            0.0,  # X
-            0.0,  # Y
-            0.0,  # theta
+            X,  # X
+            Y,  # Y
+            theta,  # theta
             0.0,  # phi_rear
             0.0,  # phi_front
-            0.0,  # vx
-            0.0,  # vy
-            0.0,  # r
-            0.0,  # w_rear
-            0.0,  # w_front
+            vx,  # vx
+            vy,  # vy
+            r,  # r
+            vx / vehicle.r_r,  # w_rear
+            vx / vehicle.r_f,  # w_front
             0.0,  # tau_engine
             0.0,  # delta_act
         ],

@@ -86,7 +86,9 @@ class SignalPlotBackend:
     name = "base"
     supports_live = False
 
-    def render(self, spec: SignalPlotSpec, *, show: bool = True, **kwargs) -> PlotResult:
+    def render(
+        self, spec: SignalPlotSpec, *, show: bool = True, **kwargs
+    ) -> PlotResult:
         """Render a one-shot plot."""
         raise NotImplementedError
 
@@ -157,8 +159,7 @@ def build_signal_plot_spec(
     if missing:
         available = ", ".join(_available_signal_names(sys, sampled.names))
         raise ValueError(
-            f"Unknown signal(s): {', '.join(missing)}. "
-            f"Available signals: {available}"
+            f"Unknown signal(s): {', '.join(missing)}. Available signals: {available}"
         )
 
     traces = []
@@ -267,7 +268,9 @@ def _with_requested_internal_signals(sys, traj, requested: tuple[str, ...]):
     missing_internal = [
         name
         for name in requested
-        if ":" in name and not traj.has_signal(name) and _is_diagram_output_port(sys, name)
+        if ":" in name
+        and not traj.has_signal(name)
+        and _is_diagram_output_port(sys, name)
     ]
     if not missing_internal:
         return traj
@@ -318,4 +321,8 @@ def _resolve_signal_backend(backend):
         )
 
         return PlotlySignalBackend()
-    raise ValueError("Unknown signal backend {!r}. Expected 'matplotlib' or 'plotly'.".format(backend))
+    raise ValueError(
+        "Unknown signal backend {!r}. Expected 'matplotlib' or 'plotly'.".format(
+            backend
+        )
+    )

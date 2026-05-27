@@ -10,6 +10,7 @@ class TireModel:
     def __init__(self, logs=False):
         self.v_min_epsilon = 0.1
 
+        # TODO:ENLEVER
         self.logs = logs
         self.kappa = []
         self.alpha = []
@@ -119,7 +120,7 @@ class Pacejka(TireModel):
         self.r_Ey2 = 1.0
 
         # Combined slip constants
-        self.d_fz = 0.0
+        self.d_fz = -1.0
         self.lambda_ya = 1.0
         self.lambda_yk = 1.0
 
@@ -130,8 +131,8 @@ class Pacejka(TireModel):
         self.Fx_log = []
         self.Fz = 1.0
 
-    def Gxa(self, a):
-        B = self.r_Bx1 * np.cos(np.arctan(self.r_Bx2)) * self.lambda_ya
+    def Gxa(self, k, a):
+        B = self.r_Bx1 * np.cos(np.arctan(self.r_Bx2 * k)) * self.lambda_ya
         C = self.r_Cx1
         E = self.r_Ex1 + self.r_Ex2 * self.d_fz
         ratio = np.cos(
@@ -140,10 +141,10 @@ class Pacejka(TireModel):
         )
         return ratio
 
-    def Gyk(self, k):
+    def Gyk(self, k, a):
         B = (
             self.r_By1
-            * np.cos(np.arctan(self.r_By2 * (np.tan(k) - self.r_By3)))
+            * np.cos(np.arctan(self.r_By2 * (np.tan(a) - self.r_By3)))
             * self.lambda_yk
         )
         C = self.r_Cy1
@@ -164,8 +165,8 @@ class Pacejka(TireModel):
 
         if mode == "w":
             # TODO: Verif
-            Fx = Fx_0 * self.Gxa(alpha)
-            Fy = Fy_0 * self.Gyk(kappa)
+            Fx = Fx_0 * self.Gxa(kappa, alpha)
+            Fy = Fy_0 * self.Gyk(kappa, alpha)
         elif mode == "c":
             # Saturation circulaire simple (Friction circle)
             F_max = self.mu * Fz
@@ -191,11 +192,11 @@ class Pacejka(TireModel):
 
         Fx, Fy = self.combined_slip(Fx, Fy, kappa, alpha, Fz, mode=None)
         # Logs
-        if self.logs:
-            self.kappa.append(kappa)
-            self.alpha.append(alpha)
-            self.Fx_log.append(Fx)
-            self.Fz = Fz
+        # if self.logs:
+        #     self.kappa.append(kappa)
+        #     self.alpha.append(alpha)
+        #     self.Fx_log.append(Fx)
+        #     self.Fz = Fz
 
         return Fx, Fy
 

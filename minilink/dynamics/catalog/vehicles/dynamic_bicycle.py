@@ -74,6 +74,9 @@ class DynamicBicycleMagicForces(DynamicSystem):
         self.inputs["delta"].labels = ["delta"]
         self.inputs["delta"].units = ["rad"]
 
+        self.max_steer = 1.571  # rad
+        self.min_steer = -1.571  # rad
+
         self.outputs = {}
         self.add_output_port(n, "y", function=self.h, dependencies=[])
 
@@ -82,9 +85,6 @@ class DynamicBicycleMagicForces(DynamicSystem):
         self.L = self.a + self.b
         self.r_f = 0.3
         self.r_r = 0.3
-
-        # self.wheel_len = 0.6
-        # self.wheel_width = 0.2
 
         self.wheel_len_rear = self.r_r * 2
         self.wheel_width_rear = 0.2
@@ -178,6 +178,8 @@ class DynamicBicycleMagicForces(DynamicSystem):
         u_in = np.array(
             [self.u2input_signal(u, "f_rear")[0], self.u2input_signal(u, "delta")[0]]
         )
+
+        u_in[1] = np.clip(u_in[1], max=self.max_steer, min=self.min_steer)
 
         M = self.M_mat(q)
         C = self.C_mat(q, v)
@@ -291,8 +293,8 @@ class DynamicBicycleMagicForces(DynamicSystem):
         Frx_w = c * Fx_r_b - s * Fy_r_b
         Fry_w = s * Fx_r_b + c * Fy_r_b
 
-        v_scale = 0.2
-        f_scale = 0.001
+        # v_scale = 0.2
+        # f_scale = 0.001
         return [
             T_wb,
             T_rear,
@@ -362,9 +364,6 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         self.r_f = 0.3
         self.r_r = 0.3
 
-        # self.wheel_len = 0.6
-        # self.wheel_width = 0.2
-
         self.wheel_len_rear = self.r_r * 2
         self.wheel_width_rear = 0.23
         self.wheel_len_front = self.r_f * 2
@@ -422,8 +421,8 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
 
             M dv + C(q,v) v + g + d = B e
         """
-        vx = v[0]
-        vy = v[1]
+        # vx = v[0]
+        # vy = v[1]
         r = v[2]
 
         C = np.zeros((5, 5))
@@ -517,7 +516,7 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         Fx_front, Fy_front = self.tire_model_f.vel2forces(
             vx_f, vy_f, w_f, self.r_f, Fz_f
         )
-        # TODO: Pas sur de comprendre a 100%
+        # TODO: Roue avant ne produit aucune force en x
         Fx_front = 0.0
 
         Fx_rear, Fy_rear = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
@@ -612,6 +611,8 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
 
         x = [q, v]
         """
+        u[1] = np.clip(u[1], max=self.max_steer, min=self.min_steer)
+
         q, v = self.x2q(x)
 
         dv = self.accelerations(q, v, u, t)
@@ -638,8 +639,8 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
         T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
 
-        v_scale = 0.2
-        f_scale = 0.001
+        # v_scale = 0.2
+        # f_scale = 0.001
 
         uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
         v_f_loc = np.array([uu, vv + self.a * wr])
@@ -764,6 +765,7 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         self.outputs = {}
         self.add_output_port(12, "y", function=self.h, dependencies=[])
+        # self.add_output_port(1, "logs", function=self.logs_generator, dependencies=[])
 
         self.state.labels = [
             "X",
@@ -803,6 +805,12 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         self.engine_tau = 0.25
         self.steering_tau = 0.15
+
+    # def logs_generator(
+    #     self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
+    # ) -> np.ndarray:
+
+    #     return
 
     def x2q(self, x):
         """
@@ -900,6 +908,7 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         w_front = v_body[4]
 
         delta = u_inputs[1]
+        delta = np.clip(delta, max=self.max_steer, min=self.min_steer)
 
         # Front wheel center velocity in body frame
         vx_f_b = vx
@@ -984,11 +993,19 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         available_torque = self.engine_power_peak / w_moteur
         # Engine torque
-        tau_rear = (
-            throttle * available_torque
-            - self.engine_dry_resistance * np.sign(w_moteur)
-            - self.engine_rolling_resistance * w_moteur
-        )
+        # tau_rear = (
+        #     throttle * available_torque
+        #     - self.engine_dry_resistance * np.sign(w_moteur)
+        #     - self.engine_rolling_resistance * w_moteur
+        # )
+        tau_rear = throttle * available_torque
+
+        if w_rear_num > 1e-6:
+            tau_rear = (
+                tau_rear
+                - self.engine_dry_resistance * np.sign(w_moteur)
+                - self.engine_rolling_resistance * w_moteur
+            )
 
         # DEBUG:
         # print(f"w_rear: {w_rear * 9.5}rpm, throttle: {throttle}, tau_rear: {tau_rear}")
@@ -1094,8 +1111,8 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
         T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
 
-        v_scale = 0.2
-        f_scale = 0.001
+        # v_scale = 0.2
+        # f_scale = 0.001
 
         uu, vv, rr = float(vb[0]), float(vb[1]), float(vb[2])
 

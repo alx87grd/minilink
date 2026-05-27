@@ -31,8 +31,6 @@ DELTA_REF = 0.0  # rad
 
 
 def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
-    # vehicle = create_vehicle()
-
     v_ref = ConstantReference(ref=vx_ref, name="Speed reference")
 
     speed_meas = Measurement(
@@ -47,7 +45,6 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
         Kp=0.8,
         Ki=0.01,
         Kd=0.0,
-        tau=0.1,
         cmd_min=-10.0,
         cmd_max=10.0,
         i_min=-5.0,
@@ -131,53 +128,58 @@ def main():
 
     import matplotlib.pyplot as plt
 
+    # plt.figure()
+
+    # # Magic Formula curve
+    # plt.plot(x, Fx_model, label="Magic Formula", linewidth=1, color="red")
+
+    # # Simulation data
+    # plt.scatter(kappa_sim, Fx_sim, s=5, alpha=0.3, label="Simulation")
+
+    # plt.xlabel("Slip ratio κ")
+    # plt.ylabel("Longitudinal Force Fx")
+    # plt.title("Slip vs Magic Formula Comparison")
+    # plt.grid(True)
+    # plt.legend()
+    # plt.show()
+
+    # diagram.plot_trajectory(
+    #     signals=("x", "u"),
+    #     backend="matplotlib",
+    # )
+
+    t = np.array(v_pid.t_hist)
+    ref = np.array(v_pid.ref_hist)
+    meas = np.array(v_pid.meas_hist)
+
+    idx = np.argsort(t)
+    t = t[idx]
+    ref = ref[idx]
+    meas = meas[idx]
+
+    t_unique, unique_idx = np.unique(t, return_index=True)
+    ref = ref[unique_idx]
+    meas = meas[unique_idx]
+    t = t_unique
+
     plt.figure()
-
-    # Magic Formula curve
-    plt.plot(x, Fx_model, label="Magic Formula", linewidth=1, color="red")
-
-    # Simulation data
-    plt.scatter(kappa_sim, Fx_sim, s=5, alpha=0.3, label="Simulation")
-
-    plt.xlabel("Slip ratio κ")
-    plt.ylabel("Longitudinal Force Fx")
-    plt.title("Slip vs Magic Formula Comparison")
-    plt.grid(True)
+    plt.plot(t, ref, label="Reference speed")
+    plt.plot(t, meas, label="Measured speed")
+    plt.xlabel("Time [s]")
+    plt.ylabel("Speed [m/s]")
+    plt.title("Speed tracking")
     plt.legend()
+    plt.grid(True)
     plt.show()
 
     diagram.plot_trajectory(
-        signals=("x", "u"),
+        signals=("speed_meas:meas", "v_ref:ref"),
         backend="matplotlib",
     )
 
-    # t = np.array(v_pid.t_hist)
-    # ref = np.array(v_pid.ref_hist)
-    # meas = np.array(v_pid.meas_hist)
+    attach_vehicle_centered_diagram_camera(diagram, vehicle)
 
-    # idx = np.argsort(t)
-    # t = t[idx]
-    # ref = ref[idx]
-    # meas = meas[idx]
-
-    # t_unique, unique_idx = np.unique(t, return_index=True)
-    # ref = ref[unique_idx]
-    # meas = meas[unique_idx]
-    # t = t_unique
-
-    # plt.figure()
-    # plt.plot(t, ref, label="Reference speed")
-    # plt.plot(t, meas, label="Measured speed")
-    # plt.xlabel("Time [s]")
-    # plt.ylabel("Speed [m/s]")
-    # plt.title("Speed tracking")
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
-
-    # attach_vehicle_centered_diagram_camera(diagram, vehicle)
-
-    # diagram.animate(renderer="matplotlib")
+    diagram.animate(renderer="matplotlib")
 
 
 if __name__ == "__main__":

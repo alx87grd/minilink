@@ -18,10 +18,11 @@ class Measurement(System):
 
     """
 
-    def __init__(self, name: str, y_size: int = 12, index: int = 5):
+    def __init__(self, name: str, y_size: int = 12, index: int = 5, show=False):
         super().__init__(0, y_size, 1)
 
         self.name = name
+        self.print = show
 
         self.y_size = int(y_size)
         self.index = int(index)
@@ -42,7 +43,8 @@ class Measurement(System):
         )
 
     def h_meas(self, x, u, t=0.0, params=None):
-        # print(f"w_rear: {u[self.index]}")
+        if self.print:
+            print(f"Meas: {u[self.index]}")
         return np.array([u[self.index]], dtype=float)
 
     def get_kinematic_geometry(self):

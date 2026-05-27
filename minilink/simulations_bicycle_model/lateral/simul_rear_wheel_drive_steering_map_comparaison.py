@@ -13,11 +13,11 @@ import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from simul_rear_wheel_drive_engine_DUMB_VX_motor_map import (
-    create_diagram as create_diagram_dumb,
+from simul_rear_wheel_drive_steering_MAP_w_PID import (
+    create_diagram as create_diagram_pid_w_steer_map,
 )
-from simul_rear_wheel_drive_engine_VX_motor_map import (
-    create_diagram as create_diagram_vx,
+from simul_rear_wheel_drive_steering_PID import (
+    create_diagram as create_diagram_pid_only,
 )
 
 # Optional, only needed if you still want animations
@@ -60,7 +60,7 @@ def get_clean_pid_history(pid):
 
 
 def run_single_comparison(
-    target_speed, simul_time, dt, plot_graph=False, animate=False
+    target_speed, target_r, simul_time, dt, plot_graph=False, animate=False
 ):
     """
     Run both simulations for one target speed.
@@ -68,7 +68,7 @@ def run_single_comparison(
     Parameters
     ----------
     target_speed : float
-        Desired speed reference in m/s.
+        Desired speed reference in rad/s.
     simul_time : float
         Simulation duration in seconds.
     dt : float
@@ -85,68 +85,72 @@ def run_single_comparison(
     """
 
     print("\n============================================================")
-    print(f"Running comparison for VX_REF = {target_speed:.2f} m/s")
+    print(f"Running comparison for R SPEED = {target_r:.2f} rad/s")
     print("============================================================")
 
     # -------------------------------------------------------------------------
-    # First simulation: fixed wheel-speed map / dumb version
+    # First simulation: PID onlyheel-speed map / dumb version
     # -------------------------------------------------------------------------
-    vehicle_fixed_w = create_vehicle()
-    diagram_fixed_w, v_pid_fixed_w = create_diagram_dumb(
-        vehicle_fixed_w,
-        vx_ref=target_speed,
+    vehicle = create_vehicle(vx=target_speed)
+    # To keep the constant Vx value seems like a reasonable solution (??)
+    vehicle.engine_dry_resistance = 0.0
+    vehicle.engine_rolling_resistance = 0.0
+
+    diagram_fixed_w, v_pid_fixed_w = create_diagram_pid_only(
+        vehicle, vx_ref=target_speed, r_ref=target_r
     )
 
     if plot_graph:
         diagram_fixed_w.plot_graphe()
 
-    print("Starting trajectory computation for fixed w simulation...")
+    print("Starting trajectory computation for PID only simulation...")
 
     diagram_fixed_w.compute_trajectory(
         tf=simul_time,
         dt=dt,
         show=False,
         verbose=False,
+        solver="scipy_lsoda",
     )
 
-    print("Trajectory computation done for fixed w simulation.")
+    print("Trajectory computation done for PID only simulation.")
 
     if animate:
-        attach_vehicle_centered_diagram_camera(diagram_fixed_w, vehicle_fixed_w)
+        attach_vehicle_centered_diagram_camera(diagram_fixed_w, vehicle)
         diagram_fixed_w.animate(renderer="matplotlib")
 
     t_fixed, ref_fixed, meas_fixed = get_clean_pid_history(v_pid_fixed_w)
 
     # -------------------------------------------------------------------------
-    # Second simulation: measured wheel-speed map / vx version
+    # Second simulation: PID w mapheel-speed map / vx version
     # -------------------------------------------------------------------------
-    vehicle_meas_w = create_vehicle()
-    diagram_meas_w, v_pid_meas_w = create_diagram_vx(
-        vehicle_meas_w, vx_ref=target_speed
+    diagram_meas_w, v_pid_meas_w = create_diagram_pid_w_steer_map(
+        vehicle, vx_ref=target_speed, r_ref=target_r
     )
 
     if plot_graph:
         diagram_meas_w.plot_graphe()
 
-    print("Starting trajectory computation for measured w simulation...")
+    print("Starting trajectory computation for PID w map simulation...")
 
     diagram_meas_w.compute_trajectory(
         tf=simul_time,
         dt=dt,
         show=False,
         verbose=False,
+        solver="scipy_lsoda",
     )
 
-    print("Trajectory computation done for measured w simulation.")
+    print("Trajectory computation done for PID w map simulation.")
 
     if animate:
-        attach_vehicle_centered_diagram_camera(diagram_meas_w, vehicle_meas_w)
+        attach_vehicle_centered_diagram_camera(diagram_meas_w, vehicle)
         diagram_meas_w.animate(renderer="matplotlib")
 
     t_meas, ref_meas, meas_meas = get_clean_pid_history(v_pid_meas_w)
 
     return {
-        "target_speed": target_speed,
+        "target_r_speed": target_r,
         "fixed_w": {
             "t": t_fixed,
             "ref": ref_fixed,
@@ -180,7 +184,7 @@ def plot_multiple_speed_comparisons(results):
         axes = [axes]
 
     for ax, result in zip(axes, results):
-        target_speed = result["target_speed"]
+        target_r_speed = result["target_r_speed"]
 
         t_fixed = result["fixed_w"]["t"]
         ref_fixed = result["fixed_w"]["ref"]
@@ -199,17 +203,17 @@ def plot_multiple_speed_comparisons(results):
         ax.plot(
             t_fixed,
             meas_fixed,
-            label="Controller - fixed w",
+            label="Controller - PID only",
         )
 
         ax.plot(
             t_meas,
             meas_meas,
-            label="Controller - map w",
+            label="Controller - PID w map",
         )
 
-        ax.set_ylabel("Speed [m/s]")
-        ax.set_title(f"Speed tracking comparison at {target_speed:.2f} m/s")
+        ax.set_ylabel("Speed [rad/s]")
+        ax.set_title(f"Speed tracking comparison at {target_r_speed:.2f} rad/s")
         ax.grid(True)
         ax.legend()
 
@@ -234,7 +238,7 @@ def plot_all_speeds_on_one_figure(results):
     colors = cmap(np.linspace(0, 1, len(results)))
 
     for result, color in zip(results, colors):
-        target_speed = result["target_speed"]
+        target_r_speed = result["target_r_speed"]
 
         t_fixed = result["fixed_w"]["t"]
         meas_fixed = result["fixed_w"]["meas"]
@@ -248,35 +252,35 @@ def plot_all_speeds_on_one_figure(results):
         # Target/reference speed
         plt.plot(
             t_target,
-            np.ones_like(t_target) * target_speed,
+            np.ones_like(t_target) * target_r_speed,
             color=color,
             linestyle=":",
             linewidth=2.5,
-            label=f"Target - {target_speed:.2f} m/s",
+            label=f"Target - {target_r_speed:.2f} rad/s",
         )
 
-        # Fixed wheel-speed version
+        # PID onlyheel-speed version
         plt.plot(
             t_fixed,
             meas_fixed,
             color=color,
             linestyle="-",
             linewidth=1.8,
-            label=f"Fixed w - {target_speed:.2f} m/s",
+            label=f"PID only - {target_r_speed:.2f} rad/s",
         )
 
-        # Measured wheel-speed version
+        # PID w mapheel-speed version
         plt.plot(
             t_meas,
             meas_meas,
             color=color,
             linestyle="--",
             linewidth=1.8,
-            label=f"Measured w - {target_speed:.2f} m/s",
+            label=f"PID w map - {target_r_speed:.2f} rad/s",
         )
 
     plt.xlabel("Time [s]")
-    plt.ylabel("Speed [m/s]")
+    plt.ylabel("Speed [rad/s]")
     plt.title("Speed tracking comparison for multiple target speeds")
     plt.grid(True)
     plt.legend()
@@ -288,17 +292,20 @@ def main():
     simul_time = 10.0
     dt = 0.02
 
-    target_speeds = np.linspace(1.0, 30.0, 8)
+    target_rs = np.linspace(0.1, 0.6, 6)
+
+    target_speed = 2.0
 
     results = []
 
     total_start = time.perf_counter()
 
-    for target_speed in target_speeds:
+    for target_r in target_rs:
         sim_start = time.perf_counter()
 
         result = run_single_comparison(
             target_speed=target_speed,
+            target_r=target_r,
             simul_time=simul_time,
             dt=dt,
             plot_graph=False,
@@ -309,7 +316,7 @@ def main():
 
         sim_elapsed = sim_end - sim_start
 
-        print(f"Computation time for {target_speed:.2f} m/s: {sim_elapsed:.3f} seconds")
+        print(f"Computation time for {target_r:.2f} rad/s: {sim_elapsed:.3f} seconds")
 
         results.append(result)
 
@@ -318,7 +325,7 @@ def main():
     total_elapsed = total_end - total_start
 
     print(f"\nTotal computation time: {total_elapsed:.3f} seconds")
-    print(f"Average time per speed: {total_elapsed / len(target_speeds):.3f} seconds")
+    print(f"Average time per speed: {total_elapsed / len(target_rs):.3f} seconds")
 
     # Recommended: one subplot per speed
     plot_multiple_speed_comparisons(results)

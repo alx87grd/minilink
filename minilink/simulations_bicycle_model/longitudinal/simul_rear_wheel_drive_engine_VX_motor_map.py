@@ -39,7 +39,6 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
         Kp=0.8,
         Ki=0.01,
         Kd=0.0,
-        tau=0.1,
         cmd_min=-10.0,
         cmd_max=10.0,
         i_min=-5.0,
@@ -87,7 +86,7 @@ def main():
     vehicle.tire_model_r = Pacejka(logs=True)
     diagram, v_pid = create_diagram(vehicle)
 
-    # diagram.plot_graphe()
+    diagram.plot_graphe()
 
     print("Starting trajectory computation...")
 
