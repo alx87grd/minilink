@@ -230,6 +230,22 @@ class DiagramSystem(System):
         for _, subsystem in self.subsystems.items():
             subsystem.refresh()
 
+    def autowire(
+        self,
+        *,
+        strict: bool = False,
+        validate: bool = True,
+    ) -> "DiagramSystem":
+        """
+        Conservatively connect unconnected inputs when one safe source matches.
+
+        This is an optional diagram-building shortcut. It does not overwrite
+        existing connections and returns ``self`` so it can be used fluently.
+        """
+        from minilink.core.composition import autowire
+
+        return autowire(self, strict=strict, validate=validate)
+
     def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
         """
         Reconstruct all subsystem output-port trajectories for this diagram.

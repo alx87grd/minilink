@@ -460,7 +460,7 @@ if __name__ == "__main__":
     # sys = system_test()
     # sim = simulator_test()
     # dia = diagram_test()
-    pendulum_test()
+    # pendulum_test()
     # diagram = algebraic_loop()  # compile() (via f_fast / Simulator) runs check_algebraic_loops()
     # solver_doing_weird_at_discontinuities()  # use euler / fixed dt; Simulator picks euler when solver_info["discontinuous_behavior"]
-    # test, d1, d2 = diagram_in_a_diagram(debug_print=False)
+    test, d1, d2 = diagram_in_a_diagram(debug_print=False)

@@ -26,7 +26,7 @@ Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/vi
 ## Quick Start
 
 ```python
-from minilink.core.blocks.basic import Integrator
+from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.simulation.simulator import Simulator
@@ -38,6 +38,13 @@ diagram.connect("source", "y", "plant", "u")
 
 traj = Simulator(diagram, tf=10.0).solve()
 diagram.plot_trajectory(traj, signals=("x", "u"), backend="matplotlib")
+```
+
+For common scripts, optional shortcuts build ordinary `DiagramSystem` objects:
+
+```python
+diagram = Step() >> Integrator()          # series y -> u
+closed = PropController() @ Integrator()  # ref/y/u closed-loop convention
 ```
 
 ## Install

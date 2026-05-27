@@ -248,6 +248,13 @@ The compiled path is the main execution path. The recursive reference path is a
 debug/reference implementation and must stay contract-equivalent to compiled
 evaluation for `f`, boundary outputs, and params semantics.
 
+Optional composition shortcuts live in `minilink.core.composition` and return
+ordinary `DiagramSystem` objects. The explicit `add_subsystem` / `connect` API
+remains the canonical general interface; `+` only adds subsystems, `>>` connects
+default output-to-input series chains, `@` builds the Pyro-style controller/plant
+closed-loop convention, and `DiagramSystem.autowire()` conservatively fills only
+unconnected inputs when exactly one safe named-port match exists.
+
 ### `Trajectory`
 
 `Trajectory` is the canonical sampled state-input object:

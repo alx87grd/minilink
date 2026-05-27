@@ -25,6 +25,9 @@ Modeling is separated from compile, simulation, optimization, planning, and
 graphics. Diagrams compile through a shared `ExecutionPlan`; NumPy and JAX
 dynamics evaluators exist for leaves and diagrams. `Trajectory` is the shared
 sampled state-input object; `core.blocks` holds lightweight diagram blocks.
+Optional diagram composition shortcuts (`+`, `>>`, `@`, and conservative
+`autowire`) now build ordinary `DiagramSystem` objects while the explicit
+named-port API remains the canonical general interface.
 
 Optimization uses pure `MathematicalProgram` plus external evaluators and
 `Optimizer` method presets (`scipy_slsqp`, `scipy_trust_constr`, `ipopt`).

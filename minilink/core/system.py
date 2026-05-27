@@ -535,6 +535,24 @@ class System:
 
     # User Shortcut / Facade API
 
+    def __add__(self, other: object) -> "DiagramSystem":
+        """Return a diagram containing ``self`` and ``other`` as subsystems."""
+        from minilink.core.composition import add_systems
+
+        return add_systems(self, other)
+
+    def __rshift__(self, other: object) -> "DiagramSystem":
+        """Return a diagram with ``self`` connected in series to ``other``."""
+        from minilink.core.composition import series
+
+        return series(self, other)
+
+    def __matmul__(self, other: object) -> "DiagramSystem":
+        """Return a closed-loop diagram ``self @ other``."""
+        from minilink.core.composition import closed_loop
+
+        return closed_loop(self, other)
+
     def compile(self, backend="numpy", verbose=False):
         """
         Convenience shortcut to compile the system into a backend evaluator.
