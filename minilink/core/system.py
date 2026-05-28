@@ -32,7 +32,9 @@ class VectorSignal:
         The default or operating point value of the signal.
     """
 
-    def __init__(self, dim=1, id="x", nominal_value=None):
+    def __init__(
+        self, dim=1, id="x", nominal_value=None
+    ):  # todo: add labels and units and bounds
 
         self.id = id
         self.dim = int(dim)
