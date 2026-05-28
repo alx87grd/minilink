@@ -61,7 +61,9 @@ The native-array equation rule applies across those paths (see DESIGN §3).
   abstractions.
 - Add linearization and differentiation helpers after the first-pass dynamics
   abstraction tree is stable.
-- Improve diagram port exporting and nested-diagram ergonomics.
+- Improve diagram port exporting and nested-diagram ergonomics. See
+  [docs/plans/custom-system-ports-implementation-plan.md](docs/plans/custom-system-ports-implementation-plan.md)
+  for proposed options (ports-first `define_ports`, named `u` helpers, `default_ports=False`).
 - Extend simulator-level forced-input helpers only after current workflows are
   stable.
 - Factor interactive graphics into swappable real-time integrator and live-input
