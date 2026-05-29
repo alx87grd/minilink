@@ -17,7 +17,7 @@ from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.diagram import DiagramSystem
 
 diag = DiagramSystem()
-diag.graphe_building_verbose = False
+diag.connection_verbose = False
 
 ctl = PropController()
 plant = Integrator()
@@ -25,12 +25,12 @@ ctl.params["Kp"] = 2.5
 
 diag.add_subsystem(ctl, "ctl")
 diag.add_subsystem(plant, "plant")
-diag.add_input_port(1, "ref")
+diag.add_input_port("r", dim=1)
 
-diag.connect("input", "ref", "ctl", "ref")
+diag.connect("input", "r", "ctl", "r")
 diag.connect("plant", "y", "ctl", "y")
 diag.connect("ctl", "u", "plant", "u")
-# diag.plot_graphe()
+# diag.plot_diagram()
 
 
 x = np.array([0.3])

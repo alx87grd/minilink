@@ -17,7 +17,7 @@ class FloatingMass1D(DynamicSystem):
     """
 
     def __init__(self):
-        super().__init__(n=2, m=1, p=1)
+        super().__init__(n=2)
 
         self.params = {"m": 1.0}
         self.name = "FloatingMass1D"
@@ -25,18 +25,14 @@ class FloatingMass1D(DynamicSystem):
         self.state.labels = ["x", "dx"]
         self.state.units = ["m", "m/s"]
 
-        self.inputs = {}
-        self.add_input_port(1, "F", nominal_value=np.array([0.0]))
-        self.inputs["F"].labels = ["Force"]
-        self.inputs["F"].units = ["N"]
+        self.add_input_port("F", nominal_value=0.0, labels=["Force"], units=["N"])
 
-        self.outputs = {}
-        self.add_output_port(1, "y", function=self.h, dependencies=[])
+        self.add_output_port("y", dim=1, function=self.h, dependencies=())
 
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         m = params["m"]
-        F = self.u2input_signal(u, "F")[0]
+        F = self.get_port_values_from_u(u, "F")[0]
         return np.array([x[1], F / m])
 
     def h(self, x, u, t=0, params=None):
@@ -44,7 +40,7 @@ class FloatingMass1D(DynamicSystem):
 
     # Graphics
     def get_kinematic_geometry(self):
-        from minilink.graphical.primitives import Arrow, Circle
+        from minilink.graphical.animation.primitives import Arrow, Circle
 
         return [
             Circle(radius=0.3, center=[0, 0], color="black", fill=True),
@@ -52,13 +48,13 @@ class FloatingMass1D(DynamicSystem):
         ]
 
     def get_kinematic_transforms(self, x, u, t):
-        from minilink.graphical.primitives import (
+        from minilink.graphical.animation.primitives import (
             scale_pose2d_matrix,
             translation_matrix,
         )
 
         pos = x[0]
-        F = self.u2input_signal(u, "F")[0]
+        F = self.get_port_values_from_u(u, "F")[0]
 
         force_scale = 0.3
         arrow_len = F * force_scale

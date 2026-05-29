@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink.core.system import DynamicSystem
-from minilink.graphical.primitives import Plane, Sphere, translation_matrix
+from minilink.graphical.animation.primitives import Plane, Sphere, translation_matrix
 from minilink.physics.engine_jax import WorldModel, unpack_state, world_ode
 
 
@@ -25,7 +25,13 @@ class PhysicsWorldSystem(DynamicSystem):
         n = 13 * n_b
         m = 6 * n_b
         p = n
-        super().__init__(n=n, m=m, p=p)
+        super().__init__(
+            n=n,
+            input_dim=m,
+            output_dim=p,
+            expose_state=True,
+            y_dependencies=(),
+        )
         self.name = name
 
         self.params["n_bodies"] = n_b

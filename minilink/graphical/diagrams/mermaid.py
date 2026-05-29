@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from minilink.graphical.diagram_export import TopologyExporter
+from minilink.graphical.diagrams.export import TopologyExporter
 
 
 class MermaidTopologyExporter(TopologyExporter):

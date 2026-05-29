@@ -26,7 +26,7 @@ class AnimationRenderer(ABC):
     ) -> None:
         """Initialize backend resources for one render session.
 
-        ``camera`` is a 4x4 :func:`~minilink.graphical.primitives.camera_matrix`
+        ``camera`` is a 4x4 :func:`~minilink.graphical.animation.primitives.camera_matrix`
         used to set up initial framing. Renderers consume the slots they
         understand (target, projection-axis columns, view scale, view-out
         direction) and ignore the rest; see ``DESIGN.md`` §4.7.

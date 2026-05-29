@@ -45,7 +45,9 @@ from minilink.planning.trajectory_optimization.shooting import (
 
 class TestPlanningArchitecture(unittest.TestCase):
     def make_system(self):
-        sys = System(n=2, m=1, p=2)
+        sys = System(n=2)
+        sys.add_input_port("u")
+        sys.add_output_port("y", dim=2, function=sys.h)
         sys.state.lower_bound = np.array([-1.0, -2.0])
         sys.state.upper_bound = np.array([1.0, 2.0])
         sys.inputs["u"].lower_bound = np.array([-3.0])
@@ -56,7 +58,7 @@ class TestPlanningArchitecture(unittest.TestCase):
     def make_single_integrator(self):
         class SingleIntegrator(DynamicSystem):
             def __init__(self):
-                super().__init__(n=1, m=1, p=1)
+                super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
                 self.state.lower_bound = np.array([-10.0])
                 self.state.upper_bound = np.array([10.0])
                 self.inputs["u"].lower_bound = np.array([-10.0])

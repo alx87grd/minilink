@@ -10,6 +10,90 @@ dynamic systems inherit.
 import numpy as np
 
 
+def _as_optional_vector(value, *, dim, field_name, signal_id):
+    if value is None:
+        return None
+    array = np.asarray(value, dtype=float).reshape(-1)
+    if array.shape != (dim,):
+        raise ValueError(
+            f"{field_name} for signal '{signal_id}' must have length {dim}, "
+            f"got {array.shape[0]}"
+        )
+    return array.copy()
+
+
+def _as_optional_string_list(value, *, dim, field_name, signal_id):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        items = [value]
+    else:
+        items = list(value)
+    if len(items) != dim:
+        raise ValueError(
+            f"{field_name} for signal '{signal_id}' must have length {dim}, "
+            f"got {len(items)}"
+        )
+    return [str(item) for item in items]
+
+
+def _length_or_none(value, *, field_name, signal_id):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return 1
+    if np.isscalar(value):
+        return 1
+    try:
+        return int(np.asarray(value).reshape(-1).shape[0])
+    except Exception as exc:
+        raise ValueError(
+            f"Could not infer dimension from {field_name} for signal '{signal_id}'"
+        ) from exc
+
+
+def _infer_signal_dim(
+    signal_id,
+    *,
+    dim=None,
+    nominal_value=None,
+    labels=None,
+    units=None,
+    lower_bound=None,
+    upper_bound=None,
+):
+    if dim is not None:
+        dim = int(dim)
+        if dim < 0:
+            raise ValueError(f"dim for signal '{signal_id}' must be nonnegative")
+        return dim
+
+    candidates = [
+        ("nominal_value", nominal_value),
+        ("labels", labels),
+        ("units", units),
+        ("lower_bound", lower_bound),
+        ("upper_bound", upper_bound),
+    ]
+    inferred = []
+    for field_name, value in candidates:
+        length = _length_or_none(value, field_name=field_name, signal_id=signal_id)
+        if length is not None:
+            inferred.append((field_name, length))
+
+    if not inferred:
+        return 1
+
+    first_name, first_dim = inferred[0]
+    for field_name, length in inferred[1:]:
+        if length != first_dim:
+            raise ValueError(
+                f"Conflicting inferred dimensions for signal '{signal_id}': "
+                f"{first_name} has length {first_dim}, {field_name} has length {length}"
+            )
+    return first_dim
+
+
 class VectorSignal:
     """
     A class representing a generic vector signal.
@@ -32,17 +116,51 @@ class VectorSignal:
         The default or operating point value of the signal.
     """
 
-    def __init__(self, dim=1, id="x", nominal_value=None):
+    def __init__(
+        self,
+        id="x",
+        *,
+        dim=None,
+        nominal_value=None,
+        labels=None,
+        units=None,
+        lower_bound=None,
+        upper_bound=None,
+    ):
 
         self.id = id
-        self.dim = int(dim)
-        if self.dim < 0:
-            raise ValueError("dim must be nonnegative")
+        self.dim = _infer_signal_dim(
+            id,
+            dim=dim,
+            nominal_value=nominal_value,
+            labels=labels,
+            units=units,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
         self.labels = [f"{id}[{i}]" for i in range(self.dim)]
         self.units = [""] * self.dim
         self.upper_bound = np.inf * np.ones(self.dim)
         self.lower_bound = -np.inf * np.ones(self.dim)
         self.set_nominal_value(nominal_value)
+        if labels is not None:
+            self.labels = _as_optional_string_list(
+                labels, dim=self.dim, field_name="labels", signal_id=id
+            )
+        if units is not None:
+            self.units = _as_optional_string_list(
+                units, dim=self.dim, field_name="units", signal_id=id
+            )
+        lower = _as_optional_vector(
+            lower_bound, dim=self.dim, field_name="lower_bound", signal_id=id
+        )
+        if lower is not None:
+            self.lower_bound = lower
+        upper = _as_optional_vector(
+            upper_bound, dim=self.dim, field_name="upper_bound", signal_id=id
+        )
+        if upper is not None:
+            self.upper_bound = upper
 
     def set_nominal_value(self, nominal_value=None):
         """
@@ -106,13 +224,34 @@ class OutputPort(VectorSignal):
     dependencies : list of str, tuple, or "all"
         The list of `InputPort` IDs that this output directly depends on for immediate feedthrough.
         - `"all"`: depends on all inputs of the system (safest, but can create false algebraic loops in MIMO systems).
-        - `list`/`tuple`: specific input IDs (e.g., `["ref", "y"]`).
+        - `list`/`tuple`: specific input IDs (e.g., `["r", "y"]`).
         - `empty list/tuple`: depends only on the state `x` or internal time, no direct feedthrough from inputs.
     """
 
-    def __init__(self, dim=1, id="y", function=None, dependencies="all"):
+    def __init__(
+        self,
+        id="y",
+        *,
+        dim=None,
+        function=None,
+        dependencies=(),
+        nominal_value=None,
+        labels=None,
+        units=None,
+        lower_bound=None,
+        upper_bound=None,
+    ):
 
-        VectorSignal.__init__(self, dim=dim, id=id)
+        VectorSignal.__init__(
+            self,
+            id=id,
+            dim=dim,
+            nominal_value=nominal_value,
+            labels=labels,
+            units=units,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
 
         if function is not None:
             self.compute = function
@@ -175,7 +314,7 @@ class System:
     user convenience state.
     """
 
-    def __init__(self, n=0, m=0, p=1):
+    def __init__(self, n=0):
         """
         Initialize the system with dimensions.
 
@@ -183,23 +322,21 @@ class System:
         ----------
         n : int, optional
             Number of continuous states (default is 0).
-        m : int, optional
-            Number of input dimensions (default is 0).
-        p : int, optional
-            Number of output dimensions (default is 1).
+        Systems start with no input or output ports. Add ports explicitly with
+        :meth:`add_input_port` and :meth:`add_output_port`.
         """
         # Structural model description
         self.n = int(n)
-        self.m = int(m)
-        self.p = int(p)
-        if self.n < 0 or self.m < 0 or self.p < 0:
-            raise ValueError("System dimensions n, m, and p must be nonnegative")
+        if self.n < 0:
+            raise ValueError("System dimension n must be nonnegative")
+        self.m = 0
+        self.p = 0
 
         # Human-readable identifier
         self.name = "System"
 
         # State metadata
-        self.state = VectorSignal(n, "x")
+        self.state = VectorSignal("x", dim=n)
 
         # Model defaults and metadata
         # Default initial condition used by convenience simulation paths.
@@ -207,9 +344,7 @@ class System:
 
         # Port structure
         self.inputs = {}
-        self.add_input_port(self.m, "u")
         self.outputs = {}
-        self.add_output_port(self.p, "y", function=self.h, dependencies="all")
 
         # Default model parameter set. Explicit ``params=...`` arguments
         # passed to ``f`` / ``h`` override this default.
@@ -318,46 +453,118 @@ class System:
 
     # Structural Model API
 
-    def add_input_port(self, dim, id, nominal_value=None):
+    def add_input_port(
+        self,
+        id,
+        *,
+        dim=None,
+        nominal_value=None,
+        labels=None,
+        units=None,
+        lower_bound=None,
+        upper_bound=None,
+    ):
         """
         Add a new input port to the system.
 
         Parameters
         ----------
-        dim : int
-            The dimension of the input port.
         id : str
             The programmatic identifier for the port.
+        dim : int, optional
+            Dimension of the input port. If omitted, inferred from supplied
+            metadata or defaults to 1.
         nominal_value : np.ndarray, optional
             The nominal value of the signal.
         """
-        self.inputs[id] = InputPort(dim, id, nominal_value)
+        self.inputs[id] = InputPort(
+            id,
+            dim=dim,
+            nominal_value=nominal_value,
+            labels=labels,
+            units=units,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
         self.recompute_input_properties()
 
-    def add_output_port(self, dim, id, function=None, dependencies="all"):
+    def add_output_port(
+        self,
+        id,
+        *,
+        dim=None,
+        function=None,
+        dependencies=(),
+        nominal_value=None,
+        labels=None,
+        units=None,
+        lower_bound=None,
+        upper_bound=None,
+    ):
         """
         Add a new output port to the system.
 
         Parameters
         ----------
-        dim : int
-            The dimension of the output port.
         id : str
             The programmatic identifier for the port.
+        dim : int, optional
+            Dimension of the output port. If omitted, inferred from supplied
+            metadata or defaults to 1.
         function : callable, optional
             The function used to compute the port's output signal.
         dependencies : list of str, tuple, or "all", optional
-            The list of input port IDs this output depends on (default is "all").
+            The list of input port IDs this output depends on (default is empty).
         """
-        self.outputs[id] = OutputPort(dim, id, function, dependencies)
+        self._validate_output_dependencies(id, dependencies)
+        self.outputs[id] = OutputPort(
+            id,
+            dim=dim,
+            function=function,
+            dependencies=dependencies,
+            nominal_value=nominal_value,
+            labels=labels,
+            units=units,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
+        self.recompute_output_properties()
+
+    def _validate_output_dependencies(self, output_id, dependencies):
+        if dependencies == "all":
+            return
+        if dependencies in ("", None):
+            raise ValueError(
+                f"dependencies for output port '{output_id}' must be (), "
+                "a sequence of input-port ids, or 'all'"
+            )
+        if isinstance(dependencies, str):
+            raise ValueError(
+                f"dependencies for output port '{output_id}' must be a sequence "
+                "of input-port ids or 'all', not a bare string"
+            )
+        unknown = [
+            port_id for port_id in tuple(dependencies) if port_id not in self.inputs
+        ]
+        if unknown:
+            names = ", ".join(repr(port_id) for port_id in unknown)
+            raise ValueError(
+                f"Unknown input dependencies for output port '{output_id}': {names}"
+            )
 
     def recompute_input_properties(self):
         """
         Recalculate the total input dimension `m` based on all input ports.
         """
         self.m = 0
-        for key, port in self.inputs.items():
+        for _, port in self.inputs.items():
             self.m += port.dim
+
+    def recompute_output_properties(self):
+        """
+        Recalculate the primary output dimension `p` from the ``y`` output port.
+        """
+        self.p = self.outputs["y"].dim if "y" in self.outputs else 0
 
     def get_all_input_labels_and_units(self):
         """
@@ -373,7 +580,7 @@ class System:
         input_labels = []
         input_units = []
 
-        for key, port in self.inputs.items():
+        for _, port in self.inputs.items():
             for i in range(port.dim):
                 input_labels.append(port.labels[i])
                 input_units.append(port.units[i])
@@ -394,13 +601,13 @@ class System:
         """
         u = np.zeros(self.m)
         i = 0
-        for key, port in self.inputs.items():
+        for _, port in self.inputs.items():
             # Unconnected input ports contribute their constant default value.
             u[i : i + port.dim] = port.get_default_value()
             i += port.dim
         return u
 
-    def get_port_values_from_u(self, u):
+    def get_port_values_from_u(self, u, *port_ids):
         """
         Get the values of all input ports from a concatenated array.
 
@@ -409,17 +616,21 @@ class System:
         u : np.ndarray
             The concatenated values of all input ports.
 
-        Returns
-        -------
-        dict
-            A dictionary mapping port IDs to their respective signal values.
+        * If no port ids are passed, return a dictionary mapping every input
+          port id to its signal value.
+        * If one port id is passed, return that port's signal value.
+        * If multiple port ids are passed, return a tuple in the requested order.
         """
         input_signals = {}
         i = 0
         for port_id, port in self.inputs.items():
             input_signals[port_id] = u[i : i + port.dim]
             i += port.dim
-        return input_signals
+        if not port_ids:
+            return input_signals
+        if len(port_ids) == 1:
+            return input_signals[port_ids[0]]
+        return tuple(input_signals[port_id] for port_id in port_ids)
 
     def get_input_port_slice(self, port_id):
         """
@@ -444,25 +655,6 @@ class System:
 
         raise KeyError(f"Unknown input port '{port_id}'")
 
-    def u2input_signal(self, u, port_id):
-        """
-        Extract the signal value for a specific input port from the concatenated input array.
-
-        Parameters
-        ----------
-        u : np.ndarray
-            The concatenated values of all input ports.
-        port_id : str
-            The identifier of the input port whose signal value is to be extracted.
-
-        Returns
-        -------
-        np.ndarray
-            The signal value corresponding to the specified input port.
-        """
-        input_signals = self.get_port_values_from_u(u)
-        return input_signals[port_id]
-
     # Visualization / Kinematic Contract
 
     def get_kinematic_geometry(self):
@@ -473,7 +665,7 @@ class System:
         By default, the base :class:`System` generates one point per state and
         one point per input.
         """
-        from minilink.graphical.primitives import Point
+        from minilink.graphical.animation.primitives import Point
 
         primitives = []
         for i in range(self.n):
@@ -489,7 +681,7 @@ class System:
         This visualization contract is intentionally still provisional.
         By default, states and inputs are mapped to simple translations.
         """
-        from minilink.graphical.primitives import translation_matrix
+        from minilink.graphical.animation.primitives import translation_matrix
 
         transforms = []
 
@@ -512,7 +704,7 @@ class System:
         """
         Return the standard 4x4 camera transform for this system.
 
-        The matrix follows :func:`minilink.graphical.primitives.camera_matrix`:
+        The matrix follows :func:`minilink.graphical.animation.primitives.camera_matrix`:
         ``T[:3, 3]`` is the look-at target in world, the columns of ``T[:3, :3]``
         are the world directions of camera-X (plot horizontal), camera-Y
         (plot vertical), and camera-Z (view-out), and ``T[3, 3]`` is the view
@@ -525,7 +717,7 @@ class System:
 
         TODO: User Architectural Review (visualization contract is TRL 1).
         """
-        from minilink.graphical.primitives import camera_matrix
+        from minilink.graphical.animation.primitives import camera_matrix
 
         return camera_matrix(
             target=self.camera_target,
@@ -534,6 +726,24 @@ class System:
         )
 
     # User Shortcut / Facade API
+
+    def __add__(self, other: object) -> "DiagramSystem":
+        """Return a diagram containing ``self`` and ``other`` as subsystems."""
+        from minilink.core.composition import add_systems
+
+        return add_systems(self, other)
+
+    def __rshift__(self, other: object) -> "DiagramSystem":
+        """Return a diagram with ``self`` connected in series to ``other``."""
+        from minilink.core.composition import series
+
+        return series(self, other)
+
+    def __matmul__(self, other: object) -> "DiagramSystem":
+        """Return a closed-loop diagram ``self @ other``."""
+        from minilink.core.composition import closed_loop
+
+        return closed_loop(self, other)
 
     def compile(self, backend="numpy", verbose=False):
         """
@@ -577,7 +787,6 @@ class System:
         Trajectory
             The simulated trajectory, also stored in :attr:`traj`.
         """
-        from minilink.graphical.plotting import plot_time_signals
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -594,10 +803,10 @@ class System:
         traj = sim.solve()
 
         if show:
-            if time_axis:
-                plot_time_signals(self, traj)
-            # else:
-            #     plot_data_signals(self, traj)
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
         self.traj = traj
 
         return traj
@@ -642,7 +851,6 @@ class System:
         Trajectory
             Simulated state-input trajectory.
         """
-        from minilink.graphical.plotting import plot_time_signals
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -660,6 +868,8 @@ class System:
         traj = sim.solve_forced(u, input_port_id=input_port_id)
 
         if show:
+            from minilink.graphical.signals import plot_time_signals
+
             plot_time_signals(self, traj)
 
         self.traj = traj
@@ -710,15 +920,15 @@ class System:
         ----------
         signals : tuple of str, optional
             Signal names to plot; see
-            :func:`minilink.graphical.plotting.plot_time_signals`.
+            :func:`minilink.graphical.signals.plot_time_signals`.
 
         Returns
         -------
-        Trajectory or PlotResult
-            :class:`~minilink.core.trajectory.Trajectory` if a simulation is run; otherwise
-            the plot result from :func:`minilink.graphical.plotting.plot_time_signals`.
+        PlotResult
+            The plot result from
+            :func:`minilink.graphical.signals.plot_time_signals`.
         """
-        from minilink.graphical.plotting import plot_time_signals
+        from minilink.graphical.signals import plot_time_signals
 
         if traj is not None:
             return plot_time_signals(
@@ -734,7 +944,14 @@ class System:
                 show=show,
             )
 
-        return self.compute_trajectory(signals=signals, plot_backend=backend, show=show)
+        traj = self.compute_trajectory(show=False)
+        return plot_time_signals(
+            self,
+            traj,
+            signals=signals,
+            backend=backend,
+            show=show,
+        )
 
     def plot_phase_plane(
         self,
@@ -753,7 +970,7 @@ class System:
         simulation result, the sampled state path is overlaid on the vector
         field. Otherwise only the vector field is plotted.
         """
-        from minilink.graphical.plotting import plot_phase_plane
+        from minilink.graphical.phase_plane import plot_phase_plane
 
         if traj is None:
             traj = self.traj
@@ -771,7 +988,7 @@ class System:
         """
         Convenience shortcut returning an HTML block representation.
         """
-        from minilink.graphical.graphe import get_system_block_html
+        from minilink.graphical.diagrams import get_system_block_html
 
         return get_system_block_html(self, label)
 
@@ -787,38 +1004,42 @@ class System:
             print("IPython is not available")
             return
 
-    def get_graphe(self):
+    def get_diagram(self):
         """
-        Convenience shortcut returning the Graphviz graph representation.
+        Convenience shortcut returning a renderable diagram representation.
         """
-        from minilink.graphical.graphe import get_system_graphe
+        from minilink.graphical.diagrams import get_diagram
 
-        return get_system_graphe(self)
+        return get_diagram(self)
 
     def _repr_svg_(self):
         """
-        Convenience notebook representation for the system graph.
+        Convenience notebook representation for the system diagram.
         """
-        g = self.get_graphe()
+        g = self.get_diagram()
         if g is None:
             return None
         return g._repr_image_svg_xml()
 
-    def plot_graphe(self, filename=None, show_inline=None, show_pdf=None):
+    def plot_diagram(self, filename=None, show_inline=None, show_pdf=None):
         """
-        Convenience shortcut to render the Graphviz system graph.
+        Convenience shortcut to render the system diagram.
 
         ``show_inline`` and ``show_pdf`` default to ``None`` and auto-resolve
-        via :func:`minilink.graphical.environment.is_inline_capable`:
+        via :func:`minilink.graphical.common.environment.is_inline_capable`:
         Jupyter / Colab get inline SVG only (no viewer pop-up, no disk write),
         while bare scripts and IPython REPLs get the legacy render-to-temp-file
         + open-in-OS-PDF-viewer behavior. Pass explicit booleans to override;
         pass ``filename`` to force a specific on-disk output.
         """
-        from minilink.graphical.graphe import plot_graphviz
+        from minilink.graphical.diagrams import plot_diagram
 
-        g = self.get_graphe()
-        plot_graphviz(g, show_inline=show_inline, show_pdf=show_pdf, filename=filename)
+        return plot_diagram(
+            self,
+            show_inline=show_inline,
+            show_pdf=show_pdf,
+            filename=filename,
+        )
 
     def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
         """
@@ -842,7 +1063,7 @@ class System:
         Convenience shortcut to animate a trajectory of this system.
 
         ``html=None`` auto-resolves via
-        :func:`minilink.graphical.environment.prefers_inline_animation`:
+        :func:`minilink.graphical.common.environment.prefers_inline_animation`:
         ``True`` in Colab and in local Jupyter with a non-interactive
         matplotlib backend (``inline`` / ``agg``); ``False`` for bare
         script, IPython REPL, and Jupyter with an interactive backend
@@ -855,7 +1076,7 @@ class System:
         primitives such as ``TorqueArrow``; see ``DESIGN.md`` §4.7).
         """
         from minilink.graphical.animation import Animator
-        from minilink.graphical.environment import prefers_inline_animation
+        from minilink.graphical.common.environment import prefers_inline_animation
 
         if traj is None:
             if self.traj is not None:
@@ -928,18 +1149,15 @@ class StaticSystem(System):
     diagram animation shows only dynamic plants unless a subclass opts in.
     """
 
-    def __init__(self, m, p):
+    def __init__(self):
         """
         Initialize a StaticSystem.
 
         Parameters
         ----------
-        m : int
-            Number of input dimensions.
-        p : int
-            Number of output dimensions.
+        Static systems start with no ports. Add input/output ports explicitly.
         """
-        System.__init__(self, 0, m, p)
+        System.__init__(self, 0)
         self.name = "StaticSystem"
 
     def get_kinematic_geometry(self):
@@ -958,7 +1176,15 @@ class DynamicSystem(System):
     # dx = f(x, u, t)
     # y  = h(x, u, t)
 
-    def __init__(self, n, m, p):
+    def __init__(
+        self,
+        n,
+        *,
+        input_dim=None,
+        output_dim=None,
+        expose_state=False,
+        y_dependencies=(),
+    ):
         """
         Initialize a DynamicSystem.
 
@@ -966,25 +1192,32 @@ class DynamicSystem(System):
         ----------
         n : int
             Number of continuous states.
-        m : int
-            Number of input dimensions.
-        p : int
-            Number of output dimensions.
+        input_dim : int, optional
+            If provided, create a standard input port named ``u``.
+        output_dim : int, optional
+            If provided, create a standard primary output port named ``y``.
+        expose_state : bool, optional
+            If True, create an auxiliary state output port named ``x``.
+        y_dependencies : tuple or "all", optional
+            Direct-feedthrough dependencies for the standard ``y`` output.
         """
-        System.__init__(self, n, m, p)
+        System.__init__(self, n)
 
         self.name = "DynamicSystem"
 
-        # By default, a dynamic system's output 'y' only depends on its state 'x', not 'u'
-        self.outputs["y"].dependencies = ()
-
-        # Add a default output port 'x' that outputs the state vector directly, useful for connecting to other blocks in the diagram
-        self.add_output_port(self.n, "x", function=self.compute_state)
+        if input_dim is not None:
+            self.add_input_port("u", dim=input_dim)
+        if output_dim is not None:
+            self.add_output_port(
+                "y", dim=output_dim, function=self.h, dependencies=y_dependencies
+            )
+        if expose_state:
+            self.add_output_port("x", dim=self.n, function=self.compute_state)
 
 
 if __name__ == "__main__":
-    x = VectorSignal(2, "x")
+    x = VectorSignal("x", dim=2)
 
-    sys = DynamicSystem(2, 1, 1)
+    sys = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
 
-    func = StaticSystem(2, 2)
+    func = StaticSystem()

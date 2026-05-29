@@ -1,2 +1,0 @@
-"""Diagram topology exporter implementations."""
-

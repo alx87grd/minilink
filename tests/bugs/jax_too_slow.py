@@ -12,10 +12,9 @@ from minilink.core.system import DynamicSystem, StaticSystem
 class Integrator(DynamicSystem):
     def __init__(self):
 
-        super().__init__(1, 1, 1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "Integrator"
-        self.outputs = {}
-        self.add_output_port(1, "y", function=self.h, dependencies=[])
+        self.add_output_port("y", dim=1, function=self.h, dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return u
@@ -26,15 +25,11 @@ class Integrator(DynamicSystem):
 
 class PropController(StaticSystem):
     def __init__(self):
-        super().__init__(2, 1)
+        super().__init__()
         self.name = "Controller"
-
-        self.inputs = {}
-        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "y", nominal_value=np.array([0.0]))
-
-        self.outputs = {}
-        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
+        self.add_input_port("r", nominal_value=0.0)
+        self.add_input_port("y", dim=1, nominal_value=np.array([0.0]))
+        self.add_output_port("u", dim=1, function=self.ctl, dependencies=("r", "y"))
 
     def ctl(self, x, u, t=0, params=None):
 
@@ -78,11 +73,11 @@ diagram.add_subsystem(sys2, "integrator2")
 diagram.connect("integrator1", "y", "integrator2", "u")
 diagram.connect("controller2", "u", "integrator1", "u")
 diagram.connect("integrator1", "y", "controller2", "y")
-diagram.connect("controller1", "u", "controller2", "ref")
+diagram.connect("controller1", "u", "controller2", "r")
 diagram.connect("integrator2", "y", "controller1", "y")
-diagram.connect("step", "y", "controller1", "ref")
+diagram.connect("step", "y", "controller1", "r")
 
-diagram.plot_graphe()
+diagram.plot_diagram()
 # diagram.compute_trajectory(tf=20)
 
 

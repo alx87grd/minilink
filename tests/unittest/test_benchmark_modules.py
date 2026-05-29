@@ -19,7 +19,7 @@ from minilink.planning.trajectory_optimization.benchmark import (
 
 class _TinyStable(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 1, 1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "TinyStable"
         self.x0 = np.array([1.0])
 

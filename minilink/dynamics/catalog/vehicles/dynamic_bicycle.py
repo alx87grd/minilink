@@ -19,7 +19,7 @@ from minilink.dynamics.catalog.vehicles.tire_models import (
     Pacejka,
     TireModel,
 )
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
     CustomLine,

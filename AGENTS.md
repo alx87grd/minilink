@@ -36,6 +36,6 @@ For headless environments, set `matplotlib.use('Agg')` before importing minilink
 
 ### Gotchas
 
-- The `plot_graphe()` method may emit D-Bus errors in headless environments — these are harmless and do not affect output.
+- The `plot_diagram()` method may emit D-Bus errors in headless environments — these are harmless and do not affect output.
 - `plot_trajectory(..., show=False)` suppresses display for trajectory figures.
 - The `agent.md` file references a `dev-h26` conda env for the maintainer's local machine. In cloud agents, use system Python 3.10+ with `pip install -e ".[dev]"` instead.

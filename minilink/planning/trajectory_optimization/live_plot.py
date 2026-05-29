@@ -35,7 +35,7 @@ class LiveTrajectoryPlotCallback:
 
         title = self._title(iteration)
         if self.handle is None:
-            from minilink.graphical.plotting import open_time_signal_plot
+            from minilink.graphical.signals import open_time_signal_plot
 
             self.handle = open_time_signal_plot(
                 self.sys,

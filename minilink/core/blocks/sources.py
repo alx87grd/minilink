@@ -8,14 +8,12 @@ from minilink.core.system import System
 class Source(System):
     def __init__(self, p):
 
-        System.__init__(self, 0, 0, p)
+        System.__init__(self, 0)
 
         self.name = "Source"
         self.params = {"value": np.zeros(p)}
 
-        self.inputs = {}
-        self.outputs = {}
-        self.add_output_port(self.p, "y", function=self.h)
+        self.add_output_port("y", dim=p, function=self.h)
 
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -35,16 +33,17 @@ class Source(System):
             Number of evaluation points used for plotting.
         ax : matplotlib.axes.Axes, optional
             Existing axis to draw on. If None, a new figure is created and shown
-            (same policy as :func:`minilink.graphical.plotting.plot_time_signals`);
+            (same policy as
+            :func:`minilink.graphical.signals.plot_time_signals`);
             if an axis is passed, the caller controls display.
         """
         import matplotlib.pyplot as plt
 
-        from minilink.graphical.environment import (
+        from minilink.graphical.common.environment import (
             allow_tall_stacked_figures,
             is_blocking_needed,
         )
-        from minilink.graphical.matplotlib_style import (
+        from minilink.graphical.common.matplotlib_style import (
             DPI_FIGURE,
             FONT_SIZE,
             signal_stack_figsize,

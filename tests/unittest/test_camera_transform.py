@@ -12,12 +12,12 @@ import numpy as np  # noqa: E402
 
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation import Animator
-from minilink.graphical.environment import override_env
-from minilink.graphical.primitives import (
+from minilink.graphical.common.environment import override_env
+from minilink.graphical.animation.primitives import (
     camera_matrix,
     world_to_camera,
 )
-from minilink.graphical.renderers.matplotlib_renderer import (
+from minilink.graphical.animation.renderers.matplotlib_renderer import (
     _axis_label_from_column,
     _camera_3d_view_init,
 )
@@ -72,12 +72,12 @@ class TestCameraMatrix(unittest.TestCase):
 
 class TestSystemDefaultCamera(unittest.TestCase):
     def test_default_camera_matches_factory(self):
-        s = DynamicSystem(2, 1, 1)
+        s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
         np.testing.assert_array_equal(T, camera_matrix())
 
     def test_camera_attributes_match_camera_matrix(self):
-        s = DynamicSystem(2, 1, 1)
+        s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         s.camera_scale = 2.0
         s.camera_plot_axes = (1, 2)
         s.camera_target[:] = (1.0, -1.0, 0.5)
@@ -94,11 +94,11 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         self.addCleanup(override_env, None)
 
     def test_default_2d_view_uses_target_plus_minus_scale(self):
-        s = DynamicSystem(2, 1, 1)
+        s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         a = Animator(s)
         a.show(np.zeros(2), np.zeros(1), 0.0, is_3d=False, renderer="matplotlib")
         # The animator closes its figure in show(); inspect via a fresh open_scene.
-        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
 
         backend = MatplotlibRenderer(a)
         backend.open_scene(
@@ -113,10 +113,10 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         plt.close(backend.fig)
 
     def test_xy_follow_camera_keeps_2d_geometry_in_world_coordinates(self):
-        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
-        from minilink.graphical.primitives import Point, camera_matrix, translation_matrix
+        from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.animation.primitives import Point, camera_matrix, translation_matrix
 
-        s = DynamicSystem(0, 0, 0)
+        s = DynamicSystem(0)
         a = Animator(s)
         backend = MatplotlibRenderer(a)
         camera = camera_matrix(target=(10.0, 3.0, 0.0), scale=4.0)
@@ -132,12 +132,12 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         plt.close(backend.fig)
 
     def test_xz_camera_sets_z_as_vertical_axis(self):
-        s = DynamicSystem(2, 1, 1)
+        s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         s.get_camera_transform = lambda x, u, t: camera_matrix(
             plot_axes=(0, 2), scale=3.0
         )
         a = Animator(s)
-        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
 
         backend = MatplotlibRenderer(a)
         backend.open_scene(
@@ -152,12 +152,12 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         plt.close(backend.fig)
 
     def test_follow_target_shifts_3d_view_box(self):
-        s = DynamicSystem(2, 1, 1)
+        s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         s.get_camera_transform = lambda x, u, t: camera_matrix(
             target=(5.0, -2.0, 1.0), scale=4.0
         )
         a = Animator(s)
-        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
 
         backend = MatplotlibRenderer(a)
         backend.open_scene(

@@ -9,11 +9,11 @@ from minilink.core.system import System
 
 class SimpleGain(System):
     def __init__(self, id_str, gain=2.0):
-        super().__init__(0, 1, 1)
+        super().__init__(0)
         self.name = id_str
         self.gain = gain
-        self.add_input_port(1, "u")
-        self.add_output_port(1, "y", function=self.h, dependencies=["u"])
+        self.add_input_port("u")
+        self.add_output_port("y", function=self.h, dependencies=("u",))
 
     def h(self, x, u, t=0, params=None):
         return u * self.gain
@@ -21,10 +21,10 @@ class SimpleGain(System):
 
 class SimpleIntegrator(System):
     def __init__(self, id_str):
-        super().__init__(1, 1, 1)
+        super().__init__(1)
         self.name = id_str
-        self.add_input_port(1, "u")
-        self.add_output_port(1, "x", function=self.compute_state, dependencies="")
+        self.add_input_port("u")
+        self.add_output_port("x", function=self.compute_state, dependencies=())
 
     def compute_state(self, x, u, t=0, params=None):
         return x
@@ -35,12 +35,12 @@ class SimpleIntegrator(System):
 
 class MultiInputNode(System):
     def __init__(self, id_str, in_ports):
-        super().__init__(1, in_ports, 1)
+        super().__init__(1)
         self.name = id_str
         self.in_ports = in_ports
         for p_idx in range(in_ports):
-            self.add_input_port(1, f"u{p_idx}")
-        self.add_output_port(1, "x", function=self.compute_state, dependencies="all")
+            self.add_input_port(f"u{p_idx}")
+        self.add_output_port("x", function=self.compute_state, dependencies="all")
 
     def compute_state(self, x, u, t=0, params=None):
         return x
@@ -52,7 +52,7 @@ class MultiInputNode(System):
 def build_deep_network(depth=50, initial_state0=1.0):
     """Build a long chain with non-zero dynamics by default."""
     diag = DiagramSystem()
-    diag.graphe_building_verbose = False
+    diag.connection_verbose = False
     for i in range(depth):
         node = SimpleIntegrator(f"Int{i}")
         if i == 0:
@@ -84,7 +84,7 @@ def make_dense_network(
     not all zeros even if ``source_value`` is 0.
     """
     diag = DiagramSystem()
-    diag.graphe_building_verbose = False
+    diag.connection_verbose = False
     rng = np.random.RandomState(seed)
 
     for i in range(num_nodes):

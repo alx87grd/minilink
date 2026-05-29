@@ -13,7 +13,7 @@ class DiagramSystem(System):
         self.subsystems = {}  # Nodes
         self.connections = {}  # Edges
 
-        System.__init__(self, 0, 0, 0)
+        System.__init__(self, 0)
 
         self.name = "Diagram"
 
@@ -23,7 +23,7 @@ class DiagramSystem(System):
         self.recompute_input_properties()
 
         self.debug_print = False
-        self.graphe_building_verbose = True
+        self.connection_verbose = True
 
         self.refresh()
 
@@ -74,7 +74,7 @@ class DiagramSystem(System):
             idx += subsystem.n
 
         self.n = n
-        self.state = VectorSignal(n, "x")
+        self.state = VectorSignal("x", dim=n)
         self.state.labels = state_labels
         self.state.units = state_units
         self.state.upper_bound = state_upper_bound
@@ -89,7 +89,7 @@ class DiagramSystem(System):
             source_port_id,
         )
 
-        if self.graphe_building_verbose:
+        if self.connection_verbose:
             print(
                 "Connected "
                 + source_sys_id
@@ -112,17 +112,22 @@ class DiagramSystem(System):
                 x, u, t, source_sys_id, source_port_id, params=params
             )
 
-        self.add_output_port(port.dim, output_port_id, compute, dependencies)
+        self.add_output_port(
+            output_port_id,
+            dim=port.dim,
+            function=compute,
+            dependencies=dependencies,
+        )
 
         if "output" not in self.connections:
             self.connections["output"] = {}
 
         self.connect(source_sys_id, source_port_id, "output", output_port_id)
 
-    def get_graphe(self):
-        from minilink.graphical.graphe import get_diagram_graphe
+    def get_diagram(self):
+        from minilink.graphical.diagrams import get_diagram
 
-        return get_diagram_graphe(self)
+        return get_diagram(self)
 
     def get_local_state(self, x, sys_id):
 
@@ -229,6 +234,22 @@ class DiagramSystem(System):
         """
         for _, subsystem in self.subsystems.items():
             subsystem.refresh()
+
+    def autowire(
+        self,
+        *,
+        strict: bool = False,
+        validate: bool = True,
+    ) -> "DiagramSystem":
+        """
+        Conservatively connect unconnected inputs when one safe source matches.
+
+        This is an optional diagram-building shortcut. It does not overwrite
+        existing connections and returns ``self`` so it can be used fluently.
+        """
+        from minilink.core.composition import autowire
+
+        return autowire(self, strict=strict, validate=validate)
 
     def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
         """

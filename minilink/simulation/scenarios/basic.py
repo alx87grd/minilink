@@ -10,7 +10,13 @@ class NumpyPendulum(DynamicSystem):
     """Pendulum using NumPy ops in `f`."""
 
     def __init__(self, *, gravity=9.81, length=1.0, damping=0.0):
-        super().__init__(n=2, m=1, p=2)
+        super().__init__(
+            n=2,
+            input_dim=1,
+            output_dim=2,
+            expose_state=True,
+            y_dependencies=(),
+        )
         self.name = "NumpyPendulum"
         self.gravity = gravity
         self.length = length

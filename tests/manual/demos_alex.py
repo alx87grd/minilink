@@ -8,7 +8,7 @@ from minilink.simulation.simulator import Simulator
 
 class Pendulum(DynamicSystem):
     def __init__(self):
-        super().__init__(2, 1, 2)
+        super().__init__(n=2)
 
         self.params = {"g": 9.81, "m": 1.0, "l": 1.0}
 
@@ -16,16 +16,12 @@ class Pendulum(DynamicSystem):
 
         self.state.labels = ["theta", "theta_dot"]
         self.state.units = ["rad", "rad/s"]
-
-        self.inputs = {}
-        self.add_input_port(1, "u", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "w", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "v", nominal_value=np.array([0.0]))
+        self.add_input_port("u", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("w", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("v", dim=1, nominal_value=np.array([0.0]))
         self.inputs["u"].labels = ["torque"]
         self.inputs["u"].units = ["Nm"]
-
-        self.outputs = {}
-        self.add_output_port(self.p, "y", function=self.h, dependencies=["v"])
+        self.add_output_port("y", dim=2, function=self.h, dependencies=("v",))
 
     def f(self, x, u, t=0, params=None):
 
@@ -63,7 +59,7 @@ class Pendulum(DynamicSystem):
 
 class PDController(StaticSystem):
     def __init__(self):
-        super().__init__(3, 1)
+        super().__init__()
 
         self.params = {
             "Kp": 10.0,
@@ -71,15 +67,11 @@ class PDController(StaticSystem):
         }
 
         self.name = "Controller"
-
-        self.inputs = {}
-        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
-        self.add_input_port(2, "y", nominal_value=np.array([0.0, 0.0]))
+        self.add_input_port("r", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("y", dim=2, nominal_value=np.array([0.0, 0.0]))
         self.inputs["y"].labels = ["theta", "theta_dot"]
         self.inputs["y"].units = ["rad", "rad/s"]
-
-        self.outputs = {}
-        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
+        self.add_output_port("u", dim=1, function=self.ctl, dependencies=("r", "y"))
         self.outputs["u"].labels = ["torque"]
         self.outputs["u"].units = ["Nm"]
 
@@ -104,14 +96,12 @@ class PDController(StaticSystem):
 
 class Integrator(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 1, 1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
 
         self.params = {"k": 1.0}
 
         self.name = "Integrator"
-
-        self.outputs = {}
-        self.add_output_port(1, "y", function=self.h, dependencies=[])
+        self.add_output_port("y", dim=1, function=self.h, dependencies=())
 
     def f(self, x, u, t=0, params=None):
 
@@ -134,20 +124,16 @@ class Integrator(DynamicSystem):
 
 class PropController(StaticSystem):
     def __init__(self):
-        super().__init__(2, 1)
+        super().__init__()
 
         self.params = {
             "Kp": 10.0,
         }
 
         self.name = "Controller"
-
-        self.inputs = {}
-        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "y", nominal_value=np.array([0.0]))
-
-        self.outputs = {}
-        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
+        self.add_input_port("r", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("y", dim=1, nominal_value=np.array([0.0]))
+        self.add_output_port("u", dim=1, function=self.ctl, dependencies=("r", "y"))
 
     def ctl(self, x, u, t=0, params=None):
 
@@ -195,10 +181,10 @@ def simulator_test():
 
 def system_test():
 
-    sys1 = DynamicSystem(2, 1, 1)
+    sys1 = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
 
-    sys1.add_input_port(2, "w", nominal_value=np.array([7.7, 2.2]))
-    sys1.add_input_port(1, "v", nominal_value=np.array([1.1]))
+    sys1.add_input_port("w", dim=2, nominal_value=np.array([7.7, 2.2]))
+    sys1.add_input_port("v", dim=1, nominal_value=np.array([1.1]))
 
     print("Sys1 u dim:", sys1.m)
     print("Sys1 x dim:", sys1.n)
@@ -217,19 +203,19 @@ def system_test():
 
     sys1.print_html()
 
-    sys1.plot_graphe()
+    sys1.plot_diagram()
 
     return sys1
 
 
 def diagram_test():
 
-    sys1 = DynamicSystem(2, 1, 1)
-    sys1.add_input_port(2, "w", nominal_value=np.array([7.7, 2.2]))
-    sys1.add_input_port(1, "v", nominal_value=np.array([1.1]))
-    sys2 = DynamicSystem(2, 1, 1)
-    sys3 = StaticSystem(1, 1)
-    sys4 = DynamicSystem(2, 1, 1)
+    sys1 = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
+    sys1.add_input_port("w", dim=2, nominal_value=np.array([7.7, 2.2]))
+    sys1.add_input_port("v", dim=1, nominal_value=np.array([1.1]))
+    sys2 = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
+    sys3 = StaticSystem()
+    sys4 = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
     step = Step(np.array([0.0]), np.array([1.0]), 1.0)
 
     gsys = DiagramSystem()
@@ -258,7 +244,7 @@ def diagram_test():
     print("List of connections :\n")
     print(gsys.connections)
 
-    _ = gsys.plot_graphe()
+    _ = gsys.plot_diagram()
 
     print("sys.n = ", gsys.n)
     print("sys.m = ", gsys.m)
@@ -305,7 +291,7 @@ def pendulum_test():
     diagram.connect("step", "y", "plant2", "u")
     diagram.connect("dist", "y", "plant", "w")
     diagram.connect("noise", "y", "plant", "v")
-    diagram.plot_graphe()
+    diagram.plot_diagram()
 
     sim = Simulator(diagram, t0=0, tf=20, dt=0.01, solver="euler")
     diagram.plot_trajectory(sim.solve(), signals=("x", "u"), backend="matplotlib")
@@ -343,9 +329,9 @@ def algebraic_loop():
     diagram.connect("controller2", "u", "integrator2", "u")
     diagram.connect("controller2", "u", "controller1", "y")
     diagram.connect("controller1", "u", "controller2", "y")
-    diagram.connect("step", "y", "controller1", "ref")
+    diagram.connect("step", "y", "controller1", "r")
 
-    diagram.plot_graphe()
+    diagram.plot_diagram()
 
     # diagram.check_algebraic_loops()
 
@@ -384,7 +370,7 @@ def solver_doing_weird_at_discontinuities():
     test.add_subsystem(sys2, "integrator2")
     test.connect("step", "y", "integrator2", "u")
     test.connect("integrator2", "y", "integrator1", "u")
-    test.plot_graphe()
+    test.plot_diagram()
     test.name = "double integrator with auto solver"
     test.compute_trajectory()  # Doing weird at discontinuities
     test.name = "double integrator with scipy solver"
@@ -420,25 +406,25 @@ def diagram_in_a_diagram(debug_print=False):
     test.add_subsystem(ctl1, "ctl")
     test.add_subsystem(sys1, "integrator1")
     test.add_subsystem(sys2, "integrator2")
-    test.connect("step", "y", "ctl", "ref")
+    test.connect("step", "y", "ctl", "r")
     test.connect("ctl", "u", "integrator1", "u")
     test.connect("integrator1", "y", "integrator2", "u")
     test.connect("integrator2", "y", "ctl", "y")
-    test.plot_graphe()
+    test.plot_diagram()
     test.compute_trajectory(dt=0.1, solver="euler")
 
     # # # Diagram
     diagram = DiagramSystem()
     diagram.debug_print = debug_print
     diagram.name = "DiagramSystem"
-    diagram.add_input_port(1, "u", nominal_value=np.array([0.0]))
+    diagram.add_input_port("u", dim=1, nominal_value=np.array([0.0]))
     diagram.add_subsystem(sys1, "integrator1")
     diagram.add_subsystem(sys2, "integrator2")
     diagram.connect("input", "u", "integrator1", "u")
     diagram.connect("integrator1", "y", "integrator2", "u")
-    diagram.connect_new_output_port("integrator2", "y", "y", dependencies=[])
+    diagram.connect_new_output_port("integrator2", "y", "y", dependencies=())
 
-    diagram.plot_graphe()
+    diagram.plot_diagram()
 
     diagram2 = DiagramSystem()
     diagram2.debug_print = debug_print
@@ -447,10 +433,10 @@ def diagram_in_a_diagram(debug_print=False):
     diagram2.add_subsystem(ctl1, "ctl")
     diagram2.add_subsystem(diagram, "double")
 
-    diagram2.connect("step", "y", "ctl", "ref")
+    diagram2.connect("step", "y", "ctl", "r")
     diagram2.connect("ctl", "u", "double", "u")
     diagram2.connect("double", "y", "ctl", "y")
-    diagram2.plot_graphe()
+    diagram2.plot_diagram()
     diagram2.compute_trajectory(dt=0.1, solver="euler")
 
     return test, diagram, diagram2
@@ -460,7 +446,7 @@ if __name__ == "__main__":
     # sys = system_test()
     # sim = simulator_test()
     # dia = diagram_test()
-    pendulum_test()
+    # pendulum_test()
     # diagram = algebraic_loop()  # compile() (via f_fast / Simulator) runs check_algebraic_loops()
     # solver_doing_weird_at_discontinuities()  # use euler / fixed dt; Simulator picks euler when solver_info["discontinuous_behavior"]
-    # test, d1, d2 = diagram_in_a_diagram(debug_print=False)
+    test, d1, d2 = diagram_in_a_diagram(debug_print=False)

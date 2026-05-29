@@ -1,7 +1,7 @@
 import numpy as np
 
 from minilink.core.system import DynamicSystem
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Circle,
     Rod,
     TorqueArrow,
@@ -14,7 +14,7 @@ class Pendulum(DynamicSystem):
     """Simple pendulum with torque, disturbance, and sensor-noise ports."""
 
     def __init__(self):
-        super().__init__(2, 1, 2)
+        super().__init__(n=2)
 
         self.params = {"g": 9.81, "m": 1.0, "l": 1.0}
 
@@ -23,20 +23,14 @@ class Pendulum(DynamicSystem):
         self.state.labels = ["theta", "theta_dot"]
         self.state.units = ["rad", "rad/s"]
 
-        self.inputs = {}
-        self.add_input_port(1, "u", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "w", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "v", nominal_value=np.array([0.0]))
-        self.inputs["u"].labels = ["torque"]
-        self.inputs["u"].units = ["Nm"]
-        self.inputs["w"].labels = ["disturbance"]
-        self.inputs["w"].units = ["Nm"]
-        self.inputs["v"].labels = ["noise"]
-        self.inputs["v"].units = ["rad"]
+        self.add_input_port("u", nominal_value=0.0, labels=["torque"], units=["Nm"])
+        self.add_input_port(
+            "w", nominal_value=0.0, labels=["disturbance"], units=["Nm"]
+        )
+        self.add_input_port("v", nominal_value=0.0, labels=["noise"], units=["rad"])
 
-        self.outputs = {}
         # The output is the state with noise added to angular position
-        self.add_output_port(self.p, "y", function=self.h, dependencies=["v"])
+        self.add_output_port("y", dim=2, function=self.h, dependencies=("v",))
 
         # Default camera target and plot axes
         self.camera_target = np.array([0, 0, 0.0])
@@ -62,7 +56,7 @@ class Pendulum(DynamicSystem):
         return dx
 
     def h(self, x, u, t=0, params=None):
-        v = self.u2input_signal(u, "v")
+        v = self.get_port_values_from_u(u, "v")
 
         y = np.zeros(self.p)
         y[0] = x[0]
@@ -99,7 +93,7 @@ class Pendulum(DynamicSystem):
 
     def get_kinematic_transforms(self, x, u, t):
         theta = x[0]
-        torque = self.u2input_signal(u, "u")[0]
+        torque = self.get_port_values_from_u(u, "u")[0]
         rod_angle = theta - np.pi / 2
         max_torque = self.inputs["u"].upper_bound[0]
         sweep = torque * (2 * np.pi / 3) / max_torque
@@ -115,7 +109,7 @@ class Pendulum(DynamicSystem):
 if __name__ == "__main__":
 
     pendulum = Pendulum()
-    pendulum.plot_graphe()
+    pendulum.plot_diagram()
     pendulum.plot_phase_plane()
 
     pendulum.x0[0] = np.pi / 2

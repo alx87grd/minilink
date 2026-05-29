@@ -9,15 +9,15 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.graphical.environment import is_blocking_needed
-from minilink.graphical.matplotlib_style import (
+from minilink.graphical.common.environment import is_blocking_needed
+from minilink.graphical.common.matplotlib_style import (
     DPI_EXPORT,
     DPI_FIGURE,
     FIGSIZE_ANIMATION,
     FONT_SIZE,
     style_animation_axes,
 )
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
     Circle,
@@ -31,7 +31,7 @@ from minilink.graphical.primitives import (
     extract_amplitude,
     world_to_camera,
 )
-from minilink.graphical.renderers.renderer import AnimationRenderer
+from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 
 _AXIS_LABEL_BY_INDEX = ("X", "Y", "Z")
 
@@ -541,7 +541,7 @@ class MatplotlibRenderer(AnimationRenderer):
 
         Only the window path lands here: Colab and Jupyter-with-non-interactive
         backend are routed to ``render_inline_animation`` upstream via
-        :func:`minilink.graphical.environment.prefers_inline_animation`.
+        :func:`minilink.graphical.common.environment.prefers_inline_animation`.
 
         - Bare script (``is_blocking_needed() is True``): block until the user
           closes the window, then clean up.

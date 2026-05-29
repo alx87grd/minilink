@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.graphical.time_signals import PlotResult
+from minilink.graphical.common import PlotResult
 
 
 @dataclass(frozen=True)
@@ -187,8 +187,8 @@ def render_phase_plane_matplotlib(
     import matplotlib
     import matplotlib.pyplot as plt
 
-    from minilink.graphical.environment import is_blocking_needed
-    from minilink.graphical.matplotlib_style import (
+    from minilink.graphical.common.environment import is_blocking_needed
+    from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,
         FIGSIZE_BASE,
         FONT_SIZE,

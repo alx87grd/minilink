@@ -19,7 +19,7 @@ import numpy as np
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem, System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     TorqueArrow,
@@ -60,17 +60,13 @@ class PathPlanner(System):
         path_a: float = A,
         path_lambda: float = LAMBDA,
     ):
-        super().__init__(0, 0, 1)
+        super().__init__(0)
         self.name = "Path planner"
-        self.inputs = {}
-        self.outputs = {}
-        self.recompute_input_properties()
         self._u_ref = float(u_ref)
         self.path_a = float(path_a)
         self.path_lambda = float(path_lambda)
-        self.add_output_port(1, "u_ref", function=self.h_u_ref, dependencies=[])
-        self.add_output_port(2, "path", function=self.h_path, dependencies=[])
-        self.p = 3
+        self.add_output_port("u_ref", dim=1, function=self.h_u_ref, dependencies=())
+        self.add_output_port("path", dim=2, function=self.h_path, dependencies=())
 
     def h_u_ref(self, x, u, t=0.0, params=None):
         return np.array([self._u_ref], dtype=float)
@@ -104,26 +100,24 @@ class Tracking(StaticSystem):
     Uses a forward look-ahead ``(px + Ld, y(px + Ld))``. The output is ``theta_ref``
     [rad] for the heading loop.
 
-    Animation: chord :class:`~minilink.graphical.primitives.Arrow` from pose to lookahead.
+    Animation: chord :class:`~minilink.graphical.animation.primitives.Arrow` from pose to lookahead.
     """
 
     def __init__(self, ld: float = LD):
-        super().__init__(8, 1)
+        super().__init__()
         self.name = "Tracking"
         self.params = {"Ld": float(ld)}
-        self.inputs = {}
         self.add_input_port(
-            2,
             "path",
+            dim=2,
             nominal_value=np.array([A, LAMBDA], dtype=float),
         )
-        self.add_input_port(6, "y", nominal_value=np.zeros(6))
-        self.outputs = {}
+        self.add_input_port("y", dim=6, nominal_value=np.zeros(6))
         self.add_output_port(
-            1,
             "theta_ref",
+            dim=1,
             function=self.guidance,
-            dependencies=["path", "y"],
+            dependencies=("path", "y"),
         )
 
     def guidance(self, x, u, t=0.0, params=None):
@@ -168,23 +162,21 @@ class HeadingLoop(StaticSystem):
     -----
     Port order in ``u``: ``theta_ref`` (1), then plant ``y`` (6).
 
-    Animation: :class:`~minilink.graphical.primitives.TorqueArrow` at the
+    Animation: :class:`~minilink.graphical.animation.primitives.TorqueArrow` at the
     vehicle CG with sweep ``theta_ref - theta`` (wrapped).
     """
 
     def __init__(self, K_psi: float = 1.85, r_max: float = 0.68):
-        super().__init__(7, 1)
+        super().__init__()
         self.name = "Heading loop"
         self.params = {"K_psi": K_psi, "r_max": r_max}
-        self.inputs = {}
-        self.add_input_port(1, "theta_ref", nominal_value=np.array([0.0]))
-        self.add_input_port(6, "y", nominal_value=np.zeros(6))
-        self.outputs = {}
+        self.add_input_port("theta_ref", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("y", dim=6, nominal_value=np.zeros(6))
         self.add_output_port(
-            1,
             "r_ref",
+            dim=1,
             function=self.heading_to_r,
-            dependencies=["theta_ref", "y"],
+            dependencies=("theta_ref", "y"),
         )
 
     def heading_to_r(self, x, u, t=0.0, params=None):
@@ -228,18 +220,16 @@ class YawRateLoop(StaticSystem):
     """
 
     def __init__(self, K_r: float = 0.52, delta_max: float = 0.52):
-        super().__init__(7, 1)
+        super().__init__()
         self.name = "Yaw-rate loop"
         self.params = {"K_r": K_r, "delta_max": delta_max}
-        self.inputs = {}
-        self.add_input_port(1, "r_ref", nominal_value=np.array([0.0]))
-        self.add_input_port(6, "y", nominal_value=np.zeros(6))
-        self.outputs = {}
+        self.add_input_port("r_ref", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("y", dim=6, nominal_value=np.zeros(6))
         self.add_output_port(
-            1,
             "delta",
+            dim=1,
             function=self.r_to_delta,
-            dependencies=["r_ref", "y"],
+            dependencies=("r_ref", "y"),
         )
 
     def r_to_delta(self, x, u, t=0.0, params=None):
@@ -286,7 +276,7 @@ class VelocityPID(DynamicSystem):
     """
 
     def __init__(self, r_rear: float):
-        super().__init__(2, 7, 1)
+        super().__init__(n=2)
         self.r_rear = float(r_rear)
         self.name = "Velocity PID"
         self.params = {
@@ -299,17 +289,15 @@ class VelocityPID(DynamicSystem):
         }
         self.state.labels = ["int_e", "u_filt"]
         self.x0 = np.array([0.0, U_REF], dtype=float)
-        self.inputs = {}
-        self.add_input_port(1, "u_ref", nominal_value=np.array([U_REF]))
-        self.add_input_port(6, "y", nominal_value=np.zeros(6))
-        self.outputs = {}
+        self.add_input_port("u_ref", dim=1, nominal_value=np.array([U_REF]))
+        self.add_input_port("y", dim=6, nominal_value=np.zeros(6))
         self.add_output_port(
-            1,
             "w_rear",
+            dim=1,
             function=self.h_w,
-            dependencies=["u_ref", "y"],
+            dependencies=("u_ref", "y"),
         )
-        self.add_output_port(2, "x", function=self.compute_state, dependencies=[])
+        self.add_output_port("x", dim=2, function=self.compute_state, dependencies=())
 
     def _speed_error(self, u):
         u_ref, u_b = u[0], u[4]
@@ -406,7 +394,7 @@ diagram.connect("vehicle", "y", "yaw_rate_loop", "y")
 diagram.connect("vel_pid", "w_rear", "vehicle", "w_rear")
 diagram.connect("yaw_rate_loop", "delta", "vehicle", "delta")
 
-diagram.plot_graphe()
+diagram.plot_diagram()
 diagram.compute_trajectory(tf=20.0, dt=0.02, show=False, verbose=False)
 diagram.plot_trajectory(signals=("x", "u"), backend="matplotlib")
 

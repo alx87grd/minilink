@@ -31,7 +31,13 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         n = self.pos + self.dof
         m = int(actuators)
         p = n
-        super().__init__(n=n, m=m, p=p)
+        super().__init__(
+            n=n,
+            input_dim=m,
+            output_dim=p,
+            expose_state=True,
+            y_dependencies=(),
+        )
 
         self.name = f"{self.dof}DoF Generalized Mechanical System"
 

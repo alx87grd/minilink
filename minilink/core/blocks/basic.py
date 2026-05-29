@@ -1,19 +1,14 @@
-import numpy as np
-
 from minilink.compile.jax_utils import array_module
 from minilink.core.system import DynamicSystem, StaticSystem
 
 
 class Integrator(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 1, 1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
 
         self.params = {"k": 1.0}
 
         self.name = "Integrator"
-
-        self.outputs = {}
-        self.add_output_port(1, "y", function=self.h, dependencies=[])
 
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -28,7 +23,7 @@ class Integrator(DynamicSystem):
 
 class PropController(StaticSystem):
     def __init__(self):
-        super().__init__(2, 1)
+        super().__init__()
 
         self.params = {
             "Kp": 10.0,
@@ -36,21 +31,19 @@ class PropController(StaticSystem):
 
         self.name = "Controller"
 
-        self.inputs = {}
-        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "y", nominal_value=np.array([0.0]))
-
-        self.outputs = {}
-        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
+        self.add_input_port("r", nominal_value=0.0)
+        self.add_input_port("y", nominal_value=0.0)
+        self.add_output_port(
+            "u", dim=1, function=self.ctl, dependencies=("r", "y")
+        )
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
         Kp = params["Kp"]
 
-        r = u[0]
-        y = u[1]
+        r, y = self.get_port_values_from_u(u, "r", "y")
 
-        u_cmd = Kp * (r - y)
+        u_cmd = Kp * (r[0] - y[0])
         xp = array_module(u)
         return xp.array([u_cmd])

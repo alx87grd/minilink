@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import sympy as sp
 
-from minilink.graphical.primitives import CustomLine
+from minilink.graphical.animation.primitives import CustomLine
 
 
 def _pose2d(px: float, py: float, theta: float, scale_x: float = 1.0) -> np.ndarray:

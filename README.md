@@ -26,18 +26,44 @@ Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/vi
 ## Quick Start
 
 ```python
-from minilink.core.blocks.basic import Integrator
+from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.blocks.sources import Step
-from minilink.core.diagram import DiagramSystem
 from minilink.simulation.simulator import Simulator
 
-diagram = DiagramSystem()
-diagram.add_subsystem(Integrator(), "plant")
-diagram.add_subsystem(Step(), "source")
-diagram.connect("source", "y", "plant", "u")
+diagram = Step() >> Integrator()
 
 traj = Simulator(diagram, tf=10.0).solve()
 diagram.plot_trajectory(traj, signals=("x", "u"), backend="matplotlib")
+```
+
+Shortcuts build ordinary `DiagramSystem` objects. Use the explicit diagram API
+when the topology is not a simple series or control loop.
+
+```python
+diagram = Step() >> Integrator()          # series y -> u
+closed = PropController() @ Integrator()  # r/y/u closed-loop convention
+```
+
+Custom blocks declare named ports explicitly. Base `System` and `StaticSystem`
+start with no ports; `DynamicSystem` can opt into textbook `u`, `y`, and `x`
+ports through constructor options.
+
+```python
+from minilink.core.system import StaticSystem
+
+
+class PDController(StaticSystem):
+    def __init__(self):
+        super().__init__()
+        self.params = {"kp": 10.0, "kd": 1.0}
+        self.add_input_port("r", nominal_value=0.0, labels=["reference"])
+        self.add_input_port("y", labels=["theta", "theta_dot"], units=["rad", "rad/s"])
+        self.add_output_port("u", function=self.ctl, dependencies=("r", "y"))
+
+    def ctl(self, x, u, t=0.0, params=None):
+        p = self.params if params is None else params
+        r, y = self.get_port_values_from_u(u, "r", "y")
+        return [p["kp"] * (r[0] - y[0]) - p["kd"] * y[1]]
 ```
 
 ## Install
@@ -86,8 +112,8 @@ Short summary—details and edge cases are in [DESIGN.md](DESIGN.md).
 - `minilink.planning`: deterministic planning problems, initial guesses, search,
   policy synthesis, and trajectory optimization.
 - `minilink.dynamics`: reusable plant abstractions and catalog models.
-- `minilink.graphical`: time-signal plotting, animation, diagram topology
-  export, graph display, and renderer backends.
+- `minilink.graphical`: time-signal, phase-plane, and diagram plotting plus
+  animation and renderer backends.
 
 ## Documentation
 
@@ -98,8 +124,8 @@ Short summary—details and edge cases are in [DESIGN.md](DESIGN.md).
 ## Examples And Benchmarks
 
 - `examples/scripts/`: runnable demos for diagrams, compilation, animation, and
-  JAX physics. See `examples/scripts/diagrams/demo_graphical_backends.py` for
-  the signal/topology backend options.
+  JAX physics. See `examples/scripts/plots/demo_graphical_backends.py` for the
+  signal and diagram backend options.
 - `tests/manual/`: one-off smoke tests and exploratory checks.
 - `tests/benchmark/`: flat benchmark runners using subsystem-local benchmark
   helpers such as `minilink.simulation.benchmark` and

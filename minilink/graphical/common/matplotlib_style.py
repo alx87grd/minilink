@@ -9,7 +9,7 @@ Shared matplotlib layout and typography defaults (Pyro-aligned where sensible).
 - Minilink grows stacked plot height with the number of rows so traces stay readable.
   In Jupyter/Colab that height is uncapped (scrollable output); in scripts and terminal
   IPython it is capped by :data:`TRAJECTORY_MAX_FIG_HEIGHT_POPUP` /
-  :data:`SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP` (see :func:`minilink.graphical.environment.allow_tall_stacked_figures`).
+  :data:`SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP` (see :func:`minilink.graphical.common.environment.allow_tall_stacked_figures`).
   Tune widths, row heights, and those caps as needed.
 
 Pyro uses ``default_fontsize = 5`` for dense print figures; Minilink uses a larger
