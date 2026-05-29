@@ -765,7 +765,7 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         self.outputs = {}
         self.add_output_port(12, "y", function=self.h, dependencies=[])
-        # self.add_output_port(1, "logs", function=self.logs_generator, dependencies=[])
+        self.add_output_port(1, "logs", function=self.logs_generator, dependencies=[])
 
         self.state.labels = [
             "X",
@@ -806,11 +806,21 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         self.engine_tau = 0.25
         self.steering_tau = 0.15
 
-    # def logs_generator(
-    #     self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
-    # ) -> np.ndarray:
+    def logs_generator(
+        self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
+    ) -> np.ndarray:
 
-    #     return
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(x, u)
+
+        Fz_f = self.mass * self.gravity * (self.b / self.L)
+        Fz_r = self.mass * self.gravity * (self.a / self.L)
+
+        # Fx_rear, Fy_rear = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
+
+        alpha, kappa = self.tire_model_r.vel2slip(vx_r, vy_r, w_r, self.r_r)
+        Fx, Fy = self.tire_model_r.slip2forces(alpha, kappa, Fz_r)
+
+        return np.array([kappa], dtype=float)
 
     def x2q(self, x):
         """

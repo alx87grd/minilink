@@ -553,6 +553,7 @@ class System:
         dt=None,
         solver=None,
         show=False,
+        time_axis=True,
         x0=None,
         compile_backend="numpy",
         verbose=True,
@@ -593,8 +594,10 @@ class System:
         traj = sim.solve()
 
         if show:
-            plot_time_signals(self, traj)
-
+            if time_axis:
+                plot_time_signals(self, traj)
+            # else:
+            #     plot_data_signals(self, traj)
         self.traj = traj
 
         return traj
@@ -663,6 +666,31 @@ class System:
 
         return traj
 
+    def plot_data(
+        self, traj=None, *, signals=("x", "u"), backend="matplotlib", show=True
+    ):
+        """
+        Plot the sampled non-time signals of the trajectory.
+        """
+        from minilink.graphical.plotting import plot_time_signals
+
+        if traj is not None:
+            return plot_data_signals(
+                self, traj, signals=signals, backend=backend, show=show
+            )
+
+        if self.traj is not None:
+            return plot_data_signals(
+                self,
+                self.traj,
+                signals=signals,
+                backend=backend,
+                show=show,
+            )
+
+        # If la trajectoire n'a jamais ete calculer
+        return self.compute_trajectory(signals=signals, plot_backend=backend, show=show)
+
     def plot_trajectory(
         self,
         traj=None,
@@ -699,7 +727,11 @@ class System:
 
         if self.traj is not None:
             return plot_time_signals(
-                self, self.traj, signals=signals, backend=backend, show=show
+                self,
+                self.traj,
+                signals=signals,
+                backend=backend,
+                show=show,
             )
 
         return self.compute_trajectory(signals=signals, plot_backend=backend, show=show)

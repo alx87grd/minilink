@@ -16,7 +16,9 @@ class MatplotlibSignalBackend(SignalPlotBackend):
     name = "matplotlib"
     supports_live = True
 
-    def render(self, spec: SignalPlotSpec, *, show: bool = True, **kwargs) -> PlotResult:
+    def render(
+        self, spec: SignalPlotSpec, *, show: bool = True, **kwargs
+    ) -> PlotResult:
         fig, axes, _ = _create_figure(spec, show=show, **kwargs)
         return PlotResult(
             backend=self.name,

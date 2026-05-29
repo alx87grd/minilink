@@ -21,7 +21,9 @@ import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem, System
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle_ALEXS_THINGS import (
+    DynamicBicycle,
+)
 from minilink.graphical.primitives import (
     Arrow,
     CustomLine,

@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.compile.jax_utils import require_jax_numpy
@@ -10,31 +9,26 @@ class TireModel:
     def __init__(self, logs=False):
         self.v_min_epsilon = 0.1
 
-        # TODO:ENLEVER
         self.logs = logs
-        self.kappa = []
-        self.alpha = []
 
     def vel2slip(self, vx, vy, w, R):
         """Compute longitudinal and lateral slip"""
 
-        # TODO: VERIF Changement ici
+        # Autre ddefinition de slip qui pourrait etre utilise
 
         # Adjusted longitudinal velocity to avoid division by zero
         # vx_adj = np.abs(vx) + self.v_min_epsilon
-
-        wr = w * R
-        # robust denominator (physically meaningful)
-        denom = np.maximum(np.maximum(np.abs(vx), np.abs(wr)), self.v_min_epsilon)
-
+        # Longitudinal slip ratio (kappa)
+        # kappa = (w * R - vx) / vx_adj
         # Lateral slip angle (alpha)
         # alpha = -np.arctan(vy / vx_adj)
         # alpha = -np.arctan2(vy, vx_adj)
 
+        wr = w * R
+        denom = np.maximum(np.maximum(np.abs(vx), np.abs(wr)), self.v_min_epsilon)
+
         alpha = -np.arctan2(vy, np.maximum(np.abs(vx), self.v_min_epsilon))
 
-        # Longitudinal slip ratio (kappa)
-        # kappa = (w * R - vx) / vx_adj
         kappa = (wr - vx) / denom
 
         if self.logs:
@@ -42,6 +36,10 @@ class TireModel:
                 print(
                     f"WARNING: |kappa| > 1 -> vx={vx:.2f}, wr={wr:.2f}, w={w:.2f}, kappa={kappa:.4f}"
                 )
+            # if np.abs(alpha) > np.pi / 2:
+            #     print(
+            #         f"WARNING: |alpha| > pi/2 -> vx={vx:.2f}, vy={vy:.2f}, alpha={alpha:.4f}"
+            #     )
 
         return alpha, kappa
 
@@ -127,9 +125,12 @@ class Pacejka(TireModel):
         # Pour cosine weighting function
         self.mu = 1.0
 
-        # Logs
+        # ==================================================================================== ENLEVER ====================================================================================
+
+        self.kappa_log = []
+        self.alpha_log = []
         self.Fx_log = []
-        self.Fz = 1.0
+        self.Fy_log = []
 
     def Gxa(self, k, a):
         B = self.r_Bx1 * np.cos(np.arctan(self.r_Bx2 * k)) * self.lambda_ya
@@ -191,84 +192,19 @@ class Pacejka(TireModel):
         Fy = mf(alpha, self.By, self.Cy, self.Dy, self.Ey, Fz)
 
         Fx, Fy = self.combined_slip(Fx, Fy, kappa, alpha, Fz, mode=None)
-        # Logs
-        # if self.logs:
-        #     self.kappa.append(kappa)
-        #     self.alpha.append(alpha)
-        #     self.Fx_log.append(Fx)
-        #     self.Fz = Fz
+
+        # ==================================================================================== ENLEVER ====================================================================================
+        if self.logs:
+            self.kappa_log.append(kappa)
+            self.alpha_log.append(alpha)
+            self.Fx_log.append(Fx)
+            self.Fz = Fz
 
         return Fx, Fy
 
 
 def main():
-
-    # -----------------------------
-    # Parameters
-    # -----------------------------
-    mu = 1.0
-    Fz = 3000.0  # example normal load [N]
-
-    # Example raw tire forces before saturation
-    Fx_raw = 2800.0
-    Fy_raw = 2200.0
-
-    # -----------------------------
-    # Friction circle saturation
-    # -----------------------------
-    F_max = mu * Fz
-    F_total = np.sqrt(Fx_raw**2 + Fy_raw**2)
-
-    Fx_sat = Fx_raw
-    Fy_sat = Fy_raw
-
-    if F_total > F_max:
-        ratio = F_max / F_total
-        Fx_sat *= ratio
-        Fy_sat *= ratio
-
-    # -----------------------------
-    # Circle points
-    # -----------------------------
-    theta = np.linspace(0, 2 * np.pi, 400)
-    Fx_circle = F_max * np.cos(theta)
-    Fy_circle = F_max * np.sin(theta)
-
-    # -----------------------------
-    # Plot
-    # -----------------------------
-    plt.figure(figsize=(7, 7))
-
-    # Friction circle
-    plt.plot(
-        Fx_circle, Fy_circle, label=r"Friction circle: $F_x^2 + F_y^2 = (\mu F_z)^2$"
-    )
-
-    # Axes
-    plt.axhline(0, color="black", linewidth=0.8)
-    plt.axvline(0, color="black", linewidth=0.8)
-
-    # Raw force vector
-    plt.plot([0, Fx_raw], [0, Fy_raw], "--", color="red", alpha=0.7)
-    plt.scatter(Fx_raw, Fy_raw, color="red", s=80, label="Raw force")
-
-    # Saturated force vector
-    plt.plot([0, Fx_sat], [0, Fy_sat], "-", color="green", alpha=0.8)
-    plt.scatter(Fx_sat, Fy_sat, color="green", s=80, label="Saturated force")
-
-    # Optional projection line
-    plt.plot([Fx_raw, Fx_sat], [Fy_raw, Fy_sat], ":", color="gray", alpha=0.8)
-
-    plt.gca().set_aspect("equal", adjustable="box")
-    plt.xlim(-1.2 * F_max, 1.2 * F_max)
-    plt.ylim(-1.2 * F_max, 1.2 * F_max)
-
-    plt.xlabel(r"$F_x$ [N]")
-    plt.ylabel(r"$F_y$ [N]")
-    plt.title("Friction Circle")
-    plt.grid(True)
-    plt.legend()
-    plt.show()
+    return None
 
 
 if __name__ == "__main__":

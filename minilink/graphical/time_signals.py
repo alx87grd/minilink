@@ -114,7 +114,9 @@ def build_sampled_signals(sys, traj, requested: tuple[str, ...]) -> SampledSigna
     plotting-friendly view with labels and units.
     """
     traj = _with_requested_internal_signals(sys, traj, requested)
+
     t = np.asarray(traj.t, dtype=float)
+
     signals: dict[str, SampledSignal] = {}
 
     signals["x"] = SampledSignal(
@@ -145,6 +147,7 @@ def build_sampled_signals(sys, traj, requested: tuple[str, ...]) -> SampledSigna
     return SampledSignals(t=t, signals=signals)
 
 
+# TODO: YOOO FAUT CHANGER LE SIGNAL PLOT ICI
 def build_signal_plot_spec(
     sys,
     traj,
@@ -181,6 +184,13 @@ def build_signal_plot_spec(
     if not traces:
         raise ValueError("No signal components were selected for plotting.")
 
+    # ============================================= YOOOOOOOOOOOOOOO =============================================
+    # IF x_axis is not TIME
+    # if ARBITRARY_X_AXIS:
+    # X_AXIS = TRACES[LE NOM DE LA TACE QUI ES PASSER EN ARGUMENT?]
+    # (DANS CE CAS ON N'AURAIT PAS BESOIN DE ARBITRARY_X_AXIS JUSTE VOIR SI LE NOM EST NONE??)
+    # ELSE:
+    #   X_AXIS = sampled.t
     return SignalPlotSpec(
         title=title or f"Time signals for {sys.name}",
         t=sampled.t,
@@ -200,6 +210,24 @@ def plot_time_signals(
     """Plot sampled time signals with the selected backend."""
     spec = build_signal_plot_spec(sys, traj, signals=signals)
     return _resolve_signal_backend(backend).render(spec, show=show, **kwargs)
+
+
+def plot_data_signals(
+    sys,
+    traj,
+    *,
+    signals: tuple[str, ...] = ("x", "u"),
+    backend="matplotlib",
+    show: bool = True,
+    **kwargs,
+) -> PlotResult:
+    """Plot sampled time signals with the selected backend."""
+    from minilink.graphical.signal_backends.matplotlib_backend import (
+        MatplotlibSignalBackend,
+    )
+
+    spec = build_signal_plot_spec(sys, traj, signals=signals)
+    return MatplotlibSignalBackend.render(spec=spec, show=show, **kwargs)
 
 
 def open_time_signal_plot(

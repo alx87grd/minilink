@@ -103,7 +103,6 @@ def main():
     diagram.compute_trajectory(
         tf=10.0,
         dt=0.005,
-        show=False,
         verbose=False,
     )
 
@@ -111,8 +110,8 @@ def main():
 
     tire = vehicle.tire_model_r
 
-    kappa_sim = np.array(tire.kappa)
-    alpha_sim = np.array(tire.alpha)
+    kappa_sim = np.array(tire.kappa_log)
+    alpha_sim = np.array(tire.alpha_log)
     Fx_sim = np.array(tire.Fx_log)
 
     x = np.linspace(np.min(kappa_sim), np.max(kappa_sim), 20000)
@@ -173,13 +172,15 @@ def main():
     plt.show()
 
     diagram.plot_trajectory(
-        signals=("speed_meas:meas", "v_ref:ref"),
+        signals=("vehicle:logs", "v_ref:ref"),
         backend="matplotlib",
     )
 
-    attach_vehicle_centered_diagram_camera(diagram, vehicle)
+    diagram.plot_data()
 
-    diagram.animate(renderer="matplotlib")
+    # attach_vehicle_centered_diagram_camera(diagram, vehicle)
+
+    # diagram.animate(renderer="matplotlib")
 
 
 if __name__ == "__main__":

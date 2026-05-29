@@ -99,40 +99,6 @@ def main():
 
     print("Trajectory computation done.")
 
-    tire = vehicle.tire_model_r
-
-    kappa_sim = np.array(tire.kappa)
-    alpha_sim = np.array(tire.alpha)
-    Fx_sim = np.array(tire.Fx_log)
-
-    x = np.linspace(np.min(kappa_sim), np.max(kappa_sim), 20000)
-
-    Fx_model = (
-        tire.Dx
-        * tire.Fz
-        * np.sin(
-            tire.Cx
-            * np.arctan(tire.Bx * x - tire.Ex * (tire.Bx * x - np.arctan(tire.Bx * x)))
-        )
-    )
-
-    import matplotlib.pyplot as plt
-
-    plt.figure()
-
-    # Magic Formula curve
-    plt.plot(x, Fx_model, label="Magic Formula", linewidth=1, color="red")
-
-    # Simulation data
-    plt.scatter(kappa_sim, Fx_sim, s=5, alpha=0.3, label="Simulation")
-
-    plt.xlabel("Slip ratio κ")
-    plt.ylabel("Longitudinal Force Fx")
-    plt.title("Slip vs Magic Formula Comparison")
-    plt.grid(True)
-    plt.legend()
-    plt.show()
-
     diagram.plot_trajectory(
         signals=("x", "u"),
         backend="matplotlib",
