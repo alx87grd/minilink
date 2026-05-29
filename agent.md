@@ -58,13 +58,15 @@ unless the helper is a public boundary.
 - Comments stay plain and sparse; add them only where they clarify non-obvious
   logic.
 - Do not add new markdown guides unless asked. Prefer updating `README.md`,
-  `DESIGN.md`, `ROADMAP.md`, or this file.
+  `DESIGN.md`, `ROADMAP.md`, `flows.md`, or this file.
 
 ## 3. Architecture And Contracts
 
 Canonical contracts (`System`, `DiagramSystem`, `Trajectory`, sets/costs,
 compilation, simulation, optimization, planning) live in [DESIGN.md](DESIGN.md)
-§3–5. Update those sections when you change public behavior.
+§4–6. User workflows and the easy-vs-lower-level interface are in
+[README.md](README.md); call-path details are in [flows.md](flows.md). Update
+those sections when you change public behavior.
 
 Quick reminders (details in DESIGN):
 

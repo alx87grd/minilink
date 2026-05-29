@@ -28,7 +28,58 @@ add a `Jax<Plant>` twin in the same module only when trajectory optimization, JI
 rollouts, or differentiable physics need traceable dynamics. Do not add a global
 backend switch or a `minilink.jax` package.
 
-## 2. Package Map
+## 2. User-Facing Interface Layers
+
+Minilink exposes three layers. [README.md](README.md) is the primary user guide;
+[flows.md](flows.md) maps each high-level call to the implementing modules.
+
+### Layer 1 — System facades (default)
+
+`System` and `DiagramSystem` inherit the same convenience methods:
+
+- simulation: `compute_trajectory`, `compute_forced`;
+- visualization: `plot_trajectory`, `plot_phase_plane`, `plot_diagram`,
+  `render`, `animate`, `game`;
+- compilation: `compile`;
+- composition operators: `+`, `>>`, `@`.
+
+These methods lazy-import simulation and graphics. They store the latest rollout
+on `self.traj` but do not change equation semantics.
+
+**Default simulation entry point:** `compute_trajectory(...)`, not direct
+`Simulator` construction. Facades default to `compile_backend="numpy"` for
+predictable behavior; pass `compile_backend="auto"` or `"jax"` when needed.
+
+### Layer 2 — Subsystem orchestrators
+
+Use when facades are too thin:
+
+- `minilink.simulation.simulator.Simulator` — time grid, solver backend, repeated
+  rollouts, `solve_forced`;
+- `minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
+  — problem → transcription → NLP → trajectory;
+- `minilink.optimization.optimizer.Optimizer` — bound NLP solver with method
+  presets.
+
+### Layer 3 — Explicit contracts
+
+Use for custom topology, performance work, or library extension:
+
+- `DiagramSystem.add_subsystem` / `connect` / `connect_new_output_port`;
+- `minilink.compile.compiler.compile` and `DynamicsEvaluator` tiers;
+- `MathematicalProgram`, transcriptions, sets, and costs as pure descriptions.
+
+Composition shortcuts in `minilink.core.composition` (`add_systems`, `series`,
+`closed_loop`, `autowire`) return ordinary `DiagramSystem` objects and remain
+optional sugar over Layer 3.
+
+### Imports
+
+Top-level `minilink/__init__.py` is currently a namespace marker. Import symbols
+from their defining modules until curated exports land (see [ROADMAP.md](ROADMAP.md)
+P1).
+
+## 3. Package Map
 
 | Package | Status | Role |
 | --- | --- | --- |
@@ -153,7 +204,7 @@ minilink/
     pendulum_pd.py
 ```
 
-## 3. Core Object Contracts
+## 4. Core Object Contracts
 
 ### `System`
 
@@ -334,7 +385,7 @@ Cost contract:
 Simple algebraic sets and costs should be single backend-native classes. Do not
 add `Jax<Cost>` or `Jax<Set>` twins when ordinary array math is traceable.
 
-## 4. Compilation And Simulation
+## 5. Compilation And Simulation
 
 ### Dynamics Compilation
 
@@ -358,14 +409,20 @@ Backend strings are centralized in `minilink.compile.backend_policy`:
 
 ### Simulation
 
-The public simulation path is:
+**Primary user API:** `System.compute_trajectory(...)` and
+`System.compute_forced(...)`. These are thin wrappers around
+`minilink.simulation.simulator.Simulator` and are the recommended entry point
+for scripts and notebooks.
+
+Lower-level path (same execution chain):
 
 ```text
 System / DiagramSystem -> compile -> DynamicsEvaluator -> Simulator -> Trajectory
 ```
 
-`System.compute_trajectory(...)` and `System.compute_forced(...)` are thin
-convenience wrappers around `Simulator`.
+Direct `Simulator(...)` construction remains appropriate when one integrator
+object should run multiple rollouts, expose solver internals, or avoid writing
+`sys.traj`.
 
 Simulation policy:
 
@@ -376,10 +433,13 @@ Simulation policy:
 - `Simulator(..., compile_backend="auto")` may try JAX and fall back to NumPy;
 - high-level `System` shortcuts default to NumPy for predictability.
 
-Solver presets currently include fixed-step Euler/RK4 and SciPy IVP variants.
-A clearer solver-options object is planned.
+Solver presets include `"scipy"`, `"scipy_stiff"`, `"scipy_max"`,
+`"scipy_ultra"`, `"scipy_lsoda"`, `"euler"`, and `"rk4_fixedsteps"`. When
+`solver` is omitted, `Simulator.select_solver` chooses based on system metadata
+and compile backend. A dedicated `SimulationOptions`-style object is planned
+(see [ROADMAP.md](ROADMAP.md) P1).
 
-## 5. Optimization And Planning
+## 6. Optimization And Planning
 
 ### Mathematical Programs
 
@@ -445,11 +505,15 @@ There are no parallel JAX transcription classes. Direct collocation, shooting,
 and multiple shooting should stay single public transcription classes whenever
 their equations can be written backend-natively.
 
-## 6. Graphics, Benchmarks, And Style
+## 7. Graphics, Benchmarks, And Style
 
-Graphics: time-signal plotting, phase-plane plotting, diagram topology export,
-and animation live in `graphical`; `System.render` / `animate` / `game` are
-facades. Time plots use explicit signal names such as `signals=("x", "u")`.
+Graphics: time-signal plotting, phase-plane plotting (`System.plot_phase_plane`
+and `minilink.graphical.phase_plane`), diagram topology export, and animation
+live in `graphical`; `System.render` / `animate` / `game` are facades. Time
+plots use explicit signal names such as `signals=("x", "u")`. Phase-plane plots
+evaluate `sys.f` on a 2D state grid with optional `Trajectory` overlay;
+matplotlib is the default phase-plane backend.
+
 Backends consume derived views (`SignalPlotSpec` for time data,
 `PhasePlaneSpec` for phase-plane vector fields, and `DiagramTopology` for
 display topology) so `Trajectory` and `DiagramSystem` remain the source objects.

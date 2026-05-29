@@ -1,7 +1,8 @@
 # Custom System Ports Implementation Plan
 
 **Status:** Implemented as the explicit port API cleanup.  
-**Related:** [DESIGN.md](../../DESIGN.md) `System` contract and [ROADMAP.md](../../ROADMAP.md) P2 diagram ergonomics.
+**Related:** [DESIGN.md](../../DESIGN.md) §4 `System` contract, [README.md](../../README.md)
+(custom block examples), and [ROADMAP.md](../../ROADMAP.md) P2 diagram ergonomics.
 
 ## Final Direction
 

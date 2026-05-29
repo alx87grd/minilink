@@ -4,7 +4,10 @@
 
 ### Project overview
 
-minilink is a pure Python library (no external services, databases, or web servers). See `README.md` for capabilities and `DESIGN.md` for architecture.
+minilink is a pure Python library (no external services, databases, or web servers).
+See [README.md](README.md) for user workflows, the easy interface
+(`compute_trajectory`, facades, composition shortcuts), and lower-level APIs.
+See [DESIGN.md](DESIGN.md) for architecture and [flows.md](flows.md) for call paths.
 
 ### Environment
 

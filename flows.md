@@ -4,6 +4,9 @@ This file maps the main user-facing flows to the objects and functions that
 actually execute them. It is intentionally implementation-facing: when a call
 path feels indirect, start here before jumping through modules.
 
+For the recommended user-facing workflow and import paths, see
+[README.md](README.md). Architecture contracts live in [DESIGN.md](DESIGN.md).
+
 ## Package Boundaries
 
 ```text
@@ -95,7 +98,7 @@ Shortcut wiring:
 
 ```text
 sys_a + sys_b
-  -> minilink.core.composition.parallel()
+  -> minilink.core.composition.add_systems()
   -> DiagramSystem with independent subsystems
 
 sys_a >> sys_b
@@ -105,7 +108,18 @@ sys_a >> sys_b
 controller @ plant
   -> minilink.core.composition.closed_loop()
   -> DiagramSystem with r/y/u closed-loop convention
+
+diagram.autowire(strict=False)
+  -> minilink.core.composition.autowire()
+  -> fills unconnected inputs when exactly one safe source matches
 ```
+
+Notes:
+
+- `DiagramSystem.connection_verbose` defaults to `True` and prints each
+  `connect()` call. Set it to `False` for quiet wiring in scripts.
+- Shortcuts do not merge two existing diagrams with `+` or connect into a
+  nested `DiagramSystem` with `>>`.
 
 Objects produced:
 
@@ -155,10 +169,17 @@ Runtime evaluator responsibilities:
 
 ## 4. Standard Simulation
 
-User call:
+Primary user call:
 
 ```python
 traj = sys.compute_trajectory(tf=10.0, dt=0.01)
+```
+
+Lower-level equivalent:
+
+```python
+from minilink.simulation.simulator import Simulator
+traj = Simulator(sys, tf=10.0, dt=0.01).solve()
 ```
 
 Flow:
@@ -467,47 +488,67 @@ Current limitation:
 - Future live input and integration backends should sit beside renderers, not
   inside `System`.
 
-## 12. Planning Result Plotting And Animation
+## 12. Trajectory Optimization
 
-User calls:
+User call:
 
 ```python
-result = planner.compute_solution()
-planner.plot_solution(signals=("x", "u"))
-planner.animate_solution(renderer="plotly")
+planner = TrajectoryOptimizationPlanner(problem, transcription=..., options=...)
+traj = planner.compute_solution()
 ```
 
 Flow:
 
 ```text
-Planner.compute_solution()
-  -> concrete planner/transcription/search implementation
-  -> _store_result(result)
-  -> planner.last_result
+TrajectoryOptimizationPlanner.compute_solution()
+  -> transcription.transcribe(problem, compile_backend=...)
+      -> MathematicalProgram
+  -> pack_initial_guess(problem, guess)
+  -> Optimizer(program, z0, method=..., compile_backend=...)
+  -> Optimizer.solve(callback=...)
+  -> transcription.unpack_solution(problem, result)
+  -> Trajectory
+  -> planner.last_result / iteration_history
+```
 
+Plotting and animation reuse the problem system's facades:
+
+```text
+planner.plot_solution(signals, backend)
+  -> problem.sys.plot_trajectory(last_result, ...)
+
+planner.animate_solution(**kwargs)
+  -> problem.sys.animate(last_result, ...)
+```
+
+Live callback during optimization:
+
+```text
+LiveTrajectoryPlotCallback(iteration)
+  -> open_time_signal_plot(problem.sys, iteration.trajectory, ...)
+  -> LivePlotHandle.update(...)
+```
+
+## 13. Base Planner Delegation
+
+All concrete planners inherit from `minilink.planning.planner.Planner`. After
+`compute_solution()`, result plotting and animation delegate to the problem
+system's normal facades:
+
+```text
 Planner.plot_solution(signals, backend)
   -> require_result()
-  -> problem.sys.plot_trajectory(result, signals, backend)
-  -> normal time-signal plotting flow
+  -> problem.sys.plot_trajectory(last_result, signals, backend)
 
 Planner.animate_solution(**kwargs)
   -> require_result()
-  -> problem.sys.animate(result, **kwargs)
-  -> normal trajectory animation flow
+  -> problem.sys.animate(last_result, **kwargs)
 ```
 
-Live trajectory-optimization callback:
+Search and policy-synthesis planners follow the same delegation pattern once they
+store a trajectory or policy result.
 
-```text
-LiveTrajectoryPlotCallback.__call__(iteration)
-  -> if first plotted iteration:
-       open_time_signal_plot(problem sys, iteration.trajectory, signals, backend)
-       -> LivePlotHandle
-  -> handle.update(iteration.trajectory, title=iteration/cost/constraint summary)
-  -> optional matplotlib pause
-```
-
-## 13. Optional Show Flags And Return Types
+## 14. Optional Show Flags And Return Types
 
 Common pattern:
 
