@@ -1,132 +1,57 @@
 # minilink
 
-`minilink` is a Python-native block-diagram framework for modeling,
-compiling, simulating, optimizing, and visualizing dynamical systems.
+Python-native block-diagram framework for modeling, simulating, optimizing, and
+visualizing dynamical systems.
 
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
-Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing
+Colab: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing
 
-## What It Is
+## Quick start
 
-- **Readable dynamical systems**: write equations as `f(x, u, t, params)` and
-  outputs as `h(x, u, t, params)`.
-- **Named-port diagrams**: compose MIMO blocks with explicit input and output
-  ports.
-- **Compiled evaluators**: turn leaves and diagrams into flat NumPy or JAX
-  `DynamicsEvaluator` objects through `ExecutionPlan`.
-- **Simulation and trajectories**: use `Simulator` or `System.compute_trajectory`
-  to produce the canonical `Trajectory(t, x, u, signals)`.
-- **Optimization and planning**: describe finite-dimensional NLPs with pure
-  `MathematicalProgram` objects; trajectory optimization transcribes planning
-  problems into that same optimization layer.
-- **Visualization**: plot sampled time signals and phase-plane vector fields,
-  animate, render, and inspect diagrams through the optional graphical layer.
-
-## Quick Start
+Compose → simulate → plot on one object. No manual `compile()` for everyday work.
 
 ```python
-from minilink.core.blocks.basic import Integrator, PropController
+from minilink.core.blocks.basic import Integrator
 from minilink.core.blocks.sources import Step
-from minilink.simulation.simulator import Simulator
 
 diagram = Step() >> Integrator()
-
-traj = Simulator(diagram, tf=10.0).solve()
-diagram.plot_trajectory(traj, signals=("x", "u"), backend="matplotlib")
+traj = diagram.compute_trajectory(tf=10.0)
+diagram.plot_trajectory(traj, signals=("x", "u"))
 ```
 
-Shortcuts build ordinary `DiagramSystem` objects. Use the explicit diagram API
-when the topology is not a simple series or control loop.
+Closed loop: `Controller() @ Plant()` (`r`, `y`, `u` ports). Catalog plants:
+`minilink.dynamics.catalog.*`. Demos: `examples/scripts/`.
 
-```python
-diagram = Step() >> Integrator()          # series y -> u
-closed = PropController() @ Integrator()  # r/y/u closed-loop convention
-```
+## Easy interface
 
-Custom blocks declare named ports explicitly. Base `System` and `StaticSystem`
-start with no ports; `DynamicSystem` can opt into textbook `u`, `y`, and `x`
-ports through constructor options.
+| Goal | Call |
+| --- | --- |
+| Simulate / force | `compute_trajectory(...)`, `compute_forced(u, ...)` |
+| Plot / phase / diagram | `plot_trajectory`, `plot_phase_plane`, `plot_diagram` |
+| Animate | `animate(traj)` |
+| Compose | `+`, `>>`, `@`, `.autowire()` |
 
-```python
-from minilink.core.system import StaticSystem
-
-
-class PDController(StaticSystem):
-    def __init__(self):
-        super().__init__()
-        self.params = {"kp": 10.0, "kd": 1.0}
-        self.add_input_port("r", nominal_value=0.0, labels=["reference"])
-        self.add_input_port("y", labels=["theta", "theta_dot"], units=["rad", "rad/s"])
-        self.add_output_port("u", function=self.ctl, dependencies=("r", "y"))
-
-    def ctl(self, x, u, t=0.0, params=None):
-        p = self.params if params is None else params
-        r, y = self.get_port_values_from_u(u, "r", "y")
-        return [p["kp"] * (r[0] - y[0]) - p["kd"] * y[1]]
-```
+Results cache on `sys.traj`. Lower level when needed: `Simulator`, `compile()`,
+explicit `DiagramSystem.connect` — see [flows.md](flows.md).
 
 ## Install
 
-Core install:
-
 ```bash
 pip install minilink
+pip install "minilink[jax]" "minilink[plotting]" "minilink[visualization]"  # optional
+pip install -e ".[dev]" && pytest   # dev clone
 ```
 
-Optional extras:
+Requires system `graphviz` for diagrams. Import from defining modules (no top-level
+re-exports yet), e.g. `minilink.core.system`, `minilink.core.blocks.basic`.
 
-```bash
-pip install "minilink[jax]"            # JAX evaluators, JIT, autodiff
-pip install "minilink[visualization]"  # meshcat / pygame renderers
-pip install "minilink[plotting]"       # Plotly signal plots and notebook renderer
-pip install "minilink[symbolic]"       # SymPy mechanics helpers
-pip install "minilink[ipopt]"          # Ipopt optimizer adapter
-```
+## Docs
 
-## Current Design Rules
+- [DESIGN.md](DESIGN.md) — principles and contracts
+- [flows.md](flows.md) — minimal call chains
+- [ROADMAP.md](ROADMAP.md) — maturity and priorities
+- [agent.md](agent.md) — maintainer / agent rules
 
-Short summary—details and edge cases are in [DESIGN.md](DESIGN.md).
-
-- **NumPy baseline, JAX optional**: choose backends explicitly (`compile_backend`,
-  evaluator backends); vocabulary in `minilink.compile.backend_policy`.
-- **Native-array equation paths** (`System`, ports, sets/costs, programs):
-  preserve the active backend; Python floats and forced NumPy conversion belong at
-  boundaries (evaluators, solvers, plotting, sampling helpers).
-- **Prefer one readable class** for simple algebra; optional `Jax<X>` twins only
-  when one implementation cannot stay traceable for both backends.
-- **`params is None`** uses object defaults; any other `params` value overrides—
-  never treat empty dicts as falsy for “use defaults.”
-
-## Main Packages
-
-- `minilink.core`: `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs,
-  and basic blocks.
-- `minilink.compile`: `ExecutionPlan`, backend policy, NumPy/JAX dynamics
-  evaluators.
-- `minilink.simulation`: `Simulator`, solver backends, forced-input utilities,
-  simulation benchmarks.
-- `minilink.optimization`: pure `MathematicalProgram`, program evaluators, and
-  optimizer method presets such as `scipy_slsqp`, `scipy_trust_constr`, and
-  `ipopt`.
-- `minilink.planning`: deterministic planning problems, initial guesses, search,
-  policy synthesis, and trajectory optimization.
-- `minilink.dynamics`: reusable plant abstractions and catalog models.
-- `minilink.graphical`: time-signal, phase-plane, and diagram plotting plus
-  animation and renderer backends.
-
-## Documentation
-
-- [DESIGN.md](DESIGN.md): current architecture and public contracts.
-- [ROADMAP.md](ROADMAP.md): active priorities and subsystem maturity.
-- [agent.md](agent.md): maintainer and AI-agent contribution rules.
-
-## Examples And Benchmarks
-
-- `examples/scripts/`: runnable demos for diagrams, compilation, animation, and
-  JAX physics. See `examples/scripts/plots/demo_graphical_backends.py` for the
-  signal and diagram backend options.
-- `tests/manual/`: one-off smoke tests and exploratory checks.
-- `tests/benchmark/`: flat benchmark runners using subsystem-local benchmark
-  helpers such as `minilink.simulation.benchmark` and
-  `minilink.optimization.benchmark`.
+Design rules: NumPy baseline, explicit JAX; native-array equation paths;
+`params is None` → defaults (never `params or self.params`).
