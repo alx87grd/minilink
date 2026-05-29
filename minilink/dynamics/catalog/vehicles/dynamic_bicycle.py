@@ -84,23 +84,21 @@ class DynamicBicycle(DynamicSystem):
     """
 
     def __init__(self):
-        super().__init__(n=6, m=2, p=6)
+        super().__init__(n=6)
 
         self.name = "Dynamic Bicycle"
 
         self.state.labels = ["x", "y", "theta", "u", "v", "r"]
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
 
-        self.inputs = {}
-        self.add_input_port(1, "w_rear", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "delta", nominal_value=np.array([0.0]))
-        self.inputs["w_rear"].labels = ["w_rear"]
-        self.inputs["w_rear"].units = ["rad/s"]
-        self.inputs["delta"].labels = ["delta"]
-        self.inputs["delta"].units = ["rad"]
+        self.add_input_port(
+            "w_rear", nominal_value=0.0, labels=["w_rear"], units=["rad/s"]
+        )
+        self.add_input_port(
+            "delta", nominal_value=0.0, labels=["delta"], units=["rad"]
+        )
 
-        self.outputs = {}
-        self.add_output_port(6, "y", function=self.h, dependencies=[])
+        self.add_output_port("y", dim=6, function=self.h, dependencies=())
 
         self.a = 1.0
         self.b = 1.0
@@ -196,9 +194,8 @@ class DynamicBicycle(DynamicSystem):
     ) -> np.ndarray:
         q = x[0:3]
         v = x[3:6]
-        u_in = np.array(
-            [self.u2input_signal(u, "w_rear")[0], self.u2input_signal(u, "delta")[0]]
-        )
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        u_in = np.array([w_rear[0], delta[0]])
 
         M = self.M_mat(q)
         C = self.C_mat(q, v)
@@ -247,9 +244,8 @@ class DynamicBicycle(DynamicSystem):
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
         vb = x[3:6]
-        u_in = np.array(
-            [self.u2input_signal(u, "w_rear")[0], self.u2input_signal(u, "delta")[0]]
-        )
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        u_in = np.array([w_rear[0], delta[0]])
         delta = float(u_in[1])
 
         T_wb = pose2d_matrix(X, Y, Theta)
@@ -381,9 +377,8 @@ class DynamicBicycleCar3D(DynamicBicycle):
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
         vb = x[3:6]
-        u_in = np.array(
-            [self.u2input_signal(u, "w_rear")[0], self.u2input_signal(u, "delta")[0]]
-        )
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        u_in = np.array([w_rear[0], delta[0]])
         delta = float(u_in[1])
         tr = self.track
         z_body = float(self.r_r) + self.body_ground_clearance + 0.5 * self.body_height
@@ -664,9 +659,8 @@ class DynamicBicycleCar3DRealistic(DynamicBicycleCar3D):
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
         vb = x[3:6]
-        u_in = np.array(
-            [self.u2input_signal(u, "w_rear")[0], self.u2input_signal(u, "delta")[0]]
-        )
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        u_in = np.array([w_rear[0], delta[0]])
         delta = float(u_in[1])
         tr = self.track
 
@@ -878,9 +872,8 @@ class JaxDynamicBicycle(DynamicBicycle):
         jnp = require_jax_numpy()
         q = x[0:3]
         v = x[3:6]
-        u_in = jnp.array(
-            [self.u2input_signal(u, "w_rear")[0], self.u2input_signal(u, "delta")[0]]
-        )
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        u_in = jnp.array([w_rear[0], delta[0]])
 
         M = self.M_mat(q)
         C = self.C_mat(q, v)
@@ -913,19 +906,27 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
         self.n = 8
         self.m = 2
 
-        self.state = VectorSignal(self.n, "x")
+        self.state = VectorSignal("x", dim=self.n)
         self.x0 = np.zeros(self.n)
 
         self.state.labels = ["x", "y", "theta", "u", "v", "r", "w_rear", "delta"]
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
 
         self.inputs = {}
-        self.add_input_port(1, "w_rear_dot", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "delta_dot", nominal_value=np.array([0.0]))
-        self.inputs["w_rear_dot"].labels = ["w_rear_dot"]
-        self.inputs["w_rear_dot"].units = ["rad/s^2"]
-        self.inputs["delta_dot"].labels = ["delta_dot"]
-        self.inputs["delta_dot"].units = ["rad/s^2"]
+        self.add_input_port(
+            "w_rear_dot",
+            nominal_value=0.0,
+            labels=["w_rear_dot"],
+            units=["rad/s^2"],
+        )
+        self.add_input_port(
+            "delta_dot",
+            nominal_value=0.0,
+            labels=["delta_dot"],
+            units=["rad/s^2"],
+        )
+        self.outputs = {}
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
 
     def f(self, x, u, t=0.0, params=None):
         jnp = require_jax_numpy()

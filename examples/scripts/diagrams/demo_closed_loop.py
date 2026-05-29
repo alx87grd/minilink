@@ -31,7 +31,7 @@ diagram.add_subsystem(sys, "plant")
 
 
 # Unconnected controller -> plant
-diagram.connect("step", "y", "controller", "ref")
+diagram.connect("step", "y", "controller", "r")
 diagram.name = "Pendulum alone"
 diagram.plot_graphe()
 diagram.compute_trajectory(tf=20)

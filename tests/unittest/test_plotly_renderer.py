@@ -26,12 +26,12 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
             self.assertTrue(hasattr(go, "Figure"))
 
     def test_make_renderer_accepts_plotly(self):
-        animator = Animator(DynamicSystem(1, 0, 1))
+        animator = Animator(DynamicSystem(1, output_dim=1, expose_state=True))
         backend = _make_renderer("plotly", animator)
         self.assertIsInstance(backend, PlotlyRenderer)
 
     def test_plotly_is_not_interactive_loop_backend(self):
-        sys = DynamicSystem(1, 0, 1)
+        sys = DynamicSystem(1, output_dim=1, expose_state=True)
         animator = Animator(sys)
 
         def update_callback(x, u, t, step_idx, events):
@@ -55,7 +55,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         pytest.importorskip("plotly")
 
     def test_static_2d_frame_builds_figure_without_showing(self):
-        sys = DynamicSystem(1, 1, 1)
+        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         x = np.array([0.5])
@@ -84,7 +84,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertEqual(tuple(fig.layout.yaxis.range), (-10.0, 10.0))
 
     def test_static_xy_camera_keeps_geometry_in_world_coordinates(self):
-        sys = DynamicSystem(0, 0, 0)
+        sys = DynamicSystem(0)
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         camera = camera_matrix(target=(10.0, 3.0, 0.0), scale=4.0)
@@ -109,7 +109,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(fig.data[0].y, dtype=float), [3.0])
 
     def test_static_3d_frame_builds_scatter3d(self):
-        sys = DynamicSystem(1, 1, 1)
+        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         frame = animator._prepare_transforms(np.array([0.5]), np.array([1.0]), 0.0)
@@ -133,7 +133,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertEqual(fig.layout.scene.aspectmode, "cube")
 
     def test_inline_animation_has_expected_frames(self):
-        sys = DynamicSystem(1, 1, 1)
+        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         traj = Trajectory(
             t=np.array([0.0, 0.1, 0.2]),
             x=np.array([[0.0, 0.1, 0.2]]),
@@ -155,7 +155,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertEqual(fig.layout.margin.b, PLOTLY_ANIMATION_2D_MARGIN["b"])
 
     def test_inline_animation_uses_fixed_camera_2d_axes(self):
-        sys = DynamicSystem(1, 0, 1)
+        sys = DynamicSystem(1, output_dim=1, expose_state=True)
         traj = Trajectory(
             t=np.array([0.0, 0.1, 0.2]),
             x=np.array([[0.0, 25.0, -5.0]]),
@@ -176,7 +176,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertIsNone(fig.frames[0].layout.xaxis.range)
 
     def test_inline_animation_updates_xy_camera_axis_ranges(self):
-        sys = DynamicSystem(0, 0, 0)
+        sys = DynamicSystem(0)
         backend = PlotlyRenderer(Animator(sys))
         frames = [
             {
@@ -212,7 +212,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         )
 
     def test_plotly_native_false_html_false_raises(self):
-        sys = DynamicSystem(1, 1, 1)
+        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         traj = Trajectory(
             t=np.array([0.0, 0.1]),
             x=np.array([[0.0, 0.1]]),
@@ -228,7 +228,7 @@ class TestPlotlyRenderer(unittest.TestCase):
             )
 
     def test_plotly_native_false_html_true_allowed(self):
-        sys = DynamicSystem(1, 1, 1)
+        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         traj = Trajectory(
             t=np.array([0.0, 0.1]),
             x=np.array([[0.0, 0.1]]),

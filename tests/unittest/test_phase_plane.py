@@ -16,7 +16,7 @@ from minilink.graphical.plotting import (  # noqa: E402
 
 class PhasePlaneTestSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(2, 1, 2)
+        super().__init__(n=2, input_dim=1, output_dim=2, y_dependencies=())
         self.name = "PhasePlaneTestSystem"
         self.state.labels = ["position", "velocity"]
         self.state.units = ["m", "m/s"]
@@ -30,7 +30,7 @@ class PhasePlaneTestSystem(DynamicSystem):
 
 class OneStateSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 0, 1)
+        super().__init__(n=1, output_dim=1, y_dependencies=())
         self.name = "OneStateSystem"
         self.state.lower_bound = np.array([-1.0])
         self.state.upper_bound = np.array([1.0])
@@ -41,7 +41,7 @@ class OneStateSystem(DynamicSystem):
 
 class UnboundedPlanarSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(2, 0, 2)
+        super().__init__(n=2, output_dim=2, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return np.array([x[1], -x[0]])

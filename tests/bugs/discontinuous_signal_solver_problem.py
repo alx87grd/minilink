@@ -45,7 +45,7 @@ diagram2.add_subsystem(sys, "plant")
 diagram2.add_subsystem(noise, "noise")
 diagram2.add_subsystem(noise2, "noise2")
 
-diagram2.connect("step", "y", "controller", "ref")
+diagram2.connect("step", "y", "controller", "r")
 diagram2.connect("controller", "u", "plant", "u")
 diagram2.connect("plant", "y", "controller", "y")
 diagram2.connect("noise", "y", "plant", "w")

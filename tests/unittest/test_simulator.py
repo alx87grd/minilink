@@ -21,10 +21,9 @@ def _have_jax() -> bool:
 
 class StableLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 1, 1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "StableLinearSystem"
         self.x0 = np.array([1.0])
-        self.inputs["u"].nominal_value = np.array([0.0])
 
     def f(self, x, u, t=0, params=None):
         xp = array_module(x)
@@ -37,12 +36,10 @@ class StableLinearSystem(DynamicSystem):
 
 class TwoPortLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 0, 1)
+        super().__init__(n=1, output_dim=1, y_dependencies=())
         self.name = "TwoPortLinearSystem"
-        self.inputs = {}
-        self.add_input_port(1, "left", nominal_value=np.array([1.0]))
-        self.add_input_port(1, "right", nominal_value=np.array([2.0]))
-        self.m = 2
+        self.add_input_port("left", nominal_value=1.0)
+        self.add_input_port("right", nominal_value=2.0)
         self.x0 = np.array([0.0])
 
     def f(self, x, u, t=0, params=None):

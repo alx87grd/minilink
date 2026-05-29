@@ -19,7 +19,7 @@ class TestGraphviz(unittest.TestCase):
         html = get_system_block_html(PropController(), "ctl")
 
         self.assertIn("Controller::ctl", html)
-        self.assertIn('PORT="ref"', html)
+        self.assertIn('PORT="r"', html)
         self.assertIn('PORT="u"', html)
 
     def test_system_graphe_contains_block_label(self):
@@ -41,7 +41,7 @@ class TestGraphviz(unittest.TestCase):
         self.assertIsNotNone(graph)
         self.assertIn("ctl", graph.source)
         self.assertIn("plant", graph.source)
-        self.assertIn("input:ref:e -> ctl:ref:w", graph.source)
+        self.assertIn("input:r:e -> ctl:r:w", graph.source)
         self.assertIn("output:y_meas:w", graph.source)
 
     def test_plot_graphviz_accepts_none_graph(self):
@@ -56,7 +56,7 @@ class TestGraphviz(unittest.TestCase):
             (edge.source_node, edge.source_port, edge.target_node, edge.target_port)
             for edge in topology.edges
         ]
-        self.assertIn(("input", "ref", "ctl", "ref"), edges)
+        self.assertIn(("input", "r", "ctl", "r"), edges)
         self.assertIn(("ctl", "u", "plant", "u"), edges)
         self.assertIn(("plant", "y", "output", "y_meas"), edges)
 
@@ -65,7 +65,7 @@ class TestGraphviz(unittest.TestCase):
 
         self.assertIn("flowchart LR", source)
         self.assertIn('ctl["Controller::ctl"]', source)
-        self.assertIn('input -- "ref -> ref" --> ctl', source)
+        self.assertIn('input -- "r -> r" --> ctl', source)
         self.assertIn('plant -- "y -> y_meas" --> output', source)
 
     @staticmethod
@@ -74,8 +74,8 @@ class TestGraphviz(unittest.TestCase):
         diagram.graphe_building_verbose = False
         diagram.add_subsystem(PropController(), "ctl")
         diagram.add_subsystem(Integrator(), "plant")
-        diagram.add_input_port(1, "ref")
-        diagram.connect("input", "ref", "ctl", "ref")
+        diagram.add_input_port("r")
+        diagram.connect("input", "r", "ctl", "r")
         diagram.connect("plant", "y", "ctl", "y")
         diagram.connect("ctl", "u", "plant", "u")
         diagram.connect_new_output_port("plant", "y", "y_meas")

@@ -13,7 +13,7 @@ class DiagramSystem(System):
         self.subsystems = {}  # Nodes
         self.connections = {}  # Edges
 
-        System.__init__(self, 0, 0, 0)
+        System.__init__(self, 0)
 
         self.name = "Diagram"
 
@@ -74,7 +74,7 @@ class DiagramSystem(System):
             idx += subsystem.n
 
         self.n = n
-        self.state = VectorSignal(n, "x")
+        self.state = VectorSignal("x", dim=n)
         self.state.labels = state_labels
         self.state.units = state_units
         self.state.upper_bound = state_upper_bound
@@ -112,7 +112,12 @@ class DiagramSystem(System):
                 x, u, t, source_sys_id, source_port_id, params=params
             )
 
-        self.add_output_port(port.dim, output_port_id, compute, dependencies)
+        self.add_output_port(
+            output_port_id,
+            dim=port.dim,
+            function=compute,
+            dependencies=dependencies,
+        )
 
         if "output" not in self.connections:
             self.connections["output"] = {}

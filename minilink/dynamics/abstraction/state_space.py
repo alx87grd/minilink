@@ -75,10 +75,15 @@ class StateSpaceSystem(DynamicSystem):
         )
 
         n, m, p = self._check_dimensions()
-        super().__init__(n=n, m=m, p=p)
+        super().__init__(
+            n=n,
+            input_dim=m,
+            output_dim=p,
+            expose_state=True,
+            y_dependencies=() if D is None else ("u",),
+        )
 
         self.name = name
-        self.outputs["y"].dependencies = () if D is None else ("u",)
 
     def _check_dimensions(self):
         """Validate state-space matrix dimensions."""

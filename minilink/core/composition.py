@@ -5,8 +5,6 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-import numpy as np
-
 
 def add_systems(*systems: "System | DiagramSystem") -> "DiagramSystem":
     """Return a diagram containing ``systems`` as subsystems with no wiring.
@@ -79,7 +77,7 @@ def closed_loop(
     controller: "System",
     plant: "System",
     *,
-    ref_port: str = "ref",
+    ref_port: str = "r",
     measurement_port: str = "y",
     control_port: str = "u",
     plant_input_port: str = "u",
@@ -136,8 +134,15 @@ def closed_loop(
     )
 
     ref = controller.inputs[ref_port]
-    diagram.add_input_port(ref.dim, ref_port, nominal_value=ref.nominal_value)
-    _copy_port_metadata(ref, diagram.inputs[ref_port])
+    diagram.add_input_port(
+        ref_port,
+        dim=ref.dim,
+        nominal_value=ref.nominal_value,
+        labels=ref.labels,
+        units=ref.units,
+        lower_bound=ref.lower_bound,
+        upper_bound=ref.upper_bound,
+    )
 
     diagram.connect("input", ref_port, controller_id, ref_port)
     diagram.connect(plant_id, plant_output_port, controller_id, measurement_port)
@@ -181,7 +186,7 @@ def autowire(
     The rules are conservative and never overwrite existing connections:
 
     - exact same port name and dimension, except generic measurement ``y``;
-    - source-like ``y`` output to a ``ref`` input;
+    - source-like ``y`` output to a ``r`` input;
     - non-source-like ``y`` output to a measurement ``y`` input.
     """
     from minilink.core.diagram import DiagramSystem
@@ -339,8 +344,15 @@ def _expose_entry_input(diagram, sys_id: str) -> None:
 
     port_id = _default_input_port(sys)
     port = sys.inputs[port_id]
-    diagram.add_input_port(port.dim, port_id, nominal_value=port.nominal_value)
-    _copy_port_metadata(port, diagram.inputs[port_id])
+    diagram.add_input_port(
+        port_id,
+        dim=port.dim,
+        nominal_value=port.nominal_value,
+        labels=port.labels,
+        units=port.units,
+        lower_bound=port.lower_bound,
+        upper_bound=port.upper_bound,
+    )
     diagram.connect("input", port_id, sys_id, port_id)
     _set_composition_entry(diagram, sys_id, port_id)
 
@@ -357,7 +369,7 @@ def _default_output_port(sys) -> str:
 
 
 def _default_input_port(sys) -> str:
-    for preferred in ("u", "ref"):
+    for preferred in ("u", "r"):
         if preferred in sys.inputs:
             return preferred
     if len(sys.inputs) == 1:
@@ -388,13 +400,6 @@ def _require_same_dim(left_dim: int, right_dim: int, left_label: str, right_labe
         )
 
 
-def _copy_port_metadata(source, target) -> None:
-    target.labels = list(source.labels)
-    target.units = list(source.units)
-    target.upper_bound = np.asarray(source.upper_bound, dtype=float).copy()
-    target.lower_bound = np.asarray(source.lower_bound, dtype=float).copy()
-
-
 def _autowire_candidates(diagram, target_id: str, input_id: str, input_port):
     candidates = list(_matching_exact_outputs(diagram, target_id, input_id, input_port))
     if input_id == "y":
@@ -412,7 +417,7 @@ def _autowire_candidates(diagram, target_id: str, input_id: str, input_port):
                 exclude=candidates,
             )
         )
-    elif input_id == "ref":
+    elif input_id == "r":
         candidates.extend(
             _matching_named_y_outputs(
                 diagram,

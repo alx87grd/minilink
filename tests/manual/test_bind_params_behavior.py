@@ -25,9 +25,9 @@ ctl.params["Kp"] = 2.5
 
 diag.add_subsystem(ctl, "ctl")
 diag.add_subsystem(plant, "plant")
-diag.add_input_port(1, "ref")
+diag.add_input_port("r", dim=1)
 
-diag.connect("input", "ref", "ctl", "ref")
+diag.connect("input", "r", "ctl", "r")
 diag.connect("plant", "y", "ctl", "y")
 diag.connect("ctl", "u", "plant", "u")
 # diag.plot_graphe()

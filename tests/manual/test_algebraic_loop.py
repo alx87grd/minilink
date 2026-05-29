@@ -11,12 +11,10 @@ from minilink.core.system import System
 
 class FeedthroughSystem(System):
     def __init__(self, id_str):
-        super().__init__(0, 1, 1)
+        super().__init__(0)
         self.name = id_str
-        self.inputs = {}
-        self.add_input_port(1, "u")
-        self.outputs = {}
-        self.add_output_port(1, "y", function=self.h, dependencies=["u"])
+        self.add_input_port("u", dim=1)
+        self.add_output_port("y", dim=1, function=self.h, dependencies=("u",))
 
     def h(self, x, u, t=0, params=None):
         return u * 2

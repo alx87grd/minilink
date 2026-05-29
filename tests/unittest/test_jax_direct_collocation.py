@@ -43,7 +43,7 @@ from minilink.planning.trajectory_optimization.shooting import (  # noqa: E402
 
 class JaxSingleIntegrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, m=1, p=1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
         self.state.lower_bound = np.array([-10.0])
         self.state.upper_bound = np.array([10.0])
         self.inputs["u"].lower_bound = np.array([-10.0])

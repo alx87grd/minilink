@@ -8,14 +8,12 @@ from minilink.core.system import System
 class Source(System):
     def __init__(self, p):
 
-        System.__init__(self, 0, 0, p)
+        System.__init__(self, 0)
 
         self.name = "Source"
         self.params = {"value": np.zeros(p)}
 
-        self.inputs = {}
-        self.outputs = {}
-        self.add_output_port(self.p, "y", function=self.h)
+        self.add_output_port("y", dim=p, function=self.h)
 
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params

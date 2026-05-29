@@ -16,7 +16,7 @@ diagram = DiagramSystem()
 diagram.graphe_building_verbose = False
 diagram.name = "Graphical backend demo"
 diagram.add_subsystem(Integrator(), "plant")
-diagram.add_input_port(1, "u_cmd", nominal_value=np.array([1.0]))
+diagram.add_input_port("u_cmd", dim=1, nominal_value=np.array([1.0]))
 diagram.connect("input", "u_cmd", "plant", "u")
 diagram.connect_new_output_port("plant", "y", "y")
 

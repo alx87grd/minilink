@@ -41,7 +41,13 @@ class MechanicalSystem(DynamicSystem):
         m = actuators
         p = dof * 2
 
-        super().__init__(n, m, p)
+        super().__init__(
+            n=n,
+            input_dim=m,
+            output_dim=p,
+            expose_state=True,
+            y_dependencies=(),
+        )
 
         self.name = f"{dof}DoF Mechanical System"
 

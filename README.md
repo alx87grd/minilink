@@ -28,23 +28,42 @@ Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/vi
 ```python
 from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.blocks.sources import Step
-from minilink.core.diagram import DiagramSystem
 from minilink.simulation.simulator import Simulator
 
-diagram = DiagramSystem()
-diagram.add_subsystem(Integrator(), "plant")
-diagram.add_subsystem(Step(), "source")
-diagram.connect("source", "y", "plant", "u")
+diagram = Step() >> Integrator()
 
 traj = Simulator(diagram, tf=10.0).solve()
 diagram.plot_trajectory(traj, signals=("x", "u"), backend="matplotlib")
 ```
 
-For common scripts, optional shortcuts build ordinary `DiagramSystem` objects:
+Shortcuts build ordinary `DiagramSystem` objects. Use the explicit diagram API
+when the topology is not a simple series or control loop.
 
 ```python
 diagram = Step() >> Integrator()          # series y -> u
-closed = PropController() @ Integrator()  # ref/y/u closed-loop convention
+closed = PropController() @ Integrator()  # r/y/u closed-loop convention
+```
+
+Custom blocks declare named ports explicitly. Base `System` and `StaticSystem`
+start with no ports; `DynamicSystem` can opt into textbook `u`, `y`, and `x`
+ports through constructor options.
+
+```python
+from minilink.core.system import StaticSystem
+
+
+class PDController(StaticSystem):
+    def __init__(self):
+        super().__init__()
+        self.params = {"kp": 10.0, "kd": 1.0}
+        self.add_input_port("r", nominal_value=0.0, labels=["reference"])
+        self.add_input_port("y", labels=["theta", "theta_dot"], units=["rad", "rad/s"])
+        self.add_output_port("u", function=self.ctl, dependencies=("r", "y"))
+
+    def ctl(self, x, u, t=0.0, params=None):
+        p = self.params if params is None else params
+        r, y = self.get_port_values_from_u(u, "r", "y")
+        return [p["kp"] * (r[0] - y[0]) - p["kd"] * y[1]]
 ```
 
 ## Install

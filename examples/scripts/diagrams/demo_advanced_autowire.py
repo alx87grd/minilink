@@ -13,14 +13,10 @@ class DemoPathPlanner(System):
     """Small source block mirroring the bicycle cascade planner ports."""
 
     def __init__(self):
-        super().__init__(0, 0, 1)
+        super().__init__(0)
         self.name = "Path planner"
-        self.inputs = {}
-        self.outputs = {}
-        self.recompute_input_properties()
-        self.add_output_port(1, "u_ref", function=self.h_u_ref, dependencies=[])
-        self.add_output_port(2, "path", function=self.h_path, dependencies=[])
-        self.p = 3
+        self.add_output_port("u_ref", dim=1, function=self.h_u_ref, dependencies=())
+        self.add_output_port("path", dim=2, function=self.h_path, dependencies=())
 
     def h_u_ref(self, x, u, t=0.0, params=None):
         return [5.0]
@@ -33,17 +29,15 @@ class DemoTracking(StaticSystem):
     """Small tracking block with the same ports as the bicycle cascade demo."""
 
     def __init__(self):
-        super().__init__(8, 1)
+        super().__init__()
         self.name = "Tracking"
-        self.inputs = {}
-        self.add_input_port(2, "path", nominal_value=[2.0, 20.0])
-        self.add_input_port(6, "y")
-        self.outputs = {}
+        self.add_input_port("path", dim=2, nominal_value=[2.0, 20.0])
+        self.add_input_port("y", dim=6)
         self.add_output_port(
-            1,
             "theta_ref",
+            dim=1,
             function=self.h_theta_ref,
-            dependencies=["path", "y"],
+            dependencies=("path", "y"),
         )
 
     def h_theta_ref(self, x, u, t=0.0, params=None):
@@ -54,17 +48,15 @@ class DemoHeadingLoop(StaticSystem):
     """Small heading loop with the same ports as the bicycle cascade demo."""
 
     def __init__(self):
-        super().__init__(7, 1)
+        super().__init__()
         self.name = "Heading loop"
-        self.inputs = {}
-        self.add_input_port(1, "theta_ref")
-        self.add_input_port(6, "y")
-        self.outputs = {}
+        self.add_input_port("theta_ref", dim=1)
+        self.add_input_port("y", dim=6)
         self.add_output_port(
-            1,
             "r_ref",
+            dim=1,
             function=self.h_r_ref,
-            dependencies=["theta_ref", "y"],
+            dependencies=("theta_ref", "y"),
         )
 
     def h_r_ref(self, x, u, t=0.0, params=None):
@@ -75,17 +67,15 @@ class DemoYawRateLoop(StaticSystem):
     """Small yaw-rate loop with the same ports as the bicycle cascade demo."""
 
     def __init__(self):
-        super().__init__(7, 1)
+        super().__init__()
         self.name = "Yaw-rate loop"
-        self.inputs = {}
-        self.add_input_port(1, "r_ref")
-        self.add_input_port(6, "y")
-        self.outputs = {}
+        self.add_input_port("r_ref", dim=1)
+        self.add_input_port("y", dim=6)
         self.add_output_port(
-            1,
             "delta",
+            dim=1,
             function=self.h_delta,
-            dependencies=["r_ref", "y"],
+            dependencies=("r_ref", "y"),
         )
 
     def h_delta(self, x, u, t=0.0, params=None):
@@ -96,17 +86,15 @@ class DemoVelocityLoop(StaticSystem):
     """Small velocity loop with the same ports as the bicycle cascade demo."""
 
     def __init__(self):
-        super().__init__(7, 1)
+        super().__init__()
         self.name = "Velocity PID"
-        self.inputs = {}
-        self.add_input_port(1, "u_ref", nominal_value=[5.0])
-        self.add_input_port(6, "y")
-        self.outputs = {}
+        self.add_input_port("u_ref", dim=1, nominal_value=[5.0])
+        self.add_input_port("y", dim=6)
         self.add_output_port(
-            1,
             "w_rear",
+            dim=1,
             function=self.h_w_rear,
-            dependencies=["u_ref", "y"],
+            dependencies=("u_ref", "y"),
         )
 
     def h_w_rear(self, x, u, t=0.0, params=None):

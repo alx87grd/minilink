@@ -18,7 +18,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
             list(diagram.subsystems),
             ["step", "controller", "integrator"],
         )
-        self.assertEqual(diagram.connections["controller"]["ref"], None)
+        self.assertEqual(diagram.connections["controller"]["r"], None)
         self.assertEqual(diagram.connections["controller"]["y"], None)
         self.assertEqual(diagram.connections["integrator"]["u"], None)
 
@@ -52,11 +52,11 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_matmul_operator_builds_closed_loop_diagram(self):
         diagram = PendulumPDController() @ Pendulum()
 
-        self.assertIn("ref", diagram.inputs)
+        self.assertIn("r", diagram.inputs)
         self.assertIn("y", diagram.outputs)
         self.assertEqual(
-            diagram.connections["controller"]["ref"],
-            ("input", "ref"),
+            diagram.connections["controller"]["r"],
+            ("input", "r"),
         )
         self.assertEqual(
             diagram.connections["controller"]["y"],
@@ -75,7 +75,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         )
 
         self.assertEqual(
-            diagram.connections["controller"]["ref"],
+            diagram.connections["controller"]["r"],
             ("step", "y"),
         )
         self.assertEqual(
@@ -97,7 +97,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         ).autowire(strict=True)
 
         self.assertEqual(
-            diagram.connections["controller"]["ref"],
+            diagram.connections["controller"]["r"],
             ("step", "y"),
         )
         self.assertEqual(

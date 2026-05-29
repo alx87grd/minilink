@@ -45,7 +45,7 @@ diagram.add_subsystem(sys, "plant")
 diagram.add_subsystem(noise, "noise")
 diagram.add_subsystem(noise2, "noise2")
 
-diagram.connect("step", "y", "controller", "ref")
+diagram.connect("step", "y", "controller", "r")
 diagram.connect("controller", "u", "plant", "u")
 diagram.connect("plant", "y", "controller", "y")
 diagram.connect("noise", "y", "plant", "w")

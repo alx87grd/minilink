@@ -31,34 +31,29 @@ class _JAXFriendlyPropController(StaticSystem):
     """P controller using NumPy or JAX ops so ``compile(..., backend='jax')`` traces."""
 
     def __init__(self):
-        super().__init__(2, 1)
+        super().__init__()
         self.params = {"Kp": 10.0}
         self.name = "Controller"
-        self.inputs = {}
-        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "y", nominal_value=np.array([0.0]))
-        self.outputs = {}
-        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
+        self.add_input_port("r", nominal_value=0.0)
+        self.add_input_port("y", nominal_value=0.0)
+        self.add_output_port("u", function=self.ctl, dependencies=("r", "y"))
 
     def ctl(self, x, u, t=0, params=None):
         if params is None:
             params = self.params
         Kp = params["Kp"]
         xp = array_module(u)
-        r = u[0]
-        y_ = u[1]
-        return xp.array([Kp * (r - y_)])
+        r, y_ = self.get_port_values_from_u(u, "r", "y")
+        return xp.array([Kp * (r[0] - y_[0])])
 
 
 class _JAXFriendlyIntegrator(DynamicSystem):
     """``dx = k u`` integrator; mirrors :class:`Integrator` with JAX-friendly arrays."""
 
     def __init__(self):
-        super().__init__(1, 1, 1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"k": 1.0}
         self.name = "Integrator"
-        self.outputs = {}
-        self.add_output_port(1, "y", function=self.h, dependencies=[])
 
     def f(self, x, u, t=0, params=None):
         if params is None:
@@ -83,9 +78,9 @@ def _build_small_closed_loop_jax():
 
     diag.add_subsystem(ctl, "ctl")
     diag.add_subsystem(plant, "plant")
-    diag.add_input_port(1, "ref")
+    diag.add_input_port("r")
 
-    diag.connect("input", "ref", "ctl", "ref")
+    diag.connect("input", "r", "ctl", "r")
     diag.connect("plant", "y", "ctl", "y")
     diag.connect("ctl", "u", "plant", "u")
     return diag
@@ -108,9 +103,9 @@ def _build_small_closed_loop():
 
     diag.add_subsystem(ctl, "ctl")
     diag.add_subsystem(plant, "plant")
-    diag.add_input_port(1, "ref")
+    diag.add_input_port("r")
 
-    diag.connect("input", "ref", "ctl", "ref")
+    diag.connect("input", "r", "ctl", "r")
     diag.connect("plant", "y", "ctl", "y")
     diag.connect("ctl", "u", "plant", "u")
     return diag
@@ -128,12 +123,10 @@ def _build_feedthrough_loop():
 
     class FeedthroughSystem(System):
         def __init__(self, name):
-            super().__init__(0, 1, 1)
+            super().__init__(0)
             self.name = name
-            self.inputs = {}
-            self.add_input_port(1, "u")
-            self.outputs = {}
-            self.add_output_port(1, "y", function=self.h, dependencies=["u"])
+            self.add_input_port("u")
+            self.add_output_port("y", function=self.h, dependencies=("u",))
 
         def h(self, x, u, t=0, params=None):
             return u * 2
@@ -292,14 +285,15 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
 
         class Gain(StaticSystem):
             def __init__(self):
-                super().__init__(1, 1)
-                self.add_output_port(1, "y", function=self.h, dependencies=["u"])
+                super().__init__()
+                self.add_input_port("u")
+                self.add_output_port("y", function=self.h, dependencies=("u",))
 
             def h(self, x, u, t=0, params=None):
                 return u * 2.0
 
         diag.add_subsystem(Gain(), "gain")
-        diag.add_input_port(1, "u")
+        diag.add_input_port("u")
         diag.connect("input", "u", "gain", "u")
 
         evaluator = compile_diagram(diag)

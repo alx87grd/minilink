@@ -169,11 +169,59 @@ contract and a small user-facing facade.
 
 Pure contract:
 
-- dimensions: `n` state dimensions, `m` input dimensions, `p` output dimensions;
+- dimensions: `n` state dimensions, `m` input dimensions, `p` primary output
+  dimensions;
 - dynamics: `f(x, u, t=0, params=None) -> dx`;
 - output: `h(x, u, t=0, params=None) -> y`;
 - ports: `InputPort` and `OutputPort`, with output-port compute callables using
   the same `(x, u, t, params)` argument shape.
+
+Base systems do not create implicit ports. `n` is constructor-owned state
+dimension metadata. `m` is derived from declared input ports. `p` is derived from
+the primary output port named `"y"`; auxiliary outputs such as `"x"` do not
+change it, and systems with no `"y"` have `p == 0`.
+
+Port declarations are ID-first and metadata-aware:
+
+```python
+self.add_input_port("u")
+self.add_input_port("y", dim=2)
+self.add_input_port("y", nominal_value=[0.0, 0.0])
+self.add_input_port("y", labels=["theta", "theta_dot"], units=["rad", "rad/s"])
+
+self.add_output_port("u", function=self.ctl, dependencies=("r", "y"))
+self.add_output_port("y", dim=2, function=self.h, dependencies=())
+```
+
+If `dim` is omitted, it is inferred from `nominal_value`, `labels`, `units`,
+`lower_bound`, or `upper_bound`; otherwise it defaults to 1. Metadata lengths are
+validated against the final dimension.
+
+Equation code should use one named-port extraction method:
+
+```python
+signals = self.get_port_values_from_u(u)
+r = self.get_port_values_from_u(u, "r")
+r, y = self.get_port_values_from_u(u, "r", "y")
+```
+
+`DynamicSystem` has explicit textbook-port convenience options for common plant
+classes:
+
+```python
+super().__init__(
+    n=2,
+    input_dim=1,
+    output_dim=1,
+    expose_state=True,
+    y_dependencies=(),
+)
+```
+
+This creates input `"u"`, primary output `"y"` using `self.h`, and optional
+state output `"x"` using `self.compute_state`. Control blocks use the standard
+generic names `"r"`, `"y"`, and `"u"` for reference, measurement, and control
+signal.
 
 `f`, `h`, and output-port compute functions are equation paths. They should
 preserve the active array backend: NumPy-like inputs produce NumPy-compatible
@@ -251,8 +299,9 @@ evaluation for `f`, boundary outputs, and params semantics.
 Optional composition shortcuts live in `minilink.core.composition` and return
 ordinary `DiagramSystem` objects. The explicit `add_subsystem` / `connect` API
 remains the canonical general interface; `+` only adds subsystems, `>>` connects
-default output-to-input series chains, `@` builds the Pyro-style controller/plant
-closed-loop convention, and `DiagramSystem.autowire()` conservatively fills only
+default output-to-input series chains, `@` builds the controller/plant closed-loop
+convention using controller input `"r"`, plant output `"y"`, and controller
+output `"u"`, and `DiagramSystem.autowire()` conservatively fills only
 unconnected inputs when exactly one safe named-port match exists.
 
 ### `Trajectory`

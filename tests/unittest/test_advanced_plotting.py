@@ -21,8 +21,7 @@ from minilink.simulation.simulator import Simulator
 
 class Integrator(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 1, 1)
-        self.add_output_port(1, "y", function=self.h, dependencies=[])
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return np.array([u[0]])
@@ -33,21 +32,22 @@ class Integrator(DynamicSystem):
 
 class PropController(StaticSystem):
     def __init__(self):
-        super().__init__(2, 1)
+        super().__init__()
         self.params = {"Kp": 5.0}
-        self.add_input_port(1, "ref", nominal_value=np.array([1.0]))
-        self.add_input_port(1, "y", nominal_value=np.array([0.0]))
-        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
+        self.add_input_port("r", nominal_value=1.0)
+        self.add_input_port("y", nominal_value=0.0)
+        self.add_output_port("u", function=self.ctl, dependencies=("r", "y"))
 
     def ctl(self, x, u, t=0, params=None):
         Kp = params["Kp"] if params else self.params["Kp"]
-        return np.array([Kp * (u[0] - u[1])])
+        r, y = self.get_port_values_from_u(u, "r", "y")
+        return np.array([Kp * (r[0] - y[0])])
 
 
 class Step(StaticSystem):
     def __init__(self):
-        super().__init__(0, 1)
-        self.add_output_port(1, "y", function=self.compute)
+        super().__init__()
+        self.add_output_port("y", function=self.compute)
 
     def compute(self, x, u, t=0, params=None):
         return np.array([1.0])
@@ -64,7 +64,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.diagram.add_subsystem(self.ctl, "ctl")
         self.diagram.add_subsystem(self.sys, "plant")
 
-        self.diagram.connect("step", "y", "ctl", "ref")
+        self.diagram.connect("step", "y", "ctl", "r")
         self.diagram.connect("ctl", "u", "plant", "u")
         self.diagram.connect("plant", "y", "ctl", "y")
 

@@ -28,6 +28,9 @@ sampled state-input object; `core.blocks` holds lightweight diagram blocks.
 Optional diagram composition shortcuts (`+`, `>>`, `@`, and conservative
 `autowire`) now build ordinary `DiagramSystem` objects while the explicit
 named-port API remains the canonical general interface.
+Custom block ports are explicit, ID-first, and metadata-aware; base systems no
+longer create hidden default ports, while `DynamicSystem` exposes standard
+`u`/`y`/`x` ports only through explicit constructor options.
 
 Optimization uses pure `MathematicalProgram` plus external evaluators and
 `Optimizer` method presets (`scipy_slsqp`, `scipy_trust_constr`, `ipopt`).
@@ -61,9 +64,9 @@ The native-array equation rule applies across those paths (see DESIGN §3).
   abstractions.
 - Add linearization and differentiation helpers after the first-pass dynamics
   abstraction tree is stable.
-- Improve diagram port exporting and nested-diagram ergonomics. See
-  [docs/plans/custom-system-ports-implementation-plan.md](docs/plans/custom-system-ports-implementation-plan.md)
-  for proposed options (ports-first `define_ports`, named `u` helpers, `default_ports=False`).
+- Improve diagram port exporting and nested-diagram ergonomics on top of the
+  explicit port API. The custom-system port cleanup is recorded in
+  [docs/plans/custom-system-ports-implementation-plan.md](docs/plans/custom-system-ports-implementation-plan.md).
 - Extend simulator-level forced-input helpers only after current workflows are
   stable.
 - Factor interactive graphics into swappable real-time integrator and live-input
