@@ -3,7 +3,7 @@
 Python-native block-diagram framework for modeling, simulating, optimizing, and
 visualizing dynamical systems.
 
-diagram
+![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
 Colab: [https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing](https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing)
 
