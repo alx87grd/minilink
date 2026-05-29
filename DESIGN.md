@@ -1,563 +1,138 @@
 # Minilink Technical Design
 
-`minilink` is a Python-native block-diagram framework for writing readable
-dynamical systems, composing them through named ports, compiling them into flat
-evaluators, and using those evaluators for simulation, optimization, and
-visualization.
+Architecture and public contracts. User guide: [README.md](README.md). Call chains:
+[flows.md](flows.md).
 
 ## 1. Design Principles
 
-1. **Math readability first**: equation code should look close to textbook
-   notation, for example `dx = A @ x + B @ u`.
-2. **Pure contracts, convenient boundaries**: core equations are functional in
-   intent; high-level objects may expose convenience methods at API boundaries.
-3. **Explicit data flow**: prefer visible objects and direct calls over hidden
-   registries, global switches, or broad metaprogramming.
-4. **Backend-native math where simple**: small algebraic helpers should work
-   with NumPy or JAX inputs without parallel class hierarchies.
-5. **Specialize only when it clarifies**: complex plants may use explicit
-   `Jax<X>` twins when a separate implementation keeps the equations readable.
+1. **Math readability first**: e.g. `dx = A @ x + B @ u`.
+2. **Pure contracts, convenient boundaries**: equation paths stay functional;
+   facades (`compute_trajectory`, `plot_*`, `animate`) live at API boundaries.
+3. **Explicit data flow**: visible objects and direct calls; no global backend
+   switches or hidden registries.
+4. **Backend-native math where simple**: one class for traceable NumPy/JAX algebra.
+5. **Specialize only when it clarifies**: `Jax<Plant>` twins when a single class
+   would sacrifice readability.
 
 ### NumPy and JAX
 
-NumPy is always required; JAX is optional (`minilink[jax]`) and must be imported
-lazily—use `require_jax_numpy()` or helpers from `minilink.compile.backend_policy`,
-not top-level `import jax` in library modules. Use `array_module` only for small
-hybrid algebra. Prefer one backend-native class for sets, costs, and transcriptions;
-add a `Jax<Plant>` twin in the same module only when trajectory optimization, JIT
-rollouts, or differentiable physics need traceable dynamics. Do not add a global
-backend switch or a `minilink.jax` package.
+NumPy required; JAX optional (`minilink[jax]`), imported lazily via
+`minilink.compile.backend_policy` / `require_jax_numpy()`. No `minilink.jax`
+package, no global mode. Explicit `compile_backend` and evaluator backend args.
+`array_module()` only for small hybrid helpers.
 
-## 2. User-Facing Interface Layers
+## 2. Interface Layers
 
-Minilink exposes three layers. [README.md](README.md) is the primary user guide;
-[flows.md](flows.md) maps each high-level call to the implementing modules.
+| Layer | Use | Examples |
+| --- | --- | --- |
+| 1 Facades | Default | `compute_trajectory`, `plot_trajectory`, `+`/`>>`/`@` |
+| 2 Orchestrators | Repeat runs, trajopt, NLP | `Simulator`, `TrajectoryOptimizationPlanner`, `Optimizer` |
+| 3 Contracts | Custom wiring, extension | `DiagramSystem.connect`, `compile()`, `MathematicalProgram` |
 
-### Layer 1 — System facades (default)
-
-`System` and `DiagramSystem` inherit the same convenience methods:
-
-- simulation: `compute_trajectory`, `compute_forced`;
-- visualization: `plot_trajectory`, `plot_phase_plane`, `plot_diagram`,
-  `render`, `animate`, `game`;
-- compilation: `compile`;
-- composition operators: `+`, `>>`, `@`.
-
-These methods lazy-import simulation and graphics. They store the latest rollout
-on `self.traj` but do not change equation semantics.
-
-**Default simulation entry point:** `compute_trajectory(...)`, not direct
-`Simulator` construction. Facades default to `compile_backend="numpy"` for
-predictable behavior; pass `compile_backend="auto"` or `"jax"` when needed.
-
-### Layer 2 — Subsystem orchestrators
-
-Use when facades are too thin:
-
-- `minilink.simulation.simulator.Simulator` — time grid, solver backend, repeated
-  rollouts, `solve_forced`;
-- `minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
-  — problem → transcription → NLP → trajectory;
-- `minilink.optimization.optimizer.Optimizer` — bound NLP solver with method
-  presets.
-
-### Layer 3 — Explicit contracts
-
-Use for custom topology, performance work, or library extension:
-
-- `DiagramSystem.add_subsystem` / `connect` / `connect_new_output_port`;
-- `minilink.compile.compiler.compile` and `DynamicsEvaluator` tiers;
-- `MathematicalProgram`, transcriptions, sets, and costs as pure descriptions.
-
-Composition shortcuts in `minilink.core.composition` (`add_systems`, `series`,
-`closed_loop`, `autowire`) return ordinary `DiagramSystem` objects and remain
-optional sugar over Layer 3.
-
-### Imports
-
-Top-level `minilink/__init__.py` is currently a namespace marker. Import symbols
-from their defining modules until curated exports land (see [ROADMAP.md](ROADMAP.md)
-P1).
+Import from defining modules; `minilink/__init__.py` is a namespace marker until
+exports are frozen ([ROADMAP.md](ROADMAP.md) P1).
 
 ## 3. Package Map
 
-| Package | Status | Role |
+| Package | TRL | Role |
 | --- | --- | --- |
-| `core/` | TRL 7 | `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs, and lightweight blocks. |
-| `compile/` | TRL 4 | Backend policy, `ExecutionPlan`, and NumPy/JAX `DynamicsEvaluator` implementations. |
-| `simulation/` | TRL 4 | `Simulator`, solver backends, forced-input handling, simulation benchmarks. |
-| `optimization/` | TRL 1 | Pure `MathematicalProgram`, program evaluators, optimizer method presets, and NLP benchmarks. |
-| `planning/` | TRL 1 | Deterministic planning problems, initial guesses, search, policy synthesis, and trajectory optimization. |
-| `dynamics/` | TRL 1 | Plant abstractions and catalog models. |
-| `symbolic/` | TRL 1 | Optional SymPy mechanics derivation/export helpers. |
-| `physics/` | TRL 1 | Engine-backed physics MVPs, currently JAX-focused. |
-| `graphical/` | TRL 2 | Plotting, animation, diagram display, renderer backends, and matplotlib style policy. |
-| `control/` | TRL 0 | Controller/static-law blocks. |
+| `core/` | 7 | `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs, blocks |
+| `compile/` | 4 | `ExecutionPlan`, NumPy/JAX evaluators |
+| `simulation/` | 4 | `Simulator`, solvers, forcing |
+| `optimization/` | 1 | `MathematicalProgram`, `Optimizer` |
+| `planning/` | 1 | problems, trajopt, search (prototype) |
+| `dynamics/` | 0–1 | abstractions + catalog plants |
+| `graphical/` | 2 | signals, phase plane, diagrams, animation |
+| `symbolic/`, `physics/`, `control/` | 0–1 | optional / MVP |
 
-### Dynamics Abstraction Tree
-
-The executable root for continuous plants is still
-`minilink.core.system.DynamicSystem`, whose contract is `dx = f(x, u, t)` and
-`y = h(x, u, t)`. Reusable dynamics base classes live in
-`minilink.dynamics.abstraction`; catalog plants keep short domain names such as
-`Pendulum`, `CartPole`, and `DynamicBicycle`.
-
-First-pass reusable bases:
-
-- `StateSpaceSystem`: exact native-array LTI form, `dx = A @ x + B @ u`,
-  `y = C @ x + D @ u`; not a local-linearization container.
-- `MechanicalSystem`: generalized-coordinate mechanics with state
-  `x = [q, dq]`; default hooks are native-array, while concrete subclasses are
-  JAX-traceable only if their overridden equations are also native-array.
-- `GeneralizedMechanicalSystem`: generalized/body-velocity mechanics with state
-  `x = [q, v]` and kinematics `qdot = N(q) @ v`; default hooks follow the same
-  native-array rule.
-
-Heterogeneous inputs such as steering angles, elevator angles, tire laws,
-aerodynamic surfaces, and propulsor maps should be modeled with named input
-ports plus an explicit force/allocation hook on the concrete system. Do not add
-Pyro-style `WithPositionInputs` inheritance branches.
-
-Backburner abstractions: `KinematicSystem`, `ManipulatorSystem`, and analysis
-helpers such as linearization and task-space/manipulability tools.
-
-Current on-disk shape:
-
-```text
-minilink/
-  core/
-    system.py
-    diagram.py
-    trajectory.py
-    costs.py
-    sets.py
-    blocks/
-      basic.py
-      sources.py
-  compile/
-    backend_policy.py
-    compiler.py
-    execution_plan.py
-    jax_utils.py
-    benchmark.py
-    evaluators/
-      evaluator.py
-      numpy_evaluator.py
-      jax_evaluator.py
-  simulation/
-    simulator.py
-    input_interpolation.py
-    benchmark.py
-    scenarios/
-    solvers/
-      solver.py
-      scipy_ivp.py
-      euler.py
-      rk4_fixed.py
-  optimization/
-    mathematical_program.py
-    optimizer.py
-    benchmark.py
-    evaluators/
-      compiler.py
-      program_evaluator.py
-      numpy_evaluator.py
-      jax_evaluator.py
-    optimizers/
-      optimizer_backend.py
-      scipy_minimize.py
-      ipopt.py
-  planning/
-    problems.py
-    planner.py
-    initial_guess.py
-    search/
-    trajectory_optimization/
-      benchmark.py
-      direct_collocation.py
-      live_plot.py
-      multiple_shooting.py
-      planner.py
-      shooting.py
-      transcription.py
-    policy_synthesis/
-  dynamics/
-    abstraction/
-    catalog/
-  graphical/
-    common/
-    signals/
-    phase_plane/
-    diagrams/
-    animation/
-  symbolic/
-    mechanics/
-      derivation.py
-      export.py
-      model.py
-      symbolic_system.py
-      utils.py
-  physics/
-    engine_jax.py
-    system.py
-  control/
-    pendulum_pd.py
-```
+**Dynamics root:** `DynamicSystem` with `f`, `h`. Reusable bases in
+`dynamics/abstraction` (`StateSpaceSystem`, `MechanicalSystem`,
+`GeneralizedMechanicalSystem`). Catalog names: `Pendulum`, `CartPole`,
+`DynamicBicycle`. Mixed inputs → named ports + concrete allocation hooks; no
+`WithPositionInputs` inheritance branches.
 
 ## 4. Core Object Contracts
 
 ### `System`
 
-`System` is the main dynamical object. It intentionally owns both the pure math
-contract and a small user-facing facade.
+- **Math:** `f(x,u,t,params)`, `h(x,u,t,params)`; ports use same signature.
+- **Dims:** `n` from constructor; `m` from input ports; `p` from primary output
+  `"y"` only (aux `"x"` does not change `p`; no `"y"` ⇒ `p==0`).
+- **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
+  slices with `get_port_values_from_u(u, "r", "y")`.
+- **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
+  `y_dependencies` create standard `u`/`y`/`x`.
+- **Control naming:** `r` reference, `y` measurement, `u` control.
+- **Facades:** lazy simulation/graphics; latest rollout on `self.traj`.
 
-Pure contract:
+### Native-array equation rule
 
-- dimensions: `n` state dimensions, `m` input dimensions, `p` primary output
-  dimensions;
-- dynamics: `f(x, u, t=0, params=None) -> dx`;
-- output: `h(x, u, t=0, params=None) -> y`;
-- ports: `InputPort` and `OutputPort`, with output-port compute callables using
-  the same `(x, u, t, params)` argument shape.
-
-Base systems do not create implicit ports. `n` is constructor-owned state
-dimension metadata. `m` is derived from declared input ports. `p` is derived from
-the primary output port named `"y"`; auxiliary outputs such as `"x"` do not
-change it, and systems with no `"y"` have `p == 0`.
-
-Port declarations are ID-first and metadata-aware:
-
-```python
-self.add_input_port("u")
-self.add_input_port("y", dim=2)
-self.add_input_port("y", nominal_value=[0.0, 0.0])
-self.add_input_port("y", labels=["theta", "theta_dot"], units=["rad", "rad/s"])
-
-self.add_output_port("u", function=self.ctl, dependencies=("r", "y"))
-self.add_output_port("y", dim=2, function=self.h, dependencies=())
-```
-
-If `dim` is omitted, it is inferred from `nominal_value`, `labels`, `units`,
-`lower_bound`, or `upper_bound`; otherwise it defaults to 1. Metadata lengths are
-validated against the final dimension.
-
-Equation code should use one named-port extraction method:
-
-```python
-signals = self.get_port_values_from_u(u)
-r = self.get_port_values_from_u(u, "r")
-r, y = self.get_port_values_from_u(u, "r", "y")
-```
-
-`DynamicSystem` has explicit textbook-port convenience options for common plant
-classes:
-
-```python
-super().__init__(
-    n=2,
-    input_dim=1,
-    output_dim=1,
-    expose_state=True,
-    y_dependencies=(),
-)
-```
-
-This creates input `"u"`, primary output `"y"` using `self.h`, and optional
-state output `"x"` using `self.compute_state`. Control blocks use the standard
-generic names `"r"`, `"y"`, and `"u"` for reference, measurement, and control
-signal.
-
-`f`, `h`, and output-port compute functions are equation paths. They should
-preserve the active array backend: NumPy-like inputs produce NumPy-compatible
-expressions, and JAX inputs produce JAX-compatible expressions when the formula
-is intended to be traceable.
-
-Boundary conveniences:
-
-- model defaults: `params`, `x0`, port nominal values, and `solver_info`;
-- visualization hooks: `get_kinematic_geometry`,
-  `get_kinematic_transforms(x, u, t)`, `get_dynamic_geometry(x, u, t)`, and
-  `get_camera_transform(x, u, t)` (standard 4x4 camera matrix; see §7);
-- facade methods: `compile`, `compute_trajectory`, `compute_forced`, time-signal
-  plotting with `signals=("x", "u")`, `render`, `animate`, `game`, and diagram
-  helpers.
-
-The facade methods may import simulation or graphics lazily. They do not change
-the math contract of `f`, `h`, or output-port compute functions.
-
-### Native-Array Equation Rule
-
-The default math contract is native-array in, native-array out. This applies to:
-
-- `System.f`, `System.h`, and output-port compute functions;
-- `Set.margin`, `InputSet.margin`, and `SingletonSet.residual`;
-- `CostFunction.g` and `CostFunction.h`;
-- trajectory-optimization transcription equations;
-- `MathematicalProgram.J`, `MathematicalProgram.h`, and
-  `MathematicalProgram.g`.
-
-Inside those equation paths, avoid forced boundary conversion such as
-`np.asarray(...)`, `np.array(...)`, or `float(...)` unless the object is
-explicitly NumPy-only. Use direct array math, `array_module(...)` for small
-hybrid helpers, or a dedicated `Jax<Plant>` twin for complex dynamics.
-
-Conversion belongs at boundaries: constructors and shape checks, `Trajectory`,
-set `contains` / `sample`, cost reporting helpers, program evaluators, solver
-adapters, plotting, animation, benchmarks, and file I/O. For example,
-`MathematicalProgramEvaluator.objective(...)` may return a Python `float`, but
-the underlying `program.J(z)` should remain a native scalar expression.
+Applies to `f`, `h`, port compute, sets, costs, transcriptions, `MathematicalProgram`
+`J`/`h`/`g`. Native in, native out; no `np.asarray` / `float()` inside equation
+paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
 
 ### Parameters
 
-The parameter rule is global:
-
-- `params is None` means use the object's default `self.params`;
-- any non-`None` `params` value is explicit and must override `self.params`;
-- equation methods should not use `params or self.params`, because an empty dict
-  or empty pytree can be a valid explicit parameter set.
-
-Compilation has two parameter modes:
-
-- `bind_params=True`: copy params into the compiled plan/evaluator;
-- `bind_params=False`: use object params where the backend can support that
-  behavior.
-
-Diagram-level parametric evaluator support is still active work. Until that tier
-is implemented and tested, use `bind_params=True` or recompile when JAX diagram
-parameters change.
+- `params is None` → `self.params`; any other value overrides (never
+  `params or self.params`).
+- Compile: `bind_params=True` copies params; diagram parametric tier still WIP—
+  recompile when JAX diagram params change.
 
 ### `DiagramSystem`
 
-`DiagramSystem` composes subsystems through named ports. Its core duties are:
+Composes subsystems by named ports; flattens state; compiled `ExecutionPlan` is
+the main execution path (reference recursive path must stay equivalent).
 
-- maintain subsystem ids, connections, and flattened state/input slices;
-- evaluate local subsystem inputs from external inputs, defaults, or internal
-  subsystem outputs;
-- expose boundary outputs separately from internal signals;
-- compile to an `ExecutionPlan` for fast NumPy/JAX evaluation.
+Shortcuts (`core.composition`): `+` add only, `>>` series, `@` closed loop,
+`autowire()` conservative fill. Explicit `add_subsystem` / `connect` remains
+canonical for general topology.
 
-The compiled path is the main execution path. The recursive reference path is a
-debug/reference implementation and must stay contract-equivalent to compiled
-evaluation for `f`, boundary outputs, and params semantics.
+### `Trajectory`, sets, costs
 
-Optional composition shortcuts live in `minilink.core.composition` and return
-ordinary `DiagramSystem` objects. The explicit `add_subsystem` / `connect` API
-remains the canonical general interface; `+` only adds subsystems, `>>` connects
-default output-to-input series chains, `@` builds the controller/plant closed-loop
-convention using controller input `"r"`, plant output `"y"`, and controller
-output `"u"`, and `DiagramSystem.autowire()` conservatively fills only
-unconnected inputs when exactly one safe named-port match exists.
-
-### `Trajectory`
-
-`Trajectory` is the canonical sampled state-input object:
-
-- `t` has shape `(N,)`;
-- `x` has shape `(n, N)`;
-- `u` has shape `(m, N)`;
-- optional sampled channels live in `signals` with shape `(dim, N)`.
-
-It is a NumPy/reporting object. Simulation, planning, tracking, plotting, and
-animation should share it when representing sampled state-input data.
-
-### Sets And Costs
-
-Sets and costs live in `core` because planning, optimization, control, and
-analysis can all need them.
-
-Set contract:
-
-- `margin(z, t=0, params=None) -> native array`;
-- feasible means all margins are nonnegative;
-- `contains` and `sample` are boundary utilities and may convert to NumPy.
-
-Input-set contract:
-
-- `margin(u, x=None, t=0, params=None) -> native array`.
-
-Cost contract:
-
-- running cost: `g(x, u, t=0, params=None) -> native scalar expression`;
-- terminal cost: `h(x, t=0, params=None) -> native scalar expression`;
-- reporting helpers such as `evaluate_trajectory`, `terminal_cost`, and
-  `total_cost` convert to NumPy/Python at the boundary.
-
-Simple algebraic sets and costs should be single backend-native classes. Do not
-add `Jax<Cost>` or `Jax<Set>` twins when ordinary array math is traceable.
+- `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
+- Sets: `margin ≥ 0` feasible; `contains`/`sample` may convert to NumPy.
+- Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
+  `PlanningProblem`, not the plant.
 
 ## 5. Compilation And Simulation
 
-### Dynamics Compilation
+`compile(system, backend)` → `DynamicsEvaluator` (`numpy`|`jax`|`auto`|`direct`).
 
-`compile(system, backend="numpy"|"jax")` returns a `DynamicsEvaluator`.
+Diagrams → `ExecutionPlan` → diagram evaluator. Internal outputs via
+`reconstruct_internal_signals`.
 
-Evaluator tiers:
+**Default sim API:** `compute_trajectory` / `compute_forced` → `Simulator` →
+`Trajectory`. Unconnected inputs use port nominals; time-varying sources belong
+in the diagram; forcing via `compute_forced`. Facades default
+`compile_backend="numpy"`.
 
-| Tier | Dynamics | Output | Fixed values |
-| --- | --- | --- | --- |
-| Standard | `f(x, u, t)` | `h(x, u, t)` | compiled/default params |
-| Parametric | `f_p(x, u, t, params)` | `h_p(x, u, t, params)` | caller supplies params |
-| IVP | `f_ivp(x, t)` | `h_ivp(x, t)` | nominal input and params |
-
-For diagrams, `ExecutionPlan` is the canonical flattened representation. It
-stores ordered port/state operations, slices, and boundary-output metadata.
-`outputs(...)` means boundary outputs only; internal signals are reconstructed
-through diagram-specific APIs such as `DiagramSystem.reconstruct_internal_signals`.
-
-Backend strings are centralized in `minilink.compile.backend_policy`:
-`"numpy"`, `"jax"`, `"auto"`, and `"direct"`.
-
-### Simulation
-
-**Primary user API:** `System.compute_trajectory(...)` and
-`System.compute_forced(...)`. These are thin wrappers around
-`minilink.simulation.simulator.Simulator` and are the recommended entry point
-for scripts and notebooks.
-
-Lower-level path (same execution chain):
-
-```text
-System / DiagramSystem -> compile -> DynamicsEvaluator -> Simulator -> Trajectory
-```
-
-Direct `Simulator(...)` construction remains appropriate when one integrator
-object should run multiple rollouts, expose solver internals, or avoid writing
-`sys.traj`.
-
-Simulation policy:
-
-- unconnected input ports contribute constant nominal values;
-- reusable time-varying model signals should be source blocks in a diagram;
-- run-specific forcing should be passed to the simulator as sampled data or a
-  callable through `compute_forced`;
-- `Simulator(..., compile_backend="auto")` may try JAX and fall back to NumPy;
-- high-level `System` shortcuts default to NumPy for predictability.
-
-Solver presets include `"scipy"`, `"scipy_stiff"`, `"scipy_max"`,
-`"scipy_ultra"`, `"scipy_lsoda"`, `"euler"`, and `"rk4_fixedsteps"`. When
-`solver` is omitted, `Simulator.select_solver` chooses based on system metadata
-and compile backend. A dedicated `SimulationOptions`-style object is planned
-(see [ROADMAP.md](ROADMAP.md) P1).
+Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
+`euler`, `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
+([ROADMAP.md](ROADMAP.md) P1).
 
 ## 6. Optimization And Planning
 
-### Mathematical Programs
+**NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;
+`Optimizer` binds method preset (`scipy_slsqp`, `scipy_trust_constr`, `ipopt`).
 
-`MathematicalProgram` is a pure finite-dimensional NLP description:
+**Planning:** `PlanningProblem` owns system, sets, cost. `X0`/`Xf` authoritative;
+`x_start`/`x_goal` are shortcuts/representative points.
 
-```text
-minimize J(z)
-subject to h(z) = 0
-           g(z) >= 0
-           lower <= z <= upper
-```
+**Trajopt:** planner → transcription → `MathematicalProgram` → `Optimizer` →
+`Trajectory`. Single backend-native transcription classes; no parallel JAX
+transcription types.
 
-Object contract:
+## 7. Graphics And Benchmarks
 
-- `J : (n_z,) -> native scalar expression`;
-- `h : (n_z,) -> (n_h,)` or `None`;
-- `g : (n_z,) -> (n_g,)` or `None`;
-- optional derivative callables: `grad_J`, `hess_J`, `jac_h`, `jac_g`;
-- optional box bounds and metadata;
-- no initial guess and no solver state.
+Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
+Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
+Plotly under `plotting` extra.
 
-`compile_program_evaluator(program, backend=...)` creates the solver-facing
-`MathematicalProgramEvaluator`. Evaluators own backend-specific validation,
-JAX `jit`/autodiff, and SciPy/Ipopt-friendly wrappers such as `objective`,
-`equality_residual`, and `inequality_margin`.
+**Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
+for all renderers. Override on `System` for custom views; kinematic hooks TRL 1.
 
-`Optimizer` is a bound solver object. It compiles the program at initialization,
-stores `z0`, and selects a method preset such as:
+Benchmark helpers live beside subsystems; runners under `tests/benchmark/`—not
+public contracts.
 
-- `scipy_slsqp`;
-- `scipy_trust_constr`;
-- `ipopt`.
-
-A method preset is the user-facing bundle of optimizer backend, backend method,
-and default options. User options override preset defaults.
-
-### Planning And Trajectory Optimization
-
-`PlanningProblem` owns the system, boundary sets, allowable sets, optional cost,
-and optional params.
-
-Boundary-set contract:
-
-- `X0` and `Xf` are the authoritative initial and terminal feasibility sets.
-- `x_start` and `x_goal` are representative points and ergonomic shortcuts.
-- If `X0` is omitted, `x_start` creates a singleton `X0`; if `x_start` is
-  omitted and `X0` is a singleton, it is derived from that set; otherwise it
-  defaults to `sys.x0`.
-- If `Xf` is omitted, `x_goal` creates a singleton `Xf`; if `x_goal` is omitted
-  and `Xf` is a singleton, it is derived from that set.
-- When a representative point and a boundary set are both supplied, the point
-  must belong to the set.
-
-Trajectory optimization is a deterministic planning family:
-
-- planners own workflow, guesses, warm starts, callbacks, and result storage;
-- transcriptions own decision-vector layout and emit `MathematicalProgram`;
-- `compile_backend` selects NumPy, direct, or JAX-compatible equation paths;
-- JAX gradients come from the program evaluator when the system, cost, and
-  constraints are traceable.
-
-There are no parallel JAX transcription classes. Direct collocation, shooting,
-and multiple shooting should stay single public transcription classes whenever
-their equations can be written backend-natively.
-
-## 7. Graphics, Benchmarks, And Style
-
-Graphics: time-signal plotting, phase-plane plotting (`System.plot_phase_plane`
-and `minilink.graphical.phase_plane`), diagram topology export, and animation
-live in `graphical`; `System.render` / `animate` / `game` are facades. Time
-plots use explicit signal names such as `signals=("x", "u")`. Phase-plane plots
-evaluate `sys.f` on a 2D state grid with optional `Trajectory` overlay;
-matplotlib is the default phase-plane backend.
-
-Backends consume derived views (`SignalPlotSpec` for time data,
-`PhasePlaneSpec` for phase-plane vector fields, and `DiagramTopology` for
-display topology) so `Trajectory` and `DiagramSystem` remain the source objects.
-Matplotlib and Graphviz are default backends; Plotly is optional under the
-`plotting` extra for signal plots plus static/precomputed notebook rendering;
-Mermaid export is dependency-free text. Plotly rendering is an
-artifact/playback backend, not the high-frequency live loop for `game()` or
-trajectory-optimization iteration updates. Kinematic hooks are provisional;
-environment and style policy live in `graphical.common`.
-
-Benchmarks: helpers live next to the measured subsystem (`compile/benchmark.py`,
-`simulation/benchmark.py`, `optimization/benchmark.py`,
-`planning/trajectory_optimization/benchmark.py`); runners under `tests/benchmark/`;
-they are not core contracts.
-
-Camera / framing contract:
-
-- `System.get_camera_transform(x, u, t) -> (4, 4) ndarray` is the standard
-  camera matrix consumed by every renderer. There is one matrix and one method:
-  2D rendering is always an orthographic projection of the same 3D camera (no
-  separate 2D pipeline). Built by `minilink.graphical.animation.primitives.camera_matrix`:
-  - `T[:3, 3]` look-at target in world (each frame for 2D projection; initial
-    framing for interactive 3D);
-  - columns of `T[:3, :3]` are world directions of camera-X (plot horizontal),
-    camera-Y (plot vertical), camera-Z (view-out); built from `plot_axes=(i, j)`
-    as `(e_i, e_j, e_i × e_j)`;
-  - `T[3, 3]` is the view scale (amplitude-channel convention, same as
-    `torque_pose2d_matrix`): orthographic half-extent for matplotlib 2D/3D and
-    pygame; perspective camera distance for meshcat.
-- Renderers consume only the slots they understand and ignore the rest:
-  matplotlib 2D keeps ordinary top-down XY views in world coordinates and moves
-  only `xlim/ylim = target ± T[3,3]`, so grid ticks remain world-fixed under
-  following cameras; non-XY 2D projections pre-multiply body transforms by
-  `world_to_camera(camera)` so primitive XY ends up in camera frame; matplotlib
-  3D decodes `view_init(elev, azim)` from `T[:3,2]` and sets
-  `xlim/ylim/zlim` once at scene open, then leaves the interactive camera to the
-  UI; meshcat sets orbit pivot and eye distance once at scene open (same
-  interactive-camera rule).
-- Intentional non-knobs (KISS): explicit arbitrary camera rotation,
-  anisotropic per-axis zoom, and field-of-view are not in the default camera
-  helper; override `get_camera_transform` directly when a system needs a custom
-  camera. `aspect='equal'` is enforced everywhere.
-
-Repository conventions: Python 3.10+; type hints and NumPy-style docstrings on
-public APIs; lazy optional imports; equation code stays explicit and math-close;
-top-level package `__init__.py` files are namespace markers; focused plot-type
-subpackages may re-export their small public facades.
+**Repo conventions:** Python 3.10+; typed public APIs; lazy optional imports;
+namespace `__init__.py` files; plot subpackages may re-export small facades.
