@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink.core.system import DynamicSystem
-from minilink.graphical.primitives import Plane, Sphere, translation_matrix
+from minilink.graphical.animation.primitives import Plane, Sphere, translation_matrix
 from minilink.physics.engine_jax import WorldModel, unpack_state, world_ode
 
 

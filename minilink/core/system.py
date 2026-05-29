@@ -665,7 +665,7 @@ class System:
         By default, the base :class:`System` generates one point per state and
         one point per input.
         """
-        from minilink.graphical.primitives import Point
+        from minilink.graphical.animation.primitives import Point
 
         primitives = []
         for i in range(self.n):
@@ -681,7 +681,7 @@ class System:
         This visualization contract is intentionally still provisional.
         By default, states and inputs are mapped to simple translations.
         """
-        from minilink.graphical.primitives import translation_matrix
+        from minilink.graphical.animation.primitives import translation_matrix
 
         transforms = []
 
@@ -704,7 +704,7 @@ class System:
         """
         Return the standard 4x4 camera transform for this system.
 
-        The matrix follows :func:`minilink.graphical.primitives.camera_matrix`:
+        The matrix follows :func:`minilink.graphical.animation.primitives.camera_matrix`:
         ``T[:3, 3]`` is the look-at target in world, the columns of ``T[:3, :3]``
         are the world directions of camera-X (plot horizontal), camera-Y
         (plot vertical), and camera-Z (view-out), and ``T[3, 3]`` is the view
@@ -717,7 +717,7 @@ class System:
 
         TODO: User Architectural Review (visualization contract is TRL 1).
         """
-        from minilink.graphical.primitives import camera_matrix
+        from minilink.graphical.animation.primitives import camera_matrix
 
         return camera_matrix(
             target=self.camera_target,
@@ -786,7 +786,6 @@ class System:
         Trajectory
             The simulated trajectory, also stored in :attr:`traj`.
         """
-        from minilink.graphical.plotting import plot_time_signals
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -803,6 +802,8 @@ class System:
         traj = sim.solve()
 
         if show:
+            from minilink.graphical.signals import plot_time_signals
+
             plot_time_signals(self, traj)
 
         self.traj = traj
@@ -849,7 +850,6 @@ class System:
         Trajectory
             Simulated state-input trajectory.
         """
-        from minilink.graphical.plotting import plot_time_signals
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -867,6 +867,8 @@ class System:
         traj = sim.solve_forced(u, input_port_id=input_port_id)
 
         if show:
+            from minilink.graphical.signals import plot_time_signals
+
             plot_time_signals(self, traj)
 
         self.traj = traj
@@ -892,15 +894,15 @@ class System:
         ----------
         signals : tuple of str, optional
             Signal names to plot; see
-            :func:`minilink.graphical.plotting.plot_time_signals`.
+            :func:`minilink.graphical.signals.plot_time_signals`.
 
         Returns
         -------
-        Trajectory or PlotResult
-            :class:`~minilink.core.trajectory.Trajectory` if a simulation is run; otherwise
-            the plot result from :func:`minilink.graphical.plotting.plot_time_signals`.
+        PlotResult
+            The plot result from
+            :func:`minilink.graphical.signals.plot_time_signals`.
         """
-        from minilink.graphical.plotting import plot_time_signals
+        from minilink.graphical.signals import plot_time_signals
 
         if traj is not None:
             return plot_time_signals(
@@ -912,7 +914,14 @@ class System:
                 self, self.traj, signals=signals, backend=backend, show=show
             )
 
-        return self.compute_trajectory(signals=signals, plot_backend=backend, show=show)
+        traj = self.compute_trajectory(show=False)
+        return plot_time_signals(
+            self,
+            traj,
+            signals=signals,
+            backend=backend,
+            show=show,
+        )
 
     def plot_phase_plane(
         self,
@@ -931,7 +940,7 @@ class System:
         simulation result, the sampled state path is overlaid on the vector
         field. Otherwise only the vector field is plotted.
         """
-        from minilink.graphical.plotting import plot_phase_plane
+        from minilink.graphical.phase_plane import plot_phase_plane
 
         if traj is None:
             traj = self.traj
@@ -949,7 +958,7 @@ class System:
         """
         Convenience shortcut returning an HTML block representation.
         """
-        from minilink.graphical.graphe import get_system_block_html
+        from minilink.graphical.diagrams import get_system_block_html
 
         return get_system_block_html(self, label)
 
@@ -965,38 +974,42 @@ class System:
             print("IPython is not available")
             return
 
-    def get_graphe(self):
+    def get_diagram(self):
         """
-        Convenience shortcut returning the Graphviz graph representation.
+        Convenience shortcut returning a renderable diagram representation.
         """
-        from minilink.graphical.graphe import get_system_graphe
+        from minilink.graphical.diagrams import get_diagram
 
-        return get_system_graphe(self)
+        return get_diagram(self)
 
     def _repr_svg_(self):
         """
-        Convenience notebook representation for the system graph.
+        Convenience notebook representation for the system diagram.
         """
-        g = self.get_graphe()
+        g = self.get_diagram()
         if g is None:
             return None
         return g._repr_image_svg_xml()
 
-    def plot_graphe(self, filename=None, show_inline=None, show_pdf=None):
+    def plot_diagram(self, filename=None, show_inline=None, show_pdf=None):
         """
-        Convenience shortcut to render the Graphviz system graph.
+        Convenience shortcut to render the system diagram.
 
         ``show_inline`` and ``show_pdf`` default to ``None`` and auto-resolve
-        via :func:`minilink.graphical.environment.is_inline_capable`:
+        via :func:`minilink.graphical.common.environment.is_inline_capable`:
         Jupyter / Colab get inline SVG only (no viewer pop-up, no disk write),
         while bare scripts and IPython REPLs get the legacy render-to-temp-file
         + open-in-OS-PDF-viewer behavior. Pass explicit booleans to override;
         pass ``filename`` to force a specific on-disk output.
         """
-        from minilink.graphical.graphe import plot_graphviz
+        from minilink.graphical.diagrams import plot_diagram
 
-        g = self.get_graphe()
-        plot_graphviz(g, show_inline=show_inline, show_pdf=show_pdf, filename=filename)
+        return plot_diagram(
+            self,
+            show_inline=show_inline,
+            show_pdf=show_pdf,
+            filename=filename,
+        )
 
     def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
         """
@@ -1020,7 +1033,7 @@ class System:
         Convenience shortcut to animate a trajectory of this system.
 
         ``html=None`` auto-resolves via
-        :func:`minilink.graphical.environment.prefers_inline_animation`:
+        :func:`minilink.graphical.common.environment.prefers_inline_animation`:
         ``True`` in Colab and in local Jupyter with a non-interactive
         matplotlib backend (``inline`` / ``agg``); ``False`` for bare
         script, IPython REPL, and Jupyter with an interactive backend
@@ -1033,7 +1046,7 @@ class System:
         primitives such as ``TorqueArrow``; see ``DESIGN.md`` §4.7).
         """
         from minilink.graphical.animation import Animator
-        from minilink.graphical.environment import prefers_inline_animation
+        from minilink.graphical.common.environment import prefers_inline_animation
 
         if traj is None:
             if self.traj is not None:

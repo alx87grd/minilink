@@ -130,4 +130,4 @@ diagram = (
     + vehicle
 ).autowire(strict=True)
 diagram.name = "Autowired bicycle cascade topology"
-diagram.plot_graphe()
+diagram.plot_diagram()

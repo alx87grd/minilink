@@ -24,7 +24,7 @@ plant = Pendulum()
 
 diagram = step + ctl + plant
 diagram.name = "Shortcut add-only diagram"
-diagram.plot_graphe()
+diagram.plot_diagram()
 
 
 # Equivalent explicit form:
@@ -39,7 +39,7 @@ diagram.plot_graphe()
 
 chain = Step() >> Integrator() >> Integrator()
 chain.name = "Shortcut integrator chain"
-chain.plot_graphe()
+chain.plot_diagram()
 # chain.compute_trajectory(tf=5.0, show=False)
 
 
@@ -55,7 +55,7 @@ chain.plot_graphe()
 # closed.connect_new_output_port("pendulum", "y", "y")
 closed = PendulumPDController() @ Pendulum()
 closed.name = "Shortcut closed-loop pendulum"
-closed.plot_graphe()
+closed.plot_diagram()
 # closed.compute_trajectory(tf=10.0, show=False)
 
 
@@ -70,4 +70,4 @@ closed.plot_graphe()
 # auto.connect("controller", "u", "pendulum", "u")
 auto = (Step() + PendulumPDController() + Pendulum()).autowire(strict=True)
 auto.name = "Autowired shortcut diagram"
-auto.plot_graphe()
+auto.plot_diagram()

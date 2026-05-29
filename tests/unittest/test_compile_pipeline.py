@@ -70,7 +70,7 @@ class _JAXFriendlyIntegrator(DynamicSystem):
 def _build_small_closed_loop_jax():
     """Same wiring as :func:`_build_small_closed_loop` with JAX-traceable blocks."""
     diag = DiagramSystem()
-    diag.graphe_building_verbose = False
+    diag.connection_verbose = False
 
     ctl = _JAXFriendlyPropController()
     plant = _JAXFriendlyIntegrator()
@@ -95,7 +95,7 @@ def _build_closed_loop_with_external_output_jax():
 def _build_small_closed_loop():
     """Step → PropController → Integrator → feedback to controller."""
     diag = DiagramSystem()
-    diag.graphe_building_verbose = False
+    diag.connection_verbose = False
 
     ctl = PropController()
     plant = Integrator()
@@ -132,7 +132,7 @@ def _build_feedthrough_loop():
             return u * 2
 
     diag = DiagramSystem()
-    diag.graphe_building_verbose = False
+    diag.connection_verbose = False
     diag.add_subsystem(FeedthroughSystem("A"), "A")
     diag.add_subsystem(FeedthroughSystem("B"), "B")
     diag.add_subsystem(FeedthroughSystem("C"), "C")
@@ -281,7 +281,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
     def test_f_zero_state(self):
         """Diagram with no dynamic subsystems should return empty dx."""
         diag = DiagramSystem()
-        diag.graphe_building_verbose = False
+        diag.connection_verbose = False
 
         class Gain(StaticSystem):
             def __init__(self):

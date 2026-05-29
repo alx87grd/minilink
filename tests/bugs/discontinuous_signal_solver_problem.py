@@ -50,7 +50,7 @@ diagram2.connect("controller", "u", "plant", "u")
 diagram2.connect("plant", "y", "controller", "y")
 diagram2.connect("noise", "y", "plant", "w")
 diagram2.connect("noise2", "y", "plant", "v")
-diagram2.plot_graphe()
+diagram2.plot_diagram()
 
 print("Running simulation... this is fast with euler solver")
 diagram2.compute_trajectory(tf=20, solver="euler", dt=0.01)

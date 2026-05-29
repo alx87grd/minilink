@@ -1,7 +1,7 @@
 """
 Trajectory animation orchestration.
 
-Backends live under :mod:`minilink.graphical.renderers`; the animator picks one by name
+Backends live under :mod:`minilink.graphical.animation.renderers`; the animator picks one by name
 (see :func:`_make_renderer`).
 
 Roadmap (not implemented here—see ``ROADMAP.md`` §7 and P2):
@@ -19,13 +19,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.graphical.environment import prefers_inline_animation
-from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
-from minilink.graphical.renderers.meshcat_renderer import MeshcatRenderer
-from minilink.graphical.renderers.plotly_renderer import PlotlyRenderer
-from minilink.graphical.renderers.pygame_renderer import PygameRenderer
-from minilink.graphical.renderers.renderer import AnimationRenderer
-from minilink.graphical.renderers.timing import (
+from minilink.graphical.common.environment import prefers_inline_animation
+from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
+from minilink.graphical.animation.renderers.meshcat_renderer import MeshcatRenderer
+from minilink.graphical.animation.renderers.plotly_renderer import PlotlyRenderer
+from minilink.graphical.animation.renderers.pygame_renderer import PygameRenderer
+from minilink.graphical.animation.renderers.renderer import AnimationRenderer
+from minilink.graphical.animation.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
 )
@@ -44,7 +44,7 @@ def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
     """
     Return a backend instance for *name*.
 
-    To add a backend, implement :class:`~minilink.graphical.renderers.renderer.AnimationRenderer`
+    To add a backend, implement :class:`~minilink.graphical.animation.renderers.renderer.AnimationRenderer`
     and extend this function.
     """
     key = name.strip().lower()
@@ -75,7 +75,7 @@ class Animator:
     """
     Coordinates playback: owns the simulated system and delegates drawing to an
     :class:`AnimationRenderer`. Matplotlib figure size and resolution live in
-    :mod:`minilink.graphical.matplotlib_style`.
+    :mod:`minilink.graphical.common.matplotlib_style`.
     """
 
     def __init__(self, sys):
@@ -117,7 +117,7 @@ class Animator:
         - ``renderer``  : graphics tech
           (``"matplotlib"``, ``"meshcat"``, ``"plotly"``, ``"pygame"``).
         - ``html``      : output channel. ``None`` auto-resolves via
-          :func:`minilink.graphical.environment.prefers_inline_animation`:
+          :func:`minilink.graphical.common.environment.prefers_inline_animation`:
           ``True`` in Colab and in local Jupyter when the active matplotlib
           backend is non-interactive (``inline`` / ``agg``), ``False`` for
           bare script, IPython REPL, and Jupyter with an interactive backend

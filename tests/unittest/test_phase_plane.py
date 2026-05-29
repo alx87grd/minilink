@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from minilink.core.system import DynamicSystem  # noqa: E402
 from minilink.core.trajectory import Trajectory  # noqa: E402
-from minilink.graphical.plotting import (  # noqa: E402
+from minilink.graphical.phase_plane import (  # noqa: E402
     build_phase_plane_spec,
     plot_phase_plane,
 )

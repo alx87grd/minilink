@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.graphical.topology import build_diagram_topology
+from minilink.graphical.diagrams.topology import build_diagram_topology
 
 
 class TopologyExporter:
@@ -29,13 +29,13 @@ def _resolve_topology_exporter(backend):
 
     key = backend.strip().lower()
     if key == "graphviz":
-        from minilink.graphical.diagram_backends.graphviz_exporter import (
+        from minilink.graphical.diagrams.dot import (
             GraphvizTopologyExporter,
         )
 
         return GraphvizTopologyExporter()
     if key == "mermaid":
-        from minilink.graphical.diagram_backends.mermaid_exporter import (
+        from minilink.graphical.diagrams.mermaid import (
             MermaidTopologyExporter,
         )
 

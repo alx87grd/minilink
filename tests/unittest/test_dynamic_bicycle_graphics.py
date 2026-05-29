@@ -7,7 +7,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycleCar3D,
     DynamicBicycleCar3DRealistic,
 )
-from minilink.graphical.primitives import ExtrudedPolygon
+from minilink.graphical.animation.primitives import ExtrudedPolygon
 
 
 class TestDynamicBicycleCamera(unittest.TestCase):

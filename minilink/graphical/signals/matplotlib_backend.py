@@ -2,44 +2,45 @@
 
 from __future__ import annotations
 
-from minilink.graphical.time_signals import (
+from minilink.graphical.signals.time_signals import (
     LivePlotHandle,
     PlotResult,
-    SignalPlotBackend,
     SignalPlotSpec,
+    _coerce_signal_plot_spec,
 )
 
 
-class MatplotlibSignalBackend(SignalPlotBackend):
-    """Render time-signal plots with matplotlib."""
+def render_matplotlib_signal_plot(
+    spec: SignalPlotSpec,
+    *,
+    show: bool = True,
+    **kwargs,
+) -> PlotResult:
+    """Render a one-shot time-signal plot with matplotlib."""
+    fig, axes, _ = _create_figure(spec, show=show, **kwargs)
+    return PlotResult(
+        backend="matplotlib",
+        payload=(fig, axes),
+        figure=fig,
+        axes=axes,
+    )
 
-    name = "matplotlib"
-    supports_live = True
 
-    def render(self, spec: SignalPlotSpec, *, show: bool = True, **kwargs) -> PlotResult:
-        fig, axes, _ = _create_figure(spec, show=show, **kwargs)
-        return PlotResult(
-            backend=self.name,
-            payload=(fig, axes),
-            figure=fig,
-            axes=axes,
-        )
-
-    def open_live(
-        self,
-        spec: SignalPlotSpec,
-        *,
-        spec_builder=None,
-        show: bool = True,
-        **kwargs,
-    ) -> LivePlotHandle:
-        fig, axes, lines = _create_figure(spec, show=show, block=False, **kwargs)
-        return MatplotlibLivePlotHandle(
-            fig,
-            axes,
-            lines,
-            spec_builder=spec_builder,
-        )
+def open_matplotlib_signal_plot(
+    spec: SignalPlotSpec,
+    *,
+    spec_builder=None,
+    show: bool = True,
+    **kwargs,
+) -> LivePlotHandle:
+    """Open a live matplotlib time-signal plot."""
+    fig, axes, lines = _create_figure(spec, show=show, block=False, **kwargs)
+    return MatplotlibLivePlotHandle(
+        fig,
+        axes,
+        lines,
+        spec_builder=spec_builder,
+    )
 
 
 class MatplotlibLivePlotHandle(LivePlotHandle):
@@ -52,7 +53,11 @@ class MatplotlibLivePlotHandle(LivePlotHandle):
         self.spec_builder = spec_builder
 
     def update(self, traj_or_spec, *, title: str | None = None) -> None:
-        spec = _coerce_spec(traj_or_spec, self.spec_builder, title=title)
+        spec = _coerce_signal_plot_spec(
+            traj_or_spec,
+            self.spec_builder,
+            title=title,
+        )
         if len(spec.traces) != len(self.lines):
             raise ValueError(
                 "Live plot update changed the number of traces; open a new plot."
@@ -89,11 +94,11 @@ def _create_figure(
     import matplotlib
     import matplotlib.pyplot as plt
 
-    from minilink.graphical.environment import (
+    from minilink.graphical.common.environment import (
         allow_tall_stacked_figures,
         is_blocking_needed,
     )
-    from minilink.graphical.matplotlib_style import (
+    from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,
         FONT_SIZE,
         style_trajectory_subplot,
@@ -153,11 +158,3 @@ def _create_figure(
             plt.pause(pause)
 
     return fig, axes, lines
-
-
-def _coerce_spec(traj_or_spec, spec_builder, *, title=None):
-    if isinstance(traj_or_spec, SignalPlotSpec):
-        return traj_or_spec
-    if spec_builder is None:
-        raise TypeError("Updating from a trajectory requires a spec builder.")
-    return spec_builder(traj_or_spec, title=title)

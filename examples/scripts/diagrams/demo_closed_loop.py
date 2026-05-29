@@ -33,20 +33,20 @@ diagram.add_subsystem(sys, "plant")
 # Unconnected controller -> plant
 diagram.connect("step", "y", "controller", "r")
 diagram.name = "Pendulum alone"
-diagram.plot_graphe()
+diagram.plot_diagram()
 diagram.compute_trajectory(tf=20)
 diagram.animate()
 
 # Open loop controller -> plant
 diagram.connect("controller", "u", "plant", "u")
 diagram.name = "Pendulum with Open Loop Controller"
-diagram.plot_graphe()
+diagram.plot_diagram()
 diagram.compute_trajectory(tf=20)
 diagram.animate()
 
 # Closed loop controller -> plant
 diagram.connect("plant", "y", "controller", "y")
 diagram.name = "Closed Loop Pendulum "
-diagram.plot_graphe()
+diagram.plot_diagram()
 diagram.compute_trajectory(tf=20)
 diagram.animate()

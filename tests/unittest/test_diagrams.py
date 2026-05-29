@@ -4,17 +4,16 @@ import pytest
 
 from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.diagram import DiagramSystem
-from minilink.graphical.graphe import (
-    get_diagram_graphe,
+from minilink.graphical.diagrams import (
+    build_diagram_topology,
+    export_diagram_topology,
+    get_diagram,
     get_system_block_html,
-    get_system_graphe,
-    plot_graphviz,
+    plot_diagram,
 )
-from minilink.graphical.diagram_export import export_diagram_topology
-from minilink.graphical.topology import build_diagram_topology
 
 
-class TestGraphviz(unittest.TestCase):
+class TestDiagrams(unittest.TestCase):
     def test_system_block_html_includes_named_ports(self):
         html = get_system_block_html(PropController(), "ctl")
 
@@ -22,21 +21,21 @@ class TestGraphviz(unittest.TestCase):
         self.assertIn('PORT="r"', html)
         self.assertIn('PORT="u"', html)
 
-    def test_system_graphe_contains_block_label(self):
+    def test_system_diagram_contains_block_label(self):
         pytest.importorskip("graphviz")
 
-        graph = get_system_graphe(Integrator())
+        graph = get_diagram(Integrator())
 
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
         self.assertIn('PORT="y"', graph.source)
 
-    def test_diagram_graphe_contains_subsystems_and_connections(self):
+    def test_diagram_graph_contains_subsystems_and_connections(self):
         pytest.importorskip("graphviz")
 
         diagram = self._make_diagram()
 
-        graph = get_diagram_graphe(diagram)
+        graph = get_diagram(diagram)
 
         self.assertIsNotNone(graph)
         self.assertIn("ctl", graph.source)
@@ -44,8 +43,13 @@ class TestGraphviz(unittest.TestCase):
         self.assertIn("input:r:e -> ctl:r:w", graph.source)
         self.assertIn("output:y_meas:w", graph.source)
 
-    def test_plot_graphviz_accepts_none_graph(self):
-        self.assertIsNone(plot_graphviz(None, show_inline=False, show_pdf=False))
+    def test_plot_diagram_no_display_returns_graph(self):
+        pytest.importorskip("graphviz")
+
+        graph = plot_diagram(Integrator(), show_inline=False, show_pdf=False)
+
+        self.assertIsNotNone(graph)
+        self.assertIn("Integrator", graph.source)
 
     def test_topology_builder_contains_ports_and_edges(self):
         topology = build_diagram_topology(self._make_diagram())
@@ -71,7 +75,7 @@ class TestGraphviz(unittest.TestCase):
     @staticmethod
     def _make_diagram():
         diagram = DiagramSystem()
-        diagram.graphe_building_verbose = False
+        diagram.connection_verbose = False
         diagram.add_subsystem(PropController(), "ctl")
         diagram.add_subsystem(Integrator(), "plant")
         diagram.add_input_port("r")

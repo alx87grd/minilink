@@ -10,8 +10,8 @@ import pytest
 from minilink.core.diagram import DiagramSystem
 from minilink.core.trajectory import Trajectory
 from minilink.core.system import DynamicSystem, StaticSystem
-from minilink.graphical.plotly_style import PLOTLY_FIG_WIDTH
-from minilink.graphical.plotting import (
+from minilink.graphical.common.plotly_style import PLOTLY_FIG_WIDTH
+from minilink.graphical.signals import (
     build_signal_plot_spec,
     open_time_signal_plot,
     plot_time_signals,
@@ -72,12 +72,12 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.traj = self.sim.solve()
 
     def test_plotting_import_is_quiet(self):
-        import minilink.graphical.plotting as plotting
+        import minilink.graphical.signals as signals
 
         interactive = plt.isinteractive()
         stream = io.StringIO()
         with contextlib.redirect_stdout(stream):
-            importlib.reload(plotting)
+            importlib.reload(signals)
         self.assertEqual(stream.getvalue(), "")
         self.assertEqual(plt.isinteractive(), interactive)
 
@@ -98,7 +98,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertEqual(traj_plus.get_signal("ctl:u").shape, (1, n_pts))
 
     def test_plot_time_signals_does_not_crash(self):
-        from minilink.graphical.environment import override_env
+        from minilink.graphical.common.environment import override_env
 
         override_env("jupyter")
         self.addCleanup(override_env, None)
@@ -110,6 +110,16 @@ class TestAdvancedPlotting(unittest.TestCase):
             show=False,
         )
         self.assertIsNotNone(result.figure)
+        plt.close(result.figure)
+
+    def test_plot_trajectory_computes_missing_trajectory_then_plots(self):
+        sys = Integrator()
+
+        result = sys.plot_trajectory(show=False)
+
+        self.assertEqual(result.backend, "matplotlib")
+        self.assertIsNotNone(result.figure)
+        self.assertIsNotNone(sys.traj)
         plt.close(result.figure)
 
     def test_signal_spec_resolves_core_and_extra_signals(self):
@@ -166,7 +176,7 @@ class TestAdvancedPlotting(unittest.TestCase):
 
 
 @pytest.mark.optional
-class TestPlotlySignalBackend(unittest.TestCase):
+class TestPlotlySignalPlot(unittest.TestCase):
     def test_plotly_static_and_live_update(self):
         pytest.importorskip("plotly")
 
@@ -203,7 +213,7 @@ class TestPlotlySignalBackend(unittest.TestCase):
         np.testing.assert_allclose(handle.fig.data[0].y, np.array([0.0, 0.25]))
 
     def test_stacked_figsize_caps_height_for_popup_layout(self):
-        from minilink.graphical.matplotlib_style import (
+        from minilink.graphical.common.matplotlib_style import (
             SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP,
             SIGNAL_PLOT_ROW_HEIGHT,
             TRAJECTORY_MAX_FIG_HEIGHT_POPUP,

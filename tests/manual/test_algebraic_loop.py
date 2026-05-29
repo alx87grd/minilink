@@ -28,12 +28,12 @@ diag.add_subsystem(FeedthroughSystem("C"), "C")
 
 diag.connect("A", "y", "B", "u")
 diag.connect("B", "y", "C", "u")
-diag.plot_graphe()
+diag.plot_diagram()
 
 diag.check_algebraic_loops()
 
 # # ── Now create an actual algebraic loop ──────────────────────────
 # diag.connect("C", "y", "A", "u")
-# diag.plot_graphe()
+# diag.plot_diagram()
 
 # diag.check_algebraic_loops()

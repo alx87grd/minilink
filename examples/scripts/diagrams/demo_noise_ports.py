@@ -44,7 +44,7 @@ diagram.connect("controller", "u", "plant", "u")
 diagram.connect("plant", "y", "controller", "y")
 diagram.connect("process_noise", "y", "plant", "w")
 diagram.connect("measurement_noise", "y", "plant", "v")
-diagram.plot_graphe()
+diagram.plot_diagram()
 
 
 diagram.name = "Pendulum without Noise"

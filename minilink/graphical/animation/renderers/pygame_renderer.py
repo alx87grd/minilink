@@ -7,7 +7,7 @@ from itertools import product
 import matplotlib.colors as mcolors
 import numpy as np
 
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
     Circle,
@@ -21,7 +21,7 @@ from minilink.graphical.primitives import (
     extract_amplitude,
     world_to_camera,
 )
-from minilink.graphical.renderers.renderer import AnimationRenderer
+from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 
 
 def _import_pygame():

@@ -94,8 +94,8 @@ out = opt.solve(
 if SHOW_FIGURE:
     import matplotlib.pyplot as plt
 
-    from minilink.graphical.environment import is_blocking_needed
-    from minilink.graphical.matplotlib_style import (
+    from minilink.graphical.common.environment import is_blocking_needed
+    from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,
         FONT_SIZE,
         style_trajectory_subplot,

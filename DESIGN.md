@@ -40,7 +40,7 @@ backend switch or a `minilink.jax` package.
 | `dynamics/` | TRL 1 | Plant abstractions and catalog models. |
 | `symbolic/` | TRL 1 | Optional SymPy mechanics derivation/export helpers. |
 | `physics/` | TRL 1 | Engine-backed physics MVPs, currently JAX-focused. |
-| `graphical/` | TRL 2 | Plotting, animation, graph display, renderer backends, and matplotlib style policy. |
+| `graphical/` | TRL 2 | Plotting, animation, diagram display, renderer backends, and matplotlib style policy. |
 | `control/` | TRL 0 | Controller/static-law blocks. |
 
 ### Dynamics Abstraction Tree
@@ -134,18 +134,11 @@ minilink/
     abstraction/
     catalog/
   graphical/
-    plotting.py
-    time_signals.py
-    topology.py
-    diagram_export.py
-    animation.py
-    environment.py
-    primitives.py
-    graphe.py
-    matplotlib_style.py
-    signal_backends/
-    diagram_backends/
-    renderers/
+    common/
+    signals/
+    phase_plane/
+    diagrams/
+    animation/
   symbolic/
     mechanics/
       derivation.py
@@ -235,7 +228,7 @@ Boundary conveniences:
   `get_kinematic_transforms(x, u, t)`, `get_dynamic_geometry(x, u, t)`, and
   `get_camera_transform(x, u, t)` (standard 4x4 camera matrix; see §7);
 - facade methods: `compile`, `compute_trajectory`, `compute_forced`, time-signal
-  plotting with `signals=("x", "u")`, `render`, `animate`, `game`, and graph
+  plotting with `signals=("x", "u")`, `render`, `animate`, `game`, and diagram
   helpers.
 
 The facade methods may import simulation or graphics lazily. They do not change
@@ -457,15 +450,15 @@ their equations can be written backend-natively.
 Graphics: time-signal plotting, phase-plane plotting, diagram topology export,
 and animation live in `graphical`; `System.render` / `animate` / `game` are
 facades. Time plots use explicit signal names such as `signals=("x", "u")`.
-Backends consume derived views (`SampledSignals` / `SignalPlotSpec` for time
-data, `PhasePlaneSpec` for phase-plane vector fields, and `DiagramTopology` for
+Backends consume derived views (`SignalPlotSpec` for time data,
+`PhasePlaneSpec` for phase-plane vector fields, and `DiagramTopology` for
 display topology) so `Trajectory` and `DiagramSystem` remain the source objects.
 Matplotlib and Graphviz are default backends; Plotly is optional under the
 `plotting` extra for signal plots plus static/precomputed notebook rendering;
 Mermaid export is dependency-free text. Plotly rendering is an
 artifact/playback backend, not the high-frequency live loop for `game()` or
 trajectory-optimization iteration updates. Kinematic hooks are provisional;
-matplotlib style policy lives in `graphical`.
+environment and style policy live in `graphical.common`.
 
 Benchmarks: helpers live next to the measured subsystem (`compile/benchmark.py`,
 `simulation/benchmark.py`, `optimization/benchmark.py`,
@@ -477,7 +470,7 @@ Camera / framing contract:
 - `System.get_camera_transform(x, u, t) -> (4, 4) ndarray` is the standard
   camera matrix consumed by every renderer. There is one matrix and one method:
   2D rendering is always an orthographic projection of the same 3D camera (no
-  separate 2D pipeline). Built by `minilink.graphical.primitives.camera_matrix`:
+  separate 2D pipeline). Built by `minilink.graphical.animation.primitives.camera_matrix`:
   - `T[:3, 3]` look-at target in world (each frame for 2D projection; initial
     framing for interactive 3D);
   - columns of `T[:3, :3]` are world directions of camera-X (plot horizontal),
@@ -502,5 +495,5 @@ Camera / framing contract:
 
 Repository conventions: Python 3.10+; type hints and NumPy-style docstrings on
 public APIs; lazy optional imports; equation code stays explicit and math-close;
-package `__init__.py` files are namespace markers, not barrel re-exports, unless an
-API freeze says otherwise.
+top-level package `__init__.py` files are namespace markers; focused plot-type
+subpackages may re-export their small public facades.

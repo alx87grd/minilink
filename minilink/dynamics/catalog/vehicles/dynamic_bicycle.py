@@ -14,7 +14,7 @@ import numpy as np
 
 from minilink.compile.jax_utils import require_jax_numpy
 from minilink.core.system import DynamicSystem
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
     CustomLine,
@@ -306,7 +306,7 @@ class DynamicBicycleCar3D(DynamicBicycle):
     """
     Same dynamics as :class:`DynamicBicycle`; overrides only kinematic graphics.
 
-    Body box, four wheel :class:`~minilink.graphical.primitives.Rod` primitives,
+    Body box, four wheel :class:`~minilink.graphical.animation.primitives.Rod` primitives,
     and duplicated velocity/force arrows at each side (bicycle model vectors on L/R).
     """
 

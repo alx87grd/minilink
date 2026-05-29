@@ -228,7 +228,7 @@ def _new_diagram():
     from minilink.core.diagram import DiagramSystem
 
     diagram = DiagramSystem()
-    diagram.graphe_building_verbose = False
+    diagram.connection_verbose = False
     _ensure_composition_state(diagram)
     return diagram
 

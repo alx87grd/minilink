@@ -1,7 +1,7 @@
 import numpy as np
 
 from minilink.core.system import DynamicSystem
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Circle,
     Rod,
     TorqueArrow,
@@ -109,7 +109,7 @@ class Pendulum(DynamicSystem):
 if __name__ == "__main__":
 
     pendulum = Pendulum()
-    pendulum.plot_graphe()
+    pendulum.plot_diagram()
     pendulum.plot_phase_plane()
 
     pendulum.x0[0] = np.pi / 2

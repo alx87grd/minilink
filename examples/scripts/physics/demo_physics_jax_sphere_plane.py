@@ -48,7 +48,7 @@ diagram = DiagramSystem()
 diagram.add_subsystem(step, "force_cmd")
 diagram.add_subsystem(sys, "world")
 diagram.connect("force_cmd", "y", "world", "u")
-diagram.plot_graphe()
+diagram.plot_diagram()
 
 traj = diagram.compute_trajectory(tf=10.0, compile_backend="auto")
 

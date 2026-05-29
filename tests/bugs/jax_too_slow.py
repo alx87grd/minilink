@@ -77,7 +77,7 @@ diagram.connect("controller1", "u", "controller2", "r")
 diagram.connect("integrator2", "y", "controller1", "y")
 diagram.connect("step", "y", "controller1", "r")
 
-diagram.plot_graphe()
+diagram.plot_diagram()
 # diagram.compute_trajectory(tf=20)
 
 

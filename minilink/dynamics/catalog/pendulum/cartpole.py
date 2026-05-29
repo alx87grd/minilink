@@ -16,7 +16,7 @@ from minilink.dynamics.abstraction.mechanical import (
     JaxMechanicalSystem,
     MechanicalSystem,
 )
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
     CustomLine,

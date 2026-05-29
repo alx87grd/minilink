@@ -12,12 +12,12 @@ import numpy as np  # noqa: E402
 
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation import Animator
-from minilink.graphical.environment import override_env
-from minilink.graphical.primitives import (
+from minilink.graphical.common.environment import override_env
+from minilink.graphical.animation.primitives import (
     camera_matrix,
     world_to_camera,
 )
-from minilink.graphical.renderers.matplotlib_renderer import (
+from minilink.graphical.animation.renderers.matplotlib_renderer import (
     _axis_label_from_column,
     _camera_3d_view_init,
 )
@@ -98,7 +98,7 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         a = Animator(s)
         a.show(np.zeros(2), np.zeros(1), 0.0, is_3d=False, renderer="matplotlib")
         # The animator closes its figure in show(); inspect via a fresh open_scene.
-        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
 
         backend = MatplotlibRenderer(a)
         backend.open_scene(
@@ -113,8 +113,8 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         plt.close(backend.fig)
 
     def test_xy_follow_camera_keeps_2d_geometry_in_world_coordinates(self):
-        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
-        from minilink.graphical.primitives import Point, camera_matrix, translation_matrix
+        from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.animation.primitives import Point, camera_matrix, translation_matrix
 
         s = DynamicSystem(0)
         a = Animator(s)
@@ -137,7 +137,7 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
             plot_axes=(0, 2), scale=3.0
         )
         a = Animator(s)
-        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
 
         backend = MatplotlibRenderer(a)
         backend.open_scene(
@@ -157,7 +157,7 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
             target=(5.0, -2.0, 1.0), scale=4.0
         )
         a = Animator(s)
-        from minilink.graphical.renderers.matplotlib_renderer import MatplotlibRenderer
+        from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
 
         backend = MatplotlibRenderer(a)
         backend.open_scene(

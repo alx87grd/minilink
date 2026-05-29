@@ -17,7 +17,7 @@ from minilink.core.blocks.basic import Integrator, PropController
 from minilink.core.diagram import DiagramSystem
 
 diag = DiagramSystem()
-diag.graphe_building_verbose = False
+diag.connection_verbose = False
 
 ctl = PropController()
 plant = Integrator()
@@ -30,7 +30,7 @@ diag.add_input_port("r", dim=1)
 diag.connect("input", "r", "ctl", "r")
 diag.connect("plant", "y", "ctl", "y")
 diag.connect("ctl", "u", "plant", "u")
-# diag.plot_graphe()
+# diag.plot_diagram()
 
 
 x = np.array([0.3])

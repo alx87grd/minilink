@@ -203,7 +203,7 @@ def system_test():
 
     sys1.print_html()
 
-    sys1.plot_graphe()
+    sys1.plot_diagram()
 
     return sys1
 
@@ -244,7 +244,7 @@ def diagram_test():
     print("List of connections :\n")
     print(gsys.connections)
 
-    _ = gsys.plot_graphe()
+    _ = gsys.plot_diagram()
 
     print("sys.n = ", gsys.n)
     print("sys.m = ", gsys.m)
@@ -291,7 +291,7 @@ def pendulum_test():
     diagram.connect("step", "y", "plant2", "u")
     diagram.connect("dist", "y", "plant", "w")
     diagram.connect("noise", "y", "plant", "v")
-    diagram.plot_graphe()
+    diagram.plot_diagram()
 
     sim = Simulator(diagram, t0=0, tf=20, dt=0.01, solver="euler")
     diagram.plot_trajectory(sim.solve(), signals=("x", "u"), backend="matplotlib")
@@ -331,7 +331,7 @@ def algebraic_loop():
     diagram.connect("controller1", "u", "controller2", "y")
     diagram.connect("step", "y", "controller1", "r")
 
-    diagram.plot_graphe()
+    diagram.plot_diagram()
 
     # diagram.check_algebraic_loops()
 
@@ -370,7 +370,7 @@ def solver_doing_weird_at_discontinuities():
     test.add_subsystem(sys2, "integrator2")
     test.connect("step", "y", "integrator2", "u")
     test.connect("integrator2", "y", "integrator1", "u")
-    test.plot_graphe()
+    test.plot_diagram()
     test.name = "double integrator with auto solver"
     test.compute_trajectory()  # Doing weird at discontinuities
     test.name = "double integrator with scipy solver"
@@ -410,7 +410,7 @@ def diagram_in_a_diagram(debug_print=False):
     test.connect("ctl", "u", "integrator1", "u")
     test.connect("integrator1", "y", "integrator2", "u")
     test.connect("integrator2", "y", "ctl", "y")
-    test.plot_graphe()
+    test.plot_diagram()
     test.compute_trajectory(dt=0.1, solver="euler")
 
     # # # Diagram
@@ -424,7 +424,7 @@ def diagram_in_a_diagram(debug_print=False):
     diagram.connect("integrator1", "y", "integrator2", "u")
     diagram.connect_new_output_port("integrator2", "y", "y", dependencies=())
 
-    diagram.plot_graphe()
+    diagram.plot_diagram()
 
     diagram2 = DiagramSystem()
     diagram2.debug_print = debug_print
@@ -436,7 +436,7 @@ def diagram_in_a_diagram(debug_print=False):
     diagram2.connect("step", "y", "ctl", "r")
     diagram2.connect("ctl", "u", "double", "u")
     diagram2.connect("double", "y", "ctl", "y")
-    diagram2.plot_graphe()
+    diagram2.plot_diagram()
     diagram2.compute_trajectory(dt=0.1, solver="euler")
 
     return test, diagram, diagram2

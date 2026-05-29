@@ -7,13 +7,13 @@ import pytest
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation import Animator, _make_renderer
-from minilink.graphical.primitives import Point, camera_matrix, translation_matrix
-from minilink.graphical.plotly_style import (
+from minilink.graphical.animation.primitives import Point, camera_matrix, translation_matrix
+from minilink.graphical.common.plotly_style import (
     PLOTLY_ANIMATION_2D_MARGIN,
     PLOTLY_ANIMATION_HEIGHT,
     PLOTLY_FIG_WIDTH,
 )
-from minilink.graphical.renderers.plotly_renderer import PlotlyRenderer, _import_plotly
+from minilink.graphical.animation.renderers.plotly_renderer import PlotlyRenderer, _import_plotly
 
 
 class TestPlotlyRendererOptionalImport(unittest.TestCase):

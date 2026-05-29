@@ -52,7 +52,7 @@ class MultiInputNode(System):
 def build_deep_network(depth=50, initial_state0=1.0):
     """Build a long chain with non-zero dynamics by default."""
     diag = DiagramSystem()
-    diag.graphe_building_verbose = False
+    diag.connection_verbose = False
     for i in range(depth):
         node = SimpleIntegrator(f"Int{i}")
         if i == 0:
@@ -84,7 +84,7 @@ def make_dense_network(
     not all zeros even if ``source_value`` is 0.
     """
     diag = DiagramSystem()
-    diag.graphe_building_verbose = False
+    diag.connection_verbose = False
     rng = np.random.RandomState(seed)
 
     for i in range(num_nodes):

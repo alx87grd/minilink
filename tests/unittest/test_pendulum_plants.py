@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
-from minilink.graphical.primitives import Box
+from minilink.graphical.animation.primitives import Box
 
 
 class TestCartPole(unittest.TestCase):

@@ -112,8 +112,8 @@ Short summary—details and edge cases are in [DESIGN.md](DESIGN.md).
 - `minilink.planning`: deterministic planning problems, initial guesses, search,
   policy synthesis, and trajectory optimization.
 - `minilink.dynamics`: reusable plant abstractions and catalog models.
-- `minilink.graphical`: time-signal plotting, animation, diagram topology
-  export, graph display, and renderer backends.
+- `minilink.graphical`: time-signal, phase-plane, and diagram plotting plus
+  animation and renderer backends.
 
 ## Documentation
 
@@ -124,8 +124,8 @@ Short summary—details and edge cases are in [DESIGN.md](DESIGN.md).
 ## Examples And Benchmarks
 
 - `examples/scripts/`: runnable demos for diagrams, compilation, animation, and
-  JAX physics. See `examples/scripts/diagrams/demo_graphical_backends.py` for
-  the signal/topology backend options.
+  JAX physics. See `examples/scripts/plots/demo_graphical_backends.py` for the
+  signal and diagram backend options.
 - `tests/manual/`: one-off smoke tests and exploratory checks.
 - `tests/benchmark/`: flat benchmark runners using subsystem-local benchmark
   helpers such as `minilink.simulation.benchmark` and

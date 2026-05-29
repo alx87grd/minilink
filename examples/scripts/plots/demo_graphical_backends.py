@@ -2,25 +2,25 @@
 
 Run from the repo root:
 
-    python examples/scripts/diagrams/demo_graphical_backends.py
+    python examples/scripts/plots/demo_graphical_backends.py
 """
 
 import numpy as np
 
 from minilink.core.blocks.basic import Integrator
 from minilink.core.diagram import DiagramSystem
-from minilink.graphical.diagram_export import export_diagram_topology
+from minilink.graphical.diagrams.export import export_diagram_topology
 
 
 diagram = DiagramSystem()
-diagram.graphe_building_verbose = False
+diagram.connection_verbose = False
 diagram.name = "Graphical backend demo"
 diagram.add_subsystem(Integrator(), "plant")
 diagram.add_input_port("u_cmd", dim=1, nominal_value=np.array([1.0]))
 diagram.connect("input", "u_cmd", "plant", "u")
 diagram.connect_new_output_port("plant", "y", "y")
 
-diagram.plot_graphe()
+diagram.plot_diagram()
 
 traj = diagram.compute_trajectory(
     tf=5.0,

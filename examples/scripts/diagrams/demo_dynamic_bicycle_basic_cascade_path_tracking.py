@@ -22,7 +22,7 @@ import numpy as np
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem, System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
-from minilink.graphical.primitives import (
+from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     TorqueArrow,
@@ -137,7 +137,7 @@ class Tracking(StaticSystem):
     Uses a forward look-ahead ``(px + Ld, y(px + Ld))``. The output is ``theta_ref``
     [rad] for the heading loop.
 
-    Animation: chord :class:`~minilink.graphical.primitives.Arrow` from pose to lookahead.
+    Animation: chord :class:`~minilink.graphical.animation.primitives.Arrow` from pose to lookahead.
     """
 
     def __init__(self, ld: float = LD):
@@ -199,7 +199,7 @@ class HeadingLoop(StaticSystem):
     -----
     Port order in ``u``: ``theta_ref`` (1), then plant ``y`` (6).
 
-    Animation: :class:`~minilink.graphical.primitives.TorqueArrow` at the
+    Animation: :class:`~minilink.graphical.animation.primitives.TorqueArrow` at the
     vehicle CG with sweep ``theta_ref - theta`` (wrapped).
     """
 
@@ -421,7 +421,7 @@ diagram.connect("vehicle", "y", "yaw_rate_loop", "y")
 diagram.connect("vel_pid", "w_rear", "vehicle", "w_rear")
 diagram.connect("yaw_rate_loop", "delta", "vehicle", "delta")
 
-diagram.plot_graphe()
+diagram.plot_diagram()
 diagram.compute_trajectory(tf=20.0, dt=0.02, show=False, verbose=False)
 diagram.plot_trajectory(signals=("x", "u"), backend="matplotlib")
 

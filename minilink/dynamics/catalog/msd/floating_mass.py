@@ -40,7 +40,7 @@ class FloatingMass1D(DynamicSystem):
 
     # Graphics
     def get_kinematic_geometry(self):
-        from minilink.graphical.primitives import Arrow, Circle
+        from minilink.graphical.animation.primitives import Arrow, Circle
 
         return [
             Circle(radius=0.3, center=[0, 0], color="black", fill=True),
@@ -48,7 +48,7 @@ class FloatingMass1D(DynamicSystem):
         ]
 
     def get_kinematic_transforms(self, x, u, t):
-        from minilink.graphical.primitives import (
+        from minilink.graphical.animation.primitives import (
             scale_pose2d_matrix,
             translation_matrix,
         )

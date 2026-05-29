@@ -7,19 +7,19 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from minilink.graphical.environment import detect_env
-from minilink.graphical.plotly_style import (
+from minilink.graphical.common.environment import detect_env
+from minilink.graphical.common.plotly_style import (
     PLOTLY_FIG_WIDTH,
     PLOTLY_SIGNAL_MARGIN,
     PLOTLY_SIGNAL_MIN_HEIGHT,
     PLOTLY_SIGNAL_ROW_HEIGHT,
     PLOTLY_TEMPLATE,
 )
-from minilink.graphical.time_signals import (
+from minilink.graphical.signals.time_signals import (
     LivePlotHandle,
     PlotResult,
-    SignalPlotBackend,
     SignalPlotSpec,
+    _coerce_signal_plot_spec,
 )
 
 # Minimal page: polls full figure JSON so the browser view stays in sync with Python.
@@ -129,72 +129,73 @@ class _PlotlyPollingServer:
             self._thread = None
 
 
-class PlotlySignalBackend(SignalPlotBackend):
-    """Render time-signal plots with Plotly."""
+def render_plotly_signal_plot(
+    spec: SignalPlotSpec,
+    *,
+    show: bool = True,
+    **kwargs,
+) -> PlotResult:
+    """Render a one-shot time-signal plot with Plotly."""
+    fig = _create_figure(spec, **kwargs)
+    if show:
+        fig.show()
+    return PlotResult(backend="plotly", payload=fig, figure=fig)
 
-    name = "plotly"
-    supports_live = True
 
-    def render(self, spec: SignalPlotSpec, *, show: bool = True, **kwargs) -> PlotResult:
-        fig = _create_figure(spec, **kwargs)
-        if show:
-            fig.show()
-        return PlotResult(backend=self.name, payload=fig, figure=fig)
+def open_plotly_signal_plot(
+    spec: SignalPlotSpec,
+    *,
+    spec_builder=None,
+    show: bool = True,
+    **kwargs,
+) -> LivePlotHandle:
+    """Open a live Plotly time-signal plot."""
+    create_kw = dict(kwargs)
+    if not show:
+        fig = _create_figure(spec, **create_kw)
+        return PlotlyLivePlotHandle(
+            fig,
+            spec_builder=spec_builder,
+            create_kw=create_kw,
+        )
 
-    def open_live(
-        self,
-        spec: SignalPlotSpec,
-        *,
-        spec_builder=None,
-        show: bool = True,
-        **kwargs,
-    ) -> LivePlotHandle:
-        create_kw = dict(kwargs)
-        if not show:
-            fig = _create_figure(spec, **create_kw)
+    env = detect_env()
+    if env in ("jupyter", "colab"):
+        go, _ = _import_plotly()
+        fig = _create_figure(spec, **create_kw)
+        try:
+            fw = go.FigureWidget(fig)
+        except (TypeError, ValueError, ImportError):
+            # Plotly 6+ may require ``anywidget``; fall back to localhost polling.
+            polling = _PlotlyPollingServer()
+            polling.start(fig)
             return PlotlyLivePlotHandle(
                 fig,
                 spec_builder=spec_builder,
                 create_kw=create_kw,
+                polling_server=polling,
             )
+        try:
+            from IPython.display import display
 
-        env = detect_env()
-        if env in ("jupyter", "colab"):
-            go, _ = _import_plotly()
-            fig = _create_figure(spec, **create_kw)
-            try:
-                fw = go.FigureWidget(fig)
-            except (TypeError, ValueError, ImportError):
-                # Plotly 6+ may require ``anywidget``; fall back to localhost polling.
-                polling = _PlotlyPollingServer()
-                polling.start(fig)
-                return PlotlyLivePlotHandle(
-                    fig,
-                    spec_builder=spec_builder,
-                    create_kw=create_kw,
-                    polling_server=polling,
-                )
-            try:
-                from IPython.display import display
-
-                display(fw)
-            except ImportError:
-                fw.show()
-            return PlotlyLivePlotHandle(
-                fw,
-                spec_builder=spec_builder,
-                create_kw=create_kw,
-            )
-
-        initial_fig = _create_figure(spec, **create_kw)
-        polling = _PlotlyPollingServer()
-        polling.start(initial_fig)
+            display(fw)
+        except ImportError:
+            fw.show()
         return PlotlyLivePlotHandle(
-            initial_fig,
+            fw,
             spec_builder=spec_builder,
             create_kw=create_kw,
-            polling_server=polling,
         )
+
+    initial_fig = _create_figure(spec, **create_kw)
+    polling = _PlotlyPollingServer()
+    polling.start(initial_fig)
+    return PlotlyLivePlotHandle(
+        initial_fig,
+        spec_builder=spec_builder,
+        create_kw=create_kw,
+        polling_server=polling,
+    )
 
 
 class PlotlyLivePlotHandle(LivePlotHandle):
@@ -214,7 +215,11 @@ class PlotlyLivePlotHandle(LivePlotHandle):
         self._polling_server = polling_server
 
     def update(self, traj_or_spec, *, title: str | None = None) -> None:
-        spec = _coerce_spec(traj_or_spec, self.spec_builder, title=title)
+        spec = _coerce_signal_plot_spec(
+            traj_or_spec,
+            self.spec_builder,
+            title=title,
+        )
 
         if self._polling_server is not None:
             new_fig = _create_figure(spec, **self._create_kw)
@@ -318,11 +323,3 @@ def _plotly_color(color: str) -> str:
         "tab:green": "#2ca02c",
     }
     return colors.get(color, color)
-
-
-def _coerce_spec(traj_or_spec, spec_builder, *, title=None):
-    if isinstance(traj_or_spec, SignalPlotSpec):
-        return traj_or_spec
-    if spec_builder is None:
-        raise TypeError("Updating from a trajectory requires a spec builder.")
-    return spec_builder(traj_or_spec, title=title)

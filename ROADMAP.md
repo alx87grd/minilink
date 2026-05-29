@@ -13,7 +13,7 @@ This document tracks active priorities and maturity. Design contracts live in
 | Simulation | TRL 4 | Clarify solver options and forcing behavior. |
 | Optimization | TRL 1 | Harden generic NLP pipeline with SciPy/Ipopt and NumPy/JAX evaluators. |
 | Planning/trajopt | TRL 1 | Validate deterministic planning API and grow method coverage carefully. |
-| Graphical | TRL 2 | Signal/topology backend seams added; stabilize render/interactive loops after core contracts settle. |
+| Graphical | TRL 2 | Signal/diagram backend seams added; stabilize render/interactive loops after core contracts settle. |
 | Dynamics catalog | TRL 0-1 | Grow reviewed plants by domain. |
 | Symbolic/physics/control | TRL 0-1 | Keep MVP examples working; expand only behind clear use cases. |
 
@@ -113,8 +113,8 @@ These are larger simplification or contract moves identified during the Phase A
 cleanup pass. They need maintainer review before implementation.
 
 - Split the `System` facade from the math contract: keep `f`, `h`, ports,
-  params, and state metadata central; move plotting, graph, animation, and game
-  shortcuts behind a small facade/mixin layer only if the public API stays
+  params, and state metadata central; move plotting, diagrams, animation, and
+  game shortcuts behind a small facade/mixin layer only if the public API stays
   equally readable.
 - Freeze top-level public exports in `minilink/__init__.py`; decide whether the
   package should stay namespace-only or expose a tiny textbook API such as
@@ -179,7 +179,7 @@ graphics contracts.
   - `plot_phase_plane(sys, traj=None, *, x_axis=0, y_axis=None, u=None,
     x_ref=None, t=0.0, bounds=None, grid_shape=(21, 21), streamplot=False,
     show=True, **kwargs)`.
-- Export the new helpers through `minilink.graphical.plotting`.
+- Export the new helpers through `minilink.graphical.phase_plane`.
 - Add `System.plot_phase_plane(...)` as the object-level facade. If `traj` is
   omitted and `self.traj` exists, overlay it; otherwise plot only the vector
   field.

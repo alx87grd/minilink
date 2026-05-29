@@ -3,9 +3,9 @@ import unittest
 import numpy as np
 import pytest
 
-from minilink.graphical.primitives import Point
-from minilink.graphical.renderers.meshcat_renderer import MeshcatCanvas, _import_meshcat
-from minilink.graphical.renderers.pygame_renderer import PygameCanvas, _import_pygame
+from minilink.graphical.animation.primitives import Point
+from minilink.graphical.animation.renderers.meshcat_renderer import MeshcatCanvas, _import_meshcat
+from minilink.graphical.animation.renderers.pygame_renderer import PygameCanvas, _import_pygame
 
 
 def _has_meshcat():

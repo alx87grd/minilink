@@ -23,7 +23,7 @@ class DiagramSystem(System):
         self.recompute_input_properties()
 
         self.debug_print = False
-        self.graphe_building_verbose = True
+        self.connection_verbose = True
 
         self.refresh()
 
@@ -89,7 +89,7 @@ class DiagramSystem(System):
             source_port_id,
         )
 
-        if self.graphe_building_verbose:
+        if self.connection_verbose:
             print(
                 "Connected "
                 + source_sys_id
@@ -124,10 +124,10 @@ class DiagramSystem(System):
 
         self.connect(source_sys_id, source_port_id, "output", output_port_id)
 
-    def get_graphe(self):
-        from minilink.graphical.graphe import get_diagram_graphe
+    def get_diagram(self):
+        from minilink.graphical.diagrams import get_diagram
 
-        return get_diagram_graphe(self)
+        return get_diagram(self)
 
     def get_local_state(self, x, sys_id):
 
