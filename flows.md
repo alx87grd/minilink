@@ -23,8 +23,6 @@ Compose:   + / >> / @ / autowire  →  DiagramSystem
            or add_subsystem + connect (+ connect_new_output_port)
 
 Simulate:  compute_trajectory*  →  Simulator  →  compile  →  solve  →  Trajectory
-           compute_forced*      →  Simulator.solve_forced
-           (* stores sys.traj)
 
 Compile:   sys.compile(backend)  →  DynamicsEvaluator
 
