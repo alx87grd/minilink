@@ -50,6 +50,7 @@ diagram.connect("controller", "u", "plant", "u")
 diagram.connect("plant", "y", "controller", "y")
 diagram.connect("noise", "y", "plant", "w")
 diagram.connect("noise2", "y", "plant", "v")
+
 diagram.plot_diagram()
 
 

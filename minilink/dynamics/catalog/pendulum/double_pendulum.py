@@ -58,6 +58,8 @@ class DoublePendulum(MechanicalSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
+        self.camera_scale = 3.0
+
     def _trig(self, q):
         c1 = np.cos(q[0])
         s1 = np.sin(q[0])
@@ -189,5 +191,6 @@ if __name__ == "__main__":
         show=False,
         verbose=False,
     )
-    double_pendulum.animate(double_traj)
-    double_pendulum.game(renderer="meshcat")
+    double_pendulum.animate()
+    double_pendulum.animate(renderer="meshcat")
+    # double_pendulum.game(renderer="meshcat")

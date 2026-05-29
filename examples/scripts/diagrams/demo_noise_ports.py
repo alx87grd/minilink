@@ -64,3 +64,4 @@ diagram.subsystems["process_noise"].params["sample_period"] = 0.2
 diagram.subsystems["measurement_noise"].params["var"] = 0.0
 # diagram.subsystems["process_noise"].show_signal()
 diagram.compute_trajectory(tf=20)
+diagram.plot_trajectory()

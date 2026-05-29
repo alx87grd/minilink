@@ -61,6 +61,28 @@ for i in range(N_LINKS):
     params[inertias[i]] = 0.1
 params[g_sym] = 9.81
 
+print("\nSymbolic mass matrix:")
+print("H[0,0]:", sym_sys.H[0, 0])
+print("H[0,1]:", sym_sys.H[0, 1])
+print("H[1,0]:", sym_sys.H[1, 0])
+print("H[1,1]:", sym_sys.H[1, 1])
+
+print("\nSymbolic Coriolis matrix:")
+print("C[0,0]:", sym_sys.C[0, 0])
+print("C[0,1]:", sym_sys.C[0, 1])
+print("C[1,0]:", sym_sys.C[1, 0])
+print("C[1,1]:", sym_sys.C[1, 1])
+
+print("\nSymbolic gravitational vector:")
+print("g[0]:", sym_sys.g[0])
+print("g[1]:", sym_sys.g[1])
+
+print("\nSymbolic actuator matrix:")
+print("B[0,0]:", sym_sys.B[0, 0])
+print("B[0,1]:", sym_sys.B[0, 1])
+print("B[1,0]:", sym_sys.B[1, 0])
+print("B[1,1]:", sym_sys.B[1, 1])
+
 print("Converting the symbolic equations of motion to a minilink ecosystem...")
 sys = sym_sys.to_minilink(parameters=params, backend="jax")
 

@@ -19,11 +19,6 @@ large_angle = np.array([1.2, 0.0])
 # Choose one compute_trajectory line.
 traj = sys.compute_trajectory(tf=tf, show=False, verbose=verbose)
 
-traj = sys.compute_forced(
-    u=lambda t: 3.0 * np.sin(10.0 * t), tf=tf, show=False, input_port_id="u"
-)
-
-
 # Choose one plot_trajectory line.
 result = sys.plot_trajectory(traj, signals=("x", "u"), backend="matplotlib", show=True)
 result = sys.plot_trajectory(traj, signals=("x",), backend="matplotlib", show=True)
@@ -32,10 +27,3 @@ result = sys.plot_trajectory(traj, signals=("u",), backend="matplotlib", show=Tr
 result = sys.plot_trajectory(traj, signals=("x", "u"), backend="plotly", show=True)
 result = sys.plot_trajectory(traj, signals=("x",), backend="plotly", show=True)
 result = sys.plot_trajectory(traj, signals=("u",), backend="plotly", show=True)
-
-
-# Notebook animation line. Plotly signal plots and Plotly animation share one width.
-# sys.camera_scale = 2.0
-# sys.animate(traj, renderer="matplotlib", html=True, is_3d=True)
-sys.animate(traj, renderer="plotly")
-# sys.animate(traj, renderer="plotly", html=True, is_3d=True)

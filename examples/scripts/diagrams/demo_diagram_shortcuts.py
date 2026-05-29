@@ -70,4 +70,4 @@ closed.plot_diagram()
 # auto.connect("controller", "u", "pendulum", "u")
 auto = (Step() + PendulumPDController() + Pendulum()).autowire(strict=True)
 auto.name = "Autowired shortcut diagram"
-auto.plot_diagram()
+# auto.plot_diagram()

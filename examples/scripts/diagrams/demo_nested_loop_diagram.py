@@ -84,4 +84,5 @@ diagram.connect("step", "y", "controller1", "r")
 
 diagram.plot_diagram()
 diagram.compute_trajectory(tf=20)
+diagram.plot_trajectory()
 # diagram.animate() # No geometry defined for the blocks

@@ -52,6 +52,6 @@ diagram.plot_diagram()
 
 traj = diagram.compute_trajectory(tf=10.0, compile_backend="auto")
 
-# diagram.animate(renderer="meshcat")
+diagram.animate(renderer="meshcat")
 
 # sys.game(renderer="meshcat")

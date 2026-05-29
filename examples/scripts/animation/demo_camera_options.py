@@ -13,5 +13,5 @@ sys.camera_plot_axes = (0, 2)
 sys.camera_scale = 80.0
 
 sys.animate()
-# sys.animate(is_3d=True)
-# sys.animate(renderer="meshcat")
+sys.animate(is_3d=True)
+sys.animate(renderer="meshcat")

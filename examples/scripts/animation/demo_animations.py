@@ -4,7 +4,7 @@ import numpy as np
 # Plant system
 sys = Pendulum()
 sys.params["m"] = 1.0
-sys.params["l"] = 5.0
+sys.params["l"] = 1.0
 sys.x0[0] = 2.0
 
 
