@@ -12,6 +12,8 @@ and keep docs synchronized with code.
   thinks in systems, signals, and equations before Python abstractions.
 - **Coach the architecture**: when a requested change risks adding ceremony,
   name the tradeoff and steer toward the simplest clear interface.
+- **Minimalist UX**: keep the main workflow beginner-friendly; push complexity to
+  orchestrators and backend modules, not reader-facing scripts.
 - **Prototype honestly**: unvalidated architecture may exist, but mark it with
   `TODO: User Architectural Review` and keep it easy to replace.
 - **Incremental refactoring**: avoid broad restructures unless the user asks for
@@ -21,13 +23,19 @@ and keep docs synchronized with code.
 
 ## 2. Coding Standards
 
-- Python 3.10+.
+- Python 3.10+; keep `DESIGN.md`, `agent.md`, and `pyproject.toml` aligned when
+  behavior or dependencies change.
 - Public APIs need type hints and NumPy-style docstrings.
 - Keep optional heavy imports lazy.
 - Match the neighborhood before editing an existing file.
 - Change only what the task requires; every diff line should earn its place.
-- Prefer explicit loops and named temporaries over dense Python tricks when the
-  data flow is mathematical.
+- Prefer explicit, readable code over clever Python when the data flow is
+  mathematical; use named temporaries in equation paths.
+- **Tests only when justified**: add or update tests for stable public APIs, TRL
+  milestones, documented contracts, or explicit user requests—not for trivial or
+  obvious behavior.
+- **Validation in proportion**: avoid defensive error-handling sprawl on internal
+  paths unless the interface is public or the failure mode is real.
 - Use dataclasses for transparent records such as trajectories, execution-plan
   operations, benchmark rows, and results.
 - Do not turn scientific objects such as systems, plants, and controllers into
@@ -48,6 +56,10 @@ In public equation paths (`f`, `h`, output-port compute functions, mechanical
 hooks, linearization, transcriptions), map inputs once and then use textbook
 locals. Avoid repeated `np.asarray`/reshape checks inside internal math paths
 unless the helper is a public boundary.
+
+**Reader-facing imports:** in tutorials, demos, and examples, keep the top of the
+file light so the math stays visible. Internal packages (`compile/`, `simulation/`,
+benchmarks, tests) may use richer imports when the benefit is clear.
 
 ### Docs And Comments
 
@@ -74,6 +86,16 @@ Quick reminders (details in DESIGN):
   plotting, `contains`, …).
 - `params is None` uses object defaults; any other `params` overrides—never
   `params or self.params`.
+- Use **inheritance** for core system types; use **composition** for diagrams
+  and optional behaviors. Keep readable modeling in `core/`; isolate compile,
+  simulation, optimization, and graphics.
+- **Compiled-evaluator vocabulary:** `outputs()` / `outputs_p()` are **boundary
+  outputs only**; diagram internals use internal-signal APIs, not `outputs()`.
+  Do not reintroduce `compute_outputs(..., ports=...)`. Keep
+  `ExecutionPlan.output_slices` and `external_output_slices` aligned. Preserve
+  JAX traceability of `f` and port compute paths.
+- Changes to evaluator contracts, `ExecutionPlan`, or diagram compile behavior
+  must update `DESIGN.md` and, if scope changed, `ROADMAP.md`.
 
 ## 4. NumPy And JAX
 
@@ -85,7 +107,9 @@ no `minilink.jax` package or global NumPy/JAX mode.
 ## 5. Package And File Layout
 
 - Import symbols from the module that defines them; package `__init__.py` files are
-  namespace markers unless a future public API freeze says otherwise.
+  namespace markers unless a future public API freeze says otherwise. **Keep each
+  `__init__.py`** so subpackages stay discoverable to Hatch and import tooling;
+  do not use package `__init__` as a barrel re-export layer.
 - Swappable roles use role-specific folders and singular contract modules:
   `compile/evaluators/evaluator.py`, `simulation/solvers/solver.py`,
   `graphical/renderers/renderer.py`,
@@ -129,6 +153,18 @@ Ask first:
 
 If a small request turns into a large job after inspection, stop and explain the
 smallest useful slice.
+
+**Scope:**
+
+- **Small tweaks** — quick, minimal source change; no broad refactors unless asked.
+- **Larger work** — write a concise implementation plan and wait for explicit
+  approval before extended multi-step execution.
+- **Scope surprise** — stop and ask which slice the user wants rather than
+  grinding forward.
+
+Demo and manual scripts stay flat and runnable from the repo root. Benchmark
+runners live under `tests/benchmark/`; import helpers from defining subsystem
+packages (see §5), not a top-level `minilink.benchmark` package.
 
 ## 8. TRL Lifecycle
 

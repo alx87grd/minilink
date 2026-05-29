@@ -99,7 +99,9 @@ canonical for general topology.
 `compile(system, backend)` → `DynamicsEvaluator` (`numpy`|`jax`|`auto`|`direct`).
 
 Diagrams → `ExecutionPlan` → diagram evaluator. Internal outputs via
-`reconstruct_internal_signals`.
+`reconstruct_internal_signals`; **`outputs()` / `outputs_p()` are boundary outputs
+only** (not diagram internals). Keep `ExecutionPlan.output_slices` and
+`external_output_slices` aligned. Do not reintroduce `compute_outputs(..., ports=...)`.
 
 **Default sim API:** `compute_trajectory` / `compute_forced` → `Simulator` →
 `Trajectory`. Unconnected inputs use port nominals; time-varying sources belong
