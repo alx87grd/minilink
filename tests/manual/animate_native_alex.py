@@ -10,11 +10,8 @@ the browser via ``Visualizer.set_animation``. ``TorqueArrow`` on the pendulum
 is frozen at ``t=0`` in the meshcat native path by design (see DESIGN.md §4.7).
 """
 
-import numpy as np
-
-from minilink.dynamics.pendulum.pendulum import Pendulum
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.simulation.simulator import Simulator
-
 
 sys = Pendulum()
 sys.x0[0] = 2.0

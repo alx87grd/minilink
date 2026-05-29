@@ -3,9 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 
-from minilink.jax_utils import array_module
-from minilink.core.framework import DynamicSystem
+from minilink.compile.jax_utils import array_module
+from minilink.core.system import DynamicSystem
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
 
 
@@ -20,10 +21,9 @@ def _have_jax() -> bool:
 
 class StableLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 1, 1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "StableLinearSystem"
         self.x0 = np.array([1.0])
-        self.inputs["u"].nominal_value = np.array([0.0])
 
     def f(self, x, u, t=0, params=None):
         xp = array_module(x)
@@ -36,12 +36,10 @@ class StableLinearSystem(DynamicSystem):
 
 class TwoPortLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(1, 0, 1)
+        super().__init__(n=1, output_dim=1, y_dependencies=())
         self.name = "TwoPortLinearSystem"
-        self.inputs = {}
-        self.add_input_port(1, "left", nominal_value=np.array([1.0]))
-        self.add_input_port(1, "right", nominal_value=np.array([2.0]))
-        self.m = 2
+        self.add_input_port("left", nominal_value=1.0)
+        self.add_input_port("right", nominal_value=2.0)
         self.x0 = np.array([0.0])
 
     def f(self, x, u, t=0, params=None):
@@ -78,6 +76,8 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
         self.assertEqual(sim.compile_backend, "numpy")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_compile_backend_auto_resolves_to_jax_when_available(self):
         sim = Simulator(
@@ -89,6 +89,8 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.compile_backend, "jax")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_auto_selects_rk4_for_large_uniform_grid_with_jax(self):
         sim = Simulator(
@@ -100,6 +102,8 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "rk4_fixedsteps")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_jax_grid_below_threshold_stays_scipy(self):
         sim = Simulator(
@@ -111,6 +115,8 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "scipy")
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_discontinuous_jax_large_grid_stays_stiff(self):
         sim = Simulator(
@@ -133,7 +139,13 @@ class TestNewSimulator(unittest.TestCase):
 
     def test_invalid_x0_shape_raises_value_error(self):
         with self.assertRaises(ValueError):
-            Simulator(StableLinearSystem(), x0=np.array([[1.0]]), tf=1.0, n_steps=5, verbose=False)
+            Simulator(
+                StableLinearSystem(),
+                x0=np.array([[1.0]]),
+                tf=1.0,
+                n_steps=5,
+                verbose=False,
+            )
 
     def test_scipy_failure_raises_and_keeps_debug_information(self):
         failed_solution = SimpleNamespace(
@@ -149,20 +161,24 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
 
         with patch(
-            "minilink.simulation.solver_backends.solve_ivp",
+            "minilink.simulation.solvers.scipy_ivp.solve_ivp",
             return_value=failed_solution,
         ):
             with self.assertRaises(RuntimeError) as ctx:
                 sim.solve()
 
         self.assertIn("integration failed", str(ctx.exception))
-        self.assertIs(sim.scipy_last_solution, failed_solution)
-        self.assertFalse(sim.last_debug["success"])
-        self.assertEqual(sim.last_debug["message"], "integration failed")
+        # Failure path: debug lives on the SciPy backend (no try/finally on Simulator)
+        sb = sim.solver_backend
+        self.assertIs(sb.last_solve_ivp_solution, failed_solution)
+        self.assertFalse(sb.last_debug["success"])
+        self.assertEqual(sb.last_debug["message"], "integration failed")
         self.assertFalse(hasattr(sim, "last_traj"))
 
     def test_solve_populates_last_traj_and_last_debug(self):
-        sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False)
+        sim = Simulator(
+            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
         traj = sim.solve()
 
         self.assertIs(sim.last_traj, traj)
@@ -171,13 +187,51 @@ class TestNewSimulator(unittest.TestCase):
         self.assertEqual(traj.u.shape, (1, 3))
 
     def test_solve_forced_validates_shape(self):
-        sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False)
+        sim = Simulator(
+            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
         bad_u = np.zeros((3, 1))
 
         with self.assertRaises(ValueError):
             sim.solve_forced(bad_u)
 
-    def test_solve_forced_rejects_unsupported_solver(self):
+    def test_solve_forced_accepts_callable_full_input(self):
+        sim = Simulator(
+            StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
+
+        traj = sim.solve_forced(lambda t: 10.0 * t)
+
+        np.testing.assert_allclose(traj.u, np.array([[0.0, 1.0, 2.0]]))
+
+    def test_solve_forced_accepts_constant_vector(self):
+        sim = Simulator(
+            TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
+
+        traj = sim.solve_forced(np.array([3.0, 4.0]))
+
+        np.testing.assert_allclose(
+            traj.u,
+            np.array(
+                [
+                    [3.0, 3.0, 3.0],
+                    [4.0, 4.0, 4.0],
+                ]
+            ),
+        )
+
+    def test_solve_forced_accepts_scalar_on_one_named_port(self):
+        sim = Simulator(
+            TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
+        )
+
+        traj = sim.solve_forced(5.0, input_port_id="left")
+
+        np.testing.assert_allclose(traj.u[0, :], np.array([5.0, 5.0, 5.0]))
+        np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
+
+    def test_solve_forced_supports_fixed_step_rk4(self):
         sim = Simulator(
             StableLinearSystem(),
             tf=0.2,
@@ -187,10 +241,12 @@ class TestNewSimulator(unittest.TestCase):
         )
         u_traj = np.zeros((1, 3))
 
-        with self.assertRaises(ValueError) as ctx:
-            sim.solve_forced(u_traj)
+        traj = sim.solve_forced(u_traj)
 
-        self.assertIn("does not support forced simulations", str(ctx.exception))
+        self.assertEqual(sim.last_debug["solver"], "rk4_fixedsteps")
+        np.testing.assert_allclose(traj.u, u_traj)
+        np.testing.assert_allclose(traj.x[:, 0], [1.0])
+        self.assertLess(traj.x[0, -1], 1.0)
 
     def test_wrapper_compute_trajectory_uses_new_simulator_path(self):
         sys = StableLinearSystem()

@@ -1,8 +1,9 @@
 import unittest
 
 import numpy as np
+import pytest
 
-from minilink.mechanics.mechanical import MechanicalSystem
+from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
 class TestMechanicalSystem(unittest.TestCase):
@@ -82,6 +83,21 @@ class TestMechanicalSystem(unittest.TestCase):
     def test_y_port_dependencies(self):
         sys = MechanicalSystem(dof=1)
         self.assertEqual(sys.outputs["y"].dependencies, ())
+
+    @pytest.mark.optional
+    @pytest.mark.jax
+    def test_default_base_is_jax_traceable_if_available(self):
+        jax = pytest.importorskip("jax")
+        jnp = pytest.importorskip("jax.numpy")
+
+        sys = MechanicalSystem(dof=2)
+        x = jnp.array([0.1, -0.2, 0.3, 0.4])
+        u = jnp.array([1.0, -2.0])
+
+        jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
+        np.testing.assert_allclose(
+            np.asarray(sys.f(x, u)), np.array([0.3, 0.4, 1.0, -2.0])
+        )
 
 
 if __name__ == "__main__":

@@ -2,9 +2,9 @@ import unittest
 
 import numpy as np
 
-from minilink.dynamics.pendulum.cartpole import CartPole
-from minilink.dynamics.pendulum.double_pendulum import DoublePendulum
-from minilink.graphical.primitives import Box
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
+from minilink.graphical.animation.primitives import Box
 
 
 class TestCartPole(unittest.TestCase):
@@ -58,9 +58,7 @@ class TestCartPole(unittest.TestCase):
 
         self.assertIsInstance(primitives[1], Box)
         self.assertEqual(primitives[1].length_z, sys.params["cart_depth"])
-        self.assertGreater(
-            transforms[4][2, 3], 0.5 * float(sys.params["cart_depth"])
-        )
+        self.assertGreater(transforms[4][2, 3], 0.5 * float(sys.params["cart_depth"]))
         self.assertEqual(len(primitives), len(transforms))
         for T in transforms:
             self.assertEqual(T.shape, (4, 4))

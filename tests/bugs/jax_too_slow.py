@@ -1,23 +1,20 @@
-import numpy as np
 import time
 
+import numpy as np
+
+from minilink.core.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
-from minilink.core.framework import DynamicSystem, StaticSystem
-from minilink.blocks.sources import Step
+from minilink.core.system import DynamicSystem, StaticSystem
 
-
-######################################################################
 # Custom blocks
-######################################################################
 
 
 class Integrator(DynamicSystem):
     def __init__(self):
 
-        super().__init__(1, 1, 1)
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "Integrator"
-        self.outputs = {}
-        self.add_output_port(1, "y", function=self.h, dependencies=[])
+        self.add_output_port("y", dim=1, function=self.h, dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return u
@@ -28,15 +25,11 @@ class Integrator(DynamicSystem):
 
 class PropController(StaticSystem):
     def __init__(self):
-        super().__init__(2, 1)
+        super().__init__()
         self.name = "Controller"
-
-        self.inputs = {}
-        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "y", nominal_value=np.array([0.0]))
-
-        self.outputs = {}
-        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
+        self.add_input_port("r", nominal_value=0.0)
+        self.add_input_port("y", dim=1, nominal_value=np.array([0.0]))
+        self.add_output_port("u", dim=1, function=self.ctl, dependencies=("r", "y"))
 
     def ctl(self, x, u, t=0, params=None):
 
@@ -48,9 +41,7 @@ class PropController(StaticSystem):
         return [u]
 
 
-######################################################################
 # Custom diagram
-######################################################################
 
 # Plant system
 sys1 = Integrator()
@@ -82,11 +73,11 @@ diagram.add_subsystem(sys2, "integrator2")
 diagram.connect("integrator1", "y", "integrator2", "u")
 diagram.connect("controller2", "u", "integrator1", "u")
 diagram.connect("integrator1", "y", "controller2", "y")
-diagram.connect("controller1", "u", "controller2", "ref")
+diagram.connect("controller1", "u", "controller2", "r")
 diagram.connect("integrator2", "y", "controller1", "y")
-diagram.connect("step", "y", "controller1", "ref")
+diagram.connect("step", "y", "controller1", "r")
 
-diagram.plot_graphe()
+diagram.plot_diagram()
 # diagram.compute_trajectory(tf=20)
 
 
@@ -102,8 +93,7 @@ f_compiled_jax = evaluator_jax.f
 f_compiled_jax_jit = evaluator_jax.get_f_jit()
 
 
-# ── Benchmarking ─────────────────────────────────────────────────────
-
+# Benchmarking
 n_iters = 10000
 print(f"\nBenchmarking {n_iters} iterations:")
 
@@ -112,14 +102,14 @@ t0 = time.perf_counter()
 for _ in range(n_iters):
     f_baseline(x, u)
 dt = time.perf_counter() - t0
-print(f"Baseline:       {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"Baseline:       {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 # NumPy Compiled
 t0 = time.perf_counter()
 for _ in range(n_iters):
     f_compiled_numpy(x, u)
 dt = time.perf_counter() - t0
-print(f"NumPy Compiled: {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"NumPy Compiled: {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 
 # JAX JIT
@@ -131,7 +121,7 @@ t0 = time.perf_counter()
 for _ in range(n_iters):
     f_compiled_jax_jit(x, u).block_until_ready()
 dt = time.perf_counter() - t0
-print(f"JAX JIT:        {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"JAX JIT:        {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 
 # Jax (not JIT)
@@ -145,6 +135,6 @@ t0 = time.perf_counter()
 for _ in range(n_iters):
     f_compiled_jax(x, u)
 dt = time.perf_counter() - t0
-print(f"JAX (not JIT):  {dt:.4f} s ({n_iters/dt:.0f} evals/sec)")
+print(f"JAX (not JIT):  {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 # Summary: The “error” is really a performance model mismatch: the implementation is intentionally trace-oriented (functional .at[].set, jnp everywhere), which is slow when run eagerly at large len(port_ops) + len(state_ops), and fast when wrapped in jax.jit, exactly as your numbers showed.

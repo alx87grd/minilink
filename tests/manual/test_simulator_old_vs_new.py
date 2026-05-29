@@ -1,16 +1,13 @@
-import numpy as np
-import jax
 import jax.numpy as jnp
 
-
-# from minilink.dynamics.pendulum.pendulum import Pendulum
-from minilink.core.framework import DynamicSystem
+# from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.core.system import DynamicSystem
 from minilink.simulation.simulator import Simulator
 
 
 class Pendulum(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, m=1, p=2)
+        super().__init__(n=2, input_dim=1, output_dim=2, y_dependencies=())
         self.name = "Pendulum"
 
     def f(self, x, u, t=0, params=None):

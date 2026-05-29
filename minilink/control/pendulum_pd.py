@@ -1,11 +1,11 @@
 import numpy as np
 
-from minilink.core.framework import StaticSystem
+from minilink.core.system import StaticSystem
 
 
 class PendulumPDController(StaticSystem):
     def __init__(self):
-        super().__init__(3, 1)
+        super().__init__()
 
         self.params = {
             "Kp": 10.0,
@@ -14,32 +14,30 @@ class PendulumPDController(StaticSystem):
 
         self.name = "Controller"
 
-        self.inputs = {}
-        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
-        self.add_input_port(2, "y", nominal_value=np.array([0.0, 0.0]))
-        self.inputs["y"].labels = ["theta", "theta_dot"]
-        self.inputs["y"].units = ["rad", "rad/s"]
+        self.add_input_port("r", nominal_value=0.0)
+        self.add_input_port(
+            "y",
+            nominal_value=[0.0, 0.0],
+            labels=["theta", "theta_dot"],
+            units=["rad", "rad/s"],
+        )
+        self.add_output_port(
+            "u",
+            dim=1,
+            function=self.ctl,
+            dependencies=("r", "y"),
+            labels=["torque"],
+            units=["Nm"],
+        )
 
-        self.outputs = {}
-        self.add_output_port(1, "u", function=self.ctl, dependencies=["ref", "y"])
-        self.outputs["u"].labels = ["torque"]
-        self.outputs["u"].units = ["Nm"]
-
-    ######################################################################
     def ctl(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
 
-        if params is None:
-            params = self.params
-
+        r, y = self.get_port_values_from_u(u, "r", "y")
+        theta = y[0]
+        theta_dot = y[1]
         Kp = params["Kp"]
         Kd = params["Kd"]
 
-        ref = u[0]
-        theta = u[1]
-        theta_dot = u[2]
-
-        torque = Kp * (ref - theta) - Kd * theta_dot
-
-        u = np.array([torque])
-
-        return u
+        tau = Kp * (r[0] - theta) - Kd * theta_dot
+        return np.array([tau])

@@ -3,27 +3,26 @@
 import unittest
 
 import numpy as np
+import pytest
 
-try:
-    import jax
-    import jax.numpy as jnp
+pytest.importorskip("jax")
 
-    from minilink.physics.engine_jax import (
-        PlaneModel,
-        SphereModel,
-        make_world_model,
-        pack_state,
-        plane_contact_force,
-        unpack_state,
-        world_ode,
-    )
+import jax  # noqa: E402
+import jax.numpy as jnp  # noqa: E402
 
-    HAS_JAX = True
-except ImportError:
-    HAS_JAX = False
+from minilink.physics.engine_jax import (  # noqa: E402
+    PlaneModel,
+    SphereModel,
+    make_world_model,
+    pack_state,
+    plane_contact_force,
+    unpack_state,
+    world_ode,
+)
 
 
-@unittest.skipUnless(HAS_JAX, "jax not installed")
+@pytest.mark.optional
+@pytest.mark.jax
 class TestPhysicsEngineJax(unittest.TestCase):
     def _single_world(self):
         return make_world_model(

@@ -1,9 +1,9 @@
 import numpy as np
 
 from minilink.control.pendulum_pd import PendulumPDController
-from minilink.dynamics.pendulum.pendulum import Pendulum
-from minilink.blocks.sources import Step, WhiteNoise
+from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 # Plant system
 sys = Pendulum()
@@ -45,12 +45,12 @@ diagram2.add_subsystem(sys, "plant")
 diagram2.add_subsystem(noise, "noise")
 diagram2.add_subsystem(noise2, "noise2")
 
-diagram2.connect("step", "y", "controller", "ref")
+diagram2.connect("step", "y", "controller", "r")
 diagram2.connect("controller", "u", "plant", "u")
 diagram2.connect("plant", "y", "controller", "y")
 diagram2.connect("noise", "y", "plant", "w")
 diagram2.connect("noise2", "y", "plant", "v")
-diagram2.plot_graphe()
+diagram2.plot_diagram()
 
 print("Running simulation... this is fast with euler solver")
 diagram2.compute_trajectory(tf=20, solver="euler", dt=0.01)

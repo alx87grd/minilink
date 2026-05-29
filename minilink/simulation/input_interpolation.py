@@ -8,10 +8,13 @@ from scipy.interpolate import interp1d
 INPUT_INTERP_KEY = "input_interp"
 
 
-def build_u_at_t(times: np.ndarray, u: np.ndarray, scheme: str = "linear") -> Callable[[float], np.ndarray]:
+def build_u_at_t(
+    times: np.ndarray, u: np.ndarray, scheme: str = "linear"
+) -> Callable[[float], np.ndarray]:
     m, n_pts = u.shape
 
     if scheme == "zoh":
+
         def u_of_t(t: float) -> np.ndarray:
             i = int(np.searchsorted(times, t, side="right")) - 1
             i = max(0, min(i, n_pts - 1))

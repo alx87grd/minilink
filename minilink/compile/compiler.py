@@ -23,6 +23,11 @@ import copy
 import time
 from typing import TYPE_CHECKING
 
+from minilink.compile.backend_policy import (
+    BACKEND_NUMPY,
+    normalize_backend,
+    require_jax_backend,
+)
 from minilink.compile.execution_plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
@@ -36,10 +41,8 @@ if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
 
-# ── Public API ──────────────────���────────────────────────────────────
-
-
-def compile(system, backend="numpy", verbose=False):
+# Public API
+def compile(system, backend=BACKEND_NUMPY, verbose=False):
     """Compile a System into a :class:`DynamicsEvaluator`.
 
     For leaf systems (non-diagram), wraps ``f``/``h`` with frozen params
@@ -66,33 +69,24 @@ def compile(system, backend="numpy", verbose=False):
     if isinstance(system, DiagramSystem):
         return compile_diagram(system, backend=backend, verbose=verbose)
 
-    key = backend.strip().lower()
-    if key == "numpy":
-        from minilink.compile.numpy_evaluator import NumpyLeafEvaluator
+    key = normalize_backend(backend)
+    if key == BACKEND_NUMPY:
+        from minilink.compile.evaluators.numpy_evaluator import NumpyLeafEvaluator
 
         return NumpyLeafEvaluator(system)
-    elif key == "jax":
-        try:
-            import jax  # noqa: F401
-        except ImportError:
-            raise ImportError(
-                "JAX is required for the 'jax' backend. "
-                "Install with: pip install jax jaxlib"
-            )
-        from minilink.compile.jax_evaluator import JaxLeafEvaluator
+    require_jax_backend()
+    from minilink.compile.evaluators.jax_evaluator import JaxLeafEvaluator
 
-        t_total = time.perf_counter()
-        evaluator = JaxLeafEvaluator(system, verbose=verbose)
-        if verbose:
-            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
-        return evaluator
-    else:
-        raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
+    t_total = time.perf_counter()
+    evaluator = JaxLeafEvaluator(system, verbose=verbose)
+    if verbose:
+        print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+    return evaluator
 
 
 def compile_diagram(
     diagram: DiagramSystem,
-    backend: str = "numpy",
+    backend: str = BACKEND_NUMPY,
     *,
     bind_params: bool = False,
     verbose: bool = False,
@@ -127,28 +121,31 @@ def compile_diagram(
     -----
     ``bind_params=True`` snapshots only each subsystem's ``params`` dict into the plan.
     It does **not** make user ``f`` / port ``compute`` implementations pure if they still
-    read or mutate other instance state; see :class:`minilink.core.framework.System`.
+    read or mutate other instance state; see :class:`minilink.core.system.System`.
     """
     t_total = time.perf_counter() if verbose else None
 
-    # --- Step 1: Algebraic loop detection --------------------------------
+    # Step 1: Algebraic loop detection
     if verbose:
         t0 = time.perf_counter()
-        print("[compile] Step 1: Checking for algebraic loops...", end="",
-              flush=True)
+        print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
 
     port_execution_order = check_algebraic_loops(diagram)
 
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # --- Step 2: Build execution plan ------------------------------------
+    # Step 2: Build execution plan
     if verbose:
         t0 = time.perf_counter()
         n_ports = len(port_execution_order)
         n_states = sum(1 for s in diagram.subsystems.values() if s.n > 0)
-        print(f"[compile] Step 2: Building execution plan "
-              f"({n_ports} ports, {n_states} states)...", end="", flush=True)
+        print(
+            f"[compile] Step 2: Building execution plan "
+            f"({n_ports} ports, {n_states} states)...",
+            end="",
+            flush=True,
+        )
 
     plan = _build_execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
@@ -157,25 +154,18 @@ def compile_diagram(
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # --- Create evaluator (steps 0, 3, 4 handled inside for JAX) ---------
-    key = backend.strip().lower()
-    if key == "numpy":
-        from minilink.compile.numpy_evaluator import NumpyDiagramEvaluator
+    # Create evaluator (steps 0, 3, 4 handled inside for JAX)
+    key = normalize_backend(backend)
+    if key == BACKEND_NUMPY:
+        from minilink.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
 
         evaluator = NumpyDiagramEvaluator(plan, diagram)
-    elif key == "jax":
-        try:
-            import jax  # noqa: F401
-        except ImportError:
-            raise ImportError(
-                "JAX is required for the 'jax' backend. "
-                "Install with: pip install jax jaxlib"
-            )
-        from minilink.compile.jax_evaluator import JaxDiagramEvaluator
+    else:
+        # key == BACKEND_JAX (normalize_backend already validated)
+        require_jax_backend()
+        from minilink.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
 
         evaluator = JaxDiagramEvaluator(plan, diagram, verbose=verbose)
-    else:
-        raise ValueError(f"Unknown backend {backend!r}. Expected 'numpy' or 'jax'.")
 
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
@@ -225,7 +215,7 @@ def _build_execution_plan_from_order(
     split out so that :func:`compile_diagram` can time each step
     individually.
     """
-    # ── 1. Map all output ports to slices in the flat signal buffer ───
+    # 1. Map all output ports to slices in the flat signal buffer
     output_slices: dict[tuple[str, str], slice] = {}
     current_idx = 0
     for sys_id, sys in diagram.subsystems.items():
@@ -235,7 +225,7 @@ def _build_execution_plan_from_order(
             current_idx += dim
     signal_dim = current_idx
 
-    # ── 2. Build PortOperation list (output ports, topological order) ─
+    # 2. Build PortOperation list (output ports, topological order)
     port_ops: list[PortOperation] = []
     for sys_id, port_id in port_execution_order:
         sys = diagram.subsystems[sys_id]
@@ -248,9 +238,7 @@ def _build_execution_plan_from_order(
         out_slice = output_slices[(sys_id, port_id)]
         local_x_slice = _state_slice(diagram, sys_id)
 
-        bound = (
-            copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
-        )
+        bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
 
         port_ops.append(
             PortOperation(
@@ -264,7 +252,7 @@ def _build_execution_plan_from_order(
             )
         )
 
-    # ── 3. Build StateOperation list (subsystems with state) ─────────
+    # 3. Build StateOperation list (subsystems with state)
     state_ops: list[StateOperation] = []
     for sys_id, sys in diagram.subsystems.items():
         if sys.n > 0:
@@ -272,9 +260,7 @@ def _build_execution_plan_from_order(
                 diagram, sys_id, output_slices, dependencies="all"
             )
             local_x_slice = _state_slice(diagram, sys_id)
-            bound = (
-                copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
-            )
+            bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
             state_ops.append(
                 StateOperation(
                     f_func=sys.f,
@@ -341,80 +327,52 @@ def check_algebraic_loops(
         If an algebraic loop is detected, with the full cycle path in the
         error message.
     """
-    # Tracks ports that have been FULLY explored (including all dependencies)
     visited: set[tuple[str, str]] = set()
-    # Path of the current recursion to provide a trace if a loop is found
     stack: list[tuple[str, str]] = []
-    # Set mirror of stack for O(1) cycle detection
     stack_set: set[tuple[str, str]] = set()
-    # The resulting topological order
     order: list[tuple[str, str]] = []
 
     def visit_port(sys_id: str, port_id: str) -> None:
         node = (sys_id, port_id)
 
-        # 1. Algebraic loop detection: if node is already on the recursion stack
         if node in stack_set:
             cycle_start_idx = stack.index(node)
             cycle_path = stack[cycle_start_idx:] + [node]
             cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
             raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
 
-        # 2. End-Point A: if we've already fully analyzed this node, stop here (Memoization)
         if node in visited:
             return
 
-        # 3. Mark as currently visiting
         stack.append(node)
         stack_set.add(node)
 
-        # 4. Explore dependencies (upstream crawl)
-        # Get the specific output port object we are visiting
         port = diagram.subsystems[sys_id].outputs.get(port_id)
         if port is not None:
-            # Get the list of input ports that this output depends on (feedthrough)
             deps = port.dependencies
             sys_inputs = diagram.subsystems[sys_id].inputs
-            # If "all", this output depends on every input port of the subsystem
             input_deps = sys_inputs.keys() if deps == "all" else deps
 
-            # Iterate over all input ports that this output depends on
             for in_port_id in input_deps:
-                # Find what is connected to this input port (the 'source')
                 source = diagram.connections[sys_id].get(in_port_id)
-                # End-Point B: if not connected, the chain ends here
                 if source is not None:
-                    # A source is a tuple: (source_subsystem_id, source_output_port_id)
                     src_sys_id, src_port_id = source
-                    # Recursively visit source subsystem if it's not a diagram input
-                    # End-Point C: Diagram inputs are terminal nodes for this search
                     if src_sys_id != "input":
                         visit_port(src_sys_id, src_port_id)
 
-        # 5. Finishing node: backtrack and finalize the execution order
-        # Remove the current node from the path list; we've finished this branch
         stack.pop()
-        # Remove from set; this node is no longer part of the "active" path
         stack_set.remove(node)
-        # Mark as visited; ensures we never waste time re-exploring this port
         visited.add(node)
-        # Store result; adding it LAST means all its dependencies are already
-        # in the 'order' list. This transforms a complex graph into a simple,
-        # optimized sequence where every signal is calculated before it's needed.
         order.append(node)
 
-    # --- STARTING POINT: EXPLORE ALL OUTPUT PORTS ---
-    # Initiate the recursive depth-first search from every subsystem output port.
-    for sys_id, sys in diagram.subsystems.items():
-        for port_id in sys.outputs:
+    for sys_id, subsystem in diagram.subsystems.items():
+        for port_id in subsystem.outputs:
             visit_port(sys_id, port_id)
 
     return order
 
 
-# ── Private helpers ──────────────────────────────────────────────────
-
-
+# Private helpers
 def _build_gather_sources(
     diagram: DiagramSystem,
     sys_id: str,
@@ -461,18 +419,14 @@ def _build_gather_sources(
             else:
                 src_sys_id, src_port_id = source
                 if src_sys_id == "input":
-                    # External diagram input → slice into u
                     source_type = EXTERNAL_INPUT
                     u_idx = 0
                     for input_port_id, input_port in diagram.inputs.items():
-                        # We found the matching diagram input port.
-                        # Calculate its 'slice' in the flat global input vector 'u'
                         if input_port_id == src_port_id:
                             source_val = slice(u_idx, u_idx + input_port.dim)
                             break
                         u_idx += input_port.dim
                 else:
-                    # Internal connection → slice into signal buffer
                     source_type = INTERNAL_SIGNAL
                     source_val = output_slices[(src_sys_id, src_port_id)]
 

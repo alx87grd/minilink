@@ -1,69 +1,95 @@
 # minilink
 
-`minilink` is a Python-native block-diagram framework for modeling, compiling, simulating, and visualizing dynamical systems.
+Python-native block-diagram framework for modeling, simulating, optimizing, and
+visualizing dynamical systems.
 
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
-Colab demo: https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing
-
-## Key Strengths
-
-- **Composable MIMO modeling** with named ports and diagrams
-- **Compiled execution** through flat `ExecutionPlan` evaluators for NumPy and JAX
-- **Differentiable-friendly design** with functional `f(x, u, t)` style APIs
-- **Headless-first core** decoupled from graphics and solver backends
-- **Pyro successor direction** for robotics and control workflows
-
-## Quick Start
-
-```python
-from minilink.blocks.basic import Integrator
-from minilink.blocks.sources import Step
-from minilink.core.diagram import DiagramSystem
-from minilink.graphical.plotting import plot_trajectory
-from minilink.simulation.simulator import Simulator
-
-diagram = DiagramSystem()
-diagram.add_subsystem(Integrator(), "plant")
-diagram.add_subsystem(Step(), "source")
-diagram.connect("source", "y", "plant", "u")
-
-traj = Simulator(diagram, tf=10.0).solve()
-plot_trajectory(diagram, traj)
-```
+Colab: [https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing](https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing)
 
 ## Tech Stack
 
 - **Core**: NumPy
-- **Simulation**: `minilink.simulation` with SciPy and fixed-step backends
+- **Simulation**: `minilink.simulation` with SciPy or custom jit-accelerated backends
 - **Compilation**: `DynamicsEvaluator` on NumPy or JAX
 - **Visualization**: Matplotlib, MeshCat, Pygame, Graphviz
 - **Acceleration**: optional JAX JIT and autodiff
 
-## Current State
+## Quick start
 
-- `core/` is the most mature subsystem and defines the main modeling contract.
-- The official simulation path is `System.compute_trajectory(...)` / `minilink.simulation.Simulator`.
-- The official trajectory object is `minilink.core.trajectory.Trajectory`.
-- The compile pipeline, evaluators, and simulator are in architecture-validation / integration stage (`compile_backend` can be `"auto"`; long JAX sims may use an auto fixed-step path when the grid is uniform and non-stiff).
-- `graphical/` has a **stabilizing** matplotlib layer—shared Pyro-style sizing/theming in `matplotlib_style`, notebook-aware stacked plot height, and trajectory **plot** modes—while other renderers and hooks remain early work.
-- `mechanics/`, symbolic mechanics, and `physics/` are early MVP work.
-- `dynamics/` holds reusable plant models; `blocks/` is wiring and signal primitives; `control/` is controller blocks; `planning/` is not started; these layers are still maturing.
-- `dynamics/pendulum/` includes Pyro-ported tutorial plants (`CartPole`, `DoublePendulum`) built on `MechanicalSystem`; see `tests/manual/demo_cartpole_doublependulum.py` for a flat animation smoke script.
+```python
+from minilink.control.pendulum_pd import PendulumPDController
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-## Documentation Guide
+controller = PendulumPDController()  # u = Kp * (r - theta) - Kd * theta_dot
+plant = Pendulum()  # theta_ddot = -(g / l) * sin(theta) + tau / (m * l**2)
 
-- **[DESIGN.md](DESIGN.md)**: architecture, core contracts, and coding standards
-- **[ROADMAP.md](ROADMAP.md)**: subsystem maturity, priorities, and Pyro migration direction
-- **[agent.md](agent.md)**: project-specific AI collaboration rules, the TRL lifecycle table, and a **supplemental** banding for recent matplotlib and simulation features (read with `DESIGN.md` / `ROADMAP.md`)
+plant.x0[0] = 2.0
+plant.params["l"] = 5.0
+plant.params["m"] = 1.0
 
-## Benchmarks
+diagram = controller @ plant
+diagram.compute_trajectory(tf=10.0)
+diagram.plot_diagram()
+diagram.plot_trajectory()
+diagram.animate()
+```
 
-- **API**: `minilink.benchmark` — `benchmark_f_speeds` / `print_f_speed_table` for compiled `f` timing; `benchmark_sim_speed_matrix` (pass a `pairs` list, e.g. `DEFAULT_SWEEP_PAIRS`) and `benchmark_sim_backend` on a built `system`; `run_standard_sim_suite` for the three standard cases (see **§4.6** in [DESIGN.md](DESIGN.md)).
-- **Scripts**: flat runners under `tests/benchmark/` (for example `benchmark_simulator_speed_matrix.py`, `benchmark_simulator_standard.py`); execute with `python tests/benchmark/<script>.py` from the repo root with the package on `PYTHONPATH`.
+```python
 
-## Examples
+import numpy as np
+from minilink.core.system import DynamicSystem
+from minilink.core.blocks.sources import Step
 
-- **Scripts**: `examples/scripts/` for diagram compilation, internal signals, animations, and JAX physics demos
-- **Manual**: `tests/manual/demo_cartpole_doublependulum.py` — quick `compute_forced` + `animate` smoke test for the Pyro-style pendulum plants
-- **Notebook**: [Colab Tutorial](https://colab.research.google.com/drive/13tnYyZMz4bLFzYLdj88H6cqO6tZg6Xp7?usp=sharing)
+class MassSpringDamper(DynamicSystem):
+
+    def __init__(self):
+        super().__init__(n=2, input_dim=1, expose_state=True)
+        self.params = {"m": 1.0, "k": 4.0, "c": 0.3}
+
+    def f(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        m, k, c = params["m"], params["k"], params["c"]
+
+        position, velocity = x
+        force = u[0]
+
+        dx = np.zeros(2)
+        dx[0] = velocity
+        dx[1] = (force - c * velocity - k * position) / m
+        return dx
+
+# Standalone system
+sys = MassSpringDamper()
+sys.x0[0] = 1.0  # released from rest at position 1
+sys.plot_diagram()
+sys.compute_trajectory(tf=20.0)
+sys.plot_trajectory()
+
+# Source
+step = Step()
+step.params["final_value"] = np.array([10.0])
+step.params["step_time"] = 2.0
+
+# Diagram source + system
+diagram = step >> sys
+diagram.plot_diagram()
+diagram.compute_trajectory(tf=20.0)
+diagram.plot_trajectory(signals=("x", "step:y"))
+```
+
+Catalog of plants: `minilink.dynamics.catalog.*`. 
+Demos: `examples/scripts/`.
+
+Lower level API when needed: `Simulator`, `compile()`,
+explicit `DiagramSystem.connect` — see [flows.md](flows.md).
+
+## Docs
+
+- [DESIGN.md](DESIGN.md) — principles and contracts
+- [flows.md](flows.md) — minimal call chains
+- [ROADMAP.md](ROADMAP.md) — maturity and priorities
+- [agent.md](agent.md) — maintainer / agent rules
+
+Design rules: NumPy baseline, explicit JAX; native-array equation paths;
+`params is None` → defaults (never `params or self.params`).

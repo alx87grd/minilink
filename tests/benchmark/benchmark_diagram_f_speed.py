@@ -6,9 +6,8 @@ Run:
 
 import numpy as np
 
-from minilink.benchmark.scenario.network import build_deep_network
-from minilink.benchmark.scenario.network import make_dense_network
-from minilink.benchmark.f_speed import benchmark_f_speeds
+from minilink.compile.benchmark import benchmark_f_evaluators, print_f_benchmark
+from minilink.simulation.scenarios.network import make_dense_network
 
 diag = make_dense_network(num_nodes=50, connections_per_node=5)
 x_np = np.ones(diag.n)
@@ -18,4 +17,5 @@ u_np = np.array([])
 # x_np = np.ones(diag.n)
 # u_np = np.array([])
 
-benchmark_f_speeds(diag, x_np, u_np, t=0.0, n_calls=1000)
+result = benchmark_f_evaluators(diag, x_np, u_np, t=0.0, n_calls=1000)
+print_f_benchmark(result)
