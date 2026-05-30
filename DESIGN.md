@@ -83,9 +83,9 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
 Composes subsystems by named ports; flattens state; compiled `ExecutionPlan` is
 the main execution path (reference recursive path must stay equivalent).
 
-Shortcuts (`core.composition`): `+` add only, `>>` series, `@` closed loop,
-`autowire()` conservative fill. Explicit `add_subsystem` / `connect` remains
-canonical for general topology.
+Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop,
+`autowire()` conservative fill. Diagram operands are flattened, not nested.
+Explicit `add_subsystem` / `connect` remains canonical for general topology.
 
 ### `Trajectory`, sets, costs
 

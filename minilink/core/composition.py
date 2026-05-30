@@ -4,22 +4,38 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from minilink.core.diagram import DiagramSystem
+    from minilink.core.system import System
+
+
+@dataclass(frozen=True)
+class _DiagramEntry:
+    sys_id: str
+    port_id: str
+    dim: int
+    boundary_port_id: str | None = None
 
 
 def add_systems(*systems: "System | DiagramSystem") -> "DiagramSystem":
-    """Return a diagram containing ``systems`` as subsystems with no wiring.
+    """Return a flat diagram containing ``systems`` as subsystems.
 
     Parameters
     ----------
     *systems : System or DiagramSystem
-        Systems to add. Passing an existing diagram as the first argument extends
-        that diagram in place.
+        Systems or diagrams to add. Diagram operands are flattened into the
+        result; passing an existing diagram as the first argument extends that
+        diagram in place.
 
     Returns
     -------
     DiagramSystem
-        A diagram containing all provided systems as subsystems. No connections
-        are inferred.
+        A diagram containing all provided systems as direct subsystems.
+        Existing diagram-internal connections are preserved, but no new
+        cross-connections are inferred.
     """
     from minilink.core.diagram import DiagramSystem
 
@@ -28,27 +44,27 @@ def add_systems(*systems: "System | DiagramSystem") -> "DiagramSystem":
 
     diagram = None
     for sys in systems:
-        if isinstance(sys, DiagramSystem):
-            if diagram is None:
+        if diagram is None:
+            if isinstance(sys, DiagramSystem):
                 diagram = sys
                 _ensure_composition_state(diagram)
-                continue
-            raise TypeError(
-                "Merging two DiagramSystem objects is not supported by '+'. "
-                "Use explicit DiagramSystem wiring for that topology."
-            )
+            else:
+                diagram = _new_diagram()
+                _add_system_to_diagram(diagram, sys)
+            continue
 
-        if diagram is None:
-            diagram = _new_diagram()
-        _add_system_to_diagram(diagram, sys)
+        if isinstance(sys, DiagramSystem):
+            _inline_diagram(diagram, sys, output_collision="unique")
+        else:
+            _add_system_to_diagram(diagram, sys)
 
     return _new_diagram() if diagram is None else diagram
 
 
 def series(
     left: "System | DiagramSystem",
-    right: "System",
-    *rest: "System",
+    right: "System | DiagramSystem",
+    *rest: "System | DiagramSystem",
 ) -> "DiagramSystem":
     """Connect systems in series using default output and input ports.
 
@@ -56,10 +72,10 @@ def series(
     ----------
     left : System or DiagramSystem
         The first system or an existing shortcut-built diagram.
-    right : System
-        System to connect after ``left``.
-    *rest : System
-        Additional systems to append to the series chain.
+    right : System or DiagramSystem
+        System or diagram to connect after ``left``.
+    *rest : System or DiagramSystem
+        Additional systems or diagrams to append to the series chain.
 
     Returns
     -------
@@ -116,9 +132,13 @@ def closed_loop(
         measurement_port,
         f"controller measurement port {measurement_port!r}",
     )
-    _require_output(controller, control_port, f"controller output port {control_port!r}")
+    _require_output(
+        controller, control_port, f"controller output port {control_port!r}"
+    )
     _require_input(plant, plant_input_port, f"plant input port {plant_input_port!r}")
-    _require_output(plant, plant_output_port, f"plant output port {plant_output_port!r}")
+    _require_output(
+        plant, plant_output_port, f"plant output port {plant_output_port!r}"
+    )
 
     _require_same_dim(
         controller.outputs[control_port].dim,
@@ -250,19 +270,39 @@ def _as_composition_diagram(sys, *, expose_entry: bool):
 def _series_pair(diagram, right):
     from minilink.core.diagram import DiagramSystem
 
-    if isinstance(right, DiagramSystem):
-        raise TypeError(
-            "Connecting into an existing DiagramSystem with '>>' is not supported yet. "
-            "Use explicit DiagramSystem wiring for that topology."
-        )
-
     source = _get_composition_output(diagram)
     if source is None:
         raise ValueError("Left side of '>>' has no output port to connect")
+    source_id, source_port = source
+
+    if isinstance(right, DiagramSystem):
+        entry = _get_available_diagram_entry(right)
+        _require_same_dim(
+            diagram.subsystems[source_id].outputs[source_port].dim,
+            entry.dim,
+            f"{source_id}:{source_port}",
+            _entry_label(entry),
+        )
+        bindings = {}
+        if entry.boundary_port_id is not None:
+            bindings[entry.boundary_port_id] = source
+        result = _inline_diagram(
+            diagram,
+            right,
+            input_bindings=bindings,
+            output_collision="replace",
+        )
+        if entry.boundary_port_id is None:
+            diagram.connect(
+                source_id,
+                source_port,
+                result[entry.sys_id],
+                entry.port_id,
+            )
+        return diagram
 
     right_id = _add_system_to_diagram(diagram, right)
     target_port = _default_input_port(right)
-    source_id, source_port = source
 
     _require_same_dim(
         diagram.subsystems[source_id].outputs[source_port].dim,
@@ -275,6 +315,97 @@ def _series_pair(diagram, right):
     diagram.connect_new_output_port(right_id, output_port, "y")
     _set_composition_output(diagram, right_id, output_port)
     return diagram
+
+
+def _inline_diagram(
+    diagram,
+    source,
+    *,
+    input_bindings=None,
+    output_collision: str,
+) -> dict[str, str]:
+    _ensure_composition_state(diagram)
+    _ensure_composition_state(source)
+    input_bindings = {} if input_bindings is None else dict(input_bindings)
+    source_subsystems = list(source.subsystems.items())
+    source_inputs = list(source.inputs.items())
+    source_connections = {
+        source_id: dict(source.connections[source_id])
+        for source_id, _subsystem in source_subsystems
+    }
+    source_output_connections = dict(source.connections.get("output", {}))
+    source_outputs = dict(source.outputs)
+    source_entry = _get_composition_entry(source)
+    source_output = _get_composition_output(source)
+
+    id_map = {}
+    for source_id, subsystem in source_subsystems:
+        target_id = _unique_id(source_id, diagram.subsystems)
+        diagram.add_subsystem(subsystem, target_id)
+        diagram._composition_system_order.append(target_id)
+        id_map[source_id] = target_id
+
+    input_port_map = {}
+    for port_id, port in source_inputs:
+        if port_id in input_bindings:
+            continue
+        target_port_id = _unique_id(port_id, diagram.inputs)
+        _add_input_port_like(diagram, target_port_id, port)
+        input_port_map[port_id] = target_port_id
+
+    for source_target_id, subsystem in source_subsystems:
+        target_id = id_map[source_target_id]
+        for input_id in subsystem.inputs:
+            edge = source_connections[source_target_id][input_id]
+            if edge is None:
+                continue
+            source_sys_id, source_port_id = edge
+            if source_sys_id == "input":
+                if source_port_id in input_bindings:
+                    bound_sys_id, bound_port_id = input_bindings[source_port_id]
+                    diagram.connect(bound_sys_id, bound_port_id, target_id, input_id)
+                else:
+                    diagram.connect(
+                        "input",
+                        input_port_map[source_port_id],
+                        target_id,
+                        input_id,
+                    )
+            else:
+                diagram.connect(
+                    id_map[source_sys_id],
+                    source_port_id,
+                    target_id,
+                    input_id,
+                )
+
+    for output_id, edge in source_output_connections.items():
+        if edge is None:
+            continue
+        source_sys_id, source_port_id = edge
+        if source_sys_id == "input":
+            raise TypeError(
+                "Flattening diagram outputs sourced directly from external "
+                "inputs is not supported by composition shortcuts."
+            )
+        target_output_id = _output_port_id(diagram, output_id, output_collision)
+        _connect_new_output_port_like(
+            diagram,
+            id_map[source_sys_id],
+            source_port_id,
+            target_output_id,
+            source_outputs[output_id],
+        )
+
+    if diagram._composition_entry is None and source_entry is not None:
+        entry_sys_id, entry_port_id = source_entry
+        _set_composition_entry(diagram, id_map[entry_sys_id], entry_port_id)
+
+    if source_output is not None:
+        output_sys_id, output_port_id = source_output
+        _set_composition_output(diagram, id_map[output_sys_id], output_port_id)
+
+    return id_map
 
 
 def _add_system_to_diagram(diagram, sys) -> str:
@@ -307,6 +438,56 @@ def _add_system_to_diagram(diagram, sys) -> str:
     return sys_id
 
 
+def _add_input_port_like(diagram, port_id: str, port) -> None:
+    diagram.add_input_port(
+        port_id,
+        dim=port.dim,
+        nominal_value=port.nominal_value,
+        labels=port.labels,
+        units=port.units,
+        lower_bound=port.lower_bound,
+        upper_bound=port.upper_bound,
+    )
+
+
+def _connect_new_output_port_like(
+    diagram,
+    source_sys_id: str,
+    source_port_id: str,
+    output_port_id: str,
+    output_port,
+) -> None:
+    def compute(x, u, t, params=None):
+        return diagram.compute_subsys_output_port(
+            x, u, t, source_sys_id, source_port_id, params=params
+        )
+
+    diagram.add_output_port(
+        output_port_id,
+        dim=output_port.dim,
+        function=compute,
+        dependencies="all",
+        nominal_value=output_port.nominal_value,
+        labels=output_port.labels,
+        units=output_port.units,
+        lower_bound=output_port.lower_bound,
+        upper_bound=output_port.upper_bound,
+    )
+
+    if "output" not in diagram.connections:
+        diagram.connections["output"] = {}
+
+    diagram.connect(source_sys_id, source_port_id, "output", output_port_id)
+
+
+def _output_port_id(diagram, output_id: str, collision: str) -> str:
+    if collision == "replace":
+        return output_id
+    if collision == "unique":
+        return _unique_id(output_id, diagram.outputs)
+    raise ValueError(f"Unknown output collision policy {collision!r}")
+
+
 def _ensure_composition_state(diagram) -> None:
     if not hasattr(diagram, "_composition_system_order"):
         diagram._composition_system_order = []
@@ -324,6 +505,19 @@ def _set_composition_output(diagram, sys_id: str, port_id: str) -> None:
     diagram._composition_output = (sys_id, port_id)
 
 
+def _get_composition_entry(diagram):
+    _ensure_composition_state(diagram)
+    entry = diagram._composition_entry
+    if entry is not None:
+        sys_id, port_id = entry
+        if (
+            sys_id in diagram.subsystems
+            and port_id in diagram.subsystems[sys_id].inputs
+        ):
+            return entry
+    return None
+
+
 def _get_composition_output(diagram):
     _ensure_composition_state(diagram)
     output = diagram._composition_output
@@ -334,7 +528,81 @@ def _get_composition_output(diagram):
         sys = diagram.subsystems[sys_id]
         if sys.outputs:
             return sys_id, _default_output_port(sys)
+
+    boundary_outputs = []
+    if "output" in diagram.connections:
+        for output_id in diagram.outputs:
+            edge = diagram.connections["output"].get(output_id)
+            if edge is not None and edge[0] != "input":
+                boundary_outputs.append(edge)
+    if "y" in diagram.outputs:
+        edge = diagram.connections.get("output", {}).get("y")
+        if edge is not None and edge[0] != "input":
+            return edge
+    if len(boundary_outputs) == 1:
+        return boundary_outputs[0]
     return None
+
+
+def _get_available_diagram_entry(diagram) -> _DiagramEntry:
+    entry = _get_composition_entry(diagram)
+    if entry is not None:
+        sys_id, port_id = entry
+        target_port = diagram.subsystems[sys_id].inputs[port_id]
+        edge = diagram.connections[sys_id][port_id]
+        if edge is None:
+            return _DiagramEntry(sys_id, port_id, target_port.dim)
+        if edge[0] == "input":
+            boundary_port_id = edge[1]
+            return _DiagramEntry(
+                sys_id,
+                port_id,
+                diagram.inputs[boundary_port_id].dim,
+                boundary_port_id,
+            )
+        raise ValueError(
+            "Right side of '>>' has no available boundary input; "
+            f"composition entry {sys_id}:{port_id} is already connected. "
+            "Use explicit DiagramSystem.connect for this topology."
+        )
+
+    boundary_inputs = list(diagram.inputs)
+    if len(boundary_inputs) != 1:
+        raise ValueError(
+            "Right side of '>>' must have exactly one composition entry or "
+            "exposed boundary input. Use explicit DiagramSystem.connect for "
+            "this topology."
+        )
+
+    boundary_port_id = boundary_inputs[0]
+    targets = _boundary_input_targets(diagram, boundary_port_id)
+    if len(targets) == 0:
+        raise ValueError(
+            "Right side of '>>' has an exposed boundary input that is not "
+            "connected to any subsystem input."
+        )
+    sys_id, port_id = targets[0]
+    return _DiagramEntry(
+        sys_id,
+        port_id,
+        diagram.inputs[boundary_port_id].dim,
+        boundary_port_id,
+    )
+
+
+def _boundary_input_targets(diagram, boundary_port_id: str) -> list[tuple[str, str]]:
+    targets = []
+    for sys_id, subsystem in diagram.subsystems.items():
+        for port_id in subsystem.inputs:
+            if diagram.connections[sys_id][port_id] == ("input", boundary_port_id):
+                targets.append((sys_id, port_id))
+    return targets
+
+
+def _entry_label(entry: _DiagramEntry) -> str:
+    if entry.boundary_port_id is not None:
+        return f"input:{entry.boundary_port_id}"
+    return f"{entry.sys_id}:{entry.port_id}"
 
 
 def _expose_entry_input(diagram, sys_id: str) -> None:

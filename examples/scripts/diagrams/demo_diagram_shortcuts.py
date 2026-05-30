@@ -7,8 +7,15 @@ Run from the repo root:
 
 from minilink.control.pendulum_pd import PendulumPDController
 from minilink.core.blocks.basic import Integrator
-from minilink.core.blocks.sources import Step
+from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+
+def show(diagram, name, operation):
+    diagram.name = name
+    print(f"{name}: {operation}")
+    diagram.plot_diagram()
+    return diagram
 
 
 # Equivalent explicit form:
@@ -23,8 +30,7 @@ plant = Pendulum()
 
 
 diagram = step + ctl + plant
-diagram.name = "Shortcut add-only diagram"
-diagram.plot_diagram()
+show(diagram, "Shortcut add-only diagram", "step + ctl + plant")
 
 
 # Equivalent explicit form:
@@ -38,8 +44,7 @@ diagram.plot_diagram()
 # chain.connect_new_output_port("integrator_2", "y", "y")
 
 chain = Step() >> Integrator() >> Integrator()
-chain.name = "Shortcut integrator chain"
-chain.plot_diagram()
+show(chain, "Shortcut integrator chain", "Step() >> Integrator() >> Integrator()")
 # chain.compute_trajectory(tf=5.0, show=False)
 
 
@@ -54,9 +59,33 @@ chain.plot_diagram()
 # closed.connect("controller", "u", "pendulum", "u")
 # closed.connect_new_output_port("pendulum", "y", "y")
 closed = PendulumPDController() @ Pendulum()
-closed.name = "Shortcut closed-loop pendulum"
-closed.plot_diagram()
+show(closed, "Shortcut closed-loop pendulum", "PendulumPDController() @ Pendulum()")
 # closed.compute_trajectory(tf=10.0, show=False)
+
+
+# Python parses this as ``step >> (controller @ plant)``. Shortcut composition
+# flattens the closed-loop diagram, so the result has direct ``step``,
+# ``controller``, and ``pendulum`` subsystems.
+fed_closed = Step(final_value=[1.0]) >> PendulumPDController() @ Pendulum()
+show(
+    fed_closed,
+    "Source into closed-loop shortcut",
+    "Step() >> PendulumPDController() @ Pendulum()",
+)
+# fed_closed.compute_trajectory(tf=10.0, show=False)
+
+
+# Noise and disturbance ports stay explicit. This keeps ``>>`` from guessing
+# between open internal plant inputs such as ``w`` and ``v``.
+noisy = Step(final_value=[1.0]) >> PendulumPDController() @ Pendulum()
+noise = WhiteNoise()
+noisy.add_subsystem(noise, "sensor_noise")
+noisy.connect("sensor_noise", "y", "pendulum", "v")
+show(
+    noisy,
+    "Closed loop with explicit sensor noise",
+    "Step() >> PendulumPDController() @ Pendulum(), WhiteNoise() -> pendulum.v",
+)
 
 
 # Equivalent explicit form:
@@ -69,5 +98,8 @@ closed.plot_diagram()
 # auto.connect("pendulum", "y", "controller", "y")
 # auto.connect("controller", "u", "pendulum", "u")
 auto = (Step() + PendulumPDController() + Pendulum()).autowire(strict=True)
-auto.name = "Autowired shortcut diagram"
-# auto.plot_diagram()
+show(
+    auto,
+    "Autowired shortcut diagram",
+    "(Step() + PendulumPDController() + Pendulum()).autowire(strict=True)",
+)

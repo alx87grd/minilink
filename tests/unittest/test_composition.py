@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.control.pendulum_pd import PendulumPDController
 from minilink.core.blocks.basic import Integrator, PropController
-from minilink.core.blocks.sources import Step
+from minilink.core.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
@@ -68,6 +68,76 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         )
         self.assertEqual(diagram.connections["output"]["y"], ("pendulum", "y"))
         self.assertEqual(diagram.outputs["y"].dim, 2)
+
+    def test_series_operator_flattens_source_into_closed_loop_diagram(self):
+        diagram = (
+            Step(final_value=[1.0], step_time=0.0)
+            >> PendulumPDController()
+            @ Pendulum()
+        )
+
+        self.assertEqual(list(diagram.subsystems), ["step", "controller", "pendulum"])
+        self.assertFalse(
+            any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
+        )
+        self.assertEqual(diagram.connections["controller"]["r"], ("step", "y"))
+        self.assertEqual(diagram.connections["controller"]["y"], ("pendulum", "y"))
+        self.assertEqual(diagram.connections["pendulum"]["u"], ("controller", "u"))
+        self.assertEqual(diagram.connections["output"]["y"], ("pendulum", "y"))
+        self.assertNotIn("r", diagram.inputs)
+
+    def test_add_operator_flattens_diagrams_without_cross_wiring(self):
+        left = Step(final_value=[1.0]) + Integrator()
+        right = PendulumPDController() @ Pendulum()
+
+        diagram = left + right
+
+        self.assertEqual(
+            list(diagram.subsystems),
+            ["step", "integrator", "controller", "pendulum"],
+        )
+        self.assertFalse(
+            any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
+        )
+        self.assertEqual(diagram.connections["integrator"]["u"], None)
+        self.assertEqual(diagram.connections["controller"]["r"], ("input", "r"))
+        self.assertEqual(diagram.connections["controller"]["y"], ("pendulum", "y"))
+        self.assertEqual(diagram.connections["pendulum"]["u"], ("controller", "u"))
+
+    def test_series_operator_flattens_diagram_to_diagram_boundary(self):
+        left = Step(final_value=[1.0], step_time=0.0) >> PropController()
+        right = Integrator() >> Integrator()
+
+        diagram = left >> right
+
+        self.assertEqual(
+            list(diagram.subsystems),
+            ["step", "controller", "integrator", "integrator_2"],
+        )
+        self.assertFalse(
+            any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
+        )
+        self.assertEqual(diagram.connections["controller"]["r"], ("step", "y"))
+        self.assertEqual(diagram.connections["integrator"]["u"], ("controller", "u"))
+        self.assertEqual(
+            diagram.connections["integrator_2"]["u"],
+            ("integrator", "y"),
+        )
+        self.assertEqual(diagram.connections["output"]["y"], ("integrator_2", "y"))
+        self.assertNotIn("u", diagram.inputs)
+
+    def test_series_into_diagram_does_not_guess_internal_noise_ports(self):
+        diagram = (
+            Step(final_value=[1.0], step_time=0.0)
+            >> PendulumPDController()
+            @ Pendulum()
+        )
+
+        with self.assertRaisesRegex(ValueError, "no available boundary input"):
+            WhiteNoise() >> diagram
+
+        self.assertEqual(diagram.connections["pendulum"]["w"], None)
+        self.assertEqual(diagram.connections["pendulum"]["v"], None)
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
         diagram = (Step(final_value=[1.0]) + PropController() + Integrator()).autowire(

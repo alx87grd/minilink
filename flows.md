@@ -44,5 +44,5 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 - `Trajectory` is numeric only (`t`, `x`, `u`, optional `signals`); labels stay on `System`.
 - Diagram internal signals in plots: `"subsystem_id:port_id"`.
 - `DiagramSystem.connection_verbose` defaults to `True`; set `False` to quiet wiring.
-- Shortcuts do not merge two diagrams with `+` or nest diagrams with `>>`.
+- Shortcuts flatten diagram operands instead of nesting them; `+` does not infer cross-wiring.
 - `compute_*` returns `Trajectory`; `plot_*` returns `PlotResult`; `show=False` skips display.
