@@ -7,7 +7,12 @@ It includes base signal representations (`VectorSignal`, `InputPort`,
 dynamic systems inherit.
 """
 
+from typing import TYPE_CHECKING
+
 import numpy as np
+
+if TYPE_CHECKING:
+    from minilink.core.diagram import DiagramSystem
 
 
 def _as_optional_vector(value, *, dim, field_name, signal_id):
@@ -298,8 +303,9 @@ class System:
       (:attr:`params`), default initial condition (:attr:`x0`), and solver
       hints (:attr:`solver_info`).
     - **Optional visualization contract**: it may describe forward-kinematic
-      geometry for rendering and animation (still MVP / TRL 1). Default
-      ``camera_*`` fields configure :meth:`get_camera_transform`; see that method.
+      geometry for rendering and animation. This API is still under
+      graphical/animation review. Default ``camera_*`` fields configure
+      :meth:`get_camera_transform`; see that method.
     - **User shortcut façade**: it exposes convenience methods such as
       :meth:`compile`, :meth:`compute_trajectory`, :meth:`render`,
       :meth:`animate`, and :meth:`game`.
@@ -715,7 +721,7 @@ class System:
         attributes for a fixed view, or override this method for a time-varying
         camera.
 
-        TODO: User Architectural Review (visualization contract is TRL 1).
+        TODO: User Architectural Review (visualization contract under review).
         """
         from minilink.graphical.animation.primitives import camera_matrix
 

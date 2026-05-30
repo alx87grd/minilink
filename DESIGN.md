@@ -34,16 +34,20 @@ exports are frozen ([ROADMAP.md](ROADMAP.md) P1).
 
 ## 3. Package Map
 
-| Package | TRL | Role |
-| --- | --- | --- |
-| `core/` | 7 | `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs, blocks |
-| `compile/` | 4 | `ExecutionPlan`, NumPy/JAX evaluators |
-| `simulation/` | 4 | `Simulator`, solvers, forcing |
-| `optimization/` | 1 | `MathematicalProgram`, `Optimizer` |
-| `planning/` | 1 | problems, trajopt, search (prototype) |
-| `dynamics/` | 0–1 | abstractions + catalog plants |
-| `graphical/` | 2 | signals, phase plane, diagrams, animation |
-| `symbolic/`, `physics/`, `control/` | 0–1 | optional / MVP |
+Component maturity is tracked only in [ROADMAP.md](ROADMAP.md); this table
+describes package ownership.
+
+| Package | Role |
+| --- | --- |
+| `core/` | `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs, blocks |
+| `compile/` | `ExecutionPlan`, NumPy/JAX evaluators |
+| `simulation/` | `Simulator`, solvers, forcing |
+| `optimization/` | `MathematicalProgram`, `Optimizer` |
+| `planning/` | problems, trajopt, search prototypes |
+| `dynamics/` | abstractions + catalog plants |
+| `graphical/` | signals, phase plane, diagrams, animation |
+| `symbolic/`, `physics/` | experimental symbolic mechanics and JAX physics demos |
+| `control/` | controller and static-law blocks |
 
 **Dynamics root:** `DynamicSystem` with `f`, `h`. Reusable bases in
 `dynamics/abstraction` (`StateSpaceSystem`, `MechanicalSystem`,
@@ -131,7 +135,8 @@ Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
 Plotly under `plotting` extra.
 
 **Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
-for all renderers. Override on `System` for custom views; kinematic hooks TRL 1.
+for all renderers. Override on `System` for custom views. Camera and kinematic
+hooks are still under graphical/animation API review.
 
 Benchmark helpers live beside subsystems; runners under `tests/benchmark/`—not
 public contracts.

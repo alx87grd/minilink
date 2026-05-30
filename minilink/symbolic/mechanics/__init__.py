@@ -1,7 +1,7 @@
 """
 Symbolic multibody mechanics (SymPy).
 
-**TRL 1** — prototype derivation and export; API and performance not frozen.
+Prototype derivation and export; API and performance are not frozen.
 
 Import convention: use the defining submodules, for example
 ``from minilink.dynamics.abstraction.mechanical import MechanicalSystem`` (NumPy) or

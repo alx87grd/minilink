@@ -1,7 +1,7 @@
 """
 Second-order mechanical systems in generalized coordinates.
 
-**TRL 1** — numeric template; see :mod:`minilink.dynamics.abstraction`.
+Numeric template; see :mod:`minilink.dynamics.abstraction`.
 
 Equation of motion::
 

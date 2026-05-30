@@ -37,6 +37,8 @@ minilink/_version.py
 # Output files #
 ############################
 output/
+docs/_build/
+site/
 *.html
 *.png
 *.gif
