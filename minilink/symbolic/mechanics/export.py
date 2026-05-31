@@ -194,7 +194,7 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
         def g(self, qv, params=None):
             return _g(qv)
 
-        def d(self, qv, dq_, params=None):
+        def d(self, qv, dq_, u=None, t=0.0, params=None):
             return _d(qv, dq_)
 
         def B(self, qv, params=None):

@@ -13,19 +13,17 @@ the same sweep scaling as the tutorial single pendulum in ``pendulum.py``.
 import numpy as np
 
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.graphical.animation.primitives import (
-    Circle,
-    CustomLine,
-    Rod,
-    TorqueArrow,
-    pose2d_matrix,
-    torque_pose2d_matrix,
-)
+from minilink.graphical.animation.primitives import (Circle, CustomLine, Rod,
+                                                     TorqueArrow,
+                                                     pose2d_matrix,
+                                                     torque_pose2d_matrix)
 
 
 class DoublePendulum(MechanicalSystem):
     """
     Two-link actuated pendulum in Pyro's manipulator-equation convention.
+
+    TRL: 1 - ready for user review.
 
     Notes
     -----
@@ -118,7 +116,7 @@ class DoublePendulum(MechanicalSystem):
         G[1] = -g2 * s12
         return G
 
-    def d(self, q, dq, params=None):
+    def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         D = np.diag([params["d1"], params["d2"]])
         return D @ dq
@@ -181,16 +179,47 @@ class DoublePendulum(MechanicalSystem):
         ]
 
 
+class Acrobot(DoublePendulum):
+    """Double pendulum actuated only at the elbow.
+
+    TRL: 1 - ready for user review.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "Acrobot"
+        self.m = 0
+        self.inputs.clear()
+        self.add_input_port(
+            "u",
+            dim=1,
+            labels=["tau"],
+            units=["Nm"],
+            lower_bound=[-10.0],
+            upper_bound=[10.0],
+        )
+
+    def B(self, q, params=None):
+        return np.array([[0.0], [1.0]])
+
+    def get_kinematic_transforms(self, x, u, t):
+        transforms = super().get_kinematic_transforms(x, np.array([0.0, u[0]]), t)
+        return transforms[:-2] + transforms[-1:]
+
+    def get_kinematic_geometry(self):
+        return super().get_kinematic_geometry()[:-2] + super().get_kinematic_geometry()[
+            -1:
+        ]
+
+
 if __name__ == "__main__":
     double_pendulum = DoublePendulum()
     double_pendulum.x0 = np.array([0.2, -0.15, 0.0, 0.0])
-    double_traj = double_pendulum.compute_forced(
+    traj = double_pendulum.compute_forced(
         lambda t: np.array([0.5 * np.sin(t), 0.25 * np.cos(1.5 * t)]),
         tf=4.0,
         n_steps=160,
         show=False,
         verbose=False,
     )
-    double_pendulum.animate()
-    double_pendulum.animate(renderer="meshcat")
-    # double_pendulum.game(renderer="meshcat")
+    double_pendulum.animate(traj)

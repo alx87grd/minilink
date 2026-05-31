@@ -5,12 +5,13 @@ Numeric template; see :mod:`minilink.dynamics.abstraction`.
 
 Equation of motion::
 
-    H(q) ddq + C(q, dq) dq + d(q, dq) + g(q) = B(q) u
+    H(q) a + C(q, v) v + d(q, v, u, t) + g(q)
+        = generalized_force(q, v, u, t)
 
 * :class:`MechanicalSystem` — native-array default template. Concrete subclasses
   remain JAX-traceable only if their hooks use JAX-compatible math.
-* :class:`JaxMechanicalSystem` — compatibility/convenience base for explicit JAX
-  plant variants. JAX is loaded lazily when you call methods on that class.
+* :class:`JaxMechanicalSystem` — convenience base for explicit JAX plant
+  variants. JAX is loaded lazily when you call methods on that class.
 """
 
 import numpy as np
@@ -23,13 +24,16 @@ class MechanicalSystem(DynamicSystem):
     """
     Mechanical system with equation of motion
 
-        H(q) ddq + C(q, dq) dq + d(q, dq) + g(q) = B(q) u
+        H(q) a + C(q, v) v + d(q, v, u, t) + g(q)
+            = generalized_force(q, v, u, t)
 
-    State is stacked as ``x = [q; dq]`` with ``n = 2 * dof`` and default output ``y = x``.
+    State is stacked as ``x = [q; v]`` with ``n = 2 * dof`` and default output
+    ``y = x``. For ordinary generalized coordinates, ``v = qdot``.
 
-    Subclasses override ``H``, ``C``, ``B``, ``g``, and/or ``d``. The default
-    hooks follow Minilink's native-array rule; a concrete subclass is
-    JAX-traceable only if its overridden hooks do the same.
+    Subclasses override ``H``, ``C``, ``B``, ``g``, ``d``, and/or
+    ``generalized_force``. The default hooks follow Minilink's native-array
+    rule; a concrete subclass is JAX-traceable only if its overridden hooks do
+    the same.
     """
 
     def __init__(self, dof=1, actuators=None):
@@ -78,7 +82,7 @@ class MechanicalSystem(DynamicSystem):
         xp = array_module(q)
         return xp.eye(self.dof)
 
-    def C(self, q, dq, params=None):
+    def C(self, q, v, params=None):
         """Coriolis and centrifugal matrix, shape (dof, dof)."""
         xp = array_module(q)
         return xp.zeros((self.dof, self.dof))
@@ -93,65 +97,64 @@ class MechanicalSystem(DynamicSystem):
         xp = array_module(q)
         return xp.zeros(self.dof)
 
-    def d(self, q, dq, params=None):
-        """Dissipative forces, shape (dof,)."""
+    def d(self, q, v, u=None, t=0.0, params=None):
+        """Left-side load/dissipation vector, shape ``(dof,)``."""
         xp = array_module(q)
         return xp.zeros(self.dof)
 
+    def generalized_force(self, q, v, u, t=0.0, params=None):
+        """Right-side generalized force vector.
+
+        The default is the textbook actuator map ``B(q) @ u``. Override this
+        method when inputs mix force commands, geometry commands, environment
+        variables, or other non-actuator semantics.
+        """
+        return self.B(q, params) @ u
+
     def x2q(self, x):
-        """Split state ``x`` into ``q`` and ``dq``."""
+        """Split state ``x`` into ``q`` and ``v``."""
         q = x[0 : self.dof]
-        dq = x[self.dof : self.n]
-        return [q, dq]
+        v = x[self.dof : self.n]
+        return [q, v]
 
-    def q2x(self, q, dq):
-        """Stack ``q`` and ``dq`` into state ``x``."""
+    def q2x(self, q, v):
+        """Stack ``q`` and ``v`` into state ``x``."""
         xp = array_module(q)
-        return xp.concatenate([q, dq])
+        return xp.concatenate([q, v])
 
-    def generalized_forces(self, q, dq, ddq, t=0, params=None):
-        """Generalized forces for a given trajectory ``q, dq, ddq``."""
+    def inverse_dynamics(self, q, v, acceleration, u=None, t=0.0, params=None):
+        """Generalized RHS force required by a trajectory."""
         params = self.params if params is None else params
         H = self.H(q, params)
-        C = self.C(q, dq, params)
+        C = self.C(q, v, params)
         g = self.g(q, params)
-        d = self.d(q, dq, params)
-        return H @ ddq + C @ dq + g + d
+        d = self.d(q, v, u, t, params)
+        return H @ acceleration + C @ v + g + d
 
-    def actuator_forces(self, q, dq, ddq, t=0, params=None):
-        """Inverse dynamics: actuator forces given ``q, dq, ddq`` (square ``B`` only)."""
-        if self.dof != self.m:
-            raise NotImplementedError
-        params = self.params if params is None else params
-        B = self.B(q, params)
-        forces = self.generalized_forces(q, dq, ddq, t, params)
-        xp = array_module(forces)
-        return xp.linalg.solve(B, forces)
-
-    def ddq(self, q, dq, u, t=0, params=None):
-        """Forward dynamics: generalized accelerations given ``u``."""
+    def forward_dynamics(self, q, v, u, t=0.0, params=None):
+        """Forward dynamics: generalized acceleration given ``u``."""
         params = self.params if params is None else params
         H = self.H(q, params)
-        C = self.C(q, dq, params)
+        C = self.C(q, v, params)
         g = self.g(q, params)
-        d = self.d(q, dq, params)
-        B = self.B(q, params)
-        rhs = B @ u - C @ dq - g - d
+        d = self.d(q, v, u, t, params)
+        tau = self.generalized_force(q, v, u, t, params)
+        rhs = tau - C @ v - g - d
         xp = array_module(rhs)
         return xp.linalg.solve(H, rhs)
 
-    def f(self, x, u, t=0, params=None):
+    def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        q, dq = self.x2q(x)
-        ddq = self.ddq(q, dq, u, t, params)
-        return self.q2x(dq, ddq)
+        q, v = self.x2q(x)
+        acceleration = self.forward_dynamics(q, v, u, t, params)
+        return self.q2x(v, acceleration)
 
-    def h(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0.0, params=None):
         return x
 
-    def kinetic_energy(self, q, dq, params=None):
+    def kinetic_energy(self, q, v, params=None):
         params = self.params if params is None else params
-        return 0.5 * (dq @ (self.H(q, params) @ dq))
+        return 0.5 * (v @ (self.H(q, params) @ v))
 
 
 class JaxMechanicalSystem(MechanicalSystem):
@@ -159,11 +162,10 @@ class JaxMechanicalSystem(MechanicalSystem):
     JAX-traceable counterpart of :class:`MechanicalSystem`.
 
     Inherits port labels, bounds, ``__init__``, ``x2q`` / ``h``, and the
-    ``generalized_forces`` formula from :class:`MechanicalSystem`. Overrides
+    ``inverse_dynamics`` formula from :class:`MechanicalSystem`. Overrides
     only the matrix builders (:meth:`H`, :meth:`C`, :meth:`B`, :meth:`g`,
-    :meth:`d`), the state-stacking helper :meth:`q2x`, and the methods that
-    call ``np.linalg.solve`` (:meth:`actuator_forces`, :meth:`ddq`,
-    :meth:`f`) so the dynamics trace through ``jax.numpy``.
+    :meth:`d`), the state-stacking helper :meth:`q2x`, and methods that need
+    JAX array creation or ``jax.numpy.linalg.solve``.
 
     JAX is loaded lazily inside each method via
     :func:`~minilink.compile.jax_utils.require_jax_numpy`, so importing this
@@ -175,7 +177,7 @@ class JaxMechanicalSystem(MechanicalSystem):
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.diag(jnp.ones(self.dof, dtype=dt))
 
-    def C(self, q, dq, params=None):
+    def C(self, q, v, params=None):
         jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.zeros((self.dof, self.dof), dtype=dt)
@@ -193,47 +195,41 @@ class JaxMechanicalSystem(MechanicalSystem):
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.zeros(self.dof, dtype=dt)
 
-    def d(self, q, dq, params=None):
+    def d(self, q, v, u=None, t=0.0, params=None):
         jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.zeros(self.dof, dtype=dt)
 
-    def q2x(self, q, dq):
+    def generalized_force(self, q, v, u, t=0.0, params=None):
+        return self.B(q, params) @ u
+
+    def q2x(self, q, v):
         jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.concatenate(
-            [jnp.asarray(q, dtype=dt).ravel(), jnp.asarray(dq, dtype=dt).ravel()]
+            [jnp.asarray(q, dtype=dt).ravel(), jnp.asarray(v, dtype=dt).ravel()]
         )
 
-    def actuator_forces(self, q, dq, ddq, t=0, params=None):
-        if self.dof != self.m:
-            raise NotImplementedError
-        params = self.params if params is None else params
-        jnp = require_jax_numpy()
-        B = self.B(q, params)
-        forces = self.generalized_forces(q, dq, ddq, t, params)
-        return jnp.linalg.solve(B, forces)
-
-    def ddq(self, q, dq, u, t=0, params=None):
+    def forward_dynamics(self, q, v, u, t=0.0, params=None):
         params = self.params if params is None else params
         jnp = require_jax_numpy()
         u = jnp.asarray(u)
         H = self.H(q, params)
-        C = self.C(q, dq, params)
+        C = self.C(q, v, params)
         g = self.g(q, params)
-        d = self.d(q, dq, params)
-        B = self.B(q, params)
-        rhs = B @ u - C @ dq - g - d
+        d = self.d(q, v, u, t, params)
+        tau = self.generalized_force(q, v, u, t, params)
+        rhs = tau - C @ v - g - d
         return jnp.linalg.solve(H, rhs)
 
-    def f(self, x, u, t=0, params=None):
+    def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         jnp = require_jax_numpy()
         u = jnp.asarray(u)
-        q, dq = self.x2q(x)
-        ddq = self.ddq(q, dq, u, t, params)
-        return self.q2x(dq, ddq)
+        q, v = self.x2q(x)
+        acceleration = self.forward_dynamics(q, v, u, t, params)
+        return self.q2x(v, acceleration)
 
-    def kinetic_energy(self, q, dq, params=None):
+    def kinetic_energy(self, q, v, params=None):
         params = self.params if params is None else params
-        return 0.5 * (dq @ (self.H(q, params) @ dq))
+        return 0.5 * (v @ (self.H(q, params) @ v))

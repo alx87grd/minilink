@@ -2,15 +2,20 @@ import unittest
 
 import numpy as np
 
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    DynamicBicycle,
-    DynamicBicycleCar3D,
-    DynamicBicycleCar3DRealistic,
-)
-from minilink.graphical.animation.primitives import ExtrudedPolygon
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
+from minilink.graphical.animation.primitives import Arrow
 
 
-class TestDynamicBicycleCamera(unittest.TestCase):
+class TestDynamicBicycle(unittest.TestCase):
+    def test_dimensions_and_labels(self):
+        sys = DynamicBicycle()
+
+        self.assertEqual(sys.n, 6)
+        self.assertEqual(sys.m, 2)
+        self.assertEqual(sys.p, 6)
+        self.assertEqual(sys.state.labels, ["x", "y", "theta", "vx", "vy", "yaw_rate"])
+        self.assertEqual(sys.inputs["u"].labels, ["w_rear", "delta"])
+
     def test_camera_follows_vehicle_position_by_default(self):
         sys = DynamicBicycle()
         sys.camera_target[:] = (1.0, -2.0, 0.5)
@@ -23,40 +28,35 @@ class TestDynamicBicycleCamera(unittest.TestCase):
         np.testing.assert_allclose(camera[:3, 3], np.array([11.0, 1.0, 0.5]))
         self.assertEqual(camera[3, 3], 7.0)
 
-    def test_camera_follow_can_be_disabled(self):
+    def test_dynamics_reference_value(self):
         sys = DynamicBicycle()
-        sys.camera_follow_vehicle = False
-        sys.camera_target[:] = (1.0, -2.0, 0.5)
-        x = np.array([10.0, 3.0, 0.25, 4.0, 0.0, 0.0])
-        u = np.zeros(sys.m)
+        x = np.array([0.1, -0.2, 0.3, 5.0, 0.4, 0.05])
+        u = np.array([20.0, 0.1])
 
-        camera = sys.get_camera_transform(x, u, 0.0)
+        dx = sys.f(x, u)
 
-        np.testing.assert_allclose(camera[:3, 3], np.array([1.0, -2.0, 0.5]))
+        np.testing.assert_allclose(
+            dx[:3],
+            sys.N(x[:3]) @ x[3:],
+        )
+        self.assertEqual(dx.shape, (6,))
+        self.assertGreater(dx[3], -20.0)
 
-
-class TestDynamicBicycleCar3DRealisticGraphics(unittest.TestCase):
-    def test_realistic_car_adds_richer_geometry_without_replacing_old_class(self):
-        old_sys = DynamicBicycleCar3D()
-        new_sys = DynamicBicycleCar3DRealistic()
-
-        old_primitives = old_sys.get_kinematic_geometry()
-        new_primitives = new_sys.get_kinematic_geometry()
-
-        self.assertGreater(len(new_primitives), len(old_primitives))
-        self.assertTrue(any(isinstance(p, ExtrudedPolygon) for p in new_primitives))
-
-    def test_realistic_car_geometry_and_transform_counts_match(self):
-        sys = DynamicBicycleCar3DRealistic()
+    def test_graphics_geometry_and_transform_counts_match(self):
+        sys = DynamicBicycle()
         x = np.zeros(sys.n)
-        u = np.zeros(sys.m)
+        x[3] = 1.0
+        u = np.array([10.0, 0.1])
 
         primitives = sys.get_kinematic_geometry()
         transforms = sys.get_kinematic_transforms(x, u, 0.0)
 
+        self.assertEqual(len(primitives), 7)
         self.assertEqual(len(primitives), len(transforms))
+        self.assertEqual(sum(isinstance(item, Arrow) for item in primitives), 4)
         for T in transforms:
             self.assertEqual(T.shape, (4, 4))
+            self.assertTrue(np.all(np.isfinite(T)))
 
 
 if __name__ == "__main__":

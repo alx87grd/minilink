@@ -126,7 +126,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["output"]["y"], ("integrator_2", "y"))
         self.assertNotIn("u", diagram.inputs)
 
-    def test_series_into_diagram_does_not_guess_internal_noise_ports(self):
+    def test_series_into_closed_loop_without_free_boundary_input_fails(self):
         diagram = (
             Step(final_value=[1.0], step_time=0.0)
             >> PendulumPDController()
@@ -136,8 +136,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no available boundary input"):
             WhiteNoise() >> diagram
 
-        self.assertEqual(diagram.connections["pendulum"]["w"], None)
-        self.assertEqual(diagram.connections["pendulum"]["v"], None)
+        self.assertEqual(diagram.connections["pendulum"]["u"], ("controller", "u"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
         diagram = (Step(final_value=[1.0]) + PropController() + Integrator()).autowire(
@@ -178,8 +177,6 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
             diagram.connections["pendulum"]["u"],
             ("controller", "u"),
         )
-        self.assertEqual(diagram.connections["pendulum"]["w"], None)
-        self.assertEqual(diagram.connections["pendulum"]["v"], None)
 
     def test_autowire_strict_refuses_ambiguous_matches(self):
         diagram = PropController() + PropController() + Integrator()
