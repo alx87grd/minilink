@@ -541,3 +541,109 @@ def extract_amplitude(T):
     T_clean = T.copy()
     T_clean[3, 3] = 1.0
     return amplitude, T_clean
+
+
+def identity_matrix():
+    """4x4 identity transform (primitive drawn at the world origin)."""
+    return np.eye(4)
+
+
+def empty_transform():
+    """Transform that parks a primitive far off-screen (used to hide it)."""
+    return translation_matrix(0.0, 0.0, -1000.0)
+
+
+def follow_xy_camera(x, y, scale):
+    """Top-down camera centered on world point *(x, y)* with view half-extent *scale*."""
+    return camera_matrix(target=(x, y, 0.0), plot_axes=(0, 1), scale=scale)
+
+
+def heading_from_vector(vx, vy):
+    """Planar heading angle of the vector *(vx, vy)*."""
+    return np.arctan2(vy, vx)
+
+
+def arrow_transform(x, y, vx, vy, scale=1.0):
+    """Place a unit :class:`Arrow` at *(x, y)*, aligned with *(vx, vy)*.
+
+    The arrow is rotated to the vector heading and stretched to
+    ``scale * |(vx, vy)|`` so its drawn length encodes the magnitude.
+    A near-zero vector collapses to zero length (nothing visible).
+    """
+    length = scale * np.hypot(vx, vy)
+    if length < 1e-12:
+        return scale_pose2d_matrix(x, y, 0.0, 0.0)
+    return scale_pose2d_matrix(x, y, heading_from_vector(vx, vy), length)
+
+
+def line_between_transform(p0, p1):
+    """Place a unit :class:`CustomLine` so it spans from *p0* to *p1* in the plane."""
+    p0 = np.asarray(p0, dtype=float)
+    p1 = np.asarray(p1, dtype=float)
+    delta = p1 - p0
+    return scale_pose2d_matrix(
+        p0[0],
+        p0[1],
+        heading_from_vector(delta[0], delta[1]),
+        np.hypot(delta[0], delta[1]),
+    )
+
+
+def rod_between_transform(p0, p1):
+    """Pose a unit :class:`Rod` (length along local -y) from *p0* to *p1* in 3-D.
+
+    Builds an orthonormal frame whose y-axis points from *p0* toward *p1*;
+    a reference axis is swapped when nearly parallel to keep the cross
+    products well conditioned.
+    """
+    p0 = np.asarray(p0, dtype=float)
+    p1 = np.asarray(p1, dtype=float)
+    delta = p1 - p0
+    length = np.linalg.norm(delta)
+    T = np.eye(4)
+    T[:3, 3] = p0
+    if length < 1e-12:
+        return T
+
+    y_axis = -delta / length
+    reference = np.array([0.0, 0.0, 1.0])
+    if abs(np.dot(y_axis, reference)) > 0.95:
+        reference = np.array([1.0, 0.0, 0.0])
+    x_axis = np.cross(reference, y_axis)
+    x_axis = x_axis / np.linalg.norm(x_axis)
+    z_axis = np.cross(x_axis, y_axis)
+    T[:3, 0] = x_axis
+    T[:3, 1] = y_axis
+    T[:3, 2] = z_axis
+    return T
+
+
+def point_transform(point):
+    """Translation transform placing a primitive at *point* (z defaults to 0)."""
+    point = np.asarray(point, dtype=float)
+    return translation_matrix(point[0], point[1], point[2] if point.size > 2 else 0.0)
+
+
+def ground_line(length=20.0, y=0.0, color="black", style="--"):
+    """Horizontal reference line of span *length* at height *y* (e.g. ground)."""
+    return CustomLine(
+        [[-0.5 * length, y, 0.0], [0.5 * length, y, 0.0]],
+        color=color,
+        linewidth=1,
+        style=style,
+    )
+
+
+def spring_line(coils=6, amplitude=0.12, color="black", linewidth=1):
+    """Unit-length zig-zag spring along local +X (lead-in, *coils* coils, lead-out).
+
+    Drawn from x=0 to x=1; pair with a transform that spans the two endpoints.
+    """
+    pts = [[0.0, 0.0, 0.0], [0.15, 0.0, 0.0]]
+    xs = np.linspace(0.2, 0.8, 2 * coils + 1)
+    for i, x in enumerate(xs):
+        y = amplitude if i % 2 else -amplitude
+        pts.append([x, y, 0.0])
+    pts.append([0.85, 0.0, 0.0])
+    pts.append([1.0, 0.0, 0.0])
+    return CustomLine(pts, color=color, linewidth=linewidth)

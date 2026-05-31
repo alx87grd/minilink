@@ -1,16 +1,7 @@
 import numpy as np
 
 from minilink.core.system import DynamicSystem
-from minilink.dynamics.catalog._graphics import (Arrow, Circle,
-                                                 arrow_transform, ground_line,
-                                                 pose2d_matrix)
-
-
-def _body_geometry(*, arrows=1):
-    geometry = [ground_line(length=12.0), Circle(radius=0.12, color="blue", fill=True)]
-    for _ in range(arrows):
-        geometry.append(Arrow(color="red", linewidth=2, origin="tail"))
-    return geometry
+from minilink.graphical.animation.primitives import Point, pose2d_matrix
 
 
 class SimpleIntegrator(DynamicSystem):
@@ -24,6 +15,8 @@ class SimpleIntegrator(DynamicSystem):
         self.name = "Simple Integrator"
         self.state.labels = ["position"]
         self.state.units = ["m"]
+        self.state.lower_bound[:] = [-10.0]
+        self.state.upper_bound[:] = [10.0]
         self.inputs["u"].labels = ["speed"]
         self.inputs["u"].units = ["m/s"]
         self.outputs["y"].labels = ["position"]
@@ -36,13 +29,13 @@ class SimpleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return _body_geometry()
+        return [
+            Point(color="blue", marker="o", size=8),
+        ]
 
     def get_kinematic_transforms(self, x, u, t):
         return [
-            pose2d_matrix(0.0, 0.0, 0.0),
             pose2d_matrix(x[0], 0.0, 0.0),
-            arrow_transform(x[0], 0.0, u[0], 0.0, scale=0.4),
         ]
 
 
@@ -57,6 +50,8 @@ class DoubleIntegrator(DynamicSystem):
         self.name = "Double Integrator"
         self.state.labels = ["position", "speed"]
         self.state.units = ["m", "m/s"]
+        self.state.lower_bound[:] = [-10.0, -10.0]
+        self.state.upper_bound[:] = [10.0, 10.0]
         self.inputs["u"].labels = ["force"]
         self.inputs["u"].units = ["N"]
         self.outputs["y"].labels = ["position"]
@@ -69,14 +64,15 @@ class DoubleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return _body_geometry(arrows=2)
+        return [
+            Point(color="blue", marker="o", size=8),
+            Point(color="blue", marker="o", size=8),
+        ]
 
     def get_kinematic_transforms(self, x, u, t):
         return [
-            pose2d_matrix(0.0, 0.0, 0.0),
             pose2d_matrix(x[0], 0.0, 0.0),
-            arrow_transform(x[0], 0.18, x[1], 0.0, scale=0.4),
-            arrow_transform(x[0], -0.18, u[0], 0.0, scale=0.25),
+            pose2d_matrix(x[1], 0.5, 0.0),
         ]
 
 
@@ -91,6 +87,8 @@ class TripleIntegrator(DynamicSystem):
         self.name = "Triple Integrator"
         self.state.labels = ["position", "speed", "force"]
         self.state.units = ["m", "m/s", "N"]
+        self.state.lower_bound[:] = [-10.0, -10.0, -10.0]
+        self.state.upper_bound[:] = [10.0, 10.0, 10.0]
         self.inputs["u"].labels = ["force_rate"]
         self.inputs["u"].units = ["N/s"]
         self.outputs["y"].labels = ["position"]
@@ -103,25 +101,27 @@ class TripleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return _body_geometry(arrows=3)
+        return [
+            Point(color="blue", marker="o", size=8),
+            Point(color="blue", marker="o", size=8),
+            Point(color="blue", marker="o", size=8),
+        ]
 
     def get_kinematic_transforms(self, x, u, t):
         return [
-            pose2d_matrix(0.0, 0.0, 0.0),
             pose2d_matrix(x[0], 0.0, 0.0),
-            arrow_transform(x[0], 0.24, x[1], 0.0, scale=0.35),
-            arrow_transform(x[0], 0.0, x[2], 0.0, scale=0.2),
-            arrow_transform(x[0], -0.24, u[0], 0.0, scale=0.12),
+            pose2d_matrix(x[1], 0.5, 0.0),
+            pose2d_matrix(x[2], 1.0, 0.0),
         ]
 
 
 if __name__ == "__main__":
-    system = DoubleIntegrator()
-    system.x0 = np.array([0.0, 0.0])
-    system.compute_forced(
-        lambda t: np.array([1.0]),
-        tf=2.0,
-        n_steps=80,
-        show=True,
-        verbose=False,
-    )
+
+    sys = DoubleIntegrator()
+    sys.plot_phase_plane()
+
+    sys.x0 = np.array([-2.0, -2.0])
+    sys.inputs["u"].nominal_value = np.array([1.0])
+    sys.compute_trajectory(tf=20.0)
+    sys.plot_phase_plane()
+    sys.animate()

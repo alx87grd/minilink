@@ -1,12 +1,27 @@
 import numpy as np
 
 from minilink.dynamics.abstraction.state_space import StateSpaceSystem
-from minilink.dynamics.catalog._graphics import (Arrow, empty_transform,
-                                                 ground_line, identity_matrix,
-                                                 line_between_transform,
-                                                 mass_box, scale_pose2d_matrix,
-                                                 spring_line,
-                                                 translation_matrix)
+from minilink.graphical.animation.primitives import (
+    Arrow,
+    Box,
+    empty_transform,
+    ground_line,
+    identity_matrix,
+    line_between_transform,
+    scale_pose2d_matrix,
+    spring_line,
+    translation_matrix,
+)
+
+
+def _mass_box(size=0.5, color="blue", opacity=0.9):
+    return Box(
+        length_x=size,
+        length_y=size,
+        length_z=0.2 * size,
+        color=color,
+        opacity=opacity,
+    )
 
 
 def _mass_output_matrix(count, output_mass):
@@ -37,6 +52,7 @@ class SingleMass(StateSpaceSystem):
         A, B, C, D = self._abcd()
         super().__init__(A, B, C, D, name="Single Mass Spring Damper")
         self._set_metadata()
+        self.camera_scale = 4.0
 
     def _abcd(self):
         return (
@@ -61,7 +77,7 @@ class SingleMass(StateSpaceSystem):
         return [
             ground_line(length=8.0),
             spring_line(),
-            mass_box(size=0.6, color="blue"),
+            _mass_box(size=0.6, color="blue"),
             Arrow(color="red", linewidth=2, origin="base"),
         ]
 
@@ -96,6 +112,7 @@ class TwoMass(StateSpaceSystem):
         A, B, C, D, output_label = self._abcd()
         super().__init__(A, B, C, D, name="Two Mass Spring Damper")
         self._set_metadata(output_label)
+        self.camera_scale = 5.0
 
     def _abcd(self):
         A = np.array(
@@ -137,8 +154,8 @@ class TwoMass(StateSpaceSystem):
             ground_line(length=10.0),
             spring_line(),
             spring_line(),
-            mass_box(size=0.55, color="green"),
-            mass_box(size=0.55, color="blue"),
+            _mass_box(size=0.55, color="green"),
+            _mass_box(size=0.55, color="blue"),
             Arrow(color="red", linewidth=2, origin="base"),
         ]
 
@@ -177,6 +194,7 @@ class ThreeMass(StateSpaceSystem):
         A, B, C, D, output_label = self._abcd()
         super().__init__(A, B, C, D, name="Three Mass Spring Damper")
         self._set_metadata(output_label)
+        self.camera_scale = 6.0
 
     def _abcd(self):
         A = np.array(
@@ -232,9 +250,9 @@ class ThreeMass(StateSpaceSystem):
             spring_line(),
             spring_line(),
             spring_line(),
-            mass_box(size=0.5, color="magenta"),
-            mass_box(size=0.5, color="green"),
-            mass_box(size=0.5, color="blue"),
+            _mass_box(size=0.5, color="magenta"),
+            _mass_box(size=0.5, color="green"),
+            _mass_box(size=0.5, color="blue"),
             Arrow(color="red", linewidth=2, origin="base"),
         ]
 
@@ -299,11 +317,10 @@ class FloatingThreeMass(ThreeMass):
 
 
 if __name__ == "__main__":
-    system = ThreeMass()
-    system.compute_forced(
-        lambda t: np.array([1.0]),
-        tf=5.0,
-        n_steps=200,
-        show=True,
-        verbose=False,
-    )
+    # sys = SingleMass()
+    # sys = TwoMass()
+    # sys = FloatingThreeMass()
+    sys = ThreeMass()
+    sys.inputs["u"].nominal_value = np.array([1.0])
+    sys.compute_trajectory(tf=15.0)
+    sys.animate(time_factor_video=5.0)

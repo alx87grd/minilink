@@ -1,7 +1,7 @@
 import numpy as np
 
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.dynamics.catalog._graphics import (
+from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     Point,
@@ -10,7 +10,6 @@ from minilink.dynamics.catalog._graphics import (
     ground_line,
     pose2d_matrix,
     scale_pose2d_matrix,
-    unit_line,
 )
 
 
@@ -187,14 +186,18 @@ class Plane2D(MechanicalSystem):
         )
         return CustomLine(pts, color="blue", linewidth=2)
 
+    def chord_line(self):
+        """Unit chord segment along local +X (scaled per surface to the wing/tail chord)."""
+        return CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="blue", linewidth=2)
+
     def get_kinematic_geometry(self):
         return [
             self.body_shape(),
             Point(color="black", marker="o", size=5),
-            unit_line(color="blue", linewidth=2),
+            self.chord_line(),
             ground_line(length=200.0, y=0.0, color="black", style="--"),
             Arrow(color="red", linewidth=2, origin="tip"),
-            unit_line(color="blue", linewidth=2),
+            self.chord_line(),
             Arrow(color="black", linewidth=2, origin="base"),
             Arrow(color="blue", linewidth=2, origin="base"),
             Arrow(color="red", linewidth=2, origin="base"),

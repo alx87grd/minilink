@@ -2,9 +2,13 @@ import numpy as np
 from scipy import signal
 
 from minilink.dynamics.abstraction.state_space import StateSpaceSystem
-from minilink.dynamics.catalog._graphics import (Arrow, Circle,
-                                                 arrow_transform, ground_line,
-                                                 pose2d_matrix)
+from minilink.graphical.animation.primitives import (
+    Arrow,
+    Circle,
+    arrow_transform,
+    ground_line,
+    pose2d_matrix,
+)
 
 
 class TransferFunction(StateSpaceSystem):
@@ -20,12 +24,8 @@ class TransferFunction(StateSpaceSystem):
         super().__init__(A, B, C, D, name=name)
         self.inputs["u"].labels = ["u"]
         self.outputs["y"].labels = ["y"]
-        self.poles = signal.TransferFunction(
-            self.numerator, self.denominator
-        ).poles
-        self.zeros = signal.TransferFunction(
-            self.numerator, self.denominator
-        ).zeros
+        self.poles = signal.TransferFunction(self.numerator, self.denominator).poles
+        self.zeros = signal.TransferFunction(self.numerator, self.denominator).zeros
 
     def get_kinematic_geometry(self):
         return [
@@ -45,11 +45,6 @@ class TransferFunction(StateSpaceSystem):
 
 
 if __name__ == "__main__":
-    system = TransferFunction([1.0], [1.0, 1.0])
-    system.compute_forced(
-        lambda t: np.array([1.0]),
-        tf=5.0,
-        n_steps=120,
-        show=True,
-        verbose=False,
-    )
+    sys = TransferFunction([1.0], [1.0, 1.0])
+    sys.compute_forced(lambda t: np.array([1.0]), tf=5.0, n_steps=120)
+    sys.animate()
