@@ -1,9 +1,13 @@
 import numpy as np
 
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.graphical.animation.primitives import (Circle, Rod, TorqueArrow,
-                                                     pose2d_matrix,
-                                                     torque_pose2d_matrix)
+from minilink.graphical.animation.primitives import (
+    Circle,
+    Rod,
+    TorqueArrow,
+    pose2d_matrix,
+    torque_pose2d_matrix,
+)
 
 
 class Pendulum(MechanicalSystem):
@@ -16,7 +20,6 @@ class Pendulum(MechanicalSystem):
         super().__init__(dof=1, actuators=1)
         self.name = "Pendulum"
         self.params = {
-            "l1": 2.0,
             "lc1": 1.0,
             "m1": 1.0,
             "I1": 1.0,
@@ -29,6 +32,9 @@ class Pendulum(MechanicalSystem):
         self.inputs["u"].units = ["Nm"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+
+        # Graphic parameters
+        self.l1 = 2.0
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 3.0
@@ -51,7 +57,7 @@ class Pendulum(MechanicalSystem):
         return np.array([params["d1"] * dq[0]])
 
     def get_kinematic_geometry(self):
-        length = self.params["l1"]
+        length = self.l1
         radius = 0.08 * length
         return [
             Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
@@ -63,7 +69,6 @@ class Pendulum(MechanicalSystem):
     def get_kinematic_transforms(self, x, u, t):
         theta = x[0]
         torque = u[0]
-        length = self.params["l1"]
         rod_angle = theta - np.pi / 2.0
         max_torque = self.inputs["u"].upper_bound[0]
         sweep = torque * (2.0 * np.pi / 3.0) / max_torque
@@ -88,6 +93,12 @@ class InvertedPendulum(Pendulum):
     def g(self, q, params=None):
         return -super().g(q, params)
 
+    def get_kinematic_transforms(self, x, u, t):
+        # theta is measured from the upward vertical (zero-angle = upright); the
+        # shared geometry draws angles from the downward vertical, so add pi.
+        upright = np.array([x[0] + np.pi, x[1]])
+        return super().get_kinematic_transforms(upright, u, t)
+
 
 class TwoIndependentPendulums(MechanicalSystem):
     """Two uncoupled single pendulums sharing the same parameters.
@@ -99,7 +110,6 @@ class TwoIndependentPendulums(MechanicalSystem):
         super().__init__(dof=2, actuators=2)
         self.name = "Two Independent Pendulums"
         self.params = {
-            "l1": 2.0,
             "lc1": 1.0,
             "m1": 1.0,
             "I1": 1.0,
@@ -112,6 +122,12 @@ class TwoIndependentPendulums(MechanicalSystem):
         self.inputs["u"].units = ["Nm", "Nm"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+
+        # Graphic parameters
+        self.l1 = 2.0
+        self.camera_target = np.array([0.0, 0.0, 0.0])
+        self.camera_plot_axes = (0, 1)
+        self.camera_scale = 4.0
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -131,7 +147,7 @@ class TwoIndependentPendulums(MechanicalSystem):
         return params["d1"] * np.asarray(dq)
 
     def get_kinematic_geometry(self):
-        length = self.params["l1"]
+        length = self.l1
         radius = 0.08 * length
         torque_radius = length / 5.0
         return [
@@ -156,7 +172,7 @@ class TwoIndependentPendulums(MechanicalSystem):
         ]
 
     def get_kinematic_transforms(self, x, u, t):
-        length = self.params["l1"]
+        length = self.l1
         anchors = [-0.6 * length, 0.6 * length]
         max_torque = self.inputs["u"].upper_bound[0]
         sweep_scale = 2.0 * np.pi / 3.0 / max_torque
@@ -181,13 +197,19 @@ class TwoIndependentPendulums(MechanicalSystem):
 
 
 if __name__ == "__main__":
-    system = Pendulum()
-    system.x0 = np.array([0.7, 0.0])
-    traj = system.compute_forced(
-        lambda t: np.array([0.5 * np.sin(t)]),
+
+    sys = Pendulum()
+
+    sys = InvertedPendulum()
+    # sys = TwoIndependentPendulums()
+
+    sys.x0 = np.array([0.0, 0.0])
+    sys.compute_forced(
+        lambda t: np.array([2.0 * np.sin(t)]),
         tf=5.0,
         n_steps=160,
         show=True,
         verbose=False,
     )
-    system.animate(traj)
+    sys.plot_phase_plane()
+    sys.animate()
