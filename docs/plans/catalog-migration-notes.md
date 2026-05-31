@@ -71,9 +71,16 @@ the `__main__` demos, and eliminate `_graphics.py`.
   generic helpers repointed to `primitives`; `__main__` uses nominal input +
   `compute_trajectory` + `animate` (6 states, no phase plane).
 
+- **pendulum/pendulum.py** — done. Already imported from `primitives`. Pulled
+  graphics-only `l1` out of `self.params` into a `self.l1` attribute (EoM uses
+  `lc1`/`I1`/`m1`, not `l1`); removed a dead `length` local; gave
+  `TwoIndependentPendulums` a fitting camera (`camera_scale=4.0`); `__main__`
+  uses `sys` + `compute_forced` (time-varying input) + `plot_phase_plane`
+  (2-state) + `animate`.
+
 ## Remaining modules
 
-pendulum/{pendulum,double_pendulum,cartpole}.py,
+pendulum/{double_pendulum,cartpole}.py,
 aerial/{rocket,drone}.py, vehicles/{dynamic_bicycle,steering,propulsion,
 suspension,mountain_car}.py, marine/boat.py, manipulators/arms.py — then delete
 `_graphics.py`.
