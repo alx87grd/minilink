@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import signal
 
-from minilink.dynamics.abstraction.state_space import StateSpaceSystem
+from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     Circle,
@@ -11,7 +11,7 @@ from minilink.graphical.animation.primitives import (
 )
 
 
-class TransferFunction(StateSpaceSystem):
+class TransferFunction(LTISystem):
     """Continuous-time SISO transfer function in state-space realization.
 
     TRL: 1 - ready for user review.
@@ -24,8 +24,9 @@ class TransferFunction(StateSpaceSystem):
         super().__init__(A, B, C, D, name=name)
         self.inputs["u"].labels = ["u"]
         self.outputs["y"].labels = ["y"]
-        self.poles = signal.TransferFunction(self.numerator, self.denominator).poles
-        self.zeros = signal.TransferFunction(self.numerator, self.denominator).zeros
+        tf = signal.TransferFunction(self.numerator, self.denominator)
+        self.poles = tf.poles
+        self.zeros = tf.zeros
 
     def get_kinematic_geometry(self):
         return [
@@ -45,6 +46,9 @@ class TransferFunction(StateSpaceSystem):
 
 
 if __name__ == "__main__":
+
     sys = TransferFunction([1.0], [1.0, 1.0])
-    sys.compute_forced(lambda t: np.array([1.0]), tf=5.0, n_steps=120)
-    sys.animate()
+
+    sys.x0 = np.array([2.0])
+    sys.compute_trajectory(tf=5.0)
+    sys.plot_trajectory()

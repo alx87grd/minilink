@@ -89,14 +89,14 @@ class TestMigratedCatalog(unittest.TestCase):
 
     def test_mass_spring_damper_reference_matrices(self):
         single = SingleMass(mass=2.0, k=4.0, b=6.0)
-        np.testing.assert_allclose(single.A, [[0.0, 1.0], [-2.0, -3.0]])
-        np.testing.assert_allclose(single.B, [[0.0], [0.5]])
+        np.testing.assert_allclose(single.A(), [[0.0, 1.0], [-2.0, -3.0]])
+        np.testing.assert_allclose(single.B(), [[0.0], [0.5]])
 
         two = TwoMass(m=1.0, k=2.0, b=0.2, output_mass=1)
-        np.testing.assert_allclose(two.C, [[1.0, 0.0, 0.0, 0.0]])
+        np.testing.assert_allclose(two.C(), [[1.0, 0.0, 0.0, 0.0]])
 
         three = ThreeMass(m=2.0, k=4.0, b=0.0, output_mass=3)
-        np.testing.assert_allclose(three.B[-1], [0.5])
+        np.testing.assert_allclose(three.B()[-1], [0.5])
 
     def test_vehicle_reference_values(self):
         bicycle = KinematicBicycle()
@@ -115,7 +115,7 @@ class TestMigratedCatalog(unittest.TestCase):
         drone = Drone2D()
         q = np.zeros(3)
         dq = np.zeros(3)
-        hover = np.array([drone.mass * drone.gravity / 2.0] * 2)
+        hover = np.array([drone.params["mass"] * drone.params["gravity"] / 2.0] * 2)
         np.testing.assert_allclose(
             drone.forward_dynamics(q, dq, hover),
             np.zeros(3),
@@ -138,13 +138,13 @@ class TestMigratedCatalog(unittest.TestCase):
         one = OneLinkManipulator()
         np.testing.assert_allclose(
             one.forward_kinematic_effector(np.array([0.0])),
-            [0.0, one.l1],
+            [0.0, one.params["l1"]],
         )
 
         five = FiveLinkPlanarManipulator()
         np.testing.assert_allclose(
             five.forward_kinematic_effector(np.zeros(5)),
-            [0.0, np.sum(five.l)],
+            [0.0, np.sum(five.params["l"])],
         )
 
     def test_pyro_designed_force_velocity_and_torque_arrows_are_present(self):
@@ -182,8 +182,6 @@ class TestMigratedCatalog(unittest.TestCase):
             (Pendulum(), 1),
             (TwoIndependentPendulums(), 2),
             (Acrobot(), 1),
-            (RotatingCartPole(), 2),
-            (UnderactuatedRotatingCartPole(), 1),
             (OneLinkManipulator(), 1),
             (TwoLinkManipulator(), 2),
         ]

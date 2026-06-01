@@ -1,17 +1,27 @@
 import numpy as np
 
-from minilink.dynamics.abstraction.generalized_mechanical import \
-    GeneralizedMechanicalSystem
-from minilink.dynamics.catalog._graphics import (Arrow, Point, TorqueArrow,
-                                                 arrow_transform, boat_body,
-                                                 follow_xy_camera,
-                                                 pose2d_matrix,
-                                                 scale_pose2d_matrix,
-                                                 torque_pose2d_matrix)
+from minilink.dynamics.abstraction.generalized_mechanical import (
+    GeneralizedMechanicalSystem,
+)
+from minilink.graphical.animation.primitives import (
+    Arrow,
+    CustomLine,
+    Point,
+    TorqueArrow,
+    arrow_transform,
+    follow_xy_camera,
+    pose2d_matrix,
+    scale_pose2d_matrix,
+    torque_pose2d_matrix,
+)
 
 
 class Boat2D(GeneralizedMechanicalSystem):
     """Three-DoF planar boat with surge/sway force inputs.
+
+    Low-speed manoeuvring model with linear plus quadratic hydrodynamic
+    damping, following Fossen, *Handbook of Marine Craft Hydrodynamics and
+    Motion Control* (2nd ed.), section 6.7.
 
     TRL: 1 - ready for user review.
     """
@@ -25,75 +35,141 @@ class Boat2D(GeneralizedMechanicalSystem):
         self.inputs["u"].units = ["N", "N"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
-        self.mass = 10000.0
-        self.inertia = 10000.0
-        self.l_t = 3.0
-        self.damping_coef = np.array([10.0, 10.0, 100.0])
-        self.Cx_max = 0.5
-        self.Cy_max = 0.6
-        self.Cm_max = 0.01
-        self.N_max = 0.1
-        self.rho = 1000.0
-        self.Alc = self.l_t * 2.0
-        self.Afc = 0.25 * self.Alc
-        self.loa = self.l_t * 2.0
-        self.camera_scale = 3.0 * self.loa
+
+        l_t = 3.0
+        self.params = {
+            "mass": 10000.0,
+            "inertia": 10000.0,
+            "l_t": l_t,
+            "damping_coef": np.array([10.0, 10.0, 100.0]),
+            "Cx_max": 0.5,
+            "Cy_max": 0.6,
+            "Cm_max": 0.01,
+            "N_max": 0.1,
+            "rho": 1000.0,
+            "Alc": 2.0 * l_t,
+            "Afc": 0.5 * l_t,
+            "loa": 2.0 * l_t,
+        }
+
+        # Graphic parameters (not part of the EoM)
+        self.body_length = 2.0 * l_t
+        self.body_width = self.params["Afc"]
+        self.camera_scale = 3.0 * self.params["loa"]
         self.show_hydrodynamic_forces = False
 
     def M(self, q, params=None):
-        return np.diag([self.mass, self.mass, self.inertia])
+        params = self.params if params is None else params
+        mass = params["mass"]
+        inertia = params["inertia"]
+
+        # rigid-body inertia: equal surge/sway mass, separate yaw inertia
+        return np.diag([mass, mass, inertia])
 
     def C(self, q, v, params=None):
+        params = self.params if params is None else params
+        mass = params["mass"]
         yaw_rate = v[2]
-        return np.array(
-            [
-                [0.0, -self.mass * yaw_rate, 0.0],
-                [self.mass * yaw_rate, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-            ]
-        )
+
+        # Coriolis coupling induced by the body-frame yaw rate
+        # fmt: off
+        return np.array([
+            [            0.0, -mass * yaw_rate, 0.0],
+            [mass * yaw_rate,              0.0, 0.0],
+            [            0.0,              0.0, 0.0],
+        ])
+        # fmt: on
 
     def N(self, q, params=None):
         theta = q[2]
         c, s = np.cos(theta), np.sin(theta)
-        return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+
+        # body-to-world rotation mapping body velocities to world rates
+        # fmt: off
+        return np.array([
+            [  c,  -s, 0.0],
+            [  s,   c, 0.0],
+            [0.0, 0.0, 1.0],
+        ])
+        # fmt: on
 
     def B(self, q, params=None):
-        return np.array([[1.0, 0.0], [0.0, 1.0], [0.0, -self.l_t]])
+        params = self.params if params is None else params
+        l_t = params["l_t"]
 
-    def current_coefficients(self, alpha):
-        Cx = -self.Cx_max * np.cos(alpha) * np.abs(np.cos(alpha))
-        Cy = self.Cy_max * np.sin(alpha) * np.abs(np.sin(alpha))
-        Cm = self.Cm_max * np.sin(2.0 * alpha)
+        # thrust acts a distance l_t aft of the c.g., adding a yaw moment
+        # fmt: off
+        return np.array([
+            [1.0,  0.0],
+            [0.0,  1.0],
+            [0.0, -l_t],
+        ])
+        # fmt: on
+
+    def current_coefficients(self, alpha, params=None):
+        params = self.params if params is None else params
+        Cx_max = params["Cx_max"]
+        Cy_max = params["Cy_max"]
+        Cm_max = params["Cm_max"]
+
+        # quadratic hydrodynamic coefficients vs. attack angle (Fossen Fig. 6.11)
+        Cx = -Cx_max * np.cos(alpha) * np.abs(np.cos(alpha))
+        Cy = Cy_max * np.sin(alpha) * np.abs(np.sin(alpha))
+        Cm = Cm_max * np.sin(2.0 * alpha)
         return Cx, Cy, Cm
 
-    def damping(self, relative_velocity):
-        d_linear = relative_velocity * self.damping_coef
-        speed_squared = relative_velocity[0] ** 2 + relative_velocity[1] ** 2
-        alpha = -np.arctan2(relative_velocity[1], relative_velocity[0])
-        Cx, Cy, Cm = self.current_coefficients(alpha)
-        fx = -0.5 * self.rho * self.Afc * Cx * speed_squared
-        fy = -0.5 * self.rho * self.Alc * Cy * speed_squared
-        mz = -0.5 * self.rho * self.Alc * self.loa * Cm * speed_squared
-        mz += (
-            self.N_max
-            * self.rho
-            * self.Alc
-            * self.loa
-            * np.abs(relative_velocity[2])
-            * relative_velocity[2]
-        )
+    def damping(self, relative_velocity, params=None):
+        params = self.params if params is None else params
+        damping_coef = params["damping_coef"]
+        rho = params["rho"]
+        Afc = params["Afc"]
+        Alc = params["Alc"]
+        loa = params["loa"]
+        N_max = params["N_max"]
+
+        vr = relative_velocity
+        speed_squared = vr[0] ** 2 + vr[1] ** 2
+        alpha = -np.arctan2(vr[1], vr[0])  # attack angle of the relative flow
+        Cx, Cy, Cm = self.current_coefficients(alpha, params)
+
+        # linear plus quadratic hydrodynamic damping (Fossen 6.7)
+        d_linear = damping_coef * vr
+        fx = -0.5 * rho * Afc * Cx * speed_squared
+        fy = -0.5 * rho * Alc * Cy * speed_squared
+        mz = -0.5 * rho * Alc * loa * Cm * speed_squared
+        mz += N_max * rho * Alc * loa * np.abs(vr[2]) * vr[2]
         return d_linear + np.array([fx, fy, mz])
 
     def d(self, q, v, u=None, t=0.0, params=None):
-        return self.damping(v)
+        params = self.params if params is None else params
+        return self.damping(v, params)
 
     def get_camera_transform(self, x, u, t):
         return follow_xy_camera(x[0], x[1], self.camera_scale)
 
+    def body_shape(self):
+        """Top-view hull silhouette with the c.g. at the local origin.
+
+        The hull spans ``body_length`` along local +X with a pointed bow and is
+        centred so the body-frame origin (c.g.) sits at mid-hull.
+        """
+        l = self.body_length
+        w = self.body_width
+        pts = np.array(
+            [
+                [-0.5 * l, -0.5 * w, 0.0],
+                [0.35 * l, -0.5 * w, 0.0],
+                [0.5 * l, 0.0, 0.0],
+                [0.35 * l, 0.5 * w, 0.0],
+                [-0.5 * l, 0.5 * w, 0.0],
+                [-0.5 * l, -0.5 * w, 0.0],
+            ]
+        )
+        return CustomLine(pts, color="blue", linewidth=2)
+
     def get_kinematic_geometry(self):
         geometry = [
-            boat_body(length=2.0 * self.l_t, width=self.Afc),
+            self.body_shape(),
             Point(color="blue", marker="o", size=5),
             Arrow(color="red", linewidth=2, origin="tip"),
         ]
@@ -102,7 +178,7 @@ class Boat2D(GeneralizedMechanicalSystem):
                 [
                     Arrow(color="black", linewidth=2, style="--", origin="base"),
                     TorqueArrow(
-                        radius=self.loa / 5.0,
+                        radius=self.params["loa"] / 5.0,
                         head_ratio=0.4,
                         color="black",
                         linewidth=2,
@@ -114,22 +190,27 @@ class Boat2D(GeneralizedMechanicalSystem):
 
     def get_kinematic_transforms(self, x, u, t):
         q = x[:3]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
+        l_t = self.params["l_t"]
         force_scale = 0.0002
+        T_body = pose2d_matrix(q[0], q[1], q[2])
         transforms = [
             T_body,
             pose2d_matrix(q[0], q[1], 0.0),
             T_body
             @ scale_pose2d_matrix(
-                -self.l_t,
+                -l_t,
                 0.0,
                 np.arctan2(u[1], u[0]),
                 force_scale * np.hypot(u[0], u[1]),
             ),
         ]
         if self.show_hydrodynamic_forces:
+            rho = self.params["rho"]
+            Alc = self.params["Alc"]
+            loa = self.params["loa"]
+            Cm_max = self.params["Cm_max"]
             hydro_force = -self.d(q, x[3:], u, t)
-            torque_max = abs(0.5 * self.rho * self.Alc * self.loa * self.Cm_max * 12.0)
+            torque_max = abs(0.5 * rho * Alc * loa * Cm_max * 12.0)
             transforms.extend(
                 [
                     T_body
@@ -159,14 +240,16 @@ class Boat2DWithCurrent(Boat2D):
     def __init__(self):
         super().__init__()
         self.name = "Planar Boat With Current"
-        self.current_velocity = np.array([-1.0, -1.0])
+        self.params["current_velocity"] = np.array([-1.0, -1.0])
 
     def d(self, q, v, u=None, t=0.0, params=None):
-        world_current = np.array(
-            [self.current_velocity[0], self.current_velocity[1], 0.0]
-        )
-        body_current = self.N(q).T @ world_current
-        return self.damping(v - body_current)
+        params = self.params if params is None else params
+        current_velocity = params["current_velocity"]
+
+        # damp the water-relative velocity (current subtracted in body frame)
+        world_current = np.array([current_velocity[0], current_velocity[1], 0.0])
+        body_current = self.N(q, params).T @ world_current
+        return self.damping(v - body_current, params)
 
     def get_kinematic_geometry(self):
         return super().get_kinematic_geometry() + [
@@ -175,24 +258,28 @@ class Boat2DWithCurrent(Boat2D):
 
     def get_kinematic_transforms(self, x, u, t):
         transforms = super().get_kinematic_transforms(x, u, t)
+        current_velocity = self.params["current_velocity"]
+        loa = self.params["loa"]
         transforms.append(
             arrow_transform(
-                x[0] - self.loa,
-                x[1] + self.loa,
-                self.current_velocity[0],
-                self.current_velocity[1],
-                scale=0.5 * self.loa,
+                x[0] - loa,
+                x[1] + loa,
+                current_velocity[0],
+                current_velocity[1],
+                scale=0.5 * loa,
             )
         )
         return transforms
 
 
 if __name__ == "__main__":
-    system = Boat2D()
-    system.compute_forced(
+    sys = Boat2D()
+    # sys = Boat2DWithCurrent()
+    # sys.show_hydrodynamic_forces = True
+
+    sys.x0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    sys.compute_forced(
         lambda t: np.array([1000.0, 50.0 * np.sin(0.5 * t)]),
         tf=10.0,
-        n_steps=240,
-        show=True,
-        verbose=False,
     )
+    sys.animate()

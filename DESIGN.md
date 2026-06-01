@@ -50,8 +50,13 @@ describes package ownership.
 | `control/` | controller and static-law blocks |
 
 **Dynamics root:** `DynamicSystem` with `f`, `h`. Reusable bases in
-`dynamics/abstraction` (`StateSpaceSystem`, `MechanicalSystem`,
-`GeneralizedMechanicalSystem`). Catalog names: `Pendulum`, `CartPole`,
+`dynamics/abstraction` (`StateSpaceSystem`, `LTISystem`, `MechanicalSystem`,
+`GeneralizedMechanicalSystem`). `StateSpaceSystem` builds its matrices through
+methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)` (so
+`dx = A(t, params) @ x + B(t, params) @ u`), mirroring `MechanicalSystem.H(q,
+params)`; subclasses assemble matrices from `params`. `LTISystem` is the
+constant-matrix convenience built from `A, B, C, D` arrays (introspect via
+`sys.A()`). Catalog names: `Pendulum`, `CartPole`,
 `DynamicBicycle`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 

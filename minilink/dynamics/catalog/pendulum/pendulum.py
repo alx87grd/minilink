@@ -20,11 +20,11 @@ class Pendulum(MechanicalSystem):
         super().__init__(dof=1, actuators=1)
         self.name = "Pendulum"
         self.params = {
-            "lc1": 1.0,
-            "m1": 1.0,
-            "I1": 1.0,
+            "m": 1.0,
+            "l": 1.0,
+            "I": 1.0,
             "gravity": 9.81,
-            "d1": 0.0,
+            "d": 0.0,
         }
         self.state.labels = ["theta", "dtheta"]
         self.state.units = ["rad", "rad/s"]
@@ -34,30 +34,38 @@ class Pendulum(MechanicalSystem):
         self.outputs["y"].units = list(self.state.units)
 
         # Graphic parameters
-        self.l1 = 2.0
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
-        self.camera_scale = 3.0
+        self.camera_scale = 1.5
 
     def H(self, q, params=None):
         params = self.params if params is None else params
-        inertia = params["m1"] * params["lc1"] ** 2 + params["I1"]
-        return np.array([[inertia]])
+        m = params["m"]
+        l = params["l"]
+        I = params["I"]
+
+        # rotational inertia of the bob about the pivot
+        return np.array([[m * l**2 + I]])
 
     def C(self, q, dq, params=None):
         return np.zeros((1, 1))
 
     def g(self, q, params=None):
         params = self.params if params is None else params
-        torque = params["m1"] * params["gravity"] * params["lc1"] * np.sin(q[0])
-        return np.array([torque])
+        m = params["m"]
+        l = params["l"]
+        gravity = params["gravity"]
+
+        # gravity restoring torque
+        return np.array([m * gravity * l * np.sin(q[0])])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
-        return np.array([params["d1"] * dq[0]])
+        d = params["d"]
+        return np.array([d * dq[0]])
 
     def get_kinematic_geometry(self):
-        length = self.l1
+        length = self.params["l"]
         radius = 0.08 * length
         return [
             Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
@@ -110,11 +118,11 @@ class TwoIndependentPendulums(MechanicalSystem):
         super().__init__(dof=2, actuators=2)
         self.name = "Two Independent Pendulums"
         self.params = {
-            "lc1": 1.0,
-            "m1": 1.0,
-            "I1": 1.0,
+            "m": 1.0,
+            "l": 1.0,
+            "I": 1.0,
             "gravity": 9.81,
-            "d1": 0.0,
+            "d": 0.0,
         }
         self.state.labels = ["theta1", "theta2", "dtheta1", "dtheta2"]
         self.state.units = ["rad", "rad", "rad/s", "rad/s"]
@@ -124,14 +132,16 @@ class TwoIndependentPendulums(MechanicalSystem):
         self.outputs["y"].units = list(self.state.units)
 
         # Graphic parameters
-        self.l1 = 2.0
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
-        self.camera_scale = 4.0
+        self.camera_scale = 2.0
 
     def H(self, q, params=None):
         params = self.params if params is None else params
-        inertia = params["m1"] * params["lc1"] ** 2 + params["I1"]
+        m = params["m"]
+        l = params["l"]
+        I = params["I"]
+        inertia = m * l**2 + I
         return np.diag([inertia, inertia])
 
     def C(self, q, dq, params=None):
@@ -139,15 +149,18 @@ class TwoIndependentPendulums(MechanicalSystem):
 
     def g(self, q, params=None):
         params = self.params if params is None else params
-        scale = params["m1"] * params["gravity"] * params["lc1"]
-        return scale * np.sin(q)
+        m = params["m"]
+        l = params["l"]
+        gravity = params["gravity"]
+        return m * gravity * l * np.sin(q)
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
-        return params["d1"] * np.asarray(dq)
+        d = params["d"]
+        return d * np.asarray(dq)
 
     def get_kinematic_geometry(self):
-        length = self.l1
+        length = self.params["l"]
         radius = 0.08 * length
         torque_radius = length / 5.0
         return [
@@ -172,7 +185,7 @@ class TwoIndependentPendulums(MechanicalSystem):
         ]
 
     def get_kinematic_transforms(self, x, u, t):
-        length = self.l1
+        length = self.params["l"]
         anchors = [-0.6 * length, 0.6 * length]
         max_torque = self.inputs["u"].upper_bound[0]
         sweep_scale = 2.0 * np.pi / 3.0 / max_torque
@@ -197,13 +210,8 @@ class TwoIndependentPendulums(MechanicalSystem):
 
 
 if __name__ == "__main__":
-
     sys = Pendulum()
-
-    sys = InvertedPendulum()
-    # sys = TwoIndependentPendulums()
-
-    sys.x0 = np.array([0.0, 0.0])
+    sys.x0 = np.array([0.7, 0.0])
     sys.compute_forced(
         lambda t: np.array([2.0 * np.sin(t)]),
         tf=5.0,

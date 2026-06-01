@@ -31,6 +31,11 @@ and keep docs synchronized with code.
 - Change only what the task requires; every diff line should earn its place.
 - Prefer explicit, readable code over clever Python when the data flow is
   mathematical; use named temporaries in equation paths.
+- **Avoid single-use private methods.** Do not split a constructor or equation
+  into `self._helper()` steps that run only once (e.g. `_set_metadata`,
+  `_abcd`); inline them at the call site. Keep a helper only when it is reused,
+  recursive, or genuinely clarifies. Module-level functions shared by several
+  classes are fine.
 - **Tests only when justified**: add or update tests for stable public APIs, TRL
   milestones, documented contracts, or explicit user requests—not for trivial or
   obvious behavior.
@@ -56,6 +61,26 @@ In public equation paths (`f`, `h`, output-port compute functions, mechanical
 hooks, linearization, transcriptions), map inputs once and then use textbook
 locals. Avoid repeated `np.asarray`/reshape checks inside internal math paths
 unless the helper is a public boundary.
+
+**Unpack `params` before equations:** in equation paths (`H`, `C`, `g`, `d`,
+`f`, `h`, …) read each needed value out of the `params` dict into a short local
+at the top of the method (`m1 = params["m1"]`, `l1 = params["l1"]`), then write
+the formula in those symbols. Keep dict indexing out of the math so the core
+equations read like textbook math.
+
+**No `self.` in core equations:** bind matrices and terms returned by methods or
+attributes to short locals first (`A = self.A(t, params)`, `H = self.H(q,
+params)`), then write the formula in those symbols (`dx = A @ x + B @ u`). The
+final equation line should read like math, free of `self.` and dict indexing.
+
+**Let core equations breathe:** separate the core equation from surrounding
+bookkeeping with a blank line, and add a short comment naming the relation or
+physics it encodes (e.g. the governing ODE), not one that narrates the syntax.
+
+**Lay out matrices as matrices:** write 2-D array literals with one row per line
+and columns visually aligned so the structure reads like written math. The
+formatter collapses alignment spacing, so wrap an aligned literal in
+`# fmt: off` / `# fmt: on` to preserve it.
 
 **Reader-facing imports:** in tutorials, demos, and examples, keep the top of the
 file light so the math stays visible. Internal packages (`compile/`, `simulation/`,

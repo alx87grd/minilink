@@ -1,2 +1,1 @@
 """Equation-level catalog systems."""
-

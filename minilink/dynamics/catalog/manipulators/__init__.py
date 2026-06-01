@@ -1,2 +1,1 @@
 """Manipulator catalog systems."""
-

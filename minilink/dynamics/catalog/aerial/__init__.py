@@ -1,2 +1,1 @@
 """Aerial vehicle catalog systems."""
-

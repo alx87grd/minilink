@@ -105,20 +105,22 @@ class Plane2D(MechanicalSystem):
 
     def H(self, q, params=None):
         params = self.params if params is None else params
-        m = params["mass"]
-        Iyy = params["inertia"]
+        mass = params["mass"]
+        inertia = params["inertia"]
 
-        return np.diag([m, m, Iyy])
+        # diagonal translational and rotational inertia
+        return np.diag([mass, mass, inertia])
 
     def C(self, q, dq, params=None):
         return np.zeros((3, 3))
 
     def g(self, q, params=None):
         params = self.params if params is None else params
-        m = params["mass"]
+        mass = params["mass"]
         gravity = params["gravity"]
 
-        return np.array([0.0, m * gravity, 0.0])
+        # weight pulls along +y (d sits on the left side of the EoM)
+        return np.array([0.0, mass * gravity, 0.0])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params

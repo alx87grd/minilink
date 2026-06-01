@@ -12,14 +12,23 @@ visually the same.
 import numpy as np
 
 from minilink.compile.jax_utils import require_jax_numpy
-from minilink.dynamics.abstraction.mechanical import (JaxMechanicalSystem,
-                                                      MechanicalSystem)
-from minilink.graphical.animation.primitives import (Arrow, Box, Circle,
-                                                     CustomLine, Point, Rod,
-                                                     TorqueArrow,
-                                                     pose2d_matrix,
-                                                     scale_pose2d_matrix,
-                                                     torque_pose2d_matrix)
+from minilink.dynamics.abstraction.mechanical import (
+    JaxMechanicalSystem,
+    MechanicalSystem,
+)
+from minilink.graphical.animation.primitives import (
+    Arrow,
+    Box,
+    CustomLine,
+    Point,
+    Rod,
+    Sphere,
+    identity_matrix,
+    point_transform,
+    pose2d_matrix,
+    rod_between_transform,
+    scale_pose2d_matrix,
+)
 
 
 class RotatingCartPole(MechanicalSystem):
@@ -48,97 +57,120 @@ class RotatingCartPole(MechanicalSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
+        # graphic camera framing the spatial mechanism (animate with is_3d=True)
+        self.camera_target = np.array([0.0, 0.0, 0.0])
+        self.camera_scale = self.params["l1"] + self.params["l2"]
+
     def H(self, q, params=None):
         params = self.params if params is None else params
-        c2 = np.cos(q[1])
         m2 = params["m2"]
         l1 = params["l1"]
         l2 = params["l2"]
+        I1 = params["I1"]
+        I2 = params["I2"]
+        c2 = np.cos(q[1])
+
+        # coupled inertia of the two rotating links
         h01 = m2 * l1 * l2 * c2
-        return np.array(
-            [
-                [m2 * l1**2 + params["I1"], h01],
-                [h01, m2 * l2**2 + params["I2"]],
-            ]
-        )
+        # fmt: off
+        return np.array([
+            [m2 * l1**2 + I1,             h01],
+            [            h01, m2 * l2**2 + I2],
+        ])
+        # fmt: on
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
-        c01 = -params["m2"] * params["l1"] * params["l2"] * np.sin(q[1]) * dq[1]
-        return np.array([[0.0, c01], [0.0, 0.0]])
+        m2 = params["m2"]
+        l1 = params["l1"]
+        l2 = params["l2"]
+
+        # Coriolis coupling driven by the second joint rate
+        c01 = -m2 * l1 * l2 * np.sin(q[1]) * dq[1]
+        # fmt: off
+        return np.array([
+            [0.0, c01],
+            [0.0, 0.0],
+        ])
+        # fmt: on
 
     def g(self, q, params=None):
         params = self.params if params is None else params
-        return np.array(
-            [0.0, -params["m2"] * params["gravity"] * params["l2"] * np.sin(q[1])]
-        )
+        m2 = params["m2"]
+        l2 = params["l2"]
+        gravity = params["gravity"]
+
+        # gravity torque acts on the second link only
+        return np.array([0.0, -m2 * gravity * l2 * np.sin(q[1])])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
-        return np.diag([params["d1"], params["d2"]]) @ dq
+        d1 = params["d1"]
+        d2 = params["d2"]
 
-    def _joint_positions(self, q, params=None):
-        params = self.params if params is None else params
-        theta1, theta2 = q
-        l1 = params["l1"]
-        l2 = params["l2"]
-        p0 = np.array([0.0, 0.0])
-        p1 = l1 * np.array([np.cos(theta1), np.sin(theta1)])
-        p2 = p1 + l2 * np.array(
-            [np.cos(theta1 + theta2), np.sin(theta1 + theta2)]
-        )
-        return p0, p1, p2
+        # linear viscous joint damping
+        return np.diag([d1, d2]) @ dq
 
     def get_kinematic_geometry(self):
-        params = self.params
-        radius = 0.08 * max(params["l1"], params["l2"])
-        torque_radius = 0.2 * max(params["l1"], params["l2"])
+        l1 = self.params["l1"]
+        l2 = self.params["l2"]
+        radius = 0.08 * max(l1, l2)
+        half = l1 + l2
+        ground_z = -l1
         return [
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(
-                length=params["l1"],
-                radius=0.03 * params["l1"],
-                color="blue",
-                linewidth=2,
+            CustomLine(
+                [
+                    [-half, -half, ground_z],
+                    [-half, half, ground_z],
+                    [half, half, ground_z],
+                    [half, -half, ground_z],
+                    [-half, -half, ground_z],
+                ],
+                color="black",
+                style="--",
             ),
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(
-                length=params["l2"],
-                radius=0.03 * params["l2"],
-                color="blue",
-                linewidth=2,
-            ),
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            TorqueArrow(
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
-            ),
-            TorqueArrow(
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
-            ),
+            Rod(length=l1, radius=0.03 * l1, color="black", linewidth=2),
+            Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2),
+            Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2),
+            Sphere(radius=radius, color="blue", opacity=0.9),
+            Sphere(radius=radius, color="blue", opacity=0.9),
+            Sphere(radius=radius, color="blue", opacity=0.9),
         ]
 
     def get_kinematic_transforms(self, x, u, t):
-        q = x[: self.dof]
-        p0, p1, p2 = self._joint_positions(q)
-        heading1 = q[0]
-        heading2 = q[0] + q[1]
-        u_lim = float(self.inputs["u"].upper_bound[0])
-        torque_scale = 2.0 * np.pi / 3.0 / u_lim
+        l1 = self.params["l1"]
+        l2 = self.params["l2"]
+        c1, s1 = np.cos(x[0]), np.sin(x[0])
+        c2, s2 = np.cos(x[1]), np.sin(x[1])
+
+        # theta1 rotates a horizontal arm about the vertical axis; theta2 swings
+        # the pole up out of that arm's plane, so the tip lives in full 3D.
+        p_support = np.array([0.0, 0.0, -l1])
+        p_pivot = np.array([0.0, 0.0, 0.0])
+        p_arm = np.array([l1 * s1, -l1 * c1, 0.0])
+        p_tip = p_arm + l2 * np.array([s2 * c1, s2 * s1, c2])
+
         return [
-            pose2d_matrix(p0[0], p0[1], 0.0),
-            pose2d_matrix(p0[0], p0[1], heading1 + np.pi / 2.0),
-            pose2d_matrix(p1[0], p1[1], 0.0),
-            pose2d_matrix(p1[0], p1[1], heading2 + np.pi / 2.0),
-            pose2d_matrix(p2[0], p2[1], 0.0),
-            torque_pose2d_matrix(p0[0], p0[1], heading1, u[0] * torque_scale),
-            torque_pose2d_matrix(p1[0], p1[1], heading2, u[1] * torque_scale),
+            identity_matrix(),
+            rod_between_transform(p_support, p_pivot),
+            rod_between_transform(p_pivot, p_arm),
+            rod_between_transform(p_arm, p_tip),
+            point_transform(p_pivot),
+            point_transform(p_arm),
+            point_transform(p_tip),
         ]
+
+    def get_camera_transform(self, x, u, t):
+        # open on a 3/4 oblique view; the view-out column encodes (elev, azim)
+        # and the interactive 3D toolbar lets the user orbit from there.
+        camera = super().get_camera_transform(x, u, t)
+        elevation, azimuth = np.radians(22.0), np.radians(-60.0)
+        camera[:3, 2] = [
+            np.cos(elevation) * np.cos(azimuth),
+            np.cos(elevation) * np.sin(azimuth),
+            np.sin(elevation),
+        ]
+        return camera
 
 
 class UnderactuatedRotatingCartPole(RotatingCartPole):
@@ -150,7 +182,6 @@ class UnderactuatedRotatingCartPole(RotatingCartPole):
     def __init__(self):
         super().__init__()
         self.name = "Underactuated Rotating Cart Pole"
-        self.m = 0
         self.inputs.clear()
         self.add_input_port(
             "u",
@@ -164,31 +195,27 @@ class UnderactuatedRotatingCartPole(RotatingCartPole):
     def B(self, q, params=None):
         return np.array([[1.0], [0.0]])
 
-    def get_kinematic_geometry(self):
-        return super().get_kinematic_geometry()[:-1]
 
-    def get_kinematic_transforms(self, x, u, t):
-        transforms = super().get_kinematic_transforms(x, np.array([u[0], 0.0]), t)
-        return transforms[:-1]
+def _configure_cartpole(sys, *, name):
+    """Set the shared EoM params, graphic attributes, and port metadata.
 
-
-def _cartpole_params():
-    return {
-        "l": 3.0,
+    Used by both the NumPy :class:`CartPole` and JAX :class:`JaxCartPole` twins,
+    which have different base classes but identical configuration.
+    """
+    sys.name = name
+    sys.params = {
         "lcg": 0.5,
         "m1": 1.0,
         "m2": 0.1,
         "gravity": 9.81,
-        "cart_length": 2.5,
-        "cart_height": 1.5,
-        "cart_depth": 0.8,
-        "ground_half_width": 10.0,
     }
 
-
-def _configure_cartpole_metadata(sys, *, name: str) -> None:
-    sys.name = name
-    sys.params = _cartpole_params()
+    # Graphic parameters (not part of the EoM)
+    sys.pole_length = 3.0
+    sys.cart_length = 2.5
+    sys.cart_height = 1.5
+    sys.cart_depth = 0.8
+    sys.ground_half_width = 10.0
 
     sys.state.labels = ["x", "theta", "dx", "dtheta"]
     sys.state.units = ["m", "rad", "m/s", "rad/s"]
@@ -211,63 +238,69 @@ class CartPole(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=1)
-        _configure_cartpole_metadata(self, name="Cart Pole")
+        _configure_cartpole(self, name="Cart Pole")
 
     def H(self, q, params=None):
         params = self.params if params is None else params
-        theta = q[1]
         m1 = params["m1"]
         m2 = params["m2"]
         lcg = params["lcg"]
+        theta = q[1]
 
-        H = np.zeros((self.dof, self.dof))
-        H[0, 0] = m1 + m2
-        H[1, 0] = m2 * lcg * np.cos(theta)
-        H[0, 1] = H[1, 0]
-        H[1, 1] = m2 * lcg**2
-        return H
+        # cart+pole translation coupled to the pole rotation
+        h01 = m2 * lcg * np.cos(theta)
+        # fmt: off
+        return np.array([
+            [m1 + m2,        h01],
+            [    h01, m2 * lcg**2],
+        ])
+        # fmt: on
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
-        theta = q[1]
-        dtheta = dq[1]
         m2 = params["m2"]
         lcg = params["lcg"]
+        theta = q[1]
+        dtheta = dq[1]
 
-        C = np.zeros((self.dof, self.dof))
-        C[0, 1] = -m2 * lcg * np.sin(theta) * dtheta
-        return C
+        # centrifugal term from the swinging pole
+        c01 = -m2 * lcg * np.sin(theta) * dtheta
+        # fmt: off
+        return np.array([
+            [0.0, c01],
+            [0.0, 0.0],
+        ])
+        # fmt: on
 
     def B(self, q, params=None):
-        B = np.zeros((self.dof, self.m))
-        B[0, 0] = 1.0
-        return B
+        # the force actuates the cart only
+        return np.array([[1.0], [0.0]])
 
     def g(self, q, params=None):
         params = self.params if params is None else params
+        m2 = params["m2"]
+        lcg = params["lcg"]
+        gravity = params["gravity"]
         theta = q[1]
-        g = np.zeros(self.dof)
-        g[1] = params["m2"] * params["gravity"] * params["lcg"] * np.sin(theta)
-        return g
+
+        # gravity torque on the pole
+        return np.array([0.0, m2 * gravity * lcg * np.sin(theta)])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         return np.zeros(self.dof)
 
     def get_kinematic_geometry(self):
-        params = self.params
-        length = params["l"]
-
-        cart_length = float(params["cart_length"])
-        cart_height = float(params["cart_height"])
-        cart_depth = float(params["cart_depth"])
+        pole_length = self.pole_length
+        cart_length = self.cart_length
+        cart_height = self.cart_height
+        cart_depth = self.cart_depth
         wheel_y = -cart_height / 2.0
-        wheel_dx = cart_length / 4.0
 
         return [
             CustomLine(
                 [
-                    [-params["ground_half_width"], 0.0, 0.0],
-                    [params["ground_half_width"], 0.0, 0.0],
+                    [-self.ground_half_width, 0.0, 0.0],
+                    [self.ground_half_width, 0.0, 0.0],
                 ],
                 color="black",
                 style="--",
@@ -279,9 +312,14 @@ class CartPole(MechanicalSystem):
                 color="black",
                 opacity=0.85,
             ),
-            Point([-wheel_dx, wheel_y, 0.0], color="black", marker="o", size=6),
-            Point([wheel_dx, wheel_y, 0.0], color="black", marker="o", size=6),
-            Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
+            Point([0.0, wheel_y, 0.0], color="black", marker="o", size=6),
+            Point([0.0, wheel_y, 0.0], color="black", marker="o", size=6),
+            Rod(
+                length=pole_length,
+                radius=0.03 * pole_length,
+                color="blue",
+                linewidth=2,
+            ),
             Arrow(color="red", linewidth=2, origin="tip"),
         ]
 
@@ -290,9 +328,9 @@ class CartPole(MechanicalSystem):
         theta = x[1]
         F = u[0]
 
-        cart_length = float(self.params["cart_length"])
-        cart_height = float(self.params["cart_height"])
-        cart_depth = float(self.params["cart_depth"])
+        cart_length = self.cart_length
+        cart_height = self.cart_height
+        cart_depth = self.cart_depth
         wheel_dx = cart_length / 4.0
         pivot_y = cart_height / 2.0
         pole_z = cart_depth / 2.0 + 0.1
@@ -305,12 +343,16 @@ class CartPole(MechanicalSystem):
             force_x = pos + cart_length / 2.0
             force_theta = np.pi
 
+        # offset the pole in z so the rod clears the cart body in 3D renderers
+        pole_pose = pose2d_matrix(pos, pivot_y, theta)
+        pole_pose[2, 3] = pole_z
+
         return [
             pose2d_matrix(0.0, 0.0, 0.0),
             pose2d_matrix(pos, pivot_y, 0.0),
             pose2d_matrix(pos - wheel_dx, pivot_y, 0.0),
             pose2d_matrix(pos + wheel_dx, pivot_y, 0.0),
-            _pose2d_offset_z(pos, pivot_y, theta, pole_z),
+            pole_pose,
             scale_pose2d_matrix(force_x, pivot_y, force_theta, force_len),
         ]
 
@@ -323,37 +365,41 @@ class JaxCartPole(JaxMechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=1)
-        _configure_cartpole_metadata(self, name="JAX Cart Pole")
+        _configure_cartpole(self, name="JAX Cart Pole")
 
     def H(self, q, params=None):
         params = self.params if params is None else params
         jnp = require_jax_numpy()
-        theta = q[1]
         m1 = params["m1"]
         m2 = params["m2"]
         lcg = params["lcg"]
+        theta = q[1]
+
+        # cart+pole translation coupled to the pole rotation
         h01 = m2 * lcg * jnp.cos(theta)
-        return jnp.array(
-            [
-                [m1 + m2, h01],
-                [h01, m2 * lcg**2],
-            ]
-        )
+        # fmt: off
+        return jnp.array([
+            [m1 + m2,        h01],
+            [    h01, m2 * lcg**2],
+        ])
+        # fmt: on
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
         jnp = require_jax_numpy()
-        theta = q[1]
-        dtheta = dq[1]
         m2 = params["m2"]
         lcg = params["lcg"]
+        theta = q[1]
+        dtheta = dq[1]
+
+        # centrifugal term from the swinging pole
         c01 = -m2 * lcg * jnp.sin(theta) * dtheta
-        return jnp.array(
-            [
-                [0.0, c01],
-                [0.0, 0.0],
-            ]
-        )
+        # fmt: off
+        return jnp.array([
+            [0.0, c01],
+            [0.0, 0.0],
+        ])
+        # fmt: on
 
     def B(self, q, params=None):
         jnp = require_jax_numpy()
@@ -362,8 +408,13 @@ class JaxCartPole(JaxMechanicalSystem):
     def g(self, q, params=None):
         params = self.params if params is None else params
         jnp = require_jax_numpy()
+        m2 = params["m2"]
+        lcg = params["lcg"]
+        gravity = params["gravity"]
         theta = q[1]
-        tau_g = params["m2"] * params["gravity"] * params["lcg"] * jnp.sin(theta)
+
+        # gravity torque on the pole
+        tau_g = m2 * gravity * lcg * jnp.sin(theta)
         return jnp.array([0.0, tau_g])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
@@ -374,21 +425,25 @@ class JaxCartPole(JaxMechanicalSystem):
     get_kinematic_transforms = CartPole.get_kinematic_transforms
 
 
-def _pose2d_offset_z(x=0.0, y=0.0, theta=0.0, z=0.0):
-    """Like :func:`pose2d_matrix`, but with an extra ``z`` translation (for 3D)."""
-    T = pose2d_matrix(x, y, theta)
-    T[2, 3] = z
-    return T
-
-
 if __name__ == "__main__":
-    cartpole = CartPole()
-    cartpole.x0 = np.array([0.0, 0.25, 0.0, 0.0])
-    traj = cartpole.compute_forced(
-        lambda t: np.array([2.0 * np.sin(2.0 * t)]),
-        tf=4.0,
-        n_steps=160,
-        show=False,
-        verbose=False,
-    )
-    cartpole.animate(traj)
+
+    sys = RotatingCartPole()
+    # sys = UnderactuatedRotatingCartPole()
+
+    sys.x0 = np.array([1.0, 0.25, 0.0, 0.0])
+    # sys.inputs["u"].nominal_value = np.array([1.0])
+    sys.compute_trajectory(tf=12.0)
+    sys.animate(is_3d=True, time_factor_video=1.0)
+    # sys.animate()
+    # sys.animate(renderer="meshcat")
+
+    sys = CartPole()
+    # sys = JaxCartPole()
+    sys.params["m1"] = 1.0
+    sys.params["m2"] = 2.0
+    sys.params["lcg"] = 2.0
+
+    sys.x0 = np.array([1.0, 2.0, 0.0, 0.0])
+    # sys.inputs["u"].nominal_value = np.array([1.0])
+    sys.compute_trajectory(tf=12.0)
+    sys.animate()

@@ -1,14 +1,22 @@
 import numpy as np
 
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.dynamics.catalog._graphics import (Arrow, Circle, CustomLine,
-                                                 arrow_transform,
-                                                 identity_matrix,
-                                                 translation_matrix)
+from minilink.graphical.animation.primitives import (
+    Arrow,
+    Circle,
+    CustomLine,
+    arrow_transform,
+    identity_matrix,
+    translation_matrix,
+)
 
 
 class MountainCar(MechanicalSystem):
     """Mountain car as a one-coordinate constrained mechanical system.
+
+    Dynamics match SherbyRobotics/pyro ``MountainCar`` in
+    ``pyro/dynamic/mountaincar.py``: a bead of mass ``mass`` slides along the
+    fixed relief curve ``z(x) = a * cos(w * x)`` under gravity.
 
     TRL: 1 - ready for user review.
     """
@@ -16,41 +24,69 @@ class MountainCar(MechanicalSystem):
     def __init__(self):
         super().__init__(dof=1, actuators=1)
         self.name = "Mountain Car"
+        self.params = {
+            "mass": 1.0,
+            "gravity": 1.0,
+            "a": 0.5,
+            "w": np.pi,
+        }
         self.state.labels = ["x", "dx"]
         self.state.units = ["m", "m/s"]
         self.inputs["u"].labels = ["throttle"]
         self.inputs["u"].units = ["N"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
-        self.mass = 1.0
-        self.gravity = 1.0
-        self.a = 0.5
-        self.w = np.pi
 
-    def z(self, x):
-        return self.a * np.cos(self.w * x)
+    def z(self, x, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        w = params["w"]
+        return a * np.cos(w * x)
 
-    def dz_dx(self, x):
-        return -self.a * self.w * np.sin(self.w * x)
+    def dz_dx(self, x, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        w = params["w"]
+        return -a * w * np.sin(w * x)
 
-    def d2z_dx2(self, x):
-        return -self.a * self.w**2 * np.cos(self.w * x)
+    def d2z_dx2(self, x, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        w = params["w"]
+        return -a * w**2 * np.cos(w * x)
 
     def H(self, q, params=None):
-        slope = self.dz_dx(q[0])
-        return np.array([[self.mass * (1.0 + slope**2)]])
+        params = self.params if params is None else params
+        mass = params["mass"]
+        slope = self.dz_dx(q[0], params)
+
+        # effective inertia of the bead sliding along the curve z(x)
+        return np.array([[mass * (1.0 + slope**2)]])
 
     def C(self, q, dq, params=None):
-        slope = self.dz_dx(q[0])
-        curvature = self.d2z_dx2(q[0])
-        return np.array([[self.mass * slope * curvature * dq[0]]])
+        params = self.params if params is None else params
+        mass = params["mass"]
+        slope = self.dz_dx(q[0], params)
+        curvature = self.d2z_dx2(q[0], params)
+
+        # Coriolis term from the slope changing along the path
+        return np.array([[mass * slope * curvature * dq[0]]])
 
     def B(self, q, params=None):
-        slope = self.dz_dx(q[0])
+        params = self.params if params is None else params
+        slope = self.dz_dx(q[0], params)
+
+        # throttle acts tangent to the curve; this projects it onto x
         return np.array([[np.sqrt(1.0 + slope**2)]])
 
     def g(self, q, params=None):
-        return np.array([self.mass * self.gravity * self.dz_dx(q[0])])
+        params = self.params if params is None else params
+        mass = params["mass"]
+        gravity = params["gravity"]
+        slope = self.dz_dx(q[0], params)
+
+        # gravity pulls the bead back down along the slope
+        return np.array([mass * gravity * slope])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         return np.zeros(1)
@@ -87,12 +123,9 @@ class MountainCar(MechanicalSystem):
 
 
 if __name__ == "__main__":
-    system = MountainCar()
-    system.x0 = np.array([-0.5, 0.0])
-    system.compute_forced(
-        lambda t: np.array([0.7]),
-        tf=5.0,
-        n_steps=160,
-        show=True,
-        verbose=False,
-    )
+    sys = MountainCar()
+    sys.x0 = np.array([-0.5, 0.0])
+    sys.inputs["u"].nominal_value = np.array([0.7])
+    sys.compute_trajectory(tf=5.0)
+    sys.plot_phase_plane()
+    sys.animate()

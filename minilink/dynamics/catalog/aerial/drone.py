@@ -2,13 +2,26 @@ import numpy as np
 
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.dynamics.catalog._graphics import (Arrow, Box, Circle, Point,
-                                                 arrow_transform, drone_body,
-                                                 follow_xy_camera, ground_line,
-                                                 identity_matrix,
-                                                 pose2d_matrix,
-                                                 scale_pose2d_matrix,
-                                                 translation_matrix)
+from minilink.graphical.animation.primitives import (
+    Arrow,
+    Box,
+    Circle,
+    Point,
+    arrow_transform,
+    follow_xy_camera,
+    ground_line,
+    identity_matrix,
+    pose2d_matrix,
+    scale_pose2d_matrix,
+    translation_matrix,
+)
+
+
+def _drone_body(width=1.0, height=0.2):
+    """Flat rectangular drone body centered on the c.g."""
+    return Box(
+        length_x=width, length_y=height, length_z=0.08, color="black", opacity=0.9
+    )
 
 
 class Drone2D(MechanicalSystem):
@@ -20,45 +33,67 @@ class Drone2D(MechanicalSystem):
     def __init__(self):
         super().__init__(dof=3, actuators=2)
         self.name = "Planar Drone"
+        self.params = {
+            "mass": 1.0,
+            "inertia": 0.1,
+            "thruster_offset": 0.5,
+            "gravity": 9.81,
+            "cda": 0.1,
+        }
         self.state.labels = ["x", "y", "theta", "vx", "vy", "omega"]
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
         self.inputs["u"].labels = ["T1", "T2"]
         self.inputs["u"].units = ["N", "N"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
-        self.mass = 1.0
-        self.inertia = 0.1
-        self.thruster_offset = 0.5
-        self.gravity = 9.81
-        self.cda = 0.1
+
+        # Graphic parameters
         self.width = 1.0
         self.height = 0.2
         self.camera_scale = 3.0
 
     def H(self, q, params=None):
-        return np.diag([self.mass, self.mass, self.inertia])
+        params = self.params if params is None else params
+        mass = params["mass"]
+        inertia = params["inertia"]
+
+        # diagonal translational and rotational inertia
+        return np.diag([mass, mass, inertia])
 
     def C(self, q, dq, params=None):
         return np.zeros((3, 3))
 
     def B(self, q, params=None):
-        theta = q[2]
-        return np.array(
-            [
-                [-np.sin(theta), -np.sin(theta)],
-                [np.cos(theta), np.cos(theta)],
-                [-self.thruster_offset, self.thruster_offset],
-            ]
-        )
+        params = self.params if params is None else params
+        offset = params["thruster_offset"]
+        s, c = np.sin(q[2]), np.cos(q[2])
+
+        # both thrusters push along the body vertical; their difference yaws
+        # fmt: off
+        return np.array([
+            [    -s,     -s],
+            [     c,      c],
+            [-offset, offset],
+        ])
+        # fmt: on
 
     def g(self, q, params=None):
-        return np.array([0.0, self.mass * self.gravity, 0.0])
+        params = self.params if params is None else params
+        mass = params["mass"]
+        gravity = params["gravity"]
+
+        # weight pulls down along +y in screen coordinates
+        return np.array([0.0, mass * gravity, 0.0])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
+        params = self.params if params is None else params
+        cda = params["cda"]
+
+        # quadratic aero drag on translation plus light linear damping on all DOF
         return np.array(
             [
-                self.cda * dq[0] * abs(dq[0]) + 0.01 * dq[0],
-                self.cda * dq[1] * abs(dq[1]) + 0.01 * dq[1],
+                cda * dq[0] * abs(dq[0]) + 0.01 * dq[0],
+                cda * dq[1] * abs(dq[1]) + 0.01 * dq[1],
                 0.01 * dq[2],
             ]
         )
@@ -69,13 +104,14 @@ class Drone2D(MechanicalSystem):
     def get_kinematic_geometry(self):
         return [
             ground_line(length=20.0),
-            drone_body(width=1.2, height=0.18),
+            _drone_body(width=1.2, height=0.18),
             Point(color="blue", marker="o", size=5),
             Arrow(color="red", linewidth=2, origin="base"),
             Arrow(color="red", linewidth=2, origin="base"),
         ]
 
     def get_kinematic_transforms(self, x, u, t):
+        offset = self.params["thruster_offset"]
         q = x[:3]
         T_body = pose2d_matrix(q[0], q[1], q[2])
         scale = 0.08
@@ -83,20 +119,8 @@ class Drone2D(MechanicalSystem):
             identity_matrix(),
             T_body,
             pose2d_matrix(q[0], q[1], 0.0),
-            T_body
-            @ scale_pose2d_matrix(
-                -self.thruster_offset,
-                0.0,
-                np.pi / 2.0,
-                scale * u[0],
-            ),
-            T_body
-            @ scale_pose2d_matrix(
-                self.thruster_offset,
-                0.0,
-                np.pi / 2.0,
-                scale * u[1],
-            ),
+            T_body @ scale_pose2d_matrix(-offset, 0.0, np.pi / 2.0, scale * u[0]),
+            T_body @ scale_pose2d_matrix(offset, 0.0, np.pi / 2.0, scale * u[1]),
         ]
 
 
@@ -109,7 +133,6 @@ class Drone2DWithSideThruster(Drone2D):
     def __init__(self):
         super().__init__()
         self.name = "Planar Drone With Side Thruster"
-        self.m = 0
         self.inputs.clear()
         self.add_input_port(
             "u",
@@ -119,10 +142,13 @@ class Drone2DWithSideThruster(Drone2D):
         )
 
     def B(self, q, params=None):
+        theta = q[2]
+
+        # extend the two-thruster matrix with a body-lateral thruster column
         B = np.zeros((3, 3))
         B[:, :2] = super().B(q, params)
-        B[0, 2] = np.cos(q[2])
-        B[1, 2] = np.sin(q[2])
+        B[0, 2] = np.cos(theta)
+        B[1, 2] = np.sin(theta)
         return B
 
     def get_kinematic_geometry(self):
@@ -156,6 +182,7 @@ class SpeedControlledDrone2D(DynamicSystem):
         self.camera_scale = 10.0
 
     def f(self, x, u, t=0.0, params=None):
+        # the commanded velocity is the position rate directly
         return np.asarray(u)
 
     def h(self, x, u, t=0.0, params=None):
@@ -166,7 +193,7 @@ class SpeedControlledDrone2D(DynamicSystem):
 
     def get_kinematic_geometry(self):
         return [
-            drone_body(width=1.0, height=0.18),
+            _drone_body(width=1.0, height=0.18),
             Arrow(color="red", linewidth=2, origin="base"),
         ]
 
@@ -186,18 +213,27 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
         self.name = "Constant Speed Helicopter Tunnel"
+        self.params = {
+            "mass": 1.0,
+            "vx": 10.0,
+        }
         self.state.labels = ["dy", "y", "x"]
         self.state.units = ["m/s", "m", "m"]
         self.inputs["u"].labels = ["force"]
         self.inputs["u"].units = ["N"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
-        self.mass = 1.0
-        self.vx = 10.0
+
+        # Graphic parameters
         self.camera_scale = 12.0
 
     def f(self, x, u, t=0.0, params=None):
-        return np.array([u[0] / self.mass, x[0], self.vx])
+        params = self.params if params is None else params
+        mass = params["mass"]
+        vx = params["vx"]
+
+        # vertical force drives altitude; horizontal cruise speed stays constant
+        return np.array([u[0] / mass, x[0], vx])
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -224,16 +260,16 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
 
 if __name__ == "__main__":
 
-    system = Drone2D()
+    sys = Drone2D()
+    # sys = Drone2DWithSideThruster()
+    # sys = SpeedControlledDrone2D()
+    # sys = ConstantSpeedHelicopterTunnel()
 
-    system.x0 = np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
+    # sys.x0 = np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
 
-    system.compute_forced(
-        lambda t: np.array([5.0, 6.0]),
-        tf=2.0,
-        n_steps=80,
-        show=True,
-        verbose=False,
-    )
+    sys.inputs["u"].nominal_value[0] = 5.0
+    sys.inputs["u"].nominal_value[1] = 5.1
 
-    system.animate()
+    sys.compute_trajectory(tf=2.0)
+
+    sys.animate()

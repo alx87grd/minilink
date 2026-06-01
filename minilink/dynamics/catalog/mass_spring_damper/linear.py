@@ -46,23 +46,10 @@ class SingleMass(StateSpaceSystem):
     """
 
     def __init__(self, mass=1.0, k=2.0, b=0.0):
-        self.mass = float(mass)
-        self.k = float(k)
-        self.b = float(b)
-        A, B, C, D = self._abcd()
-        super().__init__(A, B, C, D, name="Single Mass Spring Damper")
-        self._set_metadata()
+        super().__init__(n=2, m=1, p=1, name="Single Mass Spring Damper")
+        self.params = {"mass": float(mass), "k": float(k), "b": float(b)}
         self.camera_scale = 4.0
 
-    def _abcd(self):
-        return (
-            np.array([[0.0, 1.0], [-self.k / self.mass, -self.b / self.mass]]),
-            np.array([[0.0], [1.0 / self.mass]]),
-            np.array([[1.0, 0.0]]),
-            np.array([[0.0]]),
-        )
-
-    def _set_metadata(self):
         self.state.labels = ["x", "dx"]
         self.state.units = ["m", "m/s"]
         self.inputs["u"].labels = ["force"]
@@ -70,8 +57,36 @@ class SingleMass(StateSpaceSystem):
         self.outputs["y"].labels = ["x"]
         self.outputs["y"].units = ["m"]
 
-    def refresh(self):
-        self.A, self.B, self.C, self.D = self._abcd()
+    def A(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        mass, k, b = params["mass"], params["k"], params["b"]
+
+        # mass * x'' + b * x' + k * x = u, state = [position, velocity]
+        # fmt: off
+        return np.array([
+            [      0.0,       1.0],
+            [-k / mass, -b / mass],
+        ])
+        # fmt: on
+
+    def B(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        mass = params["mass"]
+
+        # the force enters through the acceleration row
+        return np.array(
+            [
+                [0.0],
+                [1.0 / mass],
+            ]
+        )
+
+    def C(self, t=0.0, params=None):
+        # measure the position of the mass
+        return np.array([[1.0, 0.0]])
+
+    def D(self, t=0.0, params=None):
+        return np.array([[0.0]])
 
     def get_kinematic_geometry(self):
         return [
@@ -87,7 +102,7 @@ class SingleMass(StateSpaceSystem):
         left_face = mass_x - 0.3
         spring = (
             line_between_transform([anchor, 0.0], [left_face, 0.0])
-            if self.k != 0.0
+            if self.params["k"] != 0.0
             else empty_transform()
         )
         return [
@@ -105,39 +120,19 @@ class TwoMass(StateSpaceSystem):
     """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
-        self.m1 = self.m2 = float(m)
-        self.k1 = self.k2 = float(k)
-        self.b1 = self.b2 = float(b)
+        super().__init__(n=4, m=1, p=1, name="Two Mass Spring Damper")
         self.output_mass = int(output_mass)
-        A, B, C, D, output_label = self._abcd()
-        super().__init__(A, B, C, D, name="Two Mass Spring Damper")
-        self._set_metadata(output_label)
+        self.params = {
+            "m1": float(m),
+            "m2": float(m),
+            "k1": float(k),
+            "k2": float(k),
+            "b1": float(b),
+            "b2": float(b),
+        }
         self.camera_scale = 5.0
 
-    def _abcd(self):
-        A = np.array(
-            [
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-                [
-                    -(self.k1 + self.k2) / self.m1,
-                    self.k2 / self.m1,
-                    -self.b1 / self.m1,
-                    0.0,
-                ],
-                [
-                    self.k2 / self.m2,
-                    -self.k2 / self.m2,
-                    0.0,
-                    -self.b2 / self.m2,
-                ],
-            ]
-        )
-        B = np.array([[0.0], [0.0], [0.0], [1.0 / self.m2]])
-        C, output_label = _mass_output_matrix(2, self.output_mass)
-        return A, B, C, np.array([[0.0]]), output_label
-
-    def _set_metadata(self, output_label):
+        _, output_label = _mass_output_matrix(2, self.output_mass)
         self.state.labels = ["x1", "x2", "dx1", "dx2"]
         self.state.units = ["m", "m", "m/s", "m/s"]
         self.inputs["u"].labels = ["force"]
@@ -145,9 +140,42 @@ class TwoMass(StateSpaceSystem):
         self.outputs["y"].labels = [output_label]
         self.outputs["y"].units = ["m"]
 
-    def refresh(self):
-        self.A, self.B, self.C, self.D, output_label = self._abcd()
-        self.outputs["y"].labels = [output_label]
+    def A(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        m1, m2 = params["m1"], params["m2"]
+        k1, k2 = params["k1"], params["k2"]
+        b1, b2 = params["b1"], params["b2"]
+
+        # m1 x1'' = -(k1 + k2) x1 + k2 x2 - b1 x1';  m2 x2'' = k2 (x1 - x2) - b2 x2'
+        # fmt: off
+        return np.array([
+            [            0.0,      0.0,      1.0,      0.0],
+            [            0.0,      0.0,      0.0,      1.0],
+            [-(k1 + k2) / m1,  k2 / m1, -b1 / m1,      0.0],
+            [        k2 / m2, -k2 / m2,      0.0, -b2 / m2],
+        ])
+        # fmt: on
+
+    def B(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        m2 = params["m2"]
+
+        # the force enters on the second mass
+        return np.array(
+            [
+                [0.0],
+                [0.0],
+                [0.0],
+                [1.0 / m2],
+            ]
+        )
+
+    def C(self, t=0.0, params=None):
+        C, _ = _mass_output_matrix(2, self.output_mass)
+        return C
+
+    def D(self, t=0.0, params=None):
+        return np.array([[0.0]])
 
     def get_kinematic_geometry(self):
         return [
@@ -159,15 +187,12 @@ class TwoMass(StateSpaceSystem):
             Arrow(color="red", linewidth=2, origin="base"),
         ]
 
-    def _mass_centers(self, x):
-        return np.array([x[0] - 2.0, x[1]])
-
     def get_kinematic_transforms(self, x, u, t):
-        x1, x2 = self._mass_centers(x)
+        x1, x2 = x[0] - 2.0, x[1]
         anchor = -4.0
         spring1 = (
             line_between_transform([anchor, 0.0], [x1 - 0.3, 0.0])
-            if self.k1 != 0.0
+            if self.params["k1"] != 0.0
             else empty_transform()
         )
         return [
@@ -187,52 +212,22 @@ class ThreeMass(StateSpaceSystem):
     """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
-        self.m1 = self.m2 = self.m3 = float(m)
-        self.k1 = self.k2 = self.k3 = float(k)
-        self.b1 = self.b2 = self.b3 = float(b)
+        super().__init__(n=6, m=1, p=1, name="Three Mass Spring Damper")
         self.output_mass = int(output_mass)
-        A, B, C, D, output_label = self._abcd()
-        super().__init__(A, B, C, D, name="Three Mass Spring Damper")
-        self._set_metadata(output_label)
+        self.params = {
+            "m1": float(m),
+            "m2": float(m),
+            "m3": float(m),
+            "k1": float(k),
+            "k2": float(k),
+            "k3": float(k),
+            "b1": float(b),
+            "b2": float(b),
+            "b3": float(b),
+        }
         self.camera_scale = 6.0
 
-    def _abcd(self):
-        A = np.array(
-            [
-                [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-                [
-                    -(self.k1 + self.k2) / self.m1,
-                    self.k2 / self.m1,
-                    0.0,
-                    -self.b1 / self.m1,
-                    0.0,
-                    0.0,
-                ],
-                [
-                    self.k2 / self.m2,
-                    -(self.k2 + self.k3) / self.m2,
-                    self.k3 / self.m2,
-                    0.0,
-                    -self.b2 / self.m2,
-                    0.0,
-                ],
-                [
-                    0.0,
-                    self.k3 / self.m3,
-                    -self.k3 / self.m3,
-                    0.0,
-                    0.0,
-                    -self.b3 / self.m3,
-                ],
-            ]
-        )
-        B = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [1.0 / self.m3]])
-        C, output_label = _mass_output_matrix(3, self.output_mass)
-        return A, B, C, np.array([[0.0]]), output_label
-
-    def _set_metadata(self, output_label):
+        _, output_label = _mass_output_matrix(3, self.output_mass)
         self.state.labels = ["x1", "x2", "x3", "dx1", "dx2", "dx3"]
         self.state.units = ["m", "m", "m", "m/s", "m/s", "m/s"]
         self.inputs["u"].labels = ["force"]
@@ -240,9 +235,46 @@ class ThreeMass(StateSpaceSystem):
         self.outputs["y"].labels = [output_label]
         self.outputs["y"].units = ["m"]
 
-    def refresh(self):
-        self.A, self.B, self.C, self.D, output_label = self._abcd()
-        self.outputs["y"].labels = [output_label]
+    def A(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        m1, m2, m3 = params["m1"], params["m2"], params["m3"]
+        k1, k2, k3 = params["k1"], params["k2"], params["k3"]
+        b1, b2, b3 = params["b1"], params["b2"], params["b3"]
+
+        # nearest-neighbour spring/damper coupling along the chain
+        # fmt: off
+        return np.array([
+            [            0.0,             0.0,      0.0,      1.0,      0.0,      0.0],
+            [            0.0,             0.0,      0.0,      0.0,      1.0,      0.0],
+            [            0.0,             0.0,      0.0,      0.0,      0.0,      1.0],
+            [-(k1 + k2) / m1,         k2 / m1,      0.0, -b1 / m1,      0.0,      0.0],
+            [        k2 / m2, -(k2 + k3) / m2,  k3 / m2,      0.0, -b2 / m2,      0.0],
+            [            0.0,         k3 / m3, -k3 / m3,      0.0,      0.0, -b3 / m3],
+        ])
+        # fmt: on
+
+    def B(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        m3 = params["m3"]
+
+        # the force enters on the third mass
+        return np.array(
+            [
+                [0.0],
+                [0.0],
+                [0.0],
+                [0.0],
+                [0.0],
+                [1.0 / m3],
+            ]
+        )
+
+    def C(self, t=0.0, params=None):
+        C, _ = _mass_output_matrix(3, self.output_mass)
+        return C
+
+    def D(self, t=0.0, params=None):
+        return np.array([[0.0]])
 
     def get_kinematic_geometry(self):
         return [
@@ -256,15 +288,12 @@ class ThreeMass(StateSpaceSystem):
             Arrow(color="red", linewidth=2, origin="base"),
         ]
 
-    def _mass_centers(self, x):
-        return np.array([x[0] - 2.0, x[1], x[2] + 2.0])
-
     def get_kinematic_transforms(self, x, u, t):
-        x1, x2, x3 = self._mass_centers(x)
+        x1, x2, x3 = x[0] - 2.0, x[1], x[2] + 2.0
         anchor = -4.0
         spring1 = (
             line_between_transform([anchor, 0.0], [x1 - 0.28, 0.0])
-            if self.k1 != 0.0
+            if self.params["k1"] != 0.0
             else empty_transform()
         )
         return [
@@ -299,8 +328,7 @@ class FloatingTwoMass(TwoMass):
     def __init__(self, m=1.0, k=1.0, b=0.0, output_mass=2):
         super().__init__(m=m, k=k, b=b, output_mass=output_mass)
         self.name = "Floating Two Mass"
-        self.k1 = 0.0
-        self.refresh()
+        self.params["k1"] = 0.0
 
 
 class FloatingThreeMass(ThreeMass):
@@ -312,8 +340,7 @@ class FloatingThreeMass(ThreeMass):
     def __init__(self, m=1.0, k=1.0, b=0.0, output_mass=3):
         super().__init__(m=m, k=k, b=b, output_mass=output_mass)
         self.name = "Floating Three Mass"
-        self.k1 = 0.0
-        self.refresh()
+        self.params["k1"] = 0.0
 
 
 if __name__ == "__main__":
@@ -321,6 +348,17 @@ if __name__ == "__main__":
     # sys = TwoMass()
     # sys = FloatingThreeMass()
     sys = ThreeMass()
-    sys.inputs["u"].nominal_value = np.array([1.0])
+
+    sys.params["m1"] = 5.0
+    sys.params["m2"] = 10.0
+    sys.params["m3"] = 1.0
+    sys.params["k1"] = 5.0
+    sys.params["k2"] = 20.0
+    sys.params["k3"] = 20.0
+    sys.params["b1"] = 0.0
+    sys.params["b2"] = 0.0
+    sys.params["b3"] = 0.0
+
+    sys.inputs["u"].nominal_value = np.array([10.0])
     sys.compute_trajectory(tf=15.0)
-    sys.animate(time_factor_video=5.0)
+    sys.animate(time_factor_video=1.0)

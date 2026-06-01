@@ -236,22 +236,45 @@ class MatplotlibCanvas:
                 self.drawn_objects.append(obj)
 
         elif isinstance(primitive, Sphere):
-            # 2D/3D fallback: draw sphere as a circle in XY.
             local_center = np.zeros(3)
             local_center[: len(primitive.center)] = primitive.center
             world_center = transform_matrix @ np.append(local_center, 1.0)
-            x, y = world_center[0], world_center[1]
-            circ = patches.Circle(
-                (x, y),
-                radius=primitive.radius,
-                ec=primitive.color,
-                fill=True,
-                fc=primitive.color,
-                alpha=float(np.clip(primitive.opacity, 0.0, 1.0)),
-                linewidth=1.5,
-            )
-            obj = self.ax.add_patch(circ)
-            self.drawn_objects.append(obj)
+            x, y, z = world_center[0], world_center[1], world_center[2]
+            alpha = float(np.clip(primitive.opacity, 0.0, 1.0))
+
+            if self.is_3d:
+                # 3D: three orthogonal great circles read as a ball and scale
+                # with the data axes (Axes3D cannot draw a 2D circle patch).
+                r = primitive.radius
+                th = np.linspace(0.0, 2.0 * np.pi, 24)
+                cos, sin, zero = np.cos(th), np.sin(th), np.zeros_like(th)
+                for rx, ry, rz in (
+                    (r * cos, r * sin, zero),
+                    (r * cos, zero, r * sin),
+                    (zero, r * cos, r * sin),
+                ):
+                    (obj,) = self.ax.plot(
+                        x + rx,
+                        y + ry,
+                        z + rz,
+                        color=primitive.color,
+                        linewidth=1.0,
+                        alpha=alpha,
+                    )
+                    self.drawn_objects.append(obj)
+            else:
+                # 2D fallback: draw the sphere as a filled circle in XY.
+                circ = patches.Circle(
+                    (x, y),
+                    radius=primitive.radius,
+                    ec=primitive.color,
+                    fill=True,
+                    fc=primitive.color,
+                    alpha=alpha,
+                    linewidth=1.5,
+                )
+                obj = self.ax.add_patch(circ)
+                self.drawn_objects.append(obj)
 
         elif isinstance(primitive, Plane):
             # 2D fallback: draw XY intersection line of n·x=offset.

@@ -23,9 +23,12 @@ class VanderPol(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
+        mu = params["mu"]
         y, dy = x
-        acceleration = -y + params["mu"] * dy * (1.0 - y**2)
-        return np.array([dy, acceleration])
+
+        # Van der Pol oscillator: damping is negative (pumps energy) for |y| < 1
+        ddy = -y + mu * dy * (1.0 - y**2)
+        return np.array([dy, ddy])
 
     def h(self, x, u, t=0.0, params=None):
         return x

@@ -647,3 +647,25 @@ def spring_line(coils=6, amplitude=0.12, color="black", linewidth=1):
     pts.append([0.85, 0.0, 0.0])
     pts.append([1.0, 0.0, 0.0])
     return CustomLine(pts, color=color, linewidth=linewidth)
+
+
+def wheel_box(length=0.45, width=0.16):
+    """Small flat box used as a wheel/contact patch in vehicle diagrams."""
+    return Box(
+        length_x=length, length_y=width, length_z=0.08, color="black", opacity=0.9
+    )
+
+
+def vehicle_body(length=1.0, width=0.5, color="blue", opacity=0.85):
+    """Planar car/robot shell (arrow-shaped outline pointing along +X)."""
+    pts = np.array(
+        [
+            [-0.5 * length, -0.5 * width, 0.0],
+            [0.3 * length, -0.5 * width, 0.0],
+            [0.5 * length, 0.0, 0.0],
+            [0.3 * length, 0.5 * width, 0.0],
+            [-0.5 * length, 0.5 * width, 0.0],
+            [-0.5 * length, -0.5 * width, 0.0],
+        ]
+    )
+    return CustomLine(pts, color=color, linewidth=2)

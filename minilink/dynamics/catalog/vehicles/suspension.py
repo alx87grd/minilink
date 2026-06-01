@@ -1,13 +1,17 @@
 import numpy as np
 
 from minilink.core.system import DynamicSystem
-from minilink.dynamics.catalog._graphics import (Arrow, Box, CustomLine,
-                                                 arrow_transform,
-                                                 follow_xy_camera,
-                                                 identity_matrix,
-                                                 line_between_transform,
-                                                 spring_line,
-                                                 translation_matrix)
+from minilink.graphical.animation.primitives import (
+    Arrow,
+    Box,
+    CustomLine,
+    arrow_transform,
+    follow_xy_camera,
+    identity_matrix,
+    line_between_transform,
+    spring_line,
+    translation_matrix,
+)
 
 
 class QuarterCarOnRoughTerrain(DynamicSystem):
@@ -19,34 +23,60 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
         self.name = "Quarter Car On Rough Terrain"
+        self.params = {
+            "mass": 1.0,
+            "b": 1.0,
+            "k": 1.0,
+            "vx": 1.0,
+            # Road profile: superposed sinusoids (amplitude, spatial freq, phase),
+            # used by the dynamics forcing and to draw the terrain line.
+            "a": np.array([0.5, 0.3, 0.7, 0.2, 0.2, 0.1]),
+            "w": np.array([0.2, 0.4, 0.5, 1.0, 2.0, 3.0]),
+            "phi": np.array([3.0, 2.0, 0.0, 0.0, 0.0, 0.0]),
+        }
         self.state.labels = ["dy", "y", "x"]
         self.state.units = ["m/s", "m", "m"]
         self.inputs["u"].labels = ["force"]
         self.inputs["u"].units = ["N"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
-        self.mass = 1.0
-        self.b = 1.0
-        self.k = 1.0
-        self.vx = 1.0
-        self.a = np.array([0.5, 0.3, 0.7, 0.2, 0.2, 0.1])
-        self.w = np.array([0.2, 0.4, 0.5, 1.0, 2.0, 3.0])
-        self.phi = np.array([3.0, 2.0, 0.0, 0.0, 0.0, 0.0])
+
+        # Graphic parameters
         self.camera_scale = 10.0
 
-    def z(self, x):
-        return np.sum(self.a * np.sin(self.w * (x - self.phi)))
+    def z(self, x, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        w = params["w"]
+        phi = params["phi"]
 
-    def dz(self, x):
-        return np.sum(self.a * self.w * np.cos(self.w * (x - self.phi)))
+        # ground height: superposed sinusoidal road profile
+        return np.sum(a * np.sin(w * (x - phi)))
+
+    def dz(self, x, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        w = params["w"]
+        phi = params["phi"]
+
+        # ground slope: spatial derivative of the road profile
+        return np.sum(a * w * np.cos(w * (x - phi)))
 
     def f(self, x, u, t=0.0, params=None):
-        ground = self.z(x[2])
-        ground_slope = self.dz(x[2])
-        acceleration = (
-            u[0] - self.k * (x[1] - ground) - self.b * (x[0] - ground_slope)
-        ) / self.mass
-        return np.array([acceleration, x[0], self.vx])
+        params = self.params if params is None else params
+        mass = params["mass"]
+        b = params["b"]
+        k = params["k"]
+        vx = params["vx"]
+
+        dy, y, x_pos = x
+        ground = self.z(x_pos, params)
+        ground_slope = self.dz(x_pos, params)
+
+        # mass y'' = u - k (y - z) - b (y' - z'): sprung mass over the road
+        acceleration = (u[0] - k * (y - ground) - b * (dy - ground_slope)) / mass
+
+        return np.array([acceleration, dy, vx])
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -76,5 +106,8 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
 
 
 if __name__ == "__main__":
-    system = QuarterCarOnRoughTerrain()
-    system.compute_trajectory(tf=8.0, n_steps=240, show=True, verbose=False)
+    sys = QuarterCarOnRoughTerrain()
+    sys.x0 = np.array([0.0, 0.0, 0.0])
+    sys.inputs["u"].nominal_value = np.array([5.0])
+    sys.compute_trajectory(tf=8.0)
+    sys.animate()
