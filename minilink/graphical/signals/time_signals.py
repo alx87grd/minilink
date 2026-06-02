@@ -21,6 +21,21 @@ class SignalTrace:
     color: str
 
 
+# =============================================================== MES CHANGEMENT ===============================================================
+
+
+@dataclass(frozen=True)
+class DataPlotSpec:
+    """Backend-neutral signal plot request."""
+
+    title: str
+    x_axis: SignalTrace
+    traces: tuple[SignalTrace, ...]
+
+
+# =======================================================================================================================================
+
+
 @dataclass(frozen=True)
 class SignalPlotSpec:
     """Backend-neutral signal plot request."""
@@ -111,6 +126,85 @@ def build_signal_plot_spec(
     )
 
 
+# =============================================================== MES CHANGEMENT ===============================================================
+
+
+def build_data_signal_to_plot(
+    sys,
+    traj,
+    *,
+    datas: tuple[str, ...] = ("x", "u"),
+    signals_names: tuple[str, ...] = ("x", "u"),
+    x_label: str,
+    title: str | None = None,
+) -> DataPlotSpec:
+    """Build a one-component-per-row plot specification."""
+
+    requested = (datas,) if isinstance(datas, str) else tuple(datas)
+
+    # normalize signals_names so single string becomes a 1-tuple
+    if isinstance(signals_names, str):
+        signals_names = (signals_names,)
+
+    x_axis_data = None
+    traces = []
+    for signal_name in requested:
+        if traj.has_signal(signal_name):
+            values = np.asarray(traj.get_signal(signal_name), dtype=float)
+            labels, units = _labels_and_units_for_extra_signal(
+                sys,
+                signal_name,
+                values.shape[0],
+            )
+        else:
+            available = ", ".join(_available_signal_names(sys, traj))
+            raise ValueError(
+                f"Unknown signal(s): {signal_name}. Available signals: {available}"
+            )
+
+        color = _color_for_signal(signal_name)
+
+        for i in range(values.shape[0]):
+            if labels[i] in signals_names:
+                traces.append(
+                    SignalTrace(
+                        signal=signal_name,
+                        component=i,
+                        label=labels[i],
+                        unit=units[i],
+                        values=values[i, :],
+                        color=color,
+                    )
+                )
+            elif labels[i] == x_label:
+                x_axis_data = SignalTrace(
+                    signal=signal_name,
+                    component=i,
+                    label=labels[i],
+                    unit=units[i],
+                    values=values[i, :],
+                    color=color,
+                )
+
+    if not traces:
+        raise ValueError("No signal components were selected for plotting.")
+    if x_axis_data is None:
+        raise ValueError(
+            f"X-axis signal {x_label} was not found among the available signals."
+        )
+    if title is None:
+        title = f"Data signals for {sys.name} vs {x_axis_data.label}"
+
+    return DataPlotSpec(
+        title=title,
+        x_axis=x_axis_data,
+        traces=tuple(traces),
+    )
+
+
+# =======================================================================================================================================
+
+
 def plot_time_signals(
     sys,
     traj,
@@ -122,9 +216,11 @@ def plot_time_signals(
 ) -> PlotResult:
     """Plot sampled time signals with the selected backend."""
     spec = build_signal_plot_spec(sys, traj, signals=signals)
+
     if not isinstance(backend, str):
         raise TypeError("Signal plotting backend must be a string.")
     key = backend.strip().lower()
+
     if key == "matplotlib":
         from minilink.graphical.signals.matplotlib_backend import (
             render_matplotlib_signal_plot,

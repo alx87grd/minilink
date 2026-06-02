@@ -7,7 +7,7 @@ class ConstantReference(System):
     """Constant scalar reference signal."""
 
     def __init__(self, ref: float = 1.0, name: str | None = None):
-        super().__init__(0, 0, 1)
+        super().__init__(0)
 
         self.name = name if name is not None else "Not named :("
 
@@ -18,8 +18,8 @@ class ConstantReference(System):
         self.ref = float(ref)
 
         self.add_output_port(
-            1,
             "ref",
+            dim=1,
             function=self.h_ref,
             dependencies=[],
         )

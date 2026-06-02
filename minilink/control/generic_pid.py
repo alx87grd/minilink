@@ -8,7 +8,7 @@ class Sum(System):
     """SUM."""
 
     def __init__(self, max=None, min=None, name: str = "Sum"):
-        super().__init__(0, 2, 1)
+        super().__init__(0)
 
         self.name = name
 
@@ -17,21 +17,19 @@ class Sum(System):
 
         self.inputs = {}
         self.add_input_port(
-            1,
             "1",
             nominal_value=np.array([0.0]),
         )
 
         self.add_input_port(
-            1,
             "2",
             nominal_value=np.array([0.0]),
         )
 
         self.outputs = {}
         self.add_output_port(
-            1,
             "result",
+            dim=1,
             function=self.h_meas,
             dependencies=["1", "2"],
         )
@@ -290,7 +288,7 @@ class PID(DynamicSystem):
         i_max: float = np.inf,
         name: str = "PID",
     ):
-        super().__init__(2, 2, 1)
+        super().__init__(2)
         self.name = name
 
         self.params = {
@@ -307,20 +305,20 @@ class PID(DynamicSystem):
         self.x0 = np.array([0.0, meas0], dtype=float)
 
         self.inputs = {}
-        self.add_input_port(1, "ref", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "meas", nominal_value=np.array([0.0]))
+        self.add_input_port("ref", nominal_value=np.array([0.0]))
+        self.add_input_port("meas", nominal_value=np.array([0.0]))
 
         self.outputs = {}
         self.add_output_port(
-            1,
             "cmd",
+            dim=1,
             function=self.h_w,
             dependencies=["ref", "meas"],
         )
         # self.add_output_port(1, "x", function=self.compute_state, dependencies=[])
         self.add_output_port(
-            2,
             "logs",
+            dim=2,
             function=self.data_signal,
             dependencies=["ref", "meas"],
         )

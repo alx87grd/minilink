@@ -19,7 +19,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycleRearWheelDriveEngine,
     Pacejka,
 )
-from minilink.graphical.primitives import camera_matrix
+from minilink.graphical.animation.primitives import camera_matrix
 
 THR_REF = 1.0  # Normalized throttle [0, 1]
 DELTA_REF = 0.0  # rad

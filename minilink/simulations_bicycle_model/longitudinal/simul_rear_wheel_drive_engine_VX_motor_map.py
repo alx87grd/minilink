@@ -19,7 +19,6 @@ DELTA_REF = 0.0
 
 
 def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
-    # vehicle = create_vehicle()
 
     v_ref = ConstantReference(ref=vx_ref, name="Speed reference")
 
@@ -78,20 +77,19 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
 
     diagram.connect("steering", "ref", "vehicle", "delta")
 
-    return diagram, v_pid
+    return diagram
 
 
 def main():
     vehicle = create_vehicle()
-    vehicle.tire_model_r = Pacejka(logs=True)
-    diagram, v_pid = create_diagram(vehicle)
+    diagram = create_diagram(vehicle)
 
-    diagram.plot_graphe()
+    diagram.plot_diagram()
 
     print("Starting trajectory computation...")
 
     diagram.compute_trajectory(
-        tf=10.0,
+        tf=10,
         dt=0.005,
         show=False,
         verbose=False,
@@ -104,29 +102,23 @@ def main():
         backend="matplotlib",
     )
 
-    # t = np.array(v_pid.t_hist)
-    # ref = np.array(v_pid.ref_hist)
-    # meas = np.array(v_pid.meas_hist)
+    traj = diagram.reconstruct_internal_signals(diagram.traj)
+    pid_logs = traj.get_signal("v_pid:logs")
 
-    # idx = np.argsort(t)
-    # t = t[idx]
-    # ref = ref[idx]
-    # meas = meas[idx]
+    ref = pid_logs[0, :]
+    meas = pid_logs[1, :]
 
-    # t_unique, unique_idx = np.unique(t, return_index=True)
-    # ref = ref[unique_idx]
-    # meas = meas[unique_idx]
-    # t = t_unique
+    import matplotlib.pyplot as plt
 
-    # plt.figure()
-    # plt.plot(t, ref, label="Reference speed")
-    # plt.plot(t, meas, label="Measured speed")
-    # plt.xlabel("Time [s]")
-    # plt.ylabel("Speed [m/s]")
-    # plt.title("Speed tracking")
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
+    plt.figure()
+    plt.plot(diagram.traj.t, ref, label="Reference speed")
+    plt.plot(diagram.traj.t, meas, label="Measured speed")
+    plt.xlabel("Time [s]")
+    plt.ylabel("Speed [m/s]")
+    plt.title("Speed tracking")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
     # attach_vehicle_centered_diagram_camera(diagram, vehicle)
 

@@ -32,7 +32,7 @@ class AngularSpeedToSteeringMap(System):
         # 0 states
         # 1 scalar input: acc
         # 1 scalar output: F_rear
-        super().__init__(0, 2, 1)
+        super().__init__(0)
 
         self.name = name
         self.L = vehicle.L
@@ -42,13 +42,11 @@ class AngularSpeedToSteeringMap(System):
         self.inputs = {}
 
         self.add_input_port(
-            1,
             "r_targ",
             nominal_value=np.array([0.0]),
         )
 
         self.add_input_port(
-            1,
             "vx_meas",
             nominal_value=np.array([0.0]),
         )
@@ -56,8 +54,8 @@ class AngularSpeedToSteeringMap(System):
         self.outputs = {}
 
         self.add_output_port(
-            1,
             "delta",
+            dim=1,
             function=self.h_force,
             dependencies=["r_targ", "vx_meas"],
         )

@@ -6,7 +6,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycleRearWheelDriveEngine,
     Pacejka,
 )
-from minilink.graphical.primitives import camera_matrix
+from minilink.graphical.animation.primitives import camera_matrix
 
 
 def attach_vehicle_centered_diagram_camera(

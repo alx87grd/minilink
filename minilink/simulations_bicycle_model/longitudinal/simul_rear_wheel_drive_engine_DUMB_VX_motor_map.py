@@ -9,10 +9,11 @@ The vehicle receives constant open-loop inputs:
 - delta: front steering angle [rad]
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.control.constant_ref import ConstantReference
-from minilink.control.generic_meas import AccelerationMeasurement, Measurement
+from minilink.control.generic_meas import Measurement
 from minilink.control.generic_pid import PID
 from minilink.control.motor_map import AccToRearForce, ThrMap
 from minilink.core.diagram import DiagramSystem
@@ -88,78 +89,90 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
     # Constant steering command
     diagram.connect("steering", "ref", "vehicle", "delta")
 
-    return diagram, v_pid
+    return diagram
 
 
 def main():
     vehicle = create_vehicle()
-    vehicle.tire_model_r = Pacejka(logs=True)
-    diagram, v_pid = create_diagram(vehicle)
+    diagram = create_diagram(vehicle)
 
-    # diagram.plot_graphe()
+    diagram.plot_diagram()
 
     print("Starting trajectory computation...")
 
     diagram.compute_trajectory(
-        tf=10.0,
+        tf=10,
         dt=0.005,
         verbose=False,
     )
 
     print("Trajectory computation done.")
 
+    from minilink.graphical.signals import (
+        build_data_signal_to_plot,
+        build_signal_plot_spec,
+    )
+    from minilink.graphical.signals.matplotlib_backend import (
+        render_matplotlib_signal_plot,
+    )
+
+    traj = diagram.reconstruct_internal_signals(diagram.traj)
+    logs = traj.get_signal("vehicle:r_tire_datas")
+
+    Fx = logs[0, :]
+    kappa = logs[1, :]
+    # idx = np.argsort(kappa)
+
+    # my_spec = build_data_signal_to_plot(
+    #     diagram,
+    #     traj,
+    #     datas=("vehicle:logs",),
+    #     signals_names=("vehicle:logs[0]",),
+    #     x_label="vehicle:logs[1]",
+    # )
+    # render_matplotlib_signal_plot(my_spec, show=True)
     tire = vehicle.tire_model_r
 
-    kappa_sim = np.array(tire.kappa_log)
-    alpha_sim = np.array(tire.alpha_log)
-    Fx_sim = np.array(tire.Fx_log)
+    x = np.linspace(np.min(kappa), np.max(kappa), 20000)
 
-    x = np.linspace(np.min(kappa_sim), np.max(kappa_sim), 20000)
+    Fz_r = (
+        diagram.subsystems["vehicle"].mass
+        * diagram.subsystems["vehicle"].gravity
+        * (diagram.subsystems["vehicle"].a / diagram.subsystems["vehicle"].L)
+    )
 
     Fx_model = (
         tire.Dx
-        * tire.Fz
+        * Fz_r
         * np.sin(
             tire.Cx
             * np.arctan(tire.Bx * x - tire.Ex * (tire.Bx * x - np.arctan(tire.Bx * x)))
         )
     )
 
-    import matplotlib.pyplot as plt
+    plt.figure()
+    # Magic Formula curve
+    plt.plot(x, Fx_model, label="Magic Formula", linewidth=1, color="red")
+    # Simulation data
+    plt.scatter(
+        kappa,
+        Fx,
+        s=5,
+        alpha=0.3,
+        label="Simulation",
+    )
+    plt.xlabel("Slip ratio κ")
+    plt.ylabel("Longitudinal Force Fx")
+    plt.title("Slip vs Magic Formula Comparison")
+    plt.grid(True)
+    plt.legend()
+    plt.show()
 
-    # plt.figure()
+    pid_logs = traj.get_signal("v_pid:logs")
 
-    # # Magic Formula curve
-    # plt.plot(x, Fx_model, label="Magic Formula", linewidth=1, color="red")
-
-    # # Simulation data
-    # plt.scatter(kappa_sim, Fx_sim, s=5, alpha=0.3, label="Simulation")
-
-    # plt.xlabel("Slip ratio κ")
-    # plt.ylabel("Longitudinal Force Fx")
-    # plt.title("Slip vs Magic Formula Comparison")
-    # plt.grid(True)
-    # plt.legend()
-    # plt.show()
-
-    # diagram.plot_trajectory(
-    #     signals=("x", "u"),
-    #     backend="matplotlib",
-    # )
-
-    t = np.array(v_pid.t_hist)
-    ref = np.array(v_pid.ref_hist)
-    meas = np.array(v_pid.meas_hist)
-
-    idx = np.argsort(t)
-    t = t[idx]
-    ref = ref[idx]
-    meas = meas[idx]
-
-    t_unique, unique_idx = np.unique(t, return_index=True)
-    ref = ref[unique_idx]
-    meas = meas[unique_idx]
-    t = t_unique
+    t = traj.t
+    ref = pid_logs[0, :]
+    meas = pid_logs[1, :]
 
     plt.figure()
     plt.plot(t, ref, label="Reference speed")
@@ -171,16 +184,24 @@ def main():
     plt.grid(True)
     plt.show()
 
+    # spec = build_signal_plot_spec(diagram, traj, signals=("vehicle:logs"))
+    # render_matplotlib_signal_plot(spec, show=True)
+
+    # diagram.plot_trajectory(
+    #     signals=("vehicle:logs"),
+    #     backend="matplotlib",
+    # )
+
     diagram.plot_trajectory(
-        signals=("vehicle:logs", "v_ref:ref"),
+        signals=("x"),
         backend="matplotlib",
     )
 
-    diagram.plot_data()
+    # # diagram.plot_data()
 
-    # attach_vehicle_centered_diagram_camera(diagram, vehicle)
+    attach_vehicle_centered_diagram_camera(diagram, vehicle)
 
-    # diagram.animate(renderer="matplotlib")
+    diagram.animate(renderer="matplotlib")
 
 
 if __name__ == "__main__":

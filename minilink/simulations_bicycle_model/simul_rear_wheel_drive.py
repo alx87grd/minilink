@@ -19,7 +19,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycleRearWheelDrive,
     Pacejka,
 )
-from minilink.graphical.primitives import camera_matrix
+from minilink.graphical.animation.primitives import camera_matrix
 
 T_REAR_REF = 200.0  # Nm
 DELTA_REF = 0.0  # rad

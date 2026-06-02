@@ -2,7 +2,7 @@
 
 This script compares two diagrams:
 
-1. DUMB_VX_motor_map
+1. pid_only_VX_motor_map
 2. VX_motor_map
 
 It runs multiple simulations at different target speeds and plots the speed
@@ -22,156 +22,33 @@ from simul_rear_wheel_drive_steering_PID import (
 
 # Optional, only needed if you still want animations
 from minilink.simulations_bicycle_model.vehicule_helper import (
-    attach_vehicle_centered_diagram_camera,
     create_vehicle,
 )
-
-DELTA_REF = 0.0  # rad
-
-
-def get_clean_pid_history(pid):
-    """
-    Extract, sort, and remove duplicate time entries from a PID history.
-
-    Returns
-    -------
-    t : np.ndarray
-        Time vector.
-    ref : np.ndarray
-        Reference signal history.
-    meas : np.ndarray
-        Measured signal history.
-    """
-    t = np.array(pid.t_hist)
-    ref = np.array(pid.ref_hist)
-    meas = np.array(pid.meas_hist)
-
-    idx = np.argsort(t)
-    t = t[idx]
-    ref = ref[idx]
-    meas = meas[idx]
-
-    t_unique, unique_idx = np.unique(t, return_index=True)
-    t = t_unique
-    ref = ref[unique_idx]
-    meas = meas[unique_idx]
-
-    return t, ref, meas
-
-
-def run_single_comparison(
-    target_speed, target_r, simul_time, dt, plot_graph=False, animate=False
-):
-    """
-    Run both simulations for one target speed.
-
-    Parameters
-    ----------
-    target_speed : float
-        Desired speed reference in rad/s.
-    simul_time : float
-        Simulation duration in seconds.
-    dt : float
-        Simulation time step.
-    plot_graph : bool
-        If True, plot the block diagrams.
-    animate : bool
-        If True, animate both simulations.
-
-    Returns
-    -------
-    result : dict
-        Dictionary containing cleaned PID histories for both simulations.
-    """
-
-    print("\n============================================================")
-    print(f"Running comparison for R SPEED = {target_r:.2f} rad/s")
-    print("============================================================")
-
-    # -------------------------------------------------------------------------
-    # First simulation: PID onlyheel-speed map / dumb version
-    # -------------------------------------------------------------------------
-    vehicle = create_vehicle(vx=target_speed)
-    # To keep the constant Vx value seems like a reasonable solution (??)
-    vehicle.engine_dry_resistance = 0.0
-    vehicle.engine_rolling_resistance = 0.0
-
-    diagram_fixed_w, v_pid_fixed_w = create_diagram_pid_only(
-        vehicle, vx_ref=target_speed, r_ref=target_r
-    )
-
-    if plot_graph:
-        diagram_fixed_w.plot_graphe()
-
-    print("Starting trajectory computation for PID only simulation...")
-
-    diagram_fixed_w.compute_trajectory(
-        tf=simul_time,
-        dt=dt,
-        show=False,
-        verbose=False,
-        solver="scipy_lsoda",
-    )
-
-    print("Trajectory computation done for PID only simulation.")
-
-    if animate:
-        attach_vehicle_centered_diagram_camera(diagram_fixed_w, vehicle)
-        diagram_fixed_w.animate(renderer="matplotlib")
-
-    t_fixed, ref_fixed, meas_fixed = get_clean_pid_history(v_pid_fixed_w)
-
-    # -------------------------------------------------------------------------
-    # Second simulation: PID w mapheel-speed map / vx version
-    # -------------------------------------------------------------------------
-    diagram_meas_w, v_pid_meas_w = create_diagram_pid_w_steer_map(
-        vehicle, vx_ref=target_speed, r_ref=target_r
-    )
-
-    if plot_graph:
-        diagram_meas_w.plot_graphe()
-
-    print("Starting trajectory computation for PID w map simulation...")
-
-    diagram_meas_w.compute_trajectory(
-        tf=simul_time,
-        dt=dt,
-        show=False,
-        verbose=False,
-        solver="scipy_lsoda",
-    )
-
-    print("Trajectory computation done for PID w map simulation.")
-
-    if animate:
-        attach_vehicle_centered_diagram_camera(diagram_meas_w, vehicle)
-        diagram_meas_w.animate(renderer="matplotlib")
-
-    t_meas, ref_meas, meas_meas = get_clean_pid_history(v_pid_meas_w)
-
-    return {
-        "target_r_speed": target_r,
-        "fixed_w": {
-            "t": t_fixed,
-            "ref": ref_fixed,
-            "meas": meas_fixed,
-        },
-        "meas_w": {
-            "t": t_meas,
-            "ref": ref_meas,
-            "meas": meas_meas,
-        },
-    }
 
 
 def plot_multiple_speed_comparisons(results):
     """
-    Plot speed tracking comparisons for multiple target speeds.
+    Plot speed tracking comparisons grouped by target_r.
 
-    One subplot is created for each target speed.
+    One subplot is created for each target_r; each subplot shows curves
+    for all target_speed values corresponding to that target_r.
+    The reference trajectory is plotted once per subplot (since it is
+    identical for all speeds with the same target_r). A single legend
+    is drawn for the whole figure (not per subplot).
     """
 
-    n = len(results)
+    from matplotlib.lines import Line2D
+
+    # find unique target_r values and sort them
+    target_rs = sorted({res["target_r"] for res in results})
+    # find unique speeds globally (used to build legend entries)
+    unique_speeds = sorted({res["target_speed"] for res in results})
+
+    # build a simple colormap for speeds (keeps colors consistent if desired)
+    cmap = plt.get_cmap("tab10", max(1, len(unique_speeds)))
+    speed_to_color = {s: cmap(i) for i, s in enumerate(unique_speeds)}
+
+    n = len(target_rs)
 
     fig, axes = plt.subplots(
         nrows=n,
@@ -183,142 +60,156 @@ def plot_multiple_speed_comparisons(results):
     if n == 1:
         axes = [axes]
 
-    for ax, result in zip(axes, results):
-        target_r_speed = result["target_r_speed"]
+    for ax, tr in zip(axes, target_rs):
+        # collect all results with this target_r
+        group = [res for res in results if res["target_r"] == tr]
 
-        t_fixed = result["fixed_w"]["t"]
-        ref_fixed = result["fixed_w"]["ref"]
-        meas_fixed = result["fixed_w"]["meas"]
+        if not group:
+            continue
 
-        t_meas = result["meas_w"]["t"]
-        meas_meas = result["meas_w"]["meas"]
+        # plot the reference once (take from the first result in the group)
+        ref_t = group[0]["t"]
+        ref_fixed = group[0]["pid_only"]["ref"]
+        ax.plot(ref_t, ref_fixed, "k--", linewidth=1.2)  # no per-axis label
 
-        ax.plot(
-            t_fixed,
-            ref_fixed,
-            "k--",
-            label="Reference speed",
-        )
+        for res in group:
+            t_simul = res["t"]
+            meas_fixed = res["pid_only"]["meas"]
+            meas_meas = res["fancy_ctrl"]["meas"]
+            speed = res["target_speed"]
+            color = speed_to_color[speed]
 
-        ax.plot(
-            t_fixed,
-            meas_fixed,
-            label="Controller - PID only",
-        )
-
-        ax.plot(
-            t_meas,
-            meas_meas,
-            label="Controller - PID w map",
-        )
+            # plot controller measurements without labels (legend will be global)
+            ax.plot(t_simul, meas_fixed, color=color, lw=1.5)
+            ax.plot(t_simul, meas_meas, color=color, lw=1.5, linestyle="--")
 
         ax.set_ylabel("Speed [rad/s]")
-        ax.set_title(f"Speed tracking comparison at {target_r_speed:.2f} rad/s")
+        ax.set_title(f"Speed tracking for R_REF = {tr:.2f} rad/s (all VX)")
         ax.grid(True)
-        ax.legend()
 
     axes[-1].set_xlabel("Time [s]")
 
-    plt.tight_layout()
+    # Create a single, global legend for the figure
+    # controller handles
+    ctrl_handles = [
+        Line2D([0], [0], color="k", lw=1.2, ls="--", label="Reference"),
+        Line2D([0], [0], color="gray", lw=1.5, label="PID only"),
+        Line2D([0], [0], color="gray", lw=1.5, ls="--", label="PID w map"),
+    ]
+    # speed handles (colors)
+    speed_handles = [
+        Line2D([0], [0], color=speed_to_color[s], lw=2, label=f"{s:.2f} m/s")
+        for s in unique_speeds
+    ]
+
+    all_handles = ctrl_handles + speed_handles
+
+    # create a separate legend figure (will open in another window with a GUI backend)
+    legend_fig = plt.figure(figsize=(max(6, 1.2 * len(unique_speeds)), 1.6))
+    legend_ax = legend_fig.add_subplot(111)
+    legend_ax.axis("off")
+    legend_ax.legend(handles=all_handles, loc="center", ncol=min(6, len(all_handles)))
+
+    # draw both figures (non-blocking) so the legend appears in its own window
+    fig.tight_layout()
+    legend_fig.tight_layout()
     plt.show()
 
 
-def plot_all_speeds_on_one_figure(results):
-    """
-    Plot all speeds on one figure.
+def run_single_comparison(
+    target_speed,
+    target_r,
+    simul_time=10,
+    dt=0.005,
+):
+    print("\n============================================================")
+    print(
+        f"Running comparison for VX_REF = {target_speed:.2f} m/s AND R_REF = {target_r:.2f} "
+    )
+    print("============================================================")
+    vehicle = create_vehicle(vx=target_speed)
 
-    For each target speed:
-    - all curves use the same color
-    - target/fixed/measured are distinguished by line style
-    """
+    diagram_pid_only = create_diagram_pid_only(
+        vehicle, vx_ref=target_speed, r_ref=target_r
+    )
+    diagram_fancy = create_diagram_pid_w_steer_map(
+        vehicle, vx_ref=target_speed, r_ref=target_r
+    )
 
-    plt.figure(figsize=(11, 6))
-
-    cmap = plt.get_cmap("viridis")
-    colors = cmap(np.linspace(0, 1, len(results)))
-
-    for result, color in zip(results, colors):
-        target_r_speed = result["target_r_speed"]
-
-        t_fixed = result["fixed_w"]["t"]
-        meas_fixed = result["fixed_w"]["meas"]
-
-        t_meas = result["meas_w"]["t"]
-        meas_meas = result["meas_w"]["meas"]
-
-        # Use the longest available time vector for the target line
-        t_target = t_fixed if len(t_fixed) >= len(t_meas) else t_meas
-
-        # Target/reference speed
-        plt.plot(
-            t_target,
-            np.ones_like(t_target) * target_r_speed,
-            color=color,
-            linestyle=":",
-            linewidth=2.5,
-            label=f"Target - {target_r_speed:.2f} rad/s",
+    traj_pid_only = diagram_pid_only.reconstruct_internal_signals(
+        diagram_pid_only.compute_trajectory(
+            tf=simul_time,
+            dt=dt,
+            verbose=False,
         )
+    )
+    pid_logs = traj_pid_only.get_signal("r_pid:logs")
 
-        # PID onlyheel-speed version
-        plt.plot(
-            t_fixed,
-            meas_fixed,
-            color=color,
-            linestyle="-",
-            linewidth=1.8,
-            label=f"PID only - {target_r_speed:.2f} rad/s",
+    pid_only_ref = pid_logs[0, :]
+    pid_only_meas = pid_logs[1, :]
+
+    traj_fancy = diagram_fancy.reconstruct_internal_signals(
+        diagram_fancy.compute_trajectory(
+            tf=simul_time,
+            dt=dt,
+            verbose=False,
         )
+    )
+    pid_logs = traj_fancy.get_signal("r_pid:logs")
+    # vx_pid_logs = vx_traj.get_signal("v_pid:logs")
 
-        # PID w mapheel-speed version
-        plt.plot(
-            t_meas,
-            meas_meas,
-            color=color,
-            linestyle="--",
-            linewidth=1.8,
-            label=f"PID w map - {target_r_speed:.2f} rad/s",
-        )
+    vx_ref = pid_logs[0, :]
+    vx_meas = pid_logs[1, :]
 
-    plt.xlabel("Time [s]")
-    plt.ylabel("Speed [rad/s]")
-    plt.title("Speed tracking comparison for multiple target speeds")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    # TODO: mettre aussi les info de v_pid ici. Permetterait de comparer VX selon targ en vitesse et steering.
+    # PRENDRE EN COMPTE L'ANGLE DE STEERING DANS LE CONTROLLEUR VX ??????
+    return {
+        "target_speed": target_speed,
+        "target_r": target_r,
+        "t": traj_pid_only.t,
+        "pid_only": {
+            "ref": pid_only_ref,
+            "meas": pid_only_meas,
+        },
+        "fancy_ctrl": {
+            "ref": vx_ref,
+            "meas": vx_meas,
+        },
+    }
 
 
 def main():
-    simul_time = 10.0
-    dt = 0.02
+    simul_time = 5
+    dt = 0.005
 
-    target_rs = np.linspace(0.1, 0.6, 6)
+    target_rs = np.linspace(0.0, 0.6, 7)
 
-    target_speed = 2.0
+    target_speeds = np.linspace(1.0, 30.0, 8)
 
     results = []
 
     total_start = time.perf_counter()
 
-    for target_r in target_rs:
-        sim_start = time.perf_counter()
+    for target_speed in target_speeds:
+        for target_r in target_rs:
+            sim_start = time.perf_counter()
 
-        result = run_single_comparison(
-            target_speed=target_speed,
-            target_r=target_r,
-            simul_time=simul_time,
-            dt=dt,
-            plot_graph=False,
-            animate=False,
-        )
+            result = run_single_comparison(
+                target_speed=target_speed,
+                target_r=target_r,
+                simul_time=simul_time,
+                dt=dt,
+            )
 
-        sim_end = time.perf_counter()
+            sim_end = time.perf_counter()
 
-        sim_elapsed = sim_end - sim_start
+            sim_elapsed = sim_end - sim_start
 
-        print(f"Computation time for {target_r:.2f} rad/s: {sim_elapsed:.3f} seconds")
+            print(
+                f"Computation time for {target_r:.2f} rad/s: {sim_elapsed:.3f} seconds"
+            )
 
-        results.append(result)
+            results.append(result)
 
     total_end = time.perf_counter()
 
@@ -331,7 +222,7 @@ def main():
     plot_multiple_speed_comparisons(results)
 
     # Optional: all curves on one figure
-    plot_all_speeds_on_one_figure(results)
+    # plot_all_speeds_on_one_figure(results)
 
 
 if __name__ == "__main__":

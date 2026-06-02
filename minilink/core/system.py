@@ -763,7 +763,6 @@ class System:
         dt=None,
         solver=None,
         show=False,
-        time_axis=True,
         x0=None,
         compile_backend="numpy",
         verbose=True,

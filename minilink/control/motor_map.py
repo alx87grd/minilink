@@ -31,7 +31,7 @@ class ThrMap(System):
         vehicle: DynamicBicycleRearWheelDriveEngine,
         name: str = "Throttle map",
     ):
-        super().__init__(0, 2, 1)
+        super().__init__(0)
 
         self.name = name
 
@@ -41,13 +41,11 @@ class ThrMap(System):
 
         self.inputs = {}
         self.add_input_port(
-            1,
             "F_rear",
             nominal_value=np.array([0.0]),
         )
 
         self.add_input_port(
-            1,
             "w_rear",
             nominal_value=np.array([0.0]),
         )
@@ -55,8 +53,8 @@ class ThrMap(System):
         self.outputs = {}
 
         self.add_output_port(
-            1,
             "thr",
+            dim=1,
             function=self.h_thr,
             dependencies=["F_rear", "w_rear"],
         )
@@ -121,7 +119,7 @@ class AccToRearForce(System):
         # 0 states
         # 1 scalar input: acc
         # 1 scalar output: F_rear
-        super().__init__(0, 1, 1)
+        super().__init__(0)
 
         self.name = name
 
@@ -130,7 +128,6 @@ class AccToRearForce(System):
         self.inputs = {}
 
         self.add_input_port(
-            1,
             "acc_targ",
             nominal_value=np.array([0.0]),
         )
@@ -138,8 +135,8 @@ class AccToRearForce(System):
         self.outputs = {}
 
         self.add_output_port(
-            1,
             "F_rear",
+            dim=1,
             function=self.h_force,
             dependencies=["acc_targ"],
         )

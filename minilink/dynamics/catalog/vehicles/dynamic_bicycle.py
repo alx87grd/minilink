@@ -58,8 +58,8 @@ class DynamicBicycleMagicForces(DynamicSystem):
     delta  : front steer angle [rad]
     """
 
-    def __init__(self, n=6, m=2, p=6):
-        super().__init__(n=n, m=m, p=p)
+    def __init__(self, n=6):
+        super().__init__(n=n)
 
         self.name = "Dynamic Bicycle majic forces"
 
@@ -67,8 +67,8 @@ class DynamicBicycleMagicForces(DynamicSystem):
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
 
         self.inputs = {}
-        self.add_input_port(1, "f_rear", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "delta", nominal_value=np.array([0.0]))
+        self.add_input_port("f_rear", nominal_value=np.array([0.0]))
+        self.add_input_port("delta", nominal_value=np.array([0.0]))
         self.inputs["f_rear"].labels = ["f_rear"]
         self.inputs["f_rear"].units = ["N"]
         self.inputs["delta"].labels = ["delta"]
@@ -78,7 +78,7 @@ class DynamicBicycleMagicForces(DynamicSystem):
         self.min_steer = -1.571  # rad
 
         self.outputs = {}
-        self.add_output_port(n, "y", function=self.h, dependencies=[])
+        self.add_output_port("y", dim=n, function=self.h, dependencies=[])
 
         self.a = 1.0
         self.b = 1.0
@@ -175,10 +175,10 @@ class DynamicBicycleMagicForces(DynamicSystem):
     ) -> np.ndarray:
         q = x[0:3]
         v = x[3:6]
-        u_in = np.array(
-            [self.u2input_signal(u, "f_rear")[0], self.u2input_signal(u, "delta")[0]]
-        )
 
+        # TODO: VOIR SI LE CLIP EST NECESSAIRE
+        f_rear, delta = self.get_port_values_from_u(u, "f_rear", "delta")
+        u_in = np.array([f_rear[0], delta[0]])
         u_in[1] = np.clip(u_in[1], max=self.max_steer, min=self.min_steer)
 
         M = self.M_mat(q)
@@ -263,9 +263,8 @@ class DynamicBicycleMagicForces(DynamicSystem):
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
         vb = x[3:6]
-        u_in = np.array(
-            [self.u2input_signal(u, "f_rear")[0], self.u2input_signal(u, "delta")[0]]
-        )
+        f_rear, delta = self.get_port_values_from_u(u, "f_rear", "delta")
+        u_in = np.array([f_rear[0], delta[0]])
         delta = float(u_in[1])
 
         T_wb = pose2d_matrix(X, Y, Theta)
@@ -316,8 +315,8 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
     delta  : front steer angle [rad]
     """
 
-    def __init__(self, n=10, m=2, p=10):
-        super().__init__(n, m, p)
+    def __init__(self, n=10):
+        super().__init__(n)
 
         self.name = "Dynamic Bicycle"
 
@@ -348,15 +347,15 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         ]
 
         self.inputs = {}
-        self.add_input_port(1, "t_rear", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "delta", nominal_value=np.array([0.0]))
+        self.add_input_port("t_rear", nominal_value=np.array([0.0]))
+        self.add_input_port("delta", nominal_value=np.array([0.0]))
         self.inputs["t_rear"].labels = ["t_rear"]
         self.inputs["t_rear"].units = ["Nm"]
         self.inputs["delta"].labels = ["delta"]
         self.inputs["delta"].units = ["rad"]
 
         self.outputs = {}
-        self.add_output_port(n, "y", function=self.h, dependencies=[])
+        self.add_output_port("y", dim=n, function=self.h, dependencies=[])
 
         self.a = 1.0
         self.b = 1.0
@@ -421,8 +420,6 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
 
             M dv + C(q,v) v + g + d = B e
         """
-        # vx = v[0]
-        # vy = v[1]
         r = v[2]
 
         C = np.zeros((5, 5))
@@ -629,10 +626,10 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
 
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+        # TODO: VOIR POUR APPELER x2q A LA PLACE DANS LA METHOD DU PARENT
         vb = x[5:10]  # Seul difference avec la method du parent
-        u_in = np.array(
-            [self.u2input_signal(u, "t_rear")[0], self.u2input_signal(u, "delta")[0]]
-        )
+        t_rear, delta = self.get_port_values_from_u(u, "t_rear", "delta")
+        u_in = np.array([t_rear[0], delta[0]])
         delta = float(u_in[1])
 
         T_wb = pose2d_matrix(X, Y, Theta)
@@ -745,15 +742,15 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
     """
 
-    def __init__(self):
-        super().__init__(n=12, m=2, p=12)
+    def __init__(self, n=12):
+        super().__init__(n=n)
 
         self.name = "Dynamic Bicycle With Engine"
 
         self.inputs = {}
 
-        self.add_input_port(1, "thr", nominal_value=np.array([0.0]))
-        self.add_input_port(1, "delta", nominal_value=np.array([0.0]))
+        self.add_input_port("thr", nominal_value=np.array([0.0]))
+        self.add_input_port("delta", nominal_value=np.array([0.0]))
 
         self.inputs["thr"].labels = ["thr"]
         self.inputs["thr"].units = ["normalized"]
@@ -764,8 +761,13 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         self.recompute_input_properties()
 
         self.outputs = {}
-        self.add_output_port(12, "y", function=self.h, dependencies=[])
-        self.add_output_port(1, "logs", function=self.logs_generator, dependencies=[])
+        self.add_output_port("y", dim=n, function=self.h, dependencies=[])
+        self.add_output_port(
+            "r_tire_datas",
+            dim=4,
+            function=self.rear_tire_forces_and_slip,
+            dependencies="all",
+        )
 
         self.state.labels = [
             "X",
@@ -806,21 +808,24 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         self.engine_tau = 0.25
         self.steering_tau = 0.15
 
-    def logs_generator(
+    def rear_tire_forces_and_slip(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
     ) -> np.ndarray:
+        _, v = self.x2q(x)
 
-        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(x, u)
+        tau_engine = x[10]
+        delta_act = x[11]
 
-        Fz_f = self.mass * self.gravity * (self.b / self.L)
+        u_drive = np.array([tau_engine, delta_act], dtype=float)
+
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(v, u_drive)
+
         Fz_r = self.mass * self.gravity * (self.a / self.L)
-
-        # Fx_rear, Fy_rear = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
 
         alpha, kappa = self.tire_model_r.vel2slip(vx_r, vy_r, w_r, self.r_r)
         Fx, Fy = self.tire_model_r.slip2forces(alpha, kappa, Fz_r)
 
-        return np.array([kappa], dtype=float)
+        return np.array([Fx, kappa, Fy, alpha], dtype=float)
 
     def x2q(self, x):
         """
@@ -858,8 +863,6 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
             M dv + C(q,v) v + g + d = B e
         """
-        vx = v[0]
-        vy = v[1]
         r = v[2]
 
         C = np.zeros((5, 5))
@@ -1078,8 +1081,12 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         q, v = self.x2q(x)
 
-        throttle = self.u2input_signal(u, "thr")[0]
-        delta_cmd = self.u2input_signal(u, "delta")[0]
+        # throttle = self.u2input_signal(u, "thr")[0]
+        # delta_cmd = self.u2input_signal(u, "delta")[0]
+
+        throttle, delta_cmd = self.get_port_values_from_u(u, "thr", "delta")
+        throttle = throttle[0]
+        delta_cmd = delta_cmd[0]
 
         # Commanded torque from engine map
         tau_cmd = self.engine_torque_from_throttle(v, throttle)

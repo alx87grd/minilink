@@ -18,7 +18,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycleMagicForces,
     Pacejka,
 )
-from minilink.graphical.primitives import camera_matrix
+from minilink.graphical.animation.primitives import camera_matrix
 
 U_REF = 5.0  # m/s
 

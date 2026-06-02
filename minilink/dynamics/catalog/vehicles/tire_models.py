@@ -9,7 +9,7 @@ class TireModel:
     def __init__(self, logs=False):
         self.v_min_epsilon = 0.1
 
-        self.logs = logs
+        # self.logs = logs
 
     def vel2slip(self, vx, vy, w, R):
         """Compute longitudinal and lateral slip"""
@@ -31,15 +31,15 @@ class TireModel:
 
         kappa = (wr - vx) / denom
 
-        if self.logs:
-            if np.abs(kappa) > 1.0:
-                print(
-                    f"WARNING: |kappa| > 1 -> vx={vx:.2f}, wr={wr:.2f}, w={w:.2f}, kappa={kappa:.4f}"
-                )
-            # if np.abs(alpha) > np.pi / 2:
-            #     print(
-            #         f"WARNING: |alpha| > pi/2 -> vx={vx:.2f}, vy={vy:.2f}, alpha={alpha:.4f}"
-            #     )
+        # if self.logs:
+        #     if np.abs(kappa) > 1.0:
+        #         print(
+        #             f"WARNING: |kappa| > 1 -> vx={vx:.2f}, wr={wr:.2f}, w={w:.2f}, kappa={kappa:.4f}"
+        #         )
+        #     # if np.abs(alpha) > np.pi / 2:
+        #     #     print(
+        #     #         f"WARNING: |alpha| > pi/2 -> vx={vx:.2f}, vy={vy:.2f}, alpha={alpha:.4f}"
+        #     #     )
 
         return alpha, kappa
 
@@ -91,9 +91,9 @@ class Pacejka(TireModel):
         Cy=1.3,
         Dy=1.0,
         Ey=0.97,
-        logs=False,
+        # logs=False,
     ):
-        super().__init__(logs)
+        super().__init__()
         self.Bx, self.Cx, self.Dx, self.Ex = Bx, Cx, Dx, Ex
         self.By, self.Cy, self.Dy, self.Ey = By, Cy, Dy, Ey
 
@@ -194,11 +194,11 @@ class Pacejka(TireModel):
         Fx, Fy = self.combined_slip(Fx, Fy, kappa, alpha, Fz, mode=None)
 
         # ==================================================================================== ENLEVER ====================================================================================
-        if self.logs:
-            self.kappa_log.append(kappa)
-            self.alpha_log.append(alpha)
-            self.Fx_log.append(Fx)
-            self.Fz = Fz
+        # if self.logs:
+        #     self.kappa_log.append(kappa)
+        #     self.alpha_log.append(alpha)
+        #     self.Fx_log.append(Fx)
+        #     self.Fz = Fz
 
         return Fx, Fy
 

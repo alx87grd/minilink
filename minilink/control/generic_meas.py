@@ -19,7 +19,7 @@ class Measurement(System):
     """
 
     def __init__(self, name: str, y_size: int = 12, index: int = 5, show=False):
-        super().__init__(0, y_size, 1)
+        super().__init__(0)
 
         self.name = name
         self.print = show
@@ -29,15 +29,14 @@ class Measurement(System):
 
         self.inputs = {}
         self.add_input_port(
-            self.y_size,
             "y",
             nominal_value=np.zeros(self.y_size),
         )
 
         self.outputs = {}
         self.add_output_port(
-            1,
             "meas",
+            dim=1,
             function=self.h_meas,
             dependencies=["y"],
         )
@@ -90,7 +89,7 @@ class AccelerationMeasurement(DynamicSystem):
         #
         # Output:
         # meas = estimated longitudinal acceleration
-        super().__init__(1, y_size, 1)
+        super().__init__(1)
 
         self.name = "Acceleration measurement"
 
@@ -105,15 +104,14 @@ class AccelerationMeasurement(DynamicSystem):
 
         self.inputs = {}
         self.add_input_port(
-            self.y_size,
             "y",
             nominal_value=np.zeros(self.y_size),
         )
 
         self.outputs = {}
         self.add_output_port(
-            1,
             "meas",
+            dim=1,
             function=self.h_meas,
             dependencies=["y"],
         )
