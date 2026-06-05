@@ -21,16 +21,10 @@ from minilink.dynamics.catalog.vehicles.tire_models import (
 )
 from minilink.graphical.animation.primitives import (
     Arrow,
-    Box,
     CustomLine,
-    ExtrudedPolygon,
-    Plane,
-    Rod,
-    Sphere,
     camera_matrix,
     pose2d_matrix,
     scale_pose2d_matrix,
-    translation_matrix,
 )
 
 
@@ -179,7 +173,7 @@ class DynamicBicycleMagicForces(DynamicSystem):
         # TODO: VOIR SI LE CLIP EST NECESSAIRE
         f_rear, delta = self.get_port_values_from_u(u, "f_rear", "delta")
         u_in = np.array([f_rear[0], delta[0]])
-        u_in[1] = np.clip(u_in[1], max=self.max_steer, min=self.min_steer)
+        u_in[1] = np.clip(u_in[1], self.min_steer, self.max_steer)
 
         M = self.M_mat(q)
         C = self.C_mat(q, v)
@@ -608,7 +602,7 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
 
         x = [q, v]
         """
-        u[1] = np.clip(u[1], max=self.max_steer, min=self.min_steer)
+        u[1] = np.clip(u[1], self.min_steer, self.max_steer)
 
         q, v = self.x2q(x)
 
@@ -671,55 +665,6 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         ]
 
 
-# Motor map example tres arbitraire
-def max_torque_curve(rpm):
-    torque_peak = 260.0  # Nm
-    rpm_peak = 4000.0
-
-    # Gaussian-like main torque shape
-    torque = torque_peak * np.exp(-(((rpm - rpm_peak) / 2300.0) ** 2))
-
-    # Add low-speed torque floor
-    torque += 80.0
-
-    # High-rpm roll-off
-    rolloff = 1.0 / (1.0 + np.exp((rpm - 6200.0) / 300.0))
-
-    return torque * rolloff
-
-
-def cvt_ratio_vs_speed(vehicle_speed, mode="H"):
-    """
-    vehicle_speed: m/s
-    returns approximate total ratio
-    """
-
-    if mode == "H":
-        ratio_max = 40.0
-        ratio_min = 11.5
-        v_shift_start = 2.0  # m/s
-        v_shift_end = 22.0  # m/s, ~79 km/h
-
-    elif mode == "XL":
-        ratio_max = 65.0
-        ratio_min = 18.0
-        v_shift_start = 1.0  # m/s
-        v_shift_end = 12.0  # m/s, ~43 km/h
-
-    else:
-        raise ValueError("mode must be 'H' or 'XL'")
-
-    x = (vehicle_speed - v_shift_start) / (v_shift_end - v_shift_start)
-    x = np.clip(x, 0.0, 1.0)
-
-    # Smooth transition
-    s = x * x * (3 - 2 * x)
-
-    ratio = ratio_max + s * (ratio_min - ratio_max)
-
-    return ratio
-
-
 class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
     """
     Dynamic bicycle with rear wheel dynamics and steer inputs.
@@ -762,6 +707,7 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         self.outputs = {}
         self.add_output_port("y", dim=n, function=self.h, dependencies=[])
+
         self.add_output_port(
             "r_tire_datas",
             dim=4,
@@ -808,6 +754,9 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         self.engine_tau = 0.25
         self.steering_tau = 0.15
 
+        # TODO: YOO TUNE
+        self.steering_rate_max = 10.0  # rad/s
+
     def rear_tire_forces_and_slip(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
     ) -> np.ndarray:
@@ -823,8 +772,7 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         Fz_r = self.mass * self.gravity * (self.a / self.L)
 
         alpha, kappa = self.tire_model_r.vel2slip(vx_r, vy_r, w_r, self.r_r)
-        Fx, Fy = self.tire_model_r.slip2forces(alpha, kappa, Fz_r)
-
+        Fx, Fy = self.tire_model_r.slip2forces(alpha, kappa, Fz_r, logs=False)
         return np.array([Fx, kappa, Fy, alpha], dtype=float)
 
     def x2q(self, x):
@@ -835,19 +783,14 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         v = x[5:10]
         return q, v
 
-    def q2x(self, dq, dv):
-        """
-        Convert qdot and vdot back to state derivative
-        """
-        return np.concatenate([dq, dv])
+    def q2x(self, dq, dv, d_tau_engine=0.0, d_delta_act=0.0):
+        return np.concatenate([dq, dv, [d_tau_engine, d_delta_act]])
 
     def x2engine_torque(self, x):
         """
         Convert state vector to engine torque
         """
         return x[10]
-
-    # KINEMATIC MAP
 
     def M_mat(self, q: np.ndarray) -> np.ndarray:
         """
@@ -921,7 +864,7 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         w_front = v_body[4]
 
         delta = u_inputs[1]
-        delta = np.clip(delta, max=self.max_steer, min=self.min_steer)
+        delta = np.clip(delta, self.min_steer, self.max_steer)
 
         # Front wheel center velocity in body frame
         vx_f_b = vx
@@ -944,6 +887,26 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         return vx_f, vy_f, w_front, vx_r, vy_r, w_rear
 
+    def tire_forces_body_frame_from_forces(
+        self,
+        Fx_f: float,
+        Fy_f: float,
+        Fx_r: float,
+        Fy_r: float,
+        u_in: np.ndarray,
+    ):
+        delta = float(np.clip(u_in[1], self.min_steer, self.max_steer))
+        c_d = np.cos(delta)
+        s_d = np.sin(delta)
+
+        Fx_f_b = Fx_f * c_d - Fy_f * s_d
+        Fy_f_b = Fx_f * s_d + Fy_f * c_d
+
+        Fx_r_b = Fx_r
+        Fy_r_b = Fy_r
+
+        return Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b
+
     def generalized_d(
         self, q: np.ndarray, v: np.ndarray, u_in: np.ndarray
     ) -> np.ndarray:
@@ -958,7 +921,14 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         w_front = v[4]
 
         Fx_front, Fy_front, Fx_rear, Fy_rear = self.compute_tire_physics(v, u_in)
-        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(v, u_in)
+
+        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame_from_forces(
+            Fx_front,
+            Fy_front,
+            Fx_rear,
+            Fy_rear,
+            u_in,
+        )
 
         Sum_Fx = Fx_f_b + Fx_r_b
         Sum_Fy = Fy_f_b + Fy_r_b
@@ -977,19 +947,6 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         return -Q_ext
 
-    # INPUT MAPPING
-
-    # def engine_rmp_from_wheel_speed(self, w_rear: float, vx: float):
-    #     """
-    #     Compute engine RPM from rear wheel speed.
-    #     """
-    #     # Engine / wheel speed estimate
-    #     rpm = abs(w_rear) * self.transmission_ratio(vx) * 60.0 / (2.0 * np.pi)
-
-    #     # Clamp RPM inside map range
-    #     rpm = np.clip(rpm, self.rpm[0], self.rpm[-1])
-    #     return rpm
-
     def engine_torque_from_throttle(self, v: np.ndarray, throttle: float):
         """
         Compute rear wheel drive torque from throttle and rear wheel speed.
@@ -1005,12 +962,8 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         w_moteur = w_rear_num * self.transmission_ratio
 
         available_torque = self.engine_power_peak / w_moteur
-        # Engine torque
-        # tau_rear = (
-        #     throttle * available_torque
-        #     - self.engine_dry_resistance * np.sign(w_moteur)
-        #     - self.engine_rolling_resistance * w_moteur
-        # )
+        available_torque = np.clip(available_torque, 0.0, self.engine_power_peak)
+
         tau_rear = throttle * available_torque
 
         if w_rear_num > 1e-6:
@@ -1093,6 +1046,7 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         # Actual delayed engine torque state
         tau_engine = x[10]
+        # print(f"tau_engine: {tau_engine:.2f} Nm at t={t:.2f}s")
         delta_act = x[11]
 
         # First-order low-pass engine response
@@ -1100,11 +1054,37 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         d_tau_engine = (tau_cmd - tau_engine) / engine_tau
 
         # First-order steering response
+        # steering_tau = max(self.steering_tau, 1e-6)
+        # d_delta_act = (delta_cmd - delta_act) / steering_tau
+
+        # # Clamp steering command
+        delta_cmd = float(np.clip(delta_cmd, self.min_steer, self.max_steer))
+
+        # Clamp current state for use in dynamics
+        delta_act_used = float(np.clip(delta_act, self.min_steer, self.max_steer))
+
+        # First-order steering response
         steering_tau = max(self.steering_tau, 1e-6)
         d_delta_act = (delta_cmd - delta_act) / steering_tau
 
+        # Physical steering rate limit
+        d_delta_act = float(
+            np.clip(
+                d_delta_act,
+                -self.steering_rate_max,
+                self.steering_rate_max,
+            )
+        )
+
+        # Prevent actuator state from integrating farther outside physical bounds
+        if delta_act >= self.max_steer and d_delta_act > 0.0:
+            d_delta_act = 0.0
+
+        if delta_act <= self.min_steer and d_delta_act < 0.0:
+            d_delta_act = 0.0
+
         # Use delayed/actual torque in wheel dynamics
-        u_drive = np.array([tau_engine, delta_act], dtype=float)
+        u_drive = np.array([tau_engine, delta_act_used], dtype=float)
 
         dv = self.accelerations_with_drive_torque(q, v, u_drive, t)
         dq = self.N_mat(q) @ v

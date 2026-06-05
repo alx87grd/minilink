@@ -1,14 +1,3 @@
-"""Comparison demo for two DynamicBicycleRearWheelDrive PID configurations.
-
-This script compares two diagrams:
-
-1. pid_only_VX_motor_map
-2. VX_motor_map
-
-It runs multiple simulations at different target speeds and plots the speed
-tracking result of both PID controllers.
-"""
-
 import time
 
 import matplotlib.pyplot as plt
@@ -182,7 +171,7 @@ def main():
     simul_time = 5
     dt = 0.005
 
-    target_rs = np.linspace(0.0, 0.6, 7)
+    target_rs = np.linspace(0.1, 0.6, 6)
 
     target_speeds = np.linspace(1.0, 30.0, 8)
 

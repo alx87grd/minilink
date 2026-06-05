@@ -1,14 +1,3 @@
-"""Open-loop demo for DynamicBicycleRearWheelDrive.
-
-No controller.
-No velocity PID.
-No path tracking.
-
-The vehicle receives constant open-loop inputs:
-- throotle: Normalized throttle [0, 1]
-- delta: front steering angle [rad]
-"""
-
 import matplotlib.pyplot as plt
 import numpy as np
 

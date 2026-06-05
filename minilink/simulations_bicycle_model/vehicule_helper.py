@@ -78,6 +78,9 @@ def create_vehicle(X=0.0, Y=0.0, theta=0.0, vx=0.0, vy=0.0, r=0.0):
     vehicle.engine_tau = 0.25
     vehicle.steering_tau = 0.15
 
+    vehicle.max_steer = np.pi / 4.0
+    vehicle.min_steer = -np.pi / 4.0
+
     vehicle.x0 = np.array(
         [
             X,  # X

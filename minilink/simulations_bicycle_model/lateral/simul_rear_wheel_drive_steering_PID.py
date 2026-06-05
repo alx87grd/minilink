@@ -1,14 +1,3 @@
-"""Open-loop demo for DynamicBicycleRearWheelDrive.
-
-No controller.
-No velocity PID.
-No path tracking.
-
-The vehicle receives constant open-loop inputs:
-- throotle: Normalized throttle [0, 1]
-- delta: front steering angle [rad]
-"""
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -26,8 +15,7 @@ from minilink.simulations_bicycle_model.vehicule_helper import (
     create_vehicle,
 )
 
-ACC_REF = 1.0
-VX_REF = 2.0  # m/s
+VX_REF = 30.0  # m/s
 R_REF = 0.6  # rad/s
 
 
@@ -114,8 +102,6 @@ def main():
 
     vehicle = create_vehicle(vx=vx)
     # To keep the constant Vx value seems like a reasonable solution (??)
-    vehicle.engine_dry_resistance = 0.0
-    vehicle.engine_rolling_resistance = 0.0
 
     diagram = create_diagram(vehicle, vx_ref=vx)
 

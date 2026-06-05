@@ -1,14 +1,3 @@
-"""Open-loop demo for DynamicBicycleRearWheelDrive.
-
-No controller.
-No velocity PID.
-No path tracking.
-
-The vehicle receives constant open-loop inputs:
-- throotle: Normalized throttle [0, 1]
-- delta: front steering angle [rad]
-"""
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -26,9 +15,8 @@ from minilink.simulations_bicycle_model.vehicule_helper import (
     create_vehicle,
 )
 
-ACC_REF = 1.0
-VX_REF = 2.0  # m/s
-R_REF = 0.6  # rad/s
+VX_REF = 5.0  # m/s
+R_REF = 0.5  # rad/s
 
 
 def create_diagram(
@@ -65,13 +53,13 @@ def create_diagram(
     acc_to_force = AccToRearForce(vehicle)
 
     r_pid = PID(
-        Kp=3.2,
-        Ki=1.5,
-        Kd=0.1,
-        cmd_min=-np.pi / 2.0,
-        cmd_max=np.pi / 2.0,
-        i_min=-np.pi / 2.0,
-        i_max=np.pi / 2.0,
+        Kp=0.0,  # 3.2,
+        Ki=0.2,  # 1.5,
+        Kd=0.0,  # 1.0,
+        cmd_min=-np.pi / 4.0,
+        cmd_max=np.pi / 4.0,
+        i_min=-np.pi / 4.0,
+        i_max=np.pi / 4.0,
         name="Yaw rate PID",
     )
 
@@ -126,13 +114,10 @@ def main():
     vx = VX_REF
 
     vehicle = create_vehicle(vx=vx)
-    # To keep the constant Vx value seems like a reasonable solution (??)
-    # vehicle.engine_dry_resistance = 0.0
-    # vehicle.engine_rolling_resistance = 0.0
 
     diagram = create_diagram(vehicle, vx_ref=vx)
 
-    diagram.plot_diagram()
+    # diagram.plot_diagram()
 
     print("Starting trajectory computation...")
 
@@ -152,8 +137,8 @@ def main():
 
     traj = diagram.reconstruct_internal_signals(diagram.traj)
     pid_logs = traj.get_signal("r_pid:logs")
-
     t = traj.t
+
     ref = pid_logs[0, :]
     meas = pid_logs[1, :]
 
@@ -167,19 +152,19 @@ def main():
     plt.grid(True)
     plt.show()
 
-    pid_logs = traj.get_signal("v_pid:logs")
-    ref = pid_logs[0, :]
-    meas = pid_logs[1, :]
+    # pid_logs = traj.get_signal("r_pid:pid_int_value")
+    # ref = pid_logs[0, :]
+    # # meas = pid_logs[1, :]
 
-    plt.figure()
-    plt.plot(t, ref, label="Reference speed")
-    plt.plot(t, meas, label="Measured speed")
-    plt.xlabel("Time [s]")
-    plt.ylabel("Speed [m/s]")
-    plt.title("Speed tracking")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    # plt.figure()
+    # plt.plot(t, ref, label="Reference speed")
+    # # plt.plot(t, meas, label="Measured speed")
+    # plt.xlabel("Time [s]")
+    # plt.ylabel("d*d_e [rad]")
+    # plt.title("Pid values")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
 
     attach_vehicle_centered_diagram_camera(diagram, vehicle)
 

@@ -6,7 +6,7 @@ from minilink.compile.jax_utils import require_jax_numpy
 class TireModel:
     """Base Strategy for Tire-Road Interaction"""
 
-    def __init__(self, logs=False):
+    def __init__(self):
         self.v_min_epsilon = 0.1
 
         # self.logs = logs
@@ -32,10 +32,10 @@ class TireModel:
         kappa = (wr - vx) / denom
 
         # if self.logs:
-        #     if np.abs(kappa) > 1.0:
-        #         print(
-        #             f"WARNING: |kappa| > 1 -> vx={vx:.2f}, wr={wr:.2f}, w={w:.2f}, kappa={kappa:.4f}"
-        #         )
+        if np.abs(kappa) > 1.0:
+            print(
+                f"WARNING: |kappa| > 1 -> vx={vx:.2f}, wr={wr:.2f}, w={w:.2f}, kappa={kappa:.4f}"
+            )
         #     # if np.abs(alpha) > np.pi / 2:
         #     #     print(
         #     #         f"WARNING: |alpha| > pi/2 -> vx={vx:.2f}, vy={vy:.2f}, alpha={alpha:.4f}"
@@ -180,7 +180,8 @@ class Pacejka(TireModel):
 
         return Fx, Fy
 
-    def slip2forces(self, alpha, kappa, Fz):
+    # TODO: I hate it but I need it for the slip investigation, to log the slip and forces values during the simulation
+    def slip2forces(self, alpha, kappa, Fz, logs=False):
         # Fonction magique
         def mf(x, B, C, D, E, fz):
             D_scaled = D * fz
@@ -194,11 +195,11 @@ class Pacejka(TireModel):
         Fx, Fy = self.combined_slip(Fx, Fy, kappa, alpha, Fz, mode=None)
 
         # ==================================================================================== ENLEVER ====================================================================================
-        # if self.logs:
-        #     self.kappa_log.append(kappa)
-        #     self.alpha_log.append(alpha)
-        #     self.Fx_log.append(Fx)
-        #     self.Fz = Fz
+        if logs:
+            self.kappa_log.append(kappa)
+            self.alpha_log.append(alpha)
+            self.Fx_log.append(Fx)
+            self.Fz = Fz
 
         return Fx, Fy
 

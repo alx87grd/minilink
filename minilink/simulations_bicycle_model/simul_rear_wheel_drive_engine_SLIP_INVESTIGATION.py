@@ -9,17 +9,11 @@ The vehicle receives constant open-loop inputs:
 - delta: front steering angle [rad]
 """
 
-import types
-
 import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    DynamicBicycleRearWheelDriveEngine,
-    Pacejka,
-)
 from minilink.graphical.animation.primitives import camera_matrix
 from minilink.simulations_bicycle_model.vehicule_helper import (
     attach_vehicle_centered_diagram_camera,
@@ -72,14 +66,7 @@ class ConstantVehicleInput(System):
         self.p = 2
 
     def h_thr(self, x, u, t=0.0, params=None):
-        # thr = self.thr - 0.2 * t
-        # if thr < 0.0:
-        #     thr = 0.0
-        if t > 5.0:
-            thr = 0.0
-        else:
-            thr = self.thr
-        return np.array([thr], dtype=float)
+        return np.array([self.thr], dtype=float)
 
     def h_delta(self, x, u, t=0.0, params=None):
         return np.array([self.delta], dtype=float)
@@ -87,7 +74,9 @@ class ConstantVehicleInput(System):
 
 def main():
     vehicle = create_vehicle()
-    # vehicle.engine_power_peak = vehicle.engine_power_peak / 1000
+
+    initial_vx = 1.0
+    initial_wr = -1.0
 
     vehicle.x0 = np.array(
         [
@@ -96,10 +85,10 @@ def main():
             0.0,  # theta
             0.0,  # phi_rear
             0.0,  # phi_front
-            0.0,  # vx
+            initial_vx,  # vx
             0.0,  # vy
             0.0,  # r
-            0.0,  # w_rear
+            initial_wr,  # w_rear
             0.0,  # w_front
             0.0,  # tau_engine
             0.0,  # delta_act
@@ -118,47 +107,111 @@ def main():
     diagram.add_subsystem(constant_input, "constant_input")
     diagram.add_subsystem(vehicle, "vehicle")
 
-    diagram.connect("constant_input", "thr", "vehicle", "thr")
-    diagram.connect("constant_input", "delta", "vehicle", "delta")
+    # diagram.connect("constant_input", "thr", "vehicle", "thr")
+    # diagram.connect("constant_input", "delta", "vehicle", "delta")
 
     diagram.plot_diagram()
 
     print("Starting trajectory computation...")
 
     diagram.compute_trajectory(
-        tf=10,
+        tf=5,
         dt=0.005,
         show=False,
         verbose=False,
-        solver="euler",
+        # solver="euler",
     )
 
     print("Trajectory computation done.")
 
-    diagram.plot_trajectory(
-        signals=("x", "u"),
-        backend="matplotlib",
-    )
+    # diagram.plot_trajectory(
+    #     signals=("x", "u"),
+    #     backend="matplotlib",
+    # )
+    tire = vehicle.tire_model_r
+    print(f"LEN ILLLEGAL:{len(tire.kappa_log)} ")
 
     traj = diagram.reconstruct_internal_signals(diagram.traj)
-    pid_logs = traj.get_signal("constant_input:thr")
+    logs = traj.get_signal("vehicle:r_tire_datas")
 
-    thr = pid_logs[0, :]
+    Fx = logs[0, :]
+    kappa = logs[1, :]
 
-    t = traj.t
+    # ================================================================================================================================
+    wr = initial_wr * vehicle.r_r
+    vx = initial_vx
+    denom = np.maximum(
+        np.maximum(np.abs(vx), np.abs(wr)), vehicle.tire_model_r.v_min_epsilon
+    )
+
+    kappa_true = (wr - vx) / denom
+
+    print(f"TRAJ reconstruit:{kappa[0]}|| True value:{kappa_true} ")
+    print(
+        "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    )
+    print(f"LEN TRAJ reconstruit:{len(kappa)}|| LEN ILLLEGAL:{len(tire.kappa_log)} ")
+    # ================================================================================================================================
+
+    all_kappa = tire.kappa_log + list(kappa)
+    x = np.linspace(np.min(all_kappa), np.max(all_kappa), 20000)
+
+    Fz_r = (
+        diagram.subsystems["vehicle"].mass
+        * diagram.subsystems["vehicle"].gravity
+        * (diagram.subsystems["vehicle"].a / diagram.subsystems["vehicle"].L)
+    )
+
+    Fx_model = (
+        tire.Dx
+        * Fz_r
+        * np.sin(
+            tire.Cx
+            * np.arctan(tire.Bx * x - tire.Ex * (tire.Bx * x - np.arctan(tire.Bx * x)))
+        )
+    )
 
     plt.figure()
-    plt.plot(t, thr, label="Goal speed")
-    plt.xlabel("Time [s]")
-    plt.ylabel("Throttle command [-]")
-    plt.title("Throttle command")
-    plt.legend()
+    # Magic Formula curve
+
+    plt.plot(
+        x,
+        Fx_model,
+        label="Magic Formula",
+        linewidth=1,
+        color="red",
+        alpha=0.25,  # very transparent line
+    )
+
+    # Simulation data
+    plt.scatter(
+        tire.kappa_log,
+        tire.Fx_log,
+        s=2,  # smaller green points
+        alpha=0.15,  # more transparent
+        color="green",
+        label="Append",
+    )
+
+    plt.scatter(
+        kappa,
+        Fx,
+        s=12,  # bigger blue points
+        alpha=1.0,  # solid color
+        color="blue",
+        label="Reconstruction",
+    )
+
+    plt.xlabel("Slip ratio κ")
+    plt.ylabel("Longitudinal Force Fx")
+    plt.title("LEGAL VS ILLEGAL")
     plt.grid(True)
+    plt.legend()
     plt.show()
 
-    attach_vehicle_centered_diagram_camera(diagram, vehicle)
+    # attach_vehicle_centered_diagram_camera(diagram, vehicle)
 
-    diagram.animate(renderer="matplotlib")
+    # diagram.animate(renderer="matplotlib")
     # diagram.animate(renderer="meshcat")
     # diagram.animate(renderer="plotly")
 

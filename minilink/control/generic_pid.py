@@ -323,6 +323,13 @@ class PID(DynamicSystem):
             dependencies=["ref", "meas"],
         )
 
+        # self.add_output_port(
+        #     "pid_int_value",
+        #     dim=1,
+        #     function=self.int_vars,
+        #     dependencies=["ref", "meas"],
+        # )
+
     def data_signal(self, x, u, t=0.0, params=None):
         ref = float(u[0])
         meas = float(u[1])
@@ -368,6 +375,22 @@ class PID(DynamicSystem):
         cmd = np.clip(cmd, p["cmd_min"], p["cmd_max"])
 
         return np.array([cmd], dtype=float)
+
+    # def int_vars(self, x, u, t=0.0, params=None):
+    #     p = self.params if params is None else params
+    #     int_e, meas_filt = float(x[0]), float(x[1])
+    #     ref, meas = float(u[0]), float(u[1])
+
+    #     e = ref - meas
+
+    #     tau = max(p["tau"], 1e-3)
+    #     d_filt = (meas - meas_filt) / tau
+
+    #     cmd = p["Kp"] * e + p["Ki"] * int_e - p["Kd"] * d_filt
+
+    #     cmd = np.clip(cmd, p["cmd_min"], p["cmd_max"])
+
+    #     return np.array([-p["Kd"] * d_filt], dtype=float)
 
     def get_kinematic_geometry(self):
         return []
