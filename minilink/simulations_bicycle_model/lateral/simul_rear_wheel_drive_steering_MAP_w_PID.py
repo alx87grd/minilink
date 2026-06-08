@@ -16,7 +16,7 @@ from minilink.simulations_bicycle_model.vehicule_helper import (
 )
 
 VX_REF = 5.0  # m/s
-R_REF = 0.5  # rad/s
+R_REF = 0.6  # rad/s
 
 
 def create_diagram(
@@ -60,6 +60,7 @@ def create_diagram(
         cmd_max=np.pi / 4.0,
         i_min=-np.pi / 4.0,
         i_max=np.pi / 4.0,
+        # meas0=-10.0,
         name="Yaw rate PID",
     )
 
@@ -113,7 +114,7 @@ def create_diagram(
 def main():
     vx = VX_REF
 
-    vehicle = create_vehicle(vx=vx)
+    vehicle = create_vehicle(vx=vx, r=-10.0)
 
     diagram = create_diagram(vehicle, vx_ref=vx)
 
@@ -152,19 +153,16 @@ def main():
     plt.grid(True)
     plt.show()
 
-    # pid_logs = traj.get_signal("r_pid:pid_int_value")
-    # ref = pid_logs[0, :]
-    # # meas = pid_logs[1, :]
+    pid_logs = traj.get_signal("r_pid:pid_int_value")
+    D_value = pid_logs[2, :]
 
-    # plt.figure()
-    # plt.plot(t, ref, label="Reference speed")
-    # # plt.plot(t, meas, label="Measured speed")
-    # plt.xlabel("Time [s]")
-    # plt.ylabel("d*d_e [rad]")
-    # plt.title("Pid values")
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
+    plt.figure()
+    plt.plot(t, D_value)
+    plt.xlabel("Time [s]")
+    plt.ylabel("d")
+    plt.title("Pid values")
+    plt.grid(True)
+    plt.show()
 
     attach_vehicle_centered_diagram_camera(diagram, vehicle)
 
