@@ -97,20 +97,6 @@ class DynamicBicycleMagicForces(DynamicSystem):
 
         self.camera_follow_vehicle = True
 
-    def x2q(self, x):
-        """
-        Convert state vector to generalized coordinates and velocities
-        """
-        q = x[0:3]
-        v = x[3:6]
-        return q, v
-
-    def q2x(self, dq, dv):
-        """
-        Convert qdot and vdot back to state derivative
-        """
-        return np.concatenate([dq, dv])
-
     def M_mat(self, q: np.ndarray) -> np.ndarray:
         return np.diag(np.array([self.mass, self.mass, self.inertia], dtype=float))
 
@@ -165,40 +151,10 @@ class DynamicBicycleMagicForces(DynamicSystem):
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
-    def tire_forces_body_frame_from_forces(
-        self,
-        Fx_f: float,
-        Fy_f: float,
-        Fx_r: float,
-        Fy_r: float,
-        u_in: np.ndarray,
-    ):
-        delta = float(u_in[1])
-        c_d = np.cos(delta)
-        s_d = np.sin(delta)
-
-        Fx_f_b = Fx_f * c_d - Fy_f * s_d
-        Fy_f_b = Fx_f * s_d + Fy_f * c_d
-
-        Fx_r_b = Fx_r
-        Fy_r_b = Fy_r
-
-        return Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b
-
     def generalized_d(
         self, q: np.ndarray, v: np.ndarray, u_in: np.ndarray
     ) -> np.ndarray:
-        # Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(v, u_in)
-
-        Fx_front, Fy_front, Fx_rear, Fy_rear = self.compute_tire_physics(v, u_in)
-
-        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame_from_forces(
-            Fx_front,
-            Fy_front,
-            Fx_rear,
-            Fy_rear,
-            u_in,
-        )
+        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(v, u_in)
 
         Sum_Fx = Fx_f_b + Fx_r_b
         Sum_Fy = Fy_f_b + Fy_r_b
@@ -211,8 +167,10 @@ class DynamicBicycleMagicForces(DynamicSystem):
     def f(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
     ) -> np.ndarray:
-        q, v = self.x2q(x)
+        q = x[0:3]
+        v = x[3:6]
 
+        # TODO: VOIR SI LE CLIP EST NECESSAIRE
         f_rear, delta = self.get_port_values_from_u(u, "f_rear", "delta")
         u_in = np.array([f_rear[0], delta[0]])
         u_in[1] = np.clip(u_in[1], self.min_steer, self.max_steer)
@@ -222,9 +180,7 @@ class DynamicBicycleMagicForces(DynamicSystem):
         d_vec = self.generalized_d(q, v, u_in)
         dv = np.linalg.solve(M, -C @ v - d_vec)
         dq = self.N_mat(q) @ v
-
-        dx = self.q2x(dq, dv)
-        return dx
+        return np.concatenate([dq, dv])
 
     def h(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
@@ -267,15 +223,16 @@ class DynamicBicycleMagicForces(DynamicSystem):
         return [chassis, rear_w, front_w, arr_v, arr_v, arr_f, arr_f]
 
     def tire_forces_body_frame(self, v_body: np.ndarray, u_in: np.ndarray):
-        Fx_front, Fy_front, Fx_rear, Fy_rear = self.compute_tire_physics(v_body, u_in)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in)
 
-        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame_from_forces(
-            Fx_front,
-            Fy_front,
-            Fx_rear,
-            Fy_rear,
-            u_in,
-        )
+        delta = float(u_in[1])
+        c_d, s_d = np.cos(delta), np.sin(delta)
+
+        Fx_f_b = Fx_f * c_d - Fy_f * s_d
+        Fy_f_b = Fx_f * s_d + Fy_f * c_d
+
+        Fx_r_b = Fx_r
+        Fy_r_b = Fy_r
 
         return Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b
 
@@ -297,14 +254,11 @@ class DynamicBicycleMagicForces(DynamicSystem):
         th = np.arctan2(Fy, Fx)
         return scale_pose2d_matrix(px, py, th, mag)
 
-    def get_u_int(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
-        return u
-
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
-        _, vb = self.x2q(x)
-        # f_rear, delta = self.get_port_values_from_u(u, "f_rear", "delta")
-        u_in = self.get_u_int(x, u)
+        vb = x[3:6]
+        f_rear, delta = self.get_port_values_from_u(u, "f_rear", "delta")
+        u_in = np.array([f_rear[0], delta[0]])
         delta = float(u_in[1])
 
         T_wb = pose2d_matrix(X, Y, Theta)
@@ -355,7 +309,7 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
     delta  : front steer angle [rad]
     """
 
-    def __init__(self, n=8):
+    def __init__(self, n=10):
         super().__init__(n)
 
         self.name = "Dynamic Bicycle"
@@ -364,6 +318,8 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
             "X",
             "Y",
             "theta",
+            "phi_l",
+            "phi_r",
             "vx",
             "vy",
             "r",
@@ -374,6 +330,8 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         self.state.units = [
             "[m]",
             "[m]",
+            "[rad]",
+            "[rad]",
             "[rad]",
             "[m/s]",
             "[m/s]",
@@ -390,6 +348,27 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         self.inputs["delta"].labels = ["delta"]
         self.inputs["delta"].units = ["rad"]
 
+        self.outputs = {}
+        self.add_output_port("y", dim=n, function=self.h, dependencies=[])
+
+        self.a = 1.0
+        self.b = 1.0
+        self.L = self.a + self.b
+        self.r_f = 0.3
+        self.r_r = 0.3
+
+        self.wheel_len_rear = self.r_r * 2
+        self.wheel_width_rear = 0.23
+        self.wheel_len_front = self.r_f * 2
+        self.wheel_width_front = 0.23
+
+        self.mass = 1500.0
+        self.inertia = 2500.0
+
+        self.gravity = 9.81
+        self.rho = 1.225
+        self.CdA = 0.3 * 2.2
+
         # Wheel viscous damping
         self.bw_rear = 0.0
         self.bw_front = 0.0
@@ -398,15 +377,26 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         self.Jw_rear = 1.0
         self.Jw_front = 1.0
 
+        self.tire_model_f = TireModel()
+        self.tire_model_r = TireModel()
+
+        self.camera_follow_vehicle = True
+
     # STATE / COORDINATE CONVERSION
 
     def x2q(self, x):
         """
         Convert state vector to generalized coordinates and velocities
         """
-        q = x[0:3]
-        v = x[3:8]
+        q = x[0:5]
+        v = x[5:10]
         return q, v
+
+    def q2x(self, dq, dv):
+        """
+        Convert qdot and vdot back to state derivative
+        """
+        return np.concatenate([dq, dv])
 
     # KINEMATIC MAP
 
@@ -450,6 +440,8 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
                 [c, -s, 0.0, 0.0, 0.0],  # X_dot
                 [s, c, 0.0, 0.0, 0.0],  # Y_dot
                 [0.0, 0.0, 1.0, 0.0, 0.0],  # theta_dot
+                [0.0, 0.0, 0.0, 1.0, 0.0],  # phi_l_dot = w_l
+                [0.0, 0.0, 0.0, 0.0, 1.0],  # phi_r_dot = w_r
             ]
         )
 
@@ -465,7 +457,7 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         self, v_body: np.ndarray, u_inputs: np.ndarray
     ) -> tuple[float, float, float, float, float, float]:
         """
-        q = [X, Y, theta]
+        q = [X, Y, theta, phi_rear, phi_front]
         v = [vx, vy, r, w_rear, w_front]
         """
 
@@ -515,7 +507,7 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         Fx_front, Fy_front = self.tire_model_f.vel2forces(
             vx_f, vy_f, w_f, self.r_f, Fz_f
         )
-        # Roue avant ne produit aucune force en x
+        # TODO: Roue avant ne produit aucune force en x
         Fx_front = 0.0
 
         Fx_rear, Fy_rear = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
@@ -540,23 +532,24 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
             dv = inv(M) @ (B e - C v - g - d)
         so we return d = -Q_ext
         """
+        Fx_front, Fy_front, Fx_rear, Fy_rear = self.compute_tire_physics(v, u_in)
+
         w_rear = v[3]
         w_front = v[4]
 
-        Fx_front, Fy_front, Fx_rear, Fy_rear = self.compute_tire_physics(v, u_in)
+        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(v, u_in)
 
-        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame_from_forces(
-            Fx_front,
-            Fy_front,
-            Fx_rear,
-            Fy_rear,
-            u_in,
-        )
-
+        # Forces Totales sur le châssis
+        # Axe x
         Sum_Fx = Fx_f_b + Fx_r_b
-        Sum_Fy = Fy_f_b + Fy_r_b
-        Sum_Mz = self.a * Fy_f_b - self.b * Fy_r_b
 
+        # Axe y
+        Sum_Fy = Fy_f_b + Fy_r_b
+
+        # Moment z
+        Sum_Mz = self.a * Fy_f_b - self.b * Fy_rear
+
+        # Ajout Traînée Aérodynamique
         F_aero = 0.5 * self.rho * self.CdA * v[0] * abs(v[0])
         Sum_Fx -= F_aero
 
@@ -620,8 +613,56 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         # print(u)
         return dx
 
-    def get_u_int(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
-        return u
+    def h(
+        self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
+    ) -> np.ndarray:
+        return x.copy()
+
+    def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
+        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+        # TODO: VOIR POUR APPELER x2q A LA PLACE DANS LA METHOD DU PARENT
+        vb = x[5:10]  # Seul difference avec la method du parent
+        t_rear, delta = self.get_port_values_from_u(u, "t_rear", "delta")
+        u_in = np.array([t_rear[0], delta[0]])
+        delta = float(u_in[1])
+
+        T_wb = pose2d_matrix(X, Y, Theta)
+        T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
+        T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
+
+        # v_scale = 0.2
+        # f_scale = 0.001
+
+        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
+        v_f_loc = np.array([uu, vv + self.a * wr])
+        v_r_loc = np.array([uu, vv - self.b * wr])
+
+        c, s = np.cos(Theta), np.sin(Theta)
+        rx = X + c * (-self.b) - s * 0.0
+        ry = Y + s * (-self.b) + c * 0.0
+        fx = X + c * self.a - s * 0.0
+        fy = Y + s * self.a + c * 0.0
+
+        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
+        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
+
+        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(vb, u_in)
+
+        Ffx_w = c * Fx_f_b - s * Fy_f_b
+        Ffy_w = s * Fx_f_b + c * Fy_f_b
+
+        Frx_w = c * Fx_r_b - s * Fy_r_b
+        Fry_w = s * Fx_r_b + c * Fy_r_b
+
+        return [
+            T_wb,
+            T_rear,
+            T_front,
+            self._world_arrow_pose(vrx, vry, rx, ry),
+            self._world_arrow_pose(vfx, vfy, fx, fy),
+            self._force_pose(Frx_w, Fry_w, rx, ry),
+            self._force_pose(Ffx_w, Ffy_w, fx, fy),
+        ]
 
 
 class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
@@ -638,35 +679,63 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
     -----
     x = [
         X, Y, theta,
+        phi_rear, phi_front,
         vx, vy, r,
         w_rear, w_front,
-        torque_engine,
+        tau_engine,
         delta_act,
     ]
 
     """
 
-    def __init__(self, n=10):
+    def __init__(self, n=12):
         super().__init__(n=n)
 
         self.name = "Dynamic Bicycle With Engine"
+
+        self.inputs = {}
+
+        self.add_input_port("thr", nominal_value=np.array([0.0]))
+        self.add_input_port("delta", nominal_value=np.array([0.0]))
+
+        self.inputs["thr"].labels = ["thr"]
+        self.inputs["thr"].units = ["normalized"]
+
+        self.inputs["delta"].labels = ["delta"]
+        self.inputs["delta"].units = ["rad"]
+
+        self.recompute_input_properties()
+
+        self.outputs = {}
+        self.add_output_port("y", dim=n, function=self.h, dependencies=[])
+
+        self.add_output_port(
+            "r_tire_datas",
+            dim=4,
+            function=self.rear_tire_forces_and_slip,
+            dependencies="all",
+        )
 
         self.state.labels = [
             "X",
             "Y",
             "theta",
+            "phi_rear",
+            "phi_front",
             "vx",
             "vy",
             "r",
             "w_rear",
             "w_front",
-            "torque_engine",
+            "tau_engine",
             "delta_act",
         ]
 
         self.state.units = [
             "m",
             "m",
+            "rad",
+            "rad",
             "rad",
             "m/s",
             "m/s",
@@ -677,23 +746,6 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
             "rad",
         ]
 
-        self.inputs = {}
-        self.add_input_port("thr", nominal_value=np.array([0.0]))
-        self.add_input_port("delta", nominal_value=np.array([0.0]))
-
-        self.inputs["thr"].labels = ["thr"]
-        self.inputs["thr"].units = ["normalized"]
-
-        self.inputs["delta"].labels = ["delta"]
-        self.inputs["delta"].units = ["rad"]
-
-        self.add_output_port(
-            "r_tire_datas",
-            dim=4,
-            function=self.rear_tire_forces_and_slip,
-            dependencies="all",
-        )
-
         self.engine_power_peak = 40000.0  # Watts
         self.transmission_ratio = 1.0
 
@@ -703,7 +755,7 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         self.engine_tau = 0.25
         self.steering_tau = 0.15
 
-        # TODO: A tuner. C'est pour que la commande n'explosa pas
+        # TODO: YOO TUNE
         self.steering_rate_max = 10.0  # rad/s
 
     def rear_tire_forces_and_slip(
@@ -711,9 +763,10 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
     ) -> np.ndarray:
         _, v = self.x2q(x)
 
-        torque_engine, delta_act = self.get_u_int(x, u)
+        tau_engine = x[10]
+        delta_act = x[11]
 
-        u_drive = np.array([torque_engine, delta_act], dtype=float)
+        u_drive = np.array([tau_engine, delta_act], dtype=float)
 
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(v, u_drive)
 
@@ -727,12 +780,173 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         """
         Convert state vector to generalized coordinates and velocities
         """
-        q = x[0:3]
-        v = x[3:8]
+        q = x[0:5]
+        v = x[5:10]
         return q, v
 
     def q2x(self, dq, dv, d_tau_engine=0.0, d_delta_act=0.0):
         return np.concatenate([dq, dv, [d_tau_engine, d_delta_act]])
+
+    def x2engine_torque(self, x):
+        """
+        Convert state vector to engine torque
+        """
+        return x[10]
+
+    def M_mat(self, q: np.ndarray) -> np.ndarray:
+        """
+        Generalized mass/inertia matrix in quasi-velocity coordinates
+        v = [vx, vy, r, w_l, w_r]
+        """
+        M = np.diag([self.mass, self.mass, self.inertia, self.Jw_rear, self.Jw_front])
+        return M
+
+    def C_mat(self, q: np.ndarray, v: np.ndarray) -> np.ndarray:
+        """
+        Coriolis / convective matrix such that:
+
+            M dv + C(q,v) v + g + d = B e
+        """
+        r = v[2]
+
+        C = np.zeros((5, 5))
+
+        # body-frame rigid-body convective coupling
+        C[0, 1] = -self.mass * r  # gives -m*r*vy
+        C[1, 0] = self.mass * r  # gives +m*r*vx
+
+        return C
+
+    def N_mat(self, q: np.ndarray) -> np.ndarray:
+        """
+        dq = N(q) @ v
+
+        q = [X, Y, theta, phi_l, phi_r]
+        v = [vx, vy, r, w_l, w_r]
+        """
+        theta = q[2]
+        c = np.cos(theta)
+        s = np.sin(theta)
+
+        N = np.array(
+            [
+                [c, -s, 0.0, 0.0, 0.0],  # X_dot
+                [s, c, 0.0, 0.0, 0.0],  # Y_dot
+                [0.0, 0.0, 1.0, 0.0, 0.0],  # theta_dot
+                [0.0, 0.0, 0.0, 1.0, 0.0],  # phi_l_dot = w_l
+                [0.0, 0.0, 0.0, 0.0, 1.0],  # phi_r_dot = w_r
+            ]
+        )
+
+        return N
+
+    def g(self, q):
+        """
+        No generalized conservative force in planar motion
+        """
+        return np.zeros(5)
+
+    def get_delta(self, x: np.ndarray) -> float:
+        return float(x[11])
+
+    def compute_wheel_velocities(
+        self, v_body: np.ndarray, u_inputs: np.ndarray
+    ) -> tuple[float, float, float, float, float, float]:
+        """
+        q = [X, Y, theta, phi_rear, phi_front]
+        v = [vx, vy, r, w_rear, w_front]
+        """
+
+        vx = v_body[0]
+        vy = v_body[1]
+        r = v_body[2]
+
+        w_rear = v_body[3]
+        w_front = v_body[4]
+
+        delta = u_inputs[1]
+        delta = np.clip(delta, self.min_steer, self.max_steer)
+
+        # Front wheel center velocity in body frame
+        vx_f_b = vx
+        vy_f_b = vy + self.a * r
+
+        # Rear wheel center velocity in body frame
+        vx_r_b = vx
+        vy_r_b = vy - self.b * r
+
+        # Rotate front wheel velocity into front wheel frame
+        c_d = np.cos(delta)
+        s_d = np.sin(delta)
+
+        vx_f = c_d * vx_f_b + s_d * vy_f_b
+        vy_f = -s_d * vx_f_b + c_d * vy_f_b
+
+        # Rear wheel is not steered
+        vx_r = vx_r_b
+        vy_r = vy_r_b
+
+        return vx_f, vy_f, w_front, vx_r, vy_r, w_rear
+
+    def tire_forces_body_frame_from_forces(
+        self,
+        Fx_f: float,
+        Fy_f: float,
+        Fx_r: float,
+        Fy_r: float,
+        u_in: np.ndarray,
+    ):
+        delta = float(np.clip(u_in[1], self.min_steer, self.max_steer))
+        c_d = np.cos(delta)
+        s_d = np.sin(delta)
+
+        Fx_f_b = Fx_f * c_d - Fy_f * s_d
+        Fy_f_b = Fx_f * s_d + Fy_f * c_d
+
+        Fx_r_b = Fx_r
+        Fy_r_b = Fy_r
+
+        return Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b
+
+    def generalized_d(
+        self, q: np.ndarray, v: np.ndarray, u_in: np.ndarray
+    ) -> np.ndarray:
+        """
+        Generalized non-conservative forces / loads
+
+        Returned with sign convention consistent with:
+            dv = inv(M) @ (B e - C v - g - d)
+        so we return d = -Q_ext
+        """
+        w_rear = v[3]
+        w_front = v[4]
+
+        Fx_front, Fy_front, Fx_rear, Fy_rear = self.compute_tire_physics(v, u_in)
+
+        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame_from_forces(
+            Fx_front,
+            Fy_front,
+            Fx_rear,
+            Fy_rear,
+            u_in,
+        )
+
+        Sum_Fx = Fx_f_b + Fx_r_b
+        Sum_Fy = Fy_f_b + Fy_r_b
+        Sum_Mz = self.a * Fy_f_b - self.b * Fy_r_b
+
+        F_aero = 0.5 * self.rho * self.CdA * v[0] * abs(v[0])
+        Sum_Fx -= F_aero
+
+        # wheel resisting torques from tire longitudinal forces + viscous damping
+        Tau_load_rear = self.r_r * Fx_rear + self.bw_rear * w_rear
+        Tau_load_front = self.r_f * Fx_front + self.bw_front * w_front
+
+        Q_ext = np.array([Sum_Fx, Sum_Fy, Sum_Mz, -Tau_load_rear, -Tau_load_front])
+
+        # print("Fx_l =", Fx_l, "Fx_r =", Fx_r, "Mz =", Sum_Mz)
+
+        return -Q_ext
 
     def engine_torque_from_throttle(self, v: np.ndarray, throttle: float):
         """
@@ -764,6 +978,44 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         # print(f"w_rear: {w_rear * 9.5}rpm, throttle: {throttle}, tau_rear: {tau_rear}")
         return tau_rear
 
+    def B(self, q, u):
+        """
+        Generalized effort mapping matrix
+        """
+        return np.eye(5)
+
+    def accelerations_with_drive_torque(self, q, v, u_drive, t=0.0):
+        """
+        Compute vehicle accelerations using internal drive torque input.
+
+        u_drive = [tau_rear_actual, delta]
+        """
+        tau_rear = u_drive[0]
+
+        M = self.M_mat(q)
+        C = self.C_mat(q, v)
+        g = self.g(q)
+        d = self.generalized_d(q, v, u_drive)
+        B = self.B(q, u_drive)
+
+        e = np.array(
+            [
+                0.0,
+                0.0,
+                0.0,
+                tau_rear,
+                0.0,
+            ],
+            dtype=float,
+        )
+
+        dv = np.linalg.solve(M, B @ e - C @ v - g - d)
+
+        # DEBUG:
+        # print(f"applied torque: {tau_rear}")
+
+        return dv
+
     def f(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
     ) -> np.ndarray:
@@ -773,9 +1025,10 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
 
         x = [
             X, Y, theta,
+            phi_rear, phi_front,
             vx, vy, r,
             w_rear, w_front,
-            torque_engine
+            tau_engine
         ]
 
         """
@@ -793,11 +1046,13 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         tau_cmd = self.engine_torque_from_throttle(v, throttle)
 
         # Actual delayed engine torque state
-        torque_engine, delta_act = self.get_u_int(x, u)
+        tau_engine = x[10]
+        # print(f"tau_engine: {tau_engine:.2f} Nm at t={t:.2f}s")
+        delta_act = x[11]
 
         # First-order low-pass engine response
         engine_tau = max(self.engine_tau, 1e-6)
-        d_tau_engine = (tau_cmd - torque_engine) / engine_tau
+        d_tau_engine = (tau_cmd - tau_engine) / engine_tau
 
         # First-order steering response
         # steering_tau = max(self.steering_tau, 1e-6)
@@ -830,14 +1085,64 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
             d_delta_act = 0.0
 
         # Use delayed/actual torque in wheel dynamics
-        u_drive = np.array([torque_engine, delta_act_used], dtype=float)
+        u_drive = np.array([tau_engine, delta_act_used], dtype=float)
 
-        dv = self.accelerations(q, v, u_drive, t)
+        dv = self.accelerations_with_drive_torque(q, v, u_drive, t)
         dq = self.N_mat(q) @ v
 
         return np.concatenate([dq, dv, np.array([d_tau_engine, d_delta_act])])
 
-    def get_u_int(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
-        torque_engine = float(x[8])
-        delta_act = float(x[9])
-        return np.array([torque_engine, delta_act], dtype=float)
+    def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
+        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+        vb = x[5:10]
+
+        # Actual delayed actuator states
+        tau_engine = float(x[10])
+        delta_act = float(x[11])
+
+        # Internal convention used by tire/wheel calculations.
+        u_drive = np.array([tau_engine, delta_act], dtype=float)
+
+        delta = delta_act
+
+        T_wb = pose2d_matrix(X, Y, Theta)
+        T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
+        T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
+
+        # v_scale = 0.2
+        # f_scale = 0.001
+
+        uu, vv, rr = float(vb[0]), float(vb[1]), float(vb[2])
+
+        v_f_loc = np.array([uu, vv + self.a * rr])
+        v_r_loc = np.array([uu, vv - self.b * rr])
+
+        c, s = np.cos(Theta), np.sin(Theta)
+        rx = X + c * (-self.b)
+        ry = Y + s * (-self.b)
+        fx = X + c * self.a
+        fy = Y + s * self.a
+
+        vfx = c * v_f_loc[0] - s * v_f_loc[1]
+        vfy = s * v_f_loc[0] + c * v_f_loc[1]
+
+        vrx = c * v_r_loc[0] - s * v_r_loc[1]
+        vry = s * v_r_loc[0] + c * v_r_loc[1]
+
+        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(vb, u_drive)
+
+        Ffx_w = c * Fx_f_b - s * Fy_f_b
+        Ffy_w = s * Fx_f_b + c * Fy_f_b
+
+        Frx_w = c * Fx_r_b - s * Fy_r_b
+        Fry_w = s * Fx_r_b + c * Fy_r_b
+
+        return [
+            T_wb,
+            T_rear,
+            T_front,
+            self._world_arrow_pose(vrx, vry, rx, ry),
+            self._world_arrow_pose(vfx, vfy, fx, fy),
+            self._force_pose(Frx_w, Fry_w, rx, ry),
+            self._force_pose(Ffx_w, Ffy_w, fx, fy),
+        ]

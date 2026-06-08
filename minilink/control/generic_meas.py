@@ -4,19 +4,7 @@ from minilink.core.system import DynamicSystem, System
 
 
 class Measurement(System):
-    """Extract longitudinal speed from vehicle output vector.
-
-    For DynamicBicycleRearWheelDriveEngine:
-
-        y = [
-            X, Y, theta,
-            phi_rear, phi_front,
-            vx, vy, r,
-            w_rear, w_front,
-            tau_engine, delta_act
-        ]
-
-    """
+    """A simple measurement block that outputs a single element of the input vector."""
 
     def __init__(self, name: str, y_size: int = 12, index: int = 5, show=False):
         super().__init__(0)

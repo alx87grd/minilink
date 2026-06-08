@@ -13,6 +13,7 @@ import types
 
 import numpy as np
 
+from minilink.control.constant_ref import ConstantReference
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
@@ -52,47 +53,6 @@ def attach_vehicle_centered_diagram_camera(
     )
 
 
-class ConstantVehicleInput(System):
-    """Constant open-loop inputs for DynamicBicycleRearWheelDrive.
-
-    This is not a controller. It only provides fixed inputs required by the model.
-    """
-
-    def __init__(self, t_rear: float = T_REAR_REF, delta: float = DELTA_REF):
-        super().__init__(0, 0, 1)
-
-        self.name = "Constant vehicle input"
-
-        self.inputs = {}
-        self.outputs = {}
-        self.recompute_input_properties()
-
-        self.t_rear = float(t_rear)
-        self.delta = float(delta)
-
-        self.add_output_port(
-            1,
-            "t_rear",
-            function=self.h_t_rear,
-            dependencies=[],
-        )
-
-        self.add_output_port(
-            1,
-            "delta",
-            function=self.h_delta,
-            dependencies=[],
-        )
-
-        self.p = 2
-
-    def h_t_rear(self, x, u, t=0.0, params=None):
-        return np.array([self.t_rear], dtype=float)
-
-    def h_delta(self, x, u, t=0.0, params=None):
-        return np.array([self.delta], dtype=float)
-
-
 def main():
     vehicle = DynamicBicycleRearWheelDrive()
 
@@ -106,8 +66,6 @@ def main():
             0.0,  # X
             0.0,  # Y
             0.0,  # theta
-            0.0,  # phi_rear
-            0.0,  # phi_front
             0.0,  # vx
             0.0,  # vy
             0.0,  # r
@@ -117,24 +75,31 @@ def main():
         dtype=float,
     )
 
-    constant_input = ConstantVehicleInput(
-        t_rear=T_REAR_REF,
-        delta=DELTA_REF,
+    constant_t = ConstantReference(
+        ref=T_REAR_REF,
+        name="constant torque",
+    )
+
+    constant_delta = ConstantReference(
+        ref=DELTA_REF,
+        name="constant delta",
     )
 
     diagram = DiagramSystem()
     diagram.name = "Open-loop DynamicBicycleRearWheelDrive"
 
-    diagram.add_subsystem(constant_input, "constant_input")
+    diagram.add_subsystem(constant_t, "constant_t")
+    diagram.add_subsystem(constant_delta, "constant_delta")
+
     diagram.add_subsystem(vehicle, "vehicle")
 
-    diagram.connect("constant_input", "t_rear", "vehicle", "t_rear")
-    diagram.connect("constant_input", "delta", "vehicle", "delta")
+    diagram.connect("constant_t", "ref", "vehicle", "t_rear")
+    diagram.connect("constant_delta", "ref", "vehicle", "delta")
 
-    diagram.plot_graphe()
+    diagram.plot_diagram()
 
     diagram.compute_trajectory(
-        tf=10.0,
+        tf=10,
         dt=0.02,
         show=False,
         verbose=False,

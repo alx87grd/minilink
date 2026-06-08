@@ -121,7 +121,7 @@ def main():
     diagram.connect("constant_input", "thr", "vehicle", "thr")
     diagram.connect("constant_input", "delta", "vehicle", "delta")
 
-    diagram.plot_diagram()
+    # diagram.plot_diagram()
 
     print("Starting trajectory computation...")
 
@@ -140,21 +140,21 @@ def main():
         backend="matplotlib",
     )
 
-    traj = diagram.reconstruct_internal_signals(diagram.traj)
-    pid_logs = traj.get_signal("constant_input:thr")
+    # traj = diagram.reconstruct_internal_signals(diagram.traj)
+    # pid_logs = traj.get_signal("constant_input:thr")
 
-    thr = pid_logs[0, :]
+    # thr = pid_logs[0, :]
 
-    t = traj.t
+    # t = traj.t
 
-    plt.figure()
-    plt.plot(t, thr, label="Goal speed")
-    plt.xlabel("Time [s]")
-    plt.ylabel("Throttle command [-]")
-    plt.title("Throttle command")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    # plt.figure()
+    # plt.plot(t, thr, label="Goal speed")
+    # plt.xlabel("Time [s]")
+    # plt.ylabel("Throttle command [-]")
+    # plt.title("Throttle command")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
 
     attach_vehicle_centered_diagram_camera(diagram, vehicle)
 

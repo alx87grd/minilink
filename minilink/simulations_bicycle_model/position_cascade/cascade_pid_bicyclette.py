@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.control.constant_ref import ConstantReference
+from minilink.control.full_bicycle_meas import BicycleMeasurement
 from minilink.control.generic_meas import Measurement
 from minilink.control.generic_pid import PID, Sum
 from minilink.control.motor_map import AccToRearForce, ThrMap
@@ -218,6 +219,10 @@ def y_pos(t):
     return t
 
 
+def sin_traj(t, wavelen=3.0, amp=2.0):
+    return amp * np.sin(0.5 * np.pi * t / wavelen)
+
+
 def create_diagram(
     vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF, r_ref=R_REF
 ):
@@ -227,20 +232,22 @@ def create_diagram(
     # speed_const = ConstantReference(ref=vx_ref, name="Constant linear speed")
     speed_goal = Vx2V(ref=vx_ref, name="Constant xspeed")
 
-    speed_meas = Measurement(name="Speed measurement", y_size=12, index=5, show=False)
-    x_pos_meas = Measurement(name="X pos measurement", y_size=12, index=0, show=False)
+    full_state_meas = BicycleMeasurement(name="Meas states", y_size=10)
 
-    y_pos_meas = Measurement(name="X pos measurement", y_size=12, index=1, show=False)
+    # speed_meas = Measurement(name="Speed measurement", y_size=10, index=3, show=False)
+    # x_pos_meas = Measurement(name="X pos measurement", y_size=10, index=0, show=False)
 
-    ang_speed_meas = Measurement(
-        name="Angular speed measurement", y_size=12, index=7, show=False
-    )
+    # y_pos_meas = Measurement(name="y pos measurement", y_size=10, index=1, show=False)
 
-    rear_speed_meas = Measurement(
-        name="Rear wheel speed",
-        y_size=12,
-        index=8,
-    )
+    # ang_speed_meas = Measurement(
+    #     name="Angular speed measurement", y_size=10, index=5, show=False
+    # )
+
+    # rear_speed_meas = Measurement(
+    #     name="Rear wheel speed",
+    #     y_size=10,
+    #     index=6,
+    # )
 
     x_pid = PID(
         Kp=2.0,
@@ -291,7 +298,7 @@ def create_diagram(
 
     sum_bloc = Sum(max=np.pi / 2.0, min=-np.pi / 2.0)
 
-    trajectory = Trajectory(x_traj=x_pos, y_traj=y_pos)
+    trajectory = Trajectory(x_traj=x_pos, y_traj=sin_traj)
     int_traj = IntermediateTrajectory()
 
     diagram = DiagramSystem()
@@ -306,52 +313,31 @@ def create_diagram(
     diagram.add_subsystem(acc_to_force, "acc_to_force")
     diagram.add_subsystem(thr_map, "thr_map")
     diagram.add_subsystem(v_pid, "v_pid")
-    # diagram.add_subsystem(x_pid, "x_pid")
-    diagram.add_subsystem(rear_speed_meas, "rear_speed_meas")
-    diagram.add_subsystem(speed_meas, "speed_meas")
-    diagram.add_subsystem(x_pos_meas, "x_pos_meas")
-    diagram.add_subsystem(y_pos_meas, "y_pos_meas")
 
-    diagram.add_subsystem(ang_speed_meas, "ang_speed_meas")
+    diagram.add_subsystem(full_state_meas, "full_state_meas")
     diagram.add_subsystem(sum_bloc, "sum_bloc")
 
     diagram.add_subsystem(trajectory, "trajectory")
-    # diagram.add_subsystem(int_traj, "int_traj")
-    # diagram.add_subsystem(speed_const, "speed_const")
     diagram.add_subsystem(speed_goal, "speed_goal")
 
-    # diagram.connect("speed_const", "ref", "v_pid", "ref")
     diagram.connect("speed_goal", "ref", "v_pid", "ref")
-
-    # diagram.connect("trajectory", "x_targ", "int_traj", "goal_x")
     diagram.connect("trajectory", "y_targ", "theta_pid", "ref")
-    # diagram.connect("int_traj", "x_targ", "x_pid", "ref")
 
-    # diagram.connect("x_pos_meas", "meas", "x_pid", "meas")
-    # diagram.connect("int_traj", "x_targ", "v_pid", "ref")
+    # diagram.connect("speed_meas", "meas", "v_pid", "meas")
+    diagram.connect("full_state_meas", "vx_meas", "v_pid", "meas")
 
-    # diagram.connect("x_pid", "cmd", "v_pid", "ref")
-
-    diagram.connect("speed_meas", "meas", "v_pid", "meas")
     diagram.connect("v_pid", "cmd", "acc_to_force", "acc_targ")
 
-    diagram.connect("vehicle", "y", "x_pos_meas", "y")
-    diagram.connect("vehicle", "y", "y_pos_meas", "y")
-    diagram.connect("vehicle", "y", "speed_meas", "y")
-    diagram.connect("vehicle", "y", "ang_speed_meas", "y")
-    diagram.connect("vehicle", "y", "rear_speed_meas", "y")
-
-    # diagram.connect("steering", "ref", "r_pid", "ref")
-    # diagram.connect("steering", "ref", "r_to_steering", "r_targ")
+    diagram.connect("vehicle", "y", "full_state_meas", "y")
     diagram.connect("theta_pid", "cmd", "r_pid", "ref")
     diagram.connect("theta_pid", "cmd", "r_to_steering", "r_targ")
 
-    diagram.connect("speed_meas", "meas", "r_to_steering", "vx_meas")
-    diagram.connect("ang_speed_meas", "meas", "r_pid", "meas")
+    diagram.connect("full_state_meas", "vx_meas", "r_to_steering", "vx_meas")
+    diagram.connect("full_state_meas", "r_meas", "r_pid", "meas")
 
-    diagram.connect("ang_speed_meas", "meas", "speed_goal", "theta")
+    diagram.connect("full_state_meas", "r_meas", "speed_goal", "theta")
 
-    diagram.connect("y_pos_meas", "meas", "theta_pid", "meas")
+    diagram.connect("full_state_meas", "y_meas", "theta_pid", "meas")
 
     diagram.connect("r_pid", "cmd", "sum_bloc", "1")
     diagram.connect("r_to_steering", "delta", "sum_bloc", "2")
@@ -359,7 +345,7 @@ def create_diagram(
     diagram.connect("sum_bloc", "result", "vehicle", "delta")
     diagram.connect("acc_to_force", "F_rear", "thr_map", "F_rear")
     diagram.connect("thr_map", "thr", "vehicle", "thr")
-    diagram.connect("rear_speed_meas", "meas", "thr_map", "w_rear")
+    diagram.connect("full_state_meas", "w_r_meas", "thr_map", "w_rear")
 
     return diagram
 

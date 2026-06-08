@@ -83,8 +83,6 @@ def main():
             0.0,  # X
             0.0,  # Y
             0.0,  # theta
-            0.0,  # phi_rear
-            0.0,  # phi_front
             initial_vx,  # vx
             0.0,  # vy
             0.0,  # r
@@ -119,7 +117,7 @@ def main():
         dt=0.005,
         show=False,
         verbose=False,
-        # solver="euler",
+        solver="euler",
     )
 
     print("Trajectory computation done.")

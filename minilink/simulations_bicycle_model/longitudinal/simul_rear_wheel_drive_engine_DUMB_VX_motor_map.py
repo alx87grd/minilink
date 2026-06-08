@@ -25,8 +25,8 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
 
     speed_meas = Measurement(
         name="Speed measurement",
-        y_size=12,
-        index=5,
+        y_size=10,
+        index=3,
     )
 
     rear_speed_ref = ConstantReference(ref=14.5, name="Rear wheel speed")

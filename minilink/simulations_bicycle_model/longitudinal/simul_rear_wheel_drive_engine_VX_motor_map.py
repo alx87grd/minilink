@@ -24,14 +24,14 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
 
     speed_meas = Measurement(
         name="Speed measurement",
-        y_size=12,
-        index=5,
+        y_size=10,
+        index=3,
     )
 
     rear_speed_meas = Measurement(
         name="Rear wheel speed",
-        y_size=12,
-        index=8,
+        y_size=10,
+        index=6,
     )
 
     v_pid = PID(

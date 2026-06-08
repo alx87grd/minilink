@@ -86,8 +86,6 @@ def create_vehicle(X=0.0, Y=0.0, theta=0.0, vx=0.0, vy=0.0, r=0.0):
             X,  # X
             Y,  # Y
             theta,  # theta
-            0.0,  # phi_rear
-            0.0,  # phi_front
             vx,  # vx
             vy,  # vy
             r,  # r

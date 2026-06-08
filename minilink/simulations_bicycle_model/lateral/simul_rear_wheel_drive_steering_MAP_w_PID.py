@@ -27,15 +27,15 @@ def create_diagram(
     steering = ConstantReference(ref=r_ref, name="Constant angular speed")
     speed_const = ConstantReference(ref=vx_ref, name="Constant linear speed")
 
-    speed_meas = Measurement(name="Speed measurement", y_size=12, index=5, show=False)
+    speed_meas = Measurement(name="Speed measurement", y_size=10, index=3, show=False)
     ang_speed_meas = Measurement(
-        name="Angular speed measurement", y_size=12, index=7, show=False
+        name="Angular speed measurement", y_size=10, index=5, show=False
     )
 
     rear_speed_meas = Measurement(
         name="Rear wheel speed",
-        y_size=12,
-        index=8,
+        y_size=10,
+        index=6,
     )
 
     v_pid = PID(
