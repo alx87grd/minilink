@@ -1,68 +1,25 @@
-"""Generic summing junction and PID controller blocks."""
+"""Generic PID controller block."""
 
 import numpy as np
 
-from minilink.core.system import DynamicSystem, System
-
-
-class Sum(System):
-    """Two-input summing junction with optional output saturation.
-
-    Parameters
-    ----------
-    max : float, optional
-        Upper saturation limit. Saturation is applied only when both ``max``
-        and ``min`` are provided.
-    min : float, optional
-        Lower saturation limit.
-    name : str, optional
-        Display name of the block.
-    """
-
-    def __init__(self, max=None, min=None, name: str = "Sum"):
-        super().__init__(0)
-
-        self.name = name
-
-        self.max = max
-        self.min = min
-
-        self.inputs = {}
-        self.add_input_port("1", nominal_value=np.array([0.0]))
-        self.add_input_port("2", nominal_value=np.array([0.0]))
-
-        self.outputs = {}
-        self.add_output_port(
-            "result",
-            dim=1,
-            function=self.h_sum,
-            dependencies=["1", "2"],
-        )
-
-    def h_sum(self, x, u, t=0.0, params=None):
-        a, b = self.get_port_values_from_u(u, "1", "2")
-        result = a[0] + b[0]
-
-        if self.max is not None and self.min is not None:
-            result = np.clip(result, self.min, self.max)
-
-        return np.array([result])
+from minilink.core.system import DynamicSystem
 
 
 class PID(DynamicSystem):
     """Generic scalar PID controller with filtered derivative.
 
     The controller has two states: the error integral and a first-order
-    filtered measurement used for the derivative term.
+    filtered measurement used for the derivative term. Its two input ports form
+    the difference junction, so no separate summing block is needed.
 
     .. math::
 
-        e = ref - meas
+        e = r - y
 
-        cmd = K_p \\, e + K_i \\int e \\, dt - K_d \\, \\dot{meas}_{filt}
+        u = K_p \\, e + K_i \\int e \\, dt - K_d \\, \\dot{y}_{filt}
 
-    Anti-windup clamps the integrator when the command saturates against
-    ``cmd_min`` / ``cmd_max`` or when the integral reaches ``i_min`` / ``i_max``.
+    Anti-windup stops the integrator when the command saturates against
+    ``cmd_min`` / ``cmd_max`` in the direction of the error.
 
     Ports follow the control-naming convention: input ``r`` (reference), input
     ``y`` (measurement), output ``u`` (command).
@@ -77,8 +34,6 @@ class PID(DynamicSystem):
         Initial filtered measurement.
     cmd_min, cmd_max : float
         Command saturation limits.
-    i_min, i_max : float
-        Integrator saturation limits.
     name : str
         Display name of the block.
     """
@@ -92,8 +47,6 @@ class PID(DynamicSystem):
         meas0: float = 0.0,
         cmd_min: float = -np.inf,
         cmd_max: float = np.inf,
-        i_min: float = -np.inf,
-        i_max: float = np.inf,
         name: str = "PID",
     ):
         super().__init__(2)
@@ -106,8 +59,6 @@ class PID(DynamicSystem):
             "tau": tau,
             "cmd_min": cmd_min,
             "cmd_max": cmd_max,
-            "i_min": i_min,
-            "i_max": i_max,
         }
         self.state.labels = ["int_e", "meas_filt"]
         self.x0 = np.array([0.0, meas0], dtype=float)
@@ -144,16 +95,11 @@ class PID(DynamicSystem):
 
         e, d_meas_filt, cmd = self.control_law(int_e, meas_filt, ref[0], meas[0], p)
 
-        # Anti-windup: stop integrating when the command saturates against
-        # the error direction, or when the integral hits its own limits.
+        # Anti-windup: stop integrating when the command saturates against the
+        # error direction.
         stop_hi = (cmd >= p["cmd_max"]) and (e > 0)
         stop_lo = (cmd <= p["cmd_min"]) and (e < 0)
         d_int_e = 0.0 if (stop_hi or stop_lo) else e
-
-        if int_e >= p["i_max"] and e > 0.0:
-            d_int_e = 0.0
-        elif int_e <= p["i_min"] and e < 0.0:
-            d_int_e = 0.0
 
         return np.array([d_int_e, d_meas_filt])
 

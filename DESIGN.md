@@ -45,8 +45,10 @@ exports are frozen ([ROADMAP.md](ROADMAP.md) P1).
 | `graphical/` | 2 | signals, phase plane, diagrams, animation |
 | `symbolic/`, `physics/`, `control/` | 0–1 | optional / MVP |
 
-**Control blocks:** `control/` ships reusable NumPy blocks—`PID` (filtered
-derivative + anti-windup), `Sum`, and `ConstantReference` (MVP tier).
+**Control blocks:** `control/` ships the reusable NumPy `PID` block (filtered
+derivative + command-saturation anti-windup; its `r`/`y` inputs are the
+difference junction). A constant reference is just an unconnected `r` port with
+its default (nominal) value set—no dedicated source block.
 
 **Dynamics root:** `DynamicSystem` with `f`, `h`. Reusable bases in
 `dynamics/abstraction` (`StateSpaceSystem`, `MechanicalSystem`,
