@@ -64,6 +64,9 @@ class PID(DynamicSystem):
     Anti-windup clamps the integrator when the command saturates against
     ``cmd_min`` / ``cmd_max`` or when the integral reaches ``i_min`` / ``i_max``.
 
+    Ports follow the control-naming convention: input ``r`` (reference), input
+    ``y`` (measurement), output ``u`` (command).
+
     Parameters
     ----------
     Kp, Ki, Kd : float
@@ -110,15 +113,15 @@ class PID(DynamicSystem):
         self.x0 = np.array([0.0, meas0], dtype=float)
 
         self.inputs = {}
-        self.add_input_port("ref", nominal_value=np.array([0.0]), labels=["ref"])
-        self.add_input_port("meas", nominal_value=np.array([0.0]), labels=["meas"])
+        self.add_input_port("r", nominal_value=np.array([0.0]), labels=["ref"])
+        self.add_input_port("y", nominal_value=np.array([0.0]), labels=["meas"])
 
         self.outputs = {}
         self.add_output_port(
-            "cmd",
+            "u",
             dim=1,
-            function=self.h_cmd,
-            dependencies=["ref", "meas"],
+            function=self.h_u,
+            dependencies=["r", "y"],
             labels=["cmd"],
         )
 
@@ -137,7 +140,7 @@ class PID(DynamicSystem):
     def f(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
         int_e, meas_filt = x[0], x[1]
-        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
+        ref, meas = self.get_port_values_from_u(u, "r", "y")
 
         e, d_meas_filt, cmd = self.control_law(int_e, meas_filt, ref[0], meas[0], p)
 
@@ -154,10 +157,10 @@ class PID(DynamicSystem):
 
         return np.array([d_int_e, d_meas_filt])
 
-    def h_cmd(self, x, u, t=0.0, params=None):
+    def h_u(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
         int_e, meas_filt = x[0], x[1]
-        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
+        ref, meas = self.get_port_values_from_u(u, "r", "y")
 
         _, _, cmd = self.control_law(int_e, meas_filt, ref[0], meas[0], p)
         cmd = np.clip(cmd, p["cmd_min"], p["cmd_max"])
