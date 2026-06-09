@@ -30,6 +30,20 @@ class SignalPlotSpec:
     traces: tuple[SignalTrace, ...]
 
 
+@dataclass(frozen=True)
+class DataPlotSpec:
+    """Backend-neutral signal-vs-signal plot request.
+
+    Like :class:`SignalPlotSpec`, but the y-traces are plotted against the
+    component held in ``x_axis`` instead of against time (for example an X-Y
+    vehicle path).
+    """
+
+    title: str
+    x_axis: SignalTrace
+    traces: tuple[SignalTrace, ...]
+
+
 class LivePlotHandle:
     """Base class for live signal plot handles."""
 
@@ -141,6 +155,84 @@ def plot_time_signals(
         "Unknown signal backend {!r}. Expected 'matplotlib' or 'plotly'.".format(
             backend
         )
+    )
+
+
+def build_data_plot_spec(
+    sys,
+    traj,
+    *,
+    signals: tuple[str, ...] = ("x", "u"),
+    x_label: str,
+    y_labels: tuple[str, ...] | None = None,
+    title: str | None = None,
+) -> DataPlotSpec:
+    """Build a plot of selected components against a chosen x-axis signal.
+
+    The requested ``signals`` are gathered with :func:`build_signal_plot_spec`,
+    then the component labelled ``x_label`` becomes the shared x-axis and the
+    components in ``y_labels`` (or every other component when ``y_labels`` is
+    None) become the stacked y-traces.
+    """
+    base = build_signal_plot_spec(sys, traj, signals=signals)
+
+    if isinstance(y_labels, str):
+        y_labels = (y_labels,)
+
+    x_axis = None
+    y_traces = []
+    for trace in base.traces:
+        if x_axis is None and trace.label == x_label:
+            x_axis = trace
+        elif y_labels is None or trace.label in y_labels:
+            y_traces.append(trace)
+
+    if x_axis is None:
+        available = ", ".join(trace.label for trace in base.traces)
+        raise ValueError(
+            f"X-axis signal {x_label!r} not found. Available labels: {available}"
+        )
+    if not y_traces:
+        raise ValueError("No signal components were selected for plotting.")
+
+    if title is None:
+        title = f"{sys.name} signals vs {x_axis.label}"
+
+    return DataPlotSpec(title=title, x_axis=x_axis, traces=tuple(y_traces))
+
+
+def plot_data_signals(
+    sys,
+    traj,
+    *,
+    signals: tuple[str, ...] = ("x", "u"),
+    x_label: str,
+    y_labels: tuple[str, ...] | None = None,
+    backend="matplotlib",
+    show: bool = True,
+    title: str | None = None,
+    **kwargs,
+) -> PlotResult:
+    """Plot selected signal components against another signal."""
+    spec = build_data_plot_spec(
+        sys,
+        traj,
+        signals=signals,
+        x_label=x_label,
+        y_labels=y_labels,
+        title=title,
+    )
+    if not isinstance(backend, str):
+        raise TypeError("Signal plotting backend must be a string.")
+    key = backend.strip().lower()
+    if key == "matplotlib":
+        from minilink.graphical.signals.matplotlib_backend import (
+            render_matplotlib_signal_plot,
+        )
+
+        return render_matplotlib_signal_plot(spec, show=show, **kwargs)
+    raise ValueError(
+        f"Unknown data-plot backend {backend!r}. Only 'matplotlib' is supported."
     )
 
 

@@ -875,6 +875,63 @@ class System:
 
         return traj
 
+    def plot_data(
+        self,
+        traj=None,
+        *,
+        signals=("x", "u"),
+        x_label,
+        y_labels=None,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot signal components against another signal.
+
+        Unlike :meth:`plot_trajectory`, which plots signals against time, this
+        plots the components named in ``y_labels`` against the single component
+        named ``x_label`` (for example a vehicle's Y position against its X
+        position).
+
+        If the trajectory is not computed yet, it is computed using
+        :meth:`compute_trajectory`.
+
+        Parameters
+        ----------
+        x_label : str
+            Label of the signal component to use as the x-axis.
+        y_labels : tuple of str, optional
+            Labels of the components to plot. Defaults to every gathered
+            component other than ``x_label``.
+        signals : tuple of str, optional
+            Signal names to gather; see
+            :func:`minilink.graphical.signals.plot_data_signals`.
+
+        Returns
+        -------
+        PlotResult
+            The plot result from
+            :func:`minilink.graphical.signals.plot_data_signals`.
+        """
+        from minilink.graphical.signals import plot_data_signals
+
+        if traj is None:
+            traj = (
+                self.traj
+                if self.traj is not None
+                else self.compute_trajectory(show=False)
+            )
+
+        return plot_data_signals(
+            self,
+            traj,
+            signals=signals,
+            x_label=x_label,
+            y_labels=y_labels,
+            backend=backend,
+            show=show,
+        )
+
     def plot_trajectory(
         self,
         traj=None,

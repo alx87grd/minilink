@@ -8,14 +8,14 @@ from minilink.core.trajectory import Trajectory
 
 
 class DiagramSystem(System):
-    def __init__(self):
+    def __init__(self, name="Diagram", verbose=False):
 
         self.subsystems = {}  # Nodes
         self.connections = {}  # Edges
 
         System.__init__(self, 0)
 
-        self.name = "Diagram"
+        self.name = name
 
         self.inputs = {}
         self.outputs = {}
@@ -23,7 +23,7 @@ class DiagramSystem(System):
         self.recompute_input_properties()
 
         self.debug_print = False
-        self.connection_verbose = True
+        self.connection_verbose = verbose
 
         self.refresh()
 
