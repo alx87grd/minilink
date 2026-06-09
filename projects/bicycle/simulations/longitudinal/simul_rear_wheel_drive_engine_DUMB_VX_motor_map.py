@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from projects.bicycle.control.measurement import Measurement
-from minilink.control.pid import PID
+from projects.bicycle.control.pid import InstrumentedPID as PID
 from minilink.control.references import ConstantReference
 from minilink.core.diagram import DiagramSystem
 from projects.bicycle.control.motor_map import AccToRearForce, ThrMap
