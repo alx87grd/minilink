@@ -8,12 +8,14 @@ import numpy as np
 import pytest
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.trajectory import Trajectory
 from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.trajectory import Trajectory
 from minilink.graphical.common.plotly_style import PLOTLY_FIG_WIDTH
 from minilink.graphical.signals import (
+    build_data_plot_spec,
     build_signal_plot_spec,
     open_time_signal_plot,
+    plot_data_signals,
     plot_time_signals,
 )
 from minilink.simulation.simulator import Simulator
@@ -143,6 +145,76 @@ class TestAdvancedPlotting(unittest.TestCase):
     def test_unknown_signal_reports_available_names(self):
         with self.assertRaisesRegex(ValueError, "ctl:u"):
             build_signal_plot_spec(self.diagram, self.traj, signals=("missing",))
+
+    def test_build_data_plot_spec_splits_x_and_y(self):
+        traj = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[2.0, 3.0]]),
+        )
+        spec = build_data_plot_spec(
+            self.sys,
+            traj,
+            signals=("x", "u"),
+            x_label="x[0]",
+            y_labels=("u[0]",),
+        )
+        self.assertEqual(spec.x_axis.label, "x[0]")
+        self.assertEqual([trace.label for trace in spec.traces], ["u[0]"])
+        np.testing.assert_allclose(spec.x_axis.values, np.array([0.0, 1.0]))
+
+    def test_plot_data_facade_and_function_do_not_crash(self):
+        traj = Trajectory(
+            t=np.array([0.0, 1.0, 2.0]),
+            x=np.array([[0.0, 1.0, 2.0]]),
+            u=np.array([[1.0, 1.0, 1.0]]),
+        )
+        result = plot_data_signals(
+            self.sys,
+            traj,
+            signals=("x", "u"),
+            x_label="x[0]",
+            y_labels=("u[0]",),
+            show=False,
+        )
+        self.assertEqual(result.backend, "matplotlib")
+        self.assertIsNotNone(result.figure)
+        plt.close(result.figure)
+
+        facade_result = self.sys.plot_data(
+            traj,
+            signals=("x", "u"),
+            x_label="x[0]",
+            y_labels=("u[0]",),
+            show=False,
+        )
+        self.assertEqual(facade_result.backend, "matplotlib")
+        plt.close(facade_result.figure)
+
+    def test_plot_data_unknown_x_label_raises(self):
+        traj = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[1.0, 1.0]]),
+        )
+        with self.assertRaisesRegex(ValueError, "nope"):
+            build_data_plot_spec(self.sys, traj, signals=("x",), x_label="nope")
+
+    def test_plot_data_rejects_non_matplotlib_backend(self):
+        traj = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[1.0, 1.0]]),
+        )
+        with self.assertRaisesRegex(ValueError, "matplotlib"):
+            plot_data_signals(
+                self.sys,
+                traj,
+                signals=("x", "u"),
+                x_label="x[0]",
+                y_labels=("u[0]",),
+                backend="plotly",
+            )
 
     def test_live_time_signal_plot_reuses_artists(self):
         traj0 = Trajectory(
