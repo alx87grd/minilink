@@ -121,32 +121,25 @@ class PID(DynamicSystem):
             dependencies=["ref", "meas"],
             labels=["cmd"],
         )
-        self.add_output_port(
-            "logs",
-            dim=2,
-            function=self.h_logs,
-            dependencies=["ref", "meas"],
-            labels=["ref", "meas"],
-        )
-        self.add_output_port(
-            "pid_int_value",
-            dim=3,
-            function=self.h_internals,
-            dependencies=[],
-            labels=["error", "d_meas", "int_e"],
-        )
+
+    def control_law(self, int_e, meas_filt, ref, meas, params):
+        """Return ``(error, filtered_derivative, command)`` for the given state.
+
+        Shared by the state derivative and the command output so the two stay
+        consistent.
+        """
+        e = ref - meas
+        tau = max(params["tau"], 1e-3)
+        d_meas_filt = (meas - meas_filt) / tau
+        cmd = params["Kp"] * e + params["Ki"] * int_e - params["Kd"] * d_meas_filt
+        return e, d_meas_filt, cmd
 
     def f(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
         int_e, meas_filt = x[0], x[1]
         ref, meas = self.get_port_values_from_u(u, "ref", "meas")
-        ref, meas = ref[0], meas[0]
 
-        e = ref - meas
-        tau = max(p["tau"], 1e-3)
-        d_meas_filt = (meas - meas_filt) / tau
-
-        cmd = p["Kp"] * e + p["Ki"] * int_e - p["Kd"] * d_meas_filt
+        e, d_meas_filt, cmd = self.control_law(int_e, meas_filt, ref[0], meas[0], p)
 
         # Anti-windup: stop integrating when the command saturates against
         # the error direction, or when the integral hits its own limits.
@@ -165,29 +158,8 @@ class PID(DynamicSystem):
         p = self.params if params is None else params
         int_e, meas_filt = x[0], x[1]
         ref, meas = self.get_port_values_from_u(u, "ref", "meas")
-        ref, meas = ref[0], meas[0]
 
-        e = ref - meas
-        tau = max(p["tau"], 1e-3)
-        d_filt = (meas - meas_filt) / tau
-
-        cmd = p["Kp"] * e + p["Ki"] * int_e - p["Kd"] * d_filt
+        _, _, cmd = self.control_law(int_e, meas_filt, ref[0], meas[0], p)
         cmd = np.clip(cmd, p["cmd_min"], p["cmd_max"])
 
         return np.array([cmd])
-
-    def h_logs(self, x, u, t=0.0, params=None):
-        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
-        return np.array([ref[0], meas[0]])
-
-    def h_internals(self, x, u, t=0.0, params=None):
-        p = self.params if params is None else params
-        int_e, meas_filt = x[0], x[1]
-        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
-        ref, meas = ref[0], meas[0]
-
-        e = ref - meas
-        tau = max(p["tau"], 1e-3)
-        d_filt = (meas - meas_filt) / tau
-
-        return np.array([e, d_filt, int_e])
