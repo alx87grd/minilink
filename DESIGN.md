@@ -45,6 +45,9 @@ exports are frozen ([ROADMAP.md](ROADMAP.md) P1).
 | `graphical/` | 2 | signals, phase plane, diagrams, animation |
 | `symbolic/`, `physics/`, `control/` | 0–1 | optional / MVP |
 
+**Control blocks:** `control/` ships reusable NumPy blocks—`PID` (filtered
+derivative + anti-windup), `Sum`, and `ConstantReference` (MVP tier).
+
 **Dynamics root:** `DynamicSystem` with `f`, `h`. Reusable bases in
 `dynamics/abstraction` (`StateSpaceSystem`, `MechanicalSystem`,
 `GeneralizedMechanicalSystem`). Catalog names: `Pendulum`, `CartPole`,
@@ -127,8 +130,9 @@ transcription types.
 ## 7. Graphics And Benchmarks
 
 Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
-Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
-Plotly under `plotting` extra.
+Signal-vs-signal plots (e.g. an X–Y path): `System.plot_data(x_label=..., y_labels=...)`
+→ `graphical.signals.plot_data_signals`. Phase plane: matplotlib default. Diagrams:
+Graphviz display, Mermaid export; Plotly under `plotting` extra.
 
 **Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
 for all renderers. Override on `System` for custom views; kinematic hooks TRL 1.

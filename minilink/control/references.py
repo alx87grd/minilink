@@ -32,7 +32,8 @@ class ConstantReference(System):
             dim=1,
             function=self.h_ref,
             dependencies=[],
+            labels=["ref"],
         )
 
     def h_ref(self, x, u, t=0.0, params=None):
-        return np.array([self.ref], dtype=float)
+        return np.array([self.ref])

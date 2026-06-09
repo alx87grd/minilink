@@ -40,12 +40,13 @@ class Sum(System):
         )
 
     def h_sum(self, x, u, t=0.0, params=None):
-        result = u[0] + u[1]
+        a, b = self.get_port_values_from_u(u, "1", "2")
+        result = a[0] + b[0]
 
         if self.max is not None and self.min is not None:
             result = np.clip(result, self.min, self.max)
 
-        return result
+        return np.array([result])
 
 
 class PID(DynamicSystem):
@@ -109,8 +110,8 @@ class PID(DynamicSystem):
         self.x0 = np.array([0.0, meas0], dtype=float)
 
         self.inputs = {}
-        self.add_input_port("ref", nominal_value=np.array([0.0]))
-        self.add_input_port("meas", nominal_value=np.array([0.0]))
+        self.add_input_port("ref", nominal_value=np.array([0.0]), labels=["ref"])
+        self.add_input_port("meas", nominal_value=np.array([0.0]), labels=["meas"])
 
         self.outputs = {}
         self.add_output_port(
@@ -118,24 +119,28 @@ class PID(DynamicSystem):
             dim=1,
             function=self.h_cmd,
             dependencies=["ref", "meas"],
+            labels=["cmd"],
         )
         self.add_output_port(
             "logs",
             dim=2,
             function=self.h_logs,
             dependencies=["ref", "meas"],
+            labels=["ref", "meas"],
         )
         self.add_output_port(
             "pid_int_value",
             dim=3,
             function=self.h_internals,
             dependencies=[],
+            labels=["error", "d_meas", "int_e"],
         )
 
     def f(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
-        int_e, meas_filt = float(x[0]), float(x[1])
-        ref, meas = float(u[0]), float(u[1])
+        int_e, meas_filt = x[0], x[1]
+        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
+        ref, meas = ref[0], meas[0]
 
         e = ref - meas
         tau = max(p["tau"], 1e-3)
@@ -154,12 +159,13 @@ class PID(DynamicSystem):
         elif int_e <= p["i_min"] and e < 0.0:
             d_int_e = 0.0
 
-        return np.array([d_int_e, d_meas_filt], dtype=float)
+        return np.array([d_int_e, d_meas_filt])
 
     def h_cmd(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
-        int_e, meas_filt = float(x[0]), float(x[1])
-        ref, meas = float(u[0]), float(u[1])
+        int_e, meas_filt = x[0], x[1]
+        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
+        ref, meas = ref[0], meas[0]
 
         e = ref - meas
         tau = max(p["tau"], 1e-3)
@@ -168,20 +174,20 @@ class PID(DynamicSystem):
         cmd = p["Kp"] * e + p["Ki"] * int_e - p["Kd"] * d_filt
         cmd = np.clip(cmd, p["cmd_min"], p["cmd_max"])
 
-        return np.array([cmd], dtype=float)
+        return np.array([cmd])
 
     def h_logs(self, x, u, t=0.0, params=None):
-        ref = float(u[0])
-        meas = float(u[1])
-        return np.array([ref, meas], dtype=float)
+        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
+        return np.array([ref[0], meas[0]])
 
     def h_internals(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
-        int_e, meas_filt = float(x[0]), float(x[1])
-        ref, meas = float(u[0]), float(u[1])
+        int_e, meas_filt = x[0], x[1]
+        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
+        ref, meas = ref[0], meas[0]
 
         e = ref - meas
         tau = max(p["tau"], 1e-3)
         d_filt = (meas - meas_filt) / tau
 
-        return np.array([e, d_filt, int_e], dtype=float)
+        return np.array([e, d_filt, int_e])
