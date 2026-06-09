@@ -182,31 +182,31 @@ def create_diagram(
 
     diagram.add_subsystem(speed_const, "speed_const")
 
-    diagram.connect("speed_const", "ref", "v_pid", "ref")
+    diagram.connect("speed_const", "ref", "v_pid", "r")
     # diagram.connect("trajectory", "x_targ", "int_traj", "goal_x")
-    # diagram.connect("trajectory", "x_targ", "x_pid", "ref")
-    # diagram.connect("int_traj", "x_targ", "x_pid", "ref")
+    # diagram.connect("trajectory", "x_targ", "x_pid", "r")
+    # diagram.connect("int_traj", "x_targ", "x_pid", "r")
 
-    # diagram.connect("x_pos_meas", "meas", "x_pid", "meas")
-    # diagram.connect("int_traj", "x_targ", "v_pid", "ref")
+    # diagram.connect("x_pos_meas", "meas", "x_pid", "y")
+    # diagram.connect("int_traj", "x_targ", "v_pid", "r")
 
-    # diagram.connect("x_pid", "cmd", "v_pid", "ref")
+    # diagram.connect("x_pid", "u", "v_pid", "r")
 
-    diagram.connect("speed_meas", "meas", "v_pid", "meas")
-    diagram.connect("v_pid", "cmd", "acc_to_force", "acc_targ")
+    diagram.connect("speed_meas", "meas", "v_pid", "y")
+    diagram.connect("v_pid", "u", "acc_to_force", "acc_targ")
 
     # diagram.connect("vehicle", "y", "x_pos_meas", "y")
     diagram.connect("vehicle", "y", "speed_meas", "y")
     diagram.connect("vehicle", "y", "ang_speed_meas", "y")
     diagram.connect("vehicle", "y", "rear_speed_meas", "y")
 
-    diagram.connect("steering", "ref", "r_pid", "ref")
+    diagram.connect("steering", "ref", "r_pid", "r")
     diagram.connect("steering", "ref", "r_to_steering", "r_targ")
 
     diagram.connect("speed_meas", "meas", "r_to_steering", "vx_meas")
-    diagram.connect("ang_speed_meas", "meas", "r_pid", "meas")
+    diagram.connect("ang_speed_meas", "meas", "r_pid", "y")
 
-    diagram.connect("r_pid", "cmd", "sum_bloc", "1")
+    diagram.connect("r_pid", "u", "sum_bloc", "1")
     diagram.connect("r_to_steering", "delta", "sum_bloc", "2")
 
     diagram.connect("sum_bloc", "result", "vehicle", "delta")

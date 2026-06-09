@@ -60,9 +60,9 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
     diagram.add_subsystem(vehicle, "vehicle")
 
     # Reference acceleration into PID
-    diagram.connect("v_ref", "ref", "v_pid", "ref")
-    diagram.connect("speed_meas", "meas", "v_pid", "meas")
-    diagram.connect("v_pid", "cmd", "acc_to_force", "acc_targ")
+    diagram.connect("v_ref", "ref", "v_pid", "r")
+    diagram.connect("speed_meas", "meas", "v_pid", "y")
+    diagram.connect("v_pid", "u", "acc_to_force", "acc_targ")
 
     # Vehicle output vector into acceleration measurement block
     diagram.connect("vehicle", "y", "speed_meas", "y")

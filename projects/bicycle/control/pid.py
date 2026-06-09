@@ -25,7 +25,7 @@ class InstrumentedPID(PID):
             "logs",
             dim=2,
             function=self.h_logs,
-            dependencies=["ref", "meas"],
+            dependencies=["r", "y"],
             labels=["ref", "meas"],
         )
         self.add_output_port(
@@ -37,13 +37,13 @@ class InstrumentedPID(PID):
         )
 
     def h_logs(self, x, u, t=0.0, params=None):
-        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
+        ref, meas = self.get_port_values_from_u(u, "r", "y")
         return np.array([ref[0], meas[0]])
 
     def h_internals(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
         int_e, meas_filt = x[0], x[1]
-        ref, meas = self.get_port_values_from_u(u, "ref", "meas")
+        ref, meas = self.get_port_values_from_u(u, "r", "y")
 
         e, d_meas_filt, _ = self.control_law(int_e, meas_filt, ref[0], meas[0], p)
         return np.array([e, d_meas_filt, int_e])

@@ -77,18 +77,18 @@ def create_diagram(
     diagram.add_subsystem(speed_meas, "speed_meas")
     # Constant steering command
 
-    diagram.connect("speed_const", "ref", "v_pid", "ref")
-    diagram.connect("speed_meas", "meas", "v_pid", "meas")
-    diagram.connect("v_pid", "cmd", "acc_to_force", "acc_targ")
+    diagram.connect("speed_const", "ref", "v_pid", "r")
+    diagram.connect("speed_meas", "meas", "v_pid", "y")
+    diagram.connect("v_pid", "u", "acc_to_force", "acc_targ")
 
     diagram.connect("vehicle", "y", "speed_meas", "y")
     diagram.connect("vehicle", "y", "ang_speed_meas", "y")
     diagram.connect("vehicle", "y", "rear_speed_meas", "y")
 
-    diagram.connect("steering", "ref", "r_pid", "ref")
-    diagram.connect("ang_speed_meas", "meas", "r_pid", "meas")
+    diagram.connect("steering", "ref", "r_pid", "r")
+    diagram.connect("ang_speed_meas", "meas", "r_pid", "y")
 
-    diagram.connect("r_pid", "cmd", "vehicle", "delta")
+    diagram.connect("r_pid", "u", "vehicle", "delta")
     diagram.connect("acc_to_force", "F_rear", "thr_map", "F_rear")
     diagram.connect("thr_map", "thr", "vehicle", "thr")
     diagram.connect("rear_speed_meas", "meas", "thr_map", "w_rear")
