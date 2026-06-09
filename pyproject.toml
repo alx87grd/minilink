@@ -45,6 +45,9 @@ target-version = "py310"
 exclude = [
     "minilink/_version.py",
     "**/*.ipynb",
+    # Project scratch/experiments are not user-facing library code yet;
+    # keep them out of the strict style gate.
+    "projects/**",
 ]
 
 [tool.ruff.lint]
