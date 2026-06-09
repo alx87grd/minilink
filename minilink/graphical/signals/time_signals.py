@@ -37,6 +37,11 @@ class DataPlotSpec:
     Like :class:`SignalPlotSpec`, but the y-traces are plotted against the
     component held in ``x_axis`` instead of against time (for example an X-Y
     vehicle path).
+
+    TODO: User Architectural Review. Experimental; the signal-vs-signal API
+    (:func:`build_data_plot_spec`, :func:`plot_data_signals`, this spec, and
+    ``System.plot_data``) is not frozen and currently renders with matplotlib
+    only.
     """
 
     title: str

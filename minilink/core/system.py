@@ -893,6 +893,13 @@ class System:
         named ``x_label`` (for example a vehicle's Y position against its X
         position).
 
+        .. note::
+
+            TODO: User Architectural Review. Experimental facade; the API is not
+            frozen. Open questions: matplotlib-only (no plotly parity yet),
+            label-based selection vs the name-based selection used by
+            :meth:`plot_trajectory`, and overlap with :meth:`plot_phase_plane`.
+
         If the trajectory is not computed yet, it is computed using
         :meth:`compute_trajectory`.
 

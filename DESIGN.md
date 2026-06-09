@@ -131,8 +131,9 @@ transcription types.
 
 Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
 Signal-vs-signal plots (e.g. an X–Y path): `System.plot_data(x_label=..., y_labels=...)`
-→ `graphical.signals.plot_data_signals`. Phase plane: matplotlib default. Diagrams:
-Graphviz display, Mermaid export; Plotly under `plotting` extra.
+→ `graphical.signals.plot_data_signals` (**experimental, matplotlib-only; TODO:
+User Architectural Review**). Phase plane: matplotlib default. Diagrams: Graphviz
+display, Mermaid export; Plotly under `plotting` extra.
 
 **Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
 for all renderers. Override on `System` for custom views; kinematic hooks TRL 1.
