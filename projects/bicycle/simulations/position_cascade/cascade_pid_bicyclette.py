@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.control.pid import Sum
 from projects.bicycle.control.pid import InstrumentedPID as PID
-from minilink.control.references import ConstantReference
+from projects.bicycle.control.sum import Sum
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.graphical.animation.primitives import (
@@ -226,8 +225,6 @@ def create_diagram(
 ):
 
     r_to_steering = AngularSpeedToSteeringMap(vehicle)
-    steering = ConstantReference(ref=r_ref, name="Constant angular speed")
-    # speed_const = ConstantReference(ref=vx_ref, name="Constant linear speed")
     speed_goal = Vx2V(ref=vx_ref, name="Constant xspeed")
 
     full_state_meas = BicycleMeasurement(name="Meas states", y_size=10)
@@ -253,8 +250,6 @@ def create_diagram(
         Kd=1.0,
         cmd_min=-10.0,
         cmd_max=10.0,
-        i_min=-5.0,
-        i_max=5.0,
         name="X pos PID",
     )
 
@@ -264,8 +259,6 @@ def create_diagram(
         Kd=0.0,
         cmd_min=-10.0,
         cmd_max=10.0,
-        i_min=-0.0,
-        i_max=5.0,
         name="Speed PID",
     )
 
@@ -278,8 +271,6 @@ def create_diagram(
         Kd=0.0,
         cmd_min=-10.0,
         cmd_max=10.0,
-        i_min=-10.0,
-        i_max=10.0,
         name="Yaw rate PID",
     )
 
@@ -289,8 +280,6 @@ def create_diagram(
         Kd=0.0,
         cmd_min=-np.pi / 4.0,
         cmd_max=np.pi / 4.0,
-        i_min=-np.pi / 4.0,
-        i_max=np.pi / 4.0,
         name="Yaw rate PID",
     )
 
@@ -302,7 +291,6 @@ def create_diagram(
     diagram = DiagramSystem()
     diagram.name = "Cascade PID - DynamicBicycleRearWheelDriveEngine"
 
-    diagram.add_subsystem(steering, "steering")
     diagram.add_subsystem(r_to_steering, "r_to_steering")
     diagram.add_subsystem(vehicle, "vehicle")
     diagram.add_subsystem(r_pid, "r_pid")

@@ -1,6 +1,7 @@
+import numpy as np
+
 from projects.bicycle.control.measurement import Measurement
 from projects.bicycle.control.pid import InstrumentedPID as PID
-from minilink.control.references import ConstantReference
 from minilink.core.diagram import DiagramSystem
 from projects.bicycle.control.motor_map import AccToRearForce, ThrMap
 from projects.bicycle.models.dynamic_bicycle import (
@@ -15,8 +16,6 @@ DELTA_REF = 0.0
 
 
 def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
-
-    v_ref = ConstantReference(ref=vx_ref, name="Speed reference")
 
     speed_meas = Measurement(
         name="Speed measurement",
@@ -36,14 +35,15 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
         Kd=0.0,
         cmd_min=-10.0,
         cmd_max=10.0,
-        i_min=-5.0,
-        i_max=5.0,
         name="Speed PID",
     )
 
-    steering = ConstantReference(ref=DELTA_REF, name="Constant steering")
     thr_map = ThrMap(vehicle)
     acc_to_force = AccToRearForce(vehicle)
+
+    # Constant references as default (nominal) values on unconnected ports.
+    v_pid.inputs["r"].nominal_value = np.array([vx_ref])
+    vehicle.inputs["delta"].nominal_value = np.array([DELTA_REF])
 
     diagram = DiagramSystem()
     diagram.name = "Acceleration PID - DynamicBicycleRearWheelDriveEngine"
@@ -51,15 +51,12 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
     diagram.add_subsystem(acc_to_force, "acc_to_force")
     diagram.add_subsystem(thr_map, "thr_map")
 
-    diagram.add_subsystem(v_ref, "v_ref")
     diagram.add_subsystem(v_pid, "v_pid")
     diagram.add_subsystem(rear_speed_meas, "rear_speed_meas")
     diagram.add_subsystem(speed_meas, "speed_meas")
 
-    diagram.add_subsystem(steering, "steering")
     diagram.add_subsystem(vehicle, "vehicle")
 
-    diagram.connect("v_ref", "ref", "v_pid", "r")
     diagram.connect("speed_meas", "meas", "v_pid", "y")
     diagram.connect("v_pid", "u", "acc_to_force", "acc_targ")
 
@@ -70,8 +67,6 @@ def create_diagram(vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF):
 
     diagram.connect("acc_to_force", "F_rear", "thr_map", "F_rear")
     diagram.connect("thr_map", "thr", "vehicle", "thr")
-
-    diagram.connect("steering", "ref", "vehicle", "delta")
 
     return diagram
 

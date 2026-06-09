@@ -2,9 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from projects.bicycle.control.measurement import Measurement
-from minilink.control.pid import Sum
 from projects.bicycle.control.pid import InstrumentedPID as PID
-from minilink.control.references import ConstantReference
+from projects.bicycle.control.sum import Sum
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.graphical.animation.primitives import (
@@ -103,8 +102,6 @@ def create_diagram(
 ):
 
     r_to_steering = AngularSpeedToSteeringMap(vehicle)
-    steering = ConstantReference(ref=r_ref, name="Constant angular speed")
-    speed_const = ConstantReference(ref=vx_ref, name="Constant linear speed")
 
     speed_meas = Measurement(name="Speed measurement", y_size=12, index=5, show=False)
     x_pos_meas = Measurement(name="Speed measurement", y_size=12, index=0, show=False)
@@ -125,8 +122,6 @@ def create_diagram(
         Kd=0.0,
         cmd_min=-10.0,
         cmd_max=10.0,
-        i_min=-5.0,
-        i_max=5.0,
         name="X pos PID",
     )
 
@@ -136,8 +131,6 @@ def create_diagram(
         Kd=0.0,
         cmd_min=-10.0,
         cmd_max=10.0,
-        i_min=-0.0,
-        i_max=5.0,
         name="Speed PID",
     )
 
@@ -150,19 +143,21 @@ def create_diagram(
         Kd=0.1,
         cmd_min=-np.pi / 2.0,
         cmd_max=np.pi / 2.0,
-        i_min=-np.pi / 2.0,
-        i_max=np.pi / 2.0,
         name="Yaw rate PID",
     )
 
     sum_bloc = Sum(max=np.pi / 2.0, min=-np.pi / 2.0)
+
+    # Constant references as default (nominal) values on unconnected ports.
+    v_pid.inputs["r"].nominal_value = np.array([vx_ref])
+    r_pid.inputs["r"].nominal_value = np.array([r_ref])
+    r_to_steering.inputs["r_targ"].nominal_value = np.array([r_ref])
 
     trajectory = Trajectory(x_traj=x_pos, y_traj=y_pos)
 
     diagram = DiagramSystem()
     diagram.name = "Cascade PID - DynamicBicycleRearWheelDriveEngine"
 
-    diagram.add_subsystem(steering, "steering")
     diagram.add_subsystem(r_to_steering, "r_to_steering")
     diagram.add_subsystem(vehicle, "vehicle")
     diagram.add_subsystem(r_pid, "r_pid")
@@ -180,9 +175,6 @@ def create_diagram(
     diagram.add_subsystem(trajectory, "trajectory")
     # diagram.add_subsystem(int_traj, "int_traj")
 
-    diagram.add_subsystem(speed_const, "speed_const")
-
-    diagram.connect("speed_const", "ref", "v_pid", "r")
     # diagram.connect("trajectory", "x_targ", "int_traj", "goal_x")
     # diagram.connect("trajectory", "x_targ", "x_pid", "r")
     # diagram.connect("int_traj", "x_targ", "x_pid", "r")
@@ -199,9 +191,6 @@ def create_diagram(
     diagram.connect("vehicle", "y", "speed_meas", "y")
     diagram.connect("vehicle", "y", "ang_speed_meas", "y")
     diagram.connect("vehicle", "y", "rear_speed_meas", "y")
-
-    diagram.connect("steering", "ref", "r_pid", "r")
-    diagram.connect("steering", "ref", "r_to_steering", "r_targ")
 
     diagram.connect("speed_meas", "meas", "r_to_steering", "vx_meas")
     diagram.connect("ang_speed_meas", "meas", "r_pid", "y")

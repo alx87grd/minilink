@@ -3,7 +3,6 @@ import numpy as np
 
 from projects.bicycle.control.measurement import Measurement
 from projects.bicycle.control.pid import InstrumentedPID as PID
-from minilink.control.references import ConstantReference
 from minilink.core.diagram import DiagramSystem
 from projects.bicycle.control.motor_map import AccToRearForce, ThrMap
 from projects.bicycle.models.dynamic_bicycle import (
@@ -22,9 +21,6 @@ def create_diagram(
     vehicle: DynamicBicycleRearWheelDriveEngine, vx_ref=VX_REF, r_ref=R_REF
 ):
 
-    steering = ConstantReference(ref=r_ref, name="Constant angular speed")
-    speed_const = ConstantReference(ref=vx_ref, name="Constant linear speed")
-
     rear_speed_meas = Measurement(
         name="Rear wheel speed",
         y_size=10,
@@ -42,8 +38,6 @@ def create_diagram(
         Kd=0.25,
         cmd_min=-np.pi / 4.0,
         cmd_max=np.pi / 4.0,
-        i_min=-np.pi / 4.0,
-        i_max=np.pi / 4.0,
         name="Yaw rate PID",
     )
 
@@ -53,10 +47,12 @@ def create_diagram(
         Kd=0.0,
         cmd_min=-10.0,
         cmd_max=10.0,
-        i_min=-5.0,
-        i_max=5.0,
         name="Speed PID",
     )
+
+    # Constant references as default (nominal) values on the unconnected r ports.
+    r_pid.inputs["r"].nominal_value = np.array([r_ref])
+    v_pid.inputs["r"].nominal_value = np.array([vx_ref])
 
     thr_map = ThrMap(vehicle)
     acc_to_force = AccToRearForce(vehicle)
@@ -64,20 +60,17 @@ def create_diagram(
     diagram = DiagramSystem()
     diagram.name = "Steering PID - DynamicBicycleRearWheelDriveEngine"
 
-    diagram.add_subsystem(steering, "steering")
     diagram.add_subsystem(vehicle, "vehicle")
     diagram.add_subsystem(r_pid, "r_pid")
     diagram.add_subsystem(ang_speed_meas, "ang_speed_meas")
 
     diagram.add_subsystem(acc_to_force, "acc_to_force")
     diagram.add_subsystem(thr_map, "thr_map")
-    diagram.add_subsystem(speed_const, "speed_const")
     diagram.add_subsystem(v_pid, "v_pid")
     diagram.add_subsystem(rear_speed_meas, "rear_speed_meas")
     diagram.add_subsystem(speed_meas, "speed_meas")
     # Constant steering command
 
-    diagram.connect("speed_const", "ref", "v_pid", "r")
     diagram.connect("speed_meas", "meas", "v_pid", "y")
     diagram.connect("v_pid", "u", "acc_to_force", "acc_targ")
 
@@ -85,7 +78,6 @@ def create_diagram(
     diagram.connect("vehicle", "y", "ang_speed_meas", "y")
     diagram.connect("vehicle", "y", "rear_speed_meas", "y")
 
-    diagram.connect("steering", "ref", "r_pid", "r")
     diagram.connect("ang_speed_meas", "meas", "r_pid", "y")
 
     diagram.connect("r_pid", "u", "vehicle", "delta")

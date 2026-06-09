@@ -13,7 +13,6 @@ import types
 
 import numpy as np
 
-from minilink.control.references import ConstantReference
 from minilink.core.diagram import DiagramSystem
 from minilink.graphical.animation.primitives import camera_matrix
 from projects.bicycle.models.dynamic_bicycle import DynamicBicycleRearWheelDrive
@@ -72,26 +71,14 @@ def main():
         dtype=float,
     )
 
-    constant_t = ConstantReference(
-        ref=T_REAR_REF,
-        name="constant torque",
-    )
-
-    constant_delta = ConstantReference(
-        ref=DELTA_REF,
-        name="constant delta",
-    )
+    # Constant open-loop inputs as default (nominal) values on the vehicle ports.
+    vehicle.inputs["t_rear"].nominal_value = np.array([T_REAR_REF])
+    vehicle.inputs["delta"].nominal_value = np.array([DELTA_REF])
 
     diagram = DiagramSystem()
     diagram.name = "Open-loop DynamicBicycleRearWheelDrive"
 
-    diagram.add_subsystem(constant_t, "constant_t")
-    diagram.add_subsystem(constant_delta, "constant_delta")
-
     diagram.add_subsystem(vehicle, "vehicle")
-
-    diagram.connect("constant_t", "ref", "vehicle", "t_rear")
-    diagram.connect("constant_delta", "ref", "vehicle", "delta")
 
     diagram.plot_diagram()
 
