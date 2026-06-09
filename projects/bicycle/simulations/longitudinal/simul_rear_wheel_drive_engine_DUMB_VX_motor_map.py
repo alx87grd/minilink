@@ -96,7 +96,6 @@ def main():
 
     print("Trajectory computation done.")
 
-
     traj = diagram.reconstruct_internal_signals(diagram.traj)
     logs = traj.get_signal("vehicle:r_tire_datas")
 

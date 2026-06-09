@@ -1,4 +1,3 @@
-
 from minilink.control.measurement import Measurement
 from minilink.control.pid import PID
 from minilink.control.references import ConstantReference

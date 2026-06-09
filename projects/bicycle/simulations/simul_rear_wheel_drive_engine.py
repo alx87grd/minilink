@@ -9,7 +9,6 @@ The vehicle receives constant open-loop inputs:
 - delta: front steering angle [rad]
 """
 
-
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
