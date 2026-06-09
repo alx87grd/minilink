@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.control.measurement import Measurement
+from projects.bicycle.control.measurement import Measurement
 from minilink.control.pid import PID, Sum
 from minilink.control.references import ConstantReference
 from minilink.core.diagram import DiagramSystem
