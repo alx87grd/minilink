@@ -1,8 +1,7 @@
 """Second-order mechanical systems with generalized velocities."""
 
-import numpy as np
 
-from minilink.compile.jax_utils import array_module
+from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 
 

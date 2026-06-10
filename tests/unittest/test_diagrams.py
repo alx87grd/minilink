@@ -2,7 +2,8 @@ import unittest
 
 import pytest
 
-from minilink.core.blocks.basic import Integrator, PropController
+from minilink.blocks.basic import Integrator
+from minilink.control.linear import PController
 from minilink.core.diagram import DiagramSystem
 from minilink.graphical.diagrams import (
     build_diagram_topology,
@@ -15,7 +16,7 @@ from minilink.graphical.diagrams import (
 
 class TestDiagrams(unittest.TestCase):
     def test_system_block_html_includes_named_ports(self):
-        html = get_system_block_html(PropController(), "ctl")
+        html = get_system_block_html(PController(), "ctl")
 
         self.assertIn("Controller::ctl", html)
         self.assertIn('PORT="r"', html)
@@ -76,7 +77,7 @@ class TestDiagrams(unittest.TestCase):
     def _make_diagram():
         diagram = DiagramSystem()
         diagram.connection_verbose = False
-        diagram.add_subsystem(PropController(), "ctl")
+        diagram.add_subsystem(PController(), "ctl")
         diagram.add_subsystem(Integrator(), "plant")
         diagram.add_input_port("r")
         diagram.connect("input", "r", "ctl", "r")

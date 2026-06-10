@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.blocks.sources import Step, WhiteNoise
+from minilink.blocks.sources import Step, WhiteNoise
 
 step = Step()
 step.params["initial_value"] = np.array([0.0])

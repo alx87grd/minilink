@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.compile.backend_policy import (
+from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
     normalize_backend,

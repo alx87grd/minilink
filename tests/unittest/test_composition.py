@@ -2,16 +2,16 @@ import unittest
 
 import numpy as np
 
-from minilink.control.pendulum_pd import PendulumPDController
-from minilink.core.blocks.basic import Integrator, PropController
-from minilink.core.blocks.sources import Step, WhiteNoise
+from minilink.blocks.basic import Integrator
+from minilink.blocks.sources import Step, WhiteNoise
+from minilink.control.linear import PController, PDController
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
 class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_add_operator_adds_subsystems_without_wiring(self):
-        diagram = Step(final_value=[1.0]) + PropController() + Integrator()
+        diagram = Step(final_value=[1.0]) + PController() + Integrator()
 
         self.assertIsInstance(diagram, DiagramSystem)
         self.assertEqual(
@@ -50,7 +50,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         np.testing.assert_allclose(dx, np.array([3.0, 1.0]))
 
     def test_matmul_operator_builds_closed_loop_diagram(self):
-        diagram = PendulumPDController() @ Pendulum()
+        diagram = PDController() @ Pendulum()
 
         self.assertIn("r", diagram.inputs)
         self.assertIn("y", diagram.outputs)
@@ -70,11 +70,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.outputs["y"].dim, 2)
 
     def test_series_operator_flattens_source_into_closed_loop_diagram(self):
-        diagram = (
-            Step(final_value=[1.0], step_time=0.0)
-            >> PendulumPDController()
-            @ Pendulum()
-        )
+        diagram = Step(final_value=[1.0], step_time=0.0) >> PDController() @ Pendulum()
 
         self.assertEqual(list(diagram.subsystems), ["step", "controller", "pendulum"])
         self.assertFalse(
@@ -88,7 +84,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
 
     def test_add_operator_flattens_diagrams_without_cross_wiring(self):
         left = Step(final_value=[1.0]) + Integrator()
-        right = PendulumPDController() @ Pendulum()
+        right = PDController() @ Pendulum()
 
         diagram = left + right
 
@@ -105,7 +101,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["pendulum"]["u"], ("controller", "u"))
 
     def test_series_operator_flattens_diagram_to_diagram_boundary(self):
-        left = Step(final_value=[1.0], step_time=0.0) >> PropController()
+        left = Step(final_value=[1.0], step_time=0.0) >> PController()
         right = Integrator() >> Integrator()
 
         diagram = left >> right
@@ -127,11 +123,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertNotIn("u", diagram.inputs)
 
     def test_series_into_closed_loop_without_free_boundary_input_fails(self):
-        diagram = (
-            Step(final_value=[1.0], step_time=0.0)
-            >> PendulumPDController()
-            @ Pendulum()
-        )
+        diagram = Step(final_value=[1.0], step_time=0.0) >> PDController() @ Pendulum()
 
         with self.assertRaisesRegex(ValueError, "no available boundary input"):
             WhiteNoise() >> diagram
@@ -139,7 +131,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["pendulum"]["u"], ("controller", "u"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
-        diagram = (Step(final_value=[1.0]) + PropController() + Integrator()).autowire(
+        diagram = (Step(final_value=[1.0]) + PController() + Integrator()).autowire(
             strict=True
         )
 
@@ -161,9 +153,9 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["integrator"]["u"], ("step", "y"))
 
     def test_autowire_handles_pendulum_closed_loop_convention(self):
-        diagram = (
-            Step(final_value=[1.0]) + PendulumPDController() + Pendulum()
-        ).autowire(strict=True)
+        diagram = (Step(final_value=[1.0]) + PDController() + Pendulum()).autowire(
+            strict=True
+        )
 
         self.assertEqual(
             diagram.connections["controller"]["r"],
@@ -179,7 +171,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         )
 
     def test_autowire_strict_refuses_ambiguous_matches(self):
-        diagram = PropController() + PropController() + Integrator()
+        diagram = PController() + PController() + Integrator()
 
         with self.assertRaisesRegex(ValueError, "Ambiguous autowire target"):
             diagram.autowire(strict=True)

@@ -372,7 +372,7 @@ planner = PathPlanner(U_REF, path_a=A, path_lambda=LAMBDA)
 tracking = Tracking(LD)
 heading_loop = HeadingLoop()
 yaw_rate_loop = YawRateLoop()
-vel_pid = VelocityPID(vehicle.r_r)
+vel_pid = VelocityPID(vehicle.params["r_r"])
 
 diagram = DiagramSystem()
 diagram.name = "Cascade sinusoid tracking"

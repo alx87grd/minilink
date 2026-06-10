@@ -5,9 +5,9 @@ Run from the repo root:
     python examples/scripts/diagrams/demo_diagram_shortcuts.py
 """
 
-from minilink.control.pendulum_pd import PendulumPDController
-from minilink.core.blocks.basic import Integrator
-from minilink.core.blocks.sources import Step, WhiteNoise
+from minilink.blocks.basic import Integrator
+from minilink.blocks.sources import Step, WhiteNoise
+from minilink.control.linear import PDController
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
@@ -25,7 +25,7 @@ def show(diagram, name, operation):
 # diagram.add_subsystem(ctl, "controller")
 # diagram.add_subsystem(plant, "pendulum")
 step = Step(final_value=[1.0])
-ctl = PendulumPDController()
+ctl = PDController()
 plant = Pendulum()
 
 
@@ -58,33 +58,33 @@ show(chain, "Shortcut integrator chain", "Step() >> Integrator() >> Integrator()
 # closed.connect("pendulum", "y", "controller", "y")
 # closed.connect("controller", "u", "pendulum", "u")
 # closed.connect_new_output_port("pendulum", "y", "y")
-closed = PendulumPDController() @ Pendulum()
-show(closed, "Shortcut closed-loop pendulum", "PendulumPDController() @ Pendulum()")
+closed = PDController() @ Pendulum()
+show(closed, "Shortcut closed-loop pendulum", "PDController() @ Pendulum()")
 # closed.compute_trajectory(tf=10.0, show=False)
 
 
 # Python parses this as ``step >> (controller @ plant)``. Shortcut composition
 # flattens the closed-loop diagram, so the result has direct ``step``,
 # ``controller``, and ``pendulum`` subsystems.
-fed_closed = Step(final_value=[1.0]) >> PendulumPDController() @ Pendulum()
+fed_closed = Step(final_value=[1.0]) >> PDController() @ Pendulum()
 show(
     fed_closed,
     "Source into closed-loop shortcut",
-    "Step() >> PendulumPDController() @ Pendulum()",
+    "Step() >> PDController() @ Pendulum()",
 )
 # fed_closed.compute_trajectory(tf=10.0, show=False)
 
 
 # Noise and disturbance ports stay explicit. This keeps ``>>`` from guessing
 # between open internal plant inputs such as ``w`` and ``v``.
-noisy = Step(final_value=[1.0]) >> PendulumPDController() @ Pendulum()
+noisy = Step(final_value=[1.0]) >> PDController() @ Pendulum()
 noise = WhiteNoise()
 noisy.add_subsystem(noise, "sensor_noise")
 noisy.connect("sensor_noise", "y", "pendulum", "v")
 show(
     noisy,
     "Closed loop with explicit sensor noise",
-    "Step() >> PendulumPDController() @ Pendulum(), WhiteNoise() -> pendulum.v",
+    "Step() >> PDController() @ Pendulum(), WhiteNoise() -> pendulum.v",
 )
 
 
@@ -97,9 +97,9 @@ show(
 # auto.connect("step", "y", "controller", "r")
 # auto.connect("pendulum", "y", "controller", "y")
 # auto.connect("controller", "u", "pendulum", "u")
-auto = (Step() + PendulumPDController() + Pendulum()).autowire(strict=True)
+auto = (Step() + PDController() + Pendulum()).autowire(strict=True)
 show(
     auto,
     "Autowired shortcut diagram",
-    "(Step() + PendulumPDController() + Pendulum()).autowire(strict=True)",
+    "(Step() + PDController() + Pendulum()).autowire(strict=True)",
 )

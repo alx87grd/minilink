@@ -95,9 +95,7 @@ def build_phase_plane_spec(
                 dtype=float,
             ).reshape(-1)
             if dx.shape != (sys.n,):
-                raise ValueError(
-                    f"sys.f must return shape ({sys.n},), got {dx.shape}"
-                )
+                raise ValueError(f"sys.f must return shape ({sys.n},), got {dx.shape}")
             V[row, col] = dx[x_axis]
             W[row, col] = dx[y_axis]
 

@@ -8,15 +8,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from minilink.compile.jax_utils import format_benchmark_backend_label
-from minilink.core.system import DynamicSystem
-from minilink.simulation.benchmark import (
+from benchmarks.common import format_benchmark_backend_label
+from benchmarks.simulation import (
     TRUTH_SIMULATION_VARIANT,
     SimulationBenchmarkVariant,
     benchmark_simulation_backend,
     benchmark_simulation_matrix,
     print_simulation_matrix_benchmark,
 )
+from minilink.core.system import DynamicSystem
 
 
 class _TinyStable(DynamicSystem):

@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.blocks.sources import Step
+from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem
 
@@ -19,7 +19,7 @@ class Integrator(DynamicSystem):
         return np.array([x[0]])
 
 
-class PropController(StaticSystem):
+class PController(StaticSystem):
     def __init__(self):
         super().__init__()
 
@@ -55,9 +55,9 @@ sys2.state.labels = ["x"]
 sys2.x0[0] = 20.0
 
 # Controllers
-ctl1 = PropController()
+ctl1 = PController()
 ctl1.params["Kp"] = 1.0
-ctl2 = PropController()
+ctl2 = PController()
 ctl2.params["Kp"] = 1.0
 
 # Source input

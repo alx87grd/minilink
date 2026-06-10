@@ -23,7 +23,6 @@ from dataclasses import replace
 
 import numpy as np
 
-from minilink.compile.backend_policy import BACKEND_NUMPY
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -33,14 +32,14 @@ from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
     OptimizerBackend,
 )
+from minilink.optimization.reporting import (
+    DISP_RULE_DIV,
+    DISP_RULE_MAIN,
+    preview_vector,
+)
 
 # User progress hook: current ``z``, objective ``J``, elapsed wall time ``t`` (seconds since solve start).
 OptimizationProgressCallback = Callable[[np.ndarray, float, float], None]
-
-# Human-readable ``disp=True`` panel (preamble + report share one frame).
-_DISP_LINE_WIDTH = 60
-_DISP_RULE_MAIN = "=" * _DISP_LINE_WIDTH
-_DISP_RULE_DIV = "-" * _DISP_LINE_WIDTH
 
 # User-facing optimizer methods mapped to (backend_key, default_constructor_kwargs).
 _USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
@@ -68,6 +67,8 @@ class Optimizer:
         ``"scipy_trust_constr"``, or ``"ipopt"``.
     compile_backend : str, optional
         Mathematical-program evaluator backend, ``"numpy"`` or ``"jax"``.
+        Defaults to ``program.backend`` (the native backend of the program's
+        callables).
     use_hessian : bool, optional
         For JAX program evaluators, auto-generate a dense objective Hessian
         when no ``hess_J`` is supplied.
@@ -84,7 +85,7 @@ class Optimizer:
         z0,
         *,
         method: str = "scipy_slsqp",
-        compile_backend: str = BACKEND_NUMPY,
+        compile_backend: str | None = None,
         use_hessian: bool = False,
         options: dict | None = None,
         **method_kwargs,
@@ -98,10 +99,12 @@ class Optimizer:
         self.program = program
         self.z0 = self._decision_vector(z0, program.n_z)
         self.method = method
-        self.compile_backend = compile_backend
+        self.compile_backend = (
+            program.backend if compile_backend is None else compile_backend
+        )
         self.program_evaluator = compile_program_evaluator(
             program,
-            backend=compile_backend,
+            backend=self.compile_backend,
             sample_z=self.z0,
             use_hessian=use_hessian,
         )
@@ -122,7 +125,6 @@ class Optimizer:
     def _select_backend(backend_key: str, kwargs: dict) -> OptimizerBackend:
 
         if backend_key == "scipy_minimize":
-
             from minilink.optimization.optimizers.scipy_minimize import (
                 ScipyMinimizeOptimizer,
             )
@@ -130,7 +132,6 @@ class Optimizer:
             return ScipyMinimizeOptimizer(**kwargs)
 
         if backend_key == "ipopt":
-
             try:
                 import cyipopt  # noqa: F401
             except ImportError:
@@ -218,25 +219,17 @@ class Optimizer:
             raise ValueError(f"decision vector must have shape ({int(n_z)},)")
         return arr
 
-    def _preview_z(self, z: np.ndarray, n_z: int) -> str:
-        """Compact string for a length-``n_z`` slice of ``z`` (used when ``disp=True``)."""
-        if n_z <= 8:
-            return np.array2string(z, precision=6, max_line_width=96)
-        head = np.array2string(z[:4], precision=6, max_line_width=96)
-        return f"{head} ... ({n_z} values)"
-
     def _print_solve_preamble(self, z0: np.ndarray) -> None:
         print()
-        print(_DISP_RULE_MAIN)
+        print(DISP_RULE_MAIN)
         print("===               Optimization Program                   ===")
-        print(_DISP_RULE_MAIN)
-        print("problem_class:", self.program.problem_class)
+        print(DISP_RULE_MAIN)
         print("n_z:", int(self.program.n_z))
-        print("z0:", self._preview_z(z0, int(self.program.n_z)))
+        print("z0:", preview_vector(z0))
         print(f"method={self.method!r}")
         print(f"compile_backend={self.program_evaluator.backend!r}")
         print("options:", getattr(self.backend, "options", {}))
-        print(_DISP_RULE_DIV)
+        print(DISP_RULE_DIV)
         print("Running solver...")
 
     def _print_solve_report(
@@ -245,16 +238,15 @@ class Optimizer:
     ) -> None:
         """Print the **After solve** section and close the ``disp`` panel."""
         print("Completed in", result.solve_time_s, "seconds")
-        print(_DISP_RULE_DIV)
+        print(DISP_RULE_DIV)
         print("success:", result.success)
-        print("z*:", self._preview_z(result.z, int(self.program.n_z)))
+        print("z*:", preview_vector(result.z))
         print("J*:", result.cost)
         print("stats:", result.stats)
-        print(_DISP_RULE_MAIN)
+        print(DISP_RULE_MAIN)
 
 
 if __name__ == "__main__":
-
     from minilink.optimization.mathematical_program import MathematicalProgram
 
     z_lo = 0.6

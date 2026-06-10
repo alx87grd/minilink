@@ -1,4 +1,29 @@
+"""
+Graphical primitives and 4x4 transform helpers for system animation.
+
+A system's visualization is a list of **primitives** (shapes defined in their
+own local frame) plus, at every instant, one 4x4 homogeneous **transform** per
+primitive placing it in the world (see
+:meth:`minilink.core.system.System.get_kinematic_geometry` and
+:meth:`~minilink.core.system.System.get_kinematic_transforms`). Renderers draw
+the primitives; they never know about states or inputs.
+
+Two conventions extend the plain rigid transform:
+
+- **Scale columns**: multiplying the rotation columns by a factor stretches
+  unit-sized primitives (:class:`Arrow`, :class:`CustomLine`) to a world size
+  (:func:`scale_pose2d_matrix`, :func:`arrow_transform`).
+- **Amplitude channel**: the normally-unused ``T[3, 3]`` slot carries a scalar
+  side-channel (torque sweep angle, camera view scale); renderers read and
+  reset it with :func:`extract_amplitude`.
+
+This module is NumPy-only and safe to import from core kinematic hooks: it
+never pulls in matplotlib or other rendering libraries.
+"""
+
 import numpy as np
+
+# Primitive shapes (local-frame geometry)
 
 
 class GraphicPrimitive:
@@ -27,7 +52,7 @@ class CustomLine(GraphicPrimitive):
 class Point(GraphicPrimitive):
     """An individual point marker."""
 
-    def __init__(self, pt=[0, 0, 0], color="red", marker="o", size=5):
+    def __init__(self, pt=(0, 0, 0), color="red", marker="o", size=5):
         super().__init__(color)
         self.pt = np.array(pt)
         self.marker = marker
@@ -37,7 +62,7 @@ class Point(GraphicPrimitive):
 class Circle(GraphicPrimitive):
     """A basic circle primitive. Lives in the XY plane by default."""
 
-    def __init__(self, radius=1.0, center=[0, 0, 0], color="blue", fill=False):
+    def __init__(self, radius=1.0, center=(0, 0, 0), color="blue", fill=False):
         super().__init__(color)
         self.radius = radius
         self.center = np.array(center)
@@ -47,7 +72,7 @@ class Circle(GraphicPrimitive):
 class Sphere(GraphicPrimitive):
     """A 3D sphere primitive centered at ``center`` in local frame."""
 
-    def __init__(self, radius=1.0, center=[0, 0, 0], color="blue", opacity=1.0):
+    def __init__(self, radius=1.0, center=(0, 0, 0), color="blue", opacity=1.0):
         super().__init__(color)
         self.radius = radius
         self.center = np.array(center)
@@ -81,7 +106,7 @@ class Plane(GraphicPrimitive):
 
     def __init__(
         self,
-        normal=[0, 1, 0],
+        normal=(0, 1, 0),
         offset=0.0,
         size=10.0,
         thickness=0.02,
@@ -94,19 +119,6 @@ class Plane(GraphicPrimitive):
         self.size = float(size)
         self.thickness = float(thickness)
         self.opacity = float(opacity)
-
-
-class Rectangle(GraphicPrimitive):
-    """A standard axis-aligned rectangle in local frame (XY plane by default)."""
-
-    def __init__(
-        self, width=1.0, height=1.0, center=[0, 0, 0], color="blue", fill=False
-    ):
-        super().__init__(color)
-        self.width = width
-        self.height = height
-        self.center = np.array(center)
-        self.fill = fill
 
 
 class Box(GraphicPrimitive):
@@ -264,7 +276,7 @@ class TorqueArrow(GraphicPrimitive):
     carries the **amplitude** (here, the sweep angle in radians).  In a
     standard homogeneous matrix ``T[3, 3]`` is always 1; a non-unit value
     is therefore an unambiguous side-channel that renderers extract before
-    applying the rigid part.  See :ref:`amplitude-channel` and
+    applying the rigid part.  See :func:`extract_amplitude` and
     :func:`torque_pose2d_matrix`.
 
     * Translation ``T[0:2, 3]`` — centre of the arc (joint world position).
@@ -622,6 +634,9 @@ def point_transform(point):
     """Translation transform placing a primitive at *point* (z defaults to 0)."""
     point = np.asarray(point, dtype=float)
     return translation_matrix(point[0], point[1], point[2] if point.size > 2 else 0.0)
+
+
+# Ready-Made Shapes And Poses
 
 
 def ground_line(length=20.0, y=0.0, color="black", style="--"):

@@ -2,38 +2,62 @@ import unittest
 
 import numpy as np
 
+from minilink.blocks.transfer_function import TransferFunction
 from minilink.dynamics.catalog.aerial.drone import (
-    ConstantSpeedHelicopterTunnel, Drone2D, Drone2DWithSideThruster,
-    SpeedControlledDrone2D)
+    ConstantSpeedHelicopterTunnel,
+    Drone2D,
+    Drone2DWithSideThruster,
+    SpeedControlledDrone2D,
+)
 from minilink.dynamics.catalog.aerial.plane import Plane2D
 from minilink.dynamics.catalog.aerial.rocket import Rocket
-from minilink.dynamics.catalog.equations.integrators import (DoubleIntegrator,
-                                                             SimpleIntegrator,
-                                                             TripleIntegrator)
+from minilink.dynamics.catalog.equations.integrators import (
+    DoubleIntegrator,
+    SimpleIntegrator,
+    TripleIntegrator,
+)
 from minilink.dynamics.catalog.equations.oscillators import VanderPol
-from minilink.dynamics.catalog.equations.transfer_function import \
-    TransferFunction
 from minilink.dynamics.catalog.manipulators.arms import (
-    FiveLinkPlanarManipulator, OneLinkManipulator, SpeedControlledManipulator,
-    ThreeLinkManipulator3D, TwoLinkManipulator)
+    FiveLinkPlanarManipulator,
+    OneLinkManipulator,
+    SpeedControlledManipulator,
+    ThreeLinkManipulator3D,
+    TwoLinkManipulator,
+)
 from minilink.dynamics.catalog.marine.boat import Boat2D, Boat2DWithCurrent
 from minilink.dynamics.catalog.mass_spring_damper.linear import (
-    FloatingSingleMass, FloatingThreeMass, FloatingTwoMass, SingleMass,
-    ThreeMass, TwoMass)
+    FloatingSingleMass,
+    FloatingThreeMass,
+    FloatingTwoMass,
+    SingleMass,
+    ThreeMass,
+    TwoMass,
+)
 from minilink.dynamics.catalog.pendulum.cartpole import (
-    CartPole, RotatingCartPole, UnderactuatedRotatingCartPole)
+    CartPole,
+    RotatingCartPole,
+    UnderactuatedRotatingCartPole,
+)
 from minilink.dynamics.catalog.pendulum.double_pendulum import Acrobot
 from minilink.dynamics.catalog.pendulum.pendulum import (
-    InvertedPendulum, Pendulum, TwoIndependentPendulums)
+    InvertedPendulum,
+    Pendulum,
+    TwoIndependentPendulums,
+)
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalFrontWheelDriveCarWithTorqueInput,
-    LongitudinalFrontWheelDriveCarWithWheelSlipInput)
+    LongitudinalFrontWheelDriveCarWithWheelSlipInput,
+)
 from minilink.dynamics.catalog.vehicles.steering import (
-    ConstantSpeedKinematicCar, HolonomicMobileRobot, HolonomicMobileRobot3D,
-    KinematicBicycle, KinematicCar, UdeSRacecar)
-from minilink.dynamics.catalog.vehicles.suspension import \
-    QuarterCarOnRoughTerrain
+    ConstantSpeedKinematicCar,
+    HolonomicMobileRobot,
+    HolonomicMobileRobot3D,
+    KinematicBicycle,
+    KinematicCar,
+    UdeSRacecar,
+)
+from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
 from minilink.graphical.animation.primitives import Arrow, TorqueArrow
 
 

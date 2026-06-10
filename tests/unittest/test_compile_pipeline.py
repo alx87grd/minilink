@@ -13,21 +13,22 @@ import unittest
 import numpy as np
 import pytest
 
-from minilink.compile.compiler import (
+from minilink.blocks.basic import Integrator
+from minilink.control.linear import PController
+from minilink.core.backends import array_module
+from minilink.core.compile.compiler import (
     build_execution_plan,
     check_algebraic_loops,
     compile_diagram,
 )
-from minilink.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
-from minilink.compile.execution_plan import ExecutionPlan
-from minilink.compile.jax_utils import array_module
-from minilink.core.blocks.basic import Integrator, PropController
+from minilink.core.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
+from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem, System
 
 
 # Helper: reusable test diagrams
-class _JAXFriendlyPropController(StaticSystem):
+class _JAXFriendlyPController(StaticSystem):
     """P controller using NumPy or JAX ops so ``compile(..., backend='jax')`` traces."""
 
     def __init__(self):
@@ -72,7 +73,7 @@ def _build_small_closed_loop_jax():
     diag = DiagramSystem()
     diag.connection_verbose = False
 
-    ctl = _JAXFriendlyPropController()
+    ctl = _JAXFriendlyPController()
     plant = _JAXFriendlyIntegrator()
     ctl.params["Kp"] = 2.5
 
@@ -93,11 +94,11 @@ def _build_closed_loop_with_external_output_jax():
 
 
 def _build_small_closed_loop():
-    """Step → PropController → Integrator → feedback to controller."""
+    """Step → PController → Integrator → feedback to controller."""
     diag = DiagramSystem()
     diag.connection_verbose = False
 
-    ctl = PropController()
+    ctl = PController()
     plant = Integrator()
     ctl.params["Kp"] = 2.5
 
@@ -398,7 +399,7 @@ try:
     import jax
     import jax.numpy as jnp
 
-    from minilink.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
+    from minilink.core.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
@@ -569,6 +570,151 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
 #         for sys_id, sys in self.diag.subsystems.items():
 #             for port_id in sys.outputs:
 #                 self.assertIn(f"{sys_id}:{port_id}", signals)
+
+
+# Diagram params contract (nested {sys_id: {...}})
+class TestDiagramParamsContract(unittest.TestCase):
+    """Nested params routing and the ``DiagramSystem.params`` live view."""
+
+    def setUp(self):
+        self.diag = _build_small_closed_loop()  # ctl Kp=2.5, plant k=1.0
+        self.x = np.array([0.5])
+        self.u = np.array([2.0])
+        # Closed loop: dx = k * Kp * (r - x), with r - x = 1.5 here.
+
+    def test_params_property_is_nested_live_view(self):
+        params = self.diag.params
+        self.assertEqual(set(params), {"ctl", "plant"})
+        self.assertIs(params["plant"], self.diag.subsystems["plant"].params)
+
+    def test_params_setter_distributes_by_sys_id(self):
+        self.diag.params = {"plant": {"k": 3.0}}
+        self.assertEqual(self.diag.subsystems["plant"].params["k"], 3.0)
+        np.testing.assert_allclose(self.diag.f(self.x, self.u), [11.25], atol=1e-10)
+
+    def test_params_setter_unknown_id_raises(self):
+        with self.assertRaises(ValueError):
+            self.diag.params = {"plnt": {"k": 3.0}}
+
+    def test_mutating_params_view_affects_f(self):
+        self.diag.params["plant"]["k"] = 5.0
+        np.testing.assert_allclose(self.diag.f(self.x, self.u), [18.75], atol=1e-10)
+
+    def test_partial_params_fall_back_to_defaults(self):
+        dx = self.diag.f(self.x, self.u, 0.0, params={"plant": {"k": 3.0}})
+        np.testing.assert_allclose(dx, [11.25], atol=1e-10)
+
+    def test_unknown_sys_id_raises(self):
+        with self.assertRaises(ValueError):
+            self.diag.f(self.x, self.u, 0.0, params={"plnt": {"k": 3.0}})
+
+    def test_flat_leaf_style_dict_raises(self):
+        # The old pass-through heuristic is gone: leaf-style keys are
+        # unknown subsystem ids and must fail loudly.
+        with self.assertRaises(ValueError):
+            self.diag.f(self.x, self.u, 0.0, params={"Kp": 4.0})
+
+    def test_non_mapping_params_raises_typeerror(self):
+        with self.assertRaises(TypeError):
+            self.diag.f(self.x, self.u, 0.0, params=[1.0, 2.0])
+
+
+class TestNumpyDiagramParametricTier(unittest.TestCase):
+    """NumpyDiagramEvaluator ``f_p`` / ``h_p`` / ``outputs_p`` with nested params."""
+
+    def setUp(self):
+        self.diag = _build_closed_loop_with_external_output()
+        self.evaluator = compile_diagram(self.diag, backend="numpy")
+        self.x = np.array([0.5])
+        self.u = np.array([2.0])
+
+    def test_f_p_matches_recursive_reference(self):
+        params = {"ctl": {"Kp": 4.0}, "plant": {"k": 3.0}}
+        for x_val, u_val, t in [(0.3, 1.2, 0.1), (0.0, 0.0, 0.0), (-5.0, 10.0, 0.0)]:
+            x, u = np.array([x_val]), np.array([u_val])
+            np.testing.assert_allclose(
+                self.evaluator.f_p(x, u, t, params),
+                self.diag.f(x, u, t, params=params),
+                atol=1e-10,
+            )
+
+    def test_f_p_none_matches_f(self):
+        np.testing.assert_allclose(
+            self.evaluator.f_p(self.x, self.u, 0.0, None),
+            self.evaluator.f(self.x, self.u, 0.0),
+            atol=1e-10,
+        )
+
+    def test_f_p_partial_params(self):
+        dx = self.evaluator.f_p(self.x, self.u, 0.0, {"plant": {"k": 3.0}})
+        np.testing.assert_allclose(dx, [11.25], atol=1e-10)
+
+    def test_f_p_unknown_sys_id_raises(self):
+        with self.assertRaises(ValueError):
+            self.evaluator.f_p(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
+
+    def test_outputs_p_and_h_p_single_boundary(self):
+        params = {"ctl": {"Kp": 4.0}}
+        out = self.evaluator.outputs_p(self.x, self.u, 0.0, params)
+        self.assertEqual(set(out), {"y_meas"})
+        np.testing.assert_allclose(out["y_meas"], [0.5], atol=1e-10)
+        np.testing.assert_allclose(
+            self.evaluator.h_p(self.x, self.u, 0.0, params), [0.5], atol=1e-10
+        )
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+@unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
+class TestJaxDiagramParametricTier(unittest.TestCase):
+    """JAX parametric tier: ``f_p``, ``outputs_p``, gradients w.r.t. params."""
+
+    def setUp(self):
+        self.diag = _build_closed_loop_with_external_output_jax()  # Kp=2.5, k=1.0
+        self.ev = compile_diagram(self.diag, backend="jax")
+        self.ev_np = compile_diagram(self.diag, backend="numpy")
+        self.x_j = jnp.array([0.5], dtype=jnp.float32)
+        self.u_j = jnp.array([2.0], dtype=jnp.float32)
+        self.x_np = np.array([0.5])
+        self.u_np = np.array([2.0])
+
+    def test_f_p_matches_numpy(self):
+        params = {"ctl": {"Kp": 4.0}, "plant": {"k": 3.0}}
+        np.testing.assert_allclose(
+            np.asarray(self.ev.f_p(self.x_j, self.u_j, 0.0, params)),
+            self.ev_np.f_p(self.x_np, self.u_np, 0.0, params),
+            atol=1e-5,
+        )
+
+    def test_outputs_p_matches_numpy(self):
+        params = {"plant": {"k": 3.0}}
+        out_j = self.ev.outputs_p(self.x_j, self.u_j, 0.0, params)
+        out_n = self.ev_np.outputs_p(self.x_np, self.u_np, 0.0, params)
+        self.assertEqual(set(out_j), set(out_n))
+        for key in out_n:
+            np.testing.assert_allclose(np.asarray(out_j[key]), out_n[key], atol=1e-5)
+
+    def test_jacobian_f_params_analytic(self):
+        # dx = k * Kp * (r - x): d(dx)/dk = Kp (r - x), d(dx)/dKp = k (r - x)
+        params = {"ctl": {"Kp": 2.5}, "plant": {"k": 1.0}}
+        jac = self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, params)
+        np.testing.assert_allclose(
+            np.asarray(jac["plant"]["k"]), [2.5 * 1.5], atol=1e-5
+        )
+        np.testing.assert_allclose(np.asarray(jac["ctl"]["Kp"]), [1.5], atol=1e-5)
+
+    def test_grad_flows_through_f_p(self):
+        f_p = self.ev.get_f_p_jit()
+
+        def dx0(params):
+            return f_p(self.x_j, self.u_j, 0.0, params)[0]
+
+        g = jax.grad(dx0)({"plant": {"k": 1.0}})
+        self.assertAlmostEqual(float(g["plant"]["k"]), 2.5 * 1.5, places=4)
+
+    def test_jacobian_f_params_requires_params(self):
+        with self.assertRaises(ValueError):
+            self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, None)
 
 
 if __name__ == "__main__":

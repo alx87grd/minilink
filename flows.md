@@ -7,8 +7,10 @@ Contracts: [DESIGN.md](DESIGN.md).
 
 | Package | Owns |
 | --- | --- |
-| `core` | `System`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
-| `compile` | `ExecutionPlan`, `DynamicsEvaluator` |
+| `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
+| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`) |
+| `control` | generic control laws (`PController`, `PDController`) |
+| `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |
 | `graphical` | plots, diagrams, animation (`Animator` + renderers) |
 | `planning` | `PlanningProblem`, planners, transcriptions |

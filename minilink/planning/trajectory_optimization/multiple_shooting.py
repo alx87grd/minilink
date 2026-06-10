@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.compile.backend_policy import BACKEND_JAX
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -14,8 +14,9 @@ from minilink.planning.trajectory_optimization.transcription import (
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
+    rk4_step_between_knots,
     stack_constraints,
-    transcription_backend_key,
+    trajectory_cost,
 )
 
 
@@ -39,10 +40,10 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str | None = "numpy",
+        compile_backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Build the multiple-shooting nonlinear program."""
-        if transcription_backend_key(compile_backend) == BACKEND_JAX:
+        if normalize_backend(compile_backend, allow_direct=True) == BACKEND_JAX:
             return self._transcribe_jax(problem, compile_backend=compile_backend)
 
         problem.require_cost()
@@ -67,10 +68,10 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
+            backend=program_backend_for_compile(compile_backend),
             metadata={
                 "transcription": "multiple_shooting",
                 "compile_backend": compile_backend,
-                "program_backend": program_backend_for_compile(compile_backend),
             },
         )
 
@@ -78,7 +79,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str | None,
+        compile_backend: str,
     ) -> MathematicalProgram:
         """Build a JAX-vectorized multiple-shooting program."""
         import jax
@@ -99,43 +100,15 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             u = z[split:].reshape(m, n_steps)
             return x, u
 
+        def f(x, u, t_k):
+            return problem.sys.f(x, u, t_k, system_params)
+
         def rk4_step(x_k, u0, u1, t_k):
-            umid = 0.5 * (u0 + u1)
-            k1 = problem.sys.f(x_k, u0, t_k, system_params)
-            k2 = problem.sys.f(
-                x_k + 0.5 * dt * k1,
-                umid,
-                t_k + 0.5 * dt,
-                system_params,
-            )
-            k3 = problem.sys.f(
-                x_k + 0.5 * dt * k2,
-                umid,
-                t_k + 0.5 * dt,
-                system_params,
-            )
-            k4 = problem.sys.f(
-                x_k + dt * k3,
-                u1,
-                t_k + dt,
-                system_params,
-            )
-            return x_k + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+            return rk4_step_between_knots(f, x_k, u0, u1, t_k, dt)
 
         def J(z):
             x, u = unpack_jax(z)
-            running = jax.vmap(
-                lambda x_k, u_k, t_k: cost.g(
-                    x_k,
-                    u_k,
-                    t_k,
-                    params=cost_params,
-                ),
-                in_axes=(1, 1, 0),
-            )(x, u, t)
-            integral = jnp.sum(0.5 * dt * (running[:-1] + running[1:]))
-            terminal = cost.h(x[:, -1], t[-1], params=cost_params)
-            return integral + terminal
+            return trajectory_cost(cost, x, u, t, dt, cost_params)
 
         def dynamics_residual(z):
             x, u = unpack_jax(z)
@@ -165,24 +138,19 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
+            backend=BACKEND_JAX,
             metadata={
                 "transcription": "multiple_shooting",
                 "compile_backend": compile_backend,
-                "program_backend": BACKEND_JAX,
             },
         )
 
-    def _make_step(self, problem: PlanningProblem, compile_backend: str | None):
+    def _make_step(self, problem: PlanningProblem, compile_backend: str):
         f = dynamics_function(problem, compile_backend)
+        dt = self.options.dt
 
         def step(x, u0, u1, t):
-            dt = self.options.dt
-            umid = 0.5 * (u0 + u1)
-            k1 = f(x, u0, t)
-            k2 = f(x + 0.5 * dt * k1, umid, t + 0.5 * dt)
-            k3 = f(x + 0.5 * dt * k2, umid, t + 0.5 * dt)
-            k4 = f(x + dt * k3, u1, t + dt)
-            return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+            return rk4_step_between_knots(f, x, u0, u1, t, dt)
 
         return step
 

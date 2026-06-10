@@ -9,14 +9,6 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.graphical.common.environment import is_blocking_needed
-from minilink.graphical.common.matplotlib_style import (
-    DPI_EXPORT,
-    DPI_FIGURE,
-    FIGSIZE_ANIMATION,
-    FONT_SIZE,
-    style_animation_axes,
-)
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
@@ -32,6 +24,14 @@ from minilink.graphical.animation.primitives import (
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
+from minilink.graphical.common.environment import is_blocking_needed
+from minilink.graphical.common.matplotlib_style import (
+    DPI_EXPORT,
+    DPI_FIGURE,
+    FIGSIZE_ANIMATION,
+    FONT_SIZE,
+    style_animation_axes,
+)
 
 _AXIS_LABEL_BY_INDEX = ("X", "Y", "Z")
 

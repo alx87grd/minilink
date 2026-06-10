@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.trajectory import Trajectory
 from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.trajectory import Trajectory
 from minilink.graphical.common.plotly_style import PLOTLY_FIG_WIDTH
 from minilink.graphical.signals import (
     build_signal_plot_spec,
@@ -30,7 +30,7 @@ class Integrator(DynamicSystem):
         return np.array([x[0]])
 
 
-class PropController(StaticSystem):
+class PController(StaticSystem):
     def __init__(self):
         super().__init__()
         self.params = {"Kp": 5.0}
@@ -56,7 +56,7 @@ class Step(StaticSystem):
 class TestAdvancedPlotting(unittest.TestCase):
     def setUp(self):
         self.sys = Integrator()
-        self.ctl = PropController()
+        self.ctl = PController()
         self.step = Step()
 
         self.diagram = DiagramSystem()
@@ -86,7 +86,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertFalse(self.traj.has_signal("step:y"))
 
         # Reconstruct signals
-        traj_plus = self.diagram.compute_internal_signals(self.traj)
+        traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
 
         # Test it successfully created sampled channels
         self.assertTrue(traj_plus.has_signal("step:y"))

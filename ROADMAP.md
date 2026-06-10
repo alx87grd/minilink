@@ -8,15 +8,15 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Area | TRL | Rationale | Next |
 | --- | --- | --- | --- |
 | Core + diagrams | 7 | Public API and diagram API are probably stable after the final port-declaration update. | Keep stable; finish export policy and remaining edge cases. |
-| Compile | 4 | Integrated, but dynamic evaluator methods and exposed surface still need user review. | Review evaluator API, diagram parametric tier, and backend parity. |
+| Compile (`core/compile/`) | 4 | Integrated, but dynamic evaluator methods and exposed surface still need user review. | Review evaluator API, diagram parametric tier, and backend parity. |
 | Simulation | 7 | Mature workflow with stable API and solver/forcing coverage. | Keep behavior stable; treat `SimulationOptions` as ergonomic cleanup, not a redesign. |
 | Optimization | 5 | `MathematicalProgram` and `Optimizer` are integrated and useful, but backend details still need hardening. | Harden SciPy/Ipopt behavior and evaluator details before test-gated promotion. |
 | Planning/trajopt | 2 | Some user review happened, but much of the module remains AI one-shot prototype work. | Re-evaluate architecture/API before deeper integration. |
 | Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Re-evaluate graphical API before freezing. |
 | Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Re-evaluate renderer/camera/live-loop API before freezing. |
-| Dynamics catalog | 0 | Mostly empty relative to planned Pyro port. | Port and review interesting Pyro models by domain. |
+| Dynamics catalog | 6 | Pyro models ported, QA'd term-by-term against pyro, and covered by tests (see `docs/plans/catalog-migration-notes.md`); `DynamicBicycle` params now thread fully. | Review naming/details per module toward TRL 7. |
 | Symbolic/JAX physics engine | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
-| Control | 0 | Mostly empty; planned Pyro port has not really happened yet. | Port and review Pyro control blocks when needed. |
+| Control | 5 | Generic `PController`/`PDController` integrated in `control/linear.py` and exercised by core tests. | Port further Pyro control laws (PID, LQR, computed torque) when needed. |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 
@@ -29,27 +29,64 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 - Pure `MathematicalProgram` + `Optimizer`; backend-native trajopt transcriptions.
 - Phase-plane plotting (`plot_phase_plane`, matplotlib).
 - User docs: [README.md](README.md), [flows.md](flows.md) (minimal chains).
+- Package taxonomy: four bands (framework / system libraries / tools /
+  quarantine) with a dependency law and placement algorithm
+  ([DESIGN.md §3](DESIGN.md)); `compile/` folded into `core/compile/`;
+  generic blocks in top-level `blocks/`; generic control laws in
+  `control/linear.py`; `System` facades split into `core/facades.py`
+  (API unchanged).
 
 ## 3. Priorities
 
 **P0** — Docs/contracts aligned with code; compiled vs reference path parity.
 
-**P1** — Dynamic evaluator API review; diagram parametric evaluators (`f_p`,
-`h_p`); diagram validation; top-level `minilink` exports; NLP hardening.
+**P1** — Dynamic evaluator API review; ~~diagram parametric evaluators (`f_p`,
+`h_p`)~~ done (nested `{sys_id: {…}}` params, `jacobian_f_params`; see
+DESIGN.md §4 Parameters and `demo_params_gradient.py`); diagram validation;
+top-level `minilink` exports; NLP hardening.
 
-**P2** — PID/transfer-function blocks; linearization; nested-diagram ergonomics;
+**P2** — `analysis/` seed (linearization → `LTISystem`, then frequency and
+modal); `control/lqr.py` (design fn + state-feedback block); blocks round-out
+(Sum, Gain, Saturation; PID in `control/linear.py`); nested-diagram ergonomics;
 forced-input helpers; swappable live graphics backends.
 
 ## 4. Review queue (needs maintainer sign-off)
 
-- Optional `System` facade split from math contract (keep API equally readable).
 - Public export policy for `minilink/__init__.py`.
 - Diagram validation as separate `validate()` vs inline wiring.
 - Trajopt transcription internal consolidation.
-- Dynamic bicycle module split; placeholder planning modules (RRT, DP).
+- Dynamic bicycle module split.
 - Graphics/camera contract consolidation.
 
 ## 5. Future
 
-Differentiable rollouts; hybrid/events; LQR; Gymnasium; cosimulation; multibody
-import. Phase-plane follow-ups: Plotly, 3D, compiled grid eval.
+Pre-decided homes (bands and placement rules in [DESIGN.md §3](DESIGN.md)),
+in rough build order:
+
+1. **`analysis/`** — linearization (→ `LTISystem`), frequency (Bode,
+   pole-zero), modal (eigenmodes + animation), later ctrb/obsv and stability.
+   Phase-plane math migrates here from `graphical/` when touched.
+2. **`control/`** — `lqr.py`, then `computed_torque.py`, `sliding_mode.py`,
+   `robotic.py` (impedance), `mpc.py` (uses `optimization/`), `neural.py`
+   (NN policies).
+3. **`blocks/`** — Sum, Gain, Saturation; `neural.py` (MLP block, pure `jnp`,
+   `params` = weights).
+4. **`estimation/`** — `luenberger.py`, `kalman.py`, later `ekf.py` (uses
+   `analysis/` linearization).
+5. **`identification/`** — fit parametric systems to data; one verb for
+   physical params and network weights (`fitting.py`, first-order optimizers,
+   datasets). Depends on the parametric evaluator tier (P1).
+6. **`interfaces/`** — `gymnasium.py` (RL trains outside; policies return as
+   `control/` blocks), `torch.py`/`flax.py` model wrappers, cosimulation/FMI,
+   multibody import.
+7. **Quarantine graduation** — `symbolic/` as a dynamics-authoring tool;
+   `physics/` into `dynamics/catalog/multibody/`.
+
+Out of scope by decision: discrete time (digital control, ZOH/delay blocks,
+RNNs, mixed-rate simulation) — minilink stays continuous-time only; see
+[DESIGN.md §3](DESIGN.md).
+
+Also: differentiable rollouts; hybrid/events; RRT and dynamic programming
+(removed as stubs — re-design before reintroducing, under `planning/search/`
+and `planning/policy_synthesis/`); phase-plane follow-ups (Plotly, 3D,
+compiled grid eval).

@@ -17,7 +17,7 @@ def test_mathematical_program_is_pure_description_without_z0():
         metadata={"source": "test"},
     )
 
-    assert program.problem_class == "nlp"
+    assert program.backend == "numpy"
     assert program.n_z == 2
     assert not hasattr(program, "z0")
     assert program.metadata == {"source": "test"}

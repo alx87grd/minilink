@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.compile.jax_utils import configure_jax
+from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 from minilink.planning.problems import PlanningProblem

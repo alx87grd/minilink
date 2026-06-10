@@ -11,7 +11,7 @@ visually the same.
 
 import numpy as np
 
-from minilink.compile.jax_utils import require_jax_numpy
+from minilink.core.backends import require_jax_numpy
 from minilink.dynamics.abstraction.mechanical import (
     JaxMechanicalSystem,
     MechanicalSystem,

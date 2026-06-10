@@ -1,26 +1,31 @@
-"""Convenience composition helpers for common diagram topologies."""
+"""Composition shortcuts: build common diagram topologies in one line.
+
+Public functions (also reachable as operators on :class:`System`):
+
+- :func:`add_systems` — ``a + b``: flat diagram, no wiring inferred.
+- :func:`series` — ``a >> b``: connect default output to default input.
+- :func:`closed_loop` — ``controller @ plant``: standard feedback loop.
+- :func:`autowire` — conservatively fill unconnected inputs.
+
+Shortcut-built diagrams remember a default *entry* input and *output* port
+(``diagram._composition_entry`` / ``_composition_output``, initialized by
+:class:`~minilink.core.diagram.DiagramSystem`) so chains like ``a >> b >> c``
+know where to attach the next stage. Diagram operands are flattened, not
+nested. Explicit ``add_subsystem`` / ``connect`` remains the canonical way to
+build any topology.
+"""
 
 from __future__ import annotations
 
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from minilink.core.diagram import DiagramSystem
-    from minilink.core.system import System
+from minilink.core.diagram import DiagramSystem
+from minilink.core.system import System
 
 
-@dataclass(frozen=True)
-class _DiagramEntry:
-    sys_id: str
-    port_id: str
-    dim: int
-    boundary_port_id: str | None = None
-
-
-def add_systems(*systems: "System | DiagramSystem") -> "DiagramSystem":
+def add_systems(*systems: System | DiagramSystem) -> DiagramSystem:
     """Return a flat diagram containing ``systems`` as subsystems.
 
     Parameters
@@ -37,8 +42,6 @@ def add_systems(*systems: "System | DiagramSystem") -> "DiagramSystem":
         Existing diagram-internal connections are preserved, but no new
         cross-connections are inferred.
     """
-    from minilink.core.diagram import DiagramSystem
-
     if len(systems) == 1 and isinstance(systems[0], DiagramSystem):
         return systems[0]
 
@@ -47,9 +50,8 @@ def add_systems(*systems: "System | DiagramSystem") -> "DiagramSystem":
         if diagram is None:
             if isinstance(sys, DiagramSystem):
                 diagram = sys
-                _ensure_composition_state(diagram)
             else:
-                diagram = _new_diagram()
+                diagram = DiagramSystem()
                 _add_system_to_diagram(diagram, sys)
             continue
 
@@ -58,14 +60,14 @@ def add_systems(*systems: "System | DiagramSystem") -> "DiagramSystem":
         else:
             _add_system_to_diagram(diagram, sys)
 
-    return _new_diagram() if diagram is None else diagram
+    return DiagramSystem() if diagram is None else diagram
 
 
 def series(
-    left: "System | DiagramSystem",
-    right: "System | DiagramSystem",
-    *rest: "System | DiagramSystem",
-) -> "DiagramSystem":
+    left: System | DiagramSystem,
+    right: System | DiagramSystem,
+    *rest: System | DiagramSystem,
+) -> DiagramSystem:
     """Connect systems in series using default output and input ports.
 
     Parameters
@@ -90,8 +92,8 @@ def series(
 
 
 def closed_loop(
-    controller: "System",
-    plant: "System",
+    controller: System,
+    plant: System,
     *,
     ref_port: str = "r",
     measurement_port: str = "y",
@@ -100,7 +102,7 @@ def closed_loop(
     plant_output_port: str = "y",
     output_port: str = "y",
     validate: bool = True,
-) -> "DiagramSystem":
+) -> DiagramSystem:
     """Build a Pyro-style controller/plant feedback diagram.
 
     Parameters
@@ -122,7 +124,7 @@ def closed_loop(
         A diagram exposing the controller reference as input and plant output as
         output.
     """
-    diagram = _new_diagram()
+    diagram = DiagramSystem()
     controller_id = _add_system_to_diagram(diagram, controller)
     plant_id = _add_system_to_diagram(diagram, plant)
 
@@ -154,15 +156,7 @@ def closed_loop(
     )
 
     ref = controller.inputs[ref_port]
-    diagram.add_input_port(
-        ref_port,
-        dim=ref.dim,
-        nominal_value=ref.nominal_value,
-        labels=ref.labels,
-        units=ref.units,
-        lower_bound=ref.lower_bound,
-        upper_bound=ref.upper_bound,
-    )
+    _add_input_port_like(diagram, ref_port, ref)
 
     diagram.connect("input", ref_port, controller_id, ref_port)
     diagram.connect(plant_id, plant_output_port, controller_id, measurement_port)
@@ -170,8 +164,8 @@ def closed_loop(
     diagram.connect_new_output_port(plant_id, plant_output_port, output_port)
 
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
-    _set_composition_entry(diagram, controller_id, ref_port)
-    _set_composition_output(diagram, plant_id, plant_output_port)
+    diagram._composition_entry = (controller_id, ref_port)
+    diagram._composition_output = (plant_id, plant_output_port)
 
     if validate:
         diagram.check_algebraic_loops()
@@ -179,11 +173,11 @@ def closed_loop(
 
 
 def autowire(
-    diagram: "DiagramSystem",
+    diagram: DiagramSystem,
     *,
     strict: bool = False,
     validate: bool = True,
-) -> "DiagramSystem":
+) -> DiagramSystem:
     """Fill unconnected diagram inputs when exactly one safe source matches.
 
     Parameters
@@ -209,8 +203,6 @@ def autowire(
     - source-like ``y`` output to a ``r`` input;
     - non-source-like ``y`` output to a measurement ``y`` input.
     """
-    from minilink.core.diagram import DiagramSystem
-
     if not isinstance(diagram, DiagramSystem):
         raise TypeError("autowire() expects a DiagramSystem")
 
@@ -232,8 +224,7 @@ def autowire(
         target_id, input_id, candidates = ambiguities[0]
         rendered = ", ".join(f"{sys_id}:{port_id}" for sys_id, port_id in candidates)
         raise ValueError(
-            f"Ambiguous autowire target {target_id}:{input_id}; "
-            f"candidates: {rendered}"
+            f"Ambiguous autowire target {target_id}:{input_id}; candidates: {rendered}"
         )
 
     for source_id, source_port, target_id, input_id in decisions:
@@ -244,23 +235,28 @@ def autowire(
     return diagram
 
 
-def _new_diagram():
-    from minilink.core.diagram import DiagramSystem
-
-    diagram = DiagramSystem()
-    diagram.connection_verbose = False
-    _ensure_composition_state(diagram)
-    return diagram
+# Internal machinery
+#
+# Everything below implements the shortcut bookkeeping: choosing default
+# ports, remembering entry/output, flattening diagram operands, and the
+# conservative autowire matching rules.
 
 
-def _as_composition_diagram(sys, *, expose_entry: bool):
-    from minilink.core.diagram import DiagramSystem
+@dataclass(frozen=True)
+class _DiagramEntry:
+    """Where '>>' should attach on the right operand of a series chain."""
 
+    sys_id: str
+    port_id: str
+    dim: int
+    boundary_port_id: str | None = None
+
+
+def _as_composition_diagram(sys, *, expose_entry: bool) -> DiagramSystem:
     if isinstance(sys, DiagramSystem):
-        _ensure_composition_state(sys)
         return sys
 
-    diagram = _new_diagram()
+    diagram = DiagramSystem()
     sys_id = _add_system_to_diagram(diagram, sys)
     if expose_entry:
         _expose_entry_input(diagram, sys_id)
@@ -268,8 +264,6 @@ def _as_composition_diagram(sys, *, expose_entry: bool):
 
 
 def _series_pair(diagram, right):
-    from minilink.core.diagram import DiagramSystem
-
     source = _get_composition_output(diagram)
     if source is None:
         raise ValueError("Left side of '>>' has no output port to connect")
@@ -313,7 +307,7 @@ def _series_pair(diagram, right):
     diagram.connect(source_id, source_port, right_id, target_port)
     output_port = _default_output_port(right)
     diagram.connect_new_output_port(right_id, output_port, "y")
-    _set_composition_output(diagram, right_id, output_port)
+    diagram._composition_output = (right_id, output_port)
     return diagram
 
 
@@ -324,8 +318,7 @@ def _inline_diagram(
     input_bindings=None,
     output_collision: str,
 ) -> dict[str, str]:
-    _ensure_composition_state(diagram)
-    _ensure_composition_state(source)
+    """Flatten ``source`` into ``diagram``, remapping ids; return the id map."""
     input_bindings = {} if input_bindings is None else dict(input_bindings)
     source_subsystems = list(source.subsystems.items())
     source_inputs = list(source.inputs.items())
@@ -342,7 +335,6 @@ def _inline_diagram(
     for source_id, subsystem in source_subsystems:
         target_id = _unique_id(source_id, diagram.subsystems)
         diagram.add_subsystem(subsystem, target_id)
-        diagram._composition_system_order.append(target_id)
         id_map[source_id] = target_id
 
     input_port_map = {}
@@ -399,19 +391,16 @@ def _inline_diagram(
 
     if diagram._composition_entry is None and source_entry is not None:
         entry_sys_id, entry_port_id = source_entry
-        _set_composition_entry(diagram, id_map[entry_sys_id], entry_port_id)
+        diagram._composition_entry = (id_map[entry_sys_id], entry_port_id)
 
     if source_output is not None:
         output_sys_id, output_port_id = source_output
-        _set_composition_output(diagram, id_map[output_sys_id], output_port_id)
+        diagram._composition_output = (id_map[output_sys_id], output_port_id)
 
     return id_map
 
 
 def _add_system_to_diagram(diagram, sys) -> str:
-    from minilink.core.diagram import DiagramSystem
-    from minilink.core.system import System
-
     if isinstance(sys, DiagramSystem):
         raise TypeError(
             "Nested DiagramSystem operands are not supported by this shortcut. "
@@ -420,19 +409,17 @@ def _add_system_to_diagram(diagram, sys) -> str:
     if not isinstance(sys, System):
         raise TypeError(f"Expected a System, got {type(sys).__name__}")
 
-    _ensure_composition_state(diagram)
     sys_id = _unique_id(_base_system_id(sys), diagram.subsystems)
     diagram.add_subsystem(sys, sys_id)
-    diagram._composition_system_order.append(sys_id)
 
     if sys.inputs and diagram._composition_entry is None:
         try:
-            _set_composition_entry(diagram, sys_id, _default_input_port(sys))
+            diagram._composition_entry = (sys_id, _default_input_port(sys))
         except ValueError:
             pass
     if sys.outputs:
         try:
-            _set_composition_output(diagram, sys_id, _default_output_port(sys))
+            diagram._composition_output = (sys_id, _default_output_port(sys))
         except ValueError:
             pass
     return sys_id
@@ -474,9 +461,6 @@ def _connect_new_output_port_like(
         upper_bound=output_port.upper_bound,
     )
 
-    if "output" not in diagram.connections:
-        diagram.connections["output"] = {}
-
     diagram.connect(source_sys_id, source_port_id, "output", output_port_id)
 
 
@@ -488,25 +472,7 @@ def _output_port_id(diagram, output_id: str, collision: str) -> str:
     raise ValueError(f"Unknown output collision policy {collision!r}")
 
 
-def _ensure_composition_state(diagram) -> None:
-    if not hasattr(diagram, "_composition_system_order"):
-        diagram._composition_system_order = []
-    if not hasattr(diagram, "_composition_entry"):
-        diagram._composition_entry = None
-    if not hasattr(diagram, "_composition_output"):
-        diagram._composition_output = None
-
-
-def _set_composition_entry(diagram, sys_id: str, port_id: str) -> None:
-    diagram._composition_entry = (sys_id, port_id)
-
-
-def _set_composition_output(diagram, sys_id: str, port_id: str) -> None:
-    diagram._composition_output = (sys_id, port_id)
-
-
 def _get_composition_entry(diagram):
-    _ensure_composition_state(diagram)
     entry = diagram._composition_entry
     if entry is not None:
         sys_id, port_id = entry
@@ -519,12 +485,12 @@ def _get_composition_entry(diagram):
 
 
 def _get_composition_output(diagram):
-    _ensure_composition_state(diagram)
     output = diagram._composition_output
     if output is not None:
         return output
 
-    for sys_id in reversed(diagram._composition_system_order):
+    # Fallback: the most recently added subsystem with an output port.
+    for sys_id in reversed(diagram.subsystems):
         sys = diagram.subsystems[sys_id]
         if sys.outputs:
             return sys_id, _default_output_port(sys)
@@ -611,18 +577,9 @@ def _expose_entry_input(diagram, sys_id: str) -> None:
         return
 
     port_id = _default_input_port(sys)
-    port = sys.inputs[port_id]
-    diagram.add_input_port(
-        port_id,
-        dim=port.dim,
-        nominal_value=port.nominal_value,
-        labels=port.labels,
-        units=port.units,
-        lower_bound=port.lower_bound,
-        upper_bound=port.upper_bound,
-    )
+    _add_input_port_like(diagram, port_id, sys.inputs[port_id])
     diagram.connect("input", port_id, sys_id, port_id)
-    _set_composition_entry(diagram, sys_id, port_id)
+    diagram._composition_entry = (sys_id, port_id)
 
 
 def _default_output_port(sys) -> str:

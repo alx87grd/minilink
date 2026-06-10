@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.compile.jax_utils import array_module
+from minilink.core.backends import array_module
 
 
 class Set(ABC):

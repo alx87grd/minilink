@@ -6,14 +6,21 @@ import pytest
 
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
-from minilink.graphical.animation import Animator, _make_renderer
-from minilink.graphical.animation.primitives import Point, camera_matrix, translation_matrix
+from minilink.graphical.animation import Animator, make_renderer
+from minilink.graphical.animation.primitives import (
+    Point,
+    camera_matrix,
+    translation_matrix,
+)
+from minilink.graphical.animation.renderers.plotly_renderer import (
+    PlotlyRenderer,
+    _import_plotly,
+)
 from minilink.graphical.common.plotly_style import (
     PLOTLY_ANIMATION_2D_MARGIN,
     PLOTLY_ANIMATION_HEIGHT,
     PLOTLY_FIG_WIDTH,
 )
-from minilink.graphical.animation.renderers.plotly_renderer import PlotlyRenderer, _import_plotly
 
 
 class TestPlotlyRendererOptionalImport(unittest.TestCase):
@@ -25,9 +32,9 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
         else:
             self.assertTrue(hasattr(go, "Figure"))
 
-    def test_make_renderer_accepts_plotly(self):
+    def testmake_renderer_accepts_plotly(self):
         animator = Animator(DynamicSystem(1, output_dim=1, expose_state=True))
-        backend = _make_renderer("plotly", animator)
+        backend = make_renderer("plotly", animator)
         self.assertIsInstance(backend, PlotlyRenderer)
 
     def test_plotly_is_not_interactive_loop_backend(self):

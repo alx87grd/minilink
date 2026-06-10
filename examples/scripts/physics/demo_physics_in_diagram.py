@@ -7,7 +7,7 @@ compiled, and animated in the standard minilink ecosystem.
 
 import numpy as np
 
-from minilink.core.blocks.sources import Step
+from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
 from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
 from minilink.physics.system import PhysicsWorldSystem

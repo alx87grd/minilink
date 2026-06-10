@@ -15,6 +15,7 @@ import numpy as np
 
 from minilink.core.costs import CostFunction
 from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
+from minilink.core.system import System
 
 
 @dataclass(frozen=True)
@@ -75,7 +76,7 @@ class PlanningProblem:
         Explicit parameter bundle for system, cost, and set evaluation.
     """
 
-    sys: object
+    sys: System
     x_start: np.ndarray | None = None
     x_goal: np.ndarray | None = None
     cost: CostFunction | None = None

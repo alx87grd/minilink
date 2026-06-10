@@ -23,9 +23,55 @@ and keep docs synchronized with code.
 
 ## 2. Coding Standards
 
+### Textbook Style
+
+The core promise: reading minilink should feel like reading a controls and
+dynamics textbook. These rules keep it that way as the library grows.
+
+1. **Two-audience principle** (headline rule): every file has a primary
+   reader — the *student* (`core/system.py`, `core/signals.py`, `blocks/`,
+   `dynamics/`, `control/`) or the *library developer* (`core/compile/`,
+   `core/composition.py`, evaluators). Write each file for its
+   primary reader; push the other audience's machinery elsewhere.
+2. **First-screen rule**: a student-facing module shows its docstring and
+   primary class within the first screen. Validation and inference plumbing
+   never sits above the contract — it goes below the class or in its own
+   module (e.g. `core/signals.py`).
+3. **Module section order**: primary contract class → subclasses/variants →
+   public functions → private helpers at the bottom, separated by short
+   section banners (`# Public API`, `# Internal machinery`).
+4. **Equation-block docstrings**: every `System` subclass and contract class
+   opens its docstring with the governing equations (e.g. `dx = f(x, u, t; p)`;
+   model: `costs.py`'s `J = ∫ g(x,u,t) dt + h(x(tf), tf)`).
+5. **Bare signatures in equation paths**: `def f(self, x, u, t=0, params=None):`
+   — no type annotations in `f`/`h`/port computes; shapes and types live in
+   the docstring. Full type hints belong on tools, orchestrators, and
+   structural APIs.
+6. **The `xp` idiom**: `xp = array_module(x)` right after params unpacking is
+   *the* hybrid NumPy/JAX pattern — one line, always the same shape, and the
+   entire price of JAX support in basic blocks.
+7. **Derived, not cached**: quantities computable from owned state are
+   read-only properties (`System.m`, `System.p`), never cached attributes
+   guarded by `recompute_*()` call discipline — no staleness class of bugs.
+8. **No shadow state**: attributes are initialized in `__init__`, never via
+   `hasattr(...)`-or-create at use sites.
+9. **Libraries are silent**: no `print` outside explicit `verbose=` flags,
+   default quiet. Delete debug scaffolding rather than gating it.
+10. **Pre-1.0 no-alias rule**: no compatibility aliases or shims inside the
+    library; rename cleanly and fix call sites in the same change.
+11. **Backend imports come from `core/backends.py`**: backend vocabulary and
+    the `array_module` / `require_jax_numpy` helpers live there; system
+    libraries never import from `core/compile/`.
+12. **`__main__` hello-worlds**: core modules may end with a ~10-line runnable
+    example (`python -m minilink.core.system`); anything bigger belongs in
+    `examples/`.
+
+### General
+
 - Python 3.10+; keep `DESIGN.md`, `agent.md`, and `pyproject.toml` aligned when
   behavior or dependencies change.
-- Public APIs need type hints and NumPy-style docstrings.
+- Public APIs need type hints and NumPy-style docstrings — **except equation
+  paths**, which stay bare (Textbook Style rule 5).
 - Keep optional heavy imports lazy.
 - Match the neighborhood before editing an existing file.
 - Change only what the task requires; every diff line should earn its place.
@@ -83,7 +129,7 @@ formatter collapses alignment spacing, so wrap an aligned literal in
 `# fmt: off` / `# fmt: on` to preserve it.
 
 **Reader-facing imports:** in tutorials, demos, and examples, keep the top of the
-file light so the math stays visible. Internal packages (`compile/`, `simulation/`,
+file light so the math stays visible. Internal packages (`core/compile/`, `simulation/`,
 benchmarks, tests) may use richer imports when the benefit is clear.
 
 ### Docs And Comments
@@ -126,7 +172,7 @@ Quick reminders (details in DESIGN):
 
 Library-wide policy is under [DESIGN.md §1](DESIGN.md#numpy-and-jax) (NumPy and
 JAX). When implementing: explicit backend arguments (`compile_backend`, evaluator
-backends), vocabulary from `minilink.compile.backend_policy`, lazy JAX imports, and
+backends), vocabulary and helpers from `minilink.core.backends`, lazy JAX imports, and
 no `minilink.jax` package or global NumPy/JAX mode.
 
 ## 5. Package And File Layout
@@ -135,15 +181,23 @@ no `minilink.jax` package or global NumPy/JAX mode.
   namespace markers unless a future public API freeze says otherwise. **Keep each
   `__init__.py`** so subpackages stay discoverable to Hatch and import tooling;
   do not use package `__init__` as a barrel re-export layer.
+- Packages belong to one of four bands — framework (`core/`, incl.
+  `core/compile/`), system libraries (`blocks/`, `dynamics/`, `control/`,
+  `estimation/`), tools (`simulation/`, `analysis/`, `planning/`,
+  `optimization/`, `identification/`, `graphical/`, `interfaces/`), and
+  quarantine (`symbolic/`, `physics/`). Dependency law and placement
+  algorithm: [DESIGN.md §3](DESIGN.md). Shelve library content by *role in
+  the diagram*, never by implementation technology; tools never define
+  user-facing `System` subclasses (factories are fine).
 - Swappable roles use role-specific folders and singular contract modules:
-  `compile/evaluators/evaluator.py`, `simulation/solvers/solver.py`,
+  `core/compile/evaluators/evaluator.py`, `simulation/solvers/solver.py`,
   `graphical/renderers/renderer.py`,
   `optimization/optimizers/optimizer_backend.py`.
-- `compile/compiler.py` is the compile orchestrator—do not add `compile/compilers/`.
-- Benchmark helpers live beside their subsystem; runners live under
-  `tests/benchmark/`. Import from defining packages (for example
-  `minilink.compile.benchmark`, `minilink.simulation.benchmark`)—there is no
-  top-level `minilink.benchmark` package.
+- `core/compile/compiler.py` is the compile orchestrator—do not add `compilers/` folders.
+- All performance benchmarking (helpers, fixtures, runners) lives in the
+  repo-root `benchmarks/` directory — never inside `minilink/` or `tests/`.
+  It imports minilink like an external user; nothing in `minilink/` may
+  import it (unittest smoke tests may).
 - Demo and manual scripts stay flat and runnable from the repo root.
 
 ## 6. Verification
@@ -188,8 +242,7 @@ smallest useful slice.
   grinding forward.
 
 Demo and manual scripts stay flat and runnable from the repo root. Benchmark
-runners live under `tests/benchmark/`; import helpers from defining subsystem
-packages (see §5), not a top-level `minilink.benchmark` package.
+helpers, fixtures, and `run_*` scripts live in repo-root `benchmarks/` (see §5).
 
 ## 8. TRL Lifecycle
 

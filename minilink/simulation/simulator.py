@@ -15,7 +15,7 @@ import logging
 
 import numpy as np
 
-from minilink.compile.backend_policy import (
+from minilink.core.backends import (
     BACKEND_AUTO,
     BACKEND_JAX,
     BACKEND_NUMPY,
@@ -77,7 +77,7 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
 RK4_AUTO_MIN_TIME_POINTS = 10_000
 
 # Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
-# Re-exported from :mod:`minilink.compile.backend_policy` so legacy callers
+# Re-exported from :mod:`minilink.core.backends` so legacy callers
 # importing it from the simulator keep working.
 COMPILE_BACKEND_AUTO = BACKEND_AUTO
 

@@ -14,7 +14,8 @@ class TestDynamicBicycle(unittest.TestCase):
         self.assertEqual(sys.m, 2)
         self.assertEqual(sys.p, 6)
         self.assertEqual(sys.state.labels, ["x", "y", "theta", "vx", "vy", "yaw_rate"])
-        self.assertEqual(sys.inputs["u"].labels, ["w_rear", "delta"])
+        self.assertEqual(sys.inputs["w_rear"].labels, ["w_rear"])
+        self.assertEqual(sys.inputs["delta"].labels, ["delta"])
 
     def test_camera_follows_vehicle_position_by_default(self):
         sys = DynamicBicycle()

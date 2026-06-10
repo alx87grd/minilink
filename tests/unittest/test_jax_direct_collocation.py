@@ -10,7 +10,7 @@ pytest.importorskip("jax")
 import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
-from minilink.compile.jax_utils import configure_jax  # noqa: E402
+from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.sets import BallSet  # noqa: E402
 from minilink.core.system import DynamicSystem  # noqa: E402
@@ -116,7 +116,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program,
-            backend=program.metadata["program_backend"],
+            backend=program.backend,
             sample_z=z0,
         )
         self.assertTrue(program_evaluator.has_gradient)
@@ -152,7 +152,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program,
-            backend=program.metadata["program_backend"],
+            backend=program.backend,
             sample_z=z0,
         )
         self.assertEqual(program.n_z, problem.sys.m * 5)
@@ -190,7 +190,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program,
-            backend=program.metadata["program_backend"],
+            backend=program.backend,
             sample_z=z0,
         )
         self.assertEqual(program.n_z, (problem.sys.n + problem.sys.m) * 5)
@@ -219,7 +219,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         z0 = tr.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program,
-            backend=program.metadata["program_backend"],
+            backend=program.backend,
             sample_z=z0,
         )
 

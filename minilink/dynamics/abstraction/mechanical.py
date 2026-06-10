@@ -16,7 +16,7 @@ Equation of motion::
 
 import numpy as np
 
-from minilink.compile.jax_utils import array_module, require_jax_numpy
+from minilink.core.backends import array_module, require_jax_numpy
 from minilink.core.system import DynamicSystem
 
 
@@ -168,7 +168,7 @@ class JaxMechanicalSystem(MechanicalSystem):
     JAX array creation or ``jax.numpy.linalg.solve``.
 
     JAX is loaded lazily inside each method via
-    :func:`~minilink.compile.jax_utils.require_jax_numpy`, so importing this
+    :func:`~minilink.core.backends.require_jax_numpy`, so importing this
     module stays free without the ``minilink[jax]`` extra.
     """
 

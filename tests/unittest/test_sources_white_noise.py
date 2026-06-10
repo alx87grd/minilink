@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from minilink.core.blocks.sources import WhiteNoise
+from minilink.blocks.sources import WhiteNoise
 
 
 class TestWhiteNoiseSource(unittest.TestCase):

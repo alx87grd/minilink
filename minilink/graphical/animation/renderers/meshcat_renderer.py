@@ -7,7 +7,6 @@ import time
 import matplotlib.colors as mcolors
 import numpy as np
 
-from minilink.graphical.common.environment import is_blocking_needed
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
@@ -22,6 +21,7 @@ from minilink.graphical.animation.primitives import (
     extract_amplitude,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
+from minilink.graphical.common.environment import is_blocking_needed
 
 
 def _import_meshcat():

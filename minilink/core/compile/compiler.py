@@ -1,0 +1,450 @@
+"""
+Diagram compiler: topology analysis and execution plan construction.
+
+This module provides the complete compilation pipeline:
+
+1. :func:`check_algebraic_loops` — Standalone depth-first search-based
+   algebraic loop detection.  Returns the topological execution order
+   of output ports.
+   Can be imported independently by :class:`~minilink.core.diagram.DiagramSystem`
+   for use after manual wiring.
+
+2. :func:`build_execution_plan` — Constructs an immutable
+   :class:`~minilink.core.compile.execution_plan.ExecutionPlan` from a diagram.
+   Calls :func:`check_algebraic_loops` internally.
+
+3. :func:`compile_diagram` — Top-level entry point that builds the plan and
+   wraps it in a backend evaluator.
+"""
+
+from __future__ import annotations
+
+import copy
+import time
+from typing import TYPE_CHECKING
+
+from minilink.core.backends import (
+    BACKEND_NUMPY,
+    normalize_backend,
+    require_jax_numpy,
+)
+from minilink.core.compile.execution_plan import (
+    EXTERNAL_INPUT,
+    INTERNAL_SIGNAL,
+    NOMINAL,
+    ExecutionPlan,
+    PortOperation,
+    StateOperation,
+)
+
+if TYPE_CHECKING:
+    from minilink.core.diagram import DiagramSystem
+
+
+# Public API
+def compile(system, backend=BACKEND_NUMPY, verbose=False):
+    """Compile a System into a :class:`DynamicsEvaluator`.
+
+    For leaf systems (non-diagram), wraps ``f``/``h`` with frozen params
+    and nominal u snapshot, providing the full evaluator API (RK4, rollout,
+    linearize, etc.).
+
+    For diagrams, delegates to :func:`compile_diagram`.
+
+    Parameters
+    ----------
+    system : System or DiagramSystem
+        The system to compile.
+    backend : str
+        ``'numpy'`` or ``'jax'``.
+    verbose : bool
+        If ``True``, print timed compilation steps.
+
+    Returns
+    -------
+    DynamicsEvaluator
+    """
+    from minilink.core.diagram import DiagramSystem
+
+    if isinstance(system, DiagramSystem):
+        return compile_diagram(system, backend=backend, verbose=verbose)
+
+    key = normalize_backend(backend)
+    if key == BACKEND_NUMPY:
+        from minilink.core.compile.evaluators.numpy_evaluator import NumpyLeafEvaluator
+
+        return NumpyLeafEvaluator(system)
+    require_jax_numpy()
+    from minilink.core.compile.evaluators.jax_evaluator import JaxLeafEvaluator
+
+    t_total = time.perf_counter()
+    evaluator = JaxLeafEvaluator(system, verbose=verbose)
+    if verbose:
+        print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+    return evaluator
+
+
+def compile_diagram(
+    diagram: DiagramSystem,
+    backend: str = BACKEND_NUMPY,
+    *,
+    bind_params: bool = False,
+    verbose: bool = False,
+):
+    """Compile a DiagramSystem into a backend evaluator.
+
+    Parameters
+    ----------
+    diagram : DiagramSystem
+        The wired diagram to compile.
+    backend : str
+        ``'numpy'`` or ``'jax'``.
+    bind_params : bool, optional
+        If ``True``, each plan operation stores a deep copy of that subsystem's
+        ``params`` and evaluators pass it into ``f`` / port ``compute``. If
+        ``False`` (default), ``None`` is passed and blocks use live ``self.params``.
+    verbose : bool
+        If ``True``, print timed compilation steps.
+
+    Returns
+    -------
+    NumpyDiagramEvaluator or JaxDiagramEvaluator
+        A stateless evaluator that can compute state derivatives and outputs.
+
+    Examples
+    --------
+    >>> from minilink.core.compile.compiler import compile_diagram
+    >>> evaluator = compile_diagram(diagram)
+    >>> dx = evaluator.f(x, u, t)
+
+    Notes
+    -----
+    ``bind_params=True`` snapshots only each subsystem's ``params`` dict into the plan.
+    It does **not** make user ``f`` / port ``compute`` implementations pure if they still
+    read or mutate other instance state; see :class:`minilink.core.system.System`.
+    """
+    t_total = time.perf_counter() if verbose else None
+
+    # Step 1: Algebraic loop detection
+    if verbose:
+        t0 = time.perf_counter()
+        print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
+
+    port_execution_order = check_algebraic_loops(diagram)
+
+    if verbose:
+        print(f"  ({time.perf_counter() - t0:.3f}s)")
+
+    # Step 2: Build execution plan
+    if verbose:
+        t0 = time.perf_counter()
+        n_ports = len(port_execution_order)
+        n_states = sum(1 for s in diagram.subsystems.values() if s.n > 0)
+        print(
+            f"[compile] Step 2: Building execution plan "
+            f"({n_ports} ports, {n_states} states)...",
+            end="",
+            flush=True,
+        )
+
+    plan = _build_execution_plan_from_order(
+        diagram, port_execution_order, bind_params=bind_params
+    )
+
+    if verbose:
+        print(f"  ({time.perf_counter() - t0:.3f}s)")
+
+    # Create evaluator (steps 0, 3, 4 handled inside for JAX)
+    key = normalize_backend(backend)
+    if key == BACKEND_NUMPY:
+        from minilink.core.compile.evaluators.numpy_evaluator import (
+            NumpyDiagramEvaluator,
+        )
+
+        evaluator = NumpyDiagramEvaluator(plan, diagram)
+    else:
+        # key == BACKEND_JAX (normalize_backend already validated)
+        require_jax_numpy()
+        from minilink.core.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
+
+        evaluator = JaxDiagramEvaluator(plan, diagram, verbose=verbose)
+
+    if verbose:
+        print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+
+    return evaluator
+
+
+def build_execution_plan(
+    diagram: DiagramSystem, *, bind_params: bool = False
+) -> ExecutionPlan:
+    """Build an immutable ExecutionPlan from a DiagramSystem.
+
+    This is the core compilation step.  It:
+    1. Runs algebraic loop detection via :func:`check_algebraic_loops`.
+    2. Assigns each output port a slice in the flat signal buffer.
+    3. Builds the gather-source recipes for each port and state operation.
+    4. Returns a frozen :class:`ExecutionPlan`.
+
+    Parameters
+    ----------
+    diagram : DiagramSystem
+        Must have subsystems added and connections wired.
+    bind_params : bool, optional
+        When ``True``, set :attr:`~minilink.core.compile.execution_plan.PortOperation.bound_params`
+        / :attr:`~minilink.core.compile.execution_plan.StateOperation.bound_params` on each row
+        (deep copy of ``subsystem.params`` only; see :func:`compile_diagram` Notes).
+
+    Returns
+    -------
+    ExecutionPlan
+    """
+    port_execution_order = check_algebraic_loops(diagram)
+    return _build_execution_plan_from_order(
+        diagram, port_execution_order, bind_params=bind_params
+    )
+
+
+def check_algebraic_loops(
+    diagram: DiagramSystem,
+) -> list[tuple[str, str]]:
+    """Detect algebraic loops and return the topological port execution order.
+
+    Uses depth-first search over output-port dependency edges.  An algebraic
+    loop exists when a cycle contains only direct-feedthrough paths (i.e.,
+    output ports whose ``dependencies`` include the input ports that close
+    the cycle).
+
+    This function is **standalone** and can be called independently of
+    :func:`build_execution_plan` — for example, right after wiring a diagram
+    to validate its topology before simulation.
+
+    Parameters
+    ----------
+    diagram : DiagramSystem
+        The wired diagram to analyse.
+
+    Returns
+    -------
+    list[tuple[str, str]]
+        Output ports ``(sys_id, port_id)`` in valid topological order
+        (dependencies before dependents).
+
+    Raises
+    ------
+    RuntimeError
+        If an algebraic loop is detected, with the full cycle path in the
+        error message.
+    """
+    visited: set[tuple[str, str]] = set()
+    stack: list[tuple[str, str]] = []
+    stack_set: set[tuple[str, str]] = set()
+    order: list[tuple[str, str]] = []
+
+    def visit_port(sys_id: str, port_id: str) -> None:
+        node = (sys_id, port_id)
+
+        if node in stack_set:
+            cycle_start_idx = stack.index(node)
+            cycle_path = stack[cycle_start_idx:] + [node]
+            cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
+            raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
+
+        if node in visited:
+            return
+
+        stack.append(node)
+        stack_set.add(node)
+
+        port = diagram.subsystems[sys_id].outputs.get(port_id)
+        if port is not None:
+            deps = port.dependencies
+            sys_inputs = diagram.subsystems[sys_id].inputs
+            input_deps = sys_inputs.keys() if deps == "all" else deps
+
+            for in_port_id in input_deps:
+                source = diagram.connections[sys_id].get(in_port_id)
+                if source is not None:
+                    src_sys_id, src_port_id = source
+                    if src_sys_id != "input":
+                        visit_port(src_sys_id, src_port_id)
+
+        stack.pop()
+        stack_set.remove(node)
+        visited.add(node)
+        order.append(node)
+
+    for sys_id, subsystem in diagram.subsystems.items():
+        for port_id in subsystem.outputs:
+            visit_port(sys_id, port_id)
+
+    return order
+
+
+# Private helpers
+def _build_execution_plan_from_order(
+    diagram: DiagramSystem,
+    port_execution_order: list[tuple[str, str]],
+    *,
+    bind_params: bool = False,
+) -> ExecutionPlan:
+    """Build the execution plan given a pre-computed topological order.
+
+    This is the inner implementation of :func:`build_execution_plan`,
+    split out so that :func:`compile_diagram` can time each step
+    individually.
+    """
+    # 1. Map all output ports to slices in the flat signal buffer
+    output_slices: dict[tuple[str, str], slice] = {}
+    current_idx = 0
+    for sys_id, sys in diagram.subsystems.items():
+        for port_id, port in sys.outputs.items():
+            dim = port.dim
+            output_slices[(sys_id, port_id)] = slice(current_idx, current_idx + dim)
+            current_idx += dim
+    signal_dim = current_idx
+
+    # 2. Build PortOperation list (output ports, topological order)
+    port_ops: list[PortOperation] = []
+    for sys_id, port_id in port_execution_order:
+        sys = diagram.subsystems[sys_id]
+        port = sys.outputs[port_id]
+
+        gather_sources, u_dim = _build_gather_sources(
+            diagram, sys_id, output_slices, dependencies=port.dependencies
+        )
+
+        out_slice = output_slices[(sys_id, port_id)]
+        local_x_slice = _state_slice(diagram, sys_id)
+
+        bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
+
+        port_ops.append(
+            PortOperation(
+                compute_func=port.compute,
+                local_x_slice=local_x_slice,
+                gather_sources=tuple(gather_sources),
+                out_slice=out_slice,
+                u_dim=u_dim,
+                bound_params=bound,
+                label=f"{sys_id}:{port_id}",
+                sys_id=sys_id,
+            )
+        )
+
+    # 3. Build StateOperation list (subsystems with state)
+    state_ops: list[StateOperation] = []
+    for sys_id, sys in diagram.subsystems.items():
+        if sys.n > 0:
+            gather_sources, u_dim = _build_gather_sources(
+                diagram, sys_id, output_slices, dependencies="all"
+            )
+            local_x_slice = _state_slice(diagram, sys_id)
+            bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
+            state_ops.append(
+                StateOperation(
+                    f_func=sys.f,
+                    local_x_slice=local_x_slice,
+                    gather_sources=tuple(gather_sources),
+                    u_dim=u_dim,
+                    bound_params=bound,
+                    label=sys_id,
+                    sys_id=sys_id,
+                )
+            )
+
+    external_output_slices: dict[str, slice] = {}
+    out_conns = diagram.connections.get("output", {})
+    for out_port_id in diagram.outputs:
+        src = out_conns.get(out_port_id)
+        if src is None:
+            continue
+        source_sys_id, source_port_id = src
+        key = (source_sys_id, source_port_id)
+        if key not in output_slices:
+            raise RuntimeError(
+                f"Diagram output {out_port_id!r} source {key} missing from output_slices"
+            )
+        external_output_slices[out_port_id] = output_slices[key]
+
+    return ExecutionPlan(
+        state_dim=diagram.n,
+        signal_dim=signal_dim,
+        port_ops=tuple(port_ops),
+        state_ops=tuple(state_ops),
+        output_slices=output_slices,
+        external_output_slices=external_output_slices,
+    )
+
+
+def _build_gather_sources(
+    diagram: DiagramSystem,
+    sys_id: str,
+    output_slices: dict[tuple[str, str], slice],
+    dependencies="all",
+) -> tuple[list[tuple[int, object, int]], int]:
+    """Build the gather-source recipe for a subsystem's input ports.
+
+    This is the **single implementation** of the signal-gathering logic that
+    was previously duplicated across the codebase.
+
+    Parameters
+    ----------
+    diagram : DiagramSystem
+    sys_id : str
+        The subsystem whose inputs to gather.
+    output_slices : dict
+        Pre-computed ``(sys_id, port_id) → slice`` map.
+    dependencies : list or ``"all"``
+        Which input ports are required.  ``"all"`` means every input port.
+
+    Returns
+    -------
+    gather_sources : list[tuple[int, Any, int]]
+        List of ``(source_type, source_value, dim)`` entries.
+    u_dim : int
+        Total dimension of the assembled local input vector.
+    """
+    sys = diagram.subsystems[sys_id]
+    gather_sources: list[tuple[int, object, int]] = []
+    u_dim = 0
+
+    for in_port_id, in_port in sys.inputs.items():
+        # If this input port is not a dependency, use the nominal value
+        if dependencies != "all" and in_port_id not in dependencies:
+            source_type = NOMINAL
+            source_val = in_port.nominal_value
+        else:
+            source = diagram.connections[sys_id].get(in_port_id)
+            if source is None:
+                # Not connected → use nominal value
+                source_type = NOMINAL
+                source_val = in_port.nominal_value
+            else:
+                src_sys_id, src_port_id = source
+                if src_sys_id == "input":
+                    source_type = EXTERNAL_INPUT
+                    u_idx = 0
+                    for input_port_id, input_port in diagram.inputs.items():
+                        if input_port_id == src_port_id:
+                            source_val = slice(u_idx, u_idx + input_port.dim)
+                            break
+                        u_idx += input_port.dim
+                else:
+                    source_type = INTERNAL_SIGNAL
+                    source_val = output_slices[(src_sys_id, src_port_id)]
+
+        dim = in_port.dim
+        gather_sources.append((source_type, source_val, dim))
+        u_dim += dim
+
+    return gather_sources, u_dim
+
+
+def _state_slice(diagram: DiagramSystem, sys_id: str) -> slice:
+    """Return the global state-vector slice for a subsystem."""
+    sys = diagram.subsystems[sys_id]
+    if sys.n > 0:
+        start, end = diagram.state_index[sys_id]
+        return slice(start, end)
+    return slice(0, 0)

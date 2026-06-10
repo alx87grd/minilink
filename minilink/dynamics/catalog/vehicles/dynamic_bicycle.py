@@ -2,8 +2,10 @@
 Dynamic bicycle (planar rigid body + tire forces), ported minimally from pyro
 ``vehicle_dynamic.DynamicBicycle``.
 
-State ``x = [x, y, theta, u, v, r]``: world pose and body velocities (surge, sway, yaw rate).
-Inputs ``u = [w_rear, delta]``: rear wheel spin rate [rad/s], steer angle [rad].
+State ``x = [x, y, theta, vx, vy, yaw_rate]``: world pose and body velocities
+(surge, sway, yaw rate). Inputs are two named ports ``w_rear`` (rear wheel spin
+rate [rad/s]) and ``delta`` (steer angle [rad]) so diagrams can wire each
+command independently.
 
 :class:`DynamicBicycleCar3D` subclasses this model with identical dynamics and richer 3D graphics.
 :class:`JaxDynamicBicycle` is a JAX-traceable variant of the same dynamics, suitable for
@@ -12,7 +14,7 @@ gradient-based trajectory optimization.
 
 import numpy as np
 
-from minilink.compile.jax_utils import require_jax_numpy
+from minilink.core.backends import require_jax_numpy
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -86,7 +88,7 @@ class DynamicBicycle(DynamicSystem):
 
         self.name = "Dynamic Bicycle"
 
-        self.state.labels = ["x", "y", "theta", "u", "v", "r"]
+        self.state.labels = ["x", "y", "theta", "vx", "vy", "yaw_rate"]
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
 
         self.add_input_port(
@@ -96,53 +98,80 @@ class DynamicBicycle(DynamicSystem):
 
         self.add_output_port("y", dim=6, function=self.h, dependencies=())
 
-        self.a = 1.0
-        self.b = 1.0
-        self.L = self.a + self.b
-        self.r_f = 0.3
-        self.r_r = 0.3
-
-        self.mass = 1500.0
-        self.inertia = 2500.0
-
-        self.gravity = 9.81
-        self.rho = 1.225
-        self.CdA = 0.3 * 2.2
+        # EoM parameters: CG-to-axle distances a/b [m], wheel radii r_f/r_r [m],
+        # mass [kg], yaw inertia [kg m^2], gravity [m/s^2], air density rho
+        # [kg/m^3], and drag area CdA = Cd * A [m^2].
+        self.params = {
+            "a": 1.0,
+            "b": 1.0,
+            "r_f": 0.3,
+            "r_r": 0.3,
+            "mass": 1500.0,
+            "inertia": 2500.0,
+            "gravity": 9.81,
+            "rho": 1.225,
+            "CdA": 0.3 * 2.2,
+        }
 
         self.tire_model_f = LinearTire()
         self.tire_model_r = LinearTire()
 
+        # Graphics-only attributes
         self.wheel_len = 0.6
         self.wheel_width = 0.2
         self.camera_follow_vehicle = True
 
-    def M_mat(self, q: np.ndarray) -> np.ndarray:
-        return np.diag(np.array([self.mass, self.mass, self.inertia], dtype=float))
+    def M(self, q: np.ndarray, params=None) -> np.ndarray:
+        params = self.params if params is None else params
+        mass = params["mass"]
+        inertia = params["inertia"]
 
-    def C_mat(self, q: np.ndarray, v: np.ndarray) -> np.ndarray:
+        return np.diag(np.array([mass, mass, inertia], dtype=float))
+
+    def C(self, q: np.ndarray, v: np.ndarray, params=None) -> np.ndarray:
+        params = self.params if params is None else params
+        mass = params["mass"]
+
         w = v[2]
         C = np.zeros((3, 3), dtype=float)
-        C[1, 0] = self.mass * w
-        C[0, 1] = -self.mass * w
+        C[1, 0] = mass * w
+        C[0, 1] = -mass * w
         return C
 
-    def N_mat(self, q: np.ndarray) -> np.ndarray:
+    def N(self, q: np.ndarray, params=None) -> np.ndarray:
         theta = q[2]
         c, s = np.cos(theta), np.sin(theta)
-        return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=float)
+
+        # World-frame velocity kinematics: dq = N(q) v
+        # fmt: off
+        return np.array(
+            [
+                [c, -s, 0.0],
+                [s,  c, 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=float,
+        )
+        # fmt: on
 
     def compute_wheel_velocities(
-        self, v_body: np.ndarray, u_inputs: np.ndarray
+        self, v_body: np.ndarray, u_inputs: np.ndarray, params=None
     ) -> tuple[float, float, float, float, float, float]:
-        u = v_body[0]
-        v = v_body[1]
+        params = self.params if params is None else params
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+
+        vx = v_body[0]
+        vy = v_body[1]
         r = v_body[2]
         delta = u_inputs[1]
 
-        vx_f_b = u
-        vy_f_b = v + self.a * r
-        vx_r_b = u
-        vy_r_b = v - self.b * r
+        # Contact-point velocities in the body frame, then in each wheel frame.
+        vx_f_b = vx
+        vy_f_b = vy + a * r
+        vx_r_b = vx
+        vy_r_b = vy - b * r
 
         c_d, s_d = np.cos(delta), np.sin(delta)
         vx_f = c_d * vx_f_b + s_d * vy_f_b
@@ -150,37 +179,58 @@ class DynamicBicycle(DynamicSystem):
         vx_r = vx_r_b
         vy_r = vy_r_b
 
+        # Rear wheel rate is the input; the front wheel rolls freely.
         w_r = u_inputs[0]
-        w_f = vx_f / self.r_f
+        w_f = vx_f / r_f
 
         return vx_f, vy_f, w_f, vx_r, vy_r, w_r
 
     def compute_tire_physics(
-        self, v_body: np.ndarray, u_inputs: np.ndarray
+        self, v_body: np.ndarray, u_inputs: np.ndarray, params=None
     ) -> tuple[float, float, float, float]:
+        params = self.params if params is None else params
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        L = a + b
+
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
-            v_body, u_inputs
+            v_body, u_inputs, params
         )
-        Fz_f = self.mass * self.gravity * (self.b / self.L)
-        Fz_r = self.mass * self.gravity * (self.a / self.L)
-        Fx_f, Fy_f = self.tire_model_f.vel2forces(vx_f, vy_f, w_f, self.r_f, Fz_f)
-        Fx_r, Fy_r = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
+
+        # Static normal-load split between front and rear axles.
+        Fz_f = mass * gravity * (b / L)
+        Fz_r = mass * gravity * (a / L)
+
+        Fx_f, Fy_f = self.tire_model_f.vel2forces(vx_f, vy_f, w_f, r_f, Fz_f)
+        Fx_r, Fy_r = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, r_r, Fz_r)
         return Fx_f, Fy_f, Fx_r, Fy_r
 
     def generalized_d(
-        self, q: np.ndarray, v: np.ndarray, u_in: np.ndarray
+        self, q: np.ndarray, v: np.ndarray, u_in: np.ndarray, params=None
     ) -> np.ndarray:
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v, u_in)
+        params = self.params if params is None else params
+        a = params["a"]
+        b = params["b"]
+        rho = params["rho"]
+        CdA = params["CdA"]
+
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v, u_in, params)
         delta = u_in[1]
         c_d, s_d = np.cos(delta), np.sin(delta)
+
+        # Tire forces rotated into the body frame, summed with aero drag.
         Fx_f_b = Fx_f * c_d - Fy_f * s_d
         Fy_f_b = Fx_f * s_d + Fy_f * c_d
         Fx_r_b = Fx_r
         Fy_r_b = Fy_r
         Sum_Fx = Fx_f_b + Fx_r_b
         Sum_Fy = Fy_f_b + Fy_r_b
-        Sum_Mz = self.a * Fy_f_b - self.b * Fy_r_b
-        F_aero = 0.5 * self.rho * self.CdA * v[0] * abs(v[0])
+        Sum_Mz = a * Fy_f_b - b * Fy_r_b
+        F_aero = 0.5 * rho * CdA * v[0] * abs(v[0])
         Sum_Fx -= F_aero
         F_ext = np.array([Sum_Fx, Sum_Fy, Sum_Mz], dtype=float)
         return -F_ext
@@ -188,16 +238,21 @@ class DynamicBicycle(DynamicSystem):
     def f(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0, params=None
     ) -> np.ndarray:
+        params = self.params if params is None else params
+
         q = x[0:3]
         v = x[3:6]
         w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
         u_in = np.array([w_rear[0], delta[0]])
 
-        M = self.M_mat(q)
-        C = self.C_mat(q, v)
-        d_vec = self.generalized_d(q, v, u_in)
-        dv = np.linalg.solve(M, -C @ v - d_vec)
-        dq = self.N_mat(q) @ v
+        M = self.M(q, params)
+        C = self.C(q, v, params)
+        N = self.N(q, params)
+        d = self.generalized_d(q, v, u_in, params)
+
+        # Rigid-body EoM in body frame: M dv + C v + d = 0; dq = N v
+        dv = np.linalg.solve(M, -C @ v - d)
+        dq = N @ v
         return np.concatenate([dq, dv])
 
     def h(
@@ -224,9 +279,11 @@ class DynamicBicycle(DynamicSystem):
         )
 
     def get_kinematic_geometry(self):
+        a = self.params["a"]
+        b = self.params["b"]
         wl, ww = self.wheel_len, self.wheel_width
         chassis = CustomLine(
-            np.array([[-self.b, 0.0, 0.0], [self.a, 0.0, 0.0]]),
+            np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]]),
             color="black",
             linewidth=2,
         )
@@ -238,6 +295,8 @@ class DynamicBicycle(DynamicSystem):
         return [chassis, rear_w, front_w, arr_v, arr_v, arr_f, arr_f]
 
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
+        a = self.params["a"]
+        b = self.params["b"]
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
         vb = x[3:6]
         w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
@@ -245,15 +304,15 @@ class DynamicBicycle(DynamicSystem):
         delta = float(u_in[1])
 
         T_wb = pose2d_matrix(X, Y, Theta)
-        T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
-        T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
+        T_rear = T_wb @ pose2d_matrix(-b, 0.0, 0.0)
+        T_front = T_wb @ pose2d_matrix(a, 0.0, delta)
 
         v_scale = 0.2
         f_scale = 0.001
 
         uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + self.a * wr])
-        v_r_loc = np.array([uu, vv - self.b * wr])
+        v_f_loc = np.array([uu, vv + a * wr])
+        v_r_loc = np.array([uu, vv - b * wr])
 
         def _world_arrow_pose(dx: float, dy: float, px: float, py: float):
             mag = v_scale * np.hypot(dx, dy)
@@ -263,10 +322,10 @@ class DynamicBicycle(DynamicSystem):
             return scale_pose2d_matrix(px, py, th, mag)
 
         c, s = np.cos(Theta), np.sin(Theta)
-        rx = X + c * (-self.b) - s * 0.0
-        ry = Y + s * (-self.b) + c * 0.0
-        fx = X + c * self.a - s * 0.0
-        fy = Y + s * self.a + c * 0.0
+        rx = X + c * (-b) - s * 0.0
+        ry = Y + s * (-b) + c * 0.0
+        fx = X + c * a - s * 0.0
+        fy = Y + s * a + c * 0.0
 
         vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
         vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
@@ -323,10 +382,14 @@ class DynamicBicycleCar3D(DynamicBicycle):
         self._visual_tire_radius_ratio = 0.58
 
     def get_kinematic_geometry(self):
+        a = self.params["a"]
+        b = self.params["b"]
+        r_f = self.params["r_f"]
+        r_r = self.params["r_r"]
         tr = self.track
         bh = self.body_height
         bw = self.body_width_ratio * tr
-        bl = float(self.L) + self.body_length_overhang
+        bl = (a + b) + self.body_length_overhang
         ground = Plane(
             normal=[0.0, 0.0, 1.0],
             offset=0.0,
@@ -343,7 +406,7 @@ class DynamicBicycleCar3D(DynamicBicycle):
             color="#151922",
             opacity=1.0,
         )
-        tire_rad = max(0.045, self._visual_tire_radius_ratio * min(self.r_f, self.r_r))
+        tire_rad = max(0.045, self._visual_tire_radius_ratio * min(r_f, r_r))
         w_len = self._visual_wheel_width
         wheel = Rod(
             length=w_len,
@@ -371,32 +434,36 @@ class DynamicBicycleCar3D(DynamicBicycle):
         ]
 
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
+        a = self.params["a"]
+        b = self.params["b"]
+        r_f = self.params["r_f"]
+        r_r = self.params["r_r"]
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
         vb = x[3:6]
         w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
         u_in = np.array([w_rear[0], delta[0]])
         delta = float(u_in[1])
         tr = self.track
-        z_body = float(self.r_r) + self.body_ground_clearance + 0.5 * self.body_height
-        cx_body = 0.5 * (self.a - self.b)
+        z_body = float(r_r) + self.body_ground_clearance + 0.5 * self.body_height
+        cx_body = 0.5 * (a - b)
 
         T_wb = pose2d_matrix(X, Y, Theta)
 
         T_ground = np.eye(4, dtype=float)
         T_body = T_wb @ translation_matrix(cx_body, 0.0, z_body)
 
-        T_rl = T_wb @ translation_matrix(-self.b, 0.5 * tr, self.r_r)
-        T_rr = T_wb @ translation_matrix(-self.b, -0.5 * tr, self.r_r)
+        T_rl = T_wb @ translation_matrix(-b, 0.5 * tr, r_r)
+        T_rr = T_wb @ translation_matrix(-b, -0.5 * tr, r_r)
         R_steer = pose2d_matrix(0.0, 0.0, delta)
-        T_fl = T_wb @ translation_matrix(self.a, 0.5 * tr, self.r_f) @ R_steer
-        T_fr = T_wb @ translation_matrix(self.a, -0.5 * tr, self.r_f) @ R_steer
+        T_fl = T_wb @ translation_matrix(a, 0.5 * tr, r_f) @ R_steer
+        T_fr = T_wb @ translation_matrix(a, -0.5 * tr, r_f) @ R_steer
 
         v_scale = 0.2
         f_scale = 0.001
 
         uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + self.a * wr])
-        v_r_loc = np.array([uu, vv - self.b * wr])
+        v_f_loc = np.array([uu, vv + a * wr])
+        v_r_loc = np.array([uu, vv - b * wr])
 
         c, s = np.cos(Theta), np.sin(Theta)
         vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
@@ -445,14 +512,14 @@ class DynamicBicycleCar3D(DynamicBicycle):
             T_rr,
             T_fl,
             T_fr,
-            _vel_arrow(vrx, vry, -self.b, 0.5 * tr, self.r_r),
-            _vel_arrow(vrx, vry, -self.b, -0.5 * tr, self.r_r),
-            _vel_arrow(vfx, vfy, self.a, 0.5 * tr, self.r_f),
-            _vel_arrow(vfx, vfy, self.a, -0.5 * tr, self.r_f),
-            _force_arrow(Frx_w, Fry_w, -self.b, 0.5 * tr, self.r_r),
-            _force_arrow(Frx_w, Fry_w, -self.b, -0.5 * tr, self.r_r),
-            _force_arrow(Ffx_w, Ffy_w, self.a, 0.5 * tr, self.r_f),
-            _force_arrow(Ffx_w, Ffy_w, self.a, -0.5 * tr, self.r_f),
+            _vel_arrow(vrx, vry, -b, 0.5 * tr, r_r),
+            _vel_arrow(vrx, vry, -b, -0.5 * tr, r_r),
+            _vel_arrow(vfx, vfy, a, 0.5 * tr, r_f),
+            _vel_arrow(vfx, vfy, a, -0.5 * tr, r_f),
+            _force_arrow(Frx_w, Fry_w, -b, 0.5 * tr, r_r),
+            _force_arrow(Frx_w, Fry_w, -b, -0.5 * tr, r_r),
+            _force_arrow(Ffx_w, Ffy_w, a, 0.5 * tr, r_f),
+            _force_arrow(Ffx_w, Ffy_w, a, -0.5 * tr, r_f),
         ]
 
 
@@ -510,38 +577,62 @@ class JaxDynamicBicycle(DynamicBicycle):
 
     # --- Equations of motion (JAX) ---
 
-    def M_mat(self, q):
+    def M(self, q, params=None):
         jnp = require_jax_numpy()
-        return jnp.diag(jnp.array([self.mass, self.mass, self.inertia], dtype=float))
+        params = self.params if params is None else params
+        mass = params["mass"]
+        inertia = params["inertia"]
 
-    def C_mat(self, q, v):
+        return jnp.diag(jnp.array([mass, mass, inertia], dtype=float))
+
+    def C(self, q, v, params=None):
         jnp = require_jax_numpy()
+        params = self.params if params is None else params
+        mass = params["mass"]
+
         w = v[2]
+        # fmt: off
         return jnp.array(
             [
-                [0.0, -self.mass * w, 0.0],
-                [self.mass * w, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
+                [0.0,      -mass * w, 0.0],
+                [mass * w,  0.0,      0.0],
+                [0.0,       0.0,      0.0],
             ]
         )
+        # fmt: on
 
-    def N_mat(self, q):
+    def N(self, q, params=None):
         jnp = require_jax_numpy()
         theta = q[2]
         c, s = jnp.cos(theta), jnp.sin(theta)
-        return jnp.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
 
-    def compute_wheel_velocities(self, v_body, u_inputs):
+        # World-frame velocity kinematics: dq = N(q) v
+        # fmt: off
+        return jnp.array(
+            [
+                [c, -s, 0.0],
+                [s,  c, 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        )
+        # fmt: on
+
+    def compute_wheel_velocities(self, v_body, u_inputs, params=None):
         jnp = require_jax_numpy()
-        u = v_body[0]
-        v = v_body[1]
+        params = self.params if params is None else params
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+
+        vx = v_body[0]
+        vy = v_body[1]
         r = v_body[2]
         delta = u_inputs[1]
 
-        vx_f_b = u
-        vy_f_b = v + self.a * r
-        vx_r_b = u
-        vy_r_b = v - self.b * r
+        vx_f_b = vx
+        vy_f_b = vy + a * r
+        vx_r_b = vx
+        vy_r_b = vy - b * r
 
         c_d, s_d = jnp.cos(delta), jnp.sin(delta)
         vx_f = c_d * vx_f_b + s_d * vy_f_b
@@ -550,22 +641,37 @@ class JaxDynamicBicycle(DynamicBicycle):
         vy_r = vy_r_b
 
         w_r = u_inputs[0]
-        w_f = vx_f / self.r_f
+        w_f = vx_f / r_f
         return vx_f, vy_f, w_f, vx_r, vy_r, w_r
 
-    def compute_tire_physics(self, v_body, u_inputs):
+    def compute_tire_physics(self, v_body, u_inputs, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        L = a + b
+
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
-            v_body, u_inputs
+            v_body, u_inputs, params
         )
-        Fz_f = self.mass * self.gravity * (self.b / self.L)
-        Fz_r = self.mass * self.gravity * (self.a / self.L)
-        Fx_f, Fy_f = self.tire_model_f.vel2forces(vx_f, vy_f, w_f, self.r_f, Fz_f)
-        Fx_r, Fy_r = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
+        Fz_f = mass * gravity * (b / L)
+        Fz_r = mass * gravity * (a / L)
+        Fx_f, Fy_f = self.tire_model_f.vel2forces(vx_f, vy_f, w_f, r_f, Fz_f)
+        Fx_r, Fy_r = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, r_r, Fz_r)
         return Fx_f, Fy_f, Fx_r, Fy_r
 
-    def generalized_d(self, q, v, u_in):
+    def generalized_d(self, q, v, u_in, params=None):
         jnp = require_jax_numpy()
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v, u_in)
+        params = self.params if params is None else params
+        a = params["a"]
+        b = params["b"]
+        rho = params["rho"]
+        CdA = params["CdA"]
+
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v, u_in, params)
         delta = u_in[1]
         c_d, s_d = jnp.cos(delta), jnp.sin(delta)
         Fx_f_b = Fx_f * c_d - Fy_f * s_d
@@ -574,24 +680,29 @@ class JaxDynamicBicycle(DynamicBicycle):
         Fy_r_b = Fy_r
         Sum_Fx = Fx_f_b + Fx_r_b
         Sum_Fy = Fy_f_b + Fy_r_b
-        Sum_Mz = self.a * Fy_f_b - self.b * Fy_r_b
-        F_aero = 0.5 * self.rho * self.CdA * v[0] * jnp.abs(v[0])
+        Sum_Mz = a * Fy_f_b - b * Fy_r_b
+        F_aero = 0.5 * rho * CdA * v[0] * jnp.abs(v[0])
         Sum_Fx = Sum_Fx - F_aero
         F_ext = jnp.array([Sum_Fx, Sum_Fy, Sum_Mz])
         return -F_ext
 
     def f(self, x, u, t=0.0, params=None):
         jnp = require_jax_numpy()
+        params = self.params if params is None else params
+
         q = x[0:3]
         v = x[3:6]
         w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
         u_in = jnp.array([w_rear[0], delta[0]])
 
-        M = self.M_mat(q)
-        C = self.C_mat(q, v)
-        d_vec = self.generalized_d(q, v, u_in)
-        dv = jnp.linalg.solve(M, -C @ v - d_vec)
-        dq = self.N_mat(q) @ v
+        M = self.M(q, params)
+        C = self.C(q, v, params)
+        N = self.N(q, params)
+        d = self.generalized_d(q, v, u_in, params)
+
+        # Rigid-body EoM in body frame: M dv + C v + d = 0; dq = N v
+        dv = jnp.linalg.solve(M, -C @ v - d)
+        dq = N @ v
         return jnp.concatenate([dq, dv])
 
     def h(self, x, u, t=0.0, params=None):
@@ -610,18 +721,26 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
 
     def __init__(self):
 
-        from minilink.core.system import VectorSignal
+        from minilink.core.signals import VectorSignal
 
         super().__init__()
         self.name = "JAX Dynamic Bicycle (rate inputs)"
 
         self.n = 8
-        self.m = 2
 
         self.state = VectorSignal("x", dim=self.n)
         self.x0 = np.zeros(self.n)
 
-        self.state.labels = ["x", "y", "theta", "u", "v", "r", "w_rear", "delta"]
+        self.state.labels = [
+            "x",
+            "y",
+            "theta",
+            "vx",
+            "vy",
+            "yaw_rate",
+            "w_rear",
+            "delta",
+        ]
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
 
         self.inputs = {}
@@ -642,6 +761,8 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
 
     def f(self, x, u, t=0.0, params=None):
         jnp = require_jax_numpy()
+        params = self.params if params is None else params
+
         q = x[0:3]
         v = x[3:6]
         u_in = x[6:8]  # [w_rear, delta]
@@ -651,15 +772,20 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
         # w_rear_dot = u[0]
         # delta_dot = u[1]
 
-        M = self.M_mat(q)
-        C = self.C_mat(q, v)
-        d_vec = self.generalized_d(q, v, u_in)
-        dv = jnp.linalg.solve(M, -C @ v - d_vec)
-        dq = self.N_mat(q) @ v
+        M = self.M(q, params)
+        C = self.C(q, v, params)
+        N = self.N(q, params)
+        d = self.generalized_d(q, v, u_in, params)
+
+        # Wheel/steer commands integrate the rate inputs; body follows the EoM.
+        dv = jnp.linalg.solve(M, -C @ v - d)
+        dq = N @ v
 
         return jnp.concatenate([dq, dv, u])
 
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
+        a = self.params["a"]
+        b = self.params["b"]
 
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
         vb = x[3:6]
@@ -667,15 +793,15 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
         delta = float(u_in[1])
 
         T_wb = pose2d_matrix(X, Y, Theta)
-        T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
-        T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
+        T_rear = T_wb @ pose2d_matrix(-b, 0.0, 0.0)
+        T_front = T_wb @ pose2d_matrix(a, 0.0, delta)
 
         v_scale = 0.2
         f_scale = 0.001
 
         uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + self.a * wr])
-        v_r_loc = np.array([uu, vv - self.b * wr])
+        v_f_loc = np.array([uu, vv + a * wr])
+        v_r_loc = np.array([uu, vv - b * wr])
 
         def _world_arrow_pose(dx: float, dy: float, px: float, py: float):
             mag = v_scale * np.hypot(dx, dy)
@@ -685,10 +811,10 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
             return scale_pose2d_matrix(px, py, th, mag)
 
         c, s = np.cos(Theta), np.sin(Theta)
-        rx = X + c * (-self.b) - s * 0.0
-        ry = Y + s * (-self.b) + c * 0.0
-        fx = X + c * self.a - s * 0.0
-        fy = Y + s * self.a + c * 0.0
+        rx = X + c * (-b) - s * 0.0
+        ry = Y + s * (-b) + c * 0.0
+        fx = X + c * a - s * 0.0
+        fy = Y + s * a + c * 0.0
 
         vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
         vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
@@ -721,7 +847,6 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
 
 
 if __name__ == "__main__":
-
     sys = JaxDynamicBicycleRateInputs()
     x = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     u = np.array([5.0, 0.1])

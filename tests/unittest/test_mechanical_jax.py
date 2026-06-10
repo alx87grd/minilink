@@ -17,7 +17,7 @@ pytest.importorskip("jax")
 import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
-from minilink.compile.jax_utils import configure_jax  # noqa: E402
+from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.dynamics.abstraction.mechanical import (  # noqa: E402
     JaxMechanicalSystem,
     MechanicalSystem,

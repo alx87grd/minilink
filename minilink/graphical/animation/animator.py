@@ -2,7 +2,7 @@
 Trajectory animation orchestration.
 
 Backends live under :mod:`minilink.graphical.animation.renderers`; the animator picks one by name
-(see :func:`_make_renderer`).
+(see :func:`make_renderer`).
 
 Roadmap (not implemented here—see ``ROADMAP.md`` §7 and P2):
 
@@ -17,10 +17,13 @@ Roadmap (not implemented here—see ``ROADMAP.md`` §7 and P2):
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
-from minilink.graphical.common.environment import prefers_inline_animation
-from minilink.graphical.animation.renderers.matplotlib_renderer import MatplotlibRenderer
+from minilink.graphical.animation.renderers.matplotlib_renderer import (
+    MatplotlibRenderer,
+)
 from minilink.graphical.animation.renderers.meshcat_renderer import MeshcatRenderer
 from minilink.graphical.animation.renderers.plotly_renderer import PlotlyRenderer
 from minilink.graphical.animation.renderers.pygame_renderer import PygameRenderer
@@ -29,6 +32,7 @@ from minilink.graphical.animation.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
 )
+from minilink.graphical.common.environment import prefers_inline_animation
 
 __all__ = [
     "Animator",
@@ -37,10 +41,11 @@ __all__ = [
     "MeshcatRenderer",
     "PlotlyRenderer",
     "PygameRenderer",
+    "make_renderer",
 ]
 
 
-def _make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
+def make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
     """
     Return a backend instance for *name*.
 
@@ -83,7 +88,7 @@ class Animator:
 
     def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib"):
         """Renders a single static frame of the system at state *x*, *u*, *t*."""
-        backend = _make_renderer(renderer, self)
+        backend = make_renderer(renderer, self)
         primitives = self.sys.get_kinematic_geometry()
         frame = self._prepare_transforms(x, u, t, primitives=primitives)
         backend.open_scene(
@@ -158,7 +163,7 @@ class Animator:
                 "Use native=True, or use html=True for inline framed playback."
             )
 
-        backend = _make_renderer(renderer, self)
+        backend = make_renderer(renderer, self)
         primitives = self.sys.get_kinematic_geometry()
         schedule = trajectory_frame_schedule(traj, time_factor_video)
         frames = [
@@ -175,16 +180,20 @@ class Animator:
                     is_3d=is_3d,
                 )
             except NotImplementedError:
-                print(
-                    f"html=True is not supported for renderer={renderer!r}; ignoring html."
+                warnings.warn(
+                    f"html=True is not supported for renderer={renderer!r}; "
+                    "ignoring html.",
+                    stacklevel=2,
                 )
 
         if save:
             try:
                 backend.export_animation(primitives, frames, schedule, file_name)
             except NotImplementedError:
-                print(
-                    f"save=True is not supported for renderer={renderer!r}; skipping export."
+                warnings.warn(
+                    f"save=True is not supported for renderer={renderer!r}; "
+                    "skipping export.",
+                    stacklevel=2,
                 )
 
         if not show:
@@ -194,9 +203,10 @@ class Animator:
             try:
                 return backend.play_native(primitives, frames, schedule, is_3d=is_3d)
             except NotImplementedError:
-                print(
+                warnings.warn(
                     f"native=True is not supported for renderer={renderer!r}; "
-                    "falling back to the Python-loop path."
+                    "falling back to the Python-loop path.",
+                    stacklevel=2,
                 )
 
         backend.open_scene(
@@ -261,7 +271,7 @@ class Animator:
         callback signature:
             new_x, new_u, should_stop = update_callback(x, u, t, step_idx, events)
         """
-        backend = _make_renderer(renderer, self)
+        backend = make_renderer(renderer, self)
         _require_interactive_renderer(renderer, backend)
         primitives = self.sys.get_kinematic_geometry()
 
@@ -392,7 +402,7 @@ class Animator:
         if dynamics_substeps < 1 or int(dynamics_substeps) != dynamics_substeps:
             raise ValueError("dynamics_substeps must be a positive integer.")
         dynamics_substeps = int(dynamics_substeps)
-        backend = _make_renderer(renderer, self)
+        backend = make_renderer(renderer, self)
         _require_interactive_renderer(renderer, backend)
 
         # Lazy pygame import: game() should be optional.

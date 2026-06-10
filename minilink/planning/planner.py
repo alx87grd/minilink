@@ -1,9 +1,9 @@
 """
 Shared orchestration base for deterministic planners.
 
-Concrete planners live in family subpackages (``search/``,
-``trajectory_optimization/``, ``policy_synthesis/``). Result typing is
-left to concrete planners and call sites for now.
+Concrete planners live in family subpackages (currently
+``trajectory_optimization/``). Result typing is left to concrete
+planners and call sites for now.
 
 The :class:`~minilink.planning.problems.PlanningProblem` remains
 declarative and does not solve itself.

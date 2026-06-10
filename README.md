@@ -78,10 +78,10 @@ System
 ## Quick start
 
 ```python
-from minilink.control.pendulum_pd import PendulumPDController
+from minilink.control.linear import PDController
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-controller = PendulumPDController()
+controller = PDController()
 plant = Pendulum()
 
 plant.x0[0] = 2.0
@@ -103,7 +103,7 @@ Use object defaults only when `params is None`.
 ```python
 import numpy as np
 
-from minilink.core.blocks.sources import Step
+from minilink.blocks.sources import Step
 from minilink.core.system import DynamicSystem
 
 
