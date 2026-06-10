@@ -12,11 +12,8 @@ gradient-based trajectory optimization.
 
 import numpy as np
 
-from minilink.compile.jax_utils import require_jax_numpy
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.catalog.vehicles.tire_models import (
-    LinearTire,
-    Pacejka,
     TireModel,
 )
 from minilink.graphical.animation.primitives import (
@@ -303,7 +300,6 @@ class DynamicBicycleMagicForces(DynamicSystem):
     def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
         X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
         _, vb = self.x2q(x)
-        # f_rear, delta = self.get_port_values_from_u(u, "f_rear", "delta")
         u_in = self.get_u_int(x, u)
         delta = float(u_in[1])
 
@@ -332,8 +328,6 @@ class DynamicBicycleMagicForces(DynamicSystem):
         Frx_w = c * Fx_r_b - s * Fy_r_b
         Fry_w = s * Fx_r_b + c * Fy_r_b
 
-        # v_scale = 0.2
-        # f_scale = 0.001
         return [
             T_wb,
             T_rear,
@@ -398,8 +392,6 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         self.Jw_rear = 1.0
         self.Jw_front = 1.0
 
-    # STATE / COORDINATE CONVERSION
-
     def x2q(self, x):
         """
         Convert state vector to generalized coordinates and velocities
@@ -407,8 +399,6 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         q = x[0:3]
         v = x[3:8]
         return q, v
-
-    # KINEMATIC MAP
 
     def M_mat(self, q: np.ndarray) -> np.ndarray:
         """
@@ -520,14 +510,6 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
 
         Fx_rear, Fy_rear = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, self.r_r, Fz_r)
 
-        # F_l = np.sqrt(Fx_front**2 + Fy_front**2)
-        # F_r = np.sqrt(Fx_rear**2 + Fy_rear**2)
-
-        # print(
-        #     f"Fx_l={Fx_l:.3f}, Fy_l={Fy_l:.3f}, |F_l|={F_l:.3f}, "
-        #     f"Fx_r={Fx_r:.3f}, Fy_r={Fy_r:.3f}, |F_r|={F_r:.3f}"
-        # )
-
         return Fx_front, Fy_front, Fx_rear, Fy_rear
 
     def generalized_d(
@@ -566,11 +548,7 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
 
         Q_ext = np.array([Sum_Fx, Sum_Fy, Sum_Mz, -Tau_load_rear, -Tau_load_front])
 
-        # print("Fx_l =", Fx_l, "Fx_r =", Fx_r, "Mz =", Sum_Mz)
-
         return -Q_ext
-
-    # INPUT MAPPING
 
     def u2e(self, u):
         """
@@ -752,7 +730,6 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         available_torque = np.clip(available_torque, 0.0, self.engine_power_peak)
 
         tau_rear = throttle * available_torque
-
         if w_rear_num > 1e-6:
             tau_rear = (
                 tau_rear
@@ -760,8 +737,6 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
                 - self.engine_rolling_resistance * w_moteur
             )
 
-        # DEBUG:
-        # print(f"w_rear: {w_rear * 9.5}rpm, throttle: {throttle}, tau_rear: {tau_rear}")
         return tau_rear
 
     def f(
@@ -781,9 +756,6 @@ class DynamicBicycleRearWheelDriveEngine(DynamicBicycleRearWheelDrive):
         """
 
         q, v = self.x2q(x)
-
-        # throttle = self.u2input_signal(u, "thr")[0]
-        # delta_cmd = self.u2input_signal(u, "delta")[0]
 
         throttle, delta_cmd = self.get_port_values_from_u(u, "thr", "delta")
         throttle = throttle[0]

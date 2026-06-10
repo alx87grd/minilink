@@ -234,21 +234,6 @@ def create_diagram(
 
     full_state_meas = BicycleMeasurement(name="Meas states", y_size=10)
 
-    # speed_meas = Measurement(name="Speed measurement", y_size=10, index=3, show=False)
-    # x_pos_meas = Measurement(name="X pos measurement", y_size=10, index=0, show=False)
-
-    # y_pos_meas = Measurement(name="y pos measurement", y_size=10, index=1, show=False)
-
-    # ang_speed_meas = Measurement(
-    #     name="Angular speed measurement", y_size=10, index=5, show=False
-    # )
-
-    # rear_speed_meas = Measurement(
-    #     name="Rear wheel speed",
-    #     y_size=10,
-    #     index=6,
-    # )
-
     x_pid = PID(
         Kp=2.0,
         Ki=0.0,
@@ -275,13 +260,13 @@ def create_diagram(
     acc_to_force = AccToRearForce(vehicle)
 
     theta_pid = PID(
-        Kp=1.0,
-        Ki=0.0,
-        Kd=0.0,
+        Kp=2.5,
+        Ki=0.2,
+        Kd=1.3,
         cmd_min=-10.0,
         cmd_max=10.0,
-        i_min=-10.0,
-        i_max=10.0,
+        i_min=-1.0,
+        i_max=1.0,
         name="Yaw rate PID",
     )
 
@@ -405,8 +390,8 @@ def main():
     plt.plot(t, ref, label="y meas")
     plt.plot(t, meas, label="y goal")
     plt.xlabel("Time [s]")
-    plt.ylabel("Y pas [m]")
-    plt.title("Theta PIS - Reference vs Measured")
+    plt.ylabel("Y pos [m]")
+    plt.title("Theta POS - Reference vs Measured")
     plt.legend()
     plt.grid(True)
     plt.show()

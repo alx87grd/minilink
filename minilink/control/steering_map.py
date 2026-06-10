@@ -69,7 +69,7 @@ class AngularSpeedToSteeringMap(System):
         cinematic_factor = vx_meas_num / self.L
         delta = np.arctan(r_targ / cinematic_factor)
 
-        delta = np.clip(delta, max=self.max_steer, min=self.min_steer)
+        delta = np.clip(delta, a_min=self.min_steer, a_max=self.max_steer)
         return np.array([delta], dtype=float)
 
     def get_kinematic_geometry(self):

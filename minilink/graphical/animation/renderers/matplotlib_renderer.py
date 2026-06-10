@@ -525,13 +525,27 @@ class MatplotlibRenderer(AnimationRenderer):
 
     def export_animation(self, primitives, frames, schedule, file_name: str) -> None:
         fig, ani = self._build_animation(primitives, frames, schedule)
-        print(f"Saving animation to {file_name}.gif ...")
-        ani.save(
-            file_name + ".gif",
-            writer="imagemagick",
-            fps=schedule.target_fps,
-            dpi=DPI_EXPORT,
-        )
+        # Prefer MP4 via ffmpeg when available, fall back to GIF (ImageMagick) otherwise.
+        mp4_name = file_name + ".mp4"
+        try:
+            # Use the configured ffmpeg writer if available
+            writer = animation.FFMpegWriter(fps=schedule.target_fps)
+            print(f"Saving animation to {mp4_name} ...")
+            ani.save(mp4_name, writer=writer, dpi=DPI_EXPORT)
+        except Exception:
+            gif_name = file_name + ".gif"
+            print(
+                "FFmpeg writer not available or failed; saving GIF instead to {0} ...".format(gif_name)
+            )
+            try:
+                ani.save(
+                    gif_name,
+                    writer="imagemagick",
+                    fps=schedule.target_fps,
+                    dpi=DPI_EXPORT,
+                )
+            except Exception as e:
+                print("Failed to export animation with ImageMagick as well:", e)
         plt.close(fig)
 
     def play_native(self, primitives, frames, schedule, *, is_3d: bool):

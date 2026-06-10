@@ -38,7 +38,7 @@ class Sum(System):
         result = u[0] + u[1]
 
         if self.max is not None and self.min is not None:
-            result = np.clip(result, max=self.max, min=self.min)
+            result = np.clip(result, a_min=self.min, a_max=self.max)
 
         return result
 
@@ -126,7 +126,7 @@ class PID(DynamicSystem):
         d_int_e = e
 
         # e' = ref' - meas'
-        # Si ref' ~= 0
+        # Si ref' ~= 0; il faut que ref change lentement.
         # e' = 0 - meas' = -meas'
         cmd = p["Kp"] * e + p["Ki"] * int_e - p["Kd"] * d_meas_filt
         stop_hi = (cmd >= p["cmd_max"]) and (e > 0)
