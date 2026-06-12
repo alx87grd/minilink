@@ -1,8 +1,0 @@
----
-description: Require reading agent.md before code changes
-alwaysApply: true
----
-
-# Read `agent.md` First
-
-Before edits, architecture changes, or substantive implementation, read and follow [agent.md](agent.md) in the repository root.
