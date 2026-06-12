@@ -147,21 +147,59 @@ diagram.plot_trajectory(signals=("x", "step:y"))
 See `examples/scripts/diagrams/demo_diagram_shortcuts.py` for shortcut and
 explicit versions side by side.
 
-## Lower-level APIs
+## Call chains
 
-Use the facade methods for common workflows:
+Minimal paths for debugging and extending workflows. Contracts:
+[DESIGN.md](DESIGN.md).
 
-- `compute_trajectory(...)`
-- `plot_trajectory(...)`
-- `plot_diagram(...)`
-- `animate(...)`
+Facade methods for common workflows: `compute_trajectory(...)`, `plot_trajectory(...)`,
+`plot_diagram(...)`, `animate(...)`. Use lower-level APIs when you need explicit
+control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
+`compile()` / `DynamicsEvaluator`.
 
-Use lower-level APIs when you need explicit control:
+### Package roles
 
-- `DiagramSystem.add_subsystem(...)` and `DiagramSystem.connect(...)` for custom
-  topology;
-- `Simulator` for solver, time-grid, and backend control;
-- `compile()` / `DynamicsEvaluator` for repeated evaluation and JAX execution.
+| Package | Owns |
+| --- | --- |
+| `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
+| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`) |
+| `control` | generic control laws (`PController`, `PDController`) |
+| `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
+| `simulation` | `Simulator`, solvers, time grids |
+| `graphical` | plots, diagrams, animation (`Animator` + renderers) |
+| `planning` | `PlanningProblem`, planners, transcriptions |
+| `optimization` | `MathematicalProgram`, `Optimizer` |
+
+### Main chains
+
+```text
+Model:     subclass System → f/h (+ ports or DynamicSystem options)
+
+Compose:   + / >> / @ / autowire  →  DiagramSystem
+           or add_subsystem + connect (+ connect_new_output_port)
+
+Simulate:  compute_trajectory*  →  Simulator  →  compile  →  solve  →  Trajectory
+
+Compile:   sys.compile(backend)  →  DynamicsEvaluator
+
+Plot:      plot_trajectory*  →  graphical.signals  →  PlotResult
+           plot_phase_plane* →  graphical.phase_plane
+           plot_diagram      →  graphical.diagrams (Graphviz/Mermaid)
+
+Animate:   animate* / render / game  →  Animator  →  renderer backend
+           planner.plot_solution / animate_solution  →  problem.sys.*
+
+Trajopt:   PlanningProblem + Transcription + TrajectoryOptimizationPlanner
+           → transcribe → MathematicalProgram → Optimizer → Trajectory
+
+NLP:       MathematicalProgram → Optimizer → OptimizationResult
+```
+
+- `Trajectory` is numeric only (`t`, `x`, `u`, optional `signals`); labels stay on `System`.
+- Diagram internal signals in plots: `"subsystem_id:port_id"`.
+- `DiagramSystem.connection_verbose` defaults to `True`; set `False` to quiet wiring.
+- Shortcuts flatten diagram operands instead of nesting them; `+` does not infer cross-wiring.
+- `compute_*` returns `Trajectory`; `plot_*` returns `PlotResult`; `show=False` skips display.
 
 ## Examples
 
@@ -180,7 +218,6 @@ Catalog plants live under `minilink.dynamics.catalog.*`.
 ## Docs
 
 - [DESIGN.md](DESIGN.md) — principles and contracts
-- [flows.md](flows.md) — minimal call chains
 - [ROADMAP.md](ROADMAP.md) — maturity and priorities
 - [agent.md](agent.md) — maintainer / agent rules
 

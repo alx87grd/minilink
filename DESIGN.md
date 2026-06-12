@@ -1,7 +1,6 @@
 # Minilink Technical Design
 
-Architecture and public contracts. User guide: [README.md](README.md). Call chains:
-[flows.md](flows.md).
+Architecture and public contracts. User guide and call chains: [README.md](README.md).
 
 ## 1. Design Principles
 

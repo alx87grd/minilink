@@ -5,10 +5,4 @@ alwaysApply: true
 
 # Read `agent.md` First
 
-- Before making edits, proposing architecture changes, or running substantive implementation work, read `agent.md` in the repository root.
-- Follow guidance in `agent.md` for workflow, script style, and approval boundaries.
-- Treat `agent.md` as the source of truth for Minilink's math-first style: coach the maintainer toward textbook-readable code, and ask or explain before deviating into Python-heavy patterns.
-- Exclude notebooks from normal review/style passes unless the task is only to update renamed imports/API names or the user explicitly asks for notebook cleanup. Never review notebook outputs by default.
-- If instructions in chat conflict with `agent.md`, ask for clarification before proceeding.
-- Avoid adding new guideline documents if the same guidance already exists in `agent.md`.
-- For terminal commands in this repo (tests, `examples/scripts`, benchmarks), use Python **3.10+** with the extras your task needs (`pyproject.toml`). Shared conda environment names are informal; see `agent.md` section 9 (Local Environment). Do not assume `/usr/bin/python3` is sufficient.
+Before edits, architecture changes, or substantive implementation, read and follow [agent.md](agent.md) in the repository root.

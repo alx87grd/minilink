@@ -29,7 +29,7 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 - Explicit ports; `DynamicSystem` textbook ports via constructor options.
 - Pure `MathematicalProgram` + `Optimizer`; backend-native trajopt transcriptions.
 - Phase-plane plotting (`plot_phase_plane`, matplotlib).
-- User docs: [README.md](README.md), [flows.md](flows.md) (minimal chains).
+- User docs: [README.md](README.md) (workflows and minimal call chains).
 - Package taxonomy: four bands (framework / system libraries / tools /
   quarantine) with a dependency law and placement algorithm
   ([DESIGN.md §3](DESIGN.md)); `compile/` folded into `core/compile/`;

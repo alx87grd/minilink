@@ -1,8 +1,11 @@
 # Minilink AI Agent Instructions
 
-This file defines project-specific expectations for AI agents working on
-`minilink`. The short version: keep the math readable, keep interfaces thin,
-and keep docs synchronized with code.
+This file is the **source of truth** for AI agents working on `minilink`.
+[AGENTS.md](AGENTS.md) and [.cursor/rules/read-agent-first.mdc](.cursor/rules/read-agent-first.mdc)
+are thin auto-injected entry points that point here.
+
+The short version: keep the math readable, keep interfaces thin, and keep docs
+synchronized with code.
 
 ## 1. Core Directives
 
@@ -141,14 +144,13 @@ benchmarks, tests) may use richer imports when the benefit is clear.
 - Comments stay plain and sparse; add them only where they clarify non-obvious
   logic.
 - Do not add new markdown guides unless asked. Prefer updating `README.md`,
-  `DESIGN.md`, `ROADMAP.md`, or this file. Keep [flows.md](flows.md) to minimal
-  call chains only—do not grow step-by-step internal traces in markdown.
+  `DESIGN.md`, `ROADMAP.md`, or this file. Keep [README call chains](README.md#call-chains)
+  minimal—do not grow step-by-step internal traces in markdown.
 
 ## 3. Architecture And Contracts
 
-Canonical contracts live in [DESIGN.md](DESIGN.md). User workflows:
-[README.md](README.md). Minimal call chains: [flows.md](flows.md). Update those
-when you change public behavior.
+Canonical contracts live in [DESIGN.md](DESIGN.md). User workflows and minimal
+call chains: [README.md](README.md). Update those when you change public behavior.
 
 Quick reminders (details in DESIGN):
 
@@ -202,6 +204,8 @@ no `minilink.jax` package or global NumPy/JAX mode.
 
 ## 6. Verification
 
+After substantial changes, run the full checklist in [§10 Revision Pass](#10-revision-pass).
+
 At feature completion, verify in proportion to risk:
 
 1. automated tests with `pytest`;
@@ -233,6 +237,13 @@ Ask first:
 If a small request turns into a large job after inspection, stop and explain the
 smallest useful slice.
 
+If instructions in chat conflict with this file, ask for clarification before
+proceeding.
+
+**Notebooks:** exclude notebooks from normal review/style passes unless the task
+is only to update renamed imports/API names or the user explicitly asks for
+notebook cleanup. Never review notebook outputs by default.
+
 **Scope:**
 
 - **Small tweaks** — quick, minimal source change; no broad refactors unless asked.
@@ -240,6 +251,8 @@ smallest useful slice.
   approval before extended multi-step execution.
 - **Scope surprise** — stop and ask which slice the user wants rather than
   grinding forward.
+
+Before handoff on larger work, complete [§10 Revision Pass](#10-revision-pass).
 
 Demo and manual scripts stay flat and runnable from the repo root. Benchmark
 helpers, fixtures, and `run_*` scripts live in repo-root `benchmarks/` (see §5).
@@ -267,7 +280,18 @@ Subsystem maturity in [ROADMAP.md](ROADMAP.md) uses these definitions.
 
 Target **Python 3.10+** with optional extras from `pyproject.toml` (JAX, SymPy,
 visualization, Ipopt). Do not rely on macOS `/usr/bin/python3` when it is older
-than 3.10.
+than 3.10. For terminal commands in this repo (tests, `examples/scripts`,
+benchmarks), use Python 3.10+ with the extras your task needs.
+
+Install from repo root:
+
+```bash
+pip install -e ".[dev]"
+```
+
+Optional extras: `.[jax]`, `.[symbolic]`, `.[visualization]`, `.[plotting]`,
+`.[ipopt]`. Diagram bindings need a system `graphviz` package
+(`apt install graphviz`, or conda-forge `graphviz` + `python-graphviz`).
 
 Maintainers often use a conda env for local work (for example `dev-h26`). That
 name is **not contractual**—any conda/venv with Python 3.10+ and the extras you
@@ -282,3 +306,32 @@ python -m pytest
 conda run -n dev-h26 python -m pytest
 conda run -n dev-h26 python examples/scripts/animation/demo_animations.py
 ```
+
+Run demos from repo root: `python examples/scripts/<script>.py`.
+
+Headless: set `MPLBACKEND=Agg` before graphical imports. `plot_diagram()` D-Bus
+warnings in headless environments are harmless. `animate()` needs a display;
+plotting and simulation work headless with `show=False`.
+
+## 10. Revision Pass
+
+Final pass after substantial changes. Goal: a smaller, clearer diff.
+
+1. **Re-read diff** — scope creep, dead code, stale comments; preserve user edits.
+2. **Simplify** — match local patterns; thin public APIs; lazy optional imports;
+   fail clearly on unsupported paths.
+3. **Math-first** — textbook locals in equation paths; conversion at boundaries only
+   ([Textbook Style](#textbook-style)).
+4. **Examples** — fold or update demos; runnable from repo root; no new guides unless asked.
+5. **Docs** — sync [README.md](README.md) (user API), [DESIGN.md](DESIGN.md)
+   (contracts), [ROADMAP.md](ROADMAP.md) (maturity only if changed). Keep
+   [README call chains](README.md#call-chains) minimal—update chains, not
+   step-by-step internals
+   ([Docs And Comments](#docs-and-comments), [§3 Architecture And Contracts](#3-architecture-and-contracts)).
+6. **Tests** — new behavior, regressions, optional-extra skip messages; benchmarks
+   only when performance claims matter.
+7. **Verify** — `ruff check .`, `ruff format --check .`, `pytest` (proportionate
+   to risk; see [§6 Verification](#6-verification)); `MPLBACKEND=Agg` for headless
+   graphics smoke.
+8. **Handoff** — `git status`, no stray artifacts; short summary of changes and
+   verification.
