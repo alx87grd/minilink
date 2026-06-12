@@ -8,7 +8,7 @@ from minilink.core.backends import array_module
 from minilink.core.system import StaticSystem
 
 
-class PController(StaticSystem):
+class PropController(StaticSystem):
     """Proportional controller ``u = Kp * (r - y)`` on scalar ports."""
 
     def __init__(self):
@@ -29,9 +29,11 @@ class PController(StaticSystem):
 
         Kp = params["Kp"]
 
-        r, y = self.get_port_values_from_u(u, "r", "y")
+        # Input ports concatenate into u = [r, y]
+        r = u[0]
+        y = u[1]
 
-        u_cmd = Kp * (r[0] - y[0])
+        u_cmd = Kp * (r - y)
         xp = array_module(u)
         return xp.array([u_cmd])
 
@@ -91,10 +93,11 @@ class PDController(StaticSystem):
         Kp = params["Kp"]
         Kd = params["Kd"]
 
-        r, y = self.get_port_values_from_u(u, "r", "y")
-        position = y[0]
-        rate = y[1]
+        # Input ports concatenate into u = [r, y, dy_dt]
+        r = u[0]
+        y = u[1]
+        dy_dt = u[2]
 
-        u_cmd = Kp * (r[0] - position) - Kd * rate
+        u_cmd = Kp * (r - y) - Kd * dy_dt
         xp = array_module(u)
         return xp.array([u_cmd])

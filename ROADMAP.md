@@ -17,7 +17,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Dynamics catalog | 6 | Pyro models ported, QA'd term-by-term against pyro, and covered by tests (see `docs/plans/catalog-migration-notes.md`); `DynamicBicycle` params now thread fully. | Review naming/details per module toward TRL 7. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Moved out of quarantine by maintainer decision (June 2026); math not yet QA-validated. | Add validation tests (energy, analytic contact cases) toward TRL 2. |
-| Control | 5 | Generic `PController`/`PDController` integrated in `control/linear.py` and exercised by core tests. | Port further Pyro control laws (PID, LQR, computed torque) when needed. |
+| Control | 5 | Generic `PropController`/`PDController` integrated in `control/linear.py` and exercised by core tests. | Port further Pyro control laws (PID, LQR, computed torque) when needed. |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 

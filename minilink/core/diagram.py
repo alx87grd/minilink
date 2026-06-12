@@ -480,10 +480,10 @@ class DiagramSystem(System):
 if __name__ == "__main__":
     # Hello world: unity-feedback loop  dx = Kp (r - x)
     from minilink.blocks.basic import Integrator
-    from minilink.control.linear import PController
+    from minilink.control.linear import PropController
 
     diagram = DiagramSystem()
-    diagram.add_subsystem(PController(), "ctl")
+    diagram.add_subsystem(PropController(), "ctl")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
     diagram.connect("input", "r", "ctl", "r")

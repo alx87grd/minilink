@@ -268,7 +268,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | --- | --- |
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`) |
-| `control` | generic control laws (`PController`, `PDController`) |
+| `control` | generic control laws (`PropController`, `PDController`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |
 | `graphical` | plots, diagrams, animation (`Animator` + renderers) |

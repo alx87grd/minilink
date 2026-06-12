@@ -4,14 +4,14 @@ import numpy as np
 
 from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Step, WhiteNoise
-from minilink.control.linear import PController, PDController
+from minilink.control.linear import PDController, PropController
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
 class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_add_operator_adds_subsystems_without_wiring(self):
-        diagram = Step(final_value=[1.0]) + PController() + Integrator()
+        diagram = Step(final_value=[1.0]) + PropController() + Integrator()
 
         self.assertIsInstance(diagram, DiagramSystem)
         self.assertEqual(
@@ -103,7 +103,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["pendulum"]["u"], ("pd_controller", "u"))
 
     def test_series_operator_flattens_diagram_to_diagram_boundary(self):
-        left = Step(final_value=[1.0], step_time=0.0) >> PController()
+        left = Step(final_value=[1.0], step_time=0.0) >> PropController()
         right = Integrator() >> Integrator()
 
         diagram = left >> right
@@ -133,7 +133,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["pendulum"]["u"], ("pd_controller", "u"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
-        diagram = (Step(final_value=[1.0]) + PController() + Integrator()).autowire(
+        diagram = (Step(final_value=[1.0]) + PropController() + Integrator()).autowire(
             strict=True
         )
 
@@ -173,7 +173,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         )
 
     def test_autowire_strict_refuses_ambiguous_matches(self):
-        diagram = PController() + PController() + Integrator()
+        diagram = PropController() + PropController() + Integrator()
 
         with self.assertRaisesRegex(ValueError, "Ambiguous autowire target"):
             diagram.autowire(strict=True)

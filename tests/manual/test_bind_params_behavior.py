@@ -13,14 +13,14 @@ the old gain until you call ``compile()`` again.
 import numpy as np
 
 from minilink.blocks.basic import Integrator
-from minilink.control.linear import PController
+from minilink.control.linear import PropController
 from minilink.core.compile.compiler import compile_diagram
 from minilink.core.diagram import DiagramSystem
 
 diag = DiagramSystem()
 diag.connection_verbose = False
 
-ctl = PController()
+ctl = PropController()
 plant = Integrator()
 ctl.params["Kp"] = 2.5
 
