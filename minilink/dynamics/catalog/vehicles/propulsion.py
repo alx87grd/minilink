@@ -14,10 +14,7 @@ from minilink.graphical.animation.primitives import (
 
 
 class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
-    """Longitudinal front-wheel-drive car with wheel slip as input.
-
-    TRL: 1 - ready for user review.
-    """
+    """Longitudinal front-wheel-drive car with wheel slip as input."""
 
     def __init__(self):
         super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
@@ -110,10 +107,7 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
 class LongitudinalFrontWheelDriveCarWithTorqueInput(
     LongitudinalFrontWheelDriveCarWithWheelSlipInput
 ):
-    """Longitudinal front-wheel-drive car with wheel torque input.
-
-    TRL: 1 - ready for user review.
-    """
+    """Longitudinal front-wheel-drive car with wheel torque input."""
 
     def __init__(self):
         DynamicSystem.__init__(

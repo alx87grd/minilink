@@ -32,10 +32,7 @@ from minilink.graphical.animation.primitives import (
 
 
 class RotatingCartPole(MechanicalSystem):
-    """Rotating cart-pole with both joints actuated.
-
-    TRL: 1 - ready for user review.
-    """
+    """Rotating cart-pole with both joints actuated."""
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
@@ -174,10 +171,7 @@ class RotatingCartPole(MechanicalSystem):
 
 
 class UnderactuatedRotatingCartPole(RotatingCartPole):
-    """Rotating cart-pole actuated only at the base.
-
-    TRL: 1 - ready for user review.
-    """
+    """Rotating cart-pole actuated only at the base."""
 
     def __init__(self):
         super().__init__()
@@ -231,10 +225,7 @@ def _configure_cartpole(sys, *, name):
 
 
 class CartPole(MechanicalSystem):
-    """Linear cart with one unactuated pendulum pole.
-
-    TRL: 1 - ready for user review.
-    """
+    """Linear cart with one unactuated pendulum pole."""
 
     def __init__(self):
         super().__init__(dof=2, actuators=1)
@@ -358,10 +349,7 @@ class CartPole(MechanicalSystem):
 
 
 class JaxCartPole(JaxMechanicalSystem):
-    """JAX-traceable linear cart with one unactuated pendulum pole.
-
-    TRL: 1 - ready for user review.
-    """
+    """JAX-traceable linear cart with one unactuated pendulum pole."""
 
     def __init__(self):
         super().__init__(dof=2, actuators=1)
@@ -426,7 +414,6 @@ class JaxCartPole(JaxMechanicalSystem):
 
 
 if __name__ == "__main__":
-
     sys = RotatingCartPole()
     # sys = UnderactuatedRotatingCartPole()
 

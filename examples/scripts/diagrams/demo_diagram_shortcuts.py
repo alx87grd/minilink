@@ -65,7 +65,7 @@ show(closed, "Shortcut closed-loop pendulum", "PDController() @ Pendulum()")
 
 # Python parses this as ``step >> (controller @ plant)``. Shortcut composition
 # flattens the closed-loop diagram, so the result has direct ``step``,
-# ``controller``, and ``pendulum`` subsystems.
+# ``pd_controller``, and ``pendulum`` subsystems.
 fed_closed = Step(final_value=[1.0]) >> PDController() @ Pendulum()
 show(
     fed_closed,

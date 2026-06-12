@@ -9,7 +9,11 @@ import numpy as np
 
 from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
-from minilink.dynamics.engines.contact_jax import PlaneModel, SphereModel, make_world_model
+from minilink.dynamics.engines.contact_jax import (
+    PlaneModel,
+    SphereModel,
+    make_world_model,
+)
 from minilink.dynamics.engines.world import PhysicsWorldSystem
 
 world = make_world_model(

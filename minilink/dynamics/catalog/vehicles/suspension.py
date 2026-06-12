@@ -15,10 +15,7 @@ from minilink.graphical.animation.primitives import (
 
 
 class QuarterCarOnRoughTerrain(DynamicSystem):
-    """Quarter-car suspension moving over prescribed rough terrain.
-
-    TRL: 1 - ready for user review.
-    """
+    """Quarter-car suspension moving over prescribed rough terrain."""
 
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)

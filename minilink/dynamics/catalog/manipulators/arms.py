@@ -89,10 +89,7 @@ def _planar_torque_transforms(points, angles, u, upper_bound):
 
 
 class SpeedControlledManipulator(DynamicSystem):
-    """Joint-space integrator for velocity-controlled manipulators.
-
-    TRL: 1 - ready for user review.
-    """
+    """Joint-space integrator for velocity-controlled manipulators."""
 
     def __init__(self, dof, effector_dim):
         self.dof = int(dof)
@@ -148,10 +145,7 @@ class SpeedControlledManipulator(DynamicSystem):
 
 
 class OneLinkManipulator(MechanicalSystem):
-    """One-link planar manipulator.
-
-    TRL: 1 - ready for user review.
-    """
+    """One-link planar manipulator."""
 
     def __init__(self):
         super().__init__(dof=1, actuators=1)
@@ -228,10 +222,7 @@ class OneLinkManipulator(MechanicalSystem):
 
 
 class TwoLinkManipulator(MechanicalSystem):
-    """Two-link planar manipulator.
-
-    TRL: 1 - ready for user review.
-    """
+    """Two-link planar manipulator."""
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
@@ -366,10 +357,7 @@ class TwoLinkManipulator(MechanicalSystem):
 
 
 class ThreeLinkManipulator3D(MechanicalSystem):
-    """Three-link spatial manipulator from the Pyro catalog.
-
-    TRL: 1 - ready for user review.
-    """
+    """Three-link spatial manipulator from the Pyro catalog."""
 
     def __init__(self):
         super().__init__(dof=3, actuators=3)
@@ -582,10 +570,7 @@ class ThreeLinkManipulator3D(MechanicalSystem):
 
 
 class FiveLinkPlanarManipulator(MechanicalSystem):
-    """Five-link planar manipulator with Pyro's default unit joint dynamics.
-
-    TRL: 1 - ready for user review.
-    """
+    """Five-link planar manipulator with Pyro's default unit joint dynamics."""
 
     def __init__(self):
         super().__init__(dof=5, actuators=5)

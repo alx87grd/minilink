@@ -1,3 +1,11 @@
+"""
+Source blocks: systems that emit time signals.
+
+A source is a :class:`~minilink.core.system.System` with no states and no
+input ports; its single output port ``y`` is a function of time only,
+``y = h(t; p)``.
+"""
+
 import numpy as np
 from scipy.interpolate import interp1d
 
@@ -6,6 +14,12 @@ from minilink.core.system import System
 
 
 class Source(System):
+    """Constant source: ``y = value`` for all ``t``.
+
+    Also the base class for time-signal sources; subclasses override
+    :meth:`h` with their own ``y = h(t; p)``.
+    """
+
     def __init__(self, p):
 
         System.__init__(self, 0)
@@ -26,9 +40,9 @@ class Source(System):
         Parameters
         ----------
         t0 : float, optional
-            Start time. Defaults to ``self.params["t0"]`` when available, else 0.0.
+            Start time (default 0.0).
         tf : float, optional
-            End time. Defaults to ``self.params["tf"]`` when available, else 10.0.
+            End time (default 10.0).
         n_pts : int, optional
             Number of evaluation points used for plotting.
         ax : matplotlib.axes.Axes, optional
@@ -36,6 +50,9 @@ class Source(System):
             (same policy as
             :func:`minilink.graphical.signals.plot_time_signals`);
             if an axis is passed, the caller controls display.
+
+        TODO: fold this into a generic signal-plotting interface in
+        :mod:`minilink.graphical` instead of bespoke matplotlib code here.
         """
         import matplotlib.pyplot as plt
 
@@ -102,6 +119,8 @@ class Source(System):
 
 
 class Step(Source):
+    """Step source: ``y = initial_value`` if ``t < step_time``, else ``final_value``."""
+
     def __init__(self, initial_value=None, final_value=None, step_time=1.0):
         if initial_value is None:
             initial_value = np.zeros(1)
@@ -135,6 +154,15 @@ class Step(Source):
 
 
 class WhiteNoise(Source):
+    """Band-limited white-noise source.
+
+    Gaussian samples (``mean``, ``var``) are drawn once on a uniform grid
+    with spacing ``sample_period`` over ``[t0, tf]`` and linearly
+    interpolated in between, so ``y(t)`` is deterministic for a given
+    ``seed`` and well-behaved under adaptive ODE solvers. Call
+    :meth:`refresh` after changing ``params``.
+    """
+
     def __init__(self, p=1):
 
         Source.__init__(self, p)

@@ -9,7 +9,11 @@ import time
 import jax
 import numpy as np
 
-from minilink.dynamics.engines.contact_jax import PlaneModel, SphereModel, make_world_model
+from minilink.dynamics.engines.contact_jax import (
+    PlaneModel,
+    SphereModel,
+    make_world_model,
+)
 from minilink.dynamics.engines.world import PhysicsWorldSystem
 
 # Demo controls.

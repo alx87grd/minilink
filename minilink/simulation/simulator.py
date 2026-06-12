@@ -115,7 +115,7 @@ class Simulator:
     solver : str, optional
         Solver mode; if ``None``, chosen by :meth:`select_solver`.
     verbose : bool
-        Print setup information.
+        Print setup information (default quiet).
     compile_backend : str
         Name passed as ``backend`` to :meth:`~minilink.core.system.System.compile`.
         Typical values are ``numpy`` (default) or ``jax``. Use :data:`COMPILE_BACKEND_AUTO`
@@ -131,7 +131,7 @@ class Simulator:
         n_steps=None,
         dt=None,
         solver=None,
-        verbose=True,
+        verbose=False,
         compile_backend=BACKEND_NUMPY,
     ):
         self.verbose = verbose

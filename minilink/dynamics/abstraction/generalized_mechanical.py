@@ -1,6 +1,5 @@
 """Second-order mechanical systems with generalized velocities."""
 
-
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 

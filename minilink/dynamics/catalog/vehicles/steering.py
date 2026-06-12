@@ -17,10 +17,7 @@ from minilink.graphical.animation.primitives import (
 
 
 class KinematicBicycle(DynamicSystem):
-    """Kinematic bicycle model with speed and steering-angle inputs.
-
-    TRL: 1 - ready for user review.
-    """
+    """Kinematic bicycle model with speed and steering-angle inputs."""
 
     def __init__(self):
         super().__init__(n=3, input_dim=2, output_dim=3, expose_state=True)
@@ -84,10 +81,7 @@ class KinematicBicycle(DynamicSystem):
 
 
 class KinematicCar(KinematicBicycle):
-    """Kinematic bicycle parameterized as a full-size car.
-
-    TRL: 1 - ready for user review.
-    """
+    """Kinematic bicycle parameterized as a full-size car."""
 
     def __init__(self):
         super().__init__()
@@ -104,10 +98,7 @@ class KinematicCar(KinematicBicycle):
 
 
 class ConstantSpeedKinematicCar(DynamicSystem):
-    """Kinematic car with constant speed and steering-angle input.
-
-    TRL: 1 - ready for user review.
-    """
+    """Kinematic car with constant speed and steering-angle input."""
 
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
@@ -160,10 +151,7 @@ class ConstantSpeedKinematicCar(DynamicSystem):
 
 
 class HolonomicMobileRobot(DynamicSystem):
-    """Holonomic 2D point robot.
-
-    TRL: 1 - ready for user review.
-    """
+    """Holonomic 2D point robot."""
 
     def __init__(self):
         super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
@@ -202,10 +190,7 @@ class HolonomicMobileRobot(DynamicSystem):
 
 
 class HolonomicMobileRobot3D(DynamicSystem):
-    """Holonomic 3D point robot.
-
-    TRL: 1 - ready for user review.
-    """
+    """Holonomic 3D point robot."""
 
     def __init__(self):
         super().__init__(n=3, input_dim=3, output_dim=3, expose_state=True)
@@ -249,10 +234,7 @@ class HolonomicMobileRobot3D(DynamicSystem):
 
 
 class UdeSRacecar(KinematicCar):
-    """Small kinematic car with UdeS racecar-scale parameters.
-
-    TRL: 1 - ready for user review.
-    """
+    """Small kinematic car with UdeS racecar-scale parameters."""
 
     def __init__(self):
         super().__init__()

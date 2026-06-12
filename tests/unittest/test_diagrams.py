@@ -18,7 +18,7 @@ class TestDiagrams(unittest.TestCase):
     def test_system_block_html_includes_named_ports(self):
         html = get_system_block_html(PController(), "ctl")
 
-        self.assertIn("Controller::ctl", html)
+        self.assertIn("P Controller::ctl", html)
         self.assertIn('PORT="r"', html)
         self.assertIn('PORT="u"', html)
 
@@ -69,7 +69,7 @@ class TestDiagrams(unittest.TestCase):
         source = export_diagram_topology(self._make_diagram(), backend="mermaid")
 
         self.assertIn("flowchart LR", source)
-        self.assertIn('ctl["Controller::ctl"]', source)
+        self.assertIn('ctl["P Controller::ctl"]', source)
         self.assertIn('input -- "r -> r" --> ctl', source)
         self.assertIn('plant -- "y -> y_meas" --> output', source)
 

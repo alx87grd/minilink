@@ -14,10 +14,7 @@ from minilink.graphical.animation.primitives import (
 
 
 class Plane2D(MechanicalSystem):
-    """Planar aircraft with thrust and elevator inputs.
-
-    TRL: 1 - ready for user review.
-    """
+    """Planar aircraft with thrust and elevator inputs."""
 
     def __init__(self):
         super().__init__(dof=3, actuators=2)

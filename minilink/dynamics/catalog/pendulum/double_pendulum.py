@@ -27,7 +27,6 @@ class DoublePendulum(MechanicalSystem):
     """
     Two-link actuated pendulum in Pyro's manipulator-equation convention.
 
-    TRL: 1 - ready for user review.
 
     Notes
     -----
@@ -192,10 +191,7 @@ class DoublePendulum(MechanicalSystem):
 
 
 class Acrobot(DoublePendulum):
-    """Double pendulum actuated only at the elbow.
-
-    TRL: 1 - ready for user review.
-    """
+    """Double pendulum actuated only at the elbow."""
 
     def __init__(self):
         super().__init__()
@@ -225,7 +221,6 @@ class Acrobot(DoublePendulum):
 
 
 if __name__ == "__main__":
-
     # sys = DoublePendulum()
     sys = Acrobot()
     sys.x0 = np.array([0.2, -0.15, 0.0, 0.0])

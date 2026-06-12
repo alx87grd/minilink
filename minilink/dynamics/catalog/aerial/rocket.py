@@ -14,10 +14,7 @@ from minilink.graphical.animation.primitives import (
 
 
 class Rocket(MechanicalSystem):
-    """Planar rocket with thrust magnitude and gimbal angle inputs.
-
-    TRL: 1 - ready for user review.
-    """
+    """Planar rocket with thrust magnitude and gimbal angle inputs."""
 
     def __init__(self):
         super().__init__(dof=3, actuators=2)

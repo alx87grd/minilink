@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-
 sys = Pendulum()
 sys.params["m"] = 1.0
 sys.params["l"] = 5.0

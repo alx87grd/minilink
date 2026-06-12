@@ -132,9 +132,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=ShootingTranscription(
-                ShootingOptions(tf=1.0, n_steps=5)
-            ),
+            transcription=ShootingTranscription(ShootingOptions(tf=1.0, n_steps=5)),
             options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
                 optimizer_options={"maxiter": 100, "ftol": 1e-9},
@@ -211,9 +209,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
             Xf=BallSet(center=np.array([1.0]), radius=0.1),
             cost=base.cost,
         )
-        tr = DirectCollocationTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
-        )
+        tr = DirectCollocationTranscription(DirectCollocationOptions(tf=1.0, n_steps=5))
         guess = default_initial_trajectory(problem, tr.initial_guess_time_grid(problem))
         program = tr.transcribe(problem, compile_backend="jax")
         z0 = tr.pack_initial_guess(problem, guess)

@@ -40,10 +40,7 @@ def _force_arrow_transform(x, force):
 
 
 class SingleMass(StateSpaceSystem):
-    """Single linear mass-spring-damper model.
-
-    TRL: 1 - ready for user review.
-    """
+    """Single linear mass-spring-damper model."""
 
     def __init__(self, mass=1.0, k=2.0, b=0.0):
         super().__init__(n=2, m=1, p=1, name="Single Mass Spring Damper")
@@ -114,10 +111,7 @@ class SingleMass(StateSpaceSystem):
 
 
 class TwoMass(StateSpaceSystem):
-    """Two-mass linear spring-damper chain with force on the second mass.
-
-    TRL: 1 - ready for user review.
-    """
+    """Two-mass linear spring-damper chain with force on the second mass."""
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
         super().__init__(n=4, m=1, p=1, name="Two Mass Spring Damper")
@@ -206,10 +200,7 @@ class TwoMass(StateSpaceSystem):
 
 
 class ThreeMass(StateSpaceSystem):
-    """Three-mass linear spring-damper chain with force on the third mass.
-
-    TRL: 1 - ready for user review.
-    """
+    """Three-mass linear spring-damper chain with force on the third mass."""
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
         super().__init__(n=6, m=1, p=1, name="Three Mass Spring Damper")
@@ -309,10 +300,7 @@ class ThreeMass(StateSpaceSystem):
 
 
 class FloatingSingleMass(SingleMass):
-    """Single mass with no ground spring.
-
-    TRL: 1 - ready for user review.
-    """
+    """Single mass with no ground spring."""
 
     def __init__(self, m=1.0, b=0.0):
         super().__init__(mass=m, k=0.0, b=b)
@@ -320,10 +308,7 @@ class FloatingSingleMass(SingleMass):
 
 
 class FloatingTwoMass(TwoMass):
-    """Two masses with no ground spring on the first mass.
-
-    TRL: 1 - ready for user review.
-    """
+    """Two masses with no ground spring on the first mass."""
 
     def __init__(self, m=1.0, k=1.0, b=0.0, output_mass=2):
         super().__init__(m=m, k=k, b=b, output_mass=output_mass)
@@ -332,10 +317,7 @@ class FloatingTwoMass(TwoMass):
 
 
 class FloatingThreeMass(ThreeMass):
-    """Three masses with no ground spring on the first mass.
-
-    TRL: 1 - ready for user review.
-    """
+    """Three masses with no ground spring on the first mass."""
 
     def __init__(self, m=1.0, k=1.0, b=0.0, output_mass=3):
         super().__init__(m=m, k=k, b=b, output_mass=output_mass)

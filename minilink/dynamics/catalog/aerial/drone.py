@@ -25,10 +25,7 @@ def _drone_body(width=1.0, height=0.2):
 
 
 class Drone2D(MechanicalSystem):
-    """Planar drone with two vertical body-frame thrusters.
-
-    TRL: 1 - ready for user review.
-    """
+    """Planar drone with two vertical body-frame thrusters."""
 
     def __init__(self):
         super().__init__(dof=3, actuators=2)
@@ -125,10 +122,7 @@ class Drone2D(MechanicalSystem):
 
 
 class Drone2DWithSideThruster(Drone2D):
-    """Planar drone with an added lateral body-frame thruster.
-
-    TRL: 1 - ready for user review.
-    """
+    """Planar drone with an added lateral body-frame thruster."""
 
     def __init__(self):
         super().__init__()
@@ -165,10 +159,7 @@ class Drone2DWithSideThruster(Drone2D):
 
 
 class SpeedControlledDrone2D(DynamicSystem):
-    """Planar drone abstraction with velocity inputs.
-
-    TRL: 1 - ready for user review.
-    """
+    """Planar drone abstraction with velocity inputs."""
 
     def __init__(self):
         super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
@@ -205,10 +196,7 @@ class SpeedControlledDrone2D(DynamicSystem):
 
 
 class ConstantSpeedHelicopterTunnel(DynamicSystem):
-    """Constant-speed tunnel helicopter with vertical force input.
-
-    TRL: 1 - ready for user review.
-    """
+    """Constant-speed tunnel helicopter with vertical force input."""
 
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
@@ -259,7 +247,6 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
 
 
 if __name__ == "__main__":
-
     sys = Drone2D()
     # sys = Drone2DWithSideThruster()
     # sys = SpeedControlledDrone2D()

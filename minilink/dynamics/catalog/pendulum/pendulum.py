@@ -11,10 +11,7 @@ from minilink.graphical.animation.primitives import (
 
 
 class Pendulum(MechanicalSystem):
-    """Single actuated pendulum.
-
-    TRL: 1 - ready for user review.
-    """
+    """Single actuated pendulum."""
 
     def __init__(self):
         super().__init__(dof=1, actuators=1)
@@ -89,10 +86,7 @@ class Pendulum(MechanicalSystem):
 
 
 class InvertedPendulum(Pendulum):
-    """Single actuated pendulum with upward zero-angle equilibrium.
-
-    TRL: 1 - ready for user review.
-    """
+    """Single actuated pendulum with upward zero-angle equilibrium."""
 
     def __init__(self):
         super().__init__()
@@ -109,10 +103,7 @@ class InvertedPendulum(Pendulum):
 
 
 class TwoIndependentPendulums(MechanicalSystem):
-    """Two uncoupled single pendulums sharing the same parameters.
-
-    TRL: 1 - ready for user review.
-    """
+    """Two uncoupled single pendulums sharing the same parameters."""
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)

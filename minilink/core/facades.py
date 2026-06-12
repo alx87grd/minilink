@@ -46,7 +46,7 @@ class SystemFacades:
         show=False,
         x0=None,
         compile_backend="numpy",
-        verbose=True,
+        verbose=False,
     ):
         """
         Convenience shortcut to simulate the system and return a trajectory.
@@ -103,7 +103,7 @@ class SystemFacades:
         show=False,
         x0=None,
         compile_backend="numpy",
-        verbose=True,
+        verbose=False,
     ):
         """
         Convenience shortcut to simulate the system under a prescribed input.

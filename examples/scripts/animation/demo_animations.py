@@ -1,5 +1,6 @@
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 import numpy as np
+
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 # Plant system
 sys = Pendulum()

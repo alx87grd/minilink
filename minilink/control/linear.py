@@ -18,7 +18,7 @@ class PController(StaticSystem):
             "Kp": 10.0,
         }
 
-        self.name = "Controller"
+        self.name = "P Controller"
 
         self.add_input_port("r", nominal_value=0.0)
         self.add_input_port("y", nominal_value=0.0)
@@ -67,7 +67,7 @@ class PDController(StaticSystem):
             "Kd": 1.0,
         }
 
-        self.name = "Controller"
+        self.name = "PD Controller"
 
         self.add_input_port("r", nominal_value=0.0)
         self.add_input_port(

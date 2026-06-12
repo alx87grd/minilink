@@ -4,10 +4,7 @@ from minilink.core.system import DynamicSystem
 
 
 class VanderPol(DynamicSystem):
-    """Van der Pol oscillator.
-
-    TRL: 1 - ready for user review.
-    """
+    """Van der Pol oscillator."""
 
     def __init__(self, mu=0.5):
         super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)

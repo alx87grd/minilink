@@ -16,10 +16,10 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertIsInstance(diagram, DiagramSystem)
         self.assertEqual(
             list(diagram.subsystems),
-            ["step", "controller", "integrator"],
+            ["step", "p_controller", "integrator"],
         )
-        self.assertEqual(diagram.connections["controller"]["r"], None)
-        self.assertEqual(diagram.connections["controller"]["y"], None)
+        self.assertEqual(diagram.connections["p_controller"]["r"], None)
+        self.assertEqual(diagram.connections["p_controller"]["y"], None)
         self.assertEqual(diagram.connections["integrator"]["u"], None)
 
     def test_add_operator_uniquifies_repeated_subsystem_ids(self):
@@ -55,16 +55,16 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertIn("r", diagram.inputs)
         self.assertIn("y", diagram.outputs)
         self.assertEqual(
-            diagram.connections["controller"]["r"],
+            diagram.connections["pd_controller"]["r"],
             ("input", "r"),
         )
         self.assertEqual(
-            diagram.connections["controller"]["y"],
+            diagram.connections["pd_controller"]["y"],
             ("pendulum", "y"),
         )
         self.assertEqual(
             diagram.connections["pendulum"]["u"],
-            ("controller", "u"),
+            ("pd_controller", "u"),
         )
         self.assertEqual(diagram.connections["output"]["y"], ("pendulum", "y"))
         self.assertEqual(diagram.outputs["y"].dim, 2)
@@ -72,13 +72,15 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_series_operator_flattens_source_into_closed_loop_diagram(self):
         diagram = Step(final_value=[1.0], step_time=0.0) >> PDController() @ Pendulum()
 
-        self.assertEqual(list(diagram.subsystems), ["step", "controller", "pendulum"])
+        self.assertEqual(
+            list(diagram.subsystems), ["step", "pd_controller", "pendulum"]
+        )
         self.assertFalse(
             any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
         )
-        self.assertEqual(diagram.connections["controller"]["r"], ("step", "y"))
-        self.assertEqual(diagram.connections["controller"]["y"], ("pendulum", "y"))
-        self.assertEqual(diagram.connections["pendulum"]["u"], ("controller", "u"))
+        self.assertEqual(diagram.connections["pd_controller"]["r"], ("step", "y"))
+        self.assertEqual(diagram.connections["pd_controller"]["y"], ("pendulum", "y"))
+        self.assertEqual(diagram.connections["pendulum"]["u"], ("pd_controller", "u"))
         self.assertEqual(diagram.connections["output"]["y"], ("pendulum", "y"))
         self.assertNotIn("r", diagram.inputs)
 
@@ -90,15 +92,15 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
 
         self.assertEqual(
             list(diagram.subsystems),
-            ["step", "integrator", "controller", "pendulum"],
+            ["step", "integrator", "pd_controller", "pendulum"],
         )
         self.assertFalse(
             any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
         )
         self.assertEqual(diagram.connections["integrator"]["u"], None)
-        self.assertEqual(diagram.connections["controller"]["r"], ("input", "r"))
-        self.assertEqual(diagram.connections["controller"]["y"], ("pendulum", "y"))
-        self.assertEqual(diagram.connections["pendulum"]["u"], ("controller", "u"))
+        self.assertEqual(diagram.connections["pd_controller"]["r"], ("input", "r"))
+        self.assertEqual(diagram.connections["pd_controller"]["y"], ("pendulum", "y"))
+        self.assertEqual(diagram.connections["pendulum"]["u"], ("pd_controller", "u"))
 
     def test_series_operator_flattens_diagram_to_diagram_boundary(self):
         left = Step(final_value=[1.0], step_time=0.0) >> PController()
@@ -108,13 +110,13 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
 
         self.assertEqual(
             list(diagram.subsystems),
-            ["step", "controller", "integrator", "integrator_2"],
+            ["step", "p_controller", "integrator", "integrator_2"],
         )
         self.assertFalse(
             any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
         )
-        self.assertEqual(diagram.connections["controller"]["r"], ("step", "y"))
-        self.assertEqual(diagram.connections["integrator"]["u"], ("controller", "u"))
+        self.assertEqual(diagram.connections["p_controller"]["r"], ("step", "y"))
+        self.assertEqual(diagram.connections["integrator"]["u"], ("p_controller", "u"))
         self.assertEqual(
             diagram.connections["integrator_2"]["u"],
             ("integrator", "y"),
@@ -128,7 +130,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no available boundary input"):
             WhiteNoise() >> diagram
 
-        self.assertEqual(diagram.connections["pendulum"]["u"], ("controller", "u"))
+        self.assertEqual(diagram.connections["pendulum"]["u"], ("pd_controller", "u"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
         diagram = (Step(final_value=[1.0]) + PController() + Integrator()).autowire(
@@ -136,16 +138,16 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         )
 
         self.assertEqual(
-            diagram.connections["controller"]["r"],
+            diagram.connections["p_controller"]["r"],
             ("step", "y"),
         )
         self.assertEqual(
-            diagram.connections["controller"]["y"],
+            diagram.connections["p_controller"]["y"],
             ("integrator", "y"),
         )
         self.assertEqual(
             diagram.connections["integrator"]["u"],
-            ("controller", "u"),
+            ("p_controller", "u"),
         )
 
         diagram.connect("step", "y", "integrator", "u")
@@ -158,16 +160,16 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         )
 
         self.assertEqual(
-            diagram.connections["controller"]["r"],
+            diagram.connections["pd_controller"]["r"],
             ("step", "y"),
         )
         self.assertEqual(
-            diagram.connections["controller"]["y"],
+            diagram.connections["pd_controller"]["y"],
             ("pendulum", "y"),
         )
         self.assertEqual(
             diagram.connections["pendulum"]["u"],
-            ("controller", "u"),
+            ("pd_controller", "u"),
         )
 
     def test_autowire_strict_refuses_ambiguous_matches(self):
@@ -176,8 +178,8 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Ambiguous autowire target"):
             diagram.autowire(strict=True)
 
-        self.assertEqual(diagram.connections["controller"]["y"], None)
-        self.assertEqual(diagram.connections["controller_2"]["y"], None)
+        self.assertEqual(diagram.connections["p_controller"]["y"], None)
+        self.assertEqual(diagram.connections["p_controller_2"]["y"], None)
         self.assertEqual(diagram.connections["integrator"]["u"], None)
 
 

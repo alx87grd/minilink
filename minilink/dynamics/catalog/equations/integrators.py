@@ -5,10 +5,7 @@ from minilink.graphical.animation.primitives import Point, pose2d_matrix
 
 
 class SimpleIntegrator(DynamicSystem):
-    """Single integrator ``dx = u``.
-
-    TRL: 1 - ready for user review.
-    """
+    """Single integrator ``dx = u``."""
 
     def __init__(self):
         super().__init__(n=1, input_dim=1, output_dim=1, expose_state=True)
@@ -40,10 +37,7 @@ class SimpleIntegrator(DynamicSystem):
 
 
 class DoubleIntegrator(DynamicSystem):
-    """Double integrator ``d(position)/dt = speed``, ``d(speed)/dt = u``.
-
-    TRL: 1 - ready for user review.
-    """
+    """Double integrator ``d(position)/dt = speed``, ``d(speed)/dt = u``."""
 
     def __init__(self):
         super().__init__(n=2, input_dim=1, output_dim=1, expose_state=True)
@@ -77,10 +71,7 @@ class DoubleIntegrator(DynamicSystem):
 
 
 class TripleIntegrator(DynamicSystem):
-    """Triple integrator with force as the third state.
-
-    TRL: 1 - ready for user review.
-    """
+    """Triple integrator with force as the third state."""
 
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=1, expose_state=True)
@@ -116,7 +107,6 @@ class TripleIntegrator(DynamicSystem):
 
 
 if __name__ == "__main__":
-
     sys = DoubleIntegrator()
     sys.plot_phase_plane()
 

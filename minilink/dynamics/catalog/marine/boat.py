@@ -21,10 +21,7 @@ class Boat2D(GeneralizedMechanicalSystem):
 
     Low-speed manoeuvring model with linear plus quadratic hydrodynamic
     damping, following Fossen, *Handbook of Marine Craft Hydrodynamics and
-    Motion Control* (2nd ed.), section 6.7.
-
-    TRL: 1 - ready for user review.
-    """
+    Motion Control* (2nd ed.), section 6.7."""
 
     def __init__(self):
         super().__init__(dof=3, pos=3, actuators=2)
@@ -232,10 +229,7 @@ class Boat2D(GeneralizedMechanicalSystem):
 
 
 class Boat2DWithCurrent(Boat2D):
-    """Planar boat with constant current velocity in world frame.
-
-    TRL: 1 - ready for user review.
-    """
+    """Planar boat with constant current velocity in world frame."""
 
     def __init__(self):
         super().__init__()

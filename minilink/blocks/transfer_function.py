@@ -12,10 +12,7 @@ from minilink.graphical.animation.primitives import (
 
 
 class TransferFunction(LTISystem):
-    """Continuous-time SISO transfer function in state-space realization.
-
-    TRL: 1 - ready for user review.
-    """
+    """Continuous-time SISO transfer function in state-space realization."""
 
     def __init__(self, numerator, denominator, *, name="Transfer Function"):
         self.numerator = np.asarray(numerator, dtype=float)

@@ -16,10 +16,7 @@ class MountainCar(MechanicalSystem):
 
     Dynamics match SherbyRobotics/pyro ``MountainCar`` in
     ``pyro/dynamic/mountaincar.py``: a bead of mass ``mass`` slides along the
-    fixed relief curve ``z(x) = a * cos(w * x)`` under gravity.
-
-    TRL: 1 - ready for user review.
-    """
+    fixed relief curve ``z(x) = a * cos(w * x)`` under gravity."""
 
     def __init__(self):
         super().__init__(dof=1, actuators=1)
