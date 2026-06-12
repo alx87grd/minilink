@@ -9,8 +9,8 @@ import time
 import jax
 import numpy as np
 
-from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
-from minilink.physics.system import PhysicsWorldSystem
+from minilink.dynamics.engines.contact_jax import PlaneModel, SphereModel, make_world_model
+from minilink.dynamics.engines.world import PhysicsWorldSystem
 
 # Demo controls.
 PRINT_COMPILE_REPORT = True  # Print JAX compile timing diagnostics.

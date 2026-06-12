@@ -15,7 +15,8 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Re-evaluate graphical API before freezing. |
 | Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Re-evaluate renderer/camera/live-loop API before freezing. |
 | Dynamics catalog | 6 | Pyro models ported, QA'd term-by-term against pyro, and covered by tests (see `docs/plans/catalog-migration-notes.md`); `DynamicBicycle` params now thread fully. | Review naming/details per module toward TRL 7. |
-| Symbolic/JAX physics engine | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
+| Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
+| Contact engine (`dynamics/engines/`) | 1 | Moved out of quarantine by maintainer decision (June 2026); math not yet QA-validated. | Add validation tests (energy, analytic contact cases) toward TRL 2. |
 | Control | 5 | Generic `PController`/`PDController` integrated in `control/linear.py` and exercised by core tests. | Port further Pyro control laws (PID, LQR, computed torque) when needed. |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
@@ -72,15 +73,18 @@ in rough build order:
 3. **`blocks/`** — Sum, Gain, Saturation; `neural.py` (MLP block, pure `jnp`,
    `params` = weights).
 4. **`estimation/`** — `luenberger.py`, `kalman.py`, later `ekf.py` (uses
-   `analysis/` linearization).
+   `analysis/` linearization) and `recursive.py` (online parameter
+   estimators: RLS, adaptive laws). Offline fitting stays in
+   `identification/`.
 5. **`identification/`** — fit parametric systems to data; one verb for
    physical params and network weights (`fitting.py`, first-order optimizers,
    datasets). Depends on the parametric evaluator tier (P1).
 6. **`interfaces/`** — `gymnasium.py` (RL trains outside; policies return as
    `control/` blocks), `torch.py`/`flax.py` model wrappers, cosimulation/FMI,
    multibody import.
-7. **Quarantine graduation** — `symbolic/` as a dynamics-authoring tool;
-   `physics/` into `dynamics/catalog/multibody/`.
+7. **Quarantine graduation** — `symbolic/` as a dynamics-authoring tool.
+   (The JAX contact engine moved to `dynamics/engines/` in June 2026 —
+   still experimental; validation tests pending.)
 
 Out of scope by decision: discrete time (digital control, ZOH/delay blocks,
 RNNs, mixed-rate simulation) — minilink stays continuous-time only; see

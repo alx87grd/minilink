@@ -54,9 +54,9 @@ or neural network alike):
 | Package | Role |
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction` |
-| `dynamics/` | plants: `abstraction/` mother classes + `catalog/` by physical domain |
+| `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
 | `control/` | control laws (`PController`, `PDController`) |
-| `estimation/` | observers and filters (planned) |
+| `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
 user-facing systems (factories are fine: a future `linearize()` returns an
@@ -76,13 +76,18 @@ user-facing systems (factories are fine: a future `linearize()` returns an
 
 | Package | Role |
 | --- | --- |
-| `symbolic/`, `physics/` | experimental symbolic mechanics and JAX physics demos |
+| `symbolic/` | experimental symbolic mechanics (SymPy EoM derivation) |
 
 ### Dependency law
 
-- Libraries import only `core` (exception: `control/` and `estimation/` may
-  import `dynamics/abstraction` for model-based laws such as computed torque
-  or EKF — interfaces only, never catalog content).
+- Libraries import only `core`, plus `dynamics/abstraction` interfaces —
+  never catalog content. (The abstraction modules are the shared mathematical
+  bases of the library band: `blocks/` builds LTI wiring on them, `control/`
+  computed torque, `estimation/` EKFs.)
+- Libraries may ship **factories for their own blocks** with array-in /
+  block-out signatures (`control.lqr(A, B, Q, R) -> StateFeedback`,
+  `estimation.kalman_design(A, C, Q, R) -> KalmanFilter`); the linearization
+  producing those arrays lives in `analysis/`.
 - Tools import `core`; they may consume libraries in demos and benchmarks.
 - `graphical/` is imported lazily from anywhere; rendering stays optional.
 - Quarantined packages are imported by nothing.

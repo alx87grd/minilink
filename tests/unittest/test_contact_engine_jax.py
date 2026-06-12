@@ -10,7 +10,7 @@ pytest.importorskip("jax")
 import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
-from minilink.physics.engine_jax import (  # noqa: E402
+from minilink.dynamics.engines.contact_jax import (  # noqa: E402
     PlaneModel,
     SphereModel,
     make_world_model,

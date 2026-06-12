@@ -3,8 +3,8 @@
 import numpy as np
 
 from minilink.core.system import DynamicSystem
+from minilink.dynamics.engines.contact_jax import WorldModel, unpack_state, world_ode
 from minilink.graphical.animation.primitives import Plane, Sphere, translation_matrix
-from minilink.physics.engine_jax import WorldModel, unpack_state, world_ode
 
 
 def _is_jax_array(a) -> bool:

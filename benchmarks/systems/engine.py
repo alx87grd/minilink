@@ -5,8 +5,12 @@ import numpy as np
 
 def make_physics_many_spheres(nx=6, ny=4):
     """Build a reduced many-spheres world for speed/precision sweeps."""
-    from minilink.physics.engine_jax import PlaneModel, SphereModel, make_world_model
-    from minilink.physics.system import PhysicsWorldSystem
+    from minilink.dynamics.engines.contact_jax import (
+        PlaneModel,
+        SphereModel,
+        make_world_model,
+    )
+    from minilink.dynamics.engines.world import PhysicsWorldSystem
 
     n_spheres = nx * ny
     radii = np.linspace(0.18, 0.35, n_spheres)
