@@ -6,9 +6,6 @@ and slopes, elastic forces come from JAX-differentiated energy, and contact is
 a smooth penalty force against a fixed ground plane.
 """
 
-import jax
-import jax.numpy as jnp
-
 from minilink.dynamics.engines.ancf_tire_jax import (
     ANCFTireSystem,
     make_ancf_tire_model,
@@ -33,7 +30,8 @@ sys = ANCFTireSystem(
     center=(0.0, 0.0, 1.15),
     linear_velocity=(0.0, 0.0, -0.2),
     angular_velocity=(0.0, 18.0, 0.0),
-    contact_force_scale=0.001,
+    contact_force_scale=0.1,
+    contact_force_threshold=0.1,
     name="ANCFTireFallDemo",
 )
 
@@ -44,15 +42,6 @@ traj = sys.compute_trajectory(
     compile_backend="jax",
 )
 
-# Differentiability smoke check: tangent through one ODE call.
-evaluator = sys.compile(backend="jax")
-x0 = jnp.asarray(sys.x0)
-u0 = jnp.zeros(sys.m)
-_, dx_tangent = jax.jvp(
-    lambda x: evaluator.f(x, u0, 0.0),
-    (x0,),
-    (jnp.ones_like(x0) * 1.0e-4,),
-)
-print(f"JAX JVP norm: {float(jnp.linalg.norm(dx_tangent)):.6g}")
-
-sys.animate(traj, renderer="meshcat", is_3d=True)
+sys.plot_trajectory(signals=("x"))
+sys.animate(time_factor_video=0.1)
+sys.animate(traj, time_factor_video=0.1, renderer="meshcat", is_3d=True)

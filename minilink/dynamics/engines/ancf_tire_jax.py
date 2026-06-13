@@ -24,7 +24,6 @@ from minilink.graphical.animation.primitives import (
     Plane,
     Sphere,
     camera_matrix,
-    empty_transform,
     identity_matrix,
     translation_matrix,
 )
@@ -420,11 +419,15 @@ class ANCFTireSystem(DynamicSystem):
         angular_velocity=(0.0, -30.0, 0.0),
         contact_force_scale=0.0015,
         contact_force_threshold=1.0,
+        follow_camera=False,
+        camera_target=None,
+        camera_scale=None,
         name="ANCFTireSystem",
     ):
         self.model = model
         self.contact_force_scale = float(contact_force_scale)
         self.contact_force_threshold = float(contact_force_threshold)
+        self.follow_camera = bool(follow_camera)
         n_nodes = model.n_nodes
         q_dim = 6 * n_nodes
         n = 2 * q_dim
@@ -482,7 +485,21 @@ class ANCFTireSystem(DynamicSystem):
 
         self.solver_info["smallest_time_constant"] = 0.002
         self.camera_plot_axes = (0, 2)
-        self.camera_scale = max(1.5, 2.5 * model.radius)
+        if camera_target is None:
+            c = np.asarray(center, dtype=float).reshape(3)
+            self.camera_target = np.array(
+                [
+                    c[0] + model.radius,
+                    c[1],
+                    model.plane_offset + model.radius,
+                ],
+                dtype=float,
+            )
+        else:
+            self.camera_target = np.asarray(camera_target, dtype=float).reshape(3)
+        self.camera_scale = max(2.0, 4.0 * model.radius)
+        if camera_scale is not None:
+            self.camera_scale = float(camera_scale)
 
     def f(self, x, u, t=0.0, params=None):
         model = self.model
@@ -532,7 +549,7 @@ class ANCFTireSystem(DynamicSystem):
                 )
             )
         for _ in range(self.model.n_nodes):
-            prim.append(Arrow(color="dodgerblue", linewidth=4))
+            prim.append(Arrow(color="red", linewidth=4))
         prim.append(
             Plane(
                 normal=np.asarray(self.model.plane_normal, dtype=float),
@@ -558,14 +575,18 @@ class ANCFTireSystem(DynamicSystem):
                 f = self.contact_force_scale * f_contact[i]
                 T.append(_vector_arrow_transform(p[i], f))
             else:
-                T.append(empty_transform())
+                T.append(_vector_arrow_transform(p[i], np.zeros(3)))
         T.append(identity_matrix())
         return T
 
     def get_camera_transform(self, x, u, t):
-        p = self.node_positions(x)
-        target = np.mean(p, axis=0)
-        target[2] = max(target[2], 0.35)
+        target = np.asarray(self.camera_target, dtype=float)
+        if self.follow_camera:
+            p = self.node_positions(x)
+            target = np.mean(p, axis=0)
+            target[2] = max(
+                target[2], self.model.plane_offset + 0.7 * self.model.radius
+            )
         return camera_matrix(
             target=target,
             plot_axes=self.camera_plot_axes,
@@ -606,7 +627,10 @@ def _vector_arrow_transform(origin, vector):
     T = np.eye(4)
     T[:3, 3] = origin
     if length < 1e-12:
-        return empty_transform()
+        # Keep the transform non-singular for Meshcat/Three.js keyframe
+        # decomposition while making the local unit arrow visually disappear.
+        T[:3, :3] = 1e-9 * np.eye(3)
+        return T
 
     x_axis = vector / length
     reference = np.array([0.0, 0.0, 1.0])
