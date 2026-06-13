@@ -20,9 +20,3 @@ Core
 
 .. automodule:: minilink.core.costs
    :members:
-
-.. automodule:: minilink.core.blocks.basic
-   :members:
-
-.. automodule:: minilink.core.blocks.sources
-   :members:

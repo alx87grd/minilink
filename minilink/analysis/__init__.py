@@ -1,15 +1,19 @@
-"""System analysis tools (placeholder — content planned, home decided).
+"""System analysis tools.
 
 Verbs that *characterize* a system; they return data, ``LTISystem`` models,
 or plots — never user-facing system classes (factories are fine).
 
-Planned modules (see ROADMAP.md §5 and the use-case projection):
+Implemented modules:
 
 - ``linearize.py`` — equilibrium linearization → ``LTISystem``
-- ``frequency.py`` — Bode, Nyquist, gain/phase margins, pole-zero
-- ``time_response.py`` — step/impulse sugar over the simulator
-- ``structural.py`` — controllability/observability, modal analysis
+- ``structural.py`` — controllability / observability
 - ``equilibria.py`` — trim points and root-finding on ``f``
+
+Planned modules (see ROADMAP.md §5):
+
+- ``frequency.py`` — Bode, Nyquist, gain/phase margins, pole-zero
+- ``modal.py`` — eigenmodes and modal-trajectory animation
+- ``time_response.py`` — step/impulse sugar over the simulator
 
 Placement rule: if it *characterizes* an existing system, it belongs here;
 if it *is* a block you wire into a diagram, it belongs in a library package.

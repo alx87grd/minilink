@@ -1,20 +1,20 @@
 Compile
 =======
 
-.. automodule:: minilink.compile.compiler
+.. automodule:: minilink.core.compile.compiler
    :members:
 
-.. automodule:: minilink.compile.execution_plan
+.. automodule:: minilink.core.compile.execution_plan
    :members:
 
-.. automodule:: minilink.compile.backend_policy
+.. automodule:: minilink.core.backends
    :members:
 
-.. automodule:: minilink.compile.evaluators.evaluator
+.. automodule:: minilink.core.compile.evaluators.evaluator
    :members:
 
-.. automodule:: minilink.compile.evaluators.numpy_evaluator
+.. automodule:: minilink.core.compile.evaluators.numpy_evaluator
    :members:
 
-.. automodule:: minilink.compile.evaluators.jax_evaluator
+.. automodule:: minilink.core.compile.evaluators.jax_evaluator
    :members:

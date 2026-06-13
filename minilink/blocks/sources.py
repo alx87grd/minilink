@@ -231,6 +231,55 @@ class WhiteNoise(Source):
         return y
 
 
+class TrajectorySource(Source):
+    """Replay a stored signal ``y(t)`` sampled at times ``t`` (linear interpolation).
+
+    The modern replacement for an open-loop "controller": feed a planned input
+    trajectory into a diagram. Values outside ``[t[0], t[-1]]`` hold the nearest
+    endpoint. ``values`` has shape ``(p, N)`` (or ``(N,)`` for a scalar signal)
+    aligned with the ``N`` sample times in ``t``.
+    """
+
+    def __init__(self, t, values):
+        t = np.asarray(t, dtype=float).reshape(-1)
+        values = np.asarray(values, dtype=float)
+        if values.ndim == 1:
+            values = values.reshape(1, -1)
+        if values.shape[1] != t.size:
+            raise ValueError("values must have shape (p, len(t))")
+
+        Source.__init__(self, values.shape[0])
+        self.name = "Trajectory Source"
+        self.sample_times = t
+        self.sample_values = values
+        self.refresh()
+
+    @classmethod
+    def from_trajectory(cls, traj, signal="u"):
+        """Build a source that replays a :class:`Trajectory` signal (``u`` or ``x``)."""
+        return cls(traj.t, getattr(traj, signal))
+
+    def refresh(self):
+        self._interpolators = [
+            interp1d(
+                self.sample_times,
+                self.sample_values[i, :],
+                kind="linear",
+                bounds_error=False,
+                fill_value=(self.sample_values[i, 0], self.sample_values[i, -1]),
+                assume_sorted=True,
+            )
+            for i in range(self.p)
+        ]
+
+    def h(self, x, u, t=0, params=None):
+        y = np.zeros(self.p)
+        for i, interpolator in enumerate(self._interpolators):
+            y[i] = float(interpolator(float(t)))
+
+        return y
+
+
 if __name__ == "__main__":
     noise = WhiteNoise(1)
     # Baseline

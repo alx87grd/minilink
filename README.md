@@ -131,6 +131,35 @@ import jax
 A = jax.jacfwd(lambda x: evaluator.f(x, u, 0.0))(x)   # exact linearization
 ```
 
+### Analyze and design
+
+Characterize a plant and design a controller from the same `System`. `analysis`
+verbs return data or an `LTISystem`; `control` design factories return ready-to-wire
+blocks:
+
+```python
+import numpy as np
+
+from minilink.analysis.linearize import linearize
+from minilink.control.lqr import lqr
+from minilink.core.diagram import DiagramSystem
+from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
+
+plant = InvertedPendulum()
+lti = linearize(plant, x_bar=[0.0, 0.0])             # → LTISystem at upright
+controller = lqr(lti.A(), lti.B(), Q=np.diag([10.0, 1.0]), R=[[1.0]])
+
+diagram = DiagramSystem()                             # full-state feedback
+diagram.add_subsystem(controller, "lqr")
+diagram.add_subsystem(plant, "plant")
+diagram.connect("plant", "x", "lqr", "x")
+diagram.connect("lqr", "u", "plant", "u")
+
+plant.x0 = np.array([0.4, 0.0])
+diagram.compute_trajectory(tf=8.0)
+diagram.plot_trajectory()
+```
+
 ### Trajectory optimization
 
 Planning problems combine a system, boundary conditions, and a cost; pluggable
@@ -267,8 +296,9 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | Package | Owns |
 | --- | --- |
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
-| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`) |
-| `control` | generic control laws (`PropController`, `PDController`) |
+| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters) |
+| `control` | control laws and design factories (`PID`, `ProportionalController`, `LinearFeedbackController`, `lqr`) |
+| `analysis` | characterization verbs (`linearize` → `LTISystem`, controllability/observability, equilibria) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |
 | `graphical` | plots, diagrams, animation (`Animator` + renderers) |

@@ -17,8 +17,11 @@ visualizing dynamical systems.
    api/core
    api/compile
    api/simulation
+   api/dynamics
+   api/blocks
+   api/control
+   api/analysis
    api/optimization
    api/planning
-   api/dynamics
    api/graphical
    api/experimental

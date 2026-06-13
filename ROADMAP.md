@@ -17,7 +17,8 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Dynamics catalog | 6 | Pyro models ported, QA'd term-by-term against pyro, and covered by tests (see `docs/plans/catalog-migration-notes.md`); `DynamicBicycle` params now thread fully. | Review naming/details per module toward TRL 7. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Moved out of quarantine by maintainer decision (June 2026); math not yet QA-validated. | Add validation tests (energy, analytic contact cases) toward TRL 2. |
-| Control | 5 | Generic `PropController`/`PDController` integrated in `control/linear.py` and exercised by core tests. | Port further Pyro control laws (PID, LQR, computed torque) when needed. |
+| Analysis | 4 | `analysis/linearize.py` (→ `LTISystem`), `analysis/structural.py` (ctrb/obsv), `analysis/equilibria.py` (trim) migrated from pyro with finite-difference Jacobians; covered by tests. | Add `frequency.py` (Bode/pole-zero), `modal.py`; consider JAX-exact linearization. |
+| Control | 5 | `control/linear.py` (`ProportionalController` (SISO+MIMO)/`PDController`/`PIDController`/`LinearFeedbackController`) and `control/lqr.py` (`lqr_gain`/`lqr` design factory) integrated and tested. | Port computed-torque, sliding-mode, robotic controllers; add PID anti-windup. |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 
@@ -46,10 +47,12 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 DESIGN.md §4 Parameters and `demo_params_gradient.py`); diagram validation;
 top-level `minilink` exports; NLP hardening.
 
-**P2** — `analysis/` seed (linearization → `LTISystem`, then frequency and
-modal); `control/lqr.py` (design fn + state-feedback block); blocks round-out
-(Sum, Gain, Saturation; PID in `control/linear.py`); nested-diagram ergonomics;
-forced-input helpers; swappable live graphics backends.
+**P2** — ~~`analysis/` seed (linearization → `LTISystem`)~~ done (also ctrb/obsv,
+equilibria); frequency and modal still pending. ~~`control/lqr.py` (design fn +
+state-feedback block)~~ done. ~~blocks round-out (Sum, Gain, Saturation; PID in
+`control/linear.py`)~~ done (routing, nonlinear, filters, `TrajectorySource`,
+PID, MIMO proportional). Remaining: nested-diagram ergonomics; forced-input
+helpers; swappable live graphics backends.
 
 ## 4. Review queue (needs maintainer sign-off)
 

@@ -22,8 +22,9 @@ Planning
 .. automodule:: minilink.planning.trajectory_optimization.multiple_shooting
    :members:
 
-.. automodule:: minilink.planning.search.rrt
-   :members:
-
-.. automodule:: minilink.planning.policy_synthesis.dynamic_programming
-   :members:
+.. Planned (dedicated migration sessions); modules do not exist yet:
+.. .. automodule:: minilink.planning.search.rrt
+..    :members:
+..
+.. .. automodule:: minilink.planning.policy_synthesis.dynamic_programming
+..    :members:

@@ -52,9 +52,9 @@ or neural network alike):
 
 | Package | Role |
 | --- | --- |
-| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction` |
+| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
-| `control/` | control laws (`PropController`, `PDController`) |
+| `control/` | control laws and design factories (`ProportionalController`, `PDController`, `PIDController`, `LinearFeedbackController`, `lqr`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -64,7 +64,7 @@ user-facing systems (factories are fine: a future `linearize()` returns an
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, solvers, forcing |
-| `analysis/` | linearization, frequency response, modal (planned) |
+| `analysis/` | `linearize` (→ `LTISystem`), controllability/observability, equilibria; frequency/modal planned |
 | `planning/` | problems, trajopt |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |

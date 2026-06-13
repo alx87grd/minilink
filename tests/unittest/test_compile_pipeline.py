@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from minilink.blocks.basic import Integrator
-from minilink.control.linear import PropController
+from minilink.control.linear import ProportionalController
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import (
     build_execution_plan,
@@ -94,13 +94,12 @@ def _build_closed_loop_with_external_output_jax():
 
 
 def _build_small_closed_loop():
-    """Step → PropController → Integrator → feedback to controller."""
+    """Step → ProportionalController → Integrator → feedback to controller."""
     diag = DiagramSystem()
     diag.connection_verbose = False
 
-    ctl = PropController()
+    ctl = ProportionalController(2.5)
     plant = Integrator()
-    ctl.params["Kp"] = 2.5
 
     diag.add_subsystem(ctl, "ctl")
     diag.add_subsystem(plant, "plant")

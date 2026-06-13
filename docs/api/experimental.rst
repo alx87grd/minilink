@@ -3,11 +3,11 @@ Experimental
 
 These modules are intentionally low maturity; see the TRL table in the roadmap.
 
-.. automodule:: minilink.physics.engine_jax
+.. automodule:: minilink.dynamics.engines.contact_jax
    :members:
 
-.. automodule:: minilink.physics.system
+.. automodule:: minilink.dynamics.engines.world
    :members:
 
-.. automodule:: minilink.control.pendulum_pd
+.. automodule:: minilink.symbolic.mechanics.model
    :members:

@@ -5,7 +5,7 @@ import pytest
 
 from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Source, Step
-from minilink.control.linear import PropController
+from minilink.control.linear import ProportionalController
 
 
 class TestBlocks(unittest.TestCase):
@@ -62,8 +62,7 @@ class TestBlocks(unittest.TestCase):
         np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.2, 0.4]))
 
     def test_prop_controller_scales_tracking_error(self):
-        controller = PropController()
-        controller.params["Kp"] = 2.5
+        controller = ProportionalController(2.5)
 
         np.testing.assert_array_equal(
             controller.ctl(np.array([]), np.array([3.0, 1.0])),
@@ -76,8 +75,7 @@ class TestBlocks(unittest.TestCase):
 
         plant = Integrator()
         plant.params["k"] = 2.0
-        controller = PropController()
-        controller.params["Kp"] = 2.5
+        controller = ProportionalController(2.5)
 
         dx = jax.jit(plant.f)(jnp.asarray([3.0]), jnp.asarray([4.0]))
         y = jax.jit(plant.h)(jnp.asarray([3.0]), jnp.asarray([4.0]))
