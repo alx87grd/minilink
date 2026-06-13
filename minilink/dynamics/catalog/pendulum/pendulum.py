@@ -13,12 +13,12 @@ from minilink.graphical.animation.primitives import (
 class Pendulum(MechanicalSystem):
     """Single actuated pendulum."""
 
-    def __init__(self):
+    def __init__(self, length=1.0, mass=1.0):
         super().__init__(dof=1, actuators=1)
         self.name = "Pendulum"
         self.params = {
-            "m": 1.0,
-            "l": 1.0,
+            "m": mass,
+            "l": length,
             "I": 1.0,
             "gravity": 9.81,
             "d": 0.0,
@@ -33,7 +33,7 @@ class Pendulum(MechanicalSystem):
         # Graphic parameters
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
-        self.camera_scale = 1.5
+        self.camera_scale = length * 1.5
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -83,6 +83,40 @@ class Pendulum(MechanicalSystem):
             pose2d_matrix(0.0, 0.0, theta),
             torque_pose2d_matrix(0.0, 0.0, rod_angle, sweep),
         ]
+
+
+class PendulumWithNoisePort(Pendulum):
+    """Single actuated pendulum with process and measurement noise ports.
+
+    ``w`` injects disturbance torque into the dynamics; ``v`` corrupts the
+    measured angular velocity in ``y``.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "Pendulum with Noise Ports"
+
+        self.add_input_port("w", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("v", dim=1, nominal_value=np.array([0.0]))
+        self.inputs["w"].labels = ["disturbance"]
+        self.inputs["w"].units = ["Nm"]
+        self.inputs["v"].labels = ["noise"]
+        self.inputs["v"].units = ["rad/s"]
+
+        self.outputs["y"].dependencies = ("v",)
+
+    def B(self, q, params=None):
+        return np.array([[1.0]])
+
+    def generalized_force(self, q, v, u, t=0.0, params=None):
+        tau, w = self.get_port_values_from_u(u, "u", "w")
+        return self.B(q, params) @ (tau + w)
+
+    def h(self, x, u, t=0.0, params=None):
+        v_noise = self.get_port_values_from_u(u, "v")
+        y = x.copy()
+        y[self.dof] = x[self.dof] + v_noise[0]
+        return y
 
 
 class InvertedPendulum(Pendulum):

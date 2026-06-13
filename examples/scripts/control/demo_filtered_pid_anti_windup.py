@@ -1,9 +1,4 @@
-"""Filtered PID step tracking with and without anti-windup.
-
-Run from the repo root::
-
-    python examples/scripts/control/demo_filtered_pid_anti_windup.py
-"""
+"""Filtered PID step tracking with and without anti-windup."""
 
 import numpy as np
 
@@ -39,7 +34,6 @@ diagram.plot_trajectory()
 sat = Saturation()
 sat.params["lower"] = -0.5
 sat.params["upper"] = 0.5
-sat.name = "sat"
 
 pid2 = FilteredPIDController()
 pid2.name = "pid2"
