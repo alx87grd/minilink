@@ -8,6 +8,7 @@ from minilink.graphical.signals.time_signals import (
     build_signal_plot_spec,
     open_time_signal_plot,
     plot_time_signals,
+    resolve_plot_signals,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "build_signal_plot_spec",
     "open_time_signal_plot",
     "plot_time_signals",
+    "resolve_plot_signals",
 ]

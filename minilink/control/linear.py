@@ -5,8 +5,8 @@ reference, ``y`` measurement, ``u`` control command.
 
 - :class:`ProportionalController` — output-error proportional ``u = K (r - y)`` (SISO or MIMO).
 - :class:`PDController` — scalar PD law on a (position, rate) measurement.
-- :class:`PIDController` — continuous-time PID with an integral state.
-- :class:`LinearFeedbackController` — full-state feedback ``u = ubar - K (x - r)``
+- :class:`PIDController` — continuous-time PID with an integral state on ``[y, dy_dt]``.
+- :class:`LinearStateFeedbackController` — full-state feedback ``u = ubar - K (x - r)``
   (the block returned by :func:`minilink.control.lqr.lqr`).
 """
 
@@ -71,14 +71,15 @@ class PDController(StaticSystem):
         Kp = params["Kp"]
         Kd = params["Kd"]
 
-        # Input ports concatenate into u = [r, y, dy_dt]
+        xp = array_module(u)
+
         r = u[0]
         y = u[1]
         dy_dt = u[2]
 
-        u_cmd = Kp * (r - y) - Kd * dy_dt
-        xp = array_module(u)
-        return xp.array([u_cmd])
+        u = Kp * (r - y) - Kd * dy_dt
+
+        return xp.array([u])
 
 
 class ProportionalController(StaticSystem):
@@ -91,7 +92,7 @@ class ProportionalController(StaticSystem):
 
     This is *output* feedback on the measured ``y`` port (it composes with the
     ``@`` operator). For *state* feedback with a feedforward offset — the form
-    LQR produces — use :class:`LinearFeedbackController`.
+    LQR produces — use :class:`LinearStateFeedbackController`.
     """
 
     def __init__(self, K=1.0):
@@ -119,21 +120,21 @@ class ProportionalController(StaticSystem):
 
 
 class PIDController(DynamicSystem):
-    """Continuous-time PID on a (position, rate) measurement.
+    """Continuous-time PID on a ``[y, dy_dt]`` measurement.
 
-    The measurement port ``y`` carries ``[position, rate]`` and ``r`` targets
-    the position. The single state is the integral of the position error:
+    The measurement port ``y`` carries ``[y, dy_dt]`` and ``r`` targets the
+    measured variable. The single state is the integral of the tracking error:
 
-        u = Kp (r - position) + Ki ∫(r - position) dt - Kd · rate
+        u = kp e + ki e_int - kd dy_dt,   e = r - y,   e_int = ∫ e dt
 
-    No anti-windup in this version (planned follow-up).
+    No anti-windup in this version.
     """
 
     def __init__(self):
         super().__init__(n=1)
         self.name = "PID Controller"
-        self.params = {"Kp": 10.0, "Ki": 1.0, "Kd": 1.0}
-        self.state.labels = ["integral_error"]
+        self.params = {"kp": 10.0, "ki": 1.0, "kd": 1.0}
+        self.state.labels = ["e_int"]
 
         self.add_input_port("r", nominal_value=0.0)
         self.add_input_port("y", dim=2, nominal_value=[0.0, 0.0])
@@ -142,29 +143,44 @@ class PIDController(DynamicSystem):
     def f(self, x, u, t=0, params=None):
         xp = array_module(u)
 
-        # integral state accumulates the position error e = r - position
+        # inputs ports
         r = u[0]
-        position = u[1]
-        return xp.array([r - position])
+        y = u[1]
+
+        # error
+        e = r - y
+
+        # integral state derivative
+        de_int = e
+
+        return xp.array([de_int])
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        Kp = params["Kp"]
-        Ki = params["Ki"]
-        Kd = params["Kd"]
+        kp = params["kp"]
+        ki = params["ki"]
+        kd = params["kd"]
 
-        # input ports concatenate into u = [r, position, rate]; x[0] is ∫e dt
+        xp = array_module(x)
+
+        # internal states
+        e_int = x[0]
+
+        # inputs ports
         r = u[0]
-        position = u[1]
-        rate = u[2]
-        integral = x[0]
+        y = u[1]
+        dy_dt = u[2]
 
-        u_cmd = Kp * (r - position) + Ki * integral - Kd * rate
-        xp = array_module(u)
-        return xp.array([u_cmd])
+        # error
+        e = r - y
+
+        # pid control law
+        u = kp * e + ki * e_int - kd * dy_dt
+
+        return xp.array([u])
 
 
-class LinearFeedbackController(StaticSystem):
+class LinearStateFeedbackController(StaticSystem):
     """Full-state feedback ``u = ubar - K (x - r)``.
 
     Ports: the plant state ``x`` (dimension ``n``) and a reference ``r`` (also
@@ -179,7 +195,7 @@ class LinearFeedbackController(StaticSystem):
 
     def __init__(self, K, xbar=None, ubar=None):
         super().__init__()
-        self.name = "Linear Feedback Controller"
+        self.name = "ctl"
 
         K = np.atleast_2d(np.asarray(K, dtype=float))
         m, n = K.shape

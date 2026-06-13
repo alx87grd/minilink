@@ -8,7 +8,7 @@ Sections:
 2. Nonlinear blocks (Saturation, DeadZone, Relay) — input/output curves.
 3. Filter blocks (LowPass, Notch, Washout) — frequency response.
 4. TrajectorySource — replay a stored signal.
-5. Control laws (ProportionalController, PIDController, LinearFeedbackController).
+5. Control laws (ProportionalController, PIDController, LinearStateFeedbackController).
 6. Analysis + LQR (linearize, controllability/observability, equilibria, lqr).
 """
 
@@ -128,7 +128,7 @@ prop_loop.plot_trajectory()
 
 # PIDController removes steady-state error on a double integrator.
 pid = PIDController()
-pid.params.update({"Kp": 5.0, "Ki": 1.0, "Kd": 4.0})
+pid.params.update({"kp": 5.0, "ki": 1.0, "kd": 4.0})
 pid.inputs["r"].nominal_value = np.array([1.0])  # setpoint
 pid_loop = DiagramSystem()
 pid_loop.add_subsystem(pid, "pid")

@@ -54,7 +54,7 @@ or neural network alike):
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
-| `control/` | control laws and design factories (`ProportionalController`, `PDController`, `PIDController`, `LinearFeedbackController`, `lqr`) |
+| `control/` | control laws and design factories (`ProportionalController`, `PDController`, `PIDController`, `LinearStateFeedbackController`, `lqr`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define

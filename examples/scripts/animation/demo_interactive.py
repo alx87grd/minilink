@@ -10,7 +10,7 @@ sys.params["l"] = 3.0
 sys.x0[0] = 0.0
 
 
-# sys.game()
-sys.game(renderer="pygame")
-sys.game(renderer="matplotlib")
-sys.game(renderer="meshcat")
+sys.game()
+# sys.game(renderer="pygame")
+# sys.game(renderer="matplotlib")
+# sys.game(renderer="meshcat")

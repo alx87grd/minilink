@@ -112,7 +112,10 @@ def closed_loop(
     plant : System
         Plant subsystem with control input and measurement output ports.
     ref_port, measurement_port, control_port, plant_input_port, plant_output_port : str
-        Port names used for the standard feedback wiring.
+        Port names used for the standard feedback wiring. When
+        ``measurement_port`` and ``plant_output_port`` are left at the default
+        ``y``, the builder picks ``x`` instead when the controller exposes a
+        matching state port and has no ``y`` input.
     output_port : str, optional
         Diagram boundary output name.
     validate : bool, optional
@@ -127,6 +130,13 @@ def closed_loop(
     diagram = DiagramSystem()
     controller_id = _add_system_to_diagram(diagram, controller)
     plant_id = _add_system_to_diagram(diagram, plant)
+
+    measurement_port, plant_output_port = _resolve_feedback_ports(
+        controller,
+        plant,
+        measurement_port,
+        plant_output_port,
+    )
 
     _require_input(controller, ref_port, f"controller reference port {ref_port!r}")
     _require_input(
@@ -623,6 +633,35 @@ def _require_same_dim(left_dim: int, right_dim: int, left_label: str, right_labe
             f"Port dimension mismatch: {left_label} has dim {left_dim}, "
             f"{right_label} has dim {right_dim}"
         )
+
+
+def _resolve_feedback_ports(
+    controller,
+    plant,
+    measurement_port: str,
+    plant_output_port: str,
+) -> tuple[str, str]:
+    """Pick ``y`` or ``x`` feedback ports when defaults are still in effect."""
+    using_defaults = measurement_port == "y" and plant_output_port == "y"
+    if not using_defaults:
+        return measurement_port, plant_output_port
+
+    matches = [
+        port
+        for port in ("y", "x")
+        if port in controller.inputs
+        and port in plant.outputs
+        and controller.inputs[port].dim == plant.outputs[port].dim
+    ]
+    if not matches:
+        return measurement_port, plant_output_port
+
+    if len(matches) == 1:
+        port = matches[0]
+        return port, port
+
+    # Both ports fit: keep output-feedback convention for PD/P controllers.
+    return "y", "y"
 
 
 def _autowire_candidates(diagram, target_id: str, input_id: str, input_port):

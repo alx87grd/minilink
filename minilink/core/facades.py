@@ -160,7 +160,7 @@ class SystemFacades:
         self,
         traj=None,
         *,
-        signals=("x", "u"),
+        signals=None,
         backend="matplotlib",
         show=True,
     ):
@@ -176,6 +176,8 @@ class SystemFacades:
         signals : tuple of str, optional
             Signal names to plot; see
             :func:`minilink.graphical.signals.plot_time_signals`.
+            When ``None``, defaults are chosen via
+            :func:`minilink.graphical.signals.resolve_plot_signals`.
 
         Returns
         -------
@@ -183,7 +185,10 @@ class SystemFacades:
             The plot result from
             :func:`minilink.graphical.signals.plot_time_signals`.
         """
-        from minilink.graphical.signals import plot_time_signals
+        from minilink.graphical.signals import plot_time_signals, resolve_plot_signals
+
+        if signals is None:
+            signals = resolve_plot_signals(self)
 
         if traj is not None:
             return plot_time_signals(

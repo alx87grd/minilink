@@ -18,7 +18,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Moved out of quarantine by maintainer decision (June 2026); math not yet QA-validated. | Add validation tests (energy, analytic contact cases) toward TRL 2. |
 | Analysis | 4 | `analysis/linearize.py` (→ `LTISystem`), `analysis/structural.py` (ctrb/obsv), `analysis/equilibria.py` (trim) migrated from pyro with finite-difference Jacobians; covered by tests. | Add `frequency.py` (Bode/pole-zero), `modal.py`; consider JAX-exact linearization. |
-| Control | 5 | `control/linear.py` (`ProportionalController` (SISO+MIMO)/`PDController`/`PIDController`/`LinearFeedbackController`) and `control/lqr.py` (`lqr_gain`/`lqr` design factory) integrated and tested. | Port computed-torque, sliding-mode, robotic controllers; add PID anti-windup. |
+| Control | 5 | `control/linear.py` (`ProportionalController` (SISO+MIMO)/`PDController`/`PIDController`/`LinearStateFeedbackController`) and `control/lqr.py` (`lqr_gain`/`lqr` design factory) integrated and tested. | Port computed-torque, sliding-mode, robotic controllers; add PID anti-windup. |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 

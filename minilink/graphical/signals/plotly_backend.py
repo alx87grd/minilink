@@ -318,6 +318,7 @@ def _import_plotly():
 
 def _plotly_color(color: str) -> str:
     colors = {
+        "blue": "#0000ff",
         "tab:blue": "#1f77b4",
         "tab:red": "#d62728",
         "tab:green": "#2ca02c",

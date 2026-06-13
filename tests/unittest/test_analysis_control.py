@@ -7,7 +7,7 @@ import numpy as np
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.analysis.linearize import linearize
 from minilink.analysis.structural import controllability, observability
-from minilink.control.lqr import lqr, lqr_gain
+from minilink.control.lqr import lqr, lqr_at_operating_point, lqr_gain
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum, Pendulum
@@ -57,16 +57,28 @@ class TestLQR(unittest.TestCase):
         closed_poles = np.linalg.eigvals(A - B @ K)
         self.assertTrue(np.all(closed_poles.real < 0.0))
 
+    def test_lqr_at_operating_point_matches_two_step_design(self):
+        plant = InvertedPendulum()
+        x_bar = [0.0, 0.0]
+        Q = np.diag([10.0, 1.0])
+        R = np.array([[1.0]])
+
+        lti = linearize(plant, x_bar=x_bar)
+        expected = lqr(lti.A(), lti.B(), Q, R, xbar=x_bar, ubar=[0.0])
+        controller = lqr_at_operating_point(plant, x_bar, Q, R)
+
+        np.testing.assert_allclose(controller.params["K"], expected.params["K"])
+        np.testing.assert_allclose(
+            controller.inputs["r"].nominal_value, expected.inputs["r"].nominal_value
+        )
+
     def test_lqr_closed_loop_stabilizes_inverted_pendulum(self):
         plant = InvertedPendulum()
-        lti = linearize(plant, x_bar=[0.0, 0.0])
-        controller = lqr(
-            lti.A(),
-            lti.B(),
+        controller = lqr_at_operating_point(
+            plant,
+            x_bar=[0.0, 0.0],
             Q=np.diag([10.0, 1.0]),
             R=np.array([[1.0]]),
-            xbar=[0.0, 0.0],
-            ubar=[0.0],
         )
 
         diagram = DiagramSystem()

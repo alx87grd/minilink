@@ -297,7 +297,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | --- | --- |
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters) |
-| `control` | control laws and design factories (`PID`, `ProportionalController`, `LinearFeedbackController`, `lqr`) |
+| `control` | control laws and design factories (`PID`, `ProportionalController`, `LinearStateFeedbackController`, `lqr`) |
 | `analysis` | characterization verbs (`linearize` → `LTISystem`, controllability/observability, equilibria) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |
@@ -342,6 +342,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | --- | --- |
 | Feature tour | [examples/notebooks/demo_showcase.ipynb](examples/notebooks/demo_showcase.ipynb) |
 | Diagrams | `examples/scripts/diagrams/` |
+| Control | `examples/scripts/control/` |
 | Plotting | `examples/scripts/plots/` |
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
