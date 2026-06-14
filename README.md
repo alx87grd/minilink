@@ -6,8 +6,7 @@ visualizing dynamical systems.
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
 Start here: [showcase notebook](examples/notebooks/demo_showcase.ipynb) ·
-[Colab demo](https://drive.google.com/file/d/1eMrC_8h1iZbq6lMvk4e68M6YysupJ7dg/view?usp=sharing) ·
-[design contracts](DESIGN.md) · [roadmap](ROADMAP.md)
+[Colab demo](https://drive.google.com/file/d/1N2sxPMVqFs0HQeSpY9zdv7nvUFrfXoov/view?usp=sharing)
 
 ## Why minilink
 
