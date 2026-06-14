@@ -54,7 +54,7 @@ or neural network alike):
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
-| `control/` | control laws and design factories (`ProportionalController`, `PDController`, `PIDController`, `LinearStateFeedbackController`, `lqr`) |
+| `control/` | control laws and design factories (`ProportionalController`, `PDController`, `PIDController`, `FilteredPIDController`, `LinearStateFeedbackController`, `lqr`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -170,14 +170,14 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   backends and ignores `bound_params`. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
-  (see `examples/scripts/diagrams/demo_params_gradient.py`).
+  (see `examples/scripts/identification/demo_params_gradient.py`).
 
 ### `DiagramSystem`
 
 Composes subsystems by named ports; flattens state; compiled `ExecutionPlan` is
 the main execution path (reference recursive path must stay equivalent).
 `connect()` validates port existence and dimensions at wiring time and is
-quiet by default (`connection_verbose=True` for one line per connection).
+quiet by default (`connection_verbose=False`; set `True` for one line per connection).
 
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop,
 `autowire()` conservative fill. Diagram operands are flattened, not nested.

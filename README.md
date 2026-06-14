@@ -297,7 +297,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | --- | --- |
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters) |
-| `control` | control laws and design factories (`PID`, `ProportionalController`, `LinearStateFeedbackController`, `lqr`) |
+| `control` | control laws and design factories (`PIDController`, `FilteredPIDController`, `ProportionalController`, `LinearStateFeedbackController`, `lqr`) |
 | `analysis` | characterization verbs (`linearize` → `LTISystem`, controllability/observability, equilibria) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |
@@ -332,7 +332,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 
 - `Trajectory` is numeric only (`t`, `x`, `u`, optional `signals`); labels stay on `System`.
 - Diagram internal signals in plots: `"subsystem_id:port_id"`.
-- `DiagramSystem.connection_verbose` defaults to `True`; set `False` to quiet wiring.
+- `DiagramSystem.connection_verbose` defaults to `False`; set `True` to print one line per connection.
 - Shortcuts flatten diagram operands instead of nesting them; `+` does not infer cross-wiring.
 - `compute_*` returns `Trajectory`; `plot_*` returns `PlotResult`; `show=False` skips display.
 
@@ -341,14 +341,20 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Interest | Start here |
 | --- | --- |
 | Feature tour | [examples/notebooks/demo_showcase.ipynb](examples/notebooks/demo_showcase.ipynb) |
+| Extended tour | [examples/notebooks/demo_overview.ipynb](examples/notebooks/demo_overview.ipynb) |
 | Diagrams | `examples/scripts/diagrams/` |
+| Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
+| Analysis (linearize, trim, ctrb/obsv) | `examples/scripts/analysis/` |
+| State-space / LQR | `examples/scripts/statespace/` |
+| Identification (param gradients) | `examples/scripts/identification/` |
 | Plotting | `examples/scripts/plots/` |
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |
+| Solver benchmarks | [examples/notebooks/simulation_benchmark.ipynb](examples/notebooks/simulation_benchmark.ipynb) (uses repo-root `benchmarks/`) |
 
 Catalog plants live under `minilink.dynamics.catalog.*`.
 

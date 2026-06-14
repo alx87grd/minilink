@@ -8,7 +8,7 @@ Run from the repo root:
 from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.linear import PDController
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort, Pendulum
 
 
 def show(diagram, name, operation):
@@ -77,9 +77,10 @@ show(
 
 # Noise and disturbance ports stay explicit. This keeps ``>>`` from guessing
 # between open internal plant inputs such as ``w`` and ``v``.
-noisy = Step(final_value=[1.0]) >> PDController() @ Pendulum()
+noisy = Step(final_value=[1.0]) >> PDController() @ PendulumWithNoisePort()
 noise = WhiteNoise()
 noisy.add_subsystem(noise, "sensor_noise")
+noisy
 noisy.connect("sensor_noise", "y", "pendulum", "v")
 show(
     noisy,

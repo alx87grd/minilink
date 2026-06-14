@@ -4,7 +4,7 @@ Offline verbs over logged :class:`~minilink.core.trajectory.Trajectory` data
 that return fitted parameters or systems. One verb for physical parameters
 and neural-network weights alike — both ride the parametric evaluator tier
 (``f_p`` / ``jacobian_f_params``; see
-``examples/scripts/diagrams/demo_params_gradient.py`` for the equation-error
+``examples/scripts/identification/demo_params_gradient.py`` for the equation-error
 prototype).
 
 Planned modules (see ROADMAP.md §5):

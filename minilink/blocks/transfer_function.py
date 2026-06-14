@@ -48,3 +48,4 @@ if __name__ == "__main__":
     sys.x0 = np.array([2.0])
     sys.compute_trajectory(tf=5.0)
     sys.plot_trajectory()
+    sys.animate()

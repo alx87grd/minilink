@@ -17,8 +17,8 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Dynamics catalog | 6 | Pyro models ported, QA'd term-by-term against pyro, and covered by tests (see `docs/plans/catalog-migration-notes.md`); `DynamicBicycle` params now thread fully. | Review naming/details per module toward TRL 7. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Moved out of quarantine by maintainer decision (June 2026); math not yet QA-validated. | Add validation tests (energy, analytic contact cases) toward TRL 2. |
-| Analysis | 4 | `analysis/linearize.py` (→ `LTISystem`), `analysis/structural.py` (ctrb/obsv), `analysis/equilibria.py` (trim) migrated from pyro with finite-difference Jacobians; covered by tests. | Add `frequency.py` (Bode/pole-zero), `modal.py`; consider JAX-exact linearization. |
-| Control | 5 | `control/linear.py` (`ProportionalController` (SISO+MIMO)/`PDController`/`PIDController`/`LinearStateFeedbackController`) and `control/lqr.py` (`lqr_gain`/`lqr` design factory) integrated and tested. | Port computed-torque, sliding-mode, robotic controllers; add PID anti-windup. |
+| Analysis | 4 | `analysis/linearize.py` (→ `LTISystem`), `analysis/structural.py` (ctrb/obsv), `analysis/equilibria.py` (trim) migrated from pyro with finite-difference Jacobians; covered by tests; demos in `examples/scripts/analysis/`. | Add `frequency.py` (Bode/pole-zero), `modal.py`; consider JAX-exact linearization. |
+| Control | 5 | `control/linear.py` (`ProportionalController` (SISO+MIMO)/`PDController`/`PIDController`/`LinearStateFeedbackController`), `control/lqr.py` (`lqr_gain`/`lqr`/`lqr_at_operating_point`), and `control/pid.py` (`FilteredPIDController` with anti-windup) integrated and tested. | Port computed-torque, sliding-mode, robotic controllers. |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 
@@ -35,7 +35,7 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
   quarantine) with a dependency law and placement algorithm
   ([DESIGN.md §3](DESIGN.md)); `compile/` folded into `core/compile/`;
   generic blocks in top-level `blocks/`; generic control laws in
-  `control/linear.py`; `System` facades split into `core/facades.py`
+  `control/linear.py` and `control/pid.py`; `System` facades split into `core/facades.py`
   (API unchanged).
 
 ## 3. Priorities
@@ -44,7 +44,7 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 
 **P1** — Dynamic evaluator API review; ~~diagram parametric evaluators (`f_p`,
 `h_p`)~~ done (nested `{sys_id: {…}}` params, `jacobian_f_params`; see
-DESIGN.md §4 Parameters and `demo_params_gradient.py`); diagram validation;
+DESIGN.md §4 Parameters and `examples/scripts/identification/demo_params_gradient.py`); diagram validation;
 top-level `minilink` exports; NLP hardening.
 
 **P2** — ~~`analysis/` seed (linearization → `LTISystem`)~~ done (also ctrb/obsv,
@@ -71,14 +71,15 @@ one catalog plant, e.g. pendulum) before calling `graphical/` TRL ≥ 4.
 Pre-decided homes (bands and placement rules in [DESIGN.md §3](DESIGN.md)),
 in rough build order:
 
-1. **`analysis/`** — linearization (→ `LTISystem`), frequency (Bode,
-   pole-zero), modal (eigenmodes + animation), later ctrb/obsv and stability.
+1. **`analysis/`** — linearization (→ `LTISystem`), ctrb/obsv, and equilibria done;
+   still pending: frequency (Bode, pole-zero), modal (eigenmodes + animation).
    Phase-plane math migrates here from `graphical/` when touched.
-2. **`control/`** — `lqr.py`, then `computed_torque.py`, `sliding_mode.py`,
-   `robotic.py` (impedance), `mpc.py` (uses `optimization/`), `neural.py`
-   (NN policies).
-3. **`blocks/`** — Sum, Gain, Saturation; `neural.py` (MLP block, pure `jnp`,
-   `params` = weights).
+2. **`control/`** — `lqr.py`, `linear.py`, and `control/pid.py`
+   (`FilteredPIDController`) done; still pending: `computed_torque.py`,
+   `sliding_mode.py`, `robotic.py` (impedance), `mpc.py` (uses `optimization/`),
+   `neural.py` (NN policies).
+3. **`blocks/`** — routing, nonlinear, filters, and `TrajectorySource` done;
+   still pending: `neural.py` (MLP block, pure `jnp`, `params` = weights).
 4. **`estimation/`** — `luenberger.py`, `kalman.py`, later `ekf.py` (uses
    `analysis/` linearization) and `recursive.py` (online parameter
    estimators: RLS, adaptive laws). Offline fitting stays in

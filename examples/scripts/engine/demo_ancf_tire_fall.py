@@ -43,5 +43,5 @@ traj = sys.compute_trajectory(
 )
 
 sys.plot_trajectory(signals=("x"))
-sys.animate(time_factor_video=0.1)
+# sys.animate(time_factor_video=0.1)
 sys.animate(traj, time_factor_video=0.1, renderer="meshcat", is_3d=True)

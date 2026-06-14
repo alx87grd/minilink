@@ -43,7 +43,10 @@ OptimizationProgressCallback = Callable[[np.ndarray, float, float], None]
 
 # User-facing optimizer methods mapped to (backend_key, default_constructor_kwargs).
 _USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
-    "scipy_slsqp": ("scipy_minimize", {"scipy_method": "SLSQP", "options": {}}),
+    "scipy_slsqp": (
+        "scipy_minimize",
+        {"scipy_method": "SLSQP", "options": {"disp": False}},
+    ),
     "scipy_trust_constr": (
         "scipy_minimize",
         {"scipy_method": "trust-constr", "options": {}},

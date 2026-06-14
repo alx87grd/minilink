@@ -16,7 +16,7 @@ traj = sys.compute_forced(u=t2u, tf=5.0, show=False, input_port_id="u")
 
 
 # sys.plot_trajectory()
-sys.plot_trajectory(signals=("x", "u"), backend="plotly")
+sys.plot_trajectory(backend="plotly")
 
 
 # sys.animate()

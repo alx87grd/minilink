@@ -94,7 +94,7 @@ class PendulumWithNoisePort(Pendulum):
 
     def __init__(self):
         super().__init__()
-        self.name = "Pendulum with Noise Ports"
+        self.name = "Pendulum"
 
         self.add_input_port("w", dim=1, nominal_value=np.array([0.0]))
         self.add_input_port("v", dim=1, nominal_value=np.array([0.0]))

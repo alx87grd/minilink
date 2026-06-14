@@ -3,10 +3,10 @@ import numpy as np
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.linear import PDController
 from minilink.core.diagram import DiagramSystem
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
 
 # Plant system
-sys = Pendulum()
+sys = PendulumWithNoisePort()
 
 sys.params["m"] = 1.0
 sys.params["l"] = 5.0
@@ -51,12 +51,14 @@ diagram.name = "Pendulum without Noise"
 diagram.subsystems["process_noise"].params["var"] = 0.0
 diagram.subsystems["measurement_noise"].params["var"] = 0.0
 diagram.compute_trajectory(tf=20)
+diagram.plot_trajectory()
 
 diagram.name = "Pendulum with Measurement Noise "
 diagram.subsystems["process_noise"].params["var"] = 0.0
 diagram.subsystems["measurement_noise"].params["var"] = 1.0
 # diagram.subsystems["measurement_noise"].show_signal()
 diagram.compute_trajectory(tf=20)
+diagram.plot_trajectory()
 
 diagram.name = "Pendulum with Process Noise "
 diagram.subsystems["process_noise"].params["var"] = 100.0
