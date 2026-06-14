@@ -1,0 +1,1 @@
+"""Marine vehicle catalog systems."""

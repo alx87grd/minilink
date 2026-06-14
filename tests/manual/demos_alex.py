@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.blocks.sources import Step, WhiteNoise
+from minilink.blocks.sources import Step, WhiteNoise
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, StaticSystem
 from minilink.simulation.simulator import Simulator
@@ -122,7 +122,7 @@ class Integrator(DynamicSystem):
         return y
 
 
-class PropController(StaticSystem):
+class PController(StaticSystem):
     def __init__(self):
         super().__init__()
 
@@ -200,8 +200,6 @@ def system_test():
     print("Default u:", u)
     print("Default u:", u2)
     print("Default input signals:", input_signals)
-
-    sys1.print_html()
 
     sys1.plot_diagram()
 
@@ -306,9 +304,9 @@ def algebraic_loop():
     sys.x0[0] = 20.0
 
     # Controllers
-    ctl1 = PropController()
+    ctl1 = PController()
     ctl1.params["Kp"] = 1.0
-    ctl2 = PropController()
+    ctl2 = PController()
     ctl2.params["Kp"] = 1.0
 
     # Source input
@@ -351,9 +349,9 @@ def solver_doing_weird_at_discontinuities():
     sys2.x0[0] = 20.0
 
     # # Controllers
-    # ctl1 = PropController()
+    # ctl1 = PController()
     # ctl1.params["Kp"] = 1.0
-    # ctl2 = PropController()
+    # ctl2 = PController()
     # ctl2.params["Kp"] = 1.0
 
     # Source input
@@ -389,7 +387,7 @@ def diagram_in_a_diagram(debug_print=False):
     sys2.x0[0] = 1.0
 
     # # Controllers
-    ctl1 = PropController()
+    ctl1 = PController()
     ctl1.params["Kp"] = 1.0
 
     # Source input

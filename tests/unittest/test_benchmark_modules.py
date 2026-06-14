@@ -4,17 +4,17 @@ import unittest
 
 import numpy as np
 
-from minilink.compile.benchmark import (
+from benchmarks.f_evaluators import (
     FEvaluatorBenchmarkVariant,
     benchmark_f_evaluators,
 )
-from minilink.core.system import DynamicSystem
-from minilink.planning.trajectory_optimization.benchmark import (
+from benchmarks.trajopt import (
     TrajectoryOptimizationBenchmarkConfig,
     TrajectoryOptimizationBenchmarkVariant,
     benchmark_trajectory_optimization,
     default_trajectory_optimization_solver_variants,
 )
+from minilink.core.system import DynamicSystem
 
 
 class _TinyStable(DynamicSystem):

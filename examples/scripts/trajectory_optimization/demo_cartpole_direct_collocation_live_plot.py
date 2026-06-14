@@ -9,12 +9,12 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
 )
+from minilink.planning.trajectory_optimization.live_plot import (
+    LiveTrajectoryPlotCallback,
+)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
-)
-from minilink.planning.trajectory_optimization.live_plot import (
-    LiveTrajectoryPlotCallback,
 )
 
 # Demo controls.

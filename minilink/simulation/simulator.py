@@ -15,7 +15,7 @@ import logging
 
 import numpy as np
 
-from minilink.compile.backend_policy import (
+from minilink.core.backends import (
     BACKEND_AUTO,
     BACKEND_JAX,
     BACKEND_NUMPY,
@@ -77,7 +77,7 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
 RK4_AUTO_MIN_TIME_POINTS = 10_000
 
 # Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
-# Re-exported from :mod:`minilink.compile.backend_policy` so legacy callers
+# Re-exported from :mod:`minilink.core.backends` so legacy callers
 # importing it from the simulator keep working.
 COMPILE_BACKEND_AUTO = BACKEND_AUTO
 
@@ -115,7 +115,7 @@ class Simulator:
     solver : str, optional
         Solver mode; if ``None``, chosen by :meth:`select_solver`.
     verbose : bool
-        Print setup information.
+        Print setup information (default quiet).
     compile_backend : str
         Name passed as ``backend`` to :meth:`~minilink.core.system.System.compile`.
         Typical values are ``numpy`` (default) or ``jax``. Use :data:`COMPILE_BACKEND_AUTO`
@@ -131,7 +131,7 @@ class Simulator:
         n_steps=None,
         dt=None,
         solver=None,
-        verbose=True,
+        verbose=False,
         compile_backend=BACKEND_NUMPY,
     ):
         self.verbose = verbose

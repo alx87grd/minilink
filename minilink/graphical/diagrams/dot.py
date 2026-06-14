@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 from minilink.graphical.diagrams.export import TopologyExporter
 from minilink.graphical.diagrams.topology import build_diagram_topology
 
@@ -76,8 +78,10 @@ def _render_diagram_graph(graph, show_inline=None, show_pdf=None, filename=None)
     ``show_pdf=None`` defaults to external PDF display in bare scripts.
     """
     if graph is None:
-        print(
-            "No graph to display (graphviz Python package unavailable or graph build failed)."
+        warnings.warn(
+            "No graph to display (graphviz Python package unavailable or "
+            "graph build failed).",
+            stacklevel=2,
         )
         return
 
@@ -95,7 +99,7 @@ def _render_diagram_graph(graph, show_inline=None, show_pdf=None, filename=None)
 
             display.display(graph)
         except ImportError:
-            print("IPython is not available for inline display")
+            warnings.warn("IPython is not available for inline display", stacklevel=2)
 
     need_disk = show_pdf or filename is not None
     if not need_disk:
@@ -113,7 +117,10 @@ def _render_diagram_graph(graph, show_inline=None, show_pdf=None, filename=None)
     try:
         graph.render(filename=filename, view=show_pdf)
     except Exception as exc:
-        print(f"Warning: Could not render graph. Is Graphviz installed? Error: {exc}")
+        warnings.warn(
+            f"Could not render graph. Is Graphviz installed? Error: {exc}",
+            stacklevel=2,
+        )
 
 
 def get_system_block_html(sys, html_id="sys1"):
@@ -134,7 +141,7 @@ def get_diagram(sys_or_diagram):
     try:
         return export_diagram_topology(sys_or_diagram, backend="graphviz")
     except ImportError:
-        print("graphviz is not available")
+        warnings.warn("graphviz is not available", stacklevel=2)
         return None
 
 

@@ -60,12 +60,17 @@ class MathematicalProgramEvaluator(ABC):
 
     @property
     def has_jacobian_h(self) -> bool:
-        """True when :meth:`jacobian_h` can be called."""
+        """True when :meth:`jacobian_h` can be evaluated.
+
+        Note this means "callable", not "analytic derivatives exist": with no
+        equality constraints the empty ``(0, n_z)`` Jacobian is always
+        available. Backends with analytic/AD derivatives override this.
+        """
         return self.n_h == 0
 
     @property
     def has_jacobian_g(self) -> bool:
-        """True when :meth:`jacobian_g` can be called."""
+        """True when :meth:`jacobian_g` can be evaluated (see :attr:`has_jacobian_h`)."""
         return self.n_g == 0
 
     def objective(self, z) -> float:
@@ -80,9 +85,41 @@ class MathematicalProgramEvaluator(ABC):
         """Return ``g(z)`` as a flat NumPy nonnegative margin vector."""
         return self._vector(self.g(z), self.n_g, "inequality margin")
 
+    def constraint_violations(self, z) -> tuple[float, float | None, float]:
+        """Constraint-violation summary of a solution ``z``.
+
+        Returns
+        -------
+        eq_inf : float
+            Max absolute equality residual (0.0 when there are no equalities).
+        min_ineq : float or None
+            Smallest inequality margin (negative = violated); ``None`` when
+            there are no inequality constraints.
+        bound_inf : float
+            Max box-bound violation (0.0 when within bounds or unbounded).
+        """
+        eq_inf = 0.0
+        if self.n_h:
+            eq_inf = float(np.max(np.abs(self.equality_residual(z))))
+
+        min_ineq: float | None = None
+        if self.n_g:
+            min_ineq = float(np.min(self.inequality_margin(z)))
+
+        bound_inf = 0.0
+        lower = self.program.lower
+        upper = self.program.upper
+        if lower is not None:
+            bound_inf = max(bound_inf, float(np.max(np.maximum(lower - z, 0.0))))
+        if upper is not None:
+            bound_inf = max(bound_inf, float(np.max(np.maximum(z - upper, 0.0))))
+        return eq_inf, min_ineq, bound_inf
+
     def gradient(self, z) -> np.ndarray:
         """Return objective gradient ``dJ/dz`` or raise if unavailable."""
-        raise ValueError("This mathematical-program evaluator has no objective gradient")
+        raise ValueError(
+            "This mathematical-program evaluator has no objective gradient"
+        )
 
     def hessian(self, z) -> np.ndarray:
         """Return objective Hessian ``d2J/dz2`` or raise if unavailable."""
@@ -98,7 +135,9 @@ class MathematicalProgramEvaluator(ABC):
         """Return inequality Jacobian ``dg/dz``."""
         if self.n_g == 0:
             return np.zeros((0, self.n_z), dtype=float)
-        raise ValueError("This mathematical-program evaluator has no inequality Jacobian")
+        raise ValueError(
+            "This mathematical-program evaluator has no inequality Jacobian"
+        )
 
     def scipy_bounds(self):
         """Return SciPy ``minimize`` bounds or ``None``."""

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from minilink.core.diagram import DiagramSystem
+
 
 @dataclass(frozen=True)
 class TopologyPort:
@@ -46,7 +48,7 @@ class DiagramTopology:
 
 def build_diagram_topology(sys_or_diagram) -> DiagramTopology:
     """Build a display/export topology snapshot from a system or diagram."""
-    if hasattr(sys_or_diagram, "subsystems"):
+    if isinstance(sys_or_diagram, DiagramSystem):
         return _build_diagram_system_topology(sys_or_diagram)
     return _build_single_system_topology(sys_or_diagram)
 
@@ -141,11 +143,9 @@ def _node_from_ports(
         display_id=display_id,
         kind=kind,
         inputs=tuple(
-            TopologyPort(id=port_id, dim=port.dim)
-            for port_id, port in inputs.items()
+            TopologyPort(id=port_id, dim=port.dim) for port_id, port in inputs.items()
         ),
         outputs=tuple(
-            TopologyPort(id=port_id, dim=port.dim)
-            for port_id, port in outputs.items()
+            TopologyPort(id=port_id, dim=port.dim) for port_id, port in outputs.items()
         ),
     )

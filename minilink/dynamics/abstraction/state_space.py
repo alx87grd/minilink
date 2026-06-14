@@ -1,8 +1,8 @@
-"""Exact linear time-invariant state-space systems."""
+"""Linear state-space systems (time-varying / parameter-dependent and LTI)."""
 
 import numpy as np
 
-from minilink.compile.jax_utils import array_module
+from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 
 
@@ -50,47 +50,94 @@ def _check_dimensions(A, B, C, D):
 
 
 class StateSpaceSystem(DynamicSystem):
-    """Linear time-invariant system.
+    """Linear state-space system, possibly time-varying or parameter-dependent::
 
-    The model is exact LTI state space, not a local linearization container::
+        dx = A(t, params) @ x + B(t, params) @ u
+        y  = C(t, params) @ x + D(t, params) @ u
 
-        dx = A @ x + B @ u
-        y = C @ x + D @ u
-
-    ``A``, ``B``, ``C``, and ``D`` are fixed object attributes and are kept as
-    passed so NumPy arrays, JAX arrays, or other matrix objects can drive the
-    same equation code. The ``params`` argument accepted by :meth:`f` and
-    :meth:`h` is ignored and exists only to match the standard
-    :class:`~minilink.core.system.System` signature.
+    The matrices are built by the methods :meth:`A`, :meth:`B`, :meth:`C`, and
+    :meth:`D`, mirroring :meth:`MechanicalSystem.H` ``(q, params)``. Subclasses
+    override :meth:`A` and :meth:`B` (and optionally :meth:`C` / :meth:`D`) to
+    assemble the matrices from ``params``. For a constant system, use the
+    :class:`LTISystem` convenience subclass.
     """
 
-    def __init__(self, A, B, C=None, D=None, *, name="State Space System"):
-        self.A = A
-        self.B = B
-        self.C = _identity_like(A, _shape("A", A)[0]) if C is None else C
-        self.D = (
-            _zeros_like(B, (_shape("C", self.C)[0], _shape("B", B)[1]))
+    def __init__(self, *, n, m, p=None, feedthrough=False, name="State Space System"):
+        super().__init__(
+            n=n,
+            input_dim=m,
+            output_dim=n if p is None else p,
+            expose_state=True,
+            y_dependencies=("u",) if feedthrough else (),
+        )
+        self.name = name
+
+    def A(self, t=0.0, params=None):
+        """State matrix ``A`` as a function of time and parameters."""
+        raise NotImplementedError
+
+    def B(self, t=0.0, params=None):
+        """Input matrix ``B`` as a function of time and parameters."""
+        raise NotImplementedError
+
+    def C(self, t=0.0, params=None):
+        """Output matrix ``C``; defaults to full-state output (identity)."""
+        return _identity_like(self.B(t, params), self.n)
+
+    def D(self, t=0.0, params=None):
+        """Feedthrough matrix ``D``; defaults to zero."""
+        return _zeros_like(self.B(t, params), (self.p, self.m))
+
+    def f(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        A = self.A(t, params)
+        B = self.B(t, params)
+
+        # dx = A x + B u
+        return A @ x + B @ u
+
+    def h(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        C = self.C(t, params)
+        D = self.D(t, params)
+
+        # y = C x + D u
+        return C @ x + D @ u
+
+
+class LTISystem(StateSpaceSystem):
+    """Linear time-invariant system with constant matrices::
+
+        dx = A @ x + B @ u
+        y  = C @ x + D @ u
+
+    The matrices are stored exactly as passed so NumPy arrays, JAX arrays, or
+    other matrix objects can drive the same equation code. Access them through
+    the zero-argument method calls, e.g. ``sys.A()`` (useful for introspection
+    such as ``numpy.linalg.eigvals(sys.A())``).
+    """
+
+    def __init__(self, A, B, C=None, D=None, *, name="LTI System"):
+        self._A = A
+        self._B = B
+        self._C = _identity_like(A, _shape("A", A)[0]) if C is None else C
+        self._D = (
+            _zeros_like(B, (_shape("C", self._C)[0], _shape("B", B)[1]))
             if D is None
             else D
         )
 
-        n, m, p = self._check_dimensions()
-        super().__init__(
-            n=n,
-            input_dim=m,
-            output_dim=p,
-            expose_state=True,
-            y_dependencies=() if D is None else ("u",),
-        )
+        n, m, p = _check_dimensions(self._A, self._B, self._C, self._D)
+        super().__init__(n=n, m=m, p=p, feedthrough=D is not None, name=name)
 
-        self.name = name
+    def A(self, t=0.0, params=None):
+        return self._A
 
-    def _check_dimensions(self):
-        """Validate state-space matrix dimensions."""
-        return _check_dimensions(self.A, self.B, self.C, self.D)
+    def B(self, t=0.0, params=None):
+        return self._B
 
-    def f(self, x, u, t=0.0, params=None):
-        return self.A @ x + self.B @ u
+    def C(self, t=0.0, params=None):
+        return self._C
 
-    def h(self, x, u, t=0.0, params=None):
-        return self.C @ x + self.D @ u
+    def D(self, t=0.0, params=None):
+        return self._D

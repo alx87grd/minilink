@@ -10,7 +10,7 @@ pytest.importorskip("jax")
 import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
-from minilink.compile.jax_utils import configure_jax  # noqa: E402
+from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.sets import BallSet  # noqa: E402
 from minilink.core.system import DynamicSystem  # noqa: E402
@@ -116,7 +116,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program,
-            backend=program.metadata["program_backend"],
+            backend=program.backend,
             sample_z=z0,
         )
         self.assertTrue(program_evaluator.has_gradient)
@@ -132,9 +132,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=ShootingTranscription(
-                ShootingOptions(tf=1.0, n_steps=5)
-            ),
+            transcription=ShootingTranscription(ShootingOptions(tf=1.0, n_steps=5)),
             options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
                 optimizer_options={"maxiter": 100, "ftol": 1e-9},
@@ -152,7 +150,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program,
-            backend=program.metadata["program_backend"],
+            backend=program.backend,
             sample_z=z0,
         )
         self.assertEqual(program.n_z, problem.sys.m * 5)
@@ -190,7 +188,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program,
-            backend=program.metadata["program_backend"],
+            backend=program.backend,
             sample_z=z0,
         )
         self.assertEqual(program.n_z, (problem.sys.n + problem.sys.m) * 5)
@@ -211,15 +209,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
             Xf=BallSet(center=np.array([1.0]), radius=0.1),
             cost=base.cost,
         )
-        tr = DirectCollocationTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
-        )
+        tr = DirectCollocationTranscription(DirectCollocationOptions(tf=1.0, n_steps=5))
         guess = default_initial_trajectory(problem, tr.initial_guess_time_grid(problem))
         program = tr.transcribe(problem, compile_backend="jax")
         z0 = tr.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program,
-            backend=program.metadata["program_backend"],
+            backend=program.backend,
             sample_z=z0,
         )
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from minilink.simulation.scenarios.basic import JaxPendulum, NumpyPendulum
+from benchmarks.systems.basic import JaxPendulum, NumpyPendulum
 
 
 def test_jax_pendulum_subclasses_numpy_pendulum():

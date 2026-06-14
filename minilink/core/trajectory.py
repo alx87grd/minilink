@@ -95,11 +95,6 @@ class Trajectory:
         return int(self.t.size)
 
     @property
-    def time_steps(self) -> int:
-        """Compatibility alias for the number of samples."""
-        return self.n_samples
-
-    @property
     def t0(self) -> float:
         """Initial time."""
         return float(self.t[0])

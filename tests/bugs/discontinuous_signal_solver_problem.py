@@ -1,7 +1,7 @@
 import numpy as np
 
-from minilink.control.pendulum_pd import PendulumPDController
-from minilink.core.blocks.sources import Step, WhiteNoise
+from minilink.blocks.sources import Step, WhiteNoise
+from minilink.control.linear import PDController
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
@@ -32,7 +32,7 @@ noise2.params["mean"] = 0.0
 noise2.params["seed"] = 2
 
 # Closed loop system
-ctl = PendulumPDController()
+ctl = PDController()
 ctl.params["Kp"] = 1000.0
 ctl.params["Kd"] = 100.0
 

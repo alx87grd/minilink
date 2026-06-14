@@ -18,13 +18,10 @@ Python floats at the boundary.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, TypeAlias
 
 import numpy as np
 
 from minilink.core.trajectory import Trajectory
-
-NativeScalarExpression: TypeAlias = Any
 
 
 class CostFunction(ABC):
@@ -38,23 +35,12 @@ class CostFunction(ABC):
     """
 
     @abstractmethod
-    def g(
-        self,
-        x: np.ndarray,
-        u: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> NativeScalarExpression:
+    def g(self, x, u, t=0.0, params=None):
         """Return the native scalar running cost density ``g(x, u, t)``."""
         ...
 
     @abstractmethod
-    def h(
-        self,
-        x: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> NativeScalarExpression:
+    def h(self, x, t=0.0, params=None):
         """Return the native scalar terminal cost ``h(x, t)``."""
         ...
 
@@ -177,24 +163,13 @@ class QuadraticCost(CostFunction):
             ubar=ubar,
         )
 
-    def g(
-        self,
-        x: np.ndarray,
-        u: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> NativeScalarExpression:
+    def g(self, x, u, t=0.0, params=None):
         """Return the quadratic running cost."""
         dx = x - self.xbar
         du = u - self.ubar
         return dx.T @ self.Q @ dx + du.T @ self.R @ du
 
-    def h(
-        self,
-        x: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> NativeScalarExpression:
+    def h(self, x, t=0.0, params=None):
         """Return the quadratic terminal cost."""
         dx = x - self.xbar
         return dx.T @ self.S @ dx

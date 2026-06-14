@@ -2,8 +2,13 @@
 
 import numpy as np
 
-from minilink.compile.backend_policy import BACKEND_JAX
-from minilink.compile.jax_utils import array_module
+from minilink.core.backends import (
+    BACKEND_DIRECT,
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+    array_module,
+    normalize_backend,
+)
 from minilink.core.sets import BoxInputSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -18,9 +23,9 @@ from minilink.planning.trajectory_optimization.transcription import (
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
+    rk4_step_between_knots,
     stack_constraints,
-    transcription_backend_key,
-    uses_direct_dynamics,
+    trajectory_cost,
 )
 
 
@@ -43,10 +48,10 @@ class ShootingTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str | None = "numpy",
+        compile_backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Build the input-knot nonlinear program."""
-        if transcription_backend_key(compile_backend) == BACKEND_JAX:
+        if normalize_backend(compile_backend, allow_direct=True) == BACKEND_JAX:
             return self._transcribe_jax(problem, compile_backend=compile_backend)
 
         problem.require_cost()
@@ -70,10 +75,10 @@ class ShootingTranscription(Transcription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
+            backend=program_backend_for_compile(compile_backend),
             metadata={
                 "transcription": "shooting",
                 "compile_backend": compile_backend,
-                "program_backend": program_backend_for_compile(compile_backend),
             },
         )
 
@@ -81,7 +86,7 @@ class ShootingTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str | None,
+        compile_backend: str,
     ) -> MathematicalProgram:
         """Build a JAX scan-based single-shooting program."""
         import jax
@@ -99,30 +104,13 @@ class ShootingTranscription(Transcription):
         def unpack_jax(z):
             return z.reshape(m, n_steps)
 
+        def f(x, u_k, t_k):
+            return problem.sys.f(x, u_k, t_k, system_params)
+
         def rollout(u):
             def body(x, inputs):
                 u0, u1, t_k = inputs
-                umid = 0.5 * (u0 + u1)
-                k1 = problem.sys.f(x, u0, t_k, system_params)
-                k2 = problem.sys.f(
-                    x + 0.5 * dt * k1,
-                    umid,
-                    t_k + 0.5 * dt,
-                    system_params,
-                )
-                k3 = problem.sys.f(
-                    x + 0.5 * dt * k2,
-                    umid,
-                    t_k + 0.5 * dt,
-                    system_params,
-                )
-                k4 = problem.sys.f(
-                    x + dt * k3,
-                    u1,
-                    t_k + dt,
-                    system_params,
-                )
-                x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+                x_next = rk4_step_between_knots(f, x, u0, u1, t_k, dt)
                 return x_next, x_next
 
             _, xs = jax.lax.scan(
@@ -135,18 +123,7 @@ class ShootingTranscription(Transcription):
         def J(z):
             u = unpack_jax(z)
             x = rollout(u)
-            running = jax.vmap(
-                lambda x_k, u_k, t_k: cost.g(
-                    x_k,
-                    u_k,
-                    t_k,
-                    params=cost_params,
-                ),
-                in_axes=(1, 1, 0),
-            )(x, u, t)
-            integral = jnp.sum(0.5 * dt * (running[:-1] + running[1:]))
-            terminal = cost.h(x[:, -1], t[-1], params=cost_params)
-            return integral + terminal
+            return trajectory_cost(cost, x, u, t, dt, cost_params)
 
         equalities: list[ConstraintFunction] = []
         inequalities: list[ConstraintFunction] = []
@@ -167,10 +144,10 @@ class ShootingTranscription(Transcription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
+            backend=BACKEND_JAX,
             metadata={
                 "transcription": "shooting",
                 "compile_backend": compile_backend,
-                "program_backend": BACKEND_JAX,
             },
         )
 
@@ -179,7 +156,7 @@ class ShootingTranscription(Transcription):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        compile_backend: str | None = "numpy",
+        compile_backend: str = BACKEND_NUMPY,
     ) -> Trajectory:
         """Roll out the optimized input sequence."""
         rollout = self._make_rollout(problem, compile_backend)
@@ -211,7 +188,9 @@ class ShootingTranscription(Transcription):
         """Unpack a decision vector into sampled input knots."""
         return z.reshape(problem.sys.m, self.options.n_steps)
 
-    def decision_bounds(self, problem: PlanningProblem) -> tuple[np.ndarray, np.ndarray]:
+    def decision_bounds(
+        self, problem: PlanningProblem
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Build box bounds for input-knot decision variables."""
         n_z = self.decision_dimension(problem)
         lower = np.full(n_z, -np.inf)
@@ -243,65 +222,39 @@ class ShootingTranscription(Transcription):
     def _make_rollout(
         self,
         problem: PlanningProblem,
-        compile_backend: str | None,
+        compile_backend: str,
     ):
         x0 = self._initial_state(problem)
-        if uses_direct_dynamics(problem, compile_backend):
-            return lambda u: self._rollout_direct(problem, u, x0)
+        key = normalize_backend(compile_backend, allow_direct=True)
 
-        backend = transcription_backend_key(compile_backend)
-        evaluator = problem.sys.compile(backend=backend, verbose=False)
+        if key != BACKEND_DIRECT and problem.params.system is None:
+            evaluator = problem.sys.compile(backend=key, verbose=False)
 
-        def rollout(u):
-            x_samples = evaluator.rk4_rollout_forced(
-                x0,
-                u.T,
-                float(self.options.t[0]),
-                self.options.dt,
-            )
-            return x_samples.T
+            def rollout(u):
+                x_samples = evaluator.rk4_rollout_forced(
+                    x0,
+                    u.T,
+                    float(self.options.t[0]),
+                    self.options.dt,
+                )
+                return x_samples.T
 
-        return rollout
+            return rollout
 
-    def _rollout_direct(
-        self,
-        problem: PlanningProblem,
-        u: np.ndarray,
-        x0: np.ndarray,
-    ) -> np.ndarray:
+        # Direct mode or explicit system params: step the dynamics per knot.
+        f = dynamics_function(problem, compile_backend)
+        return lambda u: self._rollout_loop(f, u, x0, problem)
+
+    def _rollout_loop(self, f, u, x0, problem: PlanningProblem) -> np.ndarray:
         n = int(problem.sys.n)
-        n_steps = self.options.n_steps
         t = self.options.t
         dt = self.options.dt
-        params = problem.params.system
         xp = array_module(u)
+
         x = xp.asarray(x0).reshape(n)
         x_samples = [x]
-        for k in range(n_steps - 1):
-            u0 = u[:, k]
-            u1 = u[:, k + 1]
-            umid = 0.5 * (u0 + u1)
-            t_k = float(t[k])
-            k1 = problem.sys.f(x, u0, t_k, params)
-            k2 = problem.sys.f(
-                x + 0.5 * dt * k1,
-                umid,
-                t_k + 0.5 * dt,
-                params,
-            )
-            k3 = problem.sys.f(
-                x + 0.5 * dt * k2,
-                umid,
-                t_k + 0.5 * dt,
-                params,
-            )
-            k4 = problem.sys.f(
-                x + dt * k3,
-                u1,
-                t_k + dt,
-                params,
-            )
-            x = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        for k in range(self.options.n_steps - 1):
+            x = rk4_step_between_knots(f, x, u[:, k], u[:, k + 1], float(t[k]), dt)
             x_samples.append(x)
         return xp.stack(x_samples, axis=1)
 
@@ -314,17 +267,9 @@ class ShootingTranscription(Transcription):
         cost = problem.require_cost()
         u = self.unpack(z, problem)
         x = rollout(u)
-        t = self.options.t
-        params = problem.params.cost
-
-        total = 0.0
-        for k in range(self.options.n_steps - 1):
-            g0 = cost.g(x[:, k], u[:, k], float(t[k]), params=params)
-            g1 = cost.g(x[:, k + 1], u[:, k + 1], float(t[k + 1]), params=params)
-            total += 0.5 * self.options.dt * (g0 + g1)
-
-        total += cost.h(x[:, -1], float(t[-1]), params=params)
-        return total
+        return trajectory_cost(
+            cost, x, u, self.options.t, self.options.dt, problem.params.cost
+        )
 
     def _add_terminal_constraints(
         self,

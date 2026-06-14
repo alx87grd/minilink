@@ -428,7 +428,7 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
         """
         dq = N(q) @ v
 
-        q = [X, Y, theta, phi_l, phi_r]
+        q = [X, Y, theta]
         v = [vx, vy, r, w_l, w_r]
         """
         theta = q[2]

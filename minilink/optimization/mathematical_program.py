@@ -17,6 +17,8 @@ from typing import Any, TypeAlias
 
 import numpy as np
 
+from minilink.core.backends import BACKEND_NUMPY
+
 # These stay loose on purpose: the runtime contract is native-backend behavior
 # plus shape checks in evaluators, without making JAX a core dependency.
 NativeArray: TypeAlias = Any
@@ -74,6 +76,9 @@ class MathematicalProgram:
     jac_h, jac_g : callable, optional
         Constraint Jacobians ``dh/dz`` and ``dg/dz`` with shapes
         ``(n_h, n_z)`` and ``(n_g, n_z)``.
+    backend : str
+        Native array backend of the callables (``"numpy"`` or ``"jax"``) —
+        the program-evaluator backend they should be compiled with.
     metadata : dict
         Optional transcription or diagnostic metadata.
     """
@@ -88,9 +93,8 @@ class MathematicalProgram:
     hess_J: ArrayFunction | None = None
     jac_h: ArrayFunction | None = None
     jac_g: ArrayFunction | None = None
+    backend: str = BACKEND_NUMPY
     metadata: dict[str, object] = field(default_factory=dict)
-
-    problem_class: str = "nlp"
 
     def __post_init__(self) -> None:
         n_z = int(self.n_z)

@@ -21,6 +21,9 @@ dev = [
     "ruff",
     "mypy",
 ]
+docs = [
+    "sphinx>=7",
+]
 visualization = [
     "meshcat",
     "pygame",
@@ -73,6 +76,10 @@ markers = [
 
 [tool.hatch.version]
 source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+# Only the library ships; tests/ and benchmarks/ stay repo-only.
+packages = ["minilink"]
 
 [tool.hatch.build.hooks.vcs]
 version-file = "minilink/_version.py"

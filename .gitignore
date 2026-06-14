@@ -37,6 +37,8 @@ minilink/_version.py
 # Output files #
 ############################
 output/
+docs/_build/
+site/
 *.html
 *.png
 *.gif
@@ -64,6 +66,7 @@ output/
 
 # Editor Config #
 .vscode/
+.cursor/
 .spyproject/
 .spyderproject/
 

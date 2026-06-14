@@ -1,8 +1,8 @@
-"""Smoke tests for :mod:`minilink.optimization.benchmark`."""
+"""Smoke tests for :mod:`benchmarks.optimization`."""
 
 import numpy as np
 
-from minilink.optimization.benchmark import (
+from benchmarks.optimization import (
     STANDARD_OPTIMIZATION_CASES,
     OptimizerBenchmarkVariant,
     benchmark_optimizer_backends,

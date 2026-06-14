@@ -75,7 +75,7 @@ def test_set_margins_are_jax_jittable():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp
 
-    from minilink.compile.jax_utils import configure_jax
+    from minilink.core.backends import configure_jax
 
     configure_jax(enable_x64=True)
 
@@ -116,7 +116,7 @@ def test_quadratic_cost_is_jax_jittable():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp
 
-    from minilink.compile.jax_utils import configure_jax
+    from minilink.core.backends import configure_jax
 
     configure_jax(enable_x64=True)
 

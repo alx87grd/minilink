@@ -16,11 +16,7 @@ from minilink.planning.initial_guess import (
     default_initial_trajectory,
     mechanical_cubic_initial_trajectory,
 )
-from minilink.planning.policy_synthesis.dynamic_programming import (
-    DynamicProgrammingPlanner,
-)
 from minilink.planning.problems import PlanningProblem, ProblemParameters
-from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -238,14 +234,14 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost)
-        dp = DynamicProgrammingPlanner(
+        planner = TrajectoryOptimizationPlanner(
             problem,
-            x_grid_shape=(5, 5),
-            u_grid_shape=(3,),
-            dt=0.1,
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(tf=1.0, n_steps=5)
+            ),
         )
         with self.assertRaises(ValueError):
-            dp.require_result()
+            planner.require_result()
 
     def test_mathematical_program_constraints_are_backend_neutral(self):
         program = MathematicalProgram(
@@ -305,17 +301,6 @@ class TestPlanningArchitecture(unittest.TestCase):
         program_evaluator = compile_program_evaluator(program, sample_z=z0)
         self.assertEqual(program.n_z, 15)
         self.assertEqual(program_evaluator.n_h, 12)
-
-        rrt = RRTPlanner(problem, dt=0.1)
-        self.assertEqual(rrt.options.max_nodes, 2000)
-
-        dp = DynamicProgrammingPlanner(
-            problem,
-            x_grid_shape=(5, 5),
-            u_grid_shape=(3,),
-            dt=0.1,
-        )
-        self.assertEqual(dp.options.x_grid_shape, (5, 5))
 
     def test_direct_collocation_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
@@ -438,6 +423,36 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
         self.assertTrue(traj.has_signal("dx"))
         self.assertTrue(traj.has_signal("cost"))
+
+    def test_dynamics_function_routes_system_params_through_compiled_evaluator(self):
+        """System params flow through the parametric tier f_p, not direct sys.f."""
+        from minilink.blocks.basic import Integrator
+        from minilink.planning.trajectory_optimization.transcription import (
+            dynamics_function,
+        )
+
+        sys = Integrator()  # dx = k * u, default k = 1.0
+        problem = PlanningProblem(
+            sys=sys,
+            x_goal=np.array([1.0]),
+            cost=QuadraticCost.from_system(sys),
+            params=ProblemParameters(system={"k": 3.0}),
+        )
+
+        x = np.array([0.0])
+        u = np.array([2.0])
+        for backend in ("numpy", "direct"):
+            f = dynamics_function(problem, backend)
+            np.testing.assert_allclose(f(x, u, 0.0), [6.0], atol=1e-12)
+
+        # Without explicit params, the compiled evaluator uses block defaults.
+        plain = PlanningProblem(
+            sys=sys,
+            x_goal=np.array([1.0]),
+            cost=QuadraticCost.from_system(sys),
+        )
+        f = dynamics_function(plain, "numpy")
+        np.testing.assert_allclose(f(x, u, 0.0), [2.0], atol=1e-12)
 
     def test_shooting_packs_trajectory_guess_as_inputs_only(self):
         problem = self.make_single_integrator_problem()

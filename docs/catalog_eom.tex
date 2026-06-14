@@ -1,0 +1,768 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\sgn}{\operatorname{sgn}}
+\newcommand{\sat}{\operatorname{sat}}
+
+\title{Minilink Dynamics Catalog Equations of Motion}
+\author{Minilink}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Scope and conventions}
+This document records the equations of motion for the clean-slate
+\texttt{minilink.dynamics.catalog} systems migrated from Pyro.  The equations
+were checked against the corresponding Pyro catalog classes by numerical
+comparison of state derivatives, state-space matrices, and mechanical model
+terms.
+
+Mechanical systems use
+\begin{equation}
+    H(q)\ddot q + C(q,\dot q)\dot q + d(q,\dot q,u,t) + g(q)
+    = \tau(q,\dot q,u,t).
+\end{equation}
+Generalized mechanical systems use
+\begin{equation}
+    M(q)\dot v + C(q,v)v + d(q,v,u,t) + g(q) = \tau(q,v,u,t),
+    \qquad
+    \dot q = N(q)v.
+\end{equation}
+Linear state-space systems use
+\begin{equation}
+    \dot x = A x + B u,
+    \qquad
+    y = Cx + Du.
+\end{equation}
+
+\section{Equation systems}
+
+\subsection{SimpleIntegrator}
+\begin{equation}
+    x = p, \qquad u = v, \qquad \dot p = v.
+\end{equation}
+
+\subsection{DoubleIntegrator}
+\begin{equation}
+    x = \begin{bmatrix} p \\ v \end{bmatrix},
+    \qquad
+    \dot x = \begin{bmatrix} v \\ u \end{bmatrix},
+    \qquad
+    y = p.
+\end{equation}
+
+\subsection{TripleIntegrator}
+\begin{equation}
+    x = \begin{bmatrix} p \\ v \\ f \end{bmatrix},
+    \qquad
+    \dot x = \begin{bmatrix} v \\ f \\ u \end{bmatrix},
+    \qquad
+    y = p.
+\end{equation}
+
+\subsection{VanderPol}
+\begin{equation}
+    x = \begin{bmatrix} y \\ \dot y \end{bmatrix},
+    \qquad
+    \dot x =
+    \begin{bmatrix}
+        \dot y \\
+        -y + \mu \dot y(1-y^2)
+    \end{bmatrix}.
+\end{equation}
+
+\subsection{TransferFunction}
+For a SISO transfer function
+\begin{equation}
+    G(s) = \frac{b_0s^r + \cdots + b_r}{a_0s^n + \cdots + a_n},
+\end{equation}
+the implementation uses SciPy's controllable state-space realization:
+\begin{equation}
+    (A,B,C,D) = \operatorname{tf2ss}(b,a),
+    \qquad
+    \dot x = Ax + Bu,
+    \qquad
+    y = Cx + Du.
+\end{equation}
+
+\section{Mass-spring-damper}
+
+\subsection{SingleMass}
+\begin{equation}
+    x = \begin{bmatrix} p \\ v \end{bmatrix},
+    \qquad
+    A =
+    \begin{bmatrix}
+        0 & 1 \\
+        -k/m & -b/m
+    \end{bmatrix},
+    \qquad
+    B = \begin{bmatrix}0 \\ 1/m\end{bmatrix}.
+\end{equation}
+
+\subsection{FloatingSingleMass}
+\begin{equation}
+    \dot p = v,
+    \qquad
+    \dot v = \frac{u - b v}{m}.
+\end{equation}
+This is \texttt{SingleMass} with \(k=0\).
+
+\subsection{TwoMass}
+\begin{align}
+    \dot p_1 &= v_1, &
+    \dot p_2 &= v_2, \\
+    \dot v_1 &=
+        \frac{-(k_1+k_2)p_1 + k_2p_2 - b_1v_1}{m_1}, &
+    \dot v_2 &=
+        \frac{k_2p_1 - k_2p_2 - b_2v_2 + u}{m_2}.
+\end{align}
+The output is \(p_2\) by default, or \(p_1\) when requested.
+
+\subsection{FloatingTwoMass}
+\begin{equation}
+    \text{\texttt{FloatingTwoMass}: same as \texttt{TwoMass} with } k_1=0.
+\end{equation}
+
+\subsection{ThreeMass}
+\begin{align}
+    \dot p_1 &= v_1, &
+    \dot p_2 &= v_2, &
+    \dot p_3 &= v_3, \\
+    \dot v_1 &=
+        \frac{-(k_1+k_2)p_1 + k_2p_2 - b_1v_1}{m_1}, \\
+    \dot v_2 &=
+        \frac{k_2p_1 -(k_2+k_3)p_2 + k_3p_3 - b_2v_2}{m_2}, \\
+    \dot v_3 &=
+        \frac{k_3p_2-k_3p_3-b_3v_3+u}{m_3}.
+\end{align}
+The default Pyro output is \(p_2\); \(p_1,p_2,p_3\) are selectable.
+
+\subsection{FloatingThreeMass}
+\begin{equation}
+    \text{\texttt{FloatingThreeMass}: same as \texttt{ThreeMass} with } k_1=0,
+    \text{ and default output } p_3.
+\end{equation}
+
+\section{Pendulum and cart-pole}
+
+\subsection{Pendulum}
+With \(q=\theta\),
+\begin{equation}
+    H = m_1l_{c1}^2 + I_1,
+    \qquad
+    C = 0,
+    \qquad
+    g = m_1g_0l_{c1}\sin\theta,
+    \qquad
+    d = d_1\dot\theta,
+    \qquad
+    \tau = u.
+\end{equation}
+
+\subsection{InvertedPendulum}
+\begin{equation}
+    H\ddot\theta + d_1\dot\theta - m_1g_0l_{c1}\sin\theta = u.
+\end{equation}
+
+\subsection{TwoIndependentPendulums}
+For \(q=[\theta_1,\theta_2]^T\),
+\begin{equation}
+    H = hI_2,\qquad
+    h=m_1l_{c1}^2+I_1,\qquad
+    C=0,\qquad
+    g=m_1g_0l_{c1}\sin(q),\qquad
+    d=d_1\dot q,\qquad
+    \tau=u.
+\end{equation}
+
+\subsection{DoublePendulum}
+Let \(q=[q_1,q_2]^T\), \(c_2=\cos q_2\), \(s_2=\sin q_2\), and
+\(s_{12}=\sin(q_1+q_2)\).  The Pyro double-pendulum convention is
+\begin{align}
+    H_{11} &=
+        m_1l_{c1}^2 + I_1
+        + m_2(l_1^2+l_{c2}^2+2l_1l_{c2}c_2) + I_2, \\
+    H_{12} &= H_{21} =
+        m_2l_{c2}^2 + m_2l_1l_{c2}c_2 + I_2, \\
+    H_{22} &= m_2l_{c2}^2 + I_2,
+\end{align}
+\begin{equation}
+    C =
+    \begin{bmatrix}
+        -h\dot q_2 & -h(\dot q_1+\dot q_2) \\
+        h\dot q_1 & 0
+    \end{bmatrix},
+    \qquad
+    h=m_2l_1l_{c2}s_2,
+\end{equation}
+\begin{equation}
+    g =
+    \begin{bmatrix}
+        -[(m_1l_{c1}+m_2l_1)g_0]\sin q_1 - m_2l_{c2}g_0s_{12} \\
+        -m_2l_{c2}g_0s_{12}
+    \end{bmatrix},
+    \qquad
+    d=\diag(d_1,d_2)\dot q,
+    \qquad
+    \tau=u.
+\end{equation}
+
+\subsection{Acrobot}
+\begin{equation}
+    H,C,g,d \text{ are the same as \texttt{DoublePendulum}}, \qquad
+    \tau = \begin{bmatrix}0\\u\end{bmatrix}.
+\end{equation}
+
+\subsection{RotatingCartPole}
+For \(q=[q_1,q_2]^T\),
+\begin{equation}
+    H =
+    \begin{bmatrix}
+        m_2l_1^2+I_1 & m_2l_1l_2\cos q_2 \\
+        m_2l_1l_2\cos q_2 & m_2l_2^2+I_2
+    \end{bmatrix},
+\end{equation}
+\begin{equation}
+    C =
+    \begin{bmatrix}
+        0 & -m_2l_1l_2\sin q_2\dot q_2 \\
+        0 & 0
+    \end{bmatrix},
+    \qquad
+    g =
+    \begin{bmatrix}
+        0 \\
+        -m_2g_0l_2\sin q_2
+    \end{bmatrix},
+    \qquad
+    d=\diag(d_1,d_2)\dot q,
+    \qquad
+    \tau=u.
+\end{equation}
+
+\subsection{UnderactuatedRotatingCartPole}
+\begin{equation}
+    H,C,g,d \text{ are the same as \texttt{RotatingCartPole}}, \qquad
+    \tau=\begin{bmatrix}u\\0\end{bmatrix}.
+\end{equation}
+
+\subsection{CartPole and JaxCartPole}
+For \(q=[x,\theta]^T\), \(\dot q=[\dot x,\dot\theta]^T\),
+\begin{equation}
+    H =
+    \begin{bmatrix}
+        m_1+m_2 & m_2l_{cg}\cos\theta \\
+        m_2l_{cg}\cos\theta & m_2l_{cg}^2
+    \end{bmatrix},
+    \qquad
+    C =
+    \begin{bmatrix}
+        0 & -m_2l_{cg}\sin\theta\,\dot\theta \\
+        0 & 0
+    \end{bmatrix},
+\end{equation}
+\begin{equation}
+    g =
+    \begin{bmatrix}
+        0\\m_2g_0l_{cg}\sin\theta
+    \end{bmatrix},
+    \qquad
+    d=0,
+    \qquad
+    \tau=\begin{bmatrix}u\\0\end{bmatrix}.
+\end{equation}
+\texttt{JaxCartPole} has the same equations and JAX-traceable array builders.
+
+\section{Vehicles}
+
+\subsection{KinematicBicycle, KinematicCar, and UdeSRacecar}
+\begin{equation}
+    \dot x = v\cos\theta,
+    \qquad
+    \dot y = v\sin\theta,
+    \qquad
+    \dot\theta = \frac{v\tan\delta}{L}.
+\end{equation}
+\texttt{KinematicCar} and \texttt{UdeSRacecar} use the same model with their
+own wheelbase \(L=a+b\).
+
+\subsection{ConstantSpeedKinematicCar}
+\begin{equation}
+    \dot x = v_0\cos\theta,
+    \qquad
+    \dot y = v_0\sin\theta,
+    \qquad
+    \dot\theta = \frac{v_0\tan\delta}{L}.
+\end{equation}
+
+\subsection{HolonomicMobileRobot}
+\begin{equation}
+    x=\begin{bmatrix}p_x\\p_y\end{bmatrix},
+    \qquad
+    u=\begin{bmatrix}v_x\\v_y\end{bmatrix},
+    \qquad
+    \dot x=u.
+\end{equation}
+
+\subsection{HolonomicMobileRobot3D}
+\begin{equation}
+    x=\begin{bmatrix}p_x\\p_y\\p_z\end{bmatrix},
+    \qquad
+    u=\begin{bmatrix}v_x\\v_y\\v_z\end{bmatrix},
+    \qquad
+    \dot x=u.
+\end{equation}
+
+\subsection{LongitudinalFrontWheelDriveCarWithWheelSlipInput}
+Let \(x=[p,v]^T\), \(s\) be wheel slip, and
+\begin{equation}
+    \mu(s) = \mu_{\max}\left(\frac{2}{1+\exp(-\mu_{\mathrm{slope}}s)}-1\right).
+\end{equation}
+With
+\begin{equation}
+    r_y=\frac{y_c}{L},\qquad r_r=\frac{x_c}{L},\qquad
+    D(v)=\frac{1}{2}\rho C_dA\,v|v|,
+\end{equation}
+the model is
+\begin{equation}
+    \dot p=v,
+    \qquad
+    \dot v =
+    \frac{\mu(s)mg_0r_r-D(v)}{m(1+\mu(s)r_y)}.
+\end{equation}
+
+\subsection{LongitudinalFrontWheelDriveCarWithTorqueInput}
+For \(x=[p,v,\omega,\phi]^T\) and wheel torque \(T\),
+\begin{equation}
+    s =
+    \sat_{[-0.5,0.5]}\left(\frac{R\omega-v}{|v|+\epsilon}\right),
+    \qquad
+    a = \frac{\mu(s)mg_0r_r-D(v)}{m(1+\mu(s)r_y)}.
+\end{equation}
+\begin{equation}
+    \dot p=v,
+    \qquad
+    \dot v=a,
+    \qquad
+    \dot\omega=\frac{T-R(ma+D(v))}{I_w},
+    \qquad
+    \dot\phi=\omega.
+\end{equation}
+
+\subsection{QuarterCarOnRoughTerrain}
+With state \(x_s=[\dot y,y,x]^T\), prescribed forward speed \(v_x\), and
+\begin{equation}
+    z(x)=\sum_i a_i\sin(w_i(x-\phi_i)),\qquad
+    z'(x)=\sum_i a_iw_i\cos(w_i(x-\phi_i)),
+\end{equation}
+the dynamics are
+\begin{equation}
+    \ddot y =
+    \frac{u-k(y-z(x))-b(\dot y-z'(x))}{m},
+    \qquad
+    \dot x=v_x.
+\end{equation}
+
+\subsection{MountainCar}
+The car is constrained to \(z(q)=a\cos(wq)\):
+\begin{align}
+    H(q)&=m(1+z'(q)^2),
+    &
+    C(q,\dot q)&=mz'(q)z''(q)\dot q,\\
+    B(q)&=\sqrt{1+z'(q)^2},
+    &
+    g(q)&=mg_0z'(q),
+    &
+    d&=0.
+\end{align}
+Thus \(H\ddot q+C\dot q+g=B(q)u\).
+
+\subsection{DynamicBicycle and tire laws}
+For \(q=[x,y,\theta]^T\), \(v=[v_x,v_y,r]^T\),
+\begin{equation}
+    \dot q =
+    \begin{bmatrix}
+        \cos\theta & -\sin\theta & 0\\
+        \sin\theta & \cos\theta & 0\\
+        0&0&1
+    \end{bmatrix}v,
+    \qquad
+    M=\diag(m,m,I_z),
+\end{equation}
+\begin{equation}
+    C =
+    \begin{bmatrix}
+        0&-mr&0\\
+        mr&0&0\\
+        0&0&0
+    \end{bmatrix}.
+\end{equation}
+For steering input \(\delta\) and rear wheel speed \(\omega_r\),
+\begin{align}
+    v_{xf} &= \cos\delta\,v_x+\sin\delta\,(v_y+ar),\\
+    v_{yf} &= -\sin\delta\,v_x+\cos\delta\,(v_y+ar),\\
+    v_{xr} &= v_x,\qquad v_{yr}=v_y-br,\qquad
+    \omega_f = v_{xf}/R_f.
+\end{align}
+The tire slip variables are
+\begin{equation}
+    \alpha=-\arctan\left(\frac{v_y}{|v_x|+\epsilon}\right),
+    \qquad
+    \kappa=\frac{\omega R-v_x}{|v_x|+\epsilon}.
+\end{equation}
+The linear tire law is
+\begin{equation}
+    F_x=C_\kappa\kappa,\qquad F_y=C_\alpha\alpha,
+    \qquad
+    \|(F_x,F_y)\|\leq \mu F_z,
+\end{equation}
+with friction-circle saturation.  The Pacejka law is
+\begin{equation}
+    F = D F_z \sin\left(C\arctan(Bs-E(Bs-\arctan(Bs)))\right)
+\end{equation}
+applied to \(s=\kappa\) and \(s=\alpha\).  Body-frame front forces are
+\begin{equation}
+    F_{xf}^{b}=F_{xf}\cos\delta-F_{yf}\sin\delta,
+    \qquad
+    F_{yf}^{b}=F_{xf}\sin\delta+F_{yf}\cos\delta.
+\end{equation}
+The left-side load is
+\begin{equation}
+    d=-
+    \begin{bmatrix}
+        F_{xf}^{b}+F_{xr}-\frac{1}{2}\rho C_dA v_x|v_x|\\
+        F_{yf}^{b}+F_{yr}\\
+        aF_{yf}^{b}-bF_{yr}
+    \end{bmatrix},
+    \qquad
+    \tau=0.
+\end{equation}
+
+\section{Aerial systems}
+
+\subsection{Drone2D}
+For \(q=[x,y,\theta]^T\),
+\begin{equation}
+    H=\diag(m,m,I),
+    \qquad
+    C=0,
+    \qquad
+    g=\begin{bmatrix}0\\mg_0\\0\end{bmatrix},
+\end{equation}
+\begin{equation}
+    d=
+    \begin{bmatrix}
+        c_d\dot x|\dot x|+0.01\dot x\\
+        c_d\dot y|\dot y|+0.01\dot y\\
+        0.01\dot\theta
+    \end{bmatrix},
+    \qquad
+    B(q)=
+    \begin{bmatrix}
+        -\sin\theta & -\sin\theta\\
+        \cos\theta & \cos\theta\\
+        -l & l
+    \end{bmatrix},
+    \qquad
+    \tau=B(q)\begin{bmatrix}T_1\\T_2\end{bmatrix}.
+\end{equation}
+
+\subsection{Drone2DWithSideThruster}
+\begin{equation}
+    B_{\mathrm{side}}(q)=
+    \begin{bmatrix}
+        -\sin\theta & -\sin\theta & \cos\theta\\
+        \cos\theta & \cos\theta & \sin\theta\\
+        -l & l & 0
+    \end{bmatrix},
+    \qquad
+    \tau=B_{\mathrm{side}}(q)
+    \begin{bmatrix}T_1\\T_2\\T_L\end{bmatrix}.
+\end{equation}
+
+\subsection{SpeedControlledDrone2D}
+\begin{equation}
+    x=\begin{bmatrix}p_x\\p_y\end{bmatrix},
+    \qquad
+    \dot x=\begin{bmatrix}u_x\\u_y\end{bmatrix}.
+\end{equation}
+
+\subsection{ConstantSpeedHelicopterTunnel}
+With state \(x_s=[\dot y,y,x]^T\),
+\begin{equation}
+    \ddot y = \frac{u}{m},
+    \qquad
+    \dot x=v_x.
+\end{equation}
+
+\subsection{Rocket}
+\begin{equation}
+    H=\diag(m,m,I),
+    \qquad
+    g=\begin{bmatrix}0\\mg_0\\0\end{bmatrix},
+    \qquad
+    d=
+    \begin{bmatrix}
+        c_d\dot x|\dot x|+0.01\dot x\\
+        c_d\dot y|\dot y|+0.01\dot y\\
+        0.01\dot\theta
+    \end{bmatrix},
+\end{equation}
+\begin{equation}
+    \tau =
+    T
+    \begin{bmatrix}
+        -\sin(\theta+\delta)\\
+        \cos(\theta+\delta)\\
+        -y_{cg}\sin\delta
+    \end{bmatrix}.
+\end{equation}
+
+\subsection{Plane2D}
+For \(q=[x,y,\theta]^T\), \(\dot q=[v_x,v_y,\omega]^T\),
+\begin{equation}
+    H=\diag(m,m,I),
+    \qquad
+    g=\begin{bmatrix}0\\mg_0\\0\end{bmatrix},
+    \qquad
+    \tau=T\begin{bmatrix}\cos\theta\\\sin\theta\\0\end{bmatrix}.
+\end{equation}
+Let
+\begin{equation}
+    V=\sqrt{v_x^2+v_y^2},
+    \qquad
+    \gamma=\arctan2(v_y,v_x),
+    \qquad
+    \alpha=\theta-\gamma.
+\end{equation}
+The lift, drag, and moment laws are
+\begin{align}
+    C_l(\alpha) &= \sin(2\alpha) + \begin{cases}4\alpha,&|\alpha|<\alpha_s\\0,&\text{otherwise,}\end{cases}\\
+    C_d(\alpha) &= C_{d0} + 1-\cos(2\alpha)
+      + \begin{cases}C_l(\alpha)^2/(\pi e AR),&|\alpha|<\alpha_s\\0,&\text{otherwise,}\end{cases}\\
+    C_m(\alpha) &= C_{m0}.
+\end{align}
+With dynamic pressure \(\bar q=\frac{1}{2}\rho V^2\),
+\begin{equation}
+    L_w=\bar qS_wC_l(\alpha),\quad
+    D_w=\bar qS_wC_d(\alpha),\quad
+    M_w=\bar qS_wc_wC_m(\alpha),
+\end{equation}
+and the same expressions for the tail using \(S_t,c_t,\alpha+\delta\).  The
+world-frame aerodynamic load is
+\begin{equation}
+    d =
+    -R(\gamma)
+    \begin{bmatrix}
+        -(D_w+D_t)\\
+        L_w+L_t\\
+        M_w+M_t-l_w(L_w\cos\alpha+D_w\sin\alpha)
+            -l_t(L_t\cos\alpha+D_t\sin\alpha)
+    \end{bmatrix}.
+\end{equation}
+
+\section{Marine systems}
+
+\subsection{Boat2D}
+For \(q=[x,y,\theta]^T\), body velocity \(v=[u_b,v_b,r]^T\),
+\begin{equation}
+    M=\diag(m,m,I),
+    \qquad
+    N(q)=
+    \begin{bmatrix}
+        \cos\theta&-\sin\theta&0\\
+        \sin\theta&\cos\theta&0\\
+        0&0&1
+    \end{bmatrix},
+\end{equation}
+\begin{equation}
+    C=
+    \begin{bmatrix}
+        0&-mr&0\\
+        mr&0&0\\
+        0&0&0
+    \end{bmatrix},
+    \qquad
+    B=
+    \begin{bmatrix}
+        1&0\\
+        0&1\\
+        0&-l_t
+    \end{bmatrix},
+    \qquad
+    \tau=B\begin{bmatrix}T_x\\T_y\end{bmatrix}.
+\end{equation}
+For relative velocity \(v_r\),
+\begin{equation}
+    d(v_r)=D_{\ell}v_r+
+    \begin{bmatrix}
+        -\frac{1}{2}\rho A_f C_x(\alpha)\|v_{r,xy}\|^2\\
+        -\frac{1}{2}\rho A_l C_y(\alpha)\|v_{r,xy}\|^2\\
+        -\frac{1}{2}\rho A_l L C_m(\alpha)\|v_{r,xy}\|^2
+        +N_{\max}\rho A_lL|r|r
+    \end{bmatrix},
+\end{equation}
+where \(\alpha=-\arctan2(v_{r,y},v_{r,x})\),
+\begin{equation}
+    C_x=-C_{x,\max}\cos\alpha|\cos\alpha|,
+    \quad
+    C_y=C_{y,\max}\sin\alpha|\sin\alpha|,
+    \quad
+    C_m=C_{m,\max}\sin(2\alpha).
+\end{equation}
+For \texttt{Boat2D}, \(v_r=v\).
+
+\subsection{Boat2DWithCurrent}
+With world current \(v_c=[v_{cx},v_{cy},0]^T\),
+\begin{equation}
+    v_r = v - N(q)^Tv_c,
+\end{equation}
+and the rest of the \texttt{Boat2D} equations are unchanged.
+
+\section{Manipulators}
+
+\subsection{SpeedControlledManipulator}
+\begin{equation}
+    x=q,\qquad u=\dot q_{\mathrm{cmd}},\qquad \dot q=u.
+\end{equation}
+The forward differential kinematics are
+\begin{equation}
+    \dot r = J(q)\dot q.
+\end{equation}
+
+\subsection{OneLinkManipulator}
+\begin{equation}
+    H=m_1l_{c1}^2+I_1,
+    \qquad
+    C=0,
+    \qquad
+    g=-m_1g_0l_{c1}\sin q,
+    \qquad
+    d=d_1\dot q,
+    \qquad
+    \tau=u.
+\end{equation}
+The end-effector kinematics are
+\begin{equation}
+    r(q)=\begin{bmatrix}l_1\sin q\\l_1\cos q\end{bmatrix},
+    \qquad
+    J(q)=\begin{bmatrix}l_1\cos q\\-l_1\sin q\end{bmatrix}.
+\end{equation}
+
+\subsection{TwoLinkManipulator}
+Let \(q=[q_1,q_2]^T\), \(c_2=\cos q_2\), \(s_2=\sin q_2\), and
+\(c_{12}=\cos(q_1+q_2)\), \(s_{12}=\sin(q_1+q_2)\).  The inertia matrix is
+\begin{align}
+    H_{11} &= m_1l_{c1}^2+I_1
+      +m_2(l_1^2+l_{c2}^2+2l_1l_{c2}c_2)+I_2,\\
+    H_{12} &= H_{21}=m_2l_{c2}^2+m_2l_1l_{c2}c_2+I_2,\\
+    H_{22} &= m_2l_{c2}^2+I_2.
+\end{align}
+\begin{equation}
+    C=
+    \begin{bmatrix}
+        -h\dot q_2&-h(\dot q_1+\dot q_2)\\
+        h\dot q_1&0
+    \end{bmatrix},
+    \quad
+    h=m_2l_1l_{c2}s_2,
+    \quad
+    d=\diag(d_1,d_2)\dot q.
+\end{equation}
+\begin{equation}
+    g=
+    \begin{bmatrix}
+        -(m_1l_{c1}+m_2l_1)g_0\sin q_1-m_2l_{c2}g_0s_{12}\\
+        -m_2l_{c2}g_0s_{12}
+    \end{bmatrix},
+    \qquad
+    \tau=u.
+\end{equation}
+\begin{equation}
+    r(q)=
+    \begin{bmatrix}
+        l_1\sin q_1+l_2s_{12}\\
+        l_1\cos q_1+l_2c_{12}
+    \end{bmatrix}.
+\end{equation}
+
+\subsection{ThreeLinkManipulator3D}
+Let \(q=[q_1,q_2,q_3]^T\), \(c_i=\cos q_i\), \(s_i=\sin q_i\), and
+\(c_{23}=\cos(q_2+q_3)\), \(s_{23}=\sin(q_2+q_3)\).  With
+\(\ell=\ell_2\), \(r_1=l_{c2}\), and \(r_2=l_{c3}\),
+\begin{align}
+    H_{11} &=
+        I_{2y}s_2^2 + I_{3y}s_{23}^2 + I_{1z}
+        + I_{2z}c_2^2 + I_{3z}c_{23}^2
+        + m_2(r_1c_2)^2 + m_3(\ell c_2+r_2c_{23})^2,\\
+    H_{22} &=
+        I_{2x}+I_{3x}+m_3\ell^2+m_2r_1^2+m_3r_2^2
+        +2m_3\ell r_2c_3,\\
+    H_{23} &= H_{32}=I_{3x}+m_3r_2^2+m_3\ell r_2c_3,\\
+    H_{33} &= I_{3x}+m_3r_2^2,
+\end{align}
+and all other entries of \(H\) are zero.  The Coriolis matrix uses
+\begin{align}
+    T_{112} &=
+        (I_{2y}-I_{2z}-m_2r_1^2)c_2s_2
+        +(I_{3y}-I_{3z})c_{23}s_{23}
+        -m_3(\ell c_2+r_2c_{23})(\ell s_2+r_2s_{23}),\\
+    T_{113} &=
+        (I_{3y}-I_{3z})c_{23}s_{23}
+        -m_3r_2s_{23}(\ell c_2+r_2c_{23}),\\
+    T_{223} &=-\ell m_3r_2s_3,
+    \qquad
+    T_{322}=\ell m_3r_2s_3.
+\end{align}
+\begin{equation}
+    C =
+    \begin{bmatrix}
+        T_{112}\dot q_2+T_{113}\dot q_3&T_{112}\dot q_1&T_{113}\dot q_1\\
+        -T_{112}\dot q_1&T_{223}\dot q_3&T_{223}(\dot q_2+\dot q_3)\\
+        -T_{113}\dot q_1&T_{322}\dot q_2&0
+    \end{bmatrix}.
+\end{equation}
+\begin{equation}
+    g =
+    \begin{bmatrix}
+        0\\
+        -(m_2g_0l_{c2}+m_3g_0l_2)c_2-m_3g_0l_{c3}c_{23}\\
+        -m_3g_0l_{c3}c_{23}
+    \end{bmatrix},
+    \qquad
+    d=\diag(d_1,d_2,d_3)\dot q,
+    \qquad
+    \tau=u.
+\end{equation}
+
+\subsection{FiveLinkPlanarManipulator}
+Pyro's five-link class defines kinematics and otherwise uses the default
+fully actuated mechanical model:
+\begin{equation}
+    H=I_5,\qquad C=0,\qquad g=0,\qquad d=0,\qquad \tau=u.
+\end{equation}
+For link lengths \(l_i\) and absolute angles
+\(\alpha_i=\sum_{j=1}^{i}q_j\),
+\begin{equation}
+    r(q)=
+    \begin{bmatrix}
+        \sum_{i=1}^{5} l_i\sin\alpha_i\\
+        \sum_{i=1}^{5} l_i\cos\alpha_i
+    \end{bmatrix},
+\end{equation}
+\begin{equation}
+    J_{1j}=\sum_{i=j}^{5}l_i\cos\alpha_i,
+    \qquad
+    J_{2j}=-\sum_{i=j}^{5}l_i\sin\alpha_i.
+\end{equation}
+
+\end{document}

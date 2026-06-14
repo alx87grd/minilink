@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from minilink.core.diagram import DiagramSystem
 from minilink.graphical.common import PlotResult
 
 
@@ -44,6 +45,35 @@ class LivePlotHandle:
         raise NotImplementedError
 
 
+def resolve_plot_signals(sys) -> tuple[str, ...]:
+    """Return default time-signal names for ``sys`` (leaf or diagram).
+
+    Leaf systems keep the historical ``x`` + boundary ``u`` convention.
+    Diagrams plot flattened states plus controller control outputs
+    (``{id}:u`` for static or dynamic controllers) and source outputs
+    (``{id}:y``) without requiring explicit ``sys_id:port`` names from the
+    user.
+    """
+    if not isinstance(sys, DiagramSystem):
+        return ("x", "u") if sys.m else ("x",)
+
+    signals = []
+    if sys.n:
+        signals.append("x")
+
+    for sys_id, sub in sys.subsystems.items():
+        if "u" in sub.outputs:
+            signals.append(f"{sys_id}:u")
+        elif sub.n == 0 and not sub.inputs:
+            if "y" in sub.outputs:
+                signals.append(f"{sys_id}:y")
+            elif sub.outputs:
+                port_id = next(iter(sub.outputs))
+                signals.append(f"{sys_id}:{port_id}")
+
+    return tuple(signals)
+
+
 def build_signal_plot_spec(
     sys,
     traj,
@@ -54,7 +84,7 @@ def build_signal_plot_spec(
     """Build a one-component-per-row plot specification."""
     requested = (signals,) if isinstance(signals, str) else tuple(signals)
 
-    if hasattr(sys, "subsystems"):
+    if isinstance(sys, DiagramSystem):
         for name in requested:
             if ":" not in name or traj.has_signal(name):
                 continue
@@ -207,7 +237,7 @@ def _units_for_vector(units, dim: int) -> tuple[str, ...]:
 
 
 def _labels_and_units_for_extra_signal(sys, name: str, dim: int):
-    if ":" in name and hasattr(sys, "subsystems"):
+    if ":" in name and isinstance(sys, DiagramSystem):
         sys_id, port_id = name.split(":", 1)
         subsystem = sys.subsystems.get(sys_id)
         if subsystem is not None and port_id in subsystem.outputs:
@@ -224,7 +254,7 @@ def _labels_and_units_for_extra_signal(sys, name: str, dim: int):
 
 def _available_signal_names(sys, traj) -> tuple[str, ...]:
     names = list(traj.signal_names)
-    if hasattr(sys, "subsystems"):
+    if isinstance(sys, DiagramSystem):
         for sys_id, subsystem in sys.subsystems.items():
             for port_id in subsystem.outputs:
                 name = f"{sys_id}:{port_id}"
@@ -235,10 +265,8 @@ def _available_signal_names(sys, traj) -> tuple[str, ...]:
 
 def _color_for_signal(name: str) -> str:
     if name == "x":
-        return "tab:blue"
-    if name == "u":
-        return "tab:red"
-    return "tab:green"
+        return "blue"
+    return "tab:red"
 
 
 def _coerce_signal_plot_spec(traj_or_spec, spec_builder, *, title=None):

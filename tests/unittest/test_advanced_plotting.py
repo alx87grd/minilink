@@ -8,13 +8,14 @@ import numpy as np
 import pytest
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.trajectory import Trajectory
 from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.trajectory import Trajectory
 from minilink.graphical.common.plotly_style import PLOTLY_FIG_WIDTH
 from minilink.graphical.signals import (
     build_signal_plot_spec,
     open_time_signal_plot,
     plot_time_signals,
+    resolve_plot_signals,
 )
 from minilink.simulation.simulator import Simulator
 
@@ -30,7 +31,7 @@ class Integrator(DynamicSystem):
         return np.array([x[0]])
 
 
-class PropController(StaticSystem):
+class PController(StaticSystem):
     def __init__(self):
         super().__init__()
         self.params = {"Kp": 5.0}
@@ -56,7 +57,7 @@ class Step(StaticSystem):
 class TestAdvancedPlotting(unittest.TestCase):
     def setUp(self):
         self.sys = Integrator()
-        self.ctl = PropController()
+        self.ctl = PController()
         self.step = Step()
 
         self.diagram = DiagramSystem()
@@ -86,7 +87,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertFalse(self.traj.has_signal("step:y"))
 
         # Reconstruct signals
-        traj_plus = self.diagram.compute_internal_signals(self.traj)
+        traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
 
         # Test it successfully created sampled channels
         self.assertTrue(traj_plus.has_signal("step:y"))
@@ -120,6 +121,70 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertEqual(result.backend, "matplotlib")
         self.assertIsNotNone(result.figure)
         self.assertIsNotNone(sys.traj)
+        plt.close(result.figure)
+
+    def test_resolve_plot_signals_leaf_integrator(self):
+        self.assertEqual(resolve_plot_signals(self.sys), ("x", "u"))
+
+    def test_resolve_plot_signals_closed_loop_diagram(self):
+        self.assertEqual(
+            resolve_plot_signals(self.diagram),
+            ("x", "step:y", "ctl:u"),
+        )
+
+    def test_resolve_plot_signals_lqr_at_cartpole(self):
+        from minilink.control.lqr import lqr_at_operating_point
+        from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+
+        plant = CartPole()
+        controller = lqr_at_operating_point(
+            plant,
+            [0.0, np.pi, 0.0, 0.0],
+            np.diag([1.0, 10.0, 1.0, 1.0]),
+            np.array([[0.1]]),
+        )
+        diagram = controller @ plant
+
+        signals = resolve_plot_signals(diagram)
+        self.assertEqual(signals[0], "x")
+        self.assertTrue(signals[1].endswith(":u"))
+
+    def test_resolve_plot_signals_series_into_closed_loop(self):
+        from minilink.blocks.sources import Step
+        from minilink.control.linear import PDController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        diagram = Step(final_value=[1.0], step_time=0.0) >> PDController() @ Pendulum()
+
+        self.assertEqual(
+            resolve_plot_signals(diagram),
+            ("x", "step:y", "pd_controller:u"),
+        )
+
+    def test_resolve_plot_signals_dynamic_controller(self):
+        from minilink.blocks.sources import Step
+        from minilink.control.pid import FilteredPIDController
+        from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
+
+        diagram = (
+            Step(final_value=[1.0], step_time=0.0)
+            >> FilteredPIDController()
+            @ DoubleIntegrator()
+        )
+
+        self.assertEqual(
+            resolve_plot_signals(diagram),
+            ("x", "step:y", "filtered_pid:u"),
+        )
+
+    def test_plot_trajectory_uses_default_signals_for_closed_loop(self):
+        from minilink.graphical.common.environment import override_env
+
+        override_env("jupyter")
+        self.addCleanup(override_env, None)
+
+        result = self.diagram.plot_trajectory(self.traj, show=False)
+        self.assertIsNotNone(result.figure)
         plt.close(result.figure)
 
     def test_signal_spec_resolves_core_and_extra_signals(self):

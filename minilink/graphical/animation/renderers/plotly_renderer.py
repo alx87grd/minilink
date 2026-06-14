@@ -7,15 +7,6 @@ import types
 import matplotlib.colors as mcolors
 import numpy as np
 
-from minilink.graphical.common.plotly_style import (
-    PLOTLY_2D_MARGIN,
-    PLOTLY_3D_MARGIN,
-    PLOTLY_ANIMATION_2D_MARGIN,
-    PLOTLY_ANIMATION_3D_MARGIN,
-    PLOTLY_ANIMATION_HEIGHT,
-    PLOTLY_FIG_WIDTH,
-    PLOTLY_TEMPLATE,
-)
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
@@ -31,7 +22,15 @@ from minilink.graphical.animation.primitives import (
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
-
+from minilink.graphical.common.plotly_style import (
+    PLOTLY_2D_MARGIN,
+    PLOTLY_3D_MARGIN,
+    PLOTLY_ANIMATION_2D_MARGIN,
+    PLOTLY_ANIMATION_3D_MARGIN,
+    PLOTLY_ANIMATION_HEIGHT,
+    PLOTLY_FIG_WIDTH,
+    PLOTLY_TEMPLATE,
+)
 
 _AXIS_LABEL_BY_INDEX = ("X", "Y", "Z")
 _BOX_EDGES = (
@@ -715,7 +714,9 @@ class PlotlyRenderer(AnimationRenderer):
 
         if isinstance(primitive, Plane):
             vertices = _transform_points(_plane_vertices(primitive), T)
-            x, y, z = _line_arrays_from_edges(vertices, ((0, 1), (1, 3), (3, 2), (2, 0)))
+            x, y, z = _line_arrays_from_edges(
+                vertices, ((0, 1), (1, 3), (3, 2), (2, 0))
+            )
             return _line_trace(
                 go,
                 x=x,

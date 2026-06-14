@@ -17,7 +17,7 @@ pytest.importorskip("jax")
 import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
-from minilink.compile.jax_utils import configure_jax  # noqa: E402
+from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.dynamics.abstraction.mechanical import (  # noqa: E402
     JaxMechanicalSystem,
     MechanicalSystem,
@@ -78,7 +78,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
             def g(self, q, params=None):
                 return np.array([2.0 * np.sin(q[0]), 1.0 * np.sin(q[1])])
 
-            def d(self, q, dq, params=None):
+            def d(self, q, dq, u=None, t=0.0, params=None):
                 return 0.05 * np.asarray(dq)
 
         class _JaxTwoLink(JaxMechanicalSystem):
@@ -105,7 +105,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
             def g(self, q, params=None):
                 return jnp.array([2.0 * jnp.sin(q[0]), 1.0 * jnp.sin(q[1])])
 
-            def d(self, q, dq, params=None):
+            def d(self, q, dq, u=None, t=0.0, params=None):
                 return 0.05 * dq
 
         sys_n = _NumpyTwoLink(dof=2)

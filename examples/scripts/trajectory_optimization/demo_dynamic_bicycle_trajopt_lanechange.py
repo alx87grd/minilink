@@ -8,7 +8,7 @@ so the optimizer receives analytic gradients/Jacobians from the program evaluato
 
 import numpy as np
 
-from minilink.compile.jax_utils import configure_jax
+from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import JaxDynamicBicycle
 from minilink.planning.problems import PlanningProblem
@@ -50,7 +50,7 @@ Q = np.diag([0.0, 4.0, 5.0, 0.1, 1.0, 1.0])
 
 
 # Penalize deviation from the cruise input (rear wheel ω that holds U_TARGET).
-ubar = np.array([U_TARGET / sys.r_r, 0.0])
+ubar = np.array([U_TARGET / sys.params["r_r"], 0.0])
 R = np.diag([0.1, 50.0])
 S = np.diag([0.0, 50.0, 50.0, 1.0, 10.0, 10.0])
 

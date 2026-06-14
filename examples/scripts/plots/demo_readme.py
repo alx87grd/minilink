@@ -1,8 +1,8 @@
 ########################################################
-from minilink.control.pendulum_pd import PendulumPDController
+from minilink.control.linear import PDController
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-controller = PendulumPDController()  # u = Kp * (r - theta) - Kd * theta_dot
+controller = PDController()  # u = Kp * (r - theta) - Kd * theta_dot
 plant = Pendulum()  # theta_ddot = -(g / l) * sin(theta) + tau / (m * l**2)
 
 plant.x0[0] = 2.0
@@ -18,12 +18,12 @@ diagram.animate()
 
 ########################################################
 import numpy as np
+
+from minilink.blocks.sources import Step
 from minilink.core.system import DynamicSystem
-from minilink.core.blocks.sources import Step
 
 
 class MassSpringDamper(DynamicSystem):
-
     def __init__(self):
         super().__init__(n=2, input_dim=1, expose_state=True)
         self.params = {"m": 1.0, "k": 4.0, "c": 0.3}

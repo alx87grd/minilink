@@ -1,4 +1,11 @@
-"""Animation, rendering, and graphical primitive API."""
+"""Animation, rendering, and graphical primitive API.
+
+The names below are re-exported lazily via ``__getattr__`` on purpose:
+:mod:`~minilink.graphical.animation.primitives` must stay importable without
+pulling in matplotlib (the core kinematic hooks import it), and importing
+:mod:`~minilink.graphical.animation.animator` eagerly here would do exactly
+that.
+"""
 
 __all__ = [
     "Animator",
@@ -7,7 +14,7 @@ __all__ = [
     "MeshcatRenderer",
     "PlotlyRenderer",
     "PygameRenderer",
-    "_make_renderer",
+    "make_renderer",
 ]
 
 

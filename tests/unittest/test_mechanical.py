@@ -20,7 +20,7 @@ class TestMechanicalSystem(unittest.TestCase):
         self.assertEqual(sys.n, 6)
 
     def test_f_double_integrator_chain(self):
-        """Default H=I, C=g=d=0, u=0 => ddq=0, dx = [dq; 0]."""
+        """Default H=I, C=g=d=0, u=0 => acceleration=0, dx = [dq; 0]."""
         sys = MechanicalSystem(dof=2)
         x = np.array([0.1, -0.2, 0.3, 0.4])
         u = np.zeros(2)
@@ -66,12 +66,46 @@ class TestMechanicalSystem(unittest.TestCase):
         sys = MassSystem()
         q = np.array([0.0])
         dq = np.array([0.0])
-        ddq = np.array([3.0])
+        acceleration = np.array([3.0])
 
-        np.testing.assert_allclose(sys.actuator_forces(q, dq, ddq), np.array([6.0]))
         np.testing.assert_allclose(
-            sys.actuator_forces(q, dq, ddq, params={"mass": 5.0}),
+            sys.inverse_dynamics(q, dq, acceleration), np.array([6.0])
+        )
+        np.testing.assert_allclose(
+            sys.inverse_dynamics(q, dq, acceleration, params={"mass": 5.0}),
             np.array([15.0]),
+        )
+
+    def test_default_generalized_force_is_actuator_map(self):
+        sys = MechanicalSystem(dof=2, actuators=1)
+        q = np.array([0.0, 0.0])
+        dq = np.array([0.0, 0.0])
+        u = np.array([3.0])
+
+        np.testing.assert_allclose(
+            sys.generalized_force(q, dq, u),
+            np.array([3.0, 0.0]),
+        )
+
+    def test_forward_and_inverse_dynamics_are_consistent(self):
+        class MassSystem(MechanicalSystem):
+            def H(self, q, params=None):
+                return np.array([[2.0]])
+
+            def d(self, q, dq, u=None, t=0.0, params=None):
+                return np.array([0.5 * dq[0]])
+
+        sys = MassSystem(dof=1)
+        q = np.array([0.0])
+        dq = np.array([4.0])
+        u = np.array([10.0])
+
+        acceleration = sys.forward_dynamics(q, dq, u)
+
+        np.testing.assert_allclose(acceleration, np.array([4.0]))
+        np.testing.assert_allclose(
+            sys.inverse_dynamics(q, dq, acceleration, u),
+            sys.generalized_force(q, dq, u),
         )
 
     def test_h_equals_state(self):

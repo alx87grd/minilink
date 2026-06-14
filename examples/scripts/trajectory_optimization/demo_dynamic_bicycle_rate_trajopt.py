@@ -14,7 +14,6 @@ from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 
-
 # --- Problem setup ---
 PRINT_SOLVE_REPORT = True  # Print the Minilink TrajOpt pre/post solve report.
 PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT  # Print compact success/cost fallback.
@@ -28,9 +27,18 @@ HEADING_TARGET = 0.0
 
 sys = JaxDynamicBicycleRateInputs()
 
-x_start = np.array([0.0, 0.0, 0.0, U_0, 0.0, 0.0, U_0 / sys.r_r, 0.0])
+x_start = np.array([0.0, 0.0, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0])
 x_ref = np.array(
-    [-0.0, Y_GOAL, HEADING_TARGET, U_TARGET, 0.0, 0.0, U_TARGET / sys.r_r, 0.0]
+    [
+        -0.0,
+        Y_GOAL,
+        HEADING_TARGET,
+        U_TARGET,
+        0.0,
+        0.0,
+        U_TARGET / sys.params["r_r"],
+        0.0,
+    ]
 )
 
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.compile.backend_policy import BACKEND_JAX
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -18,7 +18,8 @@ from minilink.planning.trajectory_optimization.transcription import (
     native_concatenate,
     program_backend_for_compile,
     stack_constraints,
-    transcription_backend_key,
+    trajectory_cost,
+    trapezoidal_defect,
 )
 
 
@@ -45,10 +46,10 @@ class DirectCollocationTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str | None = "numpy",
+        compile_backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Build the trapezoidal collocation nonlinear program."""
-        if transcription_backend_key(compile_backend) == BACKEND_JAX:
+        if normalize_backend(compile_backend, allow_direct=True) == BACKEND_JAX:
             return self._transcribe_jax(problem, compile_backend=compile_backend)
 
         problem.require_cost()
@@ -74,10 +75,10 @@ class DirectCollocationTranscription(Transcription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
+            backend=program_backend_for_compile(compile_backend),
             metadata={
                 "transcription": "direct_collocation",
                 "compile_backend": compile_backend,
-                "program_backend": program_backend_for_compile(compile_backend),
             },
         )
 
@@ -85,7 +86,7 @@ class DirectCollocationTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str | None,
+        compile_backend: str,
     ) -> MathematicalProgram:
         """Build a JAX-vectorized collocation program.
 
@@ -116,18 +117,7 @@ class DirectCollocationTranscription(Transcription):
 
         def J(z):
             x, u = unpack_jax(z)
-            running = jax.vmap(
-                lambda x_k, u_k, t_k: cost.g(
-                    x_k,
-                    u_k,
-                    t_k,
-                    params=cost_params,
-                ),
-                in_axes=(1, 1, 0),
-            )(x, u, t)
-            integral = jnp.sum(0.5 * dt * (running[:-1] + running[1:]))
-            terminal = cost.h(x[:, -1], t[-1], params=cost_params)
-            return integral + terminal
+            return trajectory_cost(cost, x, u, t, dt, cost_params)
 
         def dynamics_residual(z):
             x, u = unpack_jax(z)
@@ -141,8 +131,7 @@ class DirectCollocationTranscription(Transcription):
                 in_axes=(1, 1, 0),
                 out_axes=1,
             )(x, u, t)
-            residuals = x[:, 1:] - x[:, :-1] - 0.5 * dt * (dx[:, :-1] + dx[:, 1:])
-            return residuals.reshape(-1)
+            return trapezoidal_defect(x, dx, dt).reshape(-1)
 
         equalities: list[ConstraintFunction] = [dynamics_residual]
         inequalities: list[ConstraintFunction] = []
@@ -162,10 +151,10 @@ class DirectCollocationTranscription(Transcription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
+            backend=BACKEND_JAX,
             metadata={
                 "transcription": "direct_collocation",
                 "compile_backend": compile_backend,
-                "program_backend": BACKEND_JAX,
             },
         )
 
@@ -174,7 +163,7 @@ class DirectCollocationTranscription(Transcription):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        compile_backend: str | None = "numpy",
+        compile_backend: str = BACKEND_NUMPY,
     ) -> Trajectory:
         """Read ``(x, u)`` from the optimizer result."""
         x, u = self.unpack(result.z, problem)
@@ -238,7 +227,9 @@ class DirectCollocationTranscription(Transcription):
         """Return the collocation time grid."""
         return self.options.t
 
-    def decision_bounds(self, problem: PlanningProblem) -> tuple[np.ndarray, np.ndarray]:
+    def decision_bounds(
+        self, problem: PlanningProblem
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Build box bounds on the packed decision vector when sets expose boxes."""
         n = int(problem.sys.n)
         n_steps = self.options.n_steps
@@ -261,17 +252,9 @@ class DirectCollocationTranscription(Transcription):
     def _objective(self, z: np.ndarray, problem: PlanningProblem):
         cost = problem.require_cost()
         x, u = self.unpack(z, problem)
-        t = self.options.t
-        params = problem.params.cost
-
-        total = 0.0
-        for k in range(self.options.n_steps - 1):
-            g0 = cost.g(x[:, k], u[:, k], float(t[k]), params=params)
-            g1 = cost.g(x[:, k + 1], u[:, k + 1], float(t[k + 1]), params=params)
-            total += 0.5 * self.options.dt * (g0 + g1)
-
-        total += cost.h(x[:, -1], float(t[-1]), params=params)
-        return total
+        return trajectory_cost(
+            cost, x, u, self.options.t, self.options.dt, problem.params.cost
+        )
 
     def _dynamics_residual(
         self,
@@ -281,15 +264,11 @@ class DirectCollocationTranscription(Transcription):
     ) -> np.ndarray:
         x, u = self.unpack(z, problem)
         t = self.options.t
-        residuals = []
-        for k in range(self.options.n_steps - 1):
-            f0 = dynamics(x[:, k], u[:, k], float(t[k]))
-            f1 = dynamics(x[:, k + 1], u[:, k + 1], float(t[k + 1]))
-            dx_num = x[:, k + 1] - x[:, k]
-            dx_col = 0.5 * self.options.dt * (f0 + f1)
-            residuals.append(dx_num - dx_col)
 
-        return native_concatenate(residuals, z)
+        dx = np.column_stack(
+            [dynamics(x[:, k], u[:, k], float(t_k)) for k, t_k in enumerate(t)]
+        )
+        return trapezoidal_defect(x, dx, self.options.dt).reshape(-1)
 
     def _add_boundary_constraints(
         self,

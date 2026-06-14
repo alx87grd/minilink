@@ -14,12 +14,9 @@ def boundary_point(set_: object | None) -> np.ndarray | None:
     return None
 
 
-def nominal_input(sys: object, n_samples: int) -> np.ndarray:
+def nominal_input(sys, n_samples: int) -> np.ndarray:
     """Return the system nominal input repeated on a time grid."""
-    if hasattr(sys, "get_u_from_input_ports"):
-        u0 = sys.get_u_from_input_ports()
-    else:
-        u0 = np.zeros(sys.m)
+    u0 = sys.get_u_from_input_ports()
     return np.repeat(np.asarray(u0, dtype=float).reshape(sys.m, 1), n_samples, axis=1)
 
 
@@ -57,6 +54,8 @@ def mechanical_cubic_initial_trajectory(
     Hermite curve matching boundary positions and velocities.
     """
     sys = problem.sys
+    # Duck-typed mechanical check (a tools package must not import dynamics/;
+    # see the DESIGN.md dependency law).
     if not hasattr(sys, "dof") or int(sys.n) != 2 * int(sys.dof):
         return linear_initial_trajectory(problem, t)
 
