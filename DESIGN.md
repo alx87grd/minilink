@@ -58,13 +58,14 @@ or neural network alike):
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
-user-facing systems (factories are fine: a future `linearize()` returns an
-`LTISystem`; an LQR design function returns a state-feedback block):
+user-facing systems (factories are fine: `linearize_matrices()` returns arrays,
+`linearize()` wraps them as an `LTISystem`, and an LQR design function returns a
+state-feedback block):
 
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, solvers, forcing |
-| `analysis/` | `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`; frequency planned |
+| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`; frequency planned |
 | `planning/` | problems, trajopt |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |

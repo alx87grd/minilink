@@ -6,9 +6,8 @@ optimal gain, and ``lqr`` wraps it as a ready-to-wire
 :class:`~minilink.control.linear.LinearStateFeedbackController`.
 
 ``lqr_at_operating_point`` linearizes a plant about ``(x_bar, u_bar)`` (via
-:func:`~minilink.analysis.linearize.linearize`, lazy-imported) and returns the
-trimmed controller in one step — the pyro-style convenience over calling
-``linearize`` then ``lqr`` separately.
+:func:`~minilink.analysis.linearize.linearize_matrices`, lazy-imported) and
+returns the trimmed controller in one step.
 
 For matrix-only design, pass Jacobians from any source into ``lqr_gain`` /
 ``lqr`` directly.
@@ -85,15 +84,17 @@ def lqr_at_operating_point(
     LinearStateFeedbackController
         Full-state feedback trimmed about ``(x_bar, u_bar)``.
     """
-    from minilink.analysis.linearize import linearize
+    from minilink.analysis.linearize import linearize_matrices
 
     x_bar = np.asarray(x_bar, dtype=float).reshape(-1)
     if u_bar is None:
         u_bar = sys.get_u_from_input_ports()
     u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
 
-    lti = linearize(sys, x_bar, u_bar, t=t, params=params, epsilon=epsilon)
-    return lqr(lti.A(), lti.B(), Q, R, xbar=x_bar, ubar=u_bar)
+    A, B, _, _ = linearize_matrices(
+        sys, x_bar, u_bar, t=t, params=params, epsilon=epsilon
+    )
+    return lqr(A, B, Q, R, xbar=x_bar, ubar=u_bar)
 
 
 if __name__ == "__main__":

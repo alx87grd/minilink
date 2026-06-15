@@ -47,7 +47,7 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 DESIGN.md §4 Parameters and `examples/scripts/identification/demo_params_gradient.py`); diagram validation;
 top-level `minilink` exports; NLP hardening.
 
-**P2** — ~~`analysis/` seed (linearization → `LTISystem`)~~ done (also ctrb/obsv,
+**P2** — ~~`analysis/` seed (linearization → matrices/`LTISystem`)~~ done (also ctrb/obsv,
 equilibria, modal); frequency still pending. ~~`control/lqr.py` (design fn +
 state-feedback block)~~ done. ~~blocks round-out (Sum, Gain, Saturation; PID in
 `control/linear.py`)~~ done (routing, nonlinear, filters, `TrajectorySource`,
@@ -71,7 +71,7 @@ one catalog plant, e.g. pendulum) before calling `graphical/` TRL ≥ 4.
 Pre-decided homes (bands and placement rules in [DESIGN.md §3](DESIGN.md)),
 in rough build order:
 
-1. **`analysis/`** — linearization (→ `LTISystem`), ctrb/obsv, equilibria, and
+1. **`analysis/`** — linearization (→ matrices/`LTISystem`), ctrb/obsv, equilibria, and
    modal (eigenmodes + animation) done; still pending: frequency (Bode, pole-zero).
    Phase-plane math migrates here from `graphical/` when touched.
 2. **`control/`** — `lqr.py`, `linear.py`, and `control/pid.py`

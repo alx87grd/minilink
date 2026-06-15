@@ -133,9 +133,10 @@ A = jax.jacfwd(lambda x: evaluator.f(x, u, 0.0))(x)   # exact linearization
 ### Analyze and design
 
 Characterize a plant and design a controller from the same `System`. `analysis`
-verbs return data or an `LTISystem`; `control` design factories return ready-to-wire
-blocks. ``modal_analysis`` returns open-loop poles and mode shapes; the plant
-facade ``modal_analysis(..., mode=...)`` can also animate modes:
+verbs return raw matrices, data, or an `LTISystem`; `control` design factories
+return ready-to-wire blocks. ``modal_analysis`` returns open-loop poles and
+mode shapes; the plant facade ``modal_analysis(..., mode=...)`` can also
+animate modes:
 
 ```python
 from minilink.analysis.modal import modal_analysis
@@ -150,12 +151,13 @@ plant.modal_analysis(x_bar=[0.0, 0.0], mode="all")  # every mode
 ```python
 import numpy as np
 
-from minilink.analysis.linearize import linearize
+from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.control.lqr import lqr
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
 
 plant = InvertedPendulum()
+A, B, C, D = linearize_matrices(plant, x_bar=[0.0, 0.0])  # raw arrays
 lti = linearize(plant, x_bar=[0.0, 0.0])             # → LTISystem at upright
 controller = lqr(lti.A(), lti.B(), Q=np.diag([10.0, 1.0]), R=[[1.0]])
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.analysis.linearize import linearize
+from minilink.analysis.linearize import linearize_matrices
 from minilink.core.trajectory import Trajectory
 
 
@@ -13,8 +13,7 @@ def modal_analysis(
     *,
     t=0.0,
     params=None,
-    linearization="fd",
-    compile_backend="jax",
+    method="fd",
     epsilon=1e-6,
 ):
     """
@@ -28,8 +27,9 @@ def modal_analysis(
         Operating-point state.
     u_bar : array of shape (m,), optional
         Operating-point input. Defaults to port nominals.
-    linearization : str
-        ``'fd'`` or ``'jax'`` (passed to :func:`~minilink.analysis.linearize.linearize`).
+    method : {"fd", "jax"}
+        Linearization method passed to
+        :func:`~minilink.analysis.linearize.linearize_matrices`.
 
     Returns
     -------
@@ -43,17 +43,16 @@ def modal_analysis(
         u_bar = sys.get_u_from_input_ports()
     u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
 
-    lti = linearize(
+    A, _, _, _ = linearize_matrices(
         sys,
         x_bar,
         u_bar,
         t=t,
         params=params,
         epsilon=epsilon,
-        method=linearization,
-        compile_backend=compile_backend,
+        method=method,
     )
-    return np.linalg.eig(lti.A())
+    return np.linalg.eig(A)
 
 
 def animate_modal(
@@ -64,8 +63,7 @@ def animate_modal(
     *,
     t=0.0,
     params=None,
-    linearization="fd",
-    compile_backend="jax",
+    method="fd",
     epsilon=1e-6,
     amplitude=1.0,
     tf=None,
@@ -111,8 +109,7 @@ def animate_modal(
         u_bar,
         t=t,
         params=params,
-        linearization=linearization,
-        compile_backend=compile_backend,
+        method=method,
         epsilon=epsilon,
     )
 

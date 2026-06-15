@@ -5,7 +5,7 @@ or plots — never user-facing system classes (factories are fine).
 
 Implemented modules:
 
-- ``linearize.py`` — equilibrium linearization → ``LTISystem``
+- ``linearize.py`` — equilibrium linearization → matrices or ``LTISystem``
 - ``structural.py`` — controllability / observability
 - ``equilibria.py`` — trim points and root-finding on ``f``
 - ``modal.py`` — ``modal_analysis`` (poles, modes) and ``animate_modal``

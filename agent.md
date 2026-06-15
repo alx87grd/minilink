@@ -43,26 +43,34 @@ dynamics textbook. These rules keep it that way as the library grows.
 3. **Module section order**: primary contract class → subclasses/variants →
    public functions → private helpers at the bottom, separated by short
    section banners (`# Public API`, `# Internal machinery`).
-4. **Bare signatures in equation paths**: `def f(self, x, u, t=0, params=None):`
+4. **Selector-orchestrator split for math tools**: when a public tool combines
+   user options with core equations, keep the public function readable as:
+   choose method/options, get selected `f(x, u)` / `h(x, u)` callables, then
+   write the mathematical computation in place. Put port selection, backend
+   fallback, validation, and other ceremony in one or two small selector
+   helpers below the core math. For example, linearization should read like
+   `method = selectmethod(...)`; `f, h = selectports(...)`; then `A`, `B`,
+   `C`, `D` are computed directly from textbook Jacobian relations.
+5. **Bare signatures in equation paths**: `def f(self, x, u, t=0, params=None):`
    — no type annotations in `f`/`h`/port computes; shapes and types live in
    the docstring. Full type hints belong on tools, orchestrators, and
    structural APIs.
-5. **The `xp` idiom**: `xp = array_module(x)` right after params unpacking is
+6. **The `xp` idiom**: `xp = array_module(x)` right after params unpacking is
    *the* hybrid NumPy/JAX pattern — one line, always the same shape, and the
    entire price of JAX support in basic blocks.
-6. **Derived, not cached**: quantities computable from owned state are
+7. **Derived, not cached**: quantities computable from owned state are
    read-only properties (`System.m`, `System.p`), never cached attributes
    guarded by `recompute_*()` call discipline — no staleness class of bugs.
-7. **No shadow state**: attributes are initialized in `__init__`, never via
+8. **No shadow state**: attributes are initialized in `__init__`, never via
    `hasattr(...)`-or-create at use sites.
-8. **Libraries are silent**: no `print` outside explicit `verbose=` flags,
+9. **Libraries are silent**: no `print` outside explicit `verbose=` flags,
    default quiet. Delete debug scaffolding rather than gating it.
-9. **Pre-1.0 no-alias rule**: no compatibility aliases or shims inside the
+10. **Pre-1.0 no-alias rule**: no compatibility aliases or shims inside the
    library; rename cleanly and fix call sites in the same change.
-10. **Backend imports come from `core/backends.py`**: backend vocabulary and
+11. **Backend imports come from `core/backends.py`**: backend vocabulary and
     the `array_module` / `require_jax_numpy` helpers live there; system
     libraries never import from `core/compile/`.
-11. **`__main__` hello-worlds**: core modules may end with a ~10-line runnable
+12. **`__main__` hello-worlds**: core modules may end with a ~10-line runnable
     example (`python -m minilink.core.system`); anything bigger belongs in
     `examples/`.
 
@@ -77,6 +85,10 @@ dynamics textbook. These rules keep it that way as the library grows.
 - Change only what the task requires; every diff line should earn its place.
 - Prefer explicit, readable code over clever Python when the data flow is
   mathematical; use named temporaries in equation paths.
+- Keep math-tool helper counts low. If option resolution needs a lot of Python,
+  put it behind a selector helper that returns clean mathematical callables or
+  arrays; do not scatter one-off helpers through the file or let fallback logic
+  interrupt the equation block.
 - **Avoid single-use private methods.** Do not split a constructor or equation
   into `self._helper()` steps that run only once (e.g. `_set_metadata`,
   `_abcd`); inline them at the call site. Keep a helper only when it is reused,

@@ -45,9 +45,9 @@ are preserved; its legacy interfaces (`ContinuousDynamicSystem`, `StaticControll
   no tool imports.
 
 ### analysis/
-- **linearize.py** — `linearize(sys, x_bar, u_bar, t, params, epsilon) -> LTISystem`
-  via central finite differences (backend-agnostic; pyro read `sys.xbar/ubar/tbar`,
-  now explicit args). Carries `Delta`-prefixed state labels.
+- **linearize.py** — `linearize_matrices(sys, x_bar, u_bar, ...) -> A,B,C,D`
+  is the base API; `linearize(...) -> LTISystem` is the wrapper. Supports FD
+  and JAX-preferred linearization with warning-backed FD fallback.
 - **structural.py** — `controllability(A,B)`, `observability(A,C)` → `StructuralResult`
   (Kalman matrix, rank, full-rank verdict).
 - **equilibria.py** — `find_equilibrium(sys, x_guess, u, t, params)` via
@@ -76,8 +76,8 @@ is the end-to-end demo.
 - **`Switch`** routing block — selection semantics (by control signal / by index /
   by time) undecided.
 - **PID anti-windup / output saturation** — v1 is plain PID.
-- **JAX-exact linearization** — available via ``linearize(..., method='jax')`` and
-  ``modal_analysis(..., linearization='jax')``.
+- **JAX-exact linearization** — available via ``linearize_matrices(..., method='jax')``,
+  ``linearize(..., method='jax')``, and ``modal_analysis(..., method='jax')``.
 - **Tier B tools** (see ROADMAP §5): `analysis/frequency.py`,
   `control/computed_torque.py`, `sliding_mode.py`, `robotic.py`,
   `estimation/{luenberger,kalman}.py`, `planning/trajectory_generation/`,
