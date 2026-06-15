@@ -9,10 +9,11 @@ Implemented modules:
 - ``structural.py`` — controllability / observability
 - ``equilibria.py`` — trim points and root-finding on ``f``
 - ``modal.py`` — ``modal_analysis`` (poles, modes) and ``animate_modal``
+- ``frequency.py`` — selected-channel Bode response and plots
 
 Planned modules (see ROADMAP.md §5):
 
-- ``frequency.py`` — Bode, Nyquist, gain/phase margins, pole-zero
+- ``frequency.py`` — Nyquist, gain/phase margins, pole-zero
 - ``time_response.py`` — step/impulse sugar over the simulator
 
 Placement rule: if it *characterizes* an existing system, it belongs here;

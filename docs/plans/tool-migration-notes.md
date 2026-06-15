@@ -52,6 +52,9 @@ are preserved; its legacy interfaces (`ContinuousDynamicSystem`, `StaticControll
   (Kalman matrix, rank, full-rank verdict).
 - **equilibria.py** — `find_equilibrium(sys, x_guess, u, t, params)` via
   `scipy.optimize.fsolve` on `f`.
+- **frequency.py** — selected-channel Bode response and plot from
+  `linearize_matrices(...)`, with boundary input port/component and boundary or
+  internal output port/component selection.
 
 ### docs
 - Fixed stale `docs/api/*.rst` module paths (`minilink.compile.*` →
@@ -78,7 +81,7 @@ is the end-to-end demo.
 - **PID anti-windup / output saturation** — v1 is plain PID.
 - **JAX-exact linearization** — available via ``linearize_matrices(..., method='jax')``,
   ``linearize(..., method='jax')``, and ``modal_analysis(..., method='jax')``.
-- **Tier B tools** (see ROADMAP §5): `analysis/frequency.py`,
+- **Tier B tools** (see ROADMAP §5): frequency pole-zero / Nyquist / margins,
   `control/computed_torque.py`, `sliding_mode.py`, `robotic.py`,
   `estimation/{luenberger,kalman}.py`, `planning/trajectory_generation/`,
   `interfaces/gymnasium.py`, catalog `Pacejka` tire, stateful nonlinear blocks.

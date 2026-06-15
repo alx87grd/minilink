@@ -151,6 +151,7 @@ plant.modal_analysis(x_bar=[0.0, 0.0], mode="all")  # every mode
 ```python
 import numpy as np
 
+from minilink.analysis.frequency import bode
 from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.control.lqr import lqr
 from minilink.core.diagram import DiagramSystem
@@ -159,6 +160,8 @@ from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
 plant = InvertedPendulum()
 A, B, C, D = linearize_matrices(plant, x_bar=[0.0, 0.0])  # raw arrays
 lti = linearize(plant, x_bar=[0.0, 0.0])             # → LTISystem at upright
+w, mag, phase = bode(plant, x_bar=[0.0, 0.0], input_port="u", output_index=0)
+plant.plot_bode(x_bar=[0.0, 0.0], input_port="u", output_index=0)
 controller = lqr(lti.A(), lti.B(), Q=np.diag([10.0, 1.0]), R=[[1.0]])
 
 diagram = DiagramSystem()                             # full-state feedback

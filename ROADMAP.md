@@ -17,7 +17,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Dynamics catalog | 6 | Pyro models ported, QA'd term-by-term against pyro, and covered by tests (see `docs/plans/catalog-migration-notes.md`); `DynamicBicycle` params now thread fully. | Review naming/details per module toward TRL 7. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Moved out of quarantine by maintainer decision (June 2026); math not yet QA-validated. | Add validation tests (energy, analytic contact cases) toward TRL 2. |
-| Analysis | 5 | `linearize` (→ `LTISystem`, FD + JAX), `structural`, `equilibria`, `modal` (eigenmodes + animation); demos in `examples/scripts/analysis/`. | Add `frequency.py` (Bode/pole-zero). |
+| Analysis | 5 | `linearize` (→ `LTISystem`, FD + JAX), `structural`, `equilibria`, `modal` (eigenmodes + animation), selected-channel Bode; demos in `examples/scripts/analysis/`. | Extend `frequency.py` with pole-zero, Nyquist, and margins. |
 | Control | 5 | `control/linear.py` (`ProportionalController` (SISO+MIMO)/`PDController`/`PIDController`/`LinearStateFeedbackController`), `control/lqr.py` (`lqr_gain`/`lqr`/`lqr_at_operating_point`), and `control/pid.py` (`FilteredPIDController` with anti-windup) integrated and tested. | Port computed-torque, sliding-mode, robotic controllers. |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
@@ -48,7 +48,7 @@ DESIGN.md §4 Parameters and `examples/scripts/identification/demo_params_gradie
 top-level `minilink` exports; NLP hardening.
 
 **P2** — ~~`analysis/` seed (linearization → matrices/`LTISystem`)~~ done (also ctrb/obsv,
-equilibria, modal); frequency still pending. ~~`control/lqr.py` (design fn +
+equilibria, modal, selected-channel Bode); remaining frequency tools pending. ~~`control/lqr.py` (design fn +
 state-feedback block)~~ done. ~~blocks round-out (Sum, Gain, Saturation; PID in
 `control/linear.py`)~~ done (routing, nonlinear, filters, `TrajectorySource`,
 PID, MIMO proportional). Remaining: nested-diagram ergonomics; forced-input
@@ -71,8 +71,9 @@ one catalog plant, e.g. pendulum) before calling `graphical/` TRL ≥ 4.
 Pre-decided homes (bands and placement rules in [DESIGN.md §3](DESIGN.md)),
 in rough build order:
 
-1. **`analysis/`** — linearization (→ matrices/`LTISystem`), ctrb/obsv, equilibria, and
-   modal (eigenmodes + animation) done; still pending: frequency (Bode, pole-zero).
+1. **`analysis/`** — linearization (→ matrices/`LTISystem`), ctrb/obsv, equilibria,
+   modal (eigenmodes + animation), and selected-channel Bode done; still pending:
+   pole-zero, Nyquist, and margins.
    Phase-plane math migrates here from `graphical/` when touched.
 2. **`control/`** — `lqr.py`, `linear.py`, and `control/pid.py`
    (`FilteredPIDController`) done; still pending: `computed_torque.py`,

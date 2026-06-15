@@ -241,6 +241,54 @@ class SystemFacades:
             **kwargs,
         )
 
+    def plot_bode(
+        self,
+        x_bar=None,
+        u_bar=None,
+        *,
+        input_port=None,
+        input_index=0,
+        output_port=None,
+        output_index=0,
+        w=None,
+        n=200,
+        method="fd",
+        t=0.0,
+        params=None,
+        epsilon=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot a selected SISO Bode response.
+
+        ``input_port`` selects a boundary input port and ``input_index`` selects
+        one component inside it. ``output_port`` selects a boundary output port,
+        or an internal diagram output ``(sys_id, port_id)``; ``output_index``
+        selects one component inside that output.
+        """
+        from minilink.analysis.frequency import plot_bode
+
+        if x_bar is None:
+            x_bar = self.x0
+        return plot_bode(
+            self,
+            x_bar,
+            u_bar,
+            input_port=input_port,
+            input_index=input_index,
+            output_port=output_port,
+            output_index=output_index,
+            w=w,
+            n=n,
+            method=method,
+            t=t,
+            params=params,
+            epsilon=epsilon,
+            backend=backend,
+            show=show,
+        )
+
     def get_diagram(self):
         """
         Convenience shortcut returning a renderable diagram representation.
