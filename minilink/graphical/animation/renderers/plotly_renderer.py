@@ -361,7 +361,15 @@ class PlotlyRenderer(AnimationRenderer):
         self.is_3d = is_3d
         return self._build_animation_figure(primitives, frames, schedule)
 
-    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+    def play_native(
+        self,
+        primitives,
+        frames,
+        schedule,
+        *,
+        is_3d: bool,
+        scene_title: str | None = None,
+    ):
         self.is_3d = is_3d
         fig = self._build_animation_figure(primitives, frames, schedule)
         fig.show(

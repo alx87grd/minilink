@@ -9,3 +9,6 @@ Analysis
 
 .. automodule:: minilink.analysis.equilibria
    :members:
+
+.. automodule:: minilink.analysis.modal
+   :members:

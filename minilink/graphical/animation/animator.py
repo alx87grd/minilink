@@ -113,6 +113,7 @@ class Animator:
         html: bool | None = None,
         renderer="matplotlib",
         native: bool = True,
+        scene_title: str | None = None,
     ):
         """
         Plays back a full simulation trajectory.
@@ -201,7 +202,13 @@ class Animator:
 
         if native:
             try:
-                return backend.play_native(primitives, frames, schedule, is_3d=is_3d)
+                return backend.play_native(
+                    primitives,
+                    frames,
+                    schedule,
+                    is_3d=is_3d,
+                    scene_title=scene_title,
+                )
             except NotImplementedError:
                 warnings.warn(
                     f"native=True is not supported for renderer={renderer!r}; "
@@ -213,7 +220,7 @@ class Animator:
             is_3d=is_3d,
             show=show,
             camera=frames[0]["camera"],
-            title=f"Animation: {self.sys.name}",
+            title=scene_title or f"Animation: {self.sys.name}",
         )
         for frame in frames:
             backend.draw_frame(

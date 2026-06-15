@@ -134,7 +134,18 @@ A = jax.jacfwd(lambda x: evaluator.f(x, u, 0.0))(x)   # exact linearization
 
 Characterize a plant and design a controller from the same `System`. `analysis`
 verbs return data or an `LTISystem`; `control` design factories return ready-to-wire
-blocks:
+blocks. ``modal_analysis`` returns open-loop poles and mode shapes; the plant
+facade ``modal_analysis(..., mode=...)`` can also animate modes:
+
+```python
+from minilink.analysis.modal import modal_analysis
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+plant = Pendulum()
+poles, modes = modal_analysis(plant, x_bar=[0.0, 0.0])
+plant.modal_analysis(x_bar=[0.0, 0.0], mode=0)      # one mode
+plant.modal_analysis(x_bar=[0.0, 0.0], mode="all")  # every mode
+```
 
 ```python
 import numpy as np
@@ -297,7 +308,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters) |
 | `control` | control laws and design factories (`PIDController`, `FilteredPIDController`, `ProportionalController`, `LinearStateFeedbackController`, `lqr`) |
-| `analysis` | characterization verbs (`linearize` → `LTISystem`, controllability/observability, equilibria) |
+| `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |
 | `graphical` | plots, diagrams, animation (`Animator` + renderers) |
@@ -344,7 +355,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Diagrams | `examples/scripts/diagrams/` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
-| Analysis (linearize, trim, ctrb/obsv) | `examples/scripts/analysis/` |
+| Analysis (linearize, trim, ctrb/obsv, modal) | `examples/scripts/analysis/` |
 | State-space / LQR | `examples/scripts/statespace/` |
 | Identification (param gradients) | `examples/scripts/identification/` |
 | Plotting | `examples/scripts/plots/` |

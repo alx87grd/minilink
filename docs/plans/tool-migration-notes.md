@@ -76,9 +76,9 @@ is the end-to-end demo.
 - **`Switch`** routing block — selection semantics (by control signal / by index /
   by time) undecided.
 - **PID anti-windup / output saturation** — v1 is plain PID.
-- **JAX-exact linearization** — `linearize` uses finite differences; a `jax.jacfwd`
-  path on the compiled evaluator is a future enhancement.
-- **Tier B tools** (see ROADMAP §5): `analysis/frequency.py`, `analysis/modal.py`,
+- **JAX-exact linearization** — available via ``linearize(..., method='jax')`` and
+  ``modal_analysis(..., linearization='jax')``.
+- **Tier B tools** (see ROADMAP §5): `analysis/frequency.py`,
   `control/computed_torque.py`, `sliding_mode.py`, `robotic.py`,
   `estimation/{luenberger,kalman}.py`, `planning/trajectory_generation/`,
   `interfaces/gymnasium.py`, catalog `Pacejka` tire, stateful nonlinear blocks.

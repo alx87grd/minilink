@@ -4,7 +4,8 @@ System convenience facades.
 This module defines :class:`SystemFacades`, the mixin that gives every
 :class:`~minilink.core.system.System` its user-shortcut methods
 (:meth:`~SystemFacades.compile`, :meth:`~SystemFacades.compute_trajectory`,
-:meth:`~SystemFacades.plot_trajectory`, :meth:`~SystemFacades.animate`, ...).
+:meth:`~SystemFacades.plot_trajectory`, :meth:`~SystemFacades.animate`,
+:meth:`~SystemFacades.modal_analysis`, ...).
 
 The mixin is shortcuts only: the mathematical, structural, and visualization
 contracts stay in :mod:`minilink.core.system`. Heavy dependencies
@@ -294,6 +295,8 @@ class SystemFacades:
         html: bool | None = None,
         renderer="matplotlib",
         native: bool = True,
+        scene_title: str | None = None,
+        show: bool = True,
     ):
         """
         Convenience shortcut to animate a trajectory of this system.
@@ -323,7 +326,7 @@ class SystemFacades:
         resolved_html = prefers_inline_animation() if html is None else html
 
         animator = Animator(self)
-        show_plot = not resolved_html
+        show_plot = show and not resolved_html
         ani_obj = animator.animate_simulation(
             traj,
             time_factor_video=time_factor_video,
@@ -332,12 +335,77 @@ class SystemFacades:
             show=show_plot,
             renderer=renderer,
             native=native,
+            scene_title=scene_title,
         )
 
         # For html output, return the IPython.display.HTML object and let the
         # notebook auto-display it via the standard last-expression rule.
         # Calling display.display() *and* returning the object renders twice.
         return ani_obj
+
+    def modal_analysis(
+        self,
+        x_bar=None,
+        u_bar=None,
+        *,
+        mode=None,
+        linearization="fd",
+        compile_backend="jax",
+        amplitude=1.0,
+        tf=None,
+        n_steps=2001,
+        time_factor_video=3.0,
+        renderer="matplotlib",
+        is_3d=False,
+        show=True,
+        html=None,
+        native=True,
+        t=0.0,
+        params=None,
+        epsilon=1e-6,
+    ):
+        """
+        Linearize and eigendecompose ``A``.
+
+        Returns ``(poles, modes)``. With ``mode=None``, analyze only.
+        With ``mode=0`` or ``mode='all'``, delegates to
+        :func:`~minilink.analysis.modal.animate_modal`.
+        """
+        from minilink.analysis.modal import animate_modal, modal_analysis
+
+        if x_bar is None:
+            x_bar = self.x0
+        if mode is not None:
+            return animate_modal(
+                self,
+                x_bar,
+                mode,
+                u_bar,
+                t=t,
+                params=params,
+                linearization=linearization,
+                compile_backend=compile_backend,
+                epsilon=epsilon,
+                amplitude=amplitude,
+                tf=tf,
+                n_steps=n_steps,
+                time_factor_video=time_factor_video,
+                renderer=renderer,
+                is_3d=is_3d,
+                show=show,
+                html=html,
+                native=native,
+            )
+        return modal_analysis(
+            self,
+            x_bar,
+            u_bar,
+            t=t,
+            params=params,
+            linearization=linearization,
+            compile_backend=compile_backend,
+            epsilon=epsilon,
+        )
 
     def game(
         self,

@@ -5,10 +5,11 @@
     dΔx = A Δx + B Δu
     Δy  = C Δx + D Δu
 
-about an operating point ``(x_bar, u_bar)``, where ``Δx = x - x_bar`` etc. The
-Jacobians are estimated with central finite differences, so the system may use
-any backend. The result is an :class:`~minilink.dynamics.abstraction.state_space.LTISystem`
-ready for design tools (``control.lqr``) and analysis (``analysis.structural``).
+about an operating point ``(x_bar, u_bar)``, where ``Δx = x - x_bar`` etc.
+Jacobians use central finite differences (``method='fd'``) or exact values from
+a compiled evaluator (``method='jax'``). The result is an
+:class:`~minilink.dynamics.abstraction.state_space.LTISystem` ready for design
+tools (``control.lqr``), structural analysis, and ``analysis.modal``.
 """
 
 import numpy as np
@@ -16,7 +17,17 @@ import numpy as np
 from minilink.dynamics.abstraction.state_space import LTISystem
 
 
-def linearize(sys, x_bar, u_bar=None, *, t=0.0, params=None, epsilon=1e-6):
+def linearize(
+    sys,
+    x_bar,
+    u_bar=None,
+    *,
+    t=0.0,
+    params=None,
+    epsilon=1e-6,
+    method="fd",
+    compile_backend="jax",
+):
     """Linearize ``sys`` about ``(x_bar, u_bar)`` and return an ``LTISystem``.
 
     Parameters
@@ -29,8 +40,16 @@ def linearize(sys, x_bar, u_bar=None, *, t=0.0, params=None, epsilon=1e-6):
         Operating-point input. Defaults to the system's nominal port values.
     t : float, optional
         Time at which to evaluate the (assumed time-invariant) Jacobians.
+    params : dict, optional
+        Parameter set forwarded to ``f`` / ``h`` when ``method='fd'``.
     epsilon : float, optional
-        Central-difference step.
+        Central-difference step when ``method='fd'``.
+    method : str, optional
+        ``'fd'`` for central finite differences, ``'jax'`` for exact Jacobians
+        from a compiled evaluator.
+    compile_backend : str, optional
+        Backend passed to :meth:`~minilink.core.system.System.compile` when
+        ``method='jax'``.
 
     Returns
     -------
@@ -42,6 +61,22 @@ def linearize(sys, x_bar, u_bar=None, *, t=0.0, params=None, epsilon=1e-6):
         u_bar = sys.get_u_from_input_ports()
     u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
 
+    key = str(method).strip().lower()
+    if key == "fd":
+        A, B, C, D = _linearize_fd(sys, x_bar, u_bar, t=t, params=params, epsilon=epsilon)
+    elif key == "jax":
+        A, B, C, D = _linearize_jax(
+            sys, x_bar, u_bar, t=t, compile_backend=compile_backend
+        )
+    else:
+        raise ValueError(f"linearize method must be 'fd' or 'jax', got {method!r}")
+
+    lti = LTISystem(A, B, C, D, name=f"Linearized {sys.name}")
+    lti.state.labels = [f"Delta {label}" for label in sys.state.labels]
+    return lti
+
+
+def _linearize_fd(sys, x_bar, u_bar, *, t, params, epsilon):
     def f(x, u):
         return np.asarray(sys.f(x, u, t, params), dtype=float).reshape(-1)
 
@@ -56,13 +91,20 @@ def linearize(sys, x_bar, u_bar=None, *, t=0.0, params=None, epsilon=1e-6):
         C = _jacobian(lambda x: h(x, u_bar), x_bar, epsilon)
         D = _jacobian(lambda u: h(x_bar, u), u_bar, epsilon)
     else:
-        # no output equation: expose the full state, Δy = Δx
         C = np.eye(x_bar.size)
         D = np.zeros((x_bar.size, u_bar.size))
+    return A, B, C, D
 
-    lti = LTISystem(A, B, C, D, name=f"Linearized {sys.name}")
-    lti.state.labels = [f"Delta {label}" for label in sys.state.labels]
-    return lti
+
+def _linearize_jax(sys, x_bar, u_bar, *, t, compile_backend):
+    evaluator = sys.compile(backend=compile_backend)
+    A, B, C, D = evaluator.linearize(x_bar, u_bar, t=t)
+    return (
+        np.asarray(A, dtype=float),
+        np.asarray(B, dtype=float),
+        np.asarray(C, dtype=float),
+        np.asarray(D, dtype=float),
+    )
 
 
 def _jacobian(func, x0, epsilon):

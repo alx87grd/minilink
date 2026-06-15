@@ -502,8 +502,18 @@ class MatplotlibRenderer(AnimationRenderer):
         self.ax = None
         self.canvas = None
 
-    def _build_animation(self, primitives, frames, schedule, *, is_3d: bool = False):
+    def _build_animation(
+        self,
+        primitives,
+        frames,
+        schedule,
+        *,
+        is_3d: bool = False,
+        scene_title: str | None = None,
+    ):
         fig, ax = self._create_figure_and_ax(is_3d=is_3d, camera=frames[0]["camera"])
+        if scene_title:
+            fig.suptitle(scene_title, fontsize=FONT_SIZE)
         canvas = MatplotlibCanvas(ax, is_3d=is_3d)
 
         def update(frame_idx):
@@ -557,7 +567,15 @@ class MatplotlibRenderer(AnimationRenderer):
         )
         plt.close(fig)
 
-    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+    def play_native(
+        self,
+        primitives,
+        frames,
+        schedule,
+        *,
+        is_3d: bool,
+        scene_title: str | None = None,
+    ):
         """
         Drive playback through ``matplotlib.animation.FuncAnimation`` instead
         of a Python frame loop.
@@ -575,7 +593,13 @@ class MatplotlibRenderer(AnimationRenderer):
           loop can drive playback without ``FuncAnimation`` being garbage
           collected.
         """
-        fig, ani = self._build_animation(primitives, frames, schedule, is_3d=is_3d)
+        fig, ani = self._build_animation(
+            primitives,
+            frames,
+            schedule,
+            is_3d=is_3d,
+            scene_title=scene_title,
+        )
         self.fig = fig
         self.ax = fig.axes[0] if fig.axes else None
         self.canvas = None

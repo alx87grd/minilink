@@ -64,7 +64,7 @@ user-facing systems (factories are fine: a future `linearize()` returns an
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, solvers, forcing |
-| `analysis/` | `linearize` (→ `LTISystem`), controllability/observability, equilibria; frequency/modal planned |
+| `analysis/` | `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`; frequency planned |
 | `planning/` | problems, trajopt |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |

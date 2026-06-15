@@ -8,8 +8,8 @@ equations
     y  = h(x, u, t; p)        output
 
 Signal and port metadata live in :mod:`minilink.core.signals`; user shortcut
-methods (``compute_trajectory``, ``plot_*``, ``animate``, ...) live on the
-:class:`~minilink.core.facades.SystemFacades` mixin.
+methods (``compute_trajectory``, ``plot_*``, ``animate``, ``modal_analysis``, ...)
+live on the :class:`~minilink.core.facades.SystemFacades` mixin.
 """
 
 from typing import TYPE_CHECKING

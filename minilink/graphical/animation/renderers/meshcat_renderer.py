@@ -582,7 +582,15 @@ class MeshcatRenderer(AnimationRenderer):
 
         return animation_obj
 
-    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+    def play_native(
+        self,
+        primitives,
+        frames,
+        schedule,
+        *,
+        is_3d: bool,
+        scene_title: str | None = None,
+    ):
         """
         Drive playback through ``meshcat.animation.Animation`` +
         ``Visualizer.set_animation`` instead of a Python frame loop. The browser
