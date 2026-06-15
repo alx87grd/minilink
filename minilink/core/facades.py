@@ -289,6 +289,45 @@ class SystemFacades:
             show=show,
         )
 
+    def plot_pzmap(
+        self,
+        x_bar=None,
+        u_bar=None,
+        *,
+        input_port=None,
+        input_index=0,
+        output_port=None,
+        output_index=0,
+        method="fd",
+        t=0.0,
+        params=None,
+        epsilon=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot poles and zeros for a selected SISO channel.
+        """
+        from minilink.analysis.frequency import plot_pzmap
+
+        if x_bar is None:
+            x_bar = self.x0
+        return plot_pzmap(
+            self,
+            x_bar,
+            u_bar,
+            input_port=input_port,
+            input_index=input_index,
+            output_port=output_port,
+            output_index=output_index,
+            method=method,
+            t=t,
+            params=params,
+            epsilon=epsilon,
+            backend=backend,
+            show=show,
+        )
+
     def get_diagram(self):
         """
         Convenience shortcut returning a renderable diagram representation.

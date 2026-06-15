@@ -131,6 +131,88 @@ def bode(
     return w, magnitude_db, phase_deg
 
 
+def pzmap(
+    sys,
+    x_bar=None,
+    u_bar=None,
+    *,
+    input_port=None,
+    input_index: int = 0,
+    output_port=None,
+    output_index: int = 0,
+    method: str = "fd",
+    t: float = 0.0,
+    params=None,
+    epsilon: float = 1e-6,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Return the selected SISO channel as ``(zeros, poles, gain)``."""
+    # --- operating point ---
+    if x_bar is None:
+        x_bar = sys.x0
+
+    # --- SISO channel: one input port/component, one output port/component ---
+    if input_port is None:
+        if not sys.inputs:
+            raise ValueError("Pole-zero analysis requires at least one input port.")
+        input_port = next(iter(sys.inputs))
+
+    # Linearize about (x_bar, u_bar):
+    #   dDelta x = A Delta x + B Delta u
+    #   Delta y  = C Delta x + D Delta u
+    A, B, C, D = linearize_matrices(
+        sys,
+        x_bar,
+        u_bar,
+        inputs=[input_port],
+        outputs=None if output_port is None else [output_port],
+        method=method,
+        t=t,
+        params=params,
+        epsilon=epsilon,
+    )
+
+    input_index = int(input_index)
+    output_index = int(output_index)
+    if input_index < 0 or input_index >= B.shape[1]:
+        raise ValueError(
+            f"input_index must be in [0, {B.shape[1] - 1}] for port {input_port!r}."
+        )
+    if output_index < 0 or output_index >= C.shape[0]:
+        raise ValueError(
+            f"output_index must be in [0, {C.shape[0] - 1}] for selected output."
+        )
+
+    # Keep matrix shapes: B is (n, 1), C is (1, n), D is (1, 1).
+    B = B[:, [input_index]]
+    C = C[[output_index], :]
+    D = D[[output_index], [input_index]]
+
+    if A.size:
+        from scipy import signal
+
+        num, den = signal.ss2tf(A, B, C, D)
+        num = np.asarray(num[0], dtype=float)
+        den = np.asarray(den, dtype=float)
+
+        tol = np.finfo(float).eps * max(num.size, den.size)
+        tol *= max(np.max(np.abs(num)), np.max(np.abs(den)), 1.0)
+        while num.size > 1 and abs(num[0]) <= tol:
+            num = num[1:]
+
+        if np.all(np.abs(num) <= tol):
+            zeros = np.array([], dtype=complex)
+            poles = np.roots(den)
+            gain = 0.0
+        else:
+            zeros, poles, gain = signal.tf2zpk(num, den)
+    else:
+        zeros = np.array([], dtype=complex)
+        poles = np.array([], dtype=complex)
+        gain = D[0, 0]
+
+    return np.asarray(zeros), np.asarray(poles), float(np.real_if_close(gain))
+
+
 def plot_bode(
     sys,
     x_bar=None,
@@ -230,4 +312,111 @@ def plot_bode(
         payload=(fig, axes),
         figure=fig,
         axes=axes,
+    )
+
+
+def plot_pzmap(
+    sys,
+    x_bar=None,
+    u_bar=None,
+    *,
+    input_port=None,
+    input_index: int = 0,
+    output_port=None,
+    output_index: int = 0,
+    method: str = "fd",
+    t: float = 0.0,
+    params=None,
+    epsilon: float = 1e-6,
+    backend="matplotlib",
+    show: bool = True,
+) -> PlotResult:
+    """Plot poles and zeros for the selected SISO channel."""
+    if not isinstance(backend, str) or backend.strip().lower() != "matplotlib":
+        raise ValueError("Pole-zero plotting currently supports backend='matplotlib'.")
+
+    zeros, poles, gain = pzmap(
+        sys,
+        x_bar,
+        u_bar,
+        input_port=input_port,
+        input_index=input_index,
+        output_port=output_port,
+        output_index=output_index,
+        method=method,
+        t=t,
+        params=params,
+        epsilon=epsilon,
+    )
+
+    import matplotlib
+    import matplotlib.pyplot as plt
+
+    from minilink.graphical.common.environment import is_blocking_needed
+    from minilink.graphical.common.matplotlib_style import (
+        DPI_FIGURE,
+        FIGSIZE_BASE,
+        FONT_SIZE,
+        style_trajectory_subplot,
+    )
+
+    matplotlib.rcParams["pdf.fonttype"] = 42
+    matplotlib.rcParams["ps.fonttype"] = 42
+
+    fig, ax = plt.subplots(figsize=FIGSIZE_BASE, frameon=True, dpi=DPI_FIGURE)
+    manager = getattr(fig.canvas, "manager", None)
+    set_window_title = getattr(manager, "set_window_title", None)
+    if callable(set_window_title):
+        set_window_title(f"Pole-zero map of {sys.name}")
+
+    output_name = output_port
+    if output_name is None:
+        if "y" in sys.outputs:
+            output_name = "y"
+        elif sys.outputs:
+            output_name = next(iter(sys.outputs))
+        else:
+            output_name = "x"
+    if isinstance(output_name, tuple):
+        output_name = f"{output_name[0]}:{output_name[1]}"
+    input_name = input_port
+    if input_name is None:
+        input_name = next(iter(sys.inputs), "input")
+    channel = f"{output_name}[{output_index}] / {input_name}[{input_index}]"
+
+    if zeros.size:
+        ax.plot(
+            zeros.real,
+            zeros.imag,
+            marker="o",
+            linestyle="none",
+            fillstyle="none",
+            label="zeros",
+        )
+    if poles.size:
+        ax.plot(
+            poles.real,
+            poles.imag,
+            marker="x",
+            linestyle="none",
+            label="poles",
+        )
+    ax.axhline(0.0, color="black", linewidth=0.8, alpha=0.4)
+    ax.axvline(0.0, color="black", linewidth=0.8, alpha=0.4)
+    ax.set_xlabel("Real", fontsize=FONT_SIZE)
+    ax.set_ylabel("Imaginary", fontsize=FONT_SIZE)
+    ax.set_title(f"{channel}\ngain = {gain:.4g}", fontsize=FONT_SIZE)
+    style_trajectory_subplot(ax)
+    if zeros.size or poles.size:
+        ax.legend(loc="best")
+    fig.tight_layout()
+
+    if show and plt.get_backend().lower() != "agg":
+        plt.show(block=is_blocking_needed())
+
+    return PlotResult(
+        backend="matplotlib",
+        payload=(fig, ax),
+        figure=fig,
+        axes=ax,
     )
