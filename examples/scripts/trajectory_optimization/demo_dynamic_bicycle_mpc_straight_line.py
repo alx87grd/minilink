@@ -17,6 +17,7 @@ Run from repo root::
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -50,6 +51,11 @@ ANIMATE_MPC = False
 ANIMATE_MPC_SAVE = None
 ANIMATE_MPC_SHOW = True
 ANIMATE_TIME_FACTOR = 2.5
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = _SCRIPT_DIR / "outputs" / "mpc_straight_line"
+PLOT_SAVE = OUTPUT_DIR / "tracking_signals.png"
+ANIMATION_SAVE = OUTPUT_DIR / "mpc_plan_overlay.gif"
 
 MPC_DT = 1.0 / MPC_HZ
 SIM_DT = 1.0 / SIM_HZ
@@ -319,9 +325,11 @@ def animate_mpc_plans(
         output_path = save_path
         if not output_path.lower().endswith(".gif"):
             output_path = f"{output_path}.gif"
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         writer = animation.PillowWriter(fps=schedule.target_fps)
         ani.save(output_path, writer=writer, dpi=120)
         print(f"  animation: {output_path}")
+        _export_gif_preview_frames(Path(output_path))
 
     if show:
         plt.show()
@@ -329,6 +337,22 @@ def animate_mpc_plans(
         plt.close(fig)
 
     return output_path
+
+
+def _export_gif_preview_frames(gif_path: Path) -> None:
+    """Save a few PNG stills from a GIF for PR / docs preview."""
+    from PIL import Image
+
+    gif = Image.open(gif_path)
+    n_frames = int(getattr(gif, "n_frames", 1))
+    preview_indices = tuple(
+        sorted({0, n_frames // 5, n_frames // 2, 4 * n_frames // 5, n_frames - 1})
+    )
+    for idx in preview_indices:
+        gif.seek(idx)
+        frame_path = gif_path.with_name(f"{gif_path.stem}_frame_{idx:03d}.png")
+        gif.save(frame_path)
+        print(f"  frame: {frame_path}")
 
 
 def tracking_metrics(traj: Trajectory) -> dict[str, float]:
@@ -402,8 +426,9 @@ def main() -> None:
         axes[3].grid(True, alpha=0.3)
         fig.suptitle("MPC closed loop — straight-line tracking")
         plt.tight_layout()
-        plt.savefig("/tmp/mpc_straight_line.png", dpi=120)
-        print("  plot: /tmp/mpc_straight_line.png")
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        plt.savefig(PLOT_SAVE, dpi=120)
+        print(f"  plot: {PLOT_SAVE}")
 
     if ANIMATE_MPC or ANIMATE_MPC_SAVE is not None:
         animate_mpc_plans(
