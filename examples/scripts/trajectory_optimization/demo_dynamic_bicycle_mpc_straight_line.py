@@ -235,13 +235,14 @@ def animate_mpc_plans(
     traj = result.executed
     schedule = trajectory_frame_schedule(traj, time_factor_video)
 
-    fig, ax = plt.subplots(figsize=(10, 4.5))
+    fig, ax = plt.subplots(figsize=(10, 7))
     x_pad = 8.0
-    y_pad = 4.0
+    y_abs_max = float(np.max(np.abs(traj.x[1, :])))
+    y_pad = max(2.0, 1.25 * y_abs_max + 0.25)
     x0, x1 = float(traj.x[0, 0]), float(traj.x[0, -1])
     ax.set_xlim(x0 - x_pad, x1 + x_pad)
     ax.set_ylim(-y_pad, y_pad)
-    ax.set_aspect("equal", adjustable="box")
+    ax.set_aspect("auto")
     ax.grid(True, alpha=0.3)
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
@@ -318,7 +319,7 @@ def animate_mpc_plans(
         interval=schedule.interval_ms,
         blit=True,
     )
-    fig.suptitle("MPC closed loop — planned trajectory overlay")
+    fig.suptitle("MPC closed loop — planned trajectory overlay (y scaled for visibility)")
 
     output_path: str | None = None
     if save_path is not None:
