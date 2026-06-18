@@ -14,8 +14,8 @@ Two conventions extend the plain rigid transform:
   unit-sized primitives (:class:`Arrow`, :class:`CustomLine`) to a world size
   (:func:`scale_pose2d_matrix`, :func:`arrow_transform`).
 - **Amplitude channel**: the normally-unused ``T[3, 3]`` slot carries a scalar
-  side-channel (torque sweep angle, camera view scale); renderers read and
-  reset it with :func:`extract_amplitude`.
+  side-channel (torque sweep angle, playback time, camera view scale); renderers
+  read and reset it with :func:`extract_amplitude`.
 
 This module is NumPy-only and safe to import from core kinematic hooks: it
 never pulls in matplotlib or other rendering libraries.
@@ -356,6 +356,94 @@ class TorqueArrow(GraphicPrimitive):
         return np.vstack([arc, np.array([barb1, tip, barb2])])
 
 
+class HorizonPolyline(GraphicPrimitive):
+    """World-frame polyline of the active receding-horizon plan at time *t*.
+
+    ``plans`` is a sequence of ``(t_solve, trajectory)`` pairs with world-frame
+    ``trajectory.x`` and ``trajectory.t``. At playback time *t* (carried in
+    ``T[3, 3]`` via :func:`time_channel_matrix`), the primitive draws the latest
+    plan with ``t_solve <= t`` over samples with ``trajectory.t >= t``.
+
+    Geometry is rebuilt each frame through :meth:`compute_pts`, like
+    :class:`TorqueArrow`.
+    """
+
+    def __init__(
+        self,
+        plans,
+        *,
+        color="tab:orange",
+        linewidth=2,
+        style="--",
+    ):
+        super().__init__(color, linewidth, style)
+        self.plans = list(plans)
+
+    def compute_pts(self, t_now):
+        """Return Nx3 world-frame polyline points for the active plan tail."""
+        t_now = float(t_now)
+        active = None
+        for t_solve, plan in self.plans:
+            if t_solve <= t_now + 1e-9:
+                active = plan
+        if active is None:
+            return np.zeros((1, 3))
+        mask = active.t >= t_now - 1e-9
+        if np.count_nonzero(mask) < 2:
+            return np.zeros((1, 3))
+        xy = active.x[:2, mask]
+        return np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
+
+
+class TrajectoryPolyline(GraphicPrimitive):
+    """World-frame XY polyline sampled from a :class:`~minilink.core.trajectory.Trajectory`.
+
+    At playback time *t* (carried in ``T[3, 3]`` via :func:`time_channel_matrix`):
+
+    ``window="prefix"``
+        Samples with ``trajectory.t <= t`` — a growing executed trail.
+    ``window="suffix"``
+        Samples with ``trajectory.t >= t``.
+    ``window="all"``
+        Full trajectory polyline (time-independent geometry).
+
+    Geometry is rebuilt each frame through :meth:`compute_pts`, like
+    :class:`HorizonPolyline`.
+    """
+
+    _WINDOWS = ("prefix", "suffix", "all")
+
+    def __init__(
+        self,
+        trajectory,
+        *,
+        window="prefix",
+        color="tab:blue",
+        linewidth=2,
+        style="-",
+    ):
+        super().__init__(color, linewidth, style)
+        self.trajectory = trajectory
+        if window not in self._WINDOWS:
+            raise ValueError(f"window must be one of {self._WINDOWS}, got {window!r}")
+        self.window = window
+
+    def compute_pts(self, t_now):
+        """Return Nx3 world-frame polyline points for the selected time window."""
+        t_now = float(t_now)
+        traj = self.trajectory
+        if self.window == "all":
+            mask = np.ones(traj.n_samples, dtype=bool)
+        elif self.window == "prefix":
+            mask = traj.t <= t_now + 1e-9
+        else:
+            mask = traj.t >= t_now - 1e-9
+        if np.count_nonzero(mask) < 2:
+            return np.zeros((1, 3))
+        xy = traj.x[:2, mask]
+        return np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
+
+
 # Transformation Matrix Helpers
 
 
@@ -521,6 +609,13 @@ def world_to_camera(camera):
     W[:3, :3] = R.T
     W[:3, 3] = -R.T @ target
     return W
+
+
+def time_channel_matrix(t=0.0):
+    """Pass scalar playback time *t* through the ``T[3, 3]`` amplitude channel."""
+    T = np.eye(4)
+    T[3, 3] = float(t)
+    return T
 
 
 def torque_pose2d_matrix(x=0.0, y=0.0, start_angle=0.0, sweep=0.0):

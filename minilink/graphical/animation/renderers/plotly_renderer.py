@@ -17,7 +17,9 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
+    HorizonPolyline,
     TorqueArrow,
+    TrajectoryPolyline,
     extract_amplitude,
     world_to_camera,
 )
@@ -635,9 +637,9 @@ class PlotlyRenderer(AnimationRenderer):
                 is_3d=self.is_3d,
             )
 
-        if isinstance(primitive, TorqueArrow):
-            sweep, T_rigid = extract_amplitude(T)
-            pts = _transform_points(primitive.compute_pts(sweep), T_rigid)
+        if isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
+            channel, T_rigid = extract_amplitude(T)
+            pts = _transform_points(primitive.compute_pts(channel), T_rigid)
             return _line_trace(
                 go,
                 x=pts[:, 0],

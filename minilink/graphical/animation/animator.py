@@ -141,8 +141,9 @@ class Animator:
         Notes
         -----
         Meshcat native animation only keyframes rigid pose (position+quaternion).
-        Primitives whose geometry changes every frame (``TorqueArrow``) are frozen
-        at ``t=0`` in the native path.
+        Primitives whose geometry changes every frame (``TorqueArrow``,
+        ``HorizonPolyline``, ``TrajectoryPolyline``) are frozen at ``t=0`` in the
+        native path.
 
         Plotly does not support the legacy per-frame Python loop
         (``native=False`` with ``html=False``): use ``native=True`` or

@@ -19,7 +19,9 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
+    HorizonPolyline,
     TorqueArrow,
+    TrajectoryPolyline,
     extract_amplitude,
     world_to_camera,
 )
@@ -166,30 +168,40 @@ class MatplotlibCanvas:
                 )
             self.drawn_objects.append(obj)
 
-        elif isinstance(primitive, TorqueArrow):
-            sweep, T_rigid = extract_amplitude(transform_matrix)
-            local_pts = primitive.compute_pts(sweep)
+        elif isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
+            channel, T_rigid = extract_amplitude(transform_matrix)
+            local_pts = primitive.compute_pts(channel)
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
             world_pts = (T_rigid @ local_pts_hom.T).T
 
-            arc_n = local_pts.shape[0] - 3
-            if arc_n >= 2:
-                (arc_obj,) = self.ax.plot(
-                    world_pts[:arc_n, 0],
-                    world_pts[:arc_n, 1],
+            if isinstance(primitive, TorqueArrow):
+                arc_n = local_pts.shape[0] - 3
+                if arc_n >= 2:
+                    (arc_obj,) = self.ax.plot(
+                        world_pts[:arc_n, 0],
+                        world_pts[:arc_n, 1],
+                        color=primitive.color,
+                        linewidth=primitive.linewidth,
+                        linestyle=primitive.style,
+                    )
+                    self.drawn_objects.append(arc_obj)
+                    (head_obj,) = self.ax.plot(
+                        world_pts[arc_n:, 0],
+                        world_pts[arc_n:, 1],
+                        color=primitive.color,
+                        linewidth=primitive.linewidth,
+                        linestyle="-",
+                    )
+                    self.drawn_objects.append(head_obj)
+            elif local_pts.shape[0] >= 2:
+                (obj,) = self.ax.plot(
+                    world_pts[:, 0],
+                    world_pts[:, 1],
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
                 )
-                self.drawn_objects.append(arc_obj)
-                (head_obj,) = self.ax.plot(
-                    world_pts[arc_n:, 0],
-                    world_pts[arc_n:, 1],
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle="-",
-                )
-                self.drawn_objects.append(head_obj)
+                self.drawn_objects.append(obj)
 
         elif isinstance(primitive, Circle):
             local_center = np.zeros(3)
