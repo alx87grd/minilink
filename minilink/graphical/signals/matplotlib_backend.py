@@ -76,7 +76,8 @@ class MatplotlibLivePlotHandle(LivePlotHandle):
         if title is not None:
             self.axes[0].set_title(title)
 
-        self.fig.canvas.draw_idle()
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
 
     def close(self) -> None:
         import matplotlib.pyplot as plt
@@ -94,10 +95,7 @@ def _create_figure(
     import matplotlib
     import matplotlib.pyplot as plt
 
-    from minilink.graphical.common.environment import (
-        allow_tall_stacked_figures,
-        is_blocking_needed,
-    )
+    from minilink.graphical.common.environment import allow_tall_stacked_figures
     from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,
         FONT_SIZE,
@@ -151,9 +149,12 @@ def _create_figure(
     axes[-1].set_xlabel("Time [s]", fontsize=FONT_SIZE)
 
     if show and plt.get_backend().lower() != "agg":
-        if block is None:
-            block = is_blocking_needed()
-        plt.show(block=block)
+        if block:
+            plt.show(block=True)
+        else:
+            fig.show()
+            fig.canvas.draw()
+            fig.canvas.flush_events()
         if pause > 0.0:
             plt.pause(pause)
 
