@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
@@ -40,26 +41,30 @@ class Pendulum(MechanicalSystem):
         m = params["m"]
         l = params["l"]
         I = params["I"]
+        xp = array_module(q)
 
         # rotational inertia of the bob about the pivot
-        return np.array([[m * l**2 + I]])
+        return xp.array([[m * l**2 + I]])
 
     def C(self, q, dq, params=None):
-        return np.zeros((1, 1))
+        xp = array_module(q)
+        return xp.zeros((1, 1))
 
     def g(self, q, params=None):
         params = self.params if params is None else params
         m = params["m"]
         l = params["l"]
         gravity = params["gravity"]
+        xp = array_module(q)
 
         # gravity restoring torque
-        return np.array([m * gravity * l * np.sin(q[0])])
+        return xp.array([m * gravity * l * xp.sin(q[0])])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         d = params["d"]
-        return np.array([d * dq[0]])
+        xp = array_module(q)
+        return xp.array([d * dq[0]])
 
     def get_kinematic_geometry(self):
         length = self.params["l"]
@@ -106,7 +111,8 @@ class PendulumWithNoisePort(Pendulum):
         self.outputs["y"].dependencies = ("v",)
 
     def B(self, q, params=None):
-        return np.array([[1.0]])
+        xp = array_module(q)
+        return xp.array([[1.0]])
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
         tau, w = self.get_port_values_from_u(u, "u", "w")
@@ -167,22 +173,26 @@ class TwoIndependentPendulums(MechanicalSystem):
         l = params["l"]
         I = params["I"]
         inertia = m * l**2 + I
-        return np.diag([inertia, inertia])
+        xp = array_module(q)
+        return xp.diag(xp.array([inertia, inertia]))
 
     def C(self, q, dq, params=None):
-        return np.zeros((2, 2))
+        xp = array_module(q)
+        return xp.zeros((2, 2))
 
     def g(self, q, params=None):
         params = self.params if params is None else params
         m = params["m"]
         l = params["l"]
         gravity = params["gravity"]
-        return m * gravity * l * np.sin(q)
+        xp = array_module(q)
+        return m * gravity * l * xp.sin(q)
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         d = params["d"]
-        return d * np.asarray(dq)
+        xp = array_module(q)
+        return d * xp.asarray(dq)
 
     def get_kinematic_geometry(self):
         length = self.params["l"]
