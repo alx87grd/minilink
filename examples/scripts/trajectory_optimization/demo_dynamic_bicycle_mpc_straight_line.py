@@ -226,11 +226,16 @@ class MpcPlanBicycle(DynamicBicycle):
 mpc_anim_sys = MpcPlanBicycle(mpc_plans, traj, x_pad=REF_X_PAD)
 mpc_anim_sys.params = dict(sys_sim.params)
 mpc_anim_sys.camera_scale = CAMERA_SCALE
-Animator(mpc_anim_sys).animate_simulation(
-    traj,
-    time_factor_video=TIME_FACTOR_VIDEO,
-    renderer="matplotlib",
-    save=SAVE_ANIMATION,
-    file_name="mpc_straight_line",
-    scene_title="MPC straight-line — ref + executed + plan",
-)
+
+mpc_anim_sys.traj = traj
+mpc_anim_sys.plot_trajectory(signals=("x", "u"))
+mpc_anim_sys.animate()
+
+# Animator(mpc_anim_sys).animate_simulation(
+#     traj,
+#     time_factor_video=TIME_FACTOR_VIDEO,
+#     renderer="matplotlib",
+#     save=SAVE_ANIMATION,
+#     file_name="mpc_straight_line",
+#     scene_title="MPC dynamic bicycle",
+# )
