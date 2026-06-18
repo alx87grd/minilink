@@ -56,12 +56,6 @@ site/
 *.err
 *.msg
 *.gv
-
-# Committed trajectory-optimization demo artifacts (override blanket image ignores).
-!examples/scripts/trajectory_optimization/outputs/
-!examples/scripts/trajectory_optimization/outputs/**
-
-
 # Claude Code #
 .claude/
 

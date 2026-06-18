@@ -1,7 +1,8 @@
 """Receding-horizon MPC for straight-line tracking on the dynamic bicycle.
 
 MPC at 10 Hz (ZOH on the first planned input); plant rolled out with RK4 at 50 Hz
-between ticks. Optional top-down GIF overlays the active MPC plan.
+between ticks. Set ``SAVE_TRACKING_PNG`` / ``SAVE_GIF`` at the bottom of the scenario
+block to write figures under ``outputs/mpc_straight_line/``.
 
 Run from repo root::
 
@@ -41,8 +42,10 @@ MPC_STEPS = 18
 W_REAR_MAX = 90.0
 DELTA_MAX = 0.55
 SHOW_PLOTS = True
-SAVE_GIF = None
-SAVE_NATIVE_PLOT = True
+SAVE_TRACKING_PNG = None  # e.g. OUTPUT_DIR / "tracking_signals.png"
+SAVE_GIF = None  # e.g. OUTPUT_DIR / "mpc_plan_overlay.gif"
+SAVE_NATIVE_PLOT = False
+SAVE_EXECUTED_TRAJ = None  # e.g. OUTPUT_DIR / "executed_traj.npz"
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "mpc_straight_line"
 MPC_DT = 1.0 / MPC_HZ
@@ -141,9 +144,10 @@ if __name__ == "__main__":
         f"{np.sqrt(np.mean((traj.x[3, tail] - U_TARGET) ** 2)):.4f} m/s"
     )
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if SAVE_TRACKING_PNG is not None or SAVE_GIF is not None or SAVE_EXECUTED_TRAJ is not None:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    if SHOW_PLOTS:
+    if SHOW_PLOTS or SAVE_TRACKING_PNG is not None:
         import matplotlib.pyplot as plt
 
         fig, axes = plt.subplots(4, 1, sharex=True, figsize=(9, 9))
@@ -169,10 +173,13 @@ if __name__ == "__main__":
         axes[3].grid(True, alpha=0.3)
         fig.suptitle("MPC closed loop — straight-line tracking")
         fig.tight_layout()
-        plot_path = OUTPUT_DIR / "tracking_signals.png"
-        fig.savefig(plot_path, dpi=120)
-        plt.close(fig)
-        print(f"  plot: {plot_path}")
+        if SAVE_TRACKING_PNG is not None:
+            fig.savefig(SAVE_TRACKING_PNG, dpi=120)
+            print(f"  plot: {SAVE_TRACKING_PNG}")
+        if SHOW_PLOTS:
+            plt.show()
+        else:
+            plt.close(fig)
 
     if SAVE_GIF is not None:
         import matplotlib.animation as animation
@@ -272,11 +279,13 @@ if __name__ == "__main__":
         plt.close(fig)
         print(f"  animation: {gif_path}")
 
-    viz = DynamicBicycleCar3D()
-    viz.params = dict(sys.params)
-    viz.traj = traj
-    np.savez(OUTPUT_DIR / "executed_traj.npz", t=traj.t, x=traj.x, u=traj.u)
-    print(f"  executed traj: {OUTPUT_DIR / 'executed_traj.npz'}")
-    if SAVE_NATIVE_PLOT:
-        viz.plot_trajectory(signals=("x", "u"), show=False)
-        print("  native plot_trajectory: done")
+    if SAVE_EXECUTED_TRAJ is not None or SAVE_NATIVE_PLOT:
+        viz = DynamicBicycleCar3D()
+        viz.params = dict(sys.params)
+        viz.traj = traj
+        if SAVE_EXECUTED_TRAJ is not None:
+            np.savez(SAVE_EXECUTED_TRAJ, t=traj.t, x=traj.x, u=traj.u)
+            print(f"  executed traj: {SAVE_EXECUTED_TRAJ}")
+        if SAVE_NATIVE_PLOT:
+            viz.plot_trajectory(signals=("x", "u"), show=False)
+            print("  native plot_trajectory: done")
