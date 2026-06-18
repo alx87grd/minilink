@@ -14,14 +14,19 @@ from minilink.graphical.signals import open_time_signal_plot, resolve_plot_signa
 
 configure_jax(enable_x64=True)
 
+# Rollout horizon (JAX loss and NumPy plot share dt and tf).
+TF = 10.0
+DT = 0.05
+N_STEPS = 200
+
+# Gradient descent on PID gains.
+N_LEARN_STEPS = 1000
+LR = 1.0
+
+# Live trajectory plot during tuning.
 PLOT_EVERY = 5
 PLOT_PAUSE = 0.05
 PLOT_BACKEND = "matplotlib"  # use "plotly" if matplotlib live updates stall
-TF = 5.0
-DT = 0.05
-N_LEARN_STEPS = 1000
-N_STEPS = 100
-LR = 1.0
 
 plant = Pendulum()
 ctl = PIDController()
