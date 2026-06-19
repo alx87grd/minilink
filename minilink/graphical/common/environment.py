@@ -122,3 +122,9 @@ def override_env(name) -> None:
     """
     global _CACHE
     _CACHE = name
+
+
+if __name__ == "__main__":
+
+    print("aaa")
+    print(is_blocking_needed())

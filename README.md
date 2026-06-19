@@ -311,7 +311,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | Package | Owns |
 | --- | --- |
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
-| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters) |
+| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
 | `control` | control laws and design factories (`PIDController`, `FilteredPIDController`, `ProportionalController`, `LinearStateFeedbackController`, `lqr`) |
 | `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |

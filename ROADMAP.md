@@ -79,8 +79,8 @@ in rough build order:
    (`FilteredPIDController`) done; still pending: `computed_torque.py`,
    `sliding_mode.py`, `robotic.py` (impedance), `mpc.py` (uses `optimization/`),
    `neural.py` (NN policies).
-3. **`blocks/`** — routing, nonlinear, filters, and `TrajectorySource` done;
-   still pending: `neural.py` (MLP block, pure `jnp`, `params` = weights).
+3. **`blocks/`** — routing, nonlinear, filters, `TrajectorySource`, and
+   `neural.py` (MLP block with `params` = weights) done.
 4. **`estimation/`** — `luenberger.py`, `kalman.py`, later `ekf.py` (uses
    `analysis/` linearization) and `recursive.py` (online parameter
    estimators: RLS, adaptive laws). Offline fitting stays in

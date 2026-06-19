@@ -52,7 +52,7 @@ or neural network alike):
 
 | Package | Role |
 | --- | --- |
-| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters |
+| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
 | `control/` | control laws and design factories (`ProportionalController`, `PDController`, `PIDController`, `FilteredPIDController`, `LinearStateFeedbackController`, `lqr`) |
 | `estimation/` | online state and parameter estimators (planned) |
