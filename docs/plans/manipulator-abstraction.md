@@ -89,7 +89,19 @@ DynamicSystem
 
 Catalog arms (`OneLinkManipulator`, …) subclass `Manipulator`.
 
-Home: `minilink/dynamics/abstraction/manipulator.py`.
+## File layout
+
+Abstractions are split by role — do **not** put :class:`Manipulator` in
+``mechanical.py``.
+
+| File | Class | Responsibility |
+| --- | --- | --- |
+| `dynamics/abstraction/mechanical.py` | `MechanicalSystem`, `JaxMechanicalSystem` | `H`, `C`, `g`, `f`; joint ports `q`, `dq` |
+| `dynamics/abstraction/manipulator.py` | `Manipulator` | `forward_kinematics`, `J`; task ports `p`, `pdot` |
+
+Import :class:`Manipulator` from ``minilink.dynamics.abstraction.manipulator``.
+Catalog arms import both bases from their defining modules (no barrel re-export
+in ``__init__.py`` until API freeze).
 
 ## Port contract
 
@@ -211,21 +223,15 @@ Controller ports stay **`r`, `y`, `u`** per DESIGN. Task-space **desired**
 trajectories use `r`; **measured** task state uses `y` fed from `plant.p` /
 `plant.pdot`.
 
-## Implementation sketch (for later — not in this PR)
+## Implementation status
 
-```python
-# MechanicalSystem.__init__ (after existing ports)
-self.add_output_port("q", dim=dof, function=self.h_q, dependencies=())
-self.add_output_port("dq", dim=dof, function=self.h_dq, dependencies=())
+- [x] `MechanicalSystem`: ports `q`, `dq` + `h_q`, `h_dq` in `mechanical.py`
+- [x] `Manipulator`: ports `p`, `pdot` + kinematic hooks in `manipulator.py`
+- [ ] Rebase catalog `arms.py` on `Manipulator`
+- [ ] `JaxManipulator` twin (when needed)
+- [ ] Joint-PD demo with explicit port wiring
 
-# Manipulator.__init__
-super().__init__(dof=dof, actuators=actuators)
-self.task_dim = int(task_dim)
-self.add_output_port("p", dim=self.task_dim, function=self.h_p, dependencies=())
-self.add_output_port("pdot", dim=self.task_dim, function=self.h_pdot, dependencies=())
-```
-
-```python
+### Reference (`manipulator.py`)
 def h_p(self, x, u, t=0, params=None):
     q, dq = self.x2q(x)
     return self.forward_kinematics(q, params)
@@ -238,14 +244,14 @@ def h_pdot(self, x, u, t=0, params=None):
 
 ## Catalog migration (later)
 
-1. Add `Manipulator` in `dynamics/abstraction/`.
-2. Rebase `OneLinkManipulator` … `FiveLinkPlanarManipulator` on `Manipulator`.
-3. Rename `forward_kinematic_effector` → `forward_kinematics` (clean break;
+1. Rebase `OneLinkManipulator` … `FiveLinkPlanarManipulator` on `Manipulator`
+   (import from `dynamics/abstraction/manipulator.py`).
+2. Rename `forward_kinematic_effector` → `forward_kinematics` (clean break;
    pre-1.0 no-alias rule).
-4. `SpeedControlledManipulator` — kinematic-only plant; defer or introduce
+3. `SpeedControlledManipulator` — kinematic-only plant; defer or introduce
    `KinematicChain` (positions only, no `H`) when a demo needs it.
-5. Tests: `h_p` / `h_pdot` match analytic FK and `J @ dq`.
-6. Demo: `TwoLinkManipulator` + joint PD with `plant.q` / `plant.dq` wiring.
+4. Catalog tests: FK/`h_p`/`h_pdot` parity on concrete arms.
+5. Demo: `TwoLinkManipulator` + joint PD with `plant.q` / `plant.dq` wiring.
 
 ## Open questions
 
@@ -264,8 +270,6 @@ def h_pdot(self, x, u, t=0, params=None):
 - `control/sliding_mode.py`
 - Obstacle checks on `p` instead of per-plant `*withObstacles` subclasses
 
-## Smallest implementation slice (when approved)
+## Smallest remaining slice (when approved)
 
-1. `MechanicalSystem`: ports `q`, `dq` + `h_q`, `h_dq`.
-2. `Manipulator`: ports `p`, `pdot` + `forward_kinematics`, `J`, `h_p`, `h_pdot`.
-3. Migrate `OneLinkManipulator` only; one joint-PD demo.
+1. Migrate `OneLinkManipulator` only; one joint-PD demo.

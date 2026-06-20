@@ -20,7 +20,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Kinematic composition review before API freeze. |
 | Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Same gate as Graphical. |
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; `DynamicBicycle` params thread fully. | `Manipulator` abstraction + catalog rebase (see review queue). |
-| Dynamics abstraction | 4 | `MechanicalSystem` complete; no shared `Manipulator` with task ports yet. | Add `q`/`dq` ports on `MechanicalSystem`; `Manipulator` with `p`/`pdot`. |
+| Dynamics abstraction | 5 | `MechanicalSystem` + joint ports `q`/`dq`; `Manipulator` in `manipulator.py` with `p`/`pdot`. | Rebase catalog arms; `JaxManipulator` if needed. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Experimental; math not QA-validated. | Validation tests toward TRL 2. |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Pole-zero, Nyquist, margins, `ss2tf`; reachability costs. |
@@ -129,8 +129,8 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 ### 5.4 Dynamics abstraction
 
 - [x] `MechanicalSystem`, `JaxMechanicalSystem`, `StateSpaceSystem`, `GeneralizedMechanicalSystem`
-- [ ] `MechanicalSystem` ports `q`, `dq`
-- [ ] `Manipulator` base — `p`, `pdot`, `forward_kinematics`, `J`
+- [x] `MechanicalSystem` ports `q`, `dq` (`mechanical.py`)
+- [x] `Manipulator` base — `p`, `pdot`, `forward_kinematics`, `J` (`manipulator.py`)
 - [ ] Rebase `dynamics/catalog/manipulators/arms.py` on `Manipulator`
 - [ ] Optional `f_ext` input port for external end-effector forces
 
