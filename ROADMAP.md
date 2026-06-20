@@ -20,7 +20,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Kinematic composition review before API freeze. |
 | Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Same gate as Graphical. |
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; `DynamicBicycle` params thread fully. | `Manipulator` abstraction + catalog rebase (see review queue). |
-| Dynamics abstraction | 4 | `MechanicalSystem` complete; no shared `Manipulator` with task ports yet. | Add `q`/`dq` ports on `MechanicalSystem`; `Manipulator` with `r`/`dr`. |
+| Dynamics abstraction | 4 | `MechanicalSystem` complete; no shared `Manipulator` with task ports yet. | Add `q`/`dq` ports on `MechanicalSystem`; `Manipulator` with `p`/`pdot`. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Experimental; math not QA-validated. | Validation tests toward TRL 2. |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Pole-zero, Nyquist, margins, `ss2tf`; reachability costs. |
@@ -65,7 +65,7 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 ~~`control/lqr.py`~~ done. Remaining:
 
-- `Manipulator` abstraction (`q`/`dq`/`r`/`dr` ports) — **unblocks robot control**
+- `Manipulator` abstraction (`q`/`dq`/`p`/`pdot` ports) — **unblocks robot control**
 - `control/computed_torque.py`, `control/sliding_mode.py`, `control/robotic.py`
 - Nested-diagram ergonomics; forced-input helpers; graphics kinematic composition
 
@@ -92,7 +92,8 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 - Dynamic bicycle module split.
 - Graphics/camera contract consolidation (`KinematicModel` delegate).
 - **`Manipulator` base class** — `MechanicalSystem` + `q`/`dq` ports;
-  `Manipulator` + `r`/`dr` + FK/Jacobian
+  `Manipulator` + `p`/`pdot` + `forward_kinematics` / `J(q)` (plant task outputs;
+  controller reference stays `r` per DESIGN)
   ([manipulator-abstraction.md](docs/plans/manipulator-abstraction.md)).
 - **DP/RRT return** — offline planning on continuous plants vs out-of-scope
   discrete framework (see gap doc §4).
@@ -129,7 +130,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 - [x] `MechanicalSystem`, `JaxMechanicalSystem`, `StateSpaceSystem`, `GeneralizedMechanicalSystem`
 - [ ] `MechanicalSystem` ports `q`, `dq`
-- [ ] `Manipulator` base — `r`, `dr`, `forward_kinematic_effector`, `J`
+- [ ] `Manipulator` base — `p`, `pdot`, `forward_kinematics`, `J`
 - [ ] Rebase `dynamics/catalog/manipulators/arms.py` on `Manipulator`
 - [ ] Optional `f_ext` input port for external end-effector forces
 

@@ -6,162 +6,266 @@ Context: porting pyro `Manipulator` and `control/robotcontrollers.py` requires a
 shared robot base in minilink. Today catalog arms subclass `MechanicalSystem`
 directly and duplicate FK/Jacobian methods without exposing them as diagram ports.
 
-## Goal
+Design goal: **notation should read like a robotics/controls textbook** in both
+the port wiring diagram and the method names — while respecting minilink's
+framework-wide control convention (`r` = reference, `y` = measurement, `u` =
+actuator command).
 
-A controls reader should wire
+## Textbook notation map
 
-    controller.r  ──┐
-    plant.q    ─────┼──► JointPD / ComputedTorque / EndEffectorPD
-    plant.dq   ─────┘
+Standard manipulator notation (e.g. Spong/Hutchinson, Siciliano):
 
-without `Demux` on a stacked `y` vector. Cartesian controllers should wire
-`plant.r` and `plant.dr` directly.
+| Math | Meaning | Minilink role |
+| --- | --- | --- |
+| `q` | generalized coordinates (joint positions) | plant output port `q` |
+| `q̇` | generalized velocities | plant output port `dq` |
+| `x = [q; q̇]` | mechanical state | plant state / ports `x`, `y` |
+| `τ` | applied joint torques | plant input port `u` (documented as `τ` for arms) |
+| `H(q)`, `C(q,q̇)`, `g(q)` | inertia, Coriolis, gravity | methods on `MechanicalSystem` |
+| `p = f(q)` | forward kinematics (task position) | plant output port `p` |
+| `ṗ = J(q) q̇` | differential kinematics | plant output port `pdot` |
+| `J(q)` | manipulator Jacobian `∂p/∂q` | method `J(q, params)` |
+| `p_d`, `ṗ_d` | desired task position / velocity | **controller** input `r` (reference), not a plant port |
+| `f_ext` | external wrench at end-effector | future plant **input** port (phase 2) |
+
+### Why not pyro's `r` / `dr` on the plant?
+
+Minilink reserves **`r` for the reference input on controllers**
+([DESIGN.md §4](../../DESIGN.md)). A plant output named `r` would collide in
+every diagram:
+
+```text
+  ref.r  ──► controller.r     (desired p_d)   ✓ textbook + framework
+  plant.r ──► controller.y    (measured p)    ✗ reads as two “references”
+```
+
+**Plant task-space outputs are `p` and `pdot`** (position and its time derivative).
+The desired task trajectory connects to the controller's **`r`** port; the
+measured task state connects to **`y`** — the same pattern as joint-space PD on
+`[q, dq]`.
+
+### Why `dq` and `pdot` (not `qdot` / `v`)?
+
+| Candidate | Verdict |
+| --- | --- |
+| `dq` | **Joint port.** Matches `q̇` in code; already used in `control/linear.py` docstrings (`[q, dq]`). |
+| `qdot` | Readable but breaks the two-letter port pattern (`q`, `dq`, `p`, `pdot`). |
+| `v` on a port | **Rejected** — ambiguous (joint rate vs task velocity vs state segment). |
+| `pdot` | **Task port.** Parallel to `dq`; reads as `ṗ` without overloading `v`. |
+| `p` | **Task port.** Standard task-space position; avoids overloading framework state `x`. |
+
+Internal math may still use short locals `q`, `dq`, `p`, `pdot`, `J`, `tau`
+after unpacking `x`, `u`, `params` ([agent.md](../../agent.md) textbook style).
+
+## Goal (wiring picture)
+
+Joint-space PD:
+
+```text
+  ref.r ─────────────► controller.r
+  plant.q  ──┐
+  plant.dq ──┴─ Mux ─► controller.y
+  controller.u ────────► plant.u
+```
+
+End-effector PD (operational space):
+
+```text
+  ref.r ─────────────► controller.r          (desired p_d; rate part via metadata / Mux)
+  plant.p ──┐
+  plant.pdot ┴─ Mux ──► controller.y         (measured [p, ṗ])
+  controller.u ────────► plant.u             (τ)
+```
+
+No `Demux` on stacked `y` for new robot demos.
 
 ## Proposed hierarchy
 
-```
+```text
 DynamicSystem
-    └── MechanicalSystem          # any second-order mechanism in q
-            └── Manipulator       # serial arms with an end-effector frame
+    └── MechanicalSystem          #  H(q) q̈ + C(q,q̇) q̇ + g(q) = τ
+            └── Manipulator       #  +  p = f(q),  ṗ = J(q) q̇
 ```
 
-Catalog plants (`OneLinkManipulator`, `TwoLinkManipulator`, …) subclass
-`Manipulator`, not `MechanicalSystem` directly.
+Catalog arms (`OneLinkManipulator`, …) subclass `Manipulator`.
 
 Home: `minilink/dynamics/abstraction/manipulator.py`.
 
 ## Port contract
 
-### `MechanicalSystem` — add joint-space outputs
+### Framework ports (unchanged)
 
-Today: primary `y = [q; v]` (same as `x` when `expose_state=True`), plus
-auxiliary port `x`.
+| Port | Role |
+| --- | --- |
+| `u` | actuator command; for manipulators document as **joint torque `τ`** |
+| `y` | primary output (`System.p`); stays **`y = x = [q; dq]`** for backward compatibility |
+| `x` | full state (already exposed via `expose_state=True`) |
 
-**Add** (non-breaking — keep `y` and `x`):
+### `MechanicalSystem` — joint-space outputs (new)
 
-| Port | Dim | Compute | Notes |
+| Port | Dim | Compute | Textbook |
 | --- | ---: | --- | --- |
-| `q` | `dof` | `x2q(x)[0]` | generalized positions |
-| `dq` | `dof` | `x2q(x)[1]` | generalized velocities (`v` in math) |
+| `q` | `dof` | `x2q(x)[0]` | `q` |
+| `dq` | `dof` | `x2q(x)[1]` | `q̇` |
 
-Port labels/units inherit from the first/second half of `state.labels` /
-`state.units`. Dependencies: `()` — no feedthrough.
+Dependencies: `()` (no feedthrough). Labels/units from the first / second half of
+`state.labels` and `state.units`.
 
-Rationale:
+### `Manipulator` — task-space outputs (new)
 
-- Matches control naming (`q`, `dq`) used in pyro robot controllers.
-- `y` remains the primary output (`System.p` unchanged) for backward compatibility.
-- `x` stays for state-feedback blocks that want the full vector.
-- Controllers that need only angles or rates connect to named ports.
-
-### `Manipulator` — add task-space outputs
-
-| Port | Dim | Compute | Notes |
+| Port | Dim | Compute | Textbook |
 | --- | ---: | --- | --- |
-| `r` | `e` | `forward_kinematic_effector(q, params)` | end-effector pose/coords |
-| `dr` | `e` | `J(q, params) @ dq` | end-effector velocity |
+| `p` | `task_dim` | `forward_kinematics(q, params)` | `p = f(q)` |
+| `pdot` | `task_dim` | `J(q, params) @ dq` | `ṗ = J(q) q̇` |
 
-Constructor: `Manipulator(dof, actuators=None, effector_dim=2)`.
+Constructor: `Manipulator(dof, actuators=None, task_dim=2)`.
 
-Subclasses **must** override:
+Attribute `task_dim` replaces pyro's `e` / catalog's `effector_dim` in new code
+(catalog migration may keep a property alias during transition).
+
+## Method contract (textbook names)
+
+### On `MechanicalSystem` (existing + port helpers)
+
+| Method | Returns | Textbook |
+| --- | --- | --- |
+| `H(q, params)` | `(dof, dof)` | inertia matrix |
+| `C(q, dq, params)` | `(dof, dof)` | Coriolis matrix |
+| `g(q, params)` | `(dof,)` | gravity vector |
+| `B(q, params)` | `(dof, m)` | actuator map |
+| `d(q, dq, u, t, params)` | `(dof,)` | damping / dissipation |
+| `generalized_force(...)` | `(dof,)` | RHS force; default `B(q) @ u` → `τ` |
+| `forward_dynamics(q, dq, u, ...)` | `ddq` | `q̈` from `τ` |
+| `inverse_dynamics(q, dq, ddq, ...)` | `tau` | `τ` from `q̈` |
+| `x2q(x)` | `[q, dq]` | split `x = [q; q̇]` |
+| `q2x(q, dq)` | `x` | stack state |
+
+Port wiring helpers (thin; not part of the textbook EoM):
+
+| Method | Port |
+| --- | --- |
+| `h_q(x, u, t, params)` | `q` |
+| `h_dq(x, u, t, params)` | `dq` |
+
+Prefer **`h_q` / `h_dq`** over `compute_q` so port functions read as output maps
+`h_port` while `f` / `H` / `C` stay the dynamics vocabulary.
+
+### On `Manipulator` (subclass hooks)
+
+| Method | Returns | Textbook |
+| --- | --- | --- |
+| `forward_kinematics(q, params)` | `(task_dim,)` | `p = f(q)` |
+| `J(q, params)` | `(task_dim, dof)` | `J(q) = ∂p/∂q` |
+
+Default implementations return zeros (safe for abstract tests / JAX trace).
+
+Optional inline helper (not a separate port):
 
 ```python
-def forward_kinematic_effector(self, q, params=None):
-    ...
-
-def J(self, q, params=None):
-    ...  # shape (effector_dim, dof)
+# ṗ = J(q) q̇  — used by h_pdot and by controllers
+pdot = J @ dq
 ```
 
-Default implementations return zeros (traceable, safe for abstract testing).
+Port wiring:
 
-Optional helper (not a port):
+| Method | Port |
+| --- | --- |
+| `h_p(x, u, t, params)` | `p` |
+| `h_pdot(x, u, t, params)` | `pdot` |
 
-```python
-def forward_differential_kinematic_effector(self, q, dq, params=None):
-    return self.J(q, params) @ dq
-```
+### Pyro → minilink rename (catalog migration)
+
+| Pyro / catalog today | Proposed |
+| --- | --- |
+| `forward_kinematic_effector(q)` | `forward_kinematics(q, params)` |
+| `forward_differential_kinematic_effector(q, dq)` | inline `J(q) @ dq` or `task_velocity(q, dq, params)` if a named helper helps |
+| `effector_dim` | `task_dim` |
+| `e` (pyro) | `task_dim` |
+
+Keep **`J`** as the method name — it *is* the textbook symbol.
 
 ## Math hooks (unchanged)
 
-`MechanicalSystem` keeps `H`, `C`, `B`, `g`, `d`, `generalized_force`,
-`forward_dynamics`, `inverse_dynamics`. `Manipulator` does not alter `f`/`h`.
+`Manipulator` does **not** override `f` / `H` / `C` / `g`. It only adds
+kinematic outputs. Dynamics remain:
 
-Port compute paths call the same FK/Jacobian used by graphics and future
-`control/robotic.py` blocks — **one definition, three consumers** (ports,
-animation, control laws).
-
-## Relation to pyro
-
-Pyro `Manipulator` stores `e` (effector dim), documents `r = f(q)`,
-`dr = J(q) dq`, and expects subclasses to implement FK + `J`. Minilink mirrors
-that math but expresses outputs as **explicit ports** instead of methods only.
-
-Pyro `RobotController.x2q(y)` assumed `y` was stacked joint space. Minilink
-controllers should prefer `get_port_values_from_u` / diagram connections to
-`plant.q` and `plant.dq`, or read ports from compiled internal signals.
-
-## Implementation sketch
-
-In `MechanicalSystem.__init__` after port setup:
-
-```python
-self.add_output_port("q", dim=dof, function=self.compute_q, dependencies=())
-self.add_output_port("dq", dim=dof, function=self.compute_dq, dependencies=())
+```text
+H(q) q̈ + C(q, q̇) q̇ + g(q) + d(q, q̇, u, t) = B(q) u
 ```
 
+One `forward_kinematics` / `J` definition serves **ports**, **animation**, and
+future **`control/robotic.py`** blocks.
+
+## Relation to future controllers
+
+Naming alignment for `control/robotic.py` (planned):
+
+| Controller | Plant inputs wired | Law (textbook) |
+| --- | --- | --- |
+| Joint PD / PID | `y` ← Mux(`q`, `dq`) | `τ = K_p (q_d - q) + K_d (q̇_d - q̇)` |
+| Computed torque | `q`, `dq` (+ ref trajectory) | `τ = H(q) v + C(q,q̇)q̇ + g(q)` |
+| End-effector PD | `y` ← Mux(`p`, `pdot`) | `τ = J(q)^T ( K_p (p_d - p) + K_d (ṗ_d - ṗ) )` |
+| Kinematic (resolved rate) | `q`, `p` | `q̇ = J(q)^+ ṗ_d` |
+
+Controller ports stay **`r`, `y`, `u`** per DESIGN. Task-space **desired**
+trajectories use `r`; **measured** task state uses `y` fed from `plant.p` /
+`plant.pdot`.
+
+## Implementation sketch (for later — not in this PR)
+
 ```python
-def compute_q(self, x, u, t=0, params=None):
-    q, _ = self.x2q(x)
-    return q
+# MechanicalSystem.__init__ (after existing ports)
+self.add_output_port("q", dim=dof, function=self.h_q, dependencies=())
+self.add_output_port("dq", dim=dof, function=self.h_dq, dependencies=())
 
-def compute_dq(self, x, u, t=0, params=None):
-    _, dq = self.x2q(x)
-    return dq
-```
-
-In `Manipulator.__init__`:
-
-```python
+# Manipulator.__init__
 super().__init__(dof=dof, actuators=actuators)
-self.effector_dim = int(effector_dim)
-self.add_output_port("r", dim=self.effector_dim, function=self.compute_r, dependencies=())
-self.add_output_port("dr", dim=self.effector_dim, function=self.compute_dr, dependencies=())
+self.task_dim = int(task_dim)
+self.add_output_port("p", dim=self.task_dim, function=self.h_p, dependencies=())
+self.add_output_port("pdot", dim=self.task_dim, function=self.h_pdot, dependencies=())
 ```
 
-## Catalog migration
+```python
+def h_p(self, x, u, t=0, params=None):
+    q, dq = self.x2q(x)
+    return self.forward_kinematics(q, params)
 
-1. Add `Manipulator` base with ports.
-2. Change `OneLinkManipulator` … `FiveLinkPlanarManipulator` to subclass
-   `Manipulator`; move shared FK/Jacobian to the subclass (already there).
-3. `SpeedControlledManipulator` — separate kinematic-only plant; may subclass
-   a lighter `KinematicManipulator` (positions only, no `H`) **or** stay as
-   `DynamicSystem` until needed.
-4. Update tests: port dimensions, FK/Jacobian match `compute_r`/`compute_dr`.
-5. Demos for joint PD and effector PD wire `plant.q` / `plant.r` explicitly.
+def h_pdot(self, x, u, t=0, params=None):
+    q, dq = self.x2q(x)
+    J = self.J(q, params)
+    return J @ dq
+```
+
+## Catalog migration (later)
+
+1. Add `Manipulator` in `dynamics/abstraction/`.
+2. Rebase `OneLinkManipulator` … `FiveLinkPlanarManipulator` on `Manipulator`.
+3. Rename `forward_kinematic_effector` → `forward_kinematics` (clean break;
+   pre-1.0 no-alias rule).
+4. `SpeedControlledManipulator` — kinematic-only plant; defer or introduce
+   `KinematicChain` (positions only, no `H`) when a demo needs it.
+5. Tests: `h_p` / `h_pdot` match analytic FK and `J @ dq`.
+6. Demo: `TwoLinkManipulator` + joint PD with `plant.q` / `plant.dq` wiring.
 
 ## Open questions
 
-1. **Port name `dq` vs `v`?** Proposal: `dq` on ports (control language),
-   `v` stays as the local in `x2q` and EoM text.
-2. **Effector `r` for 3D arms:** `e=3` position only first; orientation as
-   Euler/quaternion is a follow-up (`effector_dim` or separate `R` port?).
-3. **External forces `f_ext`:** pyro documents `J^T f_ext` on the RHS.
-   Implement via optional input port `f_ext` on `Manipulator` later, not in v1.
-4. **Breaking change?** Keeping `y=[q;dq]` means no break; deprecate using
-   `y` for robot control wiring in new demos only.
-5. **`JaxManipulator` twin?** Mirror `JaxMechanicalSystem` pattern if catalog
-   gains JAX arm variants.
+1. **3D orientation in `p`:** v1 = position components only (`task_dim=3`);
+   orientation as separate ports (`R`, `omega`) or augmented `p` later?
+2. **`f_ext` input port:** external wrench; adds `J(q)^T f_ext` to the RHS —
+   phase 2, not v1.
+3. **`JaxManipulator`:** mirror `JaxMechanicalSystem` when JAX arms are needed.
+4. **Stacked convenience port:** optional `task` port = Mux(`p`, `pdot`) factory
+   for controllers that want one `y` — diagram helper only, not on the plant?
 
 ## Enables (blocked today)
 
-- `control/computed_torque.py` — needs `inverse_dynamics` + `q`, `dq`
-- `control/robotic.py` — `JointPD`, `EndEffectorPD`, kinematic controllers
-- `control/sliding_mode.py` — same access pattern
-- Obstacle-aware arms — collision on `r`, not a separate plant subclass
+- `control/computed_torque.py` — `inverse_dynamics`, ports `q`, `dq`
+- `control/robotic.py` — joint / operational-space laws
+- `control/sliding_mode.py`
+- Obstacle checks on `p` instead of per-plant `*withObstacles` subclasses
 
-## Smallest slice
+## Smallest implementation slice (when approved)
 
-1. `MechanicalSystem` gains `q`/`dq` ports + compute helpers.
-2. `Manipulator` base with `r`/`dr` ports; migrate `OneLinkManipulator` only.
-3. One demo: `TwoLinkManipulator` + joint PD using port wiring.
+1. `MechanicalSystem`: ports `q`, `dq` + `h_q`, `h_dq`.
+2. `Manipulator`: ports `p`, `pdot` + `forward_kinematics`, `J`, `h_p`, `h_pdot`.
+3. Migrate `OneLinkManipulator` only; one joint-PD demo.
