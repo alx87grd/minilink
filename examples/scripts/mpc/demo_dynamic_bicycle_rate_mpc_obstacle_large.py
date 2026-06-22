@@ -1,8 +1,8 @@
-"""High-speed rate-input MPC with soft circular obstacle repulsion (~20 m/s).
+"""Rate-input MPC with a large circular obstacle (wide keep-out disk).
 
 Run from repo root::
 
-    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_obstacle_high_speed.py
+    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_obstacle_large.py
 """
 
 import numpy as np
@@ -10,9 +10,7 @@ import numpy as np
 from minilink.core.backends import array_module, configure_jax
 from minilink.core.costs import CostFunction, QuadraticCost
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputs,
-)
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import JaxDynamicBicycleRateInputs
 from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
@@ -31,38 +29,33 @@ from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 
-U_TARGET = 20.0
-TF_SIM = 10.0
-Y0 = 4.5
-VX0 = 1.0
+U_TARGET = 8.0
+TF_SIM = 5.0
+VX0 = 6.4
 
-OBSTACLE_CENTER = (100.0, 0.0)
-OBSTACLE_RADIUS = 2.0
-OBSTACLE_MARGIN = 1.0
-OBSTACLE_REPULSION_WEIGHT = 180.0
+OBSTACLE_CENTER = (20.0, 0.0)
+OBSTACLE_RADIUS = 5.0
+OBSTACLE_MARGIN = 0.2
+OBSTACLE_REPULSION_WEIGHT = 50.0
 OBSTACLE_REPULSION_EPS = 0.08
 
 MPC_HZ = 5.0
-SIM_HZ = 500.0
+SIM_HZ = 200.0
 MPC_HORIZON = 2.0
 MPC_STEPS = 20
-MPC_MAXITER = 20
+MPC_MAXITER = 100
 MPC_FTOL = 1e-1
 MPC_DT = 1.0 / MPC_HZ
 SIM_DT = 1.0 / SIM_HZ
 SUBSTEPS = max(1, int(round(MPC_DT / SIM_DT)))
 
-Q = np.diag([0.0, 6.0, 20.0, 1.0, 5.0, 7.0, 0.05, 80.0])
-R = np.diag([0.5, 10.0])
-S = Q
+W_REAR_MAX = 90.0
+DELTA_MAX = 0.55
+W_REAR_DOT_MAX = 80.0
+DELTA_DOT_MAX = 2.0
 
-W_REAR_MAX = 120.0
-DELTA_MAX = 0.45
-W_REAR_DOT_MAX = 100.0
-DELTA_DOT_MAX = 2.5
-
-REF_X_PAD = 40.0
-CAMERA_SCALE = 40.0
+REF_X_PAD = 20.0
+CAMERA_SCALE = 12.0
 
 
 class TrackingWithObstacleCost(CostFunction):
@@ -110,7 +103,14 @@ r_r = sys_mpc.params["r_r"]
 w_rear_ref = U_TARGET / r_r
 x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, w_rear_ref, 0.0])
 ubar = np.array([0.0, 0.0])
-tracking_cost = QuadraticCost.from_system(sys_mpc, Q=Q, R=R, S=S, xbar=x_ref, ubar=ubar)
+tracking_cost = QuadraticCost.from_system(
+    sys_mpc,
+    Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
+    R=np.diag([1.0, 25.0]),
+    S=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
+    xbar=x_ref,
+    ubar=ubar,
+)
 cost = TrackingWithObstacleCost(
     tracking_cost,
     center=OBSTACLE_CENTER,
@@ -119,7 +119,7 @@ cost = TrackingWithObstacleCost(
     eps=OBSTACLE_REPULSION_EPS,
 )
 
-x0 = np.array([0.0, Y0, 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
+x0 = np.array([0.0, 3.0, 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 
 transcription = DirectCollocationTranscription(
@@ -143,10 +143,10 @@ u_hold = np.zeros(sys_sim.m)
 prev_plan = None
 next_mpc_t = 0.0
 
-print("MPC high-speed obstacle (rate inputs, soft repulsion)")
+print("MPC large obstacle (rate inputs, soft repulsion)")
 print(
-    f"  u_target={U_TARGET} m/s, vx0={VX0} m/s, start y={Y0}, "
-    f"obstacle={OBSTACLE_CENTER} R={OBSTACLE_RADIUS}+{OBSTACLE_MARGIN}"
+    f"  u_target={U_TARGET} m/s, obstacle={OBSTACLE_CENTER} "
+    f"R={OBSTACLE_RADIUS}+{OBSTACLE_MARGIN}"
 )
 
 while t < TF_SIM - 1e-12:
@@ -178,10 +178,7 @@ while t < TF_SIM - 1e-12:
 
         plan = planner.compute_solution(initial_guess=guess)
         res = planner.last_optimization_result
-        print(
-            f"MPC @ t={t:.2f}s  x={x[0]:.0f}m  y={x[1]:.2f}m  "
-            f"success={res.success}  solve={res.solve_time_s:.3f}s"
-        )
+        print(f"MPC @ t={t:.2f}s  success={res.success}  solve={res.solve_time_s:.3f}s")
         prev_plan = plan
         u_hold = plan.u[:, 0].copy()
         mpc_plans.append(
@@ -204,14 +201,12 @@ cx, cy = OBSTACLE_CENTER
 clearance = np.hypot(traj.x[0, :] - cx, traj.x[1, :] - cy) - OBSTACLE_RADIUS
 print(
     f"done: min clearance={float(clearance.min()):.2f} m, "
-    f"final x={traj.x[0, -1]:.0f} y={traj.x[1, -1]:.2f} vx={traj.x[3, -1]:.1f}"
+    f"final y={traj.x[1, -1]:.2f} vx={traj.x[3, -1]:.1f}"
 )
 
 
-class MpcHighSpeedObstacleBicycleRate(JaxDynamicBicycleRateInputs):
-    def __init__(
-        self, mpc_plans, executed_traj, *, obstacle_center, keepout_radius, x_pad
-    ):
+class MpcObstacleBicycleRate(JaxDynamicBicycleRateInputs):
+    def __init__(self, mpc_plans, executed_traj, *, obstacle_center, keepout_radius, x_pad):
         super().__init__()
         cx, cy = obstacle_center
         x_lo = float(executed_traj.x[0, 0]) - x_pad
@@ -250,7 +245,7 @@ class MpcHighSpeedObstacleBicycleRate(JaxDynamicBicycleRateInputs):
         ]
 
 
-mpc_anim_sys = MpcHighSpeedObstacleBicycleRate(
+mpc_anim_sys = MpcObstacleBicycleRate(
     mpc_plans,
     traj,
     obstacle_center=OBSTACLE_CENTER,

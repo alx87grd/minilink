@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -50,31 +51,36 @@ class Plane2D(MechanicalSystem):
         self.camera_scale = self.dynamic_range
 
     def velocity_vector(self, q, dq):
-        speed = np.sqrt(dq[0] ** 2 + dq[1] ** 2)
-        gamma = np.arctan2(dq[1], dq[0])
+        xp = array_module(dq)
+        speed = xp.sqrt(dq[0] ** 2 + dq[1] ** 2)
+        gamma = xp.arctan2(dq[1], dq[0])
         alpha = q[2] - gamma
         return speed, gamma, alpha
 
     def Cl(self, alpha, params=None):
         params = self.params if params is None else params
+        xp = array_module(alpha)
         alpha_stall = params["alpha_stall"]
         Cl_alpha = params["Cl_alpha"]
 
-        cl = np.sin(2.0 * alpha)  # flat-plate lift
-        if -alpha_stall < alpha < alpha_stall:
-            cl = cl + Cl_alpha * alpha  # linear lift slope before stall
+        cl = xp.sin(2.0 * alpha)
+        cl = xp.where(xp.abs(alpha) < alpha_stall, cl + Cl_alpha * alpha, cl)
         return cl
 
     def Cd(self, alpha, params=None):
         params = self.params if params is None else params
+        xp = array_module(alpha)
         alpha_stall = params["alpha_stall"]
         Cd0 = params["Cd0"]
         e = params["e_factor"]
         AR = params["AR"]
 
-        cd = Cd0 + (1.0 - np.cos(2.0 * alpha))  # parasite + flat-plate drag
-        if -alpha_stall < alpha < alpha_stall:
-            cd = cd + self.Cl(alpha, params) ** 2 / (np.pi * e * AR)  # induced drag
+        cd = Cd0 + (1.0 - xp.cos(2.0 * alpha))
+        cd = xp.where(
+            xp.abs(alpha) < alpha_stall,
+            cd + self.Cl(alpha, params) ** 2 / (xp.pi * e * AR),
+            cd,
+        )
         return cd
 
     def Cm(self, alpha, params=None):
@@ -83,14 +89,15 @@ class Plane2D(MechanicalSystem):
 
     def aerodynamic_forces(self, speed, alpha, delta, params=None):
         params = self.params if params is None else params
+        xp = array_module(speed)
         rho = params["rho"]
         S_w = params["S_w"]
         S_t = params["S_t"]
         AR = params["AR"]
 
         q_dyn = 0.5 * rho * speed**2
-        chord_w = np.sqrt(S_w / AR)
-        chord_t = np.sqrt(S_t / AR)
+        chord_w = xp.sqrt(S_w / AR)
+        chord_t = xp.sqrt(S_t / AR)
 
         L_w = q_dyn * S_w * self.Cl(alpha, params)
         D_w = q_dyn * S_w * self.Cd(alpha, params)
@@ -102,25 +109,27 @@ class Plane2D(MechanicalSystem):
 
     def H(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
         mass = params["mass"]
         inertia = params["inertia"]
 
-        # diagonal translational and rotational inertia
-        return np.diag([mass, mass, inertia])
+        return xp.diag(xp.array([mass, mass, inertia]))
 
     def C(self, q, dq, params=None):
-        return np.zeros((3, 3))
+        xp = array_module(q)
+        return xp.zeros((3, 3))
 
     def g(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
         mass = params["mass"]
         gravity = params["gravity"]
 
-        # weight pulls along +y (d sits on the left side of the EoM)
-        return np.array([0.0, mass * gravity, 0.0])
+        return xp.array([0.0, mass * gravity, 0.0])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
         l_w = params["l_w"]
         l_t = params["l_t"]
 
@@ -130,8 +139,7 @@ class Plane2D(MechanicalSystem):
             speed, alpha, delta, params
         )
 
-        # Net aero load in the wind frame: drag along -x_wind, lift along +y_wind.
-        c_alpha, s_alpha = np.cos(alpha), np.sin(alpha)
+        c_alpha, s_alpha = xp.cos(alpha), xp.sin(alpha)
         lift = L_w + L_t
         drag = D_w + D_t
         moment = (
@@ -140,11 +148,10 @@ class Plane2D(MechanicalSystem):
             - l_w * (L_w * c_alpha + D_w * s_alpha)
             - l_t * (L_t * c_alpha + D_t * s_alpha)
         )
-        wind_load = np.array([-drag, lift, moment])
+        wind_load = xp.array([-drag, lift, moment])
 
-        # Rotate into the inertial frame; d is a left-side load, hence the sign.
-        c_gamma, s_gamma = np.cos(gamma), np.sin(gamma)
-        R = np.array(
+        c_gamma, s_gamma = xp.cos(gamma), xp.sin(gamma)
+        R = xp.array(
             [
                 [c_gamma, -s_gamma, 0.0],
                 [s_gamma, c_gamma, 0.0],
@@ -154,10 +161,11 @@ class Plane2D(MechanicalSystem):
         return -(R @ wind_load)
 
     def generalized_force(self, q, dq, u, t=0.0, params=None):
+        xp = array_module(q)
         thrust = u[0]
         theta = q[2]
 
-        return thrust * np.array([np.cos(theta), np.sin(theta), 0.0])
+        return thrust * xp.array([xp.cos(theta), xp.sin(theta), 0.0])
 
     def get_camera_transform(self, x, u, t):
         return follow_xy_camera(x[0], x[1], self.camera_scale)
