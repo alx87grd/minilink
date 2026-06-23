@@ -77,6 +77,21 @@ class MechanicalSystem(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
+        self.add_output_port("q", dim=dof, function=self.h_q, dependencies=())
+        self.add_output_port("dq", dim=dof, function=self.h_dq, dependencies=())
+        self.outputs["q"].labels = self.state.labels[:dof]
+        self.outputs["q"].units = self.state.units[:dof]
+        self.outputs["dq"].labels = self.state.labels[dof:]
+        self.outputs["dq"].units = self.state.units[dof:]
+
+    def h_q(self, x, u, t=0, params=None):
+        q, _ = self.x2q(x)
+        return q
+
+    def h_dq(self, x, u, t=0, params=None):
+        _, dq = self.x2q(x)
+        return dq
+
     def H(self, q, params=None):
         """Inertia matrix, shape (dof, dof). Kinetic energy = 0.5 * dq^T H(q) dq."""
         xp = array_module(q)
