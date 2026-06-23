@@ -66,6 +66,10 @@ class Set(ABC):
         """
         raise NotImplementedError("Sampling is not available for this set")
 
+    def __and__(self, other: "Set") -> "IntersectionSet":
+        """Return the intersection ``self & other`` of two sets."""
+        return IntersectionSet((self, other))
+
 
 class InputSet(ABC):
     """

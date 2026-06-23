@@ -17,6 +17,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Planning/trajopt | 2 | Direct collocation / shooting exist; DP/RRT/polynomial generation not ported. | Architectural review for offline DP/RRT; traj generation. |
 | Planning/policy synthesis | 1 | Pyro DP/value iteration not ported; stubs removed. | Redesign under `planning/policy_synthesis/` (see pyro gap doc §4). |
 | Planning/search | 1 | Pyro RRT not ported; stubs removed. | Redesign under `planning/search/rrt.py`. |
+| Geometry / environment | 1 | `core/geometry.py` SDF primitives (`Sphere`/`Box`/`Union`/`Inflated`) + cost algebra (`SumCost`/`ScaledCost`) landed as the dual constraint/cost foundation for obstacles. | Build `planning/environment/` (`Obstacle`, `GaussianField`, `RobotShape`, `Environment` with `as_free_set`/`as_cost`), then RRT consumers. |
 | Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Kinematic composition review before API freeze. |
 | Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Same gate as Graphical. |
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; `DynamicBicycle` params thread fully. | `Manipulator` abstraction + catalog rebase (see review queue). |

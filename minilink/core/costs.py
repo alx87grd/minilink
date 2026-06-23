@@ -93,6 +93,24 @@ class CostFunction(ABC):
             evaluated.signals["cost"][0, -1] + self.terminal_cost(traj, params)
         )
 
+    # Cost algebra
+
+    def __add__(self, other: "CostFunction") -> "CostFunction":
+        """Return the sum cost ``self + other``."""
+        return SumCost.of(self, other)
+
+    def __radd__(self, other) -> "CostFunction":
+        """Support ``sum([...])``, whose start value is the integer ``0``."""
+        if other == 0:
+            return self
+        return SumCost.of(other, self)
+
+    def __mul__(self, weight: float) -> "CostFunction":
+        """Return this cost scaled by a weight, ``weight * self``."""
+        return ScaledCost(self, float(weight))
+
+    __rmul__ = __mul__
+
 
 @dataclass(frozen=True)
 class QuadraticCost(CostFunction):
@@ -173,3 +191,57 @@ class QuadraticCost(CostFunction):
         """Return the quadratic terminal cost."""
         dx = x - self.xbar
         return dx.T @ self.S @ dx
+
+
+@dataclass(frozen=True)
+class SumCost(CostFunction):
+    """
+    Additive cost ``J = sum_i J_i`` over several cost functions.
+
+    Built by the ``+`` operator on :class:`CostFunction`; use it to add an
+    obstacle or traversability term to a base objective.
+    """
+
+    terms: tuple
+
+    @classmethod
+    def of(cls, *costs: CostFunction) -> "SumCost":
+        """Build a sum cost, flattening nested sums into a single term list."""
+        terms: list[CostFunction] = []
+        for cost in costs:
+            if isinstance(cost, SumCost):
+                terms.extend(cost.terms)
+            else:
+                terms.append(cost)
+        return cls(tuple(terms))
+
+    def g(self, x, u, t=0.0, params=None):
+        """Return the summed running cost."""
+        return sum(cost.g(x, u, t, params) for cost in self.terms)
+
+    def h(self, x, t=0.0, params=None):
+        """Return the summed terminal cost."""
+        return sum(cost.h(x, t, params) for cost in self.terms)
+
+
+@dataclass(frozen=True)
+class ScaledCost(CostFunction):
+    """
+    Cost scaled by a weight, ``J = weight * J0``.
+
+    Built by the ``*`` operator on :class:`CostFunction`, so a weighted sum
+    reads as ``base + weight * obstacle_cost``.
+    """
+
+    cost: CostFunction
+    weight: float
+
+    def g(self, x, u, t=0.0, params=None):
+        """Return the weighted running cost."""
+        weight = self.weight
+        return weight * self.cost.g(x, u, t, params)
+
+    def h(self, x, t=0.0, params=None):
+        """Return the weighted terminal cost."""
+        weight = self.weight
+        return weight * self.cost.h(x, t, params)

@@ -43,7 +43,7 @@ rearrangement) are listed in [ROADMAP.md §5](ROADMAP.md).
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ `SystemFacades` mixin), `DiagramSystem`, signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs |
+| `core/` | `System` (+ `SystemFacades` mixin), `DiagramSystem`, signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
 | `core/compile/` | `ExecutionPlan`, compiler, NumPy/JAX evaluators |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -184,12 +184,19 @@ Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop,
 `autowire()` conservative fill. Diagram operands are flattened, not nested.
 Explicit `add_subsystem` / `connect` remains canonical for general topology.
 
-### `Trajectory`, sets, costs
+### `Trajectory`, sets, costs, geometry
 
 - `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
-- Sets: `margin ≥ 0` feasible; `contains`/`sample` may convert to NumPy.
+- Sets: `margin ≥ 0` feasible; `contains`/`sample` may convert to NumPy. Compose with
+  `&` → `IntersectionSet`.
 - Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
-  `PlanningProblem`, not the plant.
+  `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
+  `ScaledCost` (e.g. `base + w * obstacle_cost`).
+- Geometry (`geometry.py`): `Shape.sdf(p)` is the signed distance to a workspace
+  *solid* — `< 0` inside (occupied), the dual of an allowable `Set` (`margin ≥ 0`).
+  Primitives `Sphere`/`Box`/`Union`/`Inflated`; native-array math path (NumPy and
+  JAX-traceable). Foundation for the obstacle Environment, which exports a scene as a
+  free-space `Set` (hard constraint) or a traversability `CostFunction` (soft cost).
 
 ## 5. Compilation And Simulation
 
@@ -224,6 +231,12 @@ route `problem.params.system` through the parametric tier `f_p`;
 `compile_backend="direct"` calls `system.f` uncompiled (escape hatch).
 A `MathematicalProgram` carries the native backend of its callables in its
 `backend` field, and the `Optimizer` compiles with it by default.
+
+**Environment** (`planning/environment/`): scene holds hard `Shape` obstacles and soft
+`ScalarField` traversability sources. Export separately — `clearance_field(robot)` for
+collision (hard `Set` or barrier `CostFunction`) and `cost_field(robot)` for terrain
+(soft `CostFunction` or hard band via `as_constraint(upper=...)`). Compose at
+`PlanningProblem`: `X = bounds & free`, `cost = base + w * terrain`.
 
 ## 7. Graphics And Benchmarks
 
