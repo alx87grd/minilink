@@ -1,13 +1,12 @@
 """
-Soft traversability sources for workspace environments.
+Workspace penalty fields on ``p in R^2`` or ``R^3``.
 
-A :class:`ScalarField` models a smooth penalty density over the workspace —
-mud, slope preference, heat maps — not a solid region. The density is
-nonnegative and sums at the environment level into :meth:`Environment.cost_density`.
+A :class:`WorkspaceField` models a smooth penalty density over the workspace —
+mud, slope preference, heat maps — not a solid region. Densities sum at the
+scene level into :meth:`~minilink.planning.spatial.scene.Scene.cost_density`.
 
-Construction and sampling are NumPy/Python boundary utilities; :meth:`density`
-is a native-array math path that stays NumPy under NumPy input and traces under
-JAX.
+Construction is a NumPy/Python boundary; :meth:`WorkspaceField.density` is a
+native-array math path that stays NumPy under NumPy input and traces under JAX.
 """
 
 from abc import ABC, abstractmethod
@@ -20,7 +19,7 @@ from minilink.core.backends import array_module
 # Public API
 
 
-class ScalarField(ABC):
+class WorkspaceField(ABC):
     """
     Base class for workspace penalty densities.
 
@@ -35,7 +34,7 @@ class ScalarField(ABC):
 
 
 @dataclass(frozen=True)
-class GaussianField(ScalarField):
+class GaussianField(WorkspaceField):
     """
     Smooth Gaussian penalty peak centered at ``center``.
 

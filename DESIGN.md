@@ -172,6 +172,11 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   (numeric leaves required): values vary without retracing, and
   `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
   (see `examples/scripts/identification/demo_params_gradient.py`).
+- **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets` today;
+  a future `scene` tier for spatial overrides is on the roadmap. **Deferred**
+  ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides on base
+  `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types declare
+  `(t, params)` but still read frozen attributes only until a follow-up pass.
 
 ### `DiagramSystem`
 
@@ -188,15 +193,28 @@ Explicit `add_subsystem` / `connect` remains canonical for general topology.
 
 - `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
 - Sets: `margin ≥ 0` feasible; `contains`/`sample` may convert to NumPy. Compose with
-  `&` → `IntersectionSet`.
+  `&` → `IntersectionSet`. `margin(z, t, params)` is threaded by transcriptions via
+  `problem.params.sets` (merged with `environment` for field-backed sets); base
+  `Set` subclasses other than `FieldSet` / `CallableSet` do not yet read `params`
+  (deferred — see ROADMAP).
 - Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
   `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
-  `ScaledCost` (e.g. `base + w * obstacle_cost`).
+  `ScaledCost` (e.g. `base + w * obstacle_cost`). `g`/`h` receive
+  `problem.params.cost` (merged with `environment` for `FieldCost`); built-in costs
+  such as `QuadraticCost` do not yet read `params` (deferred).
 - Geometry (`geometry.py`): `Shape.sdf(p)` is the signed distance to a workspace
   *solid* — `< 0` inside (occupied), the dual of an allowable `Set` (`margin ≥ 0`).
   Primitives `Sphere`/`Box`/`Union`/`Inflated`; native-array math path (NumPy and
-  JAX-traceable). Foundation for the obstacle Environment, which exports a scene as a
-  free-space `Set` (hard constraint) or a traversability `CostFunction` (soft cost).
+  JAX-traceable). `sdf(p, t, params)` is threaded by the spatial scene pipeline;
+  primitives still use frozen dataclass fields only until parametric shapes land
+  (deferred). Foundation for hard obstacles in a :class:`~minilink.planning.spatial.scene.Scene`,
+  exported as a free-space `Set` (hard constraint) or soft `CostFunction`.
+- **Sign convention** (shared): nonnegative ⇒ feasible/free — `Shape.sdf > 0` outside,
+  `ClearanceField.value ≥ 0` collision-free, `Set.margin ≥ 0` feasible. The core stores
+  signed *physical* quantities (clearance in length units, density in cost units), never a
+  bounded `[0,1]` score: an SDF keeps a well-scaled gradient everywhere, which a squashed
+  occupancy would lose. Normalized/occupancy views are derived at the **edge** via
+  `as_cost(shaping=...)`, not stored in the field.
 
 ## 5. Compilation And Simulation
 
@@ -232,11 +250,20 @@ route `problem.params.system` through the parametric tier `f_p`;
 A `MathematicalProgram` carries the native backend of its callables in its
 `backend` field, and the `Optimizer` compiles with it by default.
 
-**Environment** (`planning/environment/`): scene holds hard `Shape` obstacles and soft
-`ScalarField` traversability sources. Export separately — `clearance_field(robot)` for
-collision (hard `Set` or barrier `CostFunction`) and `cost_field(robot)` for terrain
-(soft `CostFunction` or hard band via `as_constraint(upper=...)`). Compose at
-`PlanningProblem`: `X = bounds & free`, `cost = base + w * terrain`.
+**Spatial scene** (`planning/spatial/`): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
+**state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
+`Scene` (`obstacles`, `workspace_fields`). On X: `StateField.value(x)` fuses the robot
+placement with scene queries (`clearance_field`, `cost_field`). Export separately —
+`clearance_field(robot)` for collision (hard `Set` or barrier `CostFunction`) and
+`cost_field(robot)` for terrain (soft `CostFunction` or hard band via
+`as_constraint(upper=...)`). `StateField.value(x)` is a **scalar** (min clearance, max
+density over body probes). `RobotBody` places body-frame geometry by
+`body_poses(x,u,t,params) → T`, dimension-generic (2-D/3-D, any state size). Shape an
+obstacle term before weighting with `as_cost(shaping=...)` (`shaping.occupancy`,
+`quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
+`X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
+obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then. See
+[docs/plans/spatial-pipeline.md](docs/plans/spatial-pipeline.md).
 
 ## 7. Graphics And Benchmarks
 

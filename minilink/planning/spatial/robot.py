@@ -1,5 +1,5 @@
 """
-Robot collision bodies for environment queries.
+Robot collision bodies for spatial scene queries.
 
 A :class:`RobotBody` is the moving counterpart of a workspace
 :class:`~minilink.core.geometry.Shape`: it carries body-frame collision
@@ -11,10 +11,8 @@ its poses coming from forward kinematics. This mirrors the ``System``
 visualization contract (static geometry plus aligned transforms) but with
 collision-grade geometry, and it never imports any graphics.
 
-Collision against an environment reduces each part to body-frame
-``(center, radius)`` probes through :func:`collision_spheres`, so the cheap,
-exact query ``obstacle.sdf(world_center) - radius`` is all that is needed. The
-first pass supports a single :class:`~minilink.core.geometry.Sphere` part.
+Collision against a scene uses world ``(center, radius)`` probes from each
+placed part via :func:`collision_spheres` and :func:`apply_transform`.
 """
 
 from abc import ABC, abstractmethod
@@ -24,7 +22,6 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.geometry import Shape, Sphere
-
 
 # Public API
 
@@ -52,24 +49,26 @@ class RobotBody(ABC):
 
 
 @dataclass(frozen=True)
-class PlanarBody(RobotBody):
+class TranslationBody(RobotBody):
     """
-    Single-part planar body placed by translation and an optional heading.
+    Single-part body placed by translating its geometry to state coordinates.
+
+    The pose is a pure translation with identity orientation — exact for
+    rotation-invariant geometry such as spheres, and valid in any workspace
+    dimension. The ``position`` indices pick the workspace coordinates out of a
+    state of any size, and their count sets the workspace dimension. Oriented
+    bodies (SE(2)/SE(3) rotation) are a later addition.
 
     Parameters
     ----------
     shape : Shape
         Body-frame collision geometry (a :class:`Sphere` in the first pass).
     position : tuple of int
-        State indices of the body-frame origin in the world plane.
-    heading : int, optional
-        State index of the planar rotation angle. ``None`` leaves the body
-        unrotated (sufficient for a centered disc).
+        State indices giving the body-frame origin in the world.
     """
 
     shape: Shape
     position: tuple = (0, 1)
-    heading: int | None = None
 
     @property
     def shapes(self) -> tuple[Shape, ...]:
@@ -77,30 +76,23 @@ class PlanarBody(RobotBody):
 
     def body_poses(self, x, u=None, t=0.0, params=None):
         xp = array_module(x)
-        tx = x[self.position[0]]
-        ty = x[self.position[1]]
-        c = 1.0 if self.heading is None else xp.cos(x[self.heading])
-        s = 0.0 if self.heading is None else xp.sin(x[self.heading])
+        p = xp.stack([x[i] for i in self.position])
+        d = p.shape[0]
 
-        # homogeneous SE(2) transform of the body frame in the world
-        T = xp.stack(
-            [
-                xp.stack([c, -s, tx]),
-                xp.stack([s, c, ty]),
-                xp.asarray([0.0, 0.0, 1.0]),
-            ]
-        )
-        return (T,)
+        # homogeneous transform of a pure translation: [[I, p], [0, 1]]
+        top = xp.concatenate([xp.eye(d), p.reshape(d, 1)], axis=1)
+        bottom = xp.concatenate([xp.zeros(d), xp.ones(1)]).reshape(1, d + 1)
+        return (xp.concatenate([top, bottom], axis=0),)
 
 
-def disc(radius, *, position=(0, 1), dim=2) -> PlanarBody:
-    """Return a single-sphere planar body of the given radius."""
-    return PlanarBody(Sphere(np.zeros(dim), radius), position=position)
+def sphere(radius, *, position=(0, 1)) -> TranslationBody:
+    """Return a sphere body of the given radius (a disc in 2-D)."""
+    return TranslationBody(Sphere(np.zeros(len(position)), radius), position)
 
 
-def point(*, position=(0, 1), dim=2) -> PlanarBody:
-    """Return a radius-zero planar body (a point robot)."""
-    return PlanarBody(Sphere(np.zeros(dim), 0.0), position=position)
+def point(*, position=(0, 1)) -> TranslationBody:
+    """Return a radius-zero point body."""
+    return TranslationBody(Sphere(np.zeros(len(position)), 0.0), position)
 
 
 def apply_transform(T, q):
