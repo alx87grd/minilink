@@ -2,7 +2,7 @@
 
 Run from repo root::
 
-    python examples/scripts/planning/demo_rrt_car_parking.py
+    python examples/scripts/planning/rrt/demo_car_parking.py
 
 The same parking problem is solved twice, changing only the two swappable parts
 of the planner -- the ``TrajectoryExtender`` and the nearest-neighbour

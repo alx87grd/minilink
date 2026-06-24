@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.trajectory import Trajectory
 
 
@@ -201,8 +202,7 @@ class TimeCost(CostFunction):
     The running cost is ``g = 1`` everywhere except within ``eps`` of the target
     ``xbar``, where it is ``0`` (the absorbing goal); the terminal cost is ``0``.
     Under dynamic programming the cost-to-go becomes the time-to-go and the
-    optimal policy is bang-bang. The on-target test is a NumPy boundary check
-    (not a JAX-traceable math path).
+    optimal policy is bang-bang.
     """
 
     xbar: np.ndarray
@@ -221,7 +221,10 @@ class TimeCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return unit running cost away from the target, zero on it."""
-        return 0.0 if np.linalg.norm(x - self.xbar) < self.eps else 1.0
+        xp = array_module(x)
+        xbar = xp.asarray(self.xbar)
+        on_target = xp.linalg.norm(x - xbar) < self.eps
+        return xp.where(on_target, xp.asarray(0.0), xp.asarray(1.0))
 
     def h(self, x, t=0.0, params=None):
         """Return zero terminal cost."""

@@ -58,6 +58,9 @@ none. Nearest-neighbor metric comes from the extender/`SteeringFunction`, not th
 - NEW `examples/scripts/planning/demo_rrt_kinodynamic.py`,
   `demo_rrt_steering.py` (reuse a `Scene` for collision + `scene.plot` heatmap with the
   path/tree overlaid).
+  **Superseded (2026):** kinodynamic/steering demos live under
+  `examples/scripts/planning/rrt/` — `demo_pendulum_swingup.py`, `demo_car_parking.py`,
+  and `demo_holonomic_obstacles.py` (scene + RRT/RRT* + extenders).
 - EDIT `DESIGN.md` (planning/search contract), `ROADMAP.md` (TRL bump, P3 item).
 
 ## Reuse (don't reinvent)

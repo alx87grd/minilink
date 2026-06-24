@@ -24,6 +24,8 @@ Three interchangeable backward-step engines share this workflow:
 
 from dataclasses import dataclass
 
+import time
+
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, configure_jax
@@ -167,6 +169,8 @@ class DynamicProgrammingPlanner(Planner):
             raise ValueError(f"Unknown backend {self.options.backend!r}")
         self._G = None  # running-cost table, cached when the grid is precomputed
         self._jax_cache = {}  # compiled JAX runners keyed by (stop_on_tol, n)
+        if self.options.backend == BACKEND_JAX:
+            self.grid.ensure_jax_transition(self.options.final_time)
 
     def compute_solution(self) -> DynamicProgrammingResult:
         """Run value iteration until convergence (or ``max_iterations``)."""
@@ -203,6 +207,9 @@ class DynamicProgrammingPlanner(Planner):
         tf = opt.final_time
         step = self._loop_step if opt.backend == BACKEND_LOOP else self._vectorized_step
 
+        if opt.verbose:
+            self._print_solve_banner(max_iterations, stop_on_tol)
+
         J = self._terminal_cost(tf)
         pi = np.zeros(grid.nodes_n, dtype=int)
 
@@ -210,6 +217,7 @@ class DynamicProgrammingPlanner(Planner):
 
         delta = np.inf
         k = 0
+        start_time = time.time()
         while k < max_iterations and (not stop_on_tol or delta > opt.tol):
             k += 1
             t = tf - k * grid.dt
@@ -217,9 +225,12 @@ class DynamicProgrammingPlanner(Planner):
             J, pi = step(J_next, t)
             delta = float(np.max(np.abs(J - J_next)))
             if opt.verbose:
-                print(f"DP step {k:4d}  t={t:7.3f}  Jmax={J.max():.3g}  dJ={delta:.3g}")
+                self._print_sweep_line(k, t, J, J_next, start_time)
             if history is not None:
                 history.append((t, J.copy(), pi.copy()))
+
+        if opt.verbose and stop_on_tol:
+            print("\nBellman equation solved!")
 
         result = DynamicProgrammingResult(
             grid=grid, J=J, pi=pi, iterations=k, delta=delta, history=history
@@ -299,6 +310,9 @@ class DynamicProgrammingPlanner(Planner):
         return J_new, pi
 
     def _terminal_cost(self, t):
+        if self.options.backend == BACKEND_JAX:
+            return self._terminal_cost_jax(t)
+
         grid = self.grid
         h = self.problem.cost.h
         cost_params = self.problem.params.cost
@@ -306,15 +320,58 @@ class DynamicProgrammingPlanner(Planner):
             [float(h(grid.states[s], t, cost_params)) for s in range(grid.nodes_n)]
         )
 
+    def _terminal_cost_jax(self, t):
+        """Terminal cost-to-go at every grid node (JAX vmap over N nodes)."""
+        jax = configure_jax(enable_x64=True)
+        jnp = jax.numpy
+        grid = self.grid
+        N = grid.nodes_n
+        states = jnp.asarray(grid.states)
+        h = self.problem.cost.h
+        cost_params = self.problem.params.cost
+        verbose = self.options.verbose
+
+        if verbose:
+            print("Computing h(x,t) terminal cost.. ", end="", flush=True)
+            start = time.time()
+
+        def node(s):
+            return h(states[s], t, cost_params)
+
+        try:
+
+            @jax.jit
+            def build():
+                return jax.vmap(node)(jnp.arange(N))
+
+            J0 = np.array(build())
+        except Exception as exc:
+            raise ValueError(
+                "JAX terminal-cost build requires a JAX-traceable cost.h"
+            ) from exc
+
+        if verbose:
+            print(f"completed in {time.time() - start:4.2f} sec")
+
+        return J0
+
     def _running_cost(self, action_ok, x_next_ok, t):
         if self.grid.precomputed and self._G is not None:
             return self._G
+
+        if self.options.backend == BACKEND_JAX:
+            return self._running_cost_jax(action_ok, x_next_ok, t)
 
         grid = self.grid
         g = self.problem.cost.g
         cost_params = self.problem.params.cost
         dt = grid.dt
         N, A = grid.nodes_n, grid.actions_n
+        verbose = self.options.verbose
+
+        if verbose:
+            print("Computing g(x,u,t) look-up table.. ", end="", flush=True)
+            start = time.time()
 
         G = np.empty((N, A), dtype=float)
         for a in range(A):
@@ -324,18 +381,84 @@ class DynamicProgrammingPlanner(Planner):
 
         G[(~action_ok) | (~x_next_ok)] = self.options.out_of_bound_cost
 
+        if verbose:
+            print(f"completed in {time.time() - start:4.2f} sec")
+
         if self.grid.precomputed:
             self._G = G
         return G
 
-    def _solve_jax(self, max_iterations, stop_on_tol):
-        """Jitted on-device value iteration over the lookup table.
+    def _running_cost_jax(self, action_ok, x_next_ok, t):
+        """Running-cost lookup table G[s,a] = g(x,u,t)*dt (JAX vmap over N×A pairs)."""
+        jax = configure_jax(enable_x64=True)
+        jnp = jax.numpy
+        grid = self.grid
+        g = self.problem.cost.g
+        cost_params = self.problem.params.cost
+        dt = grid.dt
+        N, A = grid.nodes_n, grid.actions_n
+        states = jnp.asarray(grid.states)
+        inputs = jnp.asarray(grid.inputs)
+        penalty = float(self.options.out_of_bound_cost)
+        verbose = self.options.verbose
 
-        The successor and cost tables are built once with NumPy (so any plant
-        works), then the whole convergence loop runs as a single jitted
-        ``lax.while_loop`` with ``map_coordinates`` interpolation — the Bellman
-        backup mapped over every node-action pair stays on device. The compiled
-        runner is cached so repeated solves pay compilation only once.
+        if verbose:
+            print("Computing g(x,u,t) look-up table.. ", end="", flush=True)
+            start = time.time()
+
+        def pair(s, a):
+            return g(states[s], inputs[a], t, cost_params) * dt
+
+        try:
+
+            @jax.jit
+            def build():
+                sa = jnp.arange(N * A)
+                s = sa // A
+                a = sa % A
+                return jax.vmap(pair)(s, a).reshape(N, A)
+
+            G = np.array(build())
+        except Exception as exc:
+            raise ValueError(
+                "JAX G-table build requires a JAX-traceable cost.g "
+                "(QuadraticCost and TimeCost are supported)"
+            ) from exc
+
+        G[(~action_ok) | (~x_next_ok)] = penalty
+
+        if verbose:
+            print(f"completed in {time.time() - start:4.2f} sec")
+
+        if self.grid.precomputed:
+            self._G = G
+        return G
+
+    def _print_solve_banner(self, max_iterations, stop_on_tol):
+        """Print a pyro-style solve header."""
+        if stop_on_tol:
+            print(f"\nComputing backward DP iterations until dJ<{self.options.tol:.2f}:")
+            print("---------------------------------------------------------")
+        else:
+            print(f"\nComputing {max_iterations} backward DP iterations:")
+            print("-----------------------------------------")
+
+    def _print_sweep_line(self, k, t, J, J_next, start_time):
+        """Print one convergence line (pyro ``finalize_backward_step`` format)."""
+        delta = J - J_next
+        elapsed = time.time() - start_time
+        print(
+            f"{k:4d} t:{t:7.2f} Elapsed:{elapsed:7.2f} "
+            f"max:{J.max():7.2f} dmax:{delta.max():7.2f} dmin:{delta.min():7.2f}"
+        )
+
+    def _solve_jax(self, max_iterations, stop_on_tol):
+        """Jitted on-device value iteration over JAX-built lookup tables.
+
+        Grid transition, terminal cost J0, and running cost G are built with JAX
+        ``vmap`` when ``backend="jax"``. The convergence loop runs as a single
+        jitted ``lax.while_loop`` with ``map_coordinates`` interpolation. The
+        compiled runner is cached so repeated solves pay compilation only once.
         """
         jax = configure_jax(enable_x64=True)  # match NumPy float64 precision
         jnp = jax.numpy
@@ -347,7 +470,7 @@ class DynamicProgrammingPlanner(Planner):
         if opt.interpolation not in ("linear", "nearest"):
             raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
 
-        # NumPy precompute (works for any plant), then move to device.
+        # JAX-built lookup tables, then move to device for the jitted sweep.
         x_next, action_ok, x_next_ok = grid.transition(tf)
         G = jnp.asarray(self._running_cost(action_ok, x_next_ok, tf))
         J0 = jnp.asarray(self._terminal_cost(tf))
@@ -367,8 +490,20 @@ class DynamicProgrammingPlanner(Planner):
                 jax, jnp, J0, G, coords, in_bounds, max_iterations, stop_on_tol
             )
 
+        if opt.verbose:
+            self._print_solve_banner(max_iterations, stop_on_tol)
+            print("(JAX backend: per-sweep lines omitted; loop runs on device)")
+
+        start_time = time.time()
         run = self._jax_runner(jax, jnp, stop_on_tol, max_iterations)
         J, pi, k, delta = run(J0, G, coords, in_bounds)
+        if opt.verbose:
+            elapsed = time.time() - start_time
+            print(
+                f"  jax solve: {elapsed:.2f} s   iters={int(k)}   delta={float(delta):.3f}"
+            )
+            if stop_on_tol:
+                print("\nBellman equation solved!")
         result = DynamicProgrammingResult(
             grid=grid,
             J=np.array(J),  # writable copy (np.asarray of a jax buffer is read-only)
@@ -454,14 +589,23 @@ class DynamicProgrammingPlanner(Planner):
         tf, tol = self.options.final_time, float(self.options.tol)
         step = self._jax_step(jax, jnp)
 
+        if self.options.verbose:
+            self._print_solve_banner(max_iterations, stop_on_tol)
+
         J, pi, delta, k = J0, jnp.zeros(grid.nodes_n, dtype=jnp.int32), np.inf, 0
+        start_time = time.time()
         history = [(tf, np.asarray(J), np.asarray(pi))]
         while k < max_iterations and (not stop_on_tol or delta > tol):
             k += 1
             J_next = J
             J, pi = step(J, G, coords, in_bounds)
             delta = float(jnp.max(jnp.abs(J - J_next)))
+            if self.options.verbose:
+                self._print_sweep_line(k, tf - k * grid.dt, np.asarray(J), np.asarray(J_next), start_time)
             history.append((tf - k * grid.dt, np.asarray(J), np.asarray(pi)))
+
+        if self.options.verbose and stop_on_tol:
+            print("\nBellman equation solved!")
 
         result = DynamicProgrammingResult(
             grid=grid,

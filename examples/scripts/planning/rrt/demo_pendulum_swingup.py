@@ -2,7 +2,7 @@
 
 Run from repo root::
 
-    python examples/scripts/planning/demo_rrt_pendulum_swingup.py
+    python examples/scripts/planning/rrt/demo_pendulum_swingup.py
 
 The pendulum is underactuated: the torque limit (±5 Nm) is below the gravity
 torque needed to hold it horizontal (m·g·l ≈ 9.8 Nm), so the planner must pump

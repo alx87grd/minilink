@@ -17,6 +17,7 @@ def plot_value(
     J,
     *,
     axes=(0, 1),
+    anchor=None,
     vmin=0.0,
     vmax=None,
     cmap="YlOrRd",
@@ -29,6 +30,7 @@ def plot_value(
         grid,
         J,
         axes=axes,
+        anchor=anchor,
         vmin=vmin,
         vmax=vmax,
         cmap=cmap,
@@ -38,13 +40,24 @@ def plot_value(
     )
 
 
-def plot_policy(grid, pi, *, axis=0, axes=(0, 1), cmap="bwr", ax=None, show=True):
+def plot_policy(
+    grid,
+    pi,
+    *,
+    axis=0,
+    axes=(0, 1),
+    anchor=None,
+    cmap="bwr",
+    ax=None,
+    show=True,
+):
     """Draw a 2-D heatmap of input axis ``axis`` of a policy ``pi``."""
     u_axis = grid.input_from_policy(pi)[:, axis]
     return _plot_field(
         grid,
         u_axis,
         axes=axes,
+        anchor=anchor,
         vmin=grid.u_lb[axis],
         vmax=grid.u_ub[axis],
         cmap=cmap,
@@ -55,12 +68,12 @@ def plot_policy(grid, pi, *, axis=0, axes=(0, 1), cmap="bwr", ax=None, show=True
 
 
 def plot_value_3d(
-    grid, J, *, axes=(0, 1), cmap="YlOrRd", title="Cost-to-go", show=True
+    grid, J, *, axes=(0, 1), anchor=None, cmap="YlOrRd", title="Cost-to-go", show=True
 ):
     """Draw a 3-D surface of a node-indexed value field ``J``."""
     import matplotlib.pyplot as plt
 
-    Z = grid.slice_2d(grid.grid_from_array(J), axes[0], axes[1])
+    Z = grid.slice_2d(grid.grid_from_array(J), axes[0], axes[1], anchor=anchor)
     x_level, y_level = grid.x_levels[axes[0]], grid.x_levels[axes[1]]
     mesh_x, mesh_y = np.meshgrid(x_level, y_level)
 
@@ -78,7 +91,15 @@ def plot_value_3d(
 
 
 def animate(
-    grid, history, *, kind="value", axis=0, axes=(0, 1), interval=60, show=True
+    grid,
+    history,
+    *,
+    kind="value",
+    axis=0,
+    axes=(0, 1),
+    anchor=None,
+    interval=60,
+    show=True,
 ):
     """
     Animate a recorded value (``kind="value"``) or policy (``kind="policy"``)
@@ -99,7 +120,10 @@ def animate(
         x_level,
         y_level,
         grid.slice_2d(
-            grid.grid_from_array(frame_field(history[0])), axes[0], axes[1]
+            grid.grid_from_array(frame_field(history[0])),
+            axes[0],
+            axes[1],
+            anchor=anchor,
         ).T,
         shading="gouraud",
         cmap="bwr" if kind == "policy" else "YlOrRd",
@@ -109,7 +133,10 @@ def animate(
 
     def update(i):
         Z = grid.slice_2d(
-            grid.grid_from_array(frame_field(history[i])), axes[0], axes[1]
+            grid.grid_from_array(frame_field(history[i])),
+            axes[0],
+            axes[1],
+            anchor=anchor,
         )
         mesh.set_array(Z.T.ravel())
         ax.set_title(f"sweep {i}  t={history[i][0]:.2f}")
@@ -125,10 +152,12 @@ def animate(
 # Internal machinery
 
 
-def _plot_field(grid, values, *, axes, vmin, vmax, cmap, ax, title, show):
+def _plot_field(grid, values, *, axes, anchor, vmin, vmax, cmap, ax, title, show):
     import matplotlib.pyplot as plt
 
-    Z = grid.slice_2d(grid.grid_from_array(values), axes[0], axes[1])
+    Z = grid.slice_2d(
+        grid.grid_from_array(values), axes[0], axes[1], anchor=anchor
+    )
     x_level, y_level = grid.x_levels[axes[0]], grid.x_levels[axes[1]]
 
     if ax is None:

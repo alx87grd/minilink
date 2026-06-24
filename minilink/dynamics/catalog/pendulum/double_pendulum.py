@@ -12,6 +12,7 @@ the same sweep scaling as the tutorial single pendulum in ``pendulum.py``.
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
@@ -63,12 +64,13 @@ class DoublePendulum(MechanicalSystem):
         self.camera_scale = 3.0
 
     def _trig(self, q):
-        c1 = np.cos(q[0])
-        s1 = np.sin(q[0])
-        c2 = np.cos(q[1])
-        s2 = np.sin(q[1])
-        c12 = np.cos(q[0] + q[1])
-        s12 = np.sin(q[0] + q[1])
+        xp = array_module(q)
+        c1 = xp.cos(q[0])
+        s1 = xp.sin(q[0])
+        c2 = xp.cos(q[1])
+        s2 = xp.sin(q[1])
+        c12 = xp.cos(q[0] + q[1])
+        s12 = xp.sin(q[0] + q[1])
         return c1, s1, c2, s2, c12, s12
 
     def H(self, q, params=None):
@@ -82,13 +84,14 @@ class DoublePendulum(MechanicalSystem):
         m2 = params["m2"]
         I1 = params["I1"]
         I2 = params["I2"]
+        xp = array_module(q)
 
         # inertia couples the two links through the elbow angle (cos theta2)
         h00 = m1 * lc1**2 + I1 + m2 * (l1**2 + lc2**2 + 2.0 * l1 * lc2 * c2) + I2
         h01 = m2 * lc2**2 + m2 * l1 * lc2 * c2 + I2
         h11 = m2 * lc2**2 + I2
         # fmt: off
-        return np.array([
+        return xp.array([
             [h00, h01],
             [h01, h11],
         ])
@@ -101,18 +104,20 @@ class DoublePendulum(MechanicalSystem):
         m2 = params["m2"]
         l1 = params["l1"]
         lc2 = params["lc2"]
+        xp = array_module(q)
 
         # Coriolis/centrifugal coupling driven by the elbow rate
         h = m2 * l1 * lc2 * s2
         # fmt: off
-        return np.array([
+        return xp.array([
             [-h * dq[1], -h * (dq[0] + dq[1])],
             [ h * dq[0],                  0.0],
         ])
         # fmt: on
 
     def B(self, q, params=None):
-        return np.eye(self.dof)
+        xp = array_module(q)
+        return xp.eye(self.dof)
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -124,17 +129,19 @@ class DoublePendulum(MechanicalSystem):
         lc1 = params["lc1"]
         lc2 = params["lc2"]
         gravity = params["gravity"]
+        xp = array_module(q)
 
         # gravity restoring torque on each joint (sign matches the +y-down screen)
         g1 = (m1 * lc1 + m2 * l1) * gravity
         g2 = m2 * lc2 * gravity
-        return np.array([-g1 * s1 - g2 * s12, -g2 * s12])
+        return xp.array([-g1 * s1 - g2 * s12, -g2 * s12])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         d1 = params["d1"]
         d2 = params["d2"]
-        D = np.diag([d1, d2])
+        xp = array_module(dq)
+        D = xp.diag(xp.array([d1, d2]))
         return D @ dq
 
     def get_kinematic_geometry(self):
@@ -207,7 +214,8 @@ class Acrobot(DoublePendulum):
         )
 
     def B(self, q, params=None):
-        return np.array([[0.0], [1.0]])
+        xp = array_module(q)
+        return xp.array([[0.0], [1.0]])
 
     def get_kinematic_transforms(self, x, u, t):
         transforms = super().get_kinematic_transforms(x, np.array([0.0, u[0]]), t)

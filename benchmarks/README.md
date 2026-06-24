@@ -24,4 +24,6 @@ python benchmarks/run_simulator_speed_manual.py  # hand-picked simulator runs
 python benchmarks/run_optimizer_backends.py      # NLP solver presets on textbook problems
 python benchmarks/run_trajopt_backends.py        # trajopt transcription x backend sweep
 python benchmarks/run_trajopt_solver_presets.py  # direct-collocation solver presets
+python benchmarks/run_dp_backends.py             # value-iteration loop/numpy/jax backends
+python benchmarks/run_rrt_nearest_backends.py    # RRT nearest brute_force vs kd_tree
 ```

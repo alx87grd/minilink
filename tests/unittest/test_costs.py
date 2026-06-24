@@ -18,6 +18,22 @@ def test_time_cost_is_unity_off_target_zero_on_target():
     assert cost.h(np.array([1.0, 0.0])) == 0.0
 
 
+def test_time_cost_jax_matches_numpy():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    cost = TimeCost(xbar=np.zeros(2), eps=0.1)
+    states = jnp.array([[1.0, 0.0], [0.02, 0.0], [0.0, 0.0]])
+    u = jnp.zeros(1)
+
+    def g_at(x):
+        return cost.g(x, u)
+
+    jax_values = jax.vmap(g_at)(states)
+    numpy_values = np.array([cost.g(np.asarray(x), np.zeros(1)) for x in states])
+    assert np.allclose(np.asarray(jax_values), numpy_values)
+
+
 def make_quadratic(n: int = 2, m: int = 1) -> QuadraticCost:
     return QuadraticCost(
         Q=np.eye(n),

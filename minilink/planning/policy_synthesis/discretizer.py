@@ -14,10 +14,13 @@ This module is library-developer facing; the value-iteration math reads from
 :mod:`minilink.planning.policy_synthesis.dp`.
 """
 
+import time
+
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from minilink.core.sets import BoxSet
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.sets import BoxInputSet, BoxSet
 from minilink.planning.problems import PlanningProblem
 
 # Public API
@@ -44,6 +47,14 @@ class StateSpaceGrid:
         time-invariant dynamics. When ``False`` they are recomputed per call to
         :meth:`transition`, which costs less memory and supports time-varying
         dynamics.
+    precompute_backend : {"numpy", "jax"}, optional
+        Engine for building the successor lookup table. ``"numpy"`` (default) uses
+        nested Python loops (pyro's reference). ``"jax"`` vectorizes the forward
+        dynamics with ``vmap`` and is much faster on large grids when the plant
+        is JAX-traceable and the state/input sets are boxes.
+    verbose : bool, optional
+        Print mesh size and lookup-table build progress (pyro-style feedback for
+        large grids).
 
     Attributes
     ----------
@@ -63,6 +74,8 @@ class StateSpaceGrid:
         u_grid_shape,
         dt: float,
         precompute: bool = True,
+        precompute_backend: str = BACKEND_NUMPY,
+        verbose: bool = False,
     ) -> None:
         self.problem = problem
         self.sys = problem.sys
@@ -92,9 +105,42 @@ class StateSpaceGrid:
         self.nodes_n = self.states.shape[0]
         self.actions_n = self.inputs.shape[0]
 
+        self.precompute_backend = precompute_backend
+        self.verbose = bool(verbose)
+        self._jax_transition = False
+        if precompute_backend not in (BACKEND_NUMPY, BACKEND_JAX):
+            raise ValueError(f"Unknown precompute_backend {precompute_backend!r}")
+
         self.precomputed = bool(precompute)
         if self.precomputed:
-            self.x_next, self.action_ok, self.x_next_ok = self._compute_transition(0.0)
+            if self.verbose:
+                self._print_mesh_summary()
+            self.x_next, self.action_ok, self.x_next_ok = self._build_transition(0.0)
+            if precompute_backend == BACKEND_JAX:
+                self._jax_transition = True
+
+    def ensure_jax_transition(self, t: float = 0.0) -> None:
+        """Build or rebuild transition tables with the JAX backend.
+
+        Called by :class:`~minilink.planning.policy_synthesis.dp.DynamicProgrammingPlanner`
+        when ``backend="jax"``. Use ``precompute=False`` on the grid in JAX demos
+        so the slow NumPy build is skipped at construction time.
+        """
+        if self._jax_transition and self.precomputed:
+            return
+
+        if self.verbose and not self.precomputed:
+            self._print_mesh_summary()
+
+        try:
+            self.x_next, self.action_ok, self.x_next_ok = self._compute_transition_jax(t)
+        except Exception as exc:
+            raise ValueError(
+                "JAX grid precompute requires a JAX-traceable plant f and BoxSet X"
+            ) from exc
+
+        self.precomputed = True
+        self._jax_transition = True
 
     # Dynamics and validity
 
@@ -102,7 +148,7 @@ class StateSpaceGrid:
         """Return the successor states ``x_next`` of shape ``(nodes_n, actions_n, n)``."""
         if self.precomputed:
             return self.x_next
-        return self._compute_transition(t)[0]
+        return self._build_transition(t)[0]
 
     def transition(self, t: float = 0.0):
         """
@@ -113,9 +159,15 @@ class StateSpaceGrid:
         """
         if self.precomputed:
             return self.x_next, self.action_ok, self.x_next_ok
-        return self._compute_transition(t)
+        return self._build_transition(t)
 
-    def _compute_transition(self, t):
+    def _build_transition(self, t):
+        """Build successor and validity tables with the selected precompute backend."""
+        if self.precompute_backend == BACKEND_JAX:
+            return self._compute_transition_jax(t)
+        return self._compute_transition_numpy(t)
+
+    def _compute_transition_numpy(self, t):
         """Build the forward-Euler successors and the input/state validity masks."""
         N, A, n = self.nodes_n, self.actions_n, self.n
         f = self.sys.f
@@ -123,6 +175,11 @@ class StateSpaceGrid:
         sys_params = self.problem.params.system
         set_params = self.problem.params.sets
         dt = self.dt
+        verbose = self.verbose
+
+        if verbose:
+            start = time.time()
+            print("Computing x_next array.. ", end="", flush=True)
 
         x_next = np.empty((N, A, n), dtype=float)
         action_ok = np.empty((N, A), dtype=bool)
@@ -140,7 +197,105 @@ class StateSpaceGrid:
                 action_ok[s, a] = U.contains(u, x, t, set_params)
                 x_next_ok[s, a] = X.contains(xnext, t, set_params)
 
+                if verbose and (s + 1) % 10000 == 0:
+                    elapsed = time.time() - start
+                    print(
+                        f"\rComputing x_next array.. {s + 1}/{N} nodes"
+                        f" in {elapsed:4.2f} sec",
+                        end="",
+                        flush=True,
+                    )
+
+        if verbose:
+            elapsed = time.time() - start
+            print(f"\rComputing x_next array.. completed in {elapsed:4.2f} sec")
+
         return x_next, action_ok, x_next_ok
+
+    def _compute_transition_jax(self, t):
+        """Vectorized successor map and box validity masks on device."""
+        from minilink.core.backends import configure_jax
+
+        if not isinstance(self.problem.X, BoxSet):
+            raise ValueError("JAX precompute requires a BoxSet state constraint X")
+
+        jax = configure_jax(enable_x64=True)
+        jnp = jax.numpy
+
+        N, A, n = self.nodes_n, self.actions_n, self.n
+        dt = self.dt
+        sys_params = self.problem.params.system
+        states = jnp.asarray(self.states)
+        inputs = jnp.asarray(self.inputs)
+        x_lb = jnp.asarray(self.problem.X.lower)
+        x_ub = jnp.asarray(self.problem.X.upper)
+        box_inputs = isinstance(self.problem.U, BoxInputSet)
+
+        if verbose := self.verbose:
+            start = time.time()
+            print("Computing x_next array (JAX vmap).. ", end="", flush=True)
+
+        def pair(s, a):
+            x = states[s]
+            u = inputs[a]
+
+            # forward Euler step of the continuous dynamics
+            xnext = x + self.sys.f(x, u, t, sys_params) * dt
+            x_next_ok = jnp.all((xnext >= x_lb) & (xnext <= x_ub))
+            return xnext, x_next_ok
+
+        @jax.jit
+        def build():
+            sa = jnp.arange(N * A)
+            s = sa // A
+            a = sa % A
+            xnext, x_next_ok = jax.vmap(pair)(s, a)
+            return xnext.reshape(N, A, n), x_next_ok.reshape(N, A)
+
+        x_next, x_next_ok = (np.asarray(v) for v in build())
+        if box_inputs:
+            action_ok = np.ones((N, A), dtype=bool)
+        else:
+            action_ok, x_next_ok = self._validity_masks(x_next, t)
+
+        if verbose:
+            elapsed = time.time() - start
+            print(f"completed in {elapsed:4.2f} sec")
+
+        return x_next, action_ok, x_next_ok
+
+    def _validity_masks(self, x_next, t):
+        """Input and successor validity masks for a precomputed ``x_next`` table."""
+        N, A = self.nodes_n, self.actions_n
+        X, U = self.problem.X, self.problem.U
+        set_params = self.problem.params.sets
+
+        if isinstance(U, BoxInputSet) and isinstance(X, BoxSet):
+            action_ok = np.ones((N, A), dtype=bool)
+            x_next_ok = np.all(x_next >= X.lower, axis=2) & np.all(x_next <= X.upper, axis=2)
+            return action_ok, x_next_ok
+
+        action_ok = np.empty((N, A), dtype=bool)
+        x_next_ok = np.empty((N, A), dtype=bool)
+        for a in range(A):
+            u = self.inputs[a]
+            for s in range(N):
+                x = self.states[s]
+                action_ok[s, a] = U.contains(u, x, t, set_params)
+                x_next_ok[s, a] = X.contains(x_next[s, a], t, set_params)
+        return action_ok, x_next_ok
+
+    def _print_mesh_summary(self):
+        """Print grid size summary (mirrors pyro ``GridDynamicSystem.compute``)."""
+        name = getattr(self.sys, "name", "system")
+        print(f"\nGenerating mesh for: {name}")
+        print("---------------------------------------------------")
+        print(f"State space dimensions: {self.n}  Input space dimension: {self.m}")
+        print(
+            f"Number of nodes: {self.nodes_n}  Number of actions: {self.actions_n}"
+        )
+        print(f"Number of node-action pairs: {self.nodes_n * self.actions_n}")
+        print("---------------------------------------------------")
 
     # Interpolation and reshaping
 

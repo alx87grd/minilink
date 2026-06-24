@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from minilink.core.costs import QuadraticCost
+from minilink.core.costs import QuadraticCost, TimeCost
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
@@ -37,6 +37,19 @@ def make_problem():
     return PlanningProblem(sys, x_goal=np.zeros(2), cost=cost)
 
 
+def make_pendulum_problem():
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+    sys = Pendulum()
+    sys.state.lower_bound = np.array([-2.0, -2.0])
+    sys.state.upper_bound = np.array([2.0, 2.0])
+    sys.inputs["u"].lower_bound = np.array([-1.0])
+    sys.inputs["u"].upper_bound = np.array([1.0])
+    return PlanningProblem(
+        sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys)
+    )
+
+
 def solve(problem, *, precompute=True, **opt_kwargs):
     grid = StateSpaceGrid(
         problem, x_grid_shape=(31, 31), u_grid_shape=(7,), dt=0.1, precompute=precompute
@@ -49,6 +62,52 @@ def solve(problem, *, precompute=True, **opt_kwargs):
 
 
 class TestStateSpaceGrid(unittest.TestCase):
+    def test_ensure_jax_transition_builds_deferred_grid(self):
+        import pytest
+
+        pytest.importorskip("jax")
+        problem = make_pendulum_problem()
+        grid = StateSpaceGrid(
+            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
+        )
+        self.assertFalse(grid.precomputed)
+        DynamicProgrammingPlanner(
+            problem,
+            grid=grid,
+            options=DynamicProgrammingOptions(backend="jax", max_iterations=1),
+        )
+        self.assertTrue(grid.precomputed)
+        self.assertTrue(grid._jax_transition)
+        self.assertEqual(grid.x_next.shape, (121, 5, 2))
+
+    def test_jax_precompute_matches_numpy(self):
+        import pytest
+
+        pytest.importorskip("jax")
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        sys = Pendulum()
+        sys.state.lower_bound = np.array([-2.0, -2.0])
+        sys.state.upper_bound = np.array([2.0, 2.0])
+        sys.inputs["u"].lower_bound = np.array([-1.0])
+        sys.inputs["u"].upper_bound = np.array([1.0])
+        problem = PlanningProblem(
+            sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys)
+        )
+        grid_np = StateSpaceGrid(
+            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
+        )
+        grid_jax = StateSpaceGrid(
+            problem,
+            x_grid_shape=(11, 11),
+            u_grid_shape=(5,),
+            dt=0.1,
+            precompute_backend="jax",
+        )
+        self.assertTrue(np.allclose(grid_np.x_next, grid_jax.x_next))
+        self.assertTrue(np.array_equal(grid_np.action_ok, grid_jax.action_ok))
+        self.assertTrue(np.array_equal(grid_np.x_next_ok, grid_jax.x_next_ok))
+
     def test_dimensions_and_meshgrid_order(self):
         grid = StateSpaceGrid(
             make_problem(), x_grid_shape=(5, 4), u_grid_shape=(3,), dt=0.1
@@ -179,6 +238,74 @@ class TestControllerAndEvaluation(unittest.TestCase):
         self.assertTrue(np.array_equal(result.pi, loaded.pi))
 
 
+class TestJaxPrecompute(unittest.TestCase):
+    def _pendulum_grid(self):
+        import pytest
+
+        pytest.importorskip("jax")
+        problem = make_pendulum_problem()
+        grid = StateSpaceGrid(
+            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
+        )
+        return problem, grid
+
+    def test_jax_g_table_matches_numpy(self):
+        problem, grid = self._pendulum_grid()
+        x_next, action_ok, x_next_ok = grid.transition(0.0)
+        np_planner = DynamicProgrammingPlanner(
+            problem, grid=grid, options=DynamicProgrammingOptions(backend="numpy")
+        )
+        jax_planner = DynamicProgrammingPlanner(
+            problem, grid=grid, options=DynamicProgrammingOptions(backend="jax")
+        )
+        G_np = np_planner._running_cost(action_ok, x_next_ok, 0.0)
+        G_jax = jax_planner._running_cost(action_ok, x_next_ok, 0.0)
+        self.assertTrue(np.allclose(G_np, G_jax))
+
+    def test_jax_j0_matches_numpy(self):
+        problem, grid = self._pendulum_grid()
+        np_planner = DynamicProgrammingPlanner(
+            problem, grid=grid, options=DynamicProgrammingOptions(backend="numpy")
+        )
+        jax_planner = DynamicProgrammingPlanner(
+            problem, grid=grid, options=DynamicProgrammingOptions(backend="jax")
+        )
+        J0_np = np_planner._terminal_cost(0.0)
+        J0_jax = jax_planner._terminal_cost(0.0)
+        self.assertTrue(np.allclose(J0_np, J0_jax))
+
+    def test_jax_time_cost_g_table_matches_numpy(self):
+        import pytest
+
+        pytest.importorskip("jax")
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        sys = Pendulum()
+        sys.state.lower_bound = np.array([-2.0, -2.0])
+        sys.state.upper_bound = np.array([2.0, 2.0])
+        sys.inputs["u"].lower_bound = np.array([-1.0])
+        sys.inputs["u"].upper_bound = np.array([1.0])
+        problem = PlanningProblem(
+            sys, x_goal=np.zeros(2), cost=TimeCost.from_system(sys, eps=0.1)
+        )
+        grid = StateSpaceGrid(
+            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
+        )
+        DynamicProgrammingPlanner(
+            problem, grid=grid, options=DynamicProgrammingOptions(backend="jax", max_iterations=1)
+        )
+        x_next, action_ok, x_next_ok = grid.transition(0.0)
+        np_planner = DynamicProgrammingPlanner(
+            problem, grid=grid, options=DynamicProgrammingOptions(backend="numpy")
+        )
+        jax_planner = DynamicProgrammingPlanner(
+            problem, grid=grid, options=DynamicProgrammingOptions(backend="jax")
+        )
+        G_np = np_planner._running_cost(action_ok, x_next_ok, 0.0)
+        G_jax = jax_planner._running_cost(action_ok, x_next_ok, 0.0)
+        self.assertTrue(np.allclose(G_np, G_jax))
+
+
 class TestBackends(unittest.TestCase):
     def test_loop_matches_numpy(self):
         problem = make_problem()
@@ -191,9 +318,9 @@ class TestBackends(unittest.TestCase):
         import pytest
 
         pytest.importorskip("jax")
-        problem = make_problem()
-        _, vectorized = solve(problem, backend="numpy")
-        _, jax_result = solve(problem, backend="jax")
+        problem = make_pendulum_problem()
+        _, vectorized = solve(problem, backend="numpy", precompute=False)
+        _, jax_result = solve(problem, backend="jax", precompute=False)
 
         feasible = vectorized.J < 1e5
         gap = np.max(np.abs(jax_result.J[feasible] - vectorized.J[feasible]))

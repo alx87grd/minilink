@@ -2,7 +2,7 @@
 
 Run from repo root::
 
-    python examples/scripts/planning/demo_rrt_star_convergence.py
+    python examples/scripts/planning/rrt/demo_rrt_star_live.py
 
 A holonomic robot steers through a moderate obstacle field. RRT* runs with
 ``optimize_after_goal=True``: after the first goal connection the search keeps
