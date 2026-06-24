@@ -13,6 +13,10 @@ and jitted Bellman sweeps).
 
 Set ``RESOLUTION = "fast"`` for a smaller grid when iterating locally (~15M
 pairs), or ``"high"`` for a finer state/control mesh and more Bellman sweeps.
+
+After planning, three closed-loop simulations mirror pyro (hanging and two
+additional starts): state/input time plots, ``(θ1, dθ1)`` and ``(θ2, dθ2)``
+phase planes, and animation.
 """
 
 import time
@@ -37,6 +41,12 @@ RESOLUTION = "pyro"  # "fast" | "pyro" | "high"
 INF = 1000.0
 GOAL = np.zeros(4)
 HANGING = np.array([-np.pi, 1.0, 0.0, 0.0])
+
+CLOSED_LOOP_X0 = [
+    HANGING,
+    np.array([-1.0, -1.0, 0.0, 0.0]),
+    np.array([-1.0, 1.0, 0.0, 0.0]),
+]
 
 FAST_GRID = (31, 25, 31, 25)
 PYRO_GRID = (51, 41, 51, 41)
@@ -144,11 +154,16 @@ diagram.connect("plant", "y", "controller", "x")
 diagram.connect("controller", "u", "plant", "u")
 diagram.name = "Double pendulum swing-up (value iteration, JAX)"
 
-trajectory = diagram.compute_trajectory(tf=8.0)
-diagram.plot_trajectory(trajectory)
-diagram.animate()
+for x0 in CLOSED_LOOP_X0:
+    plant.x0 = x0.copy()
+    print(f"\nclosed loop from x0 = {np.round(x0, 3)}")
+    print("predicted cost-to-go:", round(result.value_at(x0), 2))
+    trajectory = diagram.compute_trajectory(tf=8.0, n_steps=4001, solver="euler")
+    diagram.plot_trajectory(trajectory, signals=("x", "u"))
+    diagram.plot_phase_plane(trajectory, x_axis=0, y_axis=2, title="(θ1, dθ1)")
+    diagram.plot_phase_plane(trajectory, x_axis=1, y_axis=3, title="(θ2, dθ2)")
+    diagram.animate()
 
-final = trajectory.x[:, -1]
-print("\npredicted cost-to-go from start:", round(result.value_at(HANGING), 2))
-print("final state:", np.round(final, 3))
-print("goal error ||x - x*||:", round(float(np.linalg.norm(final - GOAL)), 3))
+    final = trajectory.x[:, -1]
+    print("final state:", np.round(final, 3))
+    print("goal error ||x - x*||:", round(float(np.linalg.norm(final - GOAL)), 3))
