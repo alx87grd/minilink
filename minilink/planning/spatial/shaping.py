@@ -35,6 +35,23 @@ def quadratic_hinge(threshold: float = 0.0):
     return shape
 
 
+def quadratic_excess(threshold: float = 0.0):
+    """
+    One-sided quadratic penalty above ``threshold``: ``max(v - threshold, 0)**2``.
+
+    Use with :class:`~minilink.planning.spatial.state_fields.PathDistanceField`
+    to penalize deviation from a reference path (mirror of :func:`quadratic_hinge`
+    used for clearance margins).
+    """
+    threshold = float(threshold)
+
+    def shape(v):
+        xp = array_module(v)
+        return xp.maximum(v - threshold, 0.0) ** 2
+
+    return shape
+
+
 def inverse_barrier(epsilon: float = 1e-2):
     """
     Repulsive barrier ``1 / max(v, epsilon)**2`` that blows up at contact.

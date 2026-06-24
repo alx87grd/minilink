@@ -7,6 +7,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
 from minilink.core.costs import CostFunction
@@ -17,6 +18,9 @@ from minilink.planning.spatial.robot import (
     collision_spheres,
 )
 from minilink.planning.spatial.scene import Scene
+
+if TYPE_CHECKING:
+    from minilink.planning.spatial.track import ReferenceTrack
 
 # Public API
 
@@ -80,6 +84,50 @@ class CostDensityField(StateField):
                 d.append(scene.cost_density(world, t=t, params=params))
 
         return xp.max(xp.stack(d))
+
+
+@dataclass(frozen=True)
+class PathDistanceField(StateField):
+    """``value(x) = min_p distance(world_p)`` to the reference centerline."""
+
+    track: ReferenceTrack
+    robot: RobotBody
+
+    def value(self, x, u=None, t=0.0, params=None):
+        xp = array_module(x)
+        track = self.track
+        robot = self.robot
+        d = []
+        for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
+            for center, radius in collision_spheres(shape):
+                world = apply_transform(T, center)
+                d.append(track.distance(world, t=t, params=params) - radius)
+
+        return xp.min(xp.stack(d))
+
+
+@dataclass(frozen=True)
+class CorridorMarginField(StateField):
+    """``value(x) = min_p (half_width - distance(world_p))``; nonnegative in the tube."""
+
+    track: ReferenceTrack
+    robot: RobotBody
+
+    def value(self, x, u=None, t=0.0, params=None):
+        xp = array_module(x)
+        track = self.track
+        robot = self.robot
+        m = []
+        for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
+            for center, radius in collision_spheres(shape):
+                world = apply_transform(T, center)
+                m.append(
+                    track.half_width
+                    - track.distance(world, t=t, params=params)
+                    - radius
+                )
+
+        return xp.min(xp.stack(m))
 
 
 @dataclass(frozen=True)

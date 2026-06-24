@@ -318,3 +318,96 @@ def _draw_robot(ax, robot, x, t, params, color, alpha, point_marker_size):
                     markeredgewidth=1.0,
                     zorder=6,
                 )
+
+
+def plot_track(
+    track,
+    *,
+    bounds=None,
+    n_samples: int = 200,
+    show: bool = True,
+    ax=None,
+    figsize=(6.0, 6.0),
+    centerline_color: str = "#2ca02c",
+    corridor_color: str = "#98df8a",
+    corridor_alpha: float = 0.35,
+    waypoint_color: str = "#1f77b4",
+    title: str | None = None,
+    equal_aspect: bool = True,
+):
+    """
+    Plot a :class:`~minilink.planning.spatial.track.ReferenceTrack` in 2-D.
+
+    Returns ``(fig, ax)``. Matplotlib is imported on first call.
+    """
+    import matplotlib.pyplot as plt
+
+    path = track.path
+    if path.workspace_dim != 2:
+        raise ValueError("plot_track supports 2-D paths only")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize, frameon=True)
+    else:
+        fig = ax.figure
+
+    total = path.total_length
+    if total <= 0.0:
+        raise ValueError("path has zero length")
+
+    ss = np.linspace(0.0, total, n_samples)
+    center = np.array([path.sample(s) for s in ss])
+    tangents = np.array([path.tangent(s) for s in ss])
+    normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
+    half = float(track.half_width)
+    upper = center + half * normals
+    lower = center - half * normals
+    corridor = np.vstack([upper, lower[::-1]])
+
+    ax.fill(
+        corridor[:, 0],
+        corridor[:, 1],
+        color=corridor_color,
+        alpha=corridor_alpha,
+        zorder=2,
+        label="corridor",
+    )
+    ax.plot(
+        center[:, 0],
+        center[:, 1],
+        color=centerline_color,
+        linewidth=2.0,
+        zorder=3,
+        label="path",
+    )
+
+    if hasattr(path, "waypoints"):
+        wp = np.asarray(path.waypoints)
+        ax.scatter(
+            wp[:, 0],
+            wp[:, 1],
+            color=waypoint_color,
+            s=36,
+            zorder=4,
+            label="waypoints",
+        )
+
+    if bounds is not None:
+        (xlo, xhi), (ylo, yhi) = bounds
+        ax.set_xlim(xlo, xhi)
+        ax.set_ylim(ylo, yhi)
+    else:
+        pad = half + 0.5
+        ax.set_xlim(center[:, 0].min() - pad, center[:, 0].max() + pad)
+        ax.set_ylim(center[:, 1].min() - pad, center[:, 1].max() + pad)
+
+    if equal_aspect:
+        ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_title(title if title is not None else "Reference track")
+    ax.legend(loc="best", fontsize=8)
+
+    if show:
+        plt.show()
+    return fig, ax

@@ -281,6 +281,14 @@ obstacle term before weighting with `as_cost(shaping=...)` (`shaping.occupancy`,
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
 obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.
 
+**Reference track** (`planning/spatial/paths.py`, `track.py`): workspace centerlines
+from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in
+`ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
+`distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
+`corridor_field(robot).as_constraint(lower=0)` for a hard tube. Probe semantics match
+clearance (subtract body radius). Compose with obstacles:
+`X = bounds & scene.clearance_field(robot).as_constraint() & track.corridor_field(robot).as_constraint()`.
+
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
 sources every concern from the problem — collision `problem.X.contains` (optional
 orchestrator `edge_resolution` densification along edges), goal `problem.Xf`/`x_goal`,
