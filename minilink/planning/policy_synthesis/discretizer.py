@@ -23,6 +23,91 @@ from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
 from minilink.core.sets import BoxInputSet, BoxSet
 from minilink.planning.problems import PlanningProblem
 
+PAIR_PROGRESS_INTERVAL = 50_000
+
+
+def print_build_progress(done, total, start, *, prefix, unit="pairs"):
+    """In-place terminal progress line with elapsed time and ETA."""
+    elapsed = time.time() - start
+    eta = elapsed / done * (total - done) if done < total else 0.0
+    print(
+        f"\r{prefix}.. {done:,}/{total:,} {unit} ({100.0 * done / total:.1f}%)"
+        f"  {elapsed:.1f}s elapsed  ETA ~{eta:.0f}s",
+        end="",
+        flush=True,
+    )
+
+
+def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):
+    """Fill an ``(N, A)`` table by JAX ``vmap`` over flat state–action indices."""
+    total = N * A
+    out = np.empty((N, A), dtype=float)
+
+    @jax.jit
+    def eval_chunk(sa):
+        s = sa // A
+        a = sa % A
+        return jax.vmap(pair_fn)(s, a)
+
+    build_start = time.time()
+    for begin in range(0, total, interval):
+        end = min(begin + interval, total)
+        count = end - begin
+        if count == interval:
+            sa = jnp.arange(begin, end)
+            chunk = eval_chunk(sa)
+        else:
+            sa = jnp.arange(begin, end)
+            s = sa // A
+            a = sa % A
+            chunk = jax.vmap(pair_fn)(s, a)
+
+        chunk = np.asarray(chunk)
+        idx = np.arange(begin, end)
+        out[idx // A, idx % A] = chunk
+        if verbose:
+            print_build_progress(end, total, build_start, prefix=prefix)
+
+    if verbose:
+        elapsed = time.time() - build_start
+        print()
+        print(f"{prefix}.. completed in {elapsed:4.2f} sec  ({total:,} pairs)")
+
+    return out
+
+
+def build_jax_node_chunks(node_fn, N, jax, jnp, *, interval, verbose, prefix):
+    """Fill a length-``N`` vector by JAX ``vmap`` over node indices."""
+    out = np.empty(N, dtype=float)
+
+    @jax.jit
+    def eval_chunk(idx):
+        return jax.vmap(node_fn)(idx)
+
+    build_start = time.time()
+    for begin in range(0, N, interval):
+        end = min(begin + interval, N)
+        count = end - begin
+        if count == interval:
+            idx = jnp.arange(begin, end)
+            chunk = eval_chunk(idx)
+        else:
+            idx = jnp.arange(begin, end)
+            chunk = jax.vmap(node_fn)(idx)
+
+        out[begin:end] = np.asarray(chunk)
+        if verbose:
+            print_build_progress(
+                end, N, build_start, prefix=prefix, unit="nodes"
+            )
+
+    if verbose:
+        elapsed = time.time() - build_start
+        print()
+        print(f"{prefix}.. completed in {elapsed:4.2f} sec  ({N:,} nodes)")
+
+    return out
+
 # Public API
 
 
@@ -54,7 +139,7 @@ class StateSpaceGrid:
         is JAX-traceable and the state/input sets are boxes.
     verbose : bool, optional
         Print mesh size and lookup-table build progress (pyro-style feedback for
-        large grids).
+        large grids): counts every 50k items, elapsed time, and ETA.
 
     Attributes
     ----------
@@ -179,12 +264,14 @@ class StateSpaceGrid:
 
         if verbose:
             start = time.time()
+            total_pairs = N * A
             print("Computing x_next array.. ", end="", flush=True)
 
         x_next = np.empty((N, A, n), dtype=float)
         action_ok = np.empty((N, A), dtype=bool)
         x_next_ok = np.empty((N, A), dtype=bool)
 
+        pairs_done = 0
         for a in range(A):
             u = self.inputs[a]
             for s in range(N):
@@ -197,18 +284,19 @@ class StateSpaceGrid:
                 action_ok[s, a] = U.contains(u, x, t, set_params)
                 x_next_ok[s, a] = X.contains(xnext, t, set_params)
 
-                if verbose and (s + 1) % 10000 == 0:
-                    elapsed = time.time() - start
-                    print(
-                        f"\rComputing x_next array.. {s + 1}/{N} nodes"
-                        f" in {elapsed:4.2f} sec",
-                        end="",
-                        flush=True,
+                pairs_done += 1
+                if verbose and pairs_done % PAIR_PROGRESS_INTERVAL == 0:
+                    print_build_progress(
+                        pairs_done, total_pairs, start, prefix="Computing x_next array"
                     )
 
         if verbose:
             elapsed = time.time() - start
-            print(f"\rComputing x_next array.. completed in {elapsed:4.2f} sec")
+            print()
+            print(
+                f"Computing x_next array.. completed in {elapsed:4.2f} sec"
+                f"  ({total_pairs:,} pairs)"
+            )
 
         return x_next, action_ok, x_next_ok
 
@@ -231,9 +319,11 @@ class StateSpaceGrid:
         x_ub = jnp.asarray(self.problem.X.upper)
         box_inputs = isinstance(self.problem.U, BoxInputSet)
 
-        if verbose := self.verbose:
-            start = time.time()
-            print("Computing x_next array (JAX vmap).. ", end="", flush=True)
+        if self.verbose:
+            print(
+                f"Computing x_next array (JAX vmap).. {N * A:,} pairs",
+                flush=True,
+            )
 
         def pair(s, a):
             x = states[s]
@@ -244,25 +334,67 @@ class StateSpaceGrid:
             x_next_ok = jnp.all((xnext >= x_lb) & (xnext <= x_ub))
             return xnext, x_next_ok
 
-        @jax.jit
-        def build():
-            sa = jnp.arange(N * A)
-            s = sa // A
-            a = sa % A
-            xnext, x_next_ok = jax.vmap(pair)(s, a)
-            return xnext.reshape(N, A, n), x_next_ok.reshape(N, A)
-
-        x_next, x_next_ok = (np.asarray(v) for v in build())
+        x_next, x_next_ok = self._build_xnext_jax_chunks(
+            pair, N, A, n, jax, jnp, interval=PAIR_PROGRESS_INTERVAL
+        )
         if box_inputs:
             action_ok = np.ones((N, A), dtype=bool)
         else:
             action_ok, x_next_ok = self._validity_masks(x_next, t)
 
-        if verbose:
-            elapsed = time.time() - start
-            print(f"completed in {elapsed:4.2f} sec")
-
         return x_next, action_ok, x_next_ok
+
+    def _build_xnext_jax_chunks(self, pair, N, A, n, jax, jnp, *, interval):
+        """Fill ``x_next`` in fixed-size JAX chunks with optional progress lines."""
+        total_pairs = N * A
+        x_next = np.empty((N, A, n), dtype=float)
+        x_next_ok = np.empty((N, A), dtype=bool)
+        verbose = self.verbose
+
+        @jax.jit
+        def eval_chunk(sa):
+            s = sa // A
+            a = sa % A
+            xnext, ok = jax.vmap(pair)(s, a)
+            return xnext, ok
+
+        build_start = time.time()
+        for begin in range(0, total_pairs, interval):
+            end = min(begin + interval, total_pairs)
+            count = end - begin
+            if count == interval:
+                sa = jnp.arange(begin, end)
+                xnext_chunk, ok_chunk = eval_chunk(sa)
+            else:
+                sa = jnp.arange(begin, end)
+                s = sa // A
+                a = sa % A
+                xnext_chunk, ok_chunk = jax.vmap(pair)(s, a)
+
+            xnext_chunk = np.asarray(xnext_chunk)
+            ok_chunk = np.asarray(ok_chunk)
+            idx = np.arange(begin, end)
+            s_idx = idx // A
+            a_idx = idx % A
+            x_next[s_idx, a_idx] = xnext_chunk
+            x_next_ok[s_idx, a_idx] = ok_chunk
+            if verbose:
+                print_build_progress(
+                    end,
+                    total_pairs,
+                    build_start,
+                    prefix="Computing x_next array (JAX vmap)",
+                )
+
+        if verbose:
+            elapsed = time.time() - build_start
+            print()
+            print(
+                f"Computing x_next array (JAX vmap).. completed in {elapsed:4.2f} sec"
+                f"  ({total_pairs:,} pairs)"
+            )
+
+        return x_next, x_next_ok
 
     def _validity_masks(self, x_next, t):
         """Input and successor validity masks for a precomputed ``x_next`` table."""

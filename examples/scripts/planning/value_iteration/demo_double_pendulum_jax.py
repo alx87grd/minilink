@@ -31,6 +31,8 @@ from minilink.planning.policy_synthesis.dp import (
 from minilink.planning.problems import PlanningProblem
 
 RESOLUTION = "high"  # "fast" | "pyro" | "high"
+# RESOLUTION = "fast"  # "fast" | "pyro" | "high"
+# RESOLUTION = "pyro"  # "fast" | "pyro" | "high"
 
 INF = 1000.0
 GOAL = np.zeros(4)
@@ -75,7 +77,7 @@ print(
     f"nodes={nodes:,}  pairs={nodes * actions:,}"
 )
 
-t0 = time.perf_counter()
+t_plan = time.perf_counter()
 grid = StateSpaceGrid(
     problem,
     x_grid_shape=x_shape,
@@ -84,6 +86,7 @@ grid = StateSpaceGrid(
     precompute=False,
     verbose=True,
 )
+t_mesh = time.perf_counter()
 planner = DynamicProgrammingPlanner(
     problem,
     grid=grid,
@@ -95,9 +98,16 @@ planner = DynamicProgrammingPlanner(
         verbose=True,
     ),
 )
+t_xnext = time.perf_counter()
 result = planner.solve_steps(n_steps)
 planner.clean_infeasible_set()
-print(f"\nsolve ({n_steps} sweeps): {time.perf_counter() - t0:.1f} s")
+t_done = time.perf_counter()
+
+print("\ntiming summary:")
+print(f"  mesh setup:       {t_mesh - t_plan:5.2f} s")
+print(f"  x_next table:     {t_xnext - t_mesh:5.2f} s  (planner init)")
+print(f"  G, J0, Bellman:   {t_done - t_xnext:5.2f} s  (each step timed above)")
+print(f"  total pipeline:   {t_done - t_plan:5.2f} s")
 
 plotting.plot_value(
     grid,
