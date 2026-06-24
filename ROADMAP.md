@@ -15,8 +15,8 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Simulation | 7 | Mature workflow with stable API and solver/forcing coverage. | Keep behavior stable; treat `SimulationOptions` as ergonomic cleanup, not a redesign. |
 | Optimization | 5 | `MathematicalProgram` and `Optimizer` are integrated and useful, but backend details still need hardening. | Harden SciPy/Ipopt behavior and evaluator details before test-gated promotion. |
 | Planning/trajopt | 2 | Direct collocation / shooting exist; DP/RRT/polynomial generation not ported. | Architectural review for offline DP/RRT; traj generation. |
-| Planning/policy synthesis | 2 | `DynamicProgrammingPlanner` (value iteration) over a `StateSpaceGrid` discretizer of a `PlanningProblem`; both solve-to-tolerance and fixed-step modes, `precompute` memory knob, linear/nearest/spline interpolation, discount, time-varying, infeasible-set cleanup, `LookupTableController`, `PolicyEvaluator`, plotting/animation. NumPy; full pyro DP feature parity. Tested + demo. | JAX backend (`vmap`/`map_coordinates`/`jit`); `lax.while_loop` solve; GPU. |
-| Planning/search | 2 | `RRTPlanner` over `PlanningProblem` with a swappable `TrajectoryExtender` (`KinodynamicExtender` + `SteeringExtender`/`StraightLineSteering`) and a `metric` callable; collision from spatial `Scene`, system kept pure. Tested + demos. | `RRTStarPlanner` (rewire), `DubinsSteering`, RRT-Connect, KD-tree. |
+| Planning/policy synthesis | 2 | `DynamicProgrammingPlanner` (value iteration) over a `StateSpaceGrid` discretizer of a `PlanningProblem`; three interchangeable backends — `loop` (pyro reference), `numpy` (precomputed lookup table), `jax` (jitted `lax.while_loop` + `map_coordinates`); solve-to-tolerance and fixed-step modes, `precompute` memory knob, linear/nearest/spline interpolation, discount, time-varying, infeasible-set cleanup, `LookupTableController`, `PolicyEvaluator`, plotting/animation. Full pyro DP feature parity + JAX speedup. Tested + demos + `benchmarks/run_dp_backends.py`. | GPU runs; `nearest` backend parity; raster cost maps. |
+| Planning/search | 3 | `RRTPlanner` and `RRTStarPlanner` over `PlanningProblem` with swappable `TrajectoryExtender` (`KinodynamicExtender`, `SteeringExtender`/`StraightLineSteering`/`DubinsSteering`) and `metric`; free-space sampling, orchestrator `edge_resolution`, explicit `reached_goal`; optional SciPy `cKDTree` nearest backend (`nearest_backend`, Euclidean only); spatial `Scene` collision wired via `X`, system kept pure. Tested + demos incl. RRT vs RRT* comparison and KD-tree speed demo. | RRT-Connect, informed sampling. |
 | Geometry / spatial | 4 | Integrated architecture proposed for obstacle and terrain planning: `core/geometry.py` SDF primitives + cost algebra (`SumCost`/`ScaledCost`), and `planning/spatial/`: `Scene` (obstacles + `workspace_fields`), `WorkspaceField`/`StateField`, `RobotBody`/`TranslationBody`, export via `as_constraint`/`as_cost`. Tested incl. JAX twins. | User architecture validation; scene params (`ProblemParameters.scene`, future); RRT consumers; oriented/multi-sphere bodies and raster cost maps. |
 | Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Kinematic composition review before API freeze. |
 | Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Same gate as Graphical. |
@@ -148,7 +148,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [ ] `trajectory_generation/` — polynomial / min-snap
 - [x] `policy_synthesis/` — `DynamicProgrammingPlanner` (value iteration), `StateSpaceGrid`
   discretizer, `LookupTableController`, `PolicyEvaluator`, plotting (NumPy; JAX backend pending)
-- [ ] `search/rrt.py`
+- [x] `search/` — `RRTPlanner`, `RRTStarPlanner`, extenders, steering, tree; tested + demos
 - [ ] Trajectory post-filter (Butterworth `filtfilt`)
 
 ### 5.6 Estimation and identification

@@ -13,7 +13,7 @@ from minilink.planning.search.extenders import KinodynamicExtender, SteeringExte
 from minilink.planning.search.metric import euclidean, weighted
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.steering import DubinsSteering, StraightLineSteering
-from minilink.planning.search.tree import Node, Tree
+from minilink.planning.search.tree import NEAREST_KD_TREE, Node, Tree
 from minilink.planning.spatial.robot import sphere
 from minilink.planning.spatial.scene import Scene
 
@@ -58,6 +58,82 @@ def test_tree_nearest_and_near():
     assert len(near) == 2  # root and (1,0)
 
 
+def test_kdtree_nearest_and_near_match_brute_force():
+    rng = np.random.default_rng(0)
+    brute = Tree(Node(np.array([0.0, 0.0]), None, None, 0.0))
+    kd = Tree(
+        Node(np.array([0.0, 0.0]), None, None, 0.0),
+        nearest_backend=NEAREST_KD_TREE,
+    )
+    for _ in range(40):
+        x = rng.uniform(-5.0, 5.0, size=2)
+        node = Node(x, brute.root, None, float(np.linalg.norm(x)))
+        brute.add(node)
+        kd.add(Node(x, kd.root, None, float(np.linalg.norm(x))))
+
+    for _ in range(30):
+        query = rng.uniform(-5.0, 5.0, size=2)
+        brute_nearest = brute.nearest(query, euclidean)
+        kd_nearest = kd.nearest(query, euclidean)
+        assert np.allclose(brute_nearest.x, kd_nearest.x)
+
+        radius = float(rng.uniform(0.5, 3.0))
+        brute_near = {
+            tuple(np.asarray(node.x, dtype=float))
+            for node in brute.near(query, radius, euclidean)
+        }
+        kd_near = {
+            tuple(np.asarray(node.x, dtype=float))
+            for node in kd.near(query, radius, euclidean)
+        }
+        assert brute_near == kd_near
+
+
+def test_kinodynamic_reaches_goal_with_kdtree_backend():
+    problem, X = make_problem()
+    planner = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        options=RRTOptions(
+            seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
+        ),
+    )
+    traj = planner.compute_solution()
+    assert planner.reached_goal
+    assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
+    assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
+
+
+def test_kdtree_requires_euclidean_metric():
+    sys = make_dubins_problem()
+    problem = PlanningProblem(
+        sys=sys,
+        x_start=np.array([-3.0, -3.0, 0.0]),
+        x_goal=np.array([3.0, 3.0, np.pi / 2]),
+        X=BoxSet.from_system_state(sys),
+    )
+    dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
+    planner = RRTPlanner(
+        problem,
+        extender=SteeringExtender(dubins, max_distance=1.5, resolution=0.1),
+        metric=dubins.distance,
+        options=RRTOptions(seed=0, nearest_backend="kd_tree"),
+    )
+    with pytest.raises(ValueError, match="metric=euclidean"):
+        planner.compute_solution()
+
+
+def test_unknown_nearest_backend_raises():
+    problem, _ = make_problem()
+    planner = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        options=RRTOptions(seed=0, nearest_backend="invalid"),
+    )
+    with pytest.raises(ValueError, match="nearest_backend"):
+        planner.compute_solution()
+
+
 # --- kinodynamic ----------------------------------------------------------
 
 
@@ -69,6 +145,7 @@ def test_kinodynamic_reaches_goal_and_stays_free():
         options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
     )
     traj = planner.compute_solution()
+    assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
     assert traj.x.shape[0] == 2
@@ -84,6 +161,7 @@ def test_kinodynamic_random_controls_reaches_goal():
         options=RRTOptions(seed=1, goal_tolerance=0.6, max_nodes=6000),
     )
     traj = planner.compute_solution()
+    assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.6
 
 
@@ -115,6 +193,7 @@ def test_steering_reaches_goal_and_stays_free():
         options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
     )
     traj = planner.compute_solution()
+    assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
 
@@ -194,6 +273,7 @@ def test_dubins_rrt_reaches_goal_pose():
         options=RRTOptions(seed=0, goal_bias=0.2, max_nodes=8000),
     )
     traj = planner.compute_solution()
+    assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - x_goal) < 0.6
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
 
@@ -224,6 +304,97 @@ def test_select_rejects_colliding_candidate_for_free_one():
         cost=0.1,
     )
     assert planner._select([colliding, free], x_rand) is free
+
+
+def test_reached_goal_false_on_budget_exhaustion():
+    problem, _ = make_problem()
+    planner = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        options=RRTOptions(seed=0, max_nodes=10, goal_bias=0.0),
+    )
+    planner.compute_solution()
+    assert not planner.reached_goal
+    assert planner.solution_node is not None
+
+
+def test_return_best_effort_false_raises():
+    problem, _ = make_problem()
+    planner = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        options=RRTOptions(
+            seed=0, max_nodes=5, goal_bias=0.0, return_best_effort=False
+        ),
+    )
+    with pytest.raises(RuntimeError, match="failed to reach goal"):
+        planner.compute_solution()
+
+
+def test_free_state_sampling_stays_in_X():
+    problem, X = make_problem()
+    planner = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS),
+        options=RRTOptions(goal_bias=0.0),
+    )
+    rng = np.random.default_rng(42)
+    samples = [planner._sample_free_state(rng) for _ in range(40)]
+    assert all(X.contains(sample) for sample in samples)
+    assert all(np.linalg.norm(sample) > 1.0 for sample in samples)
+
+
+def test_edge_resolution_rejects_segment_through_obstacle():
+    problem, _ = make_problem()
+    planner_fine = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS),
+        options=RRTOptions(edge_resolution=0.05),
+    )
+    planner_coarse = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS),
+        options=RRTOptions(edge_resolution=None),
+    )
+    edge = Edge(
+        states=np.array([[-2.0, 0.0], [2.0, 0.0]]),
+        inputs=np.zeros((1, 2)),
+        times=np.array([0.0, 4.0]),
+        cost=4.0,
+    )
+    assert not planner_fine._edge_is_free(edge)
+    assert planner_coarse._edge_is_free(edge)
+
+
+def test_tree_rewire_and_propagate_cost():
+    edge_ab = Edge(
+        states=np.array([[0.0, 0.0], [1.0, 0.0]]),
+        inputs=np.zeros((1, 2)),
+        times=np.array([0.0, 1.0]),
+        cost=1.0,
+    )
+    edge_bc = Edge(
+        states=np.array([[1.0, 0.0], [2.0, 0.0]]),
+        inputs=np.zeros((1, 2)),
+        times=np.array([0.0, 1.0]),
+        cost=1.0,
+    )
+    edge_rc = Edge(
+        states=np.array([[0.0, 1.0], [2.0, 0.0]]),
+        inputs=np.zeros((1, 2)),
+        times=np.array([0.0, 2.0]),
+        cost=2.0,
+    )
+    tree = Tree(Node(np.array([0.0, 0.0]), None, None, 0.0))
+    a = tree.add(Node(np.array([1.0, 0.0]), tree.root, edge_ab, 1.0))
+    b = tree.add(Node(np.array([2.0, 0.0]), a, edge_bc, 2.0))
+    assert any(child is b for child in a.children)
+
+    tree.rewire(b, tree.root, edge_rc)
+    assert not any(child is b for child in a.children)
+    assert any(child is b for child in tree.root.children)
+    assert b.cost == pytest.approx(2.0)
+    assert a.children == []
 
 
 # --- built-in visualization -----------------------------------------------

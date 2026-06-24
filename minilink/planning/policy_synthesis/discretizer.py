@@ -144,34 +144,29 @@ class StateSpaceGrid:
 
     # Interpolation and reshaping
 
-    def interpolate(self, values, queries, method: str = "linear") -> np.ndarray:
+    def build_interpolator(self, values, method: str = "linear"):
         """
-        Interpolate a node-indexed field ``values`` at arbitrary states.
+        Return a regular-grid interpolator callable for a node-indexed field.
 
-        Parameters
-        ----------
-        values : array of shape (nodes_n,)
-            Scalar field by node id (e.g. a cost-to-go ``J``).
-        queries : array of shape (M, n)
-            States at which to sample the field.
-        method : {"linear", "nearest", "cubic", "quintic"}
-            Regular-grid interpolation with out-of-bounds value 0. ``"spline"``
-            is accepted as an alias for ``"cubic"``. Spline methods are smoother
-            but ring across the infeasibility penalty, so they suit value
-            functions without large out-of-bound cliffs.
+        ``method`` is one of ``{"linear", "nearest", "cubic", "quintic"}``;
+        ``"spline"`` is accepted as an alias for ``"cubic"``. Out-of-bounds
+        queries return 0. Spline methods are smoother but ring across the
+        infeasibility penalty, so they suit fields without large cliffs.
         """
         method = "cubic" if method == "spline" else method
         grid = values.reshape(self.x_grid_shape)
-        queries = np.asarray(queries, dtype=float)
-
-        interp = RegularGridInterpolator(
+        return RegularGridInterpolator(
             tuple(self.x_levels),
             grid,
             method=method,
             bounds_error=False,
             fill_value=0.0,
         )
-        return interp(queries)
+
+    def interpolate(self, values, queries, method: str = "linear") -> np.ndarray:
+        """Interpolate a node-indexed field ``values`` at states ``queries`` (M, n)."""
+        interp = self.build_interpolator(values, method)
+        return interp(np.asarray(queries, dtype=float))
 
     def grid_from_array(self, values) -> np.ndarray:
         """Reshape a node-indexed array ``(nodes_n,)`` into the state grid shape."""

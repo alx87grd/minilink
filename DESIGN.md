@@ -259,10 +259,13 @@ forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the 
 on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `compute_solution`
 to tolerance, `solve_steps` for a fixed horizon — returning a cost-to-go `J` and greedy policy
 `pi` (action ids); out-of-domain transitions are charged a finite `out_of_bound_cost` (pyro's
-`cf.INF`). `precompute` trades the `(N,A,n)` successor table for per-sweep recomputation
-(memory vs time-varying support); the JAX backend is reserved. `result.controller()` returns a
-`LookupTableController` (a `StaticSystem`, so `controller >> plant` simulates); `PolicyEvaluator`
-gives the cost-to-go of any fixed law.
+`cf.INF`). Three interchangeable backward-step backends share this workflow: `loop` (per-node
+Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table, the default),
+and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, built on a
+NumPy precompute so any plant works; linear/nearest only). `precompute` trades the `(N,A,n)`
+successor table for per-sweep recomputation (memory vs time-varying support). `result.controller()`
+returns a `LookupTableController` (a `StaticSystem`, so `controller >> plant` simulates);
+`PolicyEvaluator` gives the cost-to-go of any fixed law. Benchmark: `benchmarks/run_dp_backends.py`.
 
 **Spatial scene** (`planning/spatial/`): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
@@ -279,15 +282,27 @@ obstacle term before weighting with `as_cost(shaping=...)` (`shaping.occupancy`,
 obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.
 
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
-sources every concern from the problem — collision `problem.X.contains`, goal
-`problem.Xf`/`x_goal`, sampling `X.sample`/`U.sample`, dynamics `problem.sys.f` — so the
-system stays pure. The two swappable pieces are an injected `TrajectoryExtender`
-(`propose(from, toward, problem, rng) → Iterable[Edge]`: `KinodynamicExtender`
-forward-integrates controls, `SteeringExtender` connects exactly via a `SteeringFunction`)
-and a `metric(a,b)` callable (nearest-neighbour distance). Every system is an ODE, so an
-`Edge` always carries real `(t,x,u)`; `compute_solution() → Trajectory`. `Edge.cost` is the
-cost-to-come seam for a future `RRTStarPlanner` (the orchestrator's one overridden attach
-step).
+sources every concern from the problem — collision `problem.X.contains` (optional
+orchestrator `edge_resolution` densification along edges), goal `problem.Xf`/`x_goal`,
+free-space sampling from `problem.X` (direct `Set.sample` or rejection from state
+bounds), dynamics `problem.sys.f` — so the system stays pure. After
+`compute_solution()`, `reached_goal` and `solution_node` report success vs
+best-effort fallback (`return_best_effort`). The two swappable pieces are an injected
+`TrajectoryExtender` (`propose(from, toward, problem, rng) → Iterable[Edge]`:
+`KinodynamicExtender` forward-integrates controls, `SteeringExtender` connects exactly
+via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callable
+(nearest-neighbour distance). Every system is an ODE, so an `Edge` always carries real
+`(t,x,u)`; `compute_solution() → Trajectory`. `RRTStarPlanner` extends the attach step
+with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
+`Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
+`optimize_after_goal`, the search continues after the first goal connection until
+the best goal cost stops improving for `convergence_patience` extensions;
+`record_history` + `animate_convergence` replay tree growth and path refinement.
+``live_plot`` / ``callback`` redraw the tree during ``compute_solution`` (pyro-style);
+``live_plot_after_goal_only`` limits updates to the RRT* post-goal convergence phase.
+``RRTOptions.nearest_backend`` selects brute-force or SciPy ``cKDTree`` nearest/near
+queries (Euclidean L2 only — requires ``metric=euclidean``); see
+``examples/scripts/planning/demo_rrt_kdtree_speed.py``.
 
 ## 7. Graphics And Benchmarks
 

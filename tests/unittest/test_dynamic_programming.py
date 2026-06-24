@@ -179,5 +179,28 @@ class TestControllerAndEvaluation(unittest.TestCase):
         self.assertTrue(np.array_equal(result.pi, loaded.pi))
 
 
+class TestBackends(unittest.TestCase):
+    def test_loop_matches_numpy(self):
+        problem = make_problem()
+        _, loop = solve(problem, backend="loop")
+        _, vectorized = solve(problem, backend="numpy")
+        self.assertTrue(np.allclose(loop.J, vectorized.J))
+        self.assertTrue(np.array_equal(loop.pi, vectorized.pi))
+
+    def test_jax_matches_numpy(self):
+        import pytest
+
+        pytest.importorskip("jax")
+        problem = make_problem()
+        _, vectorized = solve(problem, backend="numpy")
+        _, jax_result = solve(problem, backend="jax")
+
+        feasible = vectorized.J < 1e5
+        gap = np.max(np.abs(jax_result.J[feasible] - vectorized.J[feasible]))
+        self.assertLess(gap, 1e-4)
+        # policies agree everywhere except rare argmin ties
+        self.assertGreater(np.mean(jax_result.pi == vectorized.pi), 0.98)
+
+
 if __name__ == "__main__":
     unittest.main()

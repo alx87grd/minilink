@@ -11,16 +11,28 @@ value-iteration-to-tolerance and the finite-horizon fixed-step solves.
 The cost is the textbook running/terminal pair ``g(x, u, t)`` / ``h(x, t)`` from
 :class:`~minilink.core.costs.CostFunction`; out-of-domain transitions are
 charged a finite ``out_of_bound_cost`` (the role of pyro's ``cf.INF``).
+
+Three interchangeable backward-step engines share this workflow:
+
+- ``"loop"`` — a per-node Python double loop (pyro's reference ``DynamicProgramming``),
+  recomputing dynamics on the fly; low memory, slow.
+- ``"numpy"`` — vectorized over a precomputed successor/cost lookup table (pyro's
+  ``DynamicProgrammingWithLookUpTable``); the default.
+- ``"jax"`` — the same vectorized backup mapped with ``vmap``/``map_coordinates``
+  and run as a single jitted ``lax.while_loop`` on device; fastest at scale.
 """
 
 from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, configure_jax
 from minilink.planning.planner import Planner
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
 from minilink.planning.problems import PlanningProblem
+
+#: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
+BACKEND_LOOP = "loop"
 
 # Public API
 
@@ -32,8 +44,10 @@ class DynamicProgrammingOptions:
 
     Parameters
     ----------
-    backend : {"numpy", "jax"}
-        Evaluation backend. ``"jax"`` is reserved for a later slice.
+    backend : {"numpy", "loop", "jax"}
+        Backward-step engine. ``"numpy"`` (default) is the vectorized lookup
+        table, ``"loop"`` the per-node Python reference, ``"jax"`` the jitted
+        device version (linear/nearest interpolation only; traceable cost/sets).
     alpha : float
         Discount (exponential forgetting) factor; use ``alpha < 1`` for
         guaranteed contraction in infinite-horizon value iteration.
@@ -149,9 +163,10 @@ class DynamicProgrammingPlanner(Planner):
         self.require_cost()
         self.grid = grid
         self.options = DynamicProgrammingOptions() if options is None else options
-        if self.options.backend == BACKEND_JAX:
-            raise NotImplementedError("The JAX backend lands in a later slice")
+        if self.options.backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
+            raise ValueError(f"Unknown backend {self.options.backend!r}")
         self._G = None  # running-cost table, cached when the grid is precomputed
+        self._jax_cache = {}  # compiled JAX runners keyed by (stop_on_tol, n)
 
     def compute_solution(self) -> DynamicProgrammingResult:
         """Run value iteration until convergence (or ``max_iterations``)."""
@@ -180,9 +195,13 @@ class DynamicProgrammingPlanner(Planner):
     # Internal machinery
 
     def _solve(self, *, max_iterations, stop_on_tol):
+        if self.options.backend == BACKEND_JAX:
+            return self._solve_jax(max_iterations, stop_on_tol)
+
         grid = self.grid
         opt = self.options
         tf = opt.final_time
+        step = self._loop_step if opt.backend == BACKEND_LOOP else self._vectorized_step
 
         J = self._terminal_cost(tf)
         pi = np.zeros(grid.nodes_n, dtype=int)
@@ -195,7 +214,7 @@ class DynamicProgrammingPlanner(Planner):
             k += 1
             t = tf - k * grid.dt
             J_next = J
-            J, pi = self._backward_step(J_next, t)
+            J, pi = step(J_next, t)
             delta = float(np.max(np.abs(J - J_next)))
             if opt.verbose:
                 print(f"DP step {k:4d}  t={t:7.3f}  Jmax={J.max():.3g}  dJ={delta:.3g}")
@@ -207,8 +226,8 @@ class DynamicProgrammingPlanner(Planner):
         )
         return self._store_result(result)
 
-    def _backward_step(self, J, t):
-        """One Bellman backup: arrival cost-to-go, then greedy minimisation."""
+    def _vectorized_step(self, J, t):
+        """Vectorized Bellman backup over the precomputed lookup table (NumPy)."""
         grid = self.grid
         n, N, A = grid.n, grid.nodes_n, grid.actions_n
         alpha = self.options.alpha
@@ -220,6 +239,64 @@ class DynamicProgrammingPlanner(Planner):
         Q = G + alpha * J_next.reshape(N, A)
 
         return Q.min(axis=1), Q.argmin(axis=1)
+
+    def _loop_step(self, J, t):
+        """One Bellman backup as an explicit loop over nodes and actions.
+
+        The readable reference engine (pyro's ``DynamicProgramming``): for every
+        state node and every control action, take a forward-Euler step, look up
+        the arrival cost-to-go, and keep the cheapest action. ``numpy`` and
+        ``jax`` compute the same thing vectorized; this version reads like the
+        textbook algorithm.
+        """
+        grid = self.grid
+        sys = self.problem.sys
+        cost = self.problem.cost
+        X = self.problem.X
+        U = self.problem.U
+        params = self.problem.params
+        dt = grid.dt
+        alpha = self.options.alpha
+        INF = self.options.out_of_bound_cost
+
+        J_interpol = grid.build_interpolator(J, self.options.interpolation)
+        J_new = np.zeros(grid.nodes_n)
+        pi = np.zeros(grid.nodes_n, dtype=int)
+
+        # For all state nodes
+        for s in range(grid.nodes_n):
+            x = grid.states[s]
+            Q = np.zeros(grid.actions_n)
+
+            # For all control actions
+            for a in range(grid.actions_n):
+                u = grid.inputs[a]
+
+                # If action is in allowable set
+                if U.contains(u, x, t, params.sets):
+                    # Forward dynamics
+                    x_next = sys.f(x, u, t, params.system) * dt + x
+
+                    # if the next state is not out-of-bound
+                    if X.contains(x_next, t, params.sets):
+                        # Estimated (interpolation) cost to go of arrival x_next state
+                        J_next = J_interpol(x_next)[0]
+
+                        # Cost-to-go of a given action
+                        Q[a] = cost.g(x, u, t, params.cost) * dt + alpha * J_next
+
+                    else:
+                        # Out of bound terminal cost
+                        Q[a] = INF
+
+                else:
+                    # Invalid control input at this state
+                    Q[a] = INF
+
+            J_new[s] = Q.min()
+            pi[s] = Q.argmin()
+
+        return J_new, pi
 
     def _terminal_cost(self, t):
         grid = self.grid
@@ -250,3 +327,148 @@ class DynamicProgrammingPlanner(Planner):
         if self.grid.precomputed:
             self._G = G
         return G
+
+    def _solve_jax(self, max_iterations, stop_on_tol):
+        """Jitted on-device value iteration over the lookup table.
+
+        The successor and cost tables are built once with NumPy (so any plant
+        works), then the whole convergence loop runs as a single jitted
+        ``lax.while_loop`` with ``map_coordinates`` interpolation — the Bellman
+        backup mapped over every node-action pair stays on device. The compiled
+        runner is cached so repeated solves pay compilation only once.
+        """
+        jax = configure_jax(enable_x64=True)  # match NumPy float64 precision
+        jnp = jax.numpy
+        grid = self.grid
+        opt = self.options
+        tf = opt.final_time
+        n = grid.n
+
+        if opt.interpolation not in ("linear", "nearest"):
+            raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
+
+        # NumPy precompute (works for any plant), then move to device.
+        x_next, action_ok, x_next_ok = grid.transition(tf)
+        G = jnp.asarray(self._running_cost(action_ok, x_next_ok, tf))
+        J0 = jnp.asarray(self._terminal_cost(tf))
+        coords = (
+            (jnp.asarray(x_next.reshape(-1, n)) - jnp.asarray(grid.x_lb))
+            / jnp.asarray(grid.x_step)
+        ).T  # fractional grid indices, shape (n, N*A)
+        # Hard-zero out-of-grid arrivals to match RegularGridInterpolator(fill_value=0)
+        # instead of map_coordinates' half-cell ramp to cval.
+        shape = tuple(int(s) for s in grid.x_grid_shape)
+        in_bounds = jnp.all(
+            (coords >= 0.0) & (coords <= (jnp.asarray(shape)[:, None] - 1)), axis=0
+        )
+
+        if opt.record_history:
+            return self._solve_jax_history(
+                jax, jnp, J0, G, coords, in_bounds, max_iterations, stop_on_tol
+            )
+
+        run = self._jax_runner(jax, jnp, stop_on_tol, max_iterations)
+        J, pi, k, delta = run(J0, G, coords, in_bounds)
+        result = DynamicProgrammingResult(
+            grid=grid,
+            J=np.array(J),  # writable copy (np.asarray of a jax buffer is read-only)
+            pi=np.array(pi, dtype=int),
+            iterations=int(k),
+            delta=float(delta),
+            history=None,
+        )
+        return self._store_result(result)
+
+    def _jax_step(self, jax, jnp):
+        """Return (and cache) the jitted single Bellman backup."""
+        cached = self._jax_cache.get("step")
+        if cached is not None:
+            return cached
+
+        from jax.scipy.ndimage import map_coordinates
+
+        shape = tuple(int(s) for s in self.grid.x_grid_shape)
+        N, A = self.grid.nodes_n, self.grid.actions_n
+        alpha = float(self.options.alpha)
+        order = 0 if self.options.interpolation == "nearest" else 1
+
+        def step(J, G, coords, in_bounds):
+            arrival = map_coordinates(
+                J.reshape(shape), coords, order=order, mode="constant", cval=0.0
+            )
+            arrival = jnp.where(in_bounds, arrival, 0.0)
+            Q = G + alpha * arrival.reshape(N, A)
+            return Q.min(axis=1), Q.argmin(axis=1).astype(jnp.int32)
+
+        compiled = jax.jit(step)
+        self._jax_cache["step"] = compiled
+        return compiled
+
+    def _jax_runner(self, jax, jnp, stop_on_tol, max_iterations):
+        """Return (and cache) the jitted whole value-iteration loop."""
+        key = (bool(stop_on_tol), int(max_iterations))
+        cached = self._jax_cache.get(key)
+        if cached is not None:
+            return cached
+
+        step = self._jax_step(jax, jnp)
+        N = self.grid.nodes_n
+        tol = float(self.options.tol)
+        zeros_pi = jnp.zeros(N, dtype=jnp.int32)
+
+        if stop_on_tol:
+
+            def run(J0, G, coords, in_bounds):
+                def cond(carry):
+                    _, _, k, delta = carry
+                    return (delta > tol) & (k < max_iterations)
+
+                def body(carry):
+                    J, _, k, _ = carry
+                    J_new, pi = step(J, G, coords, in_bounds)
+                    return J_new, pi, k + 1, jnp.max(jnp.abs(J_new - J))
+
+                init = (J0, zeros_pi, jnp.array(0), jnp.array(np.inf))
+                return jax.lax.while_loop(cond, body, init)
+        else:
+
+            def run(J0, G, coords, in_bounds):
+                def body(_, carry):
+                    J, _, _ = carry
+                    J_new, pi = step(J, G, coords, in_bounds)
+                    return J_new, pi, jnp.max(jnp.abs(J_new - J))
+
+                init = (J0, zeros_pi, jnp.array(np.inf))
+                J, pi, delta = jax.lax.fori_loop(0, max_iterations, body, init)
+                return J, pi, jnp.array(max_iterations), delta
+
+        compiled = jax.jit(run)
+        self._jax_cache[key] = compiled
+        return compiled
+
+    def _solve_jax_history(
+        self, jax, jnp, J0, G, coords, in_bounds, max_iterations, stop_on_tol
+    ):
+        """JAX value iteration that records per-sweep history (Python-driven)."""
+        grid = self.grid
+        tf, tol = self.options.final_time, float(self.options.tol)
+        step = self._jax_step(jax, jnp)
+
+        J, pi, delta, k = J0, jnp.zeros(grid.nodes_n, dtype=jnp.int32), np.inf, 0
+        history = [(tf, np.asarray(J), np.asarray(pi))]
+        while k < max_iterations and (not stop_on_tol or delta > tol):
+            k += 1
+            J_next = J
+            J, pi = step(J, G, coords, in_bounds)
+            delta = float(jnp.max(jnp.abs(J - J_next)))
+            history.append((tf - k * grid.dt, np.asarray(J), np.asarray(pi)))
+
+        result = DynamicProgrammingResult(
+            grid=grid,
+            J=np.array(J),  # writable copy
+            pi=np.array(pi, dtype=int),
+            iterations=k,
+            delta=delta,
+            history=history,
+        )
+        return self._store_result(result)
