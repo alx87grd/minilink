@@ -31,10 +31,12 @@ import numpy as np
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, configure_jax
 from minilink.planning.planner import Planner
 from minilink.planning.policy_synthesis.discretizer import (
-    PAIR_PROGRESS_INTERVAL,
+    PAIR_CHUNK_SIZE,
     StateSpaceGrid,
     build_jax_node_chunks,
     build_jax_sa_chunks,
+    maybe_print_build_progress,
+    print_build_complete,
     print_build_progress,
 )
 from minilink.planning.problems import PlanningProblem
@@ -78,7 +80,8 @@ class DynamicProgrammingOptions:
         Print build progress (50k-item counts with elapsed time and ETA) for
         lookup-table precompute and backward Bellman sweeps. Grid mesh and
         ``x_next`` progress use :attr:`StateSpaceGrid.verbose`; ``G``, ``J0``,
-        and sweeps use this flag. Set both to ``False`` for silent runs.
+        and sweeps use this flag. Progress lines update in place about every
+        2% until each step completes. Set both to ``False`` for silent runs.
     """
 
     backend: str = BACKEND_NUMPY
@@ -227,6 +230,7 @@ class DynamicProgrammingPlanner(Planner):
         delta = np.inf
         k = 0
         start_time = time.time()
+        sweep_progress = {"enabled": opt.verbose}
         while k < max_iterations and (not stop_on_tol or delta > opt.tol):
             k += 1
             t = tf - k * grid.dt
@@ -237,25 +241,27 @@ class DynamicProgrammingPlanner(Planner):
                 if stop_on_tol:
                     self._print_sweep_line(k, t, J, J_next, start_time)
                 else:
-                    print_build_progress(
+                    maybe_print_build_progress(
                         k,
                         max_iterations,
                         start_time,
                         prefix="Computing backward DP",
                         unit="sweeps",
+                        state=sweep_progress,
                     )
             if history is not None:
                 history.append((t, J.copy(), pi.copy()))
 
         if opt.verbose:
             elapsed = time.time() - start_time
-            print()
             if stop_on_tol:
-                print("\nBellman equation solved!")
+                print()
+                print("Bellman equation solved!")
             else:
-                print(
-                    f"Computing backward DP.. completed in {elapsed:4.2f} sec"
-                    f"  ({k} sweeps, delta={delta:.3f})"
+                print_build_complete(
+                    "Computing backward DP",
+                    elapsed,
+                    f"({k} sweeps, delta={delta:.3f})",
                 )
 
         result = DynamicProgrammingResult(
@@ -344,29 +350,29 @@ class DynamicProgrammingPlanner(Planner):
         cost_params = self.problem.params.cost
         N = grid.nodes_n
         verbose = self.options.verbose
+        start = time.time()
 
         if verbose:
-            start = time.time()
             print(f"Computing h(x,t) terminal cost.. {N:,} nodes", flush=True)
 
         J0 = np.empty(N, dtype=float)
+        progress = {"enabled": verbose}
         for s in range(N):
             J0[s] = float(h(grid.states[s], t, cost_params))
-            if verbose and (s + 1) % PAIR_PROGRESS_INTERVAL == 0:
-                print_build_progress(
-                    s + 1,
-                    N,
-                    start,
-                    prefix="Computing h(x,t) terminal cost",
-                    unit="nodes",
-                )
+            maybe_print_build_progress(
+                s + 1,
+                N,
+                start,
+                prefix="Computing h(x,t) terminal cost",
+                unit="nodes",
+                state=progress,
+            )
 
         if verbose:
-            elapsed = time.time() - start
-            print()
-            print(
-                f"Computing h(x,t) terminal cost.. completed in {elapsed:4.2f} sec"
-                f"  ({N:,} nodes)"
+            print_build_complete(
+                "Computing h(x,t) terminal cost",
+                time.time() - start,
+                f"({N:,} nodes)",
             )
 
         return J0
@@ -394,7 +400,7 @@ class DynamicProgrammingPlanner(Planner):
                 N,
                 jax,
                 jnp,
-                interval=PAIR_PROGRESS_INTERVAL,
+                interval=PAIR_CHUNK_SIZE,
                 verbose=verbose,
                 prefix="Computing h(x,t) terminal cost",
             )
@@ -419,34 +425,35 @@ class DynamicProgrammingPlanner(Planner):
         N, A = grid.nodes_n, grid.actions_n
         verbose = self.options.verbose
         total_pairs = N * A
+        start = time.time()
 
         if verbose:
-            start = time.time()
             print(f"Computing g(x,u,t) look-up table.. {total_pairs:,} pairs", flush=True)
 
         G = np.empty((N, A), dtype=float)
         pairs_done = 0
+        progress = {"enabled": verbose}
         for a in range(A):
             u = grid.inputs[a]
             for s in range(N):
                 G[s, a] = float(g(grid.states[s], u, t, cost_params)) * dt
                 pairs_done += 1
-                if verbose and pairs_done % PAIR_PROGRESS_INTERVAL == 0:
-                    print_build_progress(
-                        pairs_done,
-                        total_pairs,
-                        start,
-                        prefix="Computing g(x,u,t) look-up table",
-                    )
+                maybe_print_build_progress(
+                    pairs_done,
+                    total_pairs,
+                    start,
+                    prefix="Computing g(x,u,t) look-up table",
+                    unit="pairs",
+                    state=progress,
+                )
 
         G[(~action_ok) | (~x_next_ok)] = self.options.out_of_bound_cost
 
         if verbose:
-            elapsed = time.time() - start
-            print()
-            print(
-                f"Computing g(x,u,t) look-up table.. completed in {elapsed:4.2f} sec"
-                f"  ({total_pairs:,} pairs)"
+            print_build_complete(
+                "Computing g(x,u,t) look-up table",
+                time.time() - start,
+                f"({total_pairs:,} pairs)",
             )
 
         if self.grid.precomputed:
@@ -484,7 +491,7 @@ class DynamicProgrammingPlanner(Planner):
                 A,
                 jax,
                 jnp,
-                interval=PAIR_PROGRESS_INTERVAL,
+                interval=PAIR_CHUNK_SIZE,
                 verbose=verbose,
                 prefix="Computing g(x,u,t) look-up table",
             )
@@ -651,6 +658,7 @@ class DynamicProgrammingPlanner(Planner):
         J, pi = J0, jnp.zeros(grid.nodes_n, dtype=jnp.int32)
         delta, k = np.inf, 0
         start_time = time.time()
+        sweep_progress = {"enabled": opt.verbose}
         history = [(tf, np.asarray(J), np.asarray(pi))] if opt.record_history else None
 
         while k < max_iterations and (not stop_on_tol or delta > tol):
@@ -666,25 +674,27 @@ class DynamicProgrammingPlanner(Planner):
                         k, t, np.asarray(J), np.asarray(J_next), start_time
                     )
                 else:
-                    print_build_progress(
+                    maybe_print_build_progress(
                         k,
                         max_iterations,
                         start_time,
                         prefix="Computing backward DP",
                         unit="sweeps",
+                        state=sweep_progress,
                     )
             if history is not None:
                 history.append((t, np.asarray(J), np.asarray(pi)))
 
         if opt.verbose:
             elapsed = time.time() - start_time
-            print()
             if stop_on_tol:
-                print("\nBellman equation solved!")
+                print()
+                print("Bellman equation solved!")
             else:
-                print(
-                    f"Computing backward DP.. completed in {elapsed:4.2f} sec"
-                    f"  ({k} sweeps, delta={delta:.3f})"
+                print_build_complete(
+                    "Computing backward DP",
+                    elapsed,
+                    f"({k} sweeps, delta={delta:.3f})",
                 )
 
         result = DynamicProgrammingResult(

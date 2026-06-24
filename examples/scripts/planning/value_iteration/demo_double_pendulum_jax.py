@@ -30,9 +30,9 @@ from minilink.planning.policy_synthesis.dp import (
 )
 from minilink.planning.problems import PlanningProblem
 
-RESOLUTION = "high"  # "fast" | "pyro" | "high"
+# RESOLUTION = "high"  # "fast" | "pyro" | "high"
 # RESOLUTION = "fast"  # "fast" | "pyro" | "high"
-# RESOLUTION = "pyro"  # "fast" | "pyro" | "high"
+RESOLUTION = "pyro"  # "fast" | "pyro" | "high"
 
 INF = 1000.0
 GOAL = np.zeros(4)

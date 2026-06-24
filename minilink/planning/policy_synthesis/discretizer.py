@@ -23,19 +23,42 @@ from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
 from minilink.core.sets import BoxInputSet, BoxSet
 from minilink.planning.problems import PlanningProblem
 
-PAIR_PROGRESS_INTERVAL = 50_000
+PAIR_CHUNK_SIZE = 50_000
+PROGRESS_PCT_STEP = 2.0
+_PROGRESS_WIDTH = 72
 
 
 def print_build_progress(done, total, start, *, prefix, unit="pairs"):
-    """In-place terminal progress line with elapsed time and ETA."""
+    """Overwrite one terminal line with percent, elapsed time, and ETA."""
     elapsed = time.time() - start
-    eta = elapsed / done * (total - done) if done < total else 0.0
-    print(
-        f"\r{prefix}.. {done:,}/{total:,} {unit} ({100.0 * done / total:.1f}%)"
-        f"  {elapsed:.1f}s elapsed  ETA ~{eta:.0f}s",
-        end="",
-        flush=True,
-    )
+    pct = 100.0 * done / total if total else 100.0
+    eta = elapsed / done * (total - done) if 0 < done < total else 0.0
+    msg = f"{prefix}: {pct:5.1f}%  {elapsed:5.0f}s  ETA ~{eta:.0f}s"
+    pad = " " * max(0, _PROGRESS_WIDTH - len(msg))
+    print(f"\r{msg}{pad}", end="", flush=True)
+
+
+def maybe_print_build_progress(done, total, start, *, prefix, unit, state):
+    """Print at most once per ``PROGRESS_PCT_STEP`` percent (plus final 100%)."""
+    if not state.get("enabled", True) or total <= 0:
+        return state
+    pct = 100.0 * done / total
+    if done < total:
+        next_at = state.get("next_pct", PROGRESS_PCT_STEP)
+        if pct + 1e-9 < next_at:
+            return state
+        while next_at <= pct:
+            next_at += PROGRESS_PCT_STEP
+        state["next_pct"] = next_at
+    print_build_progress(done, total, start, prefix=prefix, unit=unit)
+    return state
+
+
+def print_build_complete(prefix, elapsed, detail):
+    """Finish a throttled progress line without leaving wrapped tail text."""
+    msg = f"{prefix}.. completed in {elapsed:4.2f} sec  {detail}"
+    pad = " " * max(0, _PROGRESS_WIDTH - len(msg))
+    print(f"\r{msg}{pad}")
 
 
 def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):
@@ -50,6 +73,7 @@ def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):
         return jax.vmap(pair_fn)(s, a)
 
     build_start = time.time()
+    progress = {"enabled": verbose}
     for begin in range(0, total, interval):
         end = min(begin + interval, total)
         count = end - begin
@@ -65,13 +89,12 @@ def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):
         chunk = np.asarray(chunk)
         idx = np.arange(begin, end)
         out[idx // A, idx % A] = chunk
-        if verbose:
-            print_build_progress(end, total, build_start, prefix=prefix)
+        maybe_print_build_progress(
+            end, total, build_start, prefix=prefix, unit="pairs", state=progress
+        )
 
     if verbose:
-        elapsed = time.time() - build_start
-        print()
-        print(f"{prefix}.. completed in {elapsed:4.2f} sec  ({total:,} pairs)")
+        print_build_complete(prefix, time.time() - build_start, f"({total:,} pairs)")
 
     return out
 
@@ -85,6 +108,7 @@ def build_jax_node_chunks(node_fn, N, jax, jnp, *, interval, verbose, prefix):
         return jax.vmap(node_fn)(idx)
 
     build_start = time.time()
+    progress = {"enabled": verbose}
     for begin in range(0, N, interval):
         end = min(begin + interval, N)
         count = end - begin
@@ -96,15 +120,12 @@ def build_jax_node_chunks(node_fn, N, jax, jnp, *, interval, verbose, prefix):
             chunk = jax.vmap(node_fn)(idx)
 
         out[begin:end] = np.asarray(chunk)
-        if verbose:
-            print_build_progress(
-                end, N, build_start, prefix=prefix, unit="nodes"
-            )
+        maybe_print_build_progress(
+            end, N, build_start, prefix=prefix, unit="nodes", state=progress
+        )
 
     if verbose:
-        elapsed = time.time() - build_start
-        print()
-        print(f"{prefix}.. completed in {elapsed:4.2f} sec  ({N:,} nodes)")
+        print_build_complete(prefix, time.time() - build_start, f"({N:,} nodes)")
 
     return out
 
@@ -138,8 +159,8 @@ class StateSpaceGrid:
         dynamics with ``vmap`` and is much faster on large grids when the plant
         is JAX-traceable and the state/input sets are boxes.
     verbose : bool, optional
-        Print mesh size and lookup-table build progress (pyro-style feedback for
-        large grids): counts every 50k items, elapsed time, and ETA.
+        Print mesh size and lookup-table build progress: one in-place line
+        about every 2% with elapsed time and ETA until each step completes.
 
     Attributes
     ----------
@@ -261,10 +282,10 @@ class StateSpaceGrid:
         set_params = self.problem.params.sets
         dt = self.dt
         verbose = self.verbose
+        start = time.time()
+        total_pairs = N * A
 
         if verbose:
-            start = time.time()
-            total_pairs = N * A
             print("Computing x_next array.. ", end="", flush=True)
 
         x_next = np.empty((N, A, n), dtype=float)
@@ -272,6 +293,7 @@ class StateSpaceGrid:
         x_next_ok = np.empty((N, A), dtype=bool)
 
         pairs_done = 0
+        progress = {"enabled": verbose}
         for a in range(A):
             u = self.inputs[a]
             for s in range(N):
@@ -285,17 +307,20 @@ class StateSpaceGrid:
                 x_next_ok[s, a] = X.contains(xnext, t, set_params)
 
                 pairs_done += 1
-                if verbose and pairs_done % PAIR_PROGRESS_INTERVAL == 0:
-                    print_build_progress(
-                        pairs_done, total_pairs, start, prefix="Computing x_next array"
-                    )
+                maybe_print_build_progress(
+                    pairs_done,
+                    total_pairs,
+                    start,
+                    prefix="Computing x_next array",
+                    unit="pairs",
+                    state=progress,
+                )
 
         if verbose:
-            elapsed = time.time() - start
-            print()
-            print(
-                f"Computing x_next array.. completed in {elapsed:4.2f} sec"
-                f"  ({total_pairs:,} pairs)"
+            print_build_complete(
+                "Computing x_next array",
+                time.time() - start,
+                f"({total_pairs:,} pairs)",
             )
 
         return x_next, action_ok, x_next_ok
@@ -335,7 +360,7 @@ class StateSpaceGrid:
             return xnext, x_next_ok
 
         x_next, x_next_ok = self._build_xnext_jax_chunks(
-            pair, N, A, n, jax, jnp, interval=PAIR_PROGRESS_INTERVAL
+            pair, N, A, n, jax, jnp, interval=PAIR_CHUNK_SIZE
         )
         if box_inputs:
             action_ok = np.ones((N, A), dtype=bool)
@@ -359,6 +384,7 @@ class StateSpaceGrid:
             return xnext, ok
 
         build_start = time.time()
+        progress = {"enabled": verbose}
         for begin in range(0, total_pairs, interval):
             end = min(begin + interval, total_pairs)
             count = end - begin
@@ -378,20 +404,20 @@ class StateSpaceGrid:
             a_idx = idx % A
             x_next[s_idx, a_idx] = xnext_chunk
             x_next_ok[s_idx, a_idx] = ok_chunk
-            if verbose:
-                print_build_progress(
-                    end,
-                    total_pairs,
-                    build_start,
-                    prefix="Computing x_next array (JAX vmap)",
-                )
+            maybe_print_build_progress(
+                end,
+                total_pairs,
+                build_start,
+                prefix="Computing x_next array (JAX vmap)",
+                unit="pairs",
+                state=progress,
+            )
 
         if verbose:
-            elapsed = time.time() - build_start
-            print()
-            print(
-                f"Computing x_next array (JAX vmap).. completed in {elapsed:4.2f} sec"
-                f"  ({total_pairs:,} pairs)"
+            print_build_complete(
+                "Computing x_next array (JAX vmap)",
+                time.time() - build_start,
+                f"({total_pairs:,} pairs)",
             )
 
         return x_next, x_next_ok
