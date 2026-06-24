@@ -141,10 +141,10 @@ All pyro plant EoMs are ported and term-by-term QA'd. See
 | Pyro symbol | Proposed minilink home | Pyro demo refs (approx.) | Status |
 | --- | --- | ---: | --- |
 | `RRT` | `planning/search/rrt.py` | 20 | [ ] redesign (stubs removed) |
-| `DynamicProgramming` | `planning/policy_synthesis/dp.py` | 29 | [ ] redesign (stubs removed) |
-| `LookUpTableController` | `planning/policy_synthesis/lookup_policy.py` | bundled with DP | [ ] |
-| `GridDynamicSystem` | `planning/policy_synthesis/discretizer.py` | bundled with DP | [ ] |
-| `PolicyEvaluator` (+ lookup variants) | `planning/policy_synthesis/policy_eval.py` | 4 | [ ] |
+| `DynamicProgramming` (+ lookup / spline variants) | `planning/policy_synthesis/dp.py` (`DynamicProgrammingPlanner`) | 29 | [x] value iteration; precompute + interpolation as options (NumPy; JAX pending) |
+| `LookUpTableController` | `planning/policy_synthesis/lookup_policy.py` (`LookupTableController`) | bundled with DP | [x] `StaticSystem`, composes `>>` |
+| `GridDynamicSystem` | `planning/policy_synthesis/discretizer.py` (`StateSpaceGrid`) | bundled with DP | [x] dimension-generic |
+| `PolicyEvaluator` (+ lookup variants) | `planning/policy_synthesis/policy_eval.py` | 4 | [x] |
 | `SingleAxisPolynomialTrajectoryGenerator` | `planning/trajectory_generation/polynomial.py` | 2 | [ ] |
 | `MultiPointSingleAxisPolynomialTrajectoryGenerator` | same | 2 | [ ] |
 | `TrajectoryFilter` (Butterworth `filtfilt`) | `planning/trajectory_generation/filter.py` or `analysis/` | 0 standalone | [ ] |

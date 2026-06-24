@@ -834,6 +834,7 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
 
 if __name__ == "__main__":
     sys = JaxDynamicBicycleRateInputs()
+    # sys = DynamicBicycleCar3D()
     x = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     u = np.array([5.0, 0.1])
     t = 0.0

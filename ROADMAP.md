@@ -15,9 +15,9 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Simulation | 7 | Mature workflow with stable API and solver/forcing coverage. | Keep behavior stable; treat `SimulationOptions` as ergonomic cleanup, not a redesign. |
 | Optimization | 5 | `MathematicalProgram` and `Optimizer` are integrated and useful, but backend details still need hardening. | Harden SciPy/Ipopt behavior and evaluator details before test-gated promotion. |
 | Planning/trajopt | 2 | Direct collocation / shooting exist; DP/RRT/polynomial generation not ported. | Architectural review for offline DP/RRT; traj generation. |
-| Planning/policy synthesis | 1 | Pyro DP/value iteration not ported; stubs removed. | Redesign under `planning/policy_synthesis/` (see pyro gap doc §4). |
-| Planning/search | 1 | Pyro RRT not ported; stubs removed. | Redesign under `planning/search/rrt.py`. |
-| Geometry / spatial | 2 | `core/geometry.py` SDF primitives + cost algebra (`SumCost`/`ScaledCost`), and `planning/spatial/`: `Scene` (obstacles + `workspace_fields`), `WorkspaceField`/`StateField`, `RobotBody`/`TranslationBody`, export via `as_constraint`/`as_cost`. Tested incl. JAX twins. | Scene params (`ProblemParameters.scene`, future); RRT consumers; oriented/multi-sphere bodies and raster cost maps. |
+| Planning/policy synthesis | 2 | `DynamicProgrammingPlanner` (value iteration) over a `StateSpaceGrid` discretizer of a `PlanningProblem`; both solve-to-tolerance and fixed-step modes, `precompute` memory knob, linear/nearest/spline interpolation, discount, time-varying, infeasible-set cleanup, `LookupTableController`, `PolicyEvaluator`, plotting/animation. NumPy; full pyro DP feature parity. Tested + demo. | JAX backend (`vmap`/`map_coordinates`/`jit`); `lax.while_loop` solve; GPU. |
+| Planning/search | 2 | `RRTPlanner` over `PlanningProblem` with a swappable `TrajectoryExtender` (`KinodynamicExtender` + `SteeringExtender`/`StraightLineSteering`) and a `metric` callable; collision from spatial `Scene`, system kept pure. Tested + demos. | `RRTStarPlanner` (rewire), `DubinsSteering`, RRT-Connect, KD-tree. |
+| Geometry / spatial | 4 | Integrated architecture proposed for obstacle and terrain planning: `core/geometry.py` SDF primitives + cost algebra (`SumCost`/`ScaledCost`), and `planning/spatial/`: `Scene` (obstacles + `workspace_fields`), `WorkspaceField`/`StateField`, `RobotBody`/`TranslationBody`, export via `as_constraint`/`as_cost`. Tested incl. JAX twins. | User architecture validation; scene params (`ProblemParameters.scene`, future); RRT consumers; oriented/multi-sphere bodies and raster cost maps. |
 | Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Kinematic composition review before API freeze. |
 | Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Same gate as Graphical. |
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; `DynamicBicycle` params thread fully. | `Manipulator` abstraction + catalog rebase (see review queue). |
@@ -140,14 +140,14 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] Trajectory optimization (direct collocation, shooting, multiple shooting)
 - [ ] **Scene params** — `ProblemParameters.scene`, transcription merge helpers,
   indexed overrides in `Scene` / `StateField` (moving obstacles, scenario sweeps,
-  MPC without scene rebuild). See
-  [spatial-pipeline.md](docs/plans/spatial-pipeline.md).
+  MPC without scene rebuild).
 - [ ] **Parametric `core/` primitives** (deferred follow-up) — call-time `params`
   overrides on `Shape.sdf`, `Set.margin`, and `CostFunction.g`/`h` (e.g. `BallSet`
   center/radius, `QuadraticCost` weights). Signatures exist; frozen attributes are the
   only source of truth today.
 - [ ] `trajectory_generation/` — polynomial / min-snap
-- [ ] `policy_synthesis/` — DP, lookup table controller, policy evaluator, grid discretizer
+- [x] `policy_synthesis/` — `DynamicProgrammingPlanner` (value iteration), `StateSpaceGrid`
+  discretizer, `LookupTableController`, `PolicyEvaluator`, plotting (NumPy; JAX backend pending)
 - [ ] `search/rrt.py`
 - [ ] Trajectory post-filter (Butterworth `filtfilt`)
 

@@ -55,7 +55,7 @@ class FilteredPIDController(DynamicSystem):
         e_int_max: float = np.inf,
     ):
         super().__init__(n=2)
-        self.name = "pid"
+        self.name = "Filtered PID"
 
         self.params = {
             "kp": kp,

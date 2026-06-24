@@ -194,6 +194,41 @@ class QuadraticCost(CostFunction):
 
 
 @dataclass(frozen=True)
+class TimeCost(CostFunction):
+    """
+    Minimum-time cost ``J = T``.
+
+    The running cost is ``g = 1`` everywhere except within ``eps`` of the target
+    ``xbar``, where it is ``0`` (the absorbing goal); the terminal cost is ``0``.
+    Under dynamic programming the cost-to-go becomes the time-to-go and the
+    optimal policy is bang-bang. The on-target test is a NumPy boundary check
+    (not a JAX-traceable math path).
+    """
+
+    xbar: np.ndarray
+    eps: float = 1e-3
+
+    def __post_init__(self) -> None:
+        xbar = np.asarray(self.xbar, dtype=float).reshape(-1).copy()
+        object.__setattr__(self, "xbar", xbar)
+        object.__setattr__(self, "eps", float(self.eps))
+
+    @classmethod
+    def from_system(cls, sys, *, xbar: np.ndarray | None = None, eps: float = 1e-3):
+        """Create a time cost targeting ``xbar`` (default the state origin)."""
+        xbar = np.zeros(int(sys.n)) if xbar is None else xbar
+        return cls(xbar=xbar, eps=eps)
+
+    def g(self, x, u, t=0.0, params=None):
+        """Return unit running cost away from the target, zero on it."""
+        return 0.0 if np.linalg.norm(x - self.xbar) < self.eps else 1.0
+
+    def h(self, x, t=0.0, params=None):
+        """Return zero terminal cost."""
+        return 0.0
+
+
+@dataclass(frozen=True)
 class SumCost(CostFunction):
     """
     Additive cost ``J = sum_i J_i`` over several cost functions.

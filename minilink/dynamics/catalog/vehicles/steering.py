@@ -3,6 +3,7 @@ import numpy as np
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
+    Box,
     Circle,
     Sphere,
     arrow_transform,
@@ -81,7 +82,7 @@ class KinematicBicycle(DynamicSystem):
 
 
 class KinematicCar(KinematicBicycle):
-    """Kinematic bicycle parameterized as a full-size car."""
+    """Kinematic bicycle parameterized as a full-size car with a four-wheel skin."""
 
     def __init__(self):
         super().__init__()
@@ -90,11 +91,52 @@ class KinematicCar(KinematicBicycle):
         self.b = 3.0
         self.params["length"] = self.a + self.b
 
-        # Graphic parameters (not part of the EoM)
+        # Graphic parameters (display only; the EoM use only ``length``). The skin
+        # is a rectangular body filling the ``length x width`` collision footprint
+        # plus four wheels (the front pair steering) -- replacing the bicycle's
+        # pointed outline and two in-line wheels so it reads as a car.
         self.width = 2.0
-        self.tire_length = 0.4
-        self.tire_width = 0.15
+        self.body_width_ratio = 0.74  # tub narrower than track, so wheels show
+        self.visual_wheelbase_ratio = 0.64  # axle separation as a fraction of length
+        self.tire_length = 0.95
+        self.tire_width = 0.34
         self.camera_scale = 2.0 * self.params["length"]
+
+    def get_kinematic_geometry(self):
+        length = self.params["length"]
+        body = Box(
+            length_x=length,
+            length_y=self.body_width_ratio * self.width,
+            length_z=0.4,
+            color="#4c72b0",
+            opacity=0.9,
+        )
+        return [
+            body,
+            wheel_box(self.tire_length, self.tire_width),  # rear-left
+            wheel_box(self.tire_length, self.tire_width),  # rear-right
+            wheel_box(self.tire_length, self.tire_width),  # front-left (steers)
+            wheel_box(self.tire_length, self.tire_width),  # front-right (steers)
+            Arrow(color="red", linewidth=2, origin="base"),
+        ]
+
+    def get_kinematic_transforms(self, x, u, t):
+        length = self.params["length"]
+        speed, steering = u[0], u[1]
+        axle = 0.5 * self.visual_wheelbase_ratio * length
+        half_track = (
+            0.5 * self.width - 0.5 * self.tire_width
+        )  # tire flush with the side
+        T_body = pose2d_matrix(x[0], x[1], x[2])
+        R_steer = pose2d_matrix(0.0, 0.0, steering)
+        return [
+            T_body,
+            T_body @ pose2d_matrix(-axle, half_track, 0.0),
+            T_body @ pose2d_matrix(-axle, -half_track, 0.0),
+            T_body @ pose2d_matrix(axle, half_track, 0.0) @ R_steer,
+            T_body @ pose2d_matrix(axle, -half_track, 0.0) @ R_steer,
+            T_body @ scale_pose2d_matrix(0.0, 0.0, 0.0, 0.4 * abs(speed)),
+        ]
 
 
 class ConstantSpeedKinematicCar(DynamicSystem):

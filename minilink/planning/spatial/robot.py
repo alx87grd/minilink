@@ -95,6 +95,73 @@ def point(*, position=(0, 1)) -> TranslationBody:
     return TranslationBody(Sphere(np.zeros(len(position)), 0.0), position)
 
 
+@dataclass(frozen=True)
+class PlanarRigidBody(RobotBody):
+    """
+    Oriented planar body: several parts placed by one SE(2) pose.
+
+    Every part shares the rigid pose ``(x, y, theta)``, so body-frame sphere
+    offsets sweep out an oriented footprint — e.g. a rectangular car outline —
+    whose collision then depends on its heading.
+
+    Parameters
+    ----------
+    parts : tuple of Shape
+        Body-frame collision geometry (spheres in the first pass).
+    position : tuple of int
+        State indices of the body-frame origin in the plane.
+    heading : int
+        State index of the planar heading angle.
+    """
+
+    parts: tuple
+    position: tuple = (0, 1)
+    heading: int = 2
+
+    @property
+    def shapes(self) -> tuple[Shape, ...]:
+        return self.parts
+
+    def body_poses(self, x, u=None, t=0.0, params=None):
+        xp = array_module(x)
+        tx, ty = x[self.position[0]], x[self.position[1]]
+        c = xp.cos(x[self.heading])
+        s = xp.sin(x[self.heading])
+
+        # SE(2) homogeneous transform shared by every rigid part
+        transform = xp.stack(
+            [
+                xp.stack([c, -s, tx]),
+                xp.stack([s, c, ty]),
+                xp.asarray([0.0, 0.0, 1.0]),
+            ]
+        )
+        return tuple(transform for _ in self.parts)
+
+
+def car(length, width, *, position=(0, 1), heading=2, margin=0.0) -> PlanarRigidBody:
+    """
+    Return an oriented rectangular car footprint probed at its outline.
+
+    Collision is checked at the four corners and four edge midpoints of the
+    ``length × width`` box (each grown by ``margin``), placed by an SE(2) pose —
+    so the heading sets how the rectangle fits between obstacles.
+    """
+    hl, hw = 0.5 * length, 0.5 * width
+    outline = [
+        (hl, hw),
+        (hl, -hw),
+        (-hl, hw),
+        (-hl, -hw),  # corners
+        (hl, 0.0),
+        (-hl, 0.0),
+        (0.0, hw),
+        (0.0, -hw),  # edge midpoints
+    ]
+    parts = tuple(Sphere([px, py], margin) for px, py in outline)
+    return PlanarRigidBody(parts, position=position, heading=heading)
+
+
 def apply_transform(T, q):
     """Return the world point of body-frame point ``q`` under transform ``T``."""
     xp = array_module(T, q)

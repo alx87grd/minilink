@@ -66,7 +66,7 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, solvers, forcing |
 | `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; more frequency tools planned |
-| `planning/` | problems, trajopt |
+| `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
@@ -194,14 +194,15 @@ Explicit `add_subsystem` / `connect` remains canonical for general topology.
 - `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
 - Sets: `margin ≥ 0` feasible; `contains`/`sample` may convert to NumPy. Compose with
   `&` → `IntersectionSet`. `margin(z, t, params)` is threaded by transcriptions via
-  `problem.params.sets` (merged with `environment` for field-backed sets); base
-  `Set` subclasses other than `FieldSet` / `CallableSet` do not yet read `params`
-  (deferred — see ROADMAP).
+  `problem.params.sets`; field-backed spatial sets forward that same parameter
+  object to their scene queries. Base `Set` subclasses other than `FieldSet` /
+  `CallableSet` do not yet read `params` (deferred — see ROADMAP).
 - Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
   `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
   `ScaledCost` (e.g. `base + w * obstacle_cost`). `g`/`h` receive
-  `problem.params.cost` (merged with `environment` for `FieldCost`); built-in costs
-  such as `QuadraticCost` do not yet read `params` (deferred).
+  `problem.params.cost`; `FieldCost` forwards that parameter object to its
+  underlying spatial field. Built-in costs such as `QuadraticCost` do not yet
+  read `params` (deferred).
 - Geometry (`geometry.py`): `Shape.sdf(p)` is the signed distance to a workspace
   *solid* — `< 0` inside (occupied), the dual of an allowable `Set` (`margin ≥ 0`).
   Primitives `Sphere`/`Box`/`Union`/`Inflated`; native-array math path (NumPy and
@@ -250,6 +251,19 @@ route `problem.params.system` through the parametric tier `f_p`;
 A `MathematicalProgram` carries the native backend of its callables in its
 `backend` field, and the `Optimizer` compiles with it by default.
 
+**Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
+continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
+comes from a `BoxSet`/`BoxInputSet` (so it stays finite), grid *validity* from
+`X.contains`/`U.contains` (so `X = bounds & free` still works), and successors from a
+forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the grid, not
+on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `compute_solution`
+to tolerance, `solve_steps` for a fixed horizon — returning a cost-to-go `J` and greedy policy
+`pi` (action ids); out-of-domain transitions are charged a finite `out_of_bound_cost` (pyro's
+`cf.INF`). `precompute` trades the `(N,A,n)` successor table for per-sweep recomputation
+(memory vs time-varying support); the JAX backend is reserved. `result.controller()` returns a
+`LookupTableController` (a `StaticSystem`, so `controller >> plant` simulates); `PolicyEvaluator`
+gives the cost-to-go of any fixed law.
+
 **Spatial scene** (`planning/spatial/`): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
 `Scene` (`obstacles`, `workspace_fields`). On X: `StateField.value(x)` fuses the robot
@@ -262,8 +276,18 @@ density over body probes). `RobotBody` places body-frame geometry by
 obstacle term before weighting with `as_cost(shaping=...)` (`shaping.occupancy`,
 `quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
-obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then. See
-[docs/plans/spatial-pipeline.md](docs/plans/spatial-pipeline.md).
+obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.
+
+**Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
+sources every concern from the problem — collision `problem.X.contains`, goal
+`problem.Xf`/`x_goal`, sampling `X.sample`/`U.sample`, dynamics `problem.sys.f` — so the
+system stays pure. The two swappable pieces are an injected `TrajectoryExtender`
+(`propose(from, toward, problem, rng) → Iterable[Edge]`: `KinodynamicExtender`
+forward-integrates controls, `SteeringExtender` connects exactly via a `SteeringFunction`)
+and a `metric(a,b)` callable (nearest-neighbour distance). Every system is an ODE, so an
+`Edge` always carries real `(t,x,u)`; `compute_solution() → Trajectory`. `Edge.cost` is the
+cost-to-come seam for a future `RRTStarPlanner` (the orchestrator's one overridden attach
+step).
 
 ## 7. Graphics And Benchmarks
 

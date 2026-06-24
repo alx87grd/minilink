@@ -251,7 +251,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         x = np.array([0.5])
         u = np.array([2.0])
         params = {
-            "ctl": {"Kp": 4.0},
+            "ctl": {"K": np.array([[4.0]])},
             "plant": {"k": 3.0},
         }
 
@@ -576,10 +576,10 @@ class TestDiagramParamsContract(unittest.TestCase):
     """Nested params routing and the ``DiagramSystem.params`` live view."""
 
     def setUp(self):
-        self.diag = _build_small_closed_loop()  # ctl Kp=2.5, plant k=1.0
+        self.diag = _build_small_closed_loop()  # ctl K=2.5, plant k=1.0
         self.x = np.array([0.5])
         self.u = np.array([2.0])
-        # Closed loop: dx = k * Kp * (r - x), with r - x = 1.5 here.
+        # Closed loop: dx = k * K * (r - x), with r - x = 1.5 here.
 
     def test_params_property_is_nested_live_view(self):
         params = self.diag.params
@@ -628,7 +628,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
         self.u = np.array([2.0])
 
     def test_f_p_matches_recursive_reference(self):
-        params = {"ctl": {"Kp": 4.0}, "plant": {"k": 3.0}}
+        params = {"ctl": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
         for x_val, u_val, t in [(0.3, 1.2, 0.1), (0.0, 0.0, 0.0), (-5.0, 10.0, 0.0)]:
             x, u = np.array([x_val]), np.array([u_val])
             np.testing.assert_allclose(
@@ -653,7 +653,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
             self.evaluator.f_p(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
 
     def test_outputs_p_and_h_p_single_boundary(self):
-        params = {"ctl": {"Kp": 4.0}}
+        params = {"ctl": {"K": np.array([[4.0]])}}
         out = self.evaluator.outputs_p(self.x, self.u, 0.0, params)
         self.assertEqual(set(out), {"y_meas"})
         np.testing.assert_allclose(out["y_meas"], [0.5], atol=1e-10)

@@ -1,8 +1,21 @@
 import numpy as np
 import pytest
 
-from minilink.core.costs import CostFunction, QuadraticCost, ScaledCost, SumCost
+from minilink.core.costs import (
+    CostFunction,
+    QuadraticCost,
+    ScaledCost,
+    SumCost,
+    TimeCost,
+)
 from minilink.core.trajectory import Trajectory
+
+
+def test_time_cost_is_unity_off_target_zero_on_target():
+    cost = TimeCost(xbar=np.zeros(2), eps=0.1)
+    assert cost.g(np.array([1.0, 0.0]), np.zeros(1)) == 1.0
+    assert cost.g(np.array([0.02, 0.0]), np.zeros(1)) == 0.0
+    assert cost.h(np.array([1.0, 0.0])) == 0.0
 
 
 def make_quadratic(n: int = 2, m: int = 1) -> QuadraticCost:
