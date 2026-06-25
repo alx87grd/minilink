@@ -86,13 +86,13 @@ OBSTACLE_CENTERS = (
 OBSTACLE_REPULSION_WEIGHT = 35.0
 OBSTACLE_REPULSION_EPS = 0.08
 
-# --- Speed objective ---
+# --- Speed objective --
 U_TARGET = 20.0
 VX0 = 5.0
 
 # --- Simulation horizon ---
 MULTI_LAP = False
-TF_SIM = 60.0 if MULTI_LAP else 12.0
+TF_SIM = 24
 
 MPC_HZ = 5.0
 SIM_HZ = 200.0
@@ -467,7 +467,7 @@ class MpcWideCircuitLapBicycleRate(JaxDynamicBicycleRateInputs):
     def get_kinematic_geometry(self):
         vehicle = super().get_kinematic_geometry()
         return (
-            [self._upper, self._lower, self._centerline]
+            [self._upper, self._lower]  # , self._centerline]
             + self._obstacles
             + [self._executed]
             + vehicle
@@ -478,7 +478,7 @@ class MpcWideCircuitLapBicycleRate(JaxDynamicBicycleRateInputs):
         vehicle = super().get_kinematic_transforms(x, u, t)
         n_obstacles = len(self._obstacles)
         return (
-            [np.eye(4)] * 3
+            [np.eye(4)] * 2  # * 3
             + [np.eye(4)] * n_obstacles
             + [time_channel_matrix(t)]
             + list(vehicle)
