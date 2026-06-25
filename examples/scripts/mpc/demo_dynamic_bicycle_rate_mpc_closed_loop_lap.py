@@ -1,11 +1,16 @@
-"""MPC on a smooth U-turn reference path with scene obstacles — spatial track pipeline.
+"""MPC lap-time pursuit on a closed rounded-rectangle track with obstacles.
 
-Fork of ``demo_dynamic_bicycle_rate_mpc_multi_obstacle_scene.py``: rounded 90°
-corners replace sharp polyline kinks; the reference path extends before and after
-the driven mission segment so the vehicle does not slow for "end of path".
+Fork of ``demo_dynamic_bicycle_rate_mpc_curvy_path.py``: the reference path is a
+closed loop (one physical lap). The planner uses an unrolled copy of the loop so
+the receding horizon always sees track ahead. Path and corridor costs keep the
+vehicle on the racing line; a weak surge-speed penalty lets MPC push velocity on
+straights while respecting obstacles and lateral stability.
+
+Toggle ``MULTI_LAP`` for a longer rollout (several complete laps).
+
 Run from repo root::
 
-    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_curvy_path.py
+    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py
 """
 
 import matplotlib.pyplot as plt
@@ -45,30 +50,40 @@ from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 
-U_TARGET = 10.5
-TF_SIM = 7.0
-VX0 = 5.0
-
-TURN_RADIUS = 6.0
-LEAD_IN = 4.0
-LEAD_OUT = 4.0
+# --- Track geometry ---
+TRACK_CENTER = (0.0, 0.0)
+TRACK_WIDTH = 24.0
+TRACK_HEIGHT = 14.0
+TURN_RADIUS = 3.5
 CORRIDOR_HALF_WIDTH = 2.0
 PATH_COST_WEIGHT = 40.0
 CORRIDOR_COST_WEIGHT = 25.0
-OBSTACLE_RADIUS = 0.2
-OBSTACLE_MARGIN = 0.2
+UNROLL_LAPS = 3
+
+# --- Obstacles (workspace centers) ---
+OBSTACLE_RADIUS = 0.4
+OBSTACLE_MARGIN = 0.05
 OBSTACLE_CENTERS = (
-    (9.0, -1.0),
-    # (12.0, -1.0),
+    (4.0, -6.2),
+    (-2.0, 5.0),
+    (10.0, 1.5),
 )
-OBSTACLE_REPULSION_WEIGHT = 35.0
+OBSTACLE_REPULSION_WEIGHT = 3.0
 OBSTACLE_REPULSION_EPS = 0.08
-PLOT_BOUNDS = ((-2.0, 20.0), (-3.5, 10.0))
+
+# --- Speed objective ---
+U_TARGET = 20.0
+VX0 = 2.5
+
+# --- Simulation horizon ---
+# Short default for quick iteration; flip MULTI_LAP for several laps.
+MULTI_LAP = True
+TF_SIM = 16
 
 MPC_HZ = 5.0
 SIM_HZ = 200.0
-MPC_HORIZON = 2.0
-MPC_STEPS = 20
+MPC_HORIZON = 1.5
+MPC_STEPS = 15
 MPC_MAXITER = 120
 MPC_FTOL = 1e-1
 MPC_DT = 1.0 / MPC_HZ
@@ -79,7 +94,8 @@ W_REAR_MAX = 90.0
 DELTA_MAX = 0.55
 W_REAR_DOT_MAX = 80.0
 DELTA_DOT_MAX = 2.0
-CAMERA_SCALE = 14.0
+CAMERA_SCALE = 16.0
+PLOT_MARGIN = 3.0
 TRACK_ANIM_SAMPLES = 200
 
 
@@ -110,48 +126,65 @@ def _quarter_arc_waypoints(cx, cy, radius, angle_start, n=12):
     return np.column_stack([cx + radius * np.cos(angles), cy + radius * np.sin(angles)])
 
 
-def smooth_u_turn_waypoints(
+def rounded_rect_loop_waypoints(
     *,
-    x_left=0.0,
-    y_top=8.0,
-    y_bottom=-1.0,
-    x_right=18.0,
-    radius=6.0,
-    n_arc=12,
+    cx=0.0,
+    cy=0.0,
+    width=24.0,
+    height=14.0,
+    radius=3.5,
+    n_arc=10,
 ):
-    """U path with two rounded 90° corners (dense polyline approximation)."""
-    r = radius
-    y_arc = y_bottom + r
-    cx_left = x_left + r
-    cx_right = x_right - r
+    """Closed CCW loop: rounded rectangle centered at ``(cx, cy)``.
 
-    left_vert = np.array([[x_left, y_top], [x_left, y_arc]])
-    arc_left = _quarter_arc_waypoints(cx_left, y_arc, r, np.pi, n_arc)
-    bottom = np.linspace([cx_left, y_bottom], [cx_right, y_bottom], 6)[1:-1]
-    arc_right = _quarter_arc_waypoints(cx_right, y_arc, r, -np.pi / 2, n_arc)[1:]
-    right_vert = np.linspace([x_right, y_arc], [x_right, y_top], 5)[1:-1]
+    Start/finish sits on the bottom straight, heading east.
+    """
+    w2 = width / 2.0
+    h2 = height / 2.0
+    r = radius
+    hx = w2 - r
+    hy = h2 - r
+
+    start = np.array([[cx - hx, cy - h2]])
+    bottom = np.linspace([cx - hx, cy - h2], [cx + hx, cy - h2], 5)[1:]
+    arc_br = _quarter_arc_waypoints(cx + hx, cy - h2 + r, r, -np.pi / 2, n_arc)[1:]
+    right = np.linspace([cx + w2, cy - h2 + r], [cx + w2, cy + h2 - r], 4)[1:-1]
+    arc_tr = _quarter_arc_waypoints(cx + hx, cy + h2 - r, r, 0.0, n_arc)[1:]
+    top = np.linspace([cx + hx, cy + h2], [cx - hx, cy + h2], 5)[1:-1]
+    arc_tl = _quarter_arc_waypoints(cx - hx, cy + h2 - r, r, np.pi / 2, n_arc)[1:]
+    left = np.linspace([cx - w2, cy + h2 - r], [cx - w2, cy - h2 + r], 4)[1:-1]
+    arc_bl = _quarter_arc_waypoints(cx - hx, cy - h2 + r, r, np.pi, n_arc)[1:]
     return np.vstack(
-        [left_vert, arc_left[1:], bottom, arc_right, right_vert, [[x_right, y_top]]]
+        [start, bottom, arc_br, right, arc_tr, top, arc_tl, left, arc_bl, start]
     )
 
 
-def extended_u_turn_waypoints(*, lead_in=4.0, lead_out=4.0, **u_kwargs):
-    mission = smooth_u_turn_waypoints(**u_kwargs)
-    x_left = u_kwargs.get("x_left", 0.0)
-    x_right = u_kwargs.get("x_right", 18.0)
-    y_top = u_kwargs.get("y_top", 8.0)
-    lead = np.linspace([x_left, y_top + lead_in], [x_left, y_top], 4)[0:-1]
-    tail = np.linspace([x_right, y_top], [x_right, y_top + lead_out], 4)[1:]
-    return np.vstack([lead, mission, tail]), mission
+def unroll_track(waypoints, n_laps=3):
+    """Concatenate ``n_laps`` copies so MPC always has path ahead of the vehicle."""
+    if n_laps < 1:
+        raise ValueError("n_laps must be >= 1")
+    parts = [np.asarray(waypoints, dtype=float)]
+    for _ in range(n_laps - 1):
+        parts.append(parts[-1][1:])
+    return np.vstack(parts)
 
 
-WAYPOINTS, MISSION_WAYPOINTS = extended_u_turn_waypoints(
+LOOP_WAYPOINTS = rounded_rect_loop_waypoints(
+    cx=TRACK_CENTER[0],
+    cy=TRACK_CENTER[1],
+    width=TRACK_WIDTH,
+    height=TRACK_HEIGHT,
     radius=TURN_RADIUS,
-    lead_in=LEAD_IN,
-    lead_out=LEAD_OUT,
 )
-MISSION_START = MISSION_WAYPOINTS[0].copy()
-MISSION_END = MISSION_WAYPOINTS[-1].copy()
+REFERENCE_WAYPOINTS = unroll_track(LOOP_WAYPOINTS, n_laps=UNROLL_LAPS)
+START_XY = LOOP_WAYPOINTS[0].copy()
+
+half_w = TRACK_WIDTH / 2.0
+half_h = TRACK_HEIGHT / 2.0
+PLOT_BOUNDS = (
+    (TRACK_CENTER[0] - half_w - PLOT_MARGIN, TRACK_CENTER[0] + half_w + PLOT_MARGIN),
+    (TRACK_CENTER[1] - half_h - PLOT_MARGIN, TRACK_CENTER[1] + half_h + PLOT_MARGIN),
+)
 
 configure_jax(enable_x64=True)
 
@@ -176,7 +209,12 @@ w_rear_ref = U_TARGET / r_r
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, w_rear_ref, 0.0])
 ubar = np.array([0.0, 0.0])
 
-track = ReferenceTrack(from_waypoints(WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH)
+loop_track = ReferenceTrack(
+    from_waypoints(LOOP_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
+)
+track = ReferenceTrack(
+    from_waypoints(REFERENCE_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
+)
 robot = car(length=2.4, width=0.2, position=(0, 1), heading=2, margin=0.05)
 scene = Scene(
     obstacles=tuple(Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS)
@@ -184,9 +222,9 @@ scene = Scene(
 
 stability_cost = QuadraticCost.from_system(
     sys_mpc,
-    Q=np.diag([0.0, 0.0, 0.0, 0.5, 4.0, 6.0, 0.1, 80.0]),
+    Q=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
     R=np.diag([1.0, 22.0]),
-    S=np.diag([0.0, 0.0, 0.0, 0.5, 4.0, 6.0, 0.1, 80.0]),
+    S=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
     xbar=x_cruise,
     ubar=ubar,
 )
@@ -204,14 +242,21 @@ obstacle_cost = scene.clearance_field(robot).as_cost(
 )
 cost = stability_cost + path_cost + corridor_cost + obstacle_cost
 
-s_start, _ = track.path.project(MISSION_START)
+s_start, _ = loop_track.path.project(START_XY)
 theta0 = float(
-    np.arctan2(track.path.tangent(s_start)[1], track.path.tangent(s_start)[0])
+    np.arctan2(
+        loop_track.path.tangent(s_start)[1],
+        loop_track.path.tangent(s_start)[0],
+    )
 )
+# Path-distance costs can make the first SLSQP iterate infeasible at exactly
+# axis-aligned headings (theta = 0, ±pi/2); a tiny nudge avoids that corner.
+if abs(np.cos(2.0 * theta0)) > 1.0 - 1e-9:
+    theta0 += 1e-4
 x0 = np.array(
     [
-        MISSION_START[0],
-        MISSION_START[1],
+        START_XY[0],
+        START_XY[1],
         theta0,
         VX0,
         0.0,
@@ -233,22 +278,25 @@ trajopt_options = TrajectoryOptimizationOptions(
     optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
 )
 
+lap_length = loop_track.path.total_length
+
 t_hist = [0.0]
 x_hist = [x0.copy()]
 u_hist = [np.zeros(sys_sim.m)]
 mpc_plans = []
+progress_hist = [s_start]
 x = x0.copy()
 t = 0.0
 u_hold = np.zeros(sys_sim.m)
 prev_plan = None
 next_mpc_t = 0.0
 
-s_goal, _ = track.path.project(MISSION_END)
-print("MPC smooth U-turn reference path + obstacles (rate inputs)")
+print("MPC closed-loop lap pursuit (rate inputs)")
 print(
-    f"  path length={track.path.total_length:.1f} m "
-    f"(mission {s_goal - s_start:.1f} m), "
-    f"R={TURN_RADIUS:.1f} m, u_target={U_TARGET} m/s, {len(OBSTACLE_CENTERS)} obstacles"
+    f"  lap length={lap_length:.1f} m, "
+    f"u_target={U_TARGET} m/s, tf_sim={TF_SIM:.1f} s "
+    f"({'multi-lap' if MULTI_LAP else 'short'}), "
+    f"{len(OBSTACLE_CENTERS)} obstacles"
 )
 
 while t < TF_SIM - 1e-12:
@@ -296,25 +344,37 @@ while t < TF_SIM - 1e-12:
         t_hist.append(t)
         x_hist.append(x.copy())
         u_hist.append(u_hold.copy())
+        s_now, _ = loop_track.path.project(x[0:2])
+        progress_hist.append(s_now)
 
 traj = Trajectory(t=np.asarray(t_hist), x=np.asarray(x_hist).T, u=np.asarray(u_hist).T)
+progress = np.asarray(progress_hist)
+progress_delta = np.diff(progress, prepend=progress[0])
+progress_delta = np.where(
+    progress_delta < -0.5 * lap_length, progress_delta + lap_length, progress_delta
+)
+arc_progress = np.cumsum(np.maximum(progress_delta, 0.0))
+laps_completed = arc_progress[-1] / lap_length
+mean_speed = float(np.mean(traj.x[3, :]))
+max_speed = float(np.max(traj.x[3, :]))
 
 clearances = [
     np.hypot(traj.x[0, :] - cx, traj.x[1, :] - cy) - OBSTACLE_RADIUS
     for cx, cy in OBSTACLE_CENTERS
 ]
 path_margins = [
-    float(track.corridor_field(robot).value(traj.x[:, k]))
+    float(loop_track.corridor_field(robot).value(traj.x[:, k]))
     for k in range(traj.n_samples)
 ]
 print(
-    f"done: min obstacle clearance={float(np.min(clearances)):.2f} m, "
-    f"min corridor margin={min(path_margins):.3f} m, "
-    f"final position error={np.linalg.norm(traj.x[0:2, -1] - MISSION_END):.2f} m"
+    f"done: laps~={laps_completed:.2f}, mean vx={mean_speed:.2f} m/s, "
+    f"max vx={max_speed:.2f} m/s, "
+    f"min obstacle clearance={float(np.min(clearances)):.2f} m, "
+    f"min corridor margin={min(path_margins):.3f} m"
 )
 
-fig, ax = track.plot(
-    show=False, bounds=PLOT_BOUNDS, title="Smooth U-turn + MPC executed path"
+fig, ax = loop_track.plot(
+    show=False, bounds=PLOT_BOUNDS, title="Closed loop track + MPC executed path"
 )
 scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title=None)
 ax.plot(
@@ -326,18 +386,19 @@ ax.plot(
     zorder=7,
 )
 ax.scatter(
-    [MISSION_START[0], MISSION_END[0]],
-    [MISSION_START[1], MISSION_END[1]],
-    c=["C1", "C4"],
+    [START_XY[0]],
+    [START_XY[1]],
+    c="C1",
     s=36,
     zorder=8,
+    label="start/finish",
 )
 ax.legend(loc="upper left", fontsize=8)
 fig.tight_layout()
 plt.show()
 
 
-class MpcCurvyPathBicycleRate(JaxDynamicBicycleRateInputs):
+class MpcClosedLoopLapBicycleRate(JaxDynamicBicycleRateInputs):
     def __init__(
         self, track, mpc_plans, executed_traj, *, obstacle_centers, keepout_radius
     ):
@@ -399,8 +460,8 @@ class MpcCurvyPathBicycleRate(JaxDynamicBicycleRateInputs):
         )
 
 
-mpc_anim_sys = MpcCurvyPathBicycleRate(
-    track,
+mpc_anim_sys = MpcClosedLoopLapBicycleRate(
+    loop_track,
     mpc_plans,
     traj,
     obstacle_centers=OBSTACLE_CENTERS,

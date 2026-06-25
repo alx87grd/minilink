@@ -19,6 +19,12 @@ from minilink.core.geometry import Sphere
 from minilink.core.sets import BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
+from minilink.graphical.animation.primitives import (
+    Circle,
+    CustomLine,
+    TrajectoryPolyline,
+    time_channel_matrix,
+)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.robot import sphere
@@ -35,13 +41,15 @@ from minilink.planning.trajectory_optimization.planner import (
 )
 
 TF = 14.0
-N_STEPS = 20
+N_STEPS = 50
 ROBOT_RADIUS = 0.25
 CORRIDOR_HALF_WIDTH = 0.85
 PATH_COST_WEIGHT = 10.0
 LEAD_IN = 3.0
 LEAD_OUT = 3.0
 PLOT_PAD = CORRIDOR_HALF_WIDTH + ROBOT_RADIUS + 0.3
+CAMERA_SCALE = 12.0
+TRACK_ANIM_SAMPLES = 200
 
 # Mission U-turn: down, east along the bottom, up (traj stays on this segment).
 MISSION_WAYPOINTS = np.array(
@@ -73,6 +81,93 @@ OBSTACLES = (
     Sphere([4.0, -2.0], 0.35),
     Sphere([8.0, -0.5], 0.35),
 )
+
+
+def _sample_track_boundaries(track, n_samples=TRACK_ANIM_SAMPLES):
+    """Centerline plus corridor upper/lower edges (same geometry as ``plot_track``)."""
+    path = track.path
+    ss = np.linspace(0.0, path.total_length, n_samples)
+    center = np.array([path.sample(s) for s in ss])
+    tangents = np.array([path.tangent(s) for s in ss])
+    normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
+    half = float(track.half_width)
+    upper = center + half * normals
+    lower = center - half * normals
+    return center, upper, lower
+
+
+def _line3(xy):
+    return np.hstack([xy, np.zeros((xy.shape[0], 1))])
+
+
+class HolonomicCorridorScene(HolonomicMobileRobot):
+    """Holonomic robot with reference track, corridor, obstacles, and traj trail."""
+
+    def __init__(self, track, obstacles, executed_traj, *, robot_radius=ROBOT_RADIUS):
+        super().__init__()
+        self.camera_scale = CAMERA_SCALE
+        self._robot_radius = robot_radius
+
+        center, upper, lower = _sample_track_boundaries(track)
+        self._upper = CustomLine(
+            _line3(upper),
+            color="#98df8a",
+            linewidth=1.2,
+            style="-",
+        )
+        self._lower = CustomLine(
+            _line3(lower),
+            color="#98df8a",
+            linewidth=1.2,
+            style="-",
+        )
+        self._centerline = CustomLine(
+            _line3(center),
+            color="#2ca02c",
+            linewidth=2.0,
+            style="-",
+        )
+        self._obstacles = [
+            Circle(
+                radius=obs.radius,
+                center=(obs.center[0], obs.center[1], 0.0),
+                color="tab:red",
+                fill=True,
+            )
+            for obs in obstacles
+        ]
+        self._executed = TrajectoryPolyline(
+            executed_traj,
+            window="prefix",
+            color="#1f77b4",
+            linewidth=2.5,
+            style="-",
+        )
+
+    def get_kinematic_geometry(self):
+        vehicle = super().get_kinematic_geometry()
+        vehicle[0] = Circle(
+            radius=self._robot_radius,
+            center=[0.0, 0.0, 0.0],
+            color="blue",
+            fill=True,
+        )
+        return (
+            [self._upper, self._lower, self._centerline]
+            + self._obstacles
+            + [self._executed]
+            + vehicle
+        )
+
+    def get_kinematic_transforms(self, x, u, t):
+        vehicle = super().get_kinematic_transforms(x, u, t)
+        n_static = 3 + len(self._obstacles)
+        return (
+            [np.eye(4)] * n_static
+            + [time_channel_matrix(t)]
+            + list(vehicle)
+        )
+
 
 sys = HolonomicMobileRobot()
 sys.state.lower_bound = np.array([-2.0, -6.0])
@@ -178,5 +273,7 @@ fig.tight_layout()
 plt.show()
 
 planner.plot_solution(signals=("x", "u"))
-sys.traj = traj
-sys.animate()
+
+anim_sys = HolonomicCorridorScene(track, OBSTACLES, traj, robot_radius=ROBOT_RADIUS)
+anim_sys.traj = traj
+anim_sys.animate()
