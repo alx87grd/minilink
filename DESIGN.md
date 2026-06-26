@@ -140,10 +140,16 @@ constant-matrix convenience built from `A, B, C, D` arrays (introspect via
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
-- **Visualization contract:** `get_kinematic_geometry`,
-  `get_kinematic_transforms`, `get_dynamic_geometry`, `get_camera_transform`
-  are part of the core `System` contract in `core/system.py` (graphical
-  primitives imported lazily; API still under review).
+- **Visualization contract:** `get_kinematic_geometry()` →
+  `dict[str, list[GraphicPrimitive]]` (static skin keyed by frame name);
+  `tf(x,u,t,params)` → `dict[str, 4×4]` world transforms (native-array,
+  JAX-traceable); `get_dynamic_geometry(x,u,t,params)` → same dict shape for
+  per-frame overlays (arrows, torque arcs, MPC polylines as `CustomLine`).
+  Camera hints: `camera_scale`, `camera_target`, `camera_plot_axes`,
+  `camera_follow_frame`, `camera_priority`; resolved to a 4×4 matrix at
+  animation time (`graphical.animation.camera`). Opt-in debug skins via
+  `debug_state_skin()` / `debug_state_tf()`. Transform algebra lives in
+  `core/kinematics.py`; render builders in `graphical/animation/builders.py`.
 - **Facades:** user shortcuts only (lazy simulation/graphics); defined on the
   `core.facades.SystemFacades` mixin so `core/system.py` keeps the math,
   port, and visualization contracts. `self.traj` is a convenience cache of
@@ -321,9 +327,13 @@ Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`
 Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
 Plotly under `plotting` extra.
 
-**Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
-for all renderers. Override on `System` for custom views. Camera and kinematic
-hooks are still under graphical/animation API review.
+**Animation:** `Animator` merges `tf()` frames from the primary system and
+optional overlay drawables (`animate(..., overlays=[...])`), flattens skin +
+dynamic geometry into `(primitive, world_4×4)` pairs, and resolves camera from
+hint attributes or an explicit `camera=` override (ndarray or callable).
+`SceneHistory` / `Replay` drawables (Phase 3) live in
+`graphical.animation.drawables`. Rigid transform helpers: `core/kinematics.py`;
+camera matrices: `graphical/animation/camera.py`.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing

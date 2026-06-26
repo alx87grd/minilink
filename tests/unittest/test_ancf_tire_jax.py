@@ -10,6 +10,7 @@ pytest.importorskip("jax")
 import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
+from minilink.graphical.animation.camera import resolve_camera_from_hints
 from minilink.dynamics.engines.ancf_tire_jax import (  # noqa: E402
     ANCFTireSystem,
     ancf_tire_initial_state,
@@ -104,9 +105,10 @@ class TestANCFTireJax(unittest.TestCase):
         )
 
         prim = sys.get_kinematic_geometry()
-        T = sys.get_kinematic_transforms(sys.x0, np.zeros(sys.m), 0.0)
-        self.assertEqual(len(prim), len(T))
+        frames = sys.tf(sys.x0, np.zeros(sys.m), 0.0)
         self.assertEqual(len(prim), 3 * model.n_nodes + 1)
+        for key in prim:
+            self.assertIn(key, frames)
 
     def test_contact_force_vectors_are_visible_in_geometry(self):
         model = make_ancf_tire_model(
@@ -125,9 +127,9 @@ class TestANCFTireJax(unittest.TestCase):
             contact_force_scale=0.01,
             contact_force_threshold=1.0,
         )
-        T = sys.get_kinematic_transforms(sys.x0, np.zeros(sys.m), 0.0)
+        frames = sys.tf(sys.x0, np.zeros(sys.m), 0.0)
         force_vectors = np.asarray(
-            [T[2 * model.n_nodes + i][:3, 0] for i in range(model.n_nodes)]
+            [frames[f"force{i}"][:3, 0] for i in range(model.n_nodes)]
         )
         self.assertGreater(float(np.max(force_vectors[:, 0])), 0.0)
 
@@ -139,14 +141,14 @@ class TestANCFTireJax(unittest.TestCase):
             contact_force_scale=0.01,
             contact_force_threshold=1.0,
         )
-        T = sys.get_kinematic_transforms(sys.x0, np.zeros(sys.m), 0.0)
+        frames = sys.tf(sys.x0, np.zeros(sys.m), 0.0)
         force_vectors = np.asarray(
-            [T[2 * model.n_nodes + i][:3, 0] for i in range(model.n_nodes)]
+            [frames[f"force{i}"][:3, 0] for i in range(model.n_nodes)]
         )
         self.assertLess(float(np.max(np.linalg.norm(force_vectors, axis=1))), 1e-6)
         force_dets = np.asarray(
             [
-                np.linalg.det(T[2 * model.n_nodes + i][:3, :3])
+                np.linalg.det(frames[f"force{i}"][:3, :3])
                 for i in range(model.n_nodes)
             ]
         )
@@ -159,8 +161,12 @@ class TestANCFTireJax(unittest.TestCase):
         x_shifted = np.asarray(sys.x0).copy()
         x_shifted[: 6 * model.n_nodes].reshape((model.n_nodes, 6))[:, 0] += 1.0
 
-        camera0 = sys.get_camera_transform(sys.x0, np.zeros(sys.m), 0.0)
-        camera1 = sys.get_camera_transform(x_shifted, np.zeros(sys.m), 0.0)
+        camera0 = resolve_camera_from_hints(
+            sys, sys.tf(sys.x0, np.zeros(sys.m), 0.0), 0.0
+        )
+        camera1 = resolve_camera_from_hints(
+            sys, sys.tf(x_shifted, np.zeros(sys.m), 0.0), 0.0
+        )
         self.assertAlmostEqual(float(camera0[0, 3]), float(camera1[0, 3]))
 
 

@@ -1,19 +1,16 @@
 import numpy as np
 
+from minilink.core.backends import array_module
+from minilink.core.kinematics import identity_matrix, pose2d_matrix
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
 )
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    CustomLine,
-    Point,
-    TorqueArrow,
-    arrow_transform,
-    follow_xy_camera,
-    pose2d_matrix,
-    scale_pose2d_matrix,
-    torque_pose2d_matrix,
+from minilink.graphical.animation.legacy import (
+    legacy_arrow_vector,
+    legacy_body_arrow,
+    legacy_torque_world,
 )
+from minilink.graphical.animation.primitives import CustomLine, Point
 
 
 class Boat2D(GeneralizedMechanicalSystem):
@@ -52,6 +49,7 @@ class Boat2D(GeneralizedMechanicalSystem):
         # Graphic parameters (not part of the EoM)
         self.body_length = 2.0 * l_t
         self.body_width = self.params["Afc"]
+        self.camera_follow_frame = "body"
         self.camera_scale = 3.0 * self.params["loa"]
         self.show_hydrodynamic_forces = False
 
@@ -141,9 +139,6 @@ class Boat2D(GeneralizedMechanicalSystem):
         params = self.params if params is None else params
         return self.damping(v, params)
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def body_shape(self):
         """Top-view hull silhouette with the c.g. at the local origin.
 
@@ -165,67 +160,75 @@ class Boat2D(GeneralizedMechanicalSystem):
         return CustomLine(pts, color="blue", linewidth=2)
 
     def get_kinematic_geometry(self):
-        geometry = [
-            self.body_shape(),
-            Point(color="blue", marker="o", size=5),
-            Arrow(color="red", linewidth=2, origin="tip"),
-        ]
-        if self.show_hydrodynamic_forces:
-            geometry.extend(
-                [
-                    Arrow(color="black", linewidth=2, style="--", origin="base"),
-                    TorqueArrow(
-                        radius=self.params["loa"] / 5.0,
-                        head_ratio=0.4,
-                        color="black",
-                        linewidth=2,
-                        style="--",
-                    ),
-                ]
-            )
-        return geometry
+        return {
+            "body": [self.body_shape()],
+            "cg": [Point(color="blue", marker="o", size=5)],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         q = x[:3]
-        l_t = self.params["l_t"]
+        return {
+            "world": identity_matrix(x),
+            "body": pose2d_matrix(q[0], q[1], q[2]),
+            "cg": pose2d_matrix(q[0], q[1], 0.0),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+        q = x[:3]
+        l_t = params["l_t"]
         force_scale = 0.0002
-        T_body = pose2d_matrix(q[0], q[1], q[2])
-        transforms = [
-            T_body,
-            pose2d_matrix(q[0], q[1], 0.0),
-            T_body
-            @ scale_pose2d_matrix(
-                -l_t,
-                0.0,
-                np.arctan2(u[1], u[0]),
-                force_scale * np.hypot(u[0], u[1]),
-            ),
-        ]
+        thrust = xp.hypot(u[0], u[1])
+        thrust_angle = xp.arctan2(u[1], u[0])
+        t_body = pose2d_matrix(q[0], q[1], q[2])
+        geometry = {
+            "world": [
+                legacy_body_arrow(
+                    t_body,
+                    -l_t,
+                    0.0,
+                    float(thrust_angle),
+                    force_scale * float(thrust),
+                    color="red",
+                    linewidth=2,
+                )
+            ],
+        }
         if self.show_hydrodynamic_forces:
-            rho = self.params["rho"]
-            Alc = self.params["Alc"]
-            loa = self.params["loa"]
-            Cm_max = self.params["Cm_max"]
+            rho = params["rho"]
+            Alc = params["Alc"]
+            loa = params["loa"]
+            Cm_max = params["Cm_max"]
             hydro_force = -self.d(q, x[3:], u, t)
             torque_max = abs(0.5 * rho * Alc * loa * Cm_max * 12.0)
-            transforms.extend(
-                [
-                    T_body
-                    @ scale_pose2d_matrix(
-                        0.0,
-                        0.0,
-                        np.arctan2(hydro_force[1], hydro_force[0]),
-                        force_scale * np.hypot(hydro_force[0], hydro_force[1]),
-                    ),
-                    torque_pose2d_matrix(
-                        q[0],
-                        q[1],
-                        q[2] - np.pi / 2.0,
-                        hydro_force[2] * (2.0 * np.pi) / torque_max,
-                    ),
-                ]
+            hydro_mag = force_scale * float(xp.hypot(hydro_force[0], hydro_force[1]))
+            hydro_angle = float(xp.arctan2(hydro_force[1], hydro_force[0]))
+            sweep = float(hydro_force[2] * (2.0 * np.pi) / torque_max)
+            geometry["world"].append(
+                legacy_body_arrow(
+                    t_body,
+                    0.0,
+                    0.0,
+                    hydro_angle,
+                    hydro_mag,
+                    color="black",
+                    linewidth=2,
+                )
             )
-        return transforms
+            geometry["world"].append(
+                legacy_torque_world(
+                    float(q[0]),
+                    float(q[1]),
+                    float(q[2]) - np.pi / 2.0,
+                    sweep,
+                    float(loa) / 5.0,
+                    head_ratio=0.4,
+                    color="black",
+                    linewidth=2,
+                )
+            )
+        return geometry
 
 
 class Boat2DWithCurrent(Boat2D):
@@ -245,25 +248,29 @@ class Boat2DWithCurrent(Boat2D):
         body_current = self.N(q, params).T @ world_current
         return self.damping(v - body_current, params)
 
-    def get_kinematic_geometry(self):
-        return super().get_kinematic_geometry() + [
-            Arrow(color="green", linewidth=2, origin="tip")
-        ]
+    def tf(self, x, u, t=0, params=None):
+        frames = super().tf(x, u, t, params)
+        frames["world"] = identity_matrix(x)
+        return frames
 
-    def get_kinematic_transforms(self, x, u, t):
-        transforms = super().get_kinematic_transforms(x, u, t)
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        geometry = super().get_dynamic_geometry(x, u, t, params)
         current_velocity = self.params["current_velocity"]
         loa = self.params["loa"]
-        transforms.append(
-            arrow_transform(
-                x[0] - loa,
-                x[1] + loa,
+        q = x[:3]
+        geometry.setdefault("world", []).append(
+            legacy_arrow_vector(
+                float(q[0]) - loa,
+                float(q[1]) + loa,
                 current_velocity[0],
                 current_velocity[1],
                 scale=0.5 * loa,
+                color="green",
+                linewidth=2,
+                origin="tip",
             )
         )
-        return transforms
+        return geometry
 
 
 if __name__ == "__main__":

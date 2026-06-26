@@ -32,6 +32,13 @@ from minilink.graphical.animation.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
 )
+from minilink.graphical.animation.visualization import (
+    flatten_draw_list,
+    merge_frame_dicts,
+    merge_geometry_dicts,
+    resolve_camera,
+    select_camera_source,
+)
 from minilink.graphical.common.environment import prefers_inline_animation
 
 __all__ = [
@@ -83,21 +90,32 @@ class Animator:
     :mod:`minilink.graphical.common.matplotlib_style`.
     """
 
-    def __init__(self, sys):
+    def __init__(self, sys, overlays=None, camera=None):
         self.sys = sys
+        self.overlays = list(overlays or [])
+        self.camera_override = camera
+
+    @property
+    def drawables(self):
+        return [self.sys] + self.overlays
+
+    def _active_drawables(self, overlays=None):
+        if overlays is not None:
+            return [self.sys] + list(overlays)
+        return self.drawables
 
     def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib"):
         """Renders a single static frame of the system at state *x*, *u*, *t*."""
         backend = make_renderer(renderer, self)
-        primitives = self.sys.get_kinematic_geometry()
-        frame = self._prepare_transforms(x, u, t, primitives=primitives)
+        static_geometry = self._static_geometry(overlays)
+        frame = self._prepare_transforms(x, u, t, static_geometry=static_geometry)
         backend.open_scene(
             is_3d=is_3d,
             show=True,
             camera=frame["camera"],
             title=f"{self.sys.name} — t = {t:.2f} s",
         )
-        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+        backend.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
         result = backend.present(block=True)
         backend.close_scene()
         return result
@@ -114,6 +132,8 @@ class Animator:
         renderer="matplotlib",
         native: bool = True,
         scene_title: str | None = None,
+        overlays=None,
+        camera=None,
     ):
         """
         Plays back a full simulation trajectory.
@@ -166,12 +186,20 @@ class Animator:
             )
 
         backend = make_renderer(renderer, self)
-        primitives = self.sys.get_kinematic_geometry()
+        static_geometry = self._static_geometry(overlays)
         schedule = trajectory_frame_schedule(traj, time_factor_video)
         frames = [
-            self._prepare_frame(traj, frame_idx, schedule, primitives=primitives)
+            self._prepare_frame(
+                traj,
+                frame_idx,
+                schedule,
+                static_geometry=static_geometry,
+                overlays=overlays,
+                camera_override=camera,
+            )
             for frame_idx in range(schedule.n_frames)
         ]
+        primitives = frames[0]["primitives"] if frames else []
 
         if html:
             try:
@@ -225,7 +253,7 @@ class Animator:
         )
         for frame in frames:
             backend.draw_frame(
-                primitives, frame["transforms"], frame["t"], frame["camera"]
+                frame["primitives"], frame["transforms"], frame["t"], frame["camera"]
             )
             backend.present(block=False, interval_s=schedule.interval_ms / 1000.0)
             events = backend.poll_events()
@@ -234,24 +262,60 @@ class Animator:
         backend.close_scene()
         return None
 
-    def _prepare_transforms(self, x, u, t, *, primitives=None):
-        if primitives is None:
-            primitives = self.sys.get_kinematic_geometry()
-        transforms = self.sys.get_kinematic_transforms(x, u, t)
-        if len(primitives) != len(transforms):
-            raise ValueError(
-                "System graphical error: Number of transforms must equal number of base geometric primitives."
-            )
-        camera = self.sys.get_camera_transform(x, u, t)
+    def _static_geometry(self, overlays=None):
+        return merge_geometry_dicts(
+            *(d.get_kinematic_geometry() for d in self._active_drawables(overlays))
+        )
+
+    def _prepare_transforms(
+        self,
+        x,
+        u,
+        t,
+        *,
+        static_geometry=None,
+        overlays=None,
+        camera_override=None,
+    ):
+        drawables = self._active_drawables(overlays)
+        if static_geometry is None:
+            static_geometry = self._static_geometry(overlays)
+        frame_dicts = [d.tf(x, u, t) for d in drawables]
+        frames = merge_frame_dicts(*frame_dicts)
+        dynamic_geometry = merge_geometry_dicts(
+            *(d.get_dynamic_geometry(x, u, t) for d in drawables)
+        )
+        draw_list = flatten_draw_list(frames, static_geometry, dynamic_geometry)
+        primitives = [p for p, _ in draw_list]
+        transforms = [T for _, T in draw_list]
+        camera_source = select_camera_source(drawables)
+        camera = resolve_camera(
+            camera_override if camera_override is not None else self.camera_override,
+            camera_source,
+            frames,
+            x,
+            u,
+            t,
+        )
         return {
             "x": x,
             "u": u,
             "t": float(t),
+            "primitives": primitives,
             "transforms": transforms,
             "camera": camera,
         }
 
-    def _prepare_frame(self, traj, frame_idx, schedule, *, primitives=None):
+    def _prepare_frame(
+        self,
+        traj,
+        frame_idx,
+        schedule,
+        *,
+        static_geometry=None,
+        overlays=None,
+        camera_override=None,
+    ):
         sim_idx = sim_index_for_frame(frame_idx, schedule)
         x = traj.x[:, sim_idx]
         if len(traj.u) > 0:
@@ -259,7 +323,14 @@ class Animator:
         else:
             u = np.array([])
         t = traj.t[sim_idx]
-        return self._prepare_transforms(x, u, t, primitives=primitives)
+        return self._prepare_transforms(
+            x,
+            u,
+            t,
+            static_geometry=static_geometry,
+            overlays=overlays,
+            camera_override=camera_override,
+        )
 
     def run_interactive(
         self,
@@ -281,14 +352,14 @@ class Animator:
         """
         backend = make_renderer(renderer, self)
         _require_interactive_renderer(renderer, backend)
-        primitives = self.sys.get_kinematic_geometry()
+        static_geometry = self._static_geometry(overlays)
 
         x = np.asarray(x0)
         u = np.asarray([] if u0 is None else u0)
         t = float(t0)
         step_idx = 0
 
-        frame = self._prepare_transforms(x, u, t, primitives=primitives)
+        frame = self._prepare_transforms(x, u, t, static_geometry=static_geometry)
         backend.open_scene(
             is_3d=is_3d,
             show=show,
@@ -297,7 +368,9 @@ class Animator:
         )
 
         # Draw initial state once so the callback can just update controls.
-        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+        backend.draw_frame(
+            frame["primitives"], frame["transforms"], t, frame["camera"]
+        )
         backend.present(block=False, interval_s=dt)
 
         # ROADMAP: this loop is a minimal integrator+render tick; a future backend should
@@ -313,8 +386,10 @@ class Animator:
             t += dt
             step_idx += 1
 
-            frame = self._prepare_transforms(x, u, t, primitives=primitives)
-            backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+            frame = self._prepare_transforms(x, u, t, static_geometry=static_geometry)
+            backend.draw_frame(
+                frame["primitives"], frame["transforms"], t, frame["camera"]
+            )
             backend.present(block=False, interval_s=dt)
 
             if should_stop:
@@ -433,18 +508,18 @@ class Animator:
                 f"minilink game — keyboard (focus here) — {self.sys.name}"
             )
 
-        primitives = self.sys.get_kinematic_geometry()
+        static_geometry = self._static_geometry(overlays)
 
         x = np.asarray(self.sys.x0 if x0 is None else x0, dtype=float).copy()
         u = np.asarray(np.zeros(self.sys.m) if u0 is None else u0, dtype=float).copy()
         t = float(t0)
         step_idx = 0
 
-        camera0 = self.sys.get_camera_transform(x, u, t)
+        frame0 = self._prepare_transforms(x, u, t, static_geometry=static_geometry)
         backend.open_scene(
             is_3d=is_3d,
             show=True,
-            camera=camera0,
+            camera=frame0["camera"],
             title=f"Interactive game — {self.sys.name}",
         )
 
@@ -464,8 +539,9 @@ class Animator:
         u = self._u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
         self._draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
 
-        frame = self._prepare_transforms(x, u, t, primitives=primitives)
-        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+        backend.draw_frame(
+            frame0["primitives"], frame0["transforms"], t, frame0["camera"]
+        )
         backend.present(block=False, interval_s=dt)
 
         while True:
@@ -496,8 +572,10 @@ class Animator:
             t = t + dt
             step_idx += 1
 
-            frame = self._prepare_transforms(x, u, t, primitives=primitives)
-            backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+            frame = self._prepare_transforms(x, u, t, static_geometry=static_geometry)
+            backend.draw_frame(
+                frame["primitives"], frame["transforms"], t, frame["camera"]
+            )
             backend.present(block=False, interval_s=dt)
 
             backend_events = backend.poll_events()

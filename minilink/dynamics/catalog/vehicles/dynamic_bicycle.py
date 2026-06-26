@@ -14,19 +14,29 @@ gradient-based trajectory optimization.
 
 import numpy as np
 
-from minilink.core.backends import require_jax_numpy
+from minilink.core.backends import array_module, require_jax_numpy
+from minilink.core.kinematics import identity_matrix, pose2d_matrix, translation_matrix
 from minilink.core.system import DynamicSystem
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    Box,
-    CustomLine,
-    Plane,
-    Rod,
-    camera_matrix,
-    pose2d_matrix,
-    scale_pose2d_matrix,
-    translation_matrix,
+from minilink.graphical.animation.legacy import (
+    bicycle_car3d_world_arrows,
+    bicycle_world_arrows,
 )
+from minilink.graphical.animation.primitives import Box, CustomLine, Plane, Rod
+from minilink.graphical.animation.skins import car_skin_3d
+
+
+def _wheel_rectangle_pts(wl, ww):
+    """Closed polyline in wheel frame (x forward, y lateral)."""
+    h, w = wl / 2, ww / 2
+    return np.array(
+        [
+            [h, w, 0.0],
+            [h, -w, 0.0],
+            [-h, -w, 0.0],
+            [-h, w, 0.0],
+            [h, w, 0.0],
+        ]
+    )
 
 
 class LinearTire:
@@ -55,20 +65,6 @@ class LinearTire:
             Fx *= ratio
             Fy *= ratio
         return Fx, Fy
-
-
-def _wheel_rectangle_pts(wl, ww):
-    """Closed polyline in wheel frame (x forward, y lateral)."""
-    h, w = wl / 2, ww / 2
-    return np.array(
-        [
-            [h, w, 0.0],
-            [h, -w, 0.0],
-            [-h, -w, 0.0],
-            [-h, w, 0.0],
-            [h, w, 0.0],
-        ]
-    )
 
 
 class DynamicBicycle(DynamicSystem):
@@ -117,7 +113,15 @@ class DynamicBicycle(DynamicSystem):
         # Graphics-only attributes
         self.wheel_len = 0.6
         self.wheel_width = 0.2
-        self.camera_follow_vehicle = True
+        self.camera_follow_frame = "body"
+        self.camera_scale = 4.0 * (self.params["a"] + self.params["b"])
+
+    def _bicycle_actuators(self, x, u):
+        xp = array_module(x)
+        if self.n == 8:
+            return xp.asarray(x[6:8])
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        return xp.array([w_rear[0], delta[0]])
 
     def M(self, q, params=None):
         params = self.params if params is None else params
@@ -248,24 +252,6 @@ class DynamicBicycle(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x.copy()
 
-    def get_camera_transform(self, x, u, t):
-        """Return a camera centered on the vehicle pose by default.
-
-        ``camera_target`` is treated as an offset from the vehicle position
-        when ``camera_follow_vehicle`` is true. Set ``camera_follow_vehicle`` to
-        false to use the base fixed-camera interpretation of ``camera_target``.
-        """
-        target = np.asarray(self.camera_target, dtype=float).reshape(3).copy()
-        if self.camera_follow_vehicle:
-            target[0] += float(x[0])
-            target[1] += float(x[1])
-
-        return camera_matrix(
-            target=target,
-            plot_axes=self.camera_plot_axes,
-            scale=self.camera_scale,
-        )
-
     def get_kinematic_geometry(self):
         a = self.params["a"]
         b = self.params["b"]
@@ -276,73 +262,28 @@ class DynamicBicycle(DynamicSystem):
             linewidth=2,
         )
         wpts = _wheel_rectangle_pts(wl, ww)
-        rear_w = CustomLine(wpts, color="black", linewidth=1)
-        front_w = CustomLine(wpts, color="black", linewidth=1)
-        arr_v = Arrow(color="blue", linewidth=2, origin="base")
-        arr_f = Arrow(color="red", linewidth=2, origin="base")
-        return [chassis, rear_w, front_w, arr_v, arr_v, arr_f, arr_f]
+        return {
+            "body": [chassis],
+            "axle_rear": [CustomLine(wpts, color="black", linewidth=1)],
+            "axle_front": [CustomLine(wpts, color="black", linewidth=1)],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
-        a = self.params["a"]
-        b = self.params["b"]
-        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
-        vb = x[3:6]
-        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
-        u_in = np.array([w_rear[0], delta[0]])
-        delta = float(u_in[1])
+    def tf(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        b = params["b"]
+        u_in = self._bicycle_actuators(x, u)
+        delta = u_in[1]
+        t_body = pose2d_matrix(x[0], x[1], x[2])
+        return {
+            "world": identity_matrix(x),
+            "body": t_body,
+            "axle_rear": t_body @ pose2d_matrix(-b, 0.0, 0.0),
+            "axle_front": t_body @ pose2d_matrix(a, 0.0, delta),
+        }
 
-        T_wb = pose2d_matrix(X, Y, Theta)
-        T_rear = T_wb @ pose2d_matrix(-b, 0.0, 0.0)
-        T_front = T_wb @ pose2d_matrix(a, 0.0, delta)
-
-        v_scale = 0.2
-        f_scale = 0.001
-
-        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + a * wr])
-        v_r_loc = np.array([uu, vv - b * wr])
-
-        def _world_arrow_pose(dx, dy, px, py):
-            mag = v_scale * np.hypot(dx, dy)
-            if mag < 1e-9:
-                mag = 1e-9
-            th = np.arctan2(dy, dx)
-            return scale_pose2d_matrix(px, py, th, mag)
-
-        c, s = np.cos(Theta), np.sin(Theta)
-        rx = X + c * (-b) - s * 0.0
-        ry = Y + s * (-b) + c * 0.0
-        fx = X + c * a - s * 0.0
-        fy = Y + s * a + c * 0.0
-
-        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
-        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
-
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
-        cd, sd = np.cos(delta), np.sin(delta)
-        Fxf_b = Fx_f * cd - Fy_f * sd
-        Fyf_b = Fx_f * sd + Fy_f * cd
-        Ffx_w = c * Fxf_b - s * Fyf_b
-        Ffy_w = s * Fxf_b + c * Fyf_b
-        Frx_w = c * Fx_r - s * Fy_r
-        Fry_w = s * Fx_r + c * Fy_r
-
-        def _force_pose(Fx, Fy, px, py):
-            mag = f_scale * np.hypot(Fx, Fy)
-            if mag < 1e-12:
-                mag = 1e-12
-            th = np.arctan2(Fy, Fx)
-            return scale_pose2d_matrix(px, py, th, mag)
-
-        return [
-            T_wb,
-            T_rear,
-            T_front,
-            _world_arrow_pose(vrx, vry, rx, ry),
-            _world_arrow_pose(vfx, vfy, fx, fy),
-            _force_pose(Frx_w, Fry_w, rx, ry),
-            _force_pose(Ffx_w, Ffy_w, fx, fy),
-        ]
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {"world": bicycle_world_arrows(x, u, t, self)}
 
 
 class DynamicBicycleCar3D(DynamicBicycle):
@@ -370,30 +311,23 @@ class DynamicBicycleCar3D(DynamicBicycle):
         self._visual_tire_radius_ratio = 0.58
 
     def get_kinematic_geometry(self):
-        a = self.params["a"]
-        b = self.params["b"]
-        r_f = self.params["r_f"]
-        r_r = self.params["r_r"]
+        params = self.params
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
         tr = self.track
-        bh = self.body_height
-        bw = self.body_width_ratio * tr
         bl = (a + b) + self.body_length_overhang
-        ground = Plane(
-            normal=[0.0, 0.0, 1.0],
-            offset=0.0,
-            size=self.ground_plane_size,
-            thickness=0.04,
-            color=[0.72, 0.74, 0.78],
-            opacity=0.5,
+        skin = car_skin_3d(
+            bl,
+            self.body_width_ratio * tr,
+            tr,
+            body_height=self.body_height,
+            ground_size=self.ground_plane_size,
         )
-        body = Box(
-            length_x=bl,
-            length_y=bw,
-            length_z=bh,
-            center=(0.0, 0.0, 0.0),
-            color="#151922",
-            opacity=1.0,
-        )
+        cx_body = 0.5 * (a - b)
+        z_body = r_r + self.body_ground_clearance + 0.5 * self.body_height
+        skin["body"][0].local_transform = translation_matrix(cx_body, 0.0, z_body)
         tire_rad = max(0.045, self._visual_tire_radius_ratio * min(r_f, r_r))
         w_len = self._visual_wheel_width
         wheel = Rod(
@@ -402,111 +336,40 @@ class DynamicBicycleCar3D(DynamicBicycle):
             color="#0a0a0a",
             opacity=1.0,
         )
-        arr_v = Arrow(color="blue", linewidth=2, origin="base")
-        arr_f = Arrow(color="red", linewidth=2, origin="base")
-        return [
-            ground,
-            body,
-            wheel,
-            wheel,
-            wheel,
-            wheel,
-            arr_v,
-            arr_v,
-            arr_v,
-            arr_v,
-            arr_f,
-            arr_f,
-            arr_f,
-            arr_f,
-        ]
+        skin["wheel_rl"] = [wheel]
+        skin["wheel_rr"] = [wheel]
+        skin["wheel_fl"] = [wheel]
+        skin["wheel_fr"] = [wheel]
+        return skin
 
-    def get_kinematic_transforms(self, x, u, t):
-        a = self.params["a"]
-        b = self.params["b"]
-        r_f = self.params["r_f"]
-        r_r = self.params["r_r"]
-        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
-        vb = x[3:6]
-        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
-        u_in = np.array([w_rear[0], delta[0]])
-        delta = float(u_in[1])
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {"world": bicycle_car3d_world_arrows(x, u, t, self)}
+
+    def tf(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+        u_in = self._bicycle_actuators(x, u)
+        delta = u_in[1]
         tr = self.track
-        z_body = float(r_r) + self.body_ground_clearance + 0.5 * self.body_height
         cx_body = 0.5 * (a - b)
-
-        T_wb = pose2d_matrix(X, Y, Theta)
-
-        T_ground = np.eye(4, dtype=float)
-        T_body = T_wb @ translation_matrix(cx_body, 0.0, z_body)
-
-        T_rl = T_wb @ translation_matrix(-b, 0.5 * tr, r_r)
-        T_rr = T_wb @ translation_matrix(-b, -0.5 * tr, r_r)
-        R_steer = pose2d_matrix(0.0, 0.0, delta)
-        T_fl = T_wb @ translation_matrix(a, 0.5 * tr, r_f) @ R_steer
-        T_fr = T_wb @ translation_matrix(a, -0.5 * tr, r_f) @ R_steer
-
-        v_scale = 0.2
-        f_scale = 0.001
-
-        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + a * wr])
-        v_r_loc = np.array([uu, vv - b * wr])
-
-        c, s = np.cos(Theta), np.sin(Theta)
-        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
-        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
-
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
-        cd, sd = np.cos(delta), np.sin(delta)
-        Fxf_b = Fx_f * cd - Fy_f * sd
-        Fyf_b = Fx_f * sd + Fy_f * cd
-        Ffx_w = c * Fxf_b - s * Fyf_b
-        Ffy_w = s * Fxf_b + c * Fyf_b
-        Frx_w = c * Fx_r - s * Fy_r
-        Fry_w = s * Fx_r + c * Fy_r
-
-        def _body_to_world(bx, by, bz):
-            wx = X + c * bx - s * by
-            wy = Y + s * bx + c * by
-            return wx, wy, bz
-
-        def _vel_arrow(dx, dy, bx, by, bz):
-            mag = v_scale * np.hypot(dx, dy)
-            if mag < 1e-9:
-                mag = 1e-9
-            th = np.arctan2(dy, dx)
-            px, py, pz = _body_to_world(bx, by, bz)
-            T = scale_pose2d_matrix(px, py, th, mag)
-            T[2, 3] = pz
-            return T
-
-        def _force_arrow(Fx, Fy, bx, by, bz):
-            mag = f_scale * np.hypot(Fx, Fy)
-            if mag < 1e-12:
-                mag = 1e-12
-            th = np.arctan2(Fy, Fx)
-            px, py, pz = _body_to_world(bx, by, bz)
-            T = scale_pose2d_matrix(px, py, th, mag)
-            T[2, 3] = pz
-            return T
-
-        return [
-            T_ground,
-            T_body,
-            T_rl,
-            T_rr,
-            T_fl,
-            T_fr,
-            _vel_arrow(vrx, vry, -b, 0.5 * tr, r_r),
-            _vel_arrow(vrx, vry, -b, -0.5 * tr, r_r),
-            _vel_arrow(vfx, vfy, a, 0.5 * tr, r_f),
-            _vel_arrow(vfx, vfy, a, -0.5 * tr, r_f),
-            _force_arrow(Frx_w, Fry_w, -b, 0.5 * tr, r_r),
-            _force_arrow(Frx_w, Fry_w, -b, -0.5 * tr, r_r),
-            _force_arrow(Ffx_w, Ffy_w, a, 0.5 * tr, r_f),
-            _force_arrow(Ffx_w, Ffy_w, a, -0.5 * tr, r_f),
-        ]
+        z_body = r_r + self.body_ground_clearance + 0.5 * self.body_height
+        t_wb = pose2d_matrix(x[0], x[1], x[2])
+        r_steer = pose2d_matrix(0.0, 0.0, delta)
+        frames = {
+            "world": identity_matrix(x),
+            "body": t_wb @ translation_matrix(cx_body, 0.0, z_body),
+            "wheel_rl": t_wb @ translation_matrix(-b, 0.5 * tr, r_r),
+            "wheel_rr": t_wb @ translation_matrix(-b, -0.5 * tr, r_r),
+            "wheel_fl": t_wb @ translation_matrix(a, 0.5 * tr, r_f) @ r_steer,
+            "wheel_fr": t_wb @ translation_matrix(a, -0.5 * tr, r_f) @ r_steer,
+            "axle_rear": t_wb @ translation_matrix(-b, 0.0, r_r),
+            "axle_front": t_wb @ translation_matrix(a, 0.0, r_f) @ r_steer,
+        }
+        return frames
 
 
 # === JAX-traceable variant ===================================================
@@ -768,68 +631,6 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
         dq = N @ v
 
         return jnp.concatenate([dq, dv, u])
-
-    def get_kinematic_transforms(self, x, u, t):
-        a = self.params["a"]
-        b = self.params["b"]
-
-        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
-        vb = x[3:6]
-        u_in = x[6:8]
-        delta = float(u_in[1])
-
-        T_wb = pose2d_matrix(X, Y, Theta)
-        T_rear = T_wb @ pose2d_matrix(-b, 0.0, 0.0)
-        T_front = T_wb @ pose2d_matrix(a, 0.0, delta)
-
-        v_scale = 0.2
-        f_scale = 0.001
-
-        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + a * wr])
-        v_r_loc = np.array([uu, vv - b * wr])
-
-        def _world_arrow_pose(dx, dy, px, py):
-            mag = v_scale * np.hypot(dx, dy)
-            if mag < 1e-9:
-                mag = 1e-9
-            th = np.arctan2(dy, dx)
-            return scale_pose2d_matrix(px, py, th, mag)
-
-        c, s = np.cos(Theta), np.sin(Theta)
-        rx = X + c * (-b) - s * 0.0
-        ry = Y + s * (-b) + c * 0.0
-        fx = X + c * a - s * 0.0
-        fy = Y + s * a + c * 0.0
-
-        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
-        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
-
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
-        cd, sd = np.cos(delta), np.sin(delta)
-        Fxf_b = Fx_f * cd - Fy_f * sd
-        Fyf_b = Fx_f * sd + Fy_f * cd
-        Ffx_w = c * Fxf_b - s * Fyf_b
-        Ffy_w = s * Fxf_b + c * Fyf_b
-        Frx_w = c * Fx_r - s * Fy_r
-        Fry_w = s * Fx_r + c * Fy_r
-
-        def _force_pose(Fx, Fy, px, py):
-            mag = f_scale * np.hypot(Fx, Fy)
-            if mag < 1e-12:
-                mag = 1e-12
-            th = np.arctan2(Fy, Fx)
-            return scale_pose2d_matrix(px, py, th, mag)
-
-        return [
-            T_wb,
-            T_rear,
-            T_front,
-            _world_arrow_pose(vrx, vry, rx, ry),
-            _world_arrow_pose(vfx, vfy, fx, fy),
-            _force_pose(Frx_w, Fry_w, rx, ry),
-            _force_pose(Ffx_w, Ffy_w, fx, fy),
-        ]
 
 
 if __name__ == "__main__":

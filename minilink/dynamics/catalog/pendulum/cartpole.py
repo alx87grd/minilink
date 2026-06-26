@@ -12,22 +12,18 @@ visually the same.
 import numpy as np
 
 from minilink.core.backends import require_jax_numpy
+from minilink.core.kinematics import identity_matrix, pose2d_matrix, rod_between_transform, translation_matrix
 from minilink.dynamics.abstraction.mechanical import (
     JaxMechanicalSystem,
     MechanicalSystem,
 )
+from minilink.graphical.animation.legacy import legacy_arrow, scale_pose2d_matrix
 from minilink.graphical.animation.primitives import (
-    Arrow,
     Box,
     CustomLine,
     Point,
     Rod,
     Sphere,
-    identity_matrix,
-    point_transform,
-    pose2d_matrix,
-    rod_between_transform,
-    scale_pose2d_matrix,
 )
 
 
@@ -114,27 +110,31 @@ class RotatingCartPole(MechanicalSystem):
         radius = 0.08 * max(l1, l2)
         half = l1 + l2
         ground_z = -l1
-        return [
-            CustomLine(
-                [
-                    [-half, -half, ground_z],
-                    [-half, half, ground_z],
-                    [half, half, ground_z],
-                    [half, -half, ground_z],
-                    [-half, -half, ground_z],
-                ],
-                color="black",
-                style="--",
-            ),
-            Rod(length=l1, radius=0.03 * l1, color="black", linewidth=2),
-            Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2),
-            Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2),
-            Sphere(radius=radius, color="blue", opacity=0.9),
-            Sphere(radius=radius, color="blue", opacity=0.9),
-            Sphere(radius=radius, color="blue", opacity=0.9),
-        ]
+        return {
+            "world": [
+                CustomLine(
+                    [
+                        [-half, -half, ground_z],
+                        [-half, half, ground_z],
+                        [half, half, ground_z],
+                        [half, -half, ground_z],
+                        [-half, -half, ground_z],
+                    ],
+                    color="black",
+                    style="--",
+                )
+            ],
+            "support": [
+                Rod(length=l1, radius=0.03 * l1, color="black", linewidth=2)
+            ],
+            "arm0": [Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2)],
+            "arm1": [Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2)],
+            "joint0": [Sphere(radius=radius, color="blue", opacity=0.9)],
+            "joint1": [Sphere(radius=radius, color="blue", opacity=0.9)],
+            "tip": [Sphere(radius=radius, color="blue", opacity=0.9)],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         c1, s1 = np.cos(x[0]), np.sin(x[0])
@@ -147,27 +147,15 @@ class RotatingCartPole(MechanicalSystem):
         p_arm = np.array([l1 * s1, -l1 * c1, 0.0])
         p_tip = p_arm + l2 * np.array([s2 * c1, s2 * s1, c2])
 
-        return [
-            identity_matrix(),
-            rod_between_transform(p_support, p_pivot),
-            rod_between_transform(p_pivot, p_arm),
-            rod_between_transform(p_arm, p_tip),
-            point_transform(p_pivot),
-            point_transform(p_arm),
-            point_transform(p_tip),
-        ]
-
-    def get_camera_transform(self, x, u, t):
-        # open on a 3/4 oblique view; the view-out column encodes (elev, azim)
-        # and the interactive 3D toolbar lets the user orbit from there.
-        camera = super().get_camera_transform(x, u, t)
-        elevation, azimuth = np.radians(22.0), np.radians(-60.0)
-        camera[:3, 2] = [
-            np.cos(elevation) * np.cos(azimuth),
-            np.cos(elevation) * np.sin(azimuth),
-            np.sin(elevation),
-        ]
-        return camera
+        return {
+            "world": identity_matrix(x),
+            "support": rod_between_transform(p_support, p_pivot),
+            "arm0": rod_between_transform(p_pivot, p_arm),
+            "arm1": rod_between_transform(p_arm, p_tip),
+            "joint0": translation_matrix(*p_pivot),
+            "joint1": translation_matrix(*p_arm),
+            "tip": translation_matrix(*p_tip),
+        }
 
 
 class UnderactuatedRotatingCartPole(RotatingCartPole):
@@ -287,37 +275,41 @@ class CartPole(MechanicalSystem):
         cart_depth = self.cart_depth
         wheel_y = -cart_height / 2.0
 
-        return [
-            CustomLine(
-                [
-                    [-self.ground_half_width, 0.0, 0.0],
-                    [self.ground_half_width, 0.0, 0.0],
-                ],
-                color="black",
-                style="--",
-            ),
-            Box(
-                length_x=cart_length,
-                length_y=cart_height,
-                length_z=cart_depth,
-                color="black",
-                opacity=0.85,
-            ),
-            Point([0.0, wheel_y, 0.0], color="black", marker="o", size=6),
-            Point([0.0, wheel_y, 0.0], color="black", marker="o", size=6),
-            Rod(
-                length=pole_length,
-                radius=0.03 * pole_length,
-                color="blue",
-                linewidth=2,
-            ),
-            Arrow(color="red", linewidth=2, origin="tip"),
-        ]
+        return {
+            "world": [
+                CustomLine(
+                    [
+                        [-self.ground_half_width, 0.0, 0.0],
+                        [self.ground_half_width, 0.0, 0.0],
+                    ],
+                    color="black",
+                    style="--",
+                )
+            ],
+            "cart": [
+                Box(
+                    length_x=cart_length,
+                    length_y=cart_height,
+                    length_z=cart_depth,
+                    color="black",
+                    opacity=0.85,
+                )
+            ],
+            "wheel_l": [Point([0.0, wheel_y, 0.0], color="black", marker="o", size=6)],
+            "wheel_r": [Point([0.0, wheel_y, 0.0], color="black", marker="o", size=6)],
+            "pole": [
+                Rod(
+                    length=pole_length,
+                    radius=0.03 * pole_length,
+                    color="blue",
+                    linewidth=2,
+                )
+            ],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         pos = x[0]
         theta = x[1]
-        F = u[0]
 
         cart_length = self.cart_length
         cart_height = self.cart_height
@@ -326,6 +318,23 @@ class CartPole(MechanicalSystem):
         pivot_y = cart_height / 2.0
         pole_z = cart_depth / 2.0 + 0.1
 
+        pole_pose = pose2d_matrix(pos, pivot_y, theta)
+        pole_pose[2, 3] = pole_z
+
+        return {
+            "world": identity_matrix(x),
+            "cart": pose2d_matrix(pos, pivot_y, 0.0),
+            "wheel_l": pose2d_matrix(pos - wheel_dx, pivot_y, 0.0),
+            "wheel_r": pose2d_matrix(pos + wheel_dx, pivot_y, 0.0),
+            "pole": pole_pose,
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        F = u[0]
+        pos = x[0]
+        cart_length = self.cart_length
+        cart_height = self.cart_height
+        pivot_y = cart_height / 2.0
         force_len = abs(F) * 0.3
         if F >= 0.0:
             force_x = pos - cart_length / 2.0
@@ -333,19 +342,16 @@ class CartPole(MechanicalSystem):
         else:
             force_x = pos + cart_length / 2.0
             force_theta = np.pi
-
-        # offset the pole in z so the rod clears the cart body in 3D renderers
-        pole_pose = pose2d_matrix(pos, pivot_y, theta)
-        pole_pose[2, 3] = pole_z
-
-        return [
-            pose2d_matrix(0.0, 0.0, 0.0),
-            pose2d_matrix(pos, pivot_y, 0.0),
-            pose2d_matrix(pos - wheel_dx, pivot_y, 0.0),
-            pose2d_matrix(pos + wheel_dx, pivot_y, 0.0),
-            pole_pose,
-            scale_pose2d_matrix(force_x, pivot_y, force_theta, force_len),
-        ]
+        return {
+            "world": [
+                legacy_arrow(
+                    scale_pose2d_matrix(force_x, pivot_y, force_theta, force_len),
+                    color="red",
+                    linewidth=2,
+                    origin="tip",
+                )
+            ],
+        }
 
 
 class JaxCartPole(JaxMechanicalSystem):
@@ -410,7 +416,8 @@ class JaxCartPole(JaxMechanicalSystem):
         return jnp.zeros(self.dof)
 
     get_kinematic_geometry = CartPole.get_kinematic_geometry
-    get_kinematic_transforms = CartPole.get_kinematic_transforms
+    tf = CartPole.tf
+    get_dynamic_geometry = CartPole.get_dynamic_geometry
 
 
 if __name__ == "__main__":

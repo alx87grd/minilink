@@ -1,14 +1,9 @@
 import numpy as np
 
+from minilink.core.kinematics import identity_matrix, pose2d_matrix, translation_matrix
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    Circle,
-    CustomLine,
-    arrow_transform,
-    identity_matrix,
-    translation_matrix,
-)
+from minilink.graphical.animation.legacy import legacy_arrow_vector
+from minilink.graphical.animation.primitives import Circle, CustomLine
 
 
 class MountainCar(MechanicalSystem):
@@ -94,29 +89,38 @@ class MountainCar(MechanicalSystem):
     def get_kinematic_geometry(self):
         xs = np.linspace(-1.7, 0.3, 240)
         terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
-        return [
-            CustomLine(terrain, color="black", linewidth=2),
-            Circle(radius=0.05, center=[0.0, 0.0, 0.0], color="blue", fill=True),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
+        return {
+            "world": [CustomLine(terrain, color="black", linewidth=2)],
+            "body": [Circle(radius=0.05, center=[0.0, 0.0, 0.0], color="blue", fill=True)],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
+        q = x[:1]
+        p = self.forward_kinematic_effector(q)
+        return {
+            "world": identity_matrix(x),
+            "body": translation_matrix(p[0], p[1], 0.0),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         q = x[:1]
         p = self.forward_kinematic_effector(q)
         slope = self.dz_dx(q[0])
         tangent = np.array([1.0, slope])
         tangent = tangent / np.linalg.norm(tangent)
-        return [
-            identity_matrix(),
-            translation_matrix(p[0], p[1], 0.0),
-            arrow_transform(
-                p[0],
-                p[1],
-                u[0] * tangent[0],
-                u[0] * tangent[1],
-                scale=0.3,
-            ),
-        ]
+        return {
+            "world": [
+                legacy_arrow_vector(
+                    p[0],
+                    p[1],
+                    u[0] * tangent[0],
+                    u[0] * tangent[1],
+                    scale=0.3,
+                    color="red",
+                    linewidth=2,
+                )
+            ],
+        }
 
 
 if __name__ == "__main__":

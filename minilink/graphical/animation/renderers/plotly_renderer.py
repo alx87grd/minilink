@@ -17,10 +17,6 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
-    TorqueArrow,
-    TrajectoryPolyline,
-    extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
@@ -625,21 +621,6 @@ class PlotlyRenderer(AnimationRenderer):
 
         if isinstance(primitive, (CustomLine, Arrow)):
             pts = _transform_points(primitive.pts, T)
-            return _line_trace(
-                go,
-                x=pts[:, 0],
-                y=pts[:, 1],
-                z=pts[:, 2] if self.is_3d else None,
-                color=color,
-                width=width,
-                dash=dash,
-                name=name,
-                is_3d=self.is_3d,
-            )
-
-        if isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-            channel, T_rigid = extract_amplitude(T)
-            pts = _transform_points(primitive.compute_pts(channel), T_rigid)
             return _line_trace(
                 go,
                 x=pts[:, 0],

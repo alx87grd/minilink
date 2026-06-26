@@ -53,15 +53,17 @@ class TestCartPole(unittest.TestCase):
 
     def test_graphics_geometry_and_transform_counts_match(self):
         sys = CartPole()
-        primitives = sys.get_kinematic_geometry()
-        transforms = sys.get_kinematic_transforms(np.zeros(sys.n), np.zeros(sys.m), 0.0)
+        x = np.zeros(sys.n)
+        u = np.zeros(sys.m)
+        geometry = sys.get_kinematic_geometry()
+        frames = sys.tf(x, u, 0.0)
 
-        self.assertIsInstance(primitives[1], Box)
-        self.assertEqual(primitives[1].length_z, sys.cart_depth)
-        self.assertGreater(transforms[4][2, 3], 0.5 * float(sys.cart_depth))
-        self.assertEqual(len(primitives), len(transforms))
-        for T in transforms:
-            self.assertEqual(T.shape, (4, 4))
+        self.assertIsInstance(geometry["cart"][0], Box)
+        self.assertEqual(geometry["cart"][0].length_z, sys.cart_depth)
+        self.assertGreater(frames["pole"][2, 3], 0.5 * float(sys.cart_depth))
+        for key in geometry:
+            self.assertIn(key, frames)
+            self.assertEqual(frames[key].shape, (4, 4))
 
 
 class TestDoublePendulum(unittest.TestCase):
@@ -120,12 +122,14 @@ class TestDoublePendulum(unittest.TestCase):
 
     def test_graphics_geometry_and_transform_counts_match(self):
         sys = DoublePendulum()
-        primitives = sys.get_kinematic_geometry()
-        transforms = sys.get_kinematic_transforms(np.zeros(sys.n), np.zeros(sys.m), 0.0)
+        x = np.zeros(sys.n)
+        u = np.zeros(sys.m)
+        geometry = sys.get_kinematic_geometry()
+        frames = sys.tf(x, u, 0.0)
 
-        self.assertEqual(len(primitives), len(transforms))
-        for T in transforms:
-            self.assertEqual(T.shape, (4, 4))
+        for key in geometry:
+            self.assertIn(key, frames)
+            self.assertEqual(frames[key].shape, (4, 4))
 
 
 if __name__ == "__main__":

@@ -1,16 +1,9 @@
 import numpy as np
 
+from minilink.core.kinematics import identity_matrix, pose2d_matrix, translation_matrix
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    CustomLine,
-    Point,
-    follow_xy_camera,
-    ground_line,
-    identity_matrix,
-    pose2d_matrix,
-    scale_pose2d_matrix,
-)
+from minilink.graphical.animation.legacy import legacy_arrow_vector, legacy_body_arrow
+from minilink.graphical.animation.primitives import CustomLine, Point, ground_line
 
 
 class Rocket(MechanicalSystem):
@@ -37,6 +30,7 @@ class Rocket(MechanicalSystem):
         self.width = 0.4
         self.height = 2.0
         self.dynamic_range = 10.0
+        self.camera_follow_frame = "body"
         self.camera_scale = self.dynamic_range
 
     def H(self, q, params=None):
@@ -85,8 +79,41 @@ class Rocket(MechanicalSystem):
             ]
         )
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
+    def get_kinematic_geometry(self):
+        return {
+            "world": [ground_line(length=200.0, y=0.0, color="black", style="--")],
+            "body": [self.body_shape()],
+            "cg": [Point(color="black", marker="o", size=5)],
+        }
+
+    def tf(self, x, u, t=0, params=None):
+        q = x[:3]
+        t_body = pose2d_matrix(q[0], q[1], q[2])
+        return {
+            "world": identity_matrix(x),
+            "body": t_body,
+            "cg": pose2d_matrix(q[0], q[1], 0.0),
+            "engine": t_body @ translation_matrix(0.0, -1.0, 0.0),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        q = x[:3]
+        t_body = pose2d_matrix(q[0], q[1], q[2])
+        delta = u[1]
+        thrust = u[0]
+        return {
+            "world": [
+                legacy_body_arrow(
+                    t_body,
+                    0.0,
+                    -1.0,
+                    np.pi / 2.0 + delta,
+                    0.0002 * thrust,
+                    color="red",
+                    linewidth=2,
+                )
+            ],
+        }
 
     def body_shape(self):
         """Side-view rocket silhouette with the c.g. at the local origin."""
@@ -103,30 +130,6 @@ class Rocket(MechanicalSystem):
             ]
         )
         return CustomLine(pts, color="blue", linewidth=2)
-
-    def get_kinematic_geometry(self):
-        return [
-            self.body_shape(),
-            Point(color="black", marker="o", size=5),
-            ground_line(length=200.0, y=0.0, color="black", style="--"),
-            Arrow(color="red", linewidth=2, origin="tip"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        q = x[:3]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
-        return [
-            T_body,
-            pose2d_matrix(q[0], q[1], 0.0),
-            identity_matrix(),
-            T_body
-            @ scale_pose2d_matrix(
-                0.0,
-                -1.0,
-                np.pi / 2.0 + u[1],
-                0.0002 * u[0],
-            ),
-        ]
 
 
 if __name__ == "__main__":

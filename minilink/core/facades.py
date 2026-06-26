@@ -384,6 +384,8 @@ class SystemFacades:
         native: bool = True,
         scene_title: str | None = None,
         show: bool = True,
+        overlays=None,
+        camera=None,
     ):
         """
         Convenience shortcut to animate a trajectory of this system.
@@ -412,7 +414,7 @@ class SystemFacades:
 
         resolved_html = prefers_inline_animation() if html is None else html
 
-        animator = Animator(self)
+        animator = Animator(self, overlays=overlays, camera=camera)
         show_plot = show and not resolved_html
         ani_obj = animator.animate_simulation(
             traj,
@@ -423,6 +425,8 @@ class SystemFacades:
             renderer=renderer,
             native=native,
             scene_title=scene_title,
+            overlays=overlays,
+            camera=camera,
         )
 
         # For html output, return the IPython.display.HTML object and let the

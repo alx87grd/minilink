@@ -12,17 +12,14 @@ gradient-based trajectory optimization.
 
 import numpy as np
 
+from minilink.core.backends import array_module
+from minilink.core.kinematics import identity_matrix, pose2d_matrix
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.catalog.vehicles.tire_models import (
     TireModel,
 )
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    CustomLine,
-    camera_matrix,
-    pose2d_matrix,
-    scale_pose2d_matrix,
-)
+from minilink.graphical.animation.legacy import bicycle_sl_world_arrows
+from minilink.graphical.animation.primitives import CustomLine
 
 
 def _wheel_rectangle_pts(wl: float, ww: float) -> np.ndarray:
@@ -92,7 +89,7 @@ class DynamicBicycleMagicForces(DynamicSystem):
         self.tire_model_f = TireModel()
         self.tire_model_r = TireModel()
 
-        self.camera_follow_vehicle = True
+        self.camera_follow_frame = "body"
 
     def x2q(self, x):
         """
@@ -228,24 +225,6 @@ class DynamicBicycleMagicForces(DynamicSystem):
     ) -> np.ndarray:
         return x.copy()
 
-    def get_camera_transform(self, x, u, t):
-        """Return a camera centered on the vehicle pose by default.
-
-        ``camera_target`` is treated as an offset from the vehicle position
-        when ``camera_follow_vehicle`` is true. Set ``camera_follow_vehicle`` to
-        false to use the base fixed-camera interpretation of ``camera_target``.
-        """
-        target = np.asarray(self.camera_target, dtype=float).reshape(3).copy()
-        if self.camera_follow_vehicle:
-            target[0] += float(x[0])
-            target[1] += float(x[1])
-
-        return camera_matrix(
-            target=target,
-            plot_axes=self.camera_plot_axes,
-            scale=self.camera_scale,
-        )
-
     def get_kinematic_geometry(self):
         wl_r, ww_r = self.wheel_len_rear, self.wheel_width_rear
         wl_f, ww_f = self.wheel_len_front, self.wheel_width_front
@@ -259,9 +238,27 @@ class DynamicBicycleMagicForces(DynamicSystem):
         rear_w = CustomLine(wpts_rear, color="black", linewidth=1)
         wpts_front = _wheel_rectangle_pts(wl_f, ww_f)
         front_w = CustomLine(wpts_front, color="black", linewidth=1)
-        arr_v = Arrow(color="blue", linewidth=2, origin="base")
-        arr_f = Arrow(color="red", linewidth=2, origin="base")
-        return [chassis, rear_w, front_w, arr_v, arr_v, arr_f, arr_f]
+        return {
+            "body": [chassis],
+            "axle_rear": [rear_w],
+            "axle_front": [front_w],
+        }
+
+    def tf(self, x, u, t=0, params=None):
+        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+        u_in = self.get_u_int(x, u)
+        delta = float(u_in[1])
+
+        t_body = pose2d_matrix(X, Y, Theta)
+        return {
+            "world": identity_matrix(x),
+            "body": t_body,
+            "axle_rear": t_body @ pose2d_matrix(-self.b, 0.0, 0.0),
+            "axle_front": t_body @ pose2d_matrix(self.a, 0.0, delta),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {"world": bicycle_sl_world_arrows(x, u, t, self)}
 
     def tire_forces_body_frame(self, v_body: np.ndarray, u_in: np.ndarray):
         Fx_front, Fy_front, Fx_rear, Fy_rear = self.compute_tire_physics(v_body, u_in)
@@ -276,67 +273,8 @@ class DynamicBicycleMagicForces(DynamicSystem):
 
         return Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b
 
-    def _world_arrow_pose(
-        self, dx: float, dy: float, px: float, py: float, v_scale: float = 0.2
-    ):
-        mag = v_scale * np.hypot(dx, dy)
-        if mag < 1e-9:
-            mag = 1e-9
-        th = np.arctan2(dy, dx)
-        return scale_pose2d_matrix(px, py, th, mag)
-
-    def _force_pose(
-        self, Fx: float, Fy: float, px: float, py: float, f_scale: float = 0.001
-    ):
-        mag = f_scale * np.hypot(Fx, Fy)
-        if mag < 1e-12:
-            mag = 1e-12
-        th = np.arctan2(Fy, Fx)
-        return scale_pose2d_matrix(px, py, th, mag)
-
     def get_u_int(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         return u
-
-    def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
-        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
-        _, vb = self.x2q(x)
-        u_in = self.get_u_int(x, u)
-        delta = float(u_in[1])
-
-        T_wb = pose2d_matrix(X, Y, Theta)
-        T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
-        T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
-
-        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + self.a * wr])
-        v_r_loc = np.array([uu, vv - self.b * wr])
-
-        c, s = np.cos(Theta), np.sin(Theta)
-        rx = X + c * (-self.b) - s * 0.0
-        ry = Y + s * (-self.b) + c * 0.0
-        fx = X + c * self.a - s * 0.0
-        fy = Y + s * self.a + c * 0.0
-
-        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
-        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
-
-        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(vb, u_in)
-
-        Ffx_w = c * Fx_f_b - s * Fy_f_b
-        Ffy_w = s * Fx_f_b + c * Fy_f_b
-
-        Frx_w = c * Fx_r_b - s * Fy_r_b
-        Fry_w = s * Fx_r_b + c * Fy_r_b
-
-        return [
-            T_wb,
-            T_rear,
-            T_front,
-            self._world_arrow_pose(vrx, vry, rx, ry),
-            self._world_arrow_pose(vfx, vfy, fx, fy),
-            self._force_pose(Frx_w, Fry_w, rx, ry),
-            self._force_pose(Ffx_w, Ffy_w, fx, fy),
-        ]
 
 
 class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):

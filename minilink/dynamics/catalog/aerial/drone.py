@@ -1,20 +1,14 @@
 import numpy as np
 
+from minilink.core.kinematics import identity_matrix, pose2d_matrix, translation_matrix
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    Box,
-    Circle,
-    Point,
-    arrow_transform,
-    follow_xy_camera,
-    ground_line,
-    identity_matrix,
-    pose2d_matrix,
+from minilink.graphical.animation.legacy import (
+    legacy_arrow_vector,
+    legacy_body_arrow,
     scale_pose2d_matrix,
-    translation_matrix,
 )
+from minilink.graphical.animation.primitives import Arrow, Box, Circle, Point, ground_line
 
 
 def _drone_body(width=1.0, height=0.2):
@@ -47,6 +41,7 @@ class Drone2D(MechanicalSystem):
         # Graphic parameters
         self.width = 1.0
         self.height = 0.2
+        self.camera_follow_frame = "body"
         self.camera_scale = 3.0
 
     def H(self, q, params=None):
@@ -95,30 +90,35 @@ class Drone2D(MechanicalSystem):
             ]
         )
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def get_kinematic_geometry(self):
-        return [
-            ground_line(length=20.0),
-            _drone_body(width=1.2, height=0.18),
-            Point(color="blue", marker="o", size=5),
-            Arrow(color="red", linewidth=2, origin="base"),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
+        return {
+            "world": [ground_line(length=20.0)],
+            "body": [_drone_body(width=1.2, height=0.18), Point(color="blue", marker="o", size=5)],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
+        q = x[:3]
+        t_body = pose2d_matrix(q[0], q[1], q[2])
+        return {
+            "world": identity_matrix(x),
+            "body": t_body,
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         offset = self.params["thruster_offset"]
         q = x[:3]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
+        t_body = pose2d_matrix(q[0], q[1], q[2])
         scale = 0.08
-        return [
-            identity_matrix(),
-            T_body,
-            pose2d_matrix(q[0], q[1], 0.0),
-            T_body @ scale_pose2d_matrix(-offset, 0.0, np.pi / 2.0, scale * u[0]),
-            T_body @ scale_pose2d_matrix(offset, 0.0, np.pi / 2.0, scale * u[1]),
-        ]
+        return {
+            "world": [
+                legacy_body_arrow(
+                    t_body, -offset, 0.0, np.pi / 2.0, scale * u[0], color="red", linewidth=2
+                ),
+                legacy_body_arrow(
+                    t_body, offset, 0.0, np.pi / 2.0, scale * u[1], color="red", linewidth=2
+                ),
+            ],
+        }
 
 
 class Drone2DWithSideThruster(Drone2D):
@@ -145,17 +145,14 @@ class Drone2DWithSideThruster(Drone2D):
         B[1, 2] = np.sin(theta)
         return B
 
-    def get_kinematic_geometry(self):
-        return super().get_kinematic_geometry() + [
-            Arrow(color="orange", linewidth=2, origin="base")
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        transforms = super().get_kinematic_transforms(x, u[:2], t)
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        geometry = super().get_dynamic_geometry(x, u[:2], t, params)
         q = x[:3]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
-        transforms.append(T_body @ scale_pose2d_matrix(0.0, 0.0, 0.0, 0.08 * u[2]))
-        return transforms
+        t_body = pose2d_matrix(q[0], q[1], q[2])
+        geometry["world"].append(
+            legacy_body_arrow(t_body, 0.0, 0.0, 0.0, 0.08 * u[2], color="orange", linewidth=2)
+        )
+        return geometry
 
 
 class SpeedControlledDrone2D(DynamicSystem):
@@ -170,6 +167,7 @@ class SpeedControlledDrone2D(DynamicSystem):
         self.inputs["u"].units = ["m/s", "m/s"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        self.camera_follow_frame = "body"
         self.camera_scale = 10.0
 
     def f(self, x, u, t=0.0, params=None):
@@ -179,20 +177,23 @@ class SpeedControlledDrone2D(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def get_kinematic_geometry(self):
-        return [
-            _drone_body(width=1.0, height=0.18),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
+        return {"body": [_drone_body(width=1.0, height=0.18)]}
 
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            translation_matrix(x[0], x[1], 0.0),
-            arrow_transform(x[0], x[1], u[0], u[1], scale=0.25),
-        ]
+    def tf(self, x, u, t=0, params=None):
+        return {
+            "world": identity_matrix(x),
+            "body": translation_matrix(x[0], x[1], 0.0),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {
+            "world": [
+                legacy_arrow_vector(
+                    x[0], x[1], u[0], u[1], scale=0.25, color="red", linewidth=2
+                )
+            ],
+        }
 
 
 class ConstantSpeedHelicopterTunnel(DynamicSystem):
@@ -213,6 +214,7 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
         self.outputs["y"].units = list(self.state.units)
 
         # Graphic parameters
+        self.camera_follow_frame = "body"
         self.camera_scale = 12.0
 
     def f(self, x, u, t=0.0, params=None):
@@ -226,24 +228,29 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[2], x[1], self.camera_scale)
-
     def get_kinematic_geometry(self):
-        return [
-            Box(length_x=1.0, length_y=0.35, length_z=0.2, color="blue", opacity=0.9),
-            Circle(radius=0.08, center=[-0.3, -0.2, 0.0], color="black", fill=True),
-            Circle(radius=0.08, center=[0.3, -0.2, 0.0], color="black", fill=True),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
+        return {
+            "body": [
+                Box(length_x=1.0, length_y=0.35, length_z=0.2, color="blue", opacity=0.9),
+                Circle(radius=0.08, center=[-0.3, -0.2, 0.0], color="black", fill=True),
+                Circle(radius=0.08, center=[0.3, -0.2, 0.0], color="black", fill=True),
+            ],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            translation_matrix(x[2], x[1], 0.0),
-            translation_matrix(x[2], x[1], 0.0),
-            translation_matrix(x[2], x[1], 0.0),
-            arrow_transform(x[2] + 0.6, x[1], 0.0, u[0], scale=0.2),
-        ]
+    def tf(self, x, u, t=0, params=None):
+        return {
+            "world": identity_matrix(x),
+            "body": translation_matrix(x[2], x[1], 0.0),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {
+            "world": [
+                legacy_arrow_vector(
+                    x[2] + 0.6, x[1], 0.0, u[0], scale=0.2, color="red", linewidth=2
+                )
+            ],
+        }
 
 
 if __name__ == "__main__":

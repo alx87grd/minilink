@@ -17,15 +17,13 @@ from typing import NamedTuple
 import numpy as np
 
 from minilink.core.backends import require_jax_numpy
+from minilink.core.kinematics import identity_matrix, translation_matrix
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     Plane,
     Sphere,
-    camera_matrix,
-    identity_matrix,
-    translation_matrix,
 )
 
 
@@ -500,6 +498,7 @@ class ANCFTireSystem(DynamicSystem):
         self.camera_scale = max(2.0, 4.0 * model.radius)
         if camera_scale is not None:
             self.camera_scale = float(camera_scale)
+        self.camera_follow_frame = "center" if self.follow_camera else None
 
     def f(self, x, u, t=0.0, params=None):
         model = self.model
@@ -530,27 +529,27 @@ class ANCFTireSystem(DynamicSystem):
         return np.asarray(f_contact, dtype=float)
 
     def get_kinematic_geometry(self):
-        prim = []
-        for _ in range(self.model.n_nodes):
-            prim.append(
+        geometry = {}
+        for i in range(self.model.n_nodes):
+            geometry[f"seg{i}"] = [
                 CustomLine(
                     [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
                     color="black",
                     linewidth=3,
                 )
-            )
-        for _ in range(self.model.n_nodes):
-            prim.append(
+            ]
+        for i in range(self.model.n_nodes):
+            geometry[f"node{i}"] = [
                 Sphere(
                     radius=0.025,
                     center=[0.0, 0.0, 0.0],
                     color="red",
                     opacity=1.0,
                 )
-            )
-        for _ in range(self.model.n_nodes):
-            prim.append(Arrow(color="red", linewidth=4))
-        prim.append(
+            ]
+        for i in range(self.model.n_nodes):
+            geometry[f"force{i}"] = [Arrow(color="red", linewidth=4)]
+        geometry["world"] = [
             Plane(
                 normal=np.asarray(self.model.plane_normal, dtype=float),
                 offset=float(self.model.plane_offset),
@@ -559,39 +558,34 @@ class ANCFTireSystem(DynamicSystem):
                 color="lightgray",
                 opacity=0.65,
             )
-        )
-        return prim
+        ]
+        return geometry
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         p = self.node_positions(x)
         f_contact = self.contact_forces(x)
-        T = []
-        for i in range(self.model.n_nodes):
-            T.append(_line_segment_transform(p[i], p[(i + 1) % self.model.n_nodes]))
-        for i in range(self.model.n_nodes):
-            T.append(translation_matrix(p[i, 0], p[i, 1], p[i, 2]))
-        for i in range(self.model.n_nodes):
-            if np.linalg.norm(f_contact[i]) > self.contact_force_threshold:
-                f = self.contact_force_scale * f_contact[i]
-                T.append(_vector_arrow_transform(p[i], f))
-            else:
-                T.append(_vector_arrow_transform(p[i], np.zeros(3)))
-        T.append(identity_matrix())
-        return T
-
-    def get_camera_transform(self, x, u, t):
-        target = np.asarray(self.camera_target, dtype=float)
-        if self.follow_camera:
-            p = self.node_positions(x)
-            target = np.mean(p, axis=0)
-            target[2] = max(
-                target[2], self.model.plane_offset + 0.7 * self.model.radius
+        frames = {}
+        n_nodes = self.model.n_nodes
+        for i in range(n_nodes):
+            frames[f"seg{i}"] = _line_segment_transform(
+                p[i], p[(i + 1) % n_nodes]
             )
-        return camera_matrix(
-            target=target,
-            plot_axes=self.camera_plot_axes,
-            scale=self.camera_scale,
-        )
+            frames[f"node{i}"] = translation_matrix(p[i, 0], p[i, 1], p[i, 2])
+            if np.linalg.norm(f_contact[i]) > self.contact_force_threshold:
+                force = self.contact_force_scale * f_contact[i]
+                frames[f"force{i}"] = _vector_arrow_transform(p[i], force)
+            else:
+                frames[f"force{i}"] = _vector_arrow_transform(
+                    p[i], np.zeros(3)
+                )
+        frames["world"] = identity_matrix(x)
+        if self.follow_camera:
+            center = np.mean(p, axis=0)
+            center[2] = max(
+                center[2], self.model.plane_offset + 0.7 * self.model.radius
+            )
+            frames["center"] = translation_matrix(center[0], center[1], center[2])
+        return frames
 
 
 def _line_segment_transform(p0, p1):

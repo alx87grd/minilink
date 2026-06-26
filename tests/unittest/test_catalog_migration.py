@@ -58,7 +58,16 @@ from minilink.dynamics.catalog.vehicles.steering import (
     UdeSRacecar,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
-from minilink.graphical.animation.primitives import Arrow, TorqueArrow
+from minilink.graphical.animation.camera import resolve_camera_from_hints
+from minilink.graphical.animation.primitives import Arrow, CustomLine, TorqueArrow
+
+
+def _iter_primitives(geometry):
+    if isinstance(geometry, dict):
+        for prims in geometry.values():
+            yield from prims
+        return
+    yield from geometry
 
 
 def _zero_f_smoke(system):
@@ -77,10 +86,10 @@ def _geometry_smoke(system):
         x = np.zeros(system.n)
     u = system.get_u_from_input_ports()
     geometry = system.get_kinematic_geometry()
-    transforms = system.get_kinematic_transforms(x, u, 0.0)
-    assert len(geometry) == len(transforms)
-    for transform in transforms:
-        transform = np.asarray(transform, dtype=float)
+    frames = system.tf(x, u, 0.0)
+    for key, prims in geometry.items():
+        assert key in frames, f"missing frame {key!r} in tf()"
+        transform = np.asarray(frames[key], dtype=float)
         assert transform.shape == (4, 4)
         assert np.all(np.isfinite(transform))
 
@@ -88,7 +97,19 @@ def _geometry_smoke(system):
 def _primitive_count(system, primitive_type):
     return sum(
         isinstance(primitive, primitive_type)
-        for primitive in system.get_kinematic_geometry()
+        for primitive in _iter_primitives(system.get_kinematic_geometry())
+    )
+
+
+def _dynamic_primitive_count(system, primitive_type, x=None, u=None):
+    x = np.asarray(system.x0 if x is None else x, dtype=float)
+    if x.shape != (system.n,):
+        x = np.zeros(system.n)
+    u = system.get_u_from_input_ports() if u is None else u
+    dynamic = system.get_dynamic_geometry(x, u, 0.0)
+    return sum(
+        isinstance(primitive, primitive_type)
+        for primitive in _iter_primitives(dynamic)
     )
 
 
@@ -193,13 +214,20 @@ class TestMigratedCatalog(unittest.TestCase):
 
         for system, expected in arrow_cases:
             with self.subTest(system=system.name):
-                self.assertEqual(_primitive_count(system, Arrow), expected)
+                self.assertEqual(
+                    _dynamic_primitive_count(system, Arrow), expected
+                )
                 _geometry_smoke(system)
+
+        quarter = QuarterCarOnRoughTerrain()
+        self.assertEqual(_dynamic_primitive_count(quarter, CustomLine), 1)
+        _geometry_smoke(quarter)
 
         boat = Boat2D()
         boat.show_hydrodynamic_forces = True
-        self.assertEqual(_primitive_count(boat, Arrow), 2)
-        self.assertEqual(_primitive_count(boat, TorqueArrow), 1)
+        self.assertEqual(_primitive_count(boat, Arrow), 0)
+        self.assertEqual(_dynamic_primitive_count(boat, Arrow), 2)
+        self.assertEqual(_dynamic_primitive_count(boat, CustomLine), 1)
         _geometry_smoke(boat)
 
         torque_cases = [
@@ -212,7 +240,10 @@ class TestMigratedCatalog(unittest.TestCase):
 
         for system, expected in torque_cases:
             with self.subTest(system=system.name):
-                self.assertEqual(_primitive_count(system, TorqueArrow), expected)
+                self.assertEqual(_primitive_count(system, TorqueArrow), 0)
+                self.assertEqual(
+                    _dynamic_primitive_count(system, CustomLine), expected
+                )
                 _geometry_smoke(system)
 
     def test_dynamic_domain_cameras_follow_pyro_positions(self):
@@ -251,9 +282,10 @@ class TestMigratedCatalog(unittest.TestCase):
 
         for system, x, expected_target in cases:
             with self.subTest(system=system.name):
-                camera = system.get_camera_transform(
-                    x,
-                    system.get_u_from_input_ports(),
+                u = system.get_u_from_input_ports()
+                camera = resolve_camera_from_hints(
+                    system,
+                    system.tf(x, u, 0.0),
                     0.0,
                 )
                 np.testing.assert_allclose(camera[:3, 3], expected_target)
