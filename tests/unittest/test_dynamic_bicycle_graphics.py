@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
-from minilink.graphical.animation.primitives import Arrow
+from minilink.graphical.animation.camera import resolve_camera_from_hints
+from minilink.graphical.animation.primitives import Arrow, CustomLine
 
 
 class TestDynamicBicycle(unittest.TestCase):
@@ -24,7 +25,7 @@ class TestDynamicBicycle(unittest.TestCase):
         x = np.array([10.0, 3.0, 0.25, 4.0, 0.0, 0.0])
         u = np.zeros(sys.m)
 
-        camera = sys.get_camera_transform(x, u, 0.0)
+        camera = resolve_camera_from_hints(sys, sys.tf(x, u, 0.0), 0.0)
 
         np.testing.assert_allclose(camera[:3, 3], np.array([11.0, 1.0, 0.5]))
         self.assertEqual(camera[3, 3], 7.0)
@@ -49,13 +50,23 @@ class TestDynamicBicycle(unittest.TestCase):
         x[3] = 1.0
         u = np.array([10.0, 0.1])
 
-        primitives = sys.get_kinematic_geometry()
-        transforms = sys.get_kinematic_transforms(x, u, 0.0)
+        geometry = sys.get_kinematic_geometry()
+        dynamic = sys.get_dynamic_geometry(x, u, 0.0)
+        frames = sys.tf(x, u, 0.0)
 
-        self.assertEqual(len(primitives), 7)
-        self.assertEqual(len(primitives), len(transforms))
-        self.assertEqual(sum(isinstance(item, Arrow) for item in primitives), 4)
-        for T in transforms:
+        self.assertEqual(len(geometry), 3)
+        self.assertEqual(len(dynamic), 1)
+        self.assertIn("world", dynamic)
+        for key in geometry:
+            self.assertIn(key, frames)
+        self.assertIn("world", frames)
+        arrow_count = sum(
+            isinstance(item, Arrow)
+            for items in dynamic.values()
+            for item in items
+        )
+        self.assertEqual(arrow_count, 4)
+        for T in frames.values():
             self.assertEqual(T.shape, (4, 4))
             self.assertTrue(np.all(np.isfinite(T)))
 

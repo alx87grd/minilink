@@ -17,11 +17,9 @@ from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
-from minilink.graphical.animation.primitives import (
-    CustomLine,
-    TrajectoryPolyline,
-    time_channel_matrix,
-)
+from minilink.core.kinematics import identity_matrix
+from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
+from minilink.graphical.animation.skins import merge_skins
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.robot import car
@@ -112,11 +110,27 @@ class TrajoptCurvyPathBicycleRate(JaxDynamicBicycleRateInputs):
 
     def get_kinematic_geometry(self):
         vehicle = super().get_kinematic_geometry()
-        return [self._upper, self._lower, self._centerline, self._executed] + vehicle
+        return merge_skins(
+            {"world": [self._upper, self._lower, self._centerline]},
+            vehicle,
+        )
 
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        return [np.eye(4)] * 3 + [time_channel_matrix(t)] + list(vehicle)
+    def tf(self, x, u, t=0, params=None):
+        frames = super().tf(x, u, t, params)
+        frames["world"] = identity_matrix(x)
+        return frames
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {
+            "world": [
+                CustomLine(
+                    self._executed.points_at(t),
+                    color=self._executed.color,
+                    linewidth=self._executed.linewidth,
+                    style=self._executed.style,
+                ),
+            ],
+        }
 
 
 # East straight, quarter-circle left to north, short north leg.

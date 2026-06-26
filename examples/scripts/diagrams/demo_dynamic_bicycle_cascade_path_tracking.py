@@ -17,15 +17,11 @@ arc, and steer arc (velocity loop has no drawing primitives).
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
+from minilink.core.kinematics import identity_matrix, pose2d_matrix
 from minilink.core.system import DynamicSystem, StaticSystem, System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    CustomLine,
-    TorqueArrow,
-    scale_pose2d_matrix,
-    torque_pose2d_matrix,
-)
+from minilink.graphical.animation.legacy import legacy_arrow, legacy_torque_world, scale_pose2d_matrix
+from minilink.graphical.animation.primitives import CustomLine
 
 # Path and motion setpoints (shared by pursuit law and XY plot)
 A = 2.0
@@ -78,10 +74,10 @@ class PathPlanner(System):
         xs = np.linspace(_PATH_X0, _PATH_X1, 320)
         ys = self.path_a * np.sin(2.0 * np.pi * xs / self.path_lambda)
         pts = np.column_stack([xs, ys, np.zeros_like(xs)])
-        return [CustomLine(pts, color="seagreen", linewidth=2.2, style="--")]
+        return {"world": [CustomLine(pts, color="seagreen", linewidth=2.2, style="--")]}
 
-    def get_kinematic_transforms(self, x, u, t):
-        return [np.eye(4)]
+    def tf(self, x, u, t=0, params=None):
+        return {"world": identity_matrix(x)}
 
 
 class Tracking(StaticSystem):
@@ -130,11 +126,8 @@ class Tracking(StaticSystem):
         theta_ref = np.arctan2(y_la - py, x_la - px)
         return np.array([theta_ref], dtype=float)
 
-    def get_kinematic_geometry(self):
-        return [Arrow(color="darkorange", linewidth=2.5, origin="base")]
-
-    def get_kinematic_transforms(self, x, u, t):
-        p = self.params
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        p = self.params if params is None else params
         ld = float(p["Ld"])
         amp, wavelength = float(u[0]), float(u[1])
         px, py = float(u[2]), float(u[3])
@@ -142,10 +135,21 @@ class Tracking(StaticSystem):
         y_la = amp * np.sin(2.0 * np.pi * x_la / wavelength)
         dx = x_la - px
         dy = y_la - py
-        L = float(np.hypot(dx, dy))
-        L = max(L, 1e-3)
+        L = max(float(np.hypot(dx, dy)), 1e-3)
         th = float(np.arctan2(dy, dx))
-        return [scale_pose2d_matrix(px, py, th, L)]
+        return {
+            "world": [
+                legacy_arrow(
+                    scale_pose2d_matrix(px, py, th, L),
+                    color="darkorange",
+                    linewidth=2.5,
+                    origin="base",
+                )
+            ],
+        }
+
+    def tf(self, x, u, t=0, params=None):
+        return {"world": identity_matrix(x)}
 
 
 class HeadingLoop(StaticSystem):
@@ -188,15 +192,27 @@ class HeadingLoop(StaticSystem):
         r_ref = np.clip(r_ref, -p["r_max"], p["r_max"])
         return np.array([r_ref], dtype=float)
 
-    def get_kinematic_geometry(self):
-        return [TorqueArrow(radius=1.15, color="mediumpurple", linewidth=2.0)]
-
-    def get_kinematic_transforms(self, x, u, t):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         theta_ref, theta = float(u[0]), float(u[3])
-        px, py = float(u[1]), float(u[2])
         e_psi = theta_ref - theta
         e_psi = (e_psi + np.pi) % (2.0 * np.pi) - np.pi
-        return [torque_pose2d_matrix(px, py, theta, e_psi)]
+        px, py, theta = float(u[1]), float(u[2]), float(u[3])
+        return {
+            "world": [
+                legacy_torque_world(
+                    px,
+                    py,
+                    theta,
+                    e_psi,
+                    1.15,
+                    color="mediumpurple",
+                    linewidth=2.0,
+                )
+            ],
+        }
+
+    def tf(self, x, u, t=0, params=None):
+        return {"world": identity_matrix(x)}
 
 
 class YawRateLoop(StaticSystem):
@@ -239,13 +255,26 @@ class YawRateLoop(StaticSystem):
         delta = np.clip(delta, -p["delta_max"], p["delta_max"])
         return np.array([delta], dtype=float)
 
-    def get_kinematic_geometry(self):
-        return [TorqueArrow(radius=0.85, color="coral", linewidth=2.0)]
-
-    def get_kinematic_transforms(self, x, u, t):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         px, py, theta = float(u[1]), float(u[2]), float(u[3])
         delta = float(self.r_to_delta(x, u, t)[0])
-        return [torque_pose2d_matrix(px, py, theta, delta)]
+        px, py, theta = float(u[1]), float(u[2]), float(u[3])
+        return {
+            "world": [
+                legacy_torque_world(
+                    px,
+                    py,
+                    theta,
+                    delta,
+                    0.85,
+                    color="coral",
+                    linewidth=2.0,
+                )
+            ],
+        }
+
+    def tf(self, x, u, t=0, params=None):
+        return {"world": identity_matrix(x)}
 
 
 class VelocityPID(DynamicSystem):
@@ -336,10 +365,10 @@ class VelocityPID(DynamicSystem):
         return np.array([w_cmd], dtype=float)
 
     def get_kinematic_geometry(self):
-        return []
+        return {}
 
-    def get_kinematic_transforms(self, _x, _u, _t):
-        return []
+    def tf(self, x, u, t=0, params=None):
+        return {}
 
 
 def plot_xy_vs_path(px, py, t, a_amp: float, wavelength: float):

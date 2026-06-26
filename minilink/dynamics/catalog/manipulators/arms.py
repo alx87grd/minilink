@@ -1,19 +1,10 @@
 import numpy as np
 
+from minilink.core.kinematics import identity_matrix, pose2d_matrix, rod_between_transform, translation_matrix
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    Circle,
-    Rod,
-    Sphere,
-    TorqueArrow,
-    arrow_transform,
-    point_transform,
-    pose2d_matrix,
-    rod_between_transform,
-    torque_pose2d_matrix,
-)
+from minilink.graphical.animation.legacy import legacy_arrow_vector, legacy_torque_world
+from minilink.graphical.animation.primitives import Arrow, Circle, Rod, Sphere
 
 
 def _planar_joint_positions(q, lengths):
@@ -27,65 +18,63 @@ def _planar_joint_positions(q, lengths):
     return np.asarray(points), angles
 
 
-def _planar_geometry(lengths, *, include_velocity=False, include_torque=False):
+def _planar_geometry(lengths, *, include_velocity=False):
+    lengths = np.asarray(lengths, dtype=float)
     radius = 0.08 * max(float(np.max(lengths)), 1e-12)
-    geometry = [
-        Rod(
-            length=float(length), radius=0.03 * float(length), color="blue", linewidth=2
-        )
-        for length in lengths
-    ]
-    geometry.extend(
-        Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
-        for _ in range(len(lengths) + 1)
-    )
-    if include_velocity:
-        geometry.append(Arrow(color="green", linewidth=2, origin="tail"))
-    if include_torque:
-        torque_radius = 0.2 * max(float(np.max(lengths)), 1e-12)
-        geometry.extend(
-            TorqueArrow(
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
+    geometry = {}
+    for i, length in enumerate(lengths):
+        geometry[f"link{i}"] = [
+            Rod(
+                length=float(length),
+                radius=0.03 * float(length),
+                color="blue",
                 linewidth=2,
             )
-            for _ in lengths
-        )
+        ]
+        geometry[f"joint{i}"] = [
+            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+        ]
+    geometry[f"joint{len(lengths)}"] = [
+        Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+    ]
+    if include_velocity:
+        geometry["ee"] = [Arrow(color="green", linewidth=2, origin="tail")]
     return geometry
 
 
-def _planar_link_transforms(points, angles):
-    return [
-        pose2d_matrix(point[0], point[1], np.pi - angle)
-        for point, angle in zip(points[:-1], angles)
-    ]
+def _planar_tf(points, angles, x=None):
+    frames = {"world": identity_matrix(x) if x is not None else np.eye(4)}
+    for i, angle in enumerate(angles):
+        point = points[i]
+        frames[f"link{i}"] = pose2d_matrix(point[0], point[1], np.pi - angle)
+    for i, point in enumerate(points):
+        frames[f"joint{i}"] = pose2d_matrix(point[0], point[1], 0.0)
+    return frames
 
 
-def _planar_point_transforms(points):
-    return [pose2d_matrix(point[0], point[1], 0.0) for point in points]
-
-
-def _planar_velocity_transform(q, dq, effector, jacobian):
-    velocity = jacobian(q) @ dq
-    return arrow_transform(
-        effector[0],
-        effector[1],
-        velocity[0],
-        velocity[1],
-        scale=0.4,
+def _planar_torque_geometry(points, angles, u, upper_bound):
+    torque_radius = 0.2 * max(
+        float(np.max(np.linalg.norm(np.diff(points, axis=0), axis=1))), 1e-12
     )
-
-
-def _planar_torque_transforms(points, angles, u, upper_bound):
-    transforms = []
+    lines = []
     for i, (point, angle) in enumerate(zip(points[:-1], angles)):
         limit = float(abs(upper_bound[i])) if np.isfinite(upper_bound[i]) else 5.0
         limit = max(limit, 1.0)
         sweep = u[i] * (2.0 * np.pi / 3.0) / limit
         start_angle = np.pi / 2.0 - angle
-        transforms.append(torque_pose2d_matrix(point[0], point[1], start_angle, sweep))
-    return transforms
+        lines.append(
+            legacy_torque_world(
+                point[0],
+                point[1],
+                start_angle,
+                sweep,
+                torque_radius,
+                head_ratio=0.4,
+                color="red",
+                linewidth=2,
+            )
+        )
+    return lines
 
 
 class SpeedControlledManipulator(DynamicSystem):
@@ -131,17 +120,32 @@ class SpeedControlledManipulator(DynamicSystem):
 
     def get_kinematic_geometry(self):
         lengths = self._link_lengths()
-        return _planar_geometry(lengths, include_velocity=True)
+        return _planar_geometry(lengths, include_velocity=False)
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
+        lengths = self._link_lengths()
+        points, angles = _planar_joint_positions(x, lengths)
+        return _planar_tf(points, angles, x)
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         lengths = self._link_lengths()
         points, angles = _planar_joint_positions(x, lengths)
         effector = self.forward_kinematic_effector(x)
-        return (
-            _planar_link_transforms(points, angles)
-            + _planar_point_transforms(points)
-            + [_planar_velocity_transform(x, u, effector, self.J)]
-        )
+        velocity = self.J(x) @ u
+        return {
+            "world": [
+                legacy_arrow_vector(
+                    effector[0],
+                    effector[1],
+                    velocity[0],
+                    velocity[1],
+                    scale=0.4,
+                    color="green",
+                    linewidth=2,
+                    origin="tail",
+                )
+            ],
+        }
 
 
 class OneLinkManipulator(MechanicalSystem):
@@ -208,17 +212,19 @@ class OneLinkManipulator(MechanicalSystem):
 
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]
-        return _planar_geometry(np.array([l1]), include_torque=True)
+        return _planar_geometry(np.array([l1]))
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         l1 = self.params["l1"]
         q, _ = self.x2q(x)
         points, angles = _planar_joint_positions(q, np.array([l1]))
-        return (
-            _planar_link_transforms(points, angles)
-            + _planar_point_transforms(points)
-            + _planar_torque_transforms(points, angles, u, self.inputs["u"].upper_bound)
-        )
+        return _planar_tf(points, angles, x)
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        l1 = self.params["l1"]
+        q, _ = self.x2q(x)
+        points, angles = _planar_joint_positions(q, np.array([l1]))
+        return {"world": _planar_torque_geometry(points, angles, u, self.inputs["u"].upper_bound)}
 
 
 class TwoLinkManipulator(MechanicalSystem):
@@ -342,18 +348,25 @@ class TwoLinkManipulator(MechanicalSystem):
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
-        return _planar_geometry(np.array([l1, l2]), include_torque=True)
+        return _planar_geometry(np.array([l1, l2]))
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         q, _ = self.x2q(x)
         points, angles = _planar_joint_positions(q, np.array([l1, l2]))
-        return (
-            _planar_link_transforms(points, angles)
-            + _planar_point_transforms(points)
-            + _planar_torque_transforms(points, angles, u, self.inputs["u"].upper_bound)
-        )
+        return _planar_tf(points, angles, x)
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        l1 = self.params["l1"]
+        l2 = self.params["l2"]
+        q, _ = self.x2q(x)
+        points, angles = _planar_joint_positions(q, np.array([l1, l2]))
+        return {
+            "world": _planar_torque_geometry(
+                points, angles, u, self.inputs["u"].upper_bound
+            )
+        }
 
 
 class ThreeLinkManipulator3D(MechanicalSystem):
@@ -530,17 +543,18 @@ class ThreeLinkManipulator3D(MechanicalSystem):
         l2 = self.params["l2"]
         l3 = self.params["l3"]
         radius = 0.06 * max(l1, l2, l3)
-        return [
-            Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2),
-            Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2),
-            Rod(length=l3, radius=0.03 * l3, color="blue", linewidth=2),
-            Sphere(radius=radius, color="blue", opacity=0.9),
-            Sphere(radius=radius, color="blue", opacity=0.9),
-            Sphere(radius=radius, color="blue", opacity=0.9),
-            Sphere(radius=radius, color="blue", opacity=0.9),
-        ]
+        geometry = {}
+        for i, length in enumerate([l1, l2, l3]):
+            geometry[f"link{i}"] = [
+                Rod(length=length, radius=0.03 * length, color="blue", linewidth=2)
+            ]
+        for i in range(4):
+            geometry[f"joint{i}"] = [
+                Sphere(radius=radius, color="blue", opacity=0.9)
+            ]
+        return geometry
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         l3 = self.params["l3"]
@@ -558,15 +572,13 @@ class ThreeLinkManipulator3D(MechanicalSystem):
                 l1 - l2 * s2 - l3 * s23,
             ]
         )
-        return [
-            rod_between_transform(p0, p1),
-            rod_between_transform(p1, p2),
-            rod_between_transform(p2, p3),
-            point_transform(p0),
-            point_transform(p1),
-            point_transform(p2),
-            point_transform(p3),
-        ]
+        points = [p0, p1, p2, p3]
+        frames = {}
+        for i in range(3):
+            frames[f"link{i}"] = rod_between_transform(points[i], points[i + 1])
+        for i, point in enumerate(points):
+            frames[f"joint{i}"] = translation_matrix(point[0], point[1], point[2])
+        return frames
 
 
 class FiveLinkPlanarManipulator(MechanicalSystem):
@@ -614,17 +626,23 @@ class FiveLinkPlanarManipulator(MechanicalSystem):
         return J
 
     def get_kinematic_geometry(self):
-        return _planar_geometry(self.params["l"], include_torque=True)
+        return _planar_geometry(self.params["l"])
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         l = self.params["l"]
         q, _ = self.x2q(x)
         points, angles = _planar_joint_positions(q, l)
-        return (
-            _planar_link_transforms(points, angles)
-            + _planar_point_transforms(points)
-            + _planar_torque_transforms(points, angles, u, self.inputs["u"].upper_bound)
-        )
+        return _planar_tf(points, angles, x)
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        l = self.params["l"]
+        q, _ = self.x2q(x)
+        points, angles = _planar_joint_positions(q, l)
+        return {
+            "world": _planar_torque_geometry(
+                points, angles, u, self.inputs["u"].upper_bound
+            )
+        }
 
 
 if __name__ == "__main__":

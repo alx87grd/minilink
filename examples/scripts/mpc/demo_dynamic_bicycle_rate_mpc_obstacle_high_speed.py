@@ -13,13 +13,14 @@ from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
+from minilink.core.kinematics import identity_matrix
 from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
     HorizonPolyline,
     TrajectoryPolyline,
-    time_channel_matrix,
 )
+from minilink.graphical.animation.skins import merge_skins
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -237,17 +238,33 @@ class MpcHighSpeedObstacleBicycleRate(JaxDynamicBicycleRateInputs):
 
     def get_kinematic_geometry(self):
         vehicle = super().get_kinematic_geometry()
-        return [self._ref, self._obstacle, self._executed] + vehicle + [self._mpc_plan]
+        return merge_skins(
+            {"world": [self._ref, self._obstacle]},
+            vehicle,
+        )
 
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        return [
-            np.eye(4),
-            np.eye(4),
-            time_channel_matrix(t),
-            *vehicle,
-            time_channel_matrix(t),
-        ]
+    def tf(self, x, u, t=0, params=None):
+        frames = super().tf(x, u, t, params)
+        frames["world"] = identity_matrix(x)
+        return frames
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {
+            "world": [
+                CustomLine(
+                    self._executed.points_at(t),
+                    color=self._executed.color,
+                    linewidth=self._executed.linewidth,
+                    style=self._executed.style,
+                ),
+                CustomLine(
+                    self._mpc_plan.points_at(t),
+                    color=self._mpc_plan.color,
+                    linewidth=self._mpc_plan.linewidth,
+                    style=self._mpc_plan.style,
+                ),
+            ],
+        }
 
 
 mpc_anim_sys = MpcHighSpeedObstacleBicycleRate(

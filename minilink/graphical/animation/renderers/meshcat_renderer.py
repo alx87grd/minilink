@@ -17,10 +17,6 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
-    TorqueArrow,
-    TrajectoryPolyline,
-    extract_amplitude,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 from minilink.graphical.common.environment import is_blocking_needed
@@ -118,8 +114,6 @@ class MeshcatCanvas:
                 str(primitive.color),
                 float(primitive.linewidth),
             )
-        if isinstance(primitive, TorqueArrow):
-            return ("TorqueArrow", str(primitive.color), float(primitive.linewidth))
         if isinstance(primitive, Circle):
             return (
                 "Circle",
@@ -307,27 +301,6 @@ class MeshcatCanvas:
             self._has_head[i] = False
             return
 
-        if isinstance(primitive, TorqueArrow):
-            # Dynamic geometry updated each frame; ensure secondary head path exists.
-            path.set_object(
-                g.Line(
-                    g.PointsGeometry(np.zeros((3, 2), dtype=np.float32)),
-                    g.LineBasicMaterial(
-                        color=hex_color, linewidth=float(primitive.linewidth)
-                    ),
-                )
-            )
-            self._head_path(i).set_object(
-                g.Line(
-                    g.PointsGeometry(np.zeros((3, 2), dtype=np.float32)),
-                    g.LineBasicMaterial(
-                        color=hex_color, linewidth=float(primitive.linewidth)
-                    ),
-                )
-            )
-            self._has_head[i] = True
-            return
-
     def ensure_objects(self, primitives):
         n = len(primitives)
         if n != self._n_slots:
@@ -400,52 +373,12 @@ class MeshcatCanvas:
             path.set_transform(transform_matrix)
             return
 
-        if isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-            channel, T_rigid = extract_amplitude(transform_matrix)
-            local_pts = primitive.compute_pts(channel)
-            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (T_rigid @ local_pts_hom.T).T
-            hex_color = _color_to_meshcat_hex(primitive.color)
-            if isinstance(primitive, TorqueArrow):
-                arc_n = local_pts.shape[0] - 3
-                if arc_n >= 2 and hasattr(path, "set_object"):
-                    arc_verts = np.asarray(world_pts[:arc_n, :3], dtype=np.float32).T
-                    path.set_object(
-                        g.Line(
-                            g.PointsGeometry(arc_verts),
-                            g.LineBasicMaterial(
-                                color=hex_color, linewidth=float(primitive.linewidth)
-                            ),
-                        )
-                    )
-                    head_verts = np.asarray(world_pts[arc_n:, :3], dtype=np.float32).T
-                    self._head_path(i).set_object(
-                        g.Line(
-                            g.PointsGeometry(head_verts),
-                            g.LineBasicMaterial(
-                                color=hex_color, linewidth=float(primitive.linewidth)
-                            ),
-                        )
-                    )
-            elif local_pts.shape[0] >= 2 and hasattr(path, "set_object"):
-                verts = np.asarray(world_pts[:, :3], dtype=np.float32).T
-                path.set_object(
-                    g.Line(
-                        g.PointsGeometry(verts),
-                        g.LineBasicMaterial(
-                            color=hex_color, linewidth=float(primitive.linewidth)
-                        ),
-                    )
-                )
-            return
-
 
 def _rigid_effective_transform(primitive, transform_matrix, tf):
     """
     Return the 4x4 transform that ``MeshcatCanvas.update_primitive`` would apply
-    for the given rigid primitive, or ``None`` for primitives whose geometry is
-    rebuilt each frame (``TorqueArrow``, ``HorizonPolyline``, ``TrajectoryPolyline``)
-    and therefore cannot be rigid-keyframed.
+    for the given rigid primitive, or ``None`` if the primitive cannot be
+    rigid-keyframed.
     """
     if isinstance(primitive, Point):
         local_pt = np.append(primitive.pt, 1.0)
@@ -564,35 +497,25 @@ class MeshcatRenderer(AnimationRenderer):
         """
         import meshcat.animation as mcanim
 
-        self.canvas.ensure_objects(primitives)
+        template_frame = max(frames, key=lambda frame: len(frame["primitives"]))
+        self.canvas.ensure_objects(template_frame["primitives"])
 
-        # Draw t=0 once: this sets the (frozen) geometry of TorqueArrow and gives
-        # every rigid primitive a sane starting pose before keyframes kick in.
-        t0_transforms = frames[0]["transforms"]
-        has_dynamic = False
-        for i, (prim, T0) in enumerate(zip(primitives, t0_transforms)):
+        # Draw t=0 once before keyframes.
+        t0 = frames[0]
+        for i, (prim, T0) in enumerate(zip(t0["primitives"], t0["transforms"])):
             self.canvas.update_primitive(i, prim, T0)
-            if isinstance(prim, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-                has_dynamic = True
 
         animation_obj = mcanim.Animation(default_framerate=schedule.target_fps)
         tf = self.canvas._tf
 
         for frame_idx, frame in enumerate(frames):
-            for i, (prim, T) in enumerate(zip(primitives, frame["transforms"])):
+            for i, (prim, T) in enumerate(zip(frame["primitives"], frame["transforms"])):
                 T_eff = _rigid_effective_transform(prim, T, tf)
                 if T_eff is None:
                     continue
                 path_vis = self.canvas._base_path(i)
                 with animation_obj.at_frame(path_vis, frame_idx) as frame_vis:
                     frame_vis.set_transform(np.asarray(T_eff, dtype=float))
-
-        if has_dynamic:
-            print(
-                "Note: meshcat native animation freezes dynamic-geometry "
-                "primitives (e.g. TorqueArrow, HorizonPolyline, TrajectoryPolyline) at t=0; use "
-                "native=False for frame-accurate playback of those primitives."
-            )
 
         return animation_obj
 

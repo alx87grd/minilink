@@ -13,15 +13,10 @@ the same sweep scaling as the tutorial single pendulum in ``pendulum.py``.
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.kinematics import identity_matrix, pose2d_matrix
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-from minilink.graphical.animation.primitives import (
-    Circle,
-    CustomLine,
-    Rod,
-    TorqueArrow,
-    pose2d_matrix,
-    torque_pose2d_matrix,
-)
+from minilink.graphical.animation.legacy import legacy_torque_world
+from minilink.graphical.animation.primitives import Circle, CustomLine, Rod
 
 
 class DoublePendulum(MechanicalSystem):
@@ -148,26 +143,29 @@ class DoublePendulum(MechanicalSystem):
         l1 = self.params["l1"]
         l2 = self.l2
         radius = 0.08 * max(l1, l2)
-        torque_radius = 0.2 * max(l1, l2)
 
-        return [
-            CustomLine(
-                [
-                    [-self.ground_half_width, 0.0, 0.0],
-                    [self.ground_half_width, 0.0, 0.0],
-                ],
-                color="black",
-                style="--",
-            ),
-            Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            TorqueArrow(radius=torque_radius, head_ratio=0.4, color="red", linewidth=2),
-            TorqueArrow(radius=torque_radius, head_ratio=0.4, color="red", linewidth=2),
-        ]
+        return {
+            "world": [
+                CustomLine(
+                    [
+                        [-self.ground_half_width, 0.0, 0.0],
+                        [self.ground_half_width, 0.0, 0.0],
+                    ],
+                    color="black",
+                    style="--",
+                )
+            ],
+            "link0": [
+                Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2),
+                Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
+            ],
+            "link1": [
+                Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2),
+                Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
+            ],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         q = x[: self.dof]
         l1 = self.params["l1"]
         l2 = self.l2
@@ -183,18 +181,37 @@ class DoublePendulum(MechanicalSystem):
         theta12 = np.pi - (q[0] + q[1])
         rod1_angle = np.pi / 2.0 - q[0]
         rod2_angle = np.pi / 2.0 - q[0] - q[1]
+        return {
+            "world": identity_matrix(x),
+            "link0": pose2d_matrix(p0[0], p0[1], theta1),
+            "link1": pose2d_matrix(p1[0], p1[1], theta12),
+            "joint0": pose2d_matrix(p0[0], p0[1], rod1_angle),
+            "joint1": pose2d_matrix(p1[0], p1[1], rod2_angle),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        q = x[: self.dof]
+        l1 = self.params["l1"]
+        l2 = self.l2
+        _, s1, _, _, c12, s12 = self._trig(q)
+        c1 = np.cos(q[0])
+        p0 = np.array([0.0, 0.0])
+        p1 = np.array([l1 * s1, l1 * c1])
+        rod1_angle = np.pi / 2.0 - q[0]
+        rod2_angle = np.pi / 2.0 - q[0] - q[1]
         u_lim = float(self.inputs["u"].upper_bound[0])
         torque_scale = 2.0 * np.pi / 3.0 / u_lim
-
-        return [
-            pose2d_matrix(0.0, 0.0, 0.0),
-            pose2d_matrix(p0[0], p0[1], theta1),
-            pose2d_matrix(p1[0], p1[1], 0.0),
-            pose2d_matrix(p1[0], p1[1], theta12),
-            pose2d_matrix(p2[0], p2[1], 0.0),
-            torque_pose2d_matrix(p0[0], p0[1], rod1_angle, -u[0] * torque_scale),
-            torque_pose2d_matrix(p1[0], p1[1], rod2_angle, -u[1] * torque_scale),
-        ]
+        torque_radius = 0.2 * max(self.params["l1"], self.l2)
+        return {
+            "world": [
+                legacy_torque_world(
+                    p0[0], p0[1], rod1_angle, -u[0] * torque_scale, torque_radius
+                ),
+                legacy_torque_world(
+                    p1[0], p1[1], rod2_angle, -u[1] * torque_scale, torque_radius
+                ),
+            ],
+        }
 
 
 class Acrobot(DoublePendulum):
@@ -217,15 +234,31 @@ class Acrobot(DoublePendulum):
         xp = array_module(q)
         return xp.array([[0.0], [1.0]])
 
-    def get_kinematic_transforms(self, x, u, t):
-        transforms = super().get_kinematic_transforms(x, np.array([0.0, u[0]]), t)
-        return transforms[:-2] + transforms[-1:]
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        q = x[: self.dof]
+        l1 = self.params["l1"]
+        l2 = self.l2
+        c1, s1, _, _, _, _ = self._trig(q)
+        p1 = np.array([l1 * s1, l1 * c1])
+        rod2_angle = np.pi / 2.0 - q[0] - q[1]
+        u_lim = float(self.inputs["u"].upper_bound[0])
+        torque_scale = 2.0 * np.pi / 3.0 / u_lim
+        torque_radius = 0.2 * max(self.params["l1"], self.l2)
+        return {
+            "world": [
+                legacy_torque_world(
+                    p1[0], p1[1], rod2_angle, -u[0] * torque_scale, torque_radius
+                )
+            ],
+        }
+
+    def tf(self, x, u, t=0, params=None):
+        frames = super().tf(x, u, t, params)
+        return {key: frames[key] for key in ("world", "link0", "link1", "joint1")}
 
     def get_kinematic_geometry(self):
-        return (
-            super().get_kinematic_geometry()[:-2]
-            + super().get_kinematic_geometry()[-1:]
-        )
+        geometry = super().get_kinematic_geometry()
+        return {key: geometry[key] for key in ("world", "link0", "link1")}
 
 
 if __name__ == "__main__":

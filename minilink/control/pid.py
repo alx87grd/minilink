@@ -151,7 +151,4 @@ class FilteredPIDController(DynamicSystem):
         return xp.array([u])
 
     def get_kinematic_geometry(self):
-        return []
-
-    def get_kinematic_transforms(self, x, u, t):
-        return []
+        return {}

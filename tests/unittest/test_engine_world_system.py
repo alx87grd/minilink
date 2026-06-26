@@ -72,9 +72,12 @@ class TestPhysicsSystemMinilink(unittest.TestCase):
 
     def test_geometry_transform_contract(self):
         sys = self._make_sys()
-        prim = sys.get_kinematic_geometry()
-        T = sys.get_kinematic_transforms(sys.x0, np.zeros(sys.m), 0.0)
-        self.assertEqual(len(prim), len(T))
+        geometry = sys.get_kinematic_geometry()
+        frames = sys.tf(sys.x0, np.zeros(sys.m), 0.0)
+        for key in geometry:
+            self.assertIn(key, frames)
+            for transform in (frames[key],):
+                self.assertEqual(np.asarray(transform).shape, (4, 4))
 
     def test_compile_jax_parity_one_step(self):
         sys = self._make_sys()
