@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from minilink.core.backends import array_module
 from minilink.planning.spatial.paths import ReferencePath
 from minilink.planning.spatial.robot import RobotBody
@@ -51,6 +53,26 @@ class ReferenceTrack:
         """Positive when ``p`` lies inside the corridor: ``half_width - distance``."""
         xp = array_module(p)
         return xp.asarray(self.half_width) - self.path.distance(p, t=t, params=params)
+
+    def sample_boundaries(self, n_samples=200):
+        """
+        Sample the centerline and corridor edges along the path.
+
+        Returns ``(center, upper, lower)``, each an ``(n_samples, 2)`` array.
+        This is the single source for the corridor geometry drawn by both
+        :func:`~minilink.planning.spatial.plotting.plot_track` and the animation
+        ``SceneOverlay``, so the plot and the animation never drift apart.
+        """
+        if self.path.workspace_dim != 2:
+            raise ValueError("sample_boundaries supports 2-D paths only")
+
+        ss = np.linspace(0.0, self.path.total_length, n_samples)
+        center = np.array([self.path.sample(s) for s in ss])
+        tangents = np.array([self.path.tangent(s) for s in ss])
+        normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
+
+        half = float(self.half_width)
+        return center, center + half * normals, center - half * normals
 
     def distance_field(self, robot: RobotBody) -> StateField:
         from minilink.planning.spatial.state_fields import PathDistanceField

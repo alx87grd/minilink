@@ -15,6 +15,7 @@ gradient-based trajectory optimization.
 import numpy as np
 
 from minilink.core.backends import require_jax_numpy
+from minilink.core.kinematics import se2
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -27,6 +28,7 @@ from minilink.graphical.animation.primitives import (
     scale_pose2d_matrix,
     translation_matrix,
 )
+from minilink.graphical.animation.skin import Skin
 
 
 class LinearTire:
@@ -266,83 +268,31 @@ class DynamicBicycle(DynamicSystem):
             scale=self.camera_scale,
         )
 
-    def get_kinematic_geometry(self):
-        a = self.params["a"]
-        b = self.params["b"]
-        wl, ww = self.wheel_len, self.wheel_width
-        chassis = CustomLine(
-            np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]]),
-            color="black",
-            linewidth=2,
-        )
-        wpts = _wheel_rectangle_pts(wl, ww)
-        rear_w = CustomLine(wpts, color="black", linewidth=1)
-        front_w = CustomLine(wpts, color="black", linewidth=1)
-        arr_v = Arrow(color="blue", linewidth=2, origin="base")
-        arr_f = Arrow(color="red", linewidth=2, origin="base")
-        return [chassis, rear_w, front_w, arr_v, arr_v, arr_f, arr_f]
+    def frames(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        a, b = params["a"], params["b"]
+        _, delta = self.get_port_values_from_u(u, "w_rear", "delta")
 
-    def get_kinematic_transforms(self, x, u, t):
-        a = self.params["a"]
-        b = self.params["b"]
-        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
-        vb = x[3:6]
+        # chassis at (X, Y, Theta); axles offset along the body x-axis,
+        # the front one steered by delta
+        T_wb = se2(x[0], x[1], x[2])
+        return {
+            "base": T_wb,
+            "rear_axle": T_wb @ se2(-b, 0.0, 0.0),
+            "front_axle": T_wb @ se2(a, 0.0, delta[0]),
+        }
+
+    def tire_command(self, x, u):
+        """``[w_rear, delta]`` driving the tire model and steering.
+
+        Sourced from the input ports here; rate-input variants read it from the
+        state instead.
+        """
         w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
-        u_in = np.array([w_rear[0], delta[0]])
-        delta = float(u_in[1])
+        return np.array([w_rear[0], delta[0]])
 
-        T_wb = pose2d_matrix(X, Y, Theta)
-        T_rear = T_wb @ pose2d_matrix(-b, 0.0, 0.0)
-        T_front = T_wb @ pose2d_matrix(a, 0.0, delta)
-
-        v_scale = 0.2
-        f_scale = 0.001
-
-        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + a * wr])
-        v_r_loc = np.array([uu, vv - b * wr])
-
-        def _world_arrow_pose(dx, dy, px, py):
-            mag = v_scale * np.hypot(dx, dy)
-            if mag < 1e-9:
-                mag = 1e-9
-            th = np.arctan2(dy, dx)
-            return scale_pose2d_matrix(px, py, th, mag)
-
-        c, s = np.cos(Theta), np.sin(Theta)
-        rx = X + c * (-b) - s * 0.0
-        ry = Y + s * (-b) + c * 0.0
-        fx = X + c * a - s * 0.0
-        fy = Y + s * a + c * 0.0
-
-        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
-        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
-
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
-        cd, sd = np.cos(delta), np.sin(delta)
-        Fxf_b = Fx_f * cd - Fy_f * sd
-        Fyf_b = Fx_f * sd + Fy_f * cd
-        Ffx_w = c * Fxf_b - s * Fyf_b
-        Ffy_w = s * Fxf_b + c * Fyf_b
-        Frx_w = c * Fx_r - s * Fy_r
-        Fry_w = s * Fx_r + c * Fy_r
-
-        def _force_pose(Fx, Fy, px, py):
-            mag = f_scale * np.hypot(Fx, Fy)
-            if mag < 1e-12:
-                mag = 1e-12
-            th = np.arctan2(Fy, Fx)
-            return scale_pose2d_matrix(px, py, th, mag)
-
-        return [
-            T_wb,
-            T_rear,
-            T_front,
-            _world_arrow_pose(vrx, vry, rx, ry),
-            _world_arrow_pose(vfx, vfy, fx, fy),
-            _force_pose(Frx_w, Fry_w, rx, ry),
-            _force_pose(Ffx_w, Ffy_w, fx, fy),
-        ]
+    def default_skin(self):
+        return bicycle_skin(self)
 
 
 class DynamicBicycleCar3D(DynamicBicycle):
@@ -769,67 +719,100 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
 
         return jnp.concatenate([dq, dv, u])
 
-    def get_kinematic_transforms(self, x, u, t):
-        a = self.params["a"]
-        b = self.params["b"]
+    def frames(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        a, b = params["a"], params["b"]
 
-        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
-        vb = x[3:6]
-        u_in = x[6:8]
+        # rate-input variant: steering angle delta is the state x[7]
+        T_wb = se2(x[0], x[1], x[2])
+        return {
+            "base": T_wb,
+            "rear_axle": T_wb @ se2(-b, 0.0, 0.0),
+            "front_axle": T_wb @ se2(a, 0.0, x[7]),
+        }
+
+    def tire_command(self, x, u):
+        # rate-input variant: [w_rear, delta] is carried in the state
+        return np.asarray(x[6:8])
+
+
+# Visual skin (attached via DynamicBicycle.default_skin)
+
+
+def bicycle_skin(sys):
+    """Chassis + wheels + velocity/force arrows attached to the bicycle frames.
+
+    Rigid parts ride the ``base``/``rear_axle``/``front_axle`` frames; the blue
+    velocity and red tire-force arrows are rebuilt each frame from the state and
+    the tire model.
+    """
+    a, b = sys.params["a"], sys.params["b"]
+    wl, ww = sys.wheel_len, sys.wheel_width
+    wpts = _wheel_rectangle_pts(wl, ww)
+
+    skin = Skin()
+    skin.add(
+        CustomLine(
+            np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]]), color="black", linewidth=2
+        )
+    )
+    skin.add(CustomLine(wpts, color="black", linewidth=1), frame="rear_axle")
+    skin.add(CustomLine(wpts, color="black", linewidth=1), frame="front_axle")
+    skin.add_dynamic(
+        Arrow(color="blue", linewidth=2, origin="base"),
+        lambda frames, x, u, t, params: _velocity_arrow_pose(x, "rear", a, b),
+    )
+    skin.add_dynamic(
+        Arrow(color="blue", linewidth=2, origin="base"),
+        lambda frames, x, u, t, params: _velocity_arrow_pose(x, "front", a, b),
+    )
+    skin.add_dynamic(
+        Arrow(color="red", linewidth=2, origin="base"),
+        lambda frames, x, u, t, params: _force_arrow_pose(
+            sys, x, sys.tire_command(x, u), "rear", a, b
+        ),
+    )
+    skin.add_dynamic(
+        Arrow(color="red", linewidth=2, origin="base"),
+        lambda frames, x, u, t, params: _force_arrow_pose(
+            sys, x, sys.tire_command(x, u), "front", a, b
+        ),
+    )
+    return skin
+
+
+def _velocity_arrow_pose(x, axle, a, b):
+    """World pose of the body-velocity arrow at the rear or front axle."""
+    X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+    uu, vv, wr = float(x[3]), float(x[4]), float(x[5])
+    c, s = np.cos(Theta), np.sin(Theta)
+
+    off, vy_loc = (-b, vv - b * wr) if axle == "rear" else (a, vv + a * wr)
+    px, py = X + c * off, Y + s * off
+    dx, dy = c * uu - s * vy_loc, s * uu + c * vy_loc
+
+    mag = max(0.2 * np.hypot(dx, dy), 1e-9)
+    return scale_pose2d_matrix(px, py, np.arctan2(dy, dx), mag)
+
+
+def _force_arrow_pose(sys, x, u_in, axle, a, b):
+    """World pose of the tire-force arrow at the rear or front axle."""
+    X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+    c, s = np.cos(Theta), np.sin(Theta)
+    Fx_f, Fy_f, Fx_r, Fy_r = sys.compute_tire_physics(x[3:6], u_in)
+
+    if axle == "rear":
+        px, py = X + c * (-b), Y + s * (-b)
+        Fx_w, Fy_w = c * Fx_r - s * Fy_r, s * Fx_r + c * Fy_r
+    else:
+        px, py = X + c * a, Y + s * a
         delta = float(u_in[1])
-
-        T_wb = pose2d_matrix(X, Y, Theta)
-        T_rear = T_wb @ pose2d_matrix(-b, 0.0, 0.0)
-        T_front = T_wb @ pose2d_matrix(a, 0.0, delta)
-
-        v_scale = 0.2
-        f_scale = 0.001
-
-        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + a * wr])
-        v_r_loc = np.array([uu, vv - b * wr])
-
-        def _world_arrow_pose(dx, dy, px, py):
-            mag = v_scale * np.hypot(dx, dy)
-            if mag < 1e-9:
-                mag = 1e-9
-            th = np.arctan2(dy, dx)
-            return scale_pose2d_matrix(px, py, th, mag)
-
-        c, s = np.cos(Theta), np.sin(Theta)
-        rx = X + c * (-b) - s * 0.0
-        ry = Y + s * (-b) + c * 0.0
-        fx = X + c * a - s * 0.0
-        fy = Y + s * a + c * 0.0
-
-        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
-        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
-
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
         cd, sd = np.cos(delta), np.sin(delta)
-        Fxf_b = Fx_f * cd - Fy_f * sd
-        Fyf_b = Fx_f * sd + Fy_f * cd
-        Ffx_w = c * Fxf_b - s * Fyf_b
-        Ffy_w = s * Fxf_b + c * Fyf_b
-        Frx_w = c * Fx_r - s * Fy_r
-        Fry_w = s * Fx_r + c * Fy_r
+        Fxf_b, Fyf_b = Fx_f * cd - Fy_f * sd, Fx_f * sd + Fy_f * cd
+        Fx_w, Fy_w = c * Fxf_b - s * Fyf_b, s * Fxf_b + c * Fyf_b
 
-        def _force_pose(Fx, Fy, px, py):
-            mag = f_scale * np.hypot(Fx, Fy)
-            if mag < 1e-12:
-                mag = 1e-12
-            th = np.arctan2(Fy, Fx)
-            return scale_pose2d_matrix(px, py, th, mag)
-
-        return [
-            T_wb,
-            T_rear,
-            T_front,
-            _world_arrow_pose(vrx, vry, rx, ry),
-            _world_arrow_pose(vfx, vfy, fx, fy),
-            _force_pose(Frx_w, Fry_w, rx, ry),
-            _force_pose(Ffx_w, Ffy_w, fx, fy),
-        ]
+    mag = max(0.001 * np.hypot(Fx_w, Fy_w), 1e-12)
+    return scale_pose2d_matrix(px, py, np.arctan2(Fy_w, Fx_w), mag)
 
 
 if __name__ == "__main__":

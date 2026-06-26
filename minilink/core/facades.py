@@ -384,6 +384,7 @@ class SystemFacades:
         native: bool = True,
         scene_title: str | None = None,
         show: bool = True,
+        overlay=None,
     ):
         """
         Convenience shortcut to animate a trajectory of this system.
@@ -423,6 +424,7 @@ class SystemFacades:
             renderer=renderer,
             native=native,
             scene_title=scene_title,
+            overlay=overlay,
         )
 
         # For html output, return the IPython.display.HTML object and let the

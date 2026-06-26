@@ -12,15 +12,12 @@ from minilink.graphical.animation.primitives import (
     Box,
     Circle,
     CustomLine,
+    DynamicPrimitive,
     ExtrudedPolygon,
     Plane,
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
-    TorqueArrow,
-    TrajectoryPolyline,
-    extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
@@ -343,8 +340,11 @@ class PlotlyRenderer(AnimationRenderer):
         self.show = show
         self.title = title
 
-    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
-        traces = self._traces_for_frame(primitives, transforms, camera)
+    def draw_frame(self, primitives, transforms, frame, camera) -> None:
+        t = frame["t"]
+        traces = self._traces_for_frame(
+            primitives, transforms, camera, frame["x"], frame["u"], t
+        )
         title = self.title or f"{self.sys.name} — t = {t:.2f} s"
         self.fig = self._build_figure(traces, camera, title=title)
 
@@ -391,6 +391,9 @@ class PlotlyRenderer(AnimationRenderer):
                 primitives,
                 frame["transforms"],
                 frame["camera"],
+                frame["x"],
+                frame["u"],
+                frame["t"],
             )
             for frame in frames
         ]
@@ -591,7 +594,7 @@ class PlotlyRenderer(AnimationRenderer):
             },
         }
 
-    def _traces_for_frame(self, primitives, transforms, camera):
+    def _traces_for_frame(self, primitives, transforms, camera, x=None, u=None, t=0.0):
         go = _import_plotly()
         if self.is_3d or _camera_is_world_xy(camera):
             draw_transforms = transforms
@@ -599,11 +602,11 @@ class PlotlyRenderer(AnimationRenderer):
             W = world_to_camera(camera)
             draw_transforms = [W @ T for T in transforms]
         return [
-            self._trace_for_primitive(go, prim, T, i)
+            self._trace_for_primitive(go, prim, T, i, x, u, t)
             for i, (prim, T) in enumerate(zip(primitives, draw_transforms))
         ]
 
-    def _trace_for_primitive(self, go, primitive, T, index: int):
+    def _trace_for_primitive(self, go, primitive, T, index: int, x=None, u=None, t=0.0):
         color = _plotly_color(getattr(primitive, "color", "black"))
         width = max(1.0, float(getattr(primitive, "linewidth", 1.0)))
         dash = _plotly_dash(getattr(primitive, "style", "-"))
@@ -637,9 +640,8 @@ class PlotlyRenderer(AnimationRenderer):
                 is_3d=self.is_3d,
             )
 
-        if isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-            channel, T_rigid = extract_amplitude(T)
-            pts = _transform_points(primitive.compute_pts(channel), T_rigid)
+        if isinstance(primitive, DynamicPrimitive):
+            pts = _transform_points(primitive.compute_pts(x, u, t), T)
             return _line_trace(
                 go,
                 x=pts[:, 0],

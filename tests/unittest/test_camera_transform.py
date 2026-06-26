@@ -130,7 +130,8 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         camera = camera_matrix(target=(10.0, 3.0, 0.0), scale=4.0)
 
         backend.open_scene(is_3d=False, show=False, camera=camera)
-        backend.draw_frame([Point()], [translation_matrix(10.0, 3.0, 0.0)], 0.0, camera)
+        frame = {"x": np.array([]), "u": np.array([]), "t": 0.0}
+        backend.draw_frame([Point()], [translation_matrix(10.0, 3.0, 0.0)], frame, camera)
 
         self.assertEqual(backend.ax.get_xlim(), (6.0, 14.0))
         self.assertEqual(backend.ax.get_ylim(), (-1.0, 7.0))

@@ -24,13 +24,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
-from minilink.graphical.animation.primitives import (
-    Circle,
-    CustomLine,
-    HorizonPolyline,
-    TrajectoryPolyline,
-    time_channel_matrix,
-)
+from minilink.graphical.animation.scene_overlay import SceneOverlay
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
@@ -110,24 +104,6 @@ W_REAR_DOT_MAX = 80.0
 DELTA_DOT_MAX = 2.0
 CAMERA_SCALE = 18.0
 PLOT_MARGIN = 3.0
-TRACK_ANIM_SAMPLES = 220
-
-
-def _sample_track_boundaries(track, n_samples=TRACK_ANIM_SAMPLES):
-    """Centerline plus corridor upper/lower edges (same geometry as ``plot_track``)."""
-    path = track.path
-    ss = np.linspace(0.0, path.total_length, n_samples)
-    center = np.array([path.sample(s) for s in ss])
-    tangents = np.array([path.tangent(s) for s in ss])
-    normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
-    half = float(track.half_width)
-    upper = center + half * normals
-    lower = center - half * normals
-    return center, upper, lower
-
-
-def _line3(xy):
-    return np.hstack([xy, np.zeros((xy.shape[0], 1))])
 
 
 def _quarter_arc_waypoints(cx, cy, radius, angle_start, n=10):
@@ -433,68 +409,14 @@ fig.tight_layout()
 plt.show()
 
 
-class MpcWideCircuitLapBicycleRate(JaxDynamicBicycleRateInputs):
-    def __init__(
-        self, track, mpc_plans, executed_traj, *, obstacle_centers, keepout_radius
-    ):
-        super().__init__()
-        center, upper, lower = _sample_track_boundaries(track)
-        self._upper = CustomLine(
-            _line3(upper), color="#98df8a", linewidth=1.2, style="-"
-        )
-        self._lower = CustomLine(
-            _line3(lower), color="#98df8a", linewidth=1.2, style="-"
-        )
-        self._centerline = CustomLine(
-            _line3(center), color="#2ca02c", linewidth=2.0, style="-"
-        )
-        self._obstacles = [
-            Circle(
-                radius=keepout_radius,
-                center=(cx, cy, 0.0),
-                color="tab:red",
-                fill=True,
-            )
-            for cx, cy in obstacle_centers
-        ]
-        self._executed = TrajectoryPolyline(
-            executed_traj, window="prefix", color="b", style="--", linewidth=1.0
-        )
-        self._mpc_plan = HorizonPolyline(
-            mpc_plans, color="tab:orange", linewidth=2.0, style="--"
-        )
-
-    def get_kinematic_geometry(self):
-        vehicle = super().get_kinematic_geometry()
-        return (
-            [self._upper, self._lower]  # , self._centerline]
-            + self._obstacles
-            + [self._executed]
-            + vehicle
-            + [self._mpc_plan]
-        )
-
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        n_obstacles = len(self._obstacles)
-        return (
-            [np.eye(4)] * 2  # * 3
-            + [np.eye(4)] * n_obstacles
-            + [time_channel_matrix(t)]
-            + list(vehicle)
-            + [time_channel_matrix(t)]
-        )
-
-
-mpc_anim_sys = MpcWideCircuitLapBicycleRate(
-    loop_track,
-    mpc_plans,
-    traj,
-    obstacle_centers=OBSTACLE_CENTERS,
-    keepout_radius=keepout_radius,
+sys_sim.camera_scale = CAMERA_SCALE
+sys_sim.traj = traj
+sys_sim.plot_trajectory(signals=("x", "u"))
+sys_sim.animate(
+    overlay=SceneOverlay(
+        track=loop_track,
+        obstacles=[(center, keepout_radius) for center in OBSTACLE_CENTERS],
+        mpc_plans=mpc_plans,
+        executed=traj,
+    )
 )
-mpc_anim_sys.params = dict(sys_sim.params)
-mpc_anim_sys.camera_scale = CAMERA_SCALE
-mpc_anim_sys.traj = traj
-mpc_anim_sys.plot_trajectory(signals=("x", "u"))
-mpc_anim_sys.animate()

@@ -28,13 +28,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
-from minilink.graphical.animation.primitives import (
-    Circle,
-    CustomLine,
-    HorizonPolyline,
-    TrajectoryPolyline,
-    time_channel_matrix,
-)
+from minilink.graphical.animation.scene_overlay import SceneOverlay
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.robot import point
@@ -226,66 +220,17 @@ import matplotlib.pyplot as plt
 plt.show()
 
 
-class MpcObstacleBicycleRate(JaxDynamicBicycleRateInputs):
-    def __init__(
-        self, mpc_plans, executed_traj, *, obstacle_centers, keepout_radius, x_pad
-    ):
-        super().__init__()
-        x_lo = float(executed_traj.x[0, 0]) - x_pad
-        x_hi = float(executed_traj.x[0, -1]) + x_pad
-        self._ref = CustomLine(
-            np.array([[x_lo, 0.0, 0.0], [x_hi, 0.0, 0.0]]),
-            color="k",
-            linewidth=1.0,
-            style="--",
-        )
-        self._obstacles = [
-            Circle(
-                radius=keepout_radius,
-                center=(cx, cy, 0.0),
-                color="tab:red",
-                fill=True,
-            )
-            for cx, cy in obstacle_centers
-        ]
-        self._executed = TrajectoryPolyline(
-            executed_traj, window="prefix", color="b", style="--", linewidth=1.0
-        )
-        self._mpc_plan = HorizonPolyline(
-            mpc_plans, color="tab:orange", linewidth=2.0, style="--"
-        )
+x_lo = float(traj.x[0, 0]) - REF_X_PAD
+x_hi = float(traj.x[0, -1]) + REF_X_PAD
 
-    def get_kinematic_geometry(self):
-        vehicle = super().get_kinematic_geometry()
-        return (
-            [self._ref]
-            + self._obstacles
-            + [self._executed]
-            + vehicle
-            + [self._mpc_plan]
-        )
-
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        n_obstacles = len(self._obstacles)
-        return (
-            [np.eye(4)]
-            + [np.eye(4)] * n_obstacles
-            + [time_channel_matrix(t)]
-            + list(vehicle)
-            + [time_channel_matrix(t)]
-        )
-
-
-mpc_anim_sys = MpcObstacleBicycleRate(
-    mpc_plans,
-    traj,
-    obstacle_centers=OBSTACLE_CENTERS,
-    keepout_radius=keepout_radius,
-    x_pad=REF_X_PAD,
+sys_sim.camera_scale = CAMERA_SCALE
+sys_sim.traj = traj
+sys_sim.plot_trajectory(signals=("x", "u"))
+sys_sim.animate(
+    overlay=SceneOverlay(
+        scene=scene,
+        ref_line=((x_lo, 0.0), (x_hi, 0.0)),
+        mpc_plans=mpc_plans,
+        executed=traj,
+    )
 )
-mpc_anim_sys.params = dict(sys_sim.params)
-mpc_anim_sys.camera_scale = CAMERA_SCALE
-mpc_anim_sys.traj = traj
-mpc_anim_sys.plot_trajectory(signals=("x", "u"))
-mpc_anim_sys.animate()

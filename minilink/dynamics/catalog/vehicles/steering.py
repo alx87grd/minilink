@@ -15,6 +15,7 @@ from minilink.graphical.animation.primitives import (
     vehicle_body,
     wheel_box,
 )
+from minilink.graphical.animation.skin import Skin
 
 
 class KinematicBicycle(DynamicSystem):
@@ -218,17 +219,8 @@ class HolonomicMobileRobot(DynamicSystem):
     def get_camera_transform(self, x, u, t):
         return follow_xy_camera(x[0], x[1], self.camera_scale)
 
-    def get_kinematic_geometry(self):
-        return [
-            Circle(radius=0.25, center=[0.0, 0.0, 0.0], color="blue", fill=True),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            translation_matrix(x[0], x[1], 0.0),
-            arrow_transform(x[0], x[1], u[0], u[1], scale=0.4),
-        ]
+    def default_skin(self):
+        return holonomic_skin(self)
 
 
 class HolonomicMobileRobot3D(DynamicSystem):
@@ -290,6 +282,17 @@ class UdeSRacecar(KinematicCar):
         self.tire_length = 0.04
         self.tire_width = 0.015
         self.camera_scale = 2.0 * self.params["length"]
+
+
+# Visual skin (attached via HolonomicMobileRobot.default_skin)
+
+
+def holonomic_skin(sys, radius=0.25):
+    """Filled disc at the robot position with a velocity arrow from ``u``."""
+    skin = Skin()
+    skin.add(Circle(radius=radius, center=[0.0, 0.0, 0.0], color="blue", fill=True))
+    skin.add_arrow(frame="base", source="u", index=(0, 1), scale=0.4, color="red")
+    return skin
 
 
 if __name__ == "__main__":

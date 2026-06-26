@@ -78,7 +78,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         backend.draw_frame(
             sys.get_kinematic_geometry(),
             frame["transforms"],
-            0.0,
+            frame,
             frame["camera"],
         )
         fig = backend.present(block=False)
@@ -105,7 +105,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         backend.draw_frame(
             [Point()],
             [translation_matrix(10.0, 3.0, 0.0)],
-            0.0,
+            {"x": np.array([]), "u": np.array([]), "t": 0.0},
             camera,
         )
         fig = backend.present(block=False)
@@ -130,7 +130,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         backend.draw_frame(
             sys.get_kinematic_geometry(),
             frame["transforms"],
-            0.0,
+            frame,
             frame["camera"],
         )
         fig = backend.present(block=False)
@@ -187,11 +187,15 @@ class TestPlotlyRenderer(unittest.TestCase):
         backend = PlotlyRenderer(Animator(sys))
         frames = [
             {
+                "x": np.array([]),
+                "u": np.array([]),
                 "t": 0.0,
                 "transforms": [translation_matrix(0.0, 0.0, 0.0)],
                 "camera": camera_matrix(target=(0.0, 0.0, 0.0), scale=2.0),
             },
             {
+                "x": np.array([]),
+                "u": np.array([]),
                 "t": 0.1,
                 "transforms": [translation_matrix(10.0, 3.0, 0.0)],
                 "camera": camera_matrix(target=(10.0, 3.0, 0.0), scale=2.0),

@@ -14,15 +14,13 @@ from minilink.graphical.animation.primitives import (
     Box,
     Circle,
     CustomLine,
+    DynamicPrimitive,
     ExtrudedPolygon,
     Plane,
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
     TorqueArrow,
-    TrajectoryPolyline,
-    extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
@@ -80,7 +78,7 @@ class MatplotlibCanvas:
         self.is_3d = is_3d
         self.drawn_objects = []
 
-    def draw_primitive(self, primitive, transform_matrix):
+    def draw_primitive(self, primitive, transform_matrix, x=None, u=None, t=0.0):
         if isinstance(primitive, Point):
             local_pt = np.append(primitive.pt, 1.0)
             world_pt = transform_matrix @ local_pt
@@ -168,11 +166,10 @@ class MatplotlibCanvas:
                 )
             self.drawn_objects.append(obj)
 
-        elif isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-            channel, T_rigid = extract_amplitude(transform_matrix)
-            local_pts = primitive.compute_pts(channel)
+        elif isinstance(primitive, DynamicPrimitive):
+            local_pts = primitive.compute_pts(x, u, t)
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (T_rigid @ local_pts_hom.T).T
+            world_pts = (transform_matrix @ local_pts_hom.T).T
 
             if isinstance(primitive, TorqueArrow):
                 arc_n = local_pts.shape[0] - 3
@@ -472,8 +469,9 @@ class MatplotlibRenderer(AnimationRenderer):
         if title:
             self.ax.set_title(title, fontsize=FONT_SIZE)
 
-    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
+    def draw_frame(self, primitives, transforms, frame, camera) -> None:
         self.canvas.clear()
+        x, u, t = frame["x"], frame["u"], frame["t"]
         # Normal 2D XY views keep geometry in world coordinates and move only the
         # axis limits, matching Pyro's dynamic-domain behavior. Other 2D axis
         # pairs still project onto the selected camera plane.
@@ -485,7 +483,7 @@ class MatplotlibRenderer(AnimationRenderer):
             W = world_to_camera(camera)
             draw_transforms = [W @ T for T in transforms]
         for prim, T in zip(primitives, draw_transforms):
-            self.canvas.draw_primitive(prim, T)
+            self.canvas.draw_primitive(prim, T, x, u, t)
         # 2D: refresh orthographic limits and axis labels from *camera* each frame.
         # 3D: *camera* was applied once in ``open_scene``; keep mpl toolbars / mouse
         # orbit from being reset every frame.
@@ -538,7 +536,7 @@ class MatplotlibRenderer(AnimationRenderer):
                 W = world_to_camera(camera)
                 draw_transforms = [W @ T for T in frame["transforms"]]
             for prim, T in zip(primitives, draw_transforms):
-                canvas.draw_primitive(prim, T)
+                canvas.draw_primitive(prim, T, frame["x"], frame["u"], frame["t"])
             if not is_3d:
                 self._apply_camera(ax, camera, False)
             ax.set_title(f"Time = {frame['t']:.2f} s", fontsize=FONT_SIZE)

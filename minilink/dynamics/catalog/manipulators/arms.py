@@ -12,7 +12,6 @@ from minilink.graphical.animation.primitives import (
     point_transform,
     pose2d_matrix,
     rod_between_transform,
-    torque_pose2d_matrix,
 )
 
 
@@ -27,7 +26,9 @@ def _planar_joint_positions(q, lengths):
     return np.asarray(points), angles
 
 
-def _planar_geometry(lengths, *, include_velocity=False, include_torque=False):
+def _planar_geometry(
+    lengths, *, include_velocity=False, include_torque=False, upper_bound=None
+):
     radius = 0.08 * max(float(np.max(lengths)), 1e-12)
     geometry = [
         Rod(
@@ -43,15 +44,20 @@ def _planar_geometry(lengths, *, include_velocity=False, include_torque=False):
         geometry.append(Arrow(color="green", linewidth=2, origin="tail"))
     if include_torque:
         torque_radius = 0.2 * max(float(np.max(lengths)), 1e-12)
-        geometry.extend(
-            TorqueArrow(
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
+        for i in range(len(lengths)):
+            limit = float(abs(upper_bound[i])) if np.isfinite(upper_bound[i]) else 5.0
+            limit = max(limit, 1.0)
+            geometry.append(
+                TorqueArrow(
+                    radius=torque_radius,
+                    head_ratio=0.4,
+                    color="red",
+                    linewidth=2,
+                    sweep=lambda x, u, t, _i=i, _lim=limit: (
+                        u[_i] * (2.0 * np.pi / 3.0) / _lim
+                    ),
+                )
             )
-            for _ in lengths
-        )
     return geometry
 
 
@@ -77,15 +83,11 @@ def _planar_velocity_transform(q, dq, effector, jacobian):
     )
 
 
-def _planar_torque_transforms(points, angles, u, upper_bound):
-    transforms = []
-    for i, (point, angle) in enumerate(zip(points[:-1], angles)):
-        limit = float(abs(upper_bound[i])) if np.isfinite(upper_bound[i]) else 5.0
-        limit = max(limit, 1.0)
-        sweep = u[i] * (2.0 * np.pi / 3.0) / limit
-        start_angle = np.pi / 2.0 - angle
-        transforms.append(torque_pose2d_matrix(point[0], point[1], start_angle, sweep))
-    return transforms
+def _planar_torque_transforms(points, angles):
+    return [
+        pose2d_matrix(point[0], point[1], np.pi / 2.0 - angle)
+        for point, angle in zip(points[:-1], angles)
+    ]
 
 
 class SpeedControlledManipulator(DynamicSystem):
@@ -208,7 +210,11 @@ class OneLinkManipulator(MechanicalSystem):
 
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]
-        return _planar_geometry(np.array([l1]), include_torque=True)
+        return _planar_geometry(
+            np.array([l1]),
+            include_torque=True,
+            upper_bound=self.inputs["u"].upper_bound,
+        )
 
     def get_kinematic_transforms(self, x, u, t):
         l1 = self.params["l1"]
@@ -217,7 +223,7 @@ class OneLinkManipulator(MechanicalSystem):
         return (
             _planar_link_transforms(points, angles)
             + _planar_point_transforms(points)
-            + _planar_torque_transforms(points, angles, u, self.inputs["u"].upper_bound)
+            + _planar_torque_transforms(points, angles)
         )
 
 
@@ -342,7 +348,11 @@ class TwoLinkManipulator(MechanicalSystem):
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
-        return _planar_geometry(np.array([l1, l2]), include_torque=True)
+        return _planar_geometry(
+            np.array([l1, l2]),
+            include_torque=True,
+            upper_bound=self.inputs["u"].upper_bound,
+        )
 
     def get_kinematic_transforms(self, x, u, t):
         l1 = self.params["l1"]
@@ -352,7 +362,7 @@ class TwoLinkManipulator(MechanicalSystem):
         return (
             _planar_link_transforms(points, angles)
             + _planar_point_transforms(points)
-            + _planar_torque_transforms(points, angles, u, self.inputs["u"].upper_bound)
+            + _planar_torque_transforms(points, angles)
         )
 
 
@@ -614,7 +624,11 @@ class FiveLinkPlanarManipulator(MechanicalSystem):
         return J
 
     def get_kinematic_geometry(self):
-        return _planar_geometry(self.params["l"], include_torque=True)
+        return _planar_geometry(
+            self.params["l"],
+            include_torque=True,
+            upper_bound=self.inputs["u"].upper_bound,
+        )
 
     def get_kinematic_transforms(self, x, u, t):
         l = self.params["l"]
@@ -623,7 +637,7 @@ class FiveLinkPlanarManipulator(MechanicalSystem):
         return (
             _planar_link_transforms(points, angles)
             + _planar_point_transforms(points)
-            + _planar_torque_transforms(points, angles, u, self.inputs["u"].upper_bound)
+            + _planar_torque_transforms(points, angles)
         )
 
 

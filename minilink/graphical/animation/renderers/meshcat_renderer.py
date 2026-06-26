@@ -12,15 +12,13 @@ from minilink.graphical.animation.primitives import (
     Box,
     Circle,
     CustomLine,
+    DynamicPrimitive,
     ExtrudedPolygon,
     Plane,
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
     TorqueArrow,
-    TrajectoryPolyline,
-    extract_amplitude,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 from minilink.graphical.common.environment import is_blocking_needed
@@ -345,7 +343,9 @@ class MeshcatCanvas:
                 self._set_static_geometry(i, primitive)
                 self._geom_keys[i] = key
 
-    def update_primitive(self, i: int, primitive, transform_matrix):
+    def update_primitive(
+        self, i: int, primitive, transform_matrix, x=None, u=None, t=0.0
+    ):
         g = self._g
         path = self._base_path(i)
 
@@ -400,11 +400,10 @@ class MeshcatCanvas:
             path.set_transform(transform_matrix)
             return
 
-        if isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-            channel, T_rigid = extract_amplitude(transform_matrix)
-            local_pts = primitive.compute_pts(channel)
+        if isinstance(primitive, DynamicPrimitive):
+            local_pts = primitive.compute_pts(x, u, t)
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (T_rigid @ local_pts_hom.T).T
+            world_pts = (transform_matrix @ local_pts_hom.T).T
             hex_color = _color_to_meshcat_hex(primitive.color)
             if isinstance(primitive, TorqueArrow):
                 arc_n = local_pts.shape[0] - 3
@@ -526,10 +525,11 @@ class MeshcatRenderer(AnimationRenderer):
                 self.vis.open()
                 self.vis.wait()
 
-    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
+    def draw_frame(self, primitives, transforms, frame, camera) -> None:
+        x, u, t = frame["x"], frame["u"], frame["t"]
         self.canvas.ensure_objects(primitives)
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
-            self.canvas.update_primitive(i, prim, T)
+            self.canvas.update_primitive(i, prim, T, x, u, t)
         # Meshcat uses the viewer default camera; ``camera`` is ignored.
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
@@ -568,11 +568,14 @@ class MeshcatRenderer(AnimationRenderer):
 
         # Draw t=0 once: this sets the (frozen) geometry of TorqueArrow and gives
         # every rigid primitive a sane starting pose before keyframes kick in.
-        t0_transforms = frames[0]["transforms"]
+        frame0 = frames[0]
+        t0_transforms = frame0["transforms"]
         has_dynamic = False
         for i, (prim, T0) in enumerate(zip(primitives, t0_transforms)):
-            self.canvas.update_primitive(i, prim, T0)
-            if isinstance(prim, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
+            self.canvas.update_primitive(
+                i, prim, T0, frame0["x"], frame0["u"], frame0["t"]
+            )
+            if isinstance(prim, DynamicPrimitive):
                 has_dynamic = True
 
         animation_obj = mcanim.Animation(default_framerate=schedule.target_fps)

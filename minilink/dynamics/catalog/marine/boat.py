@@ -12,7 +12,6 @@ from minilink.graphical.animation.primitives import (
     follow_xy_camera,
     pose2d_matrix,
     scale_pose2d_matrix,
-    torque_pose2d_matrix,
 )
 
 
@@ -171,6 +170,11 @@ class Boat2D(GeneralizedMechanicalSystem):
             Arrow(color="red", linewidth=2, origin="tip"),
         ]
         if self.show_hydrodynamic_forces:
+            rho = self.params["rho"]
+            Alc = self.params["Alc"]
+            loa = self.params["loa"]
+            Cm_max = self.params["Cm_max"]
+            torque_max = abs(0.5 * rho * Alc * loa * Cm_max * 12.0)
             geometry.extend(
                 [
                     Arrow(color="black", linewidth=2, style="--", origin="base"),
@@ -180,6 +184,11 @@ class Boat2D(GeneralizedMechanicalSystem):
                         color="black",
                         linewidth=2,
                         style="--",
+                        sweep=lambda x, u, t: (
+                            (-self.d(x[:3], x[3:], u, t))[2]
+                            * (2.0 * np.pi)
+                            / torque_max
+                        ),
                     ),
                 ]
             )
@@ -202,12 +211,7 @@ class Boat2D(GeneralizedMechanicalSystem):
             ),
         ]
         if self.show_hydrodynamic_forces:
-            rho = self.params["rho"]
-            Alc = self.params["Alc"]
-            loa = self.params["loa"]
-            Cm_max = self.params["Cm_max"]
             hydro_force = -self.d(q, x[3:], u, t)
-            torque_max = abs(0.5 * rho * Alc * loa * Cm_max * 12.0)
             transforms.extend(
                 [
                     T_body
@@ -217,12 +221,7 @@ class Boat2D(GeneralizedMechanicalSystem):
                         np.arctan2(hydro_force[1], hydro_force[0]),
                         force_scale * np.hypot(hydro_force[0], hydro_force[1]),
                     ),
-                    torque_pose2d_matrix(
-                        q[0],
-                        q[1],
-                        q[2] - np.pi / 2.0,
-                        hydro_force[2] * (2.0 * np.pi) / torque_max,
-                    ),
+                    pose2d_matrix(q[0], q[1], q[2] - np.pi / 2.0),
                 ]
             )
         return transforms

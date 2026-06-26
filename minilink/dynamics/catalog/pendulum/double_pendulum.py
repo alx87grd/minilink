@@ -20,7 +20,6 @@ from minilink.graphical.animation.primitives import (
     Rod,
     TorqueArrow,
     pose2d_matrix,
-    torque_pose2d_matrix,
 )
 
 
@@ -149,6 +148,7 @@ class DoublePendulum(MechanicalSystem):
         l2 = self.l2
         radius = 0.08 * max(l1, l2)
         torque_radius = 0.2 * max(l1, l2)
+        torque_scale = 2.0 * np.pi / 3.0 / float(self.inputs["u"].upper_bound[0])
 
         return [
             CustomLine(
@@ -163,8 +163,20 @@ class DoublePendulum(MechanicalSystem):
             Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
             Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2),
             Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            TorqueArrow(radius=torque_radius, head_ratio=0.4, color="red", linewidth=2),
-            TorqueArrow(radius=torque_radius, head_ratio=0.4, color="red", linewidth=2),
+            TorqueArrow(
+                radius=torque_radius,
+                head_ratio=0.4,
+                color="red",
+                linewidth=2,
+                sweep=lambda x, u, t: -u[0] * torque_scale,
+            ),
+            TorqueArrow(
+                radius=torque_radius,
+                head_ratio=0.4,
+                color="red",
+                linewidth=2,
+                sweep=lambda x, u, t: -u[1] * torque_scale,
+            ),
         ]
 
     def get_kinematic_transforms(self, x, u, t):
@@ -183,8 +195,6 @@ class DoublePendulum(MechanicalSystem):
         theta12 = np.pi - (q[0] + q[1])
         rod1_angle = np.pi / 2.0 - q[0]
         rod2_angle = np.pi / 2.0 - q[0] - q[1]
-        u_lim = float(self.inputs["u"].upper_bound[0])
-        torque_scale = 2.0 * np.pi / 3.0 / u_lim
 
         return [
             pose2d_matrix(0.0, 0.0, 0.0),
@@ -192,8 +202,8 @@ class DoublePendulum(MechanicalSystem):
             pose2d_matrix(p1[0], p1[1], 0.0),
             pose2d_matrix(p1[0], p1[1], theta12),
             pose2d_matrix(p2[0], p2[1], 0.0),
-            torque_pose2d_matrix(p0[0], p0[1], rod1_angle, -u[0] * torque_scale),
-            torque_pose2d_matrix(p1[0], p1[1], rod2_angle, -u[1] * torque_scale),
+            pose2d_matrix(p0[0], p0[1], rod1_angle),
+            pose2d_matrix(p1[0], p1[1], rod2_angle),
         ]
 
 

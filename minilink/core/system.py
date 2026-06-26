@@ -110,6 +110,10 @@ class System(SystemFacades):
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 10.0
 
+        # Optional visual appearance. ``None`` falls back to
+        # :meth:`default_skin` at draw time (no graphics import in __init__).
+        self.skin = None
+
     # Core Dynamical Contract
 
     def f(self, x, u, t=0, params=None):
@@ -336,40 +340,60 @@ class System(SystemFacades):
 
     # Visualization / Kinematic Contract
 
+    def frames(self, x, u, t=0.0, params=None):
+        """
+        Return named world poses of this system's rigid bodies.
+
+        This is the forward-kinematics skeleton: the single source of truth for
+        *where the system is* given its state. Both the visual :class:`Skin`
+        and the collision geometry attach their parts to these named frames, so
+        kinematics is computed once, never duplicated. Keys are frame names
+        (every mobile plant guarantees a ``"base"`` root); values are global
+        4x4 :func:`~minilink.core.kinematics.se2` /
+        :func:`~minilink.core.kinematics.se3_translation` poses.
+
+        The default places a single ``"base"`` frame at the first one or two
+        state components; catalog plants override with their real kinematics.
+        """
+        from minilink.core.kinematics import se3_translation
+
+        px = x[0] if self.n >= 1 else 0.0
+        py = x[1] if self.n >= 2 else 0.0
+        return {"base": se3_translation(px, py)}
+
+    def default_skin(self):
+        """
+        Return the visual :class:`~minilink.graphical.animation.skin.Skin` used
+        when :attr:`skin` is unset.
+
+        The base system draws one marker per state and input
+        (:func:`~minilink.graphical.animation.skin.generic_skin`); catalog
+        plants override this to return their own factory.
+        """
+        from minilink.graphical.animation.skin import generic_skin
+
+        return generic_skin(self)
+
     def get_kinematic_geometry(self):
         """
-        Return static graphical primitives for this system.
+        Return the static graphical primitives drawn for this system.
 
-        This visualization contract is intentionally still provisional.
-        By default, the base :class:`System` generates one point per state and
-        one point per input.
+        Delegates to the attached :attr:`skin` (or :meth:`default_skin`); the
+        skeleton :meth:`frames` plus the skin form the visualization contract.
         """
-        from minilink.graphical.animation.primitives import Point
-
-        primitives = []
-        for i in range(self.n):
-            primitives.append(Point(color="blue", marker="o"))
-        for i in range(self.m):
-            primitives.append(Point(color="red", marker="x"))
-        return primitives
+        skin = self.skin if self.skin is not None else self.default_skin()
+        return skin.primitives()
 
     def get_kinematic_transforms(self, x, u, t):
         """
-        Return transforms corresponding 1-to-1 with the static geometry.
+        Return one 4x4 transform per primitive, aligned with
+        :meth:`get_kinematic_geometry`.
 
-        This visualization contract is intentionally still provisional.
-        By default, states and inputs are mapped to simple translations.
+        The skin places each part on a named pose from :meth:`frames`, so
+        kinematics is computed once and shared with collision geometry.
         """
-        from minilink.graphical.animation.primitives import translation_matrix
-
-        transforms = []
-
-        for i in range(self.n):
-            transforms.append(translation_matrix(dx=x[i], dy=float(i)))
-        for i in range(self.m):
-            transforms.append(translation_matrix(dx=u[i], dy=float(-i - 1)))
-
-        return transforms
+        skin = self.skin if self.skin is not None else self.default_skin()
+        return skin.transforms(self.frames(x, u, t), x, u, t, self.params)
 
     def get_dynamic_geometry(self, x, u, t):
         """

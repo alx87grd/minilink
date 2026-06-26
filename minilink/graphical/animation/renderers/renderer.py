@@ -33,8 +33,12 @@ class AnimationRenderer(ABC):
         """
 
     @abstractmethod
-    def draw_frame(self, primitives, transforms, t: float, camera) -> None:
-        """Draw one frame from precomputed transforms and camera."""
+    def draw_frame(self, primitives, transforms, frame, camera) -> None:
+        """Draw one frame from precomputed transforms and camera.
+
+        ``frame`` is the per-instant dict (``x``, ``u``, ``t``, ...); dynamic
+        primitives read the live state from it to rebuild their geometry.
+        """
 
     @abstractmethod
     def present(self, *, block: bool, interval_s: float | None = None) -> None:

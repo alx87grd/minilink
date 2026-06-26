@@ -24,8 +24,8 @@ class TestTrajectoryPolyline(unittest.TestCase):
         )
         prim = TrajectoryPolyline(traj, window="prefix")
 
-        pts_early = prim.compute_pts(1.0)
-        pts_late = prim.compute_pts(2.5)
+        pts_early = prim.compute_pts(None, None, 1.0)
+        pts_late = prim.compute_pts(None, None, 2.5)
 
         self.assertEqual(pts_early.shape[0], 2)
         self.assertEqual(pts_late.shape[0], 3)

@@ -8,14 +8,17 @@ primitive placing it in the world (see
 :meth:`~minilink.core.system.System.get_kinematic_transforms`). Renderers draw
 the primitives; they never know about states or inputs.
 
-Two conventions extend the plain rigid transform:
+Primitives come in two kinds. *Static* primitives carry fixed local-frame
+points and are placed by their rigid transform. *Dynamic* primitives
+(:class:`DynamicPrimitive` — polylines, torque arrows) instead rebuild their
+points every frame from the live ``(x, u, t)`` via :meth:`compute_pts`, so
+time-varying geometry never needs to be smuggled through the transform matrix.
 
-- **Scale columns**: multiplying the rotation columns by a factor stretches
-  unit-sized primitives (:class:`Arrow`, :class:`CustomLine`) to a world size
-  (:func:`scale_pose2d_matrix`, :func:`arrow_transform`).
-- **Amplitude channel**: the normally-unused ``T[3, 3]`` slot carries a scalar
-  side-channel (torque sweep angle, playback time, camera view scale); renderers
-  read and reset it with :func:`extract_amplitude`.
+One convention extends the plain rigid transform: **scale columns** — multiplying
+the rotation columns by a factor stretches unit-sized primitives (:class:`Arrow`,
+:class:`CustomLine`) to a world size (:func:`scale_pose2d_matrix`,
+:func:`arrow_transform`). The camera matrix separately stores its view scale in
+``T[3, 3]`` (:func:`camera_matrix`).
 
 This module is NumPy-only and safe to import from core kinematic hooks: it
 never pulls in matplotlib or other rendering libraries.
@@ -266,24 +269,32 @@ def _arrow_local_pts(head_ratio=0.15, origin="base"):
     )
 
 
-class TorqueArrow(GraphicPrimitive):
+class DynamicPrimitive(GraphicPrimitive):
+    """Primitive whose geometry is rebuilt every frame from the render context.
+
+    A static primitive carries fixed local-frame points and is placed by a rigid
+    transform. A dynamic primitive instead returns fresh points each frame from
+    :meth:`compute_pts`, given the current ``(x, u, t)``. Two flavours coexist:
+
+    - *world-producing* (:class:`HorizonPolyline`, :class:`TrajectoryPolyline`)
+      return world-frame points and are placed by an identity transform;
+    - *frame-posed* (:class:`TorqueArrow`) return local-frame points placed by
+      the rigid pose supplied alongside (the joint frame).
+
+    This replaces the former ``T[3, 3]`` amplitude side-channel: the live state
+    reaches the primitive directly instead of being smuggled through the matrix.
+    """
+
+    def compute_pts(self, x, u, t):
+        raise NotImplementedError
+
+
+class TorqueArrow(DynamicPrimitive):
     """Curved arc arrow for visualizing torques around a joint.
 
-    The arc is generated dynamically via :meth:`compute_pts` because its
-    shape (sweep length) varies with the torque magnitude.
-
-    **Transform convention** — the ``T[3, 3]`` slot of the 4×4 matrix
-    carries the **amplitude** (here, the sweep angle in radians).  In a
-    standard homogeneous matrix ``T[3, 3]`` is always 1; a non-unit value
-    is therefore an unambiguous side-channel that renderers extract before
-    applying the rigid part.  See :func:`extract_amplitude` and
-    :func:`torque_pose2d_matrix`.
-
-    * Translation ``T[0:2, 3]`` — centre of the arc (joint world position).
-    * Rotation (upper-left 2×2) — starting angle of the arc (typically
-      the rod direction so the arrow originates on the link).
-    * ``T[3, 3]`` — **sweep angle in radians** (positive = CCW, negative
-      = CW).
+    The arc is rebuilt each frame via :meth:`compute_pts`; its sweep length
+    comes from the bound *sweep* callable, and the rigid pose passed by the
+    renderer (joint position + rod angle) places it on the link.
 
     Parameters
     ----------
@@ -294,6 +305,9 @@ class TorqueArrow(GraphicPrimitive):
     n_arc_pts : int
         Number of sample points used for a full-circle arc (subsampled
         proportionally for smaller sweeps).
+    sweep : callable, optional
+        ``sweep(x, u, t) -> radians`` giving the arc angle (positive = CCW).
+        ``None`` draws nothing.
     """
 
     def __init__(
@@ -304,20 +318,17 @@ class TorqueArrow(GraphicPrimitive):
         color="red",
         linewidth=2,
         style="-",
+        sweep=None,
     ):
         super().__init__(color, linewidth, style)
         self.radius = radius
         self.head_ratio = head_ratio
         self.n_arc_pts = n_arc_pts
+        self.sweep = sweep
 
-    def compute_pts(self, sweep):
-        """Return Nx3 arc + chevron polyline in **local frame** (centered at origin).
-
-        Parameters
-        ----------
-        sweep : float
-            Arc sweep angle in radians (positive = CCW).
-        """
+    def compute_pts(self, x, u, t):
+        """Return Nx3 arc + chevron polyline in **local frame** (centered at origin)."""
+        sweep = float(self.sweep(x, u, t)) if self.sweep is not None else 0.0
         r = self.radius
         d = r * self.head_ratio
 
@@ -356,16 +367,14 @@ class TorqueArrow(GraphicPrimitive):
         return np.vstack([arc, np.array([barb1, tip, barb2])])
 
 
-class HorizonPolyline(GraphicPrimitive):
+class HorizonPolyline(DynamicPrimitive):
     """World-frame polyline of the active receding-horizon plan at time *t*.
 
     ``plans`` is a sequence of ``(t_solve, trajectory)`` pairs with world-frame
-    ``trajectory.x`` and ``trajectory.t``. At playback time *t* (carried in
-    ``T[3, 3]`` via :func:`time_channel_matrix`), the primitive draws the latest
-    plan with ``t_solve <= t`` over samples with ``trajectory.t >= t``.
-
-    Geometry is rebuilt each frame through :meth:`compute_pts`, like
-    :class:`TorqueArrow`.
+    ``trajectory.x`` and ``trajectory.t``. At playback time *t* the primitive
+    draws the latest plan with ``t_solve <= t`` over samples with
+    ``trajectory.t >= t``. Geometry is rebuilt each frame through
+    :meth:`compute_pts`.
     """
 
     def __init__(
@@ -379,9 +388,9 @@ class HorizonPolyline(GraphicPrimitive):
         super().__init__(color, linewidth, style)
         self.plans = list(plans)
 
-    def compute_pts(self, t_now):
+    def compute_pts(self, x, u, t):
         """Return Nx3 world-frame polyline points for the active plan tail."""
-        t_now = float(t_now)
+        t_now = float(t)
         active = None
         for t_solve, plan in self.plans:
             if t_solve <= t_now + 1e-9:
@@ -395,10 +404,10 @@ class HorizonPolyline(GraphicPrimitive):
         return np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
 
 
-class TrajectoryPolyline(GraphicPrimitive):
+class TrajectoryPolyline(DynamicPrimitive):
     """World-frame XY polyline sampled from a :class:`~minilink.core.trajectory.Trajectory`.
 
-    At playback time *t* (carried in ``T[3, 3]`` via :func:`time_channel_matrix`):
+    At playback time *t*:
 
     ``window="prefix"``
         Samples with ``trajectory.t <= t`` — a growing executed trail.
@@ -407,8 +416,7 @@ class TrajectoryPolyline(GraphicPrimitive):
     ``window="all"``
         Full trajectory polyline (time-independent geometry).
 
-    Geometry is rebuilt each frame through :meth:`compute_pts`, like
-    :class:`HorizonPolyline`.
+    Geometry is rebuilt each frame through :meth:`compute_pts`.
     """
 
     _WINDOWS = ("prefix", "suffix", "all")
@@ -428,9 +436,9 @@ class TrajectoryPolyline(GraphicPrimitive):
             raise ValueError(f"window must be one of {self._WINDOWS}, got {window!r}")
         self.window = window
 
-    def compute_pts(self, t_now):
+    def compute_pts(self, x, u, t):
         """Return Nx3 world-frame polyline points for the selected time window."""
-        t_now = float(t_now)
+        t_now = float(t)
         traj = self.trajectory
         if self.window == "all":
             mask = np.ones(traj.n_samples, dtype=bool)
@@ -550,9 +558,8 @@ def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0):
     """Standard 4x4 camera transform.
 
     The matrix doubles as the camera's pose in the world frame **and** the
-    renderer projection knob. The amplitude channel ``T[3, 3]`` carries the
-    view scale (same side-channel convention as :func:`torque_pose2d_matrix`
-    and :func:`extract_amplitude`).
+    renderer projection knob: the ``T[3, 3]`` slot carries the view scale
+    (orthographic half-extent / perspective distance).
 
     Slot meaning
     ------------
@@ -609,45 +616,6 @@ def world_to_camera(camera):
     W[:3, :3] = R.T
     W[:3, 3] = -R.T @ target
     return W
-
-
-def time_channel_matrix(t=0.0):
-    """Pass scalar playback time *t* through the ``T[3, 3]`` amplitude channel."""
-    T = np.eye(4)
-    T[3, 3] = float(t)
-    return T
-
-
-def torque_pose2d_matrix(x=0.0, y=0.0, start_angle=0.0, sweep=0.0):
-    """4x4 matrix for :class:`TorqueArrow`.
-
-    * Rotation (upper-left 2×2) = *start_angle* — orients the arc so it
-      begins along this direction (typically the rod angle so the arrow
-      originates on the link).
-    * Translation = *(x, y)* — arc centre (joint position in world).
-    * ``T[3, 3]`` = *sweep* — arc sweep in radians (+ CCW, − CW),
-      passed through the amplitude channel.
-    """
-    T = pose2d_matrix(x, y, start_angle)
-    T[3, 3] = sweep
-    return T
-
-
-def extract_amplitude(T):
-    """Read and consume the amplitude channel from a 4×4 transform.
-
-    In a standard homogeneous matrix ``T[3, 3] == 1``.  Systems that need
-    to pass a scalar amplitude to the renderer (e.g. sweep angle, force
-    magnitude) store it in this slot via helpers like
-    :func:`torque_pose2d_matrix`.
-
-    Returns ``(amplitude, T_clean)`` where *T_clean* has ``T[3, 3]``
-    restored to 1 so it can be used as a normal rigid transform.
-    """
-    amplitude = T[3, 3]
-    T_clean = T.copy()
-    T_clean[3, 3] = 1.0
-    return amplitude, T_clean
 
 
 def identity_matrix():

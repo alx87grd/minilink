@@ -351,17 +351,10 @@ def plot_track(
     else:
         fig = ax.figure
 
-    total = path.total_length
-    if total <= 0.0:
+    if path.total_length <= 0.0:
         raise ValueError("path has zero length")
 
-    ss = np.linspace(0.0, total, n_samples)
-    center = np.array([path.sample(s) for s in ss])
-    tangents = np.array([path.tangent(s) for s in ss])
-    normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
-    half = float(track.half_width)
-    upper = center + half * normals
-    lower = center - half * normals
+    center, upper, lower = track.sample_boundaries(n_samples)
     corridor = np.vstack([upper, lower[::-1]])
 
     ax.fill(
@@ -397,7 +390,7 @@ def plot_track(
         ax.set_xlim(xlo, xhi)
         ax.set_ylim(ylo, yhi)
     else:
-        pad = half + 0.5
+        pad = float(track.half_width) + 0.5
         ax.set_xlim(center[:, 0].min() - pad, center[:, 0].max() + pad)
         ax.set_ylim(center[:, 1].min() - pad, center[:, 1].max() + pad)
 
