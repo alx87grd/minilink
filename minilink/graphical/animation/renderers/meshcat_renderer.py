@@ -497,19 +497,18 @@ class MeshcatRenderer(AnimationRenderer):
         """
         import meshcat.animation as mcanim
 
-        template_frame = max(frames, key=lambda frame: len(frame["primitives"]))
-        self.canvas.ensure_objects(template_frame["primitives"])
+        self.canvas.ensure_objects(primitives)
 
         # Draw t=0 once before keyframes.
-        t0 = frames[0]
-        for i, (prim, T0) in enumerate(zip(t0["primitives"], t0["transforms"])):
+        t0_transforms = frames[0]["transforms"]
+        for i, (prim, T0) in enumerate(zip(primitives, t0_transforms)):
             self.canvas.update_primitive(i, prim, T0)
 
         animation_obj = mcanim.Animation(default_framerate=schedule.target_fps)
         tf = self.canvas._tf
 
         for frame_idx, frame in enumerate(frames):
-            for i, (prim, T) in enumerate(zip(frame["primitives"], frame["transforms"])):
+            for i, (prim, T) in enumerate(zip(primitives, frame["transforms"])):
                 T_eff = _rigid_effective_transform(prim, T, tf)
                 if T_eff is None:
                     continue

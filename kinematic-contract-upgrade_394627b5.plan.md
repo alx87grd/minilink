@@ -173,26 +173,31 @@ Conventions that avoid extra machinery:
 
 ### Tier 2 - reusable / swappable complex skin (use-case 2)
 
-Skin **factory functions** (plain functions in `graphical/animation/skins.py`)
-return the dict, keyed by an agreed frame vocabulary:
+Skin **factory functions** (plain functions in `graphical/catalog/skins.py`)
+take the plant and return the dict, keyed by an agreed frame vocabulary:
 
 ```python
-def car_skin_2d(length, width, color="blue") -> dict[str, list]: ...
-def car_skin_3d(length, width, track, color="#151922") -> dict[str, list]: ...
+def car_skin_2d(plant, color="blue") -> dict[str, list]: ...
+def car_skin_3d(plant, color="#151922") -> dict[str, list]: ...
 ```
 
-`DynamicBicycle` and `DynamicBicycleCar3D` then differ **only** in
-`get_kinematic_geometry`, sharing one `tf` because both factories emit the same
-keys (`"body"`, `"wheel_rl"`, `"wheel_rr"`, `"wheel_fl"`, `"wheel_fr"`):
+**Swap mechanism (LOCKED - Option B):** the contract hook stays
+`get_kinematic_geometry()`; plants carry an opt-in attribute `skin` (a callable
+`(plant) -> dict`, or `None`) and the base method delegates:
 
 ```python
-def get_kinematic_geometry(self):  return car_skin_2d(self.L, self.W)
-def get_kinematic_geometry(self):  return car_skin_3d(self.L, self.W, self.track)
+class System:
+    skin = None
+    def get_kinematic_geometry(self):
+        return {} if self.skin is None else self.skin(self)
 ```
 
-This removes the ~85-line `get_kinematic_transforms` copy in the 3D car.
-Composition when needed = a one-function `merge_skins(*skins)` (concatenates lists
-on shared keys).
+So `DynamicBicycle` sets `skin = car_skin_2d`; a 3D look is one assignment
+`car.skin = car_skin_3d` (same `tf`, same `f`, both factories emit keys
+`"body"`, `"wheel_rl"`, ...). `skin : get_kinematic_geometry :: params : f` -
+method is the contract, attribute is the policy. **No** `DynamicBicycleCar3D`
+class (retired); **do not** reassign the method itself (instance-assigned
+functions receive no `self`). `merge_skins(*skins)` composes when needed.
 
 ## Dynamic-primitive pipeline
 

@@ -140,14 +140,10 @@ constant-matrix convenience built from `A, B, C, D` arrays (introspect via
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
-- **Visualization contract:** `get_kinematic_geometry()` →
-  `dict[frame_key, list[GraphicPrimitive]]` (static skin);
-  `tf(x,u,t,params)` → `dict[frame_key, 4×4 world]` (named frames, native-array,
-  JAX-traceable); `get_dynamic_geometry(x,u,t,params)` → same dict shape (rebuilt
-  each frame). Primitives draw at `frames[key] @ prim.local_transform`. Camera
-  hints (`camera_target`, `camera_plot_axes`, `camera_scale`,
-  `camera_follow_frame`, `camera_priority`) live on `System`; the animator builds
-  the 4×4 view matrix via `graphical/animation/camera.py`.
+- **Visualization contract:** `get_kinematic_geometry`,
+  `get_kinematic_transforms`, `get_dynamic_geometry`, `get_camera_transform`
+  are part of the core `System` contract in `core/system.py` (graphical
+  primitives imported lazily; API still under review).
 - **Facades:** user shortcuts only (lazy simulation/graphics); defined on the
   `core.facades.SystemFacades` mixin so `core/system.py` keeps the math,
   port, and visualization contracts. `self.traj` is a convenience cache of
@@ -325,9 +321,9 @@ Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`
 Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
 Plotly under `plotting` extra.
 
-**Camera:** hint attributes on `System` + `resolve_camera_from_hints` at the
-animator boundary (`graphical/animation/camera.py`); optional `camera=` override
-on `animate()`. One 4×4 contract for all renderers.
+**Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
+for all renderers. Override on `System` for custom views. Camera and kinematic
+hooks are still under graphical/animation API review.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing

@@ -40,10 +40,10 @@ class System(SystemFacades):
     - **Model defaults and metadata**: it carries default parameters
       (:attr:`params`), default initial condition (:attr:`x0`), and solver
       hints (:attr:`solver_info`).
-    - **Visualization contract**: keyed frames via :meth:`tf`, static skin via
-      :meth:`get_kinematic_geometry`, per-frame overlays via
-      :meth:`get_dynamic_geometry`. Default ``camera_*`` hint fields configure
-      the animator view (see ``graphical/animation/camera.py``).
+    - **Visualization contract**: it may describe forward-kinematic geometry
+      for rendering and animation (API still under graphical/animation
+      review). Default ``camera_*`` fields configure
+      :meth:`get_camera_transform`.
     - **User shortcut façade**: it exposes convenience methods such as
       :meth:`compile`, :meth:`compute_trajectory`, :meth:`render`,
       :meth:`animate`, and :meth:`game`, defined on the
@@ -105,12 +105,10 @@ class System(SystemFacades):
         # ``compute_trajectory``.
         self.traj = None
 
-        # Standard camera hints (4x4 built at animation boundary).
+        # Standard camera for :meth:`get_camera_transform`.
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 10.0
-        self.camera_follow_frame = None
-        self.camera_priority = 0.0
 
     # Core Dynamical Contract
 
@@ -340,29 +338,71 @@ class System(SystemFacades):
 
     def get_kinematic_geometry(self):
         """
-        Return static skin: ``dict[frame_key, list[GraphicPrimitive]]``.
+        Return static graphical primitives for this system.
 
-        Default is empty; opt in via
-        :func:`~minilink.graphical.animation.visualization.debug_state_skin`
-        or subclass overrides.
+        This visualization contract is intentionally still provisional.
+        By default, the base :class:`System` generates one point per state and
+        one point per input.
         """
-        return {}
+        from minilink.graphical.animation.primitives import Point
 
-    def tf(self, x, u, t=0, params=None):
-        """
-        Named world transforms: ``dict[frame_key, 4x4]``.
+        primitives = []
+        for i in range(self.n):
+            primitives.append(Point(color="blue", marker="o"))
+        for i in range(self.m):
+            primitives.append(Point(color="red", marker="x"))
+        return primitives
 
-        Equation-path hook (native-array, JAX-traceable). Default is empty.
+    def get_kinematic_transforms(self, x, u, t):
         """
-        return {}
+        Return transforms corresponding 1-to-1 with the static geometry.
 
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        This visualization contract is intentionally still provisional.
+        By default, states and inputs are mapped to simple translations.
         """
-        Per-frame dynamic skin: ``dict[frame_key, list[GraphicPrimitive]]``.
+        from minilink.graphical.animation.primitives import translation_matrix
 
-        Rebuilt every animation frame; posed by :meth:`tf` like static skin.
+        transforms = []
+
+        for i in range(self.n):
+            transforms.append(translation_matrix(dx=x[i], dy=float(i)))
+        for i in range(self.m):
+            transforms.append(translation_matrix(dx=u[i], dy=float(-i - 1)))
+
+        return transforms
+
+    def get_dynamic_geometry(self, x, u, t):
         """
-        return {}
+        Return frame-specific temporary graphical primitives.
+
+        This visualization contract is intentionally still provisional.
+        """
+        return []
+
+    def get_camera_transform(self, x, u, t):
+        """
+        Return the standard 4x4 camera transform for this system.
+
+        The matrix follows :func:`minilink.graphical.animation.primitives.camera_matrix`:
+        ``T[:3, 3]`` is the look-at target in world, the columns of ``T[:3, :3]``
+        are the world directions of camera-X (plot horizontal), camera-Y
+        (plot vertical), and camera-Z (view-out), and ``T[3, 3]`` is the view
+        scale (orthographic half-extent / perspective camera distance).
+
+        The default matches ``camera_matrix()`` via ``camera_target``,
+        ``camera_plot_axes``, and ``camera_scale`` on ``self``. Edit those
+        attributes for a fixed view, or override this method for a time-varying
+        camera.
+
+        TODO: User Architectural Review (visualization contract under review).
+        """
+        from minilink.graphical.animation.primitives import camera_matrix
+
+        return camera_matrix(
+            target=self.camera_target,
+            plot_axes=self.camera_plot_axes,
+            scale=self.camera_scale,
+        )
 
     # Composition Operators
 
@@ -404,10 +444,10 @@ class StaticSystem(System):
         self.name = "StaticSystem"
 
     def get_kinematic_geometry(self):
-        return {}
+        return []
 
-    def tf(self, x, u, t=0, params=None):
-        return {}
+    def get_kinematic_transforms(self, x, u, t):
+        return []
 
 
 class DynamicSystem(System):

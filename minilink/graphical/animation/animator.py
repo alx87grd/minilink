@@ -21,12 +21,6 @@ import warnings
 
 import numpy as np
 
-from minilink.graphical.animation.visualization import (
-    flatten_draw_list,
-    resolve_camera,
-    select_camera_source,
-)
-
 from minilink.graphical.animation.renderers.matplotlib_renderer import (
     MatplotlibRenderer,
 )
@@ -92,23 +86,18 @@ class Animator:
     def __init__(self, sys):
         self.sys = sys
 
-    def __init__(self, sys):
-        self.sys = sys
-        self.camera_override = None
-
     def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib"):
         """Renders a single static frame of the system at state *x*, *u*, *t*."""
         backend = make_renderer(renderer, self)
-        frame = self._prepare_transforms(x, u, t)
+        primitives = self.sys.get_kinematic_geometry()
+        frame = self._prepare_transforms(x, u, t, primitives=primitives)
         backend.open_scene(
             is_3d=is_3d,
             show=True,
             camera=frame["camera"],
             title=f"{self.sys.name} — t = {t:.2f} s",
         )
-        backend.draw_frame(
-            frame["primitives"], frame["transforms"], t, frame["camera"]
-        )
+        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
         result = backend.present(block=True)
         backend.close_scene()
         return result
@@ -177,19 +166,17 @@ class Animator:
             )
 
         backend = make_renderer(renderer, self)
-        static_geometry = self.sys.get_kinematic_geometry()
+        primitives = self.sys.get_kinematic_geometry()
         schedule = trajectory_frame_schedule(traj, time_factor_video)
         frames = [
-            self._prepare_frame(
-                traj, frame_idx, schedule, static_geometry=static_geometry
-            )
+            self._prepare_frame(traj, frame_idx, schedule, primitives=primitives)
             for frame_idx in range(schedule.n_frames)
         ]
 
         if html:
             try:
                 return backend.render_inline_animation(
-                    static_geometry,
+                    primitives,
                     frames,
                     schedule,
                     is_3d=is_3d,
@@ -203,7 +190,7 @@ class Animator:
 
         if save:
             try:
-                backend.export_animation(static_geometry, frames, schedule, file_name)
+                backend.export_animation(primitives, frames, schedule, file_name)
             except NotImplementedError:
                 warnings.warn(
                     f"save=True is not supported for renderer={renderer!r}; "
@@ -217,7 +204,7 @@ class Animator:
         if native:
             try:
                 return backend.play_native(
-                    static_geometry,
+                    primitives,
                     frames,
                     schedule,
                     is_3d=is_3d,
@@ -238,10 +225,7 @@ class Animator:
         )
         for frame in frames:
             backend.draw_frame(
-                frame["primitives"],
-                frame["transforms"],
-                frame["t"],
-                frame["camera"],
+                primitives, frame["transforms"], frame["t"], frame["camera"]
             )
             backend.present(block=False, interval_s=schedule.interval_ms / 1000.0)
             events = backend.poll_events()
@@ -250,32 +234,24 @@ class Animator:
         backend.close_scene()
         return None
 
-    def _prepare_transforms(self, x, u, t, *, static_geometry=None):
-        if static_geometry is None:
-            static_geometry = self.sys.get_kinematic_geometry()
-        frames = self.sys.tf(x, u, t)
-        dynamic_geometry = self.sys.get_dynamic_geometry(x, u, t)
-        draw_list = flatten_draw_list(frames, static_geometry, dynamic_geometry)
-        primitives = [p for p, _ in draw_list]
-        transforms = [T for _, T in draw_list]
-        camera = resolve_camera(
-            self.camera_override,
-            self.sys,
-            frames,
-            x,
-            u,
-            t,
-        )
+    def _prepare_transforms(self, x, u, t, *, primitives=None):
+        if primitives is None:
+            primitives = self.sys.get_kinematic_geometry()
+        transforms = self.sys.get_kinematic_transforms(x, u, t)
+        if len(primitives) != len(transforms):
+            raise ValueError(
+                "System graphical error: Number of transforms must equal number of base geometric primitives."
+            )
+        camera = self.sys.get_camera_transform(x, u, t)
         return {
             "x": x,
             "u": u,
             "t": float(t),
-            "primitives": primitives,
             "transforms": transforms,
             "camera": camera,
         }
 
-    def _prepare_frame(self, traj, frame_idx, schedule, *, static_geometry=None):
+    def _prepare_frame(self, traj, frame_idx, schedule, *, primitives=None):
         sim_idx = sim_index_for_frame(frame_idx, schedule)
         x = traj.x[:, sim_idx]
         if len(traj.u) > 0:
@@ -283,7 +259,7 @@ class Animator:
         else:
             u = np.array([])
         t = traj.t[sim_idx]
-        return self._prepare_transforms(x, u, t, static_geometry=static_geometry)
+        return self._prepare_transforms(x, u, t, primitives=primitives)
 
     def run_interactive(
         self,
@@ -312,7 +288,7 @@ class Animator:
         t = float(t0)
         step_idx = 0
 
-        frame = self._prepare_transforms(x, u, t, static_geometry=primitives)
+        frame = self._prepare_transforms(x, u, t, primitives=primitives)
         backend.open_scene(
             is_3d=is_3d,
             show=show,
@@ -321,9 +297,7 @@ class Animator:
         )
 
         # Draw initial state once so the callback can just update controls.
-        backend.draw_frame(
-            frame["primitives"], frame["transforms"], t, frame["camera"]
-        )
+        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
         backend.present(block=False, interval_s=dt)
 
         # ROADMAP: this loop is a minimal integrator+render tick; a future backend should
@@ -339,10 +313,8 @@ class Animator:
             t += dt
             step_idx += 1
 
-            frame = self._prepare_transforms(x, u, t, static_geometry=primitives)
-            backend.draw_frame(
-                frame["primitives"], frame["transforms"], t, frame["camera"]
-            )
+            frame = self._prepare_transforms(x, u, t, primitives=primitives)
+            backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
             backend.present(block=False, interval_s=dt)
 
             if should_stop:
@@ -468,11 +440,11 @@ class Animator:
         t = float(t0)
         step_idx = 0
 
-        frame0 = self._prepare_transforms(x, u, t, static_geometry=primitives)
+        camera0 = self.sys.get_camera_transform(x, u, t)
         backend.open_scene(
             is_3d=is_3d,
             show=True,
-            camera=frame0["camera"],
+            camera=camera0,
             title=f"Interactive game — {self.sys.name}",
         )
 
@@ -492,10 +464,8 @@ class Animator:
         u = self._u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
         self._draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
 
-        frame = self._prepare_transforms(x, u, t, static_geometry=primitives)
-        backend.draw_frame(
-            frame["primitives"], frame["transforms"], t, frame["camera"]
-        )
+        frame = self._prepare_transforms(x, u, t, primitives=primitives)
+        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
         backend.present(block=False, interval_s=dt)
 
         while True:
@@ -526,10 +496,8 @@ class Animator:
             t = t + dt
             step_idx += 1
 
-            frame = self._prepare_transforms(x, u, t, static_geometry=primitives)
-            backend.draw_frame(
-                frame["primitives"], frame["transforms"], t, frame["camera"]
-            )
+            frame = self._prepare_transforms(x, u, t, primitives=primitives)
+            backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
             backend.present(block=False, interval_s=dt)
 
             backend_events = backend.poll_events()

@@ -498,7 +498,7 @@ class MatplotlibRenderer(AnimationRenderer):
             else:
                 W = world_to_camera(camera)
                 draw_transforms = [W @ T for T in frame["transforms"]]
-            for prim, T in zip(frame["primitives"], draw_transforms):
+            for prim, T in zip(primitives, draw_transforms):
                 canvas.draw_primitive(prim, T)
             if not is_3d:
                 self._apply_camera(ax, camera, False)

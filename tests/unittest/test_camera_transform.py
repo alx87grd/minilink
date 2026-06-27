@@ -143,8 +143,7 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
     def test_xz_camera_sets_z_as_vertical_axis(self):
         s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         camera = camera_matrix(plot_axes=(0, 2), scale=3.0)
-        a = Animator(s)
-        a.camera_override = camera
+        a = Animator(s, camera=camera)
         from minilink.graphical.animation.renderers.matplotlib_renderer import (
             MatplotlibRenderer,
         )
@@ -153,7 +152,7 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         backend.open_scene(
             is_3d=False,
             show=False,
-            camera=camera,
+            camera=resolve_camera_from_hints(s, {}, 0.0),
         )
         self.assertEqual(backend.ax.get_xlim(), (-3.0, 3.0))
         self.assertEqual(backend.ax.get_ylim(), (-3.0, 3.0))
@@ -164,8 +163,7 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
     def test_follow_target_shifts_3d_view_box(self):
         s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         camera = camera_matrix(target=(5.0, -2.0, 1.0), scale=4.0)
-        a = Animator(s)
-        a.camera_override = camera
+        a = Animator(s, camera=camera)
         from minilink.graphical.animation.renderers.matplotlib_renderer import (
             MatplotlibRenderer,
         )

@@ -463,37 +463,18 @@ class DiagramSystem(System):
     # Visualization / Kinematic Contract
 
     def get_kinematic_geometry(self):
-        from minilink.graphical.animation.visualization import merge_geometry_dicts, prefix_geometry
+        primitives = []
+        for subsystem in self.subsystems.values():
+            primitives.extend(subsystem.get_kinematic_geometry())
+        return primitives
 
-        parts = []
-        for sys_id, subsystem in self.subsystems.items():
-            parts.append(prefix_geometry(subsystem.get_kinematic_geometry(), sys_id))
-        return merge_geometry_dicts(*parts) if parts else {}
-
-    def tf(self, x, u, t=0, params=None):
-        from minilink.graphical.animation.visualization import merge_frame_dicts, prefix_frames
-
-        parts = []
+    def get_kinematic_transforms(self, x, u, t):
+        transforms = []
         for sys_id, subsystem in self.subsystems.items():
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id)
-            parts.append(prefix_frames(subsystem.tf(local_x, local_u, t, params), sys_id))
-        return merge_frame_dicts(*parts) if parts else {}
-
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        from minilink.graphical.animation.visualization import merge_geometry_dicts, prefix_geometry
-
-        parts = []
-        for sys_id, subsystem in self.subsystems.items():
-            local_x = self.get_local_state(x, sys_id)
-            local_u = self.get_local_input(x, u, t, sys_id)
-            parts.append(
-                prefix_geometry(
-                    subsystem.get_dynamic_geometry(local_x, local_u, t, params),
-                    sys_id,
-                )
-            )
-        return merge_geometry_dicts(*parts) if parts else {}
+            transforms.extend(subsystem.get_kinematic_transforms(local_x, local_u, t))
+        return transforms
 
 
 if __name__ == "__main__":

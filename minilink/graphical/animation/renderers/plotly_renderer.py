@@ -384,7 +384,7 @@ class PlotlyRenderer(AnimationRenderer):
 
         frame_traces = [
             self._traces_for_frame(
-                frame["primitives"],
+                primitives,
                 frame["transforms"],
                 frame["camera"],
             )

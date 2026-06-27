@@ -16,19 +16,11 @@ from minilink.graphical.animation.renderers.plotly_renderer import (
     PlotlyRenderer,
     _import_plotly,
 )
-from minilink.graphical.animation.visualization import debug_state_skin, debug_state_tf
 from minilink.graphical.common.plotly_style import (
     PLOTLY_ANIMATION_2D_MARGIN,
     PLOTLY_ANIMATION_HEIGHT,
     PLOTLY_FIG_WIDTH,
 )
-
-
-def _debug_viz_system(n=1, m=1):
-    sys = DynamicSystem(n, input_dim=m, output_dim=1, expose_state=True)
-    sys.get_kinematic_geometry = lambda: debug_state_skin(sys)
-    sys.tf = lambda x, u, t=0, params=None: debug_state_tf(sys, x, u, t)
-    return sys
 
 
 class TestPlotlyRendererOptionalImport(unittest.TestCase):
@@ -70,7 +62,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         pytest.importorskip("plotly")
 
     def test_static_2d_frame_builds_figure_without_showing(self):
-        sys = _debug_viz_system()
+        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         x = np.array([0.5])
@@ -84,7 +76,7 @@ class TestPlotlyRenderer(unittest.TestCase):
             title="Plotly smoke",
         )
         backend.draw_frame(
-            frame["primitives"],
+            sys.get_kinematic_geometry(),
             frame["transforms"],
             0.0,
             frame["camera"],
@@ -124,7 +116,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(fig.data[0].y, dtype=float), [3.0])
 
     def test_static_3d_frame_builds_scatter3d(self):
-        sys = _debug_viz_system()
+        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         frame = animator._prepare_transforms(np.array([0.5]), np.array([1.0]), 0.0)
@@ -136,7 +128,7 @@ class TestPlotlyRenderer(unittest.TestCase):
             title="Plotly 3D smoke",
         )
         backend.draw_frame(
-            frame["primitives"],
+            sys.get_kinematic_geometry(),
             frame["transforms"],
             0.0,
             frame["camera"],
@@ -148,7 +140,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertEqual(fig.layout.scene.aspectmode, "cube")
 
     def test_inline_animation_has_expected_frames(self):
-        sys = _debug_viz_system()
+        sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         traj = Trajectory(
             t=np.array([0.0, 0.1, 0.2]),
             x=np.array([[0.0, 0.1, 0.2]]),
@@ -196,13 +188,11 @@ class TestPlotlyRenderer(unittest.TestCase):
         frames = [
             {
                 "t": 0.0,
-                "primitives": [Point()],
                 "transforms": [translation_matrix(0.0, 0.0, 0.0)],
                 "camera": camera_matrix(target=(0.0, 0.0, 0.0), scale=2.0),
             },
             {
                 "t": 0.1,
-                "primitives": [Point()],
                 "transforms": [translation_matrix(10.0, 3.0, 0.0)],
                 "camera": camera_matrix(target=(10.0, 3.0, 0.0), scale=2.0),
             },
