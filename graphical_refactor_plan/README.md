@@ -7,7 +7,7 @@ frame-keyed geometry, parallel `_v2` pipeline, PNG pixel-parity, phased cutover)
 
 | File | Role |
 | --- | --- |
-| [`00_original_vision.md`](00_original_vision.md) | Pointer to the **read-only** ground-truth vision (canonical file at repo root) |
+| [`00_original_vision.md`](00_original_vision.md) | Self-contained ground-truth vision: locked architecture and decisions |
 | [`01_master_overview.md`](01_master_overview.md) | Master plan: phases, gates, success criteria, locked decisions, risks |
 | [`02_demo_use_cases.md`](02_demo_use_cases.md) | Target user-facing demo scripts for the new public API |
 | [`03_kinematics_core_math.md`](03_kinematics_core_math.md) | Vision for `core/kinematics.py` — array-only, reusable transform algebra |

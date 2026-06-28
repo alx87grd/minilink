@@ -83,7 +83,7 @@ class MyRobot(DynamicSystem):
 
     def get_kinematic_geometry(self):
         return {
-            "body": [Box(width=self.L, height=self.W, color="steelblue")],
+            "body": [Box(length_x=self.L, length_y=self.W, color="steelblue")],
             "wheel": [Circle(radius=0.15, color="black")],
         }
 
@@ -185,13 +185,16 @@ pend.animate(traj)
 
 ## Use case 4 — Export rendering info (inspect without drawing)
 
-Every drawable exposes its rendering info through the **public contract hooks** —
-`tf`, `get_kinematic_geometry`, `get_dynamic_geometry`. (The animator combines them
-via an internal `flatten_draw_list`; that helper is **not public** — demos use the
-hooks directly.)
+There is **one drawable contract** — `tf`, `get_kinematic_geometry`,
+`get_dynamic_geometry` — and the **only** difference is the driving signal. A
+**state-driven drawable** (`System`/`DiagramSystem`) is a function of `(x,u,t)`; an
+**overlay add-on** (`Scene.as_visualizer()`, `SceneHistory`, `Replay`) is the same
+hooks **time-only** — `tf(t)`, `get_kinematic_geometry()`, `get_dynamic_geometry(t)`
+— with `{}` defaults so it overrides just the one it draws. The animator runs the
+same internal `flatten_draw_list` on both (not public — demos use the hooks directly).
 
 ```python
-"""Read a drawable's rendering info at one instant — public API only."""
+"""Read a state-driven drawable's rendering info at one instant — public API only."""
 import numpy as np
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 
@@ -208,53 +211,59 @@ for key, T in frames.items():
     print(key, T[:3, 3])                  # world origin of each frame
 ```
 
-**Scene — collision-primary, rendering secondary (Phase 6/7):**
+**Scene — collision-first source; visualization via `as_visualizer()` (Phase 6/7):**
 
 A `Scene` (in [`planning/spatial/scene.py`](../minilink/planning/spatial/scene.py))
-is **primarily a spatial/collision object** (obstacles, workspace,
-distance/corridor fields). It gains the **same drawable hooks as a secondary
-aspect** — exactly like a `System` is primarily dynamics (`f`) but also exposes
-rendering info. We mirror the contract onto the existing Scene; we do **not**
-invent a graphics-only Scene.
+is **a collision-first spatial source** (`obstacles`, `workspace_fields`). It does
+**not** implement the drawable contract; it **exports** a drawable the same way it
+already exports a set/cost — so a raw `Scene` is never passed where a drawable is
+expected (the animator rejects it with a "call `scene.as_visualizer()`" message,
+symmetric with `.as_cost()`).
 
 ```python
 from minilink.planning.spatial.scene import Scene
 
-scene = Scene(obstacles=obstacles, workspace=track_bounds)  # primary: collision/spatial
+scene = Scene(obstacles=obstacles)                            # collision-first source
 
-# secondary: same contract as System — world-fixed geometry derived from its obstacles
-frames = scene.tf(None, None, 0.0)        # {"world": I}
-geom = scene.get_kinematic_geometry()      # obstacle/boundary primitives from spatial data
+# three symmetric exports — Scene stays a pure planning object:
+constraint = scene.clearance_field(robot).as_constraint()    # -> Set
+cost       = scene.cost_field(robot).as_cost()               # -> CostFunction
+viz        = scene.as_visualizer()                           # -> overlay (t-only hooks)
 ```
 
-This is the reverse of "build a Scene for drawing": the collision data is the
-source of truth, and rendering is a view onto it (so one obstacle set feeds both
-clearance probes and the picture).
+`scene.as_visualizer()` returns a **graphical-band** drawable whose `tf` is empty
+(world-fixed) and whose `get_kinematic_geometry()` maps each obstacle `core.geometry`
+`Shape` to a default primitive keyed to `world` (the *default obstacle skin*;
+`as_visualizer(style=...)` can override). The collision data stays the single
+source of truth and the picture is a view onto it — one obstacle set feeds both
+clearance probes and the rendering. (A future `Scene.tf(t)` for moving obstacles
+slots in behind this export without changing the API; deferred to the planner
+upgrade.)
 
-**SceneHistory — graphics-primary (Phase 6):** time-indexed plan/trail data that is
-*not* collision geometry (MPC futures, executed trail) lives in a graphics overlay
-object:
+**SceneHistory — overlay add-on (Phase 6):** time-indexed plan/trail data that is
+*not* collision geometry (MPC futures, executed trail) lives in an overlay that
+overrides only `get_dynamic_geometry(t)` (geometry rebuilt via `points_at(t)`):
 
 ```python
-from minilink.graphical.catalog import HorizonPolyline, TrajectoryPolyline
-from minilink.graphical.animation.drawables import SceneHistory
+from minilink.graphical.catalog import HorizonPolyline, SceneHistory, TrajectoryPolyline
 
 history = SceneHistory(
     horizon=HorizonPolyline(mpc_plans, color="orange", linewidth=1.5),
     trail=TrajectoryPolyline(executed_traj, color="green"),
 )
-geom = history.get_dynamic_geometry(None, None, t=playback_t)  # slices via points_at(t)
+dynamic = history.get_dynamic_geometry(t=playback_t)  # dict[key, [prim]] via points_at(t)
 ```
 
-**Replay — full-skin ghost (Phase 6):** wraps another drawable + its own
-trajectory, posing it at `x(t)`:
+**Replay — full-skin ghost (Phase 6):** an overlay wrapping another drawable + its
+own trajectory; it **forwards** the wrapped drawable's three hooks at its own `x(t)`,
+so the ghost keeps its named frames and real skin:
 
 ```python
-from minilink.graphical.animation.drawables import Replay
+from minilink.graphical.catalog import Replay
 
 ghost = Replay(other_robot, other_traj)
-frames = ghost.tf(x_primary, u_primary, t=now)  # internally samples other_traj at t
-geom = ghost.get_kinematic_geometry()            # other_robot's skin
+frames = ghost.tf(t=now)                  # other_robot.tf(*traj.sample(now), now)
+skin = ghost.get_kinematic_geometry()     # other_robot's skin (cached)
 ```
 
 ---
@@ -312,7 +321,7 @@ Multi-robot: bump priority on the drawable that should own the camera:
 
 ```python
 robot2.camera_priority = 1.0
-robot1.animate(traj, overlays=[robot2, scene])  # robot2 wins if higher priority
+robot1.animate(traj, overlays=[robot2, scene.as_visualizer()])  # robot2 wins if higher priority
 ```
 
 ---
@@ -328,16 +337,15 @@ robot1.animate(traj, overlays=[robot2, scene])  # robot2 wins if higher priority
 """examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py — target shape"""
 import numpy as np
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleRateInputs
-from minilink.graphical.animation.drawables import SceneHistory
-from minilink.graphical.catalog import HorizonPolyline, Line, TrajectoryPolyline, follow_frame_camera
+from minilink.graphical.catalog import HorizonPolyline, Line, SceneHistory, TrajectoryPolyline, follow_frame_camera
 from minilink.planning.spatial.scene import Scene
 
 # ... planner setup, compute traj, mpc_plans list ...
 
 robot = DynamicBicycleRateInputs()  # plain catalog plant — no MpcPlan* subclass
 
-# Spatial scene (primary collision); reference path is graphics-only → SceneHistory/overlay
-scene = Scene(obstacles=obstacles, workspace=track_bounds)
+# Spatial scene (collision-first source); reference path is graphics-only → SceneHistory/overlay
+scene = Scene(obstacles=obstacles)
 history = SceneHistory(
     reference=Line(ref_pts, color="gray", linewidth=1),
     trail=TrajectoryPolyline(executed_traj, color="limegreen", linewidth=2),
@@ -347,7 +355,7 @@ history = SceneHistory(
 robot.traj = executed_traj
 robot.animate(
     executed_traj,
-    overlays=[scene, history],
+    overlays=[scene.as_visualizer(), history],
     camera=follow_frame_camera("body", scale=12.0),
     time_factor_video=2.0,
     show=True,
@@ -364,18 +372,17 @@ no manual transform list alignment.
 ```python
 """examples/scripts/planning/trajopt/demo_holonomic_corridor.py — target shape"""
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
-from minilink.graphical.animation.drawables import SceneHistory
-from minilink.graphical.catalog import TrajectoryPolyline
+from minilink.graphical.catalog import SceneHistory, TrajectoryPolyline
 from minilink.planning.spatial.scene import Scene
 
 robot = HolonomicMobileRobot()
 # ... planner, track, obstacles, traj ...
 
-# Existing spatial Scene (corridor/obstacles) — its drawable hooks render the boundaries
-scene = Scene(track=track, obstacles=obstacles, robot_radius=ROBOT_RADIUS)
+# Existing spatial Scene (obstacles) — as_visualizer() renders the default obstacle skin
+scene = Scene(obstacles=obstacles)
 history = SceneHistory(trail=TrajectoryPolyline(traj, color="blue"))
 
-robot.animate(traj, overlays=[scene, history], camera_scale=12.0)
+robot.animate(traj, overlays=[scene.as_visualizer(), history], camera_scale=12.0)
 ```
 
 ---

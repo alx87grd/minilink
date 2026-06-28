@@ -43,7 +43,7 @@ isProject: false
 ## Ground truth
 
 The **vision, architecture, and locked decisions** live in
-[`00_original_vision.md`](00_original_vision.md) (read-only).
+[`00_original_vision.md`](00_original_vision.md).
 
 This document is the **implementation playbook**: how we get there safely, what
 each phase delivers, and the gates between them. Companion files:
@@ -160,9 +160,7 @@ get_kinematic_geometry :: params : f`. Reject `sys.get_kinematic_geometry = fn`
 
 ## References
 
-- **Vision (do not edit for implementation tracking):**
-  [`00_original_vision.md`](00_original_vision.md)
-- **Abandoned branch (reference only):** `kinematic-refactor-v2` @ `3581ab6`
+- **Vision:** [`00_original_vision.md`](00_original_vision.md)
 - **Current contract:** [`minilink/core/system.py`](../minilink/core/system.py),
   [`minilink/graphical/animation/animator.py`](../minilink/graphical/animation/animator.py)
 

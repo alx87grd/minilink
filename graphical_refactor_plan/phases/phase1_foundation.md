@@ -13,9 +13,9 @@ changes rendered output.
 | [`minilink/core/kinematics.py`](../../minilink/core/kinematics.py) | core | JAX-functional transform algebra |
 | [`graphical/animation/primitives.py`](../../minilink/graphical/animation/primitives.py) | internal | primitive classes inc. new `Arrow`, `TorqueArrow` (honest geometry); `arrow_pts`/`torque_arc_pts` are private helpers used **inside** these classes |
 | [`graphical/animation/visualization.py`](../../minilink/graphical/animation/visualization.py) | internal | `flatten_draw_list`, merge/prefix (animator-only) |
-| [`graphical/animation/camera.py`](../../minilink/graphical/animation/camera.py) | internal | `resolve_camera_from_hints` |
-| [`graphical/catalog/shapes.py`](../../minilink/graphical/catalog/shapes.py) | **public** | curated primitives: `Box`, `Circle`, `Line`, `Arrow`, `Rod`, `Point`, … |
-| [`graphical/catalog/skins.py`](../../minilink/graphical/catalog/skins.py) | **public** | skin functions `(plant) -> dict`: `car_skin_2d`, `car_skin_3d`, `merge_skins`, `debug_state_skin` + camera factories |
+| [`graphical/animation/camera.py`](../../minilink/graphical/animation/camera.py) | internal | `resolve_camera_from_hints` + camera factories (`follow_frame_camera`, `fixed_camera`, `camera_matrix`) — re-exported publicly via `graphical.catalog` |
+| [`graphical/catalog/shapes.py`](../../minilink/graphical/catalog/shapes.py) | **public** | curated primitives re-exported from `animation/primitives.py`: `Box`, `Circle`, `Line` (alias of `CustomLine`), `Arrow`, `Rod`, `Point`, `HorizonPolyline`, `TrajectoryPolyline`, … |
+| [`graphical/catalog/skins.py`](../../minilink/graphical/catalog/skins.py) | **public** | skin functions `(plant) -> dict` **only**: `car_skin_2d`, `car_skin_3d`, `merge_skins`, `debug_state_skin` |
 
 Add `GraphicPrimitive.local_transform` (old renderers ignore until cutover).
 
@@ -26,17 +26,23 @@ curated public graphics. **Two catalogs, one package:**
 
 ```
 minilink/graphical/catalog/
-  __init__.py   # one-stop re-export of shapes + skins
-  shapes.py     # re-exports the user-facing primitive subset
-  skins.py      # skin functions + camera factories
+  __init__.py   # one-stop public re-export: shapes + skins + camera factories
+  shapes.py     # user-facing primitive subset (re-exported from animation/primitives.py)
+  skins.py      # skin functions (plant) -> dict only
 ```
 
 - **Public (`graphical.catalog`)** — what demos and student plants import: shape
-  primitives and skin/camera functions. Stable, friendly names.
+  primitives, skin functions, and camera factories. Stable, friendly names. The
+  classes/functions live in `animation/`; the catalog is the curated re-export
+  surface (mirrors how `dynamics.catalog` re-exports plants).
 - **Internal (`graphical/animation/`)** — what renderer/library authors touch:
   full `primitives.py` implementation, `visualization.py` (`flatten_draw_list`),
-  `camera.py` resolver, renderers, builders. `flatten_draw_list` is **not public**
-  — only the animator calls it.
+  `camera.py` (resolver **and** camera factories), renderers. `flatten_draw_list`
+  is **not public** — only the animator calls it.
+- **Camera factories** (`follow_frame_camera`, `fixed_camera`, `camera_matrix`) are
+  implemented in `animation/camera.py` and re-exported by `catalog/__init__.py` —
+  **not** placed in `skins.py`. Overlay drawables (`SceneHistory`, `Replay`, and
+  `Scene.as_visualizer`) join the public re-export when they land (overlay phase).
 
 Rule of thumb: a primitive's **class** lives in `animation/primitives.py`;
 `catalog/shapes.py` re-exports the ones students should reach for. Skins are
