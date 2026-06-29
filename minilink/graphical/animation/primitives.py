@@ -27,12 +27,21 @@ import numpy as np
 
 
 class GraphicPrimitive:
-    """Base class for all geometric objects rendered by the animator engine."""
+    """Base class for all geometric objects rendered by the animator engine.
 
-    def __init__(self, color="blue", linewidth=1, style="-"):
+    ``local_transform`` is a fixed 4x4 graphical offset baked into the primitive
+    (a constant pose within its frame). The v2 animator poses a primitive at
+    ``frames[key] @ local_transform``; the legacy pipeline ignores it. Defaults
+    to identity, so existing primitives are unaffected.
+    """
+
+    def __init__(self, color="blue", linewidth=1, style="-", local_transform=None):
         self.color = color
         self.linewidth = linewidth
         self.style = style
+        self.local_transform = (
+            np.eye(4) if local_transform is None else np.asarray(local_transform, float)
+        )
 
 
 class CustomLine(GraphicPrimitive):
@@ -47,6 +56,10 @@ class CustomLine(GraphicPrimitive):
         """
         super().__init__(color, linewidth, style)
         self.pts = np.array(pts)
+
+    def points_at(self, t):
+        """Nx3 polyline points at playback time *t* (static: time-independent)."""
+        return self.pts
 
 
 class Point(GraphicPrimitive):
@@ -241,6 +254,10 @@ class Arrow(GraphicPrimitive):
         self.origin = origin
         self.pts = _arrow_local_pts(head_ratio, origin)
 
+    def points_at(self, t):
+        """Nx3 unit-arrow points at playback time *t* (static: time-independent)."""
+        return self.pts
+
 
 def _arrow_local_pts(head_ratio=0.15, origin="base"):
     """Unit-length arrow polyline (5 pts) along +X in the local frame."""
@@ -394,6 +411,10 @@ class HorizonPolyline(GraphicPrimitive):
         xy = active.x[:2, mask]
         return np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
 
+    def points_at(self, t):
+        """Nx3 world-frame points of the active plan tail at playback time *t*."""
+        return self.compute_pts(t)
+
 
 class TrajectoryPolyline(GraphicPrimitive):
     """World-frame XY polyline sampled from a :class:`~minilink.core.trajectory.Trajectory`.
@@ -442,6 +463,10 @@ class TrajectoryPolyline(GraphicPrimitive):
             return np.zeros((1, 3))
         xy = traj.x[:2, mask]
         return np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
+
+    def points_at(self, t):
+        """Nx3 world-frame points of the selected time window at playback time *t*."""
+        return self.compute_pts(t)
 
 
 # Transformation Matrix Helpers

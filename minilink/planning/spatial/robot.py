@@ -12,7 +12,8 @@ visualization contract (static geometry plus aligned transforms) but with
 collision-grade geometry, and it never imports any graphics.
 
 Collision against a scene uses world ``(center, radius)`` probes from each
-placed part via :func:`collision_spheres` and :func:`apply_transform`.
+placed part via :func:`collision_spheres` and
+:func:`minilink.core.kinematics.apply`.
 """
 
 from abc import ABC, abstractmethod
@@ -160,16 +161,6 @@ def car(length, width, *, position=(0, 1), heading=2, margin=0.0) -> PlanarRigid
     ]
     parts = tuple(Sphere([px, py], margin) for px, py in outline)
     return PlanarRigidBody(parts, position=position, heading=heading)
-
-
-def apply_transform(T, q):
-    """Return the world point of body-frame point ``q`` under transform ``T``."""
-    xp = array_module(T, q)
-    q = xp.asarray(q)
-    d = q.shape[0]
-
-    # rotate then translate: world = R @ q + t
-    return T[:d, :d] @ q + T[:d, d]
 
 
 def collision_spheres(shape: Shape) -> tuple:

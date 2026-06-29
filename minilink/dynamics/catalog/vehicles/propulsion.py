@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.kinematics import identity, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -11,6 +12,7 @@ from minilink.graphical.animation.primitives import (
     vehicle_body,
     wheel_box,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
@@ -103,6 +105,42 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
             ),
         ]
 
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        length = self.params["length"]
+        return {
+            "world": [ground_line(length=12.0, y=-0.45)],
+            "body": [vehicle_body(length=length, width=0.7, color="blue")],
+            "wheel_rear": [wheel_box(length=0.35, width=0.18)],
+            "wheel_front": [wheel_box(length=0.35, width=0.18)],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        car_x = x[0]
+        length = self.params["length"]
+        return {
+            "world": identity(),
+            "body": translation(car_x, 0.0, 0.0),
+            "wheel_rear": translation(car_x - 0.4 * length, -0.45, 0.0),
+            "wheel_front": translation(car_x + 0.4 * length, -0.45, 0.0),
+            "arrows": translation(car_x + 0.5 * length, 0.0, 0.0),
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        force = self.slip2force(u[0]) if self.m == 1 else 0.0
+        return {
+            "arrows": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(force, 0.0),
+                    scale=1.0,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
+
 
 class LongitudinalFrontWheelDriveCarWithTorqueInput(
     LongitudinalFrontWheelDriveCarWithWheelSlipInput
@@ -142,6 +180,9 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         self.inputs["u"].units = ["Nm"]
         self.outputs["y"].labels = ["slip"]
         self.x0 = np.array([0.0, 0.01, 0.0, 0.0])
+        # v2 camera hint: this variant tracks the car (the slip-input base uses
+        # the inherited fixed camera).
+        self.camera_follow_frame = "body"
 
     def _slip(self, speed, wheel_speed, params=None):
         params = self.params if params is None else params
@@ -182,6 +223,10 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
     def get_kinematic_transforms(self, x, u, t):
         slip = self._slip(x[1], x[2])
         return super().get_kinematic_transforms(x, np.array([slip]), t)
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        slip = self._slip(x[1], x[2])
+        return super().get_dynamic_geometry_v2(x, np.array([slip]), t)
 
 
 if __name__ == "__main__":

@@ -229,6 +229,44 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
                     transforms.append(_pose2d(float(p0[0]), float(p0[1]), th, L))
             return transforms
 
+        # === v2 frame-keyed visualization contract =======================
+        #
+        # Each chain segment is a unit ``CustomLine`` posed by its per-frame
+        # stretch transform (``_pose2d`` with ``scale_x = L``) — pixel-identical
+        # to the legacy path, with the stretch carried in the frame.
+
+        def get_kinematic_geometry_v2(self):
+            if self._chain_fk_funcs is None or self._n_seg == 0:
+                return super().get_kinematic_geometry_v2()
+            return {
+                f"seg{i}": [
+                    CustomLine(
+                        np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+                        color="blue",
+                        linewidth=2,
+                    )
+                ]
+                for i in range(self._n_seg)
+            }
+
+        def tf_v2(self, x, u, t=0, params=None):
+            if self._chain_fk_funcs is None or self._n_seg == 0:
+                return super().tf_v2(x, u, t)
+            qv = np.asarray(x[: self.dof], dtype=float)
+            pts = _chain_pts(qv)
+            frames = {"world": np.eye(4, dtype=float)}
+            for i in range(self._n_seg):
+                p0, p1 = pts[i], pts[i + 1]
+                d = p1 - p0
+                L = float(np.hypot(d[0], d[1]))
+                th = float(np.arctan2(d[1], d[0]))
+                frames[f"seg{i}"] = (
+                    np.eye(4, dtype=float)
+                    if L < 1e-12
+                    else _pose2d(float(p0[0]), float(p0[1]), th, L)
+                )
+            return frames
+
     return _Generated()
 
 

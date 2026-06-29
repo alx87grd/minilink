@@ -35,7 +35,9 @@ class Node:
 class Tree:
     """A search tree rooted at a start state."""
 
-    def __init__(self, root: Node, *, nearest_backend: str = NEAREST_BRUTE_FORCE) -> None:
+    def __init__(
+        self, root: Node, *, nearest_backend: str = NEAREST_BRUTE_FORCE
+    ) -> None:
         if nearest_backend not in NEAREST_BACKENDS:
             raise ValueError(
                 f"nearest_backend must be one of {NEAREST_BACKENDS}, got {nearest_backend!r}"

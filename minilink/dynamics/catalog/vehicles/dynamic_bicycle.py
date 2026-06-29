@@ -12,9 +12,12 @@ command independently.
 gradient-based trajectory optimization.
 """
 
+from functools import partial
+
 import numpy as np
 
 from minilink.core.backends import require_jax_numpy
+from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -27,6 +30,8 @@ from minilink.graphical.animation.primitives import (
     scale_pose2d_matrix,
     translation_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2
+from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
 
 
 class LinearTire:
@@ -114,10 +119,29 @@ class DynamicBicycle(DynamicSystem):
         self.tire_model_f = LinearTire()
         self.tire_model_r = LinearTire()
 
-        # Graphics-only attributes
+        # Graphics-only attributes (2-D centerline look)
         self.wheel_len = 0.6
         self.wheel_width = 0.2
         self.camera_follow_vehicle = True
+
+        # Graphics-only attributes for the 3-D four-wheel look (read by
+        # ``car_skin_3d`` / ``tf_v2``). They live on the base plant so the 3-D
+        # look is just ``skin = car_skin_3d`` — no bespoke subclass needed. They
+        # do not affect the legacy 2-D path, so baselines are unchanged.
+        self.track = 1.92
+        self.body_height = 0.22
+        self.body_width_ratio = 0.72
+        self.body_length_overhang = 0.26
+        self.body_ground_clearance = 0.003
+        self.ground_plane_size = 120.0
+        self._visual_wheel_width = 0.2
+        self._visual_tire_radius_ratio = 0.58
+
+        # v2 visual contract: default 2-D skin (black centerline chassis, to match
+        # the legacy 2-D look) and a camera that tracks the body frame (read by
+        # ``Animator2``; the legacy ``Animator`` ignores both).
+        self.skin = partial(car_skin_2d, color="black")
+        self.camera_follow_frame = "body"
 
     def M(self, q, params=None):
         params = self.params if params is None else params
@@ -344,6 +368,99 @@ class DynamicBicycle(DynamicSystem):
             _force_pose(Ffx_w, Ffy_w, fx, fy),
         ]
 
+    # === v2 frame-keyed visualization contract ===============================
+    #
+    # Honest geometry, native-array ``tf`` (D1). The static skin comes from the
+    # opt-in ``skin`` attribute (``car_skin_2d`` by default; swap to
+    # ``car_skin_3d`` for the 3-D four-wheel look). ``tf_v2`` exposes *both* the
+    # 2-D centerline axle frames and the 3-D corner-wheel frames from one
+    # bicycle FK, so either skin attaches without touching ``f`` / ``tf``.
+
+    def _u_in_v2(self, x, u):
+        """``[w_rear, delta]`` for the v2 geometry (overridden by the rate variant)."""
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        xp = np.asarray
+        return xp([w_rear[0], delta[0]])
+
+    def tf_v2(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+        tr = self.track
+
+        delta = self._u_in_v2(x, u)[1]
+        T_wb = SE2(x[0], x[1], x[2])
+        R_steer = SE2(0.0, 0.0, delta)
+        return {
+            # body frame: 2-D chassis and the 3-D body box (the box bakes its
+            # own ride-height/x-offset via ``local_transform`` in the skin).
+            "body": T_wb,
+            # 2-D centerline axles (car_skin_2d).
+            "axle_rear": T_wb @ SE2(-b, 0.0, 0.0),
+            "axle_front": T_wb @ SE2(a, 0.0, delta),
+            # 3-D corner wheels (car_skin_3d), lifted to the hub height.
+            "wheel_rl": T_wb @ translation(-b, 0.5 * tr, r_r),
+            "wheel_rr": T_wb @ translation(-b, -0.5 * tr, r_r),
+            "wheel_fl": T_wb @ translation(a, 0.5 * tr, r_f) @ R_steer,
+            "wheel_fr": T_wb @ translation(a, -0.5 * tr, r_f) @ R_steer,
+            # frame for the dynamic velocity/force arrows; its own key keeps the
+            # arrows drawn after the static skin (legacy draw order).
+            "arrows": T_wb,
+        }
+
+    def _contact_fields_v2(self, x, u):
+        """Body-frame per-axle velocities and tire forces for the arrow geometry.
+
+        Returns ``(v_r_loc, v_f_loc, F_r_loc, F_f_loc)`` — the rear/front contact
+        velocity and tire force in the body frame. The ``arrows`` ``tf`` (a copy
+        of ``T_wb``) rotates them to world, so no manual ``cos``/``sin`` here.
+        """
+        params = self.params
+        a = params["a"]
+        b = params["b"]
+        vb = x[3:6]
+        u_in = self._u_in_v2(x, u)
+        delta = u_in[1]
+
+        uu, vv, wr = vb[0], vb[1], vb[2]
+        v_f_loc = np.array([uu, vv + a * wr])
+        v_r_loc = np.array([uu, vv - b * wr])
+
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
+        cd, sd = np.cos(delta), np.sin(delta)
+        # Front tire force rotated steer->body; rear is already body-frame.
+        F_f_loc = np.array([Fx_f * cd - Fy_f * sd, Fx_f * sd + Fy_f * cd])
+        F_r_loc = np.array([Fx_r, Fy_r])
+        return v_r_loc, v_f_loc, F_r_loc, F_f_loc
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        """2-D centerline look: one velocity and one force arrow per axle."""
+        b = self.params["b"]
+        a = self.params["a"]
+        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self._contact_fields_v2(x, u)
+        return {
+            "arrows": [
+                ArrowV2(
+                    base=(-b, 0.0), vector=v_r_loc, scale=0.2, color="blue", linewidth=2
+                ),
+                ArrowV2(
+                    base=(a, 0.0), vector=v_f_loc, scale=0.2, color="blue", linewidth=2
+                ),
+                ArrowV2(
+                    base=(-b, 0.0),
+                    vector=F_r_loc,
+                    scale=0.001,
+                    color="red",
+                    linewidth=2,
+                ),
+                ArrowV2(
+                    base=(a, 0.0), vector=F_f_loc, scale=0.001, color="red", linewidth=2
+                ),
+            ]
+        }
+
 
 class DynamicBicycleCar3D(DynamicBicycle):
     """
@@ -368,6 +485,11 @@ class DynamicBicycleCar3D(DynamicBicycle):
         # Larger tires (display only; wheel centers still use r_f / r_r).
         self._visual_wheel_width = 0.2
         self._visual_tire_radius_ratio = 0.58
+
+        # v2: this subclass's look *is* the 3-D skin (so ``render_v2`` matches
+        # ``render``). Phase 5 retires this class in favor of the base plant
+        # carrying ``skin = car_skin_3d``.
+        self.skin = car_skin_3d
 
     def get_kinematic_geometry(self):
         a = self.params["a"]
@@ -507,6 +629,41 @@ class DynamicBicycleCar3D(DynamicBicycle):
             _force_arrow(Ffx_w, Ffy_w, a, 0.5 * tr, r_f),
             _force_arrow(Ffx_w, Ffy_w, a, -0.5 * tr, r_f),
         ]
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        """3-D look: velocity and force arrows duplicated at all four wheels.
+
+        Dynamic geometry is not a skin concern, so the four-wheel arrow set is a
+        manual override here rather than something driven by ``car_skin_3d``. The
+        arrows share the base ``arrows`` frame (``T_wb``); each bakes its wheel
+        corner as its ``base`` and lifts to the hub height via ``local_transform``.
+        """
+        a = self.params["a"]
+        b = self.params["b"]
+        r_f = self.params["r_f"]
+        r_r = self.params["r_r"]
+        tr = self.track
+        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self._contact_fields_v2(x, u)
+
+        def _arrow(vec, scale, color, bx, by, bz):
+            arr = ArrowV2(
+                base=(bx, by), vector=vec, scale=scale, color=color, linewidth=2
+            )
+            arr.local_transform = translation(0.0, 0.0, bz)
+            return arr
+
+        return {
+            "arrows": [
+                _arrow(v_r_loc, 0.2, "blue", -b, 0.5 * tr, r_r),
+                _arrow(v_r_loc, 0.2, "blue", -b, -0.5 * tr, r_r),
+                _arrow(v_f_loc, 0.2, "blue", a, 0.5 * tr, r_f),
+                _arrow(v_f_loc, 0.2, "blue", a, -0.5 * tr, r_f),
+                _arrow(F_r_loc, 0.001, "red", -b, 0.5 * tr, r_r),
+                _arrow(F_r_loc, 0.001, "red", -b, -0.5 * tr, r_r),
+                _arrow(F_f_loc, 0.001, "red", a, 0.5 * tr, r_f),
+                _arrow(F_f_loc, 0.001, "red", a, -0.5 * tr, r_f),
+            ]
+        }
 
 
 # === JAX-traceable variant ===================================================
@@ -768,6 +925,10 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
         dq = N @ v
 
         return jnp.concatenate([dq, dv, u])
+
+    def _u_in_v2(self, x, u):
+        # Wheel rate and steer are integrated states here, not input ports.
+        return np.array([x[6], x[7]])
 
     def get_kinematic_transforms(self, x, u, t):
         a = self.params["a"]

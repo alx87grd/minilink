@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.kinematics import identity, translation
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -9,6 +10,7 @@ from minilink.graphical.animation.primitives import (
     identity_matrix,
     translation_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class MountainCar(MechanicalSystem):
@@ -117,6 +119,45 @@ class MountainCar(MechanicalSystem):
                 scale=0.3,
             ),
         ]
+
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        xs = np.linspace(-1.7, 0.3, 240)
+        terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
+        return {
+            "world": [CustomLine(terrain, color="black", linewidth=2)],
+            "body": [
+                Circle(radius=0.05, center=[0.0, 0.0, 0.0], color="blue", fill=True)
+            ],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        q = x[:1]
+        p = self.forward_kinematic_effector(q)
+        T = translation(p[0], p[1], 0.0)
+        return {
+            "world": identity(),
+            "body": T,
+            "arrows": T,
+        }  # Bug here tangent tf is not correct
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        q = x[:1]
+        slope = self.dz_dx(q[0])
+        tangent = np.array([1.0, slope])
+        tangent = tangent / np.linalg.norm(tangent)
+        return {
+            "arrows": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(u[0] * tangent[0], u[0] * tangent[1]),
+                    scale=0.3,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
 
 
 if __name__ == "__main__":

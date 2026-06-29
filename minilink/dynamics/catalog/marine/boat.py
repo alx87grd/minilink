@@ -13,7 +13,9 @@ from minilink.graphical.animation.primitives import (
     pose2d_matrix,
     scale_pose2d_matrix,
     torque_pose2d_matrix,
+    translation_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 
 
 class Boat2D(GeneralizedMechanicalSystem):
@@ -227,6 +229,75 @@ class Boat2D(GeneralizedMechanicalSystem):
             )
         return transforms
 
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        return {
+            "body": [self.body_shape()],
+            "center": [Point(color="blue", marker="o", size=5)],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        q = x[:3]
+        l_t = self.params["l_t"]
+        T_body = pose2d_matrix(q[0], q[1], q[2])
+        return {
+            "body": T_body,
+            "center": pose2d_matrix(q[0], q[1], 0.0),
+            "thrust": T_body @ translation_matrix(-l_t, 0.0, 0.0),
+            "hydroforce": T_body,
+            "hydrotorque": pose2d_matrix(q[0], q[1], q[2] - np.pi / 2.0),
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        force_scale = 0.0002
+        thrust_len = force_scale * np.hypot(u[0], u[1])
+        a = np.arctan2(u[1], u[0])
+        d = np.array([np.cos(a), np.sin(a)])
+        dynamic = {
+            "thrust": [
+                ArrowV2(
+                    base=-thrust_len * d,
+                    vector=d,
+                    scale=thrust_len,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
+        if self.show_hydrodynamic_forces:
+            q = x[:3]
+            rho = self.params["rho"]
+            Alc = self.params["Alc"]
+            loa = self.params["loa"]
+            Cm_max = self.params["Cm_max"]
+            hydro_force = -self.d(q, x[3:], u, t)
+            torque_max = abs(0.5 * rho * Alc * loa * Cm_max * 12.0)
+            hf_len = force_scale * np.hypot(hydro_force[0], hydro_force[1])
+            hf_a = np.arctan2(hydro_force[1], hydro_force[0])
+            hf_d = np.array([np.cos(hf_a), np.sin(hf_a)])
+            dynamic["hydroforce"] = [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=hf_d,
+                    scale=hf_len,
+                    color="black",
+                    linewidth=2,
+                    style="--",
+                )
+            ]
+            dynamic["hydrotorque"] = [
+                TorqueArrowV2(
+                    sweep=hydro_force[2] * (2.0 * np.pi) / torque_max,
+                    radius=loa / 5.0,
+                    head_ratio=0.4,
+                    color="black",
+                    linewidth=2,
+                    style="--",
+                )
+            ]
+        return dynamic
+
 
 class Boat2DWithCurrent(Boat2D):
     """Planar boat with constant current velocity in world frame."""
@@ -264,6 +335,32 @@ class Boat2DWithCurrent(Boat2D):
             )
         )
         return transforms
+
+    # === v2 frame-keyed visualization contract ===========================
+
+    def tf_v2(self, x, u, t=0, params=None):
+        frames = super().tf_v2(x, u, t)
+        loa = self.params["loa"]
+        frames["current"] = translation_matrix(x[0] - loa, x[1] + loa, 0.0)
+        return frames
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        dynamic = super().get_dynamic_geometry_v2(x, u, t)
+        current_velocity = self.params["current_velocity"]
+        loa = self.params["loa"]
+        length = 0.5 * loa * np.hypot(current_velocity[0], current_velocity[1])
+        a = np.arctan2(current_velocity[1], current_velocity[0])
+        d = np.array([np.cos(a), np.sin(a)])
+        dynamic["current"] = [
+            ArrowV2(
+                base=-length * d,
+                vector=d,
+                scale=length,
+                color="green",
+                linewidth=2,
+            )
+        ]
+        return dynamic
 
 
 if __name__ == "__main__":

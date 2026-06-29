@@ -15,17 +15,18 @@ from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
     ExtrudedPolygon,
+    HorizonPolyline,
     Plane,
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
     TorqueArrow,
     TrajectoryPolyline,
     extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
+from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 from minilink.graphical.common.environment import is_blocking_needed
 from minilink.graphical.common.matplotlib_style import (
     DPI_EXPORT,
@@ -167,6 +168,53 @@ class MatplotlibCanvas:
                     linestyle=primitive.style,
                 )
             self.drawn_objects.append(obj)
+
+        elif isinstance(primitive, (ArrowV2, TorqueArrowV2)):
+            # Honest v2 primitives: geometry baked into ``pts`` (no column-norm
+            # scale, no ``T[3, 3]`` channel) — draw the polyline at its pose.
+            local_pts = primitive.pts
+            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
+            world_pts = (transform_matrix @ local_pts_hom.T).T
+            if isinstance(primitive, TorqueArrowV2) and not self.is_3d:
+                # Match the legacy TorqueArrow: draw the arc and the chevron head
+                # as two separate Line2D so the anti-aliased join is pixel-identical.
+                arc_n = local_pts.shape[0] - 3
+                if arc_n >= 2:
+                    (arc_obj,) = self.ax.plot(
+                        world_pts[:arc_n, 0],
+                        world_pts[:arc_n, 1],
+                        color=primitive.color,
+                        linewidth=primitive.linewidth,
+                        linestyle=primitive.style,
+                    )
+                    self.drawn_objects.append(arc_obj)
+                    (head_obj,) = self.ax.plot(
+                        world_pts[arc_n:, 0],
+                        world_pts[arc_n:, 1],
+                        color=primitive.color,
+                        linewidth=primitive.linewidth,
+                        linestyle="-",
+                    )
+                    self.drawn_objects.append(head_obj)
+            elif self.is_3d:
+                (obj,) = self.ax.plot(
+                    world_pts[:, 0],
+                    world_pts[:, 1],
+                    world_pts[:, 2],
+                    color=primitive.color,
+                    linewidth=primitive.linewidth,
+                    linestyle=primitive.style,
+                )
+                self.drawn_objects.append(obj)
+            else:
+                (obj,) = self.ax.plot(
+                    world_pts[:, 0],
+                    world_pts[:, 1],
+                    color=primitive.color,
+                    linewidth=primitive.linewidth,
+                    linestyle=primitive.style,
+                )
+                self.drawn_objects.append(obj)
 
         elif isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
             channel, T_rigid = extract_amplitude(transform_matrix)
@@ -532,12 +580,15 @@ class MatplotlibRenderer(AnimationRenderer):
             frame = frames[frame_idx]
             canvas.clear()
             camera = frame["camera"]
+            # v2 frames carry their own per-frame primitive list (dynamic geometry
+            # can change each frame); old frames omit it and reuse the fixed list.
+            frame_primitives = frame.get("primitives", primitives)
             if is_3d or _camera_is_world_xy(camera):
                 draw_transforms = frame["transforms"]
             else:
                 W = world_to_camera(camera)
                 draw_transforms = [W @ T for T in frame["transforms"]]
-            for prim, T in zip(primitives, draw_transforms):
+            for prim, T in zip(frame_primitives, draw_transforms):
                 canvas.draw_primitive(prim, T)
             if not is_3d:
                 self._apply_camera(ax, camera, False)

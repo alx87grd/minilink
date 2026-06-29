@@ -10,8 +10,9 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
+from minilink.core.kinematics import apply
 from minilink.planning.spatial.grid import sample_grid
-from minilink.planning.spatial.robot import apply_transform, collision_spheres
+from minilink.planning.spatial.robot import collision_spheres
 from minilink.planning.spatial.workspace_fields import GaussianField
 
 # Public API
@@ -293,7 +294,7 @@ def _draw_robot(ax, robot, x, t, params, color, alpha, point_marker_size):
 
     for shape, T in zip(robot.shapes, robot.body_poses(x, None, t, params)):
         for center, radius in collision_spheres(shape):
-            world = apply_transform(T, center)
+            world = apply(T, center)
             wx, wy = float(world[0]), float(world[1])
             if float(radius) > 1e-12:
                 ax.add_patch(

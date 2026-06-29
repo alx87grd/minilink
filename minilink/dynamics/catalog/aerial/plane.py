@@ -9,9 +9,12 @@ from minilink.graphical.animation.primitives import (
     arrow_transform,
     follow_xy_camera,
     ground_line,
+    identity_matrix,
     pose2d_matrix,
     scale_pose2d_matrix,
+    translation_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class Plane2D(MechanicalSystem):
@@ -269,6 +272,109 @@ class Plane2D(MechanicalSystem):
                 scale=force_scale,
             ),
         ]
+
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        # static-framed primitives (the chord/force geometry is in the dynamic
+        # hook so the legacy draw order survives the static/dynamic merge)
+        return {
+            "body": [self.body_shape()],
+            "center": [Point(color="black", marker="o", size=5)],
+            "wingchord": [self.chord_line()],
+            "world": [ground_line(length=200.0, y=0.0, color="black", style="--")],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        q = x[:3]
+        params = self.params
+        chord_w = np.sqrt(params["S_w"] / params["AR"])
+        chord_t = np.sqrt(params["S_t"] / params["AR"])
+        l_w = params["l_w"]
+        l_t = params["l_t"]
+        theta = q[2]
+        delta = u[1]
+        c, s = np.cos(theta), np.sin(theta)
+        wing = np.array([q[0] - l_w * c, q[1] - l_w * s])
+        tail = np.array([q[0] - l_t * c, q[1] - l_t * s])
+        return {
+            "world": identity_matrix(),
+            "body": pose2d_matrix(q[0], q[1], q[2]),
+            "center": pose2d_matrix(q[0], q[1], 0.0),
+            "wingchord": pose2d_matrix(wing[0], wing[1], theta)
+            @ scale_pose2d_matrix(-chord_w, 0.0, 0.0, 2.0 * chord_w),
+            "thrust": pose2d_matrix(q[0], q[1], q[2])
+            @ translation_matrix(-self.l_cg, 0.0, 0.0),
+            "tailchord": pose2d_matrix(tail[0], tail[1], theta + delta)
+            @ scale_pose2d_matrix(-chord_t, 0.0, 0.0, 2.0 * chord_t),
+            "speed": translation_matrix(q[0], q[1], 0.0),
+            "wingpt": translation_matrix(wing[0], wing[1], 0.0),
+            "tailpt": translation_matrix(tail[0], tail[1], 0.0),
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        q = x[:3]
+        dq = x[3:]
+        speed, gamma, alpha = self.velocity_vector(q, dq)
+        delta = u[1]
+        L_w, D_w, _, L_t, D_t, _ = self.aerodynamic_forces(speed, alpha, delta)
+        force_scale = self.length / 10.0
+        thrust_len = force_scale * u[0]
+        speed_len = min(speed * self.length / 30.0, self.length)
+        cg, sg = np.cos(gamma), np.sin(gamma)
+        return {
+            "thrust": [
+                ArrowV2(
+                    base=(-thrust_len, 0.0),
+                    vector=(1.0, 0.0),
+                    scale=thrust_len,
+                    color="red",
+                    linewidth=2,
+                )
+            ],
+            "tailchord": [self.chord_line()],
+            "speed": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(cg, sg),
+                    scale=speed_len,
+                    color="black",
+                    linewidth=2,
+                )
+            ],
+            "wingpt": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(-L_w * sg, L_w * cg),
+                    scale=force_scale,
+                    color="blue",
+                    linewidth=2,
+                ),
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(-D_w * cg, -D_w * sg),
+                    scale=force_scale,
+                    color="red",
+                    linewidth=2,
+                ),
+            ],
+            "tailpt": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(-L_t * sg, L_t * cg),
+                    scale=force_scale,
+                    color="blue",
+                    linewidth=2,
+                ),
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(-D_t * cg, -D_t * sg),
+                    scale=force_scale,
+                    color="red",
+                    linewidth=2,
+                ),
+            ],
+        }
 
 
 if __name__ == "__main__":

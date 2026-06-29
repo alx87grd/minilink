@@ -8,9 +8,14 @@ Master plan: [`../01_master_overview.md`](../01_master_overview.md).
 
 1. Delete old hooks + `Animator` + channel hacks (`time_channel_matrix`,
    `scale_pose2d_matrix`, `arrow_transform`, `line_between_transform`,
-   `torque_pose2d_matrix`, `extract_amplitude`).
+   `torque_pose2d_matrix`, `extract_amplitude`) and the **legacy
+   `Arrow`/`TorqueArrow`** + their now-dead renderer branches.
 2. Rename `_v2` → final names (`tf`, `get_kinematic_geometry`,
-   `get_dynamic_geometry`, `Animator`, `animate`, `render`).
+   `get_dynamic_geometry`, `Animator`, `animate`, `render`); fold the honest
+   `ArrowV2`/`TorqueArrowV2` from `animation/shapes_v2.py` into `primitives.py` as
+   `Arrow`/`TorqueArrow` (delete `shapes_v2.py`; `catalog/shapes.py` returns to a
+   plain re-export); physically relocate `camera_matrix`/`world_to_camera` from
+   `primitives.py` into `animation/camera.py`.
 3. Base `System` `get_kinematic_geometry` body → the skin-delegating form (D2);
    the `skin` attribute itself was already added in Phase 1 (`None` default).
 4. **Catalog consolidation:** retire `DynamicBicycleCar3D` subclass — one

@@ -21,9 +21,11 @@ boundary.
 Overlays are **not** a new contract: it is the **same three drawable hooks** with
 `(x,u)` dropped — `tf(self, t)`, `get_kinematic_geometry(self)`,
 `get_dynamic_geometry(self, t)` — each with a `{}` default so an add-on overrides
-only what it draws. The animator resolves hooks per drawable (primary: `x,u,t`;
-overlay: `t` only), then calls the **same** `flatten_draw_list(frames, kinematic,
-dynamic)` on each. This preserves the kinematic(cached) vs
+only what it draws. This is the one place the **Phase-5 `Animator`** (formerly
+`Animator2`, renamed at cutover) is extended: it now accepts
+`animate(overlays=[...])`, resolves hooks per drawable (primary: `x,u,t`; overlay:
+`t` only), then calls the **same** `flatten_draw_list(frames, kinematic, dynamic)`
+on each and concatenates `[primary] + overlays`. This preserves the kinematic(cached) vs
 dynamic(rebuilt) split that retained-mode renderers (meshcat) need — no `is_dynamic`
 flag, no `T[3,3]` channel. `Scene.as_visualizer()` overrides only
 `get_kinematic_geometry()`; `SceneHistory` only `get_dynamic_geometry(t)`; `Replay`

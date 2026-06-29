@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -15,6 +16,7 @@ from minilink.graphical.animation.primitives import (
     vehicle_body,
     wheel_box,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class KinematicBicycle(DynamicSystem):
@@ -36,6 +38,8 @@ class KinematicBicycle(DynamicSystem):
         self.tire_length = 0.25
         self.tire_width = 0.08
         self.camera_scale = 10.0
+        # v2 camera hint: track the body frame (read by ``Animator2`` only).
+        self.camera_follow_frame = "body"
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -79,6 +83,43 @@ class KinematicBicycle(DynamicSystem):
             T_body @ pose2d_matrix(front_x, 0.0, steering),
             T_body @ scale_pose2d_matrix(0.0, 0.0, 0.0, 0.4 * abs(speed)),
         ]
+
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        length = self.params["length"]
+        return {
+            "body": [vehicle_body(length=length, width=self.width, color="blue")],
+            "axle_rear": [wheel_box(self.tire_length, self.tire_width)],
+            "axle_front": [wheel_box(self.tire_length, self.tire_width)],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        length = self.params["length"]
+        steering = u[1]
+        rear_x = -0.5 * length
+        front_x = 0.5 * length
+        T_body = SE2(x[0], x[1], x[2])
+        return {
+            "body": T_body,
+            "axle_rear": T_body @ SE2(rear_x, 0.0, 0.0),
+            "axle_front": T_body @ SE2(front_x, 0.0, steering),
+            "arrows": T_body,
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        speed = u[0]
+        return {
+            "arrows": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(1.0, 0.0),
+                    scale=0.4 * abs(speed),
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
 
 
 class KinematicCar(KinematicBicycle):
@@ -138,6 +179,41 @@ class KinematicCar(KinematicBicycle):
             T_body @ scale_pose2d_matrix(0.0, 0.0, 0.0, 0.4 * abs(speed)),
         ]
 
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        length = self.params["length"]
+        body = Box(
+            length_x=length,
+            length_y=self.body_width_ratio * self.width,
+            length_z=0.4,
+            color="#4c72b0",
+            opacity=0.9,
+        )
+        return {
+            "body": [body],
+            "wheel_rl": [wheel_box(self.tire_length, self.tire_width)],
+            "wheel_rr": [wheel_box(self.tire_length, self.tire_width)],
+            "wheel_fl": [wheel_box(self.tire_length, self.tire_width)],
+            "wheel_fr": [wheel_box(self.tire_length, self.tire_width)],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        length = self.params["length"]
+        steering = u[1]
+        axle = 0.5 * self.visual_wheelbase_ratio * length
+        half_track = 0.5 * self.width - 0.5 * self.tire_width
+        T_body = SE2(x[0], x[1], x[2])
+        R_steer = SE2(0.0, 0.0, steering)
+        return {
+            "body": T_body,
+            "wheel_rl": T_body @ SE2(-axle, half_track, 0.0),
+            "wheel_rr": T_body @ SE2(-axle, -half_track, 0.0),
+            "wheel_fl": T_body @ SE2(axle, half_track, 0.0) @ R_steer,
+            "wheel_fr": T_body @ SE2(axle, -half_track, 0.0) @ R_steer,
+            "arrows": T_body,
+        }
+
 
 class ConstantSpeedKinematicCar(DynamicSystem):
     """Kinematic car with constant speed and steering-angle input."""
@@ -160,6 +236,7 @@ class ConstantSpeedKinematicCar(DynamicSystem):
         self.tire_length = 0.25
         self.tire_width = 0.08
         self.camera_scale = 2.0 * self.params["length"]
+        self.camera_follow_frame = "body"
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -191,6 +268,19 @@ class ConstantSpeedKinematicCar(DynamicSystem):
         full_u = np.array([self.params["speed"], steering])
         return KinematicBicycle.get_kinematic_transforms(self, x, full_u, t)
 
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        return KinematicBicycle.get_kinematic_geometry_v2(self)
+
+    def tf_v2(self, x, u, t=0, params=None):
+        full_u = np.array([self.params["speed"], u[0]])
+        return KinematicBicycle.tf_v2(self, x, full_u, t)
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        full_u = np.array([self.params["speed"], u[0]])
+        return KinematicBicycle.get_dynamic_geometry_v2(self, x, full_u, t)
+
 
 class HolonomicMobileRobot(DynamicSystem):
     """Holonomic 2D point robot."""
@@ -207,6 +297,7 @@ class HolonomicMobileRobot(DynamicSystem):
 
         # Graphic parameters (not part of the EoM)
         self.camera_scale = 10.0
+        self.camera_follow_frame = "body"
 
     def f(self, x, u, t=0.0, params=None):
         # holonomic point: velocity command integrates straight to position
@@ -230,6 +321,32 @@ class HolonomicMobileRobot(DynamicSystem):
             arrow_transform(x[0], x[1], u[0], u[1], scale=0.4),
         ]
 
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        return {
+            "body": [
+                Circle(radius=0.25, center=[0.0, 0.0, 0.0], color="blue", fill=True)
+            ]
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        T = translation(x[0], x[1], 0.0)
+        return {"body": T, "arrows": T}
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        return {
+            "arrows": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(u[0], u[1]),
+                    scale=0.4,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
+
 
 class HolonomicMobileRobot3D(DynamicSystem):
     """Holonomic 3D point robot."""
@@ -247,6 +364,7 @@ class HolonomicMobileRobot3D(DynamicSystem):
         # Graphic parameters (not part of the EoM)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 10.0
+        self.camera_follow_frame = "body"
 
     def f(self, x, u, t=0.0, params=None):
         # holonomic point in 3D: velocity command integrates straight to position
@@ -273,6 +391,30 @@ class HolonomicMobileRobot3D(DynamicSystem):
             translation_matrix(x[0], x[1], x[2]),
             arrow_transform(x[0], x[1], u[0], u[1], scale=0.4),
         ]
+
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        return {"body": [Sphere(radius=0.25, color="blue", opacity=0.9)]}
+
+    def tf_v2(self, x, u, t=0, params=None):
+        return {
+            "body": translation(x[0], x[1], x[2]),
+            "arrows": translation(x[0], x[1], 0.0),
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        return {
+            "arrows": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(u[0], u[1]),
+                    scale=0.4,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
 
 
 class UdeSRacecar(KinematicCar):

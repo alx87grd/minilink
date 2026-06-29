@@ -13,17 +13,18 @@ from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
     ExtrudedPolygon,
+    HorizonPolyline,
     Plane,
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
     TorqueArrow,
     TrajectoryPolyline,
     extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
+from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 from minilink.graphical.common.plotly_style import (
     PLOTLY_2D_MARGIN,
     PLOTLY_3D_MARGIN,
@@ -623,7 +624,7 @@ class PlotlyRenderer(AnimationRenderer):
                 is_3d=self.is_3d,
             )
 
-        if isinstance(primitive, (CustomLine, Arrow)):
+        if isinstance(primitive, (CustomLine, Arrow, ArrowV2, TorqueArrowV2)):
             pts = _transform_points(primitive.pts, T)
             return _line_trace(
                 go,

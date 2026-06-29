@@ -1,6 +1,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.kinematics import SE2, identity
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
@@ -9,6 +10,7 @@ from minilink.graphical.animation.primitives import (
     pose2d_matrix,
     torque_pose2d_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import TorqueArrowV2
 
 
 class Pendulum(MechanicalSystem):
@@ -89,6 +91,47 @@ class Pendulum(MechanicalSystem):
             torque_pose2d_matrix(0.0, 0.0, rod_angle, sweep),
         ]
 
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        length = self.params["l"]
+        radius = 0.08 * length
+        return {
+            "world": [
+                Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+            ],
+            "link": [
+                Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
+                Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
+            ],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        theta = x[0]
+        rod_angle = theta - np.pi / 2.0
+        return {
+            "world": identity(),
+            "link": SE2(0.0, 0.0, theta),
+            "torque": SE2(0.0, 0.0, rod_angle),
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        length = self.params["l"]
+        torque = u[0]
+        max_torque = self.inputs["u"].upper_bound[0]
+        sweep = torque * (2.0 * np.pi / 3.0) / max_torque
+        return {
+            "torque": [
+                TorqueArrowV2(
+                    sweep=sweep,
+                    radius=length / 5.0,
+                    head_ratio=0.4,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
+
 
 class PendulumWithNoisePort(Pendulum):
     """Single actuated pendulum with process and measurement noise ports.
@@ -140,6 +183,10 @@ class InvertedPendulum(Pendulum):
         # shared geometry draws angles from the downward vertical, so add pi.
         upright = np.array([x[0] + np.pi, x[1]])
         return super().get_kinematic_transforms(upright, u, t)
+
+    def tf_v2(self, x, u, t=0, params=None):
+        upright = np.array([x[0] + np.pi, x[1]])
+        return super().tf_v2(upright, u, t)
 
 
 class TwoIndependentPendulums(MechanicalSystem):
@@ -242,6 +289,51 @@ class TwoIndependentPendulums(MechanicalSystem):
                 ]
             )
         return transforms
+
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        length = self.params["l"]
+        radius = 0.08 * length
+        geo = {}
+        for i in (0, 1):
+            geo[f"pivot{i}"] = [
+                Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+            ]
+            geo[f"link{i}"] = [
+                Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
+                Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
+            ]
+        return geo
+
+    def tf_v2(self, x, u, t=0, params=None):
+        length = self.params["l"]
+        anchors = [-0.6 * length, 0.6 * length]
+        tf = {}
+        for i, anchor_x in enumerate(anchors):
+            theta = x[i]
+            tf[f"pivot{i}"] = SE2(anchor_x, 0.0, 0.0)
+            tf[f"link{i}"] = SE2(anchor_x, 0.0, theta)
+            tf[f"torque{i}"] = SE2(anchor_x, 0.0, theta - np.pi / 2.0)
+        return tf
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        length = self.params["l"]
+        torque_radius = length / 5.0
+        max_torque = self.inputs["u"].upper_bound[0]
+        sweep_scale = 2.0 * np.pi / 3.0 / max_torque
+        dyn = {}
+        for i in (0, 1):
+            dyn[f"torque{i}"] = [
+                TorqueArrowV2(
+                    sweep=u[i] * sweep_scale,
+                    radius=torque_radius,
+                    head_ratio=0.4,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        return dyn
 
 
 if __name__ == "__main__":

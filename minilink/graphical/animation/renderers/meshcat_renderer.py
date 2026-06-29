@@ -13,16 +13,17 @@ from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
     ExtrudedPolygon,
+    HorizonPolyline,
     Plane,
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
     TorqueArrow,
     TrajectoryPolyline,
     extract_amplitude,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
+from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 from minilink.graphical.common.environment import is_blocking_needed
 
 
@@ -115,6 +116,16 @@ class MeshcatCanvas:
             return (
                 "Arrow",
                 primitive.pts.shape,
+                str(primitive.color),
+                float(primitive.linewidth),
+            )
+        if isinstance(primitive, (ArrowV2, TorqueArrowV2)):
+            # Honest v2 primitives are baked polylines; key on the points so a
+            # reshaped arc/arrow triggers a rebuild (geometry is in ``pts``).
+            return (
+                primitive.__class__.__name__,
+                primitive.pts.shape,
+                tuple(np.asarray(primitive.pts).reshape(-1).tolist()),
                 str(primitive.color),
                 float(primitive.linewidth),
             )
@@ -291,7 +302,7 @@ class MeshcatCanvas:
             self._has_head[i] = False
             return
 
-        if isinstance(primitive, (CustomLine, Arrow)):
+        if isinstance(primitive, (CustomLine, Arrow, ArrowV2, TorqueArrowV2)):
             pts = primitive.pts
             if pts.shape[1] == 2:
                 pts = np.hstack((pts, np.zeros((pts.shape[0], 1))))
@@ -355,7 +366,7 @@ class MeshcatCanvas:
             path.set_transform(self._tf.translation_matrix(world_pt[:3].tolist()))
             return
 
-        if isinstance(primitive, (CustomLine, Arrow, Circle)):
+        if isinstance(primitive, (CustomLine, Arrow, ArrowV2, TorqueArrowV2, Circle)):
             if isinstance(primitive, Circle):
                 local_center = np.zeros(3)
                 local_center[: len(primitive.center)] = primitive.center
@@ -483,7 +494,9 @@ def _rigid_effective_transform(primitive, transform_matrix, tf):
         T_c = tf.translation_matrix(c.tolist())
         return transform_matrix @ T_c
 
-    if isinstance(primitive, (CustomLine, Arrow, ExtrudedPolygon)):
+    if isinstance(
+        primitive, (CustomLine, Arrow, ArrowV2, TorqueArrowV2, ExtrudedPolygon)
+    ):
         return transform_matrix
 
     return None

@@ -131,9 +131,7 @@ class RRTStarPlanner(RRTPlanner):
         cost_tol = star_options.cost_tol if star_options else 0.05
         patience = star_options.convergence_patience if star_options else 500
         record_history = star_options.record_history if star_options else False
-        history_stride = max(
-            1, star_options.history_stride if star_options else 1
-        )
+        history_stride = max(1, star_options.history_stride if star_options else 1)
 
         x_start = np.asarray(self.problem.x_start, dtype=float)
         self.tree = Tree(
@@ -166,9 +164,7 @@ class RRTStarPlanner(RRTPlanner):
                 self.best_goal_cost = float(best_goal_node.cost)
 
             phase = (
-                "optimize"
-                if self.reached_goal and optimize_after_goal
-                else "explore"
+                "optimize" if self.reached_goal and optimize_after_goal else "explore"
             )
             self._on_search_step(phase=phase)
 
@@ -201,9 +197,7 @@ class RRTStarPlanner(RRTPlanner):
             if not options.return_best_effort:
                 raise RuntimeError("RRT* failed to reach goal within max_nodes")
 
-        return self._store_result(
-            self.tree.extract_trajectory(self.solution_node)
-        )
+        return self._store_result(self.tree.extract_trajectory(self.solution_node))
 
     def animate_convergence(self, **kwargs):
         """Animate recorded RRT* history (requires ``record_history=True``)."""
@@ -224,9 +218,7 @@ class RRTStarPlanner(RRTPlanner):
         radius = self._rewire_radius(len(self.tree.nodes))
         near_nodes = self.tree.near(x_new, radius, self.metric)
 
-        best_parent, best_edge, best_cost = self._choose_parent(
-            near_nodes, x_new, rng
-        )
+        best_parent, best_edge, best_cost = self._choose_parent(near_nodes, x_new, rng)
         if best_edge is None:
             return False
 
@@ -246,9 +238,7 @@ class RRTStarPlanner(RRTPlanner):
 
     def _refresh_best_goal(self, goal_region, best_goal_node, cost_tol):
         improved = False
-        previous_cost = (
-            None if best_goal_node is None else float(best_goal_node.cost)
-        )
+        previous_cost = None if best_goal_node is None else float(best_goal_node.cost)
 
         for node in self.tree.nodes:
             if not goal_region.contains(node.x):
@@ -278,9 +268,7 @@ class RRTStarPlanner(RRTPlanner):
             RRTStarSnapshot(
                 iteration=self.iterations,
                 best_cost=(
-                    None
-                    if best_goal_node is None
-                    else float(best_goal_node.cost)
+                    None if best_goal_node is None else float(best_goal_node.cost)
                 ),
                 reached_goal=best_goal_node is not None,
                 tree_edges=tree_edges,

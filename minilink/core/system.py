@@ -61,6 +61,13 @@ class System(SystemFacades):
     user convenience state.
     """
 
+    #: Opt-in swappable look: a callable ``(plant) -> dict[str, list[prim]]`` or
+    #: ``None``. The forward-kinematic geometry contract delegates to it once the
+    #: v2 pipeline lands; ``None`` means "no skin" (empty geometry). Set per
+    #: instance/class to swap a look without touching ``f``/``tf`` (``skin`` is to
+    #: ``get_kinematic_geometry`` as ``params`` is to ``f``).
+    skin = None
+
     def __init__(self, n=0):
         """
         Initialize the system with ``n`` continuous states.
@@ -109,6 +116,12 @@ class System(SystemFacades):
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 10.0
+        # v2 camera hints (read by ``Animator2``'s resolver; the old ``Animator``
+        # ignores them). ``camera_follow_frame`` is a ``tf`` key to track (or
+        # ``None`` for a fixed view); ``camera_priority`` tie-breaks when several
+        # hint-carrying drawables exist.
+        self.camera_follow_frame = None
+        self.camera_priority = 0.0
 
     # Core Dynamical Contract
 
@@ -378,6 +391,28 @@ class System(SystemFacades):
         This visualization contract is intentionally still provisional.
         """
         return []
+
+    # v2 Visualization Contract (frame-keyed; parallel to the old hooks)
+    #
+    # These are the additive entry points of the parallel v2 pipeline driven by
+    # ``Animator2``. They return **frame-keyed dicts** (``tf_v2`` world poses,
+    # geometry keyed by frame) instead of the old index-aligned lists. They stay
+    # empty by default until the Phase 3 catalog migration overrides them; the
+    # base kinematic hook already delegates to the opt-in ``skin`` attribute, so a
+    # plant gets a look by setting ``skin`` without overriding the method. This is
+    # the delegation that becomes the final ``get_kinematic_geometry`` at cutover.
+
+    def get_kinematic_geometry_v2(self):
+        """Static skin as ``dict[str, list[primitive]]`` (delegates to ``skin``)."""
+        return {} if self.skin is None else self.skin(self)
+
+    def tf_v2(self, x, u, t=0, params=None):
+        """World transforms as ``dict[str, 4x4]`` (the forward-kinematics hook)."""
+        return {}
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        """Per-frame geometry as ``dict[str, list[primitive]]`` (rebuilt each frame)."""
+        return {}
 
     def get_camera_transform(self, x, u, t):
         """

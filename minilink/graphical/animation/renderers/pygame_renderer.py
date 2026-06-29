@@ -13,17 +13,18 @@ from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
     ExtrudedPolygon,
+    HorizonPolyline,
     Plane,
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
     TorqueArrow,
     TrajectoryPolyline,
     extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
+from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 
 
 def _import_pygame():
@@ -139,6 +140,21 @@ class PygameCanvas:
                     False,
                     pts,
                     lw,
+                )
+
+        elif isinstance(primitive, (ArrowV2, TorqueArrowV2)):
+            # Honest v2 primitives: baked ``pts`` drawn as a polyline at its pose.
+            local_pts = primitive.pts
+            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
+            world_pts = (transform_matrix @ local_pts_hom.T).T
+            pts = [
+                self._to_screen(world_pts[i, 0], world_pts[i, 1])
+                for i in range(world_pts.shape[0])
+            ]
+            if len(pts) >= 2:
+                lw = max(1, int(round(primitive.linewidth)))
+                pygame_mod.draw.lines(
+                    self.surface, _color_to_rgb(primitive.color), False, pts, lw
                 )
 
         elif isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):

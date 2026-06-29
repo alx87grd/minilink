@@ -13,6 +13,7 @@ the same sweep scaling as the tutorial single pendulum in ``pendulum.py``.
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.kinematics import SE2, identity
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
@@ -22,6 +23,7 @@ from minilink.graphical.animation.primitives import (
     pose2d_matrix,
     torque_pose2d_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import TorqueArrowV2
 
 
 class DoublePendulum(MechanicalSystem):
@@ -196,6 +198,82 @@ class DoublePendulum(MechanicalSystem):
             torque_pose2d_matrix(p1[0], p1[1], rod2_angle, -u[1] * torque_scale),
         ]
 
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        l1 = self.params["l1"]
+        l2 = self.l2
+        radius = 0.08 * max(l1, l2)
+        return {
+            "world": [
+                CustomLine(
+                    [
+                        [-self.ground_half_width, 0.0, 0.0],
+                        [self.ground_half_width, 0.0, 0.0],
+                    ],
+                    color="black",
+                    style="--",
+                )
+            ],
+            "link1": [Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2)],
+            "joint1": [
+                Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+            ],
+            "link2": [Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2)],
+            "joint2": [
+                Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+            ],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        q = x[: self.dof]
+        l1 = self.params["l1"]
+        l2 = self.l2
+        _, s1, _, _, c12, s12 = self._trig(q)
+        c1 = np.cos(q[0])
+        p1 = np.array([l1 * s1, l1 * c1])
+        p2 = p1 + np.array([l2 * s12, l2 * c12])
+        theta1 = np.pi - q[0]
+        theta12 = np.pi - (q[0] + q[1])
+        rod1_angle = np.pi / 2.0 - q[0]
+        rod2_angle = np.pi / 2.0 - q[0] - q[1]
+        return {
+            "world": identity(),
+            "link1": SE2(0.0, 0.0, theta1),
+            "joint1": SE2(p1[0], p1[1], 0.0),
+            "link2": SE2(p1[0], p1[1], theta12),
+            "joint2": SE2(p2[0], p2[1], 0.0),
+            "torque1": SE2(0.0, 0.0, rod1_angle),
+            "torque2": SE2(p1[0], p1[1], rod2_angle),
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        l1 = self.params["l1"]
+        l2 = self.l2
+        torque_radius = 0.2 * max(l1, l2)
+        u_lim = float(self.inputs["u"].upper_bound[0])
+        torque_scale = 2.0 * np.pi / 3.0 / u_lim
+        return {
+            "torque1": [
+                TorqueArrowV2(
+                    sweep=-u[0] * torque_scale,
+                    radius=torque_radius,
+                    head_ratio=0.4,
+                    color="red",
+                    linewidth=2,
+                )
+            ],
+            "torque2": [
+                TorqueArrowV2(
+                    sweep=-u[1] * torque_scale,
+                    radius=torque_radius,
+                    head_ratio=0.4,
+                    color="red",
+                    linewidth=2,
+                )
+            ],
+        }
+
 
 class Acrobot(DoublePendulum):
     """Double pendulum actuated only at the elbow."""
@@ -226,6 +304,25 @@ class Acrobot(DoublePendulum):
             super().get_kinematic_geometry()[:-2]
             + super().get_kinematic_geometry()[-1:]
         )
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        # only the elbow joint is actuated; emit a single torque arc at joint 2
+        l1 = self.params["l1"]
+        l2 = self.l2
+        torque_radius = 0.2 * max(l1, l2)
+        u_lim = float(self.inputs["u"].upper_bound[0])
+        torque_scale = 2.0 * np.pi / 3.0 / u_lim
+        return {
+            "torque2": [
+                TorqueArrowV2(
+                    sweep=-u[0] * torque_scale,
+                    radius=torque_radius,
+                    head_ratio=0.4,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
 
 
 if __name__ == "__main__":

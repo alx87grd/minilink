@@ -9,6 +9,7 @@ that.
 
 __all__ = [
     "Animator",
+    "Animator2",
     "AnimationRenderer",
     "MatplotlibRenderer",
     "MeshcatRenderer",
@@ -19,6 +20,10 @@ __all__ = [
 
 
 def __getattr__(name):
+    if name == "Animator2":
+        from minilink.graphical.animation.animator2 import Animator2
+
+        return Animator2
     if name in __all__:
         from minilink.graphical.animation import animator
 

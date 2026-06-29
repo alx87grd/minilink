@@ -374,6 +374,65 @@ class SystemFacades:
         animator = Animator(self)
         return animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
 
+    def render_v2(self, x, u, t, is_3d=False, renderer="matplotlib", camera=None):
+        """
+        Convenience shortcut rendering a single frame through the v2 pipeline.
+
+        Parallel to :meth:`render`; uses ``Animator2`` and the frame-keyed
+        ``tf_v2`` / ``get_kinematic_geometry_v2`` / ``get_dynamic_geometry_v2``
+        hooks (empty until the Phase 3 catalog migration). ``camera`` accepts a
+        constant 4x4 or a ``camera(frames, x, u, t)`` callable override.
+        """
+        from minilink.graphical.animation.animator2 import Animator2
+
+        animator = Animator2(self)
+        return animator.show(x, u, t, is_3d=is_3d, renderer=renderer, camera=camera)
+
+    def animate_v2(
+        self,
+        traj=None,
+        time_factor_video=1.0,
+        is_3d=False,
+        html: bool | None = None,
+        renderer="matplotlib",
+        native: bool = True,
+        scene_title: str | None = None,
+        show: bool = True,
+        camera=None,
+    ):
+        """
+        Convenience shortcut to animate a trajectory through the v2 pipeline.
+
+        Parallel to :meth:`animate`; uses ``Animator2`` and the frame-keyed v2
+        hooks. ``camera`` accepts the Layer-3 override (a constant 4x4 or a
+        ``camera(frames, x, u, t)`` callable). The v2 hooks are empty until the
+        Phase 3 catalog migration, so this draws nothing for unmigrated plants.
+        """
+        from minilink.graphical.animation.animator2 import Animator2
+        from minilink.graphical.common.environment import prefers_inline_animation
+
+        if traj is None:
+            if self.traj is not None:
+                traj = self.traj
+            else:
+                traj = self.compute_trajectory()
+
+        resolved_html = prefers_inline_animation() if html is None else html
+
+        animator = Animator2(self)
+        show_plot = show and not resolved_html
+        return animator.animate_simulation(
+            traj,
+            time_factor_video=time_factor_video,
+            is_3d=is_3d,
+            html=resolved_html,
+            show=show_plot,
+            renderer=renderer,
+            native=native,
+            scene_title=scene_title,
+            camera=camera,
+        )
+
     def animate(
         self,
         traj=None,

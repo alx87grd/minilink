@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import Point, pose2d_matrix
 
@@ -35,6 +36,12 @@ class SimpleIntegrator(DynamicSystem):
             pose2d_matrix(x[0], 0.0, 0.0),
         ]
 
+    def get_kinematic_geometry_v2(self):
+        return {"p0": [Point(color="blue", marker="o", size=8)]}
+
+    def tf_v2(self, x, u, t=0, params=None):
+        return {"p0": SE2(x[0], 0.0, 0.0)}
+
 
 class DoubleIntegrator(DynamicSystem):
     """Double integrator ``d(position)/dt = speed``, ``d(speed)/dt = u``."""
@@ -68,6 +75,15 @@ class DoubleIntegrator(DynamicSystem):
             pose2d_matrix(x[0], 0.0, 0.0),
             pose2d_matrix(x[1], 0.5, 0.0),
         ]
+
+    def get_kinematic_geometry_v2(self):
+        return {
+            "p0": [Point(color="blue", marker="o", size=8)],
+            "p1": [Point(color="blue", marker="o", size=8)],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        return {"p0": SE2(x[0], 0.0, 0.0), "p1": SE2(x[1], 0.5, 0.0)}
 
 
 class TripleIntegrator(DynamicSystem):
@@ -104,6 +120,20 @@ class TripleIntegrator(DynamicSystem):
             pose2d_matrix(x[1], 0.5, 0.0),
             pose2d_matrix(x[2], 1.0, 0.0),
         ]
+
+    def get_kinematic_geometry_v2(self):
+        return {
+            "p0": [Point(color="blue", marker="o", size=8)],
+            "p1": [Point(color="blue", marker="o", size=8)],
+            "p2": [Point(color="blue", marker="o", size=8)],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        return {
+            "p0": SE2(x[0], 0.0, 0.0),
+            "p1": SE2(x[1], 0.5, 0.0),
+            "p2": SE2(x[2], 1.0, 0.0),
+        }
 
 
 if __name__ == "__main__":

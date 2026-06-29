@@ -7,27 +7,30 @@ todos:
     status: completed
   - id: p1-foundation
     content: "Phase 1: Additive foundation - core/kinematics, Arrow/TorqueArrow primitives, visualization, camera, public graphical/catalog (shapes + skins), local_transform"
-    status: pending
+    status: completed
   - id: p2-v2-pipeline
     content: "Phase 2: Parallel v2 pipeline - _v2 hooks (defaults {}), Animator2, animate_v2; old pipeline untouched"
-    status: pending
+    status: completed
   - id: p3a-vehicles
-    content: "Phase 3a: Vehicle catalog _v2 hooks + pixel parity gate + user review"
-    status: pending
+    content: "Phase 3a: Vehicle catalog _v2 hooks + pixel parity gate + user review. Done: dynamic_bicycle (DynamicBicycle 2D + DynamicBicycleCar3D), steering (KinematicBicycle/Car, ConstantSpeed, Holonomic 2D/3D, UdeS), propulsion, mountain_car -- render==render_v2 0px via scripts/check_render_v2_parity.py. Decision: dynamic arrows are per-class (not skin-driven) -- base DynamicBicycle = 2 centerline arrows, Car3D subclass overrides 4 corner arrows; skins stay static-only (so Car3D is NOT retired via base+skin -- see Phase 5). suspension done via pixel-identical spring (line_between_transform-keyed spring_line, no honest redesign per user). dynamic_bicycle_SL deferred (pre-existing broken tire_models import)."
+    status: completed
   - id: p3b-pendulum
-    content: "Phase 3b: Pendulum family _v2 + pixel parity gate + user review"
-    status: pending
+    content: "Phase 3b: Pendulum family _v2 + pixel parity gate. Done: pendulum (Pendulum/InvertedPendulum/TwoIndependentPendulums), cartpole (CartPole/RotatingCartPole/UnderactuatedRotatingCartPole/JaxCartPole), double_pendulum (DoublePendulum/Acrobot) -- 0px. Fix: 2D TorqueArrowV2 split into separate arc+head Line2D in renderer to match legacy anti-aliasing."
+    status: completed
   - id: p3c-manipulators
-    content: "Phase 3c: Manipulators _v2 + pixel parity gate + user review"
-    status: pending
+    content: "Phase 3c: Manipulators _v2 + pixel parity gate. Done: arms.py (speed-controlled, one/two/three-link, five-link planar) via shared _planar_* helpers -- 0px."
+    status: completed
   - id: p3d-rest
-    content: "Phase 3d: Remaining catalog + diagram _v2 + pixel parity gate + user review"
-    status: pending
+    content: "Phase 3d: Remaining catalog + engines _v2 + pixel parity gate. Done: mass_spring_damper/linear, aerial/{drone,rocket,plane}, marine/boat, equations/integrators, blocks/transfer_function, symbolic/mechanics/export, engines/{world,ancf_tire_jax} -- 0px. ANCF reuses legacy anisotropic arrow/segment transforms keyed to v2 frames (pixel-identical). Camera parity bridge in animation/camera.py honors custom get_camera_transform overrides."
+    status: completed
+  - id: p3e-diagram
+    content: "Phase 3e: DiagramSystem _v2 aggregation + pixel parity gate. Done: core/diagram.py namespaces subsystem frames/geometry via prefix_keys; full ordered draw list built per-subsystem (kinematic-then-dynamic) in the dynamic hook to match legacy concatenation -- pendulum-loop diagram 0px. Note: demo-local controller blocks need their own _v2 hooks (Phase 4)."
+    status: completed
   - id: p4-demos
     content: "Phase 4: Demo subclass _v2 hooks + MPC/trajopt parity + user review"
     status: pending
   - id: p5-cutover
-    content: "Phase 5: Cutover - delete old, rename _v2, base {} default, retire DynamicBicycleCar3D (skin=car_skin_3d), hacks, docs"
+    content: "Phase 5: Cutover - delete old, rename _v2, base {} default, hacks, docs. NOTE: DynamicBicycleCar3D is NOT retired via base+car_skin_3d -- per 3a, its 4-corner arrows are dynamic geometry (a get_dynamic_geometry_v2 override), which a static skin cannot express; it stays a thin subclass (static look = car_skin_3d, dynamic arrows = override)."
     status: pending
   - id: p6-overlays
     content: "Phase 6: Scene/SceneHistory/Replay + animate(overlays) + MPC demo cleanup (user architectural review)"
@@ -175,6 +178,25 @@ get_kinematic_geometry :: params : f`. Reject `sys.get_kinematic_geometry = fn`
 
 ## Current status
 
-**Phase 0 complete** (branch `refactor-v4`): 36 committed PNG baselines +
-`manifest.json` + `test_kinematic_regression` (passing, ruff clean) — awaiting
-**User Review 0** before Phase 1. Phases 1–7 pending.
+**Phases 0–2 complete** (branch `refactor-v4`):
+
+- **Phase 0** — 36 committed PNG baselines + `manifest.json` +
+  `test_kinematic_regression`.
+- **Phase 1** — additive foundation landed: `core/kinematics.py` (`apply`
+  relocated from `robot.py`), `local_transform` + `points_at` on primitives,
+  honest `shapes_v2` arrows, `visualization.flatten_draw_list`, `animation/camera`
+  resolver + factories, public `graphical/catalog` (shapes + skins), `System.skin`.
+- **Phase 2** — parallel v2 pipeline landed: `_v2` hooks (`tf_v2`,
+  `get_kinematic_geometry_v2` delegating to `skin`, `get_dynamic_geometry_v2`),
+  camera hint attributes, `Animator2`, `render_v2()` / `animate_v2()`, additive
+  honest-primitive branches in all four renderers. Old `Animator` / old hooks /
+  baselines untouched.
+
+Full pytest green and ruff clean for the new/edited modules; the old render path
+is byte-for-byte unchanged. **Awaiting User Review 2** before Phase 3.
+
+> Environment note: `test_kinematic_regression` currently shows pre-existing
+> pixel drift on this machine (reproduces with all refactor edits reverted —
+> matplotlib/font rendering differs from where the baselines were committed). It
+> is **not** caused by Phases 1–2; regenerate baselines here if this becomes the
+> canonical environment.

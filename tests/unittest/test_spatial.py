@@ -5,9 +5,9 @@ import pytest
 
 from minilink.core.backends import array_module
 from minilink.core.geometry import Sphere
+from minilink.core.kinematics import apply
 from minilink.planning.spatial.robot import (
     RobotBody,
-    apply_transform,
     point,
     sphere,
 )
@@ -52,14 +52,14 @@ def test_translation_body_pose():
     body = sphere(radius=0.3, position=(0, 1))
     (T,) = body.body_poses(np.array([1.5, -2.0]))
     assert T.shape == (3, 3)
-    assert apply_transform(T, np.zeros(2)) == pytest.approx([1.5, -2.0])
+    assert apply(T, np.zeros(2)) == pytest.approx([1.5, -2.0])
 
 
 def test_translation_body_in_3d():
     body = sphere(radius=0.5, position=(0, 1, 2))
     (T,) = body.body_poses(np.array([1.0, 2.0, 3.0]))
     assert T.shape == (4, 4)
-    assert apply_transform(T, np.zeros(3)) == pytest.approx([1.0, 2.0, 3.0])
+    assert apply(T, np.zeros(3)) == pytest.approx([1.0, 2.0, 3.0])
 
 
 def test_multibody_clearance_is_worst_case_over_parts():

@@ -22,8 +22,7 @@ class ReferencePath(ABC):
 
     @property
     @abstractmethod
-    def workspace_dim(self) -> int:
-        ...
+    def workspace_dim(self) -> int: ...
 
     @property
     @abstractmethod

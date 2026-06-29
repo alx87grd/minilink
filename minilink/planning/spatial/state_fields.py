@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
 from minilink.core.costs import CostFunction
+from minilink.core.kinematics import apply
 from minilink.core.sets import Set
 from minilink.planning.spatial.robot import (
     RobotBody,
-    apply_transform,
     collision_spheres,
 )
 from minilink.planning.spatial.scene import Scene
@@ -29,8 +29,7 @@ class StateField(ABC):
     """Scalar ``value(x)``; export with :meth:`as_constraint` or :meth:`as_cost`."""
 
     @abstractmethod
-    def value(self, x, u=None, t=0.0, params=None):
-        ...
+    def value(self, x, u=None, t=0.0, params=None): ...
 
     def as_constraint(
         self, *, lower: float | None = 0.0, upper: float | None = None
@@ -60,7 +59,7 @@ class ClearanceField(StateField):
         c = []
         for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
             for center, radius in collision_spheres(shape):
-                world = apply_transform(T, center)
+                world = apply(T, center)
                 c.append(scene.clearance(world, t=t, params=params) - radius)
 
         return xp.min(xp.stack(c))
@@ -80,7 +79,7 @@ class CostDensityField(StateField):
         d = []
         for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
             for center, _ in collision_spheres(shape):
-                world = apply_transform(T, center)
+                world = apply(T, center)
                 d.append(scene.cost_density(world, t=t, params=params))
 
         return xp.max(xp.stack(d))
@@ -100,7 +99,7 @@ class PathDistanceField(StateField):
         d = []
         for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
             for center, radius in collision_spheres(shape):
-                world = apply_transform(T, center)
+                world = apply(T, center)
                 d.append(track.distance(world, t=t, params=params) - radius)
 
         return xp.min(xp.stack(d))
@@ -120,7 +119,7 @@ class CorridorMarginField(StateField):
         m = []
         for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
             for center, radius in collision_spheres(shape):
-                world = apply_transform(T, center)
+                world = apply(T, center)
                 m.append(
                     track.half_width
                     - track.distance(world, t=t, params=params)

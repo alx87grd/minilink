@@ -10,7 +10,9 @@ from minilink.graphical.animation.primitives import (
     identity_matrix,
     pose2d_matrix,
     scale_pose2d_matrix,
+    translation_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class Rocket(MechanicalSystem):
@@ -127,6 +129,41 @@ class Rocket(MechanicalSystem):
                 0.0002 * u[0],
             ),
         ]
+
+    # === v2 frame-keyed visualization contract ===========================
+
+    def get_kinematic_geometry_v2(self):
+        return {
+            "body": [self.body_shape()],
+            "center": [Point(color="black", marker="o", size=5)],
+            "world": [ground_line(length=200.0, y=0.0, color="black", style="--")],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        q = x[:3]
+        T_body = pose2d_matrix(q[0], q[1], q[2])
+        return {
+            "world": identity_matrix(),
+            "body": T_body,
+            "center": pose2d_matrix(q[0], q[1], 0.0),
+            "thrust": T_body @ translation_matrix(0.0, -1.0, 0.0),
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        length = 0.0002 * u[0]
+        angle = np.pi / 2.0 + u[1]
+        d = np.array([np.cos(angle), np.sin(angle)])
+        return {
+            "thrust": [
+                ArrowV2(
+                    base=-length * d,
+                    vector=d,
+                    scale=length,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
 
 
 if __name__ == "__main__":

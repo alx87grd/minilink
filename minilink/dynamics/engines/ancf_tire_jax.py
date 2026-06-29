@@ -579,6 +579,57 @@ class ANCFTireSystem(DynamicSystem):
         T.append(identity_matrix())
         return T
 
+    # === v2 frame-keyed visualization contract ===========================
+    #
+    # Every ANCF primitive is a fixed unit shape; only its placing transform
+    # varies (segments stretch, arrows scale anisotropically). To stay
+    # pixel-identical the legacy primitives are reused, keyed to the same
+    # per-frame transforms — no honest-arrow substitution (which would resize
+    # the heads). All geometry is static-shaped, so nothing is dynamic.
+
+    def get_kinematic_geometry_v2(self):
+        geometry = {}
+        for i in range(self.model.n_nodes):
+            geometry[f"seg{i}"] = [
+                CustomLine(
+                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="black", linewidth=3
+                )
+            ]
+        for i in range(self.model.n_nodes):
+            geometry[f"node{i}"] = [
+                Sphere(radius=0.025, center=[0.0, 0.0, 0.0], color="red", opacity=1.0)
+            ]
+        for i in range(self.model.n_nodes):
+            geometry[f"arrow{i}"] = [Arrow(color="red", linewidth=4)]
+        geometry["world"] = [
+            Plane(
+                normal=np.asarray(self.model.plane_normal, dtype=float),
+                offset=float(self.model.plane_offset),
+                size=6.0,
+                thickness=0.03,
+                color="lightgray",
+                opacity=0.65,
+            )
+        ]
+        return geometry
+
+    def tf_v2(self, x, u, t=0, params=None):
+        p = self.node_positions(x)
+        f_contact = self.contact_forces(x)
+        frames = {"world": identity_matrix()}
+        n = self.model.n_nodes
+        for i in range(n):
+            frames[f"seg{i}"] = _line_segment_transform(p[i], p[(i + 1) % n])
+        for i in range(n):
+            frames[f"node{i}"] = translation_matrix(p[i, 0], p[i, 1], p[i, 2])
+        for i in range(n):
+            if np.linalg.norm(f_contact[i]) > self.contact_force_threshold:
+                f = self.contact_force_scale * f_contact[i]
+                frames[f"arrow{i}"] = _vector_arrow_transform(p[i], f)
+            else:
+                frames[f"arrow{i}"] = _vector_arrow_transform(p[i], np.zeros(3))
+        return frames
+
     def get_camera_transform(self, x, u, t):
         target = np.asarray(self.camera_target, dtype=float)
         if self.follow_camera:

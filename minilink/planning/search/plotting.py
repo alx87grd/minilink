@@ -228,9 +228,7 @@ def animate_convergence(
                 f"best cost={snapshot.best_cost:.2f}"
             )
         else:
-            title.set_text(
-                f"{title_prefix}  iter={snapshot.iteration}  searching..."
-            )
+            title.set_text(f"{title_prefix}  iter={snapshot.iteration}  searching...")
         return tree_lines + ([path_line] if path_line is not None else [])
 
     anim = FuncAnimation(

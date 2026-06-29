@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.kinematics import identity, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -12,6 +13,7 @@ from minilink.graphical.animation.primitives import (
     spring_line,
     translation_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class QuarterCarOnRoughTerrain(DynamicSystem):
@@ -40,6 +42,7 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
 
         # Graphic parameters
         self.camera_scale = 10.0
+        self.camera_follow_frame = "body"
 
     def z(self, x, params=None):
         params = self.params if params is None else params
@@ -80,6 +83,49 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
 
     def get_camera_transform(self, x, u, t):
         return follow_xy_camera(x[2], x[1], self.camera_scale)
+
+    # === v2 frame-keyed visualization contract ===========================
+    #
+    # The spring stays the unit ``spring_line`` posed by a per-frame stretch
+    # transform (``line_between_transform``) carried in ``tf_v2`` — the same
+    # transform the legacy path uses, so the look is pixel-identical (the spring
+    # is meant to stretch; there is no honest fixed-length primitive for it).
+
+    def get_kinematic_geometry_v2(self):
+        xs = np.linspace(-5.0, 15.0, 240)
+        terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
+        return {
+            "world": [CustomLine(terrain, color="black", linewidth=1)],
+            "spring": [spring_line(color="black")],
+            "body": [
+                Box(
+                    length_x=0.8, length_y=0.35, length_z=0.2, color="blue", opacity=0.9
+                )
+            ],
+        }
+
+    def tf_v2(self, x, u, t=0, params=None):
+        ground = self.z(x[2])
+        mass_y = x[1]
+        return {
+            "world": identity(),
+            "spring": line_between_transform([x[2], ground], [x[2], mass_y - 0.2]),
+            "body": translation(x[2], mass_y, 0.0),
+            "arrows": translation(x[2] + 0.5, mass_y, 0.0),
+        }
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        return {
+            "arrows": [
+                ArrowV2(
+                    base=(0.0, 0.0),
+                    vector=(0.0, u[0]),
+                    scale=0.2,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
 
     def get_kinematic_geometry(self):
         xs = np.linspace(-5.0, 15.0, 240)

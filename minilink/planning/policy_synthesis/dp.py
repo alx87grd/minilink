@@ -428,7 +428,9 @@ class DynamicProgrammingPlanner(Planner):
         start = time.time()
 
         if verbose:
-            print(f"Computing g(x,u,t) look-up table.. {total_pairs:,} pairs", flush=True)
+            print(
+                f"Computing g(x,u,t) look-up table.. {total_pairs:,} pairs", flush=True
+            )
 
         G = np.empty((N, A), dtype=float)
         pairs_done = 0
@@ -510,7 +512,9 @@ class DynamicProgrammingPlanner(Planner):
     def _print_solve_banner(self, max_iterations, stop_on_tol):
         """Print a pyro-style solve header."""
         if stop_on_tol:
-            print(f"\nComputing backward DP iterations until dJ<{self.options.tol:.2f}:")
+            print(
+                f"\nComputing backward DP iterations until dJ<{self.options.tol:.2f}:"
+            )
             print("---------------------------------------------------------")
         else:
             print(f"\nComputing {max_iterations} backward DP iterations:")
