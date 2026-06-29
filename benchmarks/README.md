@@ -7,7 +7,12 @@ synthetic fixture systems.
 
 The modules import minilink exactly like an external user. Nothing inside
 `minilink/` may import from here (the unittest smoke tests in
-`tests/unittest/` may).
+`tests/unittest/test_benchmark_smoke.py` may).
+
+Benchmark fixtures intentionally differ from unittest planning fixtures: e.g.
+`planning_rrt.holonomic_problem()` uses a dense 18-sphere scene for timing
+studies, while `tests/unittest/planning_helpers.py` keeps a minimal obstacle
+scene for fast RRT contract tests.
 
 ## Running
 

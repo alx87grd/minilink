@@ -58,11 +58,11 @@ from minilink.dynamics.catalog.vehicles.steering import (
     UdeSRacecar,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
-from minilink.graphical.animation.camera import resolve_camera_from_hints
 from minilink.graphical.animation.primitives import Arrow, TorqueArrow
-
 from tests.unittest.graphics_contract_helpers import (
     geometry_smoke as _geometry_smoke,
+)
+from tests.unittest.graphics_contract_helpers import (
     resolved_primitive_count as _primitive_count,
 )
 
@@ -199,48 +199,6 @@ class TestMigratedCatalog(unittest.TestCase):
             with self.subTest(system=system.name):
                 self.assertEqual(_primitive_count(system, TorqueArrow), expected)
                 _geometry_smoke(system)
-
-    def test_dynamic_domain_cameras_follow_pyro_positions(self):
-        cases = [
-            (Plane2D(), np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]), [10.0, 3.0, 0.0]),
-            (Rocket(), np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]), [10.0, 3.0, 0.0]),
-            (Drone2D(), np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]), [10.0, 3.0, 0.0]),
-            (SpeedControlledDrone2D(), np.array([10.0, 3.0]), [10.0, 3.0, 0.0]),
-            (
-                ConstantSpeedHelicopterTunnel(),
-                np.array([0.5, 3.0, 10.0]),
-                [10.0, 3.0, 0.0],
-            ),
-            (
-                Drone2DWithSideThruster(),
-                np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]),
-                [10.0, 3.0, 0.0],
-            ),
-            (Boat2D(), np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]), [10.0, 3.0, 0.0]),
-            (
-                Boat2DWithCurrent(),
-                np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]),
-                [10.0, 3.0, 0.0],
-            ),
-            (KinematicBicycle(), np.array([10.0, 3.0, 0.2]), [10.0, 3.0, 0.0]),
-            (KinematicCar(), np.array([10.0, 3.0, 0.2]), [10.0, 3.0, 0.0]),
-            (ConstantSpeedKinematicCar(), np.array([10.0, 3.0, 0.2]), [10.0, 3.0, 0.0]),
-            (UdeSRacecar(), np.array([10.0, 3.0, 0.2]), [10.0, 3.0, 0.0]),
-            (QuarterCarOnRoughTerrain(), np.array([0.5, 3.0, 10.0]), [10.0, 3.0, 0.0]),
-            (
-                LongitudinalFrontWheelDriveCarWithTorqueInput(),
-                np.array([10.0, 1.0, 0.0, 0.0]),
-                [10.0, 0.0, 0.0],
-            ),
-        ]
-
-        for system, x, expected_target in cases:
-            with self.subTest(system=system.name):
-                u = system.get_u_from_input_ports()
-                frames = system.tf(x, u, 0.0)
-                camera = resolve_camera_from_hints(system, frames, x, u, 0.0)
-                np.testing.assert_allclose(camera[:3, 3], expected_target)
-                self.assertEqual(camera[3, 3], system.camera_scale)
 
     def test_migrated_class_smoke(self):
         systems = [

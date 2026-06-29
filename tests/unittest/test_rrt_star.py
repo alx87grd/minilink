@@ -7,7 +7,7 @@ from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
-from tests.unittest.test_rrt import X_GOAL, make_problem
+from tests.unittest.planning_helpers import X_GOAL, make_holonomic_obstacle_problem
 
 
 def make_steering_extender():
@@ -24,7 +24,7 @@ def path_cost(planner) -> float:
 
 
 def test_rrt_star_reaches_goal():
-    problem, X = make_problem()
+    problem, X = make_holonomic_obstacle_problem()
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
@@ -37,7 +37,7 @@ def test_rrt_star_reaches_goal():
 
 
 def test_rrt_star_reaches_goal_with_kdtree_backend():
-    problem, X = make_problem()
+    problem, X = make_holonomic_obstacle_problem()
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
@@ -52,7 +52,7 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
 
 
 def test_rrt_star_improves_path_cost_over_rrt():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
     star_costs = []
     rrt_costs = []
@@ -72,7 +72,7 @@ def test_rrt_star_improves_path_cost_over_rrt():
 
 
 def test_rewire_false_is_at_least_as_costly():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
     with_rewire = RRTStarPlanner(
         problem,
@@ -96,7 +96,7 @@ def test_rewire_false_is_at_least_as_costly():
 
 
 def test_rrt_star_is_deterministic():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
     options = RRTStarOptions(seed=11, goal_tolerance=0.5, max_nodes=2000)
 
@@ -111,7 +111,7 @@ def test_rrt_star_is_deterministic():
 
 
 def test_rrt_star_infers_rewire_eta_from_extender():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
@@ -121,7 +121,7 @@ def test_rrt_star_infers_rewire_eta_from_extender():
 
 
 def test_rrt_star_requires_rewire_eta_for_unknown_extender():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
 
     class DummyExtender:
         def propose(self, *args, **kwargs):
@@ -143,7 +143,7 @@ def test_search_callback_invoked_on_rrt():
         def __call__(self, step):
             calls.append(step)
 
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=make_steering_extender(),
@@ -168,7 +168,7 @@ def test_live_plot_after_goal_only_skips_explore_phase():
         def __call__(self, step):
             calls.append(step.phase)
 
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
@@ -190,7 +190,7 @@ def test_live_plot_after_goal_only_skips_explore_phase():
 
 
 def test_live_plot_option_builds_callback():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=make_steering_extender(),
@@ -208,7 +208,7 @@ def test_live_plot_option_builds_callback():
 
 
 def test_optimize_after_goal_runs_longer_and_refines_cost():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
     base = dict(seed=4, goal_tolerance=0.5, max_nodes=3500, goal_bias=0.05)
 
@@ -237,7 +237,7 @@ def test_optimize_after_goal_runs_longer_and_refines_cost():
 
 
 def test_convergence_patience_stops_search():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
@@ -257,7 +257,7 @@ def test_convergence_patience_stops_search():
 
 
 def test_record_history_for_animation():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),

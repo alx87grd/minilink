@@ -1,4 +1,4 @@
-"""Shared helpers for canonical graphics contract tests (tf + _resolve_frame)."""
+"""Shared helpers for graphics contract tests (tf + Animator frame resolution)."""
 
 from __future__ import annotations
 

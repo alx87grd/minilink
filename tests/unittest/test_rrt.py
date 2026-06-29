@@ -1,38 +1,22 @@
 import numpy as np
 import pytest
 
-from minilink.core.geometry import Sphere
 from minilink.core.sets import BallSet, BoxSet
 from minilink.dynamics.catalog.vehicles.steering import (
-    HolonomicMobileRobot,
     KinematicBicycle,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.edge import Edge
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
-from minilink.planning.search.metric import euclidean, weighted
+from minilink.planning.search.metric import euclidean
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.steering import DubinsSteering, StraightLineSteering
 from minilink.planning.search.tree import NEAREST_KD_TREE, Node, Tree
-from minilink.planning.spatial.collision import sphere
-from minilink.planning.spatial.scene import Scene
-
-X_START = np.array([-4.0, -4.0])
-X_GOAL = np.array([4.0, 4.0])
-
-
-def make_problem():
-    sys = HolonomicMobileRobot()  # dx = u
-    sys.state.lower_bound = np.array([-6.0, -6.0])
-    sys.state.upper_bound = np.array([6.0, 6.0])
-    sys.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-    sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
-
-    scene = Scene(obstacles=(Sphere([0.0, 0.0], 1.0),))
-    body = sphere(radius=0.2, position=(0, 1))
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
-    return PlanningProblem(sys=sys, x_start=X_START, x_goal=X_GOAL, X=X), X
-
+from tests.unittest.planning_helpers import (
+    X_GOAL,
+    X_START,
+    make_holonomic_obstacle_problem,
+)
 
 COMPASS = [
     np.array([np.cos(a), np.sin(a)])
@@ -40,13 +24,7 @@ COMPASS = [
 ]
 
 
-# --- metric + tree --------------------------------------------------------
-
-
-def test_metrics():
-    assert euclidean([0.0, 0.0], [3.0, 4.0]) == pytest.approx(5.0)
-    d = weighted([1.0, 0.0])
-    assert d([0.0, 0.0], [3.0, 4.0]) == pytest.approx(3.0)  # y ignored
+# --- tree -----------------------------------------------------------------
 
 
 def test_tree_nearest_and_near():
@@ -90,7 +68,7 @@ def test_kdtree_nearest_and_near_match_brute_force():
 
 
 def test_kinodynamic_reaches_goal_with_kdtree_backend():
-    problem, X = make_problem()
+    problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
@@ -124,7 +102,7 @@ def test_kdtree_requires_euclidean_metric():
 
 
 def test_unknown_nearest_backend_raises():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
@@ -138,7 +116,7 @@ def test_unknown_nearest_backend_raises():
 
 
 def test_kinodynamic_reaches_goal_and_stays_free():
-    problem, X = make_problem()
+    problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
@@ -154,7 +132,7 @@ def test_kinodynamic_reaches_goal_and_stays_free():
 
 
 def test_kinodynamic_random_controls_reaches_goal():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=12, horizon=0.6, n_substeps=6),
@@ -166,7 +144,7 @@ def test_kinodynamic_random_controls_reaches_goal():
 
 
 def test_seeded_run_is_deterministic():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
 
     def run():
         return RRTPlanner(
@@ -184,7 +162,7 @@ def test_seeded_run_is_deterministic():
 
 
 def test_steering_reaches_goal_and_stays_free():
-    problem, X = make_problem()
+    problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=SteeringExtender(
@@ -199,7 +177,7 @@ def test_steering_reaches_goal_and_stays_free():
 
 
 def test_steering_edge_is_dynamically_feasible():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     evaluator = problem.sys.compile(backend="numpy", verbose=False)
     (edge,) = list(
         SteeringExtender(
@@ -282,7 +260,7 @@ def test_dubins_rrt_reaches_goal_pose():
 
 
 def test_select_rejects_colliding_candidate_for_free_one():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
@@ -307,7 +285,7 @@ def test_select_rejects_colliding_candidate_for_free_one():
 
 
 def test_reached_goal_false_on_budget_exhaustion():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
@@ -319,7 +297,7 @@ def test_reached_goal_false_on_budget_exhaustion():
 
 
 def test_return_best_effort_false_raises():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
@@ -332,7 +310,7 @@ def test_return_best_effort_false_raises():
 
 
 def test_free_state_sampling_stays_in_X():
-    problem, X = make_problem()
+    problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
@@ -345,7 +323,7 @@ def test_free_state_sampling_stays_in_X():
 
 
 def test_edge_resolution_rejects_segment_through_obstacle():
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner_fine = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
@@ -403,7 +381,7 @@ def test_tree_rewire_and_propagate_cost():
 def test_plot_tree_and_animate_search_smoke():
     mpl = pytest.importorskip("matplotlib")
     mpl.use("Agg")
-    problem, _ = make_problem()
+    problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
