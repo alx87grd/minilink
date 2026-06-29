@@ -13,6 +13,12 @@ sys.compute_trajectory(tf=10, show=False)
 
 sys.animate()
 sys.animate_v2()
+sys.animate(renderer="meshcat")
+sys.animate_v2(renderer="meshcat")
+sys.animate(renderer="plotly")
+sys.animate_v2(renderer="plotly")
+sys.animate(renderer="pygame")
+sys.animate_v2(renderer="pygame")
 
 
 sys = Pendulum()
@@ -24,6 +30,12 @@ sys.compute_trajectory(tf=10, show=False)
 
 sys.animate()
 sys.animate_v2()
+sys.animate(renderer="meshcat")
+sys.animate_v2(renderer="meshcat")
+sys.animate(renderer="plotly")
+sys.animate_v2(renderer="plotly")
+sys.animate(renderer="pygame")
+sys.animate_v2(renderer="pygame")
 
 
 sys = DynamicBicycle()
@@ -36,3 +48,9 @@ sys.compute_trajectory(tf=10, show=False)
 
 sys.animate()
 sys.animate_v2()
+sys.animate(renderer="meshcat")
+sys.animate_v2(renderer="meshcat")
+sys.animate(renderer="plotly")
+sys.animate_v2(renderer="plotly")
+sys.animate(renderer="pygame")
+sys.animate_v2(renderer="pygame")

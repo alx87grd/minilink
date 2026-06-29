@@ -13,18 +13,14 @@ from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
     ExtrudedPolygon,
-    HorizonPolyline,
     Plane,
     Point,
     Rod,
     Sphere,
     TorqueArrow,
-    TrajectoryPolyline,
-    extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
-from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 from minilink.graphical.common.plotly_style import (
     PLOTLY_2D_MARGIN,
     PLOTLY_3D_MARGIN,
@@ -387,9 +383,9 @@ class PlotlyRenderer(AnimationRenderer):
         if not frames:
             raise ValueError("Cannot animate an empty frame list.")
 
-        # v2 frames carry their own per-frame primitive list (dynamic geometry
-        # such as ArrowV2 / TorqueArrowV2 bakes a fresh shape each frame); old
-        # frames omit it and reuse the fixed representative list.
+        # Frames carry their own per-frame primitive list: dynamic geometry
+        # (honest Arrow / TorqueArrow) bakes a fresh shape each frame, while
+        # frames without one reuse the fixed representative list.
         frame_traces = [
             self._traces_for_frame(
                 frame.get("primitives", primitives),
@@ -627,23 +623,8 @@ class PlotlyRenderer(AnimationRenderer):
                 is_3d=self.is_3d,
             )
 
-        if isinstance(primitive, (CustomLine, Arrow, ArrowV2, TorqueArrowV2)):
+        if isinstance(primitive, (CustomLine, Arrow, TorqueArrow)):
             pts = _transform_points(primitive.pts, T)
-            return _line_trace(
-                go,
-                x=pts[:, 0],
-                y=pts[:, 1],
-                z=pts[:, 2] if self.is_3d else None,
-                color=color,
-                width=width,
-                dash=dash,
-                name=name,
-                is_3d=self.is_3d,
-            )
-
-        if isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-            channel, T_rigid = extract_amplitude(T)
-            pts = _transform_points(primitive.compute_pts(channel), T_rigid)
             return _line_trace(
                 go,
                 x=pts[:, 0],

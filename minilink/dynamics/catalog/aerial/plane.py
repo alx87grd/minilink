@@ -6,7 +6,6 @@ from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     Point,
-    arrow_transform,
     follow_xy_camera,
     ground_line,
     identity_matrix,
@@ -14,7 +13,6 @@ from minilink.graphical.animation.primitives import (
     scale_pose2d_matrix,
     translation_matrix,
 )
-from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class Plane2D(MechanicalSystem):
@@ -201,81 +199,6 @@ class Plane2D(MechanicalSystem):
         return CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="blue", linewidth=2)
 
     def get_kinematic_geometry(self):
-        return [
-            self.body_shape(),
-            Point(color="black", marker="o", size=5),
-            self.chord_line(),
-            ground_line(length=200.0, y=0.0, color="black", style="--"),
-            Arrow(color="red", linewidth=2, origin="tip"),
-            self.chord_line(),
-            Arrow(color="black", linewidth=2, origin="base"),
-            Arrow(color="blue", linewidth=2, origin="base"),
-            Arrow(color="red", linewidth=2, origin="base"),
-            Arrow(color="blue", linewidth=2, origin="base"),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        q = x[:3]
-        dq = x[3:]
-        params = self.params
-        speed, gamma, alpha = self.velocity_vector(q, dq)
-        delta = u[1]
-        L_w, D_w, _, L_t, D_t, _ = self.aerodynamic_forces(speed, alpha, delta)
-        force_scale = self.length / 10.0
-        chord_w = np.sqrt(params["S_w"] / params["AR"])
-        chord_t = np.sqrt(params["S_t"] / params["AR"])
-        l_w = params["l_w"]
-        l_t = params["l_t"]
-        theta = q[2]
-        c, s = np.cos(theta), np.sin(theta)
-        wing = np.array([q[0] - l_w * c, q[1] - l_w * s])
-        tail = np.array([q[0] - l_t * c, q[1] - l_t * s])
-        speed_len = min(speed * self.length / 30.0, self.length)
-        return [
-            pose2d_matrix(q[0], q[1], q[2]),
-            pose2d_matrix(q[0], q[1], 0.0),
-            pose2d_matrix(wing[0], wing[1], theta)
-            @ scale_pose2d_matrix(-chord_w, 0.0, 0.0, 2.0 * chord_w),
-            pose2d_matrix(0.0, 0.0, 0.0),
-            pose2d_matrix(q[0], q[1], q[2])
-            @ scale_pose2d_matrix(-self.l_cg, 0.0, 0.0, force_scale * u[0]),
-            pose2d_matrix(tail[0], tail[1], theta + delta)
-            @ scale_pose2d_matrix(-chord_t, 0.0, 0.0, 2.0 * chord_t),
-            scale_pose2d_matrix(q[0], q[1], gamma, speed_len),
-            arrow_transform(
-                wing[0],
-                wing[1],
-                -L_w * np.sin(gamma),
-                L_w * np.cos(gamma),
-                scale=force_scale,
-            ),
-            arrow_transform(
-                wing[0],
-                wing[1],
-                -D_w * np.cos(gamma),
-                -D_w * np.sin(gamma),
-                scale=force_scale,
-            ),
-            arrow_transform(
-                tail[0],
-                tail[1],
-                -L_t * np.sin(gamma),
-                L_t * np.cos(gamma),
-                scale=force_scale,
-            ),
-            arrow_transform(
-                tail[0],
-                tail[1],
-                -D_t * np.cos(gamma),
-                -D_t * np.sin(gamma),
-                scale=force_scale,
-            ),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
         # static-framed primitives (the chord/force geometry is in the dynamic
         # hook so the legacy draw order survives the static/dynamic merge)
         return {
@@ -285,7 +208,7 @@ class Plane2D(MechanicalSystem):
             "world": [ground_line(length=200.0, y=0.0, color="black", style="--")],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         q = x[:3]
         params = self.params
         chord_w = np.sqrt(params["S_w"] / params["AR"])
@@ -312,7 +235,7 @@ class Plane2D(MechanicalSystem):
             "tailpt": translation_matrix(tail[0], tail[1], 0.0),
         }
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         q = x[:3]
         dq = x[3:]
         speed, gamma, alpha = self.velocity_vector(q, dq)
@@ -324,7 +247,7 @@ class Plane2D(MechanicalSystem):
         cg, sg = np.cos(gamma), np.sin(gamma)
         return {
             "thrust": [
-                ArrowV2(
+                Arrow(
                     base=(-thrust_len, 0.0),
                     vector=(1.0, 0.0),
                     scale=thrust_len,
@@ -334,7 +257,7 @@ class Plane2D(MechanicalSystem):
             ],
             "tailchord": [self.chord_line()],
             "speed": [
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(cg, sg),
                     scale=speed_len,
@@ -343,14 +266,14 @@ class Plane2D(MechanicalSystem):
                 )
             ],
             "wingpt": [
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(-L_w * sg, L_w * cg),
                     scale=force_scale,
                     color="blue",
                     linewidth=2,
                 ),
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(-D_w * cg, -D_w * sg),
                     scale=force_scale,
@@ -359,14 +282,14 @@ class Plane2D(MechanicalSystem):
                 ),
             ],
             "tailpt": [
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(-L_t * sg, L_t * cg),
                     scale=force_scale,
                     color="blue",
                     linewidth=2,
                 ),
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(-D_t * cg, -D_t * sg),
                     scale=force_scale,

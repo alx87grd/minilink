@@ -20,10 +20,7 @@ from minilink.graphical.animation.primitives import (
     CustomLine,
     Rod,
     TorqueArrow,
-    pose2d_matrix,
-    torque_pose2d_matrix,
 )
-from minilink.graphical.animation.shapes_v2 import TorqueArrowV2
 
 
 class DoublePendulum(MechanicalSystem):
@@ -150,60 +147,6 @@ class DoublePendulum(MechanicalSystem):
         l1 = self.params["l1"]
         l2 = self.l2
         radius = 0.08 * max(l1, l2)
-        torque_radius = 0.2 * max(l1, l2)
-
-        return [
-            CustomLine(
-                [
-                    [-self.ground_half_width, 0.0, 0.0],
-                    [self.ground_half_width, 0.0, 0.0],
-                ],
-                color="black",
-                style="--",
-            ),
-            Rod(length=l1, radius=0.03 * l1, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(length=l2, radius=0.03 * l2, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            TorqueArrow(radius=torque_radius, head_ratio=0.4, color="red", linewidth=2),
-            TorqueArrow(radius=torque_radius, head_ratio=0.4, color="red", linewidth=2),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        q = x[: self.dof]
-        l1 = self.params["l1"]
-        l2 = self.l2
-        _, s1, _, _, c12, s12 = self._trig(q)
-        c1 = np.cos(q[0])
-
-        # joint pivots: base, elbow, tip (Pyro forward-kinematic convention)
-        p0 = np.array([0.0, 0.0])
-        p1 = np.array([l1 * s1, l1 * c1])
-        p2 = p1 + np.array([l2 * s12, l2 * c12])
-
-        theta1 = np.pi - q[0]
-        theta12 = np.pi - (q[0] + q[1])
-        rod1_angle = np.pi / 2.0 - q[0]
-        rod2_angle = np.pi / 2.0 - q[0] - q[1]
-        u_lim = float(self.inputs["u"].upper_bound[0])
-        torque_scale = 2.0 * np.pi / 3.0 / u_lim
-
-        return [
-            pose2d_matrix(0.0, 0.0, 0.0),
-            pose2d_matrix(p0[0], p0[1], theta1),
-            pose2d_matrix(p1[0], p1[1], 0.0),
-            pose2d_matrix(p1[0], p1[1], theta12),
-            pose2d_matrix(p2[0], p2[1], 0.0),
-            torque_pose2d_matrix(p0[0], p0[1], rod1_angle, -u[0] * torque_scale),
-            torque_pose2d_matrix(p1[0], p1[1], rod2_angle, -u[1] * torque_scale),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        l1 = self.params["l1"]
-        l2 = self.l2
-        radius = 0.08 * max(l1, l2)
         return {
             "world": [
                 CustomLine(
@@ -225,7 +168,7 @@ class DoublePendulum(MechanicalSystem):
             ],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         q = x[: self.dof]
         l1 = self.params["l1"]
         l2 = self.l2
@@ -247,7 +190,7 @@ class DoublePendulum(MechanicalSystem):
             "torque2": SE2(p1[0], p1[1], rod2_angle),
         }
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         l1 = self.params["l1"]
         l2 = self.l2
         torque_radius = 0.2 * max(l1, l2)
@@ -255,7 +198,7 @@ class DoublePendulum(MechanicalSystem):
         torque_scale = 2.0 * np.pi / 3.0 / u_lim
         return {
             "torque1": [
-                TorqueArrowV2(
+                TorqueArrow(
                     sweep=-u[0] * torque_scale,
                     radius=torque_radius,
                     head_ratio=0.4,
@@ -264,7 +207,7 @@ class DoublePendulum(MechanicalSystem):
                 )
             ],
             "torque2": [
-                TorqueArrowV2(
+                TorqueArrow(
                     sweep=-u[1] * torque_scale,
                     radius=torque_radius,
                     head_ratio=0.4,
@@ -295,17 +238,7 @@ class Acrobot(DoublePendulum):
         xp = array_module(q)
         return xp.array([[0.0], [1.0]])
 
-    def get_kinematic_transforms(self, x, u, t):
-        transforms = super().get_kinematic_transforms(x, np.array([0.0, u[0]]), t)
-        return transforms[:-2] + transforms[-1:]
-
-    def get_kinematic_geometry(self):
-        return (
-            super().get_kinematic_geometry()[:-2]
-            + super().get_kinematic_geometry()[-1:]
-        )
-
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         # only the elbow joint is actuated; emit a single torque arc at joint 2
         l1 = self.params["l1"]
         l2 = self.l2
@@ -314,7 +247,7 @@ class Acrobot(DoublePendulum):
         torque_scale = 2.0 * np.pi / 3.0 / u_lim
         return {
             "torque2": [
-                TorqueArrowV2(
+                TorqueArrow(
                     sweep=-u[0] * torque_scale,
                     radius=torque_radius,
                     head_ratio=0.4,

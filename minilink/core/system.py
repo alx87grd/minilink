@@ -116,10 +116,10 @@ class System(SystemFacades):
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 10.0
-        # v2 camera hints (read by ``Animator2``'s resolver; the old ``Animator``
-        # ignores them). ``camera_follow_frame`` is a ``tf`` key to track (or
-        # ``None`` for a fixed view); ``camera_priority`` tie-breaks when several
-        # hint-carrying drawables exist.
+        # Camera hints read by the ``Animator`` camera resolver.
+        # ``camera_follow_frame`` is a ``tf`` key to track (or ``None`` for a
+        # fixed view); ``camera_priority`` tie-breaks when several hint-carrying
+        # drawables exist.
         self.camera_follow_frame = None
         self.camera_priority = 0.0
 
@@ -347,70 +347,24 @@ class System(SystemFacades):
                 f"Unknown input dependencies for output port '{output_id}': {names}"
             )
 
-    # Visualization / Kinematic Contract
+    # Visualization / Kinematic Contract (frame-keyed)
+    #
+    # The three drawable hooks return **frame-keyed dicts**: ``tf`` gives world
+    # poses per named frame (forward kinematics), ``get_kinematic_geometry``
+    # gives the static skin (cached once), and ``get_dynamic_geometry`` gives
+    # per-frame geometry rebuilt each frame (force/torque arrows). The base
+    # ``get_kinematic_geometry`` delegates to the opt-in ``skin`` attribute, so a
+    # plant gets a look by setting ``skin`` without overriding the method.
 
     def get_kinematic_geometry(self):
-        """
-        Return static graphical primitives for this system.
-
-        This visualization contract is intentionally still provisional.
-        By default, the base :class:`System` generates one point per state and
-        one point per input.
-        """
-        from minilink.graphical.animation.primitives import Point
-
-        primitives = []
-        for i in range(self.n):
-            primitives.append(Point(color="blue", marker="o"))
-        for i in range(self.m):
-            primitives.append(Point(color="red", marker="x"))
-        return primitives
-
-    def get_kinematic_transforms(self, x, u, t):
-        """
-        Return transforms corresponding 1-to-1 with the static geometry.
-
-        This visualization contract is intentionally still provisional.
-        By default, states and inputs are mapped to simple translations.
-        """
-        from minilink.graphical.animation.primitives import translation_matrix
-
-        transforms = []
-
-        for i in range(self.n):
-            transforms.append(translation_matrix(dx=x[i], dy=float(i)))
-        for i in range(self.m):
-            transforms.append(translation_matrix(dx=u[i], dy=float(-i - 1)))
-
-        return transforms
-
-    def get_dynamic_geometry(self, x, u, t):
-        """
-        Return frame-specific temporary graphical primitives.
-
-        This visualization contract is intentionally still provisional.
-        """
-        return []
-
-    # v2 Visualization Contract (frame-keyed; parallel to the old hooks)
-    #
-    # These are the additive entry points of the parallel v2 pipeline driven by
-    # ``Animator2``. They return **frame-keyed dicts** (``tf_v2`` world poses,
-    # geometry keyed by frame) instead of the old index-aligned lists. They stay
-    # empty by default until the Phase 3 catalog migration overrides them; the
-    # base kinematic hook already delegates to the opt-in ``skin`` attribute, so a
-    # plant gets a look by setting ``skin`` without overriding the method. This is
-    # the delegation that becomes the final ``get_kinematic_geometry`` at cutover.
-
-    def get_kinematic_geometry_v2(self):
         """Static skin as ``dict[str, list[primitive]]`` (delegates to ``skin``)."""
         return {} if self.skin is None else self.skin(self)
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         """World transforms as ``dict[str, 4x4]`` (the forward-kinematics hook)."""
         return {}
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         """Per-frame geometry as ``dict[str, list[primitive]]`` (rebuilt each frame)."""
         return {}
 
@@ -469,20 +423,14 @@ class StaticSystem(System):
 
         y = h(u, t; p)
 
-    Static blocks default to no kinematic primitives so diagram animation
-    shows only dynamic plants unless a subclass opts in.
+    Static blocks default to no kinematic primitives (empty ``skin``) so diagram
+    animation shows only dynamic plants unless a subclass opts in.
     """
 
     def __init__(self):
         """Initialize with no states and no ports; add ports explicitly."""
         System.__init__(self, 0)
         self.name = "StaticSystem"
-
-    def get_kinematic_geometry(self):
-        return []
-
-    def get_kinematic_transforms(self, x, u, t):
-        return []
 
 
 class DynamicSystem(System):

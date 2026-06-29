@@ -2,9 +2,8 @@
 
 The keyboard-input mapping and the pygame focus/overlay window are pipeline
 agnostic — they take an input dimension and a pygame handle, never a system or
-a renderer. Keeping them here lets both the legacy :class:`Animator` and the v2
-:class:`Animator2` drive the same interactive game mode, so the functionality
-survives the Phase 5 deletion of the old pipeline.
+a renderer — so :class:`~minilink.graphical.animation.animator.Animator` can
+reuse them for the interactive ``game()`` mode.
 
 Roadmap (``ROADMAP.md`` §7): pluggable **input** backends (keyboard vs TCP
 cosimulation) and optional **live output push** should sit beside this keyboard

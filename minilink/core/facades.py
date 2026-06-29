@@ -365,30 +365,19 @@ class SystemFacades:
             filename=filename,
         )
 
-    def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
+    def render(self, x, u, t, is_3d=False, renderer="matplotlib", camera=None):
         """
         Convenience shortcut rendering a single frame of the system.
+
+        ``camera`` accepts an optional override: a constant 4x4 or a
+        ``camera(frames, x, u, t)`` callable.
         """
         from minilink.graphical.animation import Animator
 
         animator = Animator(self)
-        return animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
-
-    def render_v2(self, x, u, t, is_3d=False, renderer="matplotlib", camera=None):
-        """
-        Convenience shortcut rendering a single frame through the v2 pipeline.
-
-        Parallel to :meth:`render`; uses ``Animator2`` and the frame-keyed
-        ``tf_v2`` / ``get_kinematic_geometry_v2`` / ``get_dynamic_geometry_v2``
-        hooks (empty until the Phase 3 catalog migration). ``camera`` accepts a
-        constant 4x4 or a ``camera(frames, x, u, t)`` callable override.
-        """
-        from minilink.graphical.animation.animator2 import Animator2
-
-        animator = Animator2(self)
         return animator.show(x, u, t, is_3d=is_3d, renderer=renderer, camera=camera)
 
-    def animate_v2(
+    def animate(
         self,
         traj=None,
         time_factor_video=1.0,
@@ -401,50 +390,6 @@ class SystemFacades:
         camera=None,
     ):
         """
-        Convenience shortcut to animate a trajectory through the v2 pipeline.
-
-        Parallel to :meth:`animate`; uses ``Animator2`` and the frame-keyed v2
-        hooks. ``camera`` accepts the Layer-3 override (a constant 4x4 or a
-        ``camera(frames, x, u, t)`` callable). The v2 hooks are empty until the
-        Phase 3 catalog migration, so this draws nothing for unmigrated plants.
-        """
-        from minilink.graphical.animation.animator2 import Animator2
-        from minilink.graphical.common.environment import prefers_inline_animation
-
-        if traj is None:
-            if self.traj is not None:
-                traj = self.traj
-            else:
-                traj = self.compute_trajectory()
-
-        resolved_html = prefers_inline_animation() if html is None else html
-
-        animator = Animator2(self)
-        show_plot = show and not resolved_html
-        return animator.animate_simulation(
-            traj,
-            time_factor_video=time_factor_video,
-            is_3d=is_3d,
-            html=resolved_html,
-            show=show_plot,
-            renderer=renderer,
-            native=native,
-            scene_title=scene_title,
-            camera=camera,
-        )
-
-    def animate(
-        self,
-        traj=None,
-        time_factor_video=1.0,
-        is_3d=False,
-        html: bool | None = None,
-        renderer="matplotlib",
-        native: bool = True,
-        scene_title: str | None = None,
-        show: bool = True,
-    ):
-        """
         Convenience shortcut to animate a trajectory of this system.
 
         ``html=None`` auto-resolves via
@@ -455,10 +400,12 @@ class SystemFacades:
         (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``).
         ``native=True`` (default) drives each backend's own animation
         engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
-        Pass ``native=False`` to fall back to the legacy per-frame
-        Python-loop playback (useful for debugging or when the native
-        path's limitations matter — e.g. meshcat freezes dynamic-geometry
-        primitives such as ``TorqueArrow``; see ``DESIGN.md`` §4.7).
+        Pass ``native=False`` to fall back to the per-frame Python-loop
+        playback (useful for debugging or when the native path's limitations
+        matter — e.g. meshcat freezes per-frame dynamic geometry such as a
+        ``TorqueArrow`` sweep; see ``DESIGN.md`` §4.7). ``camera`` accepts an
+        optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
+        callable).
         """
         from minilink.graphical.animation import Animator
         from minilink.graphical.common.environment import prefers_inline_animation
@@ -482,6 +429,7 @@ class SystemFacades:
             renderer=renderer,
             native=native,
             scene_title=scene_title,
+            camera=camera,
         )
 
         # For html output, return the IPython.display.HTML object and let the
@@ -571,40 +519,6 @@ class SystemFacades:
         from minilink.graphical.animation import Animator
 
         animator = Animator(self)
-        return animator.game(
-            dt=dt,
-            dynamics_substeps=dynamics_substeps,
-            renderer=renderer,
-            is_3d=is_3d,
-            x0=self.x0 if x0 is None else x0,
-            u0=np.zeros(self.m) if u0 is None else u0,
-            t0=t0,
-            max_steps=max_steps,
-        )
-
-    def game_v2(
-        self,
-        *,
-        dt=1 / 30.0,
-        dynamics_substeps=1,
-        renderer="pygame",
-        is_3d=False,
-        x0=None,
-        u0=None,
-        t0=0.0,
-        max_steps=None,
-    ):
-        """
-        Interactive game loop through the v2 pipeline.
-
-        Parallel to :meth:`game`; uses ``Animator2`` and the frame-keyed v2 hooks
-        (``tf_v2`` / ``get_kinematic_geometry_v2`` / ``get_dynamic_geometry_v2``),
-        so live force/torque arrows are rebuilt each tick. See ``Animator2.game``
-        and ``ROADMAP.md`` §7.
-        """
-        from minilink.graphical.animation.animator2 import Animator2
-
-        animator = Animator2(self)
         return animator.game(
             dt=dt,
             dynamics_substeps=dynamics_substeps,

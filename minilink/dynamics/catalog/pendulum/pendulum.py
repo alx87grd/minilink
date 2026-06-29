@@ -7,10 +7,7 @@ from minilink.graphical.animation.primitives import (
     Circle,
     Rod,
     TorqueArrow,
-    pose2d_matrix,
-    torque_pose2d_matrix,
 )
-from minilink.graphical.animation.shapes_v2 import TorqueArrowV2
 
 
 class Pendulum(MechanicalSystem):
@@ -71,31 +68,6 @@ class Pendulum(MechanicalSystem):
     def get_kinematic_geometry(self):
         length = self.params["l"]
         radius = 0.08 * length
-        return [
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
-            TorqueArrow(radius=length / 5.0, head_ratio=0.4, color="red", linewidth=2),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        theta = x[0]
-        torque = u[0]
-        rod_angle = theta - np.pi / 2.0
-        max_torque = self.inputs["u"].upper_bound[0]
-        sweep = torque * (2.0 * np.pi / 3.0) / max_torque
-        return [
-            pose2d_matrix(0.0, 0.0, 0.0),
-            pose2d_matrix(0.0, 0.0, theta),
-            pose2d_matrix(0.0, 0.0, theta),
-            torque_pose2d_matrix(0.0, 0.0, rod_angle, sweep),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        length = self.params["l"]
-        radius = 0.08 * length
         return {
             "world": [
                 Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
@@ -106,7 +78,7 @@ class Pendulum(MechanicalSystem):
             ],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         theta = x[0]
         rod_angle = theta - np.pi / 2.0
         return {
@@ -115,14 +87,14 @@ class Pendulum(MechanicalSystem):
             "torque": SE2(0.0, 0.0, rod_angle),
         }
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         length = self.params["l"]
         torque = u[0]
         max_torque = self.inputs["u"].upper_bound[0]
         sweep = torque * (2.0 * np.pi / 3.0) / max_torque
         return {
             "torque": [
-                TorqueArrowV2(
+                TorqueArrow(
                     sweep=sweep,
                     radius=length / 5.0,
                     head_ratio=0.4,
@@ -178,15 +150,11 @@ class InvertedPendulum(Pendulum):
     def g(self, q, params=None):
         return -super().g(q, params)
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         # theta is measured from the upward vertical (zero-angle = upright); the
         # shared geometry draws angles from the downward vertical, so add pi.
         upright = np.array([x[0] + np.pi, x[1]])
-        return super().get_kinematic_transforms(upright, u, t)
-
-    def tf_v2(self, x, u, t=0, params=None):
-        upright = np.array([x[0] + np.pi, x[1]])
-        return super().tf_v2(upright, u, t)
+        return super().tf(upright, u, t)
 
 
 class TwoIndependentPendulums(MechanicalSystem):
@@ -244,57 +212,6 @@ class TwoIndependentPendulums(MechanicalSystem):
     def get_kinematic_geometry(self):
         length = self.params["l"]
         radius = 0.08 * length
-        torque_radius = length / 5.0
-        return [
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
-            TorqueArrow(
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
-            ),
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
-            TorqueArrow(
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
-            ),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        length = self.params["l"]
-        anchors = [-0.6 * length, 0.6 * length]
-        max_torque = self.inputs["u"].upper_bound[0]
-        sweep_scale = 2.0 * np.pi / 3.0 / max_torque
-        transforms = []
-        for i, anchor_x in enumerate(anchors):
-            theta = x[i]
-            rod_angle = theta - np.pi / 2.0
-            transforms.extend(
-                [
-                    pose2d_matrix(anchor_x, 0.0, 0.0),
-                    pose2d_matrix(anchor_x, 0.0, theta),
-                    pose2d_matrix(anchor_x, 0.0, theta),
-                    torque_pose2d_matrix(
-                        anchor_x,
-                        0.0,
-                        rod_angle,
-                        u[i] * sweep_scale,
-                    ),
-                ]
-            )
-        return transforms
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        length = self.params["l"]
-        radius = 0.08 * length
         geo = {}
         for i in (0, 1):
             geo[f"pivot{i}"] = [
@@ -306,7 +223,7 @@ class TwoIndependentPendulums(MechanicalSystem):
             ]
         return geo
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         length = self.params["l"]
         anchors = [-0.6 * length, 0.6 * length]
         tf = {}
@@ -317,7 +234,7 @@ class TwoIndependentPendulums(MechanicalSystem):
             tf[f"torque{i}"] = SE2(anchor_x, 0.0, theta - np.pi / 2.0)
         return tf
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         length = self.params["l"]
         torque_radius = length / 5.0
         max_torque = self.inputs["u"].upper_bound[0]
@@ -325,7 +242,7 @@ class TwoIndependentPendulums(MechanicalSystem):
         dyn = {}
         for i in (0, 1):
             dyn[f"torque{i}"] = [
-                TorqueArrowV2(
+                TorqueArrow(
                     sweep=u[i] * sweep_scale,
                     radius=torque_radius,
                     head_ratio=0.4,

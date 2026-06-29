@@ -7,16 +7,11 @@ from minilink.graphical.animation.primitives import (
     Box,
     Circle,
     Sphere,
-    arrow_transform,
     camera_matrix,
     follow_xy_camera,
-    pose2d_matrix,
-    scale_pose2d_matrix,
-    translation_matrix,
     vehicle_body,
     wheel_box,
 )
-from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class KinematicBicycle(DynamicSystem):
@@ -64,37 +59,13 @@ class KinematicBicycle(DynamicSystem):
 
     def get_kinematic_geometry(self):
         length = self.params["length"]
-        return [
-            vehicle_body(length=length, width=self.width, color="blue"),
-            wheel_box(self.tire_length, self.tire_width),
-            wheel_box(self.tire_length, self.tire_width),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        length = self.params["length"]
-        speed, steering = u[0], u[1]
-        rear_x = -0.5 * length
-        front_x = 0.5 * length
-        T_body = pose2d_matrix(x[0], x[1], x[2])
-        return [
-            T_body,
-            T_body @ pose2d_matrix(rear_x, 0.0, 0.0),
-            T_body @ pose2d_matrix(front_x, 0.0, steering),
-            T_body @ scale_pose2d_matrix(0.0, 0.0, 0.0, 0.4 * abs(speed)),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        length = self.params["length"]
         return {
             "body": [vehicle_body(length=length, width=self.width, color="blue")],
             "axle_rear": [wheel_box(self.tire_length, self.tire_width)],
             "axle_front": [wheel_box(self.tire_length, self.tire_width)],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         length = self.params["length"]
         steering = u[1]
         rear_x = -0.5 * length
@@ -107,11 +78,11 @@ class KinematicBicycle(DynamicSystem):
             "arrows": T_body,
         }
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         speed = u[0]
         return {
             "arrows": [
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(1.0, 0.0),
                     scale=0.4 * abs(speed),
@@ -152,44 +123,6 @@ class KinematicCar(KinematicBicycle):
             color="#4c72b0",
             opacity=0.9,
         )
-        return [
-            body,
-            wheel_box(self.tire_length, self.tire_width),  # rear-left
-            wheel_box(self.tire_length, self.tire_width),  # rear-right
-            wheel_box(self.tire_length, self.tire_width),  # front-left (steers)
-            wheel_box(self.tire_length, self.tire_width),  # front-right (steers)
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        length = self.params["length"]
-        speed, steering = u[0], u[1]
-        axle = 0.5 * self.visual_wheelbase_ratio * length
-        half_track = (
-            0.5 * self.width - 0.5 * self.tire_width
-        )  # tire flush with the side
-        T_body = pose2d_matrix(x[0], x[1], x[2])
-        R_steer = pose2d_matrix(0.0, 0.0, steering)
-        return [
-            T_body,
-            T_body @ pose2d_matrix(-axle, half_track, 0.0),
-            T_body @ pose2d_matrix(-axle, -half_track, 0.0),
-            T_body @ pose2d_matrix(axle, half_track, 0.0) @ R_steer,
-            T_body @ pose2d_matrix(axle, -half_track, 0.0) @ R_steer,
-            T_body @ scale_pose2d_matrix(0.0, 0.0, 0.0, 0.4 * abs(speed)),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        length = self.params["length"]
-        body = Box(
-            length_x=length,
-            length_y=self.body_width_ratio * self.width,
-            length_z=0.4,
-            color="#4c72b0",
-            opacity=0.9,
-        )
         return {
             "body": [body],
             "wheel_rl": [wheel_box(self.tire_length, self.tire_width)],
@@ -198,7 +131,7 @@ class KinematicCar(KinematicBicycle):
             "wheel_fr": [wheel_box(self.tire_length, self.tire_width)],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         length = self.params["length"]
         steering = u[1]
         axle = 0.5 * self.visual_wheelbase_ratio * length
@@ -263,23 +196,13 @@ class ConstantSpeedKinematicCar(DynamicSystem):
     def get_kinematic_geometry(self):
         return KinematicBicycle.get_kinematic_geometry(self)
 
-    def get_kinematic_transforms(self, x, u, t):
-        steering = u[0]
-        full_u = np.array([self.params["speed"], steering])
-        return KinematicBicycle.get_kinematic_transforms(self, x, full_u, t)
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        return KinematicBicycle.get_kinematic_geometry_v2(self)
-
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         full_u = np.array([self.params["speed"], u[0]])
-        return KinematicBicycle.tf_v2(self, x, full_u, t)
+        return KinematicBicycle.tf(self, x, full_u, t)
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         full_u = np.array([self.params["speed"], u[0]])
-        return KinematicBicycle.get_dynamic_geometry_v2(self, x, full_u, t)
+        return KinematicBicycle.get_dynamic_geometry(self, x, full_u, t)
 
 
 class HolonomicMobileRobot(DynamicSystem):
@@ -310,34 +233,20 @@ class HolonomicMobileRobot(DynamicSystem):
         return follow_xy_camera(x[0], x[1], self.camera_scale)
 
     def get_kinematic_geometry(self):
-        return [
-            Circle(radius=0.25, center=[0.0, 0.0, 0.0], color="blue", fill=True),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            translation_matrix(x[0], x[1], 0.0),
-            arrow_transform(x[0], x[1], u[0], u[1], scale=0.4),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
         return {
             "body": [
                 Circle(radius=0.25, center=[0.0, 0.0, 0.0], color="blue", fill=True)
             ]
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         T = translation(x[0], x[1], 0.0)
         return {"body": T, "arrows": T}
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {
             "arrows": [
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(u[0], u[1]),
                     scale=0.4,
@@ -381,32 +290,18 @@ class HolonomicMobileRobot3D(DynamicSystem):
         )
 
     def get_kinematic_geometry(self):
-        return [
-            Sphere(radius=0.25, color="blue", opacity=0.9),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            translation_matrix(x[0], x[1], x[2]),
-            arrow_transform(x[0], x[1], u[0], u[1], scale=0.4),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
         return {"body": [Sphere(radius=0.25, color="blue", opacity=0.9)]}
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         return {
             "body": translation(x[0], x[1], x[2]),
             "arrows": translation(x[0], x[1], 0.0),
         }
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {
             "arrows": [
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(u[0], u[1]),
                     scale=0.4,

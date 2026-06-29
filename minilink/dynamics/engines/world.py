@@ -72,34 +72,6 @@ class PhysicsWorldSystem(DynamicSystem):
         return x
 
     def get_kinematic_geometry(self):
-        prim = []
-        for i in range(self.world.n_bodies):
-            r = float(np.asarray(self.world.radii)[i])
-            prim.append(
-                Sphere(radius=r, center=[0.0, 0.0, 0.0], color="red", opacity=1.0)
-            )
-        prim.append(
-            Plane(
-                normal=np.asarray(self.world.plane_normal, dtype=float),
-                offset=float(self.world.plane_offset),
-                size=100.0,
-                thickness=0.1,
-                color="blue",
-                opacity=0.0,
-            )
-        )
-        return prim
-
-    def get_kinematic_transforms(self, x, u, t):
-        pos, _, _, _ = unpack_state(x, self.world.n_bodies)
-        pos_np = np.asarray(pos, dtype=float)
-        T = [translation_matrix(p[0], p[1], p[2]) for p in pos_np]
-        T.append(np.eye(4, dtype=float))  # plane guide is already in world coords
-        return T
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
         geometry = {}
         for i in range(self.world.n_bodies):
             r = float(np.asarray(self.world.radii)[i])
@@ -118,7 +90,7 @@ class PhysicsWorldSystem(DynamicSystem):
         ]
         return geometry
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         pos, _, _, _ = unpack_state(x, self.world.n_bodies)
         pos_np = np.asarray(pos, dtype=float)
         frames = {"world": np.eye(4, dtype=float)}

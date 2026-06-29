@@ -2,7 +2,7 @@ import numpy as np
 
 from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem
-from minilink.graphical.animation.primitives import Point, pose2d_matrix
+from minilink.graphical.animation.primitives import Point
 
 
 class SimpleIntegrator(DynamicSystem):
@@ -27,19 +27,9 @@ class SimpleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return [
-            Point(color="blue", marker="o", size=8),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            pose2d_matrix(x[0], 0.0, 0.0),
-        ]
-
-    def get_kinematic_geometry_v2(self):
         return {"p0": [Point(color="blue", marker="o", size=8)]}
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         return {"p0": SE2(x[0], 0.0, 0.0)}
 
 
@@ -65,24 +55,12 @@ class DoubleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return [
-            Point(color="blue", marker="o", size=8),
-            Point(color="blue", marker="o", size=8),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            pose2d_matrix(x[0], 0.0, 0.0),
-            pose2d_matrix(x[1], 0.5, 0.0),
-        ]
-
-    def get_kinematic_geometry_v2(self):
         return {
             "p0": [Point(color="blue", marker="o", size=8)],
             "p1": [Point(color="blue", marker="o", size=8)],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         return {"p0": SE2(x[0], 0.0, 0.0), "p1": SE2(x[1], 0.5, 0.0)}
 
 
@@ -108,27 +86,13 @@ class TripleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return [
-            Point(color="blue", marker="o", size=8),
-            Point(color="blue", marker="o", size=8),
-            Point(color="blue", marker="o", size=8),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            pose2d_matrix(x[0], 0.0, 0.0),
-            pose2d_matrix(x[1], 0.5, 0.0),
-            pose2d_matrix(x[2], 1.0, 0.0),
-        ]
-
-    def get_kinematic_geometry_v2(self):
         return {
             "p0": [Point(color="blue", marker="o", size=8)],
             "p1": [Point(color="blue", marker="o", size=8)],
             "p2": [Point(color="blue", marker="o", size=8)],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         return {
             "p0": SE2(x[0], 0.0, 0.0),
             "p1": SE2(x[1], 0.5, 0.0),

@@ -9,10 +9,8 @@ from minilink.graphical.animation.primitives import (
     ground_line,
     identity_matrix,
     pose2d_matrix,
-    scale_pose2d_matrix,
     translation_matrix,
 )
-from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class Rocket(MechanicalSystem):
@@ -107,39 +105,13 @@ class Rocket(MechanicalSystem):
         return CustomLine(pts, color="blue", linewidth=2)
 
     def get_kinematic_geometry(self):
-        return [
-            self.body_shape(),
-            Point(color="black", marker="o", size=5),
-            ground_line(length=200.0, y=0.0, color="black", style="--"),
-            Arrow(color="red", linewidth=2, origin="tip"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        q = x[:3]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
-        return [
-            T_body,
-            pose2d_matrix(q[0], q[1], 0.0),
-            identity_matrix(),
-            T_body
-            @ scale_pose2d_matrix(
-                0.0,
-                -1.0,
-                np.pi / 2.0 + u[1],
-                0.0002 * u[0],
-            ),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
         return {
             "body": [self.body_shape()],
             "center": [Point(color="black", marker="o", size=5)],
             "world": [ground_line(length=200.0, y=0.0, color="black", style="--")],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         q = x[:3]
         T_body = pose2d_matrix(q[0], q[1], q[2])
         return {
@@ -149,13 +121,13 @@ class Rocket(MechanicalSystem):
             "thrust": T_body @ translation_matrix(0.0, -1.0, 0.0),
         }
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         length = 0.0002 * u[0]
         angle = np.pi / 2.0 + u[1]
         d = np.array([np.cos(angle), np.sin(angle)])
         return {
             "thrust": [
-                ArrowV2(
+                Arrow(
                     base=-length * d,
                     vector=d,
                     scale=length,

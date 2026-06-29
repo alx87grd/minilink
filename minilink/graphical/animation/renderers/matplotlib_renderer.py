@@ -15,18 +15,14 @@ from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
     ExtrudedPolygon,
-    HorizonPolyline,
     Plane,
     Point,
     Rod,
     Sphere,
     TorqueArrow,
-    TrajectoryPolyline,
-    extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
-from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 from minilink.graphical.common.environment import is_blocking_needed
 from minilink.graphical.common.matplotlib_style import (
     DPI_EXPORT,
@@ -143,60 +139,12 @@ class MatplotlibCanvas:
             self.drawn_objects.append(obj)
 
         elif isinstance(primitive, Arrow):
+            # Honest arrow: geometry baked into ``pts`` (no column-norm scale,
+            # no ``T[3, 3]`` channel) — draw the polyline at its pose.
             local_pts = primitive.pts
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
             world_pts = (transform_matrix @ local_pts_hom.T).T
-            x = world_pts[:, 0]
-            y = world_pts[:, 1]
-
             if self.is_3d:
-                z = world_pts[:, 2]
-                (obj,) = self.ax.plot(
-                    x,
-                    y,
-                    z,
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle=primitive.style,
-                )
-            else:
-                (obj,) = self.ax.plot(
-                    x,
-                    y,
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle=primitive.style,
-                )
-            self.drawn_objects.append(obj)
-
-        elif isinstance(primitive, (ArrowV2, TorqueArrowV2)):
-            # Honest v2 primitives: geometry baked into ``pts`` (no column-norm
-            # scale, no ``T[3, 3]`` channel) — draw the polyline at its pose.
-            local_pts = primitive.pts
-            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (transform_matrix @ local_pts_hom.T).T
-            if isinstance(primitive, TorqueArrowV2) and not self.is_3d:
-                # Match the legacy TorqueArrow: draw the arc and the chevron head
-                # as two separate Line2D so the anti-aliased join is pixel-identical.
-                arc_n = local_pts.shape[0] - 3
-                if arc_n >= 2:
-                    (arc_obj,) = self.ax.plot(
-                        world_pts[:arc_n, 0],
-                        world_pts[:arc_n, 1],
-                        color=primitive.color,
-                        linewidth=primitive.linewidth,
-                        linestyle=primitive.style,
-                    )
-                    self.drawn_objects.append(arc_obj)
-                    (head_obj,) = self.ax.plot(
-                        world_pts[arc_n:, 0],
-                        world_pts[arc_n:, 1],
-                        color=primitive.color,
-                        linewidth=primitive.linewidth,
-                        linestyle="-",
-                    )
-                    self.drawn_objects.append(head_obj)
-            elif self.is_3d:
                 (obj,) = self.ax.plot(
                     world_pts[:, 0],
                     world_pts[:, 1],
@@ -205,7 +153,6 @@ class MatplotlibCanvas:
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
                 )
-                self.drawn_objects.append(obj)
             else:
                 (obj,) = self.ax.plot(
                     world_pts[:, 0],
@@ -214,15 +161,27 @@ class MatplotlibCanvas:
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
                 )
-                self.drawn_objects.append(obj)
+            self.drawn_objects.append(obj)
 
-        elif isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-            channel, T_rigid = extract_amplitude(transform_matrix)
-            local_pts = primitive.compute_pts(channel)
+        elif isinstance(primitive, TorqueArrow):
+            # Honest torque arc: sweep baked into ``pts``. In 2D draw the arc and
+            # the chevron head as two separate Line2D so the anti-aliased join is
+            # crisp; in 3D draw a single polyline.
+            local_pts = primitive.pts
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (T_rigid @ local_pts_hom.T).T
-
-            if isinstance(primitive, TorqueArrow):
+            world_pts = (transform_matrix @ local_pts_hom.T).T
+            if self.is_3d:
+                if local_pts.shape[0] >= 2:
+                    (obj,) = self.ax.plot(
+                        world_pts[:, 0],
+                        world_pts[:, 1],
+                        world_pts[:, 2],
+                        color=primitive.color,
+                        linewidth=primitive.linewidth,
+                        linestyle=primitive.style,
+                    )
+                    self.drawn_objects.append(obj)
+            else:
                 arc_n = local_pts.shape[0] - 3
                 if arc_n >= 2:
                     (arc_obj,) = self.ax.plot(
@@ -241,15 +200,6 @@ class MatplotlibCanvas:
                         linestyle="-",
                     )
                     self.drawn_objects.append(head_obj)
-            elif local_pts.shape[0] >= 2:
-                (obj,) = self.ax.plot(
-                    world_pts[:, 0],
-                    world_pts[:, 1],
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle=primitive.style,
-                )
-                self.drawn_objects.append(obj)
 
         elif isinstance(primitive, Circle):
             local_center = np.zeros(3)

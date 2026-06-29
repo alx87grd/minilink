@@ -530,64 +530,6 @@ class ANCFTireSystem(DynamicSystem):
         return np.asarray(f_contact, dtype=float)
 
     def get_kinematic_geometry(self):
-        prim = []
-        for _ in range(self.model.n_nodes):
-            prim.append(
-                CustomLine(
-                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
-                    color="black",
-                    linewidth=3,
-                )
-            )
-        for _ in range(self.model.n_nodes):
-            prim.append(
-                Sphere(
-                    radius=0.025,
-                    center=[0.0, 0.0, 0.0],
-                    color="red",
-                    opacity=1.0,
-                )
-            )
-        for _ in range(self.model.n_nodes):
-            prim.append(Arrow(color="red", linewidth=4))
-        prim.append(
-            Plane(
-                normal=np.asarray(self.model.plane_normal, dtype=float),
-                offset=float(self.model.plane_offset),
-                size=6.0,
-                thickness=0.03,
-                color="lightgray",
-                opacity=0.65,
-            )
-        )
-        return prim
-
-    def get_kinematic_transforms(self, x, u, t):
-        p = self.node_positions(x)
-        f_contact = self.contact_forces(x)
-        T = []
-        for i in range(self.model.n_nodes):
-            T.append(_line_segment_transform(p[i], p[(i + 1) % self.model.n_nodes]))
-        for i in range(self.model.n_nodes):
-            T.append(translation_matrix(p[i, 0], p[i, 1], p[i, 2]))
-        for i in range(self.model.n_nodes):
-            if np.linalg.norm(f_contact[i]) > self.contact_force_threshold:
-                f = self.contact_force_scale * f_contact[i]
-                T.append(_vector_arrow_transform(p[i], f))
-            else:
-                T.append(_vector_arrow_transform(p[i], np.zeros(3)))
-        T.append(identity_matrix())
-        return T
-
-    # === v2 frame-keyed visualization contract ===========================
-    #
-    # Every ANCF primitive is a fixed unit shape; only its placing transform
-    # varies (segments stretch, arrows scale anisotropically). To stay
-    # pixel-identical the legacy primitives are reused, keyed to the same
-    # per-frame transforms — no honest-arrow substitution (which would resize
-    # the heads). All geometry is static-shaped, so nothing is dynamic.
-
-    def get_kinematic_geometry_v2(self):
         geometry = {}
         for i in range(self.model.n_nodes):
             geometry[f"seg{i}"] = [
@@ -613,7 +555,7 @@ class ANCFTireSystem(DynamicSystem):
         ]
         return geometry
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         p = self.node_positions(x)
         f_contact = self.contact_forces(x)
         frames = {"world": identity_matrix()}

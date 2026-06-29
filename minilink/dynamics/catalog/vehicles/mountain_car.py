@@ -6,11 +6,7 @@ from minilink.graphical.animation.primitives import (
     Arrow,
     Circle,
     CustomLine,
-    arrow_transform,
-    identity_matrix,
-    translation_matrix,
 )
-from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class MountainCar(MechanicalSystem):
@@ -96,35 +92,6 @@ class MountainCar(MechanicalSystem):
     def get_kinematic_geometry(self):
         xs = np.linspace(-1.7, 0.3, 240)
         terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
-        return [
-            CustomLine(terrain, color="black", linewidth=2),
-            Circle(radius=0.05, center=[0.0, 0.0, 0.0], color="blue", fill=True),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        q = x[:1]
-        p = self.forward_kinematic_effector(q)
-        slope = self.dz_dx(q[0])
-        tangent = np.array([1.0, slope])
-        tangent = tangent / np.linalg.norm(tangent)
-        return [
-            identity_matrix(),
-            translation_matrix(p[0], p[1], 0.0),
-            arrow_transform(
-                p[0],
-                p[1],
-                u[0] * tangent[0],
-                u[0] * tangent[1],
-                scale=0.3,
-            ),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        xs = np.linspace(-1.7, 0.3, 240)
-        terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
         return {
             "world": [CustomLine(terrain, color="black", linewidth=2)],
             "body": [
@@ -132,7 +99,7 @@ class MountainCar(MechanicalSystem):
             ],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         q = x[:1]
         p = self.forward_kinematic_effector(q)
         T = translation(p[0], p[1], 0.0)
@@ -142,14 +109,14 @@ class MountainCar(MechanicalSystem):
             "arrows": T,
         }  # Bug here tangent tf is not correct
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         q = x[:1]
         slope = self.dz_dx(q[0])
         tangent = np.array([1.0, slope])
         tangent = tangent / np.linalg.norm(tangent)
         return {
             "arrows": [
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(u[0] * tangent[0], u[0] * tangent[1]),
                     scale=0.3,

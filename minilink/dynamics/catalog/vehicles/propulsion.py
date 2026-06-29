@@ -6,13 +6,9 @@ from minilink.graphical.animation.primitives import (
     Arrow,
     follow_xy_camera,
     ground_line,
-    identity_matrix,
-    scale_pose2d_matrix,
-    translation_matrix,
     vehicle_body,
     wheel_box,
 )
-from minilink.graphical.animation.shapes_v2 import ArrowV2
 
 
 class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
@@ -80,35 +76,6 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
 
     def get_kinematic_geometry(self):
         length = self.params["length"]
-        return [
-            ground_line(length=12.0, y=-0.45),
-            vehicle_body(length=length, width=0.7, color="blue"),
-            wheel_box(length=0.35, width=0.18),
-            wheel_box(length=0.35, width=0.18),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
-
-    def get_kinematic_transforms(self, x, u, t):
-        car_x = x[0]
-        length = self.params["length"]
-        force = self.slip2force(u[0]) if self.m == 1 else 0.0
-        return [
-            identity_matrix(),
-            translation_matrix(car_x, 0.0, 0.0),
-            translation_matrix(car_x - 0.4 * length, -0.45, 0.0),
-            translation_matrix(car_x + 0.4 * length, -0.45, 0.0),
-            scale_pose2d_matrix(
-                car_x + 0.5 * length,
-                0.0,
-                0.0 if force >= 0.0 else np.pi,
-                abs(force),
-            ),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        length = self.params["length"]
         return {
             "world": [ground_line(length=12.0, y=-0.45)],
             "body": [vehicle_body(length=length, width=0.7, color="blue")],
@@ -116,7 +83,7 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
             "wheel_front": [wheel_box(length=0.35, width=0.18)],
         }
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         car_x = x[0]
         length = self.params["length"]
         return {
@@ -127,11 +94,11 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
             "arrows": translation(car_x + 0.5 * length, 0.0, 0.0),
         }
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         force = self.slip2force(u[0]) if self.m == 1 else 0.0
         return {
             "arrows": [
-                ArrowV2(
+                Arrow(
                     base=(0.0, 0.0),
                     vector=(force, 0.0),
                     scale=1.0,
@@ -220,13 +187,9 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
     def get_camera_transform(self, x, u, t):
         return follow_xy_camera(x[0], 0.0, self.camera_scale)
 
-    def get_kinematic_transforms(self, x, u, t):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         slip = self._slip(x[1], x[2])
-        return super().get_kinematic_transforms(x, np.array([slip]), t)
-
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
-        slip = self._slip(x[1], x[2])
-        return super().get_dynamic_geometry_v2(x, np.array([slip]), t)
+        return super().get_dynamic_geometry(x, np.array([slip]), t)
 
 
 if __name__ == "__main__":

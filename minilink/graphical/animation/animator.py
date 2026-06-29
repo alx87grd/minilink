@@ -1,18 +1,25 @@
 """
 Trajectory animation orchestration.
 
-Backends live under :mod:`minilink.graphical.animation.renderers`; the animator picks one by name
-(see :func:`make_renderer`).
+The :class:`Animator` drives the frame-keyed drawable contract
+(:meth:`~minilink.core.system.System.tf` /
+:meth:`~minilink.core.system.System.get_kinematic_geometry` /
+:meth:`~minilink.core.system.System.get_dynamic_geometry`) through the renderer
+backends under :mod:`minilink.graphical.animation.renderers` (picked by name via
+:func:`make_renderer`). Per frame it resolves the named frame poses, flattens the
+cached kinematic geometry and the per-frame dynamic geometry into the flat
+``(primitive, world 4x4)`` list the renderers consume, and resolves the camera
+from the system's hints.
 
 Roadmap (not implemented here—see ``ROADMAP.md`` §7 and P2):
 
-- **Interactive integrator backends**: :meth:`Animator.game` / :meth:`Animator.run_interactive`
-  currently own a simple time loop (Euler + substeps in ``game``). These should gain a
-  ``Simulator``-style pluggable **integration** layer (base class + schemes) instead of
-  hard-coding one integrator in the animator.
-- **Live I/O backends**: ``game`` reads ``u`` only via **pygame** today; future **input**
-  backends (e.g. TCP for cosimulation) and optional **live output push** should sit
-  beside that as swappable sources/sinks, keeping renderers focused on drawing.
+- **Interactive integrator backends**: :meth:`Animator.game` /
+  :meth:`Animator.run_interactive` currently own a simple time loop (Euler +
+  substeps in ``game``). These should gain a ``Simulator``-style pluggable
+  **integration** layer instead of hard-coding one integrator in the animator.
+- **Live I/O backends**: ``game`` reads ``u`` only via **pygame** today; future
+  **input** backends (e.g. TCP for cosimulation) and optional **live output
+  push** should sit beside that as swappable sources/sinks.
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ import warnings
 
 import numpy as np
 
+from minilink.graphical.animation.camera import resolve_camera_from_hints
 from minilink.graphical.animation.interactive import (
     draw_keyboard_input_overlay,
     u_from_keyboard,
@@ -36,6 +44,7 @@ from minilink.graphical.animation.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
 )
+from minilink.graphical.animation.visualization import flatten_draw_list
 from minilink.graphical.common.environment import prefers_inline_animation
 
 __all__ = [
@@ -81,30 +90,72 @@ def _require_interactive_renderer(name: str, renderer: AnimationRenderer) -> Non
 
 
 class Animator:
-    """
-    Coordinates playback: owns the simulated system and delegates drawing to an
-    :class:`AnimationRenderer`. Matplotlib figure size and resolution live in
+    """Playback coordinator: frame-keyed hooks → flat draw list → renderer.
+
+    Owns the simulated system and delegates drawing to an
+    :class:`AnimationRenderer`. Each frame resolves the system's named frame
+    poses (``tf``), the cached kinematic geometry
+    (``get_kinematic_geometry``), and the per-frame dynamic geometry
+    (``get_dynamic_geometry``) into a flat ``(primitive, world 4x4)`` draw list.
+    Matplotlib figure size and resolution live in
     :mod:`minilink.graphical.common.matplotlib_style`.
     """
 
     def __init__(self, sys):
         self.sys = sys
 
-    def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib"):
-        """Renders a single static frame of the system at state *x*, *u*, *t*."""
+    def _resolve_frame(self, x, u, t, *, kinematic, camera_override=None):
+        """Resolve one frame to a per-frame ``(primitives, transforms, camera)`` dict."""
+        frames = self.sys.tf(x, u, t)
+        dynamic = self.sys.get_dynamic_geometry(x, u, t)
+        draw_list = flatten_draw_list(frames, kinematic, dynamic)
+        if draw_list:
+            primitives, transforms = (list(part) for part in zip(*draw_list))
+        else:
+            primitives, transforms = [], []
+        camera = resolve_camera_from_hints(
+            self.sys, frames, x, u, t, override=camera_override
+        )
+        return {
+            "x": x,
+            "u": u,
+            "t": float(t),
+            "primitives": primitives,
+            "transforms": transforms,
+            "camera": camera,
+        }
+
+    def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib", camera=None):
+        """Render a single static frame at state *x*, *u*, *t*."""
         backend = make_renderer(renderer, self)
-        primitives = self.sys.get_kinematic_geometry()
-        frame = self._prepare_transforms(x, u, t, primitives=primitives)
+        kinematic = self.sys.get_kinematic_geometry()
+        frame = self._resolve_frame(
+            x, u, t, kinematic=kinematic, camera_override=camera
+        )
         backend.open_scene(
             is_3d=is_3d,
             show=True,
             camera=frame["camera"],
             title=f"{self.sys.name} — t = {t:.2f} s",
         )
-        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+        backend.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
         result = backend.present(block=True)
         backend.close_scene()
         return result
+
+    def _build_frames(self, traj, schedule, *, kinematic, camera_override):
+        frames = []
+        for frame_idx in range(schedule.n_frames):
+            sim_idx = sim_index_for_frame(frame_idx, schedule)
+            x = traj.x[:, sim_idx]
+            u = traj.u[:, sim_idx] if len(traj.u) > 0 else np.array([])
+            t = traj.t[sim_idx]
+            frames.append(
+                self._resolve_frame(
+                    x, u, t, kinematic=kinematic, camera_override=camera_override
+                )
+            )
+        return frames
 
     def animate_simulation(
         self,
@@ -118,6 +169,7 @@ class Animator:
         renderer="matplotlib",
         native: bool = True,
         scene_title: str | None = None,
+        camera=None,
     ):
         """
         Plays back a full simulation trajectory.
@@ -138,20 +190,21 @@ class Animator:
           ``matplotlib.animation.FuncAnimation`` for matplotlib,
           ``meshcat.animation.Animation`` + ``set_animation`` for meshcat,
           and browser-side Plotly frames for plotly.
-          ``False`` falls back to the legacy per-frame Python loop (handy
-          for debugging or when the native path's limitations matter;
-          see Notes below).
+          ``False`` falls back to the per-frame Python loop (handy for
+          debugging or when the native path's limitations matter).
+
+        ``camera`` accepts the optional override: a constant 4x4 or a
+        ``camera(frames, x, u, t)`` callable.
 
         Notes
         -----
         Meshcat native animation only keyframes rigid pose (position+quaternion).
-        Primitives whose geometry changes every frame (``TorqueArrow``,
-        ``HorizonPolyline``, ``TrajectoryPolyline``) are frozen at ``t=0`` in the
-        native path.
+        Per-frame dynamic geometry (e.g. ``TorqueArrow`` sweep) is frozen at
+        ``t=0`` in the native path.
 
-        Plotly does not support the legacy per-frame Python loop
-        (``native=False`` with ``html=False``): use ``native=True`` or
-        ``html=True`` for inline/browser-frame playback.
+        Plotly does not support the per-frame Python loop (``native=False`` with
+        ``html=False``): use ``native=True`` or ``html=True`` for inline/browser
+        playback.
         """
         if html is None:
             html = prefers_inline_animation()
@@ -170,20 +223,19 @@ class Animator:
             )
 
         backend = make_renderer(renderer, self)
-        primitives = self.sys.get_kinematic_geometry()
+        kinematic = self.sys.get_kinematic_geometry()
         schedule = trajectory_frame_schedule(traj, time_factor_video)
-        frames = [
-            self._prepare_frame(traj, frame_idx, schedule, primitives=primitives)
-            for frame_idx in range(schedule.n_frames)
-        ]
+        frames = self._build_frames(
+            traj, schedule, kinematic=kinematic, camera_override=camera
+        )
+        # Representative primitive list for renderers that read the fixed arg;
+        # the matplotlib builder reads each frame's own ``"primitives"``.
+        primitives = frames[0]["primitives"] if frames else []
 
         if html:
             try:
                 return backend.render_inline_animation(
-                    primitives,
-                    frames,
-                    schedule,
-                    is_3d=is_3d,
+                    primitives, frames, schedule, is_3d=is_3d
                 )
             except NotImplementedError:
                 warnings.warn(
@@ -229,7 +281,7 @@ class Animator:
         )
         for frame in frames:
             backend.draw_frame(
-                primitives, frame["transforms"], frame["t"], frame["camera"]
+                frame["primitives"], frame["transforms"], frame["t"], frame["camera"]
             )
             backend.present(block=False, interval_s=schedule.interval_ms / 1000.0)
             events = backend.poll_events()
@@ -237,33 +289,6 @@ class Animator:
                 break
         backend.close_scene()
         return None
-
-    def _prepare_transforms(self, x, u, t, *, primitives=None):
-        if primitives is None:
-            primitives = self.sys.get_kinematic_geometry()
-        transforms = self.sys.get_kinematic_transforms(x, u, t)
-        if len(primitives) != len(transforms):
-            raise ValueError(
-                "System graphical error: Number of transforms must equal number of base geometric primitives."
-            )
-        camera = self.sys.get_camera_transform(x, u, t)
-        return {
-            "x": x,
-            "u": u,
-            "t": float(t),
-            "transforms": transforms,
-            "camera": camera,
-        }
-
-    def _prepare_frame(self, traj, frame_idx, schedule, *, primitives=None):
-        sim_idx = sim_index_for_frame(frame_idx, schedule)
-        x = traj.x[:, sim_idx]
-        if len(traj.u) > 0:
-            u = traj.u[:, sim_idx]
-        else:
-            u = np.array([])
-        t = traj.t[sim_idx]
-        return self._prepare_transforms(x, u, t, primitives=primitives)
 
     def run_interactive(
         self,
@@ -285,14 +310,14 @@ class Animator:
         """
         backend = make_renderer(renderer, self)
         _require_interactive_renderer(renderer, backend)
-        primitives = self.sys.get_kinematic_geometry()
+        kinematic = self.sys.get_kinematic_geometry()
 
         x = np.asarray(x0)
         u = np.asarray([] if u0 is None else u0)
         t = float(t0)
         step_idx = 0
 
-        frame = self._prepare_transforms(x, u, t, primitives=primitives)
+        frame = self._resolve_frame(x, u, t, kinematic=kinematic)
         backend.open_scene(
             is_3d=is_3d,
             show=show,
@@ -301,7 +326,7 @@ class Animator:
         )
 
         # Draw initial state once so the callback can just update controls.
-        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+        backend.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
         backend.present(block=False, interval_s=dt)
 
         # ROADMAP: this loop is a minimal integrator+render tick; a future backend should
@@ -317,8 +342,10 @@ class Animator:
             t += dt
             step_idx += 1
 
-            frame = self._prepare_transforms(x, u, t, primitives=primitives)
-            backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+            frame = self._resolve_frame(x, u, t, kinematic=kinematic)
+            backend.draw_frame(
+                frame["primitives"], frame["transforms"], t, frame["camera"]
+            )
             backend.present(block=False, interval_s=dt)
 
             if should_stop:
@@ -326,9 +353,6 @@ class Animator:
             if max_steps is not None and step_idx >= max_steps:
                 break
         backend.close_scene()
-
-    _u_from_keyboard = staticmethod(u_from_keyboard)
-    _draw_keyboard_input_overlay = staticmethod(draw_keyboard_input_overlay)
 
     def game(
         self,
@@ -346,13 +370,15 @@ class Animator:
         Prototype real-time interactive mode.
 
         - Poll keyboard using pygame (input only).
-        - Compute dynamics using Euler integration
-          optionally with multiple internal substeps per rendered frame.
-        - Update the visualization by redrawing transforms every tick.
+        - Compute dynamics using Euler integration optionally with multiple
+          internal substeps per rendered frame.
+        - Update the visualization by redrawing each tick; dynamic geometry
+          (force/torque arrows) is rebuilt live from the frame-keyed hooks.
 
-        Roadmap: **input** should become pluggable backends (keyboard vs TCP cosimulation,
-        etc.); **integration** should be pluggable backends (not Euler-only here); optional
-        **live output push** is a later sibling—see ``ROADMAP.md`` §7.
+        Roadmap: **input** should become pluggable backends (keyboard vs TCP
+        cosimulation, etc.); **integration** should be pluggable backends (not
+        Euler-only here); optional **live output push** is a later sibling—see
+        ``ROADMAP.md`` §7.
         """
         if dynamics_substeps < 1 or int(dynamics_substeps) != dynamics_substeps:
             raise ValueError("dynamics_substeps must be a positive integer.")
@@ -380,18 +406,18 @@ class Animator:
                 f"minilink game — keyboard (focus here) — {self.sys.name}"
             )
 
-        primitives = self.sys.get_kinematic_geometry()
+        kinematic = self.sys.get_kinematic_geometry()
 
         x = np.asarray(self.sys.x0 if x0 is None else x0, dtype=float).copy()
         u = np.asarray(np.zeros(self.sys.m) if u0 is None else u0, dtype=float).copy()
         t = float(t0)
         step_idx = 0
 
-        camera0 = self.sys.get_camera_transform(x, u, t)
+        frame = self._resolve_frame(x, u, t, kinematic=kinematic)
         backend.open_scene(
             is_3d=is_3d,
             show=True,
-            camera=camera0,
+            camera=frame["camera"],
             title=f"Interactive game — {self.sys.name}",
         )
 
@@ -408,11 +434,11 @@ class Animator:
                 return
 
         keys = pygame.key.get_pressed()
-        u = self._u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
-        self._draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
+        u = u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
+        draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
 
-        frame = self._prepare_transforms(x, u, t, primitives=primitives)
-        backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+        frame = self._resolve_frame(x, u, t, kinematic=kinematic)
+        backend.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
         backend.present(block=False, interval_s=dt)
 
         while True:
@@ -426,11 +452,11 @@ class Animator:
                     should_quit = True
 
             keys = pygame.key.get_pressed()
-            u = self._u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
-            self._draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
+            u = u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
+            draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
 
-            # ROADMAP: Euler + substeps only—replace with interactive integrator backends;
-            # live u should come from an input backend (pygame keys vs TCP, etc.).
+            # ROADMAP: Euler + substeps only—replace with interactive integrator
+            # backends; live u should come from an input backend (keys vs TCP).
             # Euler steps for dynamic systems only (ZOH on u during frame).
             if self.sys.n > 0:
                 dt_dyn = dt / dynamics_substeps
@@ -443,8 +469,10 @@ class Animator:
             t = t + dt
             step_idx += 1
 
-            frame = self._prepare_transforms(x, u, t, primitives=primitives)
-            backend.draw_frame(primitives, frame["transforms"], t, frame["camera"])
+            frame = self._resolve_frame(x, u, t, kinematic=kinematic)
+            backend.draw_frame(
+                frame["primitives"], frame["transforms"], t, frame["camera"]
+            )
             backend.present(block=False, interval_s=dt)
 
             backend_events = backend.poll_events()
