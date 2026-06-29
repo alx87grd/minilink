@@ -166,7 +166,6 @@ class Boat2D(GeneralizedMechanicalSystem):
 
     def tf(self, x, u, t=0, params=None):
         q = x[:3]
-        l_t = self.params["l_t"]
         T_body = SE2(q[0], q[1], q[2])
         return {
             "body": T_body,

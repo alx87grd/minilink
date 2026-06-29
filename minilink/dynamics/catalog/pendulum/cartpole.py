@@ -12,7 +12,7 @@ visually the same.
 import numpy as np
 
 from minilink.core.backends import require_jax_numpy
-from minilink.core.kinematics import SE2, identity, translation
+from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.mechanical import (
     JaxMechanicalSystem,
     MechanicalSystem,

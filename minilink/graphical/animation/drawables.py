@@ -140,7 +140,8 @@ class Replay(Overlay):
 def _shape_to_primitives(shape, *, color, opacity):
     """Map a planning :class:`~minilink.core.geometry.Shape` to graphic primitives."""
     from minilink.core.geometry import Box as GeomBox
-    from minilink.core.geometry import Inflated, Sphere as GeomSphere, Union
+    from minilink.core.geometry import Inflated, Union
+    from minilink.core.geometry import Sphere as GeomSphere
 
     if isinstance(shape, GeomSphere):
         center = np.asarray(shape.center, dtype=float)

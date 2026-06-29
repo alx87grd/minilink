@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.kinematics import identity, translation
+from minilink.core.kinematics import translation
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,

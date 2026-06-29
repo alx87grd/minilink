@@ -16,6 +16,7 @@ from minilink.graphical.animation.camera import (
     follow_frame_camera,
     world_to_camera,
 )
+from minilink.graphical.animation.drawables import Replay, SceneHistory
 from minilink.graphical.catalog.shapes import (
     Arrow,
     Box,
@@ -45,7 +46,6 @@ from minilink.graphical.catalog.skins import (
     debug_state_skin,
     merge_skins,
 )
-from minilink.graphical.animation.drawables import Replay, SceneHistory
 
 __all__ = [
     # shapes

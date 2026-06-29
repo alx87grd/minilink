@@ -270,9 +270,7 @@ class DynamicBicycle(DynamicSystem):
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         a = params["a"]
-        b = params["b"]
         r_f = params["r_f"]
-        r_r = params["r_r"]
         tr = self.track
 
         delta = self._u_in(x, u)[1]
