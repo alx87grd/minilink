@@ -1,18 +1,16 @@
-"""Generate kinematic-rendering PNG baselines for pixel-parity regression.
+"""Generate kinematic-rendering PNG snapshots for **local** visual review.
 
-This is the **source of truth** for the pixel-parity regression: it renders each
-catalog plant at three deterministic states through the graphics pipeline and
-saves one PNG per (plant, sample) plus a ``manifest.json`` describing the exact
-states. ``test_kinematic_regression`` re-renders the same states and compares
-pixel-for-pixel against the committed PNGs.
+Renders each catalog plant at three deterministic states through the graphics
+pipeline and writes one PNG per (plant, sample) plus ``manifest.json`` under
+``tests/fixtures/kinematic_baseline/``. PNG files are gitignored (``*.png``);
+only the manifest is committed. CI uses ``test_kinematic_regression`` render
+smoke (finite image), not pixel comparison.
 
 Run from the repo root::
 
     python scripts/generate_kinematic_baselines.py
 
-Rendering is forced onto the headless matplotlib **Agg** backend at a **fixed DPI**
-so the output is deterministic within one environment. Baselines are committed and
-must be regenerated only on a deliberate, reviewed visual change.
+Uses matplotlib **Agg** at fixed DPI for reproducibility within one environment.
 """
 
 from __future__ import annotations

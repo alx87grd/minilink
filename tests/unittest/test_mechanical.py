@@ -134,5 +134,26 @@ class TestMechanicalSystem(unittest.TestCase):
         )
 
 
+class TestJaxMechanicalInheritance(unittest.TestCase):
+    def test_jax_mechanical_subclasses_numpy_mechanical(self):
+        from minilink.dynamics.abstraction.mechanical import (
+            JaxMechanicalSystem,
+            MechanicalSystem,
+        )
+
+        self.assertTrue(issubclass(JaxMechanicalSystem, MechanicalSystem))
+
+    def test_jax_mechanical_init_matches_numpy_layout(self):
+        from minilink.dynamics.abstraction.mechanical import (
+            JaxMechanicalSystem,
+            MechanicalSystem,
+        )
+
+        a = MechanicalSystem(dof=3, actuators=2)
+        b = JaxMechanicalSystem(dof=3, actuators=2)
+        self.assertEqual((a.n, a.m, a.p), (b.n, b.m, b.p))
+        self.assertEqual(a.state.labels, b.state.labels)
+
+
 if __name__ == "__main__":
     unittest.main()
