@@ -1,43 +1,3 @@
----
-name: kinematic-contract-upgrade
-overview: "Upgrade System's three visualization hooks: get_kinematic_geometry() -> dict[frame_key, list[primitive]] (skin), get_kinematic_transforms() renamed to a bare textbook-style tf(x,u,t) -> dict[frame_key, world 4x4], and revive get_dynamic_geometry(x,u,t) -> dict[frame_key, list[primitive]] rebuilt each frame and posed by the frames dict. Frame keys (ports-style) replace index-for-index lists; fixed graphical offsets ride on a primitive.local_transform so only independent frames carry math. Retires the T[3,3] time channel and column-norm scaling. No tree, no new dataclasses. Scene and SceneHistory share the same drawable contract and are combined with the system at animate()."
-todos:
-  - id: core-kinematics
-    content: "Add core/kinematics.py (native-array, JAX-functional: xp.stack/array, no in-place assignment): translation_matrix, pose2d_matrix, rotation_matrix_x/y/z, invert_transform, apply_transform (relocated from planning/spatial/robot.py), rod_between_transform, point_transform, optional single_body_tf. Keep separate from core/geometry.py (SDF concern). No tree/resolver."
-    status: pending
-  - id: graphical-builders
-    content: "In graphical band: move render-geometry builders (arrow_pts, torque_arc_pts) + ready-made shapes here; add GraphicPrimitive.local_transform; move camera helpers to graphical/animation/camera.py; DELETE retired hacks (scale_pose2d_matrix, arrow_transform, line_between_transform, time_channel_matrix, torque_pose2d_matrix, extract_amplitude)"
-    status: pending
-  - id: primitive-local-transform
-    content: "Add optional local_transform (identity default, plain np.ndarray) to GraphicPrimitive base so fixed graphical offsets ride the primitive; renderer draws at frames[key] @ prim.local_transform. No new dataclass."
-    status: pending
-  - id: system-contract
-    content: "Upgrade the 3 hooks on System/StaticSystem/DiagramSystem: get_kinematic_geometry() -> dict[str, list[prim]]; rename get_kinematic_transforms -> tf(x,u,t,params) -> dict[str, world 4x4] written native-array (xp idiom, no float casts, JAX-traceable); default viz {} (no debug points); remove get_camera_transform method + its camera_matrix import, replace with data hints (camera_scale/target/plot_axes/follow_frame/priority); DiagramSystem slices local x,u and prefixes sys_id:frame"
-    status: pending
-  - id: migrate-all-overrides
-    content: "Atomic no-alias rename: migrate ALL ~20 get_kinematic_* overrides in one change (collapses to ~5 shared-helper rewrites: manipulator _planar_*, bicycle, pendulum + per-class skin dicts) plus call sites animator/modal/renderers/tests/demos"
-    status: pending
-  - id: dynamic-layer
-    content: "Revive get_dynamic_geometry(x,u,t,params) -> dict[str, list[prim]], rebuilt each frame and posed by frames[key] (world-space items key to 'world'); remove time_channel_matrix and column-norm scaling; HorizonPolyline/TrajectoryPolyline expose points_at(t)"
-    status: pending
-  - id: animator-renderers
-    content: "Animator: accept multiple drawables ([primary] + overlays); flatten each drawable's skin + dynamic geometry to (primitive, frames[key] @ local_transform); validate geometry keys subset of frame keys; resolve camera by source-selection (override > priority > draws-something > primary) then build 4x4 from hints + frames + t; accept camera= ndarray/callable + camera factories in graphical/animation/camera.py. Renderers stay draw-shape-at-pose."
-    status: pending
-  - id: skin-factories
-    content: "Add graphical/animation/skins.py with car_skin_2d/car_skin_3d factory functions (plain functions returning dicts, same frame keys) + merge_skins helper; no dataclasses"
-    status: pending
-  - id: migrate-plants
-    content: "Migrate one simple plant (Pendulum/CartPole, incl. torque arc via dynamic geometry) and DynamicBicycle + DynamicBicycleCar3D (shared frames, swapped skin, body/wheel-frame arrows) to prove use-cases 1 & 2; one small diagram demo for frame namespacing"
-    status: pending
-  - id: drawable-scene
-    content: "Design (stub with TODO: User Architectural Review) the shared Drawable contract on Scene (planning/spatial/scene.py made drawable), SceneHistory (time-only; MPC plans/trails), and Replay(drawable, trajectory) for other-robots/ghosts; collision RobotBody reuse of the same world dict. Optionally rewire the MPC multi-obstacle demo."
-    status: pending
-  - id: docs-tests
-    content: "Sync DESIGN.md visualization contract + README/ROADMAP; tests for geometry/frame key validation, local_transform composition, diagram namespacing, dynamic primitive without T[3,3]; ruff + headless animation smoke"
-    status: pending
-isProject: false
----
-
 # Upgraded Kinematic Contract for `System`
 
 Short-term goal: a clean, reviewed kinematic contract on `System` that (1) lets a
@@ -59,7 +19,7 @@ Decisions locked in:
   both posed by the frames dict.
 - `tf` is an **equation path**: bare signature, `xp = array_module(x)` idiom, **no
   `float(x[i])` casts**, native-array in/out — so it is JAX-traceable and reusable
-  for collision (Phase 2). `get_kinematic_geometry`/`get_dynamic_geometry` are
+  for collision (the later collision-reuse phase). `get_kinematic_geometry`/`get_dynamic_geometry` are
   rendering-only (NumPy, may cast).
 - **Default viz is empty:** base `System`/`StaticSystem`/`DynamicSystem` return
   `{}` for `tf` and `get_kinematic_geometry` (no per-state debug points). A
@@ -89,8 +49,8 @@ harmonized to bare names too, but that is out of scope here.
 
 Today `get_kinematic_transforms` returns a flat list that must match
 `get_kinematic_geometry` index-for-index (see
-[minilink/core/system.py](minilink/core/system.py),
-[dynamic_bicycle.py](minilink/dynamics/catalog/vehicles/dynamic_bicycle.py)).
+[minilink/core/system.py](../minilink/core/system.py),
+[dynamic_bicycle.py](../minilink/dynamics/catalog/vehicles/dynamic_bicycle.py)).
 Replace with:
 
 - `tf(x,u,t,params)` -> `dict[str, 4x4 world transform]` (named frames; e.g.
@@ -111,7 +71,7 @@ flowchart TD
   KF --> Compose["draw prim at frames[key] @ prim.local_transform"]
   Compose --> List["flat (primitive, world 4x4) list"]
   List --> R["renderer: draw shape at pose"]
-  KF --> Collide["collision: same world dict feeds clearance probes (Phase 2)"]
+  KF --> Collide["collision: same world dict feeds clearance probes (deferred)"]
 ```
 
 ## Frames vs graphical offsets (keep base-class math minimal)
@@ -145,6 +105,13 @@ so skins interchange across models that share the vocabulary.
   3D skins). A bicycle plant exposes both axle and corner frames so the 2D
   centerline skin and the 3D four-wheel skin both attach to one `tf`.
 
+Note: **`world` is implicit, never returned by `tf`.** The animator injects
+`"world" -> I` (identity) into the merged frame dict before posing, so a plant
+keys world-fixed geometry to `"world"` without `tf` ever emitting `"world": I`.
+`tf` returns only the **independent frames** it actually computes; the empty `tf`
+(`{}`) still has a usable `world`. Key-subset validation treats `world` as always
+present, so it never trips the "unknown key" check.
+
 This is what lets `car_skin_2d` (keys `body`, `axle_front`, `axle_rear`) and
 `car_skin_3d` (keys `body`, `wheel_*`) share a single bicycle `tf`.
 
@@ -160,8 +127,10 @@ def get_kinematic_geometry(self):
     return {"body": [vehicle_body(self.L, self.W)], "wheel": [wheel_box()]}
 
 def tf(self, x, u, t):
-    T = pose2d_matrix(x[0], x[1], x[2])
-    return {"body": T, "wheel": T @ pose2d_matrix(self.a, 0.0, delta)}
+    W_T_body     = SE2(x[0], x[1], x[2])
+    body_T_wheel = SE2(self.a, 0.0, delta)
+    W_T_wheel    = W_T_body @ body_T_wheel
+    return {"body": W_T_body, "wheel": W_T_wheel}
 ```
 
 Conventions that avoid extra machinery:
@@ -173,26 +142,31 @@ Conventions that avoid extra machinery:
 
 ### Tier 2 - reusable / swappable complex skin (use-case 2)
 
-Skin **factory functions** (plain functions in `graphical/animation/skins.py`)
-return the dict, keyed by an agreed frame vocabulary:
+Skin **factory functions** (plain functions in `graphical/catalog/skins.py`)
+take the plant and return the dict, keyed by an agreed frame vocabulary:
 
 ```python
-def car_skin_2d(length, width, color="blue") -> dict[str, list]: ...
-def car_skin_3d(length, width, track, color="#151922") -> dict[str, list]: ...
+def car_skin_2d(plant, color="blue") -> dict[str, list]: ...
+def car_skin_3d(plant, color="#151922") -> dict[str, list]: ...
 ```
 
-`DynamicBicycle` and `DynamicBicycleCar3D` then differ **only** in
-`get_kinematic_geometry`, sharing one `tf` because both factories emit the same
-keys (`"body"`, `"wheel_rl"`, `"wheel_rr"`, `"wheel_fl"`, `"wheel_fr"`):
+**Swap mechanism (LOCKED - Option B):** the contract hook stays
+`get_kinematic_geometry()`; plants carry an opt-in attribute `skin` (a callable
+`(plant) -> dict`, or `None`) and the base method delegates:
 
 ```python
-def get_kinematic_geometry(self):  return car_skin_2d(self.L, self.W)
-def get_kinematic_geometry(self):  return car_skin_3d(self.L, self.W, self.track)
+class System:
+    skin = None
+    def get_kinematic_geometry(self):
+        return {} if self.skin is None else self.skin(self)
 ```
 
-This removes the ~85-line `get_kinematic_transforms` copy in the 3D car.
-Composition when needed = a one-function `merge_skins(*skins)` (concatenates lists
-on shared keys).
+So `DynamicBicycle` sets `skin = car_skin_2d`; a 3D look is one assignment
+`car.skin = car_skin_3d` (same `tf`, same `f`, both factories emit keys
+`"body"`, `"wheel_rl"`, ...). `skin : get_kinematic_geometry :: params : f` -
+method is the contract, attribute is the policy. **No** `DynamicBicycleCar3D`
+class (retired); **do not** reassign the method itself (instance-assigned
+functions receive no `self`). `merge_skins(*skins)` composes when needed.
 
 ## Dynamic-primitive pipeline
 
@@ -210,32 +184,65 @@ deleting today's manual `c,s = cos/sin(theta); vfx = c*vx - s*vy ...` per-vector
 world rotation. For the dynamic bicycle, `vx,vy` are already body-frame, so the
 velocity arrow is local along `(vx,vy)`.
 
-Per-frame animator pipeline:
+Per-frame animator pipeline. `flatten_draw_list(frames, kinematic, dynamic)` is the
+shared helper: it consumes three already-resolved dicts and emits
+`(prim, frames[k] @ prim.local_transform)` for every primitive. The animator owns
+the per-drawable resolution - the **only** place the two signatures differ - so the
+helper itself is signature-agnostic:
 
-1. `frames = sys.tf(x, u, t)` -> world dict.
-2. for `k, prims` in `sys.get_kinematic_geometry()` (cached once): emit
-   `(prim, frames[k] @ prim.local_transform)`.
-3. for `k, prims` in `sys.get_dynamic_geometry(x, u, t)`: emit
-   `(prim, frames[k] @ prim.local_transform)`.
-4. `camera = resolve_camera(primary.camera_hints, frames, t)` (animator boundary;
-   `animate(camera=...)` overrides).
-5. renderer draws the flat `(primitive, world 4x4)` list (unchanged: "draw shape
-   at pose").
+1. primary (state-driven): resolve `frames = sys.tf(x, u, t)` (world dict),
+   `kinematic = sys.get_kinematic_geometry()` (cached once),
+   `dynamic = sys.get_dynamic_geometry(x, u, t)`, then call `flatten_draw_list`.
+2. overlays (time-only): resolve `frames = o.tf(t)` (world implicit),
+   `kinematic = o.get_kinematic_geometry()` (cached), `dynamic = o.get_dynamic_geometry(t)`,
+   then call the **same** `flatten_draw_list`.
+3. `camera = resolve_camera(primary.camera_hints, frames, t)` (animator boundary;
+   `animate(camera=...)` overrides; overlays carry no hints).
+4. renderer draws the single concatenated `(primitive, world 4x4)` list (unchanged:
+   "draw shape at pose").
 
 This retires both hacks: `t` is a real argument (no `time_channel_matrix` /
-`T[3,3]`), and arrow length is real geometry (no column-norm scaling). Terse
-render builders in the graphical band (`arrow_pts`, `torque_arc_pts`) keep
-authoring short:
+`T[3,3]`), and arrow length is real geometry (no column-norm scaling). First-class
+primitives `Arrow`/`TorqueArrow` keep authoring short - they build their own point
+geometry internally (via private `arrow_pts` / `torque_arc_pts`), and the frame
+supplies world orientation:
 
 ```python
 def get_dynamic_geometry(self, x, u, t):
     v_local = x[3:5]  # body-frame velocity
-    return {"body": [CustomLine(arrow_pts(base=(0, 0), vector=v_local, scale=0.2))]}
+    return {"body": [Arrow(base=(0, 0), vector=v_local, scale=0.2, color="red")]}
 ```
 
 `HorizonPolyline`/`TrajectoryPolyline` keep their data internally and expose
 `points_at(t)` (today's `compute_pts`, `t` passed honestly). Camera scale stays in
 `T[3,3]` because the camera is not a kinematic frame.
+
+### Static shape vs dynamic reshape (renderer modes)
+
+The kinematic/dynamic split is not just authoring sugar - it is exactly the
+distinction a **retained-mode** renderer (meshcat, three.js) needs, and the renderer
+contract already encodes it: `draw_frame(primitives, transforms, t, camera)` takes a
+**stable primitive list + per-frame transforms**. Three tiers fall out, with **no
+`is_dynamic` flag** - the producing hook (and object identity) *is* the signal:
+
+| Tier | What changes per frame | Source | meshcat |
+| --- | --- | --- | --- |
+| World-fixed static | nothing | `get_kinematic_geometry` keyed to `world` | upload once, never touch |
+| Rigid: static shape + moving transform | only the 4x4 | `get_kinematic_geometry` + `tf` | upload geometry **once**, `setTransform` per frame |
+| Dynamic reshape | the vertices | `get_dynamic_geometry` | re-stream geometry each frame |
+
+`get_kinematic_geometry()` is **cached once**, so it returns the *same primitive
+objects* every frame (geometry unchanged -> transform-only update); `get_dynamic_geometry`
+returns *fresh* objects (geometry changed -> re-upload). This replaces today's
+`T[3,3]` time/amplitude channel + `compute_pts` mutation: a reshaped primitive is
+simply rebuilt by the dynamic hook, never mutated through a transform slot.
+
+**Initially** (the contract slice), `flatten_draw_list` flattens everyone to `(primitive, world 4x4)`
+(immediate-mode parity for matplotlib/pygame), so renderers are untouched. The split
+is preserved in the hooks, so a later meshcat phase can map cached-skin nodes to
+upload-once + `setTransform` and re-stream only the dynamic hooks - a renderer-internal
+optimization, **not** a contract change. (Stable node identity comes from the
+`(drawable, frame_key, index)` of each entry.)
 
 ## Where dynamic data lives (instantaneous vs history-bound)
 
@@ -253,37 +260,161 @@ Two kinds of dynamic content share one mechanism but differ in data ownership.
 | arrows, torque arc, deformation | yes | nowhere - recomputed by `System` |
 | executed trail | needs full traj | `TrajectoryPolyline(traj)` in a `SceneHistory` |
 | MPC plan history | no (futures) | `HorizonPolyline(plans)` in a `SceneHistory` |
-| reference path, obstacles | external | `Scene` (static skin) / `Scene.to_overlay()` |
+| reference path, obstacles | external | `Scene` (collision-first) -> `scene.as_visualizer()` |
 
 Case-B data lives in the **dynamic primitive object itself**
 (`HorizonPolyline(plans)` holds `list[(t_solve, Trajectory)]`), exposing
 `points_at(t)`. Those primitives are owned by a `SceneHistory`, built at the
 animation boundary (demo/planner), not on `sys`.
 
-## Drawables: System, Scene, SceneHistory combined at `animate`
+## Drawables vs geometry sources: combined at `animate`
 
-All three implement the **same drawable contract** (`tf`,
-`get_kinematic_geometry`, `get_dynamic_geometry`); the animator iterates
-`[sys] + overlays` and merges each draw list (same code path for all).
+There is **one drawable contract** - the same three hooks everywhere (`tf`,
+`get_kinematic_geometry`, `get_dynamic_geometry`); the **only** difference is the
+driving signal:
 
-- **`System`** - the plant (full contract).
-- **`Scene`** - static external geometry (obstacles, reference). A `Scene` already
-  exists in [planning/spatial/scene.py](minilink/planning/spatial/scene.py);
-  making **that** one drawable is the "mirror the contract onto
-  Scene/Environment" step, rather than inventing a second Scene. Frames are
-  world-fixed; geometry is its obstacles/reference.
-- **`SceneHistory`** - holds time-indexed historical data (MPC plans, trails);
-  uses only the **time channel** `t`, frames are `{"world": I}`, geometry via each
-  primitive's `points_at(t)`.
+- a **state-driven drawable** (`System`/`DiagramSystem`) is a function of `(x,u,t)`,
+  because its skin/arrows depend on state; only the **primary** is fed the played
+  trajectory's `(x,u)`.
+- an **overlay add-on** is **time-only** - the same hooks with `(x,u)` dropped:
+  `tf(t)` / `get_kinematic_geometry()` / `get_dynamic_geometry(t)`, each with a `{}`
+  default so an add-on overrides only the one hook it needs. It owns its own data
+  (see *Overlay contract* below).
+
+The animator runs the same `flatten_draw_list` on every drawable and concatenates
+`[primary] + overlays` (one render path).
+
+A **geometry source** implements no drawable contract; it **exports** an overlay -
+exactly mirroring how `Scene` already exports a `Set`/`CostFunction` instead of
+pretending to be one.
+
+| Kind | Contract | Examples | Goes into `overlays=[...]` as |
+| --- | --- | --- | --- |
+| State-driven drawable | 3 hooks of `(x,u,t)` | `System`, `DiagramSystem` | itself (rendered static at a fixed pose unless wrapped in `Replay`) |
+| Overlay add-on | same 3 hooks, **`t`-only** (`{}` defaults) | `Replay`, `SceneHistory` | itself |
+| Geometry source (exports an overlay) | exports the `t`-only hooks | `Scene` | `scene.as_visualizer()` |
+
+- **`System`** - the plant (3-hook contract); a `DiagramSystem` is one too
+  (its `tf` prefixes `sys_id:frame`).
+- **`Scene`** - a **collision-first source** in
+  [planning/spatial/scene.py](../minilink/planning/spatial/scene.py) (`obstacles`,
+  `workspace_fields`); it already exports
+  `scene.clearance_field(robot).as_constraint()` and
+  `scene.cost_field(robot).as_cost()`. The third, symmetric export is
+  **`scene.as_visualizer()`** -> a `t`-only overlay (LOCKED - Option B). The
+  **graphical-band** adapter owns the *default obstacle skin* in
+  `get_kinematic_geometry()`: it maps each `core.geometry` `Shape`
+  (`Box`/`Sphere`/`Union`) to a default `GraphicPrimitive` keyed to `world` (`tf`
+  empty -> world-fixed; `get_dynamic_geometry` empty). This adapter is the natural
+  home for the deferred render/SDF `Shape` unification. We **do not** bolt
+  the drawable hooks onto the frozen planning `Scene` dataclass; passing a raw
+  `Scene` into `overlays` is a category error and the animator rejects it with a
+  "call `scene.as_visualizer()`" message (no silent auto-adapt - symmetry with
+  `.as_cost()` is the whole point).
+- **`SceneHistory`** - a `t`-only overlay holding time-indexed historical data (MPC
+  plans, trails); implements only `get_dynamic_geometry(t)` (geometry rebuilt each
+  frame via each primitive's `points_at(t)`), keyed to `world`. Built in the
+  graphical band.
+- **`Replay(drawable, trajectory)`** - a `t`-only overlay that **forwards** the
+  wrapped drawable's three hooks at its own `x(t)`: `tf(t) = drawable.tf(*traj.sample(t), t)`,
+  and likewise for the geometry hooks. Time-driven, not integrated, never a
+  dynamical participant. Because it forwards (not flattens), the ghost keeps the
+  wrapped `DiagramSystem`'s named frames + real skin.
 
 ```python
 history = SceneHistory(horizon=HorizonPolyline(mpc_plans),
                        trail=TrajectoryPolyline(executed_traj))
-sys.animate(traj, overlays=[scene, history])   # iterate [sys] + overlays, merge
+# Scene exports an overlay; overlays pass directly:
+sys.animate(traj, overlays=[scene.as_visualizer(), history])
 ```
 
 The played-back trajectory is owned by the `Animator`; a trail holds a reference
 and slices `t <= t_now` - it owns its *view*, not a copy.
+
+### Overlay contract (add-ons: the `System` hooks, time-only)
+
+An overlay is **not** a new contract: it is the **same three drawable hooks** with
+`(x,u)` dropped, plus `{}` defaults so an add-on overrides only what it draws:
+
+```python
+class Overlay:                         # the add-on side of the one drawable contract
+    def tf(self, t): return {}                    # dict[key, world 4x4]; world implicit
+    def get_kinematic_geometry(self): return {}   # dict[key, [prim]]  (static shape, cached)
+    def get_dynamic_geometry(self, t): return {}  # dict[key, [prim]]  (rebuilt each frame)
+```
+
+Rules:
+
+- **One mental model.** Same `tf` / `get_kinematic_geometry` / `get_dynamic_geometry`
+  as a `System`; the animator runs the same `flatten_draw_list` on it. The static
+  vs. dynamic split is preserved (it is what retained-mode renderers need - see
+  *Static shape vs dynamic reshape*).
+- **Driven by playback `t` only**, never the primary's `(x,u)`. An overlay owns
+  whatever state it needs: `SceneHistory` slices `points_at(t)` in
+  `get_dynamic_geometry(t)`; `Replay` forwards its own trajectory;
+  `Scene.as_visualizer()` is a static `get_kinematic_geometry()`.
+- **No camera hints.** Camera selection is a `System`-only concern; overlays never
+  steal the camera. To follow a non-primary, pass an explicit `camera=` callable or
+  make it the primary.
+- **Anything attached to the primary body is not an overlay** - it belongs in the
+  primary's `get_dynamic_geometry` (which already has the primary's frames).
+
+Which hook each add-on overrides:
+
+| Overlay | Overrides | Nature |
+| --- | --- | --- |
+| `Scene.as_visualizer()` | `get_kinematic_geometry()` | static shape (obstacles) |
+| `SceneHistory` | `get_dynamic_geometry(t)` | reshape (trail/horizon) |
+| `Replay(drawable, traj)` | all three (forwarding) | static skin + named frames |
+
+`Replay` is the bridge between the two driving signals - it just supplies the
+wrapped drawable's `(x,u)` from a stored trajectory:
+
+```python
+@dataclass
+class Replay:                          # state-driven drawable -> time-only overlay
+    drawable: object                   # a System / DiagramSystem
+    trajectory: object
+    def tf(self, t):
+        x, u = self.trajectory.sample(t)
+        return self.drawable.tf(x, u, t)               # keeps the ghost's named frames
+    def get_kinematic_geometry(self):
+        return self.drawable.get_kinematic_geometry()  # real skin, cached once
+    def get_dynamic_geometry(self, t):
+        x, u = self.trajectory.sample(t)
+        return self.drawable.get_dynamic_geometry(x, u, t)
+```
+
+So a moving `System` is never a bare overlay (it needs its own `(x,u)`); wrap it in
+`Replay`. A bare `System` in `overlays` renders statically at a fixed pose.
+
+### Two composition axes (and why scenes are not diagram blocks)
+
+Rendering-only objects (`Scene`/`Replay`/`SceneHistory`) compose at `animate`,
+**never** inside a diagram. There are two orthogonal axes:
+
+- **Dynamics axis** (`>>`, `@`): composes `f`/`h`, ports, and stacked states.
+  Every block contributes dynamical behaviour.
+- **Render axis** (`animate(overlays=[...])`): composes drawables spatially /
+  temporally; no ports, no state.
+
+A scene/replay "block" would be `n=0` states with no ports and undefined `f`/`h`,
+forcing `DiagramSystem` to special-case "rendering-only, skip me" through state
+indexing, simulation, and linearization - polluting the core dynamics contract for
+a purely visual concern. Keeping them on the render axis gives the same
+composition (`[primary] + overlays`) without overloading `>>`.
+
+### Deferred: shared `tf(t)` for moving scenes (planner upgrade)
+
+Today the `Scene` visualizer is **world-fixed** (geometry keyed to `world`, no
+frame math). Time-varying obstacles are already expressible through the obstacle
+SDF's `t` argument (`scene.clearance(p, t)`), but there is no per-obstacle *frame*.
+A future `Scene.tf(t) -> dict[str, world 4x4]` could pose obstacles for **both**
+collision probes and the visualizer skin from one source of truth (the deferred
+collision/render convergence). This is **out of scope now** and best revisited when
+the planner is upgraded. The external visualization contract stays stable either
+way: `scene.as_visualizer()` returns a drawable, so a later `tf(t)` slots in behind
+it without changing the `overlays` API.
 
 ## Module placement (band split)
 
@@ -291,49 +422,56 @@ and slices `t <= t_now` - it owns its *view*, not a copy.
 
 - `core/kinematics.py` (new) - **rigid-body poses / transform algebra**.
   Native-array and **JAX-functional** (build with `xp.stack`/`xp.array`, no
-  in-place index assignment, so `tf` traces). Holds: `translation_matrix`,
-  `pose2d_matrix`, `rotation_matrix_x/y/z`, `invert_transform`, `apply_transform`
-  (relocated from [robot.py](minilink/planning/spatial/robot.py)),
-  `rod_between_transform`, `point_transform`, optional `single_body_tf`. No
-  tree/resolver.
+  in-place index assignment, so `tf` traces). Two layers mirroring the course
+  notes: a 3×3 orientation layer (`Rx`/`Ry`/`Rz`) and a 4×4 pose layer built on it
+  (`SE3`, `SE2`, `translation`, `identity`, `inv`, `apply` — the last is
+  `apply_transform` relocated + renamed from
+  [robot.py](../minilink/planning/spatial/robot.py), call sites updated, no alias).
+  State-aware / drawing
+  sugar (`single_body_tf`, `link_frame`) stays **out** of core — in the catalog /
+  graphical layer. No tree/resolver.
 - `core/geometry.py` (exists) - **occupied space / SDF solids**. Stays separate;
   it composes with kinematics (body-frame shape probe placed by a world transform)
   but is a distinct concern. Not merged.
 
 Centralization: transform math currently scattered (`apply_transform` in
-planning, builders in graphical) moves into `core/kinematics.py`; `robot.py` and
+planning, builders in graphical) moves into `core/kinematics.py` (as `apply`);
+`robot.py` and
 graphics import from there - one transform toolkit for collision and rendering.
 
 **Rendering stays in the graphical band (messy/Python, may cast):**
 
 - `GraphicPrimitive` classes + the new `local_transform` attribute,
   render-geometry builders `arrow_pts`/`torque_arc_pts`, ready-made shapes
-  (`vehicle_body`, `wheel_box`, `spring_line`, `ground_line`), skin factories in
-  `graphical/animation/skins.py`, and camera (`camera_matrix`, `world_to_camera`,
-  follow factories) in `graphical/animation/camera.py`.
+  (`vehicle_body`, `wheel_box`, `spring_line`, `ground_line`) in
+  `graphical/animation/primitives.py`, skin factory functions in
+  `graphical/catalog/skins.py` (public; pure functions `(plant) -> dict`, see
+  *Skin contract* above and [phase1](phases/phase1_foundation.md)), and camera
+  (`camera_matrix`, `world_to_camera`, follow factories) in
+  `graphical/animation/camera.py`.
 - Deleted hacks: `scale_pose2d_matrix`, `arrow_transform`, `line_between_transform`,
   `time_channel_matrix`, `torque_pose2d_matrix`, `extract_amplitude`.
 
-Deferred (Phase 2): render-shape vs SDF-shape unification (graphical `Box`/`Sphere`
+Deferred: render-shape vs SDF-shape unification (graphical `Box`/`Sphere`
 vs `core.geometry` `Box`/`Sphere`) - one geometry attached to frames feeding both
 render and collision. Note only; not in this slice.
 
 Relocating transform helpers + removing the core->graphics camera import is an
 architecture change -> approved scope (D4); touches the band layout, keep
-[DESIGN.md §3](DESIGN.md) in sync.
+[DESIGN.md §3](../DESIGN.md) in sync.
 
-## Collision reuse (Phase 2, later)
+## Collision reuse (deferred)
 
 `RobotBody`/`PlanarRigidBody.body_poses` already returns world poses per part
-([robot.py](minilink/planning/spatial/robot.py)). Converge it onto the same
+([robot.py](../minilink/planning/spatial/robot.py)). Converge it onto the same
 world-frame dict: collision `Shape`s key to the same frames, so one FK feeds both
 the rendered chassis and the clearance probes. Both consume world poses; no tree
 needed.
 
 ## Use-case validation (standard workflows)
 
-Walked the contract through real plants ([arms.py](minilink/dynamics/catalog/manipulators/arms.py),
-[dynamic_bicycle.py](minilink/dynamics/catalog/vehicles/dynamic_bicycle.py),
+Walked the contract through real plants ([arms.py](../minilink/dynamics/catalog/manipulators/arms.py),
+[dynamic_bicycle.py](../minilink/dynamics/catalog/vehicles/dynamic_bicycle.py),
 pendulum family) to validate before implementation.
 
 1. **Physical non-spatial sys (e.g. chemical plant).** `tf` is optional: by
@@ -342,8 +480,8 @@ pendulum family) to validate before implementation.
    dashboards.
 2. **Quick-and-dirty class.** Two one-line dicts:
    `get_kinematic_geometry()` -> `{"body": [Circle(...)]}` and
-   `tf(x,u,t)` -> `{"body": pose2d_matrix(x[0], x[1], x[2])}`. Optional sugar: a
-   `single_body_tf(x, ix=0, iy=1, ith=2)` helper for the planar-rigid-body case.
+   `tf(x,u,t)` -> `{"body": SE2(x[0], x[1], x[2])}`. Optional sugar: a
+   `single_body_tf(x, ix=0, iy=1, ith=2)` catalog helper for the planar-rigid-body case.
 3. **Many-DOF manipulator.** Frames scale with DOF (`link{i}`, `joint{i}`; 11 keys
    for a 5-link arm) — a dict handles what fragile lists could not. `tf` is the FK
    chain; torque arcs are `get_dynamic_geometry` keyed to each link/joint frame,
@@ -367,8 +505,8 @@ pendulum family) to validate before implementation.
 
 Also verified: diagram animation (`DiagramSystem.tf` slices local `x,u`, prefixes
 `sys_id:frame`; static controller returns `{}`), modal animation
-([analysis/modal.py](minilink/analysis/modal.py) is a call site to migrate), and
-meshcat (named frames map cleanly to scene-graph nodes; Phase 1 keeps flattening
+([analysis/modal.py](../minilink/analysis/modal.py) is a call site to migrate), and
+meshcat (named frames map cleanly to scene-graph nodes; the contract slice keeps flattening
 to `(primitive, world 4x4)` so renderers are untouched).
 
 ## Decisions
@@ -376,12 +514,13 @@ to `(primitive, world 4x4)` so renderers are untouched).
 Resolved:
 
 - **D1 - `tf` native-array now (LOCKED).** Write `tf` JAX-traceable from day one
-  (no `float()`), so collision can reuse it in Phase 2.
+  (no `float()`), so collision can reuse it later.
 - **D2 - default viz `{}` (LOCKED).** Base `System`/`StaticSystem`/`DynamicSystem`
   return `{}`; no per-state debug points by default.
 - **D3a - multi-drawable `animate` (LOCKED).** `animate(traj, overlays=[...])`
-  where overlays may be Systems / Scenes / SceneHistory / `Replay`; the animator
-  merges `[primary] + overlays`.
+  where overlays are **t-only add-ons** (`scene.as_visualizer()`, `SceneHistory`,
+  `Replay`); the animator merges `[primary] + overlays`. Raw `Scene` and bare moving
+  `System`s are rejected — call `.as_visualizer()` / wrap in `Replay`.
 - **D4 - atomic migration (LOCKED).** The no-alias rename migrates *all*
   `get_kinematic_*` overrides in one change (~5 shared-helper rewrites cover most
   of the ~20); the whole catalog will be fixed.
@@ -429,7 +568,10 @@ such callables (Option-3 ergonomics without a class hierarchy).
 
 ### Layer 4 - source selection (diagram / multi-object)
 
-When several sources carry hints, the animator picks one deterministically:
+Only **state-driven drawables** carry camera hints (the primary and, inside a
+diagram, its subsystems); **overlays never carry hints** and so never steal the
+camera. When several hint-carrying sources exist, the animator picks one
+deterministically:
 
 1. explicit `camera=` override wins;
 2. else highest `camera_priority`;
@@ -438,38 +580,10 @@ When several sources carry hints, the animator picks one deterministically:
 4. final tie-break: the **primary** drawable (the `sys` animated / first in list).
 
 Common cases need zero config: `controller @ plant` auto-selects the plant (the
-`StaticSystem` controller has empty skin, step 3); robot + other robots + scene
-keeps the primary robot (step 4); `Scene`/`SceneHistory` never steal the camera.
-To override: bump a robot's `camera_priority`, pass `camera=`, or optional sugar
-`animate(camera_from="robot2")`.
-
-## Implications on scope
-
-- The rename touches ~20 catalog files + `animator.py` + `analysis/modal.py` +
-  renderers + tests + demos, but collapses to a handful of shared-helper rewrites
-  (manipulator `_planar_*`, bicycle, pendulum) plus per-class skin dicts.
-- `tf` rewritten native-array per plant is the main *quality* cost (worth it: it
-  is the equation-path rule and unlocks collision reuse).
-- Removing `time_channel_matrix` / column scaling updates the dynamic primitives
-  (`TorqueArrow`, `HorizonPolyline`, `TrajectoryPolyline`) and their renderer
-  read paths in the same change.
-
-## Phasing
-
-- **Phase 1 (this slice):** the three upgraded hooks + `local_transform` on
-  `System`/`DiagramSystem`, animator/renderer wiring, retire scale/time channels,
-  migrate one simple plant + the bicycle pair (+ one diagram demo);
-  `Scene`/`SceneHistory` drawable + collision reuse stubbed with
-  `TODO: User Architectural Review`.
-- **Phase 2:** collision unification onto the shared world-frame dict.
-- **Phase 3:** `SceneHistory`/`Scene.to_overlay()` fully wired; MPC demo sweep.
-
-Phase 1 boundary (LOCKED): **contract only** - upgrade the three hooks + camera
-hints, migrate the full catalog, wire the multi-drawable animator + camera
-selection, and retire the channel hacks. `Scene`/`SceneHistory`/`Replay` and
-collision reuse are stubbed with `TODO: User Architectural Review` and land in
-Phases 2-3. So instantaneous arrows/torque arcs work now; MPC-plan/trail overlays
-follow in Phase 3 (the MPC demo keeps its current form until then).
+`StaticSystem` controller has empty skin, step 3); a robot with overlaid scenes /
+ghosts keeps the primary robot, since overlays have no hints. To follow a
+non-primary (e.g. a `Replay` ghost), pass an explicit `camera=` callable or make it
+the primary - there is no `camera_from` for overlays in the simple contract.
 
 ## Catalog migration order (~20 `get_kinematic_*` overrides)
 
@@ -478,24 +592,4 @@ follow in Phase 3 (the MPC demo keeps its current form until then).
 3. Manipulators.
 4. Aerial / marine / misc.
 5. Engines (`world.py`, `ancf_tire_jax.py`).
-6. MPC / trajopt demo subclasses -> `Scene`/`SceneHistory` (Phase 3).
-
-## Verification
-
-`ruff check/format` on touched files; `pytest` (animation, primitives, camera,
-spatial); `MPLBACKEND=Agg` headless smoke of a migrated plant; update
-[DESIGN.md](DESIGN.md) visualization-contract section and
-[README.md](README.md)/[ROADMAP.md](ROADMAP.md) if public behavior changes.
-
-## Success criteria (Phase 1 sign-off)
-
-- Adding a frame to a plant edits one method (`tf`); geometry keys it by name. No
-  synchronized lists.
-- Fixed offsets use `primitive.local_transform`; `tf` carries only
-  independent-frame math.
-- A reusable car skin is shared/swapped (DynamicBicycle vs 3D car) with no
-  copy-pasted transform math.
-- No `time_channel_matrix` / column-norm scaling in migrated code; arrow size is
-  real world geometry; camera scale unchanged.
-- No new dataclasses introduced by the contract.
-- `DESIGN.md` documents the world-frame contract; frame-key vocabulary approved.
+6. MPC / trajopt demo subclasses -> `Scene`/`SceneHistory` (deferred to the overlay phase).

@@ -1,0 +1,743 @@
+[
+  {
+    "plant": "dynamic_bicycle",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycle",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0,
+    "file": "dynamic_bicycle__rest.png",
+    "sha256": "6bd1d21f128029096b2b71817fcae2c6198377bec32773937e1a9b641052fbb1"
+  },
+  {
+    "plant": "dynamic_bicycle",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycle",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7,
+    "file": "dynamic_bicycle__pose_a.png",
+    "sha256": "b2ffd778e83ecc8d047db27390b172cae576685d9845ab20cac75c65018a036b"
+  },
+  {
+    "plant": "dynamic_bicycle",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycle",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4,
+    "file": "dynamic_bicycle__pose_b.png",
+    "sha256": "c441a0d7f5e0a4d094e298cfd3c65c88becaa8400253790bdf3f93e932bae8c4"
+  },
+  {
+    "plant": "dynamic_bicycle_car3d",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycleCar3D",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0,
+    "file": "dynamic_bicycle_car3d__rest.png",
+    "sha256": "02ef478aa59cd7d3b0711cae203ece82d62823bab3b80433424e63d2e7816e8e"
+  },
+  {
+    "plant": "dynamic_bicycle_car3d",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycleCar3D",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7,
+    "file": "dynamic_bicycle_car3d__pose_a.png",
+    "sha256": "be3ce1be39e6af6ff109aa584961845cd06a2e59525bb8c072f5f71feec71957"
+  },
+  {
+    "plant": "dynamic_bicycle_car3d",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycleCar3D",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4,
+    "file": "dynamic_bicycle_car3d__pose_b.png",
+    "sha256": "2d0589cc7462bb621f05cfd670eac7326cdab107e918f8a0137dab786f1d91ca"
+  },
+  {
+    "plant": "kinematic_bicycle",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "KinematicBicycle",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0,
+    "file": "kinematic_bicycle__rest.png",
+    "sha256": "df1c40b500e2b75baca6de31aaf029a5c09b7a180b19aefc3668a3a5e6a3a9c0"
+  },
+  {
+    "plant": "kinematic_bicycle",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "KinematicBicycle",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7,
+    "file": "kinematic_bicycle__pose_a.png",
+    "sha256": "a7c9d4b1c6fb47f2891ee572dae550a3d433f29b0284937b26e65c8856337cee"
+  },
+  {
+    "plant": "kinematic_bicycle",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "KinematicBicycle",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4,
+    "file": "kinematic_bicycle__pose_b.png",
+    "sha256": "a002b4a6eb7ab9da8a10f1ef5033f656d565e238a43085c1b298961987e6cfe0"
+  },
+  {
+    "plant": "holonomic_mobile_robot",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "HolonomicMobileRobot",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0,
+    "file": "holonomic_mobile_robot__rest.png",
+    "sha256": "bc9d15b7d1421b12843652ed0311f56b527c98de45da85873b438a63ff77f8ff"
+  },
+  {
+    "plant": "holonomic_mobile_robot",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "HolonomicMobileRobot",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7,
+    "file": "holonomic_mobile_robot__pose_a.png",
+    "sha256": "3a7693268813e0d09aa963625ff8ec1767755d761bd0c4922412e5ee1a8eb171"
+  },
+  {
+    "plant": "holonomic_mobile_robot",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "HolonomicMobileRobot",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4,
+    "file": "holonomic_mobile_robot__pose_b.png",
+    "sha256": "20aa651cacc2ced57be22e24bf9d8372f1cc0d0451254fccb217001351fd596d"
+  },
+  {
+    "plant": "pendulum",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.pendulum.pendulum",
+    "class": "Pendulum",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
+    "t": 0.0,
+    "file": "pendulum__rest.png",
+    "sha256": "06fe49edf71e28ea05860e90bcb1b16f09e7506c153d6664b0dc4ac05c9f280e"
+  },
+  {
+    "plant": "pendulum",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.pendulum.pendulum",
+    "class": "Pendulum",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947
+    ],
+    "u": [
+      0.2450166444603104
+    ],
+    "t": 0.7,
+    "file": "pendulum__pose_a.png",
+    "sha256": "667350d803146aadf0bfa2e9dad8ec3d3a72cf400315e85c6a35130ab92ec7eb"
+  },
+  {
+    "plant": "pendulum",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.pendulum.pendulum",
+    "class": "Pendulum",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749
+    ],
+    "u": [
+      0.3916634548137417
+    ],
+    "t": 1.4,
+    "file": "pendulum__pose_b.png",
+    "sha256": "14f704717df386230bdb50d038b849a39c77041bc5c9352592ed04df241953bf"
+  },
+  {
+    "plant": "cartpole",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.pendulum.cartpole",
+    "class": "CartPole",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
+    "t": 0.0,
+    "file": "cartpole__rest.png",
+    "sha256": "aafb934f60a7f8dab24fee51321e2fa0dffcf8cbce92237ad6c5640b0d84054a"
+  },
+  {
+    "plant": "cartpole",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.pendulum.cartpole",
+    "class": "CartPole",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782
+    ],
+    "u": [
+      0.2450166444603104
+    ],
+    "t": 0.7,
+    "file": "cartpole__pose_a.png",
+    "sha256": "a5cc4545f914e66371bec2308747f4287ba29dfe92ae384df1ff7810cc217e6e"
+  },
+  {
+    "plant": "cartpole",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.pendulum.cartpole",
+    "class": "CartPole",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596
+    ],
+    "u": [
+      0.3916634548137417
+    ],
+    "t": 1.4,
+    "file": "cartpole__pose_b.png",
+    "sha256": "04eb7e701b49333784abbcaf3f7e3b48b7b98e68b8099879cd97426602852bfd"
+  },
+  {
+    "plant": "two_link_manipulator",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "TwoLinkManipulator",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0,
+    "file": "two_link_manipulator__rest.png",
+    "sha256": "d995bb4790a0be903db34057d7ba56c4b3d0aebc387f9fe427bbc3bb4b35a048"
+  },
+  {
+    "plant": "two_link_manipulator",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "TwoLinkManipulator",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7,
+    "file": "two_link_manipulator__pose_a.png",
+    "sha256": "d0929cc6eda053e2798cea7e4f60604148833479fa749283bba505663384a415"
+  },
+  {
+    "plant": "two_link_manipulator",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "TwoLinkManipulator",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4,
+    "file": "two_link_manipulator__pose_b.png",
+    "sha256": "4ac7e974db8cf2c953db6f6fbf39298c6a8c113c8f6d3746d19a0fe79a1d62ab"
+  },
+  {
+    "plant": "five_link_planar_manipulator",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "FiveLinkPlanarManipulator",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "t": 0.0,
+    "file": "five_link_planar_manipulator__rest.png",
+    "sha256": "2f13bb7f28772f4b8b493ac8b94b3c6e7dacdabc3d011f69be0eddf787dbc7d7"
+  },
+  {
+    "plant": "five_link_planar_manipulator",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "FiveLinkPlanarManipulator",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563,
+      0.33388511393566395,
+      0.3800930367834119,
+      0.13865412713401035,
+      -0.20771546164667423
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613,
+      -0.007299880575322148,
+      -0.16656900531995603,
+      -0.24749812415011135
+    ],
+    "t": 0.7,
+    "file": "five_link_planar_manipulator__pose_a.png",
+    "sha256": "e7b67820fc5fac998692832c91c4df958f5a90745be5df3acc046464df11c294"
+  },
+  {
+    "plant": "five_link_planar_manipulator",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "FiveLinkPlanarManipulator",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283,
+      -0.7999386060512808,
+      -0.6658139537791207,
+      -0.2991013318641888,
+      0.17209599047025242
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007,
+      0.47315004384370724,
+      0.33773159027557553,
+      0.11962466460699121
+    ],
+    "t": 1.4,
+    "file": "five_link_planar_manipulator__pose_b.png",
+    "sha256": "53da13515ec8af437f26b4a4d35750cf6c1575e4c089cb7c5096df84d5a2a8b6"
+  },
+  {
+    "plant": "drone2d",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.aerial.drone",
+    "class": "Drone2D",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0,
+    "file": "drone2d__rest.png",
+    "sha256": "ac31e16b4c07e2c42e29a90c46e68dd19e4905e89d5346db670efd7d74af6ac7"
+  },
+  {
+    "plant": "drone2d",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.aerial.drone",
+    "class": "Drone2D",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7,
+    "file": "drone2d__pose_a.png",
+    "sha256": "4aed236e61804d4c2ea0861d55f54f580971d1f2eee176d49fcea20d792ccf31"
+  },
+  {
+    "plant": "drone2d",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.aerial.drone",
+    "class": "Drone2D",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4,
+    "file": "drone2d__pose_b.png",
+    "sha256": "62d33b50a0d78c4a025c8501bf3c3c3afc7fbe885f324469e4e22aa2975d8484"
+  },
+  {
+    "plant": "simple_integrator",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.equations.integrators",
+    "class": "SimpleIntegrator",
+    "requires": [],
+    "x": [
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
+    "t": 0.0,
+    "file": "simple_integrator__rest.png",
+    "sha256": "b90a50eba46999294946009fce297ffe238d386c4000fdf2b0873dc3202c589d"
+  },
+  {
+    "plant": "simple_integrator",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.equations.integrators",
+    "class": "SimpleIntegrator",
+    "requires": [],
+    "x": [
+      0.38213459565024244
+    ],
+    "u": [
+      0.2450166444603104
+    ],
+    "t": 0.7,
+    "file": "simple_integrator__pose_a.png",
+    "sha256": "c4f85deaf8e5c1d1c1049b6cecfc1243b1be779914fb73bd61743db3896c91f1"
+  },
+  {
+    "plant": "simple_integrator",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.equations.integrators",
+    "class": "SimpleIntegrator",
+    "requires": [],
+    "x": [
+      0.7129658880491484
+    ],
+    "u": [
+      0.3916634548137417
+    ],
+    "t": 1.4,
+    "file": "simple_integrator__pose_b.png",
+    "sha256": "ca4d2d1c2e75e7155b9be3e4990735e6e81c5e8e30a857f448a613e8a0b5015c"
+  },
+  {
+    "plant": "single_mass",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.mass_spring_damper.linear",
+    "class": "SingleMass",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
+    "t": 0.0,
+    "file": "single_mass__rest.png",
+    "sha256": "36dfa3c2037c13c4c89d0af84f3246c2bd18ec6f4ab5c81427c2fe96917db97b"
+  },
+  {
+    "plant": "single_mass",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.mass_spring_damper.linear",
+    "class": "SingleMass",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947
+    ],
+    "u": [
+      0.2450166444603104
+    ],
+    "t": 0.7,
+    "file": "single_mass__pose_a.png",
+    "sha256": "e1c54dfb9607092155a8c98970cc05eef7cb631cdbb428676317f35ac1d27d6a"
+  },
+  {
+    "plant": "single_mass",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.mass_spring_damper.linear",
+    "class": "SingleMass",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749
+    ],
+    "u": [
+      0.3916634548137417
+    ],
+    "t": 1.4,
+    "file": "single_mass__pose_b.png",
+    "sha256": "1e3dd27bd5152b9e3ef5d04d75d51f1289792e19c0ed25b2d750e1ab905d9df6"
+  },
+  {
+    "plant": "dynamic_bicycle_rate_inputs",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "JaxDynamicBicycleRateInputs",
+    "requires": [
+      "jax"
+    ],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0,
+    "file": "dynamic_bicycle_rate_inputs__rest.png",
+    "sha256": "6bd1d21f128029096b2b71817fcae2c6198377bec32773937e1a9b641052fbb1"
+  },
+  {
+    "plant": "dynamic_bicycle_rate_inputs",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "JaxDynamicBicycleRateInputs",
+    "requires": [
+      "jax"
+    ],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563,
+      0.33388511393566395,
+      0.3800930367834119
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7,
+    "file": "dynamic_bicycle_rate_inputs__pose_a.png",
+    "sha256": "fc1905fda5276cd2fdc79a58d51a3ee878d4f2aa53b93a894516f8d1a1f12f05"
+  },
+  {
+    "plant": "dynamic_bicycle_rate_inputs",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "JaxDynamicBicycleRateInputs",
+    "requires": [
+      "jax"
+    ],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283,
+      -0.7999386060512808,
+      -0.6658139537791207
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4,
+    "file": "dynamic_bicycle_rate_inputs__pose_b.png",
+    "sha256": "763af984cc8d9c6b9b16f2958ee6f64c36dba1ab80b8e2d9fe41ce9863b27046"
+  }
+]
