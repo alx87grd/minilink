@@ -55,6 +55,15 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "interactive loops"):
             animator.game(renderer="plotly", max_steps=1)
 
+    def test_v2_game_requires_interactive_renderer(self):
+        from minilink.graphical.animation.animator2 import Animator2
+
+        sys = DynamicSystem(1, output_dim=1, expose_state=True)
+        animator2 = Animator2(sys)
+        self.assertTrue(hasattr(animator2, "game"))
+        with self.assertRaisesRegex(ValueError, "interactive loops"):
+            animator2.game(renderer="plotly", max_steps=1)
+
 
 @pytest.mark.optional
 class TestPlotlyRenderer(unittest.TestCase):

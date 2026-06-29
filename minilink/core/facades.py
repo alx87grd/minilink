@@ -581,3 +581,37 @@ class SystemFacades:
             t0=t0,
             max_steps=max_steps,
         )
+
+    def game_v2(
+        self,
+        *,
+        dt=1 / 30.0,
+        dynamics_substeps=1,
+        renderer="pygame",
+        is_3d=False,
+        x0=None,
+        u0=None,
+        t0=0.0,
+        max_steps=None,
+    ):
+        """
+        Interactive game loop through the v2 pipeline.
+
+        Parallel to :meth:`game`; uses ``Animator2`` and the frame-keyed v2 hooks
+        (``tf_v2`` / ``get_kinematic_geometry_v2`` / ``get_dynamic_geometry_v2``),
+        so live force/torque arrows are rebuilt each tick. See ``Animator2.game``
+        and ``ROADMAP.md`` §7.
+        """
+        from minilink.graphical.animation.animator2 import Animator2
+
+        animator = Animator2(self)
+        return animator.game(
+            dt=dt,
+            dynamics_substeps=dynamics_substeps,
+            renderer=renderer,
+            is_3d=is_3d,
+            x0=self.x0 if x0 is None else x0,
+            u0=np.zeros(self.m) if u0 is None else u0,
+            t0=t0,
+            max_steps=max_steps,
+        )

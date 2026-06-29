@@ -25,8 +25,15 @@ import warnings
 
 import numpy as np
 
-from minilink.graphical.animation.animator import make_renderer
+from minilink.graphical.animation.animator import (
+    _require_interactive_renderer,
+    make_renderer,
+)
 from minilink.graphical.animation.camera import resolve_camera_from_hints
+from minilink.graphical.animation.interactive import (
+    draw_keyboard_input_overlay,
+    u_from_keyboard,
+)
 from minilink.graphical.animation.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
@@ -198,3 +205,130 @@ class Animator2:
                 break
         backend.close_scene()
         return None
+
+    def game(
+        self,
+        *,
+        dt=1 / 100.0,
+        dynamics_substeps=1000,
+        renderer="pygame",
+        is_3d=False,
+        x0=None,
+        u0=None,
+        t0=0.0,
+        max_steps=None,
+    ):
+        """Real-time interactive mode through the v2 pipeline.
+
+        Mirrors :meth:`Animator.game` — pygame keyboard input, Euler integration
+        with internal substeps, redraw every tick — but resolves each frame from
+        the frame-keyed v2 hooks (``tf_v2`` / ``get_kinematic_geometry_v2`` /
+        ``get_dynamic_geometry_v2``) via :meth:`_resolve_frame`, so dynamic
+        geometry (force/torque arrows) is rebuilt live.
+
+        Roadmap (``ROADMAP.md`` §7): pluggable **input** (keyboard vs TCP) and
+        **integration** backends; optional **live output push**.
+        """
+        if dynamics_substeps < 1 or int(dynamics_substeps) != dynamics_substeps:
+            raise ValueError("dynamics_substeps must be a positive integer.")
+        dynamics_substeps = int(dynamics_substeps)
+        backend = make_renderer(renderer, self)
+        _require_interactive_renderer(renderer, backend)
+
+        # Lazy pygame import: game() should be optional.
+        try:
+            import pygame
+        except ImportError as e:
+            raise ImportError(
+                "pygame is required for renderer/input mode. Install with: "
+                "pip install 'minilink[visualization]'"
+            ) from e
+
+        pygame.init()
+        vis = renderer.strip().lower()
+        # When visualization is not pygame, use a visible window so SDL can
+        # deliver keyboard events (1x1 is not focusable on many platforms).
+        keyboard_input_screen = None
+        if vis != "pygame":
+            keyboard_input_screen = pygame.display.set_mode((640, 240))
+            pygame.display.set_caption(
+                f"minilink game — keyboard (focus here) — {self.sys.name}"
+            )
+
+        kinematic = self.sys.get_kinematic_geometry_v2()
+
+        x = np.asarray(self.sys.x0 if x0 is None else x0, dtype=float).copy()
+        u = np.asarray(np.zeros(self.sys.m) if u0 is None else u0, dtype=float).copy()
+        t = float(t0)
+        step_idx = 0
+
+        frame = self._resolve_frame(x, u, t, kinematic=kinematic)
+        backend.open_scene(
+            is_3d=is_3d,
+            show=True,
+            camera=frame["camera"],
+            title=f"Interactive game — {self.sys.name}",
+        )
+
+        # Initial input from keyboard (pygame display exists for renderer=pygame).
+        pygame.event.pump()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                backend.close_scene()
+                pygame.quit()
+                return
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                backend.close_scene()
+                pygame.quit()
+                return
+
+        keys = pygame.key.get_pressed()
+        u = u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
+        draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
+
+        frame = self._resolve_frame(x, u, t, kinematic=kinematic)
+        backend.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
+        backend.present(block=False, interval_s=dt)
+
+        while True:
+            should_quit = False
+
+            pygame.event.pump()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    should_quit = True
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    should_quit = True
+
+            keys = pygame.key.get_pressed()
+            u = u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
+            draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
+
+            # Euler steps for dynamic systems only (ZOH on u during frame).
+            if self.sys.n > 0:
+                dt_dyn = dt / dynamics_substeps
+                t_dyn = t
+                for _ in range(dynamics_substeps):
+                    dx = self.sys.f(x, u, t_dyn)
+                    x = x + np.asarray(dx, dtype=float) * dt_dyn
+                    t_dyn += dt_dyn
+
+            t = t + dt
+            step_idx += 1
+
+            frame = self._resolve_frame(x, u, t, kinematic=kinematic)
+            backend.draw_frame(
+                frame["primitives"], frame["transforms"], t, frame["camera"]
+            )
+            backend.present(block=False, interval_s=dt)
+
+            backend_events = backend.poll_events()
+            if backend_events.get("quit", False):
+                break
+            if should_quit:
+                break
+            if max_steps is not None and step_idx >= max_steps:
+                break
+
+        backend.close_scene()
+        pygame.quit()
