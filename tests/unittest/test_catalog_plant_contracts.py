@@ -1,7 +1,8 @@
 """Deep contract checks on representative catalog plants (dynamics + graphics).
 
-Broader catalog coverage lives in ``test_catalog_migration.py`` and pixel
-regression in ``test_kinematic_regression.py``. This file keeps a small set of
+Broader catalog coverage lives in ``test_catalog_migration.py`` and render
+smoke in ``test_kinematic_regression.py`` (manifest only — no stored PNGs).
+This file keeps a small set of
 reference-value and integration checks that are expensive to scatter.
 """
 

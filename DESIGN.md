@@ -322,8 +322,7 @@ the best goal cost stops improving for `convergence_patience` extensions;
 ``live_plot_after_goal_only`` limits updates to the RRT* post-goal convergence phase.
 ``RRTOptions.nearest_backend`` selects brute-force or SciPy ``cKDTree`` nearest/near
 queries (Euclidean L2 only — requires ``metric=euclidean``); see
-``benchmarks/run_rrt_nearest_backends.py`` and
-``examples/scripts/planning/demo_rrt_kdtree_speed_double_pendulum.py``. Modest
+``benchmarks/run_rrt_nearest_backends.py``. Modest
 speedups on low-D obstacle scenes are expected when collision checking and
 post-goal tree scans dominate.
 

@@ -413,4 +413,4 @@ Treat pyro 2.0 (minilink) as **feature-complete** when:
    params-gradient workflow shown in pyro's parameter-ID examples.
 6. README includes a **pyro migration guide** (API mapping table).
 
-Until then, use this file as the master unchecked todo.
+**Superseded** — living backlog: [pyro-port-remaining.md](../pyro-port-remaining.md).

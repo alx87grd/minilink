@@ -30,7 +30,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Estimation | 1 | Placeholder only. | Luenberger, Kalman, EKF. |
 | Identification | 2 | Parametric-tier prototype demo only. | `fitting.py` for physical + NN params. |
 | Interfaces | 1 | Placeholder only. | Gymnasium, Flax/Torch adapters. |
-| Pyro 2.0 overall | 3 | Catalog + core framework + planning search/DP/trajopt done; ~151/195 pyro demos not ported. | Phased port per [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
+| Pyro 2.0 overall | 3 | Catalog + core framework + planning search/DP/trajopt done; ~142/195 pyro demos not ported. | Phased port per [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 
@@ -58,6 +58,7 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
   linear control + LQR, analysis linearize/structural/equilibria/modal/Bode
   ([archive/tool-migration-notes.md](docs/plans/archive/tool-migration-notes.md)).
 - **Planning search + DP** — RRT/RRT*, value iteration, spatial scene integration.
+- **DP/RRT on continuous `PlanningProblem`** — discrete pyro framework remains out of scope.
 
 ## 3. Priorities
 
@@ -96,13 +97,9 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 - Diagram validation as separate `validate()` vs inline wiring.
 - Trajopt transcription internal consolidation.
 - Dynamic bicycle module split.
-- ~~Graphics kinematic composition~~ — frame-keyed ``tf`` / ``get_kinematic_geometry`` /
-  ``get_dynamic_geometry`` + ``animate(overlays=…)`` (see DESIGN §4).
 - Graphics/camera contract consolidation (`KinematicModel` delegate) — optional follow-up.
 - **`Manipulator` catalog rebase** — `arms.py` still subclasses `MechanicalSystem`
   ([manipulator-abstraction.md](docs/plans/manipulator-abstraction.md)).
-- ~~**DP/RRT return**~~ — landed on continuous `PlanningProblem`; discrete pyro
-  framework remains out of scope.
 - **Pyro game demos** — port via interactive animation or explicitly drop.
 
 ## 5. Future
@@ -192,7 +189,7 @@ Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) (June 
 | --- | ---: | ---: | ---: |
 | Catalog plants | 40+ | 40+ | **0** (QA complete) |
 | Library modules | 38 | ~25 equivalent | **~10 tools** (control nonlinear/robot, DP, RRT, traj gen, estimation, interfaces) |
-| Example scripts | 195 | 44 | **~151** |
+| Example scripts | 195 | 53 | **~142** |
 | Course notebooks | 3 | 7 (new topics) | different mix |
 
 ### Port phases (from gap doc)

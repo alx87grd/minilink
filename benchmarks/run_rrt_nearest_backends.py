@@ -7,9 +7,7 @@ Compares ``brute_force`` vs ``kd_tree`` for RRT and RRT* on the holonomic
 Modest speedups (~1.2–1.7×) are normal here: scene collision checks and the
 post-goal ``_refresh_best_goal`` full-tree scan dominate wall time (~75%
 combined on ~7k-node runs), and 2D brute-force nearest queries are already
-cheap. For clearer ``kd_tree`` wins, run the 4D double-pendulum example::
-
-    python examples/scripts/planning/demo_rrt_kdtree_speed_double_pendulum.py
+cheap. For higher-D scenes, try ``examples/scripts/planning/rrt/demo_pendulum_swingup.py``.
 
 Run from the repository root::
 
