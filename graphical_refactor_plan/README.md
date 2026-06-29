@@ -10,7 +10,7 @@ frame-keyed geometry, parallel `_v2` pipeline, PNG pixel-parity, phased cutover)
 | [`00_original_vision.md`](00_original_vision.md) | Self-contained ground-truth vision: locked architecture and decisions |
 | [`01_master_overview.md`](01_master_overview.md) | Master plan: phases, gates, success criteria, locked decisions, risks |
 | [`02_demo_use_cases.md`](02_demo_use_cases.md) | Target user-facing demo scripts for the new public API |
-| [`03_kinematics_core_math.md`](03_kinematics_core_math.md) | Vision for `core/kinematics.py` — array-only, reusable transform algebra |
+| [`03_kinematics_core_math.md`](03_kinematics_core_math.md) | Vision for `core/kinematics.py` — 3×3 `R` + 4×4 `T` layers, frame-tagged variable naming |
 | [`phases/phase0_baselines.md`](phases/phase0_baselines.md) | Phase 0 — PNG baseline harness |
 | [`phases/phase1_foundation.md`](phases/phase1_foundation.md) | Phase 1 — additive foundation modules |
 | [`phases/phase2_v2_pipeline.md`](phases/phase2_v2_pipeline.md) | Phase 2 — parallel v2 pipeline |

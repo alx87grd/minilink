@@ -16,7 +16,7 @@ These rules govern all demo-script examples and catalog student-facing code:
 | --- | --- | --- |
 | **Input ports** | `self.add_input_port("steer", labels=["delta"])` — already on `System`; no `InputPort` import | `InputPort` in `core/signals.py` |
 | **Shapes & skins** | `from minilink.graphical.catalog import Box, Circle, Arrow, car_skin_3d` — public catalog (`shapes` + `skins`) | `graphical/animation/` primitives/visualization/renderers for library authors |
-| **`tf` math** | Inline 4×4 with `xp = array_module(x)`, `xp.cos` / `xp.stack` — reads like textbook SE(2) | `pose2d_matrix` etc. in `core/kinematics.py` for shared catalog helpers |
+| **`tf` math** | Inline 4×4 with `xp = array_module(x)`, `xp.cos` / `xp.stack` — reads like textbook SE(2); tag locals with frame keys (`W_T_body`, `body_T_wheel`) | `SE2`, `Rz`, … symbols in `core/kinematics.py` for shared catalog helpers |
 | **Vehicle look** | Assign the **`skin`** attribute (callable `(plant) -> dict`); contract hook stays `get_kinematic_geometry` | Skin functions in `graphical/catalog/skins.py` |
 
 **Skin swap — contract hook + opt-in `skin` attribute (LOCKED, Option B):**
@@ -90,7 +90,7 @@ class MyRobot(DynamicSystem):
     def tf(self, x, u, t=0, params=None):
         xp = array_module(x)
         c, s = xp.cos(x[2]), xp.sin(x[2])
-        T_body = xp.array([
+        W_T_body = xp.array([
             [c, -s, 0.0, x[0]],
             [s,  c, 0.0, x[1]],
             [0.0, 0.0, 1.0, 0.0],
@@ -98,13 +98,13 @@ class MyRobot(DynamicSystem):
         ])
         delta = u[0]
         cd, sd = xp.cos(delta), xp.sin(delta)
-        T_offset = xp.array([
+        body_T_wheel = xp.array([
             [cd, -sd, 0.0, self.L * 0.35],
             [sd,  cd, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ])
-        return {"body": T_body, "wheel": T_body @ T_offset}
+        return {"body": W_T_body, "wheel": W_T_body @ body_T_wheel}
 
 
 if __name__ == "__main__":
@@ -113,9 +113,11 @@ if __name__ == "__main__":
     robot.animate(traj)
 ```
 
-**Conventions:** fixed offset on same frame → `prim.local_transform` or primitive
-`center`; not a new frame key. Catalog shared FK may use `core/kinematics` helpers
-internally — demos show the matrix directly.
+**Conventions:** frame-tagged locals (`W_T_body`, `body_T_wheel`) — see
+[`03_kinematics_core_math.md`](03_kinematics_core_math.md). Fixed offset on same
+frame → `prim.local_transform` or primitive `center`; not a new frame key.
+Catalog shared FK may use `core/kinematics` helpers internally — demos show the
+matrix directly.
 
 ---
 
@@ -211,7 +213,7 @@ for key, T in frames.items():
     print(key, T[:3, 3])                  # world origin of each frame
 ```
 
-**Scene — collision-first source; visualization via `as_visualizer()` (Phase 6/7):**
+**Scene — collision-first source; visualization via `as_visualizer()` (Phase 6):**
 
 A `Scene` (in [`planning/spatial/scene.py`](../minilink/planning/spatial/scene.py))
 is **a collision-first spatial source** (`obstacles`, `workspace_fields`). It does
@@ -317,11 +319,14 @@ car.animate(traj, camera=zoom_on_speed)    # custom callable
 car.animate(traj, camera=fixed_camera(np.array([0, 0, 0]), scale=20.0))
 ```
 
-Multi-robot: bump priority on the drawable that should own the camera:
+Multi-robot: overlays never carry camera hints — to follow robot2, animate it as
+**primary**, or pass an explicit `camera=` callable. Ghost a second robot with
+`Replay` without stealing the camera:
 
 ```python
-robot2.camera_priority = 1.0
-robot1.animate(traj, overlays=[robot2, scene.as_visualizer()])  # robot2 wins if higher priority
+ghost = Replay(robot2, traj2)
+robot1.animate(traj1, overlays=[scene.as_visualizer(), ghost])  # primary robot1 keeps camera
+robot2.animate(traj2, camera=follow)                            # or follow robot2 as primary
 ```
 
 ---

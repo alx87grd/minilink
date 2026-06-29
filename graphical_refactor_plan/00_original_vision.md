@@ -127,8 +127,10 @@ def get_kinematic_geometry(self):
     return {"body": [vehicle_body(self.L, self.W)], "wheel": [wheel_box()]}
 
 def tf(self, x, u, t):
-    T = pose2d_matrix(x[0], x[1], x[2])
-    return {"body": T, "wheel": T @ pose2d_matrix(self.a, 0.0, delta)}
+    W_T_body     = SE2(x[0], x[1], x[2])
+    body_T_wheel = SE2(self.a, 0.0, delta)
+    W_T_wheel    = W_T_body @ body_T_wheel
+    return {"body": W_T_body, "wheel": W_T_wheel}
 ```
 
 Conventions that avoid extra machinery:
@@ -420,16 +422,17 @@ it without changing the `overlays` API.
 
 - `core/kinematics.py` (new) - **rigid-body poses / transform algebra**.
   Native-array and **JAX-functional** (build with `xp.stack`/`xp.array`, no
-  in-place index assignment, so `tf` traces). Holds: `translation_matrix`,
-  `pose2d_matrix`, `rotation_matrix_x/y/z`, `invert_transform`, `apply_transform`
-  (relocated from [robot.py](../minilink/planning/spatial/robot.py)),
-  `rod_between_transform`, `point_transform`, optional `single_body_tf`. No
-  tree/resolver.
+  in-place index assignment, so `tf` traces). Two layers mirroring the course
+  notes: a 3×3 orientation layer (`Rx`/`Ry`/`Rz`) and a 4×4 pose layer built on it
+  (`SE3`, `SE2`, `translation`, `identity`, `inv`, `apply` — the last relocated
+  from [robot.py](../minilink/planning/spatial/robot.py)). State-aware / drawing
+  sugar (`single_body_tf`, `link_frame`) stays **out** of core — in the catalog /
+  graphical layer. No tree/resolver.
 - `core/geometry.py` (exists) - **occupied space / SDF solids**. Stays separate;
   it composes with kinematics (body-frame shape probe placed by a world transform)
   but is a distinct concern. Not merged.
 
-Centralization: transform math currently scattered (`apply_transform` in
+Centralization: transform math currently scattered (`apply` in
 planning, builders in graphical) moves into `core/kinematics.py`; `robot.py` and
 graphics import from there - one transform toolkit for collision and rendering.
 
@@ -471,8 +474,8 @@ pendulum family) to validate before implementation.
    dashboards.
 2. **Quick-and-dirty class.** Two one-line dicts:
    `get_kinematic_geometry()` -> `{"body": [Circle(...)]}` and
-   `tf(x,u,t)` -> `{"body": pose2d_matrix(x[0], x[1], x[2])}`. Optional sugar: a
-   `single_body_tf(x, ix=0, iy=1, ith=2)` helper for the planar-rigid-body case.
+   `tf(x,u,t)` -> `{"body": SE2(x[0], x[1], x[2])}`. Optional sugar: a
+   `single_body_tf(x, ix=0, iy=1, ith=2)` catalog helper for the planar-rigid-body case.
 3. **Many-DOF manipulator.** Frames scale with DOF (`link{i}`, `joint{i}`; 11 keys
    for a 5-link arm) — a dict handles what fragile lists could not. `tf` is the FK
    chain; torque arcs are `get_dynamic_geometry` keyed to each link/joint frame,
@@ -509,8 +512,9 @@ Resolved:
 - **D2 - default viz `{}` (LOCKED).** Base `System`/`StaticSystem`/`DynamicSystem`
   return `{}`; no per-state debug points by default.
 - **D3a - multi-drawable `animate` (LOCKED).** `animate(traj, overlays=[...])`
-  where overlays may be Systems / Scenes / SceneHistory / `Replay`; the animator
-  merges `[primary] + overlays`.
+  where overlays are **t-only add-ons** (`scene.as_visualizer()`, `SceneHistory`,
+  `Replay`); the animator merges `[primary] + overlays`. Raw `Scene` and bare moving
+  `System`s are rejected — call `.as_visualizer()` / wrap in `Replay`.
 - **D4 - atomic migration (LOCKED).** The no-alias rename migrates *all*
   `get_kinematic_*` overrides in one change (~5 shared-helper rewrites cover most
   of the ~20); the whole catalog will be fixed.

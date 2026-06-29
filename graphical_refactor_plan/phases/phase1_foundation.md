@@ -10,7 +10,7 @@ changes rendered output.
 
 | Module | Band | Role |
 | --- | --- | --- |
-| [`minilink/core/kinematics.py`](../../minilink/core/kinematics.py) | core | JAX-functional transform algebra |
+| [`minilink/core/kinematics.py`](../../minilink/core/kinematics.py) | core | two-layer SE algebra: 3×3 `Rx`/`Ry`/`Rz` + 4×4 `SE3`/`SE2`/`translation`/`identity`/`inv`/`apply` (see [`03_kinematics_core_math.md`](../03_kinematics_core_math.md)) |
 | [`graphical/animation/primitives.py`](../../minilink/graphical/animation/primitives.py) | internal | primitive classes inc. new `Arrow`, `TorqueArrow` (honest geometry); `arrow_pts`/`torque_arc_pts` are private helpers used **inside** these classes |
 | [`graphical/animation/visualization.py`](../../minilink/graphical/animation/visualization.py) | internal | `flatten_draw_list`, merge/prefix (animator-only) |
 | [`graphical/animation/camera.py`](../../minilink/graphical/animation/camera.py) | internal | `resolve_camera_from_hints` + camera factories (`follow_frame_camera`, `fixed_camera`, `camera_matrix`) — re-exported publicly via `graphical.catalog` |
@@ -50,7 +50,7 @@ Rule of thumb: a primitive's **class** lives in `animation/primitives.py`;
 
 Demo import: `from minilink.graphical.catalog import Box, Circle, Arrow, car_skin_3d`
 
-**Transform style split:** `core/kinematics.py` helpers (`pose2d_matrix`, …) serve
+**Transform style split:** `core/kinematics.py` symbols (`SE2`, `Rz`, …) serve
 **catalog internals** and advanced reuse. Demo scripts and student `tf` overrides
 use **inline 4×4** with `xp = array_module(x)`.
 

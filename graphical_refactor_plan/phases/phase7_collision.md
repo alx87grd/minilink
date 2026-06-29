@@ -11,7 +11,7 @@ Converge `RobotBody` / `PlanarRigidBody.body_poses`
 
 One forward-kinematics pass feeds both the rendered chassis and the clearance
 probes: collision `Shape`s key to the **same** frame names that `tf` returns, both
-consuming world poses through `core/kinematics.py` (`apply_transform` relocated
+consuming world poses through `core/kinematics.py` (`apply` relocated
 here). No parent/child tree needed.
 
 ## Automated gate
