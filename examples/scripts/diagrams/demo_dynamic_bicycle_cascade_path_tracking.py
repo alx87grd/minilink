@@ -17,7 +17,7 @@ arc, and steer arc (velocity loop has no drawing primitives).
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.kinematics import SE2, identity
+from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem, StaticSystem, System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
 from minilink.graphical.animation.primitives import (
@@ -80,7 +80,7 @@ class PathPlanner(System):
         return {"world": [CustomLine(pts, color="seagreen", linewidth=2.2, style="--")]}
 
     def tf(self, x, u, t=0, params=None):
-        return {"world": identity()}
+        return {}
 
 
 class Tracking(StaticSystem):
@@ -133,7 +133,7 @@ class Tracking(StaticSystem):
         return {}
 
     def tf(self, x, u, t=0, params=None):
-        return {"world": identity()}
+        return {}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         p = self.params
@@ -371,3 +371,78 @@ class VelocityPID(DynamicSystem):
         w_cmd = np.clip(w_cmd, 0.0, p["w_max"])
         return np.array([w_cmd], dtype=float)
 
+
+def plot_xy_vs_path(px, py, t, a_amp: float, wavelength: float):
+    """Overlay the simulated track (vehicle ``x,y``) and the analytic path."""
+    import matplotlib.pyplot as plt
+
+    t_final = float(t[-1])
+    x0, x1 = float(px[0]), float(px[-1])
+    pad = 5.0
+    xs = np.linspace(min(x0, x1) - pad, max(x0, x1) + pad, 600)
+    ys = a_amp * np.sin(2.0 * np.pi * xs / wavelength)
+
+    fig, ax = plt.subplots(1, 1, figsize=(9, 4))
+    ax.plot(xs, ys, "k--", linewidth=1.2, alpha=0.85, label="reference path")
+    ax.plot(px, py, "b-", linewidth=1.5, label="vehicle (x, y)")
+    ax.set_aspect("equal", adjustable="box")
+    ax.grid(True, alpha=0.35)
+    ax.legend(loc="upper right")
+    ax.set_xlabel("x [m]")
+    ax.set_ylabel("y [m]")
+    ax.set_title(f"Cascade path tracking (t_final = {t_final:.2f} s)")
+    fig.tight_layout()
+    plt.show()
+
+
+vehicle = DynamicBicycleCar3D()
+vehicle.x0 = np.array([-10.0, 0.4, 0.05, 0.0, 0.0, 0.0], dtype=float)
+
+planner = PathPlanner(U_REF, path_a=A, path_lambda=LAMBDA)
+tracking = Tracking(LD)
+heading_loop = HeadingLoop()
+yaw_rate_loop = YawRateLoop()
+vel_pid = VelocityPID(vehicle.params["r_r"])
+
+diagram = DiagramSystem()
+diagram.name = "Cascade sinusoid tracking"
+diagram.add_subsystem(planner, "planner")
+diagram.add_subsystem(tracking, "tracking")
+diagram.add_subsystem(heading_loop, "heading_loop")
+diagram.add_subsystem(yaw_rate_loop, "yaw_rate_loop")
+diagram.add_subsystem(vel_pid, "vel_pid")
+diagram.add_subsystem(vehicle, "vehicle")
+
+diagram.connect("planner", "u_ref", "vel_pid", "u_ref")
+diagram.connect("planner", "path", "tracking", "path")
+diagram.connect("vehicle", "y", "vel_pid", "y")
+diagram.connect("vehicle", "y", "tracking", "y")
+diagram.connect("tracking", "theta_ref", "heading_loop", "theta_ref")
+diagram.connect("vehicle", "y", "heading_loop", "y")
+diagram.connect("heading_loop", "r_ref", "yaw_rate_loop", "r_ref")
+diagram.connect("vehicle", "y", "yaw_rate_loop", "y")
+diagram.connect("vel_pid", "w_rear", "vehicle", "w_rear")
+diagram.connect("yaw_rate_loop", "delta", "vehicle", "delta")
+
+diagram.plot_diagram()
+diagram.compute_trajectory(tf=20.0, dt=0.02, show=False, verbose=False)
+diagram.plot_trajectory(signals=("x", "u"), backend="matplotlib")
+
+i0, i1 = diagram.state_index["vehicle"]
+xv = diagram.traj.x[i0:i1, :]
+px, py = xv[0, :], xv[1, :]
+y_des = A * np.sin(2.0 * np.pi * px / LAMBDA)
+print(
+    f"Max |lateral - sinusoid(path x)| along track: {np.max(np.abs(py - y_des)):.4f} m"
+)
+
+plot_xy_vs_path(px, py, diagram.traj.t, A, LAMBDA)
+
+
+diagram.camera_follow_frame = "vehicle:body"
+diagram.camera_scale = 14.0
+
+diagram.animate()
+# diagram.animate(renderer="meshcat")
+# diagram.animate(renderer="matplotlib")
+# diagram.animate(renderer="plotly")

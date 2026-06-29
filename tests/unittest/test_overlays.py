@@ -72,7 +72,7 @@ class TestReplay(unittest.TestCase):
 
             def tf(self, x, u, t=0, params=None):
                 self.last_t = t
-                return {"world": np.eye(4)}
+                return {}
 
         plant = MarkerPlant()
         traj = Trajectory(

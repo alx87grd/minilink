@@ -143,6 +143,11 @@ constant-matrix convenience built from `A, B, C, D` arrays (introspect via
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry`, `get_camera_transform` are part of the core `System`
   contract in `core/system.py` (graphical primitives imported lazily).
+  **`tf` returns only computed frames** (body, joints, axles, …); **`"world"` is
+  implicit** — the animator injects identity so world-fixed geometry can key to
+  `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
+  stays unprefixed (one shared root); articulated frames are namespaced
+  (``vehicle:body``).
 - **Facades:** user shortcuts only (lazy simulation/graphics); defined on the
   `core.facades.SystemFacades` mixin so `core/system.py` keeps the math,
   port, and visualization contracts. `self.traj` is a convenience cache of
@@ -187,6 +192,8 @@ quiet by default (`connection_verbose=False`; set `True` for one line per connec
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop,
 `autowire()` conservative fill. Diagram operands are flattened, not nested.
 Explicit `add_subsystem` / `connect` remains canonical for general topology.
+Visualization: subsystem `"world"` geometry merges into one shared diagram
+`"world"` frame; only articulated frames get `{sys_id}:` prefixes.
 
 ### `Trajectory`, sets, costs, geometry
 

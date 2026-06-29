@@ -19,6 +19,13 @@ import numpy as np
 WORLD = "world"
 
 
+def ensure_world_frame(frames):
+    """Return *frames* with an implicit identity ``world`` root frame if absent."""
+    frames = dict(frames)
+    frames.setdefault(WORLD, np.eye(4))
+    return frames
+
+
 def merge_geometry(*geometries):
     """Merge frame-keyed geometry dicts, concatenating primitive lists per key.
 
@@ -40,6 +47,25 @@ def prefix_keys(mapping, prefix, sep=":"):
     (``"plant:body"``), keeping keys unique when drawables are concatenated.
     """
     return {f"{prefix}{sep}{key}": value for key, value in mapping.items()}
+
+
+def namespace_subsystem_frames(sub_frames, sys_id, sep=":"):
+    """Prefix articulated subsystem frames; omit ``world`` (shared diagram root)."""
+    return {
+        f"{sys_id}{sep}{key}": value
+        for key, value in sub_frames.items()
+        if key != WORLD
+    }
+
+
+def merge_subsystem_geometry(merged, subsystem_geometry, sys_id, sep=":"):
+    """Merge one subsystem's geometry into *merged*; ``world`` stays unprefixed."""
+    for key, primitives in subsystem_geometry.items():
+        if key == WORLD:
+            merged.setdefault(WORLD, []).extend(primitives)
+        else:
+            merged.setdefault(f"{sys_id}{sep}{key}", []).extend(primitives)
+    return merged
 
 
 def flatten_draw_list(frames, kinematic, dynamic=None):
@@ -66,8 +92,7 @@ def flatten_draw_list(frames, kinematic, dynamic=None):
         If geometry is keyed to a frame ``tf`` did not provide (fail loudly —
         ``"world"`` is always treated as present).
     """
-    frames = dict(frames)
-    frames.setdefault(WORLD, np.eye(4))
+    frames = ensure_world_frame(frames)
 
     geometry = merge_geometry(kinematic or {}, dynamic or {})
 

@@ -219,7 +219,7 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
                 return super().tf(x, u, t)
             qv = np.asarray(x[: self.dof], dtype=float)
             pts = _chain_pts(qv)
-            frames = {"world": np.eye(4, dtype=float)}
+            frames = {}
             for i in range(self._n_seg):
                 p0, p1 = pts[i], pts[i + 1]
                 d = p1 - p0

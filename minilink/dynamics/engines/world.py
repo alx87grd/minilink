@@ -93,7 +93,7 @@ class PhysicsWorldSystem(DynamicSystem):
     def tf(self, x, u, t=0, params=None):
         pos, _, _, _ = unpack_state(x, self.world.n_bodies)
         pos_np = np.asarray(pos, dtype=float)
-        frames = {"world": np.eye(4, dtype=float)}
+        frames = {}
         for i, p in enumerate(pos_np):
             frames[f"body{i}"] = translation_matrix(p[0], p[1], p[2])
         return frames

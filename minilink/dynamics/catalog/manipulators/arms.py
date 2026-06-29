@@ -48,7 +48,7 @@ def _planar_kinematic_geometry(lengths):
 
 def _planar_frames(points, angles, effector=None):
     """World transforms for the planar arm links (and the effector frame)."""
-    frames = {"world": identity()}
+    frames = {}
     for i, (point, angle) in enumerate(zip(points[:-1], angles)):
         frames[f"link{i}"] = SE2(point[0], point[1], np.pi - angle)
     if effector is not None:
@@ -558,7 +558,6 @@ class ThreeLinkManipulator3D(MechanicalSystem):
             ]
         )
         return {
-            "world": identity(),
             "link0": rod_between_transform(p0, p1),
             "link1": rod_between_transform(p1, p2),
             "link2": rod_between_transform(p2, p3),

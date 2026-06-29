@@ -101,7 +101,6 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         ground = self.z(x[2])
         mass_y = x[1]
         return {
-            "world": identity(),
             "spring": line_between_transform([x[2], ground], [x[2], mass_y - 0.2]),
             "body": translation(x[2], mass_y, 0.0),
         }

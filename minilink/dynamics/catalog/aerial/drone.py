@@ -107,7 +107,6 @@ class Drone2D(MechanicalSystem):
         q = x[:3]
         T_body = pose2d_matrix(q[0], q[1], q[2])
         return {
-            "world": identity_matrix(),
             "body": T_body,
             "center": pose2d_matrix(q[0], q[1], 0.0),
         }

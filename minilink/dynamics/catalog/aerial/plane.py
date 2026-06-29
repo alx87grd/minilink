@@ -221,7 +221,6 @@ class Plane2D(MechanicalSystem):
         wing = np.array([q[0] - l_w * c, q[1] - l_w * s])
         tail = np.array([q[0] - l_t * c, q[1] - l_t * s])
         return {
-            "world": identity_matrix(),
             "body": pose2d_matrix(q[0], q[1], q[2]),
             "center": pose2d_matrix(q[0], q[1], 0.0),
             "wingchord": pose2d_matrix(wing[0], wing[1], theta)

@@ -558,7 +558,7 @@ class ANCFTireSystem(DynamicSystem):
     def tf(self, x, u, t=0, params=None):
         p = self.node_positions(x)
         f_contact = self.contact_forces(x)
-        frames = {"world": identity_matrix()}
+        frames = {}
         n = self.model.n_nodes
         for i in range(n):
             frames[f"seg{i}"] = _line_segment_transform(p[i], p[(i + 1) % n])

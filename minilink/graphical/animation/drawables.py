@@ -86,8 +86,6 @@ class SceneHistory(Overlay):
                 self._kinematic.append(primitive)
 
     def tf(self, t=0.0, params=None):
-        if self._kinematic or self._dynamic_sources:
-            return {WORLD: np.eye(4)}
         return {}
 
     def get_kinematic_geometry(self):
@@ -199,8 +197,6 @@ class SceneVisualizer(Overlay):
         self._geometry = {WORLD: primitives} if primitives else {}
 
     def tf(self, t=0.0, params=None):
-        if self._geometry:
-            return {WORLD: np.eye(4)}
         return {}
 
     def get_kinematic_geometry(self):

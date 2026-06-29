@@ -44,7 +44,7 @@ from minilink.graphical.animation.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
 )
-from minilink.graphical.animation.visualization import flatten_draw_list
+from minilink.graphical.animation.visualization import flatten_draw_list, ensure_world_frame
 from minilink.graphical.animation.drawables import validate_overlay
 from minilink.graphical.common.environment import prefers_inline_animation
 
@@ -150,7 +150,7 @@ class Animator:
         self, x, u, t, *, kinematic, camera_override=None, overlays=()
     ):
         """Resolve one frame to a per-frame ``(primitives, transforms, camera)`` dict."""
-        frames = self.sys.tf(x, u, t)
+        frames = ensure_world_frame(self.sys.tf(x, u, t))
         dynamic = self.sys.get_dynamic_geometry(x, u, t)
         draw_list = flatten_draw_list(frames, kinematic, dynamic)
         if draw_list:

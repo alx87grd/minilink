@@ -107,7 +107,6 @@ class SingleMass(StateSpaceSystem):
             else empty_transform()
         )
         return {
-            "world": identity_matrix(),
             "spring": spring,
             "body": translation_matrix(mass_x, 0.0, 0.0),
         }
@@ -195,7 +194,6 @@ class TwoMass(StateSpaceSystem):
             else empty_transform()
         )
         return {
-            "world": identity_matrix(),
             "spring1": spring1,
             "spring2": line_between_transform([x1 + 0.3, 0.0], [x2 - 0.3, 0.0]),
             "body1": translation_matrix(x1, 0.0, 0.0),
@@ -294,7 +292,6 @@ class ThreeMass(StateSpaceSystem):
             else empty_transform()
         )
         return {
-            "world": identity_matrix(),
             "spring1": spring1,
             "spring2": line_between_transform([x1 + 0.28, 0.0], [x2 - 0.28, 0.0]),
             "spring3": line_between_transform([x2 + 0.28, 0.0], [x3 - 0.28, 0.0]),

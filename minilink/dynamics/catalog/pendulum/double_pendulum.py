@@ -181,7 +181,6 @@ class DoublePendulum(MechanicalSystem):
         rod1_angle = np.pi / 2.0 - q[0]
         rod2_angle = np.pi / 2.0 - q[0] - q[1]
         return {
-            "world": identity(),
             "link1": SE2(0.0, 0.0, theta1),
             "joint1": SE2(p1[0], p1[1], 0.0),
             "link2": SE2(p1[0], p1[1], theta12),

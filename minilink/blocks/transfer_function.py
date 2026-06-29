@@ -33,7 +33,6 @@ class TransferFunction(LTISystem):
     def tf(self, x, u, t=0, params=None):
         output = float(np.asarray(self.h(x, u, t)).reshape(-1)[0])
         return {
-            "world": identity(),
             "body": translation(output, 0.0, 0.0),
             "force": translation(output, 0.0, 0.0),
         }

@@ -462,40 +462,45 @@ class DiagramSystem(System):
 
     # Visualization / Kinematic Contract
 
-    # Subsystem frames/geometry are namespaced with ``prefix_keys`` ("sys:key")
-    # so keys stay unique across subsystems. The full ordered draw list is built
-    # in the dynamic hook — per subsystem its kinematic-then-dynamic groups, in
-    # subsystem order — so each subsystem reproduces its own draw order, matching
-    # a concatenation of the subsystems' draw lists.
+    # Subsystem articulated frames are namespaced (``vehicle:body``). ``world`` is
+    # shared globally — world-fixed geometry from every subsystem merges under
+    # ``"world"``; the animator injects the identity root via ``ensure_world_frame``.
 
     def get_kinematic_geometry(self):
         return {}
 
     def tf(self, x, u, t=0, params=None):
-        from minilink.graphical.animation.visualization import prefix_keys
+        from minilink.graphical.animation.visualization import (
+            namespace_subsystem_frames,
+        )
 
         frames = {}
         for sys_id, subsystem in self.subsystems.items():
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id)
             sub_frames = dict(subsystem.tf(local_x, local_u, t))
-            sub_frames.setdefault("world", np.eye(4))
-            frames.update(prefix_keys(sub_frames, sys_id))
+            frames.update(namespace_subsystem_frames(sub_frames, sys_id))
         return frames
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         from minilink.graphical.animation.visualization import (
             merge_geometry,
-            prefix_keys,
+            merge_subsystem_geometry,
         )
 
         merged: dict[str, list] = {}
         for sys_id, subsystem in self.subsystems.items():
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id)
-            sub_kin = prefix_keys(subsystem.get_kinematic_geometry(), sys_id)
-            sub_dyn = prefix_keys(
-                subsystem.get_dynamic_geometry(local_x, local_u, t), sys_id
+            sub_kin: dict[str, list] = {}
+            sub_dyn: dict[str, list] = {}
+            merge_subsystem_geometry(
+                sub_kin, subsystem.get_kinematic_geometry(), sys_id
+            )
+            merge_subsystem_geometry(
+                sub_dyn,
+                subsystem.get_dynamic_geometry(local_x, local_u, t),
+                sys_id,
             )
             merged = merge_geometry(merged, sub_kin, sub_dyn)
         return merged

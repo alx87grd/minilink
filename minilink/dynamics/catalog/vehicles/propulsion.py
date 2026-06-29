@@ -91,7 +91,6 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
 
     def tf(self, x, u, t=0, params=None):
         return {
-            "world": identity(),
             "body": translation(x[0], 0.0, 0.0),
         }
 

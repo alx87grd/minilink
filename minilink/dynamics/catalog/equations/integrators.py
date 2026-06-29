@@ -30,7 +30,7 @@ class SimpleIntegrator(DynamicSystem):
         return {}
 
     def tf(self, x, u, t=0, params=None):
-        return {"world": SE2(0.0, 0.0, 0.0)}
+        return {}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         marker = Point(color="blue", marker="o", size=8)
@@ -63,7 +63,7 @@ class DoubleIntegrator(DynamicSystem):
         return {}
 
     def tf(self, x, u, t=0, params=None):
-        return {"world": SE2(0.0, 0.0, 0.0)}
+        return {}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         p0 = Point(color="blue", marker="o", size=8)
@@ -98,7 +98,7 @@ class TripleIntegrator(DynamicSystem):
         return {}
 
     def tf(self, x, u, t=0, params=None):
-        return {"world": SE2(0.0, 0.0, 0.0)}
+        return {}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         offsets = (0.0, 0.5, 1.0)

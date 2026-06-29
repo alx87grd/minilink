@@ -111,25 +111,18 @@ class TrajoptCurvyPathBicycleRate(JaxDynamicBicycleRateInputs):
 
     def get_kinematic_geometry(self):
         geometry = super().get_kinematic_geometry()
-        geometry.setdefault("world", [])
         geometry["world"] = [
             self._upper,
             self._lower,
             self._centerline,
-            *geometry["world"],
+            *geometry.get("world", []),
         ]
         return geometry
 
-    def tf(self, x, u, t=0, params=None):
-        frames = super().tf(x, u, t)
-        frames.setdefault("world", np.eye(4))
-        return frames
-
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         dynamic = super().get_dynamic_geometry(x, u, t)
-        dynamic.setdefault("world", [])
         dynamic["world"] = [
-            *dynamic["world"],
+            *dynamic.get("world", []),
             CustomLine(
                 self._executed.points_at(t),
                 color="#1f77b4",

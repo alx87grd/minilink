@@ -361,7 +361,12 @@ class System(SystemFacades):
         return {} if self.skin is None else self.skin(self)
 
     def tf(self, x, u, t=0, params=None):
-        """World transforms as ``dict[str, 4x4]`` (the forward-kinematics hook)."""
+        """World transforms as ``dict[str, 4x4]`` (the forward-kinematics hook).
+
+        Return only named articulation frames (``body``, ``link0``, …). Do not
+        emit ``"world": I`` — the animator injects an implicit identity root
+        for geometry keyed to ``"world"``.
+        """
         return {}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):

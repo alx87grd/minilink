@@ -157,7 +157,6 @@ class RotatingCartPole(MechanicalSystem):
         p_arm = np.array([l1 * s1, -l1 * c1, 0.0])
         p_tip = p_arm + l2 * np.array([s2 * c1, s2 * s1, c2])
         return {
-            "world": identity_matrix(),
             "support": rod_between_transform(p_support, p_pivot),
             "arm": rod_between_transform(p_pivot, p_arm),
             "pole": rod_between_transform(p_arm, p_tip),
@@ -329,7 +328,6 @@ class CartPole(MechanicalSystem):
         pole_pose[2, 3] = pole_z
         force_x = pos - cart_length / 2.0 if F >= 0.0 else pos + cart_length / 2.0
         return {
-            "world": identity(),
             "body": SE2(pos, pivot_y, 0.0),
             "pole": pole_pose,
             "force": translation(force_x, pivot_y, 0.0),
