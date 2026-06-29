@@ -6,11 +6,16 @@ import pytest
 from minilink.core.backends import array_module
 from minilink.core.geometry import Sphere
 from minilink.core.kinematics import apply
-from minilink.planning.spatial.robot import (
-    RobotBody,
+from minilink.planning.spatial.collision import (
+    CollisionBody,
+    bind,
+    car,
+    car_outline,
+    disc,
     point,
     sphere,
 )
+from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot, KinematicCar
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
     inverse_barrier,
@@ -31,7 +36,7 @@ class _ConstField(StateField):
         return float(self.val)
 
 
-class _TwoSphereBody(RobotBody):
+class _TwoSphereBody(CollisionBody):
     """Two parts: one at the state position, one offset by +2 in x."""
 
     @property
@@ -68,6 +73,80 @@ def test_multibody_clearance_is_worst_case_over_parts():
     # part 0 at (1,0) radius 0.1 -> 0.4; part 1 at (3,0) radius 0.2 -> 2.3; min wins
     assert np.ndim(value) == 0
     assert value == pytest.approx(min(1.0 - 0.5 - 0.1, 3.0 - 0.5 - 0.2))
+
+
+def test_bound_disc_matches_sphere():
+    scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
+    sys = HolonomicMobileRobot()
+    legacy = scene.clearance_field(sphere(radius=0.3, position=(0, 1)))
+    bound = scene.clearance_field(bind(sys, disc(0.3)))
+    samples = (
+        np.array([0.0, 0.0]),
+        np.array([1.0, -1.0]),
+        np.array([2.0, 2.0]),
+        np.array([-0.5, 3.0]),
+        np.array([4.0, 1.0]),
+    )
+    for x in samples:
+        assert bound.value(x) == pytest.approx(legacy.value(x))
+
+
+def test_bound_car_matches_car():
+    from minilink.core.geometry import Box
+
+    scene = Scene(
+        obstacles=(Box([-3.0, -3.0], [-0.4, 3.0]), Box([0.4, -3.0], [3.0, 3.0]))
+    )
+    sys = KinematicCar()
+    legacy = scene.clearance_field(car(length=1.6, width=0.5))
+    bound = scene.clearance_field(bind(sys, car_outline(1.6, 0.5)))
+    for x in (
+        np.array([0.0, 0.0, np.pi / 2]),
+        np.array([0.0, 0.0, 0.0]),
+        np.array([1.0, 0.5, 0.3]),
+    ):
+        assert bound.value(x) == pytest.approx(legacy.value(x))
+
+
+def test_bound_frame_mismatch_raises():
+    sys = HolonomicMobileRobot()
+    body = bind(sys, disc(0.1), frame="missing")
+    with pytest.raises(KeyError):
+        body.body_poses(np.array([0.0, 0.0]))
+
+
+class _TwoFramePlant:
+    def tf(self, x, u=None, t=0.0, params=None):
+        from minilink.core.kinematics import translation
+
+        return {
+            "f1": translation(x[0], x[1], 0.0),
+            "f2": translation(x[0] + 1.0, x[1], 0.0),
+        }
+
+
+def test_bind_multi_frame():
+    scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
+    body = bind(_TwoFramePlant(), [("f1", disc(0.1)), ("f2", disc(0.2))])
+    value = scene.clearance_field(body).value(np.array([0.0, 0.0]))
+    assert value == pytest.approx(min(-0.5 - 0.1, 1.0 - 0.5 - 0.2))
+
+
+def test_bound_jax_twin_margin_matches_and_differentiates():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
+    sys = HolonomicMobileRobot()
+    free = scene.clearance_field(bind(sys, disc(0.3))).as_constraint()
+    x = np.array([0.0, 0.0])
+
+    assert float(free.margin(jnp.array(x))[0]) == pytest.approx(
+        float(free.margin(x)[0])
+    )
+
+    gradient = jax.grad(lambda q: jnp.sum(free.margin(q)))(jnp.array(x))
+    assert np.asarray(gradient).shape == (2,)
 
 
 # --- scene + clearance field -----------------------------------------------
@@ -296,16 +375,16 @@ def test_scene_plot_smoke():
     assert fig is not None
     assert ax is not None
 
-    fig, ax = scene.plot(show=False, robot=sphere(0.25), x=np.array([2.0, 0.0]))
+    fig, ax = scene.plot(show=False, body=sphere(0.25), x=np.array([2.0, 0.0]))
     assert len(ax.patches) >= 2
 
-    _, ax = scene.plot(show=False, robot=point(), x=np.array([2.0, 0.0]))
+    _, ax = scene.plot(show=False, body=point(), x=np.array([2.0, 0.0]))
     assert len(ax.lines) >= 1
 
 
 def test_car_body_collision_depends_on_heading():
     from minilink.core.geometry import Box
-    from minilink.planning.spatial.robot import car
+    from minilink.planning.spatial.collision import car
 
     # a vertical gap (width 0.8) between two walls
     scene = Scene(

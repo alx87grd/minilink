@@ -8,7 +8,7 @@ import pytest
 from minilink.core.backends import array_module
 from minilink.core.geometry import Sphere
 from minilink.planning.spatial.paths import PolylinePath, from_waypoints
-from minilink.planning.spatial.robot import point, sphere
+from minilink.planning.spatial.collision import point, sphere
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.spatial.track import ReferenceTrack
@@ -77,10 +77,10 @@ def test_path_distance_as_soft_cost():
 def test_obstacle_and_corridor_compose():
     scene = Scene(obstacles=(Sphere([5.0, 0.0], 0.5),))
     track = ReferenceTrack(from_waypoints([[0, 0], [10, 0]]), half_width=1.0)
-    robot = point()
+    body = point()
     free = (
-        scene.clearance_field(robot).as_constraint()
-        & track.corridor_field(robot).as_constraint(lower=0.0)
+        scene.clearance_field(body).as_constraint()
+        & track.corridor_field(body).as_constraint(lower=0.0)
     )
     assert free.contains(np.array([1.0, 0.2]))
     assert not free.contains(np.array([5.0, 0.0]))

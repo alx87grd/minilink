@@ -3,9 +3,9 @@ Spatial workspace scenes and state-field factories.
 
 Compose at :class:`~minilink.planning.problems.PlanningProblem`:
 
-``X = bounds & scene.clearance_field(robot).as_constraint()``
+``X = bounds & scene.clearance_field(body).as_constraint()``
 
-``cost = base + w * scene.cost_field(robot).as_cost()``
+``cost = base + w * scene.cost_field(body).as_cost()``
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
 from minilink.core.geometry import Union
-from minilink.planning.spatial.robot import RobotBody
+from minilink.planning.spatial.collision import CollisionBody
 
 if TYPE_CHECKING:
     from minilink.planning.spatial.state_fields import StateField
@@ -54,17 +54,17 @@ class Scene:
             density = density + field.density(p, t=t, params=params)
         return density
 
-    def clearance_field(self, robot: RobotBody) -> StateField:
+    def clearance_field(self, body: CollisionBody) -> StateField:
         if not self.obstacles:
             raise ValueError("Scene has no obstacles to build a clearance field")
         from minilink.planning.spatial.state_fields import ClearanceField
 
-        return ClearanceField(self, robot)
+        return ClearanceField(self, body)
 
-    def cost_field(self, robot: RobotBody) -> StateField:
+    def cost_field(self, body: CollisionBody) -> StateField:
         from minilink.planning.spatial.state_fields import CostDensityField
 
-        return CostDensityField(self, robot)
+        return CostDensityField(self, body)
 
     def plot(self, **kwargs):
         """Plot obstacles and workspace fields (lazy matplotlib import)."""

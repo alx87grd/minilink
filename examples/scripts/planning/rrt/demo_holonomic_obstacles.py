@@ -26,7 +26,7 @@ from minilink.planning.search.extenders import KinodynamicExtender, SteeringExte
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
-from minilink.planning.spatial.robot import point, sphere
+from minilink.planning.spatial.collision import bind, disc, point, sphere
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.workspace_fields import GaussianField
 
@@ -78,10 +78,10 @@ def make_holonomic_problem(*, robot_radius=0.25):
     sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
 
     scene = Scene(obstacles=HOLONOMIC_OBSTACLES)
-    robot = sphere(radius=robot_radius, position=(0, 1))
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(robot).as_constraint()
+    body = bind(sys, disc(robot_radius))
+    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
     problem = PlanningProblem(sys=sys, x_start=X_START, x_goal=X_GOAL, X=X)
-    return sys, scene, robot, problem
+    return sys, scene, body, problem
 
 
 def make_steering_extender(*, max_distance=1.0, resolution=0.05, speed=1.0):
@@ -97,7 +97,9 @@ def make_kinodynamic_extender(*, horizon=0.6, n_substeps=6, n_primitives=8):
         np.array([np.cos(a), np.sin(a)])
         for a in np.linspace(0.0, 2.0 * np.pi, n_primitives, endpoint=False)
     ]
-    return KinodynamicExtender(controls=primitives, horizon=horizon, n_substeps=n_substeps)
+    return KinodynamicExtender(
+        controls=primitives, horizon=horizon, n_substeps=n_substeps
+    )
 
 
 def run_scene_intro():
@@ -118,7 +120,7 @@ def run_scene_intro():
         bounds=((-1.0, 7.0), (-3.0, 3.0)),
         title="Scene: clearance (point vs disc robot at sample pose)",
         show_clearance_contour=True,
-        robot=disc,
+        body=disc,
         x=sample,
     )
 
@@ -149,7 +151,9 @@ def run_rrt_vs_rrt_star():
     rrt = RRTPlanner(
         problem,
         extender=extender,
-        options=RRTOptions(seed=SEED, goal_tolerance=GOAL_TOLERANCE, max_nodes=MAX_NODES),
+        options=RRTOptions(
+            seed=SEED, goal_tolerance=GOAL_TOLERANCE, max_nodes=MAX_NODES
+        ),
     )
     rrt_traj = rrt.compute_solution()
 

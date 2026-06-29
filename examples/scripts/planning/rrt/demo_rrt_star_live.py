@@ -25,7 +25,7 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
-from minilink.planning.spatial.robot import sphere
+from minilink.planning.spatial.collision import bind, disc
 from minilink.planning.spatial.scene import Scene
 
 SEED = 2
@@ -58,8 +58,8 @@ scene = Scene(
         Sphere([4.0, 2.5], 0.6),
     )
 )
-robot = sphere(radius=0.22, position=(0, 1))
-X = BoxSet.from_system_state(sys) & scene.clearance_field(robot).as_constraint()
+body = bind(sys, disc(0.22))
+X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
 
 x_start = np.array([-4.5, -4.5])
 x_goal = np.array([4.5, 4.5])

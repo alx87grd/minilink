@@ -36,8 +36,8 @@ todos:
     content: "Phase 6: Scene/SceneHistory/Replay + animate(overlays) + MPC/trajopt demo cleanup (user architectural review). Done: drawables.py, Animator overlays, Scene.as_visualizer(), all rate-MPC demos + holonomic corridor trajopt migrated to composition at animate boundary."
     status: completed
   - id: p7-collision
-    content: "Phase 7: Collision RobotBody convergence onto shared tf dict"
-    status: pending
+    content: "Phase 7: CollisionBody / bind onto shared tf dict. Done: planning.spatial.collision module, bind(sys, geometry, frame=body), disc/car_outline/point_probe, iter_probes; planner demos migrated; apply() fixed for 4x4+2D."
+    status: completed
 isProject: false
 ---
 
@@ -111,7 +111,7 @@ flowchart TD
 | Phases 3–4 | `render_v2()` pixel-identical to `render()` per migrated plant |
 | Phase 5 | Zero `_v2`; final API; base `{}` default; hacks deleted; docs synced |
 | Phase 6 | MPC demos use overlays; same pixels, less boilerplate |
-| Phase 7 | `RobotBody` shares `tf` frame dict with renderer |
+| Phase 7 | `CollisionBody` shares `tf` frame dict with renderer |
 
 ---
 
@@ -178,17 +178,14 @@ get_kinematic_geometry :: params : f`. Reject `sys.get_kinematic_geometry = fn`
 
 ## Current status
 
-**Phases 0–6 complete** (branch `refactor-v4`):
+**Phases 0–7 complete** (branch `refactor-v4`):
 
-- **Phases 0–5** — kinematic contract cutover: string-keyed `tf` / frame-keyed geometry,
-  honest primitives, camera hints-only, catalog migrated, `_v2` and legacy transform
-  hacks removed from `minilink/`.
-- **Phase 6** — overlay composition at `animate(overlays=[...])`: `SceneHistory`,
-  `Replay`, `Scene.as_visualizer()`; all rate-MPC demos and
-  `demo_holonomic_corridor.py` migrated off plant subclasses.
+- **Phases 0–6** — kinematic contract, cutover, overlay composition at
+  `animate(overlays=[...])`.
+- **Phase 7** — collision FK reuse: `bind(planner_sys, disc|car_outline|…,
+  frame="body")` looks up ``sys.tf``; production planner demos migrated.
 
-Full pytest green. **Awaiting User Review 6** (architectural sign-off on overlay
-demos) before Phase 7 (collision `RobotBody` → shared `tf`).
+Full pytest green.
 
 > Environment note: `test_kinematic_regression` may show pre-existing pixel drift on
 > some machines (matplotlib/font rendering differs from where baselines were

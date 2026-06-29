@@ -17,7 +17,7 @@ from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
-from minilink.planning.spatial.robot import sphere
+from minilink.planning.spatial.collision import bind, disc
 from minilink.planning.spatial.scene import Scene
 
 GOAL_TOLERANCE = 0.4
@@ -74,8 +74,8 @@ def holonomic_problem():
             Sphere([-3.5, -2.0], 0.55),
         )
     )
-    robot = sphere(radius=0.25, position=(0, 1))
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(robot).as_constraint()
+    body = bind(sys, disc(0.25))
+    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
     x_goal = np.array([4.0, 4.0])
     problem = PlanningProblem(
         sys=sys,

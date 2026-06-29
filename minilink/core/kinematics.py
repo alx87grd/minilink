@@ -155,15 +155,17 @@ def apply(T, pts):
     """Transform body-frame point(s) ``pts`` into the reference frame of ``T``.
 
     ``pts`` is a single point ``(d,)`` or a batch ``(N, d)``. The leading ``d×d``
-    rotation block and translation column are used, so the same call works for a
-    4×4 SE(3) pose with 3-D points and a 3×3 SE(2) pose with planar points.
+    rotation block and translation column are used. A 4×4 pose with 2-D points
+    uses the planar embed (translation in column 3); a ``(d+1)×(d+1)`` matrix
+    uses the standard homogeneous column ``d``.
     """
     xp = array_module(T, pts)
     pts = xp.asarray(pts)
     d = pts.shape[-1]
+    n = int(T.shape[0])
 
     R = T[:d, :d]
-    p = T[:d, d]
+    p = T[:d, d] if n == d + 1 else T[:d, n - 1]
     return pts @ R.T + p
 
 

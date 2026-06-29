@@ -32,7 +32,7 @@ from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
-from minilink.planning.spatial.robot import car
+from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
     inverse_barrier,
@@ -214,7 +214,7 @@ loop_track = ReferenceTrack(
 track = ReferenceTrack(
     from_waypoints(REFERENCE_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
 )
-robot = car(length=2.4, width=0.2, position=(0, 1), heading=2, margin=0.05)
+body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
 scene = Scene(
     obstacles=tuple(Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS)
 )
@@ -227,15 +227,15 @@ stability_cost = QuadraticCost.from_system(
     xbar=x_cruise,
     ubar=ubar,
 )
-path_cost = track.distance_field(robot).as_cost(
+path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT,
     shaping=quadratic_excess(threshold=0.1),
 )
-corridor_cost = track.corridor_field(robot).as_cost(
+corridor_cost = track.corridor_field(body).as_cost(
     weight=CORRIDOR_COST_WEIGHT,
     shaping=quadratic_hinge(threshold=0.0),
 )
-obstacle_cost = scene.clearance_field(robot).as_cost(
+obstacle_cost = scene.clearance_field(body).as_cost(
     weight=OBSTACLE_REPULSION_WEIGHT,
     shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
 )
@@ -362,7 +362,7 @@ clearances = [
     for cx, cy in OBSTACLE_CENTERS
 ]
 path_margins = [
-    float(loop_track.corridor_field(robot).value(traj.x[:, k]))
+    float(loop_track.corridor_field(body).value(traj.x[:, k]))
     for k in range(traj.n_samples)
 ]
 print(

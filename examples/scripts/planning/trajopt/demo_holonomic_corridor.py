@@ -23,7 +23,7 @@ from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyli
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
-from minilink.planning.spatial.robot import sphere
+from minilink.planning.spatial.collision import bind, disc
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
@@ -104,12 +104,12 @@ sys.inputs["u"].upper_bound = np.array([1.5, 1.5])
 
 scene = Scene(obstacles=OBSTACLES)
 track = ReferenceTrack(from_waypoints(WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH)
-robot = sphere(radius=ROBOT_RADIUS, position=(0, 1))
+body = bind(sys, disc(ROBOT_RADIUS))
 
 X = (
     BoxSet.from_system_state(sys)
-    & scene.clearance_field(robot).as_constraint()
-    & track.corridor_field(robot).as_constraint(lower=0.0)
+    & scene.clearance_field(body).as_constraint()
+    & track.corridor_field(body).as_constraint(lower=0.0)
 )
 control_cost = QuadraticCost.from_system(
     sys,
@@ -118,7 +118,7 @@ control_cost = QuadraticCost.from_system(
     S=np.diag([80.0, 80.0]),
     xbar=X_GOAL,
 )
-path_cost = track.distance_field(robot).as_cost(
+path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT,
     shaping=quadratic_excess(threshold=0.05),
 )
@@ -157,11 +157,11 @@ guess = Trajectory(
 traj = planner.compute_solution(initial_guess=guess)
 
 distances = [
-    float(track.distance_field(robot).value(traj.x[:, k]))
+    float(track.distance_field(body).value(traj.x[:, k]))
     for k in range(traj.n_samples)
 ]
 corridor_margins = [
-    float(track.corridor_field(robot).value(traj.x[:, k]))
+    float(track.corridor_field(body).value(traj.x[:, k]))
     for k in range(traj.n_samples)
 ]
 print("holonomic corridor trajopt")

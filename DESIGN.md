@@ -280,11 +280,15 @@ returns a `LookupTableController` (a `StaticSystem`, so `controller >> plant` si
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
 `Scene` (`obstacles`, `workspace_fields`). On X: `StateField.value(x)` fuses the robot
 placement with scene queries (`clearance_field`, `cost_field`). Export separately —
-`clearance_field(robot)` for collision (hard `Set` or barrier `CostFunction`) and
-`cost_field(robot)` for terrain (soft `CostFunction` or hard band via
+`clearance_field(body)` for collision (hard `Set` or barrier `CostFunction`) and
+`cost_field(body)` for terrain (soft `CostFunction` or hard band via
 `as_constraint(upper=...)`). `StateField.value(x)` is a **scalar** (min clearance, max
-density over body probes). `RobotBody` places body-frame geometry by
-`body_poses(x,u,t,params) → T`, dimension-generic (2-D/3-D, any state size). Shape an
+density over body probes). **Collision reuse:** frameless geometry (`disc`,
+`car_outline`, `point_probe`) binds to the **planner** plant with
+`bind(sys, geometry, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
+via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Legacy
+state-indexed :func:`~minilink.planning.spatial.collision.sphere` / :func:`~minilink.planning.spatial.collision.car`
+remain for tests. Shape an obstacle term before weighting with
 obstacle term before weighting with `as_cost(shaping=...)` (`shaping.occupancy`,
 `quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
@@ -294,9 +298,9 @@ obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in
 `ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
 `distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
-`corridor_field(robot).as_constraint(lower=0)` for a hard tube. Probe semantics match
+`corridor_field(body).as_constraint(lower=0)` for a hard tube. Probe semantics match
 clearance (subtract body radius). Compose with obstacles:
-`X = bounds & scene.clearance_field(robot).as_constraint() & track.corridor_field(robot).as_constraint()`.
+`X = bounds & scene.clearance_field(body).as_constraint() & track.corridor_field(body).as_constraint()`.
 
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
 sources every concern from the problem — collision `problem.X.contains` (optional

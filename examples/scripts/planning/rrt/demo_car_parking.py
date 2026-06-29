@@ -35,7 +35,7 @@ from minilink.planning.search.extenders import KinodynamicExtender, SteeringExte
 from minilink.planning.search.metric import weighted
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.steering import DubinsSteering
-from minilink.planning.spatial.robot import car
+from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.scene import Scene
 
 # --- car + workspace -------------------------------------------------------
@@ -55,7 +55,7 @@ scene = Scene(
         Box([-6.0, 10.5], [26.0, 12.0]),
     )
 )
-body = car(length=5.0, width=2.0)  # oriented box footprint matching the car skin
+body = bind(sys, car_outline(length=5.0, width=2.0))
 X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
 
 x_start = np.array([0.0, 0.0, 0.0])  # on the lot, facing east

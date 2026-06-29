@@ -8,10 +8,10 @@ A dry run of the ``planning/spatial`` pipeline against a real workflow: the
 hand-written ``TrackingWithObstacleCost`` of ``demo_dynamic_bicycle_rate_mpc_obstacle``
 is replaced by
 
-    cost = tracking + w * scene.clearance_field(robot).as_cost(shaping=inverse_barrier(...))
+    cost = tracking + w * scene.clearance_field(body).as_cost(shaping=inverse_barrier(...))
 
 so the obstacle term is built from a :class:`~minilink.planning.spatial.scene.Scene`
-and a robot body (``point``) and composed onto the tracking cost with ``+``.
+and a collision body (``point_probe``) and composed onto the tracking cost with ``+``.
 Several keepout spheres are staggered along the reference path so the vehicle
 must weave while converging to the lane center.
 
@@ -36,7 +36,7 @@ from minilink.graphical.animation.primitives import (
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.robot import point
+from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import inverse_barrier
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -116,7 +116,7 @@ tracking_cost = QuadraticCost.from_system(
 scene = Scene(
     obstacles=tuple(Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS)
 )
-obstacle_cost = scene.clearance_field(point(position=(0, 1))).as_cost(
+obstacle_cost = scene.clearance_field(bind(sys_mpc, point_probe())).as_cost(
     weight=OBSTACLE_REPULSION_WEIGHT,
     shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
 )

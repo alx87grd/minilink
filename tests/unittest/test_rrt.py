@@ -14,7 +14,7 @@ from minilink.planning.search.metric import euclidean, weighted
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.steering import DubinsSteering, StraightLineSteering
 from minilink.planning.search.tree import NEAREST_KD_TREE, Node, Tree
-from minilink.planning.spatial.robot import sphere
+from minilink.planning.spatial.collision import sphere
 from minilink.planning.spatial.scene import Scene
 
 X_START = np.array([-4.0, -4.0])
@@ -29,8 +29,8 @@ def make_problem():
     sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
 
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 1.0),))
-    robot = sphere(radius=0.2, position=(0, 1))
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(robot).as_constraint()
+    body = sphere(radius=0.2, position=(0, 1))
+    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
     return PlanningProblem(sys=sys, x_start=X_START, x_goal=X_GOAL, X=X), X
 
 
