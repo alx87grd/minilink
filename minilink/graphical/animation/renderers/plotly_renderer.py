@@ -387,9 +387,12 @@ class PlotlyRenderer(AnimationRenderer):
         if not frames:
             raise ValueError("Cannot animate an empty frame list.")
 
+        # v2 frames carry their own per-frame primitive list (dynamic geometry
+        # such as ArrowV2 / TorqueArrowV2 bakes a fresh shape each frame); old
+        # frames omit it and reuse the fixed representative list.
         frame_traces = [
             self._traces_for_frame(
-                primitives,
+                frame.get("primitives", primitives),
                 frame["transforms"],
                 frame["camera"],
             )
