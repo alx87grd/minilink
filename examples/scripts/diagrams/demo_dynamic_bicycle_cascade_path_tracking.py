@@ -17,6 +17,7 @@ arc, and steer arc (velocity loop has no drawing primitives).
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
+from minilink.core.kinematics import SE2, identity
 from minilink.core.system import DynamicSystem, StaticSystem, System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
 from minilink.graphical.animation.primitives import (
@@ -26,6 +27,7 @@ from minilink.graphical.animation.primitives import (
     scale_pose2d_matrix,
     torque_pose2d_matrix,
 )
+from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 
 # Path and motion setpoints (shared by pursuit law and XY plot)
 A = 2.0
@@ -82,6 +84,16 @@ class PathPlanner(System):
 
     def get_kinematic_transforms(self, x, u, t):
         return [np.eye(4)]
+
+    # === v2 frame-keyed visualization contract ===========================
+    def get_kinematic_geometry_v2(self):
+        xs = np.linspace(_PATH_X0, _PATH_X1, 320)
+        ys = self.path_a * np.sin(2.0 * np.pi * xs / self.path_lambda)
+        pts = np.column_stack([xs, ys, np.zeros_like(xs)])
+        return {"world": [CustomLine(pts, color="seagreen", linewidth=2.2, style="--")]}
+
+    def tf_v2(self, x, u, t=0, params=None):
+        return {"world": identity()}
 
 
 class Tracking(StaticSystem):
@@ -147,6 +159,35 @@ class Tracking(StaticSystem):
         th = float(np.arctan2(dy, dx))
         return [scale_pose2d_matrix(px, py, th, L)]
 
+    # === v2 frame-keyed visualization contract ===========================
+    def get_kinematic_geometry_v2(self):
+        return {}
+
+    def tf_v2(self, x, u, t=0, params=None):
+        return {"world": identity()}
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        p = self.params
+        ld = float(p["Ld"])
+        amp, wavelength = float(u[0]), float(u[1])
+        px, py = float(u[2]), float(u[3])
+        x_la = px + ld
+        y_la = amp * np.sin(2.0 * np.pi * x_la / wavelength)
+        dx = x_la - px
+        dy = y_la - py
+        return {
+            "world": [
+                ArrowV2(
+                    base=(px, py),
+                    vector=(dx, dy),
+                    scale=1.0,
+                    color="darkorange",
+                    linewidth=2.5,
+                    head_ratio=0.15,
+                )
+            ]
+        }
+
 
 class HeadingLoop(StaticSystem):
     """P loop: heading error → yaw-rate reference ``r_ref`` [rad/s].
@@ -198,6 +239,30 @@ class HeadingLoop(StaticSystem):
         e_psi = (e_psi + np.pi) % (2.0 * np.pi) - np.pi
         return [torque_pose2d_matrix(px, py, theta, e_psi)]
 
+    # === v2 frame-keyed visualization contract ===========================
+    def get_kinematic_geometry_v2(self):
+        return {}
+
+    def tf_v2(self, x, u, t=0, params=None):
+        px, py, theta = float(u[1]), float(u[2]), float(u[3])
+        return {"heading": SE2(px, py, theta)}
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        theta_ref, theta = float(u[0]), float(u[3])
+        e_psi = theta_ref - theta
+        e_psi = (e_psi + np.pi) % (2.0 * np.pi) - np.pi
+        return {
+            "heading": [
+                TorqueArrowV2(
+                    sweep=e_psi,
+                    radius=1.15,
+                    head_ratio=0.4,
+                    color="mediumpurple",
+                    linewidth=2.0,
+                )
+            ]
+        }
+
 
 class YawRateLoop(StaticSystem):
     """P loop: yaw-rate error → steer angle ``delta`` [rad].
@@ -246,6 +311,28 @@ class YawRateLoop(StaticSystem):
         px, py, theta = float(u[1]), float(u[2]), float(u[3])
         delta = float(self.r_to_delta(x, u, t)[0])
         return [torque_pose2d_matrix(px, py, theta, delta)]
+
+    # === v2 frame-keyed visualization contract ===========================
+    def get_kinematic_geometry_v2(self):
+        return {}
+
+    def tf_v2(self, x, u, t=0, params=None):
+        px, py, theta = float(u[1]), float(u[2]), float(u[3])
+        return {"steer": SE2(px, py, theta)}
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        delta = float(self.r_to_delta(x, u, t)[0])
+        return {
+            "steer": [
+                TorqueArrowV2(
+                    sweep=delta,
+                    radius=0.85,
+                    head_ratio=0.4,
+                    color="coral",
+                    linewidth=2.0,
+                )
+            ]
+        }
 
 
 class VelocityPID(DynamicSystem):

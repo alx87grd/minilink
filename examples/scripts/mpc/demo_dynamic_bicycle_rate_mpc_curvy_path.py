@@ -398,6 +398,44 @@ class MpcCurvyPathBicycleRate(JaxDynamicBicycleRateInputs):
             + [time_channel_matrix(t)]
         )
 
+    # === v2 frame-keyed visualization contract ===========================
+    # Overlays are honest dynamic geometry: each frame bakes the world-frame
+    # polyline from ``points_at(t)`` into a CustomLine (no T[3,3] time channel).
+
+    def get_kinematic_geometry_v2(self):
+        geometry = super().get_kinematic_geometry_v2()
+        geometry.setdefault("world", [])
+        geometry["world"] = [
+            self._upper,
+            self._lower,
+            self._centerline,
+            *self._obstacles,
+            *geometry["world"],
+        ]
+        return geometry
+
+    def tf_v2(self, x, u, t=0, params=None):
+        frames = super().tf_v2(x, u, t)
+        frames.setdefault("world", np.eye(4))
+        return frames
+
+    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+        dynamic = super().get_dynamic_geometry_v2(x, u, t)
+        dynamic.setdefault("world", [])
+        dynamic["world"] = [
+            *dynamic["world"],
+            CustomLine(
+                self._executed.points_at(t), color="b", style="--", linewidth=1.0
+            ),
+            CustomLine(
+                self._mpc_plan.points_at(t),
+                color="tab:orange",
+                style="--",
+                linewidth=2.0,
+            ),
+        ]
+        return dynamic
+
 
 mpc_anim_sys = MpcCurvyPathBicycleRate(
     track,
