@@ -104,9 +104,6 @@ class Animator:
 
     def __init__(self, sys):
         self.sys = sys
-
-    def __init__(self, sys):
-        self.sys = sys
         self._overlay_kinematics = {}
 
     @staticmethod
@@ -297,8 +294,7 @@ class Animator:
             camera_override=camera,
             overlays=overlays,
         )
-        # Representative primitive list for renderers that read the fixed arg;
-        # the matplotlib builder reads each frame's own ``"primitives"``.
+        # First frame's primitives as a representative list for APIs that need one.
         primitives = frames[0]["primitives"] if frames else []
 
         if html:

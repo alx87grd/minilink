@@ -224,9 +224,8 @@ class ExtrudedPolygon(GraphicPrimitive):
 def arrow_pts(base, vector, scale=1.0, head_ratio=0.15):
     """Polyline (Nx3) of a straight arrow from *base* along *vector*, in local XY.
 
-    The arrow is drawn at its **true length** ``scale * |vector|`` — the geometry
-    is honest, so no column-norm scaling of the placing transform is needed. A
-    near-zero vector collapses to a single point (nothing visible).
+    The arrow is drawn at its **true length** ``scale * |vector|`` in the local
+    frame. A near-zero vector collapses to a single point (nothing visible).
 
     Parameters
     ----------

@@ -139,8 +139,7 @@ class MatplotlibCanvas:
             self.drawn_objects.append(obj)
 
         elif isinstance(primitive, Arrow):
-            # Honest arrow: geometry baked into ``pts`` (no column-norm scale,
-            # no ``T[3, 3]`` channel) — draw the polyline at its pose.
+            # Arrow geometry is baked into ``pts``; draw the polyline at its pose.
             local_pts = primitive.pts
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
             world_pts = (transform_matrix @ local_pts_hom.T).T
@@ -530,9 +529,7 @@ class MatplotlibRenderer(AnimationRenderer):
             frame = frames[frame_idx]
             canvas.clear()
             camera = frame["camera"]
-            # v2 frames carry their own per-frame primitive list (dynamic geometry
-            # can change each frame); old frames omit it and reuse the fixed list.
-            frame_primitives = frame.get("primitives", primitives)
+            frame_primitives = frame["primitives"]
             if is_3d or _camera_is_world_xy(camera):
                 draw_transforms = frame["transforms"]
             else:

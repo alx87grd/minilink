@@ -13,9 +13,8 @@ live here:
   :func:`follow_frame_camera` / :func:`fixed_camera` build such callables.
 
 Layer 1 (the ``camera_*`` attributes on ``System``) and Layer 4 (multi-source
-selection) live elsewhere. The matrix builders :func:`camera_matrix` /
-:func:`world_to_camera` are **re-exported** from ``primitives.py`` (physically
-relocated here at the Phase 5 cutover; re-exported now so import sites stay valid).
+selection) live elsewhere. :func:`camera_matrix` and :func:`world_to_camera` are
+defined in :mod:`minilink.graphical.animation.primitives` and re-exported here.
 """
 
 import numpy as np
