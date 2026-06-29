@@ -194,8 +194,8 @@ class Plane2D(MechanicalSystem):
         return CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="blue", linewidth=2)
 
     def get_kinematic_geometry(self):
-        # static-framed primitives (the chord/force geometry is in the dynamic
-        # hook so the legacy draw order survives the static/dynamic merge)
+        # Static-framed primitives; chord/force geometry lives in the dynamic hook
+        # so draw order matches the pre-merge layout.
         return {
             "body": [self.body_shape()],
             "center": [Point(color="black", marker="o", size=5)],

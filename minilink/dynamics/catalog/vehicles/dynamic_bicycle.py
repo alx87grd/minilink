@@ -117,7 +117,7 @@ class DynamicBicycle(DynamicSystem):
         # Graphics-only attributes for the 3-D four-wheel look (read by
         # ``car_skin_3d`` / ``tf``). They live on the base plant so the 3-D
         # look is just ``skin = car_skin_3d`` — no bespoke subclass needed. They
-        # do not affect the legacy 2-D path, so baselines are unchanged.
+        # do not affect the default 2-D centerline skin.
         self.track = 1.92
         self.body_height = 0.22
         self.body_width_ratio = 0.72
@@ -262,7 +262,7 @@ class DynamicBicycle(DynamicSystem):
         return x.copy()
 
     def _u_in(self, x, u):
-        """``[w_rear, delta]`` for the v2 geometry (overridden by the rate variant)."""
+        """``[w_rear, delta]`` port values (overridden by the rate variant)."""
         w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
         xp = np.asarray
         return xp([w_rear[0], delta[0]])
