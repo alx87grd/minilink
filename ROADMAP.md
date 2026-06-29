@@ -18,8 +18,8 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Planning/policy synthesis | 2 | `DynamicProgrammingPlanner` (value iteration) over a `StateSpaceGrid` discretizer of a `PlanningProblem`; three interchangeable backends — `loop` (pyro reference), `numpy` (precomputed lookup table), `jax` (jitted `lax.while_loop` + `map_coordinates`); solve-to-tolerance and fixed-step modes, `precompute` memory knob, linear/nearest/spline interpolation, discount, time-varying, infeasible-set cleanup, `LookupTableController`, `PolicyEvaluator`, plotting/animation. Full pyro DP feature parity + JAX speedup. Tested + demos + `benchmarks/run_dp_backends.py`. | GPU runs; `nearest` backend parity; raster cost maps. |
 | Planning/search | 3 | `RRTPlanner` and `RRTStarPlanner` over `PlanningProblem` with swappable `TrajectoryExtender` (`KinodynamicExtender`, `SteeringExtender`/`StraightLineSteering`/`DubinsSteering`) and `metric`; free-space sampling, orchestrator `edge_resolution`, explicit `reached_goal`; optional SciPy `cKDTree` nearest backend (`nearest_backend`, Euclidean only); spatial `Scene` collision wired via `X`, system kept pure. Tested + demos incl. RRT vs RRT* comparison and KD-tree speed demo. | RRT-Connect, informed sampling. |
 | Geometry / spatial | 4 | Integrated architecture proposed for obstacle and terrain planning: `core/geometry.py` SDF primitives + cost algebra (`SumCost`/`ScaledCost`), and `planning/spatial/`: `Scene` (obstacles + `workspace_fields`), `WorkspaceField`/`StateField`, `RobotBody`/`TranslationBody`, export via `as_constraint`/`as_cost`. Tested incl. JAX twins. | User architecture validation; scene params (`ProblemParameters.scene`, future); RRT consumers; oriented/multi-sphere bodies and raster cost maps. |
-| Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Kinematic composition review before API freeze. |
-| Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Same gate as Graphical. |
+| Graphical | 4 | Frame-keyed ``tf`` / geometry / overlay contract integrated; matplotlib parity baselines. | Renderer polish; optional ``KinematicModel`` delegate review. |
+| Animation | 4 | ``Animator`` + overlays (``SceneHistory``, ``Replay``); collision reuses ``tf``. | Interactive integrator backends; live I/O backends. |
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; `DynamicBicycle` params thread fully. | `Manipulator` abstraction + catalog rebase (see review queue). |
 | Dynamics abstraction | 5 | `MechanicalSystem` + joint ports `q`/`dq`; `Manipulator` in `manipulator.py` with `p`/`pdot`. | Rebase catalog arms; `JaxManipulator` if needed. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
@@ -51,6 +51,9 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
   (API unchanged).
 - **Pyro catalog plants** — all EoM models ported and QA'd
   ([catalog-migration-notes.md](docs/plans/catalog-migration-notes.md)).
+- **Kinematic graphics contract** — string-keyed ``tf``, frame-keyed geometry,
+  ``skin`` attribute, overlays at ``animate(overlays=…)``, collision ``bind()``
+  reusing ``tf`` (DESIGN §4, §6).
 - **Pyro tool tranche 1** — blocks routing/nonlinear/filters/sources,
   linear control + LQR, analysis linearize/structural/equilibria/modal/Bode
   ([tool-migration-notes.md](docs/plans/tool-migration-notes.md)).
@@ -68,7 +71,7 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 
 - `Manipulator` abstraction (`q`/`dq`/`p`/`pdot` ports) — **unblocks robot control**
 - `control/computed_torque.py`, `control/sliding_mode.py`, `control/robotic.py`
-- Nested-diagram ergonomics; forced-input helpers; graphics kinematic composition
+- Nested-diagram ergonomics; forced-input helpers
 
 **P3** — Pyro 2.0 tool port (phases B–C in gap doc):
 
@@ -91,7 +94,9 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 - Diagram validation as separate `validate()` vs inline wiring.
 - Trajopt transcription internal consolidation.
 - Dynamic bicycle module split.
-- Graphics/camera contract consolidation (`KinematicModel` delegate).
+- ~~Graphics kinematic composition~~ — frame-keyed ``tf`` / ``get_kinematic_geometry`` /
+  ``get_dynamic_geometry`` + ``animate(overlays=…)`` (see DESIGN §4).
+- Graphics/camera contract consolidation (`KinematicModel` delegate) — optional follow-up.
 - **`Manipulator` base class** — `MechanicalSystem` + `q`/`dq` ports;
   `Manipulator` + `p`/`pdot` + `forward_kinematics` / `J(q)` (plant task outputs;
   controller reference stays `r` per DESIGN)
