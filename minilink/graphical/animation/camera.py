@@ -1,4 +1,4 @@
-"""Camera resolution for the v2 animator: hints → 4x4, plus ready-made factories.
+"""Camera resolution: hints → 4x4, plus ready-made factories.
 
 The camera is a **view hint**, not a kinematic frame, so it lives in the
 graphical band (out of ``tf`` / ``core/kinematics.py``) and keeps its view scale

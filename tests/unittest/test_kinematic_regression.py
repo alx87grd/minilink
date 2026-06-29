@@ -1,4 +1,4 @@
-"""Pixel-parity regression for the kinematic rendering pipeline (Phase 0 gate).
+"""Pixel-parity regression for the kinematic rendering pipeline.
 
 Re-renders each committed baseline state through the current graphics pipeline and
 compares pixel-for-pixel against the PNG checked into

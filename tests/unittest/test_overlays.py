@@ -1,4 +1,4 @@
-"""Tests for Phase 6 overlay drawables and animate(overlays=[...])."""
+"""Tests for overlay drawables and ``animate(overlays=[...])``."""
 
 from __future__ import annotations
 

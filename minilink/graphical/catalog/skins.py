@@ -10,8 +10,7 @@ Authored against the target frame vocabulary (vehicles: ``body`` and
 ``axle_front`` for the 2-D centerline; ``body`` plus steered ``wheel_fl`` /
 ``wheel_fr`` for the 3-D four-wheel look). They read plant geometry from
 ``plant.params`` and visual attributes with sensible fallbacks, so a bare plant
-still skins. Not wired into the render pipeline (or pixel-validated) until the
-Phase 3 catalog migration.
+still skins.
 """
 
 import numpy as np

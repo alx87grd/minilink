@@ -64,10 +64,10 @@ class System(SystemFacades):
     """
 
     #: Opt-in swappable look: a callable ``(plant) -> dict[str, list[prim]]`` or
-    #: ``None``. The forward-kinematic geometry contract delegates to it once the
-    #: v2 pipeline lands; ``None`` means "no skin" (empty geometry). Set per
-    #: instance/class to swap a look without touching ``f``/``tf`` (``skin`` is to
-    #: ``get_kinematic_geometry`` as ``params`` is to ``f``).
+    #: ``None``. ``get_kinematic_geometry`` delegates to ``skin``; ``None`` means
+    #: no skin (empty geometry). Set per instance/class to swap a look without
+    #: touching ``f``/``tf`` (``skin`` is to ``get_kinematic_geometry`` as
+    #: ``params`` is to ``f``).
     skin = None
 
     def __init__(self, n=0):

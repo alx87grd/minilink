@@ -1,4 +1,4 @@
-"""Generate the kinematic-rendering PNG baselines (Phase 0 of the graphical refactor).
+"""Generate kinematic-rendering PNG baselines for pixel-parity regression.
 
 This is the **source of truth** for the pixel-parity regression: it renders each
 catalog plant at three deterministic states through the graphics pipeline and

@@ -1,11 +1,10 @@
-"""Frame-keyed geometry → flat draw-list adapter (v2 animator internals).
+"""Frame-keyed geometry → flat draw-list adapter (animator internals).
 
-The v2 drawable contract returns **frame-keyed dicts**: ``tf`` gives
+The drawable contract returns **frame-keyed dicts**: ``tf`` gives
 ``dict[key, 4x4 world]`` and the geometry hooks give ``dict[key, list[prim]]``.
-Renderers, however, still consume a **flat** ``(primitive, world 4x4)`` list
+Renderers consume a **flat** ``(primitive, world 4x4)`` list
 ("draw this shape at this pose"). :func:`flatten_draw_list` is the adapter that
-bridges the two — the v2 analog of the old index-aligned ``zip``, plus the
-``local_transform`` compose and the static/dynamic merge.
+bridges the two, plus the ``local_transform`` compose and the static/dynamic merge.
 
 It is **signature-agnostic** (it never sees ``x, u, t``): the animator resolves
 each drawable's hooks — primary with ``(x, u, t)``, overlays with ``t`` only —

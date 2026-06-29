@@ -365,9 +365,8 @@ class DynamicBicycleCar3D(DynamicBicycle):
         self._visual_wheel_width = 0.2
         self._visual_tire_radius_ratio = 0.58
 
-        # This subclass's look *is* the 3-D skin (so its render matches that of
-        # the base plant). Phase 5 retires this class in favor of the base plant
-        # carrying ``skin = car_skin_3d``.
+        # This subclass's look is the 3-D skin; dynamic arrows stay a per-class
+        # override because four corner force/velocity arrows are not skin-driven.
         self.skin = car_skin_3d
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):

@@ -28,9 +28,8 @@ class GraphicPrimitive:
     """Base class for all geometric objects rendered by the animator engine.
 
     ``local_transform`` is a fixed 4x4 graphical offset baked into the primitive
-    (a constant pose within its frame). The v2 animator poses a primitive at
-    ``frames[key] @ local_transform``; the legacy pipeline ignores it. Defaults
-    to identity, so existing primitives are unaffected.
+    (a constant pose within its frame). The animator poses a primitive at
+    ``frames[key] @ local_transform``. Defaults to identity.
     """
 
     def __init__(self, color="blue", linewidth=1, style="-", local_transform=None):
