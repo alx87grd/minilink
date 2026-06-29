@@ -1,10 +1,10 @@
 """Generate the kinematic-rendering PNG baselines (Phase 0 of the graphical refactor).
 
-This is the **source of truth** for every later pixel-parity comparison: it renders
-each catalog plant at three deterministic states through the *current* (old)
-graphics pipeline and saves one PNG per (plant, sample) plus a ``manifest.json``
-describing the exact states. ``test_kinematic_regression`` re-renders the same
-states and compares pixel-for-pixel against the committed PNGs.
+This is the **source of truth** for the pixel-parity regression: it renders each
+catalog plant at three deterministic states through the graphics pipeline and
+saves one PNG per (plant, sample) plus a ``manifest.json`` describing the exact
+states. ``test_kinematic_regression`` re-renders the same states and compares
+pixel-for-pixel against the committed PNGs.
 
 Run from the repo root::
 
@@ -57,9 +57,10 @@ class PlantSpec:
         return getattr(module, self.cls)()
 
 
-# 12 plants x 3 samples. ``dynamic_bicycle_rate_inputs`` is the JAX-only
-# ``JaxDynamicBicycleRateInputs`` (there is no NumPy rate-input variant); it is
-# skipped gracefully when JAX is not installed.
+# 11 plants x 3 samples. Graphics parity uses NumPy catalog plants only;
+# ``DynamicBicycle`` / ``DynamicBicycleCar3D`` cover the vehicle graphics contract.
+# (``JaxDynamicBicycleRateInputs`` inherits the same look but is excluded here
+# because JAX import order must not affect matplotlib pixel tests.)
 _VEHICLES = "minilink.dynamics.catalog.vehicles"
 _PENDULUM = "minilink.dynamics.catalog.pendulum"
 PLANTS: tuple[PlantSpec, ...] = (
@@ -94,12 +95,6 @@ PLANTS: tuple[PlantSpec, ...] = (
         "minilink.dynamics.catalog.mass_spring_damper.linear",
         "SingleMass",
     ),
-    PlantSpec(
-        "dynamic_bicycle_rate_inputs",
-        f"{_VEHICLES}.dynamic_bicycle",
-        "JaxDynamicBicycleRateInputs",
-        requires=("jax",),
-    ),
 )
 
 
@@ -128,20 +123,35 @@ def sample_states(sys):
     ]
 
 
+def _reset_matplotlib_state() -> None:
+    """Return matplotlib to defaults so baselines stay pixel-stable across pytest order."""
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+    matplotlib.rcdefaults()
+
+
 def render_baseline_png(sys, x, u, t, path, *, dpi=BASELINE_DPI):
-    """Render one static kinematic frame to ``path`` deterministically (Agg, fixed DPI)."""
+    """Render one static kinematic frame to ``path`` deterministically (Agg, fixed DPI).
+
+    Uses the same draw path as :meth:`Animator.show` (frame-keyed geometry +
+    ``tf`` + dynamic geometry), but saves the figure instead of presenting it.
+    """
+    _reset_matplotlib_state()
     from minilink.graphical.animation.animator import Animator
     from minilink.graphical.animation.renderers.matplotlib_renderer import (
         MatplotlibRenderer,
     )
 
-    renderer = MatplotlibRenderer(Animator(sys))
-    primitives = sys.get_kinematic_geometry()
-    transforms = sys.get_kinematic_transforms(x, u, t)
-    camera = sys.get_camera_transform(x, u, t)
+    animator = Animator(sys)
+    renderer = MatplotlibRenderer(animator)
+    kinematic = sys.get_kinematic_geometry()
+    frame = animator._resolve_frame(x, u, t, kinematic=kinematic)
 
-    renderer.open_scene(is_3d=False, show=False, camera=camera, title=sys.name)
-    renderer.draw_frame(primitives, transforms, t, camera)
+    renderer.open_scene(
+        is_3d=False, show=False, camera=frame["camera"], title=sys.name
+    )
+    renderer.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
     renderer.fig.savefig(path, dpi=dpi)
     renderer.close_scene()
 

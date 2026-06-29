@@ -33,7 +33,7 @@ class KinematicBicycle(DynamicSystem):
         self.tire_length = 0.25
         self.tire_width = 0.08
         self.camera_scale = 10.0
-        # v2 camera hint: track the body frame (read by ``Animator2`` only).
+        # Camera hint: track the body frame.
         self.camera_follow_frame = "body"
 
     def f(self, x, u, t=0.0, params=None):
@@ -59,29 +59,31 @@ class KinematicBicycle(DynamicSystem):
 
     def get_kinematic_geometry(self):
         length = self.params["length"]
+        rear_x = -0.5 * length
+        rear_wheel = wheel_box(self.tire_length, self.tire_width)
+        rear_wheel.local_transform = SE2(rear_x, 0.0, 0.0)
         return {
-            "body": [vehicle_body(length=length, width=self.width, color="blue")],
-            "axle_rear": [wheel_box(self.tire_length, self.tire_width)],
+            "body": [
+                vehicle_body(length=length, width=self.width, color="blue"),
+                rear_wheel,
+            ],
             "axle_front": [wheel_box(self.tire_length, self.tire_width)],
         }
 
     def tf(self, x, u, t=0, params=None):
         length = self.params["length"]
         steering = u[1]
-        rear_x = -0.5 * length
         front_x = 0.5 * length
         T_body = SE2(x[0], x[1], x[2])
         return {
             "body": T_body,
-            "axle_rear": T_body @ SE2(rear_x, 0.0, 0.0),
             "axle_front": T_body @ SE2(front_x, 0.0, steering),
-            "arrows": T_body,
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         speed = u[0]
         return {
-            "arrows": [
+            "body": [
                 Arrow(
                     base=(0.0, 0.0),
                     vector=(1.0, 0.0),
@@ -123,10 +125,14 @@ class KinematicCar(KinematicBicycle):
             color="#4c72b0",
             opacity=0.9,
         )
+        axle = 0.5 * self.visual_wheelbase_ratio * length
+        half_track = 0.5 * self.width - 0.5 * self.tire_width
+        wheel_rl = wheel_box(self.tire_length, self.tire_width)
+        wheel_rr = wheel_box(self.tire_length, self.tire_width)
+        wheel_rl.local_transform = SE2(-axle, half_track, 0.0)
+        wheel_rr.local_transform = SE2(-axle, -half_track, 0.0)
         return {
-            "body": [body],
-            "wheel_rl": [wheel_box(self.tire_length, self.tire_width)],
-            "wheel_rr": [wheel_box(self.tire_length, self.tire_width)],
+            "body": [body, wheel_rl, wheel_rr],
             "wheel_fl": [wheel_box(self.tire_length, self.tire_width)],
             "wheel_fr": [wheel_box(self.tire_length, self.tire_width)],
         }
@@ -140,11 +146,8 @@ class KinematicCar(KinematicBicycle):
         R_steer = SE2(0.0, 0.0, steering)
         return {
             "body": T_body,
-            "wheel_rl": T_body @ SE2(-axle, half_track, 0.0),
-            "wheel_rr": T_body @ SE2(-axle, -half_track, 0.0),
             "wheel_fl": T_body @ SE2(axle, half_track, 0.0) @ R_steer,
             "wheel_fr": T_body @ SE2(axle, -half_track, 0.0) @ R_steer,
-            "arrows": T_body,
         }
 
 
@@ -240,12 +243,11 @@ class HolonomicMobileRobot(DynamicSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
-        T = translation(x[0], x[1], 0.0)
-        return {"body": T, "arrows": T}
+        return {"body": translation(x[0], x[1], 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {
-            "arrows": [
+            "body": [
                 Arrow(
                     base=(0.0, 0.0),
                     vector=(u[0], u[1]),

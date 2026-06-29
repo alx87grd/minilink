@@ -20,7 +20,6 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
 from minilink.graphical.animation.primitives import (
     CustomLine,
     TrajectoryPolyline,
-    time_channel_matrix,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
@@ -111,17 +110,7 @@ class TrajoptCurvyPathBicycleRate(JaxDynamicBicycleRateInputs):
         )
 
     def get_kinematic_geometry(self):
-        vehicle = super().get_kinematic_geometry()
-        return [self._upper, self._lower, self._centerline, self._executed] + vehicle
-
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        return [np.eye(4)] * 3 + [time_channel_matrix(t)] + list(vehicle)
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        geometry = super().get_kinematic_geometry_v2()
+        geometry = super().get_kinematic_geometry()
         geometry.setdefault("world", [])
         geometry["world"] = [
             self._upper,
@@ -131,13 +120,13 @@ class TrajoptCurvyPathBicycleRate(JaxDynamicBicycleRateInputs):
         ]
         return geometry
 
-    def tf_v2(self, x, u, t=0, params=None):
-        frames = super().tf_v2(x, u, t)
+    def tf(self, x, u, t=0, params=None):
+        frames = super().tf(x, u, t)
         frames.setdefault("world", np.eye(4))
         return frames
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
-        dynamic = super().get_dynamic_geometry_v2(x, u, t)
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        dynamic = super().get_dynamic_geometry(x, u, t)
         dynamic.setdefault("world", [])
         dynamic["world"] = [
             *dynamic["world"],

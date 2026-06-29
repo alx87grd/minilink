@@ -23,7 +23,6 @@ from minilink.graphical.animation.primitives import (
     Circle,
     CustomLine,
     TrajectoryPolyline,
-    time_channel_matrix,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
@@ -145,33 +144,7 @@ class HolonomicCorridorScene(HolonomicMobileRobot):
         )
 
     def get_kinematic_geometry(self):
-        vehicle = super().get_kinematic_geometry()
-        vehicle[0] = Circle(
-            radius=self._robot_radius,
-            center=[0.0, 0.0, 0.0],
-            color="blue",
-            fill=True,
-        )
-        return (
-            [self._upper, self._lower, self._centerline]
-            + self._obstacles
-            + [self._executed]
-            + vehicle
-        )
-
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        n_static = 3 + len(self._obstacles)
-        return (
-            [np.eye(4)] * n_static
-            + [time_channel_matrix(t)]
-            + list(vehicle)
-        )
-
-    # === v2 frame-keyed visualization contract ===========================
-
-    def get_kinematic_geometry_v2(self):
-        geometry = super().get_kinematic_geometry_v2()
+        geometry = super().get_kinematic_geometry()
         geometry.setdefault("world", [])
         geometry["world"] = [
             self._upper,
@@ -182,13 +155,13 @@ class HolonomicCorridorScene(HolonomicMobileRobot):
         ]
         return geometry
 
-    def tf_v2(self, x, u, t=0, params=None):
-        frames = super().tf_v2(x, u, t)
+    def tf(self, x, u, t=0, params=None):
+        frames = super().tf(x, u, t)
         frames.setdefault("world", np.eye(4))
         return frames
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
-        dynamic = super().get_dynamic_geometry_v2(x, u, t)
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        dynamic = super().get_dynamic_geometry(x, u, t)
         dynamic.setdefault("world", [])
         dynamic["world"] = [
             *dynamic["world"],

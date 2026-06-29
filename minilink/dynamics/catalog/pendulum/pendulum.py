@@ -1,7 +1,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.kinematics import SE2, identity
+from minilink.core.kinematics import SE2
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
@@ -68,41 +68,32 @@ class Pendulum(MechanicalSystem):
     def get_kinematic_geometry(self):
         length = self.params["l"]
         radius = 0.08 * length
+        pivot = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
         return {
-            "world": [
-                Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
-            ],
             "link": [
+                pivot,
                 Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
                 Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
             ],
         }
 
     def tf(self, x, u, t=0, params=None):
-        theta = x[0]
-        rod_angle = theta - np.pi / 2.0
-        return {
-            "world": identity(),
-            "link": SE2(0.0, 0.0, theta),
-            "torque": SE2(0.0, 0.0, rod_angle),
-        }
+        return {"link": SE2(0.0, 0.0, x[0])}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         length = self.params["l"]
         torque = u[0]
         max_torque = self.inputs["u"].upper_bound[0]
         sweep = torque * (2.0 * np.pi / 3.0) / max_torque
-        return {
-            "torque": [
-                TorqueArrow(
-                    sweep=sweep,
-                    radius=length / 5.0,
-                    head_ratio=0.4,
-                    color="red",
-                    linewidth=2,
-                )
-            ]
-        }
+        arc = TorqueArrow(
+            sweep=sweep,
+            radius=length / 5.0,
+            head_ratio=0.4,
+            color="red",
+            linewidth=2,
+        )
+        arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
+        return {"link": [arc]}
 
 
 class PendulumWithNoisePort(Pendulum):
@@ -214,10 +205,9 @@ class TwoIndependentPendulums(MechanicalSystem):
         radius = 0.08 * length
         geo = {}
         for i in (0, 1):
-            geo[f"pivot{i}"] = [
-                Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
-            ]
+            pivot = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
             geo[f"link{i}"] = [
+                pivot,
                 Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
                 Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
             ]
@@ -226,13 +216,10 @@ class TwoIndependentPendulums(MechanicalSystem):
     def tf(self, x, u, t=0, params=None):
         length = self.params["l"]
         anchors = [-0.6 * length, 0.6 * length]
-        tf = {}
-        for i, anchor_x in enumerate(anchors):
-            theta = x[i]
-            tf[f"pivot{i}"] = SE2(anchor_x, 0.0, 0.0)
-            tf[f"link{i}"] = SE2(anchor_x, 0.0, theta)
-            tf[f"torque{i}"] = SE2(anchor_x, 0.0, theta - np.pi / 2.0)
-        return tf
+        return {
+            f"link{i}": SE2(anchor_x, 0.0, x[i])
+            for i, anchor_x in enumerate(anchors)
+        }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         length = self.params["l"]
@@ -241,15 +228,15 @@ class TwoIndependentPendulums(MechanicalSystem):
         sweep_scale = 2.0 * np.pi / 3.0 / max_torque
         dyn = {}
         for i in (0, 1):
-            dyn[f"torque{i}"] = [
-                TorqueArrow(
-                    sweep=u[i] * sweep_scale,
-                    radius=torque_radius,
-                    head_ratio=0.4,
-                    color="red",
-                    linewidth=2,
-                )
-            ]
+            arc = TorqueArrow(
+                sweep=u[i] * sweep_scale,
+                radius=torque_radius,
+                head_ratio=0.4,
+                color="red",
+                linewidth=2,
+            )
+            arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
+            dyn[f"link{i}"] = [arc]
         return dyn
 
 

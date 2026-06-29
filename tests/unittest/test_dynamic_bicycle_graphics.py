@@ -5,6 +5,8 @@ import numpy as np
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.graphical.animation.primitives import Arrow
 
+from tests.unittest.graphics_contract_helpers import resolve_draw_frame
+
 
 class TestDynamicBicycle(unittest.TestCase):
     def test_dimensions_and_labels(self):
@@ -49,8 +51,9 @@ class TestDynamicBicycle(unittest.TestCase):
         x[3] = 1.0
         u = np.array([10.0, 0.1])
 
-        primitives = sys.get_kinematic_geometry()
-        transforms = sys.get_kinematic_transforms(x, u, 0.0)
+        frame = resolve_draw_frame(sys, x, u, 0.0)
+        primitives = frame["primitives"]
+        transforms = frame["transforms"]
 
         self.assertEqual(len(primitives), 7)
         self.assertEqual(len(primitives), len(transforms))

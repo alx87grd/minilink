@@ -16,7 +16,6 @@ from minilink.graphical.animation.primitives import (
     CustomLine,
     HorizonPolyline,
     TrajectoryPolyline,
-    time_channel_matrix,
 )
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
@@ -231,36 +230,18 @@ class MpcObstacleBicycleRate(JaxDynamicBicycleRateInputs):
         )
 
     def get_kinematic_geometry(self):
-        vehicle = super().get_kinematic_geometry()
-        return [self._ref, self._obstacle, self._executed] + vehicle + [self._mpc_plan]
-
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        return [
-            np.eye(4),
-            np.eye(4),
-            time_channel_matrix(t),
-            *vehicle,
-            time_channel_matrix(t),
-        ]
-
-    # === v2 frame-keyed visualization contract ===========================
-    # Overlays are honest dynamic geometry: each frame bakes the world-frame
-    # polyline from ``points_at(t)`` into a CustomLine (no T[3,3] time channel).
-
-    def get_kinematic_geometry_v2(self):
-        geometry = super().get_kinematic_geometry_v2()
+        geometry = super().get_kinematic_geometry()
         geometry.setdefault("world", [])
         geometry["world"] = [self._ref, self._obstacle, *geometry["world"]]
         return geometry
 
-    def tf_v2(self, x, u, t=0, params=None):
-        frames = super().tf_v2(x, u, t)
+    def tf(self, x, u, t=0, params=None):
+        frames = super().tf(x, u, t)
         frames.setdefault("world", np.eye(4))
         return frames
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
-        dynamic = super().get_dynamic_geometry_v2(x, u, t)
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        dynamic = super().get_dynamic_geometry(x, u, t)
         dynamic.setdefault("world", [])
         dynamic["world"] = [
             *dynamic["world"],

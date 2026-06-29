@@ -19,6 +19,7 @@ from minilink.dynamics.engines.ancf_tire_jax import (  # noqa: E402
     plane_contact_node_forces,
     unpack_ancf_state,
 )
+from tests.unittest.graphics_contract_helpers import resolve_draw_frame  # noqa: E402
 
 
 @pytest.mark.optional
@@ -103,10 +104,9 @@ class TestANCFTireJax(unittest.TestCase):
             atol=1e-3,
         )
 
-        prim = sys.get_kinematic_geometry()
-        T = sys.get_kinematic_transforms(sys.x0, np.zeros(sys.m), 0.0)
-        self.assertEqual(len(prim), len(T))
-        self.assertEqual(len(prim), 3 * model.n_nodes + 1)
+        frame = resolve_draw_frame(sys, sys.x0, np.zeros(sys.m), 0.0)
+        self.assertEqual(len(frame["primitives"]), len(frame["transforms"]))
+        self.assertEqual(len(frame["primitives"]), 3 * model.n_nodes + 1)
 
     def test_contact_force_vectors_are_visible_in_geometry(self):
         model = make_ancf_tire_model(
@@ -125,9 +125,9 @@ class TestANCFTireJax(unittest.TestCase):
             contact_force_scale=0.01,
             contact_force_threshold=1.0,
         )
-        T = sys.get_kinematic_transforms(sys.x0, np.zeros(sys.m), 0.0)
+        frames = sys.tf(sys.x0, np.zeros(sys.m), 0.0)
         force_vectors = np.asarray(
-            [T[2 * model.n_nodes + i][:3, 0] for i in range(model.n_nodes)]
+            [frames[f"arrow{i}"][:3, 0] for i in range(model.n_nodes)]
         )
         self.assertGreater(float(np.max(force_vectors[:, 0])), 0.0)
 
@@ -139,14 +139,14 @@ class TestANCFTireJax(unittest.TestCase):
             contact_force_scale=0.01,
             contact_force_threshold=1.0,
         )
-        T = sys.get_kinematic_transforms(sys.x0, np.zeros(sys.m), 0.0)
+        frames = sys.tf(sys.x0, np.zeros(sys.m), 0.0)
         force_vectors = np.asarray(
-            [T[2 * model.n_nodes + i][:3, 0] for i in range(model.n_nodes)]
+            [frames[f"arrow{i}"][:3, 0] for i in range(model.n_nodes)]
         )
         self.assertLess(float(np.max(np.linalg.norm(force_vectors, axis=1))), 1e-6)
         force_dets = np.asarray(
             [
-                np.linalg.det(T[2 * model.n_nodes + i][:3, :3])
+                np.linalg.det(frames[f"arrow{i}"][:3, :3])
                 for i in range(model.n_nodes)
             ]
         )

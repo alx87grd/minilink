@@ -103,11 +103,7 @@ class MountainCar(MechanicalSystem):
         q = x[:1]
         p = self.forward_kinematic_effector(q)
         T = translation(p[0], p[1], 0.0)
-        return {
-            "world": identity(),
-            "body": T,
-            "arrows": T,
-        }  # Bug here tangent tf is not correct
+        return {"world": identity(), "body": T}  # Bug here tangent tf is not correct
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         q = x[:1]
@@ -115,7 +111,7 @@ class MountainCar(MechanicalSystem):
         tangent = np.array([1.0, slope])
         tangent = tangent / np.linalg.norm(tangent)
         return {
-            "arrows": [
+            "body": [
                 Arrow(
                     base=(0.0, 0.0),
                     vector=(u[0] * tangent[0], u[0] * tangent[1]),

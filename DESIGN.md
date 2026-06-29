@@ -140,10 +140,9 @@ constant-matrix convenience built from `A, B, C, D` arrays (introspect via
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
-- **Visualization contract:** `get_kinematic_geometry`,
-  `get_kinematic_transforms`, `get_dynamic_geometry`, `get_camera_transform`
-  are part of the core `System` contract in `core/system.py` (graphical
-  primitives imported lazily; API still under review).
+- **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
+  `get_dynamic_geometry`, `get_camera_transform` are part of the core `System`
+  contract in `core/system.py` (graphical primitives imported lazily).
 - **Facades:** user shortcuts only (lazy simulation/graphics); defined on the
   `core.facades.SystemFacades` mixin so `core/system.py` keeps the math,
   port, and visualization contracts. `self.traj` is a convenience cache of

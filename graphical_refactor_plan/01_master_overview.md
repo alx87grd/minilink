@@ -27,11 +27,11 @@ todos:
     content: "Phase 3e: DiagramSystem _v2 aggregation + pixel parity gate. Done: core/diagram.py namespaces subsystem frames/geometry via prefix_keys; full ordered draw list built per-subsystem (kinematic-then-dynamic) in the dynamic hook to match legacy concatenation -- pendulum-loop diagram 0px. Note: demo-local controller blocks need their own _v2 hooks (Phase 4)."
     status: completed
   - id: p4-demos
-    content: "Phase 4: Demo subclass _v2 hooks + MPC/trajopt parity + user review"
-    status: pending
+    content: "Phase 4: Demo subclass canonical hooks + MPC/trajopt parity + user review. Done: all overlay/cascade demo subclasses migrated off legacy get_kinematic_geometry/get_kinematic_transforms; _v2 renamed to canonical."
+    status: completed
   - id: p5-cutover
-    content: "Phase 5: Cutover - delete old, rename _v2, base {} default, hacks, docs. NOTE: DynamicBicycleCar3D is NOT retired via base+car_skin_3d -- per 3a, its 4-corner arrows are dynamic geometry (a get_dynamic_geometry_v2 override), which a static skin cannot express; it stays a thin subclass (static look = car_skin_3d, dynamic arrows = override)."
-    status: pending
+    content: "Phase 5: Cutover - delete old, rename _v2, base {} default, hacks, docs. NOTE: DynamicBicycleCar3D stays thin subclass (4-corner dynamic arrows). Automated gate: full pytest + baseline PNGs + grep-clean _v2."
+    status: in_progress
   - id: p6-overlays
     content: "Phase 6: Scene/SceneHistory/Replay + animate(overlays) + MPC demo cleanup (user architectural review)"
     status: pending

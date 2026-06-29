@@ -23,15 +23,17 @@ def _mass_box(size=0.5, color="blue", opacity=0.9):
     )
 
 
-def _force_arrow(force):
-    """Honest force arrow keyed to the ``force`` frame."""
+def _force_arrow(force, base=(0.35, 0.0)):
+    """Honest force arrow in the body frame (optional lateral base offset)."""
     if abs(force) < 1e-12:
         theta, length = 0.0, 0.0
     else:
         theta = 0.0 if force >= 0.0 else np.pi
         length = 0.3 * abs(force)
     d = np.array([np.cos(theta), np.sin(theta)])
-    return [Arrow(base=(0.0, 0.0), vector=d, scale=length, color="red", linewidth=2)]
+    return [
+        Arrow(base=base, vector=d, scale=length, color="red", linewidth=2)
+    ]
 
 
 def _mass_output_matrix(count, output_mass):
@@ -108,11 +110,10 @@ class SingleMass(StateSpaceSystem):
             "world": identity_matrix(),
             "spring": spring,
             "body": translation_matrix(mass_x, 0.0, 0.0),
-            "force": translation_matrix(mass_x + 0.35, 0.0, 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return {"force": _force_arrow(u[0])}
+        return {"body": _force_arrow(u[0])}
 
 
 class TwoMass(StateSpaceSystem):
@@ -199,11 +200,10 @@ class TwoMass(StateSpaceSystem):
             "spring2": line_between_transform([x1 + 0.3, 0.0], [x2 - 0.3, 0.0]),
             "body1": translation_matrix(x1, 0.0, 0.0),
             "body2": translation_matrix(x2, 0.0, 0.0),
-            "force": translation_matrix(x2 + 0.35, 0.0, 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return {"force": _force_arrow(u[0])}
+        return {"body2": _force_arrow(u[0])}
 
 
 class ThreeMass(StateSpaceSystem):
@@ -301,11 +301,10 @@ class ThreeMass(StateSpaceSystem):
             "body1": translation_matrix(x1, 0.0, 0.0),
             "body2": translation_matrix(x2, 0.0, 0.0),
             "body3": translation_matrix(x3, 0.0, 0.0),
-            "force": translation_matrix(x3 + 0.32, 0.0, 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return {"force": _force_arrow(u[0])}
+        return {"body3": _force_arrow(u[0], base=(0.32, 0.0))}
 
 
 class FloatingSingleMass(SingleMass):

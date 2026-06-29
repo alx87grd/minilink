@@ -76,30 +76,32 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
 
     def get_kinematic_geometry(self):
         length = self.params["length"]
+        wheel_rear = wheel_box(length=0.35, width=0.18)
+        wheel_front = wheel_box(length=0.35, width=0.18)
+        wheel_rear.local_transform = translation(-0.4 * length, -0.45, 0.0)
+        wheel_front.local_transform = translation(0.4 * length, -0.45, 0.0)
         return {
             "world": [ground_line(length=12.0, y=-0.45)],
-            "body": [vehicle_body(length=length, width=0.7, color="blue")],
-            "wheel_rear": [wheel_box(length=0.35, width=0.18)],
-            "wheel_front": [wheel_box(length=0.35, width=0.18)],
+            "body": [
+                vehicle_body(length=length, width=0.7, color="blue"),
+                wheel_rear,
+                wheel_front,
+            ],
         }
 
     def tf(self, x, u, t=0, params=None):
-        car_x = x[0]
-        length = self.params["length"]
         return {
             "world": identity(),
-            "body": translation(car_x, 0.0, 0.0),
-            "wheel_rear": translation(car_x - 0.4 * length, -0.45, 0.0),
-            "wheel_front": translation(car_x + 0.4 * length, -0.45, 0.0),
-            "arrows": translation(car_x + 0.5 * length, 0.0, 0.0),
+            "body": translation(x[0], 0.0, 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         force = self.slip2force(u[0]) if self.m == 1 else 0.0
+        length = self.params["length"]
         return {
-            "arrows": [
+            "body": [
                 Arrow(
-                    base=(0.0, 0.0),
+                    base=(0.5 * length, 0.0),
                     vector=(force, 0.0),
                     scale=1.0,
                     color="red",

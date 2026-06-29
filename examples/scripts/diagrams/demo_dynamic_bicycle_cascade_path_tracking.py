@@ -24,10 +24,7 @@ from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     TorqueArrow,
-    scale_pose2d_matrix,
-    torque_pose2d_matrix,
 )
-from minilink.graphical.animation.shapes_v2 import ArrowV2, TorqueArrowV2
 
 # Path and motion setpoints (shared by pursuit law and XY plot)
 A = 2.0
@@ -80,19 +77,9 @@ class PathPlanner(System):
         xs = np.linspace(_PATH_X0, _PATH_X1, 320)
         ys = self.path_a * np.sin(2.0 * np.pi * xs / self.path_lambda)
         pts = np.column_stack([xs, ys, np.zeros_like(xs)])
-        return [CustomLine(pts, color="seagreen", linewidth=2.2, style="--")]
-
-    def get_kinematic_transforms(self, x, u, t):
-        return [np.eye(4)]
-
-    # === v2 frame-keyed visualization contract ===========================
-    def get_kinematic_geometry_v2(self):
-        xs = np.linspace(_PATH_X0, _PATH_X1, 320)
-        ys = self.path_a * np.sin(2.0 * np.pi * xs / self.path_lambda)
-        pts = np.column_stack([xs, ys, np.zeros_like(xs)])
         return {"world": [CustomLine(pts, color="seagreen", linewidth=2.2, style="--")]}
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         return {"world": identity()}
 
 
@@ -143,30 +130,12 @@ class Tracking(StaticSystem):
         return np.array([theta_ref], dtype=float)
 
     def get_kinematic_geometry(self):
-        return [Arrow(color="darkorange", linewidth=2.5, origin="base")]
-
-    def get_kinematic_transforms(self, x, u, t):
-        p = self.params
-        ld = float(p["Ld"])
-        amp, wavelength = float(u[0]), float(u[1])
-        px, py = float(u[2]), float(u[3])
-        x_la = px + ld
-        y_la = amp * np.sin(2.0 * np.pi * x_la / wavelength)
-        dx = x_la - px
-        dy = y_la - py
-        L = float(np.hypot(dx, dy))
-        L = max(L, 1e-3)
-        th = float(np.arctan2(dy, dx))
-        return [scale_pose2d_matrix(px, py, th, L)]
-
-    # === v2 frame-keyed visualization contract ===========================
-    def get_kinematic_geometry_v2(self):
         return {}
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         return {"world": identity()}
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         p = self.params
         ld = float(p["Ld"])
         amp, wavelength = float(u[0]), float(u[1])
@@ -177,7 +146,7 @@ class Tracking(StaticSystem):
         dy = y_la - py
         return {
             "world": [
-                ArrowV2(
+                Arrow(
                     base=(px, py),
                     vector=(dx, dy),
                     scale=1.0,
@@ -230,30 +199,19 @@ class HeadingLoop(StaticSystem):
         return np.array([r_ref], dtype=float)
 
     def get_kinematic_geometry(self):
-        return [TorqueArrow(radius=1.15, color="mediumpurple", linewidth=2.0)]
-
-    def get_kinematic_transforms(self, x, u, t):
-        theta_ref, theta = float(u[0]), float(u[3])
-        px, py = float(u[1]), float(u[2])
-        e_psi = theta_ref - theta
-        e_psi = (e_psi + np.pi) % (2.0 * np.pi) - np.pi
-        return [torque_pose2d_matrix(px, py, theta, e_psi)]
-
-    # === v2 frame-keyed visualization contract ===========================
-    def get_kinematic_geometry_v2(self):
         return {}
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         px, py, theta = float(u[1]), float(u[2]), float(u[3])
         return {"heading": SE2(px, py, theta)}
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         theta_ref, theta = float(u[0]), float(u[3])
         e_psi = theta_ref - theta
         e_psi = (e_psi + np.pi) % (2.0 * np.pi) - np.pi
         return {
             "heading": [
-                TorqueArrowV2(
+                TorqueArrow(
                     sweep=e_psi,
                     radius=1.15,
                     head_ratio=0.4,
@@ -305,26 +263,17 @@ class YawRateLoop(StaticSystem):
         return np.array([delta], dtype=float)
 
     def get_kinematic_geometry(self):
-        return [TorqueArrow(radius=0.85, color="coral", linewidth=2.0)]
-
-    def get_kinematic_transforms(self, x, u, t):
-        px, py, theta = float(u[1]), float(u[2]), float(u[3])
-        delta = float(self.r_to_delta(x, u, t)[0])
-        return [torque_pose2d_matrix(px, py, theta, delta)]
-
-    # === v2 frame-keyed visualization contract ===========================
-    def get_kinematic_geometry_v2(self):
         return {}
 
-    def tf_v2(self, x, u, t=0, params=None):
+    def tf(self, x, u, t=0, params=None):
         px, py, theta = float(u[1]), float(u[2]), float(u[3])
         return {"steer": SE2(px, py, theta)}
 
-    def get_dynamic_geometry_v2(self, x, u, t=0, params=None):
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         delta = float(self.r_to_delta(x, u, t)[0])
         return {
             "steer": [
-                TorqueArrowV2(
+                TorqueArrow(
                     sweep=delta,
                     radius=0.85,
                     head_ratio=0.4,
@@ -422,80 +371,3 @@ class VelocityPID(DynamicSystem):
         w_cmd = np.clip(w_cmd, 0.0, p["w_max"])
         return np.array([w_cmd], dtype=float)
 
-    def get_kinematic_geometry(self):
-        return []
-
-    def get_kinematic_transforms(self, _x, _u, _t):
-        return []
-
-
-def plot_xy_vs_path(px, py, t, a_amp: float, wavelength: float):
-    """Overlay the simulated track (vehicle ``x,y``) and the analytic path."""
-    import matplotlib.pyplot as plt
-
-    t_final = float(t[-1])
-    x0, x1 = float(px[0]), float(px[-1])
-    pad = 5.0
-    xs = np.linspace(min(x0, x1) - pad, max(x0, x1) + pad, 600)
-    ys = a_amp * np.sin(2.0 * np.pi * xs / wavelength)
-
-    fig, ax = plt.subplots(1, 1, figsize=(9, 4))
-    ax.plot(xs, ys, "k--", linewidth=1.2, alpha=0.85, label="reference path")
-    ax.plot(px, py, "b-", linewidth=1.5, label="vehicle (x, y)")
-    ax.set_aspect("equal", adjustable="box")
-    ax.grid(True, alpha=0.35)
-    ax.legend(loc="upper right")
-    ax.set_xlabel("x [m]")
-    ax.set_ylabel("y [m]")
-    ax.set_title(f"Cascade path tracking (t_final = {t_final:.2f} s)")
-    fig.tight_layout()
-    plt.show()
-
-
-vehicle = DynamicBicycleCar3D()
-vehicle.x0 = np.array([-10.0, 0.4, 0.05, 0.0, 0.0, 0.0], dtype=float)
-
-planner = PathPlanner(U_REF, path_a=A, path_lambda=LAMBDA)
-tracking = Tracking(LD)
-heading_loop = HeadingLoop()
-yaw_rate_loop = YawRateLoop()
-vel_pid = VelocityPID(vehicle.params["r_r"])
-
-diagram = DiagramSystem()
-diagram.name = "Cascade sinusoid tracking"
-diagram.add_subsystem(planner, "planner")
-diagram.add_subsystem(tracking, "tracking")
-diagram.add_subsystem(heading_loop, "heading_loop")
-diagram.add_subsystem(yaw_rate_loop, "yaw_rate_loop")
-diagram.add_subsystem(vel_pid, "vel_pid")
-diagram.add_subsystem(vehicle, "vehicle")
-
-diagram.connect("planner", "u_ref", "vel_pid", "u_ref")
-diagram.connect("planner", "path", "tracking", "path")
-diagram.connect("vehicle", "y", "vel_pid", "y")
-diagram.connect("vehicle", "y", "tracking", "y")
-diagram.connect("tracking", "theta_ref", "heading_loop", "theta_ref")
-diagram.connect("vehicle", "y", "heading_loop", "y")
-diagram.connect("heading_loop", "r_ref", "yaw_rate_loop", "r_ref")
-diagram.connect("vehicle", "y", "yaw_rate_loop", "y")
-diagram.connect("vel_pid", "w_rear", "vehicle", "w_rear")
-diagram.connect("yaw_rate_loop", "delta", "vehicle", "delta")
-
-diagram.plot_diagram()
-diagram.compute_trajectory(tf=20.0, dt=0.02, show=False, verbose=False)
-diagram.plot_trajectory(signals=("x", "u"), backend="matplotlib")
-
-i0, i1 = diagram.state_index["vehicle"]
-xv = diagram.traj.x[i0:i1, :]
-px, py = xv[0, :], xv[1, :]
-y_des = A * np.sin(2.0 * np.pi * px / LAMBDA)
-print(
-    f"Max |lateral - sinusoid(path x)| along track: {np.max(np.abs(py - y_des)):.4f} m"
-)
-
-plot_xy_vs_path(px, py, diagram.traj.t, A, LAMBDA)
-
-# diagram.animate()
-diagram.animate(renderer="meshcat")
-diagram.animate(renderer="matplotlib")
-diagram.animate(renderer="plotly")

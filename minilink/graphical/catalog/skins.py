@@ -6,11 +6,12 @@ the plant's ``tf`` frame vocabulary, with **no** state math (placement comes fro
 assignment (``car.skin = car_skin_3d``); same ``f``, same ``tf``. These are plain
 functions (no dataclasses) so a custom skin is just another ``(plant) -> dict``.
 
-Authored against the target frame vocabulary (vehicles: ``body``, ``axle_front``,
-``axle_rear`` for the 2-D centerline; ``body`` + ``wheel_{rl,rr,fl,fr}`` for the
-3-D four-wheel look). They read plant geometry from ``plant.params`` and visual
-attributes with sensible fallbacks, so a bare plant still skins. Not wired into
-the render pipeline (or pixel-validated) until the Phase 3 catalog migration.
+Authored against the target frame vocabulary (vehicles: ``body`` and
+``axle_front`` for the 2-D centerline; ``body`` plus steered ``wheel_fl`` /
+``wheel_fr`` for the 3-D four-wheel look). They read plant geometry from
+``plant.params`` and visual attributes with sensible fallbacks, so a bare plant
+still skins. Not wired into the render pipeline (or pixel-validated) until the
+Phase 3 catalog migration.
 """
 
 import numpy as np
@@ -37,9 +38,10 @@ def _wheel_rectangle(wl, ww, color="black", linewidth=1):
 def car_skin_2d(plant, color="blue"):
     """2-D centerline car look: chassis line + two axle wheels.
 
-    Frame keys: ``body`` (chassis along the wheelbase), ``axle_rear`` and
-    ``axle_front`` (wheel outlines). The placing ``tf`` supplies world pose and
-    the front steer angle.
+    Frame keys: ``body`` (chassis along the wheelbase plus the rear wheel outline;
+    the rear axle offset is baked into the wheel ``local_transform``), and
+    ``axle_front`` (steered front wheel). The placing ``tf`` supplies world pose
+    and the front steer angle.
     """
     a = plant.params["a"]
     b = plant.params["b"]
@@ -47,9 +49,10 @@ def car_skin_2d(plant, color="blue"):
     ww = getattr(plant, "wheel_width", 0.2)
 
     chassis = Line(np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]]), color=color, linewidth=2)
+    rear_wheel = _wheel_rectangle(wl, ww)
+    rear_wheel.local_transform = translation(-b, 0.0, 0.0)
     return {
-        "body": [chassis],
-        "axle_rear": [_wheel_rectangle(wl, ww)],
+        "body": [chassis, rear_wheel],
         "axle_front": [_wheel_rectangle(wl, ww)],
     }
 
@@ -57,11 +60,9 @@ def car_skin_2d(plant, color="blue"):
 def car_skin_3d(plant, color="#151922"):
     """3-D four-wheel car look: ground plane, body box, four wheel rods.
 
-    Frame keys: ``world`` (ground), ``body`` (chassis box; its fixed ride-height
-    lift and CG-to-center x-offset are baked into the box ``local_transform``,
-    so the shared ``body`` frame stays the ground-level vehicle frame the 2-D
-    skin also uses), and ``wheel_rl`` / ``wheel_rr`` / ``wheel_fl`` /
-    ``wheel_fr`` (rods placed and steered by ``tf``).
+    Frame keys: ``world`` (ground), ``body`` (chassis box plus the two rear wheel
+    rods; fixed hub offsets are baked into each rod ``local_transform``), and
+    ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``).
     """
     a = plant.params["a"]
     b = plant.params["b"]
@@ -106,11 +107,14 @@ def car_skin_3d(plant, color="#151922"):
     def wheel():
         return Rod(length=wheel_width, radius=tire_radius, color="#0a0a0a", opacity=1.0)
 
+    wheel_rl = wheel()
+    wheel_rr = wheel()
+    wheel_rl.local_transform = translation(-b, 0.5 * track, r_r)
+    wheel_rr.local_transform = translation(-b, -0.5 * track, r_r)
+
     return {
         "world": [ground],
-        "body": [body],
-        "wheel_rl": [wheel()],
-        "wheel_rr": [wheel()],
+        "body": [body, wheel_rl, wheel_rr],
         "wheel_fl": [wheel()],
         "wheel_fr": [wheel()],
     }

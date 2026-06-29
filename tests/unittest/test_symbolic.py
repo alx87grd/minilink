@@ -106,9 +106,10 @@ class TestSymbolicMechanics(unittest.TestCase):
         m._setup_velocities()
         sys = derive_lagrange(m, simplify=True)
         num = sys.to_minilink({g_sym: 9.81, mass: 1.0, length: 0.5})
-        prim = num.get_kinematic_geometry()
-        T = num.get_kinematic_transforms(np.zeros(2), np.zeros(1), 0.0)
-        self.assertEqual(len(prim), len(T))
+        from tests.unittest.graphics_contract_helpers import resolve_draw_frame
+
+        frame = resolve_draw_frame(num, np.zeros(2), np.zeros(1), 0.0)
+        self.assertEqual(len(frame["primitives"]), len(frame["transforms"]))
 
     @pytest.mark.jax
     @unittest.skipUnless(HAS_SYMPY and HAS_JAX, "sympy and jax required")

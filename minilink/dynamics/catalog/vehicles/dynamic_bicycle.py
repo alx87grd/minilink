@@ -129,9 +129,8 @@ class DynamicBicycle(DynamicSystem):
         self._visual_wheel_width = 0.2
         self._visual_tire_radius_ratio = 0.58
 
-        # v2 visual contract: default 2-D skin (black centerline chassis, to match
-        # the legacy 2-D look) and a camera that tracks the body frame (read by
-        # ``Animator2``; the legacy ``Animator`` ignores both).
+        # Default 2-D skin (black centerline chassis) and a camera that tracks
+        # the body frame.
         self.skin = partial(car_skin_2d, color="black")
         self.camera_follow_frame = "body"
 
@@ -300,28 +299,22 @@ class DynamicBicycle(DynamicSystem):
         T_wb = SE2(x[0], x[1], x[2])
         R_steer = SE2(0.0, 0.0, delta)
         return {
-            # body frame: 2-D chassis and the 3-D body box (the box bakes its
-            # own ride-height/x-offset via ``local_transform`` in the skin).
+            # body frame: 2-D chassis, 3-D body box, rear wheels, and contact arrows.
             "body": T_wb,
-            # 2-D centerline axles (car_skin_2d).
-            "axle_rear": T_wb @ SE2(-b, 0.0, 0.0),
+            # 2-D front axle (steered); rear axle wheels ride on ``body`` via
+            # ``local_transform`` in the skin.
             "axle_front": T_wb @ SE2(a, 0.0, delta),
-            # 3-D corner wheels (car_skin_3d), lifted to the hub height.
-            "wheel_rl": T_wb @ translation(-b, 0.5 * tr, r_r),
-            "wheel_rr": T_wb @ translation(-b, -0.5 * tr, r_r),
+            # 3-D steered front wheels (lift + steer still need per-frame frames).
             "wheel_fl": T_wb @ translation(a, 0.5 * tr, r_f) @ R_steer,
             "wheel_fr": T_wb @ translation(a, -0.5 * tr, r_f) @ R_steer,
-            # frame for the dynamic velocity/force arrows; its own key keeps the
-            # arrows drawn after the static skin (legacy draw order).
-            "arrows": T_wb,
         }
 
     def _contact_fields(self, x, u):
         """Body-frame per-axle velocities and tire forces for the arrow geometry.
 
         Returns ``(v_r_loc, v_f_loc, F_r_loc, F_f_loc)`` — the rear/front contact
-        velocity and tire force in the body frame. The ``arrows`` ``tf`` (a copy
-        of ``T_wb``) rotates them to world, so no manual ``cos``/``sin`` here.
+        velocity and tire force in the body frame. The ``body`` ``tf`` rotates them
+        to world, so no manual ``cos``/``sin`` here.
         """
         params = self.params
         a = params["a"]
@@ -347,7 +340,7 @@ class DynamicBicycle(DynamicSystem):
         a = self.params["a"]
         v_r_loc, v_f_loc, F_r_loc, F_f_loc = self._contact_fields(x, u)
         return {
-            "arrows": [
+            "body": [
                 Arrow(
                     base=(-b, 0.0), vector=v_r_loc, scale=0.2, color="blue", linewidth=2
                 ),
@@ -402,7 +395,7 @@ class DynamicBicycleCar3D(DynamicBicycle):
 
         Dynamic geometry is not a skin concern, so the four-wheel arrow set is a
         manual override here rather than something driven by ``car_skin_3d``. The
-        arrows share the base ``arrows`` frame (``T_wb``); each bakes its wheel
+        arrows share the ``body`` frame (``T_wb``); each bakes its wheel
         corner as its ``base`` and lifts to the hub height via ``local_transform``.
         """
         a = self.params["a"]
@@ -420,7 +413,7 @@ class DynamicBicycleCar3D(DynamicBicycle):
             return arr
 
         return {
-            "arrows": [
+            "body": [
                 _arrow(v_r_loc, 0.2, "blue", -b, 0.5 * tr, r_r),
                 _arrow(v_r_loc, 0.2, "blue", -b, -0.5 * tr, r_r),
                 _arrow(v_f_loc, 0.2, "blue", a, 0.5 * tr, r_f),

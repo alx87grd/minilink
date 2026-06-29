@@ -118,24 +118,21 @@ class Rocket(MechanicalSystem):
             "world": identity_matrix(),
             "body": T_body,
             "center": pose2d_matrix(q[0], q[1], 0.0),
-            "thrust": T_body @ translation_matrix(0.0, -1.0, 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         length = 0.0002 * u[0]
         angle = np.pi / 2.0 + u[1]
         d = np.array([np.cos(angle), np.sin(angle)])
-        return {
-            "thrust": [
-                Arrow(
-                    base=-length * d,
-                    vector=d,
-                    scale=length,
-                    color="red",
-                    linewidth=2,
-                )
-            ]
-        }
+        thrust = Arrow(
+            base=-length * d,
+            vector=d,
+            scale=length,
+            color="red",
+            linewidth=2,
+        )
+        thrust.local_transform = translation_matrix(0.0, -1.0, 0.0)
+        return {"body": [thrust]}
 
 
 if __name__ == "__main__":

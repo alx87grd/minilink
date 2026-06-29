@@ -19,7 +19,7 @@
     ],
     "t": 0.0,
     "file": "dynamic_bicycle__rest.png",
-    "sha256": "6bd1d21f128029096b2b71817fcae2c6198377bec32773937e1a9b641052fbb1"
+    "sha256": "9540653887c3a7d9ff9f9f5f39d8de4d1b32576c988f1a21d83dbed70be86062"
   },
   {
     "plant": "dynamic_bicycle",
@@ -41,7 +41,7 @@
     ],
     "t": 0.7,
     "file": "dynamic_bicycle__pose_a.png",
-    "sha256": "b2ffd778e83ecc8d047db27390b172cae576685d9845ab20cac75c65018a036b"
+    "sha256": "3fc464b8e0729518e75e1777046a9e1269e4bcb2a1a7f01617e9b1ce04d85f21"
   },
   {
     "plant": "dynamic_bicycle",
@@ -63,7 +63,7 @@
     ],
     "t": 1.4,
     "file": "dynamic_bicycle__pose_b.png",
-    "sha256": "c441a0d7f5e0a4d094e298cfd3c65c88becaa8400253790bdf3f93e932bae8c4"
+    "sha256": "5256f9dd911665865876948ed90c0a7990525b4a07bda6773ae497053a2a0ffa"
   },
   {
     "plant": "dynamic_bicycle_car3d",
@@ -85,7 +85,7 @@
     ],
     "t": 0.0,
     "file": "dynamic_bicycle_car3d__rest.png",
-    "sha256": "02ef478aa59cd7d3b0711cae203ece82d62823bab3b80433424e63d2e7816e8e"
+    "sha256": "8234004adcf955592ff11ce91454c0d0c2758ff7ae440b586e25114c04279714"
   },
   {
     "plant": "dynamic_bicycle_car3d",
@@ -107,7 +107,7 @@
     ],
     "t": 0.7,
     "file": "dynamic_bicycle_car3d__pose_a.png",
-    "sha256": "be3ce1be39e6af6ff109aa584961845cd06a2e59525bb8c072f5f71feec71957"
+    "sha256": "bab613d3e194cfb93854251cf9f60cad8e0c46d2d70bf27c5e60b6d4dcfc0e3b"
   },
   {
     "plant": "dynamic_bicycle_car3d",
@@ -129,7 +129,7 @@
     ],
     "t": 1.4,
     "file": "dynamic_bicycle_car3d__pose_b.png",
-    "sha256": "2d0589cc7462bb621f05cfd670eac7326cdab107e918f8a0137dab786f1d91ca"
+    "sha256": "0d5e4dee899b690275fc1ebd8d8f7076267d8f46ad03151ad66a8ad9edc1e162"
   },
   {
     "plant": "kinematic_bicycle",
@@ -148,7 +148,7 @@
     ],
     "t": 0.0,
     "file": "kinematic_bicycle__rest.png",
-    "sha256": "df1c40b500e2b75baca6de31aaf029a5c09b7a180b19aefc3668a3a5e6a3a9c0"
+    "sha256": "246744013e4674222b91d9439bb541c0b3a69185cbefb467748f443b6b9ac25a"
   },
   {
     "plant": "kinematic_bicycle",
@@ -167,7 +167,7 @@
     ],
     "t": 0.7,
     "file": "kinematic_bicycle__pose_a.png",
-    "sha256": "a7c9d4b1c6fb47f2891ee572dae550a3d433f29b0284937b26e65c8856337cee"
+    "sha256": "518b36902757e737b6c120f5daea5ae8ffeb810add25448fed6d69f5d04b15fe"
   },
   {
     "plant": "kinematic_bicycle",
@@ -186,7 +186,7 @@
     ],
     "t": 1.4,
     "file": "kinematic_bicycle__pose_b.png",
-    "sha256": "a002b4a6eb7ab9da8a10f1ef5033f656d565e238a43085c1b298961987e6cfe0"
+    "sha256": "ef05c9da861aee21404253671c97e15baac5db22d12a8074141351ac03fb0390"
   },
   {
     "plant": "holonomic_mobile_robot",
@@ -204,7 +204,7 @@
     ],
     "t": 0.0,
     "file": "holonomic_mobile_robot__rest.png",
-    "sha256": "bc9d15b7d1421b12843652ed0311f56b527c98de45da85873b438a63ff77f8ff"
+    "sha256": "d135aeced02119ee241593df85517179c41edc57f96fc60a9757381d0adfbb19"
   },
   {
     "plant": "holonomic_mobile_robot",
@@ -222,7 +222,7 @@
     ],
     "t": 0.7,
     "file": "holonomic_mobile_robot__pose_a.png",
-    "sha256": "3a7693268813e0d09aa963625ff8ec1767755d761bd0c4922412e5ee1a8eb171"
+    "sha256": "e4e261462cae8f25cf735f144ea1f53d3bd6cd3a8e082c336801ee0ec8713357"
   },
   {
     "plant": "holonomic_mobile_robot",
@@ -240,7 +240,7 @@
     ],
     "t": 1.4,
     "file": "holonomic_mobile_robot__pose_b.png",
-    "sha256": "20aa651cacc2ced57be22e24bf9d8372f1cc0d0451254fccb217001351fd596d"
+    "sha256": "395bfae6acc6dbea7c5cadb45f5285a583c78bca15ce9862276837b35db2ea30"
   },
   {
     "plant": "pendulum",
@@ -257,7 +257,7 @@
     ],
     "t": 0.0,
     "file": "pendulum__rest.png",
-    "sha256": "06fe49edf71e28ea05860e90bcb1b16f09e7506c153d6664b0dc4ac05c9f280e"
+    "sha256": "a54423ccb2397e9bbe71a1b5ac7fabfd82a621a00822465ed3ea34733e1e807d"
   },
   {
     "plant": "pendulum",
@@ -274,7 +274,7 @@
     ],
     "t": 0.7,
     "file": "pendulum__pose_a.png",
-    "sha256": "667350d803146aadf0bfa2e9dad8ec3d3a72cf400315e85c6a35130ab92ec7eb"
+    "sha256": "000b270ff3b499cf37b0912f06f4dedeb4d98ee8f83dad213b7ca9979b1e8cc7"
   },
   {
     "plant": "pendulum",
@@ -291,7 +291,7 @@
     ],
     "t": 1.4,
     "file": "pendulum__pose_b.png",
-    "sha256": "14f704717df386230bdb50d038b849a39c77041bc5c9352592ed04df241953bf"
+    "sha256": "d5804942593afc882c3b90c14d6e7bbdb9637d3f71c827b0f72a369461972f9a"
   },
   {
     "plant": "cartpole",
@@ -310,7 +310,7 @@
     ],
     "t": 0.0,
     "file": "cartpole__rest.png",
-    "sha256": "aafb934f60a7f8dab24fee51321e2fa0dffcf8cbce92237ad6c5640b0d84054a"
+    "sha256": "f561e758ba4384f3855fa7d6da08dc0815989b8011162254777b8f072e66d3aa"
   },
   {
     "plant": "cartpole",
@@ -329,7 +329,7 @@
     ],
     "t": 0.7,
     "file": "cartpole__pose_a.png",
-    "sha256": "a5cc4545f914e66371bec2308747f4287ba29dfe92ae384df1ff7810cc217e6e"
+    "sha256": "e912ba4c748bef224da19e9b772b98063a76e9a321aa93d24a2d0dabfaca14ba"
   },
   {
     "plant": "cartpole",
@@ -348,7 +348,7 @@
     ],
     "t": 1.4,
     "file": "cartpole__pose_b.png",
-    "sha256": "04eb7e701b49333784abbcaf3f7e3b48b7b98e68b8099879cd97426602852bfd"
+    "sha256": "5ac9b43041cbf8ca453b7ed03b9ef3c918750591788fa85de1ab44c733334512"
   },
   {
     "plant": "two_link_manipulator",
@@ -368,7 +368,7 @@
     ],
     "t": 0.0,
     "file": "two_link_manipulator__rest.png",
-    "sha256": "d995bb4790a0be903db34057d7ba56c4b3d0aebc387f9fe427bbc3bb4b35a048"
+    "sha256": "92be09445cbb386ad15c0200a50abaa5d58ace7bf757f6a4dd6c72f71fb71d71"
   },
   {
     "plant": "two_link_manipulator",
@@ -388,7 +388,7 @@
     ],
     "t": 0.7,
     "file": "two_link_manipulator__pose_a.png",
-    "sha256": "d0929cc6eda053e2798cea7e4f60604148833479fa749283bba505663384a415"
+    "sha256": "1e42bcdbda02ae35a30489517393cd016219981723b80c94864e545a9ec03f87"
   },
   {
     "plant": "two_link_manipulator",
@@ -408,7 +408,7 @@
     ],
     "t": 1.4,
     "file": "two_link_manipulator__pose_b.png",
-    "sha256": "4ac7e974db8cf2c953db6f6fbf39298c6a8c113c8f6d3746d19a0fe79a1d62ab"
+    "sha256": "0a49e6a94e6206e53ac346b8456115ff19605df5f46b0982922abdb7af425142"
   },
   {
     "plant": "five_link_planar_manipulator",
@@ -437,7 +437,7 @@
     ],
     "t": 0.0,
     "file": "five_link_planar_manipulator__rest.png",
-    "sha256": "2f13bb7f28772f4b8b493ac8b94b3c6e7dacdabc3d011f69be0eddf787dbc7d7"
+    "sha256": "da8d98bd17ac738aba7b8ac4df94d75d76993a7901fc413ef08e748288239711"
   },
   {
     "plant": "five_link_planar_manipulator",
@@ -466,7 +466,7 @@
     ],
     "t": 0.7,
     "file": "five_link_planar_manipulator__pose_a.png",
-    "sha256": "e7b67820fc5fac998692832c91c4df958f5a90745be5df3acc046464df11c294"
+    "sha256": "a274919a2c52944dff36312d6cb8d553faa253dfa970ce2a679aaa6036859835"
   },
   {
     "plant": "five_link_planar_manipulator",
@@ -495,7 +495,7 @@
     ],
     "t": 1.4,
     "file": "five_link_planar_manipulator__pose_b.png",
-    "sha256": "53da13515ec8af437f26b4a4d35750cf6c1575e4c089cb7c5096df84d5a2a8b6"
+    "sha256": "2adc210f266e94f61c08e8b3714ad2be353e0532f881e35800199f8be3b56437"
   },
   {
     "plant": "drone2d",
@@ -517,7 +517,7 @@
     ],
     "t": 0.0,
     "file": "drone2d__rest.png",
-    "sha256": "ac31e16b4c07e2c42e29a90c46e68dd19e4905e89d5346db670efd7d74af6ac7"
+    "sha256": "e9c105c4db4c702bd6644979cc1d536f765b365b8e8b7e42aa2e181b401c09e5"
   },
   {
     "plant": "drone2d",
@@ -539,7 +539,7 @@
     ],
     "t": 0.7,
     "file": "drone2d__pose_a.png",
-    "sha256": "4aed236e61804d4c2ea0861d55f54f580971d1f2eee176d49fcea20d792ccf31"
+    "sha256": "ca9f46a0a685a07e5bb0afe3e05f30f89a72a6117afbe7a19b122a2706c68724"
   },
   {
     "plant": "drone2d",
@@ -561,7 +561,7 @@
     ],
     "t": 1.4,
     "file": "drone2d__pose_b.png",
-    "sha256": "62d33b50a0d78c4a025c8501bf3c3c3afc7fbe885f324469e4e22aa2975d8484"
+    "sha256": "f32c18d0bed8745c7a8c22621157ef0a8f885531ecfd043477229cd2d4157842"
   },
   {
     "plant": "simple_integrator",
@@ -577,7 +577,7 @@
     ],
     "t": 0.0,
     "file": "simple_integrator__rest.png",
-    "sha256": "b90a50eba46999294946009fce297ffe238d386c4000fdf2b0873dc3202c589d"
+    "sha256": "07f966dd045f5e3a30156b15dad7d80e7affd48b729de29e6ff6496113c145cc"
   },
   {
     "plant": "simple_integrator",
@@ -593,7 +593,7 @@
     ],
     "t": 0.7,
     "file": "simple_integrator__pose_a.png",
-    "sha256": "c4f85deaf8e5c1d1c1049b6cecfc1243b1be779914fb73bd61743db3896c91f1"
+    "sha256": "f631389b27740dbe11329ce5c45bd5c64ca388eb618b5432fd6369b0dc57204c"
   },
   {
     "plant": "simple_integrator",
@@ -609,7 +609,7 @@
     ],
     "t": 1.4,
     "file": "simple_integrator__pose_b.png",
-    "sha256": "ca4d2d1c2e75e7155b9be3e4990735e6e81c5e8e30a857f448a613e8a0b5015c"
+    "sha256": "89457a74069a7689e6ba3dfb0d7799785199fcfb9e1e0372997b11d20f6bfaff"
   },
   {
     "plant": "single_mass",
@@ -626,7 +626,7 @@
     ],
     "t": 0.0,
     "file": "single_mass__rest.png",
-    "sha256": "36dfa3c2037c13c4c89d0af84f3246c2bd18ec6f4ab5c81427c2fe96917db97b"
+    "sha256": "7cfa3e65689673ba8a5fb6dc20697145abfdc1772a5e9e6c391716285748036d"
   },
   {
     "plant": "single_mass",
@@ -643,7 +643,7 @@
     ],
     "t": 0.7,
     "file": "single_mass__pose_a.png",
-    "sha256": "e1c54dfb9607092155a8c98970cc05eef7cb631cdbb428676317f35ac1d27d6a"
+    "sha256": "6e22c882be0b394adb5494dfb5c04bc0810e5f439811eb6a58f6e0b97d92e4c8"
   },
   {
     "plant": "single_mass",
@@ -660,84 +660,6 @@
     ],
     "t": 1.4,
     "file": "single_mass__pose_b.png",
-    "sha256": "1e3dd27bd5152b9e3ef5d04d75d51f1289792e19c0ed25b2d750e1ab905d9df6"
-  },
-  {
-    "plant": "dynamic_bicycle_rate_inputs",
-    "sample": "rest",
-    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
-    "class": "JaxDynamicBicycleRateInputs",
-    "requires": [
-      "jax"
-    ],
-    "x": [
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0
-    ],
-    "u": [
-      0.0,
-      0.0
-    ],
-    "t": 0.0,
-    "file": "dynamic_bicycle_rate_inputs__rest.png",
-    "sha256": "6bd1d21f128029096b2b71817fcae2c6198377bec32773937e1a9b641052fbb1"
-  },
-  {
-    "plant": "dynamic_bicycle_rate_inputs",
-    "sample": "pose_a",
-    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
-    "class": "JaxDynamicBicycleRateInputs",
-    "requires": [
-      "jax"
-    ],
-    "x": [
-      0.38213459565024244,
-      0.14494310179066947,
-      -0.20193844183994303,
-      -0.3959969986401782,
-      -0.2903729216800561,
-      0.034999593375778563,
-      0.33388511393566395,
-      0.3800930367834119
-    ],
-    "u": [
-      0.2450166444603104,
-      0.15540249206766613
-    ],
-    "t": 0.7,
-    "file": "dynamic_bicycle_rate_inputs__pose_a.png",
-    "sha256": "fc1905fda5276cd2fdc79a58d51a3ee878d4f2aa53b93a894516f8d1a1f12f05"
-  },
-  {
-    "plant": "dynamic_bicycle_rate_inputs",
-    "sample": "pose_b",
-    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
-    "class": "JaxDynamicBicycleRateInputs",
-    "requires": [
-      "jax"
-    ],
-    "x": [
-      0.7129658880491484,
-      0.7933318483619749,
-      0.5965641697413763,
-      0.19139946337118596,
-      -0.2806265821516959,
-      -0.6546216888515283,
-      -0.7999386060512808,
-      -0.6658139537791207
-    ],
-    "u": [
-      0.3916634548137417,
-      0.49272486499423007
-    ],
-    "t": 1.4,
-    "file": "dynamic_bicycle_rate_inputs__pose_b.png",
-    "sha256": "763af984cc8d9c6b9b16f2958ee6f64c36dba1ab80b8e2d9fe41ce9863b27046"
+    "sha256": "b07a3bd43a069d9e2d7d0853f4776e8068e945b67c1c926811f7f2b3c4941498"
   }
 ]

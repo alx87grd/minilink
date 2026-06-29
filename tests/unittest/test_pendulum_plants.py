@@ -4,7 +4,9 @@ import numpy as np
 
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
-from minilink.graphical.animation.primitives import Box
+from minilink.graphical.animation.primitives import Box, Rod
+
+from tests.unittest.graphics_contract_helpers import resolve_draw_frame
 
 
 class TestCartPole(unittest.TestCase):
@@ -53,12 +55,24 @@ class TestCartPole(unittest.TestCase):
 
     def test_graphics_geometry_and_transform_counts_match(self):
         sys = CartPole()
-        primitives = sys.get_kinematic_geometry()
-        transforms = sys.get_kinematic_transforms(np.zeros(sys.n), np.zeros(sys.m), 0.0)
+        frame = resolve_draw_frame(sys)
+        primitives = frame["primitives"]
+        transforms = frame["transforms"]
 
-        self.assertIsInstance(primitives[1], Box)
-        self.assertEqual(primitives[1].length_z, sys.cart_depth)
-        self.assertGreater(transforms[4][2, 3], 0.5 * float(sys.cart_depth))
+        cart_boxes = [
+            (index, primitive)
+            for index, primitive in enumerate(primitives)
+            if isinstance(primitive, Box)
+        ]
+        self.assertEqual(len(cart_boxes), 1)
+        _, cart = cart_boxes[0]
+        self.assertEqual(cart.length_z, sys.cart_depth)
+
+        pole_indices = [
+            index for index, primitive in enumerate(primitives) if isinstance(primitive, Rod)
+        ]
+        self.assertEqual(len(pole_indices), 1)
+        self.assertGreater(transforms[pole_indices[0]][2, 3], 0.5 * float(sys.cart_depth))
         self.assertEqual(len(primitives), len(transforms))
         for T in transforms:
             self.assertEqual(T.shape, (4, 4))
@@ -120,8 +134,9 @@ class TestDoublePendulum(unittest.TestCase):
 
     def test_graphics_geometry_and_transform_counts_match(self):
         sys = DoublePendulum()
-        primitives = sys.get_kinematic_geometry()
-        transforms = sys.get_kinematic_transforms(np.zeros(sys.n), np.zeros(sys.m), 0.0)
+        frame = resolve_draw_frame(sys)
+        primitives = frame["primitives"]
+        transforms = frame["transforms"]
 
         self.assertEqual(len(primitives), len(transforms))
         for T in transforms:

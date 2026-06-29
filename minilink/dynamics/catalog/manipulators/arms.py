@@ -26,33 +26,31 @@ def _planar_joint_positions(q, lengths):
 
 
 def _planar_kinematic_geometry(lengths):
-    """Static planar arm geometry: one ``link{i}`` Rod and ``joint{i}`` Circle."""
+    """Static planar arm geometry: one ``link{i}`` rod with joint circles at each end."""
     radius = 0.08 * max(float(np.max(lengths)), 1e-12)
     geometry = {}
     for i, length in enumerate(lengths):
+        joint_base = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+        joint_tip = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+        joint_tip.local_transform = translation(0.0, -float(length), 0.0)
         geometry[f"link{i}"] = [
+            joint_base,
             Rod(
                 length=float(length),
                 radius=0.03 * float(length),
                 color="blue",
                 linewidth=2,
-            )
-        ]
-    for i in range(len(lengths) + 1):
-        geometry[f"joint{i}"] = [
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+            ),
+            joint_tip,
         ]
     return geometry
 
 
 def _planar_frames(points, angles, effector=None):
-    """World transforms for the planar arm links/joints (and the effector frame)."""
+    """World transforms for the planar arm links (and the effector frame)."""
     frames = {"world": identity()}
     for i, (point, angle) in enumerate(zip(points[:-1], angles)):
         frames[f"link{i}"] = SE2(point[0], point[1], np.pi - angle)
-        frames[f"torque{i}"] = SE2(point[0], point[1], np.pi / 2.0 - angle)
-    for i, point in enumerate(points):
-        frames[f"joint{i}"] = SE2(point[0], point[1], 0.0)
     if effector is not None:
         frames["velocity"] = translation(effector[0], effector[1], 0.0)
     return frames
@@ -74,22 +72,22 @@ def _planar_velocity_geometry(velocity):
 
 
 def _planar_torque_geometry(lengths, u, upper_bound):
-    """Per-frame joint torque arcs (honest, keyed to the ``torque{i}`` frames)."""
+    """Per-frame joint torque arcs (honest, keyed to the ``link{i}`` frames)."""
     torque_radius = 0.2 * max(float(np.max(lengths)), 1e-12)
     dynamic = {}
     for i in range(len(lengths)):
         limit = float(abs(upper_bound[i])) if np.isfinite(upper_bound[i]) else 5.0
         limit = max(limit, 1.0)
         sweep = u[i] * (2.0 * np.pi / 3.0) / limit
-        dynamic[f"torque{i}"] = [
-            TorqueArrow(
-                sweep=sweep,
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
-            )
-        ]
+        arc = TorqueArrow(
+            sweep=sweep,
+            radius=torque_radius,
+            head_ratio=0.4,
+            color="red",
+            linewidth=2,
+        )
+        arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
+        dynamic[f"link{i}"] = [arc]
     return dynamic
 
 

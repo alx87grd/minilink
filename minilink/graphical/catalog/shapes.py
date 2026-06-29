@@ -5,14 +5,14 @@ the internal ``graphical/animation/`` band; this module is the friendly, stable
 re-export. Two things to note:
 
 - ``Line`` is the public name for the internal ``CustomLine``.
-- ``Arrow`` / ``TorqueArrow`` are the **honest** v2 primitives
-  (``shapes_v2.ArrowV2`` / ``TorqueArrowV2``) — the public arrows are never the
-  legacy column-norm-scaling ones in ``animation/primitives.py``.
+- ``Arrow`` / ``TorqueArrow`` are the honest, frame-keyed primitives whose
+  geometry is baked at construction (no column-norm side-channel scaling).
 
 Demo import: ``from minilink.graphical.catalog import Box, Circle, Arrow``.
 """
 
 from minilink.graphical.animation.primitives import (
+    Arrow,
     Box,
     Circle,
     ExtrudedPolygon,
@@ -21,6 +21,7 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
+    TorqueArrow,
     TrajectoryPolyline,
     ground_line,
     spring_line,
@@ -29,12 +30,6 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.animation.primitives import (
     CustomLine as Line,
-)
-from minilink.graphical.animation.shapes_v2 import (
-    ArrowV2 as Arrow,
-)
-from minilink.graphical.animation.shapes_v2 import (
-    TorqueArrowV2 as TorqueArrow,
 )
 
 __all__ = [

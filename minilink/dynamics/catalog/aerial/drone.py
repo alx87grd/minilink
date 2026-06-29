@@ -100,6 +100,7 @@ class Drone2D(MechanicalSystem):
         return {
             "world": [ground_line(length=20.0)],
             "body": [_drone_body(width=1.2, height=0.18)],
+            "center": [Point(color="blue", marker="o", size=5)],
         }
 
     def tf(self, x, u, t=0, params=None):
@@ -108,6 +109,7 @@ class Drone2D(MechanicalSystem):
         return {
             "world": identity_matrix(),
             "body": T_body,
+            "center": pose2d_matrix(q[0], q[1], 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
@@ -159,7 +161,7 @@ class Drone2DWithSideThruster(Drone2D):
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         dynamic = super().get_dynamic_geometry(x, u[:2], t)
-        dynamic["thrust"].append(
+        dynamic["body"].append(
             Arrow(
                 base=(0.0, 0.0),
                 vector=(1.0, 0.0),
@@ -199,14 +201,11 @@ class SpeedControlledDrone2D(DynamicSystem):
         return {"body": [_drone_body(width=1.0, height=0.18)]}
 
     def tf(self, x, u, t=0, params=None):
-        return {
-            "body": translation_matrix(x[0], x[1], 0.0),
-            "vel": translation_matrix(x[0], x[1], 0.0),
-        }
+        return {"body": translation_matrix(x[0], x[1], 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {
-            "vel": [
+            "body": [
                 Arrow(
                     base=(0.0, 0.0),
                     vector=(u[0], u[1]),
@@ -264,16 +263,13 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
-        return {
-            "body": translation_matrix(x[2], x[1], 0.0),
-            "force": translation_matrix(x[2] + 0.6, x[1], 0.0),
-        }
+        return {"body": translation_matrix(x[2], x[1], 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {
-            "force": [
+            "body": [
                 Arrow(
-                    base=(0.0, 0.0),
+                    base=(0.6, 0.0),
                     vector=(0.0, u[0]),
                     scale=0.2,
                     color="red",

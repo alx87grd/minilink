@@ -60,6 +60,11 @@ from minilink.dynamics.catalog.vehicles.steering import (
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
 from minilink.graphical.animation.primitives import Arrow, TorqueArrow
 
+from tests.unittest.graphics_contract_helpers import (
+    geometry_smoke as _geometry_smoke,
+    resolved_primitive_count as _primitive_count,
+)
+
 
 def _zero_f_smoke(system):
     x = np.asarray(system.x0, dtype=float)
@@ -69,27 +74,6 @@ def _zero_f_smoke(system):
     dx = np.asarray(system.f(x, u, 0.0), dtype=float)
     assert dx.shape == (system.n,)
     assert np.all(np.isfinite(dx))
-
-
-def _geometry_smoke(system):
-    x = np.asarray(system.x0, dtype=float)
-    if x.shape != (system.n,):
-        x = np.zeros(system.n)
-    u = system.get_u_from_input_ports()
-    geometry = system.get_kinematic_geometry()
-    transforms = system.get_kinematic_transforms(x, u, 0.0)
-    assert len(geometry) == len(transforms)
-    for transform in transforms:
-        transform = np.asarray(transform, dtype=float)
-        assert transform.shape == (4, 4)
-        assert np.all(np.isfinite(transform))
-
-
-def _primitive_count(system, primitive_type):
-    return sum(
-        isinstance(primitive, primitive_type)
-        for primitive in system.get_kinematic_geometry()
-    )
 
 
 class TestMigratedCatalog(unittest.TestCase):

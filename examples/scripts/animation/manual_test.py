@@ -4,38 +4,30 @@ from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 
 
-sys = JaxCartPole()
-sys.inputs["u"].nominal_value = 2.2
-sys.x0[0] = 2.0
+# sys = JaxCartPole()
+# sys.inputs["u"].nominal_value = 2.2
+# sys.x0[0] = 2.0
 
-sys.compute_trajectory(tf=10, show=False)
-
-
-sys.animate()
-sys.animate_v2()
-sys.animate(renderer="meshcat")
-sys.animate_v2(renderer="meshcat")
-sys.animate(renderer="plotly")
-sys.animate_v2(renderer="plotly")
-sys.animate(renderer="pygame")
-sys.animate_v2(renderer="pygame")
+# sys.compute_trajectory(tf=10, show=False)
 
 
-sys = Pendulum()
-sys.inputs["u"].nominal_value = 2.2
-sys.x0[0] = 2.0
+# sys.animate()
+# sys.animate(renderer="meshcat")
+# sys.animate(renderer="plotly")
+# sys.animate(renderer="pygame")
 
-sys.compute_trajectory(tf=10, show=False)
+
+# sys = Pendulum()
+# sys.inputs["u"].nominal_value = 2.2
+# sys.x0[0] = 2.0
+
+# sys.compute_trajectory(tf=10, show=False)
 
 
-sys.animate()
-sys.animate_v2()
-sys.animate(renderer="meshcat")
-sys.animate_v2(renderer="meshcat")
-sys.animate(renderer="plotly")
-sys.animate_v2(renderer="plotly")
-sys.animate(renderer="pygame")
-sys.animate_v2(renderer="pygame")
+# sys.animate()
+# sys.animate(renderer="meshcat")
+# sys.animate(renderer="plotly")
+# sys.animate(renderer="pygame")
 
 
 sys = DynamicBicycle()
@@ -47,10 +39,6 @@ sys.compute_trajectory(tf=10, show=False)
 
 
 sys.animate()
-sys.animate_v2()
 sys.animate(renderer="meshcat")
-sys.animate_v2(renderer="meshcat")
 sys.animate(renderer="plotly")
-sys.animate_v2(renderer="plotly")
 sys.animate(renderer="pygame")
-sys.animate_v2(renderer="pygame")

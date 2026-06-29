@@ -21,6 +21,7 @@ from minilink.graphical.common.plotly_style import (
     PLOTLY_ANIMATION_HEIGHT,
     PLOTLY_FIG_WIDTH,
 )
+from minilink.graphical.catalog.skins import debug_state_skin
 
 
 class TestPlotlyRendererOptionalImport(unittest.TestCase):
@@ -55,14 +56,12 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "interactive loops"):
             animator.game(renderer="plotly", max_steps=1)
 
-    def test_v2_game_requires_interactive_renderer(self):
-        from minilink.graphical.animation.animator2 import Animator2
-
+    def test_game_requires_interactive_renderer(self):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
-        animator2 = Animator2(sys)
-        self.assertTrue(hasattr(animator2, "game"))
+        animator = Animator(sys)
+        self.assertTrue(hasattr(animator, "game"))
         with self.assertRaisesRegex(ValueError, "interactive loops"):
-            animator2.game(renderer="plotly", max_steps=1)
+            animator.game(renderer="plotly", max_steps=1)
 
 
 @pytest.mark.optional
@@ -72,11 +71,14 @@ class TestPlotlyRenderer(unittest.TestCase):
 
     def test_static_2d_frame_builds_figure_without_showing(self):
         sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         x = np.array([0.5])
         u = np.array([1.0])
-        frame = animator._prepare_transforms(x, u, 0.0)
+        frame = animator._resolve_frame(
+            x, u, 0.0, kinematic=sys.get_kinematic_geometry()
+        )
 
         backend.open_scene(
             is_3d=False,
@@ -85,7 +87,7 @@ class TestPlotlyRenderer(unittest.TestCase):
             title="Plotly smoke",
         )
         backend.draw_frame(
-            sys.get_kinematic_geometry(),
+            frame["primitives"],
             frame["transforms"],
             0.0,
             frame["camera"],
@@ -126,9 +128,12 @@ class TestPlotlyRenderer(unittest.TestCase):
 
     def test_static_3d_frame_builds_scatter3d(self):
         sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
-        frame = animator._prepare_transforms(np.array([0.5]), np.array([1.0]), 0.0)
+        frame = animator._resolve_frame(
+            np.array([0.5]), np.array([1.0]), 0.0, kinematic=sys.get_kinematic_geometry()
+        )
 
         backend.open_scene(
             is_3d=True,
@@ -137,7 +142,7 @@ class TestPlotlyRenderer(unittest.TestCase):
             title="Plotly 3D smoke",
         )
         backend.draw_frame(
-            sys.get_kinematic_geometry(),
+            frame["primitives"],
             frame["transforms"],
             0.0,
             frame["camera"],
@@ -150,6 +155,7 @@ class TestPlotlyRenderer(unittest.TestCase):
 
     def test_inline_animation_has_expected_frames(self):
         sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
         traj = Trajectory(
             t=np.array([0.0, 0.1, 0.2]),
             x=np.array([[0.0, 0.1, 0.2]]),
@@ -172,6 +178,7 @@ class TestPlotlyRenderer(unittest.TestCase):
 
     def test_inline_animation_uses_fixed_camera_2d_axes(self):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
         traj = Trajectory(
             t=np.array([0.0, 0.1, 0.2]),
             x=np.array([[0.0, 25.0, -5.0]]),
@@ -245,6 +252,7 @@ class TestPlotlyRenderer(unittest.TestCase):
 
     def test_plotly_native_false_html_true_allowed(self):
         sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
         traj = Trajectory(
             t=np.array([0.0, 0.1]),
             x=np.array([[0.0, 0.1]]),

@@ -175,8 +175,6 @@ class Boat2D(GeneralizedMechanicalSystem):
         return {
             "body": T_body,
             "center": pose2d_matrix(q[0], q[1], 0.0),
-            "thrust": T_body @ translation_matrix(-l_t, 0.0, 0.0),
-            "hydroforce": T_body,
             "hydrotorque": pose2d_matrix(q[0], q[1], q[2] - np.pi / 2.0),
         }
 
@@ -185,17 +183,16 @@ class Boat2D(GeneralizedMechanicalSystem):
         thrust_len = force_scale * np.hypot(u[0], u[1])
         a = np.arctan2(u[1], u[0])
         d = np.array([np.cos(a), np.sin(a)])
-        dynamic = {
-            "thrust": [
-                Arrow(
-                    base=-thrust_len * d,
-                    vector=d,
-                    scale=thrust_len,
-                    color="red",
-                    linewidth=2,
-                )
-            ]
-        }
+        l_t = self.params["l_t"]
+        thrust = Arrow(
+            base=-thrust_len * d,
+            vector=d,
+            scale=thrust_len,
+            color="red",
+            linewidth=2,
+        )
+        thrust.local_transform = translation_matrix(-l_t, 0.0, 0.0)
+        dynamic = {"body": [thrust]}
         if self.show_hydrodynamic_forces:
             q = x[:3]
             rho = self.params["rho"]
@@ -207,7 +204,7 @@ class Boat2D(GeneralizedMechanicalSystem):
             hf_len = force_scale * np.hypot(hydro_force[0], hydro_force[1])
             hf_a = np.arctan2(hydro_force[1], hydro_force[0])
             hf_d = np.array([np.cos(hf_a), np.sin(hf_a)])
-            dynamic["hydroforce"] = [
+            dynamic["body"].append(
                 Arrow(
                     base=(0.0, 0.0),
                     vector=hf_d,
@@ -216,7 +213,7 @@ class Boat2D(GeneralizedMechanicalSystem):
                     linewidth=2,
                     style="--",
                 )
-            ]
+            )
             dynamic["hydrotorque"] = [
                 TorqueArrow(
                     sweep=hydro_force[2] * (2.0 * np.pi) / torque_max,

@@ -226,8 +226,6 @@ class Plane2D(MechanicalSystem):
             "center": pose2d_matrix(q[0], q[1], 0.0),
             "wingchord": pose2d_matrix(wing[0], wing[1], theta)
             @ scale_pose2d_matrix(-chord_w, 0.0, 0.0, 2.0 * chord_w),
-            "thrust": pose2d_matrix(q[0], q[1], q[2])
-            @ translation_matrix(-self.l_cg, 0.0, 0.0),
             "tailchord": pose2d_matrix(tail[0], tail[1], theta + delta)
             @ scale_pose2d_matrix(-chord_t, 0.0, 0.0, 2.0 * chord_t),
             "speed": translation_matrix(q[0], q[1], 0.0),
@@ -245,16 +243,16 @@ class Plane2D(MechanicalSystem):
         thrust_len = force_scale * u[0]
         speed_len = min(speed * self.length / 30.0, self.length)
         cg, sg = np.cos(gamma), np.sin(gamma)
+        thrust = Arrow(
+            base=(-thrust_len, 0.0),
+            vector=(1.0, 0.0),
+            scale=thrust_len,
+            color="red",
+            linewidth=2,
+        )
+        thrust.local_transform = translation_matrix(-self.l_cg, 0.0, 0.0)
         return {
-            "thrust": [
-                Arrow(
-                    base=(-thrust_len, 0.0),
-                    vector=(1.0, 0.0),
-                    scale=thrust_len,
-                    color="red",
-                    linewidth=2,
-                )
-            ],
+            "body": [thrust],
             "tailchord": [self.chord_line()],
             "speed": [
                 Arrow(
