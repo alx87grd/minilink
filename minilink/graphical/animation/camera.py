@@ -66,22 +66,7 @@ def resolve_camera_from_hints(source, frames, x=None, u=None, t=0.0, *, override
         target = np.asarray(frames[follow], dtype=float)[:3, 3] + target
         return camera_matrix(target=target, plot_axes=plot_axes, scale=scale)
 
-    # No follow-frame hint: honor a custom ``get_camera_transform`` override
-    # (oblique 3D views, time-varying chase cams, …) so the v2 view matches the
-    # legacy path. The base implementation equals the hint resolver below, so
-    # plain plants fall through unchanged.
-    get_cam = getattr(type(source), "get_camera_transform", None)
-    if get_cam is not None and get_cam is not _base_get_camera_transform():
-        return np.asarray(source.get_camera_transform(x, u, t), dtype=float)
-
     return camera_matrix(target=target, plot_axes=plot_axes, scale=scale)
-
-
-def _base_get_camera_transform():
-    """Return ``System.get_camera_transform`` (lazy import to avoid a cycle)."""
-    from minilink.core.system import System
-
-    return System.get_camera_transform
 
 
 def follow_frame_camera(

@@ -101,9 +101,10 @@ PLANTS: tuple[PlantSpec, ...] = (
 def sample_states(sys):
     """Three deterministic ``(label, x, u, t)`` samples that exercise the geometry.
 
-    Rendering reads only ``get_kinematic_*`` / ``get_camera_transform`` (pure
-    trig, never ``f``), so deterministic perturbations off ``x0`` are a safe,
-    simulator-independent way to pose joints, headings, and steer angles.
+    Rendering reads only ``get_kinematic_*`` and camera hints resolved by the
+    animator (pure trig, never ``f``), so deterministic perturbations off ``x0``
+    are a safe, simulator-independent way to pose joints, headings, and steer
+    angles.
     """
     n, m = sys.n, sys.m
     x0 = np.asarray(sys.x0, dtype=float).reshape(-1).copy()

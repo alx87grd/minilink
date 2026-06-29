@@ -2,9 +2,10 @@
 
 import numpy as np
 
+from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.engines.contact_jax import WorldModel, unpack_state, world_ode
-from minilink.graphical.animation.primitives import Plane, Sphere, translation_matrix
+from minilink.graphical.animation.primitives import Plane, Sphere
 
 
 def _is_jax_array(a) -> bool:
@@ -95,5 +96,5 @@ class PhysicsWorldSystem(DynamicSystem):
         pos_np = np.asarray(pos, dtype=float)
         frames = {}
         for i, p in enumerate(pos_np):
-            frames[f"body{i}"] = translation_matrix(p[0], p[1], p[2])
+            frames[f"body{i}"] = translation(p[0], p[1], p[2])
         return frames

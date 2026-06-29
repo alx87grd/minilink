@@ -4,7 +4,6 @@ from minilink.core.kinematics import identity, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
-    follow_xy_camera,
     ground_line,
     vehicle_body,
     wheel_box,
@@ -31,6 +30,7 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
 
         # graphic camera framing the car (not part of the EoM)
         self.camera_scale = 2.0 * self.params["length"]
+        self.camera_follow_frame = "body"
 
         self.state.labels = ["x", "dx"]
         self.state.units = ["m", "m/s"]
@@ -141,6 +141,7 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
 
         # graphic camera framing the car (not part of the EoM)
         self.camera_scale = 2.0 * self.params["length"]
+        self.camera_follow_frame = "body"
 
         self.state.labels = ["x", "dx", "wheel_speed", "wheel_angle"]
         self.state.units = ["m", "m/s", "rad/s", "rad"]
@@ -184,9 +185,6 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
 
     def h(self, x, u, t=0.0, params=None):
         return np.array([self._slip(x[1], x[2], params)])
-
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], 0.0, self.camera_scale)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         slip = self._slip(x[1], x[2])

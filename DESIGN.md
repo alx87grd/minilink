@@ -141,8 +141,11 @@ constant-matrix convenience built from `A, B, C, D` arrays (introspect via
   `y_dependencies` create standard `u`/`y`/`x`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
-  `get_dynamic_geometry`, `get_camera_transform` are part of the core `System`
-  contract in `core/system.py` (graphical primitives imported lazily).
+  `get_dynamic_geometry` are part of the core `System` contract in
+  `core/system.py` (graphical primitives imported lazily). Camera hints
+  (`camera_target`, `camera_scale`, `camera_follow_frame`, …) are resolved by
+  the animator via `resolve_camera_from_hints`; custom views use
+  `animate(camera=…)`.
   **`tf` returns only computed frames** (body, joints, axles, …); **`"world"` is
   implicit** — the animator injects identity so world-fixed geometry can key to
   `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
@@ -327,9 +330,10 @@ Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`
 Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
 Plotly under `plotting` extra.
 
-**Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
-for all renderers. Override on `System` for custom views. Camera and kinematic
-hooks are still under graphical/animation API review.
+**Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix
+(`camera_matrix`) each frame via `resolve_camera_from_hints`; pass
+`animate(camera=…)` for a constant matrix or callable override. One contract
+for all renderers.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing

@@ -1,18 +1,15 @@
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     Point,
-    follow_xy_camera,
     ground_line,
-    identity_matrix,
-    pose2d_matrix,
-    scale_pose2d_matrix,
-    translation_matrix,
 )
+from minilink.graphical.catalog.shapes import segment_pose_2d
 
 
 class Plane2D(MechanicalSystem):
@@ -50,6 +47,7 @@ class Plane2D(MechanicalSystem):
         self.width = self.length / 10.0
         self.dynamic_range = self.length
         self.camera_scale = self.dynamic_range
+        self.camera_follow_frame = "body"
 
     def velocity_vector(self, q, dq):
         xp = array_module(dq)
@@ -168,9 +166,6 @@ class Plane2D(MechanicalSystem):
 
         return thrust * xp.array([xp.cos(theta), xp.sin(theta), 0.0])
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def body_shape(self):
         """Side-view fuselage silhouette with the c.g. at the local origin.
 
@@ -220,16 +215,18 @@ class Plane2D(MechanicalSystem):
         c, s = np.cos(theta), np.sin(theta)
         wing = np.array([q[0] - l_w * c, q[1] - l_w * s])
         tail = np.array([q[0] - l_t * c, q[1] - l_t * s])
+        dir_w = np.array([c, s])
+        dir_t = np.array([np.cos(theta + delta), np.sin(theta + delta)])
         return {
-            "body": pose2d_matrix(q[0], q[1], q[2]),
-            "center": pose2d_matrix(q[0], q[1], 0.0),
-            "wingchord": pose2d_matrix(wing[0], wing[1], theta)
-            @ scale_pose2d_matrix(-chord_w, 0.0, 0.0, 2.0 * chord_w),
-            "tailchord": pose2d_matrix(tail[0], tail[1], theta + delta)
-            @ scale_pose2d_matrix(-chord_t, 0.0, 0.0, 2.0 * chord_t),
-            "speed": translation_matrix(q[0], q[1], 0.0),
-            "wingpt": translation_matrix(wing[0], wing[1], 0.0),
-            "tailpt": translation_matrix(tail[0], tail[1], 0.0),
+            "body": SE2(q[0], q[1], q[2]),
+            "center": SE2(q[0], q[1], 0.0),
+            "wingchord": segment_pose_2d(wing - chord_w * dir_w, wing + chord_w * dir_w),
+            "tailchord": segment_pose_2d(
+                tail - chord_t * dir_t, tail + chord_t * dir_t
+            ),
+            "speed": translation(q[0], q[1], 0.0),
+            "wingpt": translation(wing[0], wing[1], 0.0),
+            "tailpt": translation(tail[0], tail[1], 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
@@ -249,7 +246,7 @@ class Plane2D(MechanicalSystem):
             color="red",
             linewidth=2,
         )
-        thrust.local_transform = translation_matrix(-self.l_cg, 0.0, 0.0)
+        thrust.local_transform = translation(-self.l_cg, 0.0, 0.0)
         return {
             "body": [thrust],
             "tailchord": [self.chord_line()],

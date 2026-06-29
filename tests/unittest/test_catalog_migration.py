@@ -58,6 +58,7 @@ from minilink.dynamics.catalog.vehicles.steering import (
     UdeSRacecar,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
+from minilink.graphical.animation.camera import resolve_camera_from_hints
 from minilink.graphical.animation.primitives import Arrow, TorqueArrow
 
 from tests.unittest.graphics_contract_helpers import (
@@ -235,11 +236,9 @@ class TestMigratedCatalog(unittest.TestCase):
 
         for system, x, expected_target in cases:
             with self.subTest(system=system.name):
-                camera = system.get_camera_transform(
-                    x,
-                    system.get_u_from_input_ports(),
-                    0.0,
-                )
+                u = system.get_u_from_input_ports()
+                frames = system.tf(x, u, 0.0)
+                camera = resolve_camera_from_hints(system, frames, x, u, 0.0)
                 np.testing.assert_allclose(camera[:3, 3], expected_target)
                 self.assertEqual(camera[3, 3], system.camera_scale)
 

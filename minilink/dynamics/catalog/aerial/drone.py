@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
@@ -7,11 +8,7 @@ from minilink.graphical.animation.primitives import (
     Box,
     Circle,
     Point,
-    follow_xy_camera,
     ground_line,
-    identity_matrix,
-    pose2d_matrix,
-    translation_matrix,
 )
 
 
@@ -46,6 +43,7 @@ class Drone2D(MechanicalSystem):
         self.width = 1.0
         self.height = 0.2
         self.camera_scale = 3.0
+        self.camera_follow_frame = "body"
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -93,9 +91,6 @@ class Drone2D(MechanicalSystem):
             ]
         )
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def get_kinematic_geometry(self):
         return {
             "world": [ground_line(length=20.0)],
@@ -105,10 +100,9 @@ class Drone2D(MechanicalSystem):
 
     def tf(self, x, u, t=0, params=None):
         q = x[:3]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
         return {
-            "body": T_body,
-            "center": pose2d_matrix(q[0], q[1], 0.0),
+            "body": SE2(q[0], q[1], q[2]),
+            "center": SE2(q[0], q[1], 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
@@ -185,6 +179,7 @@ class SpeedControlledDrone2D(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
         self.camera_scale = 10.0
+        self.camera_follow_frame = "body"
 
     def f(self, x, u, t=0.0, params=None):
         # the commanded velocity is the position rate directly
@@ -193,14 +188,11 @@ class SpeedControlledDrone2D(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def get_kinematic_geometry(self):
         return {"body": [_drone_body(width=1.0, height=0.18)]}
 
     def tf(self, x, u, t=0, params=None):
-        return {"body": translation_matrix(x[0], x[1], 0.0)}
+        return {"body": translation(x[0], x[1], 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {
@@ -235,6 +227,7 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
 
         # Graphic parameters
         self.camera_scale = 12.0
+        self.camera_follow_frame = "body"
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -246,9 +239,6 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
 
     def h(self, x, u, t=0.0, params=None):
         return x
-
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[2], x[1], self.camera_scale)
 
     def get_kinematic_geometry(self):
         return {
@@ -262,7 +252,7 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
-        return {"body": translation_matrix(x[2], x[1], 0.0)}
+        return {"body": translation(x[2], x[1], 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {

@@ -21,7 +21,6 @@ from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
-    camera_matrix,
 )
 from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
 
@@ -114,7 +113,6 @@ class DynamicBicycle(DynamicSystem):
         # Graphics-only attributes (2-D centerline look)
         self.wheel_len = 0.6
         self.wheel_width = 0.2
-        self.camera_follow_vehicle = True
 
         # Graphics-only attributes for the 3-D four-wheel look (read by
         # ``car_skin_3d`` / ``tf``). They live on the base plant so the 3-D
@@ -262,24 +260,6 @@ class DynamicBicycle(DynamicSystem):
 
     def h(self, x, u, t=0.0, params=None):
         return x.copy()
-
-    def get_camera_transform(self, x, u, t):
-        """Return a camera centered on the vehicle pose by default.
-
-        ``camera_target`` is treated as an offset from the vehicle position
-        when ``camera_follow_vehicle`` is true. Set ``camera_follow_vehicle`` to
-        false to use the base fixed-camera interpretation of ``camera_target``.
-        """
-        target = np.asarray(self.camera_target, dtype=float).reshape(3).copy()
-        if self.camera_follow_vehicle:
-            target[0] += float(x[0])
-            target[1] += float(x[1])
-
-        return camera_matrix(
-            target=target,
-            plot_axes=self.camera_plot_axes,
-            scale=self.camera_scale,
-        )
 
     def _u_in(self, x, u):
         """``[w_rear, delta]`` for the v2 geometry (overridden by the rate variant)."""

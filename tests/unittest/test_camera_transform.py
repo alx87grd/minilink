@@ -10,9 +10,12 @@ matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
+from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation import Animator
+from minilink.graphical.animation.camera import resolve_camera_from_hints
 from minilink.graphical.animation.primitives import (
+    Point,
     camera_matrix,
     world_to_camera,
 )
@@ -70,10 +73,10 @@ class TestCameraMatrix(unittest.TestCase):
         np.testing.assert_allclose(W @ p, [0.0, 0.0, 0.0, 1.0], atol=1e-12)
 
 
-class TestSystemDefaultCamera(unittest.TestCase):
+class TestResolveCameraFromHints(unittest.TestCase):
     def test_default_camera_matches_factory(self):
         s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
-        T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
+        T = resolve_camera_from_hints(s, {}, np.zeros(2), np.zeros(1), 0.0)
         np.testing.assert_array_equal(T, camera_matrix())
 
     def test_camera_attributes_match_camera_matrix(self):
@@ -81,11 +84,39 @@ class TestSystemDefaultCamera(unittest.TestCase):
         s.camera_scale = 2.0
         s.camera_plot_axes = (1, 2)
         s.camera_target[:] = (1.0, -1.0, 0.5)
-        T = s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0)
+        T = resolve_camera_from_hints(s, {}, np.zeros(2), np.zeros(1), 0.0)
         np.testing.assert_array_equal(
             T,
             camera_matrix(target=(1.0, -1.0, 0.5), plot_axes=(1, 2), scale=2.0),
         )
+
+    def test_follow_frame_adds_frame_origin_to_target(self):
+        s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
+        s.camera_follow_frame = "body"
+        s.camera_scale = 4.0
+        frames = {"body": translation(10.0, 3.0, 0.0)}
+        T = resolve_camera_from_hints(s, frames, np.zeros(2), np.zeros(1), 0.0)
+        np.testing.assert_allclose(T[:3, 3], [10.0, 3.0, 0.0])
+        self.assertEqual(T[3, 3], 4.0)
+
+    def test_override_constant_matrix(self):
+        s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
+        override = camera_matrix(target=(5.0, -2.0, 1.0), scale=4.0)
+        T = resolve_camera_from_hints(
+            s, {}, np.zeros(2), np.zeros(1), 0.0, override=override
+        )
+        np.testing.assert_array_equal(T, override)
+
+    def test_override_callable(self):
+        s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
+
+        def custom(frames, x, u, t):
+            return camera_matrix(plot_axes=(0, 2), scale=3.0)
+
+        T = resolve_camera_from_hints(
+            s, {}, np.zeros(2), np.zeros(1), 0.0, override=custom
+        )
+        np.testing.assert_array_equal(T, camera_matrix(plot_axes=(0, 2), scale=3.0))
 
 
 class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
@@ -97,40 +128,34 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
         s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
         a = Animator(s)
         a.show(np.zeros(2), np.zeros(1), 0.0, is_3d=False, renderer="matplotlib")
-        # The animator closes its figure in show(); inspect via a fresh open_scene.
         from minilink.graphical.animation.renderers.matplotlib_renderer import (
             MatplotlibRenderer,
         )
 
         backend = MatplotlibRenderer(a)
-        backend.open_scene(
-            is_3d=False,
-            show=False,
-            camera=s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0),
-        )
+        camera = resolve_camera_from_hints(s, {}, np.zeros(2), np.zeros(1), 0.0)
+        backend.open_scene(is_3d=False, show=False, camera=camera)
         self.assertEqual(backend.ax.get_xlim(), (-10.0, 10.0))
         self.assertEqual(backend.ax.get_ylim(), (-10.0, 10.0))
         self.assertEqual(backend.ax.get_xlabel(), "X")
         self.assertEqual(backend.ax.get_ylabel(), "Y")
         plt.close(backend.fig)
 
-    def test_xy_follow_camera_keeps_2d_geometry_in_world_coordinates(self):
-        from minilink.graphical.animation.primitives import (
-            Point,
-            camera_matrix,
-            translation_matrix,
-        )
+    def test_follow_frame_keeps_2d_geometry_in_world_coordinates(self):
         from minilink.graphical.animation.renderers.matplotlib_renderer import (
             MatplotlibRenderer,
         )
 
         s = DynamicSystem(0)
+        s.camera_follow_frame = "body"
+        s.camera_scale = 4.0
         a = Animator(s)
         backend = MatplotlibRenderer(a)
-        camera = camera_matrix(target=(10.0, 3.0, 0.0), scale=4.0)
+        frames = {"body": translation(10.0, 3.0, 0.0)}
+        camera = resolve_camera_from_hints(s, frames, np.zeros(0), np.zeros(0), 0.0)
 
         backend.open_scene(is_3d=False, show=False, camera=camera)
-        backend.draw_frame([Point()], [translation_matrix(10.0, 3.0, 0.0)], 0.0, camera)
+        backend.draw_frame([Point()], [translation(10.0, 3.0, 0.0)], 0.0, camera)
 
         self.assertEqual(backend.ax.get_xlim(), (6.0, 14.0))
         self.assertEqual(backend.ax.get_ylim(), (-1.0, 7.0))
@@ -141,20 +166,14 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
 
     def test_xz_camera_sets_z_as_vertical_axis(self):
         s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
-        s.get_camera_transform = lambda x, u, t: camera_matrix(
-            plot_axes=(0, 2), scale=3.0
-        )
         a = Animator(s)
         from minilink.graphical.animation.renderers.matplotlib_renderer import (
             MatplotlibRenderer,
         )
 
         backend = MatplotlibRenderer(a)
-        backend.open_scene(
-            is_3d=False,
-            show=False,
-            camera=s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0),
-        )
+        camera = camera_matrix(plot_axes=(0, 2), scale=3.0)
+        backend.open_scene(is_3d=False, show=False, camera=camera)
         self.assertEqual(backend.ax.get_xlim(), (-3.0, 3.0))
         self.assertEqual(backend.ax.get_ylim(), (-3.0, 3.0))
         self.assertEqual(backend.ax.get_xlabel(), "X")
@@ -163,20 +182,14 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
 
     def test_follow_target_shifts_3d_view_box(self):
         s = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
-        s.get_camera_transform = lambda x, u, t: camera_matrix(
-            target=(5.0, -2.0, 1.0), scale=4.0
-        )
         a = Animator(s)
         from minilink.graphical.animation.renderers.matplotlib_renderer import (
             MatplotlibRenderer,
         )
 
         backend = MatplotlibRenderer(a)
-        backend.open_scene(
-            is_3d=True,
-            show=False,
-            camera=s.get_camera_transform(np.zeros(2), np.zeros(1), 0.0),
-        )
+        camera = camera_matrix(target=(5.0, -2.0, 1.0), scale=4.0)
+        backend.open_scene(is_3d=True, show=False, camera=camera)
         self.assertEqual(backend.ax.get_xlim3d(), (1.0, 9.0))
         self.assertEqual(backend.ax.get_ylim3d(), (-6.0, 2.0))
         self.assertEqual(backend.ax.get_zlim3d(), (-3.0, 5.0))

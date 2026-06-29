@@ -19,11 +19,8 @@ from minilink.core.geometry import Sphere
 from minilink.core.sets import BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
-from minilink.graphical.animation.primitives import (
-    Circle,
-    CustomLine,
-    TrajectoryPolyline,
-)
+from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
+from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.robot import sphere
@@ -97,75 +94,6 @@ def _sample_track_boundaries(track, n_samples=TRACK_ANIM_SAMPLES):
 
 def _line3(xy):
     return np.hstack([xy, np.zeros((xy.shape[0], 1))])
-
-
-class HolonomicCorridorScene(HolonomicMobileRobot):
-    """Holonomic robot with reference track, corridor, obstacles, and traj trail."""
-
-    def __init__(self, track, obstacles, executed_traj, *, robot_radius=ROBOT_RADIUS):
-        super().__init__()
-        self.camera_scale = CAMERA_SCALE
-        self._robot_radius = robot_radius
-
-        center, upper, lower = _sample_track_boundaries(track)
-        self._upper = CustomLine(
-            _line3(upper),
-            color="#98df8a",
-            linewidth=1.2,
-            style="-",
-        )
-        self._lower = CustomLine(
-            _line3(lower),
-            color="#98df8a",
-            linewidth=1.2,
-            style="-",
-        )
-        self._centerline = CustomLine(
-            _line3(center),
-            color="#2ca02c",
-            linewidth=2.0,
-            style="-",
-        )
-        self._obstacles = [
-            Circle(
-                radius=obs.radius,
-                center=(obs.center[0], obs.center[1], 0.0),
-                color="tab:red",
-                fill=True,
-            )
-            for obs in obstacles
-        ]
-        self._executed = TrajectoryPolyline(
-            executed_traj,
-            window="prefix",
-            color="#1f77b4",
-            linewidth=2.5,
-            style="-",
-        )
-
-    def get_kinematic_geometry(self):
-        geometry = super().get_kinematic_geometry()
-        geometry["world"] = [
-            self._upper,
-            self._lower,
-            self._centerline,
-            *self._obstacles,
-            *geometry.get("world", []),
-        ]
-        return geometry
-
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        dynamic = super().get_dynamic_geometry(x, u, t)
-        dynamic["world"] = [
-            *dynamic.get("world", []),
-            CustomLine(
-                self._executed.points_at(t),
-                color="#1f77b4",
-                linewidth=2.5,
-                style="-",
-            ),
-        ]
-        return dynamic
 
 
 sys = HolonomicMobileRobot()
@@ -273,6 +201,36 @@ plt.show()
 
 planner.plot_solution(signals=("x", "u"))
 
-anim_sys = HolonomicCorridorScene(track, OBSTACLES, traj, robot_radius=ROBOT_RADIUS)
-anim_sys.traj = traj
-anim_sys.animate()
+# --- Animation ---
+center, upper, lower = _sample_track_boundaries(track)
+history = SceneHistory(
+    upper=CustomLine(
+        _line3(upper),
+        color="#98df8a",
+        linewidth=1.2,
+        style="-",
+    ),
+    lower=CustomLine(
+        _line3(lower),
+        color="#98df8a",
+        linewidth=1.2,
+        style="-",
+    ),
+    centerline=CustomLine(
+        _line3(center),
+        color="#2ca02c",
+        linewidth=2.0,
+        style="-",
+    ),
+    trail=TrajectoryPolyline(
+        traj,
+        window="prefix",
+        color="#1f77b4",
+        linewidth=2.5,
+        style="-",
+    ),
+)
+
+sys.camera_scale = CAMERA_SCALE
+sys.traj = traj
+sys.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history])

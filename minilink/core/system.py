@@ -42,14 +42,16 @@ class System(SystemFacades):
       hints (:attr:`solver_info`).
     - **Visualization contract**: it may describe forward-kinematic geometry
       for rendering and animation (API still under graphical/animation
-      review). Default ``camera_*`` fields configure
-      :meth:`get_camera_transform`.
+      review). Camera hints (``camera_*`` attributes) configure the animator
+      boundary resolver; pass ``animate(camera=...)`` for custom views.
     - **User shortcut façade**: it exposes convenience methods such as
       :meth:`compile`, :meth:`compute_trajectory`, :meth:`render`,
       :meth:`animate`, and :meth:`game`, defined on the
       :class:`~minilink.core.facades.SystemFacades` mixin so this module
       stays focused on the mathematical, structural, and visualization
-      contracts.
+      contracts. Camera hints (``camera_target``, ``camera_plot_axes``,
+      ``camera_scale``, ``camera_follow_frame``) are resolved by the animator;
+      custom views use ``animate(camera=...)``.
 
     Notes on dynamics and purity
     ----------------------------
@@ -112,7 +114,7 @@ class System(SystemFacades):
         # ``compute_trajectory``.
         self.traj = None
 
-        # Standard camera for :meth:`get_camera_transform`.
+        # Standard camera hints (resolved by ``Animator`` via ``camera.py``).
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 10.0
@@ -372,31 +374,6 @@ class System(SystemFacades):
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """Per-frame geometry as ``dict[str, list[primitive]]`` (rebuilt each frame)."""
         return {}
-
-    def get_camera_transform(self, x, u, t):
-        """
-        Return the standard 4x4 camera transform for this system.
-
-        The matrix follows :func:`minilink.graphical.animation.primitives.camera_matrix`:
-        ``T[:3, 3]`` is the look-at target in world, the columns of ``T[:3, :3]``
-        are the world directions of camera-X (plot horizontal), camera-Y
-        (plot vertical), and camera-Z (view-out), and ``T[3, 3]`` is the view
-        scale (orthographic half-extent / perspective camera distance).
-
-        The default matches ``camera_matrix()`` via ``camera_target``,
-        ``camera_plot_axes``, and ``camera_scale`` on ``self``. Edit those
-        attributes for a fixed view, or override this method for a time-varying
-        camera.
-
-        TODO: User Architectural Review (visualization contract under review).
-        """
-        from minilink.graphical.animation.primitives import camera_matrix
-
-        return camera_matrix(
-            target=self.camera_target,
-            plot_axes=self.camera_plot_axes,
-            scale=self.camera_scale,
-        )
 
     # Composition Operators
 

@@ -1,16 +1,13 @@
 import numpy as np
 
+from minilink.core.kinematics import translation
 from minilink.dynamics.abstraction.state_space import StateSpaceSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
-    empty_transform,
     ground_line,
-    identity_matrix,
-    line_between_transform,
-    spring_line,
-    translation_matrix,
 )
+from minilink.graphical.catalog.shapes import spring_between
 
 
 def _mass_box(size=0.5, color="blue", opacity=0.9):
@@ -93,26 +90,20 @@ class SingleMass(StateSpaceSystem):
     def get_kinematic_geometry(self):
         return {
             "world": [ground_line(length=8.0)],
-            "spring": [spring_line()],
             "body": [_mass_box(size=0.6, color="blue")],
         }
 
     def tf(self, x, u, t=0, params=None):
+        return {"body": translation(x[0], 0.0, 0.0)}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         mass_x = x[0]
         anchor = -2.0
         left_face = mass_x - 0.3
-        spring = (
-            line_between_transform([anchor, 0.0], [left_face, 0.0])
-            if self.params["k"] != 0.0
-            else empty_transform()
-        )
-        return {
-            "spring": spring,
-            "body": translation_matrix(mass_x, 0.0, 0.0),
-        }
-
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return {"body": _force_arrow(u[0])}
+        geom = {"body": _force_arrow(u[0])}
+        if self.params["k"] != 0.0:
+            geom["world"] = [spring_between([anchor, 0.0], [left_face, 0.0])]
+        return geom
 
 
 class TwoMass(StateSpaceSystem):
@@ -179,29 +170,25 @@ class TwoMass(StateSpaceSystem):
     def get_kinematic_geometry(self):
         return {
             "world": [ground_line(length=10.0)],
-            "spring1": [spring_line()],
-            "spring2": [spring_line()],
             "body1": [_mass_box(size=0.55, color="green")],
             "body2": [_mass_box(size=0.55, color="blue")],
         }
 
     def tf(self, x, u, t=0, params=None):
         x1, x2 = x[0] - 2.0, x[1]
-        anchor = -4.0
-        spring1 = (
-            line_between_transform([anchor, 0.0], [x1 - 0.3, 0.0])
-            if self.params["k1"] != 0.0
-            else empty_transform()
-        )
         return {
-            "spring1": spring1,
-            "spring2": line_between_transform([x1 + 0.3, 0.0], [x2 - 0.3, 0.0]),
-            "body1": translation_matrix(x1, 0.0, 0.0),
-            "body2": translation_matrix(x2, 0.0, 0.0),
+            "body1": translation(x1, 0.0, 0.0),
+            "body2": translation(x2, 0.0, 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return {"body2": _force_arrow(u[0])}
+        x1, x2 = x[0] - 2.0, x[1]
+        anchor = -4.0
+        springs = []
+        if self.params["k1"] != 0.0:
+            springs.append(spring_between([anchor, 0.0], [x1 - 0.3, 0.0]))
+        springs.append(spring_between([x1 + 0.3, 0.0], [x2 - 0.3, 0.0]))
+        return {"world": springs, "body2": _force_arrow(u[0])}
 
 
 class ThreeMass(StateSpaceSystem):
@@ -275,9 +262,6 @@ class ThreeMass(StateSpaceSystem):
     def get_kinematic_geometry(self):
         return {
             "world": [ground_line(length=12.0)],
-            "spring1": [spring_line()],
-            "spring2": [spring_line()],
-            "spring3": [spring_line()],
             "body1": [_mass_box(size=0.5, color="magenta")],
             "body2": [_mass_box(size=0.5, color="green")],
             "body3": [_mass_box(size=0.5, color="blue")],
@@ -285,23 +269,25 @@ class ThreeMass(StateSpaceSystem):
 
     def tf(self, x, u, t=0, params=None):
         x1, x2, x3 = x[0] - 2.0, x[1], x[2] + 2.0
-        anchor = -4.0
-        spring1 = (
-            line_between_transform([anchor, 0.0], [x1 - 0.28, 0.0])
-            if self.params["k1"] != 0.0
-            else empty_transform()
-        )
         return {
-            "spring1": spring1,
-            "spring2": line_between_transform([x1 + 0.28, 0.0], [x2 - 0.28, 0.0]),
-            "spring3": line_between_transform([x2 + 0.28, 0.0], [x3 - 0.28, 0.0]),
-            "body1": translation_matrix(x1, 0.0, 0.0),
-            "body2": translation_matrix(x2, 0.0, 0.0),
-            "body3": translation_matrix(x3, 0.0, 0.0),
+            "body1": translation(x1, 0.0, 0.0),
+            "body2": translation(x2, 0.0, 0.0),
+            "body3": translation(x3, 0.0, 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return {"body3": _force_arrow(u[0], base=(0.32, 0.0))}
+        x1, x2, x3 = x[0] - 2.0, x[1], x[2] + 2.0
+        anchor = -4.0
+        springs = []
+        if self.params["k1"] != 0.0:
+            springs.append(spring_between([anchor, 0.0], [x1 - 0.28, 0.0]))
+        springs.extend(
+            [
+                spring_between([x1 + 0.28, 0.0], [x2 - 0.28, 0.0]),
+                spring_between([x2 + 0.28, 0.0], [x3 - 0.28, 0.0]),
+            ]
+        )
+        return {"world": springs, "body3": _force_arrow(u[0], base=(0.32, 0.0))}
 
 
 class FloatingSingleMass(SingleMass):

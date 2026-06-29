@@ -7,8 +7,6 @@ from minilink.graphical.animation.primitives import (
     Box,
     Circle,
     Sphere,
-    camera_matrix,
-    follow_xy_camera,
     vehicle_body,
     wheel_box,
 )
@@ -53,9 +51,6 @@ class KinematicBicycle(DynamicSystem):
 
     def h(self, x, u, t=0.0, params=None):
         return x
-
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
 
     def get_kinematic_geometry(self):
         length = self.params["length"]
@@ -193,9 +188,6 @@ class ConstantSpeedKinematicCar(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def get_kinematic_geometry(self):
         return KinematicBicycle.get_kinematic_geometry(self)
 
@@ -231,9 +223,6 @@ class HolonomicMobileRobot(DynamicSystem):
 
     def h(self, x, u, t=0.0, params=None):
         return x
-
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
 
     def get_kinematic_geometry(self):
         return {
@@ -283,13 +272,6 @@ class HolonomicMobileRobot3D(DynamicSystem):
 
     def h(self, x, u, t=0.0, params=None):
         return x
-
-    def get_camera_transform(self, x, u, t):
-        return camera_matrix(
-            target=(x[0], x[1], x[2]),
-            plot_axes=self.camera_plot_axes,
-            scale=self.camera_scale,
-        )
 
     def get_kinematic_geometry(self):
         return {"body": [Sphere(radius=0.25, color="blue", opacity=0.9)]}

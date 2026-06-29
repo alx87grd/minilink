@@ -33,8 +33,8 @@ todos:
     content: "Phase 5: Cutover - delete old, rename _v2, base {} default, hacks, docs. NOTE: DynamicBicycleCar3D stays thin subclass (4-corner dynamic arrows). Automated gate: full pytest + baseline PNGs + grep-clean _v2."
     status: completed
   - id: p6-overlays
-    content: "Phase 6: Scene/SceneHistory/Replay + animate(overlays) + MPC demo cleanup (user architectural review). In progress: drawables.py, Animator overlays, Scene.as_visualizer(), straight-line MPC demo migrated."
-    status: in_progress
+    content: "Phase 6: Scene/SceneHistory/Replay + animate(overlays) + MPC/trajopt demo cleanup (user architectural review). Done: drawables.py, Animator overlays, Scene.as_visualizer(), all rate-MPC demos + holonomic corridor trajopt migrated to composition at animate boundary."
+    status: completed
   - id: p7-collision
     content: "Phase 7: Collision RobotBody convergence onto shared tf dict"
     status: pending
@@ -178,25 +178,18 @@ get_kinematic_geometry :: params : f`. Reject `sys.get_kinematic_geometry = fn`
 
 ## Current status
 
-**Phases 0–2 complete** (branch `refactor-v4`):
+**Phases 0–6 complete** (branch `refactor-v4`):
 
-- **Phase 0** — 36 committed PNG baselines + `manifest.json` +
-  `test_kinematic_regression`.
-- **Phase 1** — additive foundation landed: `core/kinematics.py` (`apply`
-  relocated from `robot.py`), `local_transform` + `points_at` on primitives,
-  honest `shapes_v2` arrows, `visualization.flatten_draw_list`, `animation/camera`
-  resolver + factories, public `graphical/catalog` (shapes + skins), `System.skin`.
-- **Phase 2** — parallel v2 pipeline landed: `_v2` hooks (`tf_v2`,
-  `get_kinematic_geometry_v2` delegating to `skin`, `get_dynamic_geometry_v2`),
-  camera hint attributes, `Animator2`, `render_v2()` / `animate_v2()`, additive
-  honest-primitive branches in all four renderers. Old `Animator` / old hooks /
-  baselines untouched.
+- **Phases 0–5** — kinematic contract cutover: string-keyed `tf` / frame-keyed geometry,
+  honest primitives, camera hints-only, catalog migrated, `_v2` and legacy transform
+  hacks removed from `minilink/`.
+- **Phase 6** — overlay composition at `animate(overlays=[...])`: `SceneHistory`,
+  `Replay`, `Scene.as_visualizer()`; all rate-MPC demos and
+  `demo_holonomic_corridor.py` migrated off plant subclasses.
 
-Full pytest green and ruff clean for the new/edited modules; the old render path
-is byte-for-byte unchanged. **Awaiting User Review 2** before Phase 3.
+Full pytest green. **Awaiting User Review 6** (architectural sign-off on overlay
+demos) before Phase 7 (collision `RobotBody` → shared `tf`).
 
-> Environment note: `test_kinematic_regression` currently shows pre-existing
-> pixel drift on this machine (reproduces with all refactor edits reverted —
-> matplotlib/font rendering differs from where the baselines were committed). It
-> is **not** caused by Phases 1–2; regenerate baselines here if this becomes the
-> canonical environment.
+> Environment note: `test_kinematic_regression` may show pre-existing pixel drift on
+> some machines (matplotlib/font rendering differs from where baselines were
+> committed). Regenerate baselines locally if this becomes the canonical environment.

@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import numpy as np
 
+from minilink.core.kinematics import translation
 from minilink.graphical.animation.primitives import (
     Box,
     Circle,
     CustomLine,
     HorizonPolyline,
     TrajectoryPolyline,
-    translation_matrix,
 )
 from minilink.graphical.animation.visualization import WORLD
 
@@ -146,10 +146,10 @@ def _shape_to_primitives(shape, *, color, opacity):
         center = np.asarray(shape.center, dtype=float)
         if center.size == 2:
             circle = Circle(radius=float(shape.radius), color=color, fill=True)
-            circle.local_transform = translation_matrix(center[0], center[1], 0.0)
+            circle.local_transform = translation(center[0], center[1], 0.0)
             return [circle]
         sphere = Circle(radius=float(shape.radius), color=color, fill=True)
-        sphere.local_transform = translation_matrix(center[0], center[1], center[2])
+        sphere.local_transform = translation(center[0], center[1], center[2])
         return [sphere]
 
     if isinstance(shape, GeomBox):
@@ -164,7 +164,7 @@ def _shape_to_primitives(shape, *, color, opacity):
             color=color,
             opacity=opacity,
         )
-        box.local_transform = translation_matrix(center[0], center[1], center[2] if center.size > 2 else 0.0)
+        box.local_transform = translation(center[0], center[1], center[2] if center.size > 2 else 0.0)
         return [box]
 
     if isinstance(shape, Inflated):

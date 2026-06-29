@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
+from minilink.graphical.animation.camera import resolve_camera_from_hints
 from minilink.graphical.animation.primitives import Arrow
 
 from tests.unittest.graphics_contract_helpers import resolve_draw_frame
@@ -25,8 +26,9 @@ class TestDynamicBicycle(unittest.TestCase):
         sys.camera_scale = 7.0
         x = np.array([10.0, 3.0, 0.25, 4.0, 0.0, 0.0])
         u = np.zeros(sys.m)
+        frames = sys.tf(x, u, 0.0)
 
-        camera = sys.get_camera_transform(x, u, 0.0)
+        camera = resolve_camera_from_hints(sys, frames, x, u, 0.0)
 
         np.testing.assert_allclose(camera[:3, 3], np.array([11.0, 1.0, 0.5]))
         self.assertEqual(camera[3, 3], 7.0)

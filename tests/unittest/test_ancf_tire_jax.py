@@ -19,6 +19,7 @@ from minilink.dynamics.engines.ancf_tire_jax import (  # noqa: E402
     plane_contact_node_forces,
     unpack_ancf_state,
 )
+from minilink.graphical.animation.camera import resolve_camera_from_hints
 from tests.unittest.graphics_contract_helpers import resolve_draw_frame  # noqa: E402
 
 
@@ -106,7 +107,7 @@ class TestANCFTireJax(unittest.TestCase):
 
         frame = resolve_draw_frame(sys, sys.x0, np.zeros(sys.m), 0.0)
         self.assertEqual(len(frame["primitives"]), len(frame["transforms"]))
-        self.assertEqual(len(frame["primitives"]), 3 * model.n_nodes + 1)
+        self.assertEqual(len(frame["primitives"]), 2 * model.n_nodes + 1)
 
     def test_contact_force_vectors_are_visible_in_geometry(self):
         model = make_ancf_tire_model(
@@ -125,11 +126,13 @@ class TestANCFTireJax(unittest.TestCase):
             contact_force_scale=0.01,
             contact_force_threshold=1.0,
         )
-        frames = sys.tf(sys.x0, np.zeros(sys.m), 0.0)
-        force_vectors = np.asarray(
-            [frames[f"arrow{i}"][:3, 0] for i in range(model.n_nodes)]
-        )
-        self.assertGreater(float(np.max(force_vectors[:, 0])), 0.0)
+        dynamic = sys.get_dynamic_geometry(sys.x0, np.zeros(sys.m), 0.0)
+        force_lines = dynamic["world"][model.n_nodes :]
+        spans = [
+            np.linalg.norm(line.pts[-1] - line.pts[0])
+            for line in force_lines
+        ]
+        self.assertGreater(float(np.max(spans)), 0.0)
 
     def test_contact_force_vectors_hide_without_contact(self):
         model = make_ancf_tire_model(n_nodes=8, radius=0.4, mass=4.0)
@@ -139,18 +142,8 @@ class TestANCFTireJax(unittest.TestCase):
             contact_force_scale=0.01,
             contact_force_threshold=1.0,
         )
-        frames = sys.tf(sys.x0, np.zeros(sys.m), 0.0)
-        force_vectors = np.asarray(
-            [frames[f"arrow{i}"][:3, 0] for i in range(model.n_nodes)]
-        )
-        self.assertLess(float(np.max(np.linalg.norm(force_vectors, axis=1))), 1e-6)
-        force_dets = np.asarray(
-            [
-                np.linalg.det(frames[f"arrow{i}"][:3, :3])
-                for i in range(model.n_nodes)
-            ]
-        )
-        self.assertTrue(np.all(force_dets > 0.0))
+        dynamic = sys.get_dynamic_geometry(sys.x0, np.zeros(sys.m), 0.0)
+        self.assertEqual(len(dynamic["world"]), model.n_nodes)
 
     def test_camera_is_fixed_by_default_for_forward_motion(self):
         model = make_ancf_tire_model(n_nodes=8, radius=0.4, mass=4.0)
@@ -159,8 +152,16 @@ class TestANCFTireJax(unittest.TestCase):
         x_shifted = np.asarray(sys.x0).copy()
         x_shifted[: 6 * model.n_nodes].reshape((model.n_nodes, 6))[:, 0] += 1.0
 
-        camera0 = sys.get_camera_transform(sys.x0, np.zeros(sys.m), 0.0)
-        camera1 = sys.get_camera_transform(x_shifted, np.zeros(sys.m), 0.0)
+        camera0 = resolve_camera_from_hints(
+            sys, sys.tf(sys.x0, np.zeros(sys.m), 0.0), sys.x0, np.zeros(sys.m), 0.0
+        )
+        camera1 = resolve_camera_from_hints(
+            sys,
+            sys.tf(x_shifted, np.zeros(sys.m), 0.0),
+            x_shifted,
+            np.zeros(sys.m),
+            0.0,
+        )
         self.assertAlmostEqual(float(camera0[0, 3]), float(camera1[0, 3]))
 
 

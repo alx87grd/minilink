@@ -1,15 +1,12 @@
 import numpy as np
 
+from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     Point,
-    follow_xy_camera,
     ground_line,
-    identity_matrix,
-    pose2d_matrix,
-    translation_matrix,
 )
 
 
@@ -38,6 +35,7 @@ class Rocket(MechanicalSystem):
         self.height = 2.0
         self.dynamic_range = 10.0
         self.camera_scale = self.dynamic_range
+        self.camera_follow_frame = "body"
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -85,9 +83,6 @@ class Rocket(MechanicalSystem):
             ]
         )
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def body_shape(self):
         """Side-view rocket silhouette with the c.g. at the local origin."""
         w = self.width
@@ -113,10 +108,9 @@ class Rocket(MechanicalSystem):
 
     def tf(self, x, u, t=0, params=None):
         q = x[:3]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
         return {
-            "body": T_body,
-            "center": pose2d_matrix(q[0], q[1], 0.0),
+            "body": SE2(q[0], q[1], q[2]),
+            "center": SE2(q[0], q[1], 0.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
@@ -130,7 +124,7 @@ class Rocket(MechanicalSystem):
             color="red",
             linewidth=2,
         )
-        thrust.local_transform = translation_matrix(0.0, -1.0, 0.0)
+        thrust.local_transform = translation(0.0, -1.0, 0.0)
         return {"body": [thrust]}
 
 

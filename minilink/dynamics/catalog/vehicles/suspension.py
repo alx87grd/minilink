@@ -1,15 +1,13 @@
 import numpy as np
 
-from minilink.core.kinematics import identity, translation
+from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
     CustomLine,
-    follow_xy_camera,
-    line_between_transform,
-    spring_line,
 )
+from minilink.graphical.catalog.shapes import spring_between
 
 
 class QuarterCarOnRoughTerrain(DynamicSystem):
@@ -77,19 +75,11 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[2], x[1], self.camera_scale)
-
-    # The spring stays the unit ``spring_line`` posed by a per-frame stretch
-    # transform (``line_between_transform``) carried in ``tf`` — the spring is
-    # meant to stretch, and there is no honest fixed-length primitive for it.
-
     def get_kinematic_geometry(self):
         xs = np.linspace(-5.0, 15.0, 240)
         terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
         return {
             "world": [CustomLine(terrain, color="black", linewidth=1)],
-            "spring": [spring_line(color="black")],
             "body": [
                 Box(
                     length_x=0.8, length_y=0.35, length_z=0.2, color="blue", opacity=0.9
@@ -98,15 +88,16 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
+        mass_y = x[1]
+        return {"body": translation(x[2], mass_y, 0.0)}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         ground = self.z(x[2])
         mass_y = x[1]
         return {
-            "spring": line_between_transform([x[2], ground], [x[2], mass_y - 0.2]),
-            "body": translation(x[2], mass_y, 0.0),
-        }
-
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return {
+            "world": [
+                spring_between([x[2], ground], [x[2], mass_y - 0.2]),
+            ],
             "body": [
                 Arrow(
                     base=(0.5, 0.0),
@@ -115,13 +106,13 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
                     color="red",
                     linewidth=2,
                 )
-            ]
+            ],
         }
 
 
 if __name__ == "__main__":
     sys = QuarterCarOnRoughTerrain()
     sys.x0 = np.array([0.0, 0.0, 0.0])
-    sys.inputs["u"].nominal_value = np.array([5.0])
+    sys.inputs["u"].nominal_value = np.array([1.0])
     sys.compute_trajectory(tf=8.0)
     sys.animate()

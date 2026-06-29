@@ -626,7 +626,7 @@
     ],
     "t": 0.0,
     "file": "single_mass__rest.png",
-    "sha256": "7cfa3e65689673ba8a5fb6dc20697145abfdc1772a5e9e6c391716285748036d"
+    "sha256": "db3d37de7d1cd70603c33e05a57563537733665375a66b3393603bce900ce064"
   },
   {
     "plant": "single_mass",
@@ -643,7 +643,7 @@
     ],
     "t": 0.7,
     "file": "single_mass__pose_a.png",
-    "sha256": "6e22c882be0b394adb5494dfb5c04bc0810e5f439811eb6a58f6e0b97d92e4c8"
+    "sha256": "b03ebe0e7ebb4f5e5c20fe7fc014d7adc573ca90420bcfd48785506291dcd50e"
   },
   {
     "plant": "single_mass",
@@ -660,6 +660,6 @@
     ],
     "t": 1.4,
     "file": "single_mass__pose_b.png",
-    "sha256": "b07a3bd43a069d9e2d7d0853f4776e8068e945b67c1c926811f7f2b3c4941498"
+    "sha256": "2a5179dfbd1a84159d836859777a4048c747b0afd69ff28046324d09a577c020"
   }
 ]

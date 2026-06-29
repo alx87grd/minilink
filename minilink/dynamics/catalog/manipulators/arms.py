@@ -9,9 +9,8 @@ from minilink.graphical.animation.primitives import (
     Rod,
     Sphere,
     TorqueArrow,
-    point_transform,
-    rod_between_transform,
 )
+from minilink.graphical.catalog.shapes import link_pose_3d, point_pose
 
 
 def _planar_joint_positions(q, lengths):
@@ -558,13 +557,13 @@ class ThreeLinkManipulator3D(MechanicalSystem):
             ]
         )
         return {
-            "link0": rod_between_transform(p0, p1),
-            "link1": rod_between_transform(p1, p2),
-            "link2": rod_between_transform(p2, p3),
-            "joint0": point_transform(p0),
-            "joint1": point_transform(p1),
-            "joint2": point_transform(p2),
-            "joint3": point_transform(p3),
+            "link0": link_pose_3d(p0, p1),
+            "link1": link_pose_3d(p1, p2),
+            "link2": link_pose_3d(p2, p3),
+            "joint0": point_pose(p0),
+            "joint1": point_pose(p1),
+            "joint2": point_pose(p2),
+            "joint3": point_pose(p3),
         }
 
 

@@ -24,11 +24,11 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
 from minilink.graphical.animation.primitives import (
-    Circle,
     CustomLine,
     HorizonPolyline,
     TrajectoryPolyline,
 )
+from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.paths import from_waypoints
@@ -397,83 +397,44 @@ fig.tight_layout()
 plt.show()
 
 
-class MpcClosedLoopLapBicycleRate(JaxDynamicBicycleRateInputs):
-    def __init__(
-        self, track, mpc_plans, executed_traj, *, obstacle_centers, keepout_radius
-    ):
-        super().__init__()
-        center, upper, lower = _sample_track_boundaries(track)
-        self._upper = CustomLine(
-            _line3(upper),
-            color="#98df8a",
-            linewidth=1.2,
-            style="-",
-        )
-        self._lower = CustomLine(
-            _line3(lower),
-            color="#98df8a",
-            linewidth=1.2,
-            style="-",
-        )
-        self._centerline = CustomLine(
-            _line3(center),
-            color="#2ca02c",
-            linewidth=2.0,
-            style="-",
-        )
-        self._obstacles = [
-            Circle(
-                radius=keepout_radius,
-                center=(cx, cy, 0.0),
-                color="tab:red",
-                fill=True,
-            )
-            for cx, cy in obstacle_centers
-        ]
-        self._executed = TrajectoryPolyline(
-            executed_traj, window="prefix", color="b", style="--", linewidth=1.0
-        )
-        self._mpc_plan = HorizonPolyline(
-            mpc_plans, color="tab:orange", linewidth=2.0, style="--"
-        )
-
-    def get_kinematic_geometry(self):
-        geometry = super().get_kinematic_geometry()
-        geometry["world"] = [
-            self._upper,
-            self._lower,
-            self._centerline,
-            *self._obstacles,
-            *geometry.get("world", []),
-        ]
-        return geometry
-
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        dynamic = super().get_dynamic_geometry(x, u, t)
-        dynamic["world"] = [
-            *dynamic.get("world", []),
-            CustomLine(
-                self._executed.points_at(t), color="b", style="--", linewidth=1.0
-            ),
-            CustomLine(
-                self._mpc_plan.points_at(t),
-                color="tab:orange",
-                style="--",
-                linewidth=2.0,
-            ),
-        ]
-        return dynamic
-
-
-mpc_anim_sys = MpcClosedLoopLapBicycleRate(
-    loop_track,
-    mpc_plans,
-    traj,
-    obstacle_centers=OBSTACLE_CENTERS,
-    keepout_radius=keepout_radius,
+# --- Animation ---
+center, upper, lower = _sample_track_boundaries(loop_track)
+history = SceneHistory(
+    upper=CustomLine(
+        _line3(upper),
+        color="#98df8a",
+        linewidth=1.2,
+        style="-",
+    ),
+    lower=CustomLine(
+        _line3(lower),
+        color="#98df8a",
+        linewidth=1.2,
+        style="-",
+    ),
+    centerline=CustomLine(
+        _line3(center),
+        color="#2ca02c",
+        linewidth=2.0,
+        style="-",
+    ),
+    trail=TrajectoryPolyline(
+        traj,
+        window="prefix",
+        color="b",
+        style="--",
+        linewidth=1.0,
+    ),
+    horizon=HorizonPolyline(
+        mpc_plans,
+        color="tab:orange",
+        linewidth=2.0,
+        style="--",
+    ),
 )
-mpc_anim_sys.params = dict(sys_sim.params)
-mpc_anim_sys.camera_scale = CAMERA_SCALE
-mpc_anim_sys.traj = traj
-mpc_anim_sys.plot_trajectory(signals=("x", "u"))
-mpc_anim_sys.animate()
+
+sys_sim.params = dict(sys_sim.params)
+sys_sim.camera_scale = CAMERA_SCALE
+sys_sim.traj = traj
+sys_sim.plot_trajectory(signals=("x", "u"))
+sys_sim.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history])

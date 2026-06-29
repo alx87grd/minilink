@@ -7,10 +7,10 @@ import pytest
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation import Animator, make_renderer
+from minilink.core.kinematics import identity, translation
 from minilink.graphical.animation.primitives import (
     Point,
     camera_matrix,
-    translation_matrix,
 )
 from minilink.graphical.animation.renderers.plotly_renderer import (
     PlotlyRenderer,
@@ -115,7 +115,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         )
         backend.draw_frame(
             [Point()],
-            [translation_matrix(10.0, 3.0, 0.0)],
+            [translation(10.0, 3.0, 0.0)],
             0.0,
             camera,
         )
@@ -204,12 +204,12 @@ class TestPlotlyRenderer(unittest.TestCase):
         frames = [
             {
                 "t": 0.0,
-                "transforms": [translation_matrix(0.0, 0.0, 0.0)],
+                "transforms": [identity()],
                 "camera": camera_matrix(target=(0.0, 0.0, 0.0), scale=2.0),
             },
             {
                 "t": 0.1,
-                "transforms": [translation_matrix(10.0, 3.0, 0.0)],
+                "transforms": [translation(10.0, 3.0, 0.0)],
                 "camera": camera_matrix(target=(10.0, 3.0, 0.0), scale=2.0),
             },
         ]

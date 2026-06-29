@@ -24,10 +24,8 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
-    identity_matrix,
-    point_transform,
-    rod_between_transform,
 )
+from minilink.graphical.catalog.shapes import link_pose_3d, point_pose
 
 
 class RotatingCartPole(MechanicalSystem):
@@ -107,18 +105,6 @@ class RotatingCartPole(MechanicalSystem):
         # linear viscous joint damping
         return np.diag([d1, d2]) @ dq
 
-    def get_camera_transform(self, x, u, t):
-        # open on a 3/4 oblique view; the view-out column encodes (elev, azim)
-        # and the interactive 3D toolbar lets the user orbit from there.
-        camera = super().get_camera_transform(x, u, t)
-        elevation, azimuth = np.radians(22.0), np.radians(-60.0)
-        camera[:3, 2] = [
-            np.cos(elevation) * np.cos(azimuth),
-            np.cos(elevation) * np.sin(azimuth),
-            np.sin(elevation),
-        ]
-        return camera
-
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
@@ -157,12 +143,12 @@ class RotatingCartPole(MechanicalSystem):
         p_arm = np.array([l1 * s1, -l1 * c1, 0.0])
         p_tip = p_arm + l2 * np.array([s2 * c1, s2 * s1, c2])
         return {
-            "support": rod_between_transform(p_support, p_pivot),
-            "arm": rod_between_transform(p_pivot, p_arm),
-            "pole": rod_between_transform(p_arm, p_tip),
-            "pivot": point_transform(p_pivot),
-            "armpt": point_transform(p_arm),
-            "tip": point_transform(p_tip),
+            "support": link_pose_3d(p_support, p_pivot),
+            "arm": link_pose_3d(p_pivot, p_arm),
+            "pole": link_pose_3d(p_arm, p_tip),
+            "pivot": point_pose(p_pivot),
+            "armpt": point_pose(p_arm),
+            "tip": point_pose(p_tip),
         }
 
 

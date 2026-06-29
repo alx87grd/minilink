@@ -10,13 +10,10 @@ defined in their own local frame) plus, at every instant, one 4x4 homogeneous
 never know about states or inputs.
 
 Primitives are **honest**: they bake their full point geometry at real world
-size in their own local frame, so the animator just draws them at
-``frames[key] @ local_transform`` like any other polyline — no column-norm
-scale, no ``T[3, 3]`` side-channel. The scaling helpers
-(:func:`scale_pose2d_matrix`, :func:`line_between_transform`) stretch a
-unit-length primitive (e.g. :class:`CustomLine` springs) to a world span by
-posing it with an anisotropic frame, which is a real geometric transform rather
-than a renderer side-channel.
+size in their own local frame, so the animator draws them at
+``frames[key] @ local_transform``. Placement helpers for spans and coils live
+in :mod:`minilink.graphical.catalog.shapes`; rigid pose math lives in
+:mod:`minilink.core.kinematics`.
 
 This module is NumPy-only and safe to import from core kinematic hooks: it
 never pulls in matplotlib or other rendering libraries.
@@ -475,106 +472,7 @@ class TrajectoryPolyline(GraphicPrimitive):
         return self.compute_pts(t)
 
 
-# Transformation Matrix Helpers
-
-
-def translation_matrix(dx=0.0, dy=0.0, dz=0.0):
-    """
-    Generate a 4x4 pure translation matrix.
-
-    Parameters
-    ----------
-    dx, dy, dz : float
-        Translation along the x, y, and z axes.
-
-    Returns
-    -------
-    np.ndarray
-        A 4x4 transformation matrix.
-    """
-    T = np.eye(4)
-    T[0, 3] = dx
-    T[1, 3] = dy
-    T[2, 3] = dz
-    return T
-
-
-def pose2d_matrix(x=0.0, y=0.0, theta=0.0):
-    """
-    Generate a 4x4 transformation matrix for a 2D pose (XY plane).
-
-    Parameters
-    ----------
-    x, y : float
-        Translation in the XY plane.
-    theta : float
-        Rotation around the Z axis in radians.
-
-    Returns
-    -------
-    np.ndarray
-        A 4x4 transformation matrix.
-    """
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = c
-    T[0, 1] = -s
-    T[1, 0] = s
-    T[1, 1] = c
-    T[0, 3] = x
-    T[1, 3] = y
-    return T
-
-
-def rotation_matrix_x(theta=0.0):
-    """Generate a 4x4 rotation matrix about the X axis."""
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[1, 1] = c
-    T[1, 2] = -s
-    T[2, 1] = s
-    T[2, 2] = c
-    return T
-
-
-def rotation_matrix_y(theta=0.0):
-    """Generate a 4x4 rotation matrix about the Y axis."""
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = c
-    T[0, 2] = s
-    T[2, 0] = -s
-    T[2, 2] = c
-    return T
-
-
-def rotation_matrix_z(theta=0.0):
-    """Generate a 4x4 rotation matrix about the Z axis."""
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = c
-    T[0, 1] = -s
-    T[1, 0] = s
-    T[1, 1] = c
-    return T
-
-
-def scale_pose2d_matrix(x=0.0, y=0.0, theta=0.0, scale=1.0):
-    """4x4 matrix: 2-D rotation *theta*, uniform *scale*, translation *(x, y)*.
-
-    Multiplying the rotation columns by *scale* lets renderers stretch
-    unit-length primitives (e.g. :class:`Arrow`) to the desired world size
-    while preserving position and orientation.
-    """
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = scale * c
-    T[0, 1] = scale * (-s)
-    T[1, 0] = scale * s
-    T[1, 1] = scale * c
-    T[0, 3] = x
-    T[1, 3] = y
-    return T
+# Transformation Matrix Helpers (camera + identity only; pose math → core.kinematics)
 
 
 def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0):
@@ -649,65 +547,9 @@ def identity_matrix():
 
 def empty_transform():
     """Transform that parks a primitive far off-screen (used to hide it)."""
-    return translation_matrix(0.0, 0.0, -1000.0)
+    from minilink.core.kinematics import translation
 
-
-def follow_xy_camera(x, y, scale):
-    """Top-down camera centered on world point *(x, y)* with view half-extent *scale*."""
-    return camera_matrix(target=(x, y, 0.0), plot_axes=(0, 1), scale=scale)
-
-
-def heading_from_vector(vx, vy):
-    """Planar heading angle of the vector *(vx, vy)*."""
-    return np.arctan2(vy, vx)
-
-
-def line_between_transform(p0, p1):
-    """Place a unit :class:`CustomLine` so it spans from *p0* to *p1* in the plane."""
-    p0 = np.asarray(p0, dtype=float)
-    p1 = np.asarray(p1, dtype=float)
-    delta = p1 - p0
-    return scale_pose2d_matrix(
-        p0[0],
-        p0[1],
-        heading_from_vector(delta[0], delta[1]),
-        np.hypot(delta[0], delta[1]),
-    )
-
-
-def rod_between_transform(p0, p1):
-    """Pose a unit :class:`Rod` (length along local -y) from *p0* to *p1* in 3-D.
-
-    Builds an orthonormal frame whose y-axis points from *p0* toward *p1*;
-    a reference axis is swapped when nearly parallel to keep the cross
-    products well conditioned.
-    """
-    p0 = np.asarray(p0, dtype=float)
-    p1 = np.asarray(p1, dtype=float)
-    delta = p1 - p0
-    length = np.linalg.norm(delta)
-    T = np.eye(4)
-    T[:3, 3] = p0
-    if length < 1e-12:
-        return T
-
-    y_axis = -delta / length
-    reference = np.array([0.0, 0.0, 1.0])
-    if abs(np.dot(y_axis, reference)) > 0.95:
-        reference = np.array([1.0, 0.0, 0.0])
-    x_axis = np.cross(reference, y_axis)
-    x_axis = x_axis / np.linalg.norm(x_axis)
-    z_axis = np.cross(x_axis, y_axis)
-    T[:3, 0] = x_axis
-    T[:3, 1] = y_axis
-    T[:3, 2] = z_axis
-    return T
-
-
-def point_transform(point):
-    """Translation transform placing a primitive at *point* (z defaults to 0)."""
-    point = np.asarray(point, dtype=float)
-    return translation_matrix(point[0], point[1], point[2] if point.size > 2 else 0.0)
+    return translation(0.0, 0.0, -1000.0)
 
 
 # Ready-Made Shapes And Poses

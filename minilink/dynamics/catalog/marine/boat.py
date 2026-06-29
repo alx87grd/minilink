@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
 )
@@ -8,9 +9,6 @@ from minilink.graphical.animation.primitives import (
     CustomLine,
     Point,
     TorqueArrow,
-    follow_xy_camera,
-    pose2d_matrix,
-    translation_matrix,
 )
 
 
@@ -51,6 +49,7 @@ class Boat2D(GeneralizedMechanicalSystem):
         self.body_length = 2.0 * l_t
         self.body_width = self.params["Afc"]
         self.camera_scale = 3.0 * self.params["loa"]
+        self.camera_follow_frame = "body"
         self.show_hydrodynamic_forces = False
 
     def M(self, q, params=None):
@@ -139,9 +138,6 @@ class Boat2D(GeneralizedMechanicalSystem):
         params = self.params if params is None else params
         return self.damping(v, params)
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def body_shape(self):
         """Top-view hull silhouette with the c.g. at the local origin.
 
@@ -171,11 +167,11 @@ class Boat2D(GeneralizedMechanicalSystem):
     def tf(self, x, u, t=0, params=None):
         q = x[:3]
         l_t = self.params["l_t"]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
+        T_body = SE2(q[0], q[1], q[2])
         return {
             "body": T_body,
-            "center": pose2d_matrix(q[0], q[1], 0.0),
-            "hydrotorque": pose2d_matrix(q[0], q[1], q[2] - np.pi / 2.0),
+            "center": SE2(q[0], q[1], 0.0),
+            "hydrotorque": SE2(q[0], q[1], q[2] - np.pi / 2.0),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
@@ -191,7 +187,7 @@ class Boat2D(GeneralizedMechanicalSystem):
             color="red",
             linewidth=2,
         )
-        thrust.local_transform = translation_matrix(-l_t, 0.0, 0.0)
+        thrust.local_transform = translation(-l_t, 0.0, 0.0)
         dynamic = {"body": [thrust]}
         if self.show_hydrodynamic_forces:
             q = x[:3]
@@ -247,7 +243,7 @@ class Boat2DWithCurrent(Boat2D):
     def tf(self, x, u, t=0, params=None):
         frames = super().tf(x, u, t)
         loa = self.params["loa"]
-        frames["current"] = translation_matrix(x[0] - loa, x[1] + loa, 0.0)
+        frames["current"] = translation(x[0] - loa, x[1] + loa, 0.0)
         return frames
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
@@ -271,12 +267,12 @@ class Boat2DWithCurrent(Boat2D):
 
 if __name__ == "__main__":
     sys = Boat2D()
-    # sys = Boat2DWithCurrent()
-    # sys.show_hydrodynamic_forces = True
+    sys = Boat2DWithCurrent()
+    sys.show_hydrodynamic_forces = True
 
     sys.x0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     sys.compute_forced(
-        lambda t: np.array([1000.0, 50.0 * np.sin(0.5 * t)]),
+        lambda t: np.array([10000.0, 5000.0 * np.sin(0.5 * t)]),
         tf=10.0,
     )
     sys.animate()
