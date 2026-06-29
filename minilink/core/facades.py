@@ -365,7 +365,16 @@ class SystemFacades:
             filename=filename,
         )
 
-    def render(self, x, u, t, is_3d=False, renderer="matplotlib", camera=None):
+    def render(
+        self,
+        x,
+        u,
+        t,
+        is_3d=False,
+        renderer="matplotlib",
+        camera=None,
+        overlays=None,
+    ):
         """
         Convenience shortcut rendering a single frame of the system.
 
@@ -375,7 +384,15 @@ class SystemFacades:
         from minilink.graphical.animation import Animator
 
         animator = Animator(self)
-        return animator.show(x, u, t, is_3d=is_3d, renderer=renderer, camera=camera)
+        return animator.show(
+            x,
+            u,
+            t,
+            is_3d=is_3d,
+            renderer=renderer,
+            camera=camera,
+            overlays=overlays,
+        )
 
     def animate(
         self,
@@ -388,6 +405,7 @@ class SystemFacades:
         scene_title: str | None = None,
         show: bool = True,
         camera=None,
+        overlays=None,
     ):
         """
         Convenience shortcut to animate a trajectory of this system.
@@ -430,6 +448,7 @@ class SystemFacades:
             native=native,
             scene_title=scene_title,
             camera=camera,
+            overlays=overlays,
         )
 
         # For html output, return the IPython.display.HTML object and let the

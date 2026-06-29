@@ -71,3 +71,9 @@ class Scene:
         from minilink.planning.spatial.plotting import plot_scene
 
         return plot_scene(self, **kwargs)
+
+    def as_visualizer(self, **kwargs):
+        """Return a time-only overlay that draws this scene's obstacle skin."""
+        from minilink.graphical.animation.drawables import scene_as_visualizer
+
+        return scene_as_visualizer(self, **kwargs)

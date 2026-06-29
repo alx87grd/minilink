@@ -45,6 +45,7 @@ from minilink.graphical.animation.renderers.timing import (
     trajectory_frame_schedule,
 )
 from minilink.graphical.animation.visualization import flatten_draw_list
+from minilink.graphical.animation.drawables import validate_overlay
 from minilink.graphical.common.environment import prefers_inline_animation
 
 __all__ = [
@@ -104,7 +105,50 @@ class Animator:
     def __init__(self, sys):
         self.sys = sys
 
-    def _resolve_frame(self, x, u, t, *, kinematic, camera_override=None):
+    def __init__(self, sys):
+        self.sys = sys
+        self._overlay_kinematics = {}
+
+    @staticmethod
+    def _coerce_overlays(overlays):
+        if overlays is None:
+            return ()
+        if isinstance(overlays, (list, tuple)):
+            return tuple(overlays)
+        return (overlays,)
+
+    def _resolve_overlay_draw_list(self, overlay, t):
+        validate_overlay(overlay)
+        cache_key = id(overlay)
+        if cache_key not in self._overlay_kinematics:
+            self._overlay_kinematics[cache_key] = overlay.get_kinematic_geometry()
+        kinematic = self._overlay_kinematics[cache_key]
+        frames = overlay.tf(t)
+        dynamic = overlay.get_dynamic_geometry(t)
+        draw_list = flatten_draw_list(frames, kinematic, dynamic)
+        if draw_list:
+            return (list(part) for part in zip(*draw_list))
+        return [], []
+
+    def _merge_overlays(self, frame, overlays, t):
+        overlays = self._coerce_overlays(overlays)
+        if not overlays:
+            return frame
+        primitives = list(frame["primitives"])
+        transforms = list(frame["transforms"])
+        for overlay in overlays:
+            o_primitives, o_transforms = self._resolve_overlay_draw_list(overlay, t)
+            primitives.extend(o_primitives)
+            transforms.extend(o_transforms)
+        return {
+            **frame,
+            "primitives": primitives,
+            "transforms": transforms,
+        }
+
+    def _resolve_frame(
+        self, x, u, t, *, kinematic, camera_override=None, overlays=()
+    ):
         """Resolve one frame to a per-frame ``(primitives, transforms, camera)`` dict."""
         frames = self.sys.tf(x, u, t)
         dynamic = self.sys.get_dynamic_geometry(x, u, t)
@@ -116,7 +160,7 @@ class Animator:
         camera = resolve_camera_from_hints(
             self.sys, frames, x, u, t, override=camera_override
         )
-        return {
+        frame = {
             "x": x,
             "u": u,
             "t": float(t),
@@ -124,13 +168,28 @@ class Animator:
             "transforms": transforms,
             "camera": camera,
         }
+        return self._merge_overlays(frame, overlays, t)
 
-    def show(self, x, u, t=0.0, is_3d=False, renderer="matplotlib", camera=None):
+    def show(
+        self,
+        x,
+        u,
+        t=0.0,
+        is_3d=False,
+        renderer="matplotlib",
+        camera=None,
+        overlays=None,
+    ):
         """Render a single static frame at state *x*, *u*, *t*."""
         backend = make_renderer(renderer, self)
         kinematic = self.sys.get_kinematic_geometry()
         frame = self._resolve_frame(
-            x, u, t, kinematic=kinematic, camera_override=camera
+            x,
+            u,
+            t,
+            kinematic=kinematic,
+            camera_override=camera,
+            overlays=overlays,
         )
         backend.open_scene(
             is_3d=is_3d,
@@ -143,7 +202,7 @@ class Animator:
         backend.close_scene()
         return result
 
-    def _build_frames(self, traj, schedule, *, kinematic, camera_override):
+    def _build_frames(self, traj, schedule, *, kinematic, camera_override, overlays=()):
         frames = []
         for frame_idx in range(schedule.n_frames):
             sim_idx = sim_index_for_frame(frame_idx, schedule)
@@ -152,7 +211,12 @@ class Animator:
             t = traj.t[sim_idx]
             frames.append(
                 self._resolve_frame(
-                    x, u, t, kinematic=kinematic, camera_override=camera_override
+                    x,
+                    u,
+                    t,
+                    kinematic=kinematic,
+                    camera_override=camera_override,
+                    overlays=overlays,
                 )
             )
         return frames
@@ -170,6 +234,7 @@ class Animator:
         native: bool = True,
         scene_title: str | None = None,
         camera=None,
+        overlays=None,
     ):
         """
         Plays back a full simulation trajectory.
@@ -226,7 +291,11 @@ class Animator:
         kinematic = self.sys.get_kinematic_geometry()
         schedule = trajectory_frame_schedule(traj, time_factor_video)
         frames = self._build_frames(
-            traj, schedule, kinematic=kinematic, camera_override=camera
+            traj,
+            schedule,
+            kinematic=kinematic,
+            camera_override=camera,
+            overlays=overlays,
         )
         # Representative primitive list for renderers that read the fixed arg;
         # the matplotlib builder reads each frame's own ``"primitives"``.

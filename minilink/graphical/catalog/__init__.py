@@ -41,6 +41,7 @@ from minilink.graphical.catalog.skins import (
     debug_state_skin,
     merge_skins,
 )
+from minilink.graphical.animation.drawables import Replay, SceneHistory
 
 __all__ = [
     # shapes
@@ -60,6 +61,9 @@ __all__ = [
     "spring_line",
     "vehicle_body",
     "wheel_box",
+    # overlays
+    "Replay",
+    "SceneHistory",
     # skins
     "car_skin_2d",
     "car_skin_3d",

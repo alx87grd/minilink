@@ -31,10 +31,10 @@ todos:
     status: completed
   - id: p5-cutover
     content: "Phase 5: Cutover - delete old, rename _v2, base {} default, hacks, docs. NOTE: DynamicBicycleCar3D stays thin subclass (4-corner dynamic arrows). Automated gate: full pytest + baseline PNGs + grep-clean _v2."
-    status: in_progress
+    status: completed
   - id: p6-overlays
-    content: "Phase 6: Scene/SceneHistory/Replay + animate(overlays) + MPC demo cleanup (user architectural review)"
-    status: pending
+    content: "Phase 6: Scene/SceneHistory/Replay + animate(overlays) + MPC demo cleanup (user architectural review). In progress: drawables.py, Animator overlays, Scene.as_visualizer(), straight-line MPC demo migrated."
+    status: in_progress
   - id: p7-collision
     content: "Phase 7: Collision RobotBody convergence onto shared tf dict"
     status: pending
