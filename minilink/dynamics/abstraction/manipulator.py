@@ -113,9 +113,7 @@ class Manipulator(MechanicalSystem):
             q_guess = np.asarray(q_guess, dtype=float)
         q_guess = q_guess.reshape(-1)
         if p_d.shape != (self.task_dim,):
-            raise ValueError(
-                f"p_d must have shape ({self.task_dim},), got {p_d.shape}"
-            )
+            raise ValueError(f"p_d must have shape ({self.task_dim},), got {p_d.shape}")
         if q_guess.shape != (self.dof,):
             raise ValueError(
                 f"q_guess must have shape ({self.dof},), got {q_guess.shape}"
@@ -144,10 +142,14 @@ class Manipulator(MechanicalSystem):
                 else "least_squares"
             )
         if method not in {"fsolve", "least_squares"}:
-            raise ValueError(f"method must be 'auto', 'fsolve', or 'least_squares', got {method!r}")
+            raise ValueError(
+                f"method must be 'auto', 'fsolve', or 'least_squares', got {method!r}"
+            )
 
         if method == "fsolve":
-            q_sol = np.asarray(fsolve(residual, q_guess, xtol=tol), dtype=float).reshape(-1)
+            q_sol = np.asarray(
+                fsolve(residual, q_guess, xtol=tol), dtype=float
+            ).reshape(-1)
             if np.linalg.norm(residual(q_sol)) > tol * 1e3:
                 raise RuntimeError("inverse_kinematics did not converge")
             return q_sol

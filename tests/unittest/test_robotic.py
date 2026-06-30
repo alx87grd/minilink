@@ -62,7 +62,9 @@ class TestRoboticWrappers(unittest.TestCase):
 
     def test_model_joint_impedance_custom_gravity_hook(self):
         arm = TwoLinkManipulator()
-        ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=lambda q: np.array([1.0, 2.0]))
+        ctl = ModelJointImpedance(
+            arm, gravity_comp=True, gravity=lambda q: np.array([1.0, 2.0])
+        )
         q = np.array([0.2, 0.3])
         u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
         np.testing.assert_allclose(u, [1.0, 2.0])
@@ -96,7 +98,9 @@ class TestRoboticWrappers(unittest.TestCase):
         np.testing.assert_allclose(u, arm.g(q))
 
     def test_task_impedance_closed_loop_qdq(self):
-        diagram = closed_loop_qdq(TaskImpedance(TwoLinkManipulator()), TwoLinkManipulator())
+        diagram = closed_loop_qdq(
+            TaskImpedance(TwoLinkManipulator()), TwoLinkManipulator()
+        )
         self.assertIn("mux", diagram.subsystems)
         self.assertEqual(
             diagram.connections["ctl"]["y"],

@@ -111,14 +111,18 @@ class TestManipulatorCatalog(unittest.TestCase):
             self.assertGreater(geom[f"link{i}"][0].sweep, 0.0)
             np.testing.assert_allclose(
                 geom[f"link{i}"][0].sweep,
-                -tau[i] * (2.0 * np.pi / 3.0) / max(abs(arm.inputs["u"].upper_bound[i]), 1.0),
+                -tau[i]
+                * (2.0 * np.pi / 3.0)
+                / max(abs(arm.inputs["u"].upper_bound[i]), 1.0),
             )
 
     def test_from_manipulator_inherits_kinematics(self):
         source = TwoLinkManipulator()
         speed = SpeedControlledManipulator.from_manipulator(source)
         q = np.array([0.2, -0.1])
-        np.testing.assert_allclose(speed.forward_kinematics(q), source.forward_kinematics(q))
+        np.testing.assert_allclose(
+            speed.forward_kinematics(q), source.forward_kinematics(q)
+        )
         np.testing.assert_allclose(speed.J(q), source.J(q))
         self.assertEqual(speed.n, 2)
         np.testing.assert_allclose(speed.f(q, np.array([0.3, -0.2])), [0.3, -0.2])

@@ -2,10 +2,9 @@
 
 import numpy as np
 
+from minilink.control.impedance import _as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
-
-from minilink.control.impedance import _as_dof_vector
 
 
 class FilteredController(DynamicSystem):

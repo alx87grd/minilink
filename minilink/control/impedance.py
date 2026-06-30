@@ -11,7 +11,9 @@ def _as_dof_vector(value, dof: int):
     if arr.size == 1:
         return np.full(dof, float(arr[0]))
     if arr.size != dof:
-        raise ValueError(f"expected scalar or length-{dof} vector, got shape {arr.shape}")
+        raise ValueError(
+            f"expected scalar or length-{dof} vector, got shape {arr.shape}"
+        )
     return arr
 
 
@@ -192,7 +194,6 @@ class ImpedanceIntegralController(DynamicSystem):
         )
 
     def f(self, x, u, t=0, params=None):
-        xp = array_module(u)
         ref_dim, r, pos, _rate = self._split_measurement(u)
         e_pos = self._position_error(ref_dim, r, pos)
         return e_pos

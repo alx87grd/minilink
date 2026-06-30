@@ -126,7 +126,9 @@ def JointImpedance(
         if dof is not None:
             raise ValueError("pass either a plant or dof=, not both")
         if impedance_kwargs:
-            raise ValueError("plant-based JointImpedance does not accept ImpedanceController kwargs")
+            raise ValueError(
+                "plant-based JointImpedance does not accept ImpedanceController kwargs"
+            )
         return ModelJointImpedance(
             plant_or_dof,
             tracking_ref=tracking_ref,
@@ -248,7 +250,9 @@ class TaskKinematic(StaticSystem):
 
     def __init__(self, plant, *, Kp=None):
         if not hasattr(plant, "forward_kinematics") or not hasattr(plant, "J"):
-            raise TypeError("TaskKinematic requires a plant with forward_kinematics and J")
+            raise TypeError(
+                "TaskKinematic requires a plant with forward_kinematics and J"
+            )
         dof = plant.dof
         task_dim = getattr(plant, "task_dim", plant.effector_dim)
         if dof < task_dim:
@@ -304,7 +308,9 @@ class TaskKinematicNullspace(TaskKinematic):
 
     def __init__(self, plant, *, Kp=None, K_null=None):
         if not hasattr(plant, "forward_kinematics") or not hasattr(plant, "J"):
-            raise TypeError("TaskKinematic requires a plant with forward_kinematics and J")
+            raise TypeError(
+                "TaskKinematic requires a plant with forward_kinematics and J"
+            )
         dof = plant.dof
         task_dim = getattr(plant, "task_dim", plant.effector_dim)
         if dof < task_dim:

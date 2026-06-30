@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 
+from minilink.control.impedance import _as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.system import StaticSystem
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
-
-from minilink.control.impedance import _as_dof_vector
 
 
 class ComputedTorqueController(StaticSystem):
@@ -33,7 +32,9 @@ class ComputedTorqueController(StaticSystem):
         Kd=None,
     ):
         if not isinstance(plant, MechanicalSystem):
-            raise TypeError("ComputedTorqueController requires a MechanicalSystem plant")
+            raise TypeError(
+                "ComputedTorqueController requires a MechanicalSystem plant"
+            )
         super().__init__()
         self.plant = plant
         n = plant.dof

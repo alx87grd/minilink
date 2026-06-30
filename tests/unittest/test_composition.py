@@ -12,6 +12,7 @@ from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
+
 class AugmentedMechanicalPlant(MechanicalSystem):
     """Mechanical plant with extra actuator state in ``x`` (``y = x``)."""
 
@@ -119,11 +120,11 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         )
 
     def test_series_operator_flattens_source_into_closed_loop_diagram(self):
-        diagram = Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
-
-        self.assertEqual(
-            list(diagram.subsystems), ["ref", "ctl", "sys"]
+        diagram = (
+            Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
         )
+
+        self.assertEqual(list(diagram.subsystems), ["ref", "ctl", "sys"])
         self.assertFalse(
             any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
         )
@@ -174,7 +175,9 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertNotIn("u", diagram.inputs)
 
     def test_series_into_closed_loop_without_free_boundary_input_fails(self):
-        diagram = Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
+        diagram = (
+            Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
+        )
 
         with self.assertRaisesRegex(ValueError, "no available boundary input"):
             WhiteNoise() >> diagram
@@ -204,9 +207,9 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["sys"]["u"], ("ref", "y"))
 
     def test_autowire_handles_pendulum_closed_loop_convention(self):
-        diagram = (Step(final_value=[1.0]) + ImpedanceController() + Pendulum()).autowire(
-            strict=True
-        )
+        diagram = (
+            Step(final_value=[1.0]) + ImpedanceController() + Pendulum()
+        ).autowire(strict=True)
 
         self.assertEqual(
             diagram.connections["ctl"]["r"],

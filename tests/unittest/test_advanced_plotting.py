@@ -189,7 +189,9 @@ class TestAdvancedPlotting(unittest.TestCase):
         from minilink.control.impedance import ImpedanceController
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-        diagram = Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
+        diagram = (
+            Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
+        )
 
         self.assertEqual(
             resolve_plot_signals(diagram),

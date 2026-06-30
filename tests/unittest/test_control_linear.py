@@ -6,8 +6,8 @@ import numpy as np
 
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
 from minilink.control.output import ProportionalController
-from minilink.control.state import StateFeedbackController
 from minilink.control.siso import FilteredController
+from minilink.control.state import StateFeedbackController
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
@@ -138,7 +138,10 @@ class TestImpedanceController(unittest.TestCase):
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.0, 0.0, 0.5, 0.1, 0.2, 0.3]))
         np.testing.assert_allclose(
             u,
-            [1.0 * (1.0 - 0.5) + 1.0 * (0.0 - 0.2), 1.0 * (2.0 - 0.1) + 1.0 * (0.0 - 0.3)],
+            [
+                1.0 * (1.0 - 0.5) + 1.0 * (0.0 - 0.2),
+                1.0 * (2.0 - 0.1) + 1.0 * (0.0 - 0.3),
+            ],
         )
 
 
