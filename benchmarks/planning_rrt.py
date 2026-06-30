@@ -188,7 +188,9 @@ def print_rrt_nearest_benchmark(rows, *, seeds):
     print("-" * 96)
     for label, _ in planner_pairs:
         speedups = []
-        for brute_run, kd_run in zip(runs[label]["brute_force"], runs[label]["kd_tree"]):
+        for brute_run, kd_run in zip(
+            runs[label]["brute_force"], runs[label]["kd_tree"]
+        ):
             if brute_run.success and kd_run.success:
                 speedups.append(speedup(brute_run.elapsed_s, kd_run.elapsed_s))
         avg_nodes = np.mean([run.nodes for run in runs[label]["brute_force"]])

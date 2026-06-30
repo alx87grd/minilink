@@ -4,10 +4,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from minilink.core.kinematics import identity, translation
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation import Animator, make_renderer
-from minilink.core.kinematics import identity, translation
 from minilink.graphical.animation.primitives import (
     Point,
     camera_matrix,
@@ -16,14 +16,31 @@ from minilink.graphical.animation.renderers.plotly_renderer import (
     PlotlyRenderer,
     _import_plotly,
 )
+from minilink.graphical.catalog.skins import debug_state_skin
 from minilink.graphical.common.plotly_style import (
     PLOTLY_ANIMATION_2D_MARGIN,
     PLOTLY_ANIMATION_HEIGHT,
     PLOTLY_FIG_WIDTH,
 )
-from minilink.graphical.catalog.skins import debug_state_skin
+from minilink.graphical.signals import (
+    open_time_signal_plot,
+    plot_time_signals,
+)
 
 
+class Integrator(DynamicSystem):
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+
+    def f(self, x, u, t=0, params=None):
+        return np.array([u[0]])
+
+    def h(self, x, u, t=0, params=None):
+        return x
+
+
+@pytest.mark.optional
+@pytest.mark.visualization
 class TestPlotlyRendererOptionalImport(unittest.TestCase):
     def test_import_plotly_reports_extra_when_missing(self):
         try:
@@ -65,6 +82,7 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
 
 
 @pytest.mark.optional
+@pytest.mark.visualization
 class TestPlotlyRenderer(unittest.TestCase):
     def setUp(self):
         pytest.importorskip("plotly")
@@ -132,7 +150,10 @@ class TestPlotlyRenderer(unittest.TestCase):
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         frame = animator._resolve_frame(
-            np.array([0.5]), np.array([1.0]), 0.0, kinematic=sys.get_kinematic_geometry()
+            np.array([0.5]),
+            np.array([1.0]),
+            0.0,
+            kinematic=sys.get_kinematic_geometry(),
         )
 
         backend.open_scene(
@@ -266,6 +287,66 @@ class TestPlotlyRenderer(unittest.TestCase):
             show=False,
         )
         self.assertEqual(len(fig.frames), 2)
+
+
+@pytest.mark.optional
+@pytest.mark.visualization
+class TestPlotlySignalPlot(unittest.TestCase):
+    def test_plotly_static_and_live_update(self):
+        pytest.importorskip("plotly")
+
+        sys = Integrator()
+        traj0 = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 1.0]]),
+            u=np.array([[1.0, 1.0]]),
+        )
+        traj1 = Trajectory(
+            t=np.array([0.0, 1.0]),
+            x=np.array([[0.0, 0.25]]),
+            u=np.array([[0.25, 0.25]]),
+        )
+
+        result = plot_time_signals(
+            sys,
+            traj0,
+            signals=("x", "u"),
+            backend="plotly",
+            show=False,
+        )
+        self.assertEqual(len(result.figure.data), 2)
+        self.assertEqual(result.figure.layout.width, PLOTLY_FIG_WIDTH)
+
+        handle = open_time_signal_plot(
+            sys,
+            traj0,
+            signals=("x", "u"),
+            backend="plotly",
+            show=False,
+        )
+        handle.update(traj1)
+        np.testing.assert_allclose(handle.fig.data[0].y, np.array([0.0, 0.25]))
+
+    def test_stacked_figsize_caps_height_for_popup_layout(self):
+        from minilink.graphical.common.matplotlib_style import (
+            SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP,
+            SIGNAL_PLOT_ROW_HEIGHT,
+            TRAJECTORY_MAX_FIG_HEIGHT_POPUP,
+            TRAJECTORY_ROW_HEIGHT,
+            signal_stack_figsize,
+            trajectory_stack_figsize,
+        )
+
+        n = 20
+        _, h_tall = trajectory_stack_figsize(n, allow_tall=True)
+        self.assertEqual(h_tall, TRAJECTORY_ROW_HEIGHT * n)
+        _, h_cap = trajectory_stack_figsize(n, allow_tall=False)
+        self.assertEqual(h_cap, TRAJECTORY_MAX_FIG_HEIGHT_POPUP)
+
+        _, h_sig = signal_stack_figsize(n, allow_tall=True)
+        self.assertEqual(h_sig, SIGNAL_PLOT_ROW_HEIGHT * n)
+        _, h_sig_cap = signal_stack_figsize(n, allow_tall=False)
+        self.assertEqual(h_sig_cap, SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP)
 
 
 if __name__ == "__main__":

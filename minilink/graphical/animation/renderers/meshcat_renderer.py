@@ -323,7 +323,6 @@ class MeshcatCanvas:
                 self._geom_keys[i] = key
 
     def update_primitive(self, i: int, primitive, transform_matrix):
-        g = self._g
         path = self._base_path(i)
 
         if isinstance(primitive, Point):

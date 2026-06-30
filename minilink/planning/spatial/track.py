@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
-from minilink.planning.spatial.paths import ReferencePath
 from minilink.planning.spatial.collision import CollisionBody
+from minilink.planning.spatial.paths import ReferencePath
 
 if TYPE_CHECKING:
     from minilink.planning.spatial.state_fields import StateField

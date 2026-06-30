@@ -72,7 +72,9 @@ def run_quadratic_regulator():
     trajectory = diagram.compute_trajectory(tf=20.0)
     diagram.plot_trajectory(trajectory)
 
-    policy_ax.plot(trajectory.x[0], trajectory.x[1], "k-", linewidth=2, label="closed loop")
+    policy_ax.plot(
+        trajectory.x[0], trajectory.x[1], "k-", linewidth=2, label="closed loop"
+    )
     policy_ax.plot(trajectory.x[0, 0], trajectory.x[1, 0], "go", label="start")
     policy_ax.plot(
         trajectory.x[0, -1], trajectory.x[1, -1], "r*", markersize=12, label="end"
@@ -121,11 +123,15 @@ def run_minimum_time():
     trajectory = diagram.compute_trajectory(tf=8.0)
     diagram.plot_trajectory(trajectory)
 
-    policy_ax.plot(trajectory.x[0], trajectory.x[1], "k-", linewidth=2, label="closed loop")
+    policy_ax.plot(
+        trajectory.x[0], trajectory.x[1], "k-", linewidth=2, label="closed loop"
+    )
     policy_ax.plot(trajectory.x[0, 0], trajectory.x[1, 0], "go", label="start")
     policy_ax.legend(loc="upper right", fontsize=8)
 
-    print("predicted time-to-go from start:", round(result.value_at([1.2, 0.0]), 2), "s")
+    print(
+        "predicted time-to-go from start:", round(result.value_at([1.2, 0.0]), 2), "s"
+    )
     print("final state:", np.round(trajectory.x[:, -1], 3))
 
 

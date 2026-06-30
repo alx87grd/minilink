@@ -7,8 +7,7 @@ The one-stop import surface for demos and student plants, mirroring
     from minilink.graphical.catalog import follow_frame_camera, fixed_camera
 
 Classes and functions live in the internal ``graphical/animation/`` band; this
-package is the friendly re-export. The honest ``Arrow`` / ``TorqueArrow`` (v2)
-are exposed here under those names — never the legacy column-norm-scaling ones.
+package is the friendly re-export.
 """
 
 from minilink.graphical.animation.camera import (
@@ -17,6 +16,7 @@ from minilink.graphical.animation.camera import (
     follow_frame_camera,
     world_to_camera,
 )
+from minilink.graphical.animation.drawables import Replay, SceneHistory
 from minilink.graphical.catalog.shapes import (
     Arrow,
     Box,
@@ -46,7 +46,6 @@ from minilink.graphical.catalog.skins import (
     debug_state_skin,
     merge_skins,
 )
-from minilink.graphical.animation.drawables import Replay, SceneHistory
 
 __all__ = [
     # shapes

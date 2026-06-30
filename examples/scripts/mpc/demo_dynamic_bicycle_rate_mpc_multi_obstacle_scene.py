@@ -19,6 +19,7 @@ After the closed-loop run, ``scene.plot()`` shows all obstacles with the
 executed ``(x, y)`` trajectory overlaid (matplotlib imported lazily).
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.core.backends import configure_jax
@@ -220,7 +221,6 @@ _, ax = scene.plot(
 )
 ax.plot(traj.x[0, :], traj.x[1, :], color="tab:blue", linewidth=1.5, label="executed")
 ax.legend(loc="upper left")
-import matplotlib.pyplot as plt
 
 plt.show()
 
@@ -254,4 +254,6 @@ sys_sim.params = dict(sys_sim.params)
 sys_sim.camera_scale = CAMERA_SCALE
 sys_sim.traj = traj
 sys_sim.plot_trajectory(signals=("x", "u"))
-sys_sim.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history])
+sys_sim.animate(
+    traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history]
+)

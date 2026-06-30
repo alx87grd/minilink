@@ -1,4 +1,4 @@
-"""Shared helpers for canonical graphics contract tests (tf + _resolve_frame)."""
+"""Shared helpers for graphics contract tests (tf + Animator frame resolution)."""
 
 from __future__ import annotations
 
@@ -28,4 +28,6 @@ def geometry_smoke(system, x=None, u=None, t=0.0):
 
 def resolved_primitive_count(system, primitive_type, x=None, u=None, t=0.0):
     frame = resolve_draw_frame(system, x, u, t)
-    return sum(isinstance(primitive, primitive_type) for primitive in frame["primitives"])
+    return sum(
+        isinstance(primitive, primitive_type) for primitive in frame["primitives"]
+    )

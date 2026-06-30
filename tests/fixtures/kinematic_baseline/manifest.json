@@ -17,9 +17,7 @@
       0.0,
       0.0
     ],
-    "t": 0.0,
-    "file": "dynamic_bicycle__rest.png",
-    "sha256": "9540653887c3a7d9ff9f9f5f39d8de4d1b32576c988f1a21d83dbed70be86062"
+    "t": 0.0
   },
   {
     "plant": "dynamic_bicycle",
@@ -39,9 +37,7 @@
       0.2450166444603104,
       0.15540249206766613
     ],
-    "t": 0.7,
-    "file": "dynamic_bicycle__pose_a.png",
-    "sha256": "3fc464b8e0729518e75e1777046a9e1269e4bcb2a1a7f01617e9b1ce04d85f21"
+    "t": 0.7
   },
   {
     "plant": "dynamic_bicycle",
@@ -61,9 +57,7 @@
       0.3916634548137417,
       0.49272486499423007
     ],
-    "t": 1.4,
-    "file": "dynamic_bicycle__pose_b.png",
-    "sha256": "5256f9dd911665865876948ed90c0a7990525b4a07bda6773ae497053a2a0ffa"
+    "t": 1.4
   },
   {
     "plant": "dynamic_bicycle_car3d",
@@ -83,9 +77,7 @@
       0.0,
       0.0
     ],
-    "t": 0.0,
-    "file": "dynamic_bicycle_car3d__rest.png",
-    "sha256": "8234004adcf955592ff11ce91454c0d0c2758ff7ae440b586e25114c04279714"
+    "t": 0.0
   },
   {
     "plant": "dynamic_bicycle_car3d",
@@ -105,9 +97,7 @@
       0.2450166444603104,
       0.15540249206766613
     ],
-    "t": 0.7,
-    "file": "dynamic_bicycle_car3d__pose_a.png",
-    "sha256": "bab613d3e194cfb93854251cf9f60cad8e0c46d2d70bf27c5e60b6d4dcfc0e3b"
+    "t": 0.7
   },
   {
     "plant": "dynamic_bicycle_car3d",
@@ -127,9 +117,7 @@
       0.3916634548137417,
       0.49272486499423007
     ],
-    "t": 1.4,
-    "file": "dynamic_bicycle_car3d__pose_b.png",
-    "sha256": "0d5e4dee899b690275fc1ebd8d8f7076267d8f46ad03151ad66a8ad9edc1e162"
+    "t": 1.4
   },
   {
     "plant": "kinematic_bicycle",
@@ -146,9 +134,7 @@
       0.0,
       0.0
     ],
-    "t": 0.0,
-    "file": "kinematic_bicycle__rest.png",
-    "sha256": "246744013e4674222b91d9439bb541c0b3a69185cbefb467748f443b6b9ac25a"
+    "t": 0.0
   },
   {
     "plant": "kinematic_bicycle",
@@ -165,9 +151,7 @@
       0.2450166444603104,
       0.15540249206766613
     ],
-    "t": 0.7,
-    "file": "kinematic_bicycle__pose_a.png",
-    "sha256": "518b36902757e737b6c120f5daea5ae8ffeb810add25448fed6d69f5d04b15fe"
+    "t": 0.7
   },
   {
     "plant": "kinematic_bicycle",
@@ -184,9 +168,7 @@
       0.3916634548137417,
       0.49272486499423007
     ],
-    "t": 1.4,
-    "file": "kinematic_bicycle__pose_b.png",
-    "sha256": "ef05c9da861aee21404253671c97e15baac5db22d12a8074141351ac03fb0390"
+    "t": 1.4
   },
   {
     "plant": "holonomic_mobile_robot",
@@ -202,9 +184,7 @@
       0.0,
       0.0
     ],
-    "t": 0.0,
-    "file": "holonomic_mobile_robot__rest.png",
-    "sha256": "d135aeced02119ee241593df85517179c41edc57f96fc60a9757381d0adfbb19"
+    "t": 0.0
   },
   {
     "plant": "holonomic_mobile_robot",
@@ -220,9 +200,7 @@
       0.2450166444603104,
       0.15540249206766613
     ],
-    "t": 0.7,
-    "file": "holonomic_mobile_robot__pose_a.png",
-    "sha256": "e4e261462cae8f25cf735f144ea1f53d3bd6cd3a8e082c336801ee0ec8713357"
+    "t": 0.7
   },
   {
     "plant": "holonomic_mobile_robot",
@@ -238,9 +216,7 @@
       0.3916634548137417,
       0.49272486499423007
     ],
-    "t": 1.4,
-    "file": "holonomic_mobile_robot__pose_b.png",
-    "sha256": "395bfae6acc6dbea7c5cadb45f5285a583c78bca15ce9862276837b35db2ea30"
+    "t": 1.4
   },
   {
     "plant": "pendulum",
@@ -255,9 +231,7 @@
     "u": [
       0.0
     ],
-    "t": 0.0,
-    "file": "pendulum__rest.png",
-    "sha256": "a54423ccb2397e9bbe71a1b5ac7fabfd82a621a00822465ed3ea34733e1e807d"
+    "t": 0.0
   },
   {
     "plant": "pendulum",
@@ -272,9 +246,7 @@
     "u": [
       0.2450166444603104
     ],
-    "t": 0.7,
-    "file": "pendulum__pose_a.png",
-    "sha256": "000b270ff3b499cf37b0912f06f4dedeb4d98ee8f83dad213b7ca9979b1e8cc7"
+    "t": 0.7
   },
   {
     "plant": "pendulum",
@@ -289,9 +261,7 @@
     "u": [
       0.3916634548137417
     ],
-    "t": 1.4,
-    "file": "pendulum__pose_b.png",
-    "sha256": "d5804942593afc882c3b90c14d6e7bbdb9637d3f71c827b0f72a369461972f9a"
+    "t": 1.4
   },
   {
     "plant": "cartpole",
@@ -308,9 +278,7 @@
     "u": [
       0.0
     ],
-    "t": 0.0,
-    "file": "cartpole__rest.png",
-    "sha256": "f561e758ba4384f3855fa7d6da08dc0815989b8011162254777b8f072e66d3aa"
+    "t": 0.0
   },
   {
     "plant": "cartpole",
@@ -327,9 +295,7 @@
     "u": [
       0.2450166444603104
     ],
-    "t": 0.7,
-    "file": "cartpole__pose_a.png",
-    "sha256": "e912ba4c748bef224da19e9b772b98063a76e9a321aa93d24a2d0dabfaca14ba"
+    "t": 0.7
   },
   {
     "plant": "cartpole",
@@ -346,9 +312,7 @@
     "u": [
       0.3916634548137417
     ],
-    "t": 1.4,
-    "file": "cartpole__pose_b.png",
-    "sha256": "5ac9b43041cbf8ca453b7ed03b9ef3c918750591788fa85de1ab44c733334512"
+    "t": 1.4
   },
   {
     "plant": "two_link_manipulator",
@@ -366,9 +330,7 @@
       0.0,
       0.0
     ],
-    "t": 0.0,
-    "file": "two_link_manipulator__rest.png",
-    "sha256": "92be09445cbb386ad15c0200a50abaa5d58ace7bf757f6a4dd6c72f71fb71d71"
+    "t": 0.0
   },
   {
     "plant": "two_link_manipulator",
@@ -386,9 +348,7 @@
       0.2450166444603104,
       0.15540249206766613
     ],
-    "t": 0.7,
-    "file": "two_link_manipulator__pose_a.png",
-    "sha256": "1e42bcdbda02ae35a30489517393cd016219981723b80c94864e545a9ec03f87"
+    "t": 0.7
   },
   {
     "plant": "two_link_manipulator",
@@ -406,9 +366,7 @@
       0.3916634548137417,
       0.49272486499423007
     ],
-    "t": 1.4,
-    "file": "two_link_manipulator__pose_b.png",
-    "sha256": "0a49e6a94e6206e53ac346b8456115ff19605df5f46b0982922abdb7af425142"
+    "t": 1.4
   },
   {
     "plant": "five_link_planar_manipulator",
@@ -435,9 +393,7 @@
       0.0,
       0.0
     ],
-    "t": 0.0,
-    "file": "five_link_planar_manipulator__rest.png",
-    "sha256": "da8d98bd17ac738aba7b8ac4df94d75d76993a7901fc413ef08e748288239711"
+    "t": 0.0
   },
   {
     "plant": "five_link_planar_manipulator",
@@ -464,9 +420,7 @@
       -0.16656900531995603,
       -0.24749812415011135
     ],
-    "t": 0.7,
-    "file": "five_link_planar_manipulator__pose_a.png",
-    "sha256": "a274919a2c52944dff36312d6cb8d553faa253dfa970ce2a679aaa6036859835"
+    "t": 0.7
   },
   {
     "plant": "five_link_planar_manipulator",
@@ -490,12 +444,10 @@
       0.3916634548137417,
       0.49272486499423007,
       0.47315004384370724,
-      0.33773159027557553,
+      0.3377315902755755,
       0.11962466460699121
     ],
-    "t": 1.4,
-    "file": "five_link_planar_manipulator__pose_b.png",
-    "sha256": "2adc210f266e94f61c08e8b3714ad2be353e0532f881e35800199f8be3b56437"
+    "t": 1.4
   },
   {
     "plant": "drone2d",
@@ -515,9 +467,7 @@
       0.0,
       0.0
     ],
-    "t": 0.0,
-    "file": "drone2d__rest.png",
-    "sha256": "e9c105c4db4c702bd6644979cc1d536f765b365b8e8b7e42aa2e181b401c09e5"
+    "t": 0.0
   },
   {
     "plant": "drone2d",
@@ -537,9 +487,7 @@
       0.2450166444603104,
       0.15540249206766613
     ],
-    "t": 0.7,
-    "file": "drone2d__pose_a.png",
-    "sha256": "ca9f46a0a685a07e5bb0afe3e05f30f89a72a6117afbe7a19b122a2706c68724"
+    "t": 0.7
   },
   {
     "plant": "drone2d",
@@ -559,9 +507,7 @@
       0.3916634548137417,
       0.49272486499423007
     ],
-    "t": 1.4,
-    "file": "drone2d__pose_b.png",
-    "sha256": "f32c18d0bed8745c7a8c22621157ef0a8f885531ecfd043477229cd2d4157842"
+    "t": 1.4
   },
   {
     "plant": "simple_integrator",
@@ -575,9 +521,7 @@
     "u": [
       0.0
     ],
-    "t": 0.0,
-    "file": "simple_integrator__rest.png",
-    "sha256": "07f966dd045f5e3a30156b15dad7d80e7affd48b729de29e6ff6496113c145cc"
+    "t": 0.0
   },
   {
     "plant": "simple_integrator",
@@ -591,9 +535,7 @@
     "u": [
       0.2450166444603104
     ],
-    "t": 0.7,
-    "file": "simple_integrator__pose_a.png",
-    "sha256": "f631389b27740dbe11329ce5c45bd5c64ca388eb618b5432fd6369b0dc57204c"
+    "t": 0.7
   },
   {
     "plant": "simple_integrator",
@@ -607,9 +549,7 @@
     "u": [
       0.3916634548137417
     ],
-    "t": 1.4,
-    "file": "simple_integrator__pose_b.png",
-    "sha256": "89457a74069a7689e6ba3dfb0d7799785199fcfb9e1e0372997b11d20f6bfaff"
+    "t": 1.4
   },
   {
     "plant": "single_mass",
@@ -624,9 +564,7 @@
     "u": [
       0.0
     ],
-    "t": 0.0,
-    "file": "single_mass__rest.png",
-    "sha256": "db3d37de7d1cd70603c33e05a57563537733665375a66b3393603bce900ce064"
+    "t": 0.0
   },
   {
     "plant": "single_mass",
@@ -641,9 +579,7 @@
     "u": [
       0.2450166444603104
     ],
-    "t": 0.7,
-    "file": "single_mass__pose_a.png",
-    "sha256": "b03ebe0e7ebb4f5e5c20fe7fc014d7adc573ca90420bcfd48785506291dcd50e"
+    "t": 0.7
   },
   {
     "plant": "single_mass",
@@ -658,8 +594,6 @@
     "u": [
       0.3916634548137417
     ],
-    "t": 1.4,
-    "file": "single_mass__pose_b.png",
-    "sha256": "2a5179dfbd1a84159d836859777a4048c747b0afd69ff28046324d09a577c020"
+    "t": 1.4
   }
 ]

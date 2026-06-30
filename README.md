@@ -366,6 +366,8 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Plotting | `examples/scripts/plots/` |
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
+| Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` |
+| MPC (rate-MPC bicycle demos; obstacle preset: `demo_dynamic_bicycle_rate_mpc_obstacle.py [small\|large]`) | `examples/scripts/mpc/` |
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |
@@ -377,6 +379,8 @@ Catalog plants live under `minilink.dynamics.catalog.*`.
 
 - [DESIGN.md](DESIGN.md) — principles and contracts
 - [ROADMAP.md](ROADMAP.md) — maturity and priorities
+- [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 living backlog (migration guide TBD)
+- [docs/plans/](docs/plans/) — design backlog and archived migration notes
 - [agent.md](agent.md) — maintainer / agent rules
 
 Design rules: NumPy baseline, explicit JAX; native-array equation paths;

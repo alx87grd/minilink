@@ -108,9 +108,7 @@ class CorridorMarginField(StateField):
         m = []
         for world, radius in iter_probes(self.body, x, u, t, params):
             m.append(
-                track.half_width
-                - track.distance(world, t=t, params=params)
-                - radius
+                track.half_width - track.distance(world, t=t, params=params) - radius
             )
 
         return xp.min(xp.stack(m))

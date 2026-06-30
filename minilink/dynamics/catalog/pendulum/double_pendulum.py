@@ -13,7 +13,7 @@ the same sweep scaling as the tutorial single pendulum in ``pendulum.py``.
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.kinematics import SE2, identity
+from minilink.core.kinematics import SE2
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,

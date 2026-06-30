@@ -286,10 +286,10 @@ placement with scene queries (`clearance_field`, `cost_field`). Export separatel
 density over body probes). **Collision reuse:** frameless geometry (`disc`,
 `car_outline`, `point_probe`) binds to the **planner** plant with
 `bind(sys, geometry, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
-via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Legacy
-state-indexed :func:`~minilink.planning.spatial.collision.sphere` / :func:`~minilink.planning.spatial.collision.car`
-remain for tests. Shape an obstacle term before weighting with
-obstacle term before weighting with `as_cost(shaping=...)` (`shaping.occupancy`,
+via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Frameless
+geometry: :func:`~minilink.planning.spatial.collision.disc`,
+:func:`~minilink.planning.spatial.collision.point_probe`,
+:func:`~minilink.planning.spatial.collision.car_outline`. Shape obstacles with
 `quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
 obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.
@@ -323,8 +323,7 @@ the best goal cost stops improving for `convergence_patience` extensions;
 ``live_plot_after_goal_only`` limits updates to the RRT* post-goal convergence phase.
 ``RRTOptions.nearest_backend`` selects brute-force or SciPy ``cKDTree`` nearest/near
 queries (Euclidean L2 only — requires ``metric=euclidean``); see
-``benchmarks/run_rrt_nearest_backends.py`` and
-``examples/scripts/planning/demo_rrt_kdtree_speed_double_pendulum.py``. Modest
+``benchmarks/run_rrt_nearest_backends.py``. Modest
 speedups on low-D obstacle scenes are expected when collision checking and
 post-goal tree scans dominate.
 

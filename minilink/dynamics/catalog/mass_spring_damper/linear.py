@@ -28,9 +28,7 @@ def _force_arrow(force, base=(0.35, 0.0)):
         theta = 0.0 if force >= 0.0 else np.pi
         length = 0.3 * abs(force)
     d = np.array([np.cos(theta), np.sin(theta)])
-    return [
-        Arrow(base=base, vector=d, scale=length, color="red", linewidth=2)
-    ]
+    return [Arrow(base=base, vector=d, scale=length, color="red", linewidth=2)]
 
 
 def _mass_output_matrix(count, output_mass):

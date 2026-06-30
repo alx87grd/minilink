@@ -79,9 +79,7 @@ class TestDiagramSharedWorld(unittest.TestCase):
     def test_subsystem_world_geometry_merges_under_shared_world(self):
         diagram = DiagramSystem()
         diagram.add_subsystem(WorldOnlyPlant(), "marker")
-        geom = diagram.get_dynamic_geometry(
-            np.zeros(diagram.n), np.zeros(diagram.m)
-        )
+        geom = diagram.get_dynamic_geometry(np.zeros(diagram.n), np.zeros(diagram.m))
         self.assertIn("world", geom)
         self.assertNotIn("marker:world", geom)
         self.assertEqual(len(geom["world"]), 1)
@@ -124,9 +122,7 @@ class TestDiagramSharedWorld(unittest.TestCase):
         diagram = DiagramSystem()
         diagram.add_subsystem(WorldLineA(), "a")
         diagram.add_subsystem(WorldLineB(), "b")
-        geom = diagram.get_dynamic_geometry(
-            np.zeros(diagram.n), np.zeros(diagram.m)
-        )
+        geom = diagram.get_dynamic_geometry(np.zeros(diagram.n), np.zeros(diagram.m))
         self.assertEqual(len(geom["world"]), 2)
         frame = resolve_draw_frame(diagram, np.zeros(diagram.n), np.zeros(diagram.m))
         self.assertEqual(len(frame["primitives"]), 2)
@@ -161,9 +157,7 @@ class TestOverlayImplicitWorld(unittest.TestCase):
             reference=CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="k")
         )
         self.assertEqual(history.tf(), {})
-        draw_list = flatten_draw_list(
-            history.tf(), history.get_kinematic_geometry()
-        )
+        draw_list = flatten_draw_list(history.tf(), history.get_kinematic_geometry())
         self.assertEqual(len(draw_list), 1)
 
 

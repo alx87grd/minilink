@@ -29,6 +29,7 @@ import warnings
 import numpy as np
 
 from minilink.graphical.animation.camera import resolve_camera_from_hints
+from minilink.graphical.animation.drawables import validate_overlay
 from minilink.graphical.animation.interactive import (
     draw_keyboard_input_overlay,
     u_from_keyboard,
@@ -44,8 +45,10 @@ from minilink.graphical.animation.renderers.timing import (
     sim_index_for_frame,
     trajectory_frame_schedule,
 )
-from minilink.graphical.animation.visualization import flatten_draw_list, ensure_world_frame
-from minilink.graphical.animation.drawables import validate_overlay
+from minilink.graphical.animation.visualization import (
+    ensure_world_frame,
+    flatten_draw_list,
+)
 from minilink.graphical.common.environment import prefers_inline_animation
 
 __all__ = [
@@ -104,9 +107,6 @@ class Animator:
 
     def __init__(self, sys):
         self.sys = sys
-
-    def __init__(self, sys):
-        self.sys = sys
         self._overlay_kinematics = {}
 
     @staticmethod
@@ -146,9 +146,7 @@ class Animator:
             "transforms": transforms,
         }
 
-    def _resolve_frame(
-        self, x, u, t, *, kinematic, camera_override=None, overlays=()
-    ):
+    def _resolve_frame(self, x, u, t, *, kinematic, camera_override=None, overlays=()):
         """Resolve one frame to a per-frame ``(primitives, transforms, camera)`` dict."""
         frames = ensure_world_frame(self.sys.tf(x, u, t))
         dynamic = self.sys.get_dynamic_geometry(x, u, t)
@@ -297,8 +295,7 @@ class Animator:
             camera_override=camera,
             overlays=overlays,
         )
-        # Representative primitive list for renderers that read the fixed arg;
-        # the matplotlib builder reads each frame's own ``"primitives"``.
+        # First frame's primitives as a representative list for APIs that need one.
         primitives = frames[0]["primitives"] if frames else []
 
         if html:

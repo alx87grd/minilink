@@ -274,7 +274,6 @@ class RRTPlanner(Planner):
             return edge.states
 
         states = np.asarray(edge.states, dtype=float)
-        times = np.asarray(edge.times, dtype=float)
         if states.shape[0] < 2:
             return states
 

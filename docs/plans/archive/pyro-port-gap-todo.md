@@ -362,7 +362,7 @@ Recorded minilink decisions that conflict with pyro features:
 
 27. [ ] Public export policy (`minilink/__init__.py`)
 28. [ ] Compile evaluator API review (TRL 4 → 7)
-29. [ ] Graphics kinematic composition refactor (ROADMAP review queue)
+29. [x] Graphics kinematic composition refactor (frame-keyed ``tf`` / geometry contract)
 30. [ ] Document pyro → minilink API mapping (README migration guide)
 31. [ ] TRL 8 demos for each major tool band
 32. [ ] Full pytest coverage for ported tools
@@ -413,4 +413,4 @@ Treat pyro 2.0 (minilink) as **feature-complete** when:
    params-gradient workflow shown in pyro's parameter-ID examples.
 6. README includes a **pyro migration guide** (API mapping table).
 
-Until then, use this file as the master unchecked todo.
+**Superseded** — living backlog: [pyro-port-remaining.md](../pyro-port-remaining.md).

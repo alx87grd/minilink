@@ -2,6 +2,26 @@
 
 The default pytest discovery lives in `tests/unittest`.
 
+## Philosophy
+
+Tests guard **stable public contracts** (compile evaluators, planning transcriptions,
+graphics frame keys, catalog equation references)—not implementation trivia or
+third-party print formatting. Prefer one parametrized or table-driven test over
+many near-duplicate files. Deep dynamics checks for a few representative plants
+live in `test_catalog_plant_contracts.py`; broad catalog smoke in
+`test_catalog_migration.py`; kinematic render smoke in
+`test_kinematic_regression.py` (manifest under `tests/fixtures/kinematic_baseline/`).
+Regenerate manifest: `python tests/fixtures/kinematic_baseline/regenerate_manifest.py`.
+
+Shared fixtures: `graphics_contract_helpers.py` (draw-list resolution),
+`planning_helpers.py` (RRT holonomic obstacle scene).
+
+Benchmark **performance** helpers live under repo-root `benchmarks/`; import smoke
+only in `test_benchmark_smoke.py` (not correctness asserts).
+
+`tests/manual/` and `tests/bugs/` are removed — use `examples/scripts/` for
+smoke scripts and unittest for contracts.
+
 ## Core behavior without optional extras
 
 Run tests that should pass with only the required project dependencies and the

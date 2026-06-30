@@ -3,12 +3,9 @@
 from minilink.planning.spatial.collision import (
     CollisionBody,
     bind,
-    car,
     car_outline,
     disc,
-    point,
     point_probe,
-    sphere,
 )
 from minilink.planning.spatial.paths import PolylinePath, ReferencePath, from_waypoints
 from minilink.planning.spatial.scene import Scene
@@ -37,15 +34,12 @@ __all__ = [
     "Scene",
     "StateField",
     "bind",
-    "car",
     "car_outline",
     "disc",
     "from_waypoints",
     "inverse_barrier",
     "occupancy",
-    "point",
     "point_probe",
     "quadratic_excess",
     "quadratic_hinge",
-    "sphere",
 ]

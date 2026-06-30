@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.kinematics import identity, translation
+from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -149,8 +149,7 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         self.inputs["u"].units = ["Nm"]
         self.outputs["y"].labels = ["slip"]
         self.x0 = np.array([0.0, 0.01, 0.0, 0.0])
-        # v2 camera hint: this variant tracks the car (the slip-input base uses
-        # the inherited fixed camera).
+        # Camera follows the car body (the slip-input base keeps the fixed camera).
         self.camera_follow_frame = "body"
 
     def _slip(self, speed, wheel_speed, params=None):

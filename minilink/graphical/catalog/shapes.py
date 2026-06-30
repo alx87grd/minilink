@@ -5,8 +5,8 @@ the internal ``graphical/animation/`` band; this module is the friendly, stable
 re-export. Two things to note:
 
 - ``Line`` is the public name for the internal ``CustomLine``.
-- ``Arrow`` / ``TorqueArrow`` are the honest, frame-keyed primitives whose
-  geometry is baked at construction (no column-norm side-channel scaling).
+- ``Arrow`` / ``TorqueArrow`` bake full geometry at construction in the
+  primitive's local frame.
 
 Placement helpers (``spring_between``, ``link_pose_3d``, …) live here — not in
 ``core/kinematics`` (rigid math only).

@@ -122,8 +122,7 @@ class PygameCanvas:
                 )
 
         elif isinstance(primitive, (Arrow, TorqueArrow)):
-            # Honest arrow / torque arc: baked ``pts`` drawn as a polyline at its
-            # pose (no column-norm scale, no ``T[3, 3]`` channel).
+            # Baked ``pts`` drawn as a polyline at the primitive pose.
             local_pts = primitive.pts
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
             world_pts = (transform_matrix @ local_pts_hom.T).T

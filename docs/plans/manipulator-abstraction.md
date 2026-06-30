@@ -1,6 +1,8 @@
 # Manipulator Base Abstraction — Proposal
 
-Status: **proposal for architectural review** (`TODO: User Architectural Review`).
+Status: **base class landed** (`minilink/dynamics/abstraction/manipulator.py`);
+**catalog rebase pending** (`dynamics/catalog/manipulators/arms.py` still uses
+`MechanicalSystem`).
 
 Context: porting pyro `Manipulator` and `control/robotcontrollers.py` requires a
 shared robot base in minilink. Today catalog arms subclass `MechanicalSystem`

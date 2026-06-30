@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import signal
 
-from minilink.core.kinematics import identity, translation
+from minilink.core.kinematics import translation
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.animation.primitives import (
     Arrow,

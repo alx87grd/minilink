@@ -140,7 +140,8 @@ class Replay(Overlay):
 def _shape_to_primitives(shape, *, color, opacity):
     """Map a planning :class:`~minilink.core.geometry.Shape` to graphic primitives."""
     from minilink.core.geometry import Box as GeomBox
-    from minilink.core.geometry import Inflated, Sphere as GeomSphere, Union
+    from minilink.core.geometry import Inflated, Union
+    from minilink.core.geometry import Sphere as GeomSphere
 
     if isinstance(shape, GeomSphere):
         center = np.asarray(shape.center, dtype=float)
@@ -164,7 +165,9 @@ def _shape_to_primitives(shape, *, color, opacity):
             color=color,
             opacity=opacity,
         )
-        box.local_transform = translation(center[0], center[1], center[2] if center.size > 2 else 0.0)
+        box.local_transform = translation(
+            center[0], center[1], center[2] if center.size > 2 else 0.0
+        )
         return [box]
 
     if isinstance(shape, Inflated):
@@ -182,7 +185,9 @@ def _shape_to_primitives(shape, *, color, opacity):
             out.extend(_shape_to_primitives(member, color=color, opacity=opacity))
         return out
 
-    raise TypeError(f"unsupported obstacle shape for visualization: {type(shape).__name__}")
+    raise TypeError(
+        f"unsupported obstacle shape for visualization: {type(shape).__name__}"
+    )
 
 
 class SceneVisualizer(Overlay):
