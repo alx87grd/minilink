@@ -8,16 +8,15 @@ from minilink.core.geometry import Sphere
 from minilink.core.kinematics import apply
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
+    HolonomicMobileRobot3D,
     KinematicCar,
 )
 from minilink.planning.spatial.collision import (
     CollisionBody,
     bind,
-    car,
     car_outline,
     disc,
-    point,
-    sphere,
+    point_probe,
 )
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
@@ -53,18 +52,33 @@ class _TwoSphereBody(CollisionBody):
         return (planar(x[0], x[1]), planar(x[0] + 2.0, x[1]))
 
 
+# --- robot body helpers ----------------------------------------------------
+
+
+def _holonomic_disc(radius=0.3):
+    return bind(HolonomicMobileRobot(), disc(radius))
+
+
+def _holonomic_point():
+    return bind(HolonomicMobileRobot(), point_probe())
+
+
+def _kinematic_car_body(length=1.6, width=0.5):
+    return bind(KinematicCar(), car_outline(length, width))
+
+
 # --- robot body ------------------------------------------------------------
 
 
-def test_translation_body_pose():
-    body = sphere(radius=0.3, position=(0, 1))
+def test_bind_disc_body_pose():
+    body = _holonomic_disc(0.3)
     (T,) = body.body_poses(np.array([1.5, -2.0]))
-    assert T.shape == (3, 3)
+    assert T.shape == (4, 4)
     assert apply(T, np.zeros(2)) == pytest.approx([1.5, -2.0])
 
 
-def test_translation_body_in_3d():
-    body = sphere(radius=0.5, position=(0, 1, 2))
+def test_bind_disc_in_3d():
+    body = bind(HolonomicMobileRobot3D(), Sphere(np.zeros(3), 0.5))
     (T,) = body.body_poses(np.array([1.0, 2.0, 3.0]))
     assert T.shape == (4, 4)
     assert apply(T, np.zeros(3)) == pytest.approx([1.0, 2.0, 3.0])
@@ -78,37 +92,24 @@ def test_multibody_clearance_is_worst_case_over_parts():
     assert value == pytest.approx(min(1.0 - 0.5 - 0.1, 3.0 - 0.5 - 0.2))
 
 
-def test_bound_disc_matches_sphere():
+def test_bound_disc_clearance_samples():
     scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
-    sys = HolonomicMobileRobot()
-    legacy = scene.clearance_field(sphere(radius=0.3, position=(0, 1)))
-    bound = scene.clearance_field(bind(sys, disc(0.3)))
-    samples = (
-        np.array([0.0, 0.0]),
-        np.array([1.0, -1.0]),
-        np.array([2.0, 2.0]),
-        np.array([-0.5, 3.0]),
-        np.array([4.0, 1.0]),
+    field = scene.clearance_field(_holonomic_disc(0.3))
+    assert field.value(np.array([0.0, 0.0])) == pytest.approx(
+        np.hypot(2.0, 2.0) - 0.5 - 0.3
     )
-    for x in samples:
-        assert bound.value(x) == pytest.approx(legacy.value(x))
+    assert field.value(np.array([2.0, 2.0])) == pytest.approx(-0.5 - 0.3)
 
 
-def test_bound_car_matches_car():
+def test_bound_car_clearance_depends_on_heading():
     from minilink.core.geometry import Box
 
     scene = Scene(
         obstacles=(Box([-3.0, -3.0], [-0.4, 3.0]), Box([0.4, -3.0], [3.0, 3.0]))
     )
-    sys = KinematicCar()
-    legacy = scene.clearance_field(car(length=1.6, width=0.5))
-    bound = scene.clearance_field(bind(sys, car_outline(1.6, 0.5)))
-    for x in (
-        np.array([0.0, 0.0, np.pi / 2]),
-        np.array([0.0, 0.0, 0.0]),
-        np.array([1.0, 0.5, 0.3]),
-    ):
-        assert bound.value(x) == pytest.approx(legacy.value(x))
+    field = scene.clearance_field(_kinematic_car_body())
+    assert field.value(np.array([0.0, 0.0, np.pi / 2])) > 0.0
+    assert field.value(np.array([0.0, 0.0, 0.0])) < 0.0
 
 
 def test_bound_frame_mismatch_raises():
@@ -157,7 +158,7 @@ def test_bound_jax_twin_margin_matches_and_differentiates():
 
 def test_clearance_value_against_obstacle():
     scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
-    field = scene.clearance_field(sphere(radius=0.3))
+    field = scene.clearance_field(_holonomic_disc(0.3))
     assert field.value(np.array([0.0, 0.0])) == pytest.approx(
         np.hypot(2.0, 2.0) - 0.5 - 0.3
     )
@@ -166,18 +167,12 @@ def test_clearance_value_against_obstacle():
 
 def test_clearance_pipeline_in_3d():
     scene = Scene(obstacles=(Sphere([0.0, 0.0, 0.0], 1.0),))
-    field = scene.clearance_field(sphere(0.5, position=(0, 1, 2)))
+    body = bind(HolonomicMobileRobot3D(), Sphere(np.zeros(3), 0.5))
+    field = scene.clearance_field(body)
     assert field.value(np.array([3.0, 0.0, 0.0])) == pytest.approx(3.0 - 1.0 - 0.5)
     free = field.as_constraint()
     assert free.contains(np.array([3.0, 0.0, 0.0]))
     assert not free.contains(np.array([0.5, 0.0, 0.0]))
-
-
-def test_position_indices_decouple_state_size():
-    scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
-    robot = sphere(0.3, position=(0, 1))
-    x = np.array([2.0, 0.0, 99.0, 99.0, 99.0])  # extra state ignored
-    assert scene.clearance_field(robot).value(x) == pytest.approx(2.0 - 0.5 - 0.3)
 
 
 def test_empty_scene_raises():
@@ -185,7 +180,7 @@ def test_empty_scene_raises():
     with pytest.raises(ValueError):
         scene.clearance(np.zeros(2))
     with pytest.raises(ValueError):
-        scene.clearance_field(sphere(0.3))
+        scene.clearance_field(_holonomic_disc(0.3))
 
 
 # --- workspace fields ------------------------------------------------------
@@ -213,7 +208,7 @@ def test_cost_field_value_at_robot_position():
         workspace_fields=(GaussianField(center=center, amplitude=1.5, sigma=0.8),)
     )
     x = np.array([0.0, 0.0])
-    assert scene.cost_field(sphere(radius=0.3)).value(x) == pytest.approx(
+    assert scene.cost_field(_holonomic_disc(0.3)).value(x) == pytest.approx(
         scene.cost_density(x)
     )
 
@@ -222,7 +217,7 @@ def test_cost_field_as_cost_weight_and_peak():
     scene = Scene(
         workspace_fields=(GaussianField(center=[0.0, 0.0], amplitude=2.0, sigma=0.5),)
     )
-    cost = scene.cost_field(sphere(0.2)).as_cost(weight=4.0)
+    cost = scene.cost_field(_holonomic_disc(0.2)).as_cost(weight=4.0)
     at_peak = cost.g(np.array([0.0, 0.0]), np.zeros(1))
     far = cost.g(np.array([5.0, 0.0]), np.zeros(1))
     assert at_peak == pytest.approx(8.0)
@@ -233,7 +228,7 @@ def test_cost_field_as_constraint_keep_out_band():
     scene = Scene(
         workspace_fields=(GaussianField(center=[0.0, 0.0], amplitude=1.0, sigma=0.5),)
     )
-    keep_out = scene.cost_field(point()).as_constraint(upper=0.2)
+    keep_out = scene.cost_field(_holonomic_point()).as_constraint(upper=0.2)
     assert keep_out.contains(np.array([2.0, 0.0]))
     assert not keep_out.contains(np.array([0.0, 0.0]))
 
@@ -241,7 +236,7 @@ def test_cost_field_as_constraint_keep_out_band():
 def test_empty_workspace_fields_return_zero_density_and_cost_field():
     scene = Scene()
     assert scene.cost_density(np.zeros(2)) == pytest.approx(0.0)
-    assert scene.cost_field(sphere(0.3)).value(np.array([1.0, 2.0])) == pytest.approx(
+    assert scene.cost_field(_holonomic_disc(0.3)).value(np.array([1.0, 2.0])) == pytest.approx(
         0.0
     )
 
@@ -252,7 +247,7 @@ def test_empty_workspace_fields_return_zero_density_and_cost_field():
 def test_fieldset_contains_matches_minkowski_sum():
     center, obstacle_r, robot_r = np.array([2.0, 2.0]), 0.5, 0.3
     scene = Scene(obstacles=(Sphere(center, obstacle_r),))
-    free = scene.clearance_field(sphere(radius=robot_r)).as_constraint()
+    free = scene.clearance_field(_holonomic_disc(robot_r)).as_constraint()
 
     rng = np.random.default_rng(0)
     for x in rng.uniform(-1.0, 5.0, size=(200, 2)):
@@ -263,8 +258,8 @@ def test_fieldset_contains_matches_minkowski_sum():
 def test_sphere_radius_shifts_free_boundary():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
     x = np.array([0.65, 0.0])  # 0.5 < dist < 0.5 + 0.3
-    assert scene.clearance_field(point()).as_constraint().contains(x)
-    assert not scene.clearance_field(sphere(0.3)).as_constraint().contains(x)
+    assert scene.clearance_field(_holonomic_point()).as_constraint().contains(x)
+    assert not scene.clearance_field(_holonomic_disc(0.3)).as_constraint().contains(x)
 
 
 def test_fieldset_bound_mechanics():
@@ -291,7 +286,7 @@ def test_fieldcost_weight_and_shaping():
 
 def test_cross_export_constraint_and_barrier_cost():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
-    field = scene.clearance_field(sphere(0.3))
+    field = scene.clearance_field(_holonomic_disc(0.3))
     free = field.as_constraint()
 
     def barrier(v):
@@ -333,7 +328,7 @@ def test_occupancy_is_bounded_unit_interval():
 
 def test_shaping_composes_with_clearance_field():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
-    field = scene.clearance_field(sphere(0.2))
+    field = scene.clearance_field(_holonomic_disc(0.2))
     bounded = field.as_cost(weight=3.0, shaping=occupancy(scale=0.1))
     # bounded occupancy keeps the per-step obstacle cost in [0, weight]
     assert 0.0 <= bounded.g(np.array([0.0, 0.0]), np.zeros(2)) <= 3.0
@@ -348,7 +343,7 @@ def test_jax_twin_margin_matches_and_differentiates():
     import jax.numpy as jnp
 
     scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
-    free = scene.clearance_field(sphere(0.3)).as_constraint()
+    free = scene.clearance_field(_holonomic_disc(0.3)).as_constraint()
     x = np.array([0.0, 0.0])
 
     assert float(free.margin(jnp.array(x))[0]) == pytest.approx(
@@ -378,21 +373,8 @@ def test_scene_plot_smoke():
     assert fig is not None
     assert ax is not None
 
-    fig, ax = scene.plot(show=False, body=sphere(0.25), x=np.array([2.0, 0.0]))
+    fig, ax = scene.plot(show=False, body=_holonomic_disc(0.25), x=np.array([2.0, 0.0]))
     assert len(ax.patches) >= 2
 
-    _, ax = scene.plot(show=False, body=point(), x=np.array([2.0, 0.0]))
+    _, ax = scene.plot(show=False, body=_holonomic_point(), x=np.array([2.0, 0.0]))
     assert len(ax.lines) >= 1
-
-
-def test_car_body_collision_depends_on_heading():
-    from minilink.core.geometry import Box
-    from minilink.planning.spatial.collision import car
-
-    # a vertical gap (width 0.8) between two walls
-    scene = Scene(
-        obstacles=(Box([-3.0, -3.0], [-0.4, 3.0]), Box([0.4, -3.0], [3.0, 3.0]))
-    )
-    field = scene.clearance_field(car(length=1.6, width=0.5))
-    assert field.value(np.array([0.0, 0.0, np.pi / 2])) > 0.0  # aligned: fits the gap
-    assert field.value(np.array([0.0, 0.0, 0.0])) < 0.0  # across: spans into the walls

@@ -286,9 +286,10 @@ placement with scene queries (`clearance_field`, `cost_field`). Export separatel
 density over body probes). **Collision reuse:** frameless geometry (`disc`,
 `car_outline`, `point_probe`) binds to the **planner** plant with
 `bind(sys, geometry, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
-via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Legacy
-state-indexed :func:`~minilink.planning.spatial.collision.sphere` / :func:`~minilink.planning.spatial.collision.car`
-remain for tests. Shape obstacles with `as_cost(shaping=...)` (`shaping.occupancy`,
+via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Frameless
+geometry: :func:`~minilink.planning.spatial.collision.disc`,
+:func:`~minilink.planning.spatial.collision.point_probe`,
+:func:`~minilink.planning.spatial.collision.car_outline`. Shape obstacles with
 `quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
 obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.

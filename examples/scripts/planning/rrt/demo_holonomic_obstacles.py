@@ -5,7 +5,7 @@ Run from repo root::
     python examples/scripts/planning/rrt/demo_holonomic_obstacles.py
 
 Intro: one hard obstacle plus a soft Gaussian workspace field — clearance and
-cost fields for ``point`` vs ``sphere`` robot bodies.
+cost fields for ``point_probe`` vs ``disc`` robot bodies (via :func:`bind`).
 
 Section A (default): RRT stops at the first goal; RRT* keeps searching with
 ``optimize_after_goal=True`` until path cost stops improving.
@@ -26,7 +26,7 @@ from minilink.planning.search.extenders import KinodynamicExtender, SteeringExte
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
-from minilink.planning.spatial.collision import bind, disc, point, sphere
+from minilink.planning.spatial.collision import bind, disc, point_probe
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.workspace_fields import GaussianField
 
@@ -104,14 +104,16 @@ def make_kinodynamic_extender(*, horizon=0.6, n_substeps=6, n_primitives=8):
 
 def run_scene_intro():
     """Hard obstacle + soft workspace field — point vs disc clearance."""
+    sys = HolonomicMobileRobot()
     scene = Scene(
         obstacles=(Sphere((4.0, 0.0), 0.5),),
         workspace_fields=(GaussianField((2.0, 1.5), 2.0, 1.0),),
     )
-    disc = sphere(0.25, position=(0, 1))
+    robot_disc = bind(sys, disc(0.25))
+    robot_point = bind(sys, point_probe())
     sample = np.array([3.5, 0.0])
-    point_clearance = float(scene.clearance_field(point(position=(0, 1))).value(sample))
-    disc_clearance = float(scene.clearance_field(disc).value(sample))
+    point_clearance = float(scene.clearance_field(robot_point).value(sample))
+    disc_clearance = float(scene.clearance_field(robot_disc).value(sample))
     print("Scene intro: hard obstacle + Gaussian workspace patch")
     print(f"  sample x=({sample[0]:.1f}, {sample[1]:.1f})")
     print(f"  point robot clearance = {point_clearance:.3f}")
@@ -120,7 +122,7 @@ def run_scene_intro():
         bounds=((-1.0, 7.0), (-3.0, 3.0)),
         title="Scene: clearance (point vs disc robot at sample pose)",
         show_clearance_contour=True,
-        body=disc,
+        body=robot_disc,
         x=sample,
     )
 

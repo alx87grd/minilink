@@ -30,7 +30,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Estimation | 1 | Placeholder only. | Luenberger, Kalman, EKF. |
 | Identification | 2 | Parametric-tier prototype demo only. | `fitting.py` for physical + NN params. |
 | Interfaces | 1 | Placeholder only. | Gymnasium, Flax/Torch adapters. |
-| Pyro 2.0 overall | 3 | Catalog + core framework + planning search/DP/trajopt done; ~142/195 pyro demos not ported. | Phased port per [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
+| Pyro 2.0 overall | 3 | Catalog + core framework + planning search/DP/trajopt done; ~143/195 pyro demos not ported. | Phased port per [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 
