@@ -2,6 +2,33 @@
 
 The default pytest discovery lives in `tests/unittest`.
 
+## Local environment
+
+Agents and maintainers should run pytest in the **`minilink`** conda env from
+repo-root [environment.yml](../environment.yml). After [README install](../README.md#install),
+from repo root:
+
+```bash
+conda activate minilink
+python -m pytest
+```
+
+Full suite (optional deps and headless pygame):
+
+```bash
+conda activate minilink
+SDL_VIDEODRIVER=dummy python -m pytest
+```
+
+Non-interactive:
+
+```bash
+conda run -n minilink python -m pytest
+```
+
+Marker policy and pip-only installs are below; prefer the conda env so optional
+tests behave consistently across machines.
+
 ## Philosophy
 
 Tests guard **stable public contracts** (compile evaluators, planning transcriptions,
@@ -45,7 +72,15 @@ not installed.
 
 ## Full functionality run
 
-Install all extras, then run either the optional subset or the whole suite:
+With the `minilink` conda env (recommended):
+
+```bash
+conda activate minilink
+SDL_VIDEODRIVER=dummy pytest -m optional
+SDL_VIDEODRIVER=dummy pytest
+```
+
+Or install all pip extras in another Python 3.10+ environment:
 
 ```bash
 pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt]"

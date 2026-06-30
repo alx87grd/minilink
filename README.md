@@ -308,6 +308,19 @@ Alternatively, a plain editable install works in any Python 3.10+ environment
 Graphviz is used by `plot_diagram()` for diagram topology rendering; it is not
 required for writing model equations.
 
+## Testing
+
+Use the **`minilink`** conda env above for local development and agent verification.
+From repo root:
+
+```bash
+conda activate minilink
+python -m pytest
+```
+
+For the full suite including optional backends and headless pygame smoke tests,
+see [tests/README.md](tests/README.md).
+
 ## Call chains
 
 Minimal paths for debugging and extending workflows. Contracts:

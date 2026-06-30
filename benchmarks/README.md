@@ -16,9 +16,10 @@ scene for fast RRT contract tests.
 
 ## Running
 
-From the repo root, in an environment with the extras you want to measure
-(`minilink[jax]` for JAX variants; `cyipopt` for Ipopt variants — both are
-skipped gracefully when missing):
+From the repo root with the **`minilink`** conda env active (see
+[environment.yml](../environment.yml)), or any environment with the extras you
+want to measure (`minilink[jax]` for JAX variants; `cyipopt` for Ipopt
+variants — both are skipped gracefully when missing):
 
 ```bash
 python benchmarks/run_pendulum_f_speed.py        # f() call speed, single plant

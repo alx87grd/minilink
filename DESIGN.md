@@ -345,3 +345,5 @@ minilink like an external user, and not a public contract.
 **Repo conventions:** Python 3.10+; typed public APIs (except equation paths,
 which keep bare signatures per agent.md Textbook Style); lazy optional imports;
 namespace `__init__.py` files; plot subpackages may re-export small facades.
+Agents and maintainers run tests in the **`minilink`** conda env from
+[environment.yml](environment.yml) ([agent.md §9](agent.md#9-local-environment)).

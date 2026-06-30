@@ -665,7 +665,7 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
 
     def _u_in(self, x, u):
         # Wheel rate and steer are integrated states here, not input ports.
-        return np.array([x[6], x[7]])
+        return x[6:8]
 
 
 if __name__ == "__main__":

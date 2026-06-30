@@ -49,6 +49,7 @@ Changelog = "https://github.com/alx87grd/minilink/blob/main/ROADMAP.md"
 
 [project.optional-dependencies]
 dev = [
+    "pre-commit",
     "pytest",
     "ruff",
 ]

@@ -251,7 +251,9 @@ proceeding.
 
 **Notebooks:** exclude notebooks from normal review/style passes unless the task
 is only to update renamed imports/API names or the user explicitly asks for
-notebook cleanup. Never review notebook outputs by default.
+notebook cleanup. Never review notebook outputs by default. Commits strip
+outputs from `examples/notebooks/*.ipynb` via the `nbstripout` pre-commit hook
+(`.pre-commit-config.yaml`; run `pre-commit install` once per clone).
 
 **Scope:**
 
@@ -287,34 +289,41 @@ Subsystem maturity in [ROADMAP.md](ROADMAP.md) uses these definitions.
 
 ## 9. Local Environment
 
-Target **Python 3.10+** with optional extras from `pyproject.toml` (JAX, SymPy,
-visualization, Ipopt). Do not rely on macOS `/usr/bin/python3` when it is older
-than 3.10. For terminal commands in this repo (tests, `examples/scripts`,
-benchmarks), use Python 3.10+ with the extras your task needs.
-
-Install from repo root:
+**Agents and maintainers:** run tests, examples, and benchmarks in the **`minilink`**
+conda environment from repo-root [environment.yml](environment.yml) (Python 3.13,
+core deps, optional extras, pytest/ruff/sphinx). See [README.md Install](README.md#install)
+for setup. Set `PYTHONPATH` to the repo root once:
 
 ```bash
-pip install -e ".[dev]"
+conda env create -f environment.yml   # first time only
+conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Optional extras: `.[jax]`, `.[symbolic]`, `.[visualization]`, `.[plotting]`,
-`.[ipopt]`. Diagram bindings need a system `graphviz` package
-(`apt install graphviz`, or conda-forge `graphviz` + `python-graphviz`).
-
-Maintainers often use a conda env for local work (for example `dev-h26`). That
-name is **not contractual**—any conda/venv with Python 3.10+ and the extras you
-need is fine; align versions with CI or teammates when running tests and examples.
+Verification commands (always from repo root, with `minilink` active):
 
 ```bash
-conda activate dev-h26   # or your own env
+conda activate minilink
 python -m pytest
+SDL_VIDEODRIVER=dummy python -m pytest   # full suite including pygame smoke
+python examples/scripts/<script>.py
 ```
 
+Non-interactive (CI-like, no shell activation):
+
 ```bash
-conda run -n dev-h26 python -m pytest
-conda run -n dev-h26 python examples/scripts/animation/demo_animations.py
+conda run -n minilink python -m pytest
+conda run -n minilink python examples/scripts/animation/demo_animations.py
 ```
+
+Target **Python 3.10+** in general; CI still covers 3.10–3.13. Do not rely on
+macOS `/usr/bin/python3` when it is older than 3.10.
+
+**Alternative (pip-only):** `pip install -e ".[dev]"` plus optional extras
+`.[jax]`, `.[symbolic]`, `.[visualization]`, `.[plotting]`, `.[ipopt]`. Diagram
+bindings need system `graphviz` (`apt install graphviz`, or conda-forge
+`graphviz` + `python-graphviz`). Prefer the `minilink` conda env for local work
+so optional tests and examples match teammate setups.
 
 Run demos from repo root: `python examples/scripts/<script>.py`.
 
