@@ -13,7 +13,7 @@ Kinematics (this module)::
 Joint-space outputs ``q``, ``dq`` live on :class:`MechanicalSystem`.
 Task-space outputs ``p``, ``pdot`` are added here.
 
-See ``docs/plans/manipulator-abstraction.md``.
+See ``DESIGN.md`` (dynamics + control feedback profiles).
 """
 
 from minilink.core.backends import array_module
@@ -86,3 +86,86 @@ class Manipulator(MechanicalSystem):
 
         # task-space velocity: ṗ = J(q) q̇
         return J @ dq
+
+    def inverse_kinematics(
+        self,
+        p_d,
+        q_guess=None,
+        *,
+        params=None,
+        tol=1e-9,
+        bounds=None,
+        method="auto",
+    ):
+        """Return ``q`` with ``forward_kinematics(q) ≈ p_d``.
+
+        Uses ``scipy.optimize.fsolve`` when ``task_dim == dof`` and no joint
+        bounds apply; otherwise ``scipy.optimize.least_squares``. Returns one
+        solution near ``q_guess`` (default: nominal ``q`` output).
+        """
+        import numpy as np
+        from scipy.optimize import fsolve, least_squares
+
+        p_d = np.asarray(p_d, dtype=float).reshape(-1)
+        if q_guess is None:
+            q_guess = np.asarray(self.outputs["q"].nominal_value, dtype=float)
+        else:
+            q_guess = np.asarray(q_guess, dtype=float)
+        q_guess = q_guess.reshape(-1)
+        if p_d.shape != (self.task_dim,):
+            raise ValueError(f"p_d must have shape ({self.task_dim},), got {p_d.shape}")
+        if q_guess.shape != (self.dof,):
+            raise ValueError(
+                f"q_guess must have shape ({self.dof},), got {q_guess.shape}"
+            )
+
+        def residual(q):
+            p = np.asarray(self.forward_kinematics(q, params), dtype=float).reshape(-1)
+            return p - p_d
+
+        bound_pair = None
+        if bounds is not None:
+            bound_pair = (
+                np.asarray(bounds[0], dtype=float).reshape(-1),
+                np.asarray(bounds[1], dtype=float).reshape(-1),
+            )
+        else:
+            lower = np.asarray(self.state.lower_bound[: self.dof], dtype=float)
+            upper = np.asarray(self.state.upper_bound[: self.dof], dtype=float)
+            if np.all(np.isfinite(lower)) and np.all(np.isfinite(upper)):
+                bound_pair = (lower, upper)
+
+        if method == "auto":
+            method = (
+                "fsolve"
+                if self.task_dim == self.dof and bound_pair is None
+                else "least_squares"
+            )
+        if method not in {"fsolve", "least_squares"}:
+            raise ValueError(
+                f"method must be 'auto', 'fsolve', or 'least_squares', got {method!r}"
+            )
+
+        if method == "fsolve":
+            q_sol = np.asarray(
+                fsolve(residual, q_guess, xtol=tol), dtype=float
+            ).reshape(-1)
+            if np.linalg.norm(residual(q_sol)) > tol * 1e3:
+                raise RuntimeError("inverse_kinematics did not converge")
+            return q_sol
+
+        if bound_pair is None:
+            lo = np.full(self.dof, -np.inf)
+            hi = np.full(self.dof, np.inf)
+        else:
+            lo, hi = bound_pair
+        result = least_squares(
+            residual,
+            q_guess,
+            bounds=(lo, hi),
+            ftol=tol,
+            xtol=tol,
+        )
+        if not result.success or np.linalg.norm(result.fun) > tol * 1e3:
+            raise RuntimeError("inverse_kinematics did not converge")
+        return np.asarray(result.x, dtype=float).reshape(-1)

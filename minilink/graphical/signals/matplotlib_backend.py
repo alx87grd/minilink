@@ -43,6 +43,15 @@ def open_matplotlib_signal_plot(
     )
 
 
+def _ylabel_with_unit(label: str, unit: str) -> str:
+    if not unit:
+        return label
+    unit = str(unit).strip()
+    if unit.startswith("[") and unit.endswith("]"):
+        return f"{label}\n{unit}"
+    return f"{label}\n[{unit}]"
+
+
 class MatplotlibLivePlotHandle(LivePlotHandle):
     """Live matplotlib line updater."""
 
@@ -67,7 +76,7 @@ class MatplotlibLivePlotHandle(LivePlotHandle):
             line.set_xdata(spec.t)
             line.set_ydata(trace.values)
             line.set_label(trace.label)
-            ylabel = f"{trace.label}\n[{trace.unit}]" if trace.unit else trace.label
+            ylabel = _ylabel_with_unit(trace.label, trace.unit)
             ax.set_ylabel(ylabel)
             ax.relim()
             ax.autoscale_view()
@@ -142,7 +151,7 @@ def _create_figure(
             alpha=0.8,
             label=trace.label,
         )
-        ylabel = f"{trace.label}\n[{trace.unit}]" if trace.unit else trace.label
+        ylabel = _ylabel_with_unit(trace.label, trace.unit)
         ax.set_ylabel(ylabel, fontsize=FONT_SIZE, multialignment="center")
         style_trajectory_subplot(ax)
         ax.legend(loc="upper right")

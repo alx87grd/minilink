@@ -4,9 +4,10 @@ The default pytest discovery lives in `tests/unittest`.
 
 ## Local environment
 
-Agents and maintainers should run pytest in the **`minilink`** conda env from
-repo-root [environment.yml](../environment.yml). After [README install](../README.md#install),
-from repo root:
+Setup: [README.md#install](../README.md#install) (conda env **`minilink`**, `PYTHONPATH` = repo root).
+Agent rules: [AGENTS.md](../AGENTS.md).
+
+From repo root:
 
 ```bash
 conda activate minilink

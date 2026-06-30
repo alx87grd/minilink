@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from minilink.blocks.basic import Integrator
-from minilink.control.linear import ProportionalController
+from minilink.control.output import ProportionalController
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import (
     build_execution_plan,

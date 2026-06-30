@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.control.linear import PIDController
+from minilink.control.impedance import ImpedanceIntegralController
 from minilink.core.backends import configure_jax
 from minilink.core.diagram import DiagramSystem
 from minilink.core.trajectory import Trajectory
@@ -29,7 +29,7 @@ PLOT_PAUSE = 0.05
 PLOT_BACKEND = "matplotlib"  # use "plotly" if matplotlib live updates stall
 
 plant = Pendulum()
-ctl = PIDController()
+ctl = ImpedanceIntegralController()
 ctl.params = {"kp": 1.0, "ki": 0.0, "kd": 1.0}
 
 diagram = DiagramSystem()

@@ -1,7 +1,7 @@
 """Optional JAX smoke tests (skip if jax is not installed).
 
 The match-NumPy tests follow the canonical pattern documented in
-``agent.md`` &sect;4: every JAX twin plant must include both a nominal /
+``AGENTS.md`` Verification: every JAX twin plant must include both a nominal /
 linear regime check and a non-trivial regime check (custom inertia,
 damping, gravity, or an off-axis input) so the JAX trace and the NumPy
 reference disagree at most by ULP-level rounding.

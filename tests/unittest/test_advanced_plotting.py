@@ -111,6 +111,43 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertIsNotNone(result.figure)
         plt.close(result.figure)
 
+    def test_plot_time_signals_accepts_subsystem_port_tuples(self):
+        from minilink.graphical.common.environment import override_env
+
+        override_env("jupyter")
+        self.addCleanup(override_env, None)
+
+        result = plot_time_signals(
+            self.diagram,
+            self.traj,
+            signals=("x", (self.ctl, "u"), (self.sys, "y")),
+            show=False,
+        )
+        self.assertIsNotNone(result.figure)
+        plt.close(result.figure)
+
+    def test_plot_time_signals_accepts_single_subsystem_port_pair(self):
+        from minilink.graphical.common.environment import override_env
+
+        override_env("jupyter")
+        self.addCleanup(override_env, None)
+
+        result = plot_time_signals(
+            self.diagram,
+            self.traj,
+            signals=(self.sys, "y"),
+            show=False,
+        )
+        self.assertIsNotNone(result.figure)
+        plt.close(result.figure)
+
+    def test_subsystem_signal_resolves_diagram_id(self):
+        self.assertEqual(self.diagram.subsystem_signal(self.sys, "y"), "plant:y")
+        self.assertEqual(
+            self.diagram.subsystem_signal(self.ctl, "u"),
+            "ctl:u",
+        )
+
     def test_plot_trajectory_computes_missing_trajectory_then_plots(self):
         sys = Integrator()
 
@@ -149,29 +186,31 @@ class TestAdvancedPlotting(unittest.TestCase):
 
     def test_resolve_plot_signals_series_into_closed_loop(self):
         from minilink.blocks.sources import Step
-        from minilink.control.linear import PDController
+        from minilink.control.impedance import ImpedanceController
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-        diagram = Step(final_value=[1.0], step_time=0.0) >> PDController() @ Pendulum()
+        diagram = (
+            Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
+        )
 
         self.assertEqual(
             resolve_plot_signals(diagram),
-            ("x", "step:y", "pd_controller:u"),
+            ("x", "ref:y", "ctl:u"),
         )
 
     def test_resolve_plot_signals_dynamic_controller(self):
         from minilink.blocks.sources import Step
-        from minilink.control.pid import FilteredPIDController
+        from minilink.control.siso import FilteredController
         from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
         diagram = (
             Step(final_value=[1.0], step_time=0.0)
-            >> FilteredPIDController() @ DoubleIntegrator()
+            >> FilteredController() @ DoubleIntegrator()
         )
 
         self.assertEqual(
             resolve_plot_signals(diagram),
-            ("x", "step:y", "filtered_pid:u"),
+            ("x", "ref:y", "ctl:u"),
         )
 
     def test_plot_trajectory_uses_default_signals_for_closed_loop(self):

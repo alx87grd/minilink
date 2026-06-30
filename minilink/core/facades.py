@@ -177,6 +177,9 @@ class SystemFacades:
         signals : tuple of str, optional
             Signal names to plot; see
             :func:`minilink.graphical.signals.plot_time_signals`.
+            For diagrams, each entry may be a boundary name (``"x"``),
+            an internal port (``"plant:p"``), or a ``(subsystem, port)``
+            pair resolved via :meth:`~minilink.core.diagram.DiagramSystem.subsystem_signal`.
             When ``None``, defaults are chosen via
             :func:`minilink.graphical.signals.resolve_plot_signals`.
 

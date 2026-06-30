@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
+from minilink.core.system import System
 from minilink.graphical.common import PlotResult
 
 
@@ -82,7 +83,7 @@ def build_signal_plot_spec(
     title: str | None = None,
 ) -> SignalPlotSpec:
     """Build a one-component-per-row plot specification."""
-    requested = (signals,) if isinstance(signals, str) else tuple(signals)
+    requested = _normalize_plot_signals(sys, signals)
 
     if isinstance(sys, DiagramSystem):
         for name in requested:
@@ -184,7 +185,7 @@ def open_time_signal_plot(
     **kwargs,
 ) -> LivePlotHandle:
     """Open a live time-signal plot with an update handle."""
-    signal_names = (signals,) if isinstance(signals, str) else tuple(signals)
+    signal_names = _normalize_plot_signals(sys, signals)
 
     def spec_builder(next_traj, *, title=None):
         return build_signal_plot_spec(sys, next_traj, signals=signal_names, title=title)
@@ -219,6 +220,42 @@ def open_time_signal_plot(
         "Unknown signal backend {!r}. Expected 'matplotlib' or 'plotly'.".format(
             backend
         )
+    )
+
+
+def _normalize_plot_signals(sys, signals) -> tuple[str, ...]:
+    """Expand plot signal specs to ``'sys_id:port'`` / boundary names."""
+    if isinstance(signals, str):
+        items = (signals,)
+    elif _is_subsystem_port_pair(signals):
+        items = (signals,)
+    else:
+        items = tuple(signals)
+
+    if not isinstance(sys, DiagramSystem):
+        return items
+
+    resolved = []
+    for item in items:
+        if _is_subsystem_port_pair(item):
+            subsystem, port_id = item
+            resolved.append(sys.subsystem_signal(subsystem, port_id))
+            continue
+        if not isinstance(item, str):
+            raise TypeError(
+                "Diagram plot signals must be strings or (subsystem, port) "
+                f"tuples; got {type(item).__name__}"
+            )
+        resolved.append(item)
+    return tuple(resolved)
+
+
+def _is_subsystem_port_pair(item) -> bool:
+    return (
+        isinstance(item, tuple)
+        and len(item) == 2
+        and isinstance(item[0], System)
+        and isinstance(item[1], str)
     )
 
 

@@ -1,7 +1,7 @@
 # Minilink Roadmap
 
 Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
-[agent.md](agent.md).
+[AGENTS.md](AGENTS.md).
 
 **Pyro 2.0 remaining backlog:**
 [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md).
@@ -20,19 +20,34 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Geometry / spatial | 4 | Integrated architecture proposed for obstacle and terrain planning: `core/geometry.py` SDF primitives + cost algebra (`SumCost`/`ScaledCost`), and `planning/spatial/`: `Scene` (obstacles + `workspace_fields`), `WorkspaceField`/`StateField`, `RobotBody`/`TranslationBody`, export via `as_constraint`/`as_cost`. Tested incl. JAX twins. | User architecture validation; scene params (`ProblemParameters.scene`, future); RRT consumers; oriented/multi-sphere bodies and raster cost maps. |
 | Graphical | 4 | Frame-keyed ``tf`` / geometry / overlay contract integrated. | Renderer polish; optional ``KinematicModel`` delegate review. |
 | Animation | 4 | ``Animator`` + overlays (``SceneHistory``, ``Replay``); collision reuses ``tf``. | Interactive integrator backends; live I/O backends. |
-| Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; `DynamicBicycle` params thread fully. | `Manipulator` abstraction + catalog rebase (see review queue). |
-| Dynamics abstraction | 5 | `MechanicalSystem` + joint ports `q`/`dq`; `Manipulator` in `manipulator.py` with `p`/`pdot`. | Rebase catalog arms; `JaxManipulator` if needed. |
+| Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; catalog arms on `Manipulator`. | Optional `JaxManipulator`; `f_ext` port if approved. |
+| Dynamics abstraction | 6 | `MechanicalSystem` + `Manipulator` (`p`, `pdot`, FK/J); catalog arms rebased. | `JaxManipulator` if needed; external wrench port. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Experimental; math not QA-validated. | Validation tests toward TRL 2. |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Pole-zero, Nyquist, margins, `ss2tf`; reachability costs. |
-| Control | 5 | Linear, LQR, filtered PID done. | Computed torque, sliding mode, robotic controllers (blocked on `Manipulator`). |
+| Control | 6 | Linear, LQR, filtered PID; `modelbased.py` (CT, SMC); `robotic.py` (impedance, kinematic, nullspace). | Sliding-mode + traj-following demos; dynamic joint/effector PID wrappers; trajectory LQR. |
 | Blocks | 5 | Routing, nonlinear, filters, sources, transfer function, 1-layer NN. | Multi-layer `MLP`, atomic layers (see neural-blocks plan). |
 | Estimation | 1 | Placeholder only. | Luenberger, Kalman, EKF. |
 | Identification | 2 | Parametric-tier prototype demo only. | `fitting.py` for physical + NN params. |
 | Interfaces | 1 | Placeholder only. | Gymnasium, Flax/Torch adapters. |
 | Pyro 2.0 overall | 3 | Catalog + core framework + planning search/DP/trajopt done; ~143/195 pyro demos not ported. | Phased port per [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
-TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
+### TRL definitions
+
+Readiness levels are an internal maturity scale for planning and review—not a
+release process by themselves.
+
+| Level | Name | Description |
+| --- | --- | --- |
+| **TRL 1** | Agent MVP | Initial code exists and works |
+| **TRL 2** | User-check MVP | User performs a high-level functional review |
+| **TRL 3** | Architecture Validated | High-level architecture is approved |
+| **TRL 4** | Integration Proposed | Final integration/refactor is proposed |
+| **TRL 5** | Integration Validated | User approves main-codebase integration |
+| **TRL 6** | Automated Tests Pass | Final pytest coverage exists and passes |
+| **TRL 7** | Details Validated | Naming and implementation details are approved |
+| **TRL 8** | Demo Released | Demo script is created and validated |
+| **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
 
 ## 2. Done (architecture)
 
@@ -69,10 +84,8 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 ~~`control/lqr.py`~~ done. Remaining:
 
-- ~~`Manipulator` base class~~ — landed in `manipulator.py`; **catalog rebase** on
-  `dynamics/catalog/manipulators/arms.py` still pending
-  ([manipulator-abstraction.md](docs/plans/manipulator-abstraction.md)).
-- `control/computed_torque.py`, `control/sliding_mode.py`, `control/robotic.py`
+- ~~`Manipulator` base + catalog rebase~~ — done (`manipulator.py`, `arms.py`).
+- ~~`control/modelbased.py`, `control/robotic.py`~~ — done.
 - Nested-diagram ergonomics; forced-input helpers
 
 **P3** — Remaining pyro 2.0 tools (see [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md)):
@@ -96,8 +109,6 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 - Trajopt transcription internal consolidation.
 - Dynamic bicycle module split.
 - Graphics/camera contract consolidation (`KinematicModel` delegate) — optional follow-up.
-- **`Manipulator` catalog rebase** — `arms.py` still subclasses `MechanicalSystem`
-  ([manipulator-abstraction.md](docs/plans/manipulator-abstraction.md)).
 - **Pyro game demos** — port via interactive animation or explicitly drop.
 
 ## 5. Future
@@ -113,9 +124,9 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 ### 5.2 Control
 
-- [x] `lqr.py`, `linear.py`, `pid.py` (`FilteredPIDController`)
-- [ ] `computed_torque.py`, `sliding_mode.py`
-- [ ] `robotic.py` — joint/effector PD/PID, kinematic, nullspace
+- [x] `lqr.py`, `linear.py`, `pid.py` (`FilteredController`)
+- [x] `modelbased.py` — computed torque, sliding mode
+- [ ] `robotic.py` — joint/effector PD/PID wrappers (kinematic + nullspace landed)
 - [ ] `trajectory_lqr.py` — time-varying LQR along a reference
 - [ ] `mpc.py` (uses `optimization/`) — minilink extra, no pyro equivalent
 - [ ] `neural.py` — policy wrappers ([neural-blocks-collection.md](docs/plans/neural-blocks-collection.md))
@@ -132,7 +143,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] `MechanicalSystem`, `JaxMechanicalSystem`, `StateSpaceSystem`, `GeneralizedMechanicalSystem`
 - [x] `MechanicalSystem` ports `q`, `dq` (`mechanical.py`)
 - [x] `Manipulator` base — `p`, `pdot`, `forward_kinematics`, `J` (`manipulator.py`)
-- [ ] Rebase `dynamics/catalog/manipulators/arms.py` on `Manipulator`
+- [x] Rebase `dynamics/catalog/manipulators/arms.py` on `Manipulator`
 - [ ] Optional `f_ext` input port for external end-effector forces
 
 ### 5.5 Planning
@@ -187,14 +198,14 @@ Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) (June 
 | --- | ---: | ---: | ---: |
 | Catalog plants | 40+ | 40+ | **0** (QA complete) |
 | Library modules | 38 | ~25 equivalent | **~10 tools** (control nonlinear/robot, DP, RRT, traj gen, estimation, interfaces) |
-| Example scripts | 195 | 52 | **~143** |
+| Example scripts | 195 | 60 | **~135** |
 | Course notebooks | 3 | 7 (new topics) | different mix |
 
 ### Port phases (from gap doc)
 
 | Phase | Focus | Unblocks |
 | --- | --- | --- |
-| **A** | `Manipulator` abstraction + computed torque + sliding mode + `robotic.py` | ~50 robot/pendulum demos |
+| **A** | ~~`Manipulator` + computed torque + sliding mode + `robotic.py`~~ (library landed) | representative closed-loop demos per plant band |
 | **B** | ~~DP/RRT~~ + polynomial traj gen + trajectory LQR | remaining: traj gen, traj LQR |
 | **C** | Estimation + identification + Gym interface | LQG + RL demos |
 | **D** | Frequency completion + planning cost variants | analysis + DP reachability |

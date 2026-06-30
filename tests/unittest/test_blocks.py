@@ -6,7 +6,7 @@ import pytest
 from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Source, Step
 from minilink.blocks.transfer_function import TransferFunction
-from minilink.control.linear import ProportionalController
+from minilink.control.output import ProportionalController
 
 
 class TestBlocks(unittest.TestCase):
