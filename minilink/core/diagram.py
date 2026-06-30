@@ -60,7 +60,8 @@ class DiagramSystem(System):
     where each local input ``u_i`` is gathered from the output ports connected
     to subsystem ``i``, from the diagram boundary inputs, or from the port's
     constant nominal value when unconnected. Diagram-level params are nested
-    by subsystem id: ``{"plant": {...}, "ctl": {...}}``.
+    by subsystem id: ``{"sys": {...}, "ctl": {...}}``. Shortcut-built
+    diagrams default to role ids ``ref``, ``ctl``, and ``sys``.
 
     Build diagrams with :meth:`add_subsystem` + :meth:`connect` (canonical
     wiring for any topology) or with the shortcuts ``+``, ``>>``, ``@``, and
@@ -100,6 +101,37 @@ class DiagramSystem(System):
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
         self.compute_state_properties()
+
+    def subsystem_id(self, subsystem):
+        """Return the diagram id for a subsystem instance added to this diagram."""
+        matches = [
+            sys_id
+            for sys_id, sub in self.subsystems.items()
+            if sub is subsystem
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise ValueError(
+                "Subsystem is not part of this diagram. "
+                f"Available ids: {', '.join(self.subsystems) or '(none)'}"
+            )
+        rendered = ", ".join(matches)
+        raise ValueError(
+            "Subsystem appears more than once in this diagram "
+            f"({rendered}); use an explicit 'sys_id:port' name instead."
+        )
+
+    def subsystem_signal(self, subsystem, port_id: str) -> str:
+        """Return ``'{sys_id}:{port_id}'`` for a subsystem output port."""
+        sys_id = self.subsystem_id(subsystem)
+        outputs = self.subsystems[sys_id].outputs
+        if port_id not in outputs:
+            raise ValueError(
+                f"Unknown output port {port_id!r} on subsystem {sys_id!r}; "
+                f"available: {', '.join(outputs) or '(none)'}"
+            )
+        return f"{sys_id}:{port_id}"
 
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
         """
@@ -509,7 +541,7 @@ class DiagramSystem(System):
 if __name__ == "__main__":
     # Hello world: unity-feedback loop  dx = Kp (r - x)
     from minilink.blocks.basic import Integrator
-    from minilink.control.linear import ProportionalController
+    from minilink.control.output import ProportionalController
 
     diagram = DiagramSystem()
     diagram.add_subsystem(ProportionalController(), "ctl")

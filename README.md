@@ -25,10 +25,10 @@ simulation state internally; state trajectories live in simulation results.
 ## Quick start
 
 ```python
-from minilink.control.linear import PDController
+from minilink.control.impedance import ImpedanceController
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-controller = PDController()
+controller = ImpedanceController()
 plant = Pendulum()
 
 plant.x0[0] = 2.0
@@ -82,7 +82,7 @@ step = Step(final_value=np.array([10.0]), step_time=2.0)
 diagram = step >> sys
 
 diagram.compute_trajectory(tf=20.0)
-diagram.plot_trajectory(signals=("x", "step:y"))
+diagram.plot_trajectory(signals=("x", "ref:y"))
 ```
 
 ### Diagrams from operators
@@ -337,7 +337,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | --- | --- |
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
-| `control` | control laws and design factories (`PIDController`, `FilteredPIDController`, `ProportionalController`, `LinearStateFeedbackController`, `lqr`) |
+| `control` | control laws and design factories (`ImpedanceIntegralController`, `FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`) |
 | `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |

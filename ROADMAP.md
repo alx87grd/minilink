@@ -113,7 +113,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 ### 5.2 Control
 
-- [x] `lqr.py`, `linear.py`, `pid.py` (`FilteredPIDController`)
+- [x] `lqr.py`, `linear.py`, `pid.py` (`FilteredController`)
 - [ ] `computed_torque.py`, `sliding_mode.py`
 - [ ] `robotic.py` — joint/effector PD/PID, kinematic, nullspace
 - [ ] `trajectory_lqr.py` — time-varying LQR along a reference

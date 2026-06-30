@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.sources import Step
-from minilink.control.pid import FilteredPIDController
+from minilink.control.siso import FilteredController
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
 step = Step()
@@ -15,7 +15,7 @@ step.params["step_time"] = 3.0
 sys = DoubleIntegrator()
 sys.name = "sys"
 
-pid = FilteredPIDController()
+pid = FilteredController()
 pid.params["kp"] = 5.0
 pid.params["ki"] = 1.0
 pid.params["kd"] = 3.0
@@ -34,7 +34,7 @@ sat = Saturation()
 sat.params["lower"] = -0.5
 sat.params["upper"] = 0.5
 
-pid2 = FilteredPIDController()
+pid2 = FilteredController()
 pid2.name = "pid2"
 pid2.params["kp"] = pid.params["kp"]
 pid2.params["ki"] = pid.params["ki"]

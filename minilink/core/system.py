@@ -86,6 +86,9 @@ class System(SystemFacades):
         # Human-readable identifier
         self.name = "System"
 
+        # Optional diagram subsystem key override (see composition shortcuts).
+        self.id = None
+
         # State metadata
         self.state = VectorSignal("x", dim=n)
 

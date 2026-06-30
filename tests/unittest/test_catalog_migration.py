@@ -146,13 +146,13 @@ class TestCatalogSmoke(unittest.TestCase):
     def test_manipulator_kinematics_reference_values(self):
         one = OneLinkManipulator()
         np.testing.assert_allclose(
-            one.forward_kinematic_effector(np.array([0.0])),
+            one.forward_kinematics(np.array([0.0])),
             [0.0, one.params["l1"]],
         )
 
         five = FiveLinkPlanarManipulator()
         np.testing.assert_allclose(
-            five.forward_kinematic_effector(np.zeros(5)),
+            five.forward_kinematics(np.zeros(5)),
             [0.0, np.sum(five.params["l"])],
         )
 

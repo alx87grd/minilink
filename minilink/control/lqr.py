@@ -3,7 +3,7 @@
 Array-in / block-out design factory (the dependency-law pattern for libraries):
 ``lqr_gain`` solves the continuous-time algebraic Riccati equation for the
 optimal gain, and ``lqr`` wraps it as a ready-to-wire
-:class:`~minilink.control.linear.LinearStateFeedbackController`.
+:class:`~minilink.control.state.StateFeedbackController`.
 
 ``lqr_at_operating_point`` linearizes a plant about ``(x_bar, u_bar)`` (via
 :func:`~minilink.analysis.linearize.linearize_matrices`, lazy-imported) and
@@ -16,7 +16,7 @@ For matrix-only design, pass Jacobians from any source into ``lqr_gain`` /
 import numpy as np
 from scipy.linalg import solve_continuous_are
 
-from minilink.control.linear import LinearStateFeedbackController
+from minilink.control.state import StateFeedbackController
 
 
 def lqr_gain(A, B, Q, R):
@@ -35,13 +35,13 @@ def lqr_gain(A, B, Q, R):
 
 
 def lqr(A, B, Q, R, xbar=None, ubar=None):
-    """Design an LQR and return a ``LinearStateFeedbackController``.
+    """Design an LQR and return a ``StateFeedbackController``.
 
     The block implements ``u = ubar - K (x - r)`` with ``r`` defaulting to
     ``xbar``; wire the plant state into its ``x`` port.
     """
     K = lqr_gain(A, B, Q, R)
-    return LinearStateFeedbackController(K, xbar=xbar, ubar=ubar)
+    return StateFeedbackController(K, xbar=xbar, ubar=ubar)
 
 
 def lqr_at_operating_point(
@@ -81,7 +81,7 @@ def lqr_at_operating_point(
 
     Returns
     -------
-    LinearStateFeedbackController
+    StateFeedbackController
         Full-state feedback trimmed about ``(x_bar, u_bar)``.
     """
     from minilink.analysis.linearize import linearize_matrices

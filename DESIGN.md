@@ -54,7 +54,7 @@ or neural network alike):
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
-| `control/` | control laws and design factories (`ProportionalController`, `PDController`, `PIDController`, `FilteredPIDController`, `LinearStateFeedbackController`, `lqr`) |
+| `control/` | control laws and design factories (`ProportionalController`, `ImpedanceController`, `ImpedanceIntegralController`, `FilteredController`, `StateFeedbackController`, `lqr`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -192,11 +192,30 @@ the main execution path (reference recursive path must stay equivalent).
 `connect()` validates port existence and dimensions at wiring time and is
 quiet by default (`connection_verbose=False`; set `True` for one line per connection).
 
-Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop,
-`autowire()` conservative fill. Diagram operands are flattened, not nested.
-Explicit `add_subsystem` / `connect` remains canonical for general topology.
+Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
+(with ``closed_loop(..., feedback="auto"|"y"|"qdq")`` and ``closed_loop_qdq``),
+`autowire()` conservative fill — **never inserts Mux**; use `feedback="qdq"` or
+`closed_loop_qdq` for explicit `Mux(q, dq)` wiring. Diagram operands are flattened,
+not nested. Explicit `add_subsystem` / `connect` remains canonical for general topology.
 Visualization: subsystem `"world"` geometry merges into one shared diagram
 `"world"` frame; only articulated frames get `{sys_id}:` prefixes.
+
+### Control feedback profiles
+
+Controllers in `control/` are grouped by **feedback profile** (module layout +
+optional class attribute `feedback_profile`, not inheritance):
+
+| Profile | Module | Measurement |
+| --- | --- | --- |
+| `output` | `output.py` | `y` (static output error) |
+| `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n` |
+| `state` | `state.py` | full state `x` |
+| `siso` | `siso.py` | `y` dim `n` only (decoupled loops) |
+| `impedance` | `impedance.py` | `[pos; rate]` on `y`; optional robotic `+ g(q)` via `robotic.py` |
+| `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)`` |
+
+Model-based laws (`ComputedTorqueController`, …) live in `modelbased.py` with
+tag `modelbased`. See [`docs/plans/robot-control-stack.md`](docs/plans/robot-control-stack.md).
 
 ### `Trajectory`, sets, costs, geometry
 

@@ -97,8 +97,8 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Control | `pyro/control/lqr.py` | synthesize_lqr_controller | `minilink/control/lqr.py` | synthesize_lqr | **Done** |  |
 | Control | `pyro/control/lqr.py` | linearize_and_synthesize_lqr_controller | `minilink/control/lqr.py` | linearize + synthesize_lqr | **Done** |  |
 | Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/lqr.py` | — | **TODO** | Trajectory stabilization demos |
-| Control | `pyro/control/nonlinear.py` | ComputedTorqueController | `minilink/control/` | — | **TODO** | control/computed_torque.py |
-| Control | `pyro/control/nonlinear.py` | SlidingModeController | `minilink/control/` | — | **TODO** | control/sliding_mode.py |
+| Control | `pyro/control/nonlinear.py` | ComputedTorqueController | `minilink/control/` | — | **TODO** | control/modelbased.py |
+| Control | `pyro/control/nonlinear.py` | SlidingModeController | `minilink/control/` | — | **TODO** | control/modelbased.py |
 | Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/` | — | **TODO** | control/robotic.py |
 | Control | `pyro/control/reinforcementlearning.py` | stable_baseline3_controller | `minilink/interfaces/` | — | **TODO** | Train outside; gymnasium stub |
 | Analysis | `pyro/analysis/simulation.py` | Trajectory | `minilink/core/trajectory.py` | Trajectory | **Done** |  |
@@ -216,10 +216,10 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/cartpole_rotating/cartpole_modes.py` | **Partial** | Use demo_modal.py + open-loop sim |
 | `demos_by_system/cartpole_rotating/cartpole_natural_behavior.py` | **TODO** | Representative closed-loop for cartpole_rotating |
 | `demos_by_system/cartpole_rotating/cartpole_swingup_trajectory_optimisation.py` | **Partial** | Trajopt done; plant-specific demo TODO |
-| `demos_by_system/cartpole_rotating/cartpole_with_computed_torque.py` | **TODO** | control/computed_torque.py |
-| `demos_by_system/cartpole_rotating/cartpole_with_rrt_and_computed_torque.py` | **TODO** | control/computed_torque.py |
+| `demos_by_system/cartpole_rotating/cartpole_with_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/cartpole_rotating/cartpole_with_rrt_and_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/cartpole_rotating/underactuated_cartpole_swingup.py` | **TODO** | Representative closed-loop for cartpole_rotating |
-| `demos_by_system/cartpole_rotating/underactuated_cartpole_with_partialfeedbacklinearization.py` | **TODO** | control/sliding_mode.py |
+| `demos_by_system/cartpole_rotating/underactuated_cartpole_with_partialfeedbacklinearization.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/cartpole_rotating/underactuated_cartpole_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
 | `demos_by_system/cartpole_rotating/undercartpole_with_rrt_and_direct_colocation.py` | **Partial** | RRT done; plant-specific demo TODO |
 | `demos_by_system/drone/planar_drone_trajectory_optimisation.py` | **Partial** | Trajopt done; plant-specific demo TODO |
@@ -247,36 +247,36 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/pendulum_double/double_pendulum.py` | **TODO** | Representative closed-loop for pendulum_double |
 | `demos_by_system/pendulum_double/double_pendulum_game.py` | **Drop** | sys2game interactive game |
 | `demos_by_system/pendulum_double/double_pendulum_modes.py` | **Partial** | Use demo_modal.py + open-loop sim |
-| `demos_by_system/pendulum_double/double_pendulum_with_computed_torque.py` | **TODO** | control/computed_torque.py |
-| `demos_by_system/pendulum_double/double_pendulum_with_computed_torque_and_sinus_ref.py` | **TODO** | control/computed_torque.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_computed_torque_and_sinus_ref.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_double/double_pendulum_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/pendulum_double/double_pendulum_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
-| `demos_by_system/pendulum_double/double_pendulum_with_rrt_and_computed_torque.py` | **TODO** | control/computed_torque.py |
-| `demos_by_system/pendulum_double/double_pendulum_with_sliding_mode.py` | **TODO** | control/sliding_mode.py |
-| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/computed_torque.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_rrt_and_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_sliding_mode.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_open_loop_controller.py` | **TODO** | Representative closed-loop for pendulum_double |
-| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/sliding_mode.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_double/double_pendulum_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
-| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_optimization_and_computed_torque.py` | **TODO** | control/computed_torque.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_optimization_and_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_simple/pendulum_game.py` | **Drop** | sys2game interactive game |
 | `demos_by_system/pendulum_simple/simple_pendulum.py` | **TODO** | Representative closed-loop for pendulum_simple |
 | `demos_by_system/pendulum_simple/simple_pendulum_custom_parameters.py` | **TODO** | Representative closed-loop for pendulum_simple |
 | `demos_by_system/pendulum_simple/simple_pendulum_modes.py` | **Partial** | Use demo_modal.py + open-loop sim |
 | `demos_by_system/pendulum_simple/simple_pendulum_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_computed_torque.py` | **TODO** | control/computed_torque.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_open_loop_controller.py` | **TODO** | Representative closed-loop for pendulum_simple |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_rrt.py` | **Done** | examples/scripts/planning/rrt/demo_pendulum_swingup.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_sliding_mode_controller.py` | **TODO** | control/sliding_mode.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/computed_torque.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/sliding_mode.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | demo_basics.py (mass) + demo_pendulum.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_quadratic.py` | **Done** | demo_pendulum.py |
 | `demos_by_system/plane/plane_cobra.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/plane/plane_simple_controller.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/robot_arm_1dof/onelinkrobot_joint_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
-| `demos_by_system/robot_arm_2dof/twolinkrobot_computed_torque_controller.py` | **TODO** | control/computed_torque.py |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_computed_torque_controller.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_effector_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_effector_pid_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_joint_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
@@ -284,9 +284,9 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/robot_arm_2dof/twolinkrobot_kinematic_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_kinematic_vs_dynamic_openloop.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_quasi_static_controllers.py` | **TODO** | control/robotic.py + manipulator rebase |
-| `demos_by_system/robot_arm_2dof/twolinkrobot_sliding_mode_controller.py` | **TODO** | control/sliding_mode.py |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_with_obstacles_path_planning.py` | **TODO** | control/robotic.py + manipulator rebase |
-| `demos_by_system/robot_arm_3dof/threelinkrobot_computed_torque_controller.py` | **TODO** | control/computed_torque.py |
+| `demos_by_system/robot_arm_3dof/threelinkrobot_computed_torque_controller.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/robot_arm_3dof/threelinkrobot_effector_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_3dof/threelinkrobot_effector_pid_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_3dof/threelinkrobot_joint_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
@@ -320,7 +320,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_demo.py` | **Done** | examples/scripts/planning/value_iteration/demo_pendulum.py |
 | `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | demo_pendulum.py (grid tuning differs) |
 | `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | ReachabilityCost exists; demo TODO |
-| `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/computed_torque.py |
+| `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_tool/lqr_vs_valueiteration_for_a_simple_pendulum.py` | **Done** | demo_pendulum.py Part 2 |
 | `demos_by_tool/optimal_control_demo.py` | **TODO** | Not yet audited |
 | `demos_by_tool/rl_with_stable_baseline3/double_pendulum_with_ppo.py` | **Drop** | External SB3 training |
@@ -464,7 +464,7 @@ Ordered by unblock count:
 
 | Priority | Work | Unblocks |
 | --- | --- | --- |
-| P2 | `Manipulator` catalog rebase + `control/computed_torque.py`, `sliding_mode.py`, `robotic.py` | ~50 robot/pendulum nonlinear-control demos |
+| P2 | `Manipulator` catalog rebase + `control/modelbased.py`, `control/robotic.py` | ~50 robot/pendulum nonlinear-control demos |
 | P2 | `TrajectoryLQRController` | trajectory_stabilization/ demos |
 | P3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
 | P3 | `estimation/luenberger.py`, `kalman.py` | LQG demos |

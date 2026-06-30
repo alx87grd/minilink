@@ -210,6 +210,30 @@ H(q) q̈ + C(q, q̇) q̇ + g(q) + d(q, q̇, u, t) = B(q) u
 One `forward_kinematics` / `J` definition serves **ports**, **animation**, and
 future **`control/robotic.py`** blocks.
 
+## Closed-loop wiring (implemented)
+
+Use [`closed_loop`](../../minilink/core/composition.py) / `@` with
+`feedback="auto"` (default), `"y"`, or `"qdq"`:
+
+| Situation | Wiring |
+| --- | --- |
+| Pendulum `@` | `plant.y → controller.y` (dims match) |
+| Teach split joint ports | `closed_loop_qdq(ctl, arm)` → Mux(`q`,`dq`) |
+| Augmented `x` (actuator states) | `auto` → Mux when `y` dim mismatches |
+| LQR | `plant.x → controller.x` |
+| Task impedance | Manual Mux(`p`,`pdot`) + `plant.q` for `J^T` |
+
+`autowire()` never inserts Mux — only connects `plant.y` when dims match.
+
+Joint impedance demo pattern:
+
+```python
+from minilink.core.composition import closed_loop_qdq
+from minilink.control.impedance import ImpedanceController
+
+closed_loop_qdq(ImpedanceController(dof=2), TwoLinkManipulator())
+```
+
 ## Relation to future controllers
 
 Naming alignment for `control/robotic.py` (planned):
@@ -267,9 +291,8 @@ def h_pdot(self, x, u, t=0, params=None):
 
 ## Enables (blocked today)
 
-- `control/computed_torque.py` — `inverse_dynamics`, ports `q`, `dq`
-- `control/robotic.py` — joint / operational-space laws
-- `control/sliding_mode.py`
+- `control/robotic.py` — joint / task impedance wrappers (Pyro `robotcontrollers.py`)
+- `control/modelbased.py` — computed torque, sliding mode (Pyro `nonlinear.py`)
 - Obstacle checks on `p` instead of per-plant `*withObstacles` subclasses
 
 ## Smallest remaining slice (when approved)

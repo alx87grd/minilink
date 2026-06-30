@@ -55,12 +55,12 @@ class TraceablePendulum(DynamicSystem):
         return x
 
 
-class TraceablePDController(StaticSystem):
+class TraceableImpedanceController(StaticSystem):
     """u = Kp (r − θ) − Kd dθ, with full-state measurement (JAX-traceable)."""
 
     def __init__(self):
         super().__init__()
-        self.name = "TraceablePDController"
+        self.name = "TraceableImpedanceController"
         self.params = {"Kp": 12.0, "Kd": 4.0}
         self.add_input_port("r", dim=1)
         self.add_input_port("y", dim=2)
@@ -115,7 +115,7 @@ print("=" * 70)
 
 diagram = DiagramSystem()
 diagram.connection_verbose = False
-diagram.add_subsystem(TraceablePDController(), "ctl")
+diagram.add_subsystem(TraceableImpedanceController(), "ctl")
 diagram.add_subsystem(TraceablePendulum(), "plant")
 diagram.add_input_port("r", dim=1)
 diagram.connect("input", "r", "ctl", "r")

@@ -2,7 +2,7 @@ import numpy as np
 
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
-from minilink.dynamics.abstraction.mechanical import MechanicalSystem
+from minilink.dynamics.abstraction.manipulator import Manipulator
 from minilink.graphical.animation.primitives import (
     Arrow,
     Circle,
@@ -22,6 +22,13 @@ def _planar_joint_positions(q, lengths):
         step = length * np.array([np.sin(angle), np.cos(angle)])
         points.append(points[-1] + step)
     return np.asarray(points), angles
+
+
+def _set_planar_reach_camera(manipulator, reach):
+    """Match orthographic zoom to planar arm reach (``System.camera_scale``)."""
+    reach = float(reach)
+    manipulator.camera_scale = max(1.5 * reach, 0.35)
+    manipulator.camera_target = np.array([0.0, 0.5 * reach, 0.0])
 
 
 def _planar_kinematic_geometry(lengths):
@@ -71,13 +78,17 @@ def _planar_velocity_geometry(velocity):
 
 
 def _planar_torque_geometry(lengths, u, upper_bound):
-    """Per-frame joint torque arcs (honest, keyed to the ``link{i}`` frames)."""
+    """Per-frame joint torque arcs (honest, keyed to the ``link{i}`` frames).
+
+    Sweep sign matches :class:`~minilink.dynamics.catalog.pendulum.double_pendulum.DoublePendulum`
+    (negated ``u``) for the shared ``q=0`` upright / ``+y`` link convention.
+    """
     torque_radius = 0.2 * max(float(np.max(lengths)), 1e-12)
     dynamic = {}
     for i in range(len(lengths)):
         limit = float(abs(upper_bound[i])) if np.isfinite(upper_bound[i]) else 5.0
         limit = max(limit, 1.0)
-        sweep = u[i] * (2.0 * np.pi / 3.0) / limit
+        sweep = -u[i] * (2.0 * np.pi / 3.0) / limit
         arc = TorqueArrow(
             sweep=sweep,
             radius=torque_radius,
@@ -109,6 +120,7 @@ class SpeedControlledManipulator(DynamicSystem):
         self.inputs["u"].units = ["rad/s"] * self.dof
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        _set_planar_reach_camera(self, float(np.sum(self._link_lengths())))
 
     def f(self, x, u, t=0.0, params=None):
         # velocity-controlled joints: the input is the joint-rate command
@@ -117,10 +129,10 @@ class SpeedControlledManipulator(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def forward_kinematic_effector(self, q):
+    def forward_kinematics(self, q, params=None):
         return np.zeros(self.effector_dim)
 
-    def J(self, q):
+    def J(self, q, params=None):
         return np.zeros((self.effector_dim, self.dof))
 
     def forward_differential_kinematic_effector(self, q, dq):
@@ -137,7 +149,7 @@ class SpeedControlledManipulator(DynamicSystem):
     def tf(self, x, u, t=0, params=None):
         lengths = self._link_lengths()
         points, angles = _planar_joint_positions(x, lengths)
-        effector = self.forward_kinematic_effector(x)
+        effector = self.forward_kinematics(x)
         return _planar_frames(points, angles, effector)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
@@ -145,11 +157,11 @@ class SpeedControlledManipulator(DynamicSystem):
         return _planar_velocity_geometry(velocity)
 
 
-class OneLinkManipulator(MechanicalSystem):
+class OneLinkManipulator(Manipulator):
     """One-link planar manipulator."""
 
     def __init__(self):
-        super().__init__(dof=1, actuators=1)
+        super().__init__(dof=1, actuators=1, task_dim=2)
         self.name = "One Link Manipulator"
         self.params = {
             "l1": 2.5,
@@ -165,6 +177,7 @@ class OneLinkManipulator(MechanicalSystem):
         self.inputs["u"].units = ["Nm"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        _set_planar_reach_camera(self, self.params["l1"])
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -194,11 +207,11 @@ class OneLinkManipulator(MechanicalSystem):
         # linear viscous joint damping
         return np.array([d1 * dq[0]])
 
-    def forward_kinematic_effector(self, q):
+    def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
         return np.array([l1 * np.sin(q[0]), l1 * np.cos(q[0])])
 
-    def J(self, q):
+    def J(self, q, params=None):
         l1 = self.params["l1"]
         # fmt: off
         return np.array([
@@ -221,11 +234,11 @@ class OneLinkManipulator(MechanicalSystem):
         )
 
 
-class TwoLinkManipulator(MechanicalSystem):
+class TwoLinkManipulator(Manipulator):
     """Two-link planar manipulator."""
 
     def __init__(self):
-        super().__init__(dof=2, actuators=2)
+        super().__init__(dof=2, actuators=2, task_dim=2)
         self.name = "Two Link Manipulator"
         self.params = {
             "l1": 0.5,
@@ -246,6 +259,7 @@ class TwoLinkManipulator(MechanicalSystem):
         self.inputs["u"].units = ["Nm", "Nm"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        _set_planar_reach_camera(self, self.params["l1"] + self.params["l2"])
 
     def _trig(self, q):
         return (
@@ -321,14 +335,14 @@ class TwoLinkManipulator(MechanicalSystem):
         # linear viscous joint damping
         return np.diag([d1, d2]) @ dq
 
-    def forward_kinematic_effector(self, q):
+    def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         _, s1, _, _, c12, s12 = self._trig(q)
         c1 = np.cos(q[0])
         return np.array([l1 * s1 + l2 * s12, l1 * c1 + l2 * c12])
 
-    def J(self, q):
+    def J(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         c1, s1, _, _, c12, s12 = self._trig(q)
@@ -354,11 +368,11 @@ class TwoLinkManipulator(MechanicalSystem):
         return _planar_torque_geometry(self._lengths(), u, self.inputs["u"].upper_bound)
 
 
-class ThreeLinkManipulator3D(MechanicalSystem):
+class ThreeLinkManipulator3D(Manipulator):
     """Three-link spatial manipulator from the Pyro catalog."""
 
     def __init__(self):
-        super().__init__(dof=3, actuators=3)
+        super().__init__(dof=3, actuators=3, task_dim=3)
         self.name = "Three Link Manipulator 3D"
         self.params = {
             "l1": 1.0,
@@ -395,6 +409,9 @@ class ThreeLinkManipulator3D(MechanicalSystem):
         self.inputs["u"].units = ["Nm", "Nm", "Nm"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        reach = self.params["l1"] + self.params["l2"] + self.params["l3"]
+        self.camera_scale = max(1.5 * reach, 0.5)
+        self.camera_target = np.array([0.0, 0.0, -0.5 * reach])
 
     def _trig(self, q):
         c1, s1 = np.cos(q[0]), np.sin(q[0])
@@ -501,7 +518,7 @@ class ThreeLinkManipulator3D(MechanicalSystem):
         # linear viscous joint damping
         return np.diag([d1, d2, d3]) @ dq
 
-    def forward_kinematic_effector(self, q):
+    def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         l3 = self.params["l3"]
@@ -509,7 +526,7 @@ class ThreeLinkManipulator3D(MechanicalSystem):
         radius = l2 * c2 + l3 * c23
         return np.array([radius * c1, radius * s1, l1 - l2 * s2 - l3 * s23])
 
-    def J(self, q):
+    def J(self, q, params=None):
         l2 = self.params["l2"]
         l3 = self.params["l3"]
         c1, s1, c2, s2, _, _, c23, s23 = self._trig(q)
@@ -565,13 +582,18 @@ class ThreeLinkManipulator3D(MechanicalSystem):
         }
 
 
-class FiveLinkPlanarManipulator(MechanicalSystem):
-    """Five-link planar manipulator with Pyro's default unit joint dynamics."""
+class FiveLinkPlanarManipulator(Manipulator):
+    """Five-link planar manipulator with Pyro's default unit joint dynamics.
+
+    Kinematics and Jacobian are fully specified; dynamics use the
+    :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`
+    placeholder ``H = I`` (no gravity/Coriolis). Prefer one- to three-link
+    arms for computed-torque demos.
+    """
 
     def __init__(self):
-        super().__init__(dof=5, actuators=5)
+        super().__init__(dof=5, actuators=5, task_dim=2)
         self.name = "Five Link Planar Manipulator"
-        self.effector_dim = 2
         self.params = {"l": np.array([0.5, 0.5, 0.5, 0.5, 0.5])}
         self.state.labels = [
             "theta1",
@@ -590,17 +612,18 @@ class FiveLinkPlanarManipulator(MechanicalSystem):
         self.inputs["u"].units = ["Nm"] * self.dof
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        _set_planar_reach_camera(self, float(np.sum(self.params["l"])))
 
     def _absolute_trig(self, q):
         angles = np.cumsum(q)
         return np.cos(angles), np.sin(angles)
 
-    def forward_kinematic_effector(self, q):
+    def forward_kinematics(self, q, params=None):
         l = self.params["l"]
         cos_abs, sin_abs = self._absolute_trig(q)
         return np.array([np.sum(l * sin_abs), np.sum(l * cos_abs)])
 
-    def J(self, q):
+    def J(self, q, params=None):
         l = self.params["l"]
         cos_abs, sin_abs = self._absolute_trig(q)
         J = np.zeros((2, self.dof))

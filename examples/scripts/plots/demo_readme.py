@@ -1,8 +1,8 @@
 ########################################################
-from minilink.control.linear import PDController
+from minilink.control.impedance import ImpedanceController
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-controller = PDController()  # u = Kp * (r - theta) - Kd * theta_dot
+controller = ImpedanceController()  # u = Kp * (r - theta) - Kd * theta_dot
 plant = Pendulum()  # theta_ddot = -(g / l) * sin(theta) + tau / (m * l**2)
 
 plant.x0[0] = 2.0
@@ -56,4 +56,4 @@ step.params["step_time"] = 2.0
 diagram = step >> sys
 diagram.plot_diagram()
 diagram.compute_trajectory(tf=20.0)
-diagram.plot_trajectory(signals=("x", "step:y"))
+diagram.plot_trajectory(signals=("x", (step, "y")))

@@ -3,7 +3,7 @@ import unittest
 import pytest
 
 from minilink.blocks.basic import Integrator
-from minilink.control.linear import ProportionalController
+from minilink.control.output import ProportionalController
 from minilink.core.diagram import DiagramSystem
 from minilink.graphical.diagrams import (
     build_diagram_topology,
