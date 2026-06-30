@@ -10,7 +10,8 @@ third-party print formatting. Prefer one parametrized or table-driven test over
 many near-duplicate files. Deep dynamics checks for a few representative plants
 live in `test_catalog_plant_contracts.py`; broad catalog smoke in
 `test_catalog_migration.py`; kinematic render smoke in
-`test_kinematic_regression.py` (manifest only — PNGs are local/gitignored).
+`test_kinematic_regression.py` (manifest under `tests/fixtures/kinematic_baseline/`).
+Regenerate manifest: `python tests/fixtures/kinematic_baseline/regenerate_manifest.py`.
 
 Shared fixtures: `graphics_contract_helpers.py` (draw-list resolution),
 `planning_helpers.py` (RRT holonomic obstacle scene).

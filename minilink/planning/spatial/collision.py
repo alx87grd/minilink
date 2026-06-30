@@ -84,7 +84,9 @@ def point_probe() -> Sphere:
     return Sphere(np.zeros(2), 0.0)
 
 
-def car_outline(length: float, width: float, *, margin: float = 0.0) -> tuple[Sphere, ...]:
+def car_outline(
+    length: float, width: float, *, margin: float = 0.0
+) -> tuple[Sphere, ...]:
     """
     Body-frame rectangular car footprint: corners and edge midpoints.
 
@@ -125,7 +127,9 @@ def bind(sys, spec, *, frame: str = "body") -> CollisionBody:
         and len(spec[0]) == 2
         and isinstance(spec[0][0], str)
     ):
-        bindings = tuple((frame_key, _normalize_shapes(geometry)) for frame_key, geometry in spec)
+        bindings = tuple(
+            (frame_key, _normalize_shapes(geometry)) for frame_key, geometry in spec
+        )
     else:
         bindings = ((frame, _normalize_shapes(spec)),)
     return _BoundCollisionBody(sys, bindings)
@@ -246,7 +250,9 @@ def car(length, width, *, position=(0, 1), heading=2, margin=0.0) -> PlanarRigid
 
     Same probe layout as :func:`car_outline`, with pose from ``position``/``heading`` indices.
     """
-    return PlanarRigidBody(car_outline(length, width, margin=margin), position=position, heading=heading)
+    return PlanarRigidBody(
+        car_outline(length, width, margin=margin), position=position, heading=heading
+    )
 
 
 def collision_spheres(shape: Shape) -> tuple:

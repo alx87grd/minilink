@@ -16,8 +16,14 @@ import numpy as np
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import JaxDynamicBicycleRateInputs
-from minilink.graphical.animation.primitives import CustomLine, HorizonPolyline, TrajectoryPolyline
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
+    JaxDynamicBicycleRateInputs,
+)
+from minilink.graphical.animation.primitives import (
+    CustomLine,
+    HorizonPolyline,
+    TrajectoryPolyline,
+)
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -149,10 +155,7 @@ while t < TF_SIM - 1e-12:
 
         plan = planner.compute_solution(initial_guess=guess)
         res = planner.last_optimization_result
-        print(
-            f"MPC @ t={t:.2f}s  success={res.success}  "
-            f"solve={res.solve_time_s:.3f}s"
-        )
+        print(f"MPC @ t={t:.2f}s  success={res.success}  solve={res.solve_time_s:.3f}s")
         prev_plan = plan
         u_hold = plan.u[:, 0].copy()
         mpc_plans.append(

@@ -128,10 +128,7 @@ class TestANCFTireJax(unittest.TestCase):
         )
         dynamic = sys.get_dynamic_geometry(sys.x0, np.zeros(sys.m), 0.0)
         force_lines = dynamic["world"][model.n_nodes :]
-        spans = [
-            np.linalg.norm(line.pts[-1] - line.pts[0])
-            for line in force_lines
-        ]
+        spans = [np.linalg.norm(line.pts[-1] - line.pts[0]) for line in force_lines]
         self.assertGreater(float(np.max(spans)), 0.0)
 
     def test_contact_force_vectors_hide_without_contact(self):

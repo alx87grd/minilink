@@ -189,7 +189,7 @@ Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) (June 
 | --- | ---: | ---: | ---: |
 | Catalog plants | 40+ | 40+ | **0** (QA complete) |
 | Library modules | 38 | ~25 equivalent | **~10 tools** (control nonlinear/robot, DP, RRT, traj gen, estimation, interfaces) |
-| Example scripts | 195 | 53 | **~142** |
+| Example scripts | 195 | 52 | **~143** |
 | Course notebooks | 3 | 7 (new topics) | different mix |
 
 ### Port phases (from gap doc)

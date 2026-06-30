@@ -12,6 +12,7 @@ from contextlib import redirect_stdout
 
 import numpy as np
 
+from benchmarks.dynamic_programming import benchmark_backend
 from benchmarks.f_evaluators import FEvaluatorBenchmarkVariant, benchmark_f_evaluators
 from benchmarks.optimization import (
     STANDARD_OPTIMIZATION_CASES,
@@ -19,6 +20,7 @@ from benchmarks.optimization import (
     benchmark_optimizer_backends,
     print_optimizer_benchmark,
 )
+from benchmarks.planning_rrt import benchmark_nearest_backend, holonomic_problem
 from benchmarks.simulation import (
     TRUTH_SIMULATION_VARIANT,
     SimulationBenchmarkVariant,
@@ -31,6 +33,7 @@ from benchmarks.trajopt import (
     benchmark_trajectory_optimization,
 )
 from minilink.core.system import DynamicSystem
+from minilink.planning.search.rrt import RRTPlanner
 
 
 class _TinyStable(DynamicSystem):
@@ -116,6 +119,22 @@ class TestBenchmarkSmoke(unittest.TestCase):
         )
         self.assertTrue(matrix.compile_once)
         self.assertEqual(len(matrix.rows), 2)
+
+    def test_dp_benchmark_backend_returns_row(self):
+        row = benchmark_backend("loop", (5, 5), (3,), n_steps=2, runs=1)
+        self.assertEqual(row.backend, "loop")
+        self.assertGreater(row.build_s, 0.0)
+        self.assertEqual(row.iterations, 2)
+
+    def test_planning_rrt_fixture_and_benchmark_row(self):
+        problem, extender, x_goal = holonomic_problem()
+        self.assertEqual(problem.sys.n, 2)
+        self.assertIsNotNone(extender)
+        self.assertEqual(x_goal.shape, (2,))
+        row = benchmark_nearest_backend(RRTPlanner, "brute_force", seed=0)
+        self.assertEqual(row.planner, "rrt")
+        self.assertEqual(row.backend, "brute_force")
+        self.assertGreater(row.elapsed_s, 0.0)
 
 
 if __name__ == "__main__":

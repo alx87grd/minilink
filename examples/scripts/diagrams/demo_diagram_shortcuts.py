@@ -8,7 +8,7 @@ Run from the repo root:
 from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.linear import PDController
-from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort, Pendulum
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum, PendulumWithNoisePort
 
 
 def show(diagram, name, operation):

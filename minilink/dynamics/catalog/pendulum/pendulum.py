@@ -217,8 +217,7 @@ class TwoIndependentPendulums(MechanicalSystem):
         length = self.params["l"]
         anchors = [-0.6 * length, 0.6 * length]
         return {
-            f"link{i}": SE2(anchor_x, 0.0, x[i])
-            for i, anchor_x in enumerate(anchors)
+            f"link{i}": SE2(anchor_x, 0.0, x[i]) for i, anchor_x in enumerate(anchors)
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):

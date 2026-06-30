@@ -165,7 +165,9 @@ def _shape_to_primitives(shape, *, color, opacity):
             color=color,
             opacity=opacity,
         )
-        box.local_transform = translation(center[0], center[1], center[2] if center.size > 2 else 0.0)
+        box.local_transform = translation(
+            center[0], center[1], center[2] if center.size > 2 else 0.0
+        )
         return [box]
 
     if isinstance(shape, Inflated):
@@ -183,7 +185,9 @@ def _shape_to_primitives(shape, *, color, opacity):
             out.extend(_shape_to_primitives(member, color=color, opacity=opacity))
         return out
 
-    raise TypeError(f"unsupported obstacle shape for visualization: {type(shape).__name__}")
+    raise TypeError(
+        f"unsupported obstacle shape for visualization: {type(shape).__name__}"
+    )
 
 
 class SceneVisualizer(Overlay):

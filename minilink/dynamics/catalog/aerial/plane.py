@@ -220,7 +220,9 @@ class Plane2D(MechanicalSystem):
         return {
             "body": SE2(q[0], q[1], q[2]),
             "center": SE2(q[0], q[1], 0.0),
-            "wingchord": segment_pose_2d(wing - chord_w * dir_w, wing + chord_w * dir_w),
+            "wingchord": segment_pose_2d(
+                wing - chord_w * dir_w, wing + chord_w * dir_w
+            ),
             "tailchord": segment_pose_2d(
                 tail - chord_t * dir_t, tail + chord_t * dir_t
             ),

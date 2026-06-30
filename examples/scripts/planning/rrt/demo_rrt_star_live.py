@@ -132,9 +132,7 @@ print(f"  best path cost={planner.best_goal_cost:.3f}  goal error={goal_error:.3
 print(f"  elapsed={elapsed:.2f} s  stop reason: {stop_reason}")
 
 if REPLAY_HISTORY and planner.history:
-    first_goal = next(
-        (frame for frame in planner.history if frame.reached_goal), None
-    )
+    first_goal = next((frame for frame in planner.history if frame.reached_goal), None)
     if first_goal is not None:
         print(
             f"  first goal at extension {first_goal.iteration}, "
@@ -142,8 +140,7 @@ if REPLAY_HISTORY and planner.history:
         )
         final_cost = planner.history[-1].best_cost
         print(
-            f"  final cost={final_cost:.3f} "
-            f"(Δ={first_goal.best_cost - final_cost:.3f})"
+            f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost - final_cost:.3f})"
         )
 
 if LIVE_PLOT:

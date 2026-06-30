@@ -11,7 +11,11 @@ sys.x0[0] = 2.0
 
 # sys.compute_trajectory(tf=10, show=False)
 
-t2u = lambda t: 3.0 * np.sin(10.0 * t)
+
+def t2u(t):
+    return 3.0 * np.sin(10.0 * t)
+
+
 traj = sys.compute_forced(u=t2u, tf=5.0, show=False, input_port_id="u")
 
 

@@ -168,8 +168,7 @@ class TestAdvancedPlotting(unittest.TestCase):
 
         diagram = (
             Step(final_value=[1.0], step_time=0.0)
-            >> FilteredPIDController()
-            @ DoubleIntegrator()
+            >> FilteredPIDController() @ DoubleIntegrator()
         )
 
         self.assertEqual(

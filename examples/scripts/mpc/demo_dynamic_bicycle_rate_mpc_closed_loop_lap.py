@@ -31,8 +31,8 @@ from minilink.graphical.animation.primitives import (
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.collision import bind, car_outline
+from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
     inverse_barrier,
@@ -142,7 +142,7 @@ def rounded_rect_loop_waypoints(
     h2 = height / 2.0
     r = radius
     hx = w2 - r
-    hy = h2 - r
+    _ = h2 - r
 
     start = np.array([[cx - hx, cy - h2]])
     bottom = np.linspace([cx - hx, cy - h2], [cx + hx, cy - h2], 5)[1:]
@@ -437,4 +437,6 @@ sys_sim.params = dict(sys_sim.params)
 sys_sim.camera_scale = CAMERA_SCALE
 sys_sim.traj = traj
 sys_sim.plot_trajectory(signals=("x", "u"))
-sys_sim.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history])
+sys_sim.animate(
+    traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history]
+)

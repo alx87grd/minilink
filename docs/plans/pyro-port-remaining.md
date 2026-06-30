@@ -29,7 +29,7 @@ Living checklist (June 2026). Historical gap analysis:
 
 ## Demo gap
 
-- Pyro reports ~195 example scripts; minilink has 53 under `examples/scripts/` plus 7 notebooks.
+- Pyro reports ~195 example scripts; minilink has 52 under `examples/scripts/` plus 7 notebooks.
 - No `examples/courses/` or `examples/projects/` (pyro paths never created here).
 - Priority: closed-loop showcases per major plant band, not 1:1 filename parity.
 

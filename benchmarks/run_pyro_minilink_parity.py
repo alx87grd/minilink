@@ -21,7 +21,6 @@ Environment variables:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import subprocess
 import sys
@@ -106,20 +105,28 @@ def _print_table(rows: list[ParityRow]) -> None:
         j0 = f"{r.j_at_start:8.2f}" if r.j_at_start is not None else "     n/a"
         ge = f"{r.goal_error:7.3f}" if r.goal_error is not None else "    n/a"
         nodes = f"{r.nodes:7d}" if r.nodes is not None else "    n/a"
-        backend = format_benchmark_backend_label(r.backend) if r.backend == "jax" else r.backend
+        backend = (
+            format_benchmark_backend_label(r.backend)
+            if r.backend == "jax"
+            else r.backend
+        )
         print(
             f"{r.case:22} {r.framework:8} {backend:14} {ok:>3} "
             f"{r.build_s:7.2f} {r.solve_s:7.2f} {r.sim_s:6.2f} {r.total_s:7.2f} "
             f"{j0} {ge} {nodes}  {r.notes}"
         )
     print("-" * 120)
-    print("times [s]: build = grid/x_next; solve = Bellman or RRT; sim = closed-loop roll-out")
+    print(
+        "times [s]: build = grid/x_next; solve = Bellman or RRT; sim = closed-loop roll-out"
+    )
 
 
 def _parity_verdict(pyro: ParityRow, mini: ParityRow) -> list[str]:
     lines = []
     if mini.success and not pyro.success:
-        lines.append(f"  {mini.case}/{mini.backend}: minilink succeeds where pyro failed")
+        lines.append(
+            f"  {mini.case}/{mini.backend}: minilink succeeds where pyro failed"
+        )
     elif not mini.success and pyro.success:
         lines.append(f"  FAIL {mini.case}/{mini.backend}: minilink did not reach goal")
     else:
@@ -138,7 +145,9 @@ def _parity_verdict(pyro: ParityRow, mini: ParityRow) -> list[str]:
     if mini.j_at_start is not None and pyro.j_at_start is not None:
         dj = abs(mini.j_at_start - pyro.j_at_start)
         if dj < max(2.0, 0.05 * abs(pyro.j_at_start)):
-            lines.append(f"    J(x0) {mini.j_at_start:.2f} vs pyro {pyro.j_at_start:.2f} — ok")
+            lines.append(
+                f"    J(x0) {mini.j_at_start:.2f} vs pyro {pyro.j_at_start:.2f} — ok"
+            )
         else:
             lines.append(
                 f"    WARN J(x0) gap {dj:.2f} (mini {mini.j_at_start:.2f}, pyro {pyro.j_at_start:.2f})"
@@ -146,8 +155,12 @@ def _parity_verdict(pyro: ParityRow, mini: ParityRow) -> list[str]:
 
     if mini.total_s > 0 and pyro.total_s > 0:
         speedup = pyro.total_s / mini.total_s
-        tag = "faster" if speedup > 1.05 else ("slower" if speedup < 0.95 else "similar")
-        lines.append(f"    total time {mini.total_s:.2f}s vs pyro {pyro.total_s:.2f}s ({speedup:.2f}x, {tag})")
+        tag = (
+            "faster" if speedup > 1.05 else ("slower" if speedup < 0.95 else "similar")
+        )
+        lines.append(
+            f"    total time {mini.total_s:.2f}s vs pyro {pyro.total_s:.2f}s ({speedup:.2f}x, {tag})"
+        )
     return lines
 
 
@@ -179,7 +192,7 @@ def run_pendulum_dp(*, fast: bool) -> list[ParityRow]:
         rows.append(mini)
         print(
             f"  minilink/{backend} done in {mini.total_s:.2f}s "
-            f"(success={mini.success}, elapsed {time.perf_counter()-t0:.1f}s)"
+            f"(success={mini.success}, elapsed {time.perf_counter() - t0:.1f}s)"
         )
     return rows
 
@@ -260,7 +273,7 @@ def main() -> None:
             for line in _parity_verdict(pyro_dp, mini):
                 print(line)
 
-    pyro_ddp = by_key.get(("double_pendulum_dp", "pyro"))
+    _ = by_key.get(("double_pendulum_dp", "pyro"))
     mini_ddp = by_key.get(("double_pendulum_dp", "jax"))
     if mini_ddp:
         print(
@@ -269,8 +282,12 @@ def main() -> None:
             f"(pyro reference not timed — full grid too slow in pyro Python loops)"
         )
 
-    pyro_rrt = [r for r in all_rows if r.case == "pendulum_rrt" and r.framework == "pyro"]
-    mini_rrt = [r for r in all_rows if r.case == "pendulum_rrt" and r.framework == "minilink"]
+    pyro_rrt = [
+        r for r in all_rows if r.case == "pendulum_rrt" and r.framework == "pyro"
+    ]
+    mini_rrt = [
+        r for r in all_rows if r.case == "pendulum_rrt" and r.framework == "minilink"
+    ]
     if pyro_rrt and mini_rrt:
         pyro_ok = sum(r.success for r in pyro_rrt)
         mini_ok = sum(r.success for r in mini_rrt)

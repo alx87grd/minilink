@@ -22,9 +22,8 @@ Three interchangeable backward-step engines share this workflow:
   and run as a single jitted ``lax.while_loop`` on device; fastest at scale.
 """
 
-from dataclasses import dataclass
-
 import time
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -37,7 +36,6 @@ from minilink.planning.policy_synthesis.discretizer import (
     build_jax_sa_chunks,
     maybe_print_build_progress,
     print_build_complete,
-    print_build_progress,
 )
 from minilink.planning.problems import PlanningProblem
 

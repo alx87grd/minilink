@@ -28,4 +28,6 @@ def geometry_smoke(system, x=None, u=None, t=0.0):
 
 def resolved_primitive_count(system, primitive_type, x=None, u=None, t=0.0):
     frame = resolve_draw_frame(system, x, u, t)
-    return sum(isinstance(primitive, primitive_type) for primitive in frame["primitives"])
+    return sum(
+        isinstance(primitive, primitive_type) for primitive in frame["primitives"]
+    )

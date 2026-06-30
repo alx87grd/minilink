@@ -54,9 +54,7 @@ class TestCartPole(unittest.TestCase):
 
         frame = resolve_draw_frame(sys)
         cart_boxes = [
-            primitive
-            for primitive in frame["primitives"]
-            if isinstance(primitive, Box)
+            primitive for primitive in frame["primitives"] if isinstance(primitive, Box)
         ]
         self.assertEqual(len(cart_boxes), 1)
         self.assertEqual(cart_boxes[0].length_z, sys.cart_depth)
@@ -86,7 +84,9 @@ class TestDoublePendulum(unittest.TestCase):
                 ]
             ),
         )
-        np.testing.assert_allclose(sys.g(q), np.array([-19.62 * s1 - 9.81 * s12, -9.81 * s12]))
+        np.testing.assert_allclose(
+            sys.g(q), np.array([-19.62 * s1 - 9.81 * s12, -9.81 * s12])
+        )
 
         x = np.zeros(sys.n)
         np.testing.assert_allclose(

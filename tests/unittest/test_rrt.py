@@ -466,9 +466,7 @@ def test_rewire_false_is_at_least_as_costly():
     with_rewire = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(
-            seed=5, goal_tolerance=0.5, max_nodes=2500, rewire=True
-        ),
+        options=RRTStarOptions(seed=5, goal_tolerance=0.5, max_nodes=2500, rewire=True),
     )
     without_rewire = RRTStarPlanner(
         problem,

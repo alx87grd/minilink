@@ -25,8 +25,7 @@ class TestNeuralNetwork(unittest.TestCase):
 
         y = net.compute(np.array([]), u, params=params)
         expected = (
-            params["W2"] @ np.tanh(params["W1"] @ u + params["b1"])
-            + params["b2"]
+            params["W2"] @ np.tanh(params["W1"] @ u + params["b1"]) + params["b2"]
         )
 
         self.assertEqual(y.shape, (1,))

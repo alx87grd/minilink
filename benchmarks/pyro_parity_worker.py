@@ -9,7 +9,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 
@@ -26,7 +25,9 @@ from benchmarks.pyro_parity import PYRO_RUNNERS, row_to_json  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run one pyro parity benchmark case.")
     parser.add_argument("case", choices=tuple(PYRO_RUNNERS))
-    parser.add_argument("--fast", action="store_true", help="Smaller grids / fewer steps.")
+    parser.add_argument(
+        "--fast", action="store_true", help="Smaller grids / fewer steps."
+    )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 

@@ -6,6 +6,10 @@ import pytest
 from minilink.core.backends import array_module
 from minilink.core.geometry import Sphere
 from minilink.core.kinematics import apply
+from minilink.dynamics.catalog.vehicles.steering import (
+    HolonomicMobileRobot,
+    KinematicCar,
+)
 from minilink.planning.spatial.collision import (
     CollisionBody,
     bind,
@@ -15,7 +19,6 @@ from minilink.planning.spatial.collision import (
     point,
     sphere,
 )
-from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot, KinematicCar
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
     inverse_barrier,

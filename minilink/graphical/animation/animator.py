@@ -146,9 +146,7 @@ class Animator:
             "transforms": transforms,
         }
 
-    def _resolve_frame(
-        self, x, u, t, *, kinematic, camera_override=None, overlays=()
-    ):
+    def _resolve_frame(self, x, u, t, *, kinematic, camera_override=None, overlays=()):
         """Resolve one frame to a per-frame ``(primitives, transforms, camera)`` dict."""
         frames = ensure_world_frame(self.sys.tf(x, u, t))
         dynamic = self.sys.get_dynamic_geometry(x, u, t)

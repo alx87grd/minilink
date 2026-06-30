@@ -5,7 +5,6 @@ import numpy as np
 from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.sources import Step
 from minilink.control.pid import FilteredPIDController
-from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
 step = Step()

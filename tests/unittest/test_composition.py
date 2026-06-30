@@ -155,9 +155,9 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["pendulum"]["u"], ("pd_controller", "u"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
-        diagram = (Step(final_value=[1.0]) + ProportionalController() + Integrator()).autowire(
-            strict=True
-        )
+        diagram = (
+            Step(final_value=[1.0]) + ProportionalController() + Integrator()
+        ).autowire(strict=True)
 
         self.assertEqual(
             diagram.connections["p_controller"]["r"],

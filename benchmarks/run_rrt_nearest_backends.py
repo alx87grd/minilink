@@ -16,10 +16,12 @@ Run from the repository root::
 
 from __future__ import annotations
 
+from benchmarks.planning_rrt import (
+    benchmark_nearest_backend,
+    print_rrt_nearest_benchmark,
+)
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.search.rrt_star import RRTStarPlanner
-
-from benchmarks.planning_rrt import benchmark_nearest_backend, print_rrt_nearest_benchmark
 
 # Edit these, then re-run.
 seeds = (0,)

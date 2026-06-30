@@ -4,10 +4,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from minilink.core.kinematics import identity, translation
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation import Animator, make_renderer
-from minilink.core.kinematics import identity, translation
 from minilink.graphical.animation.primitives import (
     Point,
     camera_matrix,
@@ -16,12 +16,12 @@ from minilink.graphical.animation.renderers.plotly_renderer import (
     PlotlyRenderer,
     _import_plotly,
 )
+from minilink.graphical.catalog.skins import debug_state_skin
 from minilink.graphical.common.plotly_style import (
     PLOTLY_ANIMATION_2D_MARGIN,
     PLOTLY_ANIMATION_HEIGHT,
     PLOTLY_FIG_WIDTH,
 )
-from minilink.graphical.catalog.skins import debug_state_skin
 
 
 class TestPlotlyRendererOptionalImport(unittest.TestCase):
@@ -132,7 +132,10 @@ class TestPlotlyRenderer(unittest.TestCase):
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         frame = animator._resolve_frame(
-            np.array([0.5]), np.array([1.0]), 0.0, kinematic=sys.get_kinematic_geometry()
+            np.array([0.5]),
+            np.array([1.0]),
+            0.0,
+            kinematic=sys.get_kinematic_geometry(),
         )
 
         backend.open_scene(

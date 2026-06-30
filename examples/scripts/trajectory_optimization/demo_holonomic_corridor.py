@@ -2,7 +2,7 @@
 
 Run from the repo root::
 
-    python examples/scripts/planning/trajopt/demo_holonomic_corridor.py
+    python examples/scripts/trajectory_optimization/demo_holonomic_corridor.py
 
 Waypoints define a polyline centerline (:func:`~minilink.planning.spatial.paths.from_waypoints`).
 A :class:`~minilink.planning.spatial.track.ReferenceTrack` exports a hard corridor
@@ -22,8 +22,8 @@ from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.collision import bind, disc
+from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
@@ -157,12 +157,10 @@ guess = Trajectory(
 traj = planner.compute_solution(initial_guess=guess)
 
 distances = [
-    float(track.distance_field(body).value(traj.x[:, k]))
-    for k in range(traj.n_samples)
+    float(track.distance_field(body).value(traj.x[:, k])) for k in range(traj.n_samples)
 ]
 corridor_margins = [
-    float(track.corridor_field(body).value(traj.x[:, k]))
-    for k in range(traj.n_samples)
+    float(track.corridor_field(body).value(traj.x[:, k])) for k in range(traj.n_samples)
 ]
 print("holonomic corridor trajopt")
 print(
@@ -233,4 +231,6 @@ history = SceneHistory(
 
 sys.camera_scale = CAMERA_SCALE
 sys.traj = traj
-sys.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history])
+sys.animate(
+    traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history]
+)

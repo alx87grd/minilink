@@ -69,9 +69,7 @@ class TestBlocks(unittest.TestCase):
         dx = plant.f(x, u)
         np.testing.assert_allclose(dx, np.array([1.0]))
         np.testing.assert_allclose(plant.h(x, u), np.array([0.0]))
-        np.testing.assert_allclose(
-            plant.compile("numpy").f(x, u, 0.0), np.array([1.0])
-        )
+        np.testing.assert_allclose(plant.compile("numpy").f(x, u, 0.0), np.array([1.0]))
 
     def test_prop_controller_scales_tracking_error(self):
         controller = ProportionalController(2.5)

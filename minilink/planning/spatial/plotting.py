@@ -10,8 +10,8 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
-from minilink.planning.spatial.grid import sample_grid
 from minilink.planning.spatial.collision import iter_probes
+from minilink.planning.spatial.grid import sample_grid
 from minilink.planning.spatial.workspace_fields import GaussianField
 
 # Public API

@@ -12,7 +12,6 @@ from __future__ import annotations
 import contextlib
 import io
 import json
-import os
 import time
 from dataclasses import asdict, dataclass, field
 
@@ -29,8 +28,8 @@ from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingPlanner,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.edge import Edge
+from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 
 INF_PENDULUM = 500.0
@@ -156,7 +155,9 @@ def _sample_j_on_grid(grid, J: np.ndarray, n_sample: int = 200, rng=None):
 def compare_j_fields(grid, J_ref, J_other, *, inf=INF_PENDULUM, n_sample=300):
     """Max |J_ref - J_other| on a random feasible sample (same grid layout)."""
     states, j_ref = _sample_j_on_grid(grid, J_ref, n_sample=n_sample)
-    j_other = np.array([float(grid.interpolate(J_other, s[None, :])[0]) for s in states])
+    j_other = np.array(
+        [float(grid.interpolate(J_other, s[None, :])[0]) for s in states]
+    )
     mask = (j_ref < 0.9 * inf) & (j_other < 0.9 * inf)
     if not np.any(mask):
         return float("nan")
@@ -453,9 +454,7 @@ def run_pyro_double_pendulum_dp(
 
     t0 = time.perf_counter()
     with _quiet():
-        grid = discretizer.GridDynamicSystem(
-            sys_p, list(x_grid), list(u_grid), dt=dt
-        )
+        grid = discretizer.GridDynamicSystem(sys_p, list(x_grid), list(u_grid), dt=dt)
     t_build = time.perf_counter()
     qcf = costfunction.QuadraticCostFunction.from_sys(sys_p)
     qcf.xbar = GOAL_DOUBLE.copy()
@@ -511,7 +510,9 @@ def run_pyro_pendulum_rrt(*, seed=0, max_nodes=20000) -> ParityRow:
     x_goal = UPRIGHT_PYRO.copy()
 
     planner = randomtree.RRT(sys_p, x_start)
-    planner.u_options = [np.array([tau]) for tau in (-5.0, -3.0, -1.0, 0.0, 1.0, 3.0, 5.0)]
+    planner.u_options = [
+        np.array([tau]) for tau in (-5.0, -3.0, -1.0, 0.0, 1.0, 3.0, 5.0)
+    ]
     planner.goal_radius = 0.2
     planner.alpha = 0.9
     planner.beta = 0.0

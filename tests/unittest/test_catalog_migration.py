@@ -77,7 +77,7 @@ def _zero_f_smoke(system):
     assert np.all(np.isfinite(dx))
 
 
-class TestMigratedCatalog(unittest.TestCase):
+class TestCatalogSmoke(unittest.TestCase):
     def test_low_risk_equation_reference_values(self):
         np.testing.assert_allclose(
             SimpleIntegrator().f(np.array([2.0]), np.array([3.0])),
@@ -200,7 +200,7 @@ class TestMigratedCatalog(unittest.TestCase):
                 self.assertEqual(_primitive_count(system, TorqueArrow), expected)
                 _geometry_smoke(system)
 
-    def test_migrated_class_smoke(self):
+    def test_catalog_class_smoke(self):
         systems = [
             SimpleIntegrator(),
             DoubleIntegrator(),

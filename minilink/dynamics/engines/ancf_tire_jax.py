@@ -546,9 +546,7 @@ class ANCFTireSystem(DynamicSystem):
 
     def _centroid_target(self, p):
         target = np.mean(p, axis=0)
-        target[2] = max(
-            target[2], self.model.plane_offset + 0.7 * self.model.radius
-        )
+        target[2] = max(target[2], self.model.plane_offset + 0.7 * self.model.radius)
         return target
 
     def tf(self, x, u, t=0, params=None):
@@ -579,7 +577,5 @@ class ANCFTireSystem(DynamicSystem):
         for i in range(n):
             if np.linalg.norm(f_contact[i]) > self.contact_force_threshold:
                 f = self.contact_force_scale * f_contact[i]
-                world.append(
-                    line_segment(p[i], p[i] + f, color="red", linewidth=4)
-                )
+                world.append(line_segment(p[i], p[i] + f, color="red", linewidth=4))
         return {"world": world}

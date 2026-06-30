@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 from minilink.core.diagram import DiagramSystem
-
 from tests.unittest.graphics_contract_helpers import resolve_draw_frame
 
 pytest.importorskip("jax")

@@ -128,9 +128,7 @@ class TestAnimatorOverlays(unittest.TestCase):
         self.assertEqual(len(frame["primitives"]), 1)
 
     def test_scene_visualizer_draws_obstacle(self):
-        scene = Scene(
-            obstacles=[GeomBox(np.array([1.0, 2.0]), np.array([3.0, 4.0]))]
-        )
+        scene = Scene(obstacles=[GeomBox(np.array([1.0, 2.0]), np.array([3.0, 4.0]))])
         sys = DynamicSystem(0)
         frame = Animator(sys)._resolve_frame(
             np.array([]),

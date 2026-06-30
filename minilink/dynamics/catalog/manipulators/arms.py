@@ -351,9 +351,7 @@ class TwoLinkManipulator(MechanicalSystem):
         return _planar_frames(points, angles)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return _planar_torque_geometry(
-            self._lengths(), u, self.inputs["u"].upper_bound
-        )
+        return _planar_torque_geometry(self._lengths(), u, self.inputs["u"].upper_bound)
 
 
 class ThreeLinkManipulator3D(MechanicalSystem):
