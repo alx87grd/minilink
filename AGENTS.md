@@ -87,6 +87,32 @@ Details in [DESIGN.md](DESIGN.md).
 
 Demos: flat under `examples/scripts/`, runnable from repo root.
 
+## Before push or PR (local CI gate)
+
+GitHub **CI** (`.github/workflows/test.yml`) runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13. Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+
+**Always before push** (fast; mirrors CI lint steps):
+
+```bash
+conda activate minilink
+ruff check .
+ruff format --check .
+```
+
+Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs these on the **whole repo**, not only touched files.
+
+**Pytest — proportionate** (same command CI uses; scope by change):
+
+| Change | Run |
+| --- | --- |
+| Docs/markdown only | skip pytest |
+| Narrow module + tests already updated | `pytest path/to/test_foo.py` |
+| Cross-cutting or before handoff/push | `pytest` |
+
+Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for pygame smoke; `sphinx-build` only when editing `docs/` (separate Docs workflow).
+
+**After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
+
 ## Verification
 
 Use conda env **`minilink`** from [environment.yml](environment.yml); setup in [README.md#install](README.md#install) (`PYTHONPATH` = repo root).
@@ -103,5 +129,5 @@ Final pass after substantial changes — smaller, clearer diff:
 4. Fold or update examples; runnable from repo root.
 5. Sync README (user API), DESIGN (contracts), ROADMAP (maturity if changed).
 6. Tests for new behavior; benchmarks only when performance claims matter.
-7. Verify: ruff, pytest, headless graphics smoke when relevant.
-8. Handoff: clean `git status`, short summary of changes and verification.
+7. Verify: **pre-push gate** (ruff + pytest per table above); headless graphics smoke when relevant.
+8. Handoff: clean `git status`, short summary of changes and verification; run ruff before push if committing.
