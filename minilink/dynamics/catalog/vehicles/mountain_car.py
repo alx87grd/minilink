@@ -1,13 +1,11 @@
 import numpy as np
 
+from minilink.core.kinematics import translation
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     Circle,
     CustomLine,
-    arrow_transform,
-    identity_matrix,
-    translation_matrix,
 )
 
 
@@ -94,29 +92,35 @@ class MountainCar(MechanicalSystem):
     def get_kinematic_geometry(self):
         xs = np.linspace(-1.7, 0.3, 240)
         terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
-        return [
-            CustomLine(terrain, color="black", linewidth=2),
-            Circle(radius=0.05, center=[0.0, 0.0, 0.0], color="blue", fill=True),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
+        return {
+            "world": [CustomLine(terrain, color="black", linewidth=2)],
+            "body": [
+                Circle(radius=0.05, center=[0.0, 0.0, 0.0], color="blue", fill=True)
+            ],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         q = x[:1]
         p = self.forward_kinematic_effector(q)
+        T = translation(p[0], p[1], 0.0)
+        return {"body": T}  # Bug here tangent tf is not correct
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        q = x[:1]
         slope = self.dz_dx(q[0])
         tangent = np.array([1.0, slope])
         tangent = tangent / np.linalg.norm(tangent)
-        return [
-            identity_matrix(),
-            translation_matrix(p[0], p[1], 0.0),
-            arrow_transform(
-                p[0],
-                p[1],
-                u[0] * tangent[0],
-                u[0] * tangent[1],
-                scale=0.3,
-            ),
-        ]
+        return {
+            "body": [
+                Arrow(
+                    base=(0.0, 0.0),
+                    vector=(u[0] * tangent[0], u[0] * tangent[1]),
+                    scale=0.3,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
 
 
 if __name__ == "__main__":

@@ -25,16 +25,15 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
 from minilink.graphical.animation.primitives import (
-    Circle,
     CustomLine,
     HorizonPolyline,
     TrajectoryPolyline,
-    time_channel_matrix,
 )
+from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.paths import from_waypoints
-from minilink.planning.spatial.robot import car
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
     inverse_barrier,
@@ -250,7 +249,7 @@ loop_track = ReferenceTrack(
 track = ReferenceTrack(
     from_waypoints(REFERENCE_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
 )
-robot = car(length=2.4, width=0.2, position=(0, 1), heading=2, margin=0.05)
+body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
 scene = Scene(
     obstacles=tuple(Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS)
 )
@@ -263,15 +262,15 @@ stability_cost = QuadraticCost.from_system(
     xbar=x_cruise,
     ubar=ubar,
 )
-path_cost = track.distance_field(robot).as_cost(
+path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT,
     shaping=quadratic_excess(threshold=0.1),
 )
-corridor_cost = track.corridor_field(robot).as_cost(
+corridor_cost = track.corridor_field(body).as_cost(
     weight=CORRIDOR_COST_WEIGHT,
     shaping=quadratic_hinge(threshold=0.0),
 )
-obstacle_cost = scene.clearance_field(robot).as_cost(
+obstacle_cost = scene.clearance_field(body).as_cost(
     weight=OBSTACLE_REPULSION_WEIGHT,
     shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
 )
@@ -396,7 +395,7 @@ clearances = [
     for cx, cy in OBSTACLE_CENTERS
 ]
 path_margins = [
-    float(loop_track.corridor_field(robot).value(traj.x[:, k]))
+    float(loop_track.corridor_field(body).value(traj.x[:, k]))
     for k in range(traj.n_samples)
 ]
 print(
@@ -433,68 +432,40 @@ fig.tight_layout()
 plt.show()
 
 
-class MpcWideCircuitLapBicycleRate(JaxDynamicBicycleRateInputs):
-    def __init__(
-        self, track, mpc_plans, executed_traj, *, obstacle_centers, keepout_radius
-    ):
-        super().__init__()
-        center, upper, lower = _sample_track_boundaries(track)
-        self._upper = CustomLine(
-            _line3(upper), color="#98df8a", linewidth=1.2, style="-"
-        )
-        self._lower = CustomLine(
-            _line3(lower), color="#98df8a", linewidth=1.2, style="-"
-        )
-        self._centerline = CustomLine(
-            _line3(center), color="#2ca02c", linewidth=2.0, style="-"
-        )
-        self._obstacles = [
-            Circle(
-                radius=keepout_radius,
-                center=(cx, cy, 0.0),
-                color="tab:red",
-                fill=True,
-            )
-            for cx, cy in obstacle_centers
-        ]
-        self._executed = TrajectoryPolyline(
-            executed_traj, window="prefix", color="b", style="--", linewidth=1.0
-        )
-        self._mpc_plan = HorizonPolyline(
-            mpc_plans, color="tab:orange", linewidth=2.0, style="--"
-        )
-
-    def get_kinematic_geometry(self):
-        vehicle = super().get_kinematic_geometry()
-        return (
-            [self._upper, self._lower]  # , self._centerline]
-            + self._obstacles
-            + [self._executed]
-            + vehicle
-            + [self._mpc_plan]
-        )
-
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        n_obstacles = len(self._obstacles)
-        return (
-            [np.eye(4)] * 2  # * 3
-            + [np.eye(4)] * n_obstacles
-            + [time_channel_matrix(t)]
-            + list(vehicle)
-            + [time_channel_matrix(t)]
-        )
-
-
-mpc_anim_sys = MpcWideCircuitLapBicycleRate(
-    loop_track,
-    mpc_plans,
-    traj,
-    obstacle_centers=OBSTACLE_CENTERS,
-    keepout_radius=keepout_radius,
+# --- Animation ---
+_center, upper, lower = _sample_track_boundaries(loop_track)
+history = SceneHistory(
+    upper=CustomLine(
+        _line3(upper),
+        color="#98df8a",
+        linewidth=1.2,
+        style="-",
+    ),
+    lower=CustomLine(
+        _line3(lower),
+        color="#98df8a",
+        linewidth=1.2,
+        style="-",
+    ),
+    trail=TrajectoryPolyline(
+        traj,
+        window="prefix",
+        color="b",
+        style="--",
+        linewidth=1.0,
+    ),
+    horizon=HorizonPolyline(
+        mpc_plans,
+        color="tab:orange",
+        linewidth=2.0,
+        style="--",
+    ),
 )
-mpc_anim_sys.params = dict(sys_sim.params)
-mpc_anim_sys.camera_scale = CAMERA_SCALE
-mpc_anim_sys.traj = traj
-mpc_anim_sys.plot_trajectory(signals=("x", "u"))
-mpc_anim_sys.animate()
+
+sys_sim.params = dict(sys_sim.params)
+sys_sim.camera_scale = CAMERA_SCALE
+sys_sim.traj = traj
+sys_sim.plot_trajectory(signals=("x", "u"))
+sys_sim.animate(
+    traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history]
+)

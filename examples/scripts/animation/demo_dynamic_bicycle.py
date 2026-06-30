@@ -4,10 +4,3 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar
 
 sys = DynamicBicycleCar3D()
 sys.game(renderer="meshcat")
-
-# from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-#     DynamicBicycleCar3DRealistic,
-# )
-
-# sys = DynamicBicycleCar3DRealistic()
-# sys.game(renderer="meshcat")

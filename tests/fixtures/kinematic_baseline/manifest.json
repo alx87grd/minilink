@@ -1,0 +1,599 @@
+[
+  {
+    "plant": "dynamic_bicycle",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycle",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "dynamic_bicycle",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycle",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "dynamic_bicycle",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycle",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "dynamic_bicycle_car3d",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycleCar3D",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "dynamic_bicycle_car3d",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycleCar3D",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "dynamic_bicycle_car3d",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
+    "class": "DynamicBicycleCar3D",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "kinematic_bicycle",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "KinematicBicycle",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "kinematic_bicycle",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "KinematicBicycle",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "kinematic_bicycle",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "KinematicBicycle",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "holonomic_mobile_robot",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "HolonomicMobileRobot",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "holonomic_mobile_robot",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "HolonomicMobileRobot",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "holonomic_mobile_robot",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.vehicles.steering",
+    "class": "HolonomicMobileRobot",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "pendulum",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.pendulum.pendulum",
+    "class": "Pendulum",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "pendulum",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.pendulum.pendulum",
+    "class": "Pendulum",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947
+    ],
+    "u": [
+      0.2450166444603104
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "pendulum",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.pendulum.pendulum",
+    "class": "Pendulum",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749
+    ],
+    "u": [
+      0.3916634548137417
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "cartpole",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.pendulum.cartpole",
+    "class": "CartPole",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "cartpole",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.pendulum.cartpole",
+    "class": "CartPole",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782
+    ],
+    "u": [
+      0.2450166444603104
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "cartpole",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.pendulum.cartpole",
+    "class": "CartPole",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596
+    ],
+    "u": [
+      0.3916634548137417
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "two_link_manipulator",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "TwoLinkManipulator",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "two_link_manipulator",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "TwoLinkManipulator",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "two_link_manipulator",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "TwoLinkManipulator",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "five_link_planar_manipulator",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "FiveLinkPlanarManipulator",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "five_link_planar_manipulator",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "FiveLinkPlanarManipulator",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563,
+      0.33388511393566395,
+      0.3800930367834119,
+      0.13865412713401035,
+      -0.20771546164667423
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613,
+      -0.007299880575322148,
+      -0.16656900531995603,
+      -0.24749812415011135
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "five_link_planar_manipulator",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.manipulators.arms",
+    "class": "FiveLinkPlanarManipulator",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283,
+      -0.7999386060512808,
+      -0.6658139537791207,
+      -0.2991013318641888,
+      0.17209599047025242
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007,
+      0.47315004384370724,
+      0.3377315902755755,
+      0.11962466460699121
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "drone2d",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.aerial.drone",
+    "class": "Drone2D",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "drone2d",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.aerial.drone",
+    "class": "Drone2D",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947,
+      -0.20193844183994303,
+      -0.3959969986401782,
+      -0.2903729216800561,
+      0.034999593375778563
+    ],
+    "u": [
+      0.2450166444603104,
+      0.15540249206766613
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "drone2d",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.aerial.drone",
+    "class": "Drone2D",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749,
+      0.5965641697413763,
+      0.19139946337118596,
+      -0.2806265821516959,
+      -0.6546216888515283
+    ],
+    "u": [
+      0.3916634548137417,
+      0.49272486499423007
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "simple_integrator",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.equations.integrators",
+    "class": "SimpleIntegrator",
+    "requires": [],
+    "x": [
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "simple_integrator",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.equations.integrators",
+    "class": "SimpleIntegrator",
+    "requires": [],
+    "x": [
+      0.38213459565024244
+    ],
+    "u": [
+      0.2450166444603104
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "simple_integrator",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.equations.integrators",
+    "class": "SimpleIntegrator",
+    "requires": [],
+    "x": [
+      0.7129658880491484
+    ],
+    "u": [
+      0.3916634548137417
+    ],
+    "t": 1.4
+  },
+  {
+    "plant": "single_mass",
+    "sample": "rest",
+    "module": "minilink.dynamics.catalog.mass_spring_damper.linear",
+    "class": "SingleMass",
+    "requires": [],
+    "x": [
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
+    "t": 0.0
+  },
+  {
+    "plant": "single_mass",
+    "sample": "pose_a",
+    "module": "minilink.dynamics.catalog.mass_spring_damper.linear",
+    "class": "SingleMass",
+    "requires": [],
+    "x": [
+      0.38213459565024244,
+      0.14494310179066947
+    ],
+    "u": [
+      0.2450166444603104
+    ],
+    "t": 0.7
+  },
+  {
+    "plant": "single_mass",
+    "sample": "pose_b",
+    "module": "minilink.dynamics.catalog.mass_spring_damper.linear",
+    "class": "SingleMass",
+    "requires": [],
+    "x": [
+      0.7129658880491484,
+      0.7933318483619749
+    ],
+    "u": [
+      0.3916634548137417
+    ],
+    "t": 1.4
+  }
+]

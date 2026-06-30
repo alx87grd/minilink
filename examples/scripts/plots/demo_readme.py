@@ -17,10 +17,10 @@ diagram.animate()
 
 
 ########################################################
-import numpy as np
+import numpy as np  # noqa: E402
 
-from minilink.blocks.sources import Step
-from minilink.core.system import DynamicSystem
+from minilink.blocks.sources import Step  # noqa: E402
+from minilink.core.system import DynamicSystem  # noqa: E402
 
 
 class MassSpringDamper(DynamicSystem):

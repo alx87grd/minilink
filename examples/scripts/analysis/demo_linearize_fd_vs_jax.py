@@ -5,16 +5,11 @@ Run from the repo root::
     python examples/scripts/analysis/demo_linearize_fd_vs_jax.py
 """
 
-import warnings
-
 import numpy as np
 
 from minilink.analysis.linearize import linearize_matrices
-
 from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
-
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
-
 
 np.set_printoptions(precision=4, suppress=True)
 

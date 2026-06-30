@@ -22,9 +22,8 @@ Three interchangeable backward-step engines share this workflow:
   and run as a single jitted ``lax.while_loop`` on device; fastest at scale.
 """
 
-from dataclasses import dataclass
-
 import time
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -37,7 +36,6 @@ from minilink.planning.policy_synthesis.discretizer import (
     build_jax_sa_chunks,
     maybe_print_build_progress,
     print_build_complete,
-    print_build_progress,
 )
 from minilink.planning.problems import PlanningProblem
 
@@ -428,7 +426,9 @@ class DynamicProgrammingPlanner(Planner):
         start = time.time()
 
         if verbose:
-            print(f"Computing g(x,u,t) look-up table.. {total_pairs:,} pairs", flush=True)
+            print(
+                f"Computing g(x,u,t) look-up table.. {total_pairs:,} pairs", flush=True
+            )
 
         G = np.empty((N, A), dtype=float)
         pairs_done = 0
@@ -510,7 +510,9 @@ class DynamicProgrammingPlanner(Planner):
     def _print_solve_banner(self, max_iterations, stop_on_tol):
         """Print a pyro-style solve header."""
         if stop_on_tol:
-            print(f"\nComputing backward DP iterations until dJ<{self.options.tol:.2f}:")
+            print(
+                f"\nComputing backward DP iterations until dJ<{self.options.tol:.2f}:"
+            )
             print("---------------------------------------------------------")
         else:
             print(f"\nComputing {max_iterations} backward DP iterations:")

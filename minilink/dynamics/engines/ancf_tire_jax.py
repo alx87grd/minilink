@@ -17,16 +17,13 @@ from typing import NamedTuple
 import numpy as np
 
 from minilink.core.backends import require_jax_numpy
+from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
-    Arrow,
-    CustomLine,
     Plane,
     Sphere,
-    camera_matrix,
-    identity_matrix,
-    translation_matrix,
 )
+from minilink.graphical.catalog.shapes import line_segment
 
 
 class ANCFTireModel(NamedTuple):
@@ -427,7 +424,7 @@ class ANCFTireSystem(DynamicSystem):
         self.model = model
         self.contact_force_scale = float(contact_force_scale)
         self.contact_force_threshold = float(contact_force_threshold)
-        self.follow_camera = bool(follow_camera)
+        self.camera_follow_frame = "centroid" if follow_camera else None
         n_nodes = model.n_nodes
         q_dim = 6 * n_nodes
         n = 2 * q_dim
@@ -530,27 +527,12 @@ class ANCFTireSystem(DynamicSystem):
         return np.asarray(f_contact, dtype=float)
 
     def get_kinematic_geometry(self):
-        prim = []
-        for _ in range(self.model.n_nodes):
-            prim.append(
-                CustomLine(
-                    [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
-                    color="black",
-                    linewidth=3,
-                )
-            )
-        for _ in range(self.model.n_nodes):
-            prim.append(
-                Sphere(
-                    radius=0.025,
-                    center=[0.0, 0.0, 0.0],
-                    color="red",
-                    opacity=1.0,
-                )
-            )
-        for _ in range(self.model.n_nodes):
-            prim.append(Arrow(color="red", linewidth=4))
-        prim.append(
+        geometry = {}
+        for i in range(self.model.n_nodes):
+            geometry[f"node{i}"] = [
+                Sphere(radius=0.025, center=[0.0, 0.0, 0.0], color="red", opacity=1.0)
+            ]
+        geometry["world"] = [
             Plane(
                 normal=np.asarray(self.model.plane_normal, dtype=float),
                 offset=float(self.model.plane_offset),
@@ -559,89 +541,41 @@ class ANCFTireSystem(DynamicSystem):
                 color="lightgray",
                 opacity=0.65,
             )
-        )
-        return prim
+        ]
+        return geometry
 
-    def get_kinematic_transforms(self, x, u, t):
+    def _centroid_target(self, p):
+        target = np.mean(p, axis=0)
+        target[2] = max(target[2], self.model.plane_offset + 0.7 * self.model.radius)
+        return target
+
+    def tf(self, x, u, t=0, params=None):
+        p = self.node_positions(x)
+        frames = {}
+        n = self.model.n_nodes
+        for i in range(n):
+            frames[f"node{i}"] = translation(p[i, 0], p[i, 1], p[i, 2])
+        if self.camera_follow_frame == "centroid":
+            centroid = self._centroid_target(p)
+            frames["centroid"] = translation(centroid[0], centroid[1], centroid[2])
+        return frames
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         p = self.node_positions(x)
         f_contact = self.contact_forces(x)
-        T = []
-        for i in range(self.model.n_nodes):
-            T.append(_line_segment_transform(p[i], p[(i + 1) % self.model.n_nodes]))
-        for i in range(self.model.n_nodes):
-            T.append(translation_matrix(p[i, 0], p[i, 1], p[i, 2]))
-        for i in range(self.model.n_nodes):
+        n = self.model.n_nodes
+        world = []
+        for i in range(n):
+            world.append(
+                line_segment(
+                    p[i],
+                    p[(i + 1) % n],
+                    color="black",
+                    linewidth=3,
+                )
+            )
+        for i in range(n):
             if np.linalg.norm(f_contact[i]) > self.contact_force_threshold:
                 f = self.contact_force_scale * f_contact[i]
-                T.append(_vector_arrow_transform(p[i], f))
-            else:
-                T.append(_vector_arrow_transform(p[i], np.zeros(3)))
-        T.append(identity_matrix())
-        return T
-
-    def get_camera_transform(self, x, u, t):
-        target = np.asarray(self.camera_target, dtype=float)
-        if self.follow_camera:
-            p = self.node_positions(x)
-            target = np.mean(p, axis=0)
-            target[2] = max(
-                target[2], self.model.plane_offset + 0.7 * self.model.radius
-            )
-        return camera_matrix(
-            target=target,
-            plot_axes=self.camera_plot_axes,
-            scale=self.camera_scale,
-        )
-
-
-def _line_segment_transform(p0, p1):
-    p0 = np.asarray(p0, dtype=float).reshape(3)
-    p1 = np.asarray(p1, dtype=float).reshape(3)
-    delta = p1 - p0
-    length = np.linalg.norm(delta)
-
-    T = np.eye(4)
-    T[:3, 3] = p0
-    if length < 1e-12:
-        return T
-
-    x_axis = delta / length
-    reference = np.array([0.0, 0.0, 1.0])
-    if abs(np.dot(x_axis, reference)) > 0.95:
-        reference = np.array([0.0, 1.0, 0.0])
-    y_axis = np.cross(reference, x_axis)
-    y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-12)
-    z_axis = np.cross(x_axis, y_axis)
-
-    T[:3, 0] = delta
-    T[:3, 1] = y_axis
-    T[:3, 2] = z_axis
-    return T
-
-
-def _vector_arrow_transform(origin, vector):
-    origin = np.asarray(origin, dtype=float).reshape(3)
-    vector = np.asarray(vector, dtype=float).reshape(3)
-    length = np.linalg.norm(vector)
-
-    T = np.eye(4)
-    T[:3, 3] = origin
-    if length < 1e-12:
-        # Keep the transform non-singular for Meshcat/Three.js keyframe
-        # decomposition while making the local unit arrow visually disappear.
-        T[:3, :3] = 1e-9 * np.eye(3)
-        return T
-
-    x_axis = vector / length
-    reference = np.array([0.0, 0.0, 1.0])
-    if abs(np.dot(x_axis, reference)) > 0.95:
-        reference = np.array([0.0, 1.0, 0.0])
-    y_axis = np.cross(reference, x_axis)
-    y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-12)
-    z_axis = np.cross(x_axis, y_axis)
-
-    head_width = max(0.02, 0.2 * length)
-    T[:3, 0] = vector
-    T[:3, 1] = head_width * y_axis
-    T[:3, 2] = head_width * z_axis
-    return T
+                world.append(line_segment(p[i], p[i] + f, color="red", linewidth=4))
+        return {"world": world}

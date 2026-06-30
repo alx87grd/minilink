@@ -137,6 +137,23 @@ class TestMechanicalSystemJax(unittest.TestCase):
             np.array([0.0, 2.0]),
         )
 
+    def test_jax_pendulum_subclasses_numpy_reference(self):
+        from benchmarks.systems.basic import JaxPendulum, NumpyPendulum
+
+        self.assertTrue(issubclass(JaxPendulum, NumpyPendulum))
+        p = JaxPendulum(gravity=9.81, length=1.0, damping=0.05)
+        self.assertEqual(p.n, 2)
+
+    def test_jax_pendulum_f_matches_numpy(self):
+        from benchmarks.systems.basic import JaxPendulum, NumpyPendulum
+
+        np_sys = NumpyPendulum(gravity=9.81, length=1.0, damping=0.1)
+        jx_sys = JaxPendulum(gravity=9.81, length=1.0, damping=0.1)
+        x = np.array([0.7, -0.3])
+        u = np.array([0.5])
+        dx_jx = np.asarray(jx_sys.f(jnp.asarray(x), jnp.asarray(u)))
+        np.testing.assert_allclose(dx_jx, np_sys.f(x, u), rtol=1e-9, atol=1e-9)
+
 
 if __name__ == "__main__":
     unittest.main()

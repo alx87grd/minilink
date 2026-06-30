@@ -1,13 +1,12 @@
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.kinematics import SE2
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
     Rod,
     TorqueArrow,
-    pose2d_matrix,
-    torque_pose2d_matrix,
 )
 
 
@@ -69,25 +68,32 @@ class Pendulum(MechanicalSystem):
     def get_kinematic_geometry(self):
         length = self.params["l"]
         radius = 0.08 * length
-        return [
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
-            TorqueArrow(radius=length / 5.0, head_ratio=0.4, color="red", linewidth=2),
-        ]
+        pivot = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+        return {
+            "link": [
+                pivot,
+                Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
+                Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
+            ],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
-        theta = x[0]
+    def tf(self, x, u, t=0, params=None):
+        return {"link": SE2(0.0, 0.0, x[0])}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        length = self.params["l"]
         torque = u[0]
-        rod_angle = theta - np.pi / 2.0
         max_torque = self.inputs["u"].upper_bound[0]
         sweep = torque * (2.0 * np.pi / 3.0) / max_torque
-        return [
-            pose2d_matrix(0.0, 0.0, 0.0),
-            pose2d_matrix(0.0, 0.0, theta),
-            pose2d_matrix(0.0, 0.0, theta),
-            torque_pose2d_matrix(0.0, 0.0, rod_angle, sweep),
-        ]
+        arc = TorqueArrow(
+            sweep=sweep,
+            radius=length / 5.0,
+            head_ratio=0.4,
+            color="red",
+            linewidth=2,
+        )
+        arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
+        return {"link": [arc]}
 
 
 class PendulumWithNoisePort(Pendulum):
@@ -135,11 +141,11 @@ class InvertedPendulum(Pendulum):
     def g(self, q, params=None):
         return -super().g(q, params)
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         # theta is measured from the upward vertical (zero-angle = upright); the
         # shared geometry draws angles from the downward vertical, so add pi.
         upright = np.array([x[0] + np.pi, x[1]])
-        return super().get_kinematic_transforms(upright, u, t)
+        return super().tf(upright, u, t)
 
 
 class TwoIndependentPendulums(MechanicalSystem):
@@ -197,51 +203,40 @@ class TwoIndependentPendulums(MechanicalSystem):
     def get_kinematic_geometry(self):
         length = self.params["l"]
         radius = 0.08 * length
-        torque_radius = length / 5.0
-        return [
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
-            TorqueArrow(
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
-            ),
-            Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True),
-            Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
-            Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
-            TorqueArrow(
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
-            ),
-        ]
+        geo = {}
+        for i in (0, 1):
+            pivot = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+            geo[f"link{i}"] = [
+                pivot,
+                Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
+                Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
+            ]
+        return geo
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         length = self.params["l"]
         anchors = [-0.6 * length, 0.6 * length]
+        return {
+            f"link{i}": SE2(anchor_x, 0.0, x[i]) for i, anchor_x in enumerate(anchors)
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        length = self.params["l"]
+        torque_radius = length / 5.0
         max_torque = self.inputs["u"].upper_bound[0]
         sweep_scale = 2.0 * np.pi / 3.0 / max_torque
-        transforms = []
-        for i, anchor_x in enumerate(anchors):
-            theta = x[i]
-            rod_angle = theta - np.pi / 2.0
-            transforms.extend(
-                [
-                    pose2d_matrix(anchor_x, 0.0, 0.0),
-                    pose2d_matrix(anchor_x, 0.0, theta),
-                    pose2d_matrix(anchor_x, 0.0, theta),
-                    torque_pose2d_matrix(
-                        anchor_x,
-                        0.0,
-                        rod_angle,
-                        u[i] * sweep_scale,
-                    ),
-                ]
+        dyn = {}
+        for i in (0, 1):
+            arc = TorqueArrow(
+                sweep=u[i] * sweep_scale,
+                radius=torque_radius,
+                head_ratio=0.4,
+                color="red",
+                linewidth=2,
             )
-        return transforms
+            arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
+            dyn[f"link{i}"] = [arc]
+        return dyn
 
 
 if __name__ == "__main__":

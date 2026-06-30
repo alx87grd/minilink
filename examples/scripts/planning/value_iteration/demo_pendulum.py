@@ -56,7 +56,11 @@ def run_swingup():
     pendulum.x0 = np.array([-0.1, 0.0])
 
     cost = QuadraticCost.from_system(
-        pendulum, xbar=UPRIGHT, Q=np.eye(2), R=np.array([[1.0]]), S=np.diag([10.0, 10.0])
+        pendulum,
+        xbar=UPRIGHT,
+        Q=np.eye(2),
+        R=np.array([[1.0]]),
+        S=np.diag([10.0, 10.0]),
     )
     problem = PlanningProblem(pendulum, x_goal=UPRIGHT, cost=cost)
 
@@ -85,6 +89,8 @@ def run_swingup():
 
     trajectory = diagram.compute_trajectory(tf=10.0)
     diagram.plot_trajectory(trajectory)
+
+    diagram.camera_scale = 2.0
     diagram.animate()
 
     angle_error = abs(trajectory.x[0, -1] - UPRIGHT[0])
@@ -105,7 +111,9 @@ def run_lqr_comparison():
     result = planner.compute_solution()
     planner.clean_infeasible_set()
 
-    lqr = lqr_at_operating_point(make_pendulum(bounds=(-2.0 * np.pi, 2.0 * np.pi)), UPRIGHT, Q, R)
+    lqr = lqr_at_operating_point(
+        make_pendulum(bounds=(-2.0 * np.pi, 2.0 * np.pi)), UPRIGHT, Q, R
+    )
     K = lqr.params["K"][0]
     ubar = lqr.params["ubar"][0]
     lqr_law = ubar - (grid.states - UPRIGHT) @ K
@@ -130,8 +138,12 @@ def run_lqr_comparison():
     vi_diagram.plot_trajectory(vi_traj)
     lqr_diagram.plot_trajectory(lqr_traj)
 
-    print("VI  | final angle error:", round(abs(vi_traj.x[0, -1] - UPRIGHT[0]), 3), "rad")
-    print("LQR | final angle error:", round(abs(lqr_traj.x[0, -1] - UPRIGHT[0]), 3), "rad")
+    print(
+        "VI  | final angle error:", round(abs(vi_traj.x[0, -1] - UPRIGHT[0]), 3), "rad"
+    )
+    print(
+        "LQR | final angle error:", round(abs(lqr_traj.x[0, -1] - UPRIGHT[0]), 3), "rad"
+    )
 
 
 if MODE == "lqr_comparison":

@@ -12,10 +12,9 @@ from typing import TYPE_CHECKING
 from minilink.core.backends import array_module
 from minilink.core.costs import CostFunction
 from minilink.core.sets import Set
-from minilink.planning.spatial.robot import (
-    RobotBody,
-    apply_transform,
-    collision_spheres,
+from minilink.planning.spatial.collision import (
+    CollisionBody,
+    iter_probes,
 )
 from minilink.planning.spatial.scene import Scene
 
@@ -29,8 +28,7 @@ class StateField(ABC):
     """Scalar ``value(x)``; export with :meth:`as_constraint` or :meth:`as_cost`."""
 
     @abstractmethod
-    def value(self, x, u=None, t=0.0, params=None):
-        ...
+    def value(self, x, u=None, t=0.0, params=None): ...
 
     def as_constraint(
         self, *, lower: float | None = 0.0, upper: float | None = None
@@ -51,17 +49,14 @@ class ClearanceField(StateField):
     """``value(x) = min_p ( clearance(world_p) - r_p )``; nonnegative when free."""
 
     scene: Scene
-    robot: RobotBody
+    body: CollisionBody
 
     def value(self, x, u=None, t=0.0, params=None):
         xp = array_module(x)
         scene = self.scene
-        robot = self.robot
         c = []
-        for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
-            for center, radius in collision_spheres(shape):
-                world = apply_transform(T, center)
-                c.append(scene.clearance(world, t=t, params=params) - radius)
+        for world, radius in iter_probes(self.body, x, u, t, params):
+            c.append(scene.clearance(world, t=t, params=params) - radius)
 
         return xp.min(xp.stack(c))
 
@@ -71,17 +66,14 @@ class CostDensityField(StateField):
     """``value(x) = max_p cost_density(world_p)`` over body probes."""
 
     scene: Scene
-    robot: RobotBody
+    body: CollisionBody
 
     def value(self, x, u=None, t=0.0, params=None):
         xp = array_module(x)
         scene = self.scene
-        robot = self.robot
         d = []
-        for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
-            for center, _ in collision_spheres(shape):
-                world = apply_transform(T, center)
-                d.append(scene.cost_density(world, t=t, params=params))
+        for world, _ in iter_probes(self.body, x, u, t, params):
+            d.append(scene.cost_density(world, t=t, params=params))
 
         return xp.max(xp.stack(d))
 
@@ -91,17 +83,14 @@ class PathDistanceField(StateField):
     """``value(x) = min_p distance(world_p)`` to the reference centerline."""
 
     track: ReferenceTrack
-    robot: RobotBody
+    body: CollisionBody
 
     def value(self, x, u=None, t=0.0, params=None):
         xp = array_module(x)
         track = self.track
-        robot = self.robot
         d = []
-        for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
-            for center, radius in collision_spheres(shape):
-                world = apply_transform(T, center)
-                d.append(track.distance(world, t=t, params=params) - radius)
+        for world, radius in iter_probes(self.body, x, u, t, params):
+            d.append(track.distance(world, t=t, params=params) - radius)
 
         return xp.min(xp.stack(d))
 
@@ -111,21 +100,16 @@ class CorridorMarginField(StateField):
     """``value(x) = min_p (half_width - distance(world_p))``; nonnegative in the tube."""
 
     track: ReferenceTrack
-    robot: RobotBody
+    body: CollisionBody
 
     def value(self, x, u=None, t=0.0, params=None):
         xp = array_module(x)
         track = self.track
-        robot = self.robot
         m = []
-        for shape, T in zip(robot.shapes, robot.body_poses(x, u, t, params)):
-            for center, radius in collision_spheres(shape):
-                world = apply_transform(T, center)
-                m.append(
-                    track.half_width
-                    - track.distance(world, t=t, params=params)
-                    - radius
-                )
+        for world, radius in iter_probes(self.body, x, u, t, params):
+            m.append(
+                track.half_width - track.distance(world, t=t, params=params) - radius
+            )
 
         return xp.min(xp.stack(m))
 

@@ -142,7 +142,9 @@ y_vals = jnp.linspace(Y_MIN, Y_MAX, N_GRID)
 def control_surface(r_grid, y_grid, nn_params):
     def row(y_val):
         def cell(r_val):
-            return controller.compute([], jnp.array([r_val, y_val]), params=nn_params)[0]
+            return controller.compute([], jnp.array([r_val, y_val]), params=nn_params)[
+                0
+            ]
 
         return jax.vmap(cell)(r_grid)
 

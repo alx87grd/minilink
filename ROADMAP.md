@@ -3,8 +3,8 @@
 Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 [agent.md](agent.md).
 
-**Pyro 2.0 master gap checklist:**
-[docs/plans/pyro-port-gap-todo.md](docs/plans/pyro-port-gap-todo.md).
+**Pyro 2.0 remaining backlog:**
+[docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md).
 
 ## 1. Maturity
 
@@ -14,12 +14,12 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Compile (`core/compile/`) | 4 | Integrated, but dynamic evaluator methods and exposed surface still need user review. | Review evaluator API, diagram parametric tier, and backend parity. |
 | Simulation | 7 | Mature workflow with stable API and solver/forcing coverage. | Keep behavior stable; treat `SimulationOptions` as ergonomic cleanup, not a redesign. |
 | Optimization | 5 | `MathematicalProgram` and `Optimizer` are integrated and useful, but backend details still need hardening. | Harden SciPy/Ipopt behavior and evaluator details before test-gated promotion. |
-| Planning/trajopt | 2 | Direct collocation / shooting exist; DP/RRT/polynomial generation not ported. | Architectural review for offline DP/RRT; traj generation. |
-| Planning/policy synthesis | 2 | `DynamicProgrammingPlanner` (value iteration) over a `StateSpaceGrid` discretizer of a `PlanningProblem`; three interchangeable backends — `loop` (pyro reference), `numpy` (precomputed lookup table), `jax` (jitted `lax.while_loop` + `map_coordinates`); solve-to-tolerance and fixed-step modes, `precompute` memory knob, linear/nearest/spline interpolation, discount, time-varying, infeasible-set cleanup, `LookupTableController`, `PolicyEvaluator`, plotting/animation. Full pyro DP feature parity + JAX speedup. Tested + demos + `benchmarks/run_dp_backends.py`. | GPU runs; `nearest` backend parity; raster cost maps. |
-| Planning/search | 3 | `RRTPlanner` and `RRTStarPlanner` over `PlanningProblem` with swappable `TrajectoryExtender` (`KinodynamicExtender`, `SteeringExtender`/`StraightLineSteering`/`DubinsSteering`) and `metric`; free-space sampling, orchestrator `edge_resolution`, explicit `reached_goal`; optional SciPy `cKDTree` nearest backend (`nearest_backend`, Euclidean only); spatial `Scene` collision wired via `X`, system kept pure. Tested + demos incl. RRT vs RRT* comparison and KD-tree speed demo. | RRT-Connect, informed sampling. |
+| Planning/trajopt | 5 | Direct collocation, shooting, MS transcriptions integrated; `PlanningProblem` + live-plot hooks. | Scene params tier; trajectory post-filter. |
+| Planning/policy synthesis | 4 | `DynamicProgrammingPlanner` + `StateSpaceGrid`; `loop` / `numpy` / `jax` backends; lookup policy + `PolicyEvaluator`. | Raster cost maps; GPU tuning. |
+| Planning/search | 4 | `RRTPlanner`, `RRTStarPlanner`, extenders, steering, KD-tree nearest; spatial `Scene` via `X`. | RRT-Connect; informed sampling. |
 | Geometry / spatial | 4 | Integrated architecture proposed for obstacle and terrain planning: `core/geometry.py` SDF primitives + cost algebra (`SumCost`/`ScaledCost`), and `planning/spatial/`: `Scene` (obstacles + `workspace_fields`), `WorkspaceField`/`StateField`, `RobotBody`/`TranslationBody`, export via `as_constraint`/`as_cost`. Tested incl. JAX twins. | User architecture validation; scene params (`ProblemParameters.scene`, future); RRT consumers; oriented/multi-sphere bodies and raster cost maps. |
-| Graphical | 3 | Useful, but plotting/diagram APIs are still evolving. | Kinematic composition review before API freeze. |
-| Animation | 3 | Substantial work exists, but renderer, camera, and live-loop contracts may still change. | Same gate as Graphical. |
+| Graphical | 4 | Frame-keyed ``tf`` / geometry / overlay contract integrated. | Renderer polish; optional ``KinematicModel`` delegate review. |
+| Animation | 4 | ``Animator`` + overlays (``SceneHistory``, ``Replay``); collision reuses ``tf``. | Interactive integrator backends; live I/O backends. |
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; `DynamicBicycle` params thread fully. | `Manipulator` abstraction + catalog rebase (see review queue). |
 | Dynamics abstraction | 5 | `MechanicalSystem` + joint ports `q`/`dq`; `Manipulator` in `manipulator.py` with `p`/`pdot`. | Rebase catalog arms; `JaxManipulator` if needed. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
@@ -30,7 +30,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Estimation | 1 | Placeholder only. | Luenberger, Kalman, EKF. |
 | Identification | 2 | Parametric-tier prototype demo only. | `fitting.py` for physical + NN params. |
 | Interfaces | 1 | Placeholder only. | Gymnasium, Flax/Torch adapters. |
-| Pyro 2.0 overall | 3 | Catalog + core framework done; ~151/195 pyro demos not yet ported. | Phased port per [pyro-port-gap-todo.md](docs/plans/pyro-port-gap-todo.md) §5. |
+| Pyro 2.0 overall | 3 | Catalog + core framework + planning search/DP/trajopt done; ~143/195 pyro demos not ported. | Phased port per [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
 TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 
@@ -50,10 +50,15 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
   `control/linear.py` and `control/pid.py`; `System` facades split into `core/facades.py`
   (API unchanged).
 - **Pyro catalog plants** — all EoM models ported and QA'd
-  ([catalog-migration-notes.md](docs/plans/catalog-migration-notes.md)).
+  ([archive/catalog-migration-notes.md](docs/plans/archive/catalog-migration-notes.md)).
+- **Kinematic graphics contract** — string-keyed ``tf``, frame-keyed geometry,
+  ``skin`` attribute, overlays at ``animate(overlays=…)``, collision ``bind()``
+  reusing ``tf`` (DESIGN §4, §6).
 - **Pyro tool tranche 1** — blocks routing/nonlinear/filters/sources,
   linear control + LQR, analysis linearize/structural/equilibria/modal/Bode
-  ([tool-migration-notes.md](docs/plans/tool-migration-notes.md)).
+  ([archive/tool-migration-notes.md](docs/plans/archive/tool-migration-notes.md)).
+- **Planning search + DP** — RRT/RRT*, value iteration, spatial scene integration.
+- **DP/RRT on continuous `PlanningProblem`** — discrete pyro framework remains out of scope.
 
 ## 3. Priorities
 
@@ -66,14 +71,15 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
 done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 ~~`control/lqr.py`~~ done. Remaining:
 
-- `Manipulator` abstraction (`q`/`dq`/`p`/`pdot` ports) — **unblocks robot control**
+- ~~`Manipulator` base class~~ — landed in `manipulator.py`; **catalog rebase** on
+  `dynamics/catalog/manipulators/arms.py` still pending
+  ([manipulator-abstraction.md](docs/plans/manipulator-abstraction.md)).
 - `control/computed_torque.py`, `control/sliding_mode.py`, `control/robotic.py`
-- Nested-diagram ergonomics; forced-input helpers; graphics kinematic composition
+- Nested-diagram ergonomics; forced-input helpers
 
-**P3** — Pyro 2.0 tool port (phases B–C in gap doc):
+**P3** — Remaining pyro 2.0 tools (see [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md)):
 
-- `planning/policy_synthesis/` (DP, lookup policy, grid discretizer)
-- `planning/search/rrt.py`
+- ~~`planning/policy_synthesis/`~~ done; ~~`planning/search/rrt.py`~~ done
 - `planning/trajectory_generation/` (polynomial / min-snap)
 - `estimation/luenberger.py`, `estimation/kalman.py`
 - `identification/fitting.py`
@@ -91,13 +97,9 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 - Diagram validation as separate `validate()` vs inline wiring.
 - Trajopt transcription internal consolidation.
 - Dynamic bicycle module split.
-- Graphics/camera contract consolidation (`KinematicModel` delegate).
-- **`Manipulator` base class** — `MechanicalSystem` + `q`/`dq` ports;
-  `Manipulator` + `p`/`pdot` + `forward_kinematics` / `J(q)` (plant task outputs;
-  controller reference stays `r` per DESIGN)
+- Graphics/camera contract consolidation (`KinematicModel` delegate) — optional follow-up.
+- **`Manipulator` catalog rebase** — `arms.py` still subclasses `MechanicalSystem`
   ([manipulator-abstraction.md](docs/plans/manipulator-abstraction.md)).
-- **DP/RRT return** — offline planning on continuous plants vs out-of-scope
-  discrete framework (see gap doc §4).
 - **Pyro game demos** — port via interactive animation or explicitly drop.
 
 ## 5. Future
@@ -146,9 +148,9 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
   center/radius, `QuadraticCost` weights). Signatures exist; frozen attributes are the
   only source of truth today.
 - [ ] `trajectory_generation/` — polynomial / min-snap
-- [x] `policy_synthesis/` — `DynamicProgrammingPlanner` (value iteration), `StateSpaceGrid`
-  discretizer, `LookupTableController`, `PolicyEvaluator`, plotting (NumPy; JAX backend pending)
-- [x] `search/` — `RRTPlanner`, `RRTStarPlanner`, extenders, steering, tree; tested + demos
+- [x] `policy_synthesis/` — `DynamicProgrammingPlanner`, `StateSpaceGrid`,
+  `loop` / `numpy` / `jax` backends, `LookupTableController`, `PolicyEvaluator`
+- [x] `search/` — `RRTPlanner`, `RRTStarPlanner`, extenders, steering, tree
 - [ ] Trajectory post-filter (Butterworth `filtfilt`)
 
 ### 5.6 Estimation and identification
@@ -187,7 +189,7 @@ Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) (June 
 | --- | ---: | ---: | ---: |
 | Catalog plants | 40+ | 40+ | **0** (QA complete) |
 | Library modules | 38 | ~25 equivalent | **~10 tools** (control nonlinear/robot, DP, RRT, traj gen, estimation, interfaces) |
-| Example scripts | 195 | 44 | **~151** |
+| Example scripts | 195 | 52 | **~143** |
 | Course notebooks | 3 | 7 (new topics) | different mix |
 
 ### Port phases (from gap doc)
@@ -195,7 +197,7 @@ Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) (June 
 | Phase | Focus | Unblocks |
 | --- | --- | --- |
 | **A** | `Manipulator` abstraction + computed torque + sliding mode + `robotic.py` | ~50 robot/pendulum demos |
-| **B** | DP/RRT redesign + polynomial traj gen + trajectory LQR | ~50 planning demos |
+| **B** | ~~DP/RRT~~ + polynomial traj gen + trajectory LQR | remaining: traj gen, traj LQR |
 | **C** | Estimation + identification + Gym interface | LQG + RL demos |
 | **D** | Frequency completion + planning cost variants | analysis + DP reachability |
 | **E** | Obstacles, Pacejka, stochastic | specialized catalog |
@@ -211,5 +213,5 @@ Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) (June 
 5. `identification/fitting.py` covers the params-gradient workflow.
 6. README includes a pyro → minilink API migration guide.
 
-Full per-module and per-demo checklists:
-[docs/plans/pyro-port-gap-todo.md](docs/plans/pyro-port-gap-todo.md).
+Full per-module backlog:
+[docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md).

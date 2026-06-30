@@ -155,9 +155,7 @@ def animate(
 def _plot_field(grid, values, *, axes, anchor, vmin, vmax, cmap, ax, title, show):
     import matplotlib.pyplot as plt
 
-    Z = grid.slice_2d(
-        grid.grid_from_array(values), axes[0], axes[1], anchor=anchor
-    )
+    Z = grid.slice_2d(grid.grid_from_array(values), axes[0], axes[1], anchor=anchor)
     x_level, y_level = grid.x_levels[axes[0]], grid.x_levels[axes[1]]
 
     if ax is None:

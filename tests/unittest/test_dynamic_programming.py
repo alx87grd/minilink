@@ -45,9 +45,7 @@ def make_pendulum_problem():
     sys.state.upper_bound = np.array([2.0, 2.0])
     sys.inputs["u"].lower_bound = np.array([-1.0])
     sys.inputs["u"].upper_bound = np.array([1.0])
-    return PlanningProblem(
-        sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys)
-    )
+    return PlanningProblem(sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys))
 
 
 def solve(problem, *, precompute=True, **opt_kwargs):
@@ -244,9 +242,7 @@ class TestJaxPrecompute(unittest.TestCase):
 
         pytest.importorskip("jax")
         problem = make_pendulum_problem()
-        grid = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
-        )
+        grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1)
         return problem, grid
 
     def test_jax_g_table_matches_numpy(self):
@@ -292,7 +288,9 @@ class TestJaxPrecompute(unittest.TestCase):
             problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
         )
         DynamicProgrammingPlanner(
-            problem, grid=grid, options=DynamicProgrammingOptions(backend="jax", max_iterations=1)
+            problem,
+            grid=grid,
+            options=DynamicProgrammingOptions(backend="jax", max_iterations=1),
         )
         x_next, action_ok, x_next_ok = grid.transition(0.0)
         np_planner = DynamicProgrammingPlanner(

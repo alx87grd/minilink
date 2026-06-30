@@ -3,25 +3,31 @@
 Run from repo root::
 
     python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_obstacle.py
+    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_obstacle.py large
+
+Presets: ``small`` (default, tight obstacle) or ``large`` (wide keep-out disk).
 """
+
+import sys
 
 import numpy as np
 
 from minilink.core.backends import array_module, configure_jax
 from minilink.core.costs import CostFunction, QuadraticCost
+from minilink.core.geometry import Sphere
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
 from minilink.graphical.animation.primitives import (
-    Circle,
     CustomLine,
     HorizonPolyline,
     TrajectoryPolyline,
-    time_channel_matrix,
 )
+from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.spatial.scene import Scene
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -31,14 +37,25 @@ from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 
+PRESETS = {
+    "small": {
+        "title": "MPC obstacle avoidance (rate inputs, soft repulsion)",
+        "obstacle_radius": 0.4,
+        "repulsion_weight": 2.0,
+    },
+    "large": {
+        "title": "MPC large obstacle (rate inputs, soft repulsion)",
+        "obstacle_radius": 5.0,
+        "repulsion_weight": 50.0,
+    },
+}
+
 U_TARGET = 8.0
 TF_SIM = 5.0
 VX0 = 6.4
 
 OBSTACLE_CENTER = (20.0, 0.0)
-OBSTACLE_RADIUS = 0.4
 OBSTACLE_MARGIN = 0.2
-OBSTACLE_REPULSION_WEIGHT = 2.0
 OBSTACLE_REPULSION_EPS = 0.08
 
 MPC_HZ = 5.0
@@ -83,6 +100,17 @@ class TrackingWithObstacleCost(CostFunction):
         return self.tracking.h(x, t, params=params) + self._repulsion(x)
 
 
+def _preset_name() -> str:
+    if len(sys.argv) > 1 and sys.argv[1] in PRESETS:
+        return sys.argv[1]
+    return "small"
+
+
+preset_name = _preset_name()
+preset = PRESETS[preset_name]
+OBSTACLE_RADIUS = preset["obstacle_radius"]
+OBSTACLE_REPULSION_WEIGHT = preset["repulsion_weight"]
+
 configure_jax(enable_x64=True)
 
 sys_mpc = JaxDynamicBicycleRateInputs()
@@ -90,15 +118,15 @@ sys_sim = JaxDynamicBicycleRateInputs()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
 sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 
-for sys in (sys_mpc, sys_sim):
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = W_REAR_MAX
-    sys.state.lower_bound[7] = -DELTA_MAX
-    sys.state.upper_bound[7] = DELTA_MAX
-    sys.inputs["w_rear_dot"].lower_bound[0] = -W_REAR_DOT_MAX
-    sys.inputs["w_rear_dot"].upper_bound[0] = W_REAR_DOT_MAX
-    sys.inputs["delta_dot"].lower_bound[0] = -DELTA_DOT_MAX
-    sys.inputs["delta_dot"].upper_bound[0] = DELTA_DOT_MAX
+for system in (sys_mpc, sys_sim):
+    system.state.lower_bound[6] = 0.0
+    system.state.upper_bound[6] = W_REAR_MAX
+    system.state.lower_bound[7] = -DELTA_MAX
+    system.state.upper_bound[7] = DELTA_MAX
+    system.inputs["w_rear_dot"].lower_bound[0] = -W_REAR_DOT_MAX
+    system.inputs["w_rear_dot"].upper_bound[0] = W_REAR_DOT_MAX
+    system.inputs["delta_dot"].lower_bound[0] = -DELTA_DOT_MAX
+    system.inputs["delta_dot"].upper_bound[0] = DELTA_DOT_MAX
 
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 r_r = sys_mpc.params["r_r"]
@@ -145,9 +173,9 @@ u_hold = np.zeros(sys_sim.m)
 prev_plan = None
 next_mpc_t = 0.0
 
-print("MPC obstacle avoidance (rate inputs, soft repulsion)")
+print(preset["title"])
 print(
-    f"  u_target={U_TARGET} m/s, horizon={MPC_HORIZON}s, "
+    f"  preset={preset_name}, u_target={U_TARGET} m/s, horizon={MPC_HORIZON}s, "
     f"obstacle={OBSTACLE_CENTER} R={OBSTACLE_RADIUS}+{OBSTACLE_MARGIN}"
 )
 
@@ -207,66 +235,36 @@ print(
 )
 
 
-class MpcObstacleBicycleRate(JaxDynamicBicycleRateInputs):
-    def __init__(
-        self, mpc_plans, executed_traj, *, obstacle_center, keepout_radius, x_pad
-    ):
-        super().__init__()
-        cx, cy = obstacle_center
-        x_lo = float(executed_traj.x[0, 0]) - x_pad
-        x_hi = float(executed_traj.x[0, -1]) + x_pad
-        self._ref = CustomLine(
-            np.array([[x_lo, 0.0, 0.0], [x_hi, 0.0, 0.0]]),
-            color="k",
-            linewidth=1.0,
-            style="--",
-        )
-        self._obstacle = Circle(
-            radius=keepout_radius,
-            center=(cx, cy, 0.0),
-            color="tab:red",
-            fill=True,
-        )
-        self._executed = TrajectoryPolyline(
-            executed_traj, window="prefix", color="b", style="--", linewidth=1.0
-        )
-        self._mpc_plan = HorizonPolyline(
-            mpc_plans, color="tab:orange", linewidth=2.0, style="--"
-        )
-
-    def get_kinematic_geometry(self):
-        vehicle = super().get_kinematic_geometry()
-        return [self._ref, self._obstacle, self._executed] + vehicle + [self._mpc_plan]
-
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        return [
-            np.eye(4),
-            np.eye(4),
-            time_channel_matrix(t),
-            *vehicle,
-            time_channel_matrix(t),
-        ]
-
-
-mpc_anim_sys = MpcObstacleBicycleRate(
-    mpc_plans,
-    traj,
-    obstacle_center=OBSTACLE_CENTER,
-    keepout_radius=keepout_radius,
-    x_pad=REF_X_PAD,
+# --- Animation ---
+scene = Scene(obstacles=[Sphere(OBSTACLE_CENTER, keepout_radius)])
+x0_ref = float(traj.x[0, 0]) - REF_X_PAD
+x1_ref = float(traj.x[0, -1]) + REF_X_PAD
+history = SceneHistory(
+    reference=CustomLine(
+        np.array([[x0_ref, 0.0, 0.0], [x1_ref, 0.0, 0.0]]),
+        color="k",
+        linewidth=1.0,
+        style="--",
+    ),
+    trail=TrajectoryPolyline(
+        traj,
+        window="prefix",
+        color="b",
+        style="--",
+        linewidth=1.0,
+    ),
+    horizon=HorizonPolyline(
+        mpc_plans,
+        color="tab:orange",
+        linewidth=2.0,
+        style="--",
+    ),
 )
-mpc_anim_sys.params = dict(sys_sim.params)
-mpc_anim_sys.camera_scale = CAMERA_SCALE
-mpc_anim_sys.traj = traj
-mpc_anim_sys.plot_trajectory(signals=("x", "u"))
-mpc_anim_sys.animate()
 
-# from minilink.graphical.animation import Animator
-
-# Animator(mpc_anim_sys).animate_simulation(
-#     traj,
-#     save=True,
-#     file_name="mpc_obstacle",  # writes mpc_obstacle.gif
-#     show=False,
-# )
+sys_sim.params = dict(sys_sim.params)
+sys_sim.camera_scale = CAMERA_SCALE
+sys_sim.traj = traj
+sys_sim.plot_trajectory(signals=("x", "u"))
+sys_sim.animate(
+    traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history]
+)

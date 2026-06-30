@@ -10,8 +10,8 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
+from minilink.planning.spatial.collision import iter_probes
 from minilink.planning.spatial.grid import sample_grid
-from minilink.planning.spatial.robot import apply_transform, collision_spheres
 from minilink.planning.spatial.workspace_fields import GaussianField
 
 # Public API
@@ -25,7 +25,7 @@ def plot_scene(
     show_obstacles: bool = True,
     show_density: bool = True,
     show_clearance_contour: bool = False,
-    robot=None,
+    body=None,
     x=None,
     states=None,
     show: bool = True,
@@ -37,8 +37,8 @@ def plot_scene(
     obstacle_alpha: float = 0.45,
     density_cmap: str = "Oranges",
     density_alpha: float = 0.55,
-    robot_color: str = "#4c72b0",
-    robot_alpha: float = 0.35,
+    body_color: str = "#4c72b0",
+    body_alpha: float = 0.35,
     point_marker_size: float = 9.0,
     title: str | None = None,
     equal_aspect: bool = True,
@@ -46,7 +46,7 @@ def plot_scene(
     """
     Plot hard obstacles and soft workspace fields for a 2-D scene.
 
-    Pass ``robot`` with ``x`` (one state) or ``states`` (several) to overlay
+    Pass ``body`` with ``x`` (one state) or ``states`` (several) to overlay
     collision discs at the placed body poses.
 
     Returns ``(fig, ax)``. Matplotlib is imported on first call.
@@ -108,17 +108,17 @@ def plot_scene(
     for field in scene.workspace_fields:
         _draw_field_marker(ax, field)
 
-    robot_states = _coerce_robot_states(x, states)
-    if robot is not None:
-        for state in robot_states:
-            _draw_robot(
+    body_states = _coerce_body_states(x, states)
+    if body is not None:
+        for state in body_states:
+            _draw_body(
                 ax,
-                robot,
+                body,
                 state,
                 t,
                 params,
-                robot_color,
-                robot_alpha,
+                body_color,
+                body_alpha,
                 point_marker_size,
             )
 
@@ -280,7 +280,7 @@ def _draw_field_marker(ax, field):
     raise TypeError(f"unsupported field type for plotting: {type(field).__name__}")
 
 
-def _coerce_robot_states(x, states):
+def _coerce_body_states(x, states):
     if states is not None:
         return [np.asarray(state, dtype=float).reshape(-1) for state in states]
     if x is not None:
@@ -288,36 +288,34 @@ def _coerce_robot_states(x, states):
     return []
 
 
-def _draw_robot(ax, robot, x, t, params, color, alpha, point_marker_size):
+def _draw_body(ax, body, x, t, params, color, alpha, point_marker_size):
     import matplotlib.patches as mpatches
 
-    for shape, T in zip(robot.shapes, robot.body_poses(x, None, t, params)):
-        for center, radius in collision_spheres(shape):
-            world = apply_transform(T, center)
-            wx, wy = float(world[0]), float(world[1])
-            if float(radius) > 1e-12:
-                ax.add_patch(
-                    mpatches.Circle(
-                        (wx, wy),
-                        float(radius),
-                        facecolor=color,
-                        edgecolor="k",
-                        linewidth=0.8,
-                        alpha=alpha,
-                        zorder=6,
-                    )
-                )
-            else:
-                ax.plot(
-                    wx,
-                    wy,
-                    marker="o",
-                    color=color,
-                    markersize=point_marker_size,
-                    markeredgecolor="k",
-                    markeredgewidth=1.0,
+    for world, radius in iter_probes(body, x, None, t, params):
+        wx, wy = float(world[0]), float(world[1])
+        if float(radius) > 1e-12:
+            ax.add_patch(
+                mpatches.Circle(
+                    (wx, wy),
+                    float(radius),
+                    facecolor=color,
+                    edgecolor="k",
+                    linewidth=0.8,
+                    alpha=alpha,
                     zorder=6,
                 )
+            )
+        else:
+            ax.plot(
+                wx,
+                wy,
+                marker="o",
+                color=color,
+                markersize=point_marker_size,
+                markeredgecolor="k",
+                markeredgewidth=1.0,
+                zorder=6,
+            )
 
 
 def plot_track(

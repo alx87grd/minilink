@@ -1,17 +1,15 @@
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     Point,
-    arrow_transform,
-    follow_xy_camera,
     ground_line,
-    pose2d_matrix,
-    scale_pose2d_matrix,
 )
+from minilink.graphical.catalog.shapes import segment_pose_2d
 
 
 class Plane2D(MechanicalSystem):
@@ -49,6 +47,7 @@ class Plane2D(MechanicalSystem):
         self.width = self.length / 10.0
         self.dynamic_range = self.length
         self.camera_scale = self.dynamic_range
+        self.camera_follow_frame = "body"
 
     def velocity_vector(self, q, dq):
         xp = array_module(dq)
@@ -167,9 +166,6 @@ class Plane2D(MechanicalSystem):
 
         return thrust * xp.array([xp.cos(theta), xp.sin(theta), 0.0])
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def body_shape(self):
         """Side-view fuselage silhouette with the c.g. at the local origin.
 
@@ -198,77 +194,106 @@ class Plane2D(MechanicalSystem):
         return CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="blue", linewidth=2)
 
     def get_kinematic_geometry(self):
-        return [
-            self.body_shape(),
-            Point(color="black", marker="o", size=5),
-            self.chord_line(),
-            ground_line(length=200.0, y=0.0, color="black", style="--"),
-            Arrow(color="red", linewidth=2, origin="tip"),
-            self.chord_line(),
-            Arrow(color="black", linewidth=2, origin="base"),
-            Arrow(color="blue", linewidth=2, origin="base"),
-            Arrow(color="red", linewidth=2, origin="base"),
-            Arrow(color="blue", linewidth=2, origin="base"),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
+        # Static-framed primitives; chord/force geometry lives in the dynamic hook
+        # so draw order matches the pre-merge layout.
+        return {
+            "body": [self.body_shape()],
+            "center": [Point(color="black", marker="o", size=5)],
+            "wingchord": [self.chord_line()],
+            "world": [ground_line(length=200.0, y=0.0, color="black", style="--")],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         q = x[:3]
-        dq = x[3:]
         params = self.params
-        speed, gamma, alpha = self.velocity_vector(q, dq)
-        delta = u[1]
-        L_w, D_w, _, L_t, D_t, _ = self.aerodynamic_forces(speed, alpha, delta)
-        force_scale = self.length / 10.0
         chord_w = np.sqrt(params["S_w"] / params["AR"])
         chord_t = np.sqrt(params["S_t"] / params["AR"])
         l_w = params["l_w"]
         l_t = params["l_t"]
         theta = q[2]
+        delta = u[1]
         c, s = np.cos(theta), np.sin(theta)
         wing = np.array([q[0] - l_w * c, q[1] - l_w * s])
         tail = np.array([q[0] - l_t * c, q[1] - l_t * s])
+        dir_w = np.array([c, s])
+        dir_t = np.array([np.cos(theta + delta), np.sin(theta + delta)])
+        return {
+            "body": SE2(q[0], q[1], q[2]),
+            "center": SE2(q[0], q[1], 0.0),
+            "wingchord": segment_pose_2d(
+                wing - chord_w * dir_w, wing + chord_w * dir_w
+            ),
+            "tailchord": segment_pose_2d(
+                tail - chord_t * dir_t, tail + chord_t * dir_t
+            ),
+            "speed": translation(q[0], q[1], 0.0),
+            "wingpt": translation(wing[0], wing[1], 0.0),
+            "tailpt": translation(tail[0], tail[1], 0.0),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        q = x[:3]
+        dq = x[3:]
+        speed, gamma, alpha = self.velocity_vector(q, dq)
+        delta = u[1]
+        L_w, D_w, _, L_t, D_t, _ = self.aerodynamic_forces(speed, alpha, delta)
+        force_scale = self.length / 10.0
+        thrust_len = force_scale * u[0]
         speed_len = min(speed * self.length / 30.0, self.length)
-        return [
-            pose2d_matrix(q[0], q[1], q[2]),
-            pose2d_matrix(q[0], q[1], 0.0),
-            pose2d_matrix(wing[0], wing[1], theta)
-            @ scale_pose2d_matrix(-chord_w, 0.0, 0.0, 2.0 * chord_w),
-            pose2d_matrix(0.0, 0.0, 0.0),
-            pose2d_matrix(q[0], q[1], q[2])
-            @ scale_pose2d_matrix(-self.l_cg, 0.0, 0.0, force_scale * u[0]),
-            pose2d_matrix(tail[0], tail[1], theta + delta)
-            @ scale_pose2d_matrix(-chord_t, 0.0, 0.0, 2.0 * chord_t),
-            scale_pose2d_matrix(q[0], q[1], gamma, speed_len),
-            arrow_transform(
-                wing[0],
-                wing[1],
-                -L_w * np.sin(gamma),
-                L_w * np.cos(gamma),
-                scale=force_scale,
-            ),
-            arrow_transform(
-                wing[0],
-                wing[1],
-                -D_w * np.cos(gamma),
-                -D_w * np.sin(gamma),
-                scale=force_scale,
-            ),
-            arrow_transform(
-                tail[0],
-                tail[1],
-                -L_t * np.sin(gamma),
-                L_t * np.cos(gamma),
-                scale=force_scale,
-            ),
-            arrow_transform(
-                tail[0],
-                tail[1],
-                -D_t * np.cos(gamma),
-                -D_t * np.sin(gamma),
-                scale=force_scale,
-            ),
-        ]
+        cg, sg = np.cos(gamma), np.sin(gamma)
+        thrust = Arrow(
+            base=(-thrust_len, 0.0),
+            vector=(1.0, 0.0),
+            scale=thrust_len,
+            color="red",
+            linewidth=2,
+        )
+        thrust.local_transform = translation(-self.l_cg, 0.0, 0.0)
+        return {
+            "body": [thrust],
+            "tailchord": [self.chord_line()],
+            "speed": [
+                Arrow(
+                    base=(0.0, 0.0),
+                    vector=(cg, sg),
+                    scale=speed_len,
+                    color="black",
+                    linewidth=2,
+                )
+            ],
+            "wingpt": [
+                Arrow(
+                    base=(0.0, 0.0),
+                    vector=(-L_w * sg, L_w * cg),
+                    scale=force_scale,
+                    color="blue",
+                    linewidth=2,
+                ),
+                Arrow(
+                    base=(0.0, 0.0),
+                    vector=(-D_w * cg, -D_w * sg),
+                    scale=force_scale,
+                    color="red",
+                    linewidth=2,
+                ),
+            ],
+            "tailpt": [
+                Arrow(
+                    base=(0.0, 0.0),
+                    vector=(-L_t * sg, L_t * cg),
+                    scale=force_scale,
+                    color="blue",
+                    linewidth=2,
+                ),
+                Arrow(
+                    base=(0.0, 0.0),
+                    vector=(-D_t * cg, -D_t * sg),
+                    scale=force_scale,
+                    color="red",
+                    linewidth=2,
+                ),
+            ],
+        }
 
 
 if __name__ == "__main__":

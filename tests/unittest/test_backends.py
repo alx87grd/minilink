@@ -17,13 +17,6 @@ from minilink.core.backends import (
 )
 
 
-def test_constants_have_expected_string_values():
-    assert BACKEND_NUMPY == "numpy"
-    assert BACKEND_JAX == "jax"
-    assert BACKEND_AUTO == "auto"
-    assert BACKEND_DIRECT == "direct"
-
-
 def test_compile_simulator_transcription_backend_sets():
     assert set(COMPILE_BACKENDS) == {BACKEND_NUMPY, BACKEND_JAX}
     assert set(SIMULATOR_BACKENDS) == {BACKEND_NUMPY, BACKEND_JAX, BACKEND_AUTO}

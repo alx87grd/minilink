@@ -22,9 +22,50 @@ Planning
 .. automodule:: minilink.planning.trajectory_optimization.multiple_shooting
    :members:
 
-.. Planned (dedicated migration sessions); modules do not exist yet:
-.. .. automodule:: minilink.planning.search.rrt
-..    :members:
-..
-.. .. automodule:: minilink.planning.policy_synthesis.dynamic_programming
-..    :members:
+Spatial
+-------
+
+.. automodule:: minilink.planning.spatial.scene
+   :members:
+
+.. automodule:: minilink.planning.spatial.collision
+   :members:
+
+.. automodule:: minilink.planning.spatial.state_fields
+   :members:
+
+.. automodule:: minilink.planning.spatial.track
+   :members:
+
+.. automodule:: minilink.planning.spatial.paths
+   :members:
+
+.. automodule:: minilink.planning.spatial.shaping
+   :members:
+
+.. automodule:: minilink.planning.spatial.workspace_fields
+   :members:
+
+Search
+------
+
+.. automodule:: minilink.planning.search.rrt
+   :members:
+
+.. automodule:: minilink.planning.search.rrt_star
+   :members:
+
+.. automodule:: minilink.planning.search.extenders
+   :members:
+
+.. automodule:: minilink.planning.search.steering
+   :members:
+
+.. automodule:: minilink.planning.search.tree
+   :members:
+
+Policy synthesis
+----------------
+
+.. automodule:: minilink.planning.policy_synthesis.dp
+   :members:

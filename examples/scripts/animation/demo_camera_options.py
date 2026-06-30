@@ -8,10 +8,10 @@ sys.x0[0] = 2.0
 
 sys.compute_trajectory(tf=10.0)
 
-sys.camera_target[:] = (5.0, 5.0, 0.0)
-sys.camera_plot_axes = (0, 2)
-sys.camera_scale = 80.0
+# sys.camera_target[:] = (5.0, 5.0, 0.0)
+# sys.camera_plot_axes = (0, 2)
+# sys.camera_scale = 10.0
 
 sys.animate()
-sys.animate(is_3d=True)
-sys.animate(renderer="meshcat")
+# sys.animate(is_3d=True)
+# sys.animate(renderer="meshcat")

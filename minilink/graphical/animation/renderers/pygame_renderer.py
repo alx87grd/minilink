@@ -17,10 +17,7 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
-    HorizonPolyline,
     TorqueArrow,
-    TrajectoryPolyline,
-    extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
@@ -124,49 +121,20 @@ class PygameCanvas:
                     lw,
                 )
 
-        elif isinstance(primitive, Arrow):
+        elif isinstance(primitive, (Arrow, TorqueArrow)):
+            # Baked ``pts`` drawn as a polyline at the primitive pose.
             local_pts = primitive.pts
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
             world_pts = (transform_matrix @ local_pts_hom.T).T
-            pts = []
-            for i in range(world_pts.shape[0]):
-                pts.append(self._to_screen(world_pts[i, 0], world_pts[i, 1]))
+            pts = [
+                self._to_screen(world_pts[i, 0], world_pts[i, 1])
+                for i in range(world_pts.shape[0])
+            ]
             if len(pts) >= 2:
                 lw = max(1, int(round(primitive.linewidth)))
                 pygame_mod.draw.lines(
-                    self.surface,
-                    _color_to_rgb(primitive.color),
-                    False,
-                    pts,
-                    lw,
+                    self.surface, _color_to_rgb(primitive.color), False, pts, lw
                 )
-
-        elif isinstance(primitive, (TorqueArrow, HorizonPolyline, TrajectoryPolyline)):
-            channel, T_rigid = extract_amplitude(transform_matrix)
-            local_pts = primitive.compute_pts(channel)
-            local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (T_rigid @ local_pts_hom.T).T
-            col = _color_to_rgb(primitive.color)
-            lw = max(1, int(round(primitive.linewidth)))
-            if isinstance(primitive, TorqueArrow):
-                arc_n = local_pts.shape[0] - 3
-                if arc_n >= 2:
-                    arc_screen = [
-                        self._to_screen(world_pts[i, 0], world_pts[i, 1])
-                        for i in range(arc_n)
-                    ]
-                    pygame_mod.draw.lines(self.surface, col, False, arc_screen, lw)
-                    head_screen = [
-                        self._to_screen(world_pts[i, 0], world_pts[i, 1])
-                        for i in range(arc_n, world_pts.shape[0])
-                    ]
-                    pygame_mod.draw.lines(self.surface, col, False, head_screen, lw)
-            elif local_pts.shape[0] >= 2:
-                screen_pts = [
-                    self._to_screen(world_pts[i, 0], world_pts[i, 1])
-                    for i in range(world_pts.shape[0])
-                ]
-                pygame_mod.draw.lines(self.surface, col, False, screen_pts, lw)
 
         elif isinstance(primitive, Circle):
             local_center = np.zeros(3)

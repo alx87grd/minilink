@@ -140,10 +140,17 @@ constant-matrix convenience built from `A, B, C, D` arrays (introspect via
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
-- **Visualization contract:** `get_kinematic_geometry`,
-  `get_kinematic_transforms`, `get_dynamic_geometry`, `get_camera_transform`
-  are part of the core `System` contract in `core/system.py` (graphical
-  primitives imported lazily; API still under review).
+- **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
+  `get_dynamic_geometry` are part of the core `System` contract in
+  `core/system.py` (graphical primitives imported lazily). Camera hints
+  (`camera_target`, `camera_scale`, `camera_follow_frame`, …) are resolved by
+  the animator via `resolve_camera_from_hints`; custom views use
+  `animate(camera=…)`.
+  **`tf` returns only computed frames** (body, joints, axles, …); **`"world"` is
+  implicit** — the animator injects identity so world-fixed geometry can key to
+  `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
+  stays unprefixed (one shared root); articulated frames are namespaced
+  (``vehicle:body``).
 - **Facades:** user shortcuts only (lazy simulation/graphics); defined on the
   `core.facades.SystemFacades` mixin so `core/system.py` keeps the math,
   port, and visualization contracts. `self.traj` is a convenience cache of
@@ -188,6 +195,8 @@ quiet by default (`connection_verbose=False`; set `True` for one line per connec
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop,
 `autowire()` conservative fill. Diagram operands are flattened, not nested.
 Explicit `add_subsystem` / `connect` remains canonical for general topology.
+Visualization: subsystem `"world"` geometry merges into one shared diagram
+`"world"` frame; only articulated frames get `{sys_id}:` prefixes.
 
 ### `Trajectory`, sets, costs, geometry
 
@@ -271,12 +280,16 @@ returns a `LookupTableController` (a `StaticSystem`, so `controller >> plant` si
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
 `Scene` (`obstacles`, `workspace_fields`). On X: `StateField.value(x)` fuses the robot
 placement with scene queries (`clearance_field`, `cost_field`). Export separately —
-`clearance_field(robot)` for collision (hard `Set` or barrier `CostFunction`) and
-`cost_field(robot)` for terrain (soft `CostFunction` or hard band via
+`clearance_field(body)` for collision (hard `Set` or barrier `CostFunction`) and
+`cost_field(body)` for terrain (soft `CostFunction` or hard band via
 `as_constraint(upper=...)`). `StateField.value(x)` is a **scalar** (min clearance, max
-density over body probes). `RobotBody` places body-frame geometry by
-`body_poses(x,u,t,params) → T`, dimension-generic (2-D/3-D, any state size). Shape an
-obstacle term before weighting with `as_cost(shaping=...)` (`shaping.occupancy`,
+density over body probes). **Collision reuse:** frameless geometry (`disc`,
+`car_outline`, `point_probe`) binds to the **planner** plant with
+`bind(sys, geometry, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
+via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Frameless
+geometry: :func:`~minilink.planning.spatial.collision.disc`,
+:func:`~minilink.planning.spatial.collision.point_probe`,
+:func:`~minilink.planning.spatial.collision.car_outline`. Shape obstacles with
 `quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
 obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.
@@ -285,9 +298,9 @@ obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in
 `ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
 `distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
-`corridor_field(robot).as_constraint(lower=0)` for a hard tube. Probe semantics match
+`corridor_field(body).as_constraint(lower=0)` for a hard tube. Probe semantics match
 clearance (subtract body radius). Compose with obstacles:
-`X = bounds & scene.clearance_field(robot).as_constraint() & track.corridor_field(robot).as_constraint()`.
+`X = bounds & scene.clearance_field(body).as_constraint() & track.corridor_field(body).as_constraint()`.
 
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
 sources every concern from the problem — collision `problem.X.contains` (optional
@@ -310,8 +323,7 @@ the best goal cost stops improving for `convergence_patience` extensions;
 ``live_plot_after_goal_only`` limits updates to the RRT* post-goal convergence phase.
 ``RRTOptions.nearest_backend`` selects brute-force or SciPy ``cKDTree`` nearest/near
 queries (Euclidean L2 only — requires ``metric=euclidean``); see
-``benchmarks/run_rrt_nearest_backends.py`` and
-``examples/scripts/planning/demo_rrt_kdtree_speed_double_pendulum.py``. Modest
+``benchmarks/run_rrt_nearest_backends.py``. Modest
 speedups on low-D obstacle scenes are expected when collision checking and
 post-goal tree scans dominate.
 
@@ -321,9 +333,10 @@ Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`
 Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
 Plotly under `plotting` extra.
 
-**Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
-for all renderers. Override on `System` for custom views. Camera and kinematic
-hooks are still under graphical/animation API review.
+**Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix
+(`camera_matrix`) each frame via `resolve_camera_from_hints`; pass
+`animate(camera=…)` for a constant matrix or callable override. One contract
+for all renderers.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing

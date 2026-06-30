@@ -129,6 +129,7 @@ def build_jax_node_chunks(node_fn, N, jax, jnp, *, interval, verbose, prefix):
 
     return out
 
+
 # Public API
 
 
@@ -239,7 +240,9 @@ class StateSpaceGrid:
             self._print_mesh_summary()
 
         try:
-            self.x_next, self.action_ok, self.x_next_ok = self._compute_transition_jax(t)
+            self.x_next, self.action_ok, self.x_next_ok = self._compute_transition_jax(
+                t
+            )
         except Exception as exc:
             raise ValueError(
                 "JAX grid precompute requires a JAX-traceable plant f and BoxSet X"
@@ -430,7 +433,9 @@ class StateSpaceGrid:
 
         if isinstance(U, BoxInputSet) and isinstance(X, BoxSet):
             action_ok = np.ones((N, A), dtype=bool)
-            x_next_ok = np.all(x_next >= X.lower, axis=2) & np.all(x_next <= X.upper, axis=2)
+            x_next_ok = np.all(x_next >= X.lower, axis=2) & np.all(
+                x_next <= X.upper, axis=2
+            )
             return action_ok, x_next_ok
 
         action_ok = np.empty((N, A), dtype=bool)
@@ -449,9 +454,7 @@ class StateSpaceGrid:
         print(f"\nGenerating mesh for: {name}")
         print("---------------------------------------------------")
         print(f"State space dimensions: {self.n}  Input space dimension: {self.m}")
-        print(
-            f"Number of nodes: {self.nodes_n}  Number of actions: {self.actions_n}"
-        )
+        print(f"Number of nodes: {self.nodes_n}  Number of actions: {self.actions_n}")
         print(f"Number of node-action pairs: {self.nodes_n * self.actions_n}")
         print("---------------------------------------------------")
 

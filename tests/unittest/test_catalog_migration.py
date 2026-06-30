@@ -59,6 +59,12 @@ from minilink.dynamics.catalog.vehicles.steering import (
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
 from minilink.graphical.animation.primitives import Arrow, TorqueArrow
+from tests.unittest.graphics_contract_helpers import (
+    geometry_smoke as _geometry_smoke,
+)
+from tests.unittest.graphics_contract_helpers import (
+    resolved_primitive_count as _primitive_count,
+)
 
 
 def _zero_f_smoke(system):
@@ -71,28 +77,7 @@ def _zero_f_smoke(system):
     assert np.all(np.isfinite(dx))
 
 
-def _geometry_smoke(system):
-    x = np.asarray(system.x0, dtype=float)
-    if x.shape != (system.n,):
-        x = np.zeros(system.n)
-    u = system.get_u_from_input_ports()
-    geometry = system.get_kinematic_geometry()
-    transforms = system.get_kinematic_transforms(x, u, 0.0)
-    assert len(geometry) == len(transforms)
-    for transform in transforms:
-        transform = np.asarray(transform, dtype=float)
-        assert transform.shape == (4, 4)
-        assert np.all(np.isfinite(transform))
-
-
-def _primitive_count(system, primitive_type):
-    return sum(
-        isinstance(primitive, primitive_type)
-        for primitive in system.get_kinematic_geometry()
-    )
-
-
-class TestMigratedCatalog(unittest.TestCase):
+class TestCatalogSmoke(unittest.TestCase):
     def test_low_risk_equation_reference_values(self):
         np.testing.assert_allclose(
             SimpleIntegrator().f(np.array([2.0]), np.array([3.0])),
@@ -215,51 +200,7 @@ class TestMigratedCatalog(unittest.TestCase):
                 self.assertEqual(_primitive_count(system, TorqueArrow), expected)
                 _geometry_smoke(system)
 
-    def test_dynamic_domain_cameras_follow_pyro_positions(self):
-        cases = [
-            (Plane2D(), np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]), [10.0, 3.0, 0.0]),
-            (Rocket(), np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]), [10.0, 3.0, 0.0]),
-            (Drone2D(), np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]), [10.0, 3.0, 0.0]),
-            (SpeedControlledDrone2D(), np.array([10.0, 3.0]), [10.0, 3.0, 0.0]),
-            (
-                ConstantSpeedHelicopterTunnel(),
-                np.array([0.5, 3.0, 10.0]),
-                [10.0, 3.0, 0.0],
-            ),
-            (
-                Drone2DWithSideThruster(),
-                np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]),
-                [10.0, 3.0, 0.0],
-            ),
-            (Boat2D(), np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]), [10.0, 3.0, 0.0]),
-            (
-                Boat2DWithCurrent(),
-                np.array([10.0, 3.0, 0.2, 1.0, 0.0, 0.0]),
-                [10.0, 3.0, 0.0],
-            ),
-            (KinematicBicycle(), np.array([10.0, 3.0, 0.2]), [10.0, 3.0, 0.0]),
-            (KinematicCar(), np.array([10.0, 3.0, 0.2]), [10.0, 3.0, 0.0]),
-            (ConstantSpeedKinematicCar(), np.array([10.0, 3.0, 0.2]), [10.0, 3.0, 0.0]),
-            (UdeSRacecar(), np.array([10.0, 3.0, 0.2]), [10.0, 3.0, 0.0]),
-            (QuarterCarOnRoughTerrain(), np.array([0.5, 3.0, 10.0]), [10.0, 3.0, 0.0]),
-            (
-                LongitudinalFrontWheelDriveCarWithTorqueInput(),
-                np.array([10.0, 1.0, 0.0, 0.0]),
-                [10.0, 0.0, 0.0],
-            ),
-        ]
-
-        for system, x, expected_target in cases:
-            with self.subTest(system=system.name):
-                camera = system.get_camera_transform(
-                    x,
-                    system.get_u_from_input_ports(),
-                    0.0,
-                )
-                np.testing.assert_allclose(camera[:3, 3], expected_target)
-                self.assertEqual(camera[3, 3], system.camera_scale)
-
-    def test_migrated_class_smoke(self):
+    def test_catalog_class_smoke(self):
         systems = [
             SimpleIntegrator(),
             DoubleIntegrator(),

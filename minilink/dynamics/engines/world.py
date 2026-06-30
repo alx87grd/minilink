@@ -2,9 +2,10 @@
 
 import numpy as np
 
+from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.engines.contact_jax import WorldModel, unpack_state, world_ode
-from minilink.graphical.animation.primitives import Plane, Sphere, translation_matrix
+from minilink.graphical.animation.primitives import Plane, Sphere
 
 
 def _is_jax_array(a) -> bool:
@@ -72,13 +73,13 @@ class PhysicsWorldSystem(DynamicSystem):
         return x
 
     def get_kinematic_geometry(self):
-        prim = []
+        geometry = {}
         for i in range(self.world.n_bodies):
             r = float(np.asarray(self.world.radii)[i])
-            prim.append(
+            geometry[f"body{i}"] = [
                 Sphere(radius=r, center=[0.0, 0.0, 0.0], color="red", opacity=1.0)
-            )
-        prim.append(
+            ]
+        geometry["world"] = [
             Plane(
                 normal=np.asarray(self.world.plane_normal, dtype=float),
                 offset=float(self.world.plane_offset),
@@ -87,12 +88,13 @@ class PhysicsWorldSystem(DynamicSystem):
                 color="blue",
                 opacity=0.0,
             )
-        )
-        return prim
+        ]
+        return geometry
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         pos, _, _, _ = unpack_state(x, self.world.n_bodies)
         pos_np = np.asarray(pos, dtype=float)
-        T = [translation_matrix(p[0], p[1], p[2]) for p in pos_np]
-        T.append(np.eye(4, dtype=float))  # plane guide is already in world coords
-        return T
+        frames = {}
+        for i, p in enumerate(pos_np):
+            frames[f"body{i}"] = translation(p[0], p[1], p[2])
+        return frames

@@ -1,17 +1,13 @@
 import numpy as np
 
+from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
     CustomLine,
-    arrow_transform,
-    follow_xy_camera,
-    identity_matrix,
-    line_between_transform,
-    spring_line,
-    translation_matrix,
 )
+from minilink.graphical.catalog.shapes import spring_between
 
 
 class QuarterCarOnRoughTerrain(DynamicSystem):
@@ -40,6 +36,7 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
 
         # Graphic parameters
         self.camera_scale = 10.0
+        self.camera_follow_frame = "body"
 
     def z(self, x, params=None):
         params = self.params if params is None else params
@@ -78,33 +75,44 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[2], x[1], self.camera_scale)
-
     def get_kinematic_geometry(self):
         xs = np.linspace(-5.0, 15.0, 240)
         terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
-        return [
-            CustomLine(terrain, color="black", linewidth=1),
-            spring_line(color="black"),
-            Box(length_x=0.8, length_y=0.35, length_z=0.2, color="blue", opacity=0.9),
-            Arrow(color="red", linewidth=2, origin="base"),
-        ]
+        return {
+            "world": [CustomLine(terrain, color="black", linewidth=1)],
+            "body": [
+                Box(
+                    length_x=0.8, length_y=0.35, length_z=0.2, color="blue", opacity=0.9
+                )
+            ],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
+        mass_y = x[1]
+        return {"body": translation(x[2], mass_y, 0.0)}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         ground = self.z(x[2])
         mass_y = x[1]
-        return [
-            identity_matrix(),
-            line_between_transform([x[2], ground], [x[2], mass_y - 0.2]),
-            translation_matrix(x[2], mass_y, 0.0),
-            arrow_transform(x[2] + 0.5, mass_y, 0.0, u[0], scale=0.2),
-        ]
+        return {
+            "world": [
+                spring_between([x[2], ground], [x[2], mass_y - 0.2]),
+            ],
+            "body": [
+                Arrow(
+                    base=(0.5, 0.0),
+                    vector=(0.0, u[0]),
+                    scale=0.2,
+                    color="red",
+                    linewidth=2,
+                )
+            ],
+        }
 
 
 if __name__ == "__main__":
     sys = QuarterCarOnRoughTerrain()
     sys.x0 = np.array([0.0, 0.0, 0.0])
-    sys.inputs["u"].nominal_value = np.array([5.0])
+    sys.inputs["u"].nominal_value = np.array([1.0])
     sys.compute_trajectory(tf=8.0)
     sys.animate()

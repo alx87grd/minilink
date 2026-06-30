@@ -218,8 +218,8 @@ After substantial changes, run the full checklist in [§10 Revision Pass](#10-re
 At feature completion, verify in proportion to risk:
 
 1. automated tests with `pytest`;
-2. manual smoke scripts in `tests/manual/` when useful;
-3. demo scripts in `examples/` for major user-facing workflows.
+2. smoke scripts in `examples/scripts/` for major user-facing workflows;
+3. repo-root `benchmarks/` runners when touching performance-sensitive paths.
 
 JAX twin plants need tests showing JAX equations match the NumPy reference in a
 nominal case and a non-trivial parameter regime.

@@ -4,8 +4,8 @@ Reference tracks: a path plus an optional corridor for planning exports.
 Compose at :class:`~minilink.planning.problems.PlanningProblem`::
 
     track = ReferenceTrack(from_waypoints(pts), half_width=1.0)
-    X = bounds & track.corridor_field(robot).as_constraint()
-    cost = base + track.distance_field(robot).as_cost(weight=5.0)
+    X = bounds & track.corridor_field(body).as_constraint()
+    cost = base + track.distance_field(body).as_cost(weight=5.0)
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
+from minilink.planning.spatial.collision import CollisionBody
 from minilink.planning.spatial.paths import ReferencePath
-from minilink.planning.spatial.robot import RobotBody
 
 if TYPE_CHECKING:
     from minilink.planning.spatial.state_fields import StateField
@@ -52,15 +52,15 @@ class ReferenceTrack:
         xp = array_module(p)
         return xp.asarray(self.half_width) - self.path.distance(p, t=t, params=params)
 
-    def distance_field(self, robot: RobotBody) -> StateField:
+    def distance_field(self, body: CollisionBody) -> StateField:
         from minilink.planning.spatial.state_fields import PathDistanceField
 
-        return PathDistanceField(self, robot)
+        return PathDistanceField(self, body)
 
-    def corridor_field(self, robot: RobotBody) -> StateField:
+    def corridor_field(self, body: CollisionBody) -> StateField:
         from minilink.planning.spatial.state_fields import CorridorMarginField
 
-        return CorridorMarginField(self, robot)
+        return CorridorMarginField(self, body)
 
     def plot(self, **kwargs):
         """Plot the centerline and corridor (lazy matplotlib import)."""

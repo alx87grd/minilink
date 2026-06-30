@@ -25,7 +25,7 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
-from minilink.planning.spatial.robot import sphere
+from minilink.planning.spatial.collision import bind, disc
 from minilink.planning.spatial.scene import Scene
 
 SEED = 2
@@ -58,8 +58,8 @@ scene = Scene(
         Sphere([4.0, 2.5], 0.6),
     )
 )
-robot = sphere(radius=0.22, position=(0, 1))
-X = BoxSet.from_system_state(sys) & scene.clearance_field(robot).as_constraint()
+body = bind(sys, disc(0.22))
+X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
 
 x_start = np.array([-4.5, -4.5])
 x_goal = np.array([4.5, 4.5])
@@ -132,9 +132,7 @@ print(f"  best path cost={planner.best_goal_cost:.3f}  goal error={goal_error:.3
 print(f"  elapsed={elapsed:.2f} s  stop reason: {stop_reason}")
 
 if REPLAY_HISTORY and planner.history:
-    first_goal = next(
-        (frame for frame in planner.history if frame.reached_goal), None
-    )
+    first_goal = next((frame for frame in planner.history if frame.reached_goal), None)
     if first_goal is not None:
         print(
             f"  first goal at extension {first_goal.iteration}, "
@@ -142,8 +140,7 @@ if REPLAY_HISTORY and planner.history:
         )
         final_cost = planner.history[-1].best_cost
         print(
-            f"  final cost={final_cost:.3f} "
-            f"(Δ={first_goal.best_cost - final_cost:.3f})"
+            f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost - final_cost:.3f})"
         )
 
 if LIVE_PLOT:

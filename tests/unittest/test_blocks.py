@@ -5,6 +5,7 @@ import pytest
 
 from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Source, Step
+from minilink.blocks.transfer_function import TransferFunction
 from minilink.control.linear import ProportionalController
 
 
@@ -60,6 +61,15 @@ class TestBlocks(unittest.TestCase):
         )
 
         np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.2, 0.4]))
+
+    def test_transfer_function_first_order_step(self):
+        plant = TransferFunction([1.0], [1.0, 1.0])
+        x = np.array([0.0])
+        u = np.array([1.0])
+        dx = plant.f(x, u)
+        np.testing.assert_allclose(dx, np.array([1.0]))
+        np.testing.assert_allclose(plant.h(x, u), np.array([0.0]))
+        np.testing.assert_allclose(plant.compile("numpy").f(x, u, 0.0), np.array([1.0]))
 
     def test_prop_controller_scales_tracking_error(self):
         controller = ProportionalController(2.5)

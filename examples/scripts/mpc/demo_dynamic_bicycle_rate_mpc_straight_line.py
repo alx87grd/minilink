@@ -16,13 +16,15 @@ import numpy as np
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import JaxDynamicBicycleRateInputs
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
+    JaxDynamicBicycleRateInputs,
+)
 from minilink.graphical.animation.primitives import (
     CustomLine,
     HorizonPolyline,
     TrajectoryPolyline,
-    time_channel_matrix,
 )
+from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -153,10 +155,7 @@ while t < TF_SIM - 1e-12:
 
         plan = planner.compute_solution(initial_guess=guess)
         res = planner.last_optimization_result
-        print(
-            f"MPC @ t={t:.2f}s  success={res.success}  "
-            f"solve={res.solve_time_s:.3f}s"
-        )
+        print(f"MPC @ t={t:.2f}s  success={res.success}  solve={res.solve_time_s:.3f}s")
         prev_plan = plan
         u_hold = plan.u[:, 0].copy()
         mpc_plans.append(
@@ -182,53 +181,32 @@ traj = Trajectory(
 
 
 # --- Animation ---
+x0_ref = float(traj.x[0, 0]) - REF_X_PAD
+x1_ref = float(traj.x[0, -1]) + REF_X_PAD
+history = SceneHistory(
+    reference=CustomLine(
+        np.array([[x0_ref, 0.0, 0.0], [x1_ref, 0.0, 0.0]]),
+        color="k",
+        linewidth=1.0,
+        style="--",
+    ),
+    trail=TrajectoryPolyline(
+        traj,
+        window="prefix",
+        color="b",
+        style="--",
+        linewidth=1.0,
+    ),
+    horizon=HorizonPolyline(
+        mpc_plans,
+        color="tab:orange",
+        linewidth=2.0,
+        style="--",
+    ),
+)
 
-
-class MpcPlanBicycleRate(JaxDynamicBicycleRateInputs):
-    """Rate-input bicycle with reference, executed trail, and MPC plan overlays."""
-
-    def __init__(self, mpc_plans, executed_traj, *, x_pad=REF_X_PAD):
-        super().__init__()
-        x0 = float(executed_traj.x[0, 0]) - x_pad
-        x1 = float(executed_traj.x[0, -1]) + x_pad
-        self._ref = CustomLine(
-            np.array([[x0, 0.0, 0.0], [x1, 0.0, 0.0]]),
-            color="k",
-            linewidth=1.0,
-            style="--",
-        )
-        self._executed = TrajectoryPolyline(
-            executed_traj,
-            window="prefix",
-            color="b",
-            style="--",
-            linewidth=1.0,
-        )
-        self._mpc_plan = HorizonPolyline(
-            mpc_plans,
-            color="tab:orange",
-            linewidth=2.0,
-            style="--",
-        )
-
-    def get_kinematic_geometry(self):
-        vehicle = super().get_kinematic_geometry()
-        return [self._ref, self._executed] + vehicle + [self._mpc_plan]
-
-    def get_kinematic_transforms(self, x, u, t):
-        vehicle = super().get_kinematic_transforms(x, u, t)
-        return [
-            np.eye(4),
-            time_channel_matrix(t),
-            *vehicle,
-            time_channel_matrix(t),
-        ]
-
-
-mpc_anim_sys = MpcPlanBicycleRate(mpc_plans, traj, x_pad=REF_X_PAD)
-mpc_anim_sys.params = dict(sys_sim.params)
-mpc_anim_sys.camera_scale = CAMERA_SCALE
-
-mpc_anim_sys.traj = traj
-mpc_anim_sys.plot_trajectory(signals=("x", "u"))
-mpc_anim_sys.animate()
+sys_sim.params = dict(sys_sim.params)
+sys_sim.camera_scale = CAMERA_SCALE
+sys_sim.traj = traj
+sys_sim.plot_trajectory(signals=("x", "u"))
+sys_sim.animate(traj, overlays=[history])

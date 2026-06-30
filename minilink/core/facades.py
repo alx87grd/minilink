@@ -365,14 +365,34 @@ class SystemFacades:
             filename=filename,
         )
 
-    def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
+    def render(
+        self,
+        x,
+        u,
+        t,
+        is_3d=False,
+        renderer="matplotlib",
+        camera=None,
+        overlays=None,
+    ):
         """
         Convenience shortcut rendering a single frame of the system.
+
+        ``camera`` accepts an optional override: a constant 4x4 or a
+        ``camera(frames, x, u, t)`` callable.
         """
         from minilink.graphical.animation import Animator
 
         animator = Animator(self)
-        return animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
+        return animator.show(
+            x,
+            u,
+            t,
+            is_3d=is_3d,
+            renderer=renderer,
+            camera=camera,
+            overlays=overlays,
+        )
 
     def animate(
         self,
@@ -384,6 +404,8 @@ class SystemFacades:
         native: bool = True,
         scene_title: str | None = None,
         show: bool = True,
+        camera=None,
+        overlays=None,
     ):
         """
         Convenience shortcut to animate a trajectory of this system.
@@ -396,10 +418,12 @@ class SystemFacades:
         (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``).
         ``native=True`` (default) drives each backend's own animation
         engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
-        Pass ``native=False`` to fall back to the legacy per-frame
-        Python-loop playback (useful for debugging or when the native
-        path's limitations matter — e.g. meshcat freezes dynamic-geometry
-        primitives such as ``TorqueArrow``; see ``DESIGN.md`` §4.7).
+        Pass ``native=False`` to fall back to the per-frame Python-loop
+        playback (useful for debugging or when the native path's limitations
+        matter — e.g. meshcat freezes per-frame dynamic geometry such as a
+        ``TorqueArrow`` sweep; see ``DESIGN.md`` §4.7). ``camera`` accepts an
+        optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
+        callable).
         """
         from minilink.graphical.animation import Animator
         from minilink.graphical.common.environment import prefers_inline_animation
@@ -423,6 +447,8 @@ class SystemFacades:
             renderer=renderer,
             native=native,
             scene_title=scene_title,
+            camera=camera,
+            overlays=overlays,
         )
 
         # For html output, return the IPython.display.HTML object and let the
