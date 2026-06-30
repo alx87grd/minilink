@@ -102,11 +102,17 @@ def _planar_torque_geometry(lengths, u, upper_bound):
 
 
 class SpeedControlledManipulator(DynamicSystem):
-    """Joint-space integrator for velocity-controlled manipulators."""
+    """Joint-space integrator for velocity-controlled manipulators.
+
+    Dynamics: ``dq = u``. State and default output ``y`` are joint angles ``q``.
+    Use :meth:`from_manipulator` to inherit ``forward_kinematics`` and ``J`` from
+    a torque-controlled :class:`Manipulator`.
+    """
 
     def __init__(self, dof, effector_dim):
         self.dof = int(dof)
         self.effector_dim = int(effector_dim)
+        self._kin_arm = None
         super().__init__(
             n=self.dof,
             input_dim=self.dof,
@@ -120,7 +126,28 @@ class SpeedControlledManipulator(DynamicSystem):
         self.inputs["u"].units = ["rad/s"] * self.dof
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+        p_labels = [f"p{i}" for i in range(self.effector_dim)]
+        self.add_output_port(
+            "p",
+            dim=self.effector_dim,
+            function=self.h_p,
+            dependencies=(),
+            labels=p_labels,
+            units=["[m]"] * self.effector_dim,
+        )
         _set_planar_reach_camera(self, float(np.sum(self._link_lengths())))
+
+    @classmethod
+    def from_manipulator(cls, arm: Manipulator):
+        """Build a velocity-controlled plant with kinematics from *arm*."""
+        if not isinstance(arm, Manipulator):
+            raise TypeError("from_manipulator requires a Manipulator instance")
+        inst = cls(arm.dof, arm.task_dim)
+        inst._kin_arm = arm
+        inst.name = f"{arm.dof} Joint Speed Controlled {arm.name}"
+        reach = float(np.sum(inst._link_lengths()))
+        _set_planar_reach_camera(inst, reach)
+        return inst
 
     def f(self, x, u, t=0.0, params=None):
         # velocity-controlled joints: the input is the joint-rate command
@@ -129,16 +156,29 @@ class SpeedControlledManipulator(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
+    def h_p(self, x, u, t=0, params=None):
+        return self.forward_kinematics(x, params)
+
     def forward_kinematics(self, q, params=None):
+        if self._kin_arm is not None:
+            return self._kin_arm.forward_kinematics(q, params)
         return np.zeros(self.effector_dim)
 
     def J(self, q, params=None):
+        if self._kin_arm is not None:
+            return self._kin_arm.J(q, params)
         return np.zeros((self.effector_dim, self.dof))
 
     def forward_differential_kinematic_effector(self, q, dq):
         return self.J(q) @ dq
 
     def _link_lengths(self):
+        if self._kin_arm is not None:
+            arm = self._kin_arm
+            if hasattr(arm, "_lengths"):
+                return arm._lengths()
+            if hasattr(arm, "params") and "l" in arm.params:
+                return np.asarray(arm.params["l"], dtype=float)
         if hasattr(self, "l"):
             return np.asarray(self.l, dtype=float)
         return np.ones(self.dof)

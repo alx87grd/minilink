@@ -4,9 +4,21 @@ import unittest
 
 import numpy as np
 
-from minilink.control.robotic import JointImpedance, ModelJointImpedance, TaskImpedance
-from minilink.core.composition import closed_loop_qdq
-from minilink.dynamics.catalog.manipulators.arms import OneLinkManipulator, TwoLinkManipulator
+from minilink.blocks.sources import Source
+from minilink.control.robotic import (
+    JointImpedance,
+    ModelJointImpedance,
+    TaskImpedance,
+    TaskKinematic,
+    TaskKinematicNullspace,
+)
+from minilink.core.composition import closed_loop, closed_loop_qdq
+from minilink.dynamics.catalog.manipulators.arms import (
+    FiveLinkPlanarManipulator,
+    OneLinkManipulator,
+    SpeedControlledManipulator,
+    TwoLinkManipulator,
+)
 
 
 class TestManipulatorPorts(unittest.TestCase):
@@ -89,6 +101,58 @@ class TestRoboticWrappers(unittest.TestCase):
         self.assertEqual(
             diagram.connections["ctl"]["y"],
             ("mux", "y"),
+        )
+
+    def test_task_kinematic_law(self):
+        arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
+        ctl = TaskKinematic(arm, Kp=[1.0, 1.0])
+        q = np.array([0.2, -0.1])
+        p_d = np.array([0.5, 0.5])
+        dq = ctl.ctl(None, np.concatenate([p_d, q]))
+        p = arm.forward_kinematics(q)
+        J = arm.J(q)
+        expected = np.linalg.solve(J, p_d - p)
+        np.testing.assert_allclose(dq, expected)
+
+    def test_task_kinematic_closed_loop_y(self):
+        arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
+        diagram = closed_loop(TaskKinematic(arm), arm)
+        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        self.assertNotIn("mux", diagram.subsystems)
+
+    def test_task_kinematic_nullspace_projection(self):
+        arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
+        ctl = TaskKinematicNullspace(
+            arm,
+            Kp=[1.0, 1.0],
+            K_null=[10.0] * 5,
+        )
+        q = np.array([0.1, 0.1, 0.1, 0.1, 0.1])
+        p_d = np.array([1.0, 1.0])
+        q_null = np.array([-1.0] * 5)
+        dq = ctl.ctl(None, np.concatenate([p_d, q_null, q]))
+        J = arm.J(q)
+        J_pinv = np.linalg.pinv(J)
+        null_proj = np.eye(5) - J_pinv @ J
+        q_e = q_null - q
+        dq_null_only = null_proj @ (ctl.params["K_null"] * q_e)
+        np.testing.assert_allclose(J @ dq_null_only, np.zeros(2), atol=1e-10)
+        dq_task = J_pinv @ (ctl.params["Kp"] * (p_d - arm.forward_kinematics(q)))
+        np.testing.assert_allclose(dq, dq_task + dq_null_only)
+
+    def test_task_kinematic_nullspace_dual_ref_autowire(self):
+        arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
+        ref_p = Source(2)
+        ref_p.params["value"] = np.array([1.0, 1.0])
+        ref_q = Source(5)
+        ref_q.params["value"] = np.array([-1.0] * 5)
+        ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
+        diagram = (ref_q + (ref_p >> (ctl @ arm))).autowire(strict=True)
+        self.assertEqual(diagram.connections["ctl"]["r"][1], "y")
+        self.assertEqual(diagram.connections["ctl"]["r_null"][1], "y")
+        self.assertNotEqual(
+            diagram.connections["ctl"]["r"][0],
+            diagram.connections["ctl"]["r_null"][0],
         )
 
 

@@ -30,6 +30,33 @@ def _has_pygame():
     return True
 
 
+class _FakeMeshcatNode:
+    """Minimal meshcat path tree for canvas smoke tests (no ZMQ server)."""
+
+    def __init__(self):
+        self.children = {}
+        self.object = None
+        self.transform = None
+
+    def __getitem__(self, key):
+        child = self.children.get(key)
+        if child is None:
+            child = _FakeMeshcatNode()
+            self.children[key] = child
+        return child
+
+    def set_object(self, obj):
+        self.object = obj
+
+    def set_transform(self, transform):
+        self.transform = transform
+
+    def delete(self):
+        self.children.clear()
+        self.object = None
+        self.transform = None
+
+
 @pytest.mark.optional
 @pytest.mark.visualization
 class TestVisualizationOptionalImports(unittest.TestCase):
@@ -55,14 +82,15 @@ class TestVisualizationOptionalImports(unittest.TestCase):
 class TestMeshcatOptionalSmoke(unittest.TestCase):
     @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
     def test_canvas_can_create_point_geometry_without_opening_browser(self):
-        meshcat = _import_meshcat()
-        vis = meshcat.Visualizer()
-        canvas = MeshcatCanvas(vis, is_3d=True)
+        canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
 
         canvas.ensure_objects([Point([0.0, 0.0, 0.0])])
         canvas.update_primitive(0, Point([0.0, 0.0, 0.0]), np.eye(4))
 
         self.assertEqual(canvas._n_slots, 1)
+        slot = canvas.scene["p0"]
+        self.assertIsNotNone(slot.object)
+        self.assertIsNotNone(slot.transform)
         canvas.clear()
 
 

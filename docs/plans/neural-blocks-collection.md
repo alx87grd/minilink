@@ -35,7 +35,7 @@ compiled diagram.**
 
 ## Design anchors
 
-Any long-term NN collection should respect constraints from `agent.md` and
+Any long-term NN collection should respect constraints from [AGENTS.md](../../AGENTS.md) and
 `DESIGN.md`:
 
 | Principle | Implication for NN blocks |
@@ -171,7 +171,7 @@ arrays in `self.params`.
 | Zero new dependencies | No `nnx`/`linen` module patterns, no optax bundled |
 | Equations stay textbook-readable | Residual blocks, batch norm, attention are manual |
 | Already proven JAX-traceable through `diagram.compile()` | Importing pretrained Flax checkpoints not supported |
-| Aligns with `agent.md` rule 6 (`xp` idiom) | Users who live in Flax ecosystem write their own glue |
+| Aligns with [AGENTS.md](../../AGENTS.md) rule 6 (`xp` idiom) | Users who live in Flax ecosystem write their own glue |
 | `identification/` can use `jax.grad` uniformly | Parameter init/heuristics are hand-rolled |
 
 ### Option 2 — Flax/Linen as core implementation

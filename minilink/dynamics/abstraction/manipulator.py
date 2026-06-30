@@ -13,7 +13,7 @@ Kinematics (this module)::
 Joint-space outputs ``q``, ``dq`` live on :class:`MechanicalSystem`.
 Task-space outputs ``p``, ``pdot`` are added here.
 
-See ``docs/plans/manipulator-abstraction.md``.
+See ``DESIGN.md`` (dynamics + control feedback profiles).
 """
 
 from minilink.core.backends import array_module

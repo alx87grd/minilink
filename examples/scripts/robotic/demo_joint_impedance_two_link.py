@@ -11,7 +11,7 @@ Joint-space virtual spring-damper on ``[q, dq]`` via ``closed_loop_qdq``::
     sys.dq ──┴─ Mux ─► ctl.y
     ctl.u ──► sys.u          (τ = PD + optional g(q))
 
-Same end-effector step task as :mod:`demo_task_impedance_two_link` (``p0`` → ``p1``),
+Same end-effector step task as ``demo_task_impedance_two_link.py`` (``p0`` → ``p1``),
 with joint references from inverse kinematics.
 """
 

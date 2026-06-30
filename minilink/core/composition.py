@@ -211,9 +211,7 @@ def closed_loop(
         diagram.connect(plant_id, "dq", wiring.mux_id, "in1")
         diagram.connect(wiring.mux_id, "y", controller_id, measurement_port)
     else:
-        diagram.connect(
-            plant_id, plant_output_port, controller_id, measurement_port
-        )
+        diagram.connect(plant_id, plant_output_port, controller_id, measurement_port)
     diagram.connect(controller_id, control_port, plant_id, plant_input_port)
     diagram.connect_new_output_port(plant_id, plant_output_port, output_port)
 
@@ -853,7 +851,7 @@ def _autowire_candidates(diagram, target_id: str, input_id: str, input_port):
                 exclude=candidates,
             )
         )
-    elif input_id == "r":
+    elif input_id == "r" or input_id.startswith("r_"):
         candidates.extend(
             _matching_named_y_outputs(
                 diagram,
@@ -913,9 +911,8 @@ def _is_controller_like(sys) -> bool:
 
 
 def _default_subsystem_id(sys, *, role=None) -> str:
-    custom_id = getattr(sys, "id", None)
-    if custom_id:
-        return _normalize_identifier(str(custom_id))
+    if sys.id:
+        return _normalize_identifier(str(sys.id))
     if role is not None:
         return _normalize_identifier(str(role))
     if _is_source_like(sys):

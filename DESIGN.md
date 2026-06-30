@@ -13,6 +13,8 @@ Architecture and public contracts. User guide and call chains: [README.md](READM
 5. **Specialize only when it clarifies**: `Jax<Plant>` twins when a single class
    would sacrifice readability.
 
+Contributing style (textbook rules, workflow): [AGENTS.md](AGENTS.md).
+
 ### NumPy and JAX
 
 NumPy required; JAX optional (`minilink[jax]`), imported lazily via
@@ -54,7 +56,7 @@ or neural network alike):
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
-| `control/` | control laws and design factories (`ProportionalController`, `ImpedanceController`, `ImpedanceIntegralController`, `FilteredController`, `StateFeedbackController`, `lqr`) |
+| `control/` | control laws and design factories (`linear.py`, `pid.py`, `lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -125,7 +127,11 @@ methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)` (so
 params)`; subclasses assemble matrices from `params`. `LTISystem` is the
 constant-matrix convenience built from `A, B, C, D` arrays (introspect via
 `sys.A()`). Catalog names: `Pendulum`, `CartPole`,
-`DynamicBicycle`. Mixed inputs → named ports + concrete allocation hooks; no
+`DynamicBicycle`. **`Manipulator`** (`MechanicalSystem` + task ports `p`, `pdot`;
+methods `forward_kinematics`, `J`, `inverse_kinematics`) is the catalog base for
+serial arms. Joint impedance / task impedance / computed torque use
+``closed_loop_qdq`` or ``feedback="auto"``; see `control/robotic.py` and
+`control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
 ## 4. Core Object Contracts
@@ -197,6 +203,12 @@ Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
 `autowire()` conservative fill — **never inserts Mux**; use `feedback="qdq"` or
 `closed_loop_qdq` for explicit `Mux(q, dq)` wiring. Diagram operands are flattened,
 not nested. Explicit `add_subsystem` / `connect` remains canonical for general topology.
+
+**Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers),
+`sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
+with ``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``.
+Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
+
 Visualization: subsystem `"world"` geometry merges into one shared diagram
 `"world"` frame; only articulated frames get `{sys_id}:` prefixes.
 
@@ -208,14 +220,12 @@ optional class attribute `feedback_profile`, not inheritance):
 | Profile | Module | Measurement |
 | --- | --- | --- |
 | `output` | `output.py` | `y` (static output error) |
-| `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n` |
+| `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` |
 | `state` | `state.py` | full state `x` |
 | `siso` | `siso.py` | `y` dim `n` only (decoupled loops) |
-| `impedance` | `impedance.py` | `[pos; rate]` on `y`; optional robotic `+ g(q)` via `robotic.py` |
 | `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)`` |
-
-Model-based laws (`ComputedTorqueController`, …) live in `modelbased.py` with
-tag `modelbased`. See [`docs/plans/robot-control-stack.md`](docs/plans/robot-control-stack.md).
+| `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants |
+| `modelbased` | `modelbased.py` | Full state ``x``; model-based torque laws (computed torque, sliding mode) |
 
 ### `Trajectory`, sets, costs, geometry
 
@@ -362,7 +372,7 @@ synthetic fixtures, `run_*` scripts) — outside the shipped package, importing
 minilink like an external user, and not a public contract.
 
 **Repo conventions:** Python 3.10+; typed public APIs (except equation paths,
-which keep bare signatures per agent.md Textbook Style); lazy optional imports;
+which keep bare signatures per [AGENTS.md](AGENTS.md) Textbook Style); lazy optional imports;
 namespace `__init__.py` files; plot subpackages may re-export small facades.
 Agents and maintainers run tests in the **`minilink`** conda env from
-[environment.yml](environment.yml) ([agent.md §9](agent.md#9-local-environment)).
+[environment.yml](environment.yml) ([README.md#install](README.md#install)).

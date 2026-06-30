@@ -337,7 +337,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | --- | --- |
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
-| `control` | control laws and design factories (`ImpedanceIntegralController`, `FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`) |
+| `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`) |
 | `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |
@@ -371,7 +371,8 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 ```
 
 - `Trajectory` is numeric only (`t`, `x`, `u`, optional `signals`); labels stay on `System`.
-- Diagram internal signals in plots: `"subsystem_id:port_id"`.
+- Diagram internal signals in plots: `"sys_id:port_id"`, or ``(subsystem, "port")``
+  tuples; shortcut-built diagrams default to ``ref`` / ``ctl`` / ``sys``.
 - `DiagramSystem.connection_verbose` defaults to `False`; set `True` to print one line per connection.
 - Shortcuts flatten diagram operands instead of nesting them; `+` does not infer cross-wiring.
 - `compute_*` returns `Trajectory`; `plot_*` returns `PlotResult`; `show=False` skips display.
@@ -385,6 +386,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Diagrams | `examples/scripts/diagrams/` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
+| Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |
 | Analysis (linearize, trim, ctrb/obsv, modal) | `examples/scripts/analysis/` |
 | State-space / LQR | `examples/scripts/statespace/` |
 | Identification (param gradients) | `examples/scripts/identification/` |
@@ -406,8 +408,9 @@ Catalog plants live under `minilink.dynamics.catalog.*`.
 - [ROADMAP.md](ROADMAP.md) — maturity and priorities
 - [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 parity audit (library + all 195 demos)
 - [docs/plans/](docs/plans/) — active design backlog
-- [agent.md](agent.md) — maintainer / agent rules
+- [AGENTS.md](AGENTS.md) — contributor / agent rules
 - API reference (Sphinx, optional): `pip install -e ".[docs]" && sphinx-build -b html docs docs/_build/html` then open `docs/_build/html/index.html` (GitHub Pages deploys from `main` via [.github/workflows/docs.yml](.github/workflows/docs.yml))
 
 Design rules: NumPy baseline, explicit JAX; native-array equation paths;
-`params is None` means object defaults, never `params or self.params`.
+`params is None` means object defaults, never `params or self.params`. Coding
+style: [AGENTS.md](AGENTS.md).

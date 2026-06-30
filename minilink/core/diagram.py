@@ -105,9 +105,7 @@ class DiagramSystem(System):
     def subsystem_id(self, subsystem):
         """Return the diagram id for a subsystem instance added to this diagram."""
         matches = [
-            sys_id
-            for sys_id, sub in self.subsystems.items()
-            if sub is subsystem
+            sys_id for sys_id, sub in self.subsystems.items() if sub is subsystem
         ]
         if len(matches) == 1:
             return matches[0]

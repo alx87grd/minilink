@@ -6,7 +6,7 @@ Status: draft plan (June 2026). No implementation in this phase.
 
 Flat-state vehicles (e.g. `DynamicBicycle`, rate-input models) do not subclass
 `MechanicalSystem`. This doc defines optional **view ports** so the same control
-**feedback profiles** from [`robot-control-stack.md`](robot-control-stack.md) apply
+**feedback profiles** in [DESIGN.md §4](../../DESIGN.md#control-feedback-profiles) apply
 without renaming dynamics shelves.
 
 ## View ports (proposed)

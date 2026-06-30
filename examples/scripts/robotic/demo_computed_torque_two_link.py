@@ -10,7 +10,7 @@ Joint-space feedback with PD gains inside :class:`ComputedTorqueController`::
     sys.y ─────────────► ctl.y              ([q; dq])
     ctl.u ──► sys.u
 
-Same end-effector step task as :mod:`demo_task_impedance_two_link` (``p0`` → ``p1``),
+Same end-effector step task as ``demo_task_impedance_two_link.py`` (``p0`` → ``p1``),
 with joint references from inverse kinematics.
 """
 

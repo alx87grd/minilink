@@ -10,12 +10,10 @@ settles (or keeps moving) from the initial pose with ``τ = 0``.
 
 import numpy as np
 
-from minilink.dynamics.catalog.manipulators.arms import (
-    OneLinkManipulator,
-    TwoLinkManipulator,
-)
+from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
 
 # # --- One link: release from a raised angle ---
+# from minilink.dynamics.catalog.manipulators.arms import OneLinkManipulator
 # one = OneLinkManipulator()
 # one.x0 = np.array([0.9, 0.0])
 
@@ -25,8 +23,6 @@ from minilink.dynamics.catalog.manipulators.arms import (
 
 # --- Two links: release from a bent configuration ---
 two = TwoLinkManipulator()
-
-two.inputs["u"].nominal_value[0] = 2.0
 
 p_start = np.array([0.5, 0.5])
 q0 = two.inverse_kinematics(p_start)
