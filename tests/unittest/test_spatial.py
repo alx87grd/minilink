@@ -236,9 +236,9 @@ def test_cost_field_as_constraint_keep_out_band():
 def test_empty_workspace_fields_return_zero_density_and_cost_field():
     scene = Scene()
     assert scene.cost_density(np.zeros(2)) == pytest.approx(0.0)
-    assert scene.cost_field(_holonomic_disc(0.3)).value(np.array([1.0, 2.0])) == pytest.approx(
-        0.0
-    )
+    assert scene.cost_field(_holonomic_disc(0.3)).value(
+        np.array([1.0, 2.0])
+    ) == pytest.approx(0.0)
 
 
 # --- FieldSet --------------------------------------------------------------
