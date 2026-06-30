@@ -409,7 +409,7 @@ Catalog plants live under `minilink.dynamics.catalog.*`.
 - [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 parity audit (library + all 195 demos)
 - [docs/plans/](docs/plans/) — active design backlog
 - [AGENTS.md](AGENTS.md) — contributor / agent rules
-- API reference (Sphinx, optional): `pip install -e ".[docs]" && sphinx-build -b html docs docs/_build/html` then open `docs/_build/html/index.html` (GitHub Pages deploys from `main` via [.github/workflows/docs.yml](.github/workflows/docs.yml))
+- API reference (Sphinx): [alx87grd.github.io/minilink](https://alx87grd.github.io/minilink/) (built from `main` via [.github/workflows/docs.yml](.github/workflows/docs.yml)); local build: `pip install -e ".[docs]" && sphinx-build -b html docs docs/_build/html`
 
 Design rules: NumPy baseline, explicit JAX; native-array equation paths;
 `params is None` means object defaults, never `params or self.params`. Coding
