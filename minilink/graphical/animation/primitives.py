@@ -1,21 +1,19 @@
 """
 Graphical primitives and 4x4 transform helpers for system animation.
 
-A system's visualization is a list of **primitives** (shapes defined in their
-own local frame) plus, at every instant, one 4x4 homogeneous **transform** per
-primitive placing it in the world (see
-:meth:`minilink.core.system.System.get_kinematic_geometry` and
-:meth:`~minilink.core.system.System.get_kinematic_transforms`). Renderers draw
-the primitives; they never know about states or inputs.
+A system's visualization is a dict of named **frames** to **primitives** (shapes
+defined in their own local frame) plus, at every instant, one 4x4 homogeneous
+**transform** per frame placing it in the world (see
+:meth:`minilink.core.system.System.get_kinematic_geometry`,
+:meth:`~minilink.core.system.System.get_dynamic_geometry`, and
+:meth:`~minilink.core.system.System.tf`). Renderers draw the primitives; they
+never know about states or inputs.
 
-Two conventions extend the plain rigid transform:
-
-- **Scale columns**: multiplying the rotation columns by a factor stretches
-  unit-sized primitives (:class:`Arrow`, :class:`CustomLine`) to a world size
-  (:func:`scale_pose2d_matrix`, :func:`arrow_transform`).
-- **Amplitude channel**: the normally-unused ``T[3, 3]`` slot carries a scalar
-  side-channel (torque sweep angle, camera view scale); renderers read and
-  reset it with :func:`extract_amplitude`.
+Primitives are **honest**: they bake their full point geometry at real world
+size in their own local frame, so the animator draws them at
+``frames[key] @ local_transform``. Placement helpers for spans and coils live
+in :mod:`minilink.graphical.catalog.shapes`; rigid pose math lives in
+:mod:`minilink.core.kinematics`.
 
 This module is NumPy-only and safe to import from core kinematic hooks: it
 never pulls in matplotlib or other rendering libraries.
@@ -27,12 +25,20 @@ import numpy as np
 
 
 class GraphicPrimitive:
-    """Base class for all geometric objects rendered by the animator engine."""
+    """Base class for all geometric objects rendered by the animator engine.
 
-    def __init__(self, color="blue", linewidth=1, style="-"):
+    ``local_transform`` is a fixed 4x4 graphical offset baked into the primitive
+    (a constant pose within its frame). The animator poses a primitive at
+    ``frames[key] @ local_transform``. Defaults to identity.
+    """
+
+    def __init__(self, color="blue", linewidth=1, style="-", local_transform=None):
         self.color = color
         self.linewidth = linewidth
         self.style = style
+        self.local_transform = (
+            np.eye(4) if local_transform is None else np.asarray(local_transform, float)
+        )
 
 
 class CustomLine(GraphicPrimitive):
@@ -47,6 +53,10 @@ class CustomLine(GraphicPrimitive):
         """
         super().__init__(color, linewidth, style)
         self.pts = np.array(pts)
+
+    def points_at(self, t):
+        """Nx3 polyline points at playback time *t* (static: time-independent)."""
+        return self.pts
 
 
 class Point(GraphicPrimitive):
@@ -211,82 +221,127 @@ class ExtrudedPolygon(GraphicPrimitive):
         return vertices, np.asarray(faces, dtype=np.uint32)
 
 
-class Arrow(GraphicPrimitive):
-    """A 2-D arrow rendered as a polyline (shaft + chevron head).
+def arrow_pts(base, vector, scale=1.0, head_ratio=0.15):
+    """Polyline (Nx3) of a straight arrow from *base* along *vector*, in local XY.
 
-    The arrow is defined in a **unit local frame** along +X: base at the
-    origin, tip at (1, 0).  Renderers apply the accompanying 4x4
-    transform whose **column-norm scaling** controls the displayed length
-    and whose rotation/translation sets the world pose.
+    The arrow is drawn at its **true length** ``scale * |vector|`` in the local
+    frame. A near-zero vector collapses to a single point (nothing visible).
 
     Parameters
     ----------
+    base : array-like, length 2
+        Tail of the arrow in the local frame.
+    vector : array-like, length 2
+        Direction (and, with *scale*, length) of the shaft.
+    scale : float
+        Multiplies *vector* to set the drawn length (e.g. a velocity gain).
     head_ratio : float
-        Head barb length as a fraction of the shaft (default 0.15).
-    origin : str
-        ``'base'`` places the local origin at the tail;
-        ``'tip'`` places it at the arrow head.
+        Chevron barb length as a fraction of the shaft length.
+    """
+    base = np.asarray(base, dtype=float).reshape(2)
+    shaft = scale * np.asarray(vector, dtype=float).reshape(2)
+    length = float(np.hypot(shaft[0], shaft[1]))
+    if length < 1e-12:
+        return np.array([[base[0], base[1], 0.0]])
+
+    tip = base + shaft
+    direction = shaft / length
+    d = head_ratio * length
+    back = direction * d
+    perp = np.array([-direction[1], direction[0]]) * d
+
+    barb1 = tip - back + perp
+    barb2 = tip - back - perp
+    return np.array(
+        [
+            [base[0], base[1], 0.0],
+            [tip[0], tip[1], 0.0],
+            [barb1[0], barb1[1], 0.0],
+            [tip[0], tip[1], 0.0],
+            [barb2[0], barb2[1], 0.0],
+        ]
+    )
+
+
+def torque_arc_pts(sweep, radius=1.0, head_ratio=0.4, n_arc_pts=40):
+    """Polyline (Nx3) of a circular torque arc + chevron, centered at the origin.
+
+    The arc is baked at the given *sweep* (radians, + = CCW) and *radius*, so the
+    sweep rides in the geometry rather than a transform side-channel.
+    """
+    sweep = float(sweep)
+    r = radius
+    d = r * head_ratio
+
+    if abs(sweep) < 1e-6:
+        return np.zeros((1, 3))
+
+    n_pts = max(3, int(abs(sweep) / (2 * np.pi) * n_arc_pts))
+    angles = np.linspace(0.0, sweep, n_pts)
+    arc = np.column_stack([r * np.cos(angles), r * np.sin(angles), np.zeros(n_pts)])
+
+    tip_c, tip_s = np.cos(sweep), np.sin(sweep)
+    tip = np.array([r * tip_c, r * tip_s, 0.0])
+    if sweep > 0:
+        barb1 = tip + np.array(
+            [-d / 2 * tip_c + d / 2 * tip_s, -d / 2 * tip_s - d / 2 * tip_c, 0.0]
+        )
+        barb2 = tip + np.array(
+            [d / 2 * tip_c + d / 2 * tip_s, d / 2 * tip_s - d / 2 * tip_c, 0.0]
+        )
+    else:
+        barb1 = tip + np.array(
+            [-d / 2 * tip_c - d / 2 * tip_s, -d / 2 * tip_s + d / 2 * tip_c, 0.0]
+        )
+        barb2 = tip + np.array(
+            [d / 2 * tip_c - d / 2 * tip_s, d / 2 * tip_s + d / 2 * tip_c, 0.0]
+        )
+    return np.vstack([arc, np.array([barb1, tip, barb2])])
+
+
+class Arrow(GraphicPrimitive):
+    """A 2-D arrow at honest world size — shaft from *base* along *vector*.
+
+    The geometry is baked at its true length ``scale * |vector|``; the renderer
+    simply draws ``self.pts`` posed by the frame. Pass body-frame ``vector`` and
+    key the primitive to that body frame so its orientation comes from ``tf`` (no
+    manual ``cos``/``sin`` rotation).
     """
 
     def __init__(
         self,
+        base=(0.0, 0.0),
+        vector=(1.0, 0.0),
+        scale=1.0,
         head_ratio=0.15,
-        origin="base",
         color="red",
         linewidth=2,
         style="-",
     ):
         super().__init__(color, linewidth, style)
+        self.base = np.asarray(base, dtype=float).reshape(2)
+        self.vector = np.asarray(vector, dtype=float).reshape(2)
+        self.scale = float(scale)
         self.head_ratio = head_ratio
-        self.origin = origin
-        self.pts = _arrow_local_pts(head_ratio, origin)
+        self.pts = arrow_pts(self.base, self.vector, self.scale, head_ratio)
 
-
-def _arrow_local_pts(head_ratio=0.15, origin="base"):
-    """Unit-length arrow polyline (5 pts) along +X in the local frame."""
-    d = head_ratio
-    if origin == "tip":
-        return np.array(
-            [
-                [-1.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [-d, d, 0.0],
-                [0.0, 0.0, 0.0],
-                [-d, -d, 0.0],
-            ]
-        )
-    return np.array(
-        [
-            [0.0, 0.0, 0.0],
-            [1.0, 0.0, 0.0],
-            [1.0 - d, d, 0.0],
-            [1.0, 0.0, 0.0],
-            [1.0 - d, -d, 0.0],
-        ]
-    )
+    def points_at(self, t):
+        """Nx3 arrow points at playback time *t* (geometry baked at construction)."""
+        return self.pts
 
 
 class TorqueArrow(GraphicPrimitive):
-    """Curved arc arrow for visualizing torques around a joint.
+    """A curved torque arc at honest geometry — *sweep* baked into the points.
 
-    The arc is generated dynamically via :meth:`compute_pts` because its
-    shape (sweep length) varies with the torque magnitude.
-
-    **Transform convention** — the ``T[3, 3]`` slot of the 4×4 matrix
-    carries the **amplitude** (here, the sweep angle in radians).  In a
-    standard homogeneous matrix ``T[3, 3]`` is always 1; a non-unit value
-    is therefore an unambiguous side-channel that renderers extract before
-    applying the rigid part.  See :func:`extract_amplitude` and
-    :func:`torque_pose2d_matrix`.
-
-    * Translation ``T[0:2, 3]`` — centre of the arc (joint world position).
-    * Rotation (upper-left 2×2) — starting angle of the arc (typically
-      the rod direction so the arrow originates on the link).
-    * ``T[3, 3]`` — **sweep angle in radians** (positive = CCW, negative
-      = CW).
+    The arc for the given *sweep* and *radius* is built at construction, centered
+    at the local origin; the placing frame supplies world position and the start
+    orientation. Rebuild it each frame in ``get_dynamic_geometry`` with the
+    instantaneous torque.
 
     Parameters
     ----------
+    sweep : float
+        Arc sweep angle in radians (positive = CCW, negative = CW).
     radius : float
         Radius of the arc in world units.
     head_ratio : float
@@ -298,6 +353,7 @@ class TorqueArrow(GraphicPrimitive):
 
     def __init__(
         self,
+        sweep,
         radius=1.0,
         head_ratio=0.4,
         n_arc_pts=40,
@@ -306,165 +362,124 @@ class TorqueArrow(GraphicPrimitive):
         style="-",
     ):
         super().__init__(color, linewidth, style)
+        self.sweep = float(sweep)
         self.radius = radius
         self.head_ratio = head_ratio
         self.n_arc_pts = n_arc_pts
+        self.pts = torque_arc_pts(self.sweep, radius, head_ratio, n_arc_pts)
 
-    def compute_pts(self, sweep):
-        """Return Nx3 arc + chevron polyline in **local frame** (centered at origin).
+    def points_at(self, t):
+        """Nx3 arc points at playback time *t* (geometry baked at construction)."""
+        return self.pts
 
-        Parameters
-        ----------
-        sweep : float
-            Arc sweep angle in radians (positive = CCW).
-        """
-        r = self.radius
-        d = r * self.head_ratio
 
-        if abs(sweep) < 1e-6:
+class HorizonPolyline(GraphicPrimitive):
+    """World-frame polyline of the active receding-horizon plan at time *t*.
+
+    ``plans`` is a sequence of ``(t_solve, trajectory)`` pairs with world-frame
+    ``trajectory.x`` and ``trajectory.t``. At playback time *t*, the primitive
+    draws the latest plan with ``t_solve <= t`` over samples with
+    ``trajectory.t >= t``.
+
+    Geometry is rebuilt each frame through :meth:`points_at` (an overlay's
+    ``get_dynamic_geometry(t)`` bakes the world polyline into a
+    :class:`CustomLine`).
+    """
+
+    def __init__(
+        self,
+        plans,
+        *,
+        color="tab:orange",
+        linewidth=2,
+        style="--",
+    ):
+        super().__init__(color, linewidth, style)
+        self.plans = list(plans)
+
+    def compute_pts(self, t_now):
+        """Return Nx3 world-frame polyline points for the active plan tail."""
+        t_now = float(t_now)
+        active = None
+        for t_solve, plan in self.plans:
+            if t_solve <= t_now + 1e-9:
+                active = plan
+        if active is None:
             return np.zeros((1, 3))
+        mask = active.t >= t_now - 1e-9
+        if np.count_nonzero(mask) < 2:
+            return np.zeros((1, 3))
+        xy = active.x[:2, mask]
+        return np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
 
-        n_pts = max(3, int(abs(sweep) / (2 * np.pi) * self.n_arc_pts))
-        angles = np.linspace(0, sweep, n_pts)
-        arc = np.column_stack(
-            [
-                r * np.cos(angles),
-                r * np.sin(angles),
-                np.zeros(n_pts),
-            ]
-        )
+    def points_at(self, t):
+        """Nx3 world-frame points of the active plan tail at playback time *t*."""
+        return self.compute_pts(t)
 
-        tip_c = np.cos(sweep)
-        tip_s = np.sin(sweep)
-        tip = np.array([r * tip_c, r * tip_s, 0.0])
 
-        if sweep > 0:
-            barb1 = tip + np.array(
-                [-d / 2 * tip_c + d / 2 * tip_s, -d / 2 * tip_s - d / 2 * tip_c, 0.0]
-            )
-            barb2 = tip + np.array(
-                [d / 2 * tip_c + d / 2 * tip_s, d / 2 * tip_s - d / 2 * tip_c, 0.0]
-            )
+class TrajectoryPolyline(GraphicPrimitive):
+    """World-frame XY polyline sampled from a :class:`~minilink.core.trajectory.Trajectory`.
+
+    At playback time *t*:
+
+    ``window="prefix"``
+        Samples with ``trajectory.t <= t`` — a growing executed trail.
+    ``window="suffix"``
+        Samples with ``trajectory.t >= t``.
+    ``window="all"``
+        Full trajectory polyline (time-independent geometry).
+
+    Geometry is rebuilt each frame through :meth:`compute_pts`, like
+    :class:`HorizonPolyline`.
+    """
+
+    _WINDOWS = ("prefix", "suffix", "all")
+
+    def __init__(
+        self,
+        trajectory,
+        *,
+        window="prefix",
+        color="tab:blue",
+        linewidth=2,
+        style="-",
+    ):
+        super().__init__(color, linewidth, style)
+        self.trajectory = trajectory
+        if window not in self._WINDOWS:
+            raise ValueError(f"window must be one of {self._WINDOWS}, got {window!r}")
+        self.window = window
+
+    def compute_pts(self, t_now):
+        """Return Nx3 world-frame polyline points for the selected time window."""
+        t_now = float(t_now)
+        traj = self.trajectory
+        if self.window == "all":
+            mask = np.ones(traj.n_samples, dtype=bool)
+        elif self.window == "prefix":
+            mask = traj.t <= t_now + 1e-9
         else:
-            barb1 = tip + np.array(
-                [-d / 2 * tip_c - d / 2 * tip_s, -d / 2 * tip_s + d / 2 * tip_c, 0.0]
-            )
-            barb2 = tip + np.array(
-                [d / 2 * tip_c - d / 2 * tip_s, d / 2 * tip_s + d / 2 * tip_c, 0.0]
-            )
+            mask = traj.t >= t_now - 1e-9
+        if np.count_nonzero(mask) < 2:
+            return np.zeros((1, 3))
+        xy = traj.x[:2, mask]
+        return np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
 
-        return np.vstack([arc, np.array([barb1, tip, barb2])])
-
-
-# Transformation Matrix Helpers
+    def points_at(self, t):
+        """Nx3 world-frame points of the selected time window at playback time *t*."""
+        return self.compute_pts(t)
 
 
-def translation_matrix(dx=0.0, dy=0.0, dz=0.0):
-    """
-    Generate a 4x4 pure translation matrix.
-
-    Parameters
-    ----------
-    dx, dy, dz : float
-        Translation along the x, y, and z axes.
-
-    Returns
-    -------
-    np.ndarray
-        A 4x4 transformation matrix.
-    """
-    T = np.eye(4)
-    T[0, 3] = dx
-    T[1, 3] = dy
-    T[2, 3] = dz
-    return T
-
-
-def pose2d_matrix(x=0.0, y=0.0, theta=0.0):
-    """
-    Generate a 4x4 transformation matrix for a 2D pose (XY plane).
-
-    Parameters
-    ----------
-    x, y : float
-        Translation in the XY plane.
-    theta : float
-        Rotation around the Z axis in radians.
-
-    Returns
-    -------
-    np.ndarray
-        A 4x4 transformation matrix.
-    """
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = c
-    T[0, 1] = -s
-    T[1, 0] = s
-    T[1, 1] = c
-    T[0, 3] = x
-    T[1, 3] = y
-    return T
-
-
-def rotation_matrix_x(theta=0.0):
-    """Generate a 4x4 rotation matrix about the X axis."""
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[1, 1] = c
-    T[1, 2] = -s
-    T[2, 1] = s
-    T[2, 2] = c
-    return T
-
-
-def rotation_matrix_y(theta=0.0):
-    """Generate a 4x4 rotation matrix about the Y axis."""
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = c
-    T[0, 2] = s
-    T[2, 0] = -s
-    T[2, 2] = c
-    return T
-
-
-def rotation_matrix_z(theta=0.0):
-    """Generate a 4x4 rotation matrix about the Z axis."""
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = c
-    T[0, 1] = -s
-    T[1, 0] = s
-    T[1, 1] = c
-    return T
-
-
-def scale_pose2d_matrix(x=0.0, y=0.0, theta=0.0, scale=1.0):
-    """4x4 matrix: 2-D rotation *theta*, uniform *scale*, translation *(x, y)*.
-
-    Multiplying the rotation columns by *scale* lets renderers stretch
-    unit-length primitives (e.g. :class:`Arrow`) to the desired world size
-    while preserving position and orientation.
-    """
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = scale * c
-    T[0, 1] = scale * (-s)
-    T[1, 0] = scale * s
-    T[1, 1] = scale * c
-    T[0, 3] = x
-    T[1, 3] = y
-    return T
+# Transformation Matrix Helpers (camera + identity only; pose math → core.kinematics)
 
 
 def camera_matrix(target=(0.0, 0.0, 0.0), plot_axes=(0, 1), scale=10.0):
     """Standard 4x4 camera transform.
 
     The matrix doubles as the camera's pose in the world frame **and** the
-    renderer projection knob. The amplitude channel ``T[3, 3]`` carries the
-    view scale (same side-channel convention as :func:`torque_pose2d_matrix`
-    and :func:`extract_amplitude`).
+    renderer projection knob. The ``T[3, 3]`` slot carries the view scale
+    (orthographic half-extent for matplotlib / pygame; camera distance for
+    meshcat).
 
     Slot meaning
     ------------
@@ -523,38 +538,6 @@ def world_to_camera(camera):
     return W
 
 
-def torque_pose2d_matrix(x=0.0, y=0.0, start_angle=0.0, sweep=0.0):
-    """4x4 matrix for :class:`TorqueArrow`.
-
-    * Rotation (upper-left 2×2) = *start_angle* — orients the arc so it
-      begins along this direction (typically the rod angle so the arrow
-      originates on the link).
-    * Translation = *(x, y)* — arc centre (joint position in world).
-    * ``T[3, 3]`` = *sweep* — arc sweep in radians (+ CCW, − CW),
-      passed through the amplitude channel.
-    """
-    T = pose2d_matrix(x, y, start_angle)
-    T[3, 3] = sweep
-    return T
-
-
-def extract_amplitude(T):
-    """Read and consume the amplitude channel from a 4×4 transform.
-
-    In a standard homogeneous matrix ``T[3, 3] == 1``.  Systems that need
-    to pass a scalar amplitude to the renderer (e.g. sweep angle, force
-    magnitude) store it in this slot via helpers like
-    :func:`torque_pose2d_matrix`.
-
-    Returns ``(amplitude, T_clean)`` where *T_clean* has ``T[3, 3]``
-    restored to 1 so it can be used as a normal rigid transform.
-    """
-    amplitude = T[3, 3]
-    T_clean = T.copy()
-    T_clean[3, 3] = 1.0
-    return amplitude, T_clean
-
-
 def identity_matrix():
     """4x4 identity transform (primitive drawn at the world origin)."""
     return np.eye(4)
@@ -562,78 +545,9 @@ def identity_matrix():
 
 def empty_transform():
     """Transform that parks a primitive far off-screen (used to hide it)."""
-    return translation_matrix(0.0, 0.0, -1000.0)
+    from minilink.core.kinematics import translation
 
-
-def follow_xy_camera(x, y, scale):
-    """Top-down camera centered on world point *(x, y)* with view half-extent *scale*."""
-    return camera_matrix(target=(x, y, 0.0), plot_axes=(0, 1), scale=scale)
-
-
-def heading_from_vector(vx, vy):
-    """Planar heading angle of the vector *(vx, vy)*."""
-    return np.arctan2(vy, vx)
-
-
-def arrow_transform(x, y, vx, vy, scale=1.0):
-    """Place a unit :class:`Arrow` at *(x, y)*, aligned with *(vx, vy)*.
-
-    The arrow is rotated to the vector heading and stretched to
-    ``scale * |(vx, vy)|`` so its drawn length encodes the magnitude.
-    A near-zero vector collapses to zero length (nothing visible).
-    """
-    length = scale * np.hypot(vx, vy)
-    if length < 1e-12:
-        return scale_pose2d_matrix(x, y, 0.0, 0.0)
-    return scale_pose2d_matrix(x, y, heading_from_vector(vx, vy), length)
-
-
-def line_between_transform(p0, p1):
-    """Place a unit :class:`CustomLine` so it spans from *p0* to *p1* in the plane."""
-    p0 = np.asarray(p0, dtype=float)
-    p1 = np.asarray(p1, dtype=float)
-    delta = p1 - p0
-    return scale_pose2d_matrix(
-        p0[0],
-        p0[1],
-        heading_from_vector(delta[0], delta[1]),
-        np.hypot(delta[0], delta[1]),
-    )
-
-
-def rod_between_transform(p0, p1):
-    """Pose a unit :class:`Rod` (length along local -y) from *p0* to *p1* in 3-D.
-
-    Builds an orthonormal frame whose y-axis points from *p0* toward *p1*;
-    a reference axis is swapped when nearly parallel to keep the cross
-    products well conditioned.
-    """
-    p0 = np.asarray(p0, dtype=float)
-    p1 = np.asarray(p1, dtype=float)
-    delta = p1 - p0
-    length = np.linalg.norm(delta)
-    T = np.eye(4)
-    T[:3, 3] = p0
-    if length < 1e-12:
-        return T
-
-    y_axis = -delta / length
-    reference = np.array([0.0, 0.0, 1.0])
-    if abs(np.dot(y_axis, reference)) > 0.95:
-        reference = np.array([1.0, 0.0, 0.0])
-    x_axis = np.cross(reference, y_axis)
-    x_axis = x_axis / np.linalg.norm(x_axis)
-    z_axis = np.cross(x_axis, y_axis)
-    T[:3, 0] = x_axis
-    T[:3, 1] = y_axis
-    T[:3, 2] = z_axis
-    return T
-
-
-def point_transform(point):
-    """Translation transform placing a primitive at *point* (z defaults to 0)."""
-    point = np.asarray(point, dtype=float)
-    return translation_matrix(point[0], point[1], point[2] if point.size > 2 else 0.0)
+    return translation(0.0, 0.0, -1000.0)
 
 
 # Ready-Made Shapes And Poses

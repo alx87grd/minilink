@@ -7,13 +7,19 @@ synthetic fixture systems.
 
 The modules import minilink exactly like an external user. Nothing inside
 `minilink/` may import from here (the unittest smoke tests in
-`tests/unittest/` may).
+`tests/unittest/test_benchmark_smoke.py` may).
+
+Benchmark fixtures intentionally differ from unittest planning fixtures: e.g.
+`planning_rrt.holonomic_problem()` uses a dense 18-sphere scene for timing
+studies, while `tests/unittest/planning_helpers.py` keeps a minimal obstacle
+scene for fast RRT contract tests.
 
 ## Running
 
-From the repo root, in an environment with the extras you want to measure
-(`minilink[jax]` for JAX variants; `cyipopt` for Ipopt variants — both are
-skipped gracefully when missing):
+From the repo root with the **`minilink`** conda env active (see
+[environment.yml](../environment.yml)), or any environment with the extras you
+want to measure (`minilink[jax]` for JAX variants; `cyipopt` for Ipopt
+variants — both are skipped gracefully when missing):
 
 ```bash
 python benchmarks/run_pendulum_f_speed.py        # f() call speed, single plant
@@ -24,4 +30,6 @@ python benchmarks/run_simulator_speed_manual.py  # hand-picked simulator runs
 python benchmarks/run_optimizer_backends.py      # NLP solver presets on textbook problems
 python benchmarks/run_trajopt_backends.py        # trajopt transcription x backend sweep
 python benchmarks/run_trajopt_solver_presets.py  # direct-collocation solver presets
+python benchmarks/run_dp_backends.py             # value-iteration loop/numpy/jax backends
+python benchmarks/run_rrt_nearest_backends.py    # RRT nearest brute_force vs kd_tree
 ```

@@ -17,14 +17,13 @@ arc, and steer arc (velocity loop has no drawing primitives).
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
+from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem, StaticSystem, System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
 from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     TorqueArrow,
-    scale_pose2d_matrix,
-    torque_pose2d_matrix,
 )
 
 # Path and motion setpoints (shared by pursuit law and XY plot)
@@ -78,10 +77,10 @@ class PathPlanner(System):
         xs = np.linspace(_PATH_X0, _PATH_X1, 320)
         ys = self.path_a * np.sin(2.0 * np.pi * xs / self.path_lambda)
         pts = np.column_stack([xs, ys, np.zeros_like(xs)])
-        return [CustomLine(pts, color="seagreen", linewidth=2.2, style="--")]
+        return {"world": [CustomLine(pts, color="seagreen", linewidth=2.2, style="--")]}
 
-    def get_kinematic_transforms(self, x, u, t):
-        return [np.eye(4)]
+    def tf(self, x, u, t=0, params=None):
+        return {}
 
 
 class Tracking(StaticSystem):
@@ -131,9 +130,12 @@ class Tracking(StaticSystem):
         return np.array([theta_ref], dtype=float)
 
     def get_kinematic_geometry(self):
-        return [Arrow(color="darkorange", linewidth=2.5, origin="base")]
+        return {}
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
+        return {}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         p = self.params
         ld = float(p["Ld"])
         amp, wavelength = float(u[0]), float(u[1])
@@ -142,10 +144,18 @@ class Tracking(StaticSystem):
         y_la = amp * np.sin(2.0 * np.pi * x_la / wavelength)
         dx = x_la - px
         dy = y_la - py
-        L = float(np.hypot(dx, dy))
-        L = max(L, 1e-3)
-        th = float(np.arctan2(dy, dx))
-        return [scale_pose2d_matrix(px, py, th, L)]
+        return {
+            "world": [
+                Arrow(
+                    base=(px, py),
+                    vector=(dx, dy),
+                    scale=1.0,
+                    color="darkorange",
+                    linewidth=2.5,
+                    head_ratio=0.15,
+                )
+            ]
+        }
 
 
 class HeadingLoop(StaticSystem):
@@ -189,14 +199,27 @@ class HeadingLoop(StaticSystem):
         return np.array([r_ref], dtype=float)
 
     def get_kinematic_geometry(self):
-        return [TorqueArrow(radius=1.15, color="mediumpurple", linewidth=2.0)]
+        return {}
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
+        px, py, theta = float(u[1]), float(u[2]), float(u[3])
+        return {"heading": SE2(px, py, theta)}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         theta_ref, theta = float(u[0]), float(u[3])
-        px, py = float(u[1]), float(u[2])
         e_psi = theta_ref - theta
         e_psi = (e_psi + np.pi) % (2.0 * np.pi) - np.pi
-        return [torque_pose2d_matrix(px, py, theta, e_psi)]
+        return {
+            "heading": [
+                TorqueArrow(
+                    sweep=e_psi,
+                    radius=1.15,
+                    head_ratio=0.4,
+                    color="mediumpurple",
+                    linewidth=2.0,
+                )
+            ]
+        }
 
 
 class YawRateLoop(StaticSystem):
@@ -240,12 +263,25 @@ class YawRateLoop(StaticSystem):
         return np.array([delta], dtype=float)
 
     def get_kinematic_geometry(self):
-        return [TorqueArrow(radius=0.85, color="coral", linewidth=2.0)]
+        return {}
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         px, py, theta = float(u[1]), float(u[2]), float(u[3])
+        return {"steer": SE2(px, py, theta)}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
         delta = float(self.r_to_delta(x, u, t)[0])
-        return [torque_pose2d_matrix(px, py, theta, delta)]
+        return {
+            "steer": [
+                TorqueArrow(
+                    sweep=delta,
+                    radius=0.85,
+                    head_ratio=0.4,
+                    color="coral",
+                    linewidth=2.0,
+                )
+            ]
+        }
 
 
 class VelocityPID(DynamicSystem):
@@ -335,12 +371,6 @@ class VelocityPID(DynamicSystem):
         w_cmd = np.clip(w_cmd, 0.0, p["w_max"])
         return np.array([w_cmd], dtype=float)
 
-    def get_kinematic_geometry(self):
-        return []
-
-    def get_kinematic_transforms(self, _x, _u, _t):
-        return []
-
 
 def plot_xy_vs_path(px, py, t, a_amp: float, wavelength: float):
     """Overlay the simulated track (vehicle ``x,y``) and the analytic path."""
@@ -408,7 +438,11 @@ print(
 
 plot_xy_vs_path(px, py, diagram.traj.t, A, LAMBDA)
 
-# diagram.animate()
-diagram.animate(renderer="meshcat")
-diagram.animate(renderer="matplotlib")
-diagram.animate(renderer="plotly")
+
+diagram.camera_follow_frame = "vehicle:body"
+diagram.camera_scale = 14.0
+
+diagram.animate()
+# diagram.animate(renderer="meshcat")
+# diagram.animate(renderer="matplotlib")
+# diagram.animate(renderer="plotly")

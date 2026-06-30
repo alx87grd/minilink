@@ -79,7 +79,7 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
     backend : {"numpy", "jax"}
         ``"numpy"`` → :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem``.
         ``"jax"`` → :class:`~minilink.dynamics.abstraction.mechanical.JaxMechanicalSystem``
-        (requires ``jax`` / ``jaxlib``). Chain FK for :meth:`get_kinematic_transforms`
+        (requires ``jax`` / ``jaxlib``). Chain FK for :meth:`tf`
         is always NumPy-based.
     """
     if backend not in ("numpy", "jax"):
@@ -203,31 +203,34 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
         def get_kinematic_geometry(self):
             if self._chain_fk_funcs is None or self._n_seg == 0:
                 return super().get_kinematic_geometry()
-            return [
-                CustomLine(
-                    np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
-                    color="blue",
-                    linewidth=2,
-                )
-                for _ in range(self._n_seg)
-            ]
+            return {
+                f"seg{i}": [
+                    CustomLine(
+                        np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+                        color="blue",
+                        linewidth=2,
+                    )
+                ]
+                for i in range(self._n_seg)
+            }
 
-        def get_kinematic_transforms(self, x, u, t):
+        def tf(self, x, u, t=0, params=None):
             if self._chain_fk_funcs is None or self._n_seg == 0:
-                return super().get_kinematic_transforms(x, u, t)
+                return super().tf(x, u, t)
             qv = np.asarray(x[: self.dof], dtype=float)
             pts = _chain_pts(qv)
-            transforms = []
+            frames = {}
             for i in range(self._n_seg):
                 p0, p1 = pts[i], pts[i + 1]
                 d = p1 - p0
                 L = float(np.hypot(d[0], d[1]))
                 th = float(np.arctan2(d[1], d[0]))
-                if L < 1e-12:
-                    transforms.append(np.eye(4, dtype=float))
-                else:
-                    transforms.append(_pose2d(float(p0[0]), float(p0[1]), th, L))
-            return transforms
+                frames[f"seg{i}"] = (
+                    np.eye(4, dtype=float)
+                    if L < 1e-12
+                    else _pose2d(float(p0[0]), float(p0[1]), th, L)
+                )
+            return frames
 
     return _Generated()
 

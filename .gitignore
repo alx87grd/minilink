@@ -56,8 +56,6 @@ site/
 *.err
 *.msg
 *.gv
-
-
 # Claude Code #
 .claude/
 

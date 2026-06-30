@@ -1,7 +1,8 @@
 import numpy as np
 
+from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem
-from minilink.graphical.animation.primitives import Point, pose2d_matrix
+from minilink.graphical.animation.primitives import Point
 
 
 class SimpleIntegrator(DynamicSystem):
@@ -26,14 +27,15 @@ class SimpleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return [
-            Point(color="blue", marker="o", size=8),
-        ]
+        return {}
 
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            pose2d_matrix(x[0], 0.0, 0.0),
-        ]
+    def tf(self, x, u, t=0, params=None):
+        return {}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        marker = Point(color="blue", marker="o", size=8)
+        marker.local_transform = SE2(x[0], 0.0, 0.0)
+        return {"world": [marker]}
 
 
 class DoubleIntegrator(DynamicSystem):
@@ -58,16 +60,17 @@ class DoubleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return [
-            Point(color="blue", marker="o", size=8),
-            Point(color="blue", marker="o", size=8),
-        ]
+        return {}
 
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            pose2d_matrix(x[0], 0.0, 0.0),
-            pose2d_matrix(x[1], 0.5, 0.0),
-        ]
+    def tf(self, x, u, t=0, params=None):
+        return {}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        p0 = Point(color="blue", marker="o", size=8)
+        p0.local_transform = SE2(x[0], 0.0, 0.0)
+        p1 = Point(color="blue", marker="o", size=8)
+        p1.local_transform = SE2(x[1], 0.5, 0.0)
+        return {"world": [p0, p1]}
 
 
 class TripleIntegrator(DynamicSystem):
@@ -92,18 +95,19 @@ class TripleIntegrator(DynamicSystem):
         return np.array([x[0]])
 
     def get_kinematic_geometry(self):
-        return [
-            Point(color="blue", marker="o", size=8),
-            Point(color="blue", marker="o", size=8),
-            Point(color="blue", marker="o", size=8),
-        ]
+        return {}
 
-    def get_kinematic_transforms(self, x, u, t):
-        return [
-            pose2d_matrix(x[0], 0.0, 0.0),
-            pose2d_matrix(x[1], 0.5, 0.0),
-            pose2d_matrix(x[2], 1.0, 0.0),
-        ]
+    def tf(self, x, u, t=0, params=None):
+        return {}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        offsets = (0.0, 0.5, 1.0)
+        markers = []
+        for xi, y_off in zip(x, offsets):
+            marker = Point(color="blue", marker="o", size=8)
+            marker.local_transform = SE2(xi, y_off, 0.0)
+            markers.append(marker)
+        return {"world": markers}
 
 
 if __name__ == "__main__":

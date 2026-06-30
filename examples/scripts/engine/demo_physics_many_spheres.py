@@ -59,7 +59,15 @@ for i in range(sys.world.n_bodies):
 sys.x0 = x0
 
 
-sys.compute_trajectory(tf=10.0, show=False, solver="scipy")
+# sys.compute_trajectory(tf=10.0, show=False, solver="scipy", dt=0.001, verbose=True)
+sys.compute_trajectory(
+    tf=10.0,
+    show=False,
+    solver="rk4_fixedsteps",
+    dt=0.001,
+    verbose=True,
+    compile_backend="jax",
+)
 sys.animate(renderer="meshcat")
 
 

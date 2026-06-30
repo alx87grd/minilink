@@ -5,9 +5,34 @@ build-backend = "hatchling.build"
 [project]
 name = "minilink"
 dynamic = ["version"]
-description = "A block-diagram simulation framework built in Python"
+description = "Python-native block-diagram framework for modeling, simulating, optimizing, and visualizing dynamical systems"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Alexandre Girard", email = "alx87grd@gmail.com" },
+]
+keywords = [
+    "simulation",
+    "control-systems",
+    "dynamical-systems",
+    "block-diagram",
+    "optimization",
+    "trajectory-planning",
+    "model-predictive-control",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
 dependencies = [
     "numpy",
     "scipy",
@@ -15,11 +40,18 @@ dependencies = [
     "graphviz",
 ]
 
+[project.urls]
+Homepage = "https://github.com/alx87grd/minilink"
+Repository = "https://github.com/alx87grd/minilink"
+Documentation = "https://github.com/alx87grd/minilink/blob/main/DESIGN.md"
+Issues = "https://github.com/alx87grd/minilink/issues"
+Changelog = "https://github.com/alx87grd/minilink/blob/main/ROADMAP.md"
+
 [project.optional-dependencies]
 dev = [
+    "pre-commit",
     "pytest",
     "ruff",
-    "mypy",
 ]
 docs = [
     "sphinx>=7",
@@ -72,10 +104,17 @@ markers = [
     "jax: tests that require the jax extra",
     "symbolic: tests that require the symbolic extra",
     "visualization: tests that require the visualization extra",
+    "plotting: tests that require the plotting extra",
+    "ipopt: tests that require the ipopt extra",
 ]
 
 [tool.hatch.version]
 source = "vcs"
+# Ignore non-semver tags such as pre-phase5-cutover; use latest 0.* release tag.
+fallback-version = "0.0.0"
+
+[tool.hatch.version.raw-options]
+git_describe_command = "git describe --dirty --tags --long --match '0.*'"
 
 [tool.hatch.build.targets.wheel]
 # Only the library ships; tests/ and benchmarks/ stay repo-only.

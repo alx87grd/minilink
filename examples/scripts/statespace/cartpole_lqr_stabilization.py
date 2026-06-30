@@ -1,6 +1,7 @@
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole
-from minilink.control.lqr import lqr_at_operating_point
 import numpy as np
+
+from minilink.control.lqr import lqr_at_operating_point
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 
 plant = CartPole()
 x_bar = np.array([0.0, np.pi, 0.0, 0.0])  # pole inverted, cart at origin

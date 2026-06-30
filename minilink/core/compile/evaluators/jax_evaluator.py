@@ -270,6 +270,10 @@ class JaxLeafEvaluator(DynamicsEvaluator):
             raise ValueError("jacobian_f_params requires an explicit params pytree")
         return self._jit_jac_f_params(x, u, t, params)
 
+    def get_f_jit(self):
+        """Return the JIT-compiled ``f`` callable directly (skips method dispatch)."""
+        return self._jit_f
+
     def get_f_p_jit(self):
         """Return the JIT-compiled parametric ``f_p`` callable (for grad/vmap composition)."""
         return self._jit_f_p

@@ -1,15 +1,12 @@
 import numpy as np
 
+from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     Point,
-    follow_xy_camera,
     ground_line,
-    identity_matrix,
-    pose2d_matrix,
-    scale_pose2d_matrix,
 )
 
 
@@ -38,6 +35,7 @@ class Rocket(MechanicalSystem):
         self.height = 2.0
         self.dynamic_range = 10.0
         self.camera_scale = self.dynamic_range
+        self.camera_follow_frame = "body"
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -85,9 +83,6 @@ class Rocket(MechanicalSystem):
             ]
         )
 
-    def get_camera_transform(self, x, u, t):
-        return follow_xy_camera(x[0], x[1], self.camera_scale)
-
     def body_shape(self):
         """Side-view rocket silhouette with the c.g. at the local origin."""
         w = self.width
@@ -105,28 +100,32 @@ class Rocket(MechanicalSystem):
         return CustomLine(pts, color="blue", linewidth=2)
 
     def get_kinematic_geometry(self):
-        return [
-            self.body_shape(),
-            Point(color="black", marker="o", size=5),
-            ground_line(length=200.0, y=0.0, color="black", style="--"),
-            Arrow(color="red", linewidth=2, origin="tip"),
-        ]
+        return {
+            "body": [self.body_shape()],
+            "center": [Point(color="black", marker="o", size=5)],
+            "world": [ground_line(length=200.0, y=0.0, color="black", style="--")],
+        }
 
-    def get_kinematic_transforms(self, x, u, t):
+    def tf(self, x, u, t=0, params=None):
         q = x[:3]
-        T_body = pose2d_matrix(q[0], q[1], q[2])
-        return [
-            T_body,
-            pose2d_matrix(q[0], q[1], 0.0),
-            identity_matrix(),
-            T_body
-            @ scale_pose2d_matrix(
-                0.0,
-                -1.0,
-                np.pi / 2.0 + u[1],
-                0.0002 * u[0],
-            ),
-        ]
+        return {
+            "body": SE2(q[0], q[1], q[2]),
+            "center": SE2(q[0], q[1], 0.0),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        length = 0.0002 * u[0]
+        angle = np.pi / 2.0 + u[1]
+        d = np.array([np.cos(angle), np.sin(angle)])
+        thrust = Arrow(
+            base=-length * d,
+            vector=d,
+            scale=length,
+            color="red",
+            linewidth=2,
+        )
+        thrust.local_transform = translation(0.0, -1.0, 0.0)
+        return {"body": [thrust]}
 
 
 if __name__ == "__main__":

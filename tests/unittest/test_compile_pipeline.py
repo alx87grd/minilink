@@ -251,7 +251,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         x = np.array([0.5])
         u = np.array([2.0])
         params = {
-            "ctl": {"Kp": 4.0},
+            "ctl": {"K": np.array([[4.0]])},
             "plant": {"k": 3.0},
         }
 
@@ -489,97 +489,15 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         )
 
 
-# @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-# class TestJaxDiagramEvaluator(unittest.TestCase):
-#     """Test JaxDiagramEvaluator against the reference diagram.f() and for JAX traceability."""
-
-#     def setUp(self):
-#         self.diag = _build_small_closed_loop()
-#         self.evaluator = compile_diagram(self.diag, backend="jax")
-#         self.x = jnp.array([0.3], dtype=jnp.float32)
-#         self.u = jnp.array([1.2], dtype=jnp.float32)
-
-#     def test_returns_jax_evaluator(self):
-#         self.assertIsInstance(self.evaluator, JaxDiagramEvaluator)
-
-#     def test_f_matches_numpy(self):
-#         """JaxDiagramEvaluator.f must match NumpyDiagramEvaluator exactly."""
-#         np_evaluator = compile_diagram(self.diag, backend="numpy")
-#         x_np = np.array([0.3])
-#         u_np = np.array([1.2])
-
-#         dx_numpy = np_evaluator.f(x_np, u_np, 0.1)
-#         dx_jax = np.array(self.evaluator.f(self.x, self.u, 0.1))
-
-#         np.testing.assert_allclose(dx_jax, dx_numpy, atol=1e-5)
-
-#     def test_f_multiple_points(self):
-#         """Test at several state/input combinations."""
-#         np_evaluator = compile_diagram(self.diag, backend="numpy")
-#         for x_val, u_val in [(0.0, 0.0), (1.0, 2.0), (-5.0, 10.0)]:
-#             x_np = np.array([x_val])
-#             u_np = np.array([u_val])
-#             x_jax = jnp.array(x_np, dtype=jnp.float32)
-#             u_jax = jnp.array(u_np, dtype=jnp.float32)
-#             dx_ref = np_evaluator.f(x_np, u_np, 0.0)
-#             dx_jax = np.array(self.evaluator.f(x_jax, u_jax, 0.0))
-#             np.testing.assert_allclose(dx_jax, dx_ref, atol=1e-5)
-
-#     def test_f_is_differentiable(self):
-#         """jax.grad must flow through f."""
-#         def dx0_of_u(u0):
-#             return self.evaluator.f(
-#                 self.x, jnp.array([u0], dtype=jnp.float32), 0.0
-#             )[0]
-
-#         # For an integrator dx/dt = u, so d(dx)/du = 1
-#         grad_val = float(jax.grad(dx0_of_u)(jnp.array(1.2, dtype=jnp.float32)))
-#         self.assertAlmostEqual(abs(grad_val), 1.0, places=4)
-
-#     def test_internal_signals_dict_plant_y(self):
-#         """JaxDiagramEvaluator.compute_internal_signals_dict for one port."""
-#         d = self.evaluator.compute_internal_signals_dict(self.x, self.u, 0.0)
-#         y = d["plant:y"]
-#         self.assertAlmostEqual(float(y[0]), 0.3, places=5)
-
-#     def test_internal_signals_dict_is_differentiable(self):
-#         """jax.grad through compute_internal_signals_dict slice."""
-#         def y_of_x(x0):
-#             d = self.evaluator.compute_internal_signals_dict(
-#                 jnp.array([x0], dtype=jnp.float32), self.u, 0.0
-#             )
-#             return d["plant:y"][0]
-
-#         grad_val = float(jax.grad(y_of_x)(jnp.array(0.3, dtype=jnp.float32)))
-#         self.assertAlmostEqual(abs(grad_val), 1.0, places=4)
-
-#     def test_get_f_jit(self):
-#         """get_f_jit returns a callable that matches eager result."""
-#         jit_dx = self.evaluator.get_f_jit()
-#         dx_eager = self.evaluator.f(self.x, self.u, 0.0)
-#         dx_jit = jit_dx(self.x, self.u, 0.0)
-#         np.testing.assert_allclose(
-#             np.array(dx_jit), np.array(dx_eager), atol=1e-5
-#         )
-
-#     def test_compute_internal_signals_dict(self):
-#         """compute_internal_signals_dict returns {sys_id:port_id -> jax array}."""
-#         signals = self.evaluator.compute_internal_signals_dict(self.x, self.u, 0.0)
-#         self.assertIsInstance(signals, dict)
-#         for sys_id, sys in self.diag.subsystems.items():
-#             for port_id in sys.outputs:
-#                 self.assertIn(f"{sys_id}:{port_id}", signals)
-
-
 # Diagram params contract (nested {sys_id: {...}})
 class TestDiagramParamsContract(unittest.TestCase):
     """Nested params routing and the ``DiagramSystem.params`` live view."""
 
     def setUp(self):
-        self.diag = _build_small_closed_loop()  # ctl Kp=2.5, plant k=1.0
+        self.diag = _build_small_closed_loop()  # ctl K=2.5, plant k=1.0
         self.x = np.array([0.5])
         self.u = np.array([2.0])
-        # Closed loop: dx = k * Kp * (r - x), with r - x = 1.5 here.
+        # Closed loop: dx = k * K * (r - x), with r - x = 1.5 here.
 
     def test_params_property_is_nested_live_view(self):
         params = self.diag.params
@@ -628,7 +546,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
         self.u = np.array([2.0])
 
     def test_f_p_matches_recursive_reference(self):
-        params = {"ctl": {"Kp": 4.0}, "plant": {"k": 3.0}}
+        params = {"ctl": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
         for x_val, u_val, t in [(0.3, 1.2, 0.1), (0.0, 0.0, 0.0), (-5.0, 10.0, 0.0)]:
             x, u = np.array([x_val]), np.array([u_val])
             np.testing.assert_allclose(
@@ -653,7 +571,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
             self.evaluator.f_p(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
 
     def test_outputs_p_and_h_p_single_boundary(self):
-        params = {"ctl": {"Kp": 4.0}}
+        params = {"ctl": {"K": np.array([[4.0]])}}
         out = self.evaluator.outputs_p(self.x, self.u, 0.0, params)
         self.assertEqual(set(out), {"y_meas"})
         np.testing.assert_allclose(out["y_meas"], [0.5], atol=1e-10)

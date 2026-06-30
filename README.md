@@ -133,19 +133,35 @@ A = jax.jacfwd(lambda x: evaluator.f(x, u, 0.0))(x)   # exact linearization
 ### Analyze and design
 
 Characterize a plant and design a controller from the same `System`. `analysis`
-verbs return data or an `LTISystem`; `control` design factories return ready-to-wire
-blocks:
+verbs return raw matrices, data, or an `LTISystem`; `control` design factories
+return ready-to-wire blocks. ``modal_analysis`` returns open-loop poles and
+mode shapes; the plant facade ``modal_analysis(..., mode=...)`` can also
+animate modes:
+
+```python
+from minilink.analysis.modal import modal_analysis
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+plant = Pendulum()
+poles, modes = modal_analysis(plant, x_bar=[0.0, 0.0])
+plant.modal_analysis(x_bar=[0.0, 0.0], mode=0)      # one mode
+plant.modal_analysis(x_bar=[0.0, 0.0], mode="all")  # every mode
+```
 
 ```python
 import numpy as np
 
-from minilink.analysis.linearize import linearize
+from minilink.analysis.frequency import bode
+from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.control.lqr import lqr
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
 
 plant = InvertedPendulum()
+A, B, C, D = linearize_matrices(plant, x_bar=[0.0, 0.0])  # raw arrays
 lti = linearize(plant, x_bar=[0.0, 0.0])             # → LTISystem at upright
+w, mag, phase = bode(plant, x_bar=[0.0, 0.0], input_port="u", output_index=0)
+plant.plot_bode(x_bar=[0.0, 0.0], input_port="u", output_index=0)
 controller = lqr(lti.A(), lti.B(), Q=np.diag([10.0, 1.0]), R=[[1.0]])
 
 diagram = DiagramSystem()                             # full-state feedback
@@ -257,17 +273,29 @@ System
 
 ## Install
 
-Minilink requires Python 3.10+. Conda is recommended because diagram rendering
-and some optimization backends depend on native libraries.
+Minilink requires Python 3.10+ (3.13 recommended for conda). Conda is recommended
+because diagram rendering and some optimization backends depend on native libraries.
+
+Full dev environment from [environment.yml](environment.yml) (core deps, optional
+extras, pytest/ruff/sphinx, Jupyter):
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda create -n minilink -c conda-forge python=3.10 numpy scipy matplotlib graphviz python-graphviz
+conda env create -f environment.yml
 conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Optional features:
+Minimal manual setup:
+
+```bash
+git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda create -n minilink -c conda-forge python=3.13 numpy scipy matplotlib graphviz python-graphviz
+conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+```
+
+Optional features (included in `environment.yml`; install separately for minimal envs):
 
 ```bash
 conda install -c conda-forge jax jaxlib meshcat-python pygame plotly sympy ipopt cyipopt
@@ -279,6 +307,19 @@ Alternatively, a plain editable install works in any Python 3.10+ environment
 
 Graphviz is used by `plot_diagram()` for diagram topology rendering; it is not
 required for writing model equations.
+
+## Testing
+
+Use the **`minilink`** conda env above for local development and agent verification.
+From repo root:
+
+```bash
+conda activate minilink
+python -m pytest
+```
+
+For the full suite including optional backends and headless pygame smoke tests,
+see [tests/README.md](tests/README.md).
 
 ## Call chains
 
@@ -295,9 +336,9 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | Package | Owns |
 | --- | --- |
 | `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
-| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters) |
+| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
 | `control` | control laws and design factories (`PIDController`, `FilteredPIDController`, `ProportionalController`, `LinearStateFeedbackController`, `lqr`) |
-| `analysis` | characterization verbs (`linearize` → `LTISystem`, controllability/observability, equilibria) |
+| `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, solvers, time grids |
 | `graphical` | plots, diagrams, animation (`Animator` + renderers) |
@@ -344,12 +385,14 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Diagrams | `examples/scripts/diagrams/` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
-| Analysis (linearize, trim, ctrb/obsv) | `examples/scripts/analysis/` |
+| Analysis (linearize, trim, ctrb/obsv, modal) | `examples/scripts/analysis/` |
 | State-space / LQR | `examples/scripts/statespace/` |
 | Identification (param gradients) | `examples/scripts/identification/` |
 | Plotting | `examples/scripts/plots/` |
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
+| Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` |
+| MPC (rate-MPC bicycle demos; obstacle preset: `demo_dynamic_bicycle_rate_mpc_obstacle.py [small\|large]`) | `examples/scripts/mpc/` |
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |
@@ -361,7 +404,10 @@ Catalog plants live under `minilink.dynamics.catalog.*`.
 
 - [DESIGN.md](DESIGN.md) — principles and contracts
 - [ROADMAP.md](ROADMAP.md) — maturity and priorities
+- [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 parity audit (library + all 195 demos)
+- [docs/plans/](docs/plans/) — active design backlog
 - [agent.md](agent.md) — maintainer / agent rules
+- API reference (Sphinx, optional): `pip install -e ".[docs]" && sphinx-build -b html docs docs/_build/html` then open `docs/_build/html/index.html` (GitHub Pages deploys from `main` via [.github/workflows/docs.yml](.github/workflows/docs.yml))
 
 Design rules: NumPy baseline, explicit JAX; native-array equation paths;
 `params is None` means object defaults, never `params or self.params`.

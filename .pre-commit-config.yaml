@@ -1,0 +1,9 @@
+# Install: pip install pre-commit && pre-commit install
+# Run on all notebooks: pre-commit run nbstripout --all-files
+
+repos:
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout
+        files: ^examples/notebooks/.*\.ipynb$

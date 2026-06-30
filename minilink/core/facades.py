@@ -4,7 +4,8 @@ System convenience facades.
 This module defines :class:`SystemFacades`, the mixin that gives every
 :class:`~minilink.core.system.System` its user-shortcut methods
 (:meth:`~SystemFacades.compile`, :meth:`~SystemFacades.compute_trajectory`,
-:meth:`~SystemFacades.plot_trajectory`, :meth:`~SystemFacades.animate`, ...).
+:meth:`~SystemFacades.plot_trajectory`, :meth:`~SystemFacades.animate`,
+:meth:`~SystemFacades.modal_analysis`, ...).
 
 The mixin is shortcuts only: the mathematical, structural, and visualization
 contracts stay in :mod:`minilink.core.system`. Heavy dependencies
@@ -240,6 +241,93 @@ class SystemFacades:
             **kwargs,
         )
 
+    def plot_bode(
+        self,
+        x_bar=None,
+        u_bar=None,
+        *,
+        input_port=None,
+        input_index=0,
+        output_port=None,
+        output_index=0,
+        w=None,
+        n=200,
+        method="fd",
+        t=0.0,
+        params=None,
+        epsilon=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot a selected SISO Bode response.
+
+        ``input_port`` selects a boundary input port and ``input_index`` selects
+        one component inside it. ``output_port`` selects a boundary output port,
+        or an internal diagram output ``(sys_id, port_id)``; ``output_index``
+        selects one component inside that output.
+        """
+        from minilink.analysis.frequency import plot_bode
+
+        if x_bar is None:
+            x_bar = self.x0
+        return plot_bode(
+            self,
+            x_bar,
+            u_bar,
+            input_port=input_port,
+            input_index=input_index,
+            output_port=output_port,
+            output_index=output_index,
+            w=w,
+            n=n,
+            method=method,
+            t=t,
+            params=params,
+            epsilon=epsilon,
+            backend=backend,
+            show=show,
+        )
+
+    def plot_pzmap(
+        self,
+        x_bar=None,
+        u_bar=None,
+        *,
+        input_port=None,
+        input_index=0,
+        output_port=None,
+        output_index=0,
+        method="fd",
+        t=0.0,
+        params=None,
+        epsilon=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot poles and zeros for a selected SISO channel.
+        """
+        from minilink.analysis.frequency import plot_pzmap
+
+        if x_bar is None:
+            x_bar = self.x0
+        return plot_pzmap(
+            self,
+            x_bar,
+            u_bar,
+            input_port=input_port,
+            input_index=input_index,
+            output_port=output_port,
+            output_index=output_index,
+            method=method,
+            t=t,
+            params=params,
+            epsilon=epsilon,
+            backend=backend,
+            show=show,
+        )
+
     def get_diagram(self):
         """
         Convenience shortcut returning a renderable diagram representation.
@@ -277,14 +365,34 @@ class SystemFacades:
             filename=filename,
         )
 
-    def render(self, x, u, t, is_3d=False, renderer="matplotlib"):
+    def render(
+        self,
+        x,
+        u,
+        t,
+        is_3d=False,
+        renderer="matplotlib",
+        camera=None,
+        overlays=None,
+    ):
         """
         Convenience shortcut rendering a single frame of the system.
+
+        ``camera`` accepts an optional override: a constant 4x4 or a
+        ``camera(frames, x, u, t)`` callable.
         """
         from minilink.graphical.animation import Animator
 
         animator = Animator(self)
-        return animator.show(x, u, t, is_3d=is_3d, renderer=renderer)
+        return animator.show(
+            x,
+            u,
+            t,
+            is_3d=is_3d,
+            renderer=renderer,
+            camera=camera,
+            overlays=overlays,
+        )
 
     def animate(
         self,
@@ -294,6 +402,10 @@ class SystemFacades:
         html: bool | None = None,
         renderer="matplotlib",
         native: bool = True,
+        scene_title: str | None = None,
+        show: bool = True,
+        camera=None,
+        overlays=None,
     ):
         """
         Convenience shortcut to animate a trajectory of this system.
@@ -306,10 +418,12 @@ class SystemFacades:
         (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``).
         ``native=True`` (default) drives each backend's own animation
         engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
-        Pass ``native=False`` to fall back to the legacy per-frame
-        Python-loop playback (useful for debugging or when the native
-        path's limitations matter — e.g. meshcat freezes dynamic-geometry
-        primitives such as ``TorqueArrow``; see ``DESIGN.md`` §4.7).
+        Pass ``native=False`` to fall back to the per-frame Python-loop
+        playback (useful for debugging or when the native path's limitations
+        matter — e.g. meshcat freezes per-frame dynamic geometry such as a
+        ``TorqueArrow`` sweep; see ``DESIGN.md`` §4.7). ``camera`` accepts an
+        optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
+        callable).
         """
         from minilink.graphical.animation import Animator
         from minilink.graphical.common.environment import prefers_inline_animation
@@ -323,7 +437,7 @@ class SystemFacades:
         resolved_html = prefers_inline_animation() if html is None else html
 
         animator = Animator(self)
-        show_plot = not resolved_html
+        show_plot = show and not resolved_html
         ani_obj = animator.animate_simulation(
             traj,
             time_factor_video=time_factor_video,
@@ -332,12 +446,76 @@ class SystemFacades:
             show=show_plot,
             renderer=renderer,
             native=native,
+            scene_title=scene_title,
+            camera=camera,
+            overlays=overlays,
         )
 
         # For html output, return the IPython.display.HTML object and let the
         # notebook auto-display it via the standard last-expression rule.
         # Calling display.display() *and* returning the object renders twice.
         return ani_obj
+
+    def modal_analysis(
+        self,
+        x_bar=None,
+        u_bar=None,
+        *,
+        mode=None,
+        method="fd",
+        amplitude=1.0,
+        tf=None,
+        n_steps=2001,
+        time_factor_video=3.0,
+        renderer="matplotlib",
+        is_3d=False,
+        show=True,
+        html=None,
+        native=True,
+        t=0.0,
+        params=None,
+        epsilon=1e-6,
+    ):
+        """
+        Linearize and eigendecompose ``A``.
+
+        Returns ``(poles, modes)``. With ``mode=None``, analyze only.
+        With ``mode=0`` or ``mode='all'``, delegates to
+        :func:`~minilink.analysis.modal.animate_modal`.
+        """
+        from minilink.analysis.modal import animate_modal, modal_analysis
+
+        if x_bar is None:
+            x_bar = self.x0
+        if mode is not None:
+            return animate_modal(
+                self,
+                x_bar,
+                mode,
+                u_bar,
+                t=t,
+                params=params,
+                method=method,
+                epsilon=epsilon,
+                amplitude=amplitude,
+                tf=tf,
+                n_steps=n_steps,
+                time_factor_video=time_factor_video,
+                renderer=renderer,
+                is_3d=is_3d,
+                show=show,
+                html=html,
+                native=native,
+            )
+        return modal_analysis(
+            self,
+            x_bar,
+            u_bar,
+            t=t,
+            params=params,
+            method=method,
+            epsilon=epsilon,
+        )
 
     def game(
         self,

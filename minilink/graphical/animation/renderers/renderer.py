@@ -65,7 +65,15 @@ class AnimationRenderer(ABC):
         """Optional animation export (default: unsupported)."""
         raise NotImplementedError("Animation export is not supported by this renderer.")
 
-    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+    def play_native(
+        self,
+        primitives,
+        frames,
+        schedule,
+        *,
+        is_3d: bool,
+        scene_title: str | None = None,
+    ):
         """
         Optional native playback using the backend's own animation engine.
 

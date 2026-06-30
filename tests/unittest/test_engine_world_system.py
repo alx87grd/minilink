@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from minilink.core.diagram import DiagramSystem
+from tests.unittest.graphics_contract_helpers import resolve_draw_frame
 
 pytest.importorskip("jax")
 
@@ -72,9 +73,8 @@ class TestPhysicsSystemMinilink(unittest.TestCase):
 
     def test_geometry_transform_contract(self):
         sys = self._make_sys()
-        prim = sys.get_kinematic_geometry()
-        T = sys.get_kinematic_transforms(sys.x0, np.zeros(sys.m), 0.0)
-        self.assertEqual(len(prim), len(T))
+        frame = resolve_draw_frame(sys, sys.x0, np.zeros(sys.m), 0.0)
+        self.assertEqual(len(frame["primitives"]), len(frame["transforms"]))
 
     def test_compile_jax_parity_one_step(self):
         sys = self._make_sys()

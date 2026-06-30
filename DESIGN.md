@@ -43,7 +43,7 @@ rearrangement) are listed in [ROADMAP.md §5](ROADMAP.md).
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ `SystemFacades` mixin), `DiagramSystem`, signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs |
+| `core/` | `System` (+ `SystemFacades` mixin), `DiagramSystem`, signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
 | `core/compile/` | `ExecutionPlan`, compiler, NumPy/JAX evaluators |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -52,20 +52,21 @@ or neural network alike):
 
 | Package | Role |
 | --- | --- |
-| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters |
+| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
 | `control/` | control laws and design factories (`ProportionalController`, `PDController`, `PIDController`, `FilteredPIDController`, `LinearStateFeedbackController`, `lqr`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
-user-facing systems (factories are fine: a future `linearize()` returns an
-`LTISystem`; an LQR design function returns a state-feedback block):
+user-facing systems (factories are fine: `linearize_matrices()` returns arrays,
+`linearize()` wraps them as an `LTISystem`, and an LQR design function returns a
+state-feedback block):
 
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, solvers, forcing |
-| `analysis/` | `linearize` (→ `LTISystem`), controllability/observability, equilibria; frequency/modal planned |
-| `planning/` | problems, trajopt |
+| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; more frequency tools planned |
+| `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
@@ -139,10 +140,17 @@ constant-matrix convenience built from `A, B, C, D` arrays (introspect via
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
-- **Visualization contract:** `get_kinematic_geometry`,
-  `get_kinematic_transforms`, `get_dynamic_geometry`, `get_camera_transform`
-  are part of the core `System` contract in `core/system.py` (graphical
-  primitives imported lazily; API still under review).
+- **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
+  `get_dynamic_geometry` are part of the core `System` contract in
+  `core/system.py` (graphical primitives imported lazily). Camera hints
+  (`camera_target`, `camera_scale`, `camera_follow_frame`, …) are resolved by
+  the animator via `resolve_camera_from_hints`; custom views use
+  `animate(camera=…)`.
+  **`tf` returns only computed frames** (body, joints, axles, …); **`"world"` is
+  implicit** — the animator injects identity so world-fixed geometry can key to
+  `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
+  stays unprefixed (one shared root); articulated frames are namespaced
+  (``vehicle:body``).
 - **Facades:** user shortcuts only (lazy simulation/graphics); defined on the
   `core.facades.SystemFacades` mixin so `core/system.py` keeps the math,
   port, and visualization contracts. `self.traj` is a convenience cache of
@@ -171,6 +179,11 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   (numeric leaves required): values vary without retracing, and
   `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
   (see `examples/scripts/identification/demo_params_gradient.py`).
+- **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets` today;
+  a future `scene` tier for spatial overrides is on the roadmap. **Deferred**
+  ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides on base
+  `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types declare
+  `(t, params)` but still read frozen attributes only until a follow-up pass.
 
 ### `DiagramSystem`
 
@@ -182,13 +195,36 @@ quiet by default (`connection_verbose=False`; set `True` for one line per connec
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop,
 `autowire()` conservative fill. Diagram operands are flattened, not nested.
 Explicit `add_subsystem` / `connect` remains canonical for general topology.
+Visualization: subsystem `"world"` geometry merges into one shared diagram
+`"world"` frame; only articulated frames get `{sys_id}:` prefixes.
 
-### `Trajectory`, sets, costs
+### `Trajectory`, sets, costs, geometry
 
 - `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
-- Sets: `margin ≥ 0` feasible; `contains`/`sample` may convert to NumPy.
+- Sets: `margin ≥ 0` feasible; `contains`/`sample` may convert to NumPy. Compose with
+  `&` → `IntersectionSet`. `margin(z, t, params)` is threaded by transcriptions via
+  `problem.params.sets`; field-backed spatial sets forward that same parameter
+  object to their scene queries. Base `Set` subclasses other than `FieldSet` /
+  `CallableSet` do not yet read `params` (deferred — see ROADMAP).
 - Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
-  `PlanningProblem`, not the plant.
+  `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
+  `ScaledCost` (e.g. `base + w * obstacle_cost`). `g`/`h` receive
+  `problem.params.cost`; `FieldCost` forwards that parameter object to its
+  underlying spatial field. Built-in costs such as `QuadraticCost` do not yet
+  read `params` (deferred).
+- Geometry (`geometry.py`): `Shape.sdf(p)` is the signed distance to a workspace
+  *solid* — `< 0` inside (occupied), the dual of an allowable `Set` (`margin ≥ 0`).
+  Primitives `Sphere`/`Box`/`Union`/`Inflated`; native-array math path (NumPy and
+  JAX-traceable). `sdf(p, t, params)` is threaded by the spatial scene pipeline;
+  primitives still use frozen dataclass fields only until parametric shapes land
+  (deferred). Foundation for hard obstacles in a :class:`~minilink.planning.spatial.scene.Scene`,
+  exported as a free-space `Set` (hard constraint) or soft `CostFunction`.
+- **Sign convention** (shared): nonnegative ⇒ feasible/free — `Shape.sdf > 0` outside,
+  `ClearanceField.value ≥ 0` collision-free, `Set.margin ≥ 0` feasible. The core stores
+  signed *physical* quantities (clearance in length units, density in cost units), never a
+  bounded `[0,1]` score: an SDF keeps a well-scaled gradient everywhere, which a squashed
+  occupancy would lose. Normalized/occupancy views are derived at the **edge** via
+  `as_cost(shaping=...)`, not stored in the field.
 
 ## 5. Compilation And Simulation
 
@@ -224,15 +260,83 @@ route `problem.params.system` through the parametric tier `f_p`;
 A `MathematicalProgram` carries the native backend of its callables in its
 `backend` field, and the `Optimizer` compiles with it by default.
 
+**Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
+continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
+comes from a `BoxSet`/`BoxInputSet` (so it stays finite), grid *validity* from
+`X.contains`/`U.contains` (so `X = bounds & free` still works), and successors from a
+forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the grid, not
+on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `compute_solution`
+to tolerance, `solve_steps` for a fixed horizon — returning a cost-to-go `J` and greedy policy
+`pi` (action ids); out-of-domain transitions are charged a finite `out_of_bound_cost` (pyro's
+`cf.INF`). Three interchangeable backward-step backends share this workflow: `loop` (per-node
+Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table, the default),
+and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, built on a
+NumPy precompute so any plant works; linear/nearest only). `precompute` trades the `(N,A,n)`
+successor table for per-sweep recomputation (memory vs time-varying support). `result.controller()`
+returns a `LookupTableController` (a `StaticSystem`, so `controller >> plant` simulates);
+`PolicyEvaluator` gives the cost-to-go of any fixed law. Benchmark: `benchmarks/run_dp_backends.py`.
+
+**Spatial scene** (`planning/spatial/`): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
+**state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
+`Scene` (`obstacles`, `workspace_fields`). On X: `StateField.value(x)` fuses the robot
+placement with scene queries (`clearance_field`, `cost_field`). Export separately —
+`clearance_field(body)` for collision (hard `Set` or barrier `CostFunction`) and
+`cost_field(body)` for terrain (soft `CostFunction` or hard band via
+`as_constraint(upper=...)`). `StateField.value(x)` is a **scalar** (min clearance, max
+density over body probes). **Collision reuse:** frameless geometry (`disc`,
+`car_outline`, `point_probe`) binds to the **planner** plant with
+`bind(sys, geometry, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
+via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Frameless
+geometry: :func:`~minilink.planning.spatial.collision.disc`,
+:func:`~minilink.planning.spatial.collision.point_probe`,
+:func:`~minilink.planning.spatial.collision.car_outline`. Shape obstacles with
+`quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
+`X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
+obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.
+
+**Reference track** (`planning/spatial/paths.py`, `track.py`): workspace centerlines
+from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in
+`ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
+`distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
+`corridor_field(body).as_constraint(lower=0)` for a hard tube. Probe semantics match
+clearance (subtract body radius). Compose with obstacles:
+`X = bounds & scene.clearance_field(body).as_constraint() & track.corridor_field(body).as_constraint()`.
+
+**Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
+sources every concern from the problem — collision `problem.X.contains` (optional
+orchestrator `edge_resolution` densification along edges), goal `problem.Xf`/`x_goal`,
+free-space sampling from `problem.X` (direct `Set.sample` or rejection from state
+bounds), dynamics `problem.sys.f` — so the system stays pure. After
+`compute_solution()`, `reached_goal` and `solution_node` report success vs
+best-effort fallback (`return_best_effort`). The two swappable pieces are an injected
+`TrajectoryExtender` (`propose(from, toward, problem, rng) → Iterable[Edge]`:
+`KinodynamicExtender` forward-integrates controls, `SteeringExtender` connects exactly
+via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callable
+(nearest-neighbour distance). Every system is an ODE, so an `Edge` always carries real
+`(t,x,u)`; `compute_solution() → Trajectory`. `RRTStarPlanner` extends the attach step
+with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
+`Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
+`optimize_after_goal`, the search continues after the first goal connection until
+the best goal cost stops improving for `convergence_patience` extensions;
+`record_history` + `animate_convergence` replay tree growth and path refinement.
+``live_plot`` / ``callback`` redraw the tree during ``compute_solution`` (pyro-style);
+``live_plot_after_goal_only`` limits updates to the RRT* post-goal convergence phase.
+``RRTOptions.nearest_backend`` selects brute-force or SciPy ``cKDTree`` nearest/near
+queries (Euclidean L2 only — requires ``metric=euclidean``); see
+``benchmarks/run_rrt_nearest_backends.py``. Modest
+speedups on low-D obstacle scenes are expected when collision checking and
+post-goal tree scans dominate.
+
 ## 7. Graphics And Benchmarks
 
 Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
 Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
 Plotly under `plotting` extra.
 
-**Camera:** `get_camera_transform` → 4×4 matrix (`camera_matrix`); one contract
-for all renderers. Override on `System` for custom views. Camera and kinematic
-hooks are still under graphical/animation API review.
+**Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix
+(`camera_matrix`) each frame via `resolve_camera_from_hints`; pass
+`animate(camera=…)` for a constant matrix or callable override. One contract
+for all renderers.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing
@@ -241,3 +345,5 @@ minilink like an external user, and not a public contract.
 **Repo conventions:** Python 3.10+; typed public APIs (except equation paths,
 which keep bare signatures per agent.md Textbook Style); lazy optional imports;
 namespace `__init__.py` files; plot subpackages may re-export small facades.
+Agents and maintainers run tests in the **`minilink`** conda env from
+[environment.yml](environment.yml) ([agent.md §9](agent.md#9-local-environment)).

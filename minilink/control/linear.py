@@ -195,7 +195,7 @@ class LinearStateFeedbackController(StaticSystem):
 
     def __init__(self, K, xbar=None, ubar=None):
         super().__init__()
-        self.name = "ctl"
+        self.name = "Linear State Feedback Controller"
 
         K = np.atleast_2d(np.asarray(K, dtype=float))
         m, n = K.shape

@@ -55,7 +55,7 @@ class FilteredPIDController(DynamicSystem):
         e_int_max: float = np.inf,
     ):
         super().__init__(n=2)
-        self.name = "pid"
+        self.name = "Filtered PID"
 
         self.params = {
             "kp": kp,
@@ -149,9 +149,3 @@ class FilteredPIDController(DynamicSystem):
         u = xp.clip(u, u_min, u_max)
 
         return xp.array([u])
-
-    def get_kinematic_geometry(self):
-        return []
-
-    def get_kinematic_transforms(self, x, u, t):
-        return []

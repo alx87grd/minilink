@@ -1,0 +1,59 @@
+# Conda environment for minilink development.
+#
+# Covers every third-party import under minilink/ (core, optional features, dev tools).
+# Conda-forge package names differ from PyPI where noted in comments.
+#
+# Create:
+#   conda env create -f environment.yml
+#   conda activate minilink
+#
+# Repo-root import (matches README; alternative: pip install -e ".[dev]" inside the env):
+#   conda env config vars set PYTHONPATH="$PWD"
+#   conda deactivate && conda activate minilink
+#
+# CI tests Python 3.10–3.13; pin below to match your local conda env.
+
+name: minilink
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pip
+
+  # --- core (pyproject [project].dependencies + scipy/matplotlib usage) ---
+  - numpy
+  - scipy
+  - matplotlib
+  - graphviz          # Graphviz binaries (dot)
+  - python-graphviz   # `import graphviz` in graphical/diagrams/dot.py
+
+  # --- optional: jax ([jax]) ---
+  - jax
+  - jaxlib
+
+  # --- optional: symbolic ([symbolic]) ---
+  - sympy
+
+  # --- optional: visualization ([visualization]) ---
+  - meshcat-python    # PyPI name: meshcat
+  - pygame
+
+  # --- optional: plotting ([plotting]) ---
+  - plotly
+
+  # --- optional: ipopt ([ipopt]) ---
+  - ipopt             # native solver library
+  - cyipopt           # `from cyipopt import minimize_ipopt`
+
+  # --- dev ([dev] + docs) ---
+  - pytest
+  - ruff
+  - pre-commit
+  - sphinx
+
+  # --- notebooks / inline display (IPython in diagrams, meshcat, plotly) ---
+  - ipython
+  - ipykernel
+  - jupyter
+  - jupyterlab
+  - notebook

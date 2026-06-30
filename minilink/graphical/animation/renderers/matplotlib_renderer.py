@@ -20,7 +20,6 @@ from minilink.graphical.animation.primitives import (
     Rod,
     Sphere,
     TorqueArrow,
-    extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
@@ -140,26 +139,23 @@ class MatplotlibCanvas:
             self.drawn_objects.append(obj)
 
         elif isinstance(primitive, Arrow):
+            # Arrow geometry is baked into ``pts``; draw the polyline at its pose.
             local_pts = primitive.pts
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
             world_pts = (transform_matrix @ local_pts_hom.T).T
-            x = world_pts[:, 0]
-            y = world_pts[:, 1]
-
             if self.is_3d:
-                z = world_pts[:, 2]
                 (obj,) = self.ax.plot(
-                    x,
-                    y,
-                    z,
+                    world_pts[:, 0],
+                    world_pts[:, 1],
+                    world_pts[:, 2],
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
                 )
             else:
                 (obj,) = self.ax.plot(
-                    x,
-                    y,
+                    world_pts[:, 0],
+                    world_pts[:, 1],
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
@@ -167,29 +163,42 @@ class MatplotlibCanvas:
             self.drawn_objects.append(obj)
 
         elif isinstance(primitive, TorqueArrow):
-            sweep, T_rigid = extract_amplitude(transform_matrix)
-            local_pts = primitive.compute_pts(sweep)
+            # Honest torque arc: sweep baked into ``pts``. In 2D draw the arc and
+            # the chevron head as two separate Line2D so the anti-aliased join is
+            # crisp; in 3D draw a single polyline.
+            local_pts = primitive.pts
             local_pts_hom = np.hstack((local_pts, np.ones((local_pts.shape[0], 1))))
-            world_pts = (T_rigid @ local_pts_hom.T).T
-
-            arc_n = local_pts.shape[0] - 3
-            if arc_n >= 2:
-                (arc_obj,) = self.ax.plot(
-                    world_pts[:arc_n, 0],
-                    world_pts[:arc_n, 1],
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle=primitive.style,
-                )
-                self.drawn_objects.append(arc_obj)
-                (head_obj,) = self.ax.plot(
-                    world_pts[arc_n:, 0],
-                    world_pts[arc_n:, 1],
-                    color=primitive.color,
-                    linewidth=primitive.linewidth,
-                    linestyle="-",
-                )
-                self.drawn_objects.append(head_obj)
+            world_pts = (transform_matrix @ local_pts_hom.T).T
+            if self.is_3d:
+                if local_pts.shape[0] >= 2:
+                    (obj,) = self.ax.plot(
+                        world_pts[:, 0],
+                        world_pts[:, 1],
+                        world_pts[:, 2],
+                        color=primitive.color,
+                        linewidth=primitive.linewidth,
+                        linestyle=primitive.style,
+                    )
+                    self.drawn_objects.append(obj)
+            else:
+                arc_n = local_pts.shape[0] - 3
+                if arc_n >= 2:
+                    (arc_obj,) = self.ax.plot(
+                        world_pts[:arc_n, 0],
+                        world_pts[:arc_n, 1],
+                        color=primitive.color,
+                        linewidth=primitive.linewidth,
+                        linestyle=primitive.style,
+                    )
+                    self.drawn_objects.append(arc_obj)
+                    (head_obj,) = self.ax.plot(
+                        world_pts[arc_n:, 0],
+                        world_pts[arc_n:, 1],
+                        color=primitive.color,
+                        linewidth=primitive.linewidth,
+                        linestyle="-",
+                    )
+                    self.drawn_objects.append(head_obj)
 
         elif isinstance(primitive, Circle):
             local_center = np.zeros(3)
@@ -502,20 +511,31 @@ class MatplotlibRenderer(AnimationRenderer):
         self.ax = None
         self.canvas = None
 
-    def _build_animation(self, primitives, frames, schedule, *, is_3d: bool = False):
+    def _build_animation(
+        self,
+        primitives,
+        frames,
+        schedule,
+        *,
+        is_3d: bool = False,
+        scene_title: str | None = None,
+    ):
         fig, ax = self._create_figure_and_ax(is_3d=is_3d, camera=frames[0]["camera"])
+        if scene_title:
+            fig.suptitle(scene_title, fontsize=FONT_SIZE)
         canvas = MatplotlibCanvas(ax, is_3d=is_3d)
 
         def update(frame_idx):
             frame = frames[frame_idx]
             canvas.clear()
             camera = frame["camera"]
+            frame_primitives = frame["primitives"]
             if is_3d or _camera_is_world_xy(camera):
                 draw_transforms = frame["transforms"]
             else:
                 W = world_to_camera(camera)
                 draw_transforms = [W @ T for T in frame["transforms"]]
-            for prim, T in zip(primitives, draw_transforms):
+            for prim, T in zip(frame_primitives, draw_transforms):
                 canvas.draw_primitive(prim, T)
             if not is_3d:
                 self._apply_camera(ax, camera, False)
@@ -557,7 +577,15 @@ class MatplotlibRenderer(AnimationRenderer):
         )
         plt.close(fig)
 
-    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+    def play_native(
+        self,
+        primitives,
+        frames,
+        schedule,
+        *,
+        is_3d: bool,
+        scene_title: str | None = None,
+    ):
         """
         Drive playback through ``matplotlib.animation.FuncAnimation`` instead
         of a Python frame loop.
@@ -575,7 +603,13 @@ class MatplotlibRenderer(AnimationRenderer):
           loop can drive playback without ``FuncAnimation`` being garbage
           collected.
         """
-        fig, ani = self._build_animation(primitives, frames, schedule, is_3d=is_3d)
+        fig, ani = self._build_animation(
+            primitives,
+            frames,
+            schedule,
+            is_3d=is_3d,
+            scene_title=scene_title,
+        )
         self.fig = fig
         self.ax = fig.axes[0] if fig.axes else None
         self.canvas = None

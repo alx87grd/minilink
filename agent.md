@@ -43,26 +43,34 @@ dynamics textbook. These rules keep it that way as the library grows.
 3. **Module section order**: primary contract class → subclasses/variants →
    public functions → private helpers at the bottom, separated by short
    section banners (`# Public API`, `# Internal machinery`).
-4. **Bare signatures in equation paths**: `def f(self, x, u, t=0, params=None):`
+4. **Selector-orchestrator split for math tools**: when a public tool combines
+   user options with core equations, keep the public function readable as:
+   choose method/options, get selected `f(x, u)` / `h(x, u)` callables, then
+   write the mathematical computation in place. Put port selection, backend
+   fallback, validation, and other ceremony in one or two small selector
+   helpers below the core math. For example, linearization should read like
+   `method = selectmethod(...)`; `f, h = selectports(...)`; then `A`, `B`,
+   `C`, `D` are computed directly from textbook Jacobian relations.
+5. **Bare signatures in equation paths**: `def f(self, x, u, t=0, params=None):`
    — no type annotations in `f`/`h`/port computes; shapes and types live in
    the docstring. Full type hints belong on tools, orchestrators, and
    structural APIs.
-5. **The `xp` idiom**: `xp = array_module(x)` right after params unpacking is
+6. **The `xp` idiom**: `xp = array_module(x)` right after params unpacking is
    *the* hybrid NumPy/JAX pattern — one line, always the same shape, and the
    entire price of JAX support in basic blocks.
-6. **Derived, not cached**: quantities computable from owned state are
+7. **Derived, not cached**: quantities computable from owned state are
    read-only properties (`System.m`, `System.p`), never cached attributes
    guarded by `recompute_*()` call discipline — no staleness class of bugs.
-7. **No shadow state**: attributes are initialized in `__init__`, never via
+8. **No shadow state**: attributes are initialized in `__init__`, never via
    `hasattr(...)`-or-create at use sites.
-8. **Libraries are silent**: no `print` outside explicit `verbose=` flags,
+9. **Libraries are silent**: no `print` outside explicit `verbose=` flags,
    default quiet. Delete debug scaffolding rather than gating it.
-9. **Pre-1.0 no-alias rule**: no compatibility aliases or shims inside the
+10. **Pre-1.0 no-alias rule**: no compatibility aliases or shims inside the
    library; rename cleanly and fix call sites in the same change.
-10. **Backend imports come from `core/backends.py`**: backend vocabulary and
+11. **Backend imports come from `core/backends.py`**: backend vocabulary and
     the `array_module` / `require_jax_numpy` helpers live there; system
     libraries never import from `core/compile/`.
-11. **`__main__` hello-worlds**: core modules may end with a ~10-line runnable
+12. **`__main__` hello-worlds**: core modules may end with a ~10-line runnable
     example (`python -m minilink.core.system`); anything bigger belongs in
     `examples/`.
 
@@ -77,6 +85,10 @@ dynamics textbook. These rules keep it that way as the library grows.
 - Change only what the task requires; every diff line should earn its place.
 - Prefer explicit, readable code over clever Python when the data flow is
   mathematical; use named temporaries in equation paths.
+- Keep math-tool helper counts low. If option resolution needs a lot of Python,
+  put it behind a selector helper that returns clean mathematical callables or
+  arrays; do not scatter one-off helpers through the file or let fallback logic
+  interrupt the equation block.
 - **Avoid single-use private methods.** Do not split a constructor or equation
   into `self._helper()` steps that run only once (e.g. `_set_metadata`,
   `_abcd`); inline them at the call site. Keep a helper only when it is reused,
@@ -206,8 +218,8 @@ After substantial changes, run the full checklist in [§10 Revision Pass](#10-re
 At feature completion, verify in proportion to risk:
 
 1. automated tests with `pytest`;
-2. manual smoke scripts in `tests/manual/` when useful;
-3. demo scripts in `examples/` for major user-facing workflows.
+2. smoke scripts in `examples/scripts/` for major user-facing workflows;
+3. repo-root `benchmarks/` runners when touching performance-sensitive paths.
 
 JAX twin plants need tests showing JAX equations match the NumPy reference in a
 nominal case and a non-trivial parameter regime.
@@ -239,7 +251,9 @@ proceeding.
 
 **Notebooks:** exclude notebooks from normal review/style passes unless the task
 is only to update renamed imports/API names or the user explicitly asks for
-notebook cleanup. Never review notebook outputs by default.
+notebook cleanup. Never review notebook outputs by default. Commits strip
+outputs from `examples/notebooks/*.ipynb` via the `nbstripout` pre-commit hook
+(`.pre-commit-config.yaml`; run `pre-commit install` once per clone).
 
 **Scope:**
 
@@ -275,34 +289,41 @@ Subsystem maturity in [ROADMAP.md](ROADMAP.md) uses these definitions.
 
 ## 9. Local Environment
 
-Target **Python 3.10+** with optional extras from `pyproject.toml` (JAX, SymPy,
-visualization, Ipopt). Do not rely on macOS `/usr/bin/python3` when it is older
-than 3.10. For terminal commands in this repo (tests, `examples/scripts`,
-benchmarks), use Python 3.10+ with the extras your task needs.
-
-Install from repo root:
+**Agents and maintainers:** run tests, examples, and benchmarks in the **`minilink`**
+conda environment from repo-root [environment.yml](environment.yml) (Python 3.13,
+core deps, optional extras, pytest/ruff/sphinx). See [README.md Install](README.md#install)
+for setup. Set `PYTHONPATH` to the repo root once:
 
 ```bash
-pip install -e ".[dev]"
+conda env create -f environment.yml   # first time only
+conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Optional extras: `.[jax]`, `.[symbolic]`, `.[visualization]`, `.[plotting]`,
-`.[ipopt]`. Diagram bindings need a system `graphviz` package
-(`apt install graphviz`, or conda-forge `graphviz` + `python-graphviz`).
-
-Maintainers often use a conda env for local work (for example `dev-h26`). That
-name is **not contractual**—any conda/venv with Python 3.10+ and the extras you
-need is fine; align versions with CI or teammates when running tests and examples.
+Verification commands (always from repo root, with `minilink` active):
 
 ```bash
-conda activate dev-h26   # or your own env
+conda activate minilink
 python -m pytest
+SDL_VIDEODRIVER=dummy python -m pytest   # full suite including pygame smoke
+python examples/scripts/<script>.py
 ```
 
+Non-interactive (CI-like, no shell activation):
+
 ```bash
-conda run -n dev-h26 python -m pytest
-conda run -n dev-h26 python examples/scripts/animation/demo_animations.py
+conda run -n minilink python -m pytest
+conda run -n minilink python examples/scripts/animation/demo_animations.py
 ```
+
+Target **Python 3.10+** in general; CI still covers 3.10–3.13. Do not rely on
+macOS `/usr/bin/python3` when it is older than 3.10.
+
+**Alternative (pip-only):** `pip install -e ".[dev]"` plus optional extras
+`.[jax]`, `.[symbolic]`, `.[visualization]`, `.[plotting]`, `.[ipopt]`. Diagram
+bindings need system `graphviz` (`apt install graphviz`, or conda-forge
+`graphviz` + `python-graphviz`). Prefer the `minilink` conda env for local work
+so optional tests and examples match teammate setups.
 
 Run demos from repo root: `python examples/scripts/<script>.py`.
 

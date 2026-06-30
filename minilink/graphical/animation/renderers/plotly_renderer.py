@@ -18,7 +18,6 @@ from minilink.graphical.animation.primitives import (
     Rod,
     Sphere,
     TorqueArrow,
-    extract_amplitude,
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
@@ -361,7 +360,15 @@ class PlotlyRenderer(AnimationRenderer):
         self.is_3d = is_3d
         return self._build_animation_figure(primitives, frames, schedule)
 
-    def play_native(self, primitives, frames, schedule, *, is_3d: bool):
+    def play_native(
+        self,
+        primitives,
+        frames,
+        schedule,
+        *,
+        is_3d: bool,
+        scene_title: str | None = None,
+    ):
         self.is_3d = is_3d
         fig = self._build_animation_figure(primitives, frames, schedule)
         fig.show(
@@ -376,9 +383,10 @@ class PlotlyRenderer(AnimationRenderer):
         if not frames:
             raise ValueError("Cannot animate an empty frame list.")
 
+        # Frames carry their own per-frame primitive list (dynamic geometry).
         frame_traces = [
             self._traces_for_frame(
-                primitives,
+                frame["primitives"],
                 frame["transforms"],
                 frame["camera"],
             )
@@ -613,23 +621,8 @@ class PlotlyRenderer(AnimationRenderer):
                 is_3d=self.is_3d,
             )
 
-        if isinstance(primitive, (CustomLine, Arrow)):
+        if isinstance(primitive, (CustomLine, Arrow, TorqueArrow)):
             pts = _transform_points(primitive.pts, T)
-            return _line_trace(
-                go,
-                x=pts[:, 0],
-                y=pts[:, 1],
-                z=pts[:, 2] if self.is_3d else None,
-                color=color,
-                width=width,
-                dash=dash,
-                name=name,
-                is_3d=self.is_3d,
-            )
-
-        if isinstance(primitive, TorqueArrow):
-            sweep, T_rigid = extract_amplitude(T)
-            pts = _transform_points(primitive.compute_pts(sweep), T_rigid)
             return _line_trace(
                 go,
                 x=pts[:, 0],
