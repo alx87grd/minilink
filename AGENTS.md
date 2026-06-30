@@ -26,6 +26,7 @@ Do not add new markdown guides unless asked. Keep [README call chains](README.md
 - **Minimalist UX**: beginner-friendly main workflow; complexity in orchestrators and backends.
 - **Prototype honestly**: unvalidated architecture gets `TODO: User Architectural Review`.
 - **Incremental refactoring**: no broad restructures unless the user asks.
+- **Preserve user edits**: never revert or "clean up" manual changes the user made in demos, notebooks, examples, or scratch code — commented-out plots, tuning constants (`TF`, gains, step times), disabled sections, exploratory variables — unless they explicitly ask you to change those lines. Commit/review passes must not overwrite user-tuned script state.
 - **Docs are contract**: update DESIGN / ROADMAP / README when public behavior or maturity claims change.
 
 ## Textbook style
@@ -74,7 +75,9 @@ Details in [DESIGN.md](DESIGN.md).
 
 ## Workflow
 
-**Do directly:** typos and stale docs; docstrings/types in touched files; small cleanups for the requested change.
+**Do directly:** typos and stale docs; docstrings/types in files you are already changing for the task; small cleanups that directly support the requested change.
+
+**Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals).
 
 **Ask first:** delete/rename files; architecture refactors; new dependencies; evaluator/optimizer contract changes; removing user scratch code.
 
@@ -94,7 +97,7 @@ After substantial changes: `pytest` (proportionate to risk), ruff on touched Pyt
 
 Final pass after substantial changes — smaller, clearer diff:
 
-1. Re-read diff for scope creep and stale comments.
+1. Re-read diff for scope creep and stale comments; **preserve user manual edits** in demos/notebooks.
 2. Simplify; match local patterns; lazy optional imports.
 3. Math-first locals in equation paths; conversion at boundaries only.
 4. Fold or update examples; runnable from repo root.

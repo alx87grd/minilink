@@ -24,6 +24,8 @@ from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
 # --- Two links: release from a bent configuration ---
 two = TwoLinkManipulator()
 
+two.inputs["u"].nominal_value[0] = 2.0
+
 p_start = np.array([0.5, 0.5])
 q0 = two.inverse_kinematics(p_start)
 two.x0 = np.concatenate([q0, np.zeros(2)])
