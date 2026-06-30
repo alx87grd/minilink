@@ -43,7 +43,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/alx87grd/minilink"
 Repository = "https://github.com/alx87grd/minilink"
-Documentation = "https://github.com/alx87grd/minilink/blob/main/DESIGN.md"
+Documentation = "https://alx87grd.github.io/minilink/"
 Issues = "https://github.com/alx87grd/minilink/issues"
 Changelog = "https://github.com/alx87grd/minilink/blob/main/ROADMAP.md"
 
@@ -55,6 +55,7 @@ dev = [
 ]
 docs = [
     "sphinx>=7",
+    "furo>=2024.8.6",
 ]
 visualization = [
     "meshcat",
