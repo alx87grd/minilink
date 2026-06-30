@@ -39,8 +39,7 @@ class Integrator(DynamicSystem):
         return x
 
 
-@pytest.mark.optional
-@pytest.mark.visualization
+@pytest.mark.plotting
 class TestPlotlyRendererOptionalImport(unittest.TestCase):
     def test_import_plotly_reports_extra_when_missing(self):
         try:
@@ -81,8 +80,7 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
             animator.game(renderer="plotly", max_steps=1)
 
 
-@pytest.mark.optional
-@pytest.mark.visualization
+@pytest.mark.plotting
 class TestPlotlyRenderer(unittest.TestCase):
     def setUp(self):
         pytest.importorskip("plotly")
@@ -222,21 +220,24 @@ class TestPlotlyRenderer(unittest.TestCase):
     def test_inline_animation_updates_xy_camera_axis_ranges(self):
         sys = DynamicSystem(0)
         backend = PlotlyRenderer(Animator(sys))
+        point = Point()
         frames = [
             {
                 "t": 0.0,
+                "primitives": [point],
                 "transforms": [identity()],
                 "camera": camera_matrix(target=(0.0, 0.0, 0.0), scale=2.0),
             },
             {
                 "t": 0.1,
+                "primitives": [point],
                 "transforms": [translation(10.0, 3.0, 0.0)],
                 "camera": camera_matrix(target=(10.0, 3.0, 0.0), scale=2.0),
             },
         ]
 
         fig = backend.render_inline_animation(
-            [Point()],
+            [point],
             frames,
             SimpleNamespace(interval_ms=50),
             is_3d=False,
@@ -289,8 +290,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         self.assertEqual(len(fig.frames), 2)
 
 
-@pytest.mark.optional
-@pytest.mark.visualization
+@pytest.mark.plotting
 class TestPlotlySignalPlot(unittest.TestCase):
     def test_plotly_static_and_live_update(self):
         pytest.importorskip("plotly")

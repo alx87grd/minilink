@@ -273,17 +273,29 @@ System
 
 ## Install
 
-Minilink requires Python 3.10+. Conda is recommended because diagram rendering
-and some optimization backends depend on native libraries.
+Minilink requires Python 3.10+ (3.13 recommended for conda). Conda is recommended
+because diagram rendering and some optimization backends depend on native libraries.
+
+Full dev environment from [environment.yml](environment.yml) (core deps, optional
+extras, pytest/ruff/sphinx, Jupyter):
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda create -n minilink -c conda-forge python=3.10 numpy scipy matplotlib graphviz python-graphviz
+conda env create -f environment.yml
 conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Optional features:
+Minimal manual setup:
+
+```bash
+git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda create -n minilink -c conda-forge python=3.13 numpy scipy matplotlib graphviz python-graphviz
+conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+```
+
+Optional features (included in `environment.yml`; install separately for minimal envs):
 
 ```bash
 conda install -c conda-forge jax jaxlib meshcat-python pygame plotly sympy ipopt cyipopt
@@ -379,9 +391,10 @@ Catalog plants live under `minilink.dynamics.catalog.*`.
 
 - [DESIGN.md](DESIGN.md) — principles and contracts
 - [ROADMAP.md](ROADMAP.md) — maturity and priorities
-- [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 living backlog (migration guide TBD)
-- [docs/plans/](docs/plans/) — design backlog and archived migration notes
+- [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 parity audit (library + all 195 demos)
+- [docs/plans/](docs/plans/) — active design backlog
 - [agent.md](agent.md) — maintainer / agent rules
+- API reference (Sphinx, optional): `pip install -e ".[docs]" && sphinx-build -b html docs docs/_build/html` then open `docs/_build/html/index.html` (GitHub Pages deploys from `main` via [.github/workflows/docs.yml](.github/workflows/docs.yml))
 
 Design rules: NumPy baseline, explicit JAX; native-array equation paths;
 `params is None` means object defaults, never `params or self.params`.

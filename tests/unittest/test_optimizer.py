@@ -107,7 +107,7 @@ def test_solve_accepts_one_off_initial_guess_without_recompiling():
 _IPOPT_QUIET = {"print_level": 0, "max_iter": 200}
 
 
-@pytest.mark.optional
+@pytest.mark.ipopt
 def test_ipopt_unconstrained_quadratic():
     pytest.importorskip("cyipopt")
 
@@ -124,7 +124,7 @@ def test_ipopt_unconstrained_quadratic():
     assert out.cost is not None and out.cost < 1e-10
 
 
-@pytest.mark.optional
+@pytest.mark.ipopt
 def test_ipopt_box_bounds():
     pytest.importorskip("cyipopt")
 
@@ -151,7 +151,7 @@ def test_ipopt_box_bounds():
     assert np.allclose(out.z, np.ones(3), atol=1e-6)
 
 
-@pytest.mark.optional
+@pytest.mark.ipopt
 def test_ipopt_equality_constraint():
     pytest.importorskip("cyipopt")
 
@@ -178,7 +178,7 @@ def test_ipopt_equality_constraint():
     assert np.allclose(out.z, [-1.0 / np.sqrt(2.0), -1.0 / np.sqrt(2.0)], atol=1e-5)
 
 
-@pytest.mark.optional
+@pytest.mark.ipopt
 def test_ipopt_inequality_with_bounds():
     pytest.importorskip("cyipopt")
 
@@ -213,7 +213,7 @@ def test_ipopt_inequality_with_bounds():
     assert np.allclose(out.z, [1.0, 0.0], atol=1e-4)
 
 
-@pytest.mark.optional
+@pytest.mark.ipopt
 def test_ipopt_record_solve_time():
     pytest.importorskip("cyipopt")
 
@@ -230,7 +230,7 @@ def test_ipopt_record_solve_time():
     assert out.solve_time_s is not None and out.solve_time_s >= 0.0
 
 
-@pytest.mark.optional
+@pytest.mark.ipopt
 def test_ipopt_solve_callback_not_supported():
     pytest.importorskip("cyipopt")
 

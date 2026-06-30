@@ -31,8 +31,8 @@ Run tests that should pass with only the required project dependencies and the
 pytest -m "not optional"
 ```
 
-This excludes tests that need optional extras such as JAX, SymPy, meshcat, or
-pygame.
+This excludes tests that need optional extras such as JAX, SymPy, meshcat,
+pygame, plotly, or cyipopt.
 
 ## Default local run
 
@@ -48,7 +48,7 @@ not installed.
 Install all extras, then run either the optional subset or the whole suite:
 
 ```bash
-pip install -e ".[dev,symbolic,jax,visualization]"
+pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt]"
 SDL_VIDEODRIVER=dummy pytest -m optional
 SDL_VIDEODRIVER=dummy pytest
 ```
@@ -62,6 +62,8 @@ Cursor Cloud sessions.
 - `jax`: tests requiring `jax` / `jaxlib`
 - `symbolic`: tests requiring `sympy`
 - `visualization`: tests requiring `meshcat` or `pygame`
+- `plotting`: tests requiring `plotly`
+- `ipopt`: tests requiring `cyipopt`
 
 When adding optional behavior, put the import inside a guarded block and add the
 appropriate marker(s). This keeps `pytest -m "not optional"` a dependable

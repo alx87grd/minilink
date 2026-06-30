@@ -49,14 +49,12 @@ TRL definitions: [agent.md §8](agent.md#8-trl-lifecycle).
   generic blocks in top-level `blocks/`; generic control laws in
   `control/linear.py` and `control/pid.py`; `System` facades split into `core/facades.py`
   (API unchanged).
-- **Pyro catalog plants** — all EoM models ported and QA'd
-  ([archive/catalog-migration-notes.md](docs/plans/archive/catalog-migration-notes.md)).
+- **Pyro catalog plants** — all EoM models ported and QA'd.
 - **Kinematic graphics contract** — string-keyed ``tf``, frame-keyed geometry,
   ``skin`` attribute, overlays at ``animate(overlays=…)``, collision ``bind()``
   reusing ``tf`` (DESIGN §4, §6).
 - **Pyro tool tranche 1** — blocks routing/nonlinear/filters/sources,
-  linear control + LQR, analysis linearize/structural/equilibria/modal/Bode
-  ([archive/tool-migration-notes.md](docs/plans/archive/tool-migration-notes.md)).
+  linear control + LQR, analysis linearize/structural/equilibria/modal/Bode.
 - **Planning search + DP** — RRT/RRT*, value iteration, spatial scene integration.
 - **DP/RRT on continuous `PlanningProblem`** — discrete pyro framework remains out of scope.
 
