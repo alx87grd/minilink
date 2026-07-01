@@ -18,6 +18,7 @@ from minilink.planning.spatial.collision import (
     disc,
     point_probe,
 )
+from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
     inverse_barrier,
@@ -378,3 +379,87 @@ def test_scene_plot_smoke():
 
     _, ax = scene.plot(show=False, body=_holonomic_point(), x=np.array([2.0, 0.0]))
     assert len(ax.lines) >= 1
+
+
+# --- workspace cost raster -------------------------------------------------
+
+
+def test_sample_field_costs_matches_point_probe_cost():
+    scene = Scene(obstacles=(Sphere([2.0, 0.0], 0.5),))
+    body = _holonomic_point()
+    cost = scene.clearance_field(body).as_cost(
+        weight=4.0, shaping=inverse_barrier(epsilon=0.1)
+    )
+    bounds = ((-1.0, 4.0), (-2.0, 2.0))
+    grid = sample_field_costs([cost], bounds=bounds, grid=(5, 4))
+    p = np.array([grid.xs[2], grid.ys[1]])
+    assert grid.Z[1, 2] == pytest.approx(cost.g(p, np.zeros(1)))
+
+
+def test_sample_field_costs_obstacle_is_radially_symmetric():
+    scene = Scene(obstacles=(Sphere([2.0, 0.0], 0.5),))
+    cost = scene.clearance_field(_holonomic_point()).as_cost(weight=1.0)
+    bounds = ((0.0, 4.0), (-2.0, 2.0))
+    grid = sample_field_costs([cost], bounds=bounds, grid=(41, 21))
+    center_j = int(np.argmin(np.abs(grid.ys)))
+    row = grid.Z[center_j, :]
+    xs = grid.xs
+    left = row[xs < 2.0]
+    right = row[xs > 2.0]
+    assert np.allclose(left, right[::-1], rtol=0.0, atol=1e-12)
+
+
+def test_cost_field_cmap_low_to_high_contrast():
+    from minilink.planning.spatial.plotting import cost_field_cmap
+
+    cmap = cost_field_cmap()
+    low = cmap(0.0)
+    high = cmap(1.0)
+    assert low[2] > low[0]  # blue end
+    assert high[0] > high[2]  # red end
+
+
+def test_plot_cost_field_exports_smoke(tmp_path):
+    import os
+
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+
+    from minilink.planning.spatial.plotting import plot_cost_field_exports
+
+    scene = Scene(obstacles=(Sphere([1.0, 0.0], 0.4),))
+    body = _holonomic_point()
+    bounds = ((-1.0, 3.0), (-1.0, 1.0))
+    path = scene.clearance_field(body).as_cost(weight=1.0)
+    corridor = scene.clearance_field(body).as_cost(weight=2.0)
+    obstacle = scene.clearance_field(body).as_cost(weight=3.0)
+    grids = {
+        "path": sample_field_costs([path], bounds=bounds, grid=(16, 14)),
+        "corridor": sample_field_costs([corridor], bounds=bounds, grid=(16, 14)),
+        "obstacle": sample_field_costs([obstacle], bounds=bounds, grid=(16, 14)),
+        "combined": sample_field_costs(
+            [path, corridor, obstacle], bounds=bounds, grid=(16, 14)
+        ),
+    }
+    out = plot_cost_field_exports(
+        grids,
+        scene=scene,
+        overlay_bounds=bounds,
+        log_scale=True,
+        show=False,
+        save_dir=tmp_path,
+    )
+    assert set(out) == {"path", "corridor", "obstacle", "combined"}
+    assert out["obstacle"]["2d"][1].get_title() == "Obstacle cost (2D)"
+    assert out["combined"]["3d"][1].get_title() == "Combined cost (3D)"
+    for entry in out.values():
+        fig2d, ax2d = entry["2d"]
+        fig3d, ax3d = entry["3d"]
+        assert fig2d is not None and ax2d is not None
+        assert fig3d is not None and ax3d is not None
+        assert len(fig2d.axes) == 2
+        assert len(fig3d.axes) == 2
+    assert (tmp_path / "combined_2d.png").exists()
+    assert (tmp_path / "combined_3d.png").exists()
