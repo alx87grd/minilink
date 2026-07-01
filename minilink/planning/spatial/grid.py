@@ -4,11 +4,12 @@ Backend-neutral rasters of a scalar field on a 2-D grid.
 :func:`sample_grid` evaluates a scalar query ``fn(p, t, params)`` over an
 axis-aligned grid and returns a :class:`FieldGrid` of plain NumPy arrays — no
 matplotlib. Scenes and state fields use it to rasterize clearance and
-cost-density queries for heatmaps and grid planners; rendering lives in
+cost-density queries for heatmaps; :func:`sample_field_costs` rasterizes shaped
+``FieldCost`` terms for MPC tuning plots in
 :mod:`minilink.planning.spatial.plotting`.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -76,3 +77,42 @@ def sample_grid(
         for i, x in enumerate(xs):
             Z[j, i] = float(fn(np.array([x, y]), t, params))
     return FieldGrid(xs, ys, Z)
+
+
+def pad_bounds(bounds, padding: float):
+    """Expand axis-aligned ``((x_lo, x_hi), (y_lo, y_hi))`` bounds by ``padding``."""
+    (x_lo, x_hi), (y_lo, y_hi) = bounds
+    pad = float(padding)
+    return ((x_lo - pad, x_hi + pad), (y_lo - pad, y_hi + pad))
+
+
+def sample_field_costs(
+    costs: Sequence,
+    *,
+    bounds,
+    grid: tuple = (200, 200),
+    state_dim: int = 2,
+    u=None,
+    t: float = 0.0,
+    params=None,
+) -> FieldGrid:
+    """
+    Rasterize shaped ``FieldCost`` terms on a workspace XY grid.
+
+    Each cell is the cost of a **workspace point** ``p = (x, y)`` using a
+    **point probe** — build costs with ``bind(sys, point_probe())`` so the
+    field does not depend on robot heading or body extent. ``state_dim`` must
+    match the planner plant state size (``sys.n``).
+    """
+    if not costs:
+        raise ValueError("sample_field_costs requires at least one cost")
+
+    u_use = np.zeros(1) if u is None else u
+    x = np.zeros(int(state_dim))
+
+    def fn(p, t_query=0.0, params_query=None):
+        x[0] = p[0]
+        x[1] = p[1]
+        return sum(float(c.g(x, u_use, t=t_query, params=params_query)) for c in costs)
+
+    return sample_grid(fn, bounds, grid=grid, t=t, params=params)

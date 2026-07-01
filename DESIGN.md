@@ -331,6 +331,11 @@ from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrappe
 clearance (subtract body radius). Compose with obstacles:
 `X = bounds & scene.clearance_field(body).as_constraint() & track.corridor_field(body).as_constraint()`.
 
+**Workspace cost raster** (`grid.sample_field_costs`, `plotting.plot_cost_field` /
+`plot_cost_field_3d` / `plot_cost_field_exports`): rasterize shaped ``FieldCost`` terms
+at workspace points ``p = (x, y)`` with a **point probe** body (heading-independent).
+Build viz costs with ``bind(sys, point_probe())``; MPC may still use ``car_outline``.
+
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
 sources every concern from the problem — collision `problem.X.contains` (optional
 orchestrator `edge_resolution` densification along edges), goal `problem.Xf`/`x_goal`,

@@ -27,9 +27,11 @@ from minilink.planning.mpc import (
     MPCPlanner,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, car_outline
+from minilink.planning.spatial.collision import bind, car_outline, point_probe
+from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
 from minilink.planning.spatial.paths import from_waypoints
+from minilink.planning.spatial.plotting import plot_cost_field_exports
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
     inverse_barrier,
@@ -98,6 +100,7 @@ W_REAR_DOT_MAX = 80.0
 DELTA_DOT_MAX = 2.0
 CAMERA_SCALE = 18.0
 PLOT_MARGIN = 3.0
+COST_FIELD_MARGIN = 6.0
 
 
 def _quarter_arc_waypoints(cx, cy, radius, angle_start, n=10):
@@ -221,6 +224,7 @@ track = ReferenceTrack(
     from_waypoints(REFERENCE_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
 )
 body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
+probe = bind(sys_mpc, point_probe())
 scene = Scene(
     obstacles=tuple(Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS)
 )
@@ -245,7 +249,20 @@ obstacle_cost = scene.clearance_field(body).as_cost(
     weight=OBSTACLE_REPULSION_WEIGHT,
     shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
 )
-
+# Workspace heatmaps: point probe at each (x, y) — heading-independent tuning view.
+# MPC costs above still use car_outline for the planner body.
+path_cost_viz = track.distance_field(probe).as_cost(
+    weight=PATH_COST_WEIGHT,
+    shaping=quadratic_excess(threshold=0.1),
+)
+corridor_cost_viz = track.corridor_field(probe).as_cost(
+    weight=CORRIDOR_COST_WEIGHT,
+    shaping=quadratic_hinge(threshold=0.0),
+)
+obstacle_cost_viz = scene.clearance_field(probe).as_cost(
+    weight=OBSTACLE_REPULSION_WEIGHT,
+    shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
+)
 cost = stability_cost + path_cost + corridor_cost + obstacle_cost
 
 s_start, _ = loop_track.path.project(START_XY)
@@ -401,6 +418,25 @@ ax.scatter(
 ax.legend(loc="upper left", fontsize=8)
 fig.tight_layout()
 plt.show()
+
+COST_FIELD_BOUNDS = pad_bounds(PLOT_BOUNDS, COST_FIELD_MARGIN - PLOT_MARGIN)
+_cost_kw = dict(bounds=COST_FIELD_BOUNDS, state_dim=sys_mpc.n)
+
+plot_cost_field_exports(
+    {
+        "path": sample_field_costs([path_cost_viz], **_cost_kw),
+        "corridor": sample_field_costs([corridor_cost_viz], **_cost_kw),
+        "obstacle": sample_field_costs([obstacle_cost_viz], **_cost_kw),
+        "combined": sample_field_costs(
+            [path_cost_viz, corridor_cost_viz, obstacle_cost_viz], **_cost_kw
+        ),
+    },
+    track=loop_track,
+    scene=scene,
+    overlay_bounds=PLOT_BOUNDS,
+    traj=traj.x[0:2, :],
+    log_scale=True,
+)
 
 
 # --- Animation ---
