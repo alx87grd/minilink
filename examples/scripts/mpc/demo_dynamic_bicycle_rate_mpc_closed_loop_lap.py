@@ -317,12 +317,12 @@ sys_sim.animate(
     ],
 )
 
-sys_sim.animate(
-    traj,
-    renderer="meshcat",
-    overlays=[
-        TrackCorridorOverlay(loop_track),
-        scene.as_visualizer(color="tab:red", opacity=0.45),
-        history,
-    ],
-)
+# sys_sim.animate(
+#     traj,
+#     renderer="meshcat",
+#     overlays=[
+#         TrackCorridorOverlay(loop_track),
+#         scene.as_visualizer(color="tab:red", opacity=0.45),
+#         history,
+#     ],
+# )
