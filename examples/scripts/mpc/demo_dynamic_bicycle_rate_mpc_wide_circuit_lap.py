@@ -52,7 +52,6 @@ RADIUS_SLOW = 3.5
 CORRIDOR_HALF_WIDTH = 2.5
 PATH_COST_WEIGHT = 40.0
 CORRIDOR_COST_WEIGHT = 25.0
-UNROLL_LAPS = 3
 
 # --- Eight obstacles offset from the centerline ---
 OBSTACLE_RADIUS = 0.25
@@ -162,16 +161,6 @@ def wide_sweeper_circuit_waypoints(
     )
 
 
-def unroll_track(waypoints, n_laps=3):
-    """Concatenate ``n_laps`` copies so MPC always has path ahead of the vehicle."""
-    if n_laps < 1:
-        raise ValueError("n_laps must be >= 1")
-    parts = [np.asarray(waypoints, dtype=float)]
-    for _ in range(n_laps - 1):
-        parts.append(parts[-1][1:])
-    return np.vstack(parts)
-
-
 LOOP_WAYPOINTS = wide_sweeper_circuit_waypoints(
     cx=CIRCUIT_CENTER[0],
     cy=CIRCUIT_CENTER[1],
@@ -180,7 +169,6 @@ LOOP_WAYPOINTS = wide_sweeper_circuit_waypoints(
     r_fast=RADIUS_FAST,
     r_slow=RADIUS_SLOW,
 )
-REFERENCE_WAYPOINTS = unroll_track(LOOP_WAYPOINTS, n_laps=UNROLL_LAPS)
 START_XY = LOOP_WAYPOINTS[0].copy()
 
 PLOT_BOUNDS = (
@@ -220,9 +208,6 @@ ubar = np.array([0.0, 0.0])
 loop_track = ReferenceTrack(
     from_waypoints(LOOP_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
 )
-track = ReferenceTrack(
-    from_waypoints(REFERENCE_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
-)
 body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
 probe = bind(sys_mpc, point_probe())
 scene = Scene(
@@ -237,11 +222,11 @@ stability_cost = QuadraticCost.from_system(
     xbar=x_cruise,
     ubar=ubar,
 )
-path_cost = track.distance_field(body).as_cost(
+path_cost = loop_track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT,
     shaping=quadratic_excess(threshold=0.1),
 )
-corridor_cost = track.corridor_field(body).as_cost(
+corridor_cost = loop_track.corridor_field(body).as_cost(
     weight=CORRIDOR_COST_WEIGHT,
     shaping=quadratic_hinge(threshold=0.0),
 )
@@ -251,11 +236,11 @@ obstacle_cost = scene.clearance_field(body).as_cost(
 )
 # Workspace heatmaps: point probe at each (x, y) — heading-independent tuning view.
 # MPC costs above still use car_outline for the planner body.
-path_cost_viz = track.distance_field(probe).as_cost(
+path_cost_viz = loop_track.distance_field(probe).as_cost(
     weight=PATH_COST_WEIGHT,
     shaping=quadratic_excess(threshold=0.1),
 )
-corridor_cost_viz = track.corridor_field(probe).as_cost(
+corridor_cost_viz = loop_track.corridor_field(probe).as_cost(
     weight=CORRIDOR_COST_WEIGHT,
     shaping=quadratic_hinge(threshold=0.0),
 )

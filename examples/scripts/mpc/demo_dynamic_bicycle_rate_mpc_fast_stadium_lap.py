@@ -48,7 +48,6 @@ TURN_RADIUS = 5.0
 CORRIDOR_HALF_WIDTH = 4.0
 PATH_COST_WEIGHT = 40.0
 CORRIDOR_COST_WEIGHT = 45.0
-UNROLL_LAPS = 3
 
 OBSTACLE_RADIUS = 0.4
 OBSTACLE_MARGIN = 0.05
@@ -144,13 +143,6 @@ def rounded_rect_loop_waypoints(*, cx, cy, width, height, radius, n_arc=10):
     )
 
 
-def unroll_track(waypoints, n_laps=3):
-    parts = [np.asarray(waypoints, dtype=float)]
-    for _ in range(n_laps - 1):
-        parts.append(parts[-1][1:])
-    return np.vstack(parts)
-
-
 LOOP_WAYPOINTS = rounded_rect_loop_waypoints(
     cx=TRACK_CENTER[0],
     cy=TRACK_CENTER[1],
@@ -158,7 +150,6 @@ LOOP_WAYPOINTS = rounded_rect_loop_waypoints(
     height=TRACK_HEIGHT,
     radius=TURN_RADIUS,
 )
-REFERENCE_WAYPOINTS = unroll_track(LOOP_WAYPOINTS, n_laps=UNROLL_LAPS)
 START_XY = LOOP_WAYPOINTS[0].copy()
 PLOT_BOUNDS = (
     (
@@ -195,9 +186,6 @@ x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 loop_track = ReferenceTrack(
     from_waypoints(LOOP_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
 )
-track = ReferenceTrack(
-    from_waypoints(REFERENCE_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
-)
 body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
 scene = Scene(
     obstacles=tuple(Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS)
@@ -212,10 +200,10 @@ cost = (
         xbar=x_cruise,
         ubar=np.zeros(2),
     )
-    + track.distance_field(body).as_cost(
+    + loop_track.distance_field(body).as_cost(
         weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
     )
-    + track.corridor_field(body).as_cost(
+    + loop_track.corridor_field(body).as_cost(
         weight=CORRIDOR_COST_WEIGHT, shaping=quadratic_hinge(threshold=0.0)
     )
     + scene.clearance_field(body).as_cost(

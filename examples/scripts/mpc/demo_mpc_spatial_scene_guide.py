@@ -54,7 +54,6 @@ TRACK_WIDTH = 24.0
 TRACK_HEIGHT = 14.0
 TURN_RADIUS = 3.5
 CORRIDOR_HALF_WIDTH = 2.0
-UNROLL_LAPS = 3
 
 OBSTACLE_RADIUS = 0.4
 OBSTACLE_MARGIN = 0.05
@@ -108,13 +107,6 @@ def rounded_rect_loop_waypoints(*, cx, cy, width, height, radius, n_arc=10):
     )
 
 
-def unroll_track(waypoints, n_laps=3):
-    parts = [np.asarray(waypoints, dtype=float)]
-    for _ in range(n_laps - 1):
-        parts.append(parts[-1][1:])
-    return np.vstack(parts)
-
-
 def _section(title: str) -> None:
     print(f"\n=== {title} ===")
 
@@ -130,7 +122,6 @@ LOOP_WAYPOINTS = rounded_rect_loop_waypoints(
     height=TRACK_HEIGHT,
     radius=TURN_RADIUS,
 )
-REFERENCE_WAYPOINTS = unroll_track(LOOP_WAYPOINTS, n_laps=UNROLL_LAPS)
 START_XY = LOOP_WAYPOINTS[0].copy()
 PLOT_BOUNDS = (
     (
@@ -146,9 +137,6 @@ PLOT_BOUNDS = (
 _section("Step 1: workspace geometry")
 loop_track = ReferenceTrack(
     from_waypoints(LOOP_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
-)
-track = ReferenceTrack(
-    from_waypoints(REFERENCE_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
 )
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 scene = Scene(
@@ -174,10 +162,10 @@ print(f"  state dim n={sys_mpc.n}, input dim m={sys_mpc.m}")
 
 _section("Step 3: workspace cost heatmaps (point_probe)")
 probe = bind(sys_mpc, point_probe())
-path_cost_viz = track.distance_field(probe).as_cost(
+path_cost_viz = loop_track.distance_field(probe).as_cost(
     weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
 )
-corridor_cost_viz = track.corridor_field(probe).as_cost(
+corridor_cost_viz = loop_track.corridor_field(probe).as_cost(
     weight=CORRIDOR_COST_WEIGHT, shaping=quadratic_hinge(threshold=0.0)
 )
 obstacle_cost_viz = scene.clearance_field(probe).as_cost(
@@ -211,8 +199,8 @@ x0 = np.array([START_XY[0], START_XY[1], theta0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 
 _section("Step 5: state fields — value(x) at start pose")
 clearance_field = scene.clearance_field(body)
-corridor_field = track.corridor_field(body)
-distance_field = track.distance_field(body)
+corridor_field = loop_track.corridor_field(body)
+distance_field = loop_track.distance_field(body)
 _print_field("clearance_field.value(x0)", float(clearance_field.value(x0)))
 _print_field("corridor_field.value(x0)", float(corridor_field.value(x0)))
 _print_field("distance_field.value(x0)", float(distance_field.value(x0)))
@@ -248,7 +236,7 @@ cost = stability_cost + path_cost + corridor_cost + obstacle_cost
 
 _section("Step 8: PlanningProblem")
 problem = PlanningProblem(sys=sys_mpc, x_start=x0, X=X, cost=cost)
-print("  MPC lap demo uses soft costs only: PlanningProblem(sys, x_start=x, cost=cost)")
+print("  soft spatial costs only: PlanningProblem(sys, x_start=x, cost=cost)")
 
 _section("Step 9: direct collocation planner (not solved)")
 transcription = DirectCollocationTranscription(
