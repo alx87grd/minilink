@@ -1,11 +1,11 @@
-"""MPC lap pursuit on a wide technical circuit with eight obstacles.
+"""MPC fast lap on a wide 50 m × 10 m stadium track with obstacles.
 
-Wide asymmetric loop (bottom chicane, fast right sweeper, tight left hairpin).
+Higher target speed and faster MPC rate than ``demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py``.
 Uses compile-once :class:`~minilink.planning.mpc.planner.MPCPlanner`.
 
 Run from repo root::
 
-    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_wide_circuit_lap.py
+    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_fast_stadium_lap.py
 """
 
 import matplotlib.pyplot as plt
@@ -41,53 +41,75 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
 )
 
-# --- Wide circuit geometry (asymmetric CCW loop) ---
-CIRCUIT_CENTER = (0.0, 0.0)
-CIRCUIT_WIDTH = 34.0
-CIRCUIT_HEIGHT = 20.0
-RADIUS_FAST = 5.0
-RADIUS_SLOW = 3.5
-CORRIDOR_HALF_WIDTH = 2.5
+TRACK_CENTER = (0.0, 0.0)
+TRACK_WIDTH = 50.0
+TRACK_HEIGHT = 10.0
+TURN_RADIUS = 5.0
+CORRIDOR_HALF_WIDTH = 4.0
 PATH_COST_WEIGHT = 40.0
-CORRIDOR_COST_WEIGHT = 25.0
+CORRIDOR_COST_WEIGHT = 45.0
 UNROLL_LAPS = 3
 
-# --- Eight obstacles offset from the centerline ---
-OBSTACLE_RADIUS = 0.25
-OBSTACLE_MARGIN = 0.2
+OBSTACLE_RADIUS = 0.4
+OBSTACLE_MARGIN = 0.05
 OBSTACLE_CENTERS = (
-    (-10.0, -9.5),
-    # (-2.5, -10.5),
-    (-2.5, -11.5),
-    (-2.5, -12.5),
-    (-2.5, -13.5),
-    (-2.5, -14.5),
-    (8.0, -10.5),
+    (0.0, 8.0),
+    (0.0, -9.0),
+    (-20.0, 0.0),
+    (-19.0, 0.0),
+    (-18.0, 0.0),
+    (-17.0, 0.0),
+    (-16.0, 0.0),
+    (-15.0, 0.0),
+    (-14.0, 0.0),
+    (-13.0, 0.0),
+    (-12.0, 0.0),
+    (-11.0, 0.0),
+    (-10.0, 0.0),
+    (-9.0, 0.0),
+    (-8.0, 0.0),
+    (-7.0, 0.0),
+    (-6.0, 0.0),
+    (-5.0, 0.0),
+    (-4.0, 0.0),
+    (-3.0, 0.0),
+    (-2.0, 0.0),
+    (-1.0, 0.0),
+    (0.0, 0.0),
+    (1.0, 0.0),
+    (2.0, 0.0),
+    (3.0, 0.0),
+    (4.0, 0.0),
+    (5.0, 0.0),
+    (6.0, 0.0),
+    (7.0, 0.0),
+    (8.0, 0.0),
+    (9.0, 0.0),
+    (10.0, 0.0),
+    (11.0, 0.0),
+    (12.0, 0.0),
+    (13.0, 0.0),
     (14.0, 0.0),
-    (5.0, 10.5),
-    (-6.0, 9.5),
-    (-14.0, 2.0),
-    (-6.0, -5.0),
-    (-6.0, -6.0),
-    (-6.0, -7.0),
-    (-6.0, -8.0),
-    (-6.0, -9.0),
+    (15.0, 0.0),
+    (16.0, 0.0),
+    (17.0, 0.0),
+    (18.0, 0.0),
+    (19.0, 0.0),
+    (20.0, 0.0),
 )
-OBSTACLE_REPULSION_WEIGHT = 35.0
+OBSTACLE_REPULSION_WEIGHT = 3.0
 OBSTACLE_REPULSION_EPS = 0.08
 
-# --- Speed objective --
-U_TARGET = 20.0
-VX0 = 5.0
-
-TF_SIM = 24.0
+U_TARGET = 30.0
+VX0 = 2.5
+TF_SIM = 20.0
 
 MPC_HZ = 5.0
 SIM_HZ = 200.0
 MPC_HORIZON = 2.0
-MPC_STEPS = 20
-MPC_MAXITER = 150
-MPC_FTOL = 1e-1
+MPC_STEPS = 10
+MPC_MAXITER = 50
+MPC_FTOL = 1.0
 MPC_DT = 1.0 / MPC_HZ
 SIM_DT = 1.0 / SIM_HZ
 SUBSTEPS = max(1, int(round(MPC_DT / SIM_DT)))
@@ -96,98 +118,56 @@ W_REAR_MAX = 90.0
 DELTA_MAX = 0.55
 W_REAR_DOT_MAX = 80.0
 DELTA_DOT_MAX = 2.0
-CAMERA_SCALE = 18.0
+CAMERA_SCALE = 16.0
 PLOT_MARGIN = 3.0
 
 
-def _quarter_arc_waypoints(cx, cy, radius, angle_start, n=10):
-    """90° counter-clockwise arc from ``angle_start``."""
+def _quarter_arc_waypoints(cx, cy, radius, angle_start, n=12):
     angles = np.linspace(angle_start, angle_start + np.pi / 2, n)
     return np.column_stack([cx + radius * np.cos(angles), cy + radius * np.sin(angles)])
 
 
-def _join(*parts):
-    out = np.asarray(parts[0], dtype=float)
-    for part in parts[1:]:
-        seg = np.asarray(part, dtype=float)
-        if seg.size == 0:
-            continue
-        out = np.vstack([out, seg[1:]])
-    return out
-
-
-def wide_sweeper_circuit_waypoints(
-    *,
-    cx=0.0,
-    cy=0.0,
-    width=34.0,
-    height=20.0,
-    r_fast=5.0,
-    r_slow=3.5,
-):
-    """Wide CCW loop: bottom chicane, fast right corners, tight left hairpin."""
-    w2 = width / 2.0
-    h2 = height / 2.0
-    y_bot = cy - h2
-    y_top = cy + h2
-    x_left = cx - w2
-    x_right = cx + w2
-    r_br = r_tr = r_bl = r_fast
-    r_tl = r_slow
-    hx_br = x_right - r_br
-    hx_tl = x_left + r_tl
-
-    start = np.array([[x_left + 3.0, y_bot]])
-    launch = np.linspace(start[0], [x_left + 10.0, y_bot], 4)[1:]
-    chicane = np.array(
-        [
-            [x_left + 12.0, y_bot],
-            [x_left + 14.0, y_bot + 1.8],
-            [x_left + 16.0, y_bot],
-            [hx_br - 1.5, y_bot],
-        ]
-    )
-    arc_br = _quarter_arc_waypoints(hx_br, y_bot + r_br, r_br, -np.pi / 2)[1:]
-    right = np.linspace([x_right, y_bot + r_br], [x_right, y_top - r_tr], 5)[1:-1]
-    arc_tr = _quarter_arc_waypoints(hx_br, y_top - r_tr, r_tr, 0.0)[1:]
-    top = np.linspace([hx_br, y_top], [hx_tl + 3.0, y_top], 5)[1:-1]
-    arc_tl = _quarter_arc_waypoints(hx_tl, y_top - r_tl, r_tl, np.pi / 2)[1:]
-    left = np.linspace([x_left, y_top - r_tl], [x_left, y_bot + r_bl], 5)[1:-1]
-    arc_bl = _quarter_arc_waypoints(x_left + r_bl, y_bot + r_bl, r_bl, np.pi)[1:]
-    return _join(
-        start, launch, chicane, arc_br, right, arc_tr, top, arc_tl, left, arc_bl, start
+def rounded_rect_loop_waypoints(*, cx, cy, width, height, radius, n_arc=10):
+    w2, h2, r = width / 2.0, height / 2.0, radius
+    hx = w2 - r
+    start = np.array([[cx - hx, cy - h2]])
+    bottom = np.linspace([cx - hx, cy - h2], [cx + hx, cy - h2], 5)[1:]
+    arc_br = _quarter_arc_waypoints(cx + hx, cy - h2 + r, r, -np.pi / 2, n_arc)[1:]
+    right = np.linspace([cx + w2, cy - h2 + r], [cx + w2, cy + h2 - r], 4)[1:-1]
+    arc_tr = _quarter_arc_waypoints(cx + hx, cy + h2 - r, r, 0.0, n_arc)[1:]
+    top = np.linspace([cx + hx, cy + h2], [cx - hx, cy + h2], 5)[1:-1]
+    arc_tl = _quarter_arc_waypoints(cx - hx, cy + h2 - r, r, np.pi / 2, n_arc)[1:]
+    left = np.linspace([cx - w2, cy + h2 - r], [cx - w2, cy - h2 + r], 4)[1:-1]
+    arc_bl = _quarter_arc_waypoints(cx - hx, cy - h2 + r, r, np.pi, n_arc)[1:]
+    return np.vstack(
+        [start, bottom, arc_br, right, arc_tr, top, arc_tl, left, arc_bl, start]
     )
 
 
 def unroll_track(waypoints, n_laps=3):
-    """Concatenate ``n_laps`` copies so MPC always has path ahead of the vehicle."""
-    if n_laps < 1:
-        raise ValueError("n_laps must be >= 1")
     parts = [np.asarray(waypoints, dtype=float)]
     for _ in range(n_laps - 1):
         parts.append(parts[-1][1:])
     return np.vstack(parts)
 
 
-LOOP_WAYPOINTS = wide_sweeper_circuit_waypoints(
-    cx=CIRCUIT_CENTER[0],
-    cy=CIRCUIT_CENTER[1],
-    width=CIRCUIT_WIDTH,
-    height=CIRCUIT_HEIGHT,
-    r_fast=RADIUS_FAST,
-    r_slow=RADIUS_SLOW,
+LOOP_WAYPOINTS = rounded_rect_loop_waypoints(
+    cx=TRACK_CENTER[0],
+    cy=TRACK_CENTER[1],
+    width=TRACK_WIDTH,
+    height=TRACK_HEIGHT,
+    radius=TURN_RADIUS,
 )
 REFERENCE_WAYPOINTS = unroll_track(LOOP_WAYPOINTS, n_laps=UNROLL_LAPS)
 START_XY = LOOP_WAYPOINTS[0].copy()
-
 PLOT_BOUNDS = (
     (
-        LOOP_WAYPOINTS[:, 0].min() - PLOT_MARGIN,
-        LOOP_WAYPOINTS[:, 0].max() + PLOT_MARGIN,
+        TRACK_CENTER[0] - TRACK_WIDTH / 2 - PLOT_MARGIN,
+        TRACK_CENTER[0] + TRACK_WIDTH / 2 + PLOT_MARGIN,
     ),
     (
-        LOOP_WAYPOINTS[:, 1].min() - PLOT_MARGIN,
-        LOOP_WAYPOINTS[:, 1].max() + PLOT_MARGIN,
+        TRACK_CENTER[1] - TRACK_HEIGHT / 2 - PLOT_MARGIN,
+        TRACK_CENTER[1] + TRACK_HEIGHT / 2 + PLOT_MARGIN,
     ),
 )
 
@@ -210,9 +190,7 @@ for sys in (sys_mpc, sys_sim):
 
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 r_r = sys_mpc.params["r_r"]
-w_rear_ref = U_TARGET / r_r
-x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, w_rear_ref, 0.0])
-ubar = np.array([0.0, 0.0])
+x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 
 loop_track = ReferenceTrack(
     from_waypoints(LOOP_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
@@ -225,28 +203,26 @@ scene = Scene(
     obstacles=tuple(Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS)
 )
 
-stability_cost = QuadraticCost.from_system(
-    sys_mpc,
-    Q=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
-    R=np.diag([1.0, 22.0]),
-    S=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
-    xbar=x_cruise,
-    ubar=ubar,
+cost = (
+    QuadraticCost.from_system(
+        sys_mpc,
+        Q=np.diag([0.0, 0.0, 0.0, 0.3, 1.0, 1.0, 0.01, 0.1]),
+        R=np.diag([1.0, 1.0]),
+        S=np.diag([0.0, 0.0, 0.0, 0.3, 1.0, 1.0, 0.01, 0.1]),
+        xbar=x_cruise,
+        ubar=np.zeros(2),
+    )
+    + track.distance_field(body).as_cost(
+        weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
+    )
+    + track.corridor_field(body).as_cost(
+        weight=CORRIDOR_COST_WEIGHT, shaping=quadratic_hinge(threshold=0.0)
+    )
+    + scene.clearance_field(body).as_cost(
+        weight=OBSTACLE_REPULSION_WEIGHT,
+        shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
+    )
 )
-path_cost = track.distance_field(body).as_cost(
-    weight=PATH_COST_WEIGHT,
-    shaping=quadratic_excess(threshold=0.1),
-)
-corridor_cost = track.corridor_field(body).as_cost(
-    weight=CORRIDOR_COST_WEIGHT,
-    shaping=quadratic_hinge(threshold=0.0),
-)
-obstacle_cost = scene.clearance_field(body).as_cost(
-    weight=OBSTACLE_REPULSION_WEIGHT,
-    shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
-)
-
-cost = stability_cost + path_cost + corridor_cost + obstacle_cost
 
 s_start, _ = loop_track.path.project(START_XY)
 theta0 = float(
@@ -257,20 +233,9 @@ theta0 = float(
 )
 if abs(np.cos(2.0 * theta0)) > 1.0 - 1e-9:
     theta0 += 1e-4
-x0 = np.array(
-    [
-        START_XY[0],
-        START_XY[1],
-        theta0,
-        VX0,
-        0.0,
-        0.0,
-        VX0 / r_r,
-        0.0,
-    ]
-)
-sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
+x0 = np.array([START_XY[0], START_XY[1], theta0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 
+sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
 mpc_planner = MPCPlanner(
     template_problem,
@@ -286,24 +251,16 @@ mpc_planner = MPCPlanner(
 )
 
 lap_length = loop_track.path.total_length
+t_hist, x_hist, u_hist = [0.0], [x0.copy()], [np.zeros(sys_sim.m)]
+mpc_plans, progress_hist = [], [s_start]
+x, t, u_hold = x0.copy(), 0.0, np.zeros(sys_sim.m)
+prev_plan, next_mpc_t = None, 0.0
 
-t_hist = [0.0]
-x_hist = [x0.copy()]
-u_hist = [np.zeros(sys_sim.m)]
-mpc_plans = []
-progress_hist = [s_start]
-x = x0.copy()
-t = 0.0
-u_hold = np.zeros(sys_sim.m)
-prev_plan = None
-next_mpc_t = 0.0
-
-print("MPC wide-circuit lap pursuit (rate inputs)")
+print("MPC fast stadium lap (50 m × 10 m track)")
 print(f"  compile={mpc_planner.compile_time_s:.3f}s (once)")
 print(
-    f"  lap length={lap_length:.1f} m, corridor={2 * CORRIDOR_HALF_WIDTH:.1f} m, "
-    f"u_target={U_TARGET} m/s, tf_sim={TF_SIM:.1f} s, "
-    f"{len(OBSTACLE_CENTERS)} obstacles"
+    f"  lap length={lap_length:.1f} m, u_target={U_TARGET} m/s, "
+    f"mpc_hz={MPC_HZ}, tf_sim={TF_SIM:.1f} s, {len(OBSTACLE_CENTERS)} obstacles"
 )
 
 while t < TF_SIM - 1e-12:
@@ -316,9 +273,7 @@ while t < TF_SIM - 1e-12:
                 x_guess = prev_plan.x[:, mask].copy()
                 x_guess[:, 0] = x
                 guess = Trajectory(
-                    t=t_shift[mask] - t,
-                    x=x_guess,
-                    u=prev_plan.u[:, mask],
+                    t=t_shift[mask] - t, x=x_guess, u=prev_plan.u[:, mask]
                 )
         else:
             guess = default_initial_trajectory(
@@ -347,8 +302,7 @@ while t < TF_SIM - 1e-12:
         t_hist.append(t)
         x_hist.append(x.copy())
         u_hist.append(u_hold.copy())
-        s_now, _ = loop_track.path.project(x[0:2])
-        progress_hist.append(s_now)
+        progress_hist.append(loop_track.path.project(x[0:2])[0])
 
 traj = Trajectory(t=np.asarray(t_hist), x=np.asarray(x_hist).T, u=np.asarray(u_hist).T)
 progress = np.asarray(progress_hist)
@@ -356,30 +310,19 @@ progress_delta = np.diff(progress, prepend=progress[0])
 progress_delta = np.where(
     progress_delta < -0.5 * lap_length, progress_delta + lap_length, progress_delta
 )
-arc_progress = np.cumsum(np.maximum(progress_delta, 0.0))
-laps_completed = arc_progress[-1] / lap_length
-mean_speed = float(np.mean(traj.x[3, :]))
-max_speed = float(np.max(traj.x[3, :]))
-
+laps_completed = np.cumsum(np.maximum(progress_delta, 0.0))[-1] / lap_length
 clearances = [
     np.hypot(traj.x[0, :] - cx, traj.x[1, :] - cy) - OBSTACLE_RADIUS
     for cx, cy in OBSTACLE_CENTERS
 ]
-path_margins = [
-    float(loop_track.corridor_field(body).value(traj.x[:, k]))
-    for k in range(traj.n_samples)
-]
 print(
-    f"done: laps~={laps_completed:.2f}, mean vx={mean_speed:.2f} m/s, "
-    f"max vx={max_speed:.2f} m/s, "
-    f"min obstacle clearance={float(np.min(clearances)):.2f} m, "
-    f"min corridor margin={min(path_margins):.3f} m"
+    f"done: laps~={laps_completed:.2f}, mean vx={float(np.mean(traj.x[3, :])):.2f} m/s, "
+    f"max vx={float(np.max(traj.x[3, :])):.2f} m/s, "
+    f"min obstacle clearance={float(np.min(clearances)):.2f} m"
 )
 
 fig, ax = loop_track.plot(
-    show=False,
-    bounds=PLOT_BOUNDS,
-    title="Wide technical circuit + MPC executed path",
+    show=False, bounds=PLOT_BOUNDS, title="Fast stadium track + MPC executed path"
 )
 scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title=None)
 ax.plot(
@@ -390,27 +333,17 @@ ax.plot(
     label="executed",
     zorder=7,
 )
-ax.scatter(
-    [START_XY[0]],
-    [START_XY[1]],
-    c="C1",
-    s=36,
-    zorder=8,
-    label="start/finish",
-)
+ax.scatter([START_XY[0]], [START_XY[1]], c="C1", s=36, zorder=8, label="start/finish")
 ax.legend(loc="upper left", fontsize=8)
 fig.tight_layout()
 plt.show()
 
-
-# --- Animation ---
 history = SceneHistory(
     trail=TrajectoryPolyline(
         traj, window="prefix", color="#1565c0", style="--", linewidth=1.0
     ),
     horizon=HorizonPolyline(mpc_plans, color="#ef6c00", linewidth=2.0, style="--"),
 )
-
 sys_sim.params = dict(sys_sim.params)
 sys_sim.camera_scale = CAMERA_SCALE
 sys_sim.traj = traj
@@ -423,3 +356,15 @@ sys_sim.animate(
         history,
     ],
 )
+
+# sys_sim.animate(
+#     traj,
+#     overlays=[
+#         TrackCorridorOverlay(loop_track),
+#         scene.as_visualizer(color="tab:red", opacity=0.45),
+#         history,
+#     ],
+#     save=True,
+#     file_name="fast_stadium_lap.gif",
+#     show=False,  # optional: skip the popup window
+# )

@@ -326,9 +326,8 @@ def plot_track(
     show: bool = True,
     ax=None,
     figsize=(6.0, 6.0),
-    centerline_color: str = "#2ca02c",
-    corridor_color: str = "#98df8a",
-    corridor_alpha: float = 0.35,
+    centerline_color: str = "#5c6570",
+    corridor_edge_color: str = "#9aa3af",
     waypoint_color: str = "#1f77b4",
     title: str | None = None,
     equal_aspect: bool = True,
@@ -360,21 +359,28 @@ def plot_track(
     half = float(track.half_width)
     upper = center + half * normals
     lower = center - half * normals
-    corridor = np.vstack([upper, lower[::-1]])
 
-    ax.fill(
-        corridor[:, 0],
-        corridor[:, 1],
-        color=corridor_color,
-        alpha=corridor_alpha,
+    ax.plot(
+        upper[:, 0],
+        upper[:, 1],
+        color=corridor_edge_color,
+        linewidth=1.0,
         zorder=2,
         label="corridor",
+    )
+    ax.plot(
+        lower[:, 0],
+        lower[:, 1],
+        color=corridor_edge_color,
+        linewidth=1.0,
+        zorder=2,
     )
     ax.plot(
         center[:, 0],
         center[:, 1],
         color=centerline_color,
-        linewidth=2.0,
+        linewidth=1.2,
+        linestyle=(0, (5, 4)),
         zorder=3,
         label="path",
     )

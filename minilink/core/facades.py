@@ -407,6 +407,8 @@ class SystemFacades:
         native: bool = True,
         scene_title: str | None = None,
         show: bool = True,
+        save: bool = False,
+        file_name: str = "Animation",
         camera=None,
         overlays=None,
     ):
@@ -426,7 +428,8 @@ class SystemFacades:
         matter — e.g. meshcat freezes per-frame dynamic geometry such as a
         ``TorqueArrow`` sweep; see ``DESIGN.md`` §4.7). ``camera`` accepts an
         optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
-        callable).
+        callable). ``save=True`` with ``renderer="matplotlib"`` writes a GIF
+        via ImageMagick (``{file_name}.gif``).
         """
         from minilink.graphical.animation import Animator
         from minilink.graphical.common.environment import prefers_inline_animation
@@ -447,6 +450,8 @@ class SystemFacades:
             is_3d=is_3d,
             html=resolved_html,
             show=show_plot,
+            save=save,
+            file_name=file_name,
             renderer=renderer,
             native=native,
             scene_title=scene_title,
