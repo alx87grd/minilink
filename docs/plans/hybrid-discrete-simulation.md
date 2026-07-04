@@ -122,6 +122,85 @@ one cascade demo (optional second MPC demo or SMC + filter).
 **Deferred in Phase B:** non-integer ratios (e.g. 30 Hz vs 100 Hz), FOH, delays, mixing flow
 blocks on the controller side.
 
+### Cascade multi-rate: expand, don't schedule (simplest Phase B design)
+
+**Do not simulate multiple clocks.** Simulate **one fast base tick** on the controller side
+and **expand** the logical cascade so slower blocks become step subsystems wrapped with
+hold/gate state. This is the minimal Simulink subset — not a general multi-rate engine.
+
+```text
+User writes (logical topology, no manual holds):
+
+  r → [ filter ] → [ MPC ] → u_cmd
+        100 Hz      10 Hz
+
+Expand once (expand_scheduled_step):
+
+  r → [ filter ] → … → [ HoldRegister? ] → [ RateGate(MPC) ] → u_cmd
+        @ dt_base       (on cross-rate edges)   (fire every k=10)
+
+Simulate:
+
+  every dt_base:  step_evaluator.step(...)   on expanded StepDiagramSystem
+  hybrid loop:    ZOH u → plant (rk4_rollout_zoh) → sample y   (unchanged from Phase A)
+```
+
+**Three user-facing pieces** — no second simulator, no hidden hold dict in the evaluator:
+
+| Piece | Role |
+| --- | --- |
+| `StepDiagramSystem` | Wire cascade normally (`filter >> mpc`); no clock blocks in user diagram |
+| `expand_scheduled_step(diagram, dt_base, schedule)` | Insert `RateGate` / `HoldRegister` / `SampleLatch` on cross-rate edges |
+| `HybridSimulator` | Expanded step diagram @ `dt_base` + ZOH `u` → continuous plant |
+
+**End-to-end API (Phase B):**
+
+```python
+controller = StepDiagramSystem()
+controller.add_subsystem(ref_filter, "filter")
+controller.add_subsystem(mpc_block, "mpc")
+controller.add_input_port("r")
+controller.connect("input", "r", "filter", "r")
+controller.connect("filter", "y", "mpc", "r")
+controller.connect_new_output_port("mpc", "u", "u")
+
+sync = expand_scheduled_step(
+    controller,
+    dt_base=0.01,                       # 100 Hz — fastest block rate
+    schedule={"filter": 1, "mpc": 10},  # mpc fires every 10 base ticks
+)
+
+hybrid = HybridDiagram(step=sync, continuous=plant, connections=[...], dt_base=0.01)
+HybridSimulator(hybrid, ...).run()
+```
+
+**Expansion rules (v1):**
+
+| Situation | Insert | Per `dt_base` tick |
+| --- | --- | --- |
+| Same rate | Direct wire | Both fire |
+| Slow ← fast (e.g. MPC ← filter) | `SampleLatch` on edge | Latch when slow block fires |
+| Fast ← slow | `HoldRegister` on edge | ZOH between slow updates |
+| Block divisor `k > 1` | `RateGate` wrapper | Run inner `phi` every k ticks; else identity |
+
+**Defaults:**
+
+- Set **`dt_base`** to the **fastest** controller block period.
+- **`schedule[sys_id] = k`** means the block fires every **k** base steps (`10 Hz` on `100 Hz` base → `k=10`).
+- Plant boundary: same ZOH + sample as Phase A; plant may use inner substeps `dt_plant << dt_base` inside `rk4_rollout_zoh`.
+
+**Why this is not “full Simulink”:**
+
+| Full Simulink multi-rate | This plan (Phase B) |
+| --- | --- |
+| Arbitrary flow + step in one canvas | Controller = step diagram only; plant = flow diagram only |
+| Many clock domains + opaque scheduler | **One `dt_base`** on controller side after expansion |
+| FOH, delays, triggered subs, events | **ZOH + sample + integer divisors** only |
+| Hidden runtime hold buffers | Holds are **diagram subsystems with state** (debuggable, in `ExecutionPlan`) |
+
+Step-only closed loops (no plant) use the same expansion, then `TimedStepSimulator` at
+`sync_dt = dt_base` — one code path for controller-only and hybrid sim.
+
 ### What this is not (short term)
 
 | Out of scope | Instead |
@@ -390,31 +469,41 @@ flowchart TB
 
 ## Clock architecture
 
+**Phase B rule:** user never hand-wires holds or rate gates in the logical diagram —
+`expand_scheduled_step` is the only public multi-rate entry (see
+[Cascade multi-rate](#cascade-multi-rate-expand-dont-schedule-simplest-phase-b-design)).
+
 | Question | Answer |
 | --- | --- |
 | Reuse continuous wiring for step diagrams? | **Yes** — sibling `StepDiagramSystem` + shared mixin / `ExecutionPlan` |
-| Full topology at synchronous level? | **Yes** |
+| Full topology at synchronous level? | **Yes** — after expansion |
 | Where does clock live? | **`expand_scheduled_step()`** + `dt_base`; not on `StepSystem` |
 | Second diagram topology class? | **Yes** — `StepDiagramSystem` sibling of `DiagramSystem` |
 | Middle layer for wiring + clock? | **Expansion** to sync diagram with hold/gate internal state |
 | Public `schedule` on `TimedStepSimulator`? | **No** — multi-rate must go through expansion |
+| Multiple sim loops for cascade? | **No** — one sync step @ `dt_base` on expanded diagram |
 
 ### Expand, then simulate synchronously
 
 ```python
-# User writes logical topology (no clock)
-controller = StepDiagramSystem(...)
-controller.connect("mpc", "u", "filter", "r")
+# User writes logical cascade (no clock, no holds)
+controller = StepDiagramSystem()
+controller.add_subsystem(ref_filter, "filter")
+controller.add_subsystem(mpc_block, "mpc")
+controller.connect("input", "r", "filter", "r")
+controller.connect("filter", "y", "mpc", "r")
 
-# Middle layer: bind schedule + expand to base-clock diagram
+# Expand to base-clock diagram with internal RateGate / Hold / SampleLatch
 sync_diagram = expand_scheduled_step(
     controller,
     dt_base=0.01,
-    schedule={"mpc": 10, "filter": 1},
+    schedule={"filter": 1, "mpc": 10},
 )
 
-# Single sim path — sync step every dt_base
+# Controller-only: sync step every dt_base
 simulate_steps(sync_diagram, x0, options=TimedStepOptions(sync_dt=0.01, tf=10.0))
+
+# Hybrid: pass sync_diagram to HybridDiagram.step — plant loop unchanged
 ```
 
 The expanded diagram **is** a normal `StepDiagramSystem`. Holds and rate gating are
@@ -689,7 +778,8 @@ Python outer (step + MPC/SMC solvers) / JAX inner (plant rollout).
 
 - Step blocks compose like flow systems (diagram + ports).
 - Turn-based and clock-driven both use `StepSystem`; only the orchestrator differs.
-- Multi-rate: one sync sim loop at `dt_base` after expansion.
+- Multi-rate cascade: **logical diagram → `expand_scheduled_step` → one loop @ `dt_base`**
+  (not multiple clocks, not full Simulink).
 - Hybrid v1: thin scheduler over step `φ` + `rk4_rollout_zoh` plant — **MPC and SMC** at one
   `Ts` (Phase A), then cascade controllers on `dt_base` (Phase B).
 - MPC and SMC demos drop hand-rolled outer loops; same `HybridSimulator` API.
