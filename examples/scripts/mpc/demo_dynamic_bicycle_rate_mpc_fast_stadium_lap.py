@@ -1,11 +1,11 @@
-"""MPC closed-loop lap on a compact rounded-rectangle track with obstacles.
+"""MPC fast lap on a wide 50 m × 10 m stadium track with obstacles.
 
-Smaller track and slower MPC rate than ``demo_dynamic_bicycle_rate_mpc_fast_stadium_lap.py``.
+Higher target speed and faster MPC rate than ``demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py``.
 Uses compile-once :class:`~minilink.planning.mpc.planner.MPCPlanner`.
 
 Run from repo root::
 
-    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py
+    python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_fast_stadium_lap.py
 """
 
 import matplotlib.pyplot as plt
@@ -42,32 +42,72 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
 )
 
 TRACK_CENTER = (0.0, 0.0)
-TRACK_WIDTH = 24.0
-TRACK_HEIGHT = 14.0
-TURN_RADIUS = 3.5
-CORRIDOR_HALF_WIDTH = 2.0
+TRACK_WIDTH = 50.0
+TRACK_HEIGHT = 10.0
+TURN_RADIUS = 5.0
+CORRIDOR_HALF_WIDTH = 4.0
 PATH_COST_WEIGHT = 40.0
-CORRIDOR_COST_WEIGHT = 25.0
+CORRIDOR_COST_WEIGHT = 45.0
 
 OBSTACLE_RADIUS = 0.4
 OBSTACLE_MARGIN = 0.05
 OBSTACLE_CENTERS = (
-    (4.0, -6.2),
-    (-2.0, 5.0),
-    (10.0, 1.5),
+    (0.0, 8.0),
+    (0.0, -9.0),
+    (-20.0, 0.0),
+    (-19.0, 0.0),
+    (-18.0, 0.0),
+    (-17.0, 0.0),
+    (-16.0, 0.0),
+    (-15.0, 0.0),
+    (-14.0, 0.0),
+    (-13.0, 0.0),
+    (-12.0, 0.0),
+    (-11.0, 0.0),
+    (-10.0, 0.0),
+    (-9.0, 0.0),
+    (-8.0, 0.0),
+    (-7.0, 0.0),
+    (-6.0, 0.0),
+    (-5.0, 0.0),
+    (-4.0, 0.0),
+    (-3.0, 0.0),
+    (-2.0, 0.0),
+    (-1.0, 0.0),
+    (0.0, 0.0),
+    (1.0, 0.0),
+    (2.0, 0.0),
+    (3.0, 0.0),
+    (4.0, 0.0),
+    (5.0, 0.0),
+    (6.0, 0.0),
+    (7.0, 0.0),
+    (8.0, 0.0),
+    (9.0, 0.0),
+    (10.0, 0.0),
+    (11.0, 0.0),
+    (12.0, 0.0),
+    (13.0, 0.0),
+    (14.0, 0.0),
+    (15.0, 0.0),
+    (16.0, 0.0),
+    (17.0, 0.0),
+    (18.0, 0.0),
+    (19.0, 0.0),
+    (20.0, 0.0),
 )
 OBSTACLE_REPULSION_WEIGHT = 3.0
 OBSTACLE_REPULSION_EPS = 0.08
 
-U_TARGET = 20.0
+U_TARGET = 30.0
 VX0 = 2.5
-TF_SIM = 16.0
+TF_SIM = 20.0
 
 MPC_HZ = 5.0
 SIM_HZ = 200.0
-MPC_HORIZON = 1.5
-MPC_STEPS = 15
-MPC_MAXITER = 120
+MPC_HORIZON = 2.0
+MPC_STEPS = 10
+MPC_MAXITER = 50
 MPC_FTOL = 1.0
 MPC_DT = 1.0 / MPC_HZ
 SIM_DT = 1.0 / SIM_HZ
@@ -154,9 +194,9 @@ scene = Scene(
 cost = (
     QuadraticCost.from_system(
         sys_mpc,
-        Q=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
-        R=np.diag([1.0, 22.0]),
-        S=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
+        Q=np.diag([0.0, 0.0, 0.0, 0.3, 1.0, 1.0, 0.01, 0.1]),
+        R=np.diag([1.0, 1.0]),
+        S=np.diag([0.0, 0.0, 0.0, 0.3, 1.0, 1.0, 0.01, 0.1]),
         xbar=x_cruise,
         ubar=np.zeros(2),
     )
@@ -204,11 +244,11 @@ mpc_plans, progress_hist = [], [s_start]
 x, t, u_hold = x0.copy(), 0.0, np.zeros(sys_sim.m)
 prev_plan, next_mpc_t = None, 0.0
 
-print("MPC closed-loop lap pursuit (compact track)")
+print("MPC fast stadium lap (50 m × 10 m track)")
 print(f"  compile={mpc_planner.compile_time_s:.3f}s (once)")
 print(
     f"  lap length={lap_length:.1f} m, u_target={U_TARGET} m/s, "
-    f"tf_sim={TF_SIM:.1f} s, {len(OBSTACLE_CENTERS)} obstacles"
+    f"mpc_hz={MPC_HZ}, tf_sim={TF_SIM:.1f} s, {len(OBSTACLE_CENTERS)} obstacles"
 )
 
 while t < TF_SIM - 1e-12:
@@ -270,7 +310,7 @@ print(
 )
 
 fig, ax = loop_track.plot(
-    show=False, bounds=PLOT_BOUNDS, title="Closed loop track + MPC executed path"
+    show=False, bounds=PLOT_BOUNDS, title="Fast stadium track + MPC executed path"
 )
 scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title=None)
 ax.plot(
@@ -307,10 +347,12 @@ sys_sim.animate(
 
 # sys_sim.animate(
 #     traj,
-#     renderer="meshcat",
 #     overlays=[
 #         TrackCorridorOverlay(loop_track),
 #         scene.as_visualizer(color="tab:red", opacity=0.45),
 #         history,
 #     ],
+#     save=True,
+#     file_name="fast_stadium_lap.gif",
+#     show=False,  # optional: skip the popup window
 # )

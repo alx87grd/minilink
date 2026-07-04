@@ -1,13 +1,7 @@
 """MPC lap pursuit on a wide technical circuit with eight obstacles.
 
-Exploration fork of the closed-loop lap demos: start from a **wide** corridor
-(2.5 m half-width) and a 34 m × 20 m asymmetric loop (bottom chicane, fast
-right sweeper, tight left hairpin) before tightening features. The planner uses
-an unrolled copy of the loop so the receding horizon always sees track ahead.
-
-Headless sweep (20 s): ~1.4 laps, 100/100 MPC solves succeeding.
-
-Toggle ``MULTI_LAP`` for a longer rollout (several complete laps).
+Wide asymmetric loop (bottom chicane, fast right sweeper, tight left hairpin).
+Uses compile-once :class:`~minilink.planning.mpc.planner.MPCPlanner`.
 
 Run from repo root::
 
@@ -24,16 +18,20 @@ from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
-from minilink.graphical.animation.primitives import (
-    CustomLine,
-    HorizonPolyline,
-    TrajectoryPolyline,
-)
+from minilink.graphical.animation.primitives import HorizonPolyline, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
+from minilink.planning.mpc import (
+    MPCDirectCollocationTranscription,
+    MPCOptions,
+    MPCPlanner,
+)
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, car_outline
+from minilink.planning.spatial.collision import bind, car_outline, point_probe
+from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
+from minilink.planning.spatial.overlays import TrackCorridorOverlay
 from minilink.planning.spatial.paths import from_waypoints
+from minilink.planning.spatial.plotting import plot_cost_field_exports
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import (
     inverse_barrier,
@@ -43,11 +41,6 @@ from minilink.planning.spatial.shaping import (
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
 )
 
 # --- Wide circuit geometry (asymmetric CCW loop) ---
@@ -59,7 +52,6 @@ RADIUS_SLOW = 3.5
 CORRIDOR_HALF_WIDTH = 2.5
 PATH_COST_WEIGHT = 40.0
 CORRIDOR_COST_WEIGHT = 25.0
-UNROLL_LAPS = 3
 
 # --- Eight obstacles offset from the centerline ---
 OBSTACLE_RADIUS = 0.25
@@ -89,14 +81,12 @@ OBSTACLE_REPULSION_EPS = 0.08
 U_TARGET = 20.0
 VX0 = 5.0
 
-# --- Simulation horizon ---
-MULTI_LAP = False
-TF_SIM = 24
+TF_SIM = 24.0
 
 MPC_HZ = 5.0
 SIM_HZ = 200.0
 MPC_HORIZON = 2.0
-MPC_STEPS = 20
+MPC_STEPS = 10
 MPC_MAXITER = 150
 MPC_FTOL = 1e-1
 MPC_DT = 1.0 / MPC_HZ
@@ -109,24 +99,7 @@ W_REAR_DOT_MAX = 80.0
 DELTA_DOT_MAX = 2.0
 CAMERA_SCALE = 18.0
 PLOT_MARGIN = 3.0
-TRACK_ANIM_SAMPLES = 220
-
-
-def _sample_track_boundaries(track, n_samples=TRACK_ANIM_SAMPLES):
-    """Centerline plus corridor upper/lower edges (same geometry as ``plot_track``)."""
-    path = track.path
-    ss = np.linspace(0.0, path.total_length, n_samples)
-    center = np.array([path.sample(s) for s in ss])
-    tangents = np.array([path.tangent(s) for s in ss])
-    normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
-    half = float(track.half_width)
-    upper = center + half * normals
-    lower = center - half * normals
-    return center, upper, lower
-
-
-def _line3(xy):
-    return np.hstack([xy, np.zeros((xy.shape[0], 1))])
+COST_FIELD_MARGIN = 6.0
 
 
 def _quarter_arc_waypoints(cx, cy, radius, angle_start, n=10):
@@ -188,16 +161,6 @@ def wide_sweeper_circuit_waypoints(
     )
 
 
-def unroll_track(waypoints, n_laps=3):
-    """Concatenate ``n_laps`` copies so MPC always has path ahead of the vehicle."""
-    if n_laps < 1:
-        raise ValueError("n_laps must be >= 1")
-    parts = [np.asarray(waypoints, dtype=float)]
-    for _ in range(n_laps - 1):
-        parts.append(parts[-1][1:])
-    return np.vstack(parts)
-
-
 LOOP_WAYPOINTS = wide_sweeper_circuit_waypoints(
     cx=CIRCUIT_CENTER[0],
     cy=CIRCUIT_CENTER[1],
@@ -206,7 +169,6 @@ LOOP_WAYPOINTS = wide_sweeper_circuit_waypoints(
     r_fast=RADIUS_FAST,
     r_slow=RADIUS_SLOW,
 )
-REFERENCE_WAYPOINTS = unroll_track(LOOP_WAYPOINTS, n_laps=UNROLL_LAPS)
 START_XY = LOOP_WAYPOINTS[0].copy()
 
 PLOT_BOUNDS = (
@@ -246,10 +208,8 @@ ubar = np.array([0.0, 0.0])
 loop_track = ReferenceTrack(
     from_waypoints(LOOP_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
 )
-track = ReferenceTrack(
-    from_waypoints(REFERENCE_WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
-)
 body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
+probe = bind(sys_mpc, point_probe())
 scene = Scene(
     obstacles=tuple(Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS)
 )
@@ -262,15 +222,29 @@ stability_cost = QuadraticCost.from_system(
     xbar=x_cruise,
     ubar=ubar,
 )
-path_cost = track.distance_field(body).as_cost(
+path_cost = loop_track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT,
     shaping=quadratic_excess(threshold=0.1),
 )
-corridor_cost = track.corridor_field(body).as_cost(
+corridor_cost = loop_track.corridor_field(body).as_cost(
     weight=CORRIDOR_COST_WEIGHT,
     shaping=quadratic_hinge(threshold=0.0),
 )
 obstacle_cost = scene.clearance_field(body).as_cost(
+    weight=OBSTACLE_REPULSION_WEIGHT,
+    shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
+)
+# Workspace heatmaps: point probe at each (x, y) — heading-independent tuning view.
+# MPC costs above still use car_outline for the planner body.
+path_cost_viz = loop_track.distance_field(probe).as_cost(
+    weight=PATH_COST_WEIGHT,
+    shaping=quadratic_excess(threshold=0.1),
+)
+corridor_cost_viz = loop_track.corridor_field(probe).as_cost(
+    weight=CORRIDOR_COST_WEIGHT,
+    shaping=quadratic_hinge(threshold=0.0),
+)
+obstacle_cost_viz = scene.clearance_field(probe).as_cost(
     weight=OBSTACLE_REPULSION_WEIGHT,
     shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
 )
@@ -299,15 +273,18 @@ x0 = np.array(
 )
 sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 
-transcription = DirectCollocationTranscription(
-    DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
-)
-trajopt_options = TrajectoryOptimizationOptions(
-    compile_backend="jax",
-    optimizer_method="scipy_slsqp",
-    solve_disp=False,
-    record_solve_time=True,
-    optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
+template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
+mpc_planner = MPCPlanner(
+    template_problem,
+    transcription=MPCDirectCollocationTranscription(
+        DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+    ),
+    options=MPCOptions(
+        compile_backend="jax",
+        optimizer_method="scipy_slsqp",
+        record_solve_time=True,
+        optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
+    ),
 )
 
 lap_length = loop_track.path.total_length
@@ -324,22 +301,15 @@ prev_plan = None
 next_mpc_t = 0.0
 
 print("MPC wide-circuit lap pursuit (rate inputs)")
+print(f"  compile={mpc_planner.compile_time_s:.3f}s (once)")
 print(
     f"  lap length={lap_length:.1f} m, corridor={2 * CORRIDOR_HALF_WIDTH:.1f} m, "
-    f"u_target={U_TARGET} m/s, tf_sim={TF_SIM:.1f} s "
-    f"({'multi-lap' if MULTI_LAP else 'short'}), "
+    f"u_target={U_TARGET} m/s, tf_sim={TF_SIM:.1f} s, "
     f"{len(OBSTACLE_CENTERS)} obstacles"
 )
 
 while t < TF_SIM - 1e-12:
     if t >= next_mpc_t - 1e-12:
-        problem = PlanningProblem(sys=sys_mpc, x_start=x, cost=cost)
-        planner = TrajectoryOptimizationPlanner(
-            problem,
-            transcription=transcription,
-            options=trajopt_options,
-        )
-
         guess = None
         if prev_plan is not None and prev_plan.n_samples >= 3:
             t_shift = prev_plan.t + MPC_DT
@@ -354,13 +324,16 @@ while t < TF_SIM - 1e-12:
                 )
         else:
             guess = default_initial_trajectory(
-                problem,
-                transcription.initial_guess_time_grid(problem),
+                template_problem,
+                mpc_planner.transcription.initial_guess_time_grid(template_problem),
             )
 
-        plan = planner.compute_solution(initial_guess=guess)
-        res = planner.last_optimization_result
-        print(f"MPC @ t={t:.2f}s  success={res.success}  solve={res.solve_time_s:.3f}s")
+        plan = mpc_planner.step(x, initial_guess=guess)
+        res = mpc_planner.last_optimization_result
+        print(
+            f"MPC @ t={t:.2f}s  success={res.success}  "
+            f"solve={res.solve_time_s:.3f}s  step={mpc_planner.last_step_time_s:.3f}s"
+        )
         prev_plan = plan
         u_hold = plan.u[:, 0].copy()
         mpc_plans.append(
@@ -431,35 +404,32 @@ ax.legend(loc="upper left", fontsize=8)
 fig.tight_layout()
 plt.show()
 
+COST_FIELD_BOUNDS = pad_bounds(PLOT_BOUNDS, COST_FIELD_MARGIN - PLOT_MARGIN)
+_cost_kw = dict(bounds=COST_FIELD_BOUNDS, state_dim=sys_mpc.n)
+
+plot_cost_field_exports(
+    {
+        "path": sample_field_costs([path_cost_viz], **_cost_kw),
+        "corridor": sample_field_costs([corridor_cost_viz], **_cost_kw),
+        "obstacle": sample_field_costs([obstacle_cost_viz], **_cost_kw),
+        "combined": sample_field_costs(
+            [path_cost_viz, corridor_cost_viz, obstacle_cost_viz], **_cost_kw
+        ),
+    },
+    track=loop_track,
+    scene=scene,
+    overlay_bounds=PLOT_BOUNDS,
+    traj=traj.x[0:2, :],
+    log_scale=True,
+)
+
 
 # --- Animation ---
-_center, upper, lower = _sample_track_boundaries(loop_track)
 history = SceneHistory(
-    upper=CustomLine(
-        _line3(upper),
-        color="#98df8a",
-        linewidth=1.2,
-        style="-",
-    ),
-    lower=CustomLine(
-        _line3(lower),
-        color="#98df8a",
-        linewidth=1.2,
-        style="-",
-    ),
     trail=TrajectoryPolyline(
-        traj,
-        window="prefix",
-        color="b",
-        style="--",
-        linewidth=1.0,
+        traj, window="prefix", color="#1565c0", style="--", linewidth=1.0
     ),
-    horizon=HorizonPolyline(
-        mpc_plans,
-        color="tab:orange",
-        linewidth=2.0,
-        style="--",
-    ),
+    horizon=HorizonPolyline(mpc_plans, color="#ef6c00", linewidth=2.0, style="--"),
 )
 
 sys_sim.params = dict(sys_sim.params)
@@ -467,5 +437,10 @@ sys_sim.camera_scale = CAMERA_SCALE
 sys_sim.traj = traj
 sys_sim.plot_trajectory(signals=("x", "u"))
 sys_sim.animate(
-    traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45), history]
+    traj,
+    overlays=[
+        TrackCorridorOverlay(loop_track),
+        scene.as_visualizer(color="tab:red", opacity=0.45),
+        history,
+    ],
 )

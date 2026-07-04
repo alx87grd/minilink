@@ -111,8 +111,8 @@ class DynamicBicycle(DynamicSystem):
         self.tire_model_r = LinearTire()
 
         # Graphics-only attributes (2-D centerline look)
-        self.wheel_len = 0.6
-        self.wheel_width = 0.2
+        self.wheel_len = 0.76
+        self.wheel_width = 0.27
 
         # Graphics-only attributes for the 3-D four-wheel look (read by
         # ``car_skin_3d`` / ``tf``). They live on the base plant so the 3-D
@@ -129,7 +129,7 @@ class DynamicBicycle(DynamicSystem):
 
         # Default 2-D skin (black centerline chassis) and a camera that tracks
         # the body frame.
-        self.skin = partial(car_skin_2d, color="black")
+        self.skin = partial(car_skin_2d, color="#1a1a1a")
         self.camera_follow_frame = "body"
 
     def M(self, q, params=None):
@@ -320,20 +320,32 @@ class DynamicBicycle(DynamicSystem):
         return {
             "body": [
                 Arrow(
-                    base=(-b, 0.0), vector=v_r_loc, scale=0.2, color="blue", linewidth=2
+                    base=(-b, 0.0),
+                    vector=v_r_loc,
+                    scale=0.2,
+                    color="blue",
+                    linewidth=1.25,
                 ),
                 Arrow(
-                    base=(a, 0.0), vector=v_f_loc, scale=0.2, color="blue", linewidth=2
+                    base=(a, 0.0),
+                    vector=v_f_loc,
+                    scale=0.2,
+                    color="blue",
+                    linewidth=1.25,
                 ),
                 Arrow(
                     base=(-b, 0.0),
                     vector=F_r_loc,
                     scale=0.001,
                     color="red",
-                    linewidth=2,
+                    linewidth=1.25,
                 ),
                 Arrow(
-                    base=(a, 0.0), vector=F_f_loc, scale=0.001, color="red", linewidth=2
+                    base=(a, 0.0),
+                    vector=F_f_loc,
+                    scale=0.001,
+                    color="red",
+                    linewidth=1.25,
                 ),
             ]
         }

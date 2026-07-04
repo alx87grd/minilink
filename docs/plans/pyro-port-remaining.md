@@ -403,9 +403,11 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | `examples/scripts/engine/demo_physics_many_spheres.py` | engine |
 | `examples/scripts/identification/demo_params_gradient.py` | identification |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | mpc |
+| `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_fast_stadium_lap.py` | mpc |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_multi_obstacle_scene.py` | mpc |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_obstacle.py` | mpc |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py` | mpc |
+| `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py` | mpc |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_wide_circuit_lap.py` | mpc |
 | `examples/scripts/optimization/demo_basic_optim.py` | optimization |
 | `examples/scripts/optimization/demo_optim_plot.py` | optimization |

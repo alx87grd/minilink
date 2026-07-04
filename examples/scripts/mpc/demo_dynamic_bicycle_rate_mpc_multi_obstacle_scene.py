@@ -36,17 +36,17 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
+from minilink.planning.mpc import (
+    MPCDirectCollocationTranscription,
+    MPCOptions,
+    MPCPlanner,
+)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import inverse_barrier
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
 )
 
 U_TARGET = 10.0
@@ -126,15 +126,18 @@ cost = tracking_cost + obstacle_cost
 x0 = np.array([0.0, 3.0, 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 
-transcription = DirectCollocationTranscription(
-    DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
-)
-trajopt_options = TrajectoryOptimizationOptions(
-    compile_backend="jax",
-    optimizer_method="scipy_slsqp",
-    solve_disp=False,
-    record_solve_time=True,
-    optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
+template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
+mpc_planner = MPCPlanner(
+    template_problem,
+    transcription=MPCDirectCollocationTranscription(
+        DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+    ),
+    options=MPCOptions(
+        compile_backend="jax",
+        optimizer_method="scipy_slsqp",
+        record_solve_time=True,
+        optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
+    ),
 )
 
 t_hist = [0.0]
@@ -148,22 +151,14 @@ prev_plan = None
 next_mpc_t = 0.0
 
 print("MPC multi-obstacle avoidance (rate inputs, spatial-scene cost)")
+print(f"  compile={mpc_planner.compile_time_s:.3f}s (once)")
 print(
     f"  u_target={U_TARGET} m/s, horizon={MPC_HORIZON}s, "
     f"{len(OBSTACLE_CENTERS)} obstacles R={OBSTACLE_RADIUS}+{OBSTACLE_MARGIN}"
 )
-for index, center in enumerate(OBSTACLE_CENTERS, start=1):
-    print(f"    {index}: center={center}")
 
 while t < TF_SIM - 1e-12:
     if t >= next_mpc_t - 1e-12:
-        problem = PlanningProblem(sys=sys_mpc, x_start=x, cost=cost)
-        planner = TrajectoryOptimizationPlanner(
-            problem,
-            transcription=transcription,
-            options=trajopt_options,
-        )
-
         guess = None
         if prev_plan is not None and prev_plan.n_samples >= 3:
             t_shift = prev_plan.t + MPC_DT
@@ -178,13 +173,16 @@ while t < TF_SIM - 1e-12:
                 )
         else:
             guess = default_initial_trajectory(
-                problem,
-                transcription.initial_guess_time_grid(problem),
+                template_problem,
+                mpc_planner.transcription.initial_guess_time_grid(template_problem),
             )
 
-        plan = planner.compute_solution(initial_guess=guess)
-        res = planner.last_optimization_result
-        print(f"MPC @ t={t:.2f}s  success={res.success}  solve={res.solve_time_s:.3f}s")
+        plan = mpc_planner.step(x, initial_guess=guess)
+        res = mpc_planner.last_optimization_result
+        print(
+            f"MPC @ t={t:.2f}s  success={res.success}  "
+            f"solve={res.solve_time_s:.3f}s  step={mpc_planner.last_step_time_s:.3f}s"
+        )
         prev_plan = plan
         u_hold = plan.u[:, 0].copy()
         mpc_plans.append(

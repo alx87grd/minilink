@@ -34,7 +34,7 @@ def _wheel_rectangle(wl, ww, color="black", linewidth=1):
     return Line(pts, color=color, linewidth=linewidth)
 
 
-def car_skin_2d(plant, color="blue"):
+def car_skin_2d(plant, color="#1a1a1a"):
     """2-D centerline car look: chassis line + two axle wheels.
 
     Frame keys: ``body`` (chassis along the wheelbase plus the rear wheel outline;
@@ -47,7 +47,9 @@ def car_skin_2d(plant, color="blue"):
     wl = getattr(plant, "wheel_len", 0.6)
     ww = getattr(plant, "wheel_width", 0.2)
 
-    chassis = Line(np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]]), color=color, linewidth=2)
+    chassis = Line(
+        np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]]), color=color, linewidth=2.5
+    )
     rear_wheel = _wheel_rectangle(wl, ww)
     rear_wheel.local_transform = translation(-b, 0.0, 0.0)
     return {
