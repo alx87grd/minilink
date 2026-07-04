@@ -40,6 +40,118 @@ Multi-rate (e.g. 10 Hz MPC + 100 Hz filter) uses **`expand_scheduled_step()`** t
 
 ---
 
+## Short-term use cases (what we are building for)
+
+The first **hybrid** capability is **not** an arbitrary mixed diagram. It is one recurring
+pattern:
+
+```text
+[ sampled controller (step side) ]  --ZOH on u-->  [ continuous plant (flow side) ]
+              ^                                              |
+              +---------------- measurements y ----------------+
+```
+
+Both primary near-term targets share this **two-side** structure; only the controller block
+differs.
+
+| Use case | Controller (step side) | Plant (flow side) | Sample time |
+| --- | --- | --- | --- |
+| **MPC closed loop** | `MPCBlock` (`StepSystem` wrapping `MPCPlanner.step`) | `DynamicBicycle` (or other catalog plant) | `Ts` = MPC period |
+| **Sliding-mode control (SMC)** | `SMCBlock` or generic sampled `StepSystem` controller | same continuous plant | `Ts` = SMC period |
+
+**ZOH semantics:** between controller updates, plant input `u` is **held constant**
+(zero-order hold). Measurements `y` are **sampled** at controller ticks (typically end of each
+plant sub-interval, or start — pick one convention and document in `HybridSimulator`).
+
+This is the **only** hybrid topology in scope for v1. Controllers may contain static wiring
+(gains, saturations, mux) inside the step diagram; the plant stays a homogeneous flow diagram.
+
+### Phase A — single-rate controller (ship first)
+
+One controller block, one sample period `Ts`, plant integrated with inner step `dt_plant`
+where `dt_plant = Ts` or subdivides `Ts` (e.g. `Ts = 0.1 s`, plant RK4 at `0.01 s` per
+`HybridSimulator` tick).
+
+```text
+Phase A topology (single Ts):
+
+  r ──► [ MPC or SMC @ 1/Ts ] ──ZOH──► [ plant ] ──► y
+              ▲                              │
+              └──────── y sampled ───────────┘
+```
+
+**Deliverables:**
+
+- `HybridDiagram` + `HybridSimulator` with boundary ZOH + measurement sample.
+- `MPCBlock` + refactor one MPC demo (straight-line bicycle).
+- **`SMCBlock`** (or documented pattern): `StepSystem` implementing discrete-time sliding
+  mode; same `HybridSimulator` loop as MPC — **no second sim path**.
+- Controller step diagram may be a **single leaf** (`MPCBlock` / `SMCBlock`) plus static
+  blocks; no multi-rate expansion required yet.
+
+**Acceptance:** closed-loop sim matches hand-rolled demo loops within tolerance; plant sees
+piecewise-constant `u` between samples.
+
+### Phase B — multi-block controller, integer multiples of base clock
+
+Cascade or multi-rate **controller only** — e.g. outer MPC @ 10 Hz, inner reference filter @
+100 Hz, still driving one continuous plant. All controller blocks run at rates that are
+**integer divisors of one `dt_base`** (no non-integer ratios in v1).
+
+```text
+Phase B topology (expand before hybrid sim):
+
+  r ──► [ filter @ 100 Hz ] ──► [ MPC @ 10 Hz ] ──ZOH──► [ plant @ continuous ]
+              StepDiagramSystem (logical)  →  expand_scheduled_step  →  sync @ dt_base
+```
+
+**Mechanism:** user wires logical `StepDiagramSystem`; calls
+`expand_scheduled_step(..., dt_base, schedule)`; passes **expanded** diagram to
+`HybridDiagram.step`. Plant side unchanged from Phase A.
+
+**Example schedule** (`dt_base = 0.01 s` = 100 Hz):
+
+| Block | Rate | `schedule[sys_id]` |
+| --- | --- | --- |
+| `filter` | 100 Hz | `1` |
+| `mpc` | 10 Hz | `10` |
+
+**Deliverables:** `RateGate`, `HoldRegister`, `SampleLatch`, `expand_scheduled_step` tests;
+one cascade demo (optional second MPC demo or SMC + filter).
+
+**Deferred in Phase B:** non-integer ratios (e.g. 30 Hz vs 100 Hz), FOH, delays, mixing flow
+blocks on the controller side.
+
+### What this is not (short term)
+
+| Out of scope | Instead |
+| --- | --- |
+| One flat diagram with Integrator + MPC | Two sides + `HybridSimulator` |
+| Controller and plant at unrelated clocks without expansion | Phase B expansion to `dt_base` |
+| Event-driven switching (relay, impact) | Future layer 5 |
+| Full Simulink hybrid library | ZOH + sample only |
+
+```mermaid
+flowchart LR
+    subgraph phaseA [Phase A single Ts]
+        C1[MPC or SMC block]
+        P1[continuous plant]
+        C1 -->|ZOH u| P1
+        P1 -->|sample y| C1
+    end
+
+    subgraph phaseB [Phase B multi-rate controller]
+        C2[expanded step diagram]
+        P2[continuous plant]
+        C2 -->|ZOH u| P2
+        P2 -->|sample y| C2
+    end
+
+    phaseA --> phaseB
+```
+
+---
+
 ## Four system kinds
 
 Every block extends the same `System` shell (ports, params, `h`, visualization). Evolution
@@ -234,8 +346,13 @@ heterogeneous blocks in one diagram class before event scheduling exists.
 | **1** | `StepSystem`, `ZOHHold` (math: `phi` only) | Clock, diagrams, simulation |
 | **2a** | `StepDiagramSystem` — synchronous, full topology | Multi-rate without expansion |
 | **2b** | compile + `StepRunner` + `TimedStepSimulator` + `expand_scheduled_step` | Evaluator hold-buffer scheduler |
-| **3** | `HybridDiagram`, `HybridSimulator`, `MPCBlock` | Arbitrary hybrid topology |
+| **3a** | **Phase A:** `HybridSimulator`, `MPCBlock`, `SMCBlock` pattern, one `Ts` | Multi-rate controller |
+| **3b** | **Phase B:** cascade controller via `expand_scheduled_step` | Non-integer rate ratios |
 | **4–5** | (future) events, guards, switched modes | — |
+
+**Implementation gates:** Layer 3a (single-rate hybrid) may start after step compile works;
+Layer 3b (multi-rate expansion) requires Layer 2 expansion blocks; do not block MPC/SMC on
+multi-rate.
 
 ---
 
@@ -429,13 +546,18 @@ Multi-rate: expand first, then simulate with `sync_dt = dt_base`.
 
 ---
 
-## Layer 3: Hybrid — two-side topology only
+## Layer 3: Hybrid — sampled controller + ZOH + continuous plant
+
+The **only** v1 hybrid structure (see [Short-term use cases](#short-term-use-cases-what-we-are-building-for)):
 
 ```
-[ StepDiagramSystem ]  --ZOH u-->  [ DiagramSystem plant ]
-         ^                                    |
-         +----------- measurements y -----------+
+[ StepDiagramSystem ]  --ZOH on u-->  [ DiagramSystem plant ]
+         ^                                      |
+         +----------- sample y -------------------+
 ```
+
+Phase A: one controller block at sample period `Ts`. Phase B: expanded multi-rate step
+diagram at `dt_base`, same plant boundary.
 
 ### `HybridDiagram` — `minilink/core/hybrid_diagram.py`
 
@@ -450,25 +572,42 @@ class HybridDiagram:
 
 ### `HybridSimulator` — `minilink/simulation/hybrid_simulator.py`
 
-Per base tick (orchestrator — see pseudocode above):
+**Phase A** — single controller sample time `Ts` (= `dt_base` or outer tick):
 
-1. Step side — `step_evaluator.step` on expanded sync diagram.
-2. Boundary — step outputs → `u_hold` for plant.
-3. Continuous — `cont_evaluator.rk4_rollout_zoh(...)` (JAX scan).
-4. Feedback — sample plant outputs → step inputs.
+Per controller tick:
 
-Python outer (step + MPC solvers) / JAX inner (plant rollout).
+1. Step side — `step_evaluator.step` (MPC, SMC, or single `StepSystem` controller).
+2. Boundary — hold controller output `u` (ZOH) for the plant over `[t, t + Ts]`.
+3. Continuous — `cont_evaluator.rk4_rollout_zoh(x, u_hold, t, Ts)` (optional inner substeps
+   `dt_plant << Ts`).
+4. Feedback — sample plant outputs `y` at tick boundary → controller inputs.
+
+**Phase B** — same loop at `dt_base`; step side is **pre-expanded** multi-rate diagram
+(Phase A plant path unchanged).
+
+Python outer (step + MPC/SMC solvers) / JAX inner (plant rollout).
 
 ### `MPCBlock` — `minilink/planning/mpc/`
 
 - `StepSystem` wrapping `MPCPlanner.step`.
 - Warm-start state in `__init__`; no `core/compile/` imports.
 - `sys_mpc` vs `sys_sim` stays explicit in demos.
+- Primary **Phase A** reference controller.
 
-### MPC demo target
+### Sampled sliding-mode controller (`SMCBlock` or pattern)
 
-Refactor `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py` only; preserve
-user tuning.
+- **`StepSystem`** implementing discrete-time sliding-mode law (or equivalent sampled SMC).
+- Lives on step side of `HybridDiagram`; **same ZOH boundary** as MPC.
+- May live in `minilink/control/` as factory + block; no `core/compile/` imports.
+- **Phase A** deliverable alongside MPC — proves hybrid sim is not MPC-specific.
+
+### Demo targets
+
+| Phase | Demo | Notes |
+| --- | --- | --- |
+| **A** | Refactor `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py` | Preserve user tuning |
+| **A** | New or existing SMC + plant demo (e.g. bicycle or pendulum) | Same `HybridSimulator` API |
+| **B** | Cascade: filter @ fast rate + MPC @ slow rate | Uses `expand_scheduled_step` |
 
 ---
 
@@ -476,8 +615,10 @@ user tuning.
 
 ### In scope
 
-- Layers 1–3 as above; one MPC demo refactor; DESIGN / ROADMAP / README sync on
-  implementation.
+- Layers 1–3 as above.
+- **Phase A:** single-rate MPC and SMC (sampled controller + ZOH + continuous plant).
+- **Phase B:** multi-block controller at integer multiples of `dt_base`.
+- DESIGN / ROADMAP / README sync on implementation.
 
 ### Deferred
 
@@ -503,29 +644,33 @@ user tuning.
 | 2 | `test_scheduled_step.py` | expansion slow→fast ZOH; fast→slow sample |
 | 2 | `test_step_runner.py` | clock-free stepping |
 | 2 | `test_timed_step_simulator.py` | sync closed loop; expanded multi-rate |
-| 3 | `test_hybrid_simulator.py` | two-side ZOH → plant → feedback |
-| 3 | `test_mpc_block.py` | MPCBlock smoke |
+| 3 | `test_hybrid_simulator.py` | Phase A: ZOH → plant → sample y; MPC and SMC smoke |
+| 3 | `test_mpc_block.py` | MPCBlock closed loop |
+| 3 | `test_smc_hybrid.py` | SMC + plant via same HybridSimulator (Phase A) |
+| 2–3 | `test_scheduled_step_cascade.py` | Phase B: filter fast + MPC slow on `dt_base` |
 
 ---
 
 ## Implementation order
 
-| Step | Layer | Deliverable |
-| --- | --- | --- |
-| 1 | 1 | `StepSystem`, `ZOHHold`, leaf tests |
-| 2 | 1 | `rk4_rollout_zoh` |
-| 3 | 2 | shared diagram wiring mixin (`core/wiring.py`) |
-| 4 | 2 | `StepDiagramSystem` |
-| 5 | 2 | `compile_step_diagram` + `StepEvaluator` |
-| 6 | 2 | `RateGate`, `HoldRegister`, `SampleLatch` |
-| 7 | 2 | `expand_scheduled_step()` + tests |
-| 8 | 2 | `StepRunner` + `TimedStepSimulator` + closed-loop tests |
-| 9 | 3 | `HybridDiagram` |
-| 10 | 3 | `HybridSimulator` |
-| 11 | 3 | `MPCBlock` + straight-line demo |
-| 12 | all | DESIGN / ROADMAP / README |
+| Step | Layer | Deliverable | Phase |
+| --- | --- | --- | --- |
+| 1 | 1 | `StepSystem`, `ZOHHold`, leaf tests | — |
+| 2 | 1 | `rk4_rollout_zoh` | — |
+| 3 | 2 | shared diagram wiring mixin (`core/wiring.py`) | — |
+| 4 | 2 | `StepDiagramSystem` | — |
+| 5 | 2 | `compile_step_diagram` + `StepEvaluator` | — |
+| 6 | 2 | `StepRunner` + `TimedStepSimulator` + closed-loop tests | — |
+| 7 | 3 | `HybridDiagram` + `HybridSimulator` (ZOH + sample) | **A** |
+| 8 | 3 | `MPCBlock` + straight-line MPC demo | **A** |
+| 9 | 3 | `SMCBlock` (or pattern) + SMC hybrid demo | **A** |
+| 10 | 2 | `RateGate`, `HoldRegister`, `SampleLatch` | **B** |
+| 11 | 2 | `expand_scheduled_step()` + tests | **B** |
+| 12 | 3 | Cascade controller demo (multi-rate on `dt_base`) | **B** |
+| 13 | all | DESIGN / ROADMAP / README | — |
 
-**Gate:** Layer 3 starts only after Layer 2 step-only tests pass.
+**Gate:** Phase A hybrid (steps 7–9) after step compile + `rk4_rollout_zoh`. Phase B
+(steps 10–12) after Phase A hybrid tests pass; do not block MPC/SMC on expansion.
 
 ---
 
@@ -545,6 +690,7 @@ user tuning.
 - Step blocks compose like flow systems (diagram + ports).
 - Turn-based and clock-driven both use `StepSystem`; only the orchestrator differs.
 - Multi-rate: one sync sim loop at `dt_base` after expansion.
-- Hybrid v1: thin scheduler over step `φ` + `rk4_rollout_zoh` plant.
+- Hybrid v1: thin scheduler over step `φ` + `rk4_rollout_zoh` plant — **MPC and SMC** at one
+  `Ts` (Phase A), then cascade controllers on `dt_base` (Phase B).
+- MPC and SMC demos drop hand-rolled outer loops; same `HybridSimulator` API.
 - Future switched/hybrid: same `f` and `phi` atoms + event scheduler — no leaf rewrite.
-- MPC demos drop hand-rolled outer loops.
