@@ -5,6 +5,7 @@ Active design backlog only — implemented work lives in [DESIGN.md](../../DESIG
 
 | File | Role |
 | --- | --- |
+| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / discrete** — `DiscreteSystem`, discrete diagrams, multi-rate expansion, narrow hybrid sim |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | **Planning pipeline** — result contract (path vs policy), parametric MPC/scene, transcription unification |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | **Parity audit** — full pyro ↔ minilink library + demo status tables |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle view ports + control wiring (design only) |
