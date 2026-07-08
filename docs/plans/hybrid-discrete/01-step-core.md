@@ -1,11 +1,11 @@
-# Layer 1: Pure Discrete Core (No Time)
+# Phase 1: Step Core (leaf)
 
-**Build first.** Standalone stepping framework — no dependency on continuous `f` or `discretize`.
-Controllers (`MPCBlock`, `SMCBlock`), games, and difference-equation blocks implement `step`
-directly; [discretize (02-discretization.md)](02-discretization.md) is an optional later verb
-that **produces** a `StepSystem` from a continuous plant.
+**Build first.** Pure difference-equation blocks — **no clock, no diagrams, no `discretize`.**
 
-**Files:** `minilink/core/system.py`, `minilink/core/step_diagram.py`, `minilink/simulation/step_runner.py`
+Leaf types implement `step(x, u, k)` directly (MPC law, SMC, games, manual difference eqs.).
+See [Phase 2 (02-step-diagram.md)](02-step-diagram.md) for composing blocks into diagrams.
+
+**Files:** `minilink/core/system.py`, `minilink/blocks/`
 
 ## `StepSystem`
 
@@ -25,32 +25,17 @@ class StepSystem(System):
 
 ### Contract
 - Same port/params surface as `DynamicSystem`; **`step` returns next state** (`x_new`), not a derivative.
-- **Integer step index `k`**, not float `t` — mirrors continuous time the way `n` mirrors state dimension (do not use `n` for the index).
-- **`k=0` default** — same role as `t=0` on `f` / `h`; turn-based and clock-free paths may ignore it.
+- **Integer step index `k`**, not float `t` — do not use `n` (state dimension) for the index.
+- **`k=0` default** — same role as `t=0` on `f` / `h`; clock-free paths may ignore `k`.
 - `solver_info`: `continuous_time_equation=False`.
 - Do **not** overload `f` on this class.
+- **No sample time on the class** — clock lives in orchestrators ([Phase 4](04-scheduled-orchestrator.md)).
 
-## `StepDiagramSystem`
+## `ZOHHold` (optional leaf)
 
-- Sibling of `DiagramSystem`, sharing port wiring via `core/wiring.py` mixin.
-- **`x_{k+1} = step(x, u, k)`** — same stacked loop as continuous `DiagramSystem.f`.
-- `compile_step_diagram` yields a `StepEvaluator` exposing **`step(x, u, k)`** which iterates topologically through each block's `step`.
-- Subsystems permitted: `StepSystem`, `StaticSystem`. Rejects `DynamicSystem` at compile.
+Step-side hold register for teaching / tests; hybrid plant holds live in `HybridSimulator`
+([Phase 5](05-hybrid-simulation.md)).
 
-## Run / Simulation
+## Tests
 
-Pure discrete systems have no concept of physical time; they simply iterate forward.
-
-### `StepRunner`
-- Steps the discrete equations forward `N` times by incrementing `k`.
-- **No `tf`, no `dt`**.
-- Useful for pure state-machine algorithms or un-clocked games (like chess moves).
-
-### `TimedStepSimulator`
-- Evaluates a synchronous `StepDiagramSystem` on a uniform grid (`k = 0, 1, …` with `t_k = k · sync_dt` for logging only).
-- Single-rate only; multi-rate uses `ScheduledStepOrchestrator` ([03-scheduled-orchestrator.md](03-scheduled-orchestrator.md)).
-
-### Tests
 - `test_step_system.py`: leaf `step`; `ZOHHold`; `solver_info`.
-- `test_step_diagram.py`: wiring; `@` closed loop.
-- `test_step_runner.py`: clock-free stepping tests.

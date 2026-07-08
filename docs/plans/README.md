@@ -1,14 +1,1 @@
-# Planning documents
-
-Active design backlog only — implemented work lives in [DESIGN.md](../../DESIGN.md),
-[README.md](../../README.md), and module docstrings.
-
-| File | Role |
-| --- | --- |
-| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — `StepSystem.step(x, u, k)`, ZOH controller → plant (MPC, SMC), orchestrator multi-rate on `dt_base` |
-| [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | **Planning pipeline** — result contract (path vs policy), parametric MPC/scene, transcription unification |
-| [pyro-port-remaining.md](pyro-port-remaining.md) | **Parity audit** — full pyro ↔ minilink library + demo status tables |
-| [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle view ports + control wiring (design only) |
-| [neural-blocks-collection.md](neural-blocks-collection.md) | Aspirational MLP / `control/neural.py` design notes |
-
-Update `pyro-port-remaining.md` when landing or dropping a pyro port item.
+| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — Phases 1–5: `StepSystem`, diagrams, `discretize`, orchestrator, hybrid sim |

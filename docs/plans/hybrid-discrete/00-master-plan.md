@@ -2,92 +2,100 @@
 
 Status: draft plan (July 2026). No implementation in this phase.
 
-Architecture for discrete-time blocks, discrete diagrams, multi-rate orchestration, and narrow
-hybrid simulation (discrete ZOH → continuous plant ← measurements). Supersedes the
+Architecture for discrete-time blocks, step diagrams, optional discretization, scheduled stepping,
+and narrow hybrid simulation (discrete controller ↔ continuous plant). Supersedes the
 continuous-time-only stance in [DESIGN.md](../../../DESIGN.md) §3 for this **subset** — not
 full Simulink parity.
 
-## Vision and Structure
+## Vision — five implementation phases
 
-This design splits the hybrid discrete simulation capability into a clear pipeline, described across four detailed contracts:
+| Phase | Doc | Delivers |
+| --- | --- | --- |
+| **1** | [01-step-core.md](01-step-core.md) | `StepSystem`, `ZOHHold` — pure `step(x, u, k)`, no clock |
+| **2** | [02-step-diagram.md](02-step-diagram.md) | `StepDiagramSystem`, compile, `StepEvaluator`, `StepRunner` |
+| **3** | [03-discretization.md](03-discretization.md) | `discretize(DynamicSystem, dt)` → `StepSystem` (optional tool) |
+| **4** | [04-scheduled-orchestrator.md](04-scheduled-orchestrator.md) | `StepSchedule.dt_base` + `ScheduledStepOrchestrator` |
+| **5** | [05-hybrid-simulation.md](05-hybrid-simulation.md) | `HybridDiagram` + `HybridSimulator` + MPC/SMC demos |
 
-1. **[Step Core (01-step-core.md)](01-step-core.md)**: Pure discrete math — **`StepSystem`**, diagrams, compile, runners. **Build this first.**
-2. **[Discretization (02-discretization.md)](02-discretization.md)**: **`discretize`** — optional conversion verb: continuous `DynamicSystem` + sample time `dt` → `StepSystem`. **After step core.**
-3. **[Scheduled Orchestrator (03-scheduled-orchestrator.md)](03-scheduled-orchestrator.md)**: Clock-driven multi-rate diagram execution.
-4. **[Hybrid Simulation (04-hybrid-simulation.md)](04-hybrid-simulation.md)**: Connecting discrete controllers to continuous plants.
+**Clock rule:** sample time lives in **`StepSchedule.dt_base`** (Phase 4+). Leaf `step` and
+Phase 2 diagrams stay time-agnostic; hybrid sim **always** uses the orchestrator on the step side.
 
-## Architecture Pipeline
+## Architecture pipeline
 
 ```mermaid
 flowchart TB
-    subgraph Continuous [Continuous Domain]
-        DS_C[DynamicSystem]
-        Diag_C[DiagramSystem]
+    subgraph P1 [Phase 1 Step leaf]
+        SS[StepSystem step]
     end
 
-    subgraph Conversion [Discretization Layer]
+    subgraph P2 [Phase 2 Step diagram]
+        SDS[StepDiagramSystem]
+        SE[StepEvaluator]
+        SR[StepRunner]
+    end
+
+    subgraph P3 [Phase 3 Conversion]
         DISC[discretize]
     end
 
-    subgraph Layer1 [Layer 1: Pure Discrete Core]
-        DS_D["StepSystem<br/>x_{k+1} = step(x, u, k)"]
-        Diag_D[StepDiagramSystem]
-        DSim[StepRunner<br/>N steps]
+    subgraph P4 [Phase 4 Clock]
+        SCH[StepSchedule dt_base]
+        ORCH[ScheduledStepOrchestrator]
     end
 
-    subgraph Layer2 [Layer 2: Scheduled / Clocked]
-        sched[StepSchedule<br/>dt_base, fire map]
-        orch[ScheduledStepOrchestrator]
+    subgraph P5 [Phase 5 Hybrid]
+        HD[HybridDiagram]
+        HS[HybridSimulator boundary + plant]
     end
 
-    subgraph Layer3 [Layer 3: Hybrid Simulation]
-        HybDiag[HybridDiagram]
-        HybSim[HybridSimulator]
+    subgraph Cont [Existing continuous]
+        DS[DynamicSystem]
+        DF[DiagramSystem]
     end
 
-    DS_C --> DISC
-    DS_D --> Diag_D
-    DISC -.->|returns| DS_D
-    Diag_D --> DSim
-    
-    Diag_D -.->|if physical time| sched
-    sched --> orch
-    orch -->|evaluates diagram natively| Diag_D
-    
-    Diag_D -.->|controller side| HybDiag
-    Diag_C -.->|plant side| HybDiag
-    HybDiag --> HybSim
+    SS --> SDS --> SE
+    SE --> SR
+    DS --> DISC --> SS
+    SDS --> ORCH
+    SCH --> ORCH
+    ORCH --> HS
+    SDS --> HD
+    DF --> HD
+    HD --> HS
 ```
 
-## Phases
+## Split of concerns
 
-The implementation will be delivered in two phases:
-- **Phase A**: Single-rate hybrid simulation (MPC/SMC + ZOH + continuous plant).
-- **Phase B**: Multi-rate cascade controllers via the `ScheduledStepOrchestrator`.
-
-*Note: Graph expansion via `expand_scheduled_step` has been deliberately moved out-of-scope for the initial releases, relying entirely on the orchestrator approach to keep diagram logic thin.*
+| Concern | Owner | Phase |
+| --- | --- | --- |
+| Pure `step` math | `StepSystem` | 1 |
+| Step block wiring | `StepDiagramSystem` / `StepEvaluator` | 2 |
+| Continuous → discrete plant block | `discretize()` | 3 (optional) |
+| Sample time + multi-rate **inside** step diagram | `StepSchedule` + orchestrator | 4 |
+| Step↔plant ZOH/sample + plant integration | `HybridSimulator` | 5 |
 
 ## Implementation order
 
-Build the **pure stepping framework** before any continuous→discrete conversion. Phase A hybrid
-does **not** require `discretize` — controllers are native `StepSystem` blocks; the plant stays
-continuous (`rk4_rollout_zoh`).
+| Step | Phase | Deliverable |
+| --- | --- | --- |
+| 1 | 1 | `StepSystem`, `ZOHHold`, leaf tests |
+| 2 | 2 | shared wiring mixin (`core/wiring.py`) |
+| 3 | 2 | `StepDiagramSystem`, `compile_step_diagram`, `StepEvaluator` |
+| 4 | 2 | `StepRunner`, `TimedStepSimulator`, closed-loop tests |
+| 5 | 3 | `discretize` verb + tests *(optional for Phase 5 MPC path)* |
+| 6 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, orchestrator tests |
+| 7 | 5 | `rk4_rollout_zoh` |
+| 8 | 5 | `HybridDiagram`, `HybridSimulator` (multi-port boundary) |
+| 9 | 5 | `MPCBlock` + straight-line demo **(5a)** |
+| 10 | 5 | `SMCBlock` + hybrid demo **(5a)** |
+| 11 | 5 | Cascade hybrid demo **(5b**, non-trivial `fire`) |
+| 12 | all | DESIGN / ROADMAP / README |
 
-| Step | Component | Deliverable | Phase |
-| --- | --- | --- | --- |
-| 1 | Layer 1 | `StepSystem`, `ZOHHold`, leaf tests | — |
-| 2 | Layer 1 | shared diagram wiring mixin (`core/wiring.py`) | — |
-| 3 | Layer 1 | `StepDiagramSystem`, `compile_step_diagram` + `StepEvaluator` | — |
-| 4 | Layer 1 | `StepRunner` + `TimedStepSimulator` + closed-loop tests | — |
-| 5 | Layer 3 | `rk4_rollout_zoh` | — |
-| 6 | Layer 3 | `HybridDiagram` + `HybridSimulator` (multi-port boundary) | **A** |
-| 7 | Layer 3 | `MPCBlock` + straight-line MPC demo | **A** |
-| 8 | Layer 3 | `SMCBlock` (or pattern) + SMC hybrid demo | **A** |
-| 9 | Conversion | `discretize` verb (`DynamicSystem` + `dt` → `StepSystem`) | post–step core |
-| 10 | Layer 2 | `StepSchedule` + `ScheduledStepOrchestrator` + tests | **B** |
-| 11 | Layer 3 | Cascade controller hybrid demo | **B** |
-| 12 | all | DESIGN / ROADMAP / README | — |
+**Gates:**
 
-**Gate:** Phase A hybrid (steps 6–8) after step compile + closed-loop tests + `rk4_rollout_zoh`.
-Phase B (steps 10–11) after Phase A hybrid tests pass. **`discretize` (step 9) is optional** for
-Phase A/B — ship when step core is stable; not a blocker for MPC/SMC hybrid demos.
+- Phase 2 before 4, 5, and before Phase 3 (discretize returns blocks used in diagrams).
+- **Phase 4 before Phase 5** — hybrid always orchestrates the step side.
+- Phase 3 optional for Phase 5 MPC/SMC (continuous plant + native controller blocks).
+- **5a** before **5b** (trivial schedule before multi-rate cascade hybrid).
+
+Full design: [hybrid-discrete-simulation.md](../hybrid-discrete-simulation.md).
