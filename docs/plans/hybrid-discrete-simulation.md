@@ -28,6 +28,7 @@ engines and decides **when** each applies.
 
 Near-term deliverables (see **[00-master-plan.md](hybrid-discrete/00-master-plan.md)** for full phase list):
 
+0. **Phase 0** — extract shared diagram wiring mixin; validate continuous diagrams unchanged.
 1. **Phase 1** — `StepSystem` leaf; pure `step(x, u, k)`; no clock.
 2. **Phase 2** — `StepDiagramSystem`, compile, `StepEvaluator`, `StepRunner`.
 3. **Phase 3** — `discretize()` optional conversion tool.
@@ -43,15 +44,18 @@ unchanged; **`ScheduledStepOrchestrator`** fires blocks on schedule with interna
 
 ## Implementation phases
 
-Split contracts: [01-step-core](hybrid-discrete/01-step-core.md) ·
+Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
+[01-step-core](hybrid-discrete/01-step-core.md) ·
 [02-step-diagram](hybrid-discrete/02-step-diagram.md) ·
 [03-discretization](hybrid-discrete/03-discretization.md) ·
 [04-scheduled-orchestrator](hybrid-discrete/04-scheduled-orchestrator.md) ·
 [05-hybrid-simulation](hybrid-discrete/05-hybrid-simulation.md) ·
+[05c-hybrid-viz-shortcuts](hybrid-discrete/05c-hybrid-viz-shortcuts.md) ·
 [06-mpc-step-block](hybrid-discrete/06-mpc-step-block.md)
 
 | Phase | Delivers | Clock |
 | --- | --- | --- |
+| **0** | `WiredDiagramMixin` / `core/wiring.py`; `DiagramSystem` unchanged API | — |
 | **1** | `StepSystem`, `ZOHHold` | none |
 | **2** | `StepDiagramSystem`, `StepEvaluator`, `StepRunner` | none (or logging-only in `TimedStepSimulator`) |
 | **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure |
@@ -64,8 +68,9 @@ step↔plant boundary ZOH/sample + continuous plant (`rk4_rollout_zoh`). Hybrid 
 even for single-rate control (trivial schedule: empty `fire` ⇒ every block every tick).
 
 **Phase 5 milestones:** **5a** — hybrid + trivial schedule + SMC demo; **5b** — cascade hybrid
-with non-trivial `fire`. **Phase 6 milestones:** **6a** — stateless `MPCStepBlock` + straight-line
-MPC demo; **6b** — block state holds last plan for warm-start parity.
+with non-trivial `fire`; **5c** — `plot_hybrid_diagram` + `hybrid_closed_loop`. **Phase 6
+milestones:** **6a** — stateless `MPCStepBlock` + straight-line MPC demo; **6b** — block state
+holds last optimizer **`z`** for warm-start parity.
 
 ---
 
@@ -521,18 +526,20 @@ heterogeneous blocks in one diagram class before event scheduling exists.
 
 | Phase | Delivers | Does not deliver |
 | --- | --- | --- |
+| **0** | `WiredDiagramMixin`; continuous diagrams unchanged | `StepSystem`, compile fork |
 | **1** | `StepSystem`, `ZOHHold` | Clock, diagrams |
 | **2** | `StepDiagramSystem`, compile, `StepEvaluator`, `StepRunner` | `StepSchedule`, hybrid |
 | **3** | **`discretize`** | Required for hybrid MPC path |
 | **4** | `StepSchedule` + `ScheduledStepOrchestrator` | Plant, hybrid boundary |
 | **5a** | Hybrid + trivial schedule + SMC | Multi-rate controller; MPC |
 | **5b** | Cascade hybrid (non-trivial `fire`) | Expansion lowering; MPC |
+| **5c** | `plot_hybrid_diagram`, `hybrid_closed_loop` | `@` across domains |
 | **6a** | `MPCStepBlock` stateless + MPC hybrid demo | Warm-start state |
-| **6b** | `MPCStepBlock` with last-plan state | — |
+| **6b** | `MPCStepBlock` with last `z` state | — |
 | **Future** | events, guards, `expand_scheduled_step` | — |
 
-**Gates:** Phase 2 before 4 and 5. **Phase 4 before Phase 5.** Phase 3 optional for hybrid.
-5a before 5b. **Phase 5 before Phase 6.** 6a before 6b.
+**Gates:** **Phase 0 before Phase 1.** Phase 2 before 4 and 5. **Phase 4 before Phase 5.**
+Phase 3 optional for hybrid. 5a → 5b → 5c. **Phase 5 before Phase 6.** 6a → 6b.
 
 ---
 
@@ -540,6 +547,10 @@ heterogeneous blocks in one diagram class before event scheduling exists.
 
 ```mermaid
 flowchart TB
+    subgraph p0 [Phase 0 Wiring]
+        WIR[WiredDiagramMixin]
+    end
+
     subgraph p1 [Phase 1]
         SS[StepSystem]
     end
@@ -560,17 +571,23 @@ flowchart TB
         HS[HybridSimulator]
     end
 
+    subgraph p5c [Phase 5c Viz]
+        PLOT[plot_hybrid_diagram]
+    end
+
     subgraph p6 [Phase 6 MPC StepBlock]
         MPC[MPCStepBlock]
     end
 
+    WIR --> SDS
     SS --> SDS --> SE --> SR
     SDS --> SO
     SCH --> SO
     SO --> HS
     HD --> HS
+    HD --> PLOT
     MPC --> SDS
-    p1 --> p2 --> p4 --> p5 --> p6
+    p0 --> p1 --> p2 --> p4 --> p5 --> p5c --> p6
 ```
 
 ---
@@ -657,6 +674,19 @@ Not required for Phase 5b orchestrator path.
 
 ---
 
+## Phase 0: Core wiring refactor
+
+Extract shared diagram wiring before any step types land. Full contract and validation gate:
+[00-wiring-refactor.md](hybrid-discrete/00-wiring-refactor.md).
+
+**Deliverable:** `minilink/core/wiring.py` mixin; `DiagramSystem` delegates; **pytest + diagram
+smoke unchanged**.
+
+**Gate:** Phase 0 merges only after continuous diagram tests and composition shortcuts pass with
+no API or topology regressions.
+
+---
+
 ## Phase 1: `StepSystem` (leaf)
 
 **Files:** `minilink/core/system.py`, `minilink/blocks/`
@@ -688,10 +718,8 @@ class StepSystem(System):
 
 ### Shared wiring extraction
 
-**File:** `minilink/core/wiring.py` (or `WiredDiagramBase` mixin) — used by both
-`DiagramSystem` and `StepDiagramSystem`:
-
-- `connect`, `get_local_input`, params nesting, `state_index`, boundary outputs.
+Completed in [Phase 0](hybrid-discrete/00-wiring-refactor.md) — `minilink/core/wiring.py` mixin.
+`DiagramSystem` and `StepDiagramSystem` both compose it.
 
 ### `StepDiagramSystem`
 
@@ -823,6 +851,7 @@ Per **`schedule.dt_base`** tick:
 | --- | --- | --- |
 | **5a** | SMC + plant hybrid | trivial schedule |
 | **5b** | Cascade: filter fast + slow step block | non-trivial `fire`; MPC slot in 6a refresh |
+| **5c** | `plot_hybrid_diagram` on SMC/MPC hybrid | `hybrid_closed_loop` shortcut |
 | **6a** | Refactor straight-line MPC demo | stateless `MPCStepBlock` |
 | **6b** | Same MPC demo | warm-start state parity |
 
@@ -850,9 +879,11 @@ refactor in 6a; warm-start parity in 6b.
 
 ### In scope
 
+- **Phase 0:** wiring mixin refactor + validation gate.
 - Layers 1–3 as above.
 - **Phase 5a:** single-rate hybrid (trivial schedule) + SMC.
 - **Phase 5b:** multi-block controller at integer multiples of `schedule.dt_base`.
+- **Phase 5c:** hybrid diagram plot + `hybrid_closed_loop` shortcut.
 - **Phase 6:** `MPCStepBlock` + MPC demo refactor (6a stateless, 6b warm-start).
 - DESIGN / ROADMAP / README sync on implementation.
 
@@ -877,6 +908,8 @@ refactor in 6a; warm-start parity in 6b.
 
 | Phase | File | Cases |
 | --- | --- | --- |
+| 0 | `test_wiring_mixin.py` | topology parity; connect validation unchanged |
+| 0 | (existing) | `test_composition.py`, `test_diagrams.py`, diagram compile tests |
 | 1 | `test_step_system.py` | leaf `step`; `ZOHHold`; `solver_info` |
 | 2 | `test_step_diagram.py` | wiring; `@` closed loop |
 | 2 | `test_step_runner.py` | clock-free stepping |
@@ -888,6 +921,8 @@ refactor in 6a; warm-start parity in 6b.
 | 5 | `test_hybrid_boundary_connect.py` | invalid boundary wiring |
 | 5 | `test_smc_hybrid.py` | 5a smoke |
 | 5 | `test_hybrid_cascade.py` | 5b filter + slow block |
+| 5c | `test_hybrid_topology.py` | hybrid plot topology; boundary edges |
+| 5c | `test_hybrid_closed_loop.py` | shortcut vs manual `connect_boundary` |
 | 6 | `test_mpc_step_block.py` | 6a stateless MPC block |
 | 6 | `test_mpc_step_block_warm_start.py` | 6b plan state pack/shift |
 | 6 | `test_mpc_hybrid_demo_parity.py` | hybrid vs hand-rolled MPC |
@@ -901,17 +936,19 @@ See [00-master-plan.md](hybrid-discrete/00-master-plan.md). Summary:
 
 | Step | Phase | Deliverable |
 | --- | --- | --- |
+| **0** | **0** | `core/wiring.py` mixin + validation gate |
 | 1 | 1 | `StepSystem`, `ZOHHold`, leaf tests |
-| 2–4 | 2 | wiring, `StepDiagramSystem`, compile, `StepRunner`, tests |
-| 5 | 3 | `discretize` *(optional)* |
-| 6 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, tests |
-| 7–9 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** |
-| 10 | 5 | cascade hybrid demo **(5b)** |
+| 2–3 | 2 | `StepDiagramSystem`, compile, `StepRunner`, tests |
+| 4 | 3 | `discretize` *(optional)* |
+| 5 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, tests |
+| 6–8 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** |
+| 9 | 5 | cascade hybrid demo **(5b)** |
+| 10 | 5c | `plot_hybrid_diagram`, `hybrid_closed_loop` |
 | 11 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line demo |
 | 12 | 6 | `MPCStepBlock` warm-start **(6b)** |
 | 13 | all | DESIGN / ROADMAP / README |
 
-**Gates:** Phase 2 → Phase 4 → Phase 5 → Phase 6. Phase 3 optional. **5a → 5b.** **6a → 6b.**
+**Gates:** **0 → 1 → 2 → 4 → 5 → 5c → 6.** Phase 3 optional. **5a → 5b.** **6a → 6b.**
 
 See [03-discretization.md](hybrid-discrete/03-discretization.md) for the conversion contract.
 

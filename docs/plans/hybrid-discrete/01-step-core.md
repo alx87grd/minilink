@@ -1,6 +1,6 @@
 # Phase 1: Step Core (leaf)
 
-**Build first.** Pure difference-equation blocks — **no clock, no diagrams, no `discretize`.**
+**After [Phase 0](00-wiring-refactor.md).** Pure difference-equation blocks — **no clock, no diagrams, no `discretize`.**
 
 Leaf types implement `step(x, u, k)` directly (MPC law, SMC, games, manual difference eqs.).
 See [Phase 2 (02-step-diagram.md)](02-step-diagram.md) for composing blocks into diagrams.

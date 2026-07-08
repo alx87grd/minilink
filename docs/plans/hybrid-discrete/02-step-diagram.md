@@ -1,20 +1,16 @@
 # Phase 2: Step Diagram + Evaluator
 
-**After [Phase 1](01-step-core.md).** Compose `StepSystem` + `StaticSystem` blocks into
-`StepDiagramSystem`; compile to `StepEvaluator`. Still **no wall clock** on the diagram —
-`StepRunner` advances `k` without `dt`.
+**After [Phase 0](00-wiring-refactor.md) and [Phase 1](01-step-core.md).** Compose `StepSystem` +
+`StaticSystem` blocks into `StepDiagramSystem`; compile to `StepEvaluator`. Still **no wall clock**
+on the diagram — `StepRunner` advances `k` without `dt`.
 
-**Files:** `minilink/core/wiring.py`, `minilink/core/step_diagram.py`,
-`minilink/core/compile/` (step path), `minilink/simulation/step_runner.py`
+**Files:** `minilink/core/step_diagram.py`, `minilink/core/compile/` (step path),
+`minilink/simulation/step_runner.py`
 
-## Shared wiring mixin
-
-Extract from `DiagramSystem`: `connect`, boundary ports, params nesting, `state_index` —
-shared by flow and step diagrams. **Minimal scope** — do not unify evaluators or runners.
-
+Wiring comes from [Phase 0](00-wiring-refactor.md) **`WiredDiagramMixin`** — do not re-extract here.
 ## `StepDiagramSystem`
 
-- Sibling of `DiagramSystem`.
+- Composes **`WiredDiagramMixin`** from Phase 0 (same `connect` / boundary ports as flow diagrams).
 - Stacked **`step(x, u, k)`** loop (same topology machinery as flow `f`).
 - `compile_step_diagram()` → **`StepEvaluator.step(x, u, k)`**.
 - Subsystems: `StepSystem`, `StaticSystem` only; reject `DynamicSystem` at compile.

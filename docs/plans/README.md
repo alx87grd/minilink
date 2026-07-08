@@ -1,1 +1,1 @@
-| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — Phases 1–6: `StepSystem`, diagrams, orchestrator, hybrid sim, `MPCStepBlock` |
+| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — Phases 0–6 + 5c: wiring refactor, step/hybrid sim, viz, `MPCStepBlock` |

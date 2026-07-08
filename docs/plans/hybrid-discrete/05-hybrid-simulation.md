@@ -165,3 +165,5 @@ HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
 - `test_hybrid_boundary_connect.py` — invalid boundary wiring
 - `test_hybrid_cascade.py` — 5b filter + slow block
 - `test_smc_hybrid.py` — 5a smoke
+
+**5c** (viz + shortcuts): [05c-hybrid-viz-shortcuts.md](05c-hybrid-viz-shortcuts.md).
