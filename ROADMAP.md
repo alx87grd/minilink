@@ -165,6 +165,22 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] `search/` — `RRTPlanner`, `RRTStarPlanner`, extenders, steering, tree
 - [ ] Trajectory post-filter (Butterworth `filtfilt`)
 
+### 5.5a Step / hybrid simulation (subsidiary)
+
+Narrow add-on for discrete control in the loop (MPC, SMC, sampled regulators) on
+continuous plants — not full Simulink parity. Plan:
+[docs/plans/hybrid-discrete/00-master-plan.md](docs/plans/hybrid-discrete/00-master-plan.md).
+
+- [x] **Phase 0** — `WiredDiagramMixin` in `core/wiring.py`; `DiagramSystem` delegates;
+  continuous diagram API unchanged
+- [ ] **Phase 1** — `StepSystem`, `compile_step` (leaf), `StepRunner`
+- [ ] **Phase 2** — `StepDiagramSystem`, `compile_step_diagram`
+- [ ] **Phase 3** — `discretize()` *(optional)*
+- [ ] **Phase 4** — `StepSchedule`, `ScheduledStepOrchestrator`
+- [ ] **Phase 5** — `HybridDiagram`, `HybridSimulator`, SMC / cascade hybrids
+- [ ] **Phase 5c** — `plot_hybrid_diagram`, `hybrid_closed_loop`
+- [ ] **Phase 6** — `MPCStepBlock` + MPC demo refactor (drop hand-rolled outer loops)
+
 ### 5.6 Estimation and identification
 
 - [ ] `estimation/luenberger.py`, `kalman.py`, `ekf.py`, `recursive.py`
@@ -189,8 +205,10 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 ### 5.10 Out of scope (by decision)
 
-Discrete time (ZOH/delay, digital control), RNNs, mixed-rate simulation,
-differentiable-rollout library, hybrid/events — see [DESIGN.md §3](DESIGN.md).
+Full Simulink / arbitrary multi-clock hybrid parity, event-driven switching
+(guards, impacts), RNN policy blocks, differentiable-rollout library — see
+[DESIGN.md §3](DESIGN.md). The **narrow** step/hybrid subset in §5.5a is in
+scope as a subsidiary program; it does not replace the continuous-time core.
 Pygame game framework (`sys2game`) — no first-class port unless reversed.
 
 ## 6. Pyro 2.0 port status
