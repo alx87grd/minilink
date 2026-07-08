@@ -836,7 +836,10 @@ Refactor so `MPCPlanner` exports a **`StepSystem`** leaf for hybrid simulation. 
 | Milestone | State | Behavior |
 | --- | --- | --- |
 | **6a** | **`n = 0`** | `MPCPlanner.step(..., initial_guess=None)` every tick; `h` returns `u_cmd` |
-| **6b** | **`n > 0`** | packed last plan in `x`; shift horizon for `initial_guess` |
+| **6b** | **`n = decision_dimension`** | block `x` holds last optimizer **`z`**; `shift_mpc_initial_guess` → next `initial_guess` |
+
+Warm-start state uses the transcription decision vector **`z`**, not a new core Trajectory flatten
+— see [06-mpc-step-block.md](hybrid-discrete/06-mpc-step-block.md).
 
 **Gate:** Phase 5 hybrid sim before Phase 6. **6a** before **6b**. One straight-line MPC demo
 refactor in 6a; warm-start parity in 6b.

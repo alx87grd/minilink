@@ -97,12 +97,66 @@ def step(self, x, u, k=0, params=None):
     return pack_plan_state(plan)   # x_new for next tick
 ```
 
-### State encoding (6b)
+### State encoding (6b) — use `z`, not a core Trajectory flatten
 
-- Pack minimal trajectory data needed for shift: e.g. `(t, x, u)` arrays or a flat `z` vector.
-- **`shift_plan_state`** mirrors demo logic: advance time grid by one `dt_base`, pin `x[:, 0]` to
-  measured state, truncate to horizon.
-- State dimension fixed at compile/prepare time from planner transcription.
+**Do not** add a `Trajectory` → flat vector helper in `minilink/core/`. Flatten layout is
+**transcription-specific** (direct collocation packs `[x.ravel(); u.ravel()]`, shooting packs
+`u.ravel()` only) and already lives on the transcription:
+
+```191:224:minilink/planning/trajectory_optimization/direct_collocation.py
+    def pack(
+        self, x: np.ndarray, u: np.ndarray, problem: PlanningProblem
+    ) -> np.ndarray:
+        """Pack sampled state and input matrices into one decision vector."""
+        return np.concatenate((x.reshape(-1), u.reshape(-1)))
+    ...
+    def pack_initial_guess(
+        self,
+        problem: PlanningProblem,
+        guess: np.ndarray | Trajectory | None,
+    ) -> np.ndarray:
+        ...
+        if isinstance(guess, Trajectory):
+            resampled = guess.resample(t_new=self.options.t)
+            return self.pack(resampled.x, resampled.u, problem)
+
+        return guess.reshape(-1)
+```
+
+**`MPCStepBlock` warm-start state = previous optimizer decision `z`**, not a hand-rolled
+trajectory flatten:
+
+| Representation | Role |
+| --- | --- |
+| **`z`** (`result.z` from last solve) | **Block state `x`** — fixed `n = transcription.decision_dimension(problem)` |
+| **`Trajectory`** | User / demo API; `MPCPlanner.step(..., initial_guess=traj)`; shift logic in trajectory space |
+| **`pack` / `unpack` / `pack_initial_guess`** | Transcription bridge — planning layer only |
+
+```python
+n_z = planner.transcription.decision_dimension(planner.problem)
+# block constructed with n=n_z when warm_start=True
+
+def step(self, x, u, k=0, params=None):
+    x_meas = extract_measurement(u, ...)
+    z_guess = shift_mpc_initial_guess(
+        x, x_meas, planner.transcription, planner.problem, dt_shift=planner_dt
+    ) if x.size else None
+    plan = self._planner.step(x_meas, initial_guess=z_guess)
+    return np.asarray(self._planner.last_optimization_result.z).copy()
+```
+
+**Warm-start shift** (today's demo logic in `Trajectory` space) becomes a **planning helper**
+(e.g. `minilink/planning/mpc/warm_start.py`):
+
+1. `unpack(z_prev) → (x, u)` on the fixed collocation grid.
+2. Shift / truncate horizon; pin `x[:, 0] = x_meas` (same semantics as straight-line demo).
+3. `pack(x, u)` **or** build a `Trajectory` and call `pack_initial_guess` (resamples to grid).
+
+Either path ends in `z` before the solver; prefer **matrix shift + `pack`** to avoid an extra
+`Trajectory` alloc in the hot loop. **`Trajectory` stays the logging / plotting / user-facing
+type**; it is not the canonical simulation state vector.
+
+**6a:** `n = 0`, no `z` retained. **6b:** `n = decision_dimension`, state is last `z`.
 
 ### 6b acceptance
 
@@ -121,7 +175,8 @@ Phase 6 work:
 
 1. **`mpc_step_block(planner, ...)`** factory in `planning/mpc/`.
 2. Document input/output port layout for bicycle (and one generic template).
-3. Optional: `MPCPlanner` helper `default_initial_guess_from_state(x)` if not already centralized.
+3. **`shift_mpc_initial_guess(z_prev, x_meas, transcription, problem, dt_shift)`** in
+   `planning/mpc/` — factors demo shift logic; **not** a core `Trajectory` flatten tool.
 4. **Do not** move compile-once / `prepare()` into the sim loop — block holds prepared planner from `__init__`.
 
 ## Hybrid wiring (6a)
