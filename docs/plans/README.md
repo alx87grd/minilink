@@ -1,1 +1,1 @@
-| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — Phases 1–5: `StepSystem`, diagrams, `discretize`, orchestrator, hybrid sim |
+| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — Phases 1–6: `StepSystem`, diagrams, orchestrator, hybrid sim, `MPCStepBlock` |

@@ -49,6 +49,9 @@ class ScheduledStepOrchestrator:
 
 - **Single-rate mode:** all blocks fire every tick; no cross-rate buffers needed (degenerate case).
 - **Multi-rate mode:** slow consumer ← fast producer **sample**; fast ← slow **ZOH** (orchestrator buffers).
+- **Partial firing:** each tick runs only `sys_id`s with `k % fire[sys_id] == 0`; skipped blocks
+  keep prior outputs in orchestrator buffers. Uses per-block step hooks from Phase 2 compile
+  (not a full-diagram `StepEvaluator.step` unless all divisors are 1).
 - **Public API** for clocked step diagrams — standalone or embedded in `HybridSimulator`.
 - Does **not** integrate the continuous plant or handle hybrid boundary ports.
 
