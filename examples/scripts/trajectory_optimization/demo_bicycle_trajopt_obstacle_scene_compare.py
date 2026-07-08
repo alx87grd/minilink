@@ -50,8 +50,8 @@ from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 
-TF = 2.0
-N_STEPS = 10
+TF = 4.0
+N_STEPS = 20
 U_0 = 8.0
 U_TARGET = 10.0
 Y_START = 0.0
