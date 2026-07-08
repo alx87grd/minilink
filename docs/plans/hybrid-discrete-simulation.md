@@ -1,6 +1,6 @@
 # Hybrid and step simulation (design only)
 
-Status: draft plan (July 2026). No implementation in this phase.
+Status: Phase 0 complete (July 2026); Phases 1–6 pending.
 
 Architecture for **step maps** (difference equations, jumps, turn-based dynamics),
 step diagrams, **scheduled multi-rate orchestration**, clock-driven hybrid simulation

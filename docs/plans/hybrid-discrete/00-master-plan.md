@@ -1,6 +1,7 @@
 # Hybrid discrete simulation: Master Plan
 
-Status: draft plan (July 2026). No implementation in this phase.
+Status: Phase 0 complete (July 2026); Phases 1–6 pending. Plan:
+[00-wiring-refactor.md](00-wiring-refactor.md).
 
 Program charter for discrete-time blocks, step diagrams, optional discretization, scheduled
 stepping, narrow hybrid simulation (discrete controller ↔ continuous plant), and MPC
@@ -178,7 +179,6 @@ flowchart TB
 
     WIR --> DF
     WIR --> SDS
-    PROTO --> PLOT
     SS --> CSL --> SR
     SS --> SDS --> SE --> SR
     DS -.-> DISC -.-> SS
@@ -215,7 +215,7 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 
 | Milestone | Pass when |
 | --- | --- |
-| **0** | `DiagramSystem` public API unchanged; `build_diagram_topology` + closed-loop trajectories match pre-refactor (fixed seeds); composition + diagram pytest green |
+| **0** | `DiagramSystem` public API unchanged; `build_diagram_topology` + closed-loop trajectories match pre-refactor (fixed seeds); composition + diagram pytest green | **Done** |
 | **1** | Leaf `step` / `h(x, u, k)`; `compile_step` leaf; `StepRunner` rollout; evolution routing via **`isinstance(StepSystem)`**; no wall time on leaf; `ZOHHold` + teaching demo smoke |
 | **2** | Step diagram closed loop via `connect`; gather passes **`k`**; `run_steps` on diagram evaluator; partial-fire hooks for Phase 4 |
 | **3** *(optional)* | `discretize` euler/rk4 match continuous integration over fixed `dt` |
