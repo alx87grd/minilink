@@ -31,6 +31,10 @@ adapter the diagram and orchestrator call.
 | **`MPCStepBlock`** | `StepSystem` façade: map diagram `u` / `x` ↔ planner call; expose `u_cmd` on `h` |
 | **`HybridSimulator`** | Clock, boundary ZOH/sample, plant — unchanged from Phase 5 |
 
+**Coordinate note:** `MPCStepBlock.step(x, u, k, …)` uses integer **`k`** (orchestrator fire
+index). `MPCPlanner.step(x_meas, …)` is the planning API — different object, different meaning;
+no wall time on the block ([Phase 1](01-step-core.md)).
+
 ## Milestones
 
 | Milestone | Block state | Warm start | Demo |

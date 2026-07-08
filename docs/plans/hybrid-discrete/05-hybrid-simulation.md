@@ -82,13 +82,21 @@ No separate `dt_base` field — use **`schedule.dt_base`** for step ticks and pl
 
 ### Tick order and buffers
 
-Logical order each base tick `k` at time `t_k`:
+Logical order each base tick **`k`** (hybrid simulator also tracks **`t_k = t0 + k · dt_base`**
+for the **plant only**):
 
-1. **Sample (read)** — assemble `u_step` from **`sample_buffers`** (plant outputs latched at end of tick `k-1`) and world refs on step-diagram boundaries.
-2. **Step** — `orchestrator.tick(x_step, u_step, t_k, k)` → `step_outputs`
-3. **ZOH (write)** — step boundary outputs → **`zoh_buffers`** → assemble `u_plant`
-4. **Flow** — `rk4_rollout_zoh(x_flow, u_plant, t_k, schedule.dt_base, dt_inner=...)`
-5. **Sample (write)** — plant boundary outputs at `t_k + dt_base` → **`sample_buffers`** for tick `k+1`
+1. **Sample (read)** — assemble `u_step` from **`sample_buffers`** (plant outputs latched at end
+   of tick `k-1`) and world refs on step-diagram boundaries.
+2. **Step** — `orchestrator.tick(x_step, u_step, k)` → `step_outputs` (**`k` only** into step
+   diagram eval — no `t` on `StepSystem` leaves).
+3. **ZOH (write)** — step boundary outputs → **`zoh_buffers`** → assemble `u_plant`.
+4. **Flow** — `rk4_rollout_zoh(x_flow, u_plant, t_k, schedule.dt_base, dt_inner=...)` — **plant
+   uses float `t`**.
+5. **Sample (write)** — plant boundary outputs at `t_k + dt_base` → **`sample_buffers`** for tick
+   `k+1`.
+
+**Coordinate split:** step side = **`k` (int)**; continuous plant = **`t` (float)**. Do not pass
+`t_k` into `StepSystem.step` or step-diagram port gather.
 
 **One-tick feedback delay:** the controller at tick `k` sees plant measurements from the **end**
 of interval `k-1`, not the state after integrating interval `k`.

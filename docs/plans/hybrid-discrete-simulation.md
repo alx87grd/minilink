@@ -29,7 +29,7 @@ engines and decides **when** each applies.
 Near-term deliverables (see **[00-master-plan.md](hybrid-discrete/00-master-plan.md)** for full phase list):
 
 0. **Phase 0** — extract shared diagram wiring mixin; validate continuous diagrams unchanged.
-1. **Phase 1** — `StepSystem` leaf; pure `step(x, u, k)`; no clock.
+1. **Phase 1** — `StepSystem` leaf; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf.
 2. **Phase 2** — `StepDiagramSystem`, compile, `StepEvaluator`, `StepRunner`.
 3. **Phase 3** — `discretize()` optional conversion tool.
 4. **Phase 4** — `StepSchedule.dt_base` + `ScheduledStepOrchestrator` (single- and multi-rate).
@@ -55,7 +55,7 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 
 | Phase | Delivers | Clock |
 | --- | --- | --- |
-| **0** | `WiredDiagramMixin` / `core/wiring.py`; `DiagramSystem` unchanged API | — |
+| **0** | `WiredDiagramMixin` / `core/wiring.py` (wiring, gather, `tf`, `check_algebraic_loops`); `DiagramSystem` unchanged API | — |
 | **1** | `StepSystem`, `ZOHHold` | none |
 | **2** | `StepDiagramSystem`, `StepEvaluator`, `StepRunner` | none (or logging-only in `TimedStepSimulator`) |
 | **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure |
@@ -382,22 +382,34 @@ hook may remain for facades only.
 
 ---
 
-## Naming: `f` vs `step`
+## Naming: `f` vs `step` and the third slot
 
 | | Flow | Step |
 | --- | --- | --- |
-| **Math** | `dx = f(x, u, t; p)` | `x_{k+1} = step(x, u, k; p)` |
-| **Leaf method** | `f(...)` on `DynamicSystem` | **`step(...)`** on `StepSystem` |
-| **Evaluator** | `DynamicsEvaluator.f` → `dx` | **`StepEvaluator.step`** → `x_new` (calls each block's `step`) |
-| **Step index** | continuous time `t` (float) | **`k`** (int); do not use `n` (state dimension) |
+| **Math (evolution)** | `dx = f(x, u, t; p)` | `x_{k+1} = step(x, u, k; p)` |
+| **Math (output)** | `y = h(x, u, t; p)` | `y = h(x, u, k; p)` |
+| **Leaf evolution** | `DynamicSystem.f` | `StepSystem.step` |
+| **Leaf output** | `System.h` with **`t`** | `StepSystem.h` with **`k`** |
+| **Evaluator evolution** | `DynamicsEvaluator.f` → `dx` | `StepEvaluator.step` → `x_new` |
+| **Third slot on shared gather / `port.compute`** | **`t`** (float, seconds) | **`k`** (int, step/turn index) |
 | **Avoid** | — | **`g`** (gravity, costs, NLP constraints already use `g` in minilink) |
 
-Leaf and evaluator share the verb **`step`**, mirroring how diagram evaluators expose **`f`**
+**`StepSystem` has no wall time** — `k` can index chess moves, game turns, or orchestrator fire
+counts. **`StepSchedule.dt_base`** ([Phase 4](hybrid-discrete/04-scheduled-orchestrator.md))
+schedules firing and (hybrid) plant holds; it does **not** become `t` inside `step()`.
+
+**Do not** pass `t_k = k · dt_base` into `StepSystem` or step-diagram port eval. **Do not**
+convert `float(k)` / `int(t)` at path boundaries.
+
+**JAX:** separate `JaxDiagramEvaluator` (float `t`) and `JaxStepEvaluator` (int `k`) — never
+one jitted graph mixing both third-slot types.
+
+Leaf and step evaluator share the verb **`step`**, mirroring how diagram evaluators expose **`f`**
 for flow systems. Docstrings may use `x_{k+1}` or `x_new`; the return value is the next state
 vector.
 
-**`StepSystem` has no class-level clock** — sample time lives in **`StepSchedule.dt_base`**
-(Phase 4+). Hybrid and clocked discrete sim **always** go through `ScheduledStepOrchestrator`.
+Hybrid and clocked discrete sim **always** go through `ScheduledStepOrchestrator` on the step
+side ([Phase 4+](hybrid-discrete/04-scheduled-orchestrator.md)).
 
 ---
 
@@ -456,7 +468,7 @@ t, k = t0, 0
 
 while t < tf:
     u_step = assemble_step_inputs(hybrid, world, sample_buffers, t, k)
-    x_step, step_out, _orch_bufs = orch.tick(x_step, u_step, t, k)
+    x_step, step_out, _orch_bufs = orch.tick(x_step, u_step, k)
     u_plant = assemble_plant_inputs(hybrid, zoh_buffers, step_out)
     x_flow = cont_evaluator.rk4_rollout_zoh(
         x_flow, u_plant, t, dt, dt_inner=plant_dt_inner
@@ -723,7 +735,7 @@ Completed in [Phase 0](hybrid-discrete/00-wiring-refactor.md) — `minilink/core
 
 ### `StepDiagramSystem`
 
-**File:** `minilink/core/step_diagram.py` — **sibling** of `DiagramSystem`.
+**File:** `minilink/core/diagram.py` — `StepDiagramSystem` **sibling** of `DiagramSystem` in the same module.
 
 - **`x_{k+1} = step(x, u, k)`** — same stacked loop as flow `DiagramSystem.f`.
 - Evaluator exposes **`step(x, u, k)`** calling each block's `step`.
