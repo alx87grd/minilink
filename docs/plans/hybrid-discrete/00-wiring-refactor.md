@@ -1,5 +1,7 @@
 # Phase 0: Core wiring refactor (prep)
 
+**Status: complete (July 2026).** Phase 1 unblocked.
+
 **Before [Phase 1](01-step-core.md).** Extract **all evolution-agnostic diagram machinery**
 from `DiagramSystem` into a reusable mixin — **no new simulation behavior**, no `StepSystem`,
 no hybrid types, no compile fork.
@@ -269,7 +271,7 @@ where tests exist.
 - **Mixin over subclass** — `StepDiagramSystem` is a sibling, not a subclass of `DiagramSystem`.
 - **Mechanical diff:** move methods, inherit mixin, delete duplicates — no drive-by renames.
 - **Do not** add `StepDiagramSystem` stub in Phase 0.
-- Mark **`TODO: User Architectural Review`** on `WiredDiagramMixin` until validation gate passes.
+- Phase 0 validation gate passed; architectural review closed July 2026.
 
 ## Downstream
 

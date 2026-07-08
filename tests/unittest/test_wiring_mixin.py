@@ -119,6 +119,27 @@ class TestWiringMixin(unittest.TestCase):
         with self.assertRaises(ValueError):
             diagram.params = {"typo": {"Kp": 1.0}}
 
+    def test_closed_loop_euler_trajectory_matches_compiled_f(self):
+        """Reference ``diagram.f`` and compiled evaluator stay aligned over rollout."""
+        diagram = _build_closed_loop()
+        evaluator = diagram.compile(backend="numpy")
+        x0 = np.array([0.0])
+        u = np.array([1.0])
+        dt = 0.1
+        n_steps = 10
+
+        x_ref = x0.copy()
+        x_comp = x0.copy()
+        for step in range(n_steps):
+            t = step * dt
+            dx_ref = diagram.f(x_ref, u, t)
+            dx_comp = evaluator.f(x_comp, u, t)
+            np.testing.assert_allclose(dx_comp, dx_ref, atol=1e-10)
+            x_ref = x_ref + dx_ref * dt
+            x_comp = x_comp + dx_comp * dt
+
+        np.testing.assert_allclose(x_comp, x_ref, atol=1e-10)
+
 
 if __name__ == "__main__":
     unittest.main()

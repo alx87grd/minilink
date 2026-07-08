@@ -1,7 +1,10 @@
 """
 Shared diagram wiring: mixin, params validation, and topology checks.
 
-TODO: User Architectural Review
+Evolution-agnostic machinery shared by flow ``DiagramSystem`` (Phase 0) and
+future ``StepDiagramSystem`` (Phase 2). Flow diagrams pass simulation time
+``t`` (float) as the third gather slot; step diagrams will pass step index
+``k`` (int) in the same parameter position.
 """
 
 from __future__ import annotations
