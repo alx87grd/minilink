@@ -5,7 +5,7 @@ Active design backlog only — implemented work lives in [DESIGN.md](../../DESIG
 
 | File | Role |
 | --- | --- |
-| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — `StepSystem` (`phi`), ZOH controller → plant (MPC, SMC), orchestrator multi-rate on `dt_base` |
+| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — `StepSystem.step(x, u, k)`, ZOH controller → plant (MPC, SMC), orchestrator multi-rate on `dt_base` |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | **Planning pipeline** — result contract (path vs policy), parametric MPC/scene, transcription unification |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | **Parity audit** — full pyro ↔ minilink library + demo status tables |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle view ports + control wiring (design only) |

@@ -11,8 +11,8 @@ full Simulink parity.
 
 This design splits the hybrid discrete simulation capability into a clear pipeline, described across four detailed contracts:
 
-1. **[Discretization (01-discretization.md)](01-discretization.md)**: Bridging continuous systems to the discrete domain.
-2. **[Step Core (02-step-core.md)](02-step-core.md)**: Pure discrete math with no notion of physical time.
+1. **[Step Core (01-step-core.md)](01-step-core.md)**: Pure discrete math — **`StepSystem`**, diagrams, compile, runners. **Build this first.**
+2. **[Discretization (02-discretization.md)](02-discretization.md)**: **`discretize`** — optional conversion verb: continuous `DynamicSystem` + sample time `dt` → `StepSystem`. **After step core.**
 3. **[Scheduled Orchestrator (03-scheduled-orchestrator.md)](03-scheduled-orchestrator.md)**: Clock-driven multi-rate diagram execution.
 4. **[Hybrid Simulation (04-hybrid-simulation.md)](04-hybrid-simulation.md)**: Connecting discrete controllers to continuous plants.
 
@@ -30,7 +30,7 @@ flowchart TB
     end
 
     subgraph Layer1 [Layer 1: Pure Discrete Core]
-        DS_D[StepSystem<br/>x⁺ = φ(x, u, k)]
+        DS_D["StepSystem<br/>x_{k+1} = step(x, u, k)"]
         Diag_D[StepDiagramSystem]
         DSim[StepRunner<br/>N steps]
     end
@@ -46,8 +46,8 @@ flowchart TB
     end
 
     DS_C --> DISC
-    DISC --> DS_D
     DS_D --> Diag_D
+    DISC -.->|returns| DS_D
     Diag_D --> DSim
     
     Diag_D -.->|if physical time| sched
@@ -69,19 +69,25 @@ The implementation will be delivered in two phases:
 
 ## Implementation order
 
+Build the **pure stepping framework** before any continuous→discrete conversion. Phase A hybrid
+does **not** require `discretize` — controllers are native `StepSystem` blocks; the plant stays
+continuous (`rk4_rollout_zoh`).
+
 | Step | Component | Deliverable | Phase |
 | --- | --- | --- | --- |
 | 1 | Layer 1 | `StepSystem`, `ZOHHold`, leaf tests | — |
-| 2 | Conversion| `discretize` verb mapping continuous to `StepSystem` | — |
-| 3 | Layer 1 | shared diagram wiring mixin (`core/wiring.py`) | — |
-| 4 | Layer 1 | `StepDiagramSystem`, `compile_step_diagram` + `StepEvaluator` | — |
-| 5 | Layer 1 | `StepRunner` + `TimedStepSimulator` + closed-loop tests | — |
-| 6 | Layer 3 | `rk4_rollout_zoh` | — |
-| 7 | Layer 3 | `HybridDiagram` + `HybridSimulator` (ZOH + sample) | **A** |
-| 8 | Layer 3 | `MPCBlock` + straight-line MPC demo | **A** |
-| 9 | Layer 3 | `SMCBlock` (or pattern) + SMC hybrid demo | **A** |
+| 2 | Layer 1 | shared diagram wiring mixin (`core/wiring.py`) | — |
+| 3 | Layer 1 | `StepDiagramSystem`, `compile_step_diagram` + `StepEvaluator` | — |
+| 4 | Layer 1 | `StepRunner` + `TimedStepSimulator` + closed-loop tests | — |
+| 5 | Layer 3 | `rk4_rollout_zoh` | — |
+| 6 | Layer 3 | `HybridDiagram` + `HybridSimulator` (multi-port boundary) | **A** |
+| 7 | Layer 3 | `MPCBlock` + straight-line MPC demo | **A** |
+| 8 | Layer 3 | `SMCBlock` (or pattern) + SMC hybrid demo | **A** |
+| 9 | Conversion | `discretize` verb (`DynamicSystem` + `dt` → `StepSystem`) | post–step core |
 | 10 | Layer 2 | `StepSchedule` + `ScheduledStepOrchestrator` + tests | **B** |
 | 11 | Layer 3 | Cascade controller hybrid demo | **B** |
 | 12 | all | DESIGN / ROADMAP / README | — |
 
-**Gate:** Phase A hybrid (steps 7–9) begins after step compile + `rk4_rollout_zoh`. Phase B (steps 10–11) begins after Phase A hybrid tests pass.\n
+**Gate:** Phase A hybrid (steps 6–8) after step compile + closed-loop tests + `rk4_rollout_zoh`.
+Phase B (steps 10–11) after Phase A hybrid tests pass. **`discretize` (step 9) is optional** for
+Phase A/B — ship when step core is stable; not a blocker for MPC/SMC hybrid demos.

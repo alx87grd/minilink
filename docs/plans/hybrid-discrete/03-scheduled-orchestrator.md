@@ -16,6 +16,7 @@ class StepSchedule:
 ### Contract
 - Maps system IDs to their firing frequency (divisor of the base tick).
 - `None` implies all blocks fire every base tick (Phase A).
+- Orchestrator owns wall time: `t_k = t0 + k · dt_base`.
 
 ## `ScheduledStepOrchestrator`
 
@@ -32,7 +33,7 @@ class ScheduledStepOrchestrator:
 ```
 
 ### Contract
-- **No Diagram Expansion:** Uses compiled port wiring and per-block `phi` callables on the pure `StepDiagramSystem`.
+- **No Diagram Expansion:** Uses compiled port wiring and per-block **`step`** callables on the pure `StepDiagramSystem`.
 - **ZOH implicitly provided:** If a downstream block runs at a faster rate than its upstream source, the orchestrator supplies the last computed output from its internal buffer.
 - **Public API:** `ScheduledStepOrchestrator` is the primary, public mechanism for multi-rate loops.
 
@@ -40,4 +41,4 @@ class ScheduledStepOrchestrator:
 - `expand_scheduled_step` (inserting explicit `RateGate` and `SampleLatch` subsystems) is deferred as an optional lowering feature for later phases if explicitly requested.
 
 ### Tests
-- `test_scheduled_step_orchestrator.py`: Phase B fire mask, ZOH/sample buffers, and cascade performance.\n
+- `test_scheduled_step_orchestrator.py`: Phase B fire mask, ZOH/sample buffers, and cascade performance.

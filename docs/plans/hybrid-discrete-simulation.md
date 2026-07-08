@@ -20,7 +20,7 @@ Build in layers on **two fundamental state-evolution maps**:
 | Map | Leaf type | Equation | Meaning |
 | --- | --- | --- | --- |
 | **Flow `f`** | `DynamicSystem` | `dx = f(x, u, t; p)` | ODE / continuous evolution |
-| **Step `phi`** | `StepSystem` | `x⁺ = φ(x, u, t; p)` | One-shot update (difference eq., jump, turn) |
+| **Step `step`** | `StepSystem` | `x_{k+1} = step(x, u, k; p)` | One-shot update (difference eq., jump, turn) |
 
 **Static** blocks (`StaticSystem`, `n = 0`) and **output** map `h` are shared across all
 kinds. **Hybrid** is not a third map — it is **orchestration** that calls flow and step
@@ -28,7 +28,7 @@ engines and decides **when** each applies.
 
 Near-term deliverables:
 
-1. **`StepSystem`** — sibling of `DynamicSystem`; **`phi`** returns next state (not `dx`).
+1. **`StepSystem`** — sibling of `DynamicSystem`; **`step(x, u, k)`** returns next state (not `dx`).
 2. **Step diagram pipeline** — sibling `StepDiagramSystem` + compile + `StepRunner`
    (clock-free) + timed `TimedStepSimulator`; reuse wiring and `ExecutionPlan`.
 3. **Hybrid simulation (v1)** — two-side topology only: step side → ZOH → continuous plant
@@ -44,29 +44,36 @@ fires each block on schedule, and owns **hold/latch buffers** for cross-rate sig
 
 ## Short-term use cases (what we are building for)
 
-The first **hybrid** capability is **not** an arbitrary mixed diagram. It is one recurring
-pattern:
+The first **hybrid** capability is **not** an arbitrary mixed diagram. It is a **two-side**
+structure — step diagram + continuous diagram — with explicit **boundary connections**:
 
 ```text
-[ sampled controller (step side) ]  --ZOH on u-->  [ continuous plant (flow side) ]
-              ^                                              |
-              +---------------- measurements y ----------------+
+[ sampled controller (step side) ]  --ZOH (step→plant edges)-->  [ continuous plant ]
+              ^                                                           |
+              +-------- sample (plant→step edges, any port) ---------------+
 ```
 
-Both primary near-term targets share this **two-side** structure; only the controller block
-differs.
+Both primary near-term targets share this structure; only the controller block differs.
+**Phase A supports multiple named ports** across the boundary (not only `"u"` / `"y"`); MPC and
+SMC demos use the **minimal** case (one command edge + one measurement edge, possibly vector-valued).
 
 | Use case | Controller (step side) | Plant (flow side) | Sample time |
 | --- | --- | --- | --- |
 | **MPC closed loop** | `MPCBlock` (`StepSystem` wrapping `MPCPlanner.step`) | `DynamicBicycle` (or other catalog plant) | `Ts` = MPC period |
 | **Sliding-mode control (SMC)** | `SMCBlock` or generic sampled `StepSystem` controller | same continuous plant | `Ts` = SMC period |
 
-**ZOH semantics:** between controller updates, plant input `u` is **held constant**
-(zero-order hold). Measurements `y` are **sampled** at controller ticks (typically end of each
-plant sub-interval, or start — pick one convention and document in `HybridSimulator`).
+**Boundary semantics (Phase A):**
 
-This is the **only** hybrid topology in scope for v1. Controllers may contain static wiring
-(gains, saturations, mux) inside the step diagram; the plant stays a homogeneous flow diagram.
+| Direction | Policy |
+| --- | --- |
+| Step output → plant input | **ZOH** — held constant over `[t, t + dt_base]` |
+| Plant output → step input | **Sample** — latched at tick boundary (end of plant interval) |
+
+Tick order: **sample → step → ZOH → integrate plant** (standard one-tick feedback delay).
+World references (`r`) attach to step or plant diagram boundary inputs — not hybrid edges.
+
+This is the **only** hybrid topology class in scope for v1. Controllers may contain static wiring
+inside the step diagram; the plant stays a homogeneous flow diagram.
 
 ### Phase A — single-rate controller (ship first)
 
@@ -84,15 +91,15 @@ Phase A topology (single Ts):
 
 **Deliverables:**
 
-- `HybridDiagram` + `HybridSimulator` with boundary ZOH + measurement sample.
+- `HybridDiagram` + `HybridSimulator` with **`BoundaryConnection`** list (multi-port ZOH + sample).
 - `MPCBlock` + refactor one MPC demo (straight-line bicycle).
 - **`SMCBlock`** (or documented pattern): `StepSystem` implementing discrete-time sliding
   mode; same `HybridSimulator` loop as MPC — **no second sim path**.
 - Controller step diagram may be a **single leaf** (`MPCBlock` / `SMCBlock`) plus static
   blocks; no multi-rate expansion required yet.
 
-**Acceptance:** closed-loop sim matches hand-rolled demo loops within tolerance; plant sees
-piecewise-constant `u` between samples.
+**Acceptance:** closed-loop sim matches hand-rolled demo loops within tolerance; plant inputs
+held piecewise-constant between samples on every step→plant edge.
 
 ### Phase B — multi-block controller, integer multiples of base clock
 
@@ -110,11 +117,11 @@ Phase B topology (orchestrator on logical diagram):
 **Mechanism:** user wires logical `StepDiagramSystem`; attaches
 `StepSchedule(dt_base, fire={...})` on `HybridDiagram` (or orchestrator); **no graph
 rewrite**. `ScheduledStepOrchestrator` @ `dt_base` updates buffers and calls each block's
-`phi` when its divisor fires. Plant side unchanged from Phase A.
+`step` when its divisor fires. Plant side unchanged from Phase A.
 
 **Example schedule** (`dt_base = 0.01 s` = 100 Hz):
 
-| Block | Rate | `fire[sys_id]` (divisor k) |
+| Block | Rate | `fire[sys_id]` (divisor d) |
 | --- | --- | --- |
 | `filter` | 100 Hz | `1` |
 | `mpc` | 10 Hz | `10` |
@@ -133,9 +140,9 @@ orchestrator buffers.**
 | | **A — Orchestrator buffers** (adopt) | **B — Diagram expansion** (optional) |
 | --- | --- | --- |
 | **Idea** | Logical diagram unchanged; orchestrator owns ZOH/latch **buffers** and fires blocks on schedule | `expand_scheduled_step()` inserts `RateGate`, `HoldRegister`, `SampleLatch` as step blocks with state |
-| **Block contract** | Pure `phi`; rate via `StepSchedule.fire` (optional per-block hint in `params`) | Pure `phi` wrapped in infrastructure blocks |
+| **Block contract** | Pure `step`; rate via `StepSchedule.fire` (optional per-block hint in `params`) | Pure `step` wrapped in infrastructure blocks |
 | **Hold state** | Orchestrator side buffers (export via `buffer_history` on traj) | In diagram state vector `x` |
-| **Sim loop** | Orchestrator tick @ `dt_base` → subset of `phi` calls | Full `StepEvaluator.step` on expanded diagram |
+| **Sim loop** | Orchestrator tick @ `dt_base` → subset of `step` calls | Full `StepEvaluator.step` on expanded diagram |
 
 **Orchestrator — pros:** pure control-law blocks; logical diagram = mental model; complexity
 in orchestrators ([AGENTS.md](../../AGENTS.md)); natural Phase A → B (same
@@ -171,21 +178,21 @@ User writes (logical topology, no holds):
 Orchestrator @ dt_base (ScheduledStepOrchestrator):
 
   tick k:
-    if filter fires:  run filter.phi(...); buffer["filter:y"] ← output
+    if filter fires:  run filter.step(..., k); buffer["filter:y"] ← output
     else:              use buffer["filter:y"]  (ZOH for downstream)
-    if mpc fires:      run mpc.phi(..., buffer["filter:y"]); buffer["mpc:u"] ← u_cmd
+    if mpc fires:      run mpc.step(..., k, buffer["filter:y"]); buffer["mpc:u"] ← u_cmd
     ...
-  HybridSimulator: ZOH buffer["mpc:u"] → plant → sample y
+  HybridSimulator: ZOH step→plant edges → integrate plant → sample plant→step edges
 ```
 
 **Three user-facing pieces:**
 
 | Piece | Role |
 | --- | --- |
-| `StepDiagramSystem` | Wire cascade normally (`filter >> mpc`); blocks stay pure `phi` |
+| `StepDiagramSystem` | Wire cascade normally (`filter >> mpc`); blocks stay pure `step` |
 | `StepSchedule(dt_base, fire)` | Integer divisors per `sys_id`; lives on `HybridDiagram` / orchestrator |
 | `ScheduledStepOrchestrator` | Buffers + fire mask @ `dt_base`; embedded in `HybridSimulator` for Phase B |
-| `HybridSimulator` | Orchestrator tick + ZOH `u` → continuous plant (Phase A/B) |
+| `HybridSimulator` | Orchestrator tick + boundary ZOH/sample → continuous plant (Phase A/B) |
 
 **End-to-end API (Phase B):**
 
@@ -201,11 +208,13 @@ controller.connect_new_output_port("mpc", "u", "u")
 schedule = StepSchedule(dt_base=0.01, fire={"filter": 1, "mpc": 10})
 
 hybrid = HybridDiagram(
-    step=controller,              # logical diagram — not expanded
+    step=controller,
     continuous=plant,
     schedule=schedule,
-    connections=[...],
+    dt_base=0.01,
 )
+hybrid.connect_boundary("output", "u", "plant", "u")
+hybrid.connect_boundary("input", "y", "plant", "y")
 HybridSimulator(hybrid, ...).run()
 ```
 
@@ -216,7 +225,7 @@ HybridSimulator(hybrid, ...).run()
 | Same rate | Both fire same ticks |
 | Slow consumer ← fast producer | **Sample** producer output when slow block fires |
 | Fast consumer ← slow producer | **ZOH** — hold last slow output in buffer |
-| Block divisor `k > 1` | Run `phi` every k ticks; skip otherwise (buffer holds) |
+| Block divisor `d > 1` | Run `step` every d base ticks; skip otherwise (buffer holds) |
 
 **Debug:** orchestrator records `buffer_history` (or `HybridSimResult.buffers`) so internal
 holds are plottable like diagram internal signals — without putting hold state in `x`.
@@ -224,7 +233,7 @@ holds are plottable like diagram internal signals — without putting hold state
 **Defaults:**
 
 - **`dt_base`** = fastest controller block period.
-- **`fire[sys_id] = k`** = block fires every **k** base steps.
+- **`fire[sys_id] = d`** = block fires every **d** base steps (step index **`k`** increments every base tick).
 - Plant boundary: same ZOH + sample as Phase A.
 
 **Optional lowering (expansion path):**
@@ -259,15 +268,15 @@ flowchart LR
     subgraph phaseA [Phase A single Ts]
         C1[MPC or SMC block]
         P1[continuous plant]
-        C1 -->|ZOH u| P1
-        P1 -->|sample y| C1
+        C1 -->|ZOH edges| P1
+        P1 -->|sample edges| C1
     end
 
     subgraph phaseB [Phase B multi-rate controller]
         C2[logical step diagram + orchestrator]
         P2[continuous plant]
-        C2 -->|ZOH u| P2
-        P2 -->|sample y| C2
+        C2 -->|ZOH edges| P2
+        P2 -->|sample edges| C2
     end
 
     phaseA --> phaseB
@@ -284,15 +293,15 @@ differs by kind:
 | --- | --- | --- | --- | --- |
 | **Static** | `n = 0` | `h` | `y = h(u, t; p)` | Algebra: gains, mux, saturation |
 | **Flow** | `n > 0` | `f` | `dx = f(x, u, t; p)` | Plants, integrators, ODE controllers |
-| **Step** | `n > 0` | `φ` (`phi`) | `x⁺ = φ(x, u, t; p)` | Digital control laws, games, jumps |
-| **Hybrid** | `n > 0` | **`f` + `φ`** | flow between steps; step at instants | MPC+plant, switched systems, impacts |
+| **Step** | `n > 0` | `step` | `x_{k+1} = step(x, u, k; p)` | Digital control laws, games, jumps |
+| **Hybrid** | `n > 0` | **`f` + `step`** | flow between steps; step at instants | MPC+plant, switched systems, impacts |
 
 ```mermaid
 flowchart TB
     subgraph leaves [Leaf maps]
         ST[StaticSystem h only]
         FL[DynamicSystem f flow]
-        SP[StepSystem phi step]
+        SP[StepSystem step]
     end
 
     subgraph diagrams [Homogeneous diagrams]
@@ -334,7 +343,7 @@ Investigated options for the step core:
 
 **Shared without duplication:** port wiring, params nesting, algebraic-loop detection,
 `ExecutionPlan`, `PortOperation`, `StateOperation`. **Forked:** leaf type, evaluator public
-API (`f` → `dx` vs `step` → `x⁺`), and advance loop (ODE integrator vs `x ← φ`).
+API (`f` → `dx` vs `step` → `x_new`), and advance loop (ODE integrator vs `x ← step(...)`).
 
 Do **not** use `solver_info["continuous_time_equation"]` as the primary semantic switch —
 evolution kind is **type-level** (`isinstance(sys, StepSystem)`). The existing simulator
@@ -342,22 +351,24 @@ hook may remain for facades only.
 
 ---
 
-## Naming: `f` vs `phi`
+## Naming: `f` vs `step`
 
 | | Flow | Step |
 | --- | --- | --- |
-| **Math** | `dx = f(x, u, t; p)` | `x⁺ = φ(x, u, t; p)` or `x_{k+1} = φ(x_k, u_k, t_k; p)` |
-| **Leaf method** | `f(...)` on `DynamicSystem` | **`phi(...)`** on `StepSystem` |
-| **Evaluator** | `DynamicsEvaluator.f` → `dx` | **`StepEvaluator.step`** → `x⁺` (calls stored `phi`) |
+| **Math** | `dx = f(x, u, t; p)` | `x_{k+1} = step(x, u, k; p)` |
+| **Leaf method** | `f(...)` on `DynamicSystem` | **`step(...)`** on `StepSystem` |
+| **Evaluator** | `DynamicsEvaluator.f` → `dx` | **`StepEvaluator.step`** → `x_new` (calls each block's `step`) |
+| **Step index** | continuous time `t` (float) | **`k`** (int); do not use `n` (state dimension) |
 | **Avoid** | — | **`g`** (gravity, costs, NLP constraints already use `g` in minilink) |
 
-`phi` is the standard one-step **transition map** in dynamical-systems literature and pairs
-cleanly with flow `f`. **`step`** is the orchestrator/evaluator verb, not the leaf equation
-name.
+Leaf and evaluator share the verb **`step`**, mirroring how diagram evaluators expose **`f`**
+for flow systems. Docstrings may use `x_{k+1}` or `x_new`; the return value is the next state
+vector.
 
-Phase-1 **`StepSystem` has no clock on the class** — turn-based games use `StepRunner` with
-`t` as move index. Sample periods for digital control live in **`StepSchedule`** (Phase B) or
-outer `HybridSimulator` tick (Phase A).
+**`StepSystem` has no class-level clock** — turn-based games use `StepRunner` with caller-owned
+`k`. Sample periods for digital control live in **`StepSchedule`** (Phase B) or the outer
+`HybridSimulator` tick (Phase A); orchestrator maps `t_k = t0 + k · dt_base` when wall time is
+needed for logging or plant integration.
 
 ---
 
@@ -366,11 +377,11 @@ outer `HybridSimulator` tick (Phase A).
 When flow and step combine, three pieces are required:
 
 1. **Flow engine** — integrate `dx = f(...)` (existing `DynamicsEvaluator` + solvers).
-2. **Step engine** — apply `x ← φ(...)` (`StepEvaluator.step`).
+2. **Step engine** — apply `x ← step(...)` (`StepEvaluator.step`).
 3. **Scheduler** — decides *when* to flow, *when* to step, and boundary I/O between sides.
 
 The scheduler is **not** a fourth fundamental map. Clocks, guards, and triggers live in
-orchestrators — not inside leaf `f` or `phi`.
+orchestrators — not inside leaf `f` or `step`.
 
 ### Trigger policies (what the scheduler implements)
 
@@ -378,16 +389,16 @@ orchestrators — not inside leaf `f` or `phi`.
 | --- | --- | --- | --- |
 | **Clock-driven** | every `dt_base` or tick `k` | MPC @ 10 Hz + plant | `HybridSimulator`, `TimedStepSimulator` |
 | **Turn / index-driven** | caller advances one step | chess, RL `env.step` | `StepRunner` only (no `dt`) |
-| **Event-driven** | guard `g(x,u,t)` during flow | impact, relay crossing | **Deferred** — flow + event locator + jump `φ` |
+| **Event-driven** | guard `g(x,u,t)` during flow | impact, relay crossing | **Deferred** — flow + event locator + jump `step` |
 | **Mode-driven** | discrete mode `σ` selects `f_σ` | switched continuous plant | **Deferred** — mode in state or params + scheduler |
 | **Enable / triggered** | enable signal | triggered subsystem | orchestrator skip-fire (future) |
 
 ```text
          ┌──────────────── orchestrator ────────────────┐
          │                                              │
-  u ───► │  [step side φ] ──ZOH──► [flow side f] ──y──►│──► y_meas
-         │       ▲                      │               │
-         │       └──── sample y ────────┘               │
+  r ───► │  [step side] ──ZOH (edges)──► [flow plant]   │
+         │       ▲              │                       │
+         │       └── sample (edges) ────────────────────┘
          └──────────────────────────────────────────────┘
 ```
 
@@ -398,32 +409,45 @@ orchestrators — not inside leaf `f` or `phi`.
 | Time / tick index | scheduler |
 | Call integrate `f` on plant vs step/orchestrate controller | `HybridSimulator` |
 | Cross-rate holds / latches | `ScheduledStepOrchestrator` buffers |
-| Boundary: ZOH, sample, port mapping | `HybridDiagram` + scheduler |
+| Boundary: multi-port ZOH / sample, port mapping | `HybridDiagram.connect_boundary` + `HybridSimulator` |
 | Homogeneous compile per side | `compile()` vs `compile_step()` |
 | Guards / zero-crossings | future `EventHybrid` (layer 5) |
 
 ### v1 hybrid cycle (clock-driven, pseudocode)
 
-**Phase A** (`schedule is None` — all blocks fire):
+**Phase A** (`schedule is None` — all blocks fire). Boundary driven by `hybrid.connections`;
+`assemble_*` maps buffer dicts to diagram boundary input vectors (see
+[04-hybrid-simulation.md](hybrid-discrete/04-hybrid-simulation.md)).
 
 ```python
 x_flow, x_step = x_flow_0, x_step_0
-t = t0
+zoh_buffers, sample_buffers = {}, {}
+t, k = t0, 0
+
 while t < tf:
-    u_hold = step_evaluator.outputs(x_step, u_ext, t)["u"]
-    x_step = step_evaluator.step(x_step, u_ext, t)
-    x_flow = cont_evaluator.rk4_rollout_zoh(x_flow, u_hold, t, dt)
-    y_meas = cont_evaluator.outputs(x_flow, u_hold, t + dt)["y"]
-    u_ext = sample_for_step_side(y_meas)
-    t += dt
+    u_step = assemble_step_inputs(hybrid, world, sample_buffers, x_flow, t, k)
+    x_step = step_evaluator.step(x_step, u_step, k)
+
+    step_out = step_evaluator.outputs(x_step, u_step, k)
+    u_plant = assemble_plant_inputs(hybrid, zoh_buffers, step_out)
+
+    x_flow = cont_evaluator.rk4_rollout_zoh(x_flow, u_plant, t, dt_base)
+    plant_out = cont_evaluator.outputs(x_flow, u_plant, t + dt_base)
+    update_sample_buffers(hybrid, sample_buffers, plant_out)
+
+    t += dt_base
+    k += 1
 ```
 
-**Phase B** — replace step side with orchestrator tick:
+**Phase B** — replace `step_evaluator.step` with `orchestrator.tick(...)`; plant boundary
+unchanged:
 
 ```python
 while t < tf:
-    x_step, u_hold, _bufs = orchestrator.tick(x_step, u_ext, t, k)
-    x_flow = cont_evaluator.rk4_rollout_zoh(x_flow, u_hold, t, dt_base)
+    u_step = assemble_step_inputs(...)
+    x_step, step_out, _orch_bufs = orchestrator.tick(x_step, u_step, t, k)
+    u_plant = assemble_plant_inputs(hybrid, zoh_buffers, step_out)
+    x_flow = cont_evaluator.rk4_rollout_zoh(x_flow, u_plant, t, dt_base)
     ...
     t += dt_base
     k += 1
@@ -441,13 +465,13 @@ Path from this plan to hybrid automata / switched systems **without changing the
 | --- | --- | --- |
 | **A — Compositional** | Two-side MPC + plant | `HybridSimulator` (this plan) |
 | **B — Switched flow** | `f_σ(x,u)`, mode `σ` | `DynamicSystem` + mode in state/params; scheduler picks `σ` |
-| **C — Full hybrid** | flow + guard + jump | integrate `f` until guard; then `x ← φ_jump` |
+| **C — Full hybrid** | flow + guard + jump | integrate `f` until guard; then `x ← step_jump(...)` |
 
 ```mermaid
 flowchart TB
     subgraph primitives [Leaf primitives — build now]
         DS[DynamicSystem flow f]
-        SS[StepSystem step phi]
+        SS[StepSystem step]
         ST[StaticSystem]
     end
 
@@ -474,24 +498,26 @@ heterogeneous blocks in one diagram class before event scheduling exists.
 
 ## Recommendation
 
-**Build two leaf maps (`f` and `phi`), homogeneous diagrams, then hybrid as thin glue.**
+**Build two leaf maps (`f` and `step`), homogeneous diagrams, then hybrid as thin glue.**
 
 - Each layer is testable in isolation (step closed loops before touching the plant).
 - Reuses minilink's pattern: `System` → diagram → compile → evaluator → runner/simulator.
-- Hybrid schedules two mature pipelines; no fused `ExecutionPlan` mixing `dx` and `x⁺`.
+- Hybrid schedules two mature pipelines; no fused `ExecutionPlan` mixing `dx` and `x_new`.
 
 | Layer | Delivers | Does not deliver |
 | --- | --- | --- |
-| **1** | `StepSystem`, `ZOHHold` (math: `phi` only) | Clock, diagrams, simulation |
+| **1** | `StepSystem`, `ZOHHold` (math: `step` only) | Clock, diagrams, simulation |
 | **2a** | `StepDiagramSystem` — logical topology, compile | Multi-rate scheduling |
 | **2b** | compile + `StepRunner` + `TimedStepSimulator` | Multi-rate orchestrator |
 | **2c** | `StepSchedule` + `ScheduledStepOrchestrator` | Non-integer rate ratios |
 | **3a** | **Phase A:** `HybridSimulator`, `MPCBlock`, `SMCBlock`, one `Ts` | Multi-rate controller |
 | **3b** | **Phase B:** cascade via orchestrator @ `dt_base` | Expansion lowering (optional) |
 | **4–5** | (future) events, guards, switched modes; optional `expand_scheduled_step` | — |
+| **Conv.** | **`discretize`** — `DynamicSystem` + `dt` → `StepSystem` (after step core) | Not required for Phase A hybrid |
 
-**Implementation gates:** Layer 3a (single-rate hybrid) after step compile works. Phase B
-orchestrator does **not** block MPC/SMC. Expansion lowering is optional post-Phase B.
+**Implementation gates:** Layer 3a (single-rate hybrid) after step compile + closed-loop tests work.
+Phase B orchestrator does **not** block MPC/SMC. **`discretize` is post–step-core**, optional for
+hybrid v1. Expansion lowering is optional post-Phase B.
 
 ---
 
@@ -500,7 +526,7 @@ orchestrator does **not** block MPC/SMC. Expansion lowering is optional post-Pha
 ```mermaid
 flowchart TB
     subgraph layer1 [Layer 1 StepSystem]
-        SS[StepSystem leaf phi]
+        SS[StepSystem leaf step]
         ZOH[ZOHHold block]
     end
 
@@ -548,7 +574,9 @@ flowchart TB
 ### Phase A: single-rate (no schedule object)
 
 ```python
-hybrid = HybridDiagram(step=controller, continuous=plant, connections=[...], dt_base=Ts)
+hybrid = HybridDiagram(step=controller, continuous=plant, dt_base=Ts)
+hybrid.connect_boundary("output", "u", "plant", "u")
+hybrid.connect_boundary("input", "y", "plant", "y")
 HybridSimulator(hybrid, ...).run()   # every tick: all blocks fire
 ```
 
@@ -563,7 +591,9 @@ controller.connect("filter", "y", "mpc", "r")
 
 schedule = StepSchedule(dt_base=0.01, fire={"filter": 1, "mpc": 10})
 
-hybrid = HybridDiagram(step=controller, continuous=plant, schedule=schedule, connections=[...])
+hybrid = HybridDiagram(step=controller, continuous=plant, schedule=schedule, dt_base=0.01)
+hybrid.connect_boundary("output", "u", "plant", "u")
+hybrid.connect_boundary("input", "y", "plant", "y")
 HybridSimulator(hybrid, ...).run()
 ```
 
@@ -571,13 +601,15 @@ HybridSimulator(hybrid, ...).run()
 
 ```python
 sync = expand_scheduled_step(controller, dt_base=0.01, schedule={"filter": 1, "mpc": 10})
-hybrid = HybridDiagram(step=sync, continuous=plant, connections=[...], dt_base=0.01)
+hybrid = HybridDiagram(step=sync, continuous=plant, dt_base=0.01)
+hybrid.connect_boundary("output", "u", "plant", "u")
+hybrid.connect_boundary("input", "y", "plant", "y")
 # StepEvaluator.step on expanded diagram — holds in x, no orchestrator buffers
 ```
 
 **Rate metadata on blocks:** optional `params["sample_period"]` or class doc hint for
-documentation; **authoritative** divisors live in `StepSchedule.fire`. Leaf `phi` stays
-pure — mirrors continuous minilink: **`phi` is math; time grid lives in the orchestrator.**
+documentation; **authoritative** divisors live in `StepSchedule.fire`. Leaf `step` stays
+pure — mirrors continuous minilink: **`step` is math; time grid lives in the orchestrator.**
 
 ### Optional expansion blocks (lowering only)
 
@@ -585,7 +617,7 @@ If `expand_scheduled_step()` is implemented later:
 
 | Block | Role when expanded |
 | --- | --- |
-| `RateGate` | Wrap slow subsystem; fire inner `phi` every k ticks |
+| `RateGate` | Wrap slow subsystem; fire inner `step` every d base ticks |
 | `HoldRegister` | ZOH on slow→fast edges |
 | `SampleLatch` | Sample on fast→slow edges |
 
@@ -603,7 +635,7 @@ Not required for Phase B orchestrator path.
 | Step | Out of scope in DESIGN §3 | Layers 1–3 (subset) |
 | MPC demos | Manual Python loop × 7 | Layer 3 via `MPCBlock` + `HybridSimulator` |
 | JAX plant rollout | `rk4_rollout_ivp` scan | add `rk4_rollout_zoh` for hybrid inner loop |
-| `game()` loop | Euler on `f` | Later: branch for `StepSystem` → `x = phi(x,u,t)` |
+| `game()` loop | Euler on `f` | Later: branch for `StepSystem` → `x = step(x, u, k)` |
 
 ---
 
@@ -614,18 +646,22 @@ Not required for Phase B orchestrator path.
 ```python
 class StepSystem(System):
     """
-    x⁺ = φ(x, u, t; p)
-    y  = h(x, u, t; p)
+    x_{k+1} = step(x, u, k; p)
+    y_k     = h(x, u, k; p)
     """
-    def phi(self, x, u, t=0, params=None):
+    def step(self, x, u, k=0, params=None):
+        ...
+
+    def h(self, x, u, k=0, params=None):
         ...
 ```
 
 - Same port/params surface as `DynamicSystem` (`u`, `y`, optional `x` ports).
-- **`phi` returns next state**, not derivative; do **not** overload `f` on this class.
+- **`step` returns next state** (`x_new`), not a derivative; do **not** overload `f` on this class.
+- **Integer step index `k`**, not float `t`; `k=0` default (same role as `t=0` on `f` / `h`).
 - `solver_info`: `continuous_time_equation=False`.
-- `dt` or sample time inside `phi` via `params` or wiring only when the **model** needs it —
-  not a class-level clock.
+- Sample period inside `step` via `params` or closed-over discretization only when the **model**
+  needs it — not a class-level clock.
 - Parallel continuous work: **`rk4_rollout_zoh`** on flow evaluator (JAX scan) for Layer 3.
 
 ---
@@ -643,16 +679,15 @@ class StepSystem(System):
 
 **File:** `minilink/core/step_diagram.py` — **sibling** of `DiagramSystem`.
 
-- **`x⁺ = φ(x, u, t)`** — same stacked loop as flow `DiagramSystem.f`; docstring and method
-  name differ (`phi` or diagram-level `step_state`).
-- Evaluator exposes **`step(x, u, t)`** calling each block's `phi`.
+- **`x_{k+1} = step(x, u, k)`** — same stacked loop as flow `DiagramSystem.f`.
+- Evaluator exposes **`step(x, u, k)`** calling each block's `step`.
 - Subsystems: `StepSystem`, `StaticSystem`, `ZOHHold`. Reject `DynamicSystem` at compile.
 - Reuse `build_execution_plan()` and `ExecutionPlan` — do not fork.
 
 | Flow | Step |
 | --- | --- |
 | `compile_diagram()` → `DynamicsEvaluator` | `compile_step_diagram()` → `StepEvaluator` |
-| `evaluator.f → dx` | `evaluator.step → x⁺` |
+| `evaluator.f → dx` | `evaluator.step → x_new` |
 | RK4, rollout, SciPy | stepping only |
 
 Mark step compile path **`TODO: User Architectural Review`** until closed-loop tests pass.
@@ -661,10 +696,10 @@ Mark step compile path **`TODO: User Architectural Review`** until closed-loop t
 
 **Files:** `minilink/simulation/step_runner.py`, `minilink/simulation/timed_step_simulator.py`
 
-**`StepRunner`** — clock-free; caller owns `t` sequence (turn-based, generic stepping):
+**`StepRunner`** — clock-free; caller owns `k` sequence (turn-based, generic stepping):
 
 ```python
-def run_steps(evaluator, x0, u_sequence, t_sequence) -> StepResult
+def run_steps(evaluator, x0, u_sequence, k_sequence) -> StepResult
 ```
 
 **`TimedStepSimulator`** — uniform grid wrapper (digital control):
@@ -686,30 +721,38 @@ Multi-rate: `ScheduledStepOrchestrator` when `schedule is not None`; single-rate
 | Layer | Shared? |
 | --- | --- |
 | Port wiring | **Yes** — `core/wiring.py` mixin |
-| Diagram state map | **Yes** — same loop; `dx` vs `x⁺` docstring |
+| Diagram state map | **Yes** — same loop; `dx` vs `x_new` docstring |
 | `ExecutionPlan` | **Yes** |
 | Leaf type | **Sibling** — `DynamicSystem` vs `StepSystem` |
 | Evaluator | **Sibling** — `DynamicsEvaluator` vs `StepEvaluator` |
-| Runner / simulator | **Different** — ODE vs `x ← φ` |
+| Runner / simulator | **Different** — ODE vs `x ← step(...)` |
 
 ---
 
 ## Layer 3: Hybrid — sampled controller + ZOH + continuous plant
 
-The **only** v1 hybrid structure (see [Short-term use cases](#short-term-use-cases-what-we-are-building-for)):
+Two-side structure with **`BoundaryConnection`** edges (multi-port in Phase A). Minimal MPC/SMC
+loops use one step→plant + one plant→step edge; see
+[04-hybrid-simulation.md](hybrid-discrete/04-hybrid-simulation.md).
 
+```text
+  r ──► [ StepDiagramSystem ] ──(ZOH edges)──► [ DiagramSystem plant ]
+              ▲                                        │
+              └──── (sample edges, any ports) ──────────┘
 ```
-[ StepDiagramSystem ]  --ZOH on u-->  [ DiagramSystem plant ]
-         ^                                      |
-         +----------- sample y -------------------+
-```
 
-Phase A: one controller block at sample period `Ts`. Phase B: logical step diagram +
-`StepSchedule` + `ScheduledStepOrchestrator` @ `dt_base`, same plant boundary.
+Phase A: one controller sample period `Ts` (= `dt_base`). Phase B: logical step diagram +
+`StepSchedule` + `ScheduledStepOrchestrator` @ `dt_base`; **plant boundary unchanged**.
 
-### `HybridDiagram` — `minilink/core/hybrid_diagram.py`
+### `BoundaryConnection` and `HybridDiagram` — `minilink/core/hybrid_diagram.py`
 
 ```python
+@dataclass(frozen=True)
+class BoundaryConnection:
+    step: tuple[str, str]          # ("output"|"input"|sys_id, port_id)
+    continuous: tuple[str, str]    # ("input"|"output"|sys_id, port_id)
+    # Direction: step out → cont in (ZOH), or cont out → step in (sample)
+
 @dataclass
 class StepSchedule:
     dt_base: float
@@ -717,12 +760,20 @@ class StepSchedule:
 
 @dataclass
 class HybridDiagram:
-    step: StepDiagramSystem          # logical diagram (not expanded by default)
+    step: StepDiagramSystem
     continuous: DiagramSystem
     connections: list[BoundaryConnection]
-    dt_base: float                   # Phase A outer tick (= Ts); Phase B = schedule.dt_base
-    schedule: StepSchedule | None = None   # None => all blocks fire every tick (Phase A)
+    dt_base: float
+    schedule: StepSchedule | None = None
+
+    def connect_boundary(
+        self, step_sys_id, step_port_id, continuous_sys_id, continuous_port_id
+    ) -> None: ...
 ```
+
+Validate port dimensions and output→input direction at connect time. `HybridSimulator` keeps
+**`zoh_buffers`** (step→plant) and **`sample_buffers`** (plant→step); assembles boundary `u`
+vectors like compile `EXTERNAL_INPUT` gathers.
 
 ### `ScheduledStepOrchestrator` — `minilink/simulation/scheduled_step.py`
 
@@ -732,34 +783,33 @@ Runs a **logical** compiled step diagram @ `dt_base`:
 class ScheduledStepOrchestrator:
     def __init__(self, diagram, schedule: StepSchedule, *, compile_backend="numpy"): ...
 
-    def tick(self, x_step, u_ext, t, k) -> tuple[x_step, u_plant, BufferSnapshot]: ...
-    """Fire blocks per schedule.fire; update hold/latch buffers; return plant input."""
+    def tick(self, x_step, u_step, t, k) -> tuple[x_step, step_outputs, BufferSnapshot]: ...
+    """Fire blocks per schedule.fire; return updated step state and boundary outputs."""
 
     def buffer_history(self) -> dict[str, np.ndarray]: ...  # debug / plot internal holds
 ```
 
-Uses compiled port wiring and per-block `phi` callables; **does not** require expanded
+Uses compiled port wiring and per-block **`step`** callables; **does not** require expanded
 diagram. Embedded by `HybridSimulator` when `schedule is not None`.
 
 ### `HybridSimulator` — `minilink/simulation/hybrid_simulator.py`
 
-**Phase A** — `schedule is None`; every block fires each tick:
+**Phase A** — `schedule is None`; every block fires each tick.
 
-Per controller tick:
+Per **`dt_base`** tick (see [tick order](hybrid-discrete/04-hybrid-simulation.md)):
 
-1. Step side — `step_evaluator.step` (all blocks) or orchestrator with all `fire=1`.
-2. Boundary — hold controller output `u` (ZOH) for the plant over `[t, t + Ts]`.
-3. Continuous — `cont_evaluator.rk4_rollout_zoh(x, u_hold, t, Ts)` (optional inner substeps
-   `dt_plant << Ts`).
-4. Feedback — sample plant outputs `y` at tick boundary → controller inputs.
+1. **Sample** — plant→step edges into `sample_buffers`; assemble step boundary inputs.
+2. **Step** — `step_evaluator.step` or `ScheduledStepOrchestrator.tick`.
+3. **ZOH** — step→plant edges into `zoh_buffers`; assemble plant boundary inputs.
+4. **Flow** — `cont_evaluator.rk4_rollout_zoh(x, u_plant, t, dt_base)` (optional inner substeps).
 
-**Phase B** — `ScheduledStepOrchestrator.tick` @ `dt_base`; plant path unchanged from Phase A.
+**Phase B** — orchestrator on step side only; plant boundary path unchanged from Phase A.
 
 Python outer (step + MPC/SMC solvers) / JAX inner (plant rollout).
 
 ### `MPCBlock` — `minilink/planning/mpc/`
 
-- `StepSystem` wrapping `MPCPlanner.step`.
+- `StepSystem` implementing **`step(x, u, k)`** by wrapping `MPCPlanner.step` (planner API unchanged).
 - Warm-start state in `__init__`; no `core/compile/` imports.
 - `sys_mpc` vs `sys_sim` stays explicit in demos.
 - Primary **Phase A** reference controller.
@@ -767,7 +817,7 @@ Python outer (step + MPC/SMC solvers) / JAX inner (plant rollout).
 ### Sampled sliding-mode controller (`SMCBlock` or pattern)
 
 - **`StepSystem`** implementing discrete-time sliding-mode law (or equivalent sampled SMC).
-- Lives on step side of `HybridDiagram`; **same ZOH boundary** as MPC.
+- Lives on step side of `HybridDiagram`; **same boundary API** as MPC (any `connect_boundary` edges).
 - May live in `minilink/control/` as factory + block; no `core/compile/` imports.
 - **Phase A** deliverable alongside MPC — proves hybrid sim is not MPC-specific.
 
@@ -795,13 +845,15 @@ Python outer (step + MPC/SMC solvers) / JAX inner (plant rollout).
 | Item | Why |
 | --- | --- |
 | Flow + step in one flat diagram | v1 uses two sides + orchestrator |
+| Cross-boundary algebraic loop (same tick) | sample-before-step convention; stricter check later |
+| Per-port FOH, delay, async boundary rates | ZOH + sample @ `dt_base` only |
 | Non-integer divisor ratios | resampling / drift |
 | Evaluator hold-buffer scheduler (public) | orchestrator is the public contract |
 | `expand_scheduled_step` / infra hold blocks | optional lowering; post-Phase B if needed |
 | FOH, delay, events, full Simulink multi-rate | ZOH subset only |
 | `EventHybrid` (guards, zero-crossing, jump maps) | layer 5; needs event engine |
 | Switched-mode flow without events | mode in state; scheduler later |
-| `linearize` / Bode on native `StepSystem` | Jacobian ∂φ/∂x is discrete A; separate pass |
+| `linearize` / Bode on native `StepSystem` | Jacobian ∂step/∂x is discrete A; separate pass |
 
 ---
 
@@ -809,13 +861,15 @@ Python outer (step + MPC/SMC solvers) / JAX inner (plant rollout).
 
 | Layer | File | Cases |
 | --- | --- | --- |
-| 1 | `test_step_system.py` | leaf `phi`; `ZOHHold`; `solver_info` |
+| 1 | `test_step_system.py` | leaf `step`; `ZOHHold`; `solver_info` |
 | 1 | `test_rk4_rollout_zoh.py` | NumPy/JAX vs repeated `rk4_step` |
 | 2 | `test_step_diagram.py` | wiring; `@` closed loop |
 | 2 | `test_scheduled_step_orchestrator.py` | Phase B: fire mask, ZOH/sample buffers, cascade |
 | 2 | `test_step_runner.py` | clock-free stepping |
 | 2 | `test_timed_step_simulator.py` | sync closed loop; single-rate step diagram |
-| 3 | `test_hybrid_simulator.py` | Phase A: ZOH → plant → sample y; MPC and SMC smoke |
+| Conv. | `test_discretize.py` | euler/rk4 match continuous integration over `dt` (post–step core) |
+| 3 | `test_hybrid_simulator.py` | Phase A: multi-port boundary; minimal u/y matches hand-rolled MPC |
+| 3 | `test_hybrid_boundary_connect.py` | invalid boundary wiring raises at connect time |
 | 3 | `test_mpc_block.py` | MPCBlock closed loop |
 | 3 | `test_smc_hybrid.py` | SMC + plant via same HybridSimulator (Phase A) |
 | 2–3 | `test_hybrid_cascade.py` | Phase B: filter fast + MPC slow via orchestrator |
@@ -825,32 +879,38 @@ Python outer (step + MPC/SMC solvers) / JAX inner (plant rollout).
 
 ## Implementation order
 
+Build the **pure stepping framework** first; **`discretize`** comes after step core is tested.
+Phase A hybrid does **not** need `discretize` (native `StepSystem` controllers + continuous plant).
+
 | Step | Layer | Deliverable | Phase |
 | --- | --- | --- | --- |
 | 1 | 1 | `StepSystem`, `ZOHHold`, leaf tests | — |
-| 2 | 1 | `rk4_rollout_zoh` | — |
-| 3 | 2 | shared diagram wiring mixin (`core/wiring.py`) | — |
-| 4 | 2 | `StepDiagramSystem` | — |
-| 5 | 2 | `compile_step_diagram` + `StepEvaluator` | — |
-| 6 | 2 | `StepRunner` + `TimedStepSimulator` + closed-loop tests | — |
-| 7 | 3 | `HybridDiagram` + `HybridSimulator` (ZOH + sample) | **A** |
+| 2 | 2 | shared diagram wiring mixin (`core/wiring.py`) | — |
+| 3 | 2 | `StepDiagramSystem` | — |
+| 4 | 2 | `compile_step_diagram` + `StepEvaluator` | — |
+| 5 | 2 | `StepRunner` + `TimedStepSimulator` + closed-loop tests | — |
+| 6 | 1 | `rk4_rollout_zoh` | — |
+| 7 | 3 | `HybridDiagram` + `HybridSimulator` (multi-port boundary) | **A** |
 | 8 | 3 | `MPCBlock` + straight-line MPC demo | **A** |
 | 9 | 3 | `SMCBlock` (or pattern) + SMC hybrid demo | **A** |
-| 10 | 2 | `StepSchedule` + `ScheduledStepOrchestrator` + tests | **B** |
-| 11 | 3 | Cascade controller hybrid demo | **B** |
-| 12 | 2 | *(optional)* `expand_scheduled_step` + hold blocks | post-B |
-| 13 | all | DESIGN / ROADMAP / README | — |
+| 10 | Conv. | **`discretize`** — `DynamicSystem` + `dt` → `StepSystem` | post–step core |
+| 11 | 2 | `StepSchedule` + `ScheduledStepOrchestrator` + tests | **B** |
+| 12 | 3 | Cascade controller hybrid demo | **B** |
+| 13 | 2 | *(optional)* `expand_scheduled_step` + hold blocks | post-B |
+| 14 | all | DESIGN / ROADMAP / README | — |
 
-**Gate:** Phase A hybrid (steps 7–9) after step compile + `rk4_rollout_zoh`. Phase B
-(steps 10–11) after Phase A hybrid tests pass. Expansion (step 12) optional — do not block
-MPC/SMC or cascade on it.
+**Gate:** Phase A hybrid (steps 7–9) after step compile + closed-loop tests + `rk4_rollout_zoh`.
+Phase B (steps 11–12) after Phase A hybrid tests pass. **`discretize` (step 10) optional** — not
+a blocker for MPC/SMC or cascade. Expansion (step 13) optional — do not block MPC/SMC on it.
+
+See [02-discretization.md](hybrid-discrete/02-discretization.md) for the conversion contract.
 
 ---
 
 ## AGENTS.md alignment (summary)
 
-- Textbook math: `dx = f(...)`, `x⁺ = φ(...)`; bare `f` / `phi` / `h` on equation paths.
-- Complexity in orchestrators + simulators; thin leaf types (pure `phi`).
+- Textbook math: `dx = f(...)`, `x_{k+1} = step(...)`; bare `f` / `step` / `h` on equation paths.
+- Complexity in orchestrators + simulators; thin leaf types (pure `step`).
 - Reuse port gather / `ExecutionPlan`; no blind fork.
 - `MPCBlock` in `planning/mpc/`; warm-start in `__init__`.
 - Preserve user demo tuning; one demo refactor only.
@@ -864,7 +924,7 @@ MPC/SMC or cascade on it.
 - Turn-based and clock-driven both use `StepSystem`; only the orchestrator differs.
 - Multi-rate cascade: **logical diagram + `StepSchedule` + orchestrator @ `dt_base`**
   (holds in orchestrator buffers; optional expansion lowering later).
-- Hybrid v1: thin scheduler over step `φ` + `rk4_rollout_zoh` plant — **MPC and SMC** at one
+- Hybrid v1: thin scheduler over `step` + `rk4_rollout_zoh` plant — **MPC and SMC** at one
   `Ts` (Phase A), then cascade controllers on `dt_base` (Phase B).
 - MPC and SMC demos drop hand-rolled outer loops; same `HybridSimulator` API.
-- Future switched/hybrid: same `f` and `phi` atoms + event scheduler — no leaf rewrite.
+- Future switched/hybrid: same `f` and `step` atoms + event scheduler — no leaf rewrite.
