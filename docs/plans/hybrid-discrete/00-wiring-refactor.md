@@ -196,12 +196,11 @@ hybrid-plant scheduling — **not** passed into `StepSystem.step`.
 Phase 0 **moves** `check_algebraic_loops` implementation to `wiring.py`. `compiler.py` imports
 it from there (dependency direction: compile → wiring, not wiring → compile).
 
-Phase 2 adds:
+Phase 1 adds leaf step compile; Phase 2 adds diagram step compile:
 
 ```text
-compile/wiring_plan.py   # build_port_ops, gather helpers (optional extract)  ← shared
-compile/compiler.py      # compile_diagram, StateOperation(f_func=...)
-compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name TBD)
+compile/compiler.py      # compile (flow); compile_step (step) — leaf branch in Phase 1
+compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name TBD) — Phase 2
 ```
 
 ## In scope (Phase 0)
@@ -218,8 +217,10 @@ compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name 
 
 | Item | Phase |
 | --- | --- |
-| `StepSystem`, `StepDiagramSystem` class body | 1–2 (`diagram.py`) |
-| `compile_step_diagram`, `StepEvaluator`, `JaxStepEvaluator` | 2 |
+| `StepSystem` class body | 1 (`system.py`) |
+| `compile_step` (leaf), `StepRunner`, `NumpyStepLeafEvaluator` | 1 |
+| `StepDiagramSystem` class body | 2 (`diagram.py`) |
+| `compile_step_diagram`, diagram `StepEvaluator`, `JaxStepEvaluator` | 2 |
 | `build_diagram_topology` for step side | **5c** |
 | `composition.py` `isinstance` generalization | 2 or 5c |
 | `hybrid_closed_loop`, `plot_hybrid_diagram` | 5c |
