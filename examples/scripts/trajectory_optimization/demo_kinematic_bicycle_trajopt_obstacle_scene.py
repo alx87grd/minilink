@@ -1,16 +1,13 @@
-"""One-shot TrajOpt lane change with a single scene-pipeline obstacle cost.
+"""One-shot TrajOpt with a kinematic bicycle and a scene-pipeline obstacle cost.
 
 Run from repo root::
 
-    python examples/scripts/trajectory_optimization/demo_dynamic_bicycle_trajopt_obstacle_scene.py
+    python examples/scripts/trajectory_optimization/demo_kinematic_bicycle_trajopt_obstacle_scene.py
 
-Same open-loop direct-collocation workflow as
-``demo_dynamic_bicycle_trajopt_lanechange.py``, with tracking cost composed as
-
-    cost = tracking + w * scene.clearance_field(body).as_cost(shaping=inverse_barrier(...))
-
-so the keepout sphere is built from :class:`~minilink.planning.spatial.scene.Scene`
-rather than a hand-written repulsion term.
+Same obstacle-avoidance workflow as
+``demo_dynamic_bicycle_trajopt_obstacle_scene.py``, but on
+:class:`~minilink.dynamics.catalog.vehicles.steering.JaxKinematicBicycleRateInputs`
+(state ``[x, y, theta, speed, steering]``, inputs ``[speed_dot, steering_dot]``).
 """
 
 import matplotlib.pyplot as plt
@@ -19,9 +16,7 @@ import numpy as np
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputs,
-)
+from minilink.dynamics.catalog.vehicles.steering import JaxKinematicBicycleRateInputs
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
@@ -38,43 +33,44 @@ from minilink.planning.trajectory_optimization.planner import (
 )
 
 TF = 4.0
-N_STEPS = 40
+N_STEPS = 20
 U_0 = 5.0
 U_TARGET = 10.0
 Y_START = 0.0
 Y_GOAL = 0.0
 HEADING_TARGET = 0.0
+DELTA_MAX = 0.55
+V_MAX = 12.0
+SPEED_DOT_MAX = 3.0
+STEERING_DOT_MAX = 2.0
 
 OBSTACLE_CENTER = (12.0, 0.2)
 OBSTACLE_RADIUS = 0.4
 OBSTACLE_MARGIN = 0.2
 OBSTACLE_REPULSION_WEIGHT = 1000.0
 OBSTACLE_REPULSION_EPS = 1.0
-PLOT_BOUNDS = ((-2.0, U_0 * TF + 2.0), (-2.0, 2.0))
+PLOT_BOUNDS = ((-2.0, U_TARGET * TF + 2.0), (-3.5, 2.0))
 
 configure_jax(enable_x64=True)
 
-sys = JaxDynamicBicycleRateInputs()
+sys = JaxKinematicBicycleRateInputs()
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
+sys.state.lower_bound[3] = 0.0
+sys.state.upper_bound[3] = V_MAX
+sys.state.lower_bound[4] = -DELTA_MAX
+sys.state.upper_bound[4] = DELTA_MAX
+sys.inputs["speed_dot"].lower_bound[0] = -SPEED_DOT_MAX
+sys.inputs["speed_dot"].upper_bound[0] = SPEED_DOT_MAX
+sys.inputs["steering_dot"].lower_bound[0] = -STEERING_DOT_MAX
+sys.inputs["steering_dot"].upper_bound[0] = STEERING_DOT_MAX
 
-x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0])
-x_ref = np.array(
-    [
-        0.0,
-        Y_GOAL,
-        HEADING_TARGET,
-        U_TARGET,
-        0.0,
-        0.0,
-        U_TARGET / sys.params["r_r"],
-        0.0,
-    ]
-)
+x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0])
+x_ref = np.array([U_TARGET * TF, Y_GOAL, HEADING_TARGET, U_TARGET, 0.0])
 ubar = np.array([0.0, 0.0])
 
-Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0])
+Q = np.diag([0.0, 10.0, 1.0, 0.1, 100.0])
 R = np.diag([1.0, 10.0])
-S = np.diag([0.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0])
+S = np.diag([1.0, 10.0, 100.0, 10.0, 100.0])
 
 tracking_cost = QuadraticCost.from_system(
     sys,

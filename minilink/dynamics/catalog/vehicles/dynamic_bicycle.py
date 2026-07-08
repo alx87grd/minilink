@@ -601,6 +601,11 @@ class JaxDynamicBicycle(DynamicBicycle):
         jnp = require_jax_numpy()
         return jnp.asarray(x)
 
+    def _u_in(self, x, u):
+        jnp = require_jax_numpy()
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        return jnp.array([w_rear[0], delta[0]])
+
 
 class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
     """JAX-traceable :class:`DynamicBicycle` with rate inputs.

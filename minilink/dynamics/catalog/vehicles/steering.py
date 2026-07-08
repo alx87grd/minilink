@@ -1,5 +1,8 @@
+from functools import partial
+
 import numpy as np
 
+from minilink.core.backends import require_jax_numpy
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
@@ -7,18 +10,24 @@ from minilink.graphical.animation.primitives import (
     Box,
     Circle,
     Sphere,
-    vehicle_body,
     wheel_box,
 )
+from minilink.graphical.catalog.skins import car_skin_2d
 
 
 class KinematicBicycle(DynamicSystem):
-    """Kinematic bicycle model with speed and steering-angle inputs."""
+    """Kinematic bicycle model with speed and steering-angle inputs.
+
+    See :class:`JaxKinematicBicycle` and :class:`JaxKinematicBicycleRateInputs`
+    for JAX-traceable variants.
+    """
 
     def __init__(self):
         super().__init__(n=3, input_dim=2, output_dim=3, expose_state=True)
         self.name = "Kinematic Bicycle"
-        self.params = {"length": 1.0}
+        # CG-centered wheelbase: ``length = a + b`` (same frame convention as
+        # :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycle`).
+        self.params = {"a": 1.0, "b": 1.0, "length": 2.0}
         self.state.labels = ["x", "y", "theta"]
         self.state.units = ["m", "m", "rad"]
         self.inputs["u"].labels = ["speed", "steering"]
@@ -26,17 +35,16 @@ class KinematicBicycle(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphic parameters (not part of the EoM)
-        self.width = 0.35
-        self.tire_length = 0.25
-        self.tire_width = 0.08
+        # Graphics-only (2-D centerline look shared with :class:`DynamicBicycle`)
+        self.wheel_len = 0.76
+        self.wheel_width = 0.27
         self.camera_scale = 10.0
-        # Camera hint: track the body frame.
         self.camera_follow_frame = "body"
+        self.skin = partial(car_skin_2d, color="#1a1a1a")
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        length = params["length"]
+        length = params["a"] + params["b"]
         speed, steering = u
         theta = x[2]
 
@@ -52,42 +60,18 @@ class KinematicBicycle(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def get_kinematic_geometry(self):
-        length = self.params["length"]
-        rear_x = -0.5 * length
-        rear_wheel = wheel_box(self.tire_length, self.tire_width)
-        rear_wheel.local_transform = SE2(rear_x, 0.0, 0.0)
-        return {
-            "body": [
-                vehicle_body(length=length, width=self.width, color="blue"),
-                rear_wheel,
-            ],
-            "axle_front": [wheel_box(self.tire_length, self.tire_width)],
-        }
-
     def tf(self, x, u, t=0, params=None):
-        length = self.params["length"]
+        params = self.params if params is None else params
+        a = params["a"]
         steering = u[1]
-        front_x = 0.5 * length
-        T_body = SE2(x[0], x[1], x[2])
+        T_wb = SE2(x[0], x[1], x[2])
         return {
-            "body": T_body,
-            "axle_front": T_body @ SE2(front_x, 0.0, steering),
+            "body": T_wb,
+            "axle_front": T_wb @ SE2(a, 0.0, steering),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        speed = u[0]
-        return {
-            "body": [
-                Arrow(
-                    base=(0.0, 0.0),
-                    vector=(1.0, 0.0),
-                    scale=0.4 * abs(speed),
-                    color="red",
-                    linewidth=2,
-                )
-            ]
-        }
+        return {}
 
 
 class KinematicCar(KinematicBicycle):
@@ -98,6 +82,8 @@ class KinematicCar(KinematicBicycle):
         self.name = "Kinematic Car"
         self.a = 2.0
         self.b = 3.0
+        self.params["a"] = self.a
+        self.params["b"] = self.b
         self.params["length"] = self.a + self.b
 
         # Graphic parameters (display only; the EoM use only ``length``). The skin
@@ -154,7 +140,12 @@ class ConstantSpeedKinematicCar(DynamicSystem):
         self.name = "Constant Speed Kinematic Car"
         self.a = 2.0
         self.b = 3.0
-        self.params = {"speed": 2.0, "length": self.a + self.b}
+        self.params = {
+            "speed": 2.0,
+            "a": self.a,
+            "b": self.b,
+            "length": self.a + self.b,
+        }
         self.state.labels = ["x", "y", "theta"]
         self.state.units = ["m", "m", "rad"]
         self.inputs["u"].labels = ["steering"]
@@ -162,12 +153,11 @@ class ConstantSpeedKinematicCar(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphic parameters (not part of the EoM)
-        self.width = 2.0
-        self.tire_length = 0.25
-        self.tire_width = 0.08
+        self.wheel_len = 0.76
+        self.wheel_width = 0.27
         self.camera_scale = 2.0 * self.params["length"]
         self.camera_follow_frame = "body"
+        self.skin = partial(car_skin_2d, color="#1a1a1a")
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -187,9 +177,6 @@ class ConstantSpeedKinematicCar(DynamicSystem):
 
     def h(self, x, u, t=0.0, params=None):
         return x
-
-    def get_kinematic_geometry(self):
-        return KinematicBicycle.get_kinematic_geometry(self)
 
     def tf(self, x, u, t=0, params=None):
         full_u = np.array([self.params["speed"], u[0]])
@@ -304,6 +291,8 @@ class UdeSRacecar(KinematicCar):
         self.name = "UdeS Racecar"
         self.a = 0.17
         self.b = 0.17
+        self.params["a"] = self.a
+        self.params["b"] = self.b
         self.params["length"] = self.a + self.b
 
         # Graphic parameters (not part of the EoM)
@@ -311,6 +300,113 @@ class UdeSRacecar(KinematicCar):
         self.tire_length = 0.04
         self.tire_width = 0.015
         self.camera_scale = 2.0 * self.params["length"]
+
+
+# Same equations as :class:`KinematicBicycle`, but written so the dynamics ``f``
+# trace through ``jax.numpy`` for gradient-based trajectory optimization.
+
+
+class JaxKinematicBicycle(KinematicBicycle):
+    """JAX-traceable :class:`KinematicBicycle`.
+
+    Inherits the geometry and visualization contract from
+    :class:`KinematicBicycle` and only overrides the equations of motion so that
+    ``f(x, u, t)`` traces through ``jax.numpy``.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "JAX Kinematic Bicycle"
+
+    def f(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        params = self.params if params is None else params
+        length = params["a"] + params["b"]
+        speed = u[0]
+        steering = u[1]
+        theta = x[2]
+
+        # kinematic bicycle: heading turns at speed * tan(steering) / wheelbase
+        return jnp.array(
+            [
+                speed * jnp.cos(theta),
+                speed * jnp.sin(theta),
+                speed * jnp.tan(steering) / length,
+            ]
+        )
+
+    def h(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        return jnp.asarray(x)
+
+
+class JaxKinematicBicycleRateInputs(JaxKinematicBicycle):
+    """JAX-traceable :class:`KinematicBicycle` with rate inputs.
+
+    State ``x = [x, y, theta, speed, steering]``; inputs are ``speed_dot`` and
+    ``steering_dot``. Useful with trajectory optimization run with
+    ``compile_backend="jax"``.
+    """
+
+    def __init__(self):
+        from minilink.core.signals import VectorSignal
+
+        super().__init__()
+        self.name = "JAX Kinematic Bicycle (rate inputs)"
+
+        self.n = 5
+
+        self.state = VectorSignal("x", dim=self.n)
+        self.x0 = np.zeros(self.n)
+
+        self.state.labels = ["x", "y", "theta", "speed", "steering"]
+        self.state.units = ["m", "m", "rad", "m/s", "rad"]
+
+        self.inputs = {}
+        self.add_input_port(
+            "speed_dot",
+            nominal_value=0.0,
+            labels=["speed_dot"],
+            units=["m/s^2"],
+        )
+        self.add_input_port(
+            "steering_dot",
+            nominal_value=0.0,
+            labels=["steering_dot"],
+            units=["rad/s"],
+        )
+        self.outputs = {}
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
+
+    def f(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        params = self.params if params is None else params
+        length = params["a"] + params["b"]
+        speed = x[3]
+        steering = x[4]
+        theta = x[2]
+
+        pose_dot = jnp.array(
+            [
+                speed * jnp.cos(theta),
+                speed * jnp.sin(theta),
+                speed * jnp.tan(steering) / length,
+            ]
+        )
+        return jnp.concatenate([pose_dot, u])
+
+    def tf(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        a = params["a"]
+        steering = x[4]
+        T_wb = SE2(x[0], x[1], x[2])
+        return {
+            "body": T_wb,
+            "axle_front": T_wb @ SE2(a, 0.0, steering),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {}
 
 
 if __name__ == "__main__":
