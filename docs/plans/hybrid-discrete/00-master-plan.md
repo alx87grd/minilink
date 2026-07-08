@@ -40,7 +40,7 @@ subset.
 ### In scope
 
 - Shared diagram wiring mixin (Phase 0); continuous `DiagramSystem` API unchanged.
-- `StepSystem` leaf + `compile_step` + `StepRunner`; `StepDiagramSystem` compile path.
+- `StepSystem` leaf + unified `compile()` step branch + `StepRunner`; `StepDiagramSystem` compile path.
 - `StepSchedule.dt_base` + `ScheduledStepOrchestrator` (single- and integer multi-rate).
 - Two-side `HybridDiagram` + `HybridSimulator` (boundary ZOH/sample, `rk4_rollout_zoh`).
 - SMC hybrid (5a), cascade hybrid with non-trivial `fire` (5b), hybrid plot + shortcuts (5c).
@@ -93,7 +93,8 @@ Detail and tick-0 init: [05-hybrid-simulation.md](05-hybrid-simulation.md).
 | Phase | Doc | Delivers | Milestones |
 | --- | --- | --- | --- |
 | **0** | [00-wiring-refactor.md](00-wiring-refactor.md) | `WiredDiagramMixin` (wiring, gather, `tf`, `check_algebraic_loops`); `DiagramSystem` delegates — **no new behavior** | — |
-| **1** | [01-step-core.md](01-step-core.md) | `StepSystem`, `ZOHHold`; `compile_step` (leaf); `StepRunner` + `StepResult`; teaching demos — **no wall time** | — |
+| **1a** | [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md) | Move `f` to `DynamicSystem`; typed `compile()` → static / dynamic evaluators; `StaticSimulator` + facade routing; diagram `state_ops` guards | — |
+| **1** | [01-step-core.md](01-step-core.md) | `StepSystem`, `ZOHHold`; unified `compile()` step branch; `StepRunner` + `StepResult`; teaching demos — **no wall time** | — |
 | **2** | [02-step-diagram.md](02-step-diagram.md) | `StepDiagramSystem` (`StepSystem` + `StaticSystem`), `compile_step_diagram`, diagram `StepEvaluator`; `TimedStepSimulator` (test stopgap only); **partial-fire compile hooks** for Phase 4 | — |
 | **3** | [03-discretization.md](03-discretization.md) | `discretize(DynamicSystem, dt)` → `StepSystem` *(optional; not on hybrid critical path)* | — |
 | **4** | [04-scheduled-orchestrator.md](04-scheduled-orchestrator.md) | `StepSchedule.dt_base` + `ScheduledStepOrchestrator` — public clocked step path | — |
@@ -140,7 +141,7 @@ flowchart TB
 
     subgraph P1 [Phase 1 Step leaf + rollout]
         SS[StepSystem step]
-        CSL[compile_step leaf]
+        CSL[compile step leaf]
         SR[StepRunner clock-free]
     end
 
@@ -203,7 +204,7 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 | Shared wiring, gather, `tf`, `check_algebraic_loops` | `WiredDiagramMixin` | **0** |
 | Third slot: **`t` (flow)** / **`k` (step)** on shared port paths | call site + evaluator | 0–2 |
 | Pure `step` / `h` math (`k` only, no wall time) | `StepSystem` | 1 |
-| Leaf `compile_step` + clock-free rollout | `StepEvaluator` leaf + `StepRunner` | 1 |
+| Leaf unified `compile()` step branch + clock-free rollout | `StepEvaluator` leaf + `StepRunner` | 1 |
 | Step block wiring + compile hooks for partial fire | `StepDiagramSystem` / diagram `StepEvaluator` | 2 |
 | Continuous → discrete plant block | `discretize()` | 3 (optional) |
 | Sample time + multi-rate **inside** step diagram | `StepSchedule` + orchestrator | 4 |
@@ -216,7 +217,8 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 | Milestone | Pass when |
 | --- | --- |
 | **0** | `DiagramSystem` public API unchanged; `build_diagram_topology` + closed-loop trajectories match pre-refactor (fixed seeds); composition + diagram pytest green | **Done** |
-| **1** | Leaf `step` / `h(x, u, k)`; `compile_step` leaf; `StepRunner` rollout; evolution routing via **`isinstance(StepSystem)`**; no wall time on leaf; `ZOHHold` + teaching demo smoke |
+| **1a** | `f` only on `DynamicSystem`; `compile(StaticSystem)` → static evaluator (no fake `f`); `compute_trajectory` on static + dynamic via typed simulators; diagram state_ops on `DynamicSystem` only |
+| **1** | Leaf `step` / `h(x, u, k)`; unified `compile()` step branch; `StepRunner` rollout; no `f` on `StepSystem`; `compute_trajectory` not on step leaves; `ZOHHold` + teaching demo smoke |
 | **2** | Step diagram closed loop via `connect`; gather passes **`k`**; `run_steps` on diagram evaluator; partial-fire hooks for Phase 4 |
 | **3** *(optional)* | `discretize` euler/rk4 match continuous integration over fixed `dt` |
 | **4** | Trivial + multi-rate `fire`; cross-rate buffers; standalone orchestrator tests |
@@ -236,8 +238,9 @@ MPC failure policy in Phase 6.
 | Step | Phase | Deliverable |
 | --- | --- | --- |
 | **0** | **0** | `core/wiring.py` mixin; `DiagramSystem` delegates; validation gate |
-| 1 | 1 | `StepSystem`, `ZOHHold`, `compile_step` (leaf), `StepRunner`, leaf + runner tests, teaching demos |
-| 2 | 2 | `StepDiagramSystem` in `diagram.py` on mixin, `compile_step_diagram`, diagram `StepEvaluator`, partial-fire hooks, closed-loop tests |
+| 1 | **1a** | Move `f` to `DynamicSystem`; `StaticEvaluator` + `StaticSimulator`; unified `compile()` dispatch; facade routing |
+| 2 | 1 | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepRunner`, leaf + runner tests, teaching demos |
+| 2 | 2 | `StepDiagramSystem` in `diagram.py` on mixin, `compile()` step-diagram branch, diagram `StepEvaluator`, partial-fire hooks, closed-loop tests |
 | 3 | 2 | `TimedStepSimulator` (tests only) |
 | 4 | 3 | `discretize` verb + tests *(optional — anytime after step 3)* |
 | 5 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, orchestrator tests |
@@ -252,7 +255,8 @@ MPC failure policy in Phase 6.
 
 ## Gates
 
-- **Phase 0 before Phase 1** — wiring extracted; continuous behavior validated unchanged.
+- **Phase 0 before Phase 1a** — wiring extracted; continuous behavior validated unchanged.
+- **Phase 1a before Phase 1** — `f` on `DynamicSystem`; typed compile/sim; no lying `System.f`.
 - **Phase 2 before Phase 4 and Phase 5** — step compile + partial-fire hooks exist.
 - **Phase 3 optional** — not required for hybrid MPC/SMC; may land anytime after Phase 2 (step 4).
 - **Phase 4 before Phase 5** — hybrid always orchestrates the step side.
