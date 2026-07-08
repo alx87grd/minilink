@@ -1,1 +1,2 @@
-| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — Phases 0–6 + 5c: wiring refactor, step/hybrid sim, viz, `MPCStepBlock` |
+| [hybrid-discrete-simulation.md](hybrid-discrete-simulation.md) | **Hybrid / step** — Phases 0–6 + 5c + **1a**: wiring, evolution maps, step/hybrid sim, viz, `MPCStepBlock` |
+| [hybrid-discrete/01a-evolution-map-refactor.md](hybrid-discrete/01a-evolution-map-refactor.md) | **Phase 1a** — move `f` to `DynamicSystem`; typed compile/sim (static + dynamic) |

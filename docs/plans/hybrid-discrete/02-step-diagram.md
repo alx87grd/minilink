@@ -18,7 +18,7 @@ Wiring, gather, `tf`, and `check_algebraic_loops` come from [Phase 0](00-wiring-
 - Same module as `DiagramSystem`: **`minilink/core/diagram.py`**.
 - Composes **`WiredDiagramMixin`** (same `connect` / boundary ports / gather / viz as flow).
 - Stacked **`step(x, u, k)`** loop (same topology machinery as flow `f`).
-- `compile()` / `compile_step()` → **`compile_step_diagram`** → diagram **`StepEvaluator.step(x, u, k)`**.
+- `compile()` → **`compile_step_diagram`** (via unified `compile()` dispatch) → diagram **`StepEvaluator.step(x, u, k)`**.
 - Subsystems: `StepSystem`, `StaticSystem` only; reject `DynamicSystem` at compile.
 - Reuse `PortOperation` gather recipes and topology — do not fork wiring.
 
@@ -84,7 +84,7 @@ re-compile per mask. Implementation completes in
 
 ### `StepRunner` (Phase 1 — reuse)
 
-Closed-loop demos and tests call **`run_steps(diagram.compile_step(), ...)`** — no new runner in
+Closed-loop demos and tests call **`run_steps(diagram.compile(), ...)`** — no new runner in
 Phase 2.
 
 ### `TimedStepSimulator` (Phase 2 stopgap)

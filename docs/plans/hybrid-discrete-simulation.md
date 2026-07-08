@@ -29,8 +29,9 @@ engines and decides **when** each applies.
 Near-term deliverables (see **[00-master-plan.md](hybrid-discrete/00-master-plan.md)** for full phase list):
 
 0. **Phase 0** — extract shared diagram wiring mixin; validate continuous diagrams unchanged.
-1. **Phase 1** — `StepSystem` leaf; `compile_step` (leaf); `StepRunner`; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf.
-2. **Phase 2** — `StepDiagramSystem`, `compile_step_diagram`, diagram `StepEvaluator`.
+0. **Phase 1a** — move `f` to `DynamicSystem`; typed `compile()` (static / dynamic evaluators); `StaticSimulator`; `compute_trajectory` on static + dynamic only ([01a-evolution-map-refactor.md](hybrid-discrete/01a-evolution-map-refactor.md)).
+1. **Phase 1** — `StepSystem` leaf; unified `compile()` step branch; `StepRunner`; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf.
+2. **Phase 2** — `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator`.
 3. **Phase 3** — `discretize()` optional conversion tool.
 4. **Phase 4** — `StepSchedule.dt_base` + `ScheduledStepOrchestrator` (single- and multi-rate).
 5. **Phase 5** — `HybridSimulator` + boundary ports; **always** uses Phase 4 on the step side.
@@ -56,8 +57,9 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 | Phase | Delivers | Clock |
 | --- | --- | --- |
 | **0** | `WiredDiagramMixin` / `core/wiring.py` (wiring, gather, `tf`, `check_algebraic_loops`); `DiagramSystem` unchanged API | — |
-| **1** | `StepSystem`, `ZOHHold`, `compile_step` (leaf), `StepRunner` | none |
-| **2** | `StepDiagramSystem`, `compile_step_diagram`, diagram `StepEvaluator` | none (or logging-only in `TimedStepSimulator`) |
+| **1a** | `f` on `DynamicSystem`; `StaticEvaluator` + `StaticSimulator`; unified `compile()`; facade routing | — |
+| **1** | `StepSystem`, `ZOHHold`, unified `compile()` step branch, `StepRunner` | none |
+| **2** | `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator` | none (or logging-only in `TimedStepSimulator`) |
 | **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure |
 | **4** | `StepSchedule` + `ScheduledStepOrchestrator` | **`dt_base`** authoritative for clocked step sim |
 | **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; orchestrator always on step side |
@@ -550,7 +552,7 @@ heterogeneous blocks in one diagram class before event scheduling exists.
 | **6b** | `MPCStepBlock` with last `z` state | — |
 | **Future** | events, guards, `expand_scheduled_step` | — |
 
-**Gates:** **Phase 0 before Phase 1.** Phase 2 before 4 and 5. **Phase 4 before Phase 5.**
+**Gates:** **Phase 0 before Phase 1a.** **Phase 1a before Phase 1.** Phase 2 before 4 and 5. **Phase 4 before Phase 5.**
 Phase 3 optional for hybrid. 5a → 5b → 5c. **Phase 5 before Phase 6.** 6a → 6b.
 
 ---
