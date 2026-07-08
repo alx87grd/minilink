@@ -18,7 +18,7 @@ Wiring, gather, `tf`, and `check_algebraic_loops` come from [Phase 0](00-wiring-
 - Same module as `DiagramSystem`: **`minilink/core/diagram.py`**.
 - Composes **`WiredDiagramMixin`** (same `connect` / boundary ports / gather / viz as flow).
 - Stacked **`step(x, u, k)`** loop (same topology machinery as flow `f`).
-- `compile()` / `compile_step()` → **`compile_step_diagram`** → diagram **`StepEvaluator.step(x, u, k)`**.
+- `compile()` → **`compile_step_diagram`** (internal) → diagram **`StepEvaluator.step(x, u, k)`**.
 - Subsystems: `StepSystem`, `StaticSystem` only; reject `DynamicSystem` at compile.
 - Reuse `PortOperation` gather recipes and topology — do not fork wiring.
 
@@ -52,12 +52,15 @@ Flow `ExecutionPlan` has `StateOperation` with `f_func → dx`. Step compile **r
 
 Order: port signals before state advance (same as flow: ports before `f`).
 
-### `compile_step` branch (extends Phase 1)
+### `compile()` branch (extends Phase 1)
 
-| `system` type | Route |
-| --- | --- |
-| `StepSystem` leaf | `NumpyStepLeafEvaluator` / `JaxStepLeafEvaluator` ([Phase 1](01-step-core.md)) |
-| `StepDiagramSystem` | `compile_step_diagram` → `NumpyStepDiagramEvaluator` / `JaxStepEvaluator` |
+`compile(system)` dispatches by type — same public entry as flow diagrams:
+
+| `system` type | Route | Returns |
+| --- | --- | --- |
+| `DiagramSystem` | `compile_diagram` | `DynamicsEvaluator` |
+| `StepSystem` leaf | `_compile_step_leaf` | `StepEvaluator` ([Phase 1](01-step-core.md)) |
+| `StepDiagramSystem` | `compile_step_diagram` | `StepEvaluator` (diagram) |
 
 ### Evaluator backends
 
@@ -84,7 +87,7 @@ re-compile per mask. Implementation completes in
 
 ### `StepRunner` (Phase 1 — reuse)
 
-Closed-loop demos and tests call **`run_steps(diagram.compile_step(), ...)`** — no new runner in
+Closed-loop demos and tests call **`run_steps(diagram.compile(), ...)`** — no new runner in
 Phase 2.
 
 ### `TimedStepSimulator` (Phase 2 stopgap)

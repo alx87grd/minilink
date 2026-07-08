@@ -199,8 +199,8 @@ it from there (dependency direction: compile → wiring, not wiring → compile)
 Phase 1 adds leaf step compile; Phase 2 adds diagram step compile:
 
 ```text
-compile/compiler.py      # compile (flow); compile_step (step) — leaf branch in Phase 1
-compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name TBD) — Phase 2
+compile/compiler.py      # compile() — type dispatch; step leaf branch Phase 1
+compile/step_compiler.py # compile_step_diagram (internal), step_ops — Phase 2
 ```
 
 ## In scope (Phase 0)
@@ -218,9 +218,9 @@ compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name 
 | Item | Phase |
 | --- | --- |
 | `StepSystem` class body | 1 (`system.py`) |
-| `compile_step` (leaf), `StepRunner`, `NumpyStepLeafEvaluator` | 1 |
+| `compile()` step leaf branch, `StepRunner`, `NumpyStepLeafEvaluator` | 1 |
 | `StepDiagramSystem` class body | 2 (`diagram.py`) |
-| `compile_step_diagram`, diagram `StepEvaluator`, `JaxStepEvaluator` | 2 |
+| `compile()` diagram step branch (`compile_step_diagram` internal), diagram `StepEvaluator`, `JaxStepEvaluator` | 2 |
 | `build_diagram_topology` for step side | **5c** |
 | `composition.py` `isinstance` generalization | 2 or 5c |
 | `hybrid_closed_loop`, `plot_hybrid_diagram` | 5c |

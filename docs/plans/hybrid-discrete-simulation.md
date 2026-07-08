@@ -29,8 +29,8 @@ engines and decides **when** each applies.
 Near-term deliverables (see **[00-master-plan.md](hybrid-discrete/00-master-plan.md)** for full phase list):
 
 0. **Phase 0** — extract shared diagram wiring mixin; validate continuous diagrams unchanged.
-1. **Phase 1** — `StepSystem` leaf; `compile_step` (leaf); `StepRunner`; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf.
-2. **Phase 2** — `StepDiagramSystem`, `compile_step_diagram`, diagram `StepEvaluator`.
+1. **Phase 1** — `StepSystem` leaf; `compile()` step branch; `StepRunner`; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf.
+2. **Phase 2** — `StepDiagramSystem`, `compile()` diagram step branch, diagram `StepEvaluator`.
 3. **Phase 3** — `discretize()` optional conversion tool.
 4. **Phase 4** — `StepSchedule.dt_base` + `ScheduledStepOrchestrator` (single- and multi-rate).
 5. **Phase 5** — `HybridSimulator` + boundary ports; **always** uses Phase 4 on the step side.
@@ -56,8 +56,8 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 | Phase | Delivers | Clock |
 | --- | --- | --- |
 | **0** | `WiredDiagramMixin` / `core/wiring.py` (wiring, gather, `tf`, `check_algebraic_loops`); `DiagramSystem` unchanged API | — |
-| **1** | `StepSystem`, `ZOHHold`, `compile_step` (leaf), `StepRunner` | none |
-| **2** | `StepDiagramSystem`, `compile_step_diagram`, diagram `StepEvaluator` | none (or logging-only in `TimedStepSimulator`) |
+| **1** | `StepSystem`, `ZOHHold`, `compile()` step leaf branch, `StepRunner` | none |
+| **2** | `StepDiagramSystem`, `compile()` diagram step branch, diagram `StepEvaluator` | none (or logging-only in `TimedStepSimulator`) |
 | **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure |
 | **4** | `StepSchedule` + `ScheduledStepOrchestrator` | **`dt_base`** authoritative for clocked step sim |
 | **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; orchestrator always on step side |
@@ -451,7 +451,7 @@ orchestrators — not inside leaf `f` or `step`.
 | Call integrate `f` on plant vs step/orchestrate controller | `HybridSimulator` |
 | Cross-rate holds / latches (within step diagram) | `ScheduledStepOrchestrator` (Phase 4) |
 | Boundary ZOH / sample (step ↔ plant) | `HybridSimulator` (Phase 5) |
-| Homogeneous compile per side | `compile()` vs `compile_step()` |
+| Homogeneous compile per side | Both use **`compile()`** → `DynamicsEvaluator` (flow) or `StepEvaluator` (step) |
 | Guards / zero-crossings | future `EventHybrid` (layer 5) |
 
 ### v1 hybrid cycle (clock-driven, pseudocode)
@@ -539,8 +539,8 @@ heterogeneous blocks in one diagram class before event scheduling exists.
 | Phase | Delivers | Does not deliver |
 | --- | --- | --- |
 | **0** | `WiredDiagramMixin`; continuous diagrams unchanged | `StepSystem`, compile fork |
-| **1** | `StepSystem`, `ZOHHold`, `compile_step` (leaf), `StepRunner` | Clock, diagrams |
-| **2** | `StepDiagramSystem`, `compile_step_diagram`, diagram `StepEvaluator` | `StepSchedule`, hybrid |
+| **1** | `StepSystem`, `ZOHHold`, `compile()` step leaf branch, `StepRunner` | Clock, diagrams |
+| **2** | `StepDiagramSystem`, `compile()` diagram step branch, diagram `StepEvaluator` | `StepSchedule`, hybrid |
 | **3** | **`discretize`** | Required for hybrid MPC path |
 | **4** | `StepSchedule` + `ScheduledStepOrchestrator` | Plant, hybrid boundary |
 | **5a** | Hybrid + trivial schedule + SMC | Multi-rate controller; MPC |
@@ -565,7 +565,7 @@ flowchart TB
 
     subgraph p1 [Phase 1 Leaf + rollout]
         SS[StepSystem]
-        CSL[compile_step leaf]
+        CSL[compile step leaf]
         SR[StepRunner]
     end
 
@@ -727,11 +727,13 @@ class StepSystem(System):
 - Sample period inside `step` via `params` or closed-over discretization only when the **model**
   needs it — not a class-level clock.
 - Parallel continuous work: **`rk4_rollout_zoh`** on flow evaluator (Phase 5).
-- **Leaf compile** — `compile_step(StepSystem)` → `NumpyStepLeafEvaluator` (JAX optional); mirrors
-  flow `compile()` leaf path. `StepSystem.compile()` delegates here. Reject flow `compile()` / RK4.
+- **Leaf compile** — `compile(StepSystem)` → `NumpyStepLeafEvaluator` (JAX optional); same public
+  verb as flow. `StepSystem.compile()` → `compile(self)`. Return type is `StepEvaluator`, not
+  `DynamicsEvaluator`.
 - **`StepRunner`** — clock-free `run_steps(evaluator, x0, n_steps=...)`; `StepResult` trajectories.
   Diagram evaluators (Phase 2) implement the same `.step` / `.h` surface.
-- **Teaching demos** via `compile_step` + `StepRunner`: Fibonacci, discrete accumulator, logistic map —
+- **Teaching demos** via `block.compile()` + `StepRunner`: Fibonacci, discrete accumulator,
+  logistic map —
   see [01-step-core.md](hybrid-discrete/01-step-core.md#teaching-demos-canonical-leaf-scripts).
 
 ---
@@ -756,7 +758,7 @@ Completed in [Phase 0](hybrid-discrete/00-wiring-refactor.md) — `minilink/core
 
 | Flow | Step |
 | --- | --- |
-| `compile_diagram()` → `DynamicsEvaluator` | `compile_step_diagram()` → `StepEvaluator` |
+| `compile()` → `DynamicsEvaluator` | `compile()` → `StepEvaluator` |
 | `evaluator.f → dx` | `evaluator.step → x_new` |
 | RK4, rollout, SciPy | stepping only |
 
@@ -937,7 +939,7 @@ refactor in 6a; warm-start parity in 6b.
 | 0 | `test_wiring_mixin.py` | topology parity; connect validation unchanged |
 | 0 | (existing) | `test_composition.py`, `test_diagrams.py`, diagram compile tests |
 | 1 | `test_step_system.py` | leaf `step`; `ZOHHold`; `isinstance(StepSystem)`; simulator rejects step leaf |
-| 1 | `test_compile_step_leaf.py` | `compile_step` leaf; frozen params parity |
+| 1 | `test_compile_step_leaf.py` | `compile()` on `StepSystem` leaf; frozen params parity |
 | 1 | `test_step_runner.py` | clock-free `run_steps` on leaf evaluator |
 | 1 | `examples/scripts/step/demo_step_*.py` | Fibonacci / accumulator / logistic smoke (exit 0, spot checks) |
 | 2 | `test_step_diagram.py` | wiring; closed loop via `connect` |
@@ -966,8 +968,8 @@ See [00-master-plan.md](hybrid-discrete/00-master-plan.md). Summary:
 | Step | Phase | Deliverable |
 | --- | --- | --- |
 | **0** | **0** | `core/wiring.py` mixin + validation gate |
-| 1 | 1 | `StepSystem`, `ZOHHold`, `compile_step` (leaf), `StepRunner`, leaf + runner tests, teaching demos |
-| 2–3 | 2 | `StepDiagramSystem`, `compile_step_diagram`, diagram evaluator, closed-loop tests, `TimedStepSimulator` (tests only) |
+| 1 | 1 | `StepSystem`, `ZOHHold`, `compile()` step leaf branch, `StepRunner`, leaf + runner tests, teaching demos |
+| 2–3 | 2 | `StepDiagramSystem`, `compile()` diagram step branch, diagram evaluator, closed-loop tests, `TimedStepSimulator` (tests only) |
 | 4 | 3 | `discretize` *(optional)* |
 | 5 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, tests |
 | 6–8 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** |

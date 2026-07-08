@@ -76,18 +76,26 @@ blocks ignore the third argument. Flow time-varying sources (`Step` at seconds, 
 duplicate meta flag.
 
 `compute_trajectory` on `StepSystem` remains **unsupported** (flow-only façade). Leaf
-**`compile_step`** and **`StepRunner`** are in scope — the public pure-step rollout path.
+**`compile()`** (returns `StepEvaluator`) and **`StepRunner`** are in scope — the public
+pure-step rollout path.
 
-## Leaf compile (`compile_step`)
+## Leaf compile (`compile()`)
 
-Mirror flow [`compile()`](../../../minilink/core/compile/compiler.py): one entry point, leaf vs
-diagram branch added in Phase 2.
+**One public compile verb** for flow and step — extend existing
+[`compile()`](../../../minilink/core/compile/compiler.py) with type dispatch (mirror today:
+`DiagramSystem` → diagram path, else leaf). **Do not** add a separate public `compile_step`.
 
-**Phase 1** — `compile_step(system, backend=...)` accepts **`StepSystem` leaf only**; rejects
-`DiagramSystem` / `StepDiagramSystem` with a clear error.
+**Phase 1** — `compile(system, backend=...)` accepts **`StepSystem` leaf** → `StepEvaluator`;
+rejects `DiagramSystem` / `StepDiagramSystem` with a clear error until Phase 2. Flow leaves
+(`DynamicSystem`) keep the existing `DynamicsEvaluator` path unchanged.
 
 ```python
-def compile_step(system, backend="numpy", verbose=False) -> StepEvaluator:
+def compile(system, backend="numpy", verbose=False) -> DynamicsEvaluator | StepEvaluator:
+    if isinstance(system, DiagramSystem):
+        return compile_diagram(...)
+    if isinstance(system, StepSystem):
+        return _compile_step_leaf(system, backend=backend, verbose=verbose)
+    # DynamicSystem and other flow leaves — existing NumpyLeafEvaluator / JaxLeafEvaluator
     ...
 ```
 
@@ -98,11 +106,13 @@ def compile_step(system, backend="numpy", verbose=False) -> StepEvaluator:
 
 - Wrap `step` / `h` with frozen `params` and nominal `u` snapshot — same pattern as
   `NumpyLeafEvaluator`.
-- `StepSystem.compile()` delegates to `compile_step` (analogous to flow `System.compile()`).
+- **`StepSystem.compile()`** uses the same `SystemFacades.compile()` → `compile(self)` as flow
+  systems; return type is `StepEvaluator`, not `DynamicsEvaluator`.
 - Base **`StepEvaluator`** protocol (minimal): `.step`, `.h` (and `.outputs` if mirroring flow
   leaf). Diagram evaluators in Phase 2 implement the same surface so **`StepRunner` is unchanged**.
 
-**Do not** route `StepSystem` through flow `compile()` / `DynamicsEvaluator` / RK4.
+**Do not** implement step leaves by wrapping `NumpyLeafEvaluator` or exposing `f` / RK4 on
+`StepSystem`.
 
 ## `StepRunner` (clock-free rollout)
 
@@ -144,10 +154,10 @@ Step-side hold register for teaching / tests; hybrid plant holds live in `Hybrid
 ## Teaching demos (canonical leaf scripts)
 
 Flat under `examples/scripts/step/`, runnable from repo root. **No** flow `Simulator`, **no**
-diagrams — use **`compile_step(block)` + `StepRunner.run_steps`**:
+diagrams — use **`block.compile()` + `StepRunner.run_steps`**:
 
 ```python
-evaluator = block.compile_step()  # or compile_step(block)
+evaluator = block.compile()
 result = run_steps(evaluator, block.x0, n_steps=20, u=u_seq)
 ```
 
@@ -197,7 +207,7 @@ Acceptance: exit 0; printed sequences match closed-form spot checks (Fibonacci t
 
 - `test_step_system.py`: leaf `step`; `h(x, u, k)`; `ZOHHold`; `isinstance(StepSystem)`; no `f`
   overload; `Simulator` rejects step leaf without relying on `solver_info` flag.
-- `test_compile_step_leaf.py`: `compile_step` on leaf; frozen params; `step`/`h` parity with
-  direct calls.
+- `test_compile_step_leaf.py`: `compile()` on `StepSystem` leaf; frozen params; `step`/`h` parity
+  with direct calls.
 - `test_step_runner.py`: clock-free `run_steps` on leaf evaluator; `StepResult` shapes; optional
   `u(k)` callable.
