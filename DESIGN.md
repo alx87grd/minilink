@@ -111,15 +111,28 @@ holds canonical textbook ODEs (integrator chains, `VanderPol`) with graphics,
 labels, and bounds for teaching demos — the name overlap (`Integrator` vs
 `SimpleIntegrator`) is intentional given those roles.
 
-### Scope: continuous time only
+### Continuous-time core; step/hybrid subsidiary
 
-Minilink is continuous-time only by decision (June 2026). Digital control and
-discrete dynamics (ZOH/delay blocks, sampled controllers, RNNs, mixed-rate
-simulation) are out of scope; the framework may assume continuous-time `f`.
-If discrete time ever enters scope, it is a framework design project on
-`System` and `core/compile/` scheduling — not an incremental patch.
+Minilink's **primary framework** is continuous-time: `DynamicSystem`, flow
+`DiagramSystem`, `compile` → `DynamicsEvaluator`, `Simulator`, and analysis on
+`f`. Plants, control design, teaching, and most library growth target this path.
 
-**Dynamics root:** `DynamicSystem` with `f`, `h`. Reusable bases in
+**Step and hybrid** are a **narrow parallel add-on** — not a second framework of
+equal weight. They exist so discrete control laws (MPC, SMC, sampled regulators)
+can close the loop on a continuous plant without hand-rolled outer `while` loops.
+Scope and contracts: [hybrid-discrete master plan](docs/plans/hybrid-discrete/00-master-plan.md)
+(subset only — not full Simulink / discrete-dynamics parity).
+
+**Design trade-off rule:** when step or hybrid work conflicts with continuous-time
+clarity, **prefer the continuous core**. Add-ons must stay on **sibling types and
+separate compile/sim paths** (`StepSystem` beside `DynamicSystem`, not a flag on
+`f`; `HybridDiagram` as two-side glue, not a merged heterogeneous diagram) so
+flow APIs, evaluators, and `DiagramSystem` behavior remain unchanged. Do not fold
+discrete scheduling, sample-time metadata, or mixed `f`/`step` semantics into
+`DynamicSystem`, flow `compile()`, or `Simulator` unless there is a clear
+flow-side benefit.
+
+**Dynamics root (continuous):** `DynamicSystem` with `f`, `h`. Reusable bases in
 `dynamics/abstraction` (`StateSpaceSystem`, `LTISystem`, `MechanicalSystem`,
 `GeneralizedMechanicalSystem`). `StateSpaceSystem` builds its matrices through
 methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)` (so

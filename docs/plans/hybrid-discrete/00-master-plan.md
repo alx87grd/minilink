@@ -7,6 +7,12 @@ stepping, narrow hybrid simulation (discrete controller ↔ continuous plant), a
 `StepBlock` export. Supersedes the continuous-time-only stance in
 [DESIGN.md](../../../DESIGN.md) §3 for this **subset** — not full Simulink parity.
 
+**Priority:** this program is **subsidiary** to the continuous-time core
+(`DynamicSystem`, flow `DiagramSystem`, `Simulator`). Step/hybrid exist to run discrete
+control laws in closed loop — not to redefine the framework. When trade-offs arise, **keep the
+continuous path clean**; add-ons stay on sibling types and separate compile/sim paths. See
+[DESIGN.md §3](../../../DESIGN.md#continuous-time-core-stephybrid-subsidiary).
+
 Full design rationale: [hybrid-discrete-simulation.md](../hybrid-discrete-simulation.md).
 Phase contracts: shard docs linked below.
 
@@ -67,6 +73,7 @@ subset.
 | Evolution kind by **class type** (`StepSystem` vs `DynamicSystem`), not `solver_info["continuous_time_equation"]` | Adopt |
 | Third slot: flow passes **`t` (float)**; step passes **`k` (int)** — no conversion, no artificial time on `StepSystem` | Adopt |
 | Separate `DynamicsEvaluator` / `StepEvaluator` JIT (no mixed `t`/`k` in one graph) | Adopt |
+| **Continuous core wins trade-offs** — step/hybrid must not complicate flow `DiagramSystem`, `compile()`, or `Simulator` | Adopt |
 
 ### Hybrid tick semantics (summary)
 

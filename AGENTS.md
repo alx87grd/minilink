@@ -67,6 +67,7 @@ Reading minilink should feel like a controls/dynamics textbook.
 
 Details in [DESIGN.md](DESIGN.md).
 
+- **Continuous-time core is the priority** — `DynamicSystem`, flow diagrams, `Simulator`, and analysis on `f` are the main framework. `StepSystem` / hybrid are subsidiary utilities for discrete control in the loop (MPC, SMC). On trade-offs, keep the continuous path clean; step/hybrid add-ons use sibling types and separate compile/sim paths — do not complicate flow `compile()`, `DiagramSystem`, or `Simulator`.
 - Equation paths stay **native-array**; conversions at boundaries only.
 - `params is None` → object defaults; any other `params` overrides — never `params or self.params`.
 - **Inheritance** for core system types; **composition** for diagrams and optional behaviors.
