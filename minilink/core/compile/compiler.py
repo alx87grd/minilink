@@ -3,9 +3,9 @@ Diagram compiler: topology analysis and execution plan construction.
 
 This module provides the complete compilation pipeline:
 
-1. :func:`check_algebraic_loops` — Standalone depth-first search-based
-   algebraic loop detection.  Returns the topological execution order
-   of output ports.
+1. :func:`~minilink.core.wiring.check_algebraic_loops` — Standalone depth-first
+   search-based algebraic loop detection (implemented in ``wiring.py``,
+   re-exported here). Returns the topological execution order of output ports.
    Can be imported independently by :class:`~minilink.core.diagram.DiagramSystem`
    for use after manual wiring.
 
@@ -36,6 +36,7 @@ from minilink.core.compile.execution_plan import (
     PortOperation,
     StateOperation,
 )
+from minilink.core.wiring import check_algebraic_loops
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -203,82 +204,6 @@ def build_execution_plan(
     return _build_execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
     )
-
-
-def check_algebraic_loops(
-    diagram: DiagramSystem,
-) -> list[tuple[str, str]]:
-    """Detect algebraic loops and return the topological port execution order.
-
-    Uses depth-first search over output-port dependency edges.  An algebraic
-    loop exists when a cycle contains only direct-feedthrough paths (i.e.,
-    output ports whose ``dependencies`` include the input ports that close
-    the cycle).
-
-    This function is **standalone** and can be called independently of
-    :func:`build_execution_plan` — for example, right after wiring a diagram
-    to validate its topology before simulation.
-
-    Parameters
-    ----------
-    diagram : DiagramSystem
-        The wired diagram to analyse.
-
-    Returns
-    -------
-    list[tuple[str, str]]
-        Output ports ``(sys_id, port_id)`` in valid topological order
-        (dependencies before dependents).
-
-    Raises
-    ------
-    RuntimeError
-        If an algebraic loop is detected, with the full cycle path in the
-        error message.
-    """
-    visited: set[tuple[str, str]] = set()
-    stack: list[tuple[str, str]] = []
-    stack_set: set[tuple[str, str]] = set()
-    order: list[tuple[str, str]] = []
-
-    def visit_port(sys_id: str, port_id: str) -> None:
-        node = (sys_id, port_id)
-
-        if node in stack_set:
-            cycle_start_idx = stack.index(node)
-            cycle_path = stack[cycle_start_idx:] + [node]
-            cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
-            raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
-
-        if node in visited:
-            return
-
-        stack.append(node)
-        stack_set.add(node)
-
-        port = diagram.subsystems[sys_id].outputs.get(port_id)
-        if port is not None:
-            deps = port.dependencies
-            sys_inputs = diagram.subsystems[sys_id].inputs
-            input_deps = sys_inputs.keys() if deps == "all" else deps
-
-            for in_port_id in input_deps:
-                source = diagram.connections[sys_id].get(in_port_id)
-                if source is not None:
-                    src_sys_id, src_port_id = source
-                    if src_sys_id != "input":
-                        visit_port(src_sys_id, src_port_id)
-
-        stack.pop()
-        stack_set.remove(node)
-        visited.add(node)
-        order.append(node)
-
-    for sys_id, subsystem in diagram.subsystems.items():
-        for port_id in subsystem.outputs:
-            visit_port(sys_id, port_id)
-
-    return order
 
 
 # Private helpers

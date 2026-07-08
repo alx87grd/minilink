@@ -68,7 +68,7 @@ the first hybrid-related change **small, reviewable, and test-gated** — only r
 
 ```text
 minilink/core/
-├── wiring.py          # NEW — validate_diagram_params, WiredDiagram, WiredDiagramMixin
+├── wiring.py          # NEW — validate_diagram_params, WiredDiagramMixin
 └── diagram.py         # DiagramSystem(WiredDiagramMixin, System) — flow tail only
 ```
 
@@ -113,7 +113,6 @@ name on both; return type and backend differ (Phase 2).
 | Method / attr | Role | Notes |
 | --- | --- | --- |
 | `validate_diagram_params()` | module-level helper | Co-locate with mixin |
-| **`WiredDiagram`** protocol | structural typing | **Required** |
 | `check_algebraic_loops()` | topology DFS | **Move implementation here**; `compiler.py` imports it |
 | `subsystems`, `connections` | registry | |
 | `connection_verbose` | wiring UX | |
@@ -170,23 +169,12 @@ def _init_wiring(self, *, name: str = "Diagram") -> None:
 Subsystem policy: flow diagram rejects `StepSystem` at compile (optional Phase 2); step diagram
 rejects `DynamicSystem` at compile.
 
-## `WiredDiagram` protocol (required)
+## Typing note (no Protocol in Phase 0)
 
-```python
-class WiredDiagram(Protocol):
-    name: str
-    subsystems: dict[str, System]
-    connections: dict[str, dict[str, tuple[str, str] | None]]
-    inputs: dict   # from System
-    outputs: dict  # from System
-    state_index: dict[str, tuple[int, int]]
-    n: int
-```
-
-Used by:
-
-- `check_algebraic_loops` / `_build_gather_sources` (typed as `WiredDiagram`)
-- `build_diagram_topology` generalization (Phase **5c**; Phase 0 does not change `topology.py`)
+`check_algebraic_loops` and `_build_gather_sources` stay typed as **`DiagramSystem`** in Phase 0.
+Phase 2 widens to **`DiagramSystem | StepDiagramSystem`** (or duck-types via `.subsystems` /
+`.connections` only). Phase **5c** `build_diagram_topology` uses `isinstance` on both diagram
+classes — no `typing.Protocol` required.
 
 ## What is shared vs forked (reference)
 
@@ -220,8 +208,7 @@ compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name 
 
 | Deliverable | File |
 | --- | --- |
-| `WiredDiagram` protocol | `wiring.py` |
-| `check_algebraic_loops(WiredDiagram)` | `wiring.py` |
+| `check_algebraic_loops(DiagramSystem)` | `wiring.py` |
 | `WiredDiagramMixin` with full table above | `wiring.py` |
 | `DiagramSystem(WiredDiagramMixin, System)` | `diagram.py` |
 | `compiler.py` imports `check_algebraic_loops` from `wiring` | `compile/` |
@@ -233,7 +220,7 @@ compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name 
 | --- | --- |
 | `StepSystem`, `StepDiagramSystem` class body | 1–2 (`diagram.py`) |
 | `compile_step_diagram`, `StepEvaluator`, `JaxStepEvaluator` | 2 |
-| `build_diagram_topology(WiredDiagram)` | **5c** |
+| `build_diagram_topology` for step side | **5c** |
 | `composition.py` `isinstance` generalization | 2 or 5c |
 | `hybrid_closed_loop`, `plot_hybrid_diagram` | 5c |
 
@@ -261,6 +248,9 @@ compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name 
 
 - `examples/scripts/diagrams/demo_diagram_shortcuts.py`
 - `examples/scripts/diagrams/demo_closed_loop.py`
+- **Large diagram smokes** (headless):
+  - `MPLBACKEND=Agg SDL_VIDEODRIVER=dummy python examples/scripts/diagrams/demo_dynamic_bicycle_cascade_path_tracking.py` — multi-loop cascade (~448 lines); verify lateral-error print + exit 0
+  - `MPLBACKEND=Agg python examples/scripts/diagrams/demo_diagram_compiling.py` — compile path + evaluator parity (~153 lines)
 - `diagram.plot_diagram()` on one existing closed-loop example — visual spot-check optional
 
 **Acceptance:** bit-for-bit floating equivalence not required, but **same topology
@@ -288,4 +278,4 @@ where tests exist.
 | **2** | `StepDiagramSystem` in **`diagram.py`**; gather + ports pass **`k`**; separate step JIT |
 | **4** | `dt_base` fires blocks; **`k`** into diagram eval — not `t` into `StepSystem` |
 | **5** | Plant integration uses **`t`**; step side uses **`k`** |
-| **5c** | `build_diagram_topology(hybrid.step)` via `WiredDiagram` protocol |
+| **5c** | `build_diagram_topology(hybrid.step)` via `isinstance` on diagram siblings |

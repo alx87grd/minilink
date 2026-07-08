@@ -45,7 +45,7 @@ rearrangement) are listed in [ROADMAP.md §5](ROADMAP.md).
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ `SystemFacades` mixin), `DiagramSystem`, signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
+| `core/` | `System` (+ `SystemFacades` mixin), `DiagramSystem`, shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
 | `core/compile/` | `ExecutionPlan`, compiler, NumPy/JAX evaluators |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -195,6 +195,10 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
 
 Composes subsystems by named ports; flattens state; compiled `ExecutionPlan` is
 the main execution path (reference recursive path must stay equivalent).
+Wiring, port gather, params nesting, and `check_algebraic_loops` live on
+`WiredDiagramMixin` in `wiring.py`; `DiagramSystem` adds flow-only `f`,
+`compile`, and `reconstruct_internal_signals`. Public `DiagramSystem` API is
+unchanged (methods inherited from the mixin).
 `connect()` validates port existence and dimensions at wiring time and is
 quiet by default (`connection_verbose=False`; set `True` for one line per connection).
 

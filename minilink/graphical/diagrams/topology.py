@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from minilink.core.diagram import DiagramSystem
+from minilink.core.wiring import WiredDiagramMixin
 
 
 @dataclass(frozen=True)
@@ -48,7 +48,7 @@ class DiagramTopology:
 
 def build_diagram_topology(sys_or_diagram) -> DiagramTopology:
     """Build a display/export topology snapshot from a system or diagram."""
-    if isinstance(sys_or_diagram, DiagramSystem):
+    if isinstance(sys_or_diagram, WiredDiagramMixin):
         return _build_diagram_system_topology(sys_or_diagram)
     return _build_single_system_topology(sys_or_diagram)
 

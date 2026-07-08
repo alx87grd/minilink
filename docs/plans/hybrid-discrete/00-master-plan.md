@@ -63,7 +63,7 @@ subset.
 | Boundary: step→plant **ZOH**, plant→step **sample** with **one-tick delay** | Adopt |
 | `hybrid_closed_loop` facade; **no** `@` across step/flow domains | Adopt |
 | 6b warm-start block state = transcription decision **`z`**, not core `Trajectory` flatten | Adopt |
-| Phase 0 **`WiredDiagram` protocol** for topology export (not optional) | Adopt |
+| Phase 0 mixin only — **no** `WiredDiagram` Protocol (typing widened in Phase 2 / 5c) | Adopt |
 | Third slot: flow passes **`t` (float)**; step passes **`k` (int)** — no conversion, no artificial time on `StepSystem` | Adopt |
 | Separate `DynamicsEvaluator` / `StepEvaluator` JIT (no mixed `t`/`k` in one graph) | Adopt |
 
@@ -83,7 +83,7 @@ Detail and tick-0 init: [05-hybrid-simulation.md](05-hybrid-simulation.md).
 
 | Phase | Doc | Delivers | Milestones |
 | --- | --- | --- | --- |
-| **0** | [00-wiring-refactor.md](00-wiring-refactor.md) | `WiredDiagramMixin` (wiring, gather, `tf`, `check_algebraic_loops`) + protocol; `DiagramSystem` delegates — **no new behavior** | — |
+| **0** | [00-wiring-refactor.md](00-wiring-refactor.md) | `WiredDiagramMixin` (wiring, gather, `tf`, `check_algebraic_loops`); `DiagramSystem` delegates — **no new behavior** | — |
 | **1** | [01-step-core.md](01-step-core.md) | `StepSystem`, `ZOHHold` — `step(x, u, k)` / `h(x, u, k)`; **no wall time on leaf** | — |
 | **2** | [02-step-diagram.md](02-step-diagram.md) | `StepDiagramSystem` (`StepSystem` + `StaticSystem`), `compile_step_diagram`, `StepEvaluator`, `StepRunner`; `TimedStepSimulator` (test stopgap only); **partial-fire compile hooks** for Phase 4 | — |
 | **3** | [03-discretization.md](03-discretization.md) | `discretize(DynamicSystem, dt)` → `StepSystem` *(optional; not on hybrid critical path)* | — |
@@ -126,7 +126,6 @@ clocked API once Phase 4 lands.
 flowchart TB
     subgraph P0 [Phase 0 Wiring]
         WIR[WiredDiagramMixin]
-        PROTO[WiredDiagram protocol]
     end
 
     subgraph P1 [Phase 1 Step leaf]
@@ -191,7 +190,7 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 
 | Concern | Owner | Phase |
 | --- | --- | --- |
-| Shared wiring, gather, `tf`, `check_algebraic_loops`, `WiredDiagram` protocol | `WiredDiagramMixin` | **0** |
+| Shared wiring, gather, `tf`, `check_algebraic_loops` | `WiredDiagramMixin` | **0** |
 | Third slot: **`t` (flow)** / **`k` (step)** on shared port paths | call site + evaluator | 0–2 |
 | Pure `step` / `h` math (`k` only, no wall time) | `StepSystem` | 1 |
 | Step block wiring + compile hooks for partial fire | `StepDiagramSystem` / `StepEvaluator` | 2 |
@@ -225,7 +224,7 @@ MPC failure policy in Phase 6.
 
 | Step | Phase | Deliverable |
 | --- | --- | --- |
-| **0** | **0** | `core/wiring.py` mixin + `WiredDiagram` protocol; `DiagramSystem` delegates; validation gate |
+| **0** | **0** | `core/wiring.py` mixin; `DiagramSystem` delegates; validation gate |
 | 1 | 1 | `StepSystem`, `ZOHHold`, leaf tests |
 | 2 | 2 | `StepDiagramSystem` in `diagram.py` on mixin, `compile_step_diagram`, `StepEvaluator`, partial-fire hooks |
 | 3 | 2 | `StepRunner`, `TimedStepSimulator` (tests only), closed-loop tests |

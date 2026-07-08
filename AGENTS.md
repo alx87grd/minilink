@@ -28,6 +28,7 @@ Do not add new markdown guides unless asked. Keep [README call chains](README.md
 - **Incremental refactoring**: no broad restructures unless the user asks.
 - **Preserve user edits**: never revert or "clean up" manual changes the user made in demos, notebooks, examples, or scratch code — commented-out plots, tuning constants (`TF`, gains, step times), disabled sections, exploratory variables — unless they explicitly ask you to change those lines. Commit/review passes must not overwrite user-tuned script state.
 - **Docs are contract**: update DESIGN / ROADMAP / README when public behavior or maturity claims change.
+- **Familiar patterns first**: do not introduce programming concepts or advanced Python styles absent from the repo and the user's prior choices (e.g. `typing.Protocol`, metaclasses) unless there is a strong runtime or maintainability reason. Static-typing-only wins are not enough on their own — prefer patterns already in use (mixins, unions, duck typing). If the tradeoff is unclear, validate with the user before landing the pattern.
 
 ## Textbook style
 
