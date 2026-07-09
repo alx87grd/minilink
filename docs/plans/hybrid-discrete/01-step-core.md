@@ -133,8 +133,8 @@ class StepRollout:
 Same verb as flow and static ([Phase 1a](01a-evolution-map-refactor.md)): **`sys.compile()`**
 dispatches by type. **No public `compile_step`.**
 
-**Phase 1** — `compile()` on **`StepSystem` leaf only** (diagram branch in Phase 2); rejects
-`DiagramSystem` / `StepDiagramSystem` with a clear error until Phase 2.
+**Phase 1** — `compile()` on **`StepSystem` leaf only** (diagram branch in Phase 2); Phase 1
+rejected `DiagramSystem` / `StepDiagramSystem` until Phase 2 landed.
 
 **Dispatch order (leaf):** `DiagramSystem` → **`StepSystem`** → `DynamicSystem` → static
 `n == 0` → `TypeError`.

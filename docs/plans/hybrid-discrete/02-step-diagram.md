@@ -1,5 +1,8 @@
 # Phase 2: Step Diagram + Evaluator
 
+**Status:** complete (`0b7a1fd` on `dev-hybrid`, July 2026). `TimedStepSimulator` skipped per
+contract — `compute_rollout` covers tests.
+
 **After [Phase 0](00-wiring-refactor.md), [Phase 1](01-step-core.md), and
 [Phase 1b](01b-facade-mixin-split.md).** Compose `StepSystem` + static `System` (`n=0`)
 blocks into `StepDiagramSystem`; compile to diagram **`StepEvaluator`**. **No wall

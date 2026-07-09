@@ -27,12 +27,16 @@ from benchmarks.simulation import (
     benchmark_simulation_backend,
     benchmark_simulation_matrix,
 )
+from benchmarks.step_evaluators import (
+    StepEvaluatorBenchmarkVariant,
+    benchmark_step_evaluators,
+)
 from benchmarks.trajopt import (
     TrajectoryOptimizationBenchmarkConfig,
     TrajectoryOptimizationBenchmarkVariant,
     benchmark_trajectory_optimization,
 )
-from minilink.core.system import DynamicSystem
+from minilink.core.system import DynamicSystem, StepSystem
 from minilink.planning.search.rrt import RRTPlanner
 
 
@@ -47,6 +51,19 @@ class _TinyStable(DynamicSystem):
 
     def h(self, x, u, t=0, params=None):
         return x
+
+
+class _TinyStep(StepSystem):
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        self.name = "TinyStep"
+        self.x0 = np.array([1.0])
+
+    def step(self, x, u, k=0, params=None):
+        return np.asarray([x[0] + u[0]], dtype=float)
+
+    def h(self, x, u, k=0, params=None):
+        return np.asarray(x, dtype=float)
 
 
 class TestBenchmarkSmoke(unittest.TestCase):
@@ -64,6 +81,22 @@ class TestBenchmarkSmoke(unittest.TestCase):
             variants=(
                 FEvaluatorBenchmarkVariant("native", None),
                 FEvaluatorBenchmarkVariant("numpy", "numpy"),
+            ),
+        )
+        self.assertEqual(len(result.rows), 2)
+        self.assertGreaterEqual(result.rows[1].loop_s, 0.0)
+
+    def test_step_evaluator_benchmark_returns_rows(self):
+        step_sys = _TinyStep()
+        result = benchmark_step_evaluators(
+            step_sys,
+            np.array([1.0]),
+            np.array([0.0]),
+            k=0,
+            n_calls=2,
+            variants=(
+                StepEvaluatorBenchmarkVariant("native", None),
+                StepEvaluatorBenchmarkVariant("numpy", "numpy"),
             ),
         )
         self.assertEqual(len(result.rows), 2)

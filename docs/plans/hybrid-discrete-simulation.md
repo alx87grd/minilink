@@ -1,6 +1,6 @@
 # Hybrid and step simulation (design only)
 
-Status: Phases **0**, **1a**, **1**, **1b** complete on `dev-hybrid` (July 2026); Phases **2–6**
+Status: Phases **0**, **1a**, **1**, **1b**, **2** complete on `dev-hybrid` (July 2026); Phases **3–6**
 pending. Shard contracts: [hybrid-discrete/00-master-plan.md](hybrid-discrete/00-master-plan.md).
 
 Architecture for **step maps** (difference equations, jumps, turn-based dynamics),
@@ -33,7 +33,7 @@ Near-term deliverables (see **[00-master-plan.md](hybrid-discrete/00-master-plan
 0. **Phase 1a** — move `f` to `DynamicSystem`; typed `compile()` (static / dynamic evaluators); `StaticSimulator`; `compute_trajectory` on static + dynamic only. **Done** (`d131a89`).
 1. **Phase 1** — `StepSystem` leaf; unified `compile()` step branch; `StepEvaluator.rollout` / `compute_rollout`; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf. **Done** (`700f8ea`).
 1b. **Phase 1b** — façade mixin split; `DiagramSystem` IS-A `DynamicSystem`; MRO sim dispatch. **Done** (`40c8297`).
-2. **Phase 2** — `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator`.
+2. **Phase 2** — `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator`. **Done** (`0b7a1fd`).
 3. **Phase 3** — `discretize()` optional conversion tool.
 4. **Phase 4** — `StepSchedule.dt_base` + `ScheduledStepOrchestrator` (single- and multi-rate).
 5. **Phase 5** — `HybridSimulator` + boundary ports; **always** uses Phase 4 on the step side.
@@ -64,7 +64,7 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 | **1a** | `f` on `DynamicSystem`; `StaticEvaluator` + `StaticSimulator`; unified `compile()` | — | **Done** |
 | **1** | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepEvaluator.rollout` / `compute_rollout` | none | **Done** |
 | **1b** | Façade mixins; `DiagramSystem(DynamicSystem)`; MRO sim dispatch | — | **Done** |
-| **2** | `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator` | none (or logging-only in `TimedStepSimulator`) | pending |
+| **2** | `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator` | none | **Done** |
 | **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure | pending |
 | **4** | `StepSchedule` + `ScheduledStepOrchestrator` | **`dt_base`** authoritative for clocked step sim | pending |
 | **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; orchestrator always on step side | pending |
@@ -963,7 +963,7 @@ See [00-master-plan.md](hybrid-discrete/00-master-plan.md). Summary:
 | 1 | **1a** | `f` on `DynamicSystem`; typed `compile()`; `StaticSimulator` | **Done** |
 | 2 | **1** | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepEvaluator.rollout`, teaching demos | **Done** |
 | 3 | **1b** | Façade mixins; `DiagramSystem(DynamicSystem)` | **Done** |
-| 4–5 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `compile_step_diagram`, diagram evaluator, `compute_rollout` tests | pending |
+| 4–5 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `compile_step_diagram`, diagram evaluator, `compute_rollout` tests (`TimedStepSimulator` skipped) | **Done** |
 | 6 | 3 | `discretize` *(optional)* | pending |
 | 7 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, tests | pending |
 | 8–10 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** | pending |

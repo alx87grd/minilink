@@ -1,7 +1,7 @@
 # Hybrid discrete simulation: Master Plan
 
-Status: Phases **0**, **1a**, **1**, **1b** complete on `dev-hybrid` (July 2026); Phases **2–6**
-pending. Next: [02-step-diagram.md](02-step-diagram.md). Wiring prep:
+Status: Phases **0**, **1a**, **1**, **1b**, **2** complete on `dev-hybrid` (July 2026); Phases **3–6**
+pending. Next: [04-scheduled-orchestrator.md](04-scheduled-orchestrator.md). Wiring prep:
 [00-wiring-refactor.md](00-wiring-refactor.md).
 
 Program charter for discrete-time blocks, step diagrams, optional discretization, scheduled
@@ -98,7 +98,7 @@ Detail and tick-0 init: [05-hybrid-simulation.md](05-hybrid-simulation.md).
 | **1a** | [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md) | Move `f` to `DynamicSystem`; typed `compile()` → static / dynamic evaluators; `StaticSimulator`; diagram `state_ops` guards | **Done** (`d131a89`) |
 | **1** | [01-step-core.md](01-step-core.md) | `StepSystem`, `ZOHHold`; unified `compile()` step branch; `StepRollout` + `rollout()` / `compute_rollout`; teaching demos — **no wall time** | **Done** (`700f8ea`) |
 | **1b** | [01b-facade-mixin-split.md](01b-facade-mixin-split.md) | Façade mixins (`Shared` / `Dynamic` / `Step`); `DiagramSystem` IS-A `DynamicSystem`; MRO sim dispatch — no `_simulate` router | **Done** (`40c8297`) |
-| **2** | [02-step-diagram.md](02-step-diagram.md) | `StepDiagramSystem` (`StepSystem` + static `System`), `StepExecutionPlan`, `compile_step_diagram`, `NumpyStepDiagramEvaluator`; `compute_rollout` on diagrams; `TimedStepSimulator` optional (tests) | — |
+| **2** | [02-step-diagram.md](02-step-diagram.md) | `StepDiagramSystem` (`StepSystem` + static `System`), `StepExecutionPlan`, `compile_step_diagram`, `NumpyStepDiagramEvaluator`; `compute_rollout` on diagrams; `TimedStepSimulator` optional (skipped) | **Done** (`0b7a1fd`) |
 | **3** | [03-discretization.md](03-discretization.md) | `discretize(DynamicSystem, dt)` → `StepSystem` *(optional; not on hybrid critical path)* | — |
 | **4** | [04-scheduled-orchestrator.md](04-scheduled-orchestrator.md) | `StepSchedule.dt_base` + `ScheduledStepOrchestrator` — public clocked step path | — |
 | **5** | [05-hybrid-simulation.md](05-hybrid-simulation.md) | `HybridDiagram`, `HybridSimulator`, `rk4_rollout_zoh` | **5a** trivial schedule + SMC · **5b** cascade + non-trivial `fire` |
@@ -115,6 +115,7 @@ side. **`StepEvaluator.rollout`** (Phase 1) is clock-free (games, unit tests, le
 | Phase | Demo / outcome |
 | --- | --- |
 | **1** | Leaf teaching scripts via `compute_rollout`: Fibonacci, discrete accumulator, logistic map (`examples/scripts/step/`) |
+| **2** | Step diagram demos: unity feedback, ZOH+integrator, cascade integrators/ZOH (`demo_step_diagram_*.py`) |
 | **5a** | SMC (or generic `StepSystem`) + continuous plant via `HybridSimulator` |
 | **5b** | Filter @ fast rate + slow controller cascade (`fire` divisors) |
 | **5c** | `hybrid.plot_diagram()`; `hybrid_closed_loop(step_ctl, plant, schedule=...)` |
@@ -225,7 +226,7 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 | **1a** | `f` only on `DynamicSystem`; `compile(System n==0)` → static evaluator (no fake `f`); `compute_trajectory` on static + dynamic via typed simulators; diagram `state_ops` on `DynamicSystem` only | **Done** |
 | **1** | Leaf `step` / `h(x, u, k)`; unified `compile()` step branch; `StepRollout` + `rollout()` / `compute_rollout`; no `f` on `StepSystem`; `ZOHHold` + teaching demo smoke | **Done** |
 | **1b** | Three façade mixins; `DiagramSystem(DynamicSystem)`; `Simulator` / `StaticSimulator` isinstance collapse; `test_facades_split.py`; DESIGN / README sync | **Done** |
-| **2** | Step diagram closed loop via `connect`; gather passes **`k`**; `rollout()` / **`compute_rollout`** on diagram evaluator; parallel `StepExecutionPlan`; partial-fire hooks for Phase 4 |
+| **2** | Step diagram closed loop via `connect`; gather passes **`k`**; `rollout()` / **`compute_rollout`** on diagram evaluator; parallel `StepExecutionPlan`; partial-fire hooks for Phase 4 | **Done** |
 | **3** *(optional)* | `discretize` euler/rk4 match continuous integration over fixed `dt` |
 | **4** | Trivial + multi-rate `fire`; cross-rate buffers; standalone orchestrator tests |
 | **5a** | `HybridSimulator` matches hand-rolled SMC (or test double); multi-port boundary; one-tick delay enforced |
@@ -248,8 +249,8 @@ MPC failure policy in Phase 6.
 | 1 | **1a** | Move `f` to `DynamicSystem`; `StaticEvaluator` + `StaticSimulator`; unified `compile()` dispatch | **Done** |
 | 2 | **1** | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepRollout` + facades, leaf + rollout tests, teaching demos | **Done** |
 | 3 | **1b** | Façade mixin split; `DiagramSystem(DynamicSystem)`; sim boundaries; `test_facades_split.py` | **Done** |
-| 4 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `step_compiler.py`, diagram `StepEvaluator`, partial-fire hooks, closed-loop + `compute_rollout` tests |
-| 5 | 2 | `TimedStepSimulator` (tests only) |
+| 4 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `step_compiler.py`, diagram `StepEvaluator`, partial-fire hooks, closed-loop + `compute_rollout` tests | **Done** |
+| 5 | 2 | `TimedStepSimulator` (tests only) | skipped (`compute_rollout` covers Phase 2) |
 | 6 | 3 | `discretize` verb + tests *(optional — anytime after step 4)* |
 | 7 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, orchestrator tests |
 | 8 | 5 | `rk4_rollout_zoh` |
