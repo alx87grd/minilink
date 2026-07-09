@@ -290,7 +290,7 @@ class TestLQR(unittest.TestCase):
         diagram.connect("ctl", "u", "plant", "u")
 
         plant.x0 = np.array([0.2, 0.0])  # small tip from upright
-        traj = diagram.compute_trajectory(tf=10.0, n_steps=1001)
+        traj = diagram.compute_trajectory(tf=10.0, n_steps=1001, verbose=False)
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=1e-2)
 
 

@@ -6,12 +6,17 @@ Integrates ``dx/dt = f(x, u, t)`` along a time grid using pluggable solver backe
 (SciPy, Euler, fixed-step RK4). Static ``System`` leaves use
 :class:`~minilink.simulation.static_simulator.StaticSimulator` instead.
 
+Discontinuous closed-loop diagrams (e.g. sliding-mode ``sign(s)``): grid-point
+``Trajectory`` / ``reconstruct_internal_signals`` torques need not match RK4
+sub-step behavior — see `DESIGN.md` §5 (*Discontinuous closed loops — known issues*).
+
 Public module symbols :data:`COMPILE_BACKEND_AUTO` and :data:`RK4_AUTO_MIN_TIME_POINTS`
 control automatic compile backend selection and optional fixed-step RK4 on long
 uniform grids when using the JAX compiler.
 """
 
 import logging
+import time
 
 import numpy as np
 
@@ -21,6 +26,11 @@ from minilink.core.backends import (
     BACKEND_NUMPY,
 )
 from minilink.core.trajectory import Trajectory
+from minilink.simulation.sim_reporting import (
+    print_simulation_preamble,
+    print_simulation_report,
+)
+from minilink.simulation.solver_warnings import emit_discontinuous_solver_warnings
 from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
@@ -76,6 +86,10 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
 # SciPy when the output grid is long enough
 RK4_AUTO_MIN_TIME_POINTS = 10_000
 
+# Default automatic dt scale relative to ``solver_info["smallest_time_constant"]``
+SMOOTH_AUTO_DT_SCALE = 0.1
+DISCONTINUOUS_AUTO_DT_SCALE = 0.1
+
 # Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
 # Re-exported from :mod:`minilink.core.backends` so legacy callers
 # importing it from the simulator keep working.
@@ -120,6 +134,9 @@ class Simulator:
         Name passed as ``backend`` to :meth:`~minilink.core.system.System.compile`.
         Typical values are ``numpy`` (default) or ``jax``. Use :data:`COMPILE_BACKEND_AUTO`
         (the string ``auto``) to try JAX if importable, then fall back to NumPy.
+    solver_warnings : str
+        ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
+        :class:`UserWarning` messages from :mod:`minilink.simulation.solver_warnings`.
     """
 
     def __init__(
@@ -133,6 +150,7 @@ class Simulator:
         solver=None,
         verbose=False,
         compile_backend=BACKEND_NUMPY,
+        solver_warnings="warn",
     ):
         from minilink.core.system import DynamicSystem
 
@@ -150,6 +168,13 @@ class Simulator:
         self.verbose = verbose
         self.sys = sys
         self.sys.refresh()
+        self.user_solver = solver
+        self.user_specified_dt = dt is not None
+        self.auto_time_grid = n_steps is None and dt is None
+        self.solver_warnings = solver_warnings
+        self.t0 = float(t0)
+        self.tf = float(tf)
+        self.last_solve_time_s = None
 
         # Select the time vector
         self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
@@ -168,15 +193,36 @@ class Simulator:
             self.solver_mode
         )
         self.solver_backend = self._select_backend(solver_backend_key)
+        self.dt = dt
+
+        setup_notes = emit_discontinuous_solver_warnings(
+            solver_mode=self.solver_mode,
+            solver_info=sys.solver_info,
+            dt=dt,
+            user_solver=self.user_solver,
+            user_specified_dt=self.user_specified_dt,
+            solver_warnings=self.solver_warnings,
+            verbose=self.verbose,
+        )
 
         if self.verbose:
-            print(
-                f"Simulator:\n"
-                "--------------\n"
-                f"Simulating system {sys.name} from t={t0} to t={tf}"
+            print_simulation_preamble(
+                title="===               Time-Domain Simulation                  ===",
+                system_name=sys.name,
+                n=sys.n,
+                m=sys.m,
+                x0=self.x0,
+                t0=self.t0,
+                tf=self.tf,
+                n_pts=self.n_pts,
+                dt=dt,
+                solver_mode=self.solver_mode,
+                user_solver=self.user_solver,
+                compile_backend=self.compile_backend,
+                auto_time_grid=self.auto_time_grid,
+                solver_options=self.solver_backend_options or None,
+                notes=setup_notes or None,
             )
-
-            print(f"Time steps = {n_steps}, dt={dt} and solver= {self.solver_mode}")
 
         self.scipy_last_solution = None
         self.last_debug = None
@@ -203,14 +249,15 @@ class Simulator:
 
         # Automatically
         if n_steps is None and dt is None:
-            # Automatically select the time step based on the smallest time constant of the system
+            if sys.solver_info.get("discontinuous_behavior", False):
+                scale = DISCONTINUOUS_AUTO_DT_SCALE
+            else:
+                scale = SMOOTH_AUTO_DT_SCALE
             dt = self._validate_dt(
-                sys.solver_info["smallest_time_constant"] * 0.1,
+                sys.solver_info["smallest_time_constant"] * scale,
                 label="automatic dt",
             )
             time_vector = np.arange(t0, tf + dt, dt)
-            if self.verbose:
-                print("Automatic dt based on the smallest time constant of the system")
 
         # If only dt is set, use a uniform grid with that step size
         elif dt is None:
@@ -243,7 +290,7 @@ class Simulator:
         Choose the solver backend label from the system and options.
 
         - If the user has specified a solver, return it.
-        - If the system has discontinuous behavior, return ``"scipy_stiff"``.
+        - If the system has discontinuous behavior, return ``"euler"``.
         - If ``compile_backend`` is ``"jax"``, the time grid is uniform, and the
           number of evaluation points is at least :data:`RK4_AUTO_MIN_TIME_POINTS`,
           return ``"rk4_fixedsteps"`` (fast JIT rollout).
@@ -251,10 +298,8 @@ class Simulator:
         """
         if user_solver is not None:
             return user_solver
-        if not sys.solver_info["continuous_time_equation"]:
-            raise ValueError("Prototype Simulator does not support discrete solver")
-        if sys.solver_info["discontinuous_behavior"]:
-            return "scipy_stiff"
+        if sys.solver_info.get("discontinuous_behavior", False):
+            return "euler"
         if (
             self.compile_backend == BACKEND_JAX
             and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
@@ -277,10 +322,16 @@ class Simulator:
         """
 
         # Integrate the system using the selected solver backend
+        time_solve = self.verbose
+        if time_solve:
+            t_start = time.perf_counter()
 
         x_traj = self.solver_backend.integrate(
             self.evaluator, self.times, self.x0, args=self.solver_backend_options
         )
+
+        if time_solve:
+            self.last_solve_time_s = time.perf_counter() - t_start
 
         # Build the input trajectory
 
@@ -296,6 +347,14 @@ class Simulator:
 
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
+
+        if self.verbose:
+            print_simulation_report(
+                elapsed_s=self.last_solve_time_s,
+                n_samples=traj.n_samples,
+                x_final=traj.x[:, -1] if traj.n > 0 else None,
+                last_debug=self.last_debug,
+            )
 
         return traj
 
@@ -318,6 +377,10 @@ class Simulator:
             raise ValueError(
                 f"Solver '{self.solver_mode}' does not support forced simulations"
             )
+        time_solve = self.verbose
+        if time_solve:
+            t_start = time.perf_counter()
+
         x_traj = self.solver_backend.integrate_forced(
             self.evaluator,
             self.times,
@@ -326,16 +389,25 @@ class Simulator:
             args=self.solver_backend_options,
         )
 
+        if time_solve:
+            self.last_solve_time_s = time.perf_counter() - t_start
+
         traj = Trajectory(t=self.times, x=x_traj, u=u_traj)
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
+
+        if self.verbose:
+            print_simulation_report(
+                elapsed_s=self.last_solve_time_s,
+                n_samples=traj.n_samples,
+                x_final=traj.x[:, -1] if traj.n > 0 else None,
+                last_debug=self.last_debug,
+            )
 
         return traj
 
     # Private: compile, validation, and backend wiring
     def _build_evaluator(self, sys, compile_backend):
-        if self.verbose:
-            print(f"Compiling with backend={compile_backend!r}.")
         return sys.compile(backend=compile_backend)
 
     def _resolve_and_build_evaluator(self, sys, compile_backend):
@@ -346,22 +418,13 @@ class Simulator:
         if compile_backend != BACKEND_AUTO:
             return compile_backend, self._build_evaluator(sys, compile_backend)
 
-        if self.verbose:
-            print("Compiling: automatic backend (try JAX, fall back to NumPy).")
         try:
             import jax  # noqa: F401
         except ImportError:
-            if self.verbose:
-                print("JAX not installed; using NumPy compile backend.")
             return BACKEND_NUMPY, self._build_evaluator(sys, BACKEND_NUMPY)
         try:
             return BACKEND_JAX, self._build_evaluator(sys, BACKEND_JAX)
-        except Exception as exc:
-            if self.verbose:
-                print(
-                    f"JAX compile failed ({type(exc).__name__}: {exc}); "
-                    "using NumPy compile backend."
-                )
+        except Exception:
             logging.getLogger(__name__).debug(
                 "JAX compile failed, falling back to numpy", exc_info=True
             )

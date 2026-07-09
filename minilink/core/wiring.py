@@ -151,6 +151,16 @@ class WiredDiagramMixin:
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
         self.compute_state_properties()
+        self._refresh_solver_info()
+
+    def _refresh_solver_info(self):
+        """Bubble subsystem solver hints to the diagram root."""
+        if not hasattr(self, "solver_info"):
+            return
+        self.solver_info["discontinuous_behavior"] = any(
+            subsystem.solver_info.get("discontinuous_behavior", False)
+            for subsystem in self.subsystems.values()
+        )
 
     def subsystem_id(self, subsystem):
         """Return the diagram id for a subsystem instance added to this diagram."""

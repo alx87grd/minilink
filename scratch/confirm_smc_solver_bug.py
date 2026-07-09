@@ -9,6 +9,7 @@ Checks:
   2. Does sign(s) ever flip (required for bang-bang chatter in tau)?
   3. Does removing the discontinuous term change the state trajectory?
   4. Does logged ctl:u match u implied during integration (f_ivp)?
+  5. Euler vs rk4_fixedsteps on demo_sliding_mode_pendulum params (repro case).
 """
 
 from __future__ import annotations
@@ -180,6 +181,50 @@ def check_f_ivp_consistency(diagram):
     )
 
 
+def repro_demo_euler_vs_rk4():
+    """Match demo_sliding_mode_pendulum.py (lam=20, ref step at 0.5, dt=0.1)."""
+    plant = Pendulum(length=1.0, mass=1.0)
+    plant.x0 = np.array([0.0, 0.0])
+    ref = Step(
+        initial_value=np.array([0.0, 0.0]),
+        final_value=np.array([np.pi, 0.0]),
+        step_time=0.5,
+    )
+    smc = SlidingModeController(plant, lam=20.0, gain=8.0, nab=0.15)
+    diagram = ref >> closed_loop_qdq(smc, plant)
+    ev = diagram.compile(backend="numpy")
+    dt = 0.1
+    u_nom = diagram.get_u_from_input_ports()
+
+    print("\n=== Repro: demo_sliding_mode_pendulum (euler vs rk4, dt=0.1) ===")
+    for solver in ("euler", "rk4_fixedsteps"):
+        traj = diagram.compute_trajectory(tf=1.0, dt=dt, solver=solver, show=False)
+        traj = diagram.reconstruct_internal_signals(traj)
+        u = traj.signals["ctl:u"][0]
+        print(f"  {solver} ctl:u = {u}")
+        print(f"    max |Δu| on grid = {np.max(np.abs(np.diff(u))):.4f}")
+
+    for label, stepper in (
+        ("euler step-start u", ev.euler_step_ivp),
+        ("rk4 step-start u", ev.rk4_step_ivp),
+    ):
+        x = plant.x0.copy()
+        u_steps = []
+        for i in range(11):
+            t = i * dt
+            sig = ev.compute_internal_signals_dict(x, u_nom, t)
+            u_steps.append(float(sig["ctl:u"][0]))
+            if i < 10:
+                x = stepper(x, t, dt)
+        print(f"  manual {label}: {u_steps}")
+
+    print(
+        "  => NOT a plot glitch: printed arrays differ. Euler ±8.3 swings are "
+        "inverse-dynamics oscillation (sign(s) stays -1 after ref step); RK4 "
+        "smooth tau from better integration + constant -K sign(s) offset."
+    )
+
+
 def main():
     diagram, plant = build_diagram()
     q_d = np.pi + 0.25
@@ -205,6 +250,7 @@ def main():
 
     ab_test_discontinuous_term()
     check_f_ivp_consistency(diagram)
+    repro_demo_euler_vs_rk4()
 
     print("\n=== Verdict hints ===")
     if results and all(r["sign_flips"] == 0 for r in results):

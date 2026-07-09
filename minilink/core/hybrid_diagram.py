@@ -142,10 +142,15 @@ class HybridDiagram:
         n_steps=None,
         plant_dt_inner=None,
         compile_backend="numpy",
-        verbose=False,
+        verbose=True,
         show=False,
     ):
         """Simulate with nominal boundary inputs on ``[t0, tf]``.
+
+        Parameters
+        ----------
+        verbose : bool
+            Print hybrid simulator setup (default ``True`` for interactive use).
 
         Returns
         -------
@@ -179,10 +184,15 @@ class HybridDiagram:
         n_steps=None,
         plant_dt_inner=None,
         compile_backend="numpy",
-        verbose=False,
+        verbose=True,
         show=False,
     ):
         """Simulate with prescribed computer-boundary input on ``[t0, tf]``.
+
+        Parameters
+        ----------
+        verbose : bool
+            Print hybrid simulator setup (default ``True`` for interactive use).
 
         Returns
         -------
@@ -224,7 +234,7 @@ class HybridDiagram:
             if self.traj is not None:
                 traj = self.traj
             else:
-                traj = self.compute_trajectory(show=False)
+                traj = self.compute_trajectory(show=False, verbose=False)
         return traj.plot(
             signals=signals,
             abscissa=abscissa,

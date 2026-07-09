@@ -10,15 +10,10 @@ Pyro law on ``[q; dq]`` feedback (``closed_loop_qdq`` inserts ``Mux(q, dq) → s
     plant.q, plant.dq ─► smc.y              ([q; dq])
     smc.u ─────────────► plant.u            (τ)
 
-Fixed-step RK4 is used here because SciPy adaptive solvers hang or overflow on
-this closed loop.
-
-**Known bug (continuous path):** ``DiagramSystem`` integration uses algebraic
-``f_ivp`` feedback (``u`` re-evaluated at every RK sub-step, not sample-hold).
-With these ICs/gains, ``sign(s)`` often stays one-signed, so ``tau`` looks
-smooth (inverse dynamics + constant ``-K sign(s)``) rather than chattering.
-SciPy and RK4 then look deceptively similar. Diagnostic:
-``scratch/confirm_smc_solver_bug.py``. Fix tracked in ROADMAP §5.2.
+**Discontinuous closed loop:** prefer auto **Euler** (``solver=None``) or
+``solver="euler"`` with a small ``dt``. See `DESIGN.md` — *Discontinuous
+closed loops — known issues*. Solver comparisons live in
+``tests/unittest/test_discontinuous_solvers.py``.
 """
 
 import numpy as np
@@ -29,20 +24,21 @@ from minilink.core.composition import closed_loop_qdq
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 plant = Pendulum(length=1.0, mass=1.0)
-plant.x0 = np.array([0.2, 0.0])
+model = Pendulum(length=1.0, mass=0.5)
+plant.x0 = np.array([1.0, 0.0])
 
 ref = Step(
-    initial_value=np.array([0.0, 0.0]),
-    final_value=np.array([np.pi + 0.25, 0.0]),
-    step_time=0.0,
+    initial_value=np.array([np.pi, 0.0]),
+    final_value=np.array([0.0, 0.0]),
+    step_time=0.5,
 )
 
-smc = SlidingModeController(plant, lam=2.0, gain=8.0, nab=0.15)
+smc = SlidingModeController(model, lam=20.0, gain=8.0, nab=0.15)
 
 diagram = ref >> closed_loop_qdq(smc, plant)
 
 diagram.plot_diagram()
-diagram.compute_trajectory(tf=8.0, dt=0.1, solver="rk4_fixedsteps")
-# diagram.compute_trajectory(tf=8.0, dt=0.1)
+traj = diagram.compute_trajectory(tf=10.0)
+# traj = diagram.compute_trajectory(tf=10.0, dt=0.01, solver="euler")
 diagram.plot_trajectory()
-diagram.animate()
+# diagram.animate()

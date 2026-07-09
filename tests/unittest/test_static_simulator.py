@@ -20,7 +20,7 @@ except ImportError:
 class TestStaticSimulator(unittest.TestCase):
     def test_gain_compute_trajectory_shape(self):
         gain = Gain(K=2.0, dim=1)
-        traj = gain.compute_trajectory(t0=0, tf=1, n_steps=5)
+        traj = gain.compute_trajectory(t0=0, tf=1, n_steps=5, verbose=False)
         self.assertEqual(traj.x.shape, (0, 5))
         self.assertEqual(traj.u.shape, (1, 5))
         self.assertIn("y", traj.signals)
@@ -32,7 +32,7 @@ class TestStaticSimulator(unittest.TestCase):
             final_value=np.array([1.0]),
             step_time=0.5,
         )
-        traj = step.compute_trajectory(t0=0, tf=1, n_steps=3)
+        traj = step.compute_trajectory(t0=0, tf=1, n_steps=3, verbose=False)
         self.assertEqual(traj.x.shape, (0, 3))
         y = traj.signals["y"]
         np.testing.assert_array_equal(y[:, 0], [0.0])
@@ -52,6 +52,8 @@ class TestStaticSimulator(unittest.TestCase):
 class TestStaticSimulatorJax(unittest.TestCase):
     def test_gain_jax_compile_backend(self):
         gain = Gain(K=2.0, dim=1)
-        traj = gain.compute_trajectory(t0=0, tf=0.5, n_steps=3, compile_backend="jax")
+        traj = gain.compute_trajectory(
+            t0=0, tf=0.5, n_steps=3, compile_backend="jax", verbose=False
+        )
         self.assertEqual(traj.x.shape, (0, 3))
         self.assertIn("y", traj.signals)

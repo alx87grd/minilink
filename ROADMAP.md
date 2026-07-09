@@ -126,7 +126,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 - [x] `lqr.py`, `linear.py`, `pid.py` (`FilteredController`)
 - [x] `modelbased.py` — computed torque, sliding mode (Pyro parity)
-- [ ] **Continuous SMC closed loop** — flag ``discontinuous_behavior`` on diagrams with ``SlidingModeController``; SciPy vs ``rk4_fixedsteps`` parity; ``f_ivp`` algebraic re-evaluation vs expected ``sign(s)`` chattering / Zeno (diagnostic: ``scratch/confirm_smc_solver_bug.py``)
+- [x] **Continuous SMC closed loop** — [discontinuous-solver-selection.md](docs/plans/discontinuous-solver-selection.md): SMC `solver_info` flag, diagram aggregation, auto **Euler** + finer `dt`, forced-solver warnings (see also [DESIGN.md §5 — Discontinuous closed loops](DESIGN.md#discontinuous-closed-loops--known-issues))
 - [ ] `robotic.py` — joint/effector PD/PID wrappers (kinematic + nullspace landed)
 - [ ] `trajectory_lqr.py` — time-varying LQR along a reference
 - [ ] `mpc.py` (uses `optimization/`) — minilink extra, no pyro equivalent

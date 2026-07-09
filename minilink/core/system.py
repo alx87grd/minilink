@@ -101,7 +101,6 @@ class System(SharedSystemFacades):
 
         # Solver hints used by high-level simulation shortcuts.
         self.solver_info = {
-            "continuous_time_equation": True,
             "smallest_time_constant": 0.001,
             "discontinuous_behavior": False,
         }

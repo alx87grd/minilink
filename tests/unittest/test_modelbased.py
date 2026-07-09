@@ -4,7 +4,9 @@ import unittest
 
 import numpy as np
 
+from minilink.blocks.sources import Step
 from minilink.control.modelbased import ComputedTorqueController, SlidingModeController
+from minilink.core.composition import closed_loop_qdq
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
@@ -53,6 +55,21 @@ class TestModelBasedControllers(unittest.TestCase):
         self.assertIn("y", ctl.inputs)
         self.assertIn("u", ctl.outputs)
         self.assertEqual(ctl.inputs["y"].dim, 2)
+
+    def test_sliding_mode_sets_discontinuous_behavior(self):
+        ctl = SlidingModeController(Pendulum())
+        self.assertTrue(ctl.solver_info["discontinuous_behavior"])
+
+    def test_closed_loop_qdq_aggregates_discontinuous_behavior(self):
+        plant = Pendulum()
+        smc = SlidingModeController(plant)
+        ref = Step(
+            initial_value=np.zeros(2),
+            final_value=np.zeros(2),
+            step_time=1.0,
+        )
+        diagram = ref >> closed_loop_qdq(smc, plant)
+        self.assertTrue(diagram.solver_info["discontinuous_behavior"])
 
 
 if __name__ == "__main__":

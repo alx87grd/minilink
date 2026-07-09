@@ -137,6 +137,7 @@ class SlidingModeController(ComputedTorqueController):
         }
         ctl_fn = self._ctl_tracking if tracking_ref else self._ctl_regulation
         self.outputs["u"].compute = ctl_fn
+        self.solver_info["discontinuous_behavior"] = True
 
     def _ctl_regulation(self, x, u, t=0, params=None):
         params = self.params if params is None else params

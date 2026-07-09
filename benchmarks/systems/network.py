@@ -117,4 +117,4 @@ def make_dense_network(
 if __name__ == "__main__":
     diag = build_deep_network(depth=50)
     diag = make_dense_network(num_nodes=50, connections_per_node=5)
-    diag.compute_trajectory(dt=0.01)
+    diag.compute_trajectory(dt=0.01, verbose=False)

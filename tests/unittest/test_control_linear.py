@@ -63,7 +63,7 @@ class TestImpedanceIntegralController(unittest.TestCase):
         diagram.connect("plant", "x", "pid", "y")  # feed [position, speed]
         diagram.connect("pid", "u", "plant", "u")
 
-        traj = diagram.compute_trajectory(tf=40.0, n_steps=4001)
+        traj = diagram.compute_trajectory(tf=40.0, n_steps=4001, verbose=False)
         # state order: [pid e_int, plant position, plant speed]
         position = traj.x[1, -1]
         speed = traj.x[2, -1]
@@ -117,7 +117,7 @@ class TestFilteredController(unittest.TestCase):
         diagram.connect("plant", "y", "pid", "y")
         diagram.connect("pid", "u", "plant", "u")
 
-        traj = diagram.compute_trajectory(tf=40.0, n_steps=4001)
+        traj = diagram.compute_trajectory(tf=40.0, n_steps=4001, verbose=False)
         # state order: [pid e_int, pid y_filt, plant position, plant speed]
         position = traj.x[2, -1]
         speed = traj.x[3, -1]

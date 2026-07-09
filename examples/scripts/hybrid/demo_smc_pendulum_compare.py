@@ -5,10 +5,10 @@ Compares fixed-step RK4 closed loop with
 sampled at ``TS`` via :func:`~minilink.analysis.discretize.sample_static` and
 :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`.
 
-**Known bug (continuous path):** same as
-``examples/scripts/control/demo_sliding_mode_pendulum.py`` — algebraic ``f_ivp``
-closed loop; smooth ``tau`` and weak solver contrast until fixed (ROADMAP §5.2,
-``scratch/confirm_smc_solver_bug.py``).
+**Known issues (continuous path):** same as
+``examples/scripts/control/demo_sliding_mode_pendulum.py`` — auto **Euler** with
+finer ``dt`` is the recommended continuous path; see
+`DESIGN.md` (*Discontinuous closed loops — known issues*).
 
 Run from the repo root::
 

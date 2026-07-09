@@ -1,4 +1,5 @@
 import unittest
+import warnings
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -7,7 +8,11 @@ import pytest
 
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
-from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
+from minilink.simulation.simulator import (
+    COMPILE_BACKEND_AUTO,
+    DISCONTINUOUS_AUTO_DT_SCALE,
+    Simulator,
+)
 
 
 def _have_jax() -> bool:
@@ -58,9 +63,15 @@ class DiscontinuousLinearSystem(StableLinearSystem):
 
 
 class TestNewSimulator(unittest.TestCase):
-    def test_default_solver_auto_selects_stiff_for_discontinuous_system(self):
-        sim = Simulator(DiscontinuousLinearSystem(), tf=1.0, n_steps=5, verbose=False)
-        self.assertEqual(sim.solver_mode, "scipy_stiff")
+    def test_default_solver_auto_selects_euler_for_discontinuous_system(self):
+        sim = Simulator(
+            DiscontinuousLinearSystem(),
+            tf=1.0,
+            n_steps=5,
+            solver_warnings="ignore",
+            verbose=False,
+        )
+        self.assertEqual(sim.solver_mode, "euler")
 
     def test_large_grid_numpy_stays_scipy(self):
         sim = Simulator(
@@ -118,15 +129,67 @@ class TestNewSimulator(unittest.TestCase):
     @pytest.mark.optional
     @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
-    def test_discontinuous_jax_large_grid_stays_stiff(self):
+    def test_discontinuous_jax_large_grid_stays_euler(self):
         sim = Simulator(
             DiscontinuousLinearSystem(),
             tf=1.0,
             n_steps=10_000,
             compile_backend="jax",
+            solver_warnings="ignore",
             verbose=False,
         )
-        self.assertEqual(sim.solver_mode, "scipy_stiff")
+        self.assertEqual(sim.solver_mode, "euler")
+
+    def test_discontinuous_auto_dt_is_finer(self):
+        sim = Simulator(
+            DiscontinuousLinearSystem(),
+            tf=0.01,
+            solver_warnings="ignore",
+            verbose=False,
+        )
+        expected_dt = 0.001 * DISCONTINUOUS_AUTO_DT_SCALE
+        self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
+
+    def test_discontinuous_auto_solver_emits_warning(self):
+        with pytest.warns(UserWarning, match="Discontinuous feedback"):
+            Simulator(
+                DiscontinuousLinearSystem(),
+                tf=1.0,
+                n_steps=5,
+                solver_warnings="warn",
+                verbose=False,
+            )
+
+    def test_discontinuous_forced_rk4_emits_substep_warning(self):
+        with pytest.warns(UserWarning, match="sub-step"):
+            Simulator(
+                DiscontinuousLinearSystem(),
+                tf=1.0,
+                n_steps=5,
+                solver="rk4_fixedsteps",
+                solver_warnings="warn",
+                verbose=False,
+            )
+
+    def test_discontinuous_forced_scipy_stiff_emits_adaptive_warning(self):
+        with pytest.warns(UserWarning, match="adaptive stepping"):
+            Simulator(
+                DiscontinuousLinearSystem(),
+                tf=1.0,
+                n_steps=5,
+                solver="scipy_stiff",
+                solver_warnings="warn",
+                verbose=False,
+            )
+
+    def test_smooth_system_emits_no_discontinuous_warning(self):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", UserWarning)
+            Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
+        discontinuous_msgs = [
+            w.message for w in caught if "Discontinuous feedback" in str(w.message)
+        ]
+        self.assertEqual(discontinuous_msgs, [])
 
     def test_invalid_time_grid_arguments_raise_value_error(self):
         sys = StableLinearSystem()
@@ -250,7 +313,9 @@ class TestNewSimulator(unittest.TestCase):
 
     def test_wrapper_compute_trajectory_uses_new_simulator_path(self):
         sys = StableLinearSystem()
-        traj = sys.compute_trajectory(tf=0.2, n_steps=3, solver="euler", show=False)
+        traj = sys.compute_trajectory(
+            tf=0.2, n_steps=3, solver="euler", show=False, verbose=False
+        )
 
         self.assertIs(sys.traj, traj)
         self.assertEqual(traj.x.shape, (1, 3))

@@ -360,6 +360,54 @@ Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda
 `euler`, `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
 ([ROADMAP.md](ROADMAP.md) P1).
 
+### Discontinuous closed loops — known issues
+
+Controllers with discontinuous laws (e.g. :class:`~minilink.control.modelbased.SlidingModeController`
+``sign(s)``) on a **continuous** :class:`DiagramSystem` closed loop are supported today,
+but several solver/logging behaviors are misleading until a dedicated hybrid or
+event-handling path lands ([ROADMAP.md](ROADMAP.md) §5.2).
+
+**Algebraic feedback during integration.** Nominal closed-loop runs integrate
+``f_ivp(x, t)`` — the diagram evaluator re-solves feedback at **every** call to
+``f``. There is no sample-and-hold on the controller torque inside a step.
+
+**Fixed-step RK4 (`rk4_fixedsteps`).** Each step evaluates ``f`` at four intermediate
+states (k1–k4). ``u`` and ``sign(s)`` can **flip sign between sub-steps** while the
+weighted RK4 update **nearly cancels**, leaving ``x`` almost unchanged on the output
+grid. The plant can look stationary even though instantaneous dynamics at the grid
+point imply large ``ddq``.
+
+**What the trajectory records.** :class:`~minilink.core.trajectory.Trajectory` stores
+``x`` (and boundary ``u``) on the **output time grid only**. It does **not** log
+internal RK4 sub-step torques. :meth:`~minilink.core.diagram.DiagramSystem.reconstruct_internal_signals`
+and ``plot_trajectory`` evaluate ``ctl:u`` and ``f(x, u, t)`` at those **grid states**
+— equivalent to the k1/start-of-interval algebraic map, **not** the effective
+piecewise dynamics integrated over ``[t_k, t_k + dt]``. Therefore:
+
+- Reconstructed ``ctl:u`` can appear **smooth or constant** while sub-step torques oscillate.
+- ``f``-based ``ddq`` at a grid point can **disagree** with ``Δdq/Δt`` from the stored
+  state (especially under ``rk4_fixedsteps``).
+- This is **not** a compile-backend bug; NumPy and JAX evaluators show the same pattern.
+
+**SciPy adaptive solvers.** ``scipy`` / ``scipy_stiff`` / ``scipy_lsoda`` on the same
+closed loop may stall, overflow, or take extreme substeps near switching (Zeno-like
+behavior). Prefer **explicit Euler with a small ``dt``** or **hybrid** sampling for
+discontinuous mechanical SMC demos.
+
+**Hybrid contrast.** :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
+holds controller torque constant between computer ticks (ZOH) and samples plant outputs
+at tick boundaries — the intended semantics for digital SMC. See
+``examples/scripts/hybrid/demo_smc_pendulum_compare.py``.
+
+**Diagnostics.** ``scratch/confirm_smc_solver_bug.py`` compares solvers, ``ddq_f`` vs
+numerical ``Δdq/Δt``, and RK4 k1–k4 cancellation on the pendulum SMC demo.
+
+**Mitigation (landed):** [docs/plans/discontinuous-solver-selection.md](docs/plans/discontinuous-solver-selection.md)
+— ``SlidingModeController`` sets ``discontinuous_behavior``; diagrams aggregate the flag;
+auto ``select_solver`` picks **Euler** with finer default ``dt``; ``UserWarning`` on every
+discontinuous solve (stronger when forcing ``rk4_fixedsteps`` / ``scipy_*``). Evolution
+kind is class-type routing only — ``solver_info["continuous_time_equation"]`` was removed.
+
 ## 6. Optimization And Planning
 
 **NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;

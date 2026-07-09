@@ -109,7 +109,9 @@ def _minilink_closed_loop(plant, controller, x0, *, tf, n_steps, solver="euler")
     diagram.add_subsystem(plant, "plant")
     diagram.connect("plant", "y", "controller", "x")
     diagram.connect("controller", "u", "plant", "u")
-    return diagram.compute_trajectory(tf=tf, n_steps=n_steps, solver=solver)
+    return diagram.compute_trajectory(
+        tf=tf, n_steps=n_steps, solver=solver, verbose=False
+    )
 
 
 def _pendulum_problem(*, bounds=10.0):

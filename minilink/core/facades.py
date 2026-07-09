@@ -50,7 +50,7 @@ class SharedSystemFacades:
         show=False,
         x0=None,
         compile_backend="numpy",
-        verbose=False,
+        verbose=True,
     ):
         """
         Convenience shortcut to sample boundary IO on a time grid.
@@ -66,6 +66,10 @@ class SharedSystemFacades:
             Passed to the simulator (default ``\"numpy\"``).
             Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
+        verbose : bool
+            Print simulator setup (solver, ``dt``, compile backend). Default
+            ``True`` for interactive ``compute_trajectory`` calls; library
+            helpers pass ``verbose=False``.
 
         Returns
         -------
@@ -108,7 +112,7 @@ class SharedSystemFacades:
         show=False,
         x0=None,
         compile_backend="numpy",
-        verbose=False,
+        verbose=True,
     ):
         """
         Convenience shortcut to sample boundary IO under a prescribed input.
@@ -130,6 +134,9 @@ class SharedSystemFacades:
         input_port_id : str, optional
             Named input port to force while keeping the others at default
             values.
+        verbose : bool
+            Print simulator setup. Default ``True``; pass ``False`` from library
+            helpers.
 
         Returns
         -------
@@ -208,7 +215,7 @@ class SharedSystemFacades:
                 self, self.traj, signals=signals, backend=backend, show=show
             )
 
-        traj = self.compute_trajectory(show=False)
+        traj = self.compute_trajectory(show=False, verbose=False)
         return plot_time_signals(
             self,
             traj,
@@ -324,7 +331,7 @@ class SharedSystemFacades:
             if self.traj is not None:
                 traj = self.traj
             else:
-                traj = self.compute_trajectory()
+                traj = self.compute_trajectory(verbose=False)
 
         resolved_html = prefers_inline_animation() if html is None else html
 
@@ -370,7 +377,8 @@ class DynamicSystemFacades:
         show=False,
         x0=None,
         compile_backend="numpy",
-        verbose=False,
+        verbose=True,
+        solver_warnings="warn",
     ):
         """
         Convenience shortcut to simulate the system and return a trajectory.
@@ -385,6 +393,12 @@ class DynamicSystemFacades:
             Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``\"numpy\"``).
             Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
+        verbose : bool
+            Print solver selection, time grid, and compile backend (default
+            ``True`` for interactive use).
+        solver_warnings : str
+            ``\"warn\"`` (default), ``\"error\"``, or ``\"ignore\"`` for discontinuous-loop
+            warnings (see :mod:`minilink.simulation.solver_warnings`).
 
         Returns
         -------
@@ -403,6 +417,7 @@ class DynamicSystemFacades:
             solver=solver,
             compile_backend=compile_backend,
             verbose=verbose,
+            solver_warnings=solver_warnings,
         )
         traj = sim.solve()
 
@@ -427,7 +442,8 @@ class DynamicSystemFacades:
         show=False,
         x0=None,
         compile_backend="numpy",
-        verbose=False,
+        verbose=True,
+        solver_warnings="warn",
     ):
         """
         Convenience shortcut to simulate the system under a prescribed input.
@@ -449,6 +465,11 @@ class DynamicSystemFacades:
         input_port_id : str, optional
             Named input port to force while keeping the others at default
             values.
+        verbose : bool
+            Print solver selection and time grid (default ``True``).
+        solver_warnings : str
+            ``\"warn\"`` (default), ``\"error\"``, or ``\"ignore\"`` for discontinuous-loop
+            warnings (see :mod:`minilink.simulation.solver_warnings`).
 
         Returns
         -------
@@ -467,6 +488,7 @@ class DynamicSystemFacades:
             solver=solver,
             compile_backend=compile_backend,
             verbose=verbose,
+            solver_warnings=solver_warnings,
         )
 
         traj = sim.solve_forced(u, input_port_id=input_port_id)
