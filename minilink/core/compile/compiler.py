@@ -48,6 +48,7 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
     """Compile a system into a typed evaluator.
 
     Returns :class:`StaticEvaluator` for static ``System`` leaves (``n=0``),
+    :class:`StepEvaluator` for :class:`StepSystem` leaves,
     :class:`DynamicsEvaluator` for :class:`DynamicSystem` leaves and diagrams.
 
     Parameters
@@ -60,12 +61,28 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
         If ``True``, print timed compilation steps.
     """
     from minilink.core.diagram import DiagramSystem
-    from minilink.core.system import DynamicSystem
+    from minilink.core.system import DynamicSystem, StepSystem
 
     if isinstance(system, DiagramSystem):
         return compile_diagram(system, backend=backend, verbose=verbose)
 
     key = normalize_backend(backend)
+
+    if isinstance(system, StepSystem):
+        if key == BACKEND_NUMPY:
+            from minilink.core.compile.evaluators.step_evaluator import (
+                NumpyStepEvaluator,
+            )
+
+            return NumpyStepEvaluator(system)
+        require_jax_numpy()
+        from minilink.core.compile.evaluators.step_evaluator import JaxStepEvaluator
+
+        t_total = time.perf_counter()
+        evaluator = JaxStepEvaluator(system, verbose=verbose)
+        if verbose:
+            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+        return evaluator
 
     if isinstance(system, DynamicSystem):
         if key == BACKEND_NUMPY:
@@ -86,7 +103,7 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
     if system.n > 0:
         raise TypeError(
             f"Cannot compile {type(system).__name__} with n={system.n}; "
-            "subclass DynamicSystem and implement f()."
+            "subclass DynamicSystem and implement f(), or StepSystem for discrete evolution."
         )
 
     if key == BACKEND_NUMPY:
@@ -144,6 +161,15 @@ def compile_diagram(
     It does **not** make user ``f`` / port ``compute`` implementations pure if they still
     read or mutate other instance state; see :class:`minilink.core.system.System`.
     """
+    from minilink.core.system import StepSystem
+
+    for sys_id, subsystem in diagram.subsystems.items():
+        if isinstance(subsystem, StepSystem):
+            raise TypeError(
+                f"StepSystem leaf '{sys_id}' cannot be compiled inside a flow "
+                "DiagramSystem; use StepDiagramSystem (Phase 2)."
+            )
+
     t_total = time.perf_counter() if verbose else None
 
     # Step 1: Algebraic loop detection

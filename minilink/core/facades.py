@@ -1,11 +1,9 @@
 """
 System convenience facades.
 
-This module defines :class:`SystemFacades`, the mixin that gives every
-:class:`~minilink.core.system.System` its user-shortcut methods
-(:meth:`~SystemFacades.compile`, :meth:`~SystemFacades.compute_trajectory`,
-:meth:`~SystemFacades.plot_trajectory`, :meth:`~SystemFacades.animate`,
-:meth:`~SystemFacades.modal_analysis`, ...).
+This module defines facade mixins for :class:`~minilink.core.system.System`
+subclasses: :class:`SystemFacades` (shared shortcuts), and
+:class:`StepRolloutFacades` (discrete rollout on :class:`~minilink.core.system.StepSystem`).
 
 The mixin is shortcuts only: the mathematical, structural, and visualization
 contracts stay in :mod:`minilink.core.system`. Heavy dependencies
@@ -13,6 +11,89 @@ contracts stay in :mod:`minilink.core.system`. Heavy dependencies
 """
 
 import numpy as np
+
+
+class StepRolloutFacades:
+    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`."""
+
+    def compute_rollout(
+        self,
+        n_steps,
+        u=None,
+        *,
+        x0=None,
+        compile_backend="numpy",
+        show=False,
+        verbose=False,
+    ):
+        """
+        Convenience shortcut to roll out a discrete-time step system.
+
+        Parameters
+        ----------
+        n_steps : int
+            Number of step transitions to apply.
+        u : array, sequence, callable, or None, optional
+            Input schedule passed to the compiled evaluator rollout.
+        x0 : array, optional
+            Initial state; defaults to :attr:`x0`.
+        compile_backend : str
+            Backend passed to :meth:`compile`.
+        show : bool
+            If ``True``, plot the rollout via :meth:`plot_rollout`.
+
+        Returns
+        -------
+        StepRollout
+            The rollout, also stored in :attr:`rollout`.
+        """
+        ev = self.compile(backend=compile_backend, verbose=verbose)
+        rollout = ev.rollout(x0 if x0 is not None else self.x0, n_steps=n_steps, u=u)
+        self.rollout = rollout
+        if show:
+            self.plot_rollout(rollout)
+        return rollout
+
+    def plot_rollout(
+        self,
+        rollout=None,
+        *,
+        signals=None,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot sampled step signals.
+
+        If the rollout is not computed yet, it must be provided or available on
+        :attr:`rollout`.
+        """
+        from minilink.graphical.signals import plot_time_signals, resolve_plot_signals
+
+        if signals is None:
+            signals = resolve_plot_signals(self)
+
+        if rollout is not None:
+            return plot_time_signals(
+                self,
+                rollout.as_trajectory(),
+                signals=signals,
+                backend=backend,
+                show=show,
+            )
+
+        if self.rollout is not None:
+            return plot_time_signals(
+                self,
+                self.rollout.as_trajectory(),
+                signals=signals,
+                backend=backend,
+                show=show,
+            )
+
+        raise ValueError(
+            "No rollout available; pass rollout=... or call compute_rollout first."
+        )
 
 
 class SystemFacades:
@@ -83,7 +164,7 @@ class SystemFacades:
             )
         raise TypeError(
             f"Cannot simulate {type(self).__name__} with n={self.n}; "
-            "subclass DynamicSystem and implement f()."
+            "subclass DynamicSystem and implement f(), or StepSystem for discrete evolution."
         )
 
     def compute_trajectory(

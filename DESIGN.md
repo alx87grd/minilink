@@ -132,7 +132,9 @@ discrete scheduling, sample-time metadata, or mixed `f`/`step` semantics into
 `DynamicSystem`, flow `compile()`, or `Simulator` unless there is a clear
 flow-side benefit.
 
-**Dynamics root (continuous):** `DynamicSystem` with `f`, `h`. Reusable bases in
+**Dynamics root (continuous):** `DynamicSystem` with `f`, `h`. **Discrete leaf (subsidiary):**
+:class:`StepSystem` with `step`, `h` and integer index `k` — no `f`, no wall clock on the
+leaf. Reusable bases in
 `dynamics/abstraction` (`StateSpaceSystem`, `LTISystem`, `MechanicalSystem`,
 `GeneralizedMechanicalSystem`). `StateSpaceSystem` builds its matrices through
 methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)` (so
@@ -160,6 +162,9 @@ serial arms. Joint impedance / task impedance / computed torque use
   slices with `get_port_values_from_u(u, "r", "y")`.
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
+- **StepSystem (discrete leaf):** same port shortcut as `DynamicSystem`; evolution is
+  `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`;
+  cache `self.rollout`. See [01-step-core.md](docs/plans/hybrid-discrete/01-step-core.md).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
@@ -280,6 +285,8 @@ optional class attribute `feedback_profile`, not inheritance):
 
 - :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.dynamics_evaluator.DynamicsEvaluator`
   (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)
+- :class:`StepSystem` leaf → :class:`~minilink.core.compile.evaluators.step_evaluator.StepEvaluator`
+  (`NumpyStepEvaluator` / `JaxStepEvaluator`) — `.step`, `.outputs`, `.rollout`; no `.f`
 - static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.static_evaluator.StaticEvaluator`
   (`NumpyStaticEvaluator` / `JaxStaticEvaluator`) — `.outputs` only, no `.f`
 - :class:`DiagramSystem` → diagram evaluator (same dynamics tier as above)
@@ -300,6 +307,8 @@ reintroduce `compute_outputs(..., ports=...)`.
   (ODE integration)
 - static :class:`System` (`n=0`) → :class:`~minilink.simulation.static_simulator.StaticSimulator`
   (time grid + boundary outputs in `Trajectory.signals`)
+- :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)` (clock-free
+  :class:`~minilink.core.step_rollout.StepRollout`; not `Simulator`)
 
 Unconnected inputs use port nominals; time-varying sources belong in the diagram;
 forcing via `compute_forced`. Facades default `compile_backend="numpy"`.

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from minilink.core.facades import SystemFacades
+from minilink.core.facades import StepRolloutFacades, SystemFacades
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
 if TYPE_CHECKING:
@@ -438,6 +438,108 @@ class DynamicSystem(System):
         """
         dx = np.zeros(self.n)
         return dx
+
+
+class StepSystem(StepRolloutFacades, System):
+    """
+    A system with discrete states (``n >= 1``)
+
+        x_{k+1} = step(x, u, k; p)
+        y_k     = h(x, u, k; p)
+
+    The constructor can create the standard ports in one line: an input ``u``,
+    a primary output ``y`` wired to :meth:`~System.h`, and optionally an
+    auxiliary state output ``x``.
+    """
+
+    def __init__(
+        self,
+        n,
+        *,
+        input_dim=None,
+        output_dim=None,
+        expose_state=False,
+        y_dependencies=(),
+    ):
+        """
+        Initialize a StepSystem.
+
+        Parameters
+        ----------
+        n : int
+            Number of discrete states.
+        input_dim : int, optional
+            If provided, create a standard input port named ``u``.
+        output_dim : int, optional
+            If provided, create a standard primary output port named ``y``.
+        expose_state : bool, optional
+            If True, create an auxiliary state output port named ``x``.
+        y_dependencies : tuple or "all", optional
+            Direct-feedthrough dependencies for the standard ``y`` output.
+        """
+        if int(n) < 1:
+            raise ValueError("StepSystem requires n >= 1")
+        System.__init__(self, n)
+
+        self.name = "StepSystem"
+        self.rollout = None
+
+        if input_dim is not None:
+            self.add_input_port("u", dim=input_dim)
+        if output_dim is not None:
+            self.add_output_port(
+                "y", dim=output_dim, function=self.h, dependencies=y_dependencies
+            )
+        if expose_state:
+            self.add_output_port("x", dim=self.n, function=self.compute_state)
+
+    def compute_trajectory(self, *args, **kwargs):
+        raise TypeError(
+            "compute_trajectory is not supported on StepSystem; "
+            "use compute_rollout(n_steps=...) instead."
+        )
+
+    def compute_forced(self, *args, **kwargs):
+        raise TypeError(
+            "compute_forced is not supported on StepSystem; "
+            "use compute_rollout(n_steps=...) instead."
+        )
+
+    def step(self, x, u, k=0, params=None):
+        """
+        Discrete state update ``x_{k+1} = step(x, u, k; p)``.
+
+        Parameters
+        ----------
+        x : array of shape (n,)
+        u : array of shape (m,)
+        k : int
+        params : dict, optional
+            ``None`` means "use ``self.params``".
+
+        Returns
+        -------
+        x_new : array of shape (n,)
+        """
+        return np.asarray(x).reshape(self.n).copy()
+
+    def h(self, x, u, k=0, params=None):
+        """
+        Output ``y_k = h(x, u, k; p)``.
+
+        Parameters
+        ----------
+        x : array of shape (n,)
+        u : array of shape (m,)
+        k : int
+        params : dict, optional
+
+        Returns
+        -------
+        y : array of shape (p,)
+        """
+        y = np.zeros(self.p)
+        return y
 
 
 if __name__ == "__main__":

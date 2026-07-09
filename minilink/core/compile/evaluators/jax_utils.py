@@ -142,6 +142,52 @@ def build_jit_dynamic_leaf(jax, system, frozen_p, u_nom):
     }
 
 
+def build_jit_step_leaf(jax, system, frozen_p):
+    """JIT ``step`` and output tiers for a :class:`StepSystem` leaf."""
+    step_raw = system.step
+    output_items = tuple((pid, port.compute) for pid, port in system.outputs.items())
+
+    jit_step = jax.jit(lambda x, u, k: step_raw(x, u, k, frozen_p))
+    jit_step_p = jax.jit(lambda x, u, k, p: step_raw(x, u, k, p))
+
+    def _outputs_frozen(x, u, k):
+        return {pid: fn(x, u, k, frozen_p) for pid, fn in output_items}
+
+    def _outputs_param(x, u, k, p):
+        return {pid: fn(x, u, k, p) for pid, fn in output_items}
+
+    if output_items:
+        jit_outputs = jax.jit(_outputs_frozen)
+        jit_outputs_p = jax.jit(_outputs_param)
+    else:
+        jit_outputs = jax.jit(lambda x, u, k: {})
+        jit_outputs_p = jax.jit(lambda x, u, k, p: {})
+
+    return {
+        "step": jit_step,
+        "step_p": jit_step_p,
+        "outputs": jit_outputs,
+        "outputs_p": jit_outputs_p,
+    }
+
+
+def build_jit_step_rollout(jax, jnp, jit_step):
+    """JIT a scan-based rollout for a compiled step function."""
+
+    def _rollout(x0, u_steps):
+        ks = jnp.arange(u_steps.shape[0])
+
+        def body(x, inputs):
+            k, u_k = inputs
+            x_next = jit_step(x, u_k, k)
+            return x_next, x_next
+
+        _, xs = jax.lax.scan(body, x0, (ks, u_steps))
+        return jnp.concatenate((x0[None, :], xs), axis=0)
+
+    return jax.jit(_rollout)
+
+
 class JaxIntegrationMixin:
     """Shared IVP integration overrides for JAX dynamic evaluators."""
 

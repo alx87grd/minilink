@@ -6,8 +6,10 @@ import numpy as np
 import pytest
 
 from minilink.blocks.basic import Integrator
-from minilink.blocks.routing import Gain
 from minilink.core.compile.compiler import compile
+from minilink.core.compile.evaluators.dynamics_evaluator import DynamicsEvaluator
+from minilink.core.compile.evaluators.step_evaluator import NumpyStepEvaluator
+from minilink.core.system import StepSystem
 
 try:
     import jax.numpy as jnp
@@ -24,6 +26,8 @@ class TestEvaluatorApi(unittest.TestCase):
         self.assertFalse(hasattr(ev, "h_p"))
 
     def test_static_evaluator_outputs_y(self):
+        from minilink.blocks.routing import Gain
+
         gain = Gain(K=2.0, dim=1)
         ev = compile(gain)
         out = ev.outputs(np.array([]), np.array([3.0]), 0.0)
@@ -35,6 +39,22 @@ class TestEvaluatorApi(unittest.TestCase):
             self.skipTest("JAX not installed")
         ev = compile(Integrator(), backend="jax")
         self.assertFalse(hasattr(ev, "get_f_jit"))
+
+    def test_step_evaluator_has_rollout_not_integrate(self):
+        class IdentityStep(StepSystem):
+            def __init__(self):
+                super().__init__(n=1)
+
+            def step(self, x, u, k=0, params=None):
+                return x
+
+        ev = compile(IdentityStep())
+        self.assertIsInstance(ev, NumpyStepEvaluator)
+        self.assertTrue(hasattr(ev, "rollout"))
+        self.assertFalse(hasattr(ev, "f"))
+        self.assertFalse(hasattr(ev, "integrate"))
+        self.assertFalse(hasattr(ev, "h"))
+        self.assertFalse(isinstance(ev, DynamicsEvaluator))
 
 
 @pytest.mark.optional
