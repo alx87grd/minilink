@@ -6,7 +6,7 @@ hand-rolled outer loops in MPC demos.
 
 **Requires:** Phases **1–2** (`StepSystem`, `StepDiagramSystem`), Phase **1b** (flow diagram IS-A
 `DynamicSystem`), Phase 5 (`HybridSimulator`).
-Phase 4 orchestrator on the step side when used inside hybrid sim.
+Phase 4 **`Computer`** on the step side when used inside hybrid sim.
 
 **Files:** `minilink/planning/mpc/step_block.py` (name TBD), `minilink/planning/mpc/planner.py`
 
@@ -17,12 +17,12 @@ loop with manual `u_hold`, `SUBSTEPS`, and warm-start shifting. Phase 5 delivers
 `HybridSimulator`; Phase 6 moves MPC **into** the step-diagram contract so demos become:
 
 ```python
-hybrid = HybridDiagram(step=controller_with_mpc, continuous=plant, schedule=schedule)
+hybrid = HybridDiagram(computer=Computer(controller_with_mpc, schedule), plant=plant)
 HybridSimulator(hybrid, ...).run()
 ```
 
 `MPCPlanner` remains the NLP engine; **`MPCStepBlock`** (working name) is the `StepSystem`
-adapter the diagram and orchestrator call.
+adapter the diagram and **Computer** call.
 
 ## Split of concerns
 
@@ -32,7 +32,7 @@ adapter the diagram and orchestrator call.
 | **`MPCStepBlock`** | `StepSystem` façade: map diagram `u` / `x` ↔ planner call; expose `u_cmd` on `h` |
 | **`HybridSimulator`** | Clock, boundary ZOH/sample, plant — unchanged from Phase 5 |
 
-**Coordinate note:** `MPCStepBlock.step(x, u, k, …)` uses integer **`k`** (orchestrator fire
+**Coordinate note:** `MPCStepBlock.step(x, u, k, …)` uses integer **`k`** (Computer fire
 index). `MPCPlanner.step(x_meas, …)` is the planning API — different object, different meaning;
 no wall time on the block ([Phase 1](01-step-core.md)).
 
@@ -74,7 +74,7 @@ class MPCStepBlock(StepSystem):
 ### 6a rules
 
 - **`n = 0`** — no block state vector; warm-start trajectory is **not** retained across ticks.
-- **`step` is the sole planner call site** per orchestrator fire (no duplicate solve in `h`).
+- **`step` is the sole planner call site** per Computer fire (no duplicate solve in `h`).
 - Input unpacking (which entries of `u` are `y`, `r`, etc.) is explicit at construct time or via
   port metadata — not implicit globals.
 - Factory helper encouraged:
@@ -194,9 +194,9 @@ controller.add_input_port("y")
 controller.connect_new_output_port("mpc", "u", "u")
 
 schedule = StepSchedule(dt_base=MPC_DT)
-hybrid = HybridDiagram(step=controller, continuous=plant, schedule=schedule)
-hybrid.connect_boundary(direction="step_to_plant", step_port="u", continuous_port="u")
-hybrid.connect_boundary(direction="plant_to_step", step_port="y", continuous_port="y")
+hybrid = HybridDiagram(computer=Computer(controller, schedule), plant=plant)
+hybrid.connect_boundary(direction="computer_to_plant", computer_port="u", plant_port="u")
+hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_port="y")
 HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
 ```
 

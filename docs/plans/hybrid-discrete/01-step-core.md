@@ -58,8 +58,8 @@ class StepSystem(System):
   game step). No `dt`, no `t_k`, no seconds on the leaf class.
 - **Evolution kind is the class type** — use `isinstance(sys, StepSystem)` (or `DynamicSystem`
   for flow), **not** `solver_info["continuous_time_equation"]`.
-- **No sample time on the class** — `StepSchedule.dt_base` ([Phase 4](04-scheduled-orchestrator.md))
-  schedules *when* the orchestrator fires; it does **not** become time inside `step()`.
+- **No sample time on the class** — `StepSchedule.dt_base` ([Phase 4](04-computer.md))
+  schedules *when* the **Computer** fires; it does **not** become time inside `step()`.
 - **`self.rollout = None`** — convenience cache for the last rollout (parallel `self.traj`).
 
 ### Third slot: evolution vs outputs
@@ -126,7 +126,7 @@ class StepRollout:
 - Phase 2 diagram rollouts return the same type.
 
 **Not in Phase 1:** `TimedStepSimulator` (Phase 2 diagram stopgap),
-`ScheduledStepOrchestrator` (Phase 4), hybrid plant integration (Phase 5).
+**`Computer`** (Phase 4), hybrid plant integration (Phase 5).
 
 ## Leaf compile (unified `compile()`)
 

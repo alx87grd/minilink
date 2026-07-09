@@ -7,7 +7,7 @@ contract — `compute_rollout` covers tests.
 [Phase 1b](01b-facade-mixin-split.md).** Compose `StepSystem` + static `System` (`n=0`)
 blocks into `StepDiagramSystem`; compile to diagram **`StepEvaluator`**. **No wall
 clock on the diagram** — reuse Phase 1 **`StepEvaluator.rollout`** and
-**`compute_rollout`** (Phase 1b façades); `dt_base` arrives in Phase 4 for orchestrator /
+**`compute_rollout`** (Phase 1b façades); `dt_base` arrives in Phase 4 **`Computer`** /
 hybrid plant scheduling, not inside leaf `step`.
 
 **Files:** `minilink/core/diagram.py`, `minilink/core/compile/step_execution_plan.py` (new),
@@ -163,13 +163,13 @@ Compile-time guards (symmetric to flow):
 
 ### Partial firing (Phase 4 preview)
 
-`ScheduledStepOrchestrator` fires a **subset** of blocks per tick. Phase 2 compile should:
+**`Computer`** fires a **subset** of blocks per tick. Phase 2 compile should:
 
 - Keep **`sys_id`** on every `PortOperation` / `StepOperation` (already on flow ops).
 - Expose optional **`step_block(sys_id, x, u, k)`** (or op index ranges) on diagram
   `StepEvaluator` so Phase 4 does not re-compile per mask.
 
-Full orchestrator logic: [Phase 4](04-scheduled-orchestrator.md).
+Full computer / tick logic: [Phase 4](04-computer.md).
 
 ## Run
 
@@ -187,7 +187,7 @@ diagram.compile().rollout(x0, n_steps=50, u=u_seq)
 
 - **Optional** — only if a test needs `sync_dt` **logging** before Phase 4.
 - Inner loop: `StepEvaluator.step` / `rollout` with integer **`k`**.
-- **Replaced** by `ScheduledStepOrchestrator` in [Phase 4](04-scheduled-orchestrator.md).
+- **Replaced** by **`Computer`** in [Phase 4](04-computer.md).
 - **Do not** document in README until Phase 4 lands.
 
 If `compute_rollout` covers all Phase 2 tests, **skip** `TimedStepSimulator` entirely.

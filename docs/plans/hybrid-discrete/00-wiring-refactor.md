@@ -192,9 +192,9 @@ classes — no `typing.Protocol` required.
 | Diagram interpreted evolve | loop structure | `f()` / `step()` body |
 | `compile()` ceremony | loop detect, `port_ops`, gather recipes | `f_func` vs `step_func`; evaluator class |
 | Evaluator fast path | `port_ops` walk | `.f`→`dx`+RK4 vs `.step`→`x_new` |
-| Simulation | — | ODE / hybrid plant vs step / hybrid orchestrator |
+| Simulation | — | ODE / hybrid plant vs step / hybrid **Computer** |
 
-**Not shared:** `rk4_*` rollout on `DynamicsEvaluator` only. **`dt_base`** is orchestrator /
+**Not shared:** `rk4_*` rollout on `DynamicsEvaluator` only. **`dt_base`** is **Computer** /
 hybrid-plant scheduling — **not** passed into `StepSystem.step`.
 
 ## Compile module (Phase 0 touch: re-export only)

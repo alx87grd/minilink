@@ -3,14 +3,15 @@
 **After [Phase 5b](05-hybrid-simulation.md)** (or in parallel once `HybridDiagram` exists).
 Makes hybrid systems as easy to **see** and **wire** as continuous `DiagramSystem` today.
 
-**Requires:** Phase 0 wiring mixin, Phase 2 `StepDiagramSystem`, Phase 5 `HybridDiagram`.
+**Requires:** Phase 0 wiring mixin, Phase 2 `StepDiagramSystem`, Phase 4 `Computer`, Phase 5
+`HybridDiagram`.
 
 ## Goals
 
 | Today (continuous) | Target (hybrid) |
 | --- | --- |
-| `diagram.plot_diagram()` | `hybrid.plot_diagram()` — one figure, two sides + boundary edges |
-| `ctl @ plant` → `DiagramSystem` | `hybrid_closed_loop(step_ctl, plant, schedule=...)` → `HybridDiagram` |
+| `diagram.plot_diagram()` | `hybrid.plot_diagram()` — **flattened combined topology** in one figure |
+| `ctl @ plant` → `DiagramSystem` | `hybrid_closed_loop(computer_side, plant, schedule=...)` → `HybridDiagram` |
 | `build_diagram_topology(diagram)` | + `build_hybrid_topology(hybrid)` |
 
 ## Visualization
@@ -26,6 +27,34 @@ surface from [Phase 0](00-wiring-refactor.md).
 
 ### Hybrid composite plot (new)
 
+**Goal:** `HybridDiagram` is **not** a true `DiagramSystem`, but **`plot_diagram()`** should still
+render a **nice combined view**: plant internals + computer internals + boundary edges, as if it
+were one flattened topology.
+
+**Layout (Graphviz clusters):**
+
+```text
+┌─ cluster: Plant (DiagramSystem) ─────────────────────────┐
+│  [internal flow blocks and connections]                  │
+└───────────────────────────┬──────────────────────────────┘
+                            │  ZOH / sample (multi-channel)
+┌─ cluster: Computer ───────┴──────────────────────────────┐
+│  ┌─ StepDiagram internals (flattened subsystems) ─────┐  │
+│  │  filter → mpc → …                                   │  │
+│  └─────────────────────────────────────────────────────┘  │
+│  subtitle: dt_base, fire summary (schedule metadata)      │
+└──────────────────────────────────────────────────────────┘
+```
+
+- **Computer cluster** is a **visual overlay** — a labeled box wrapping the step-diagram
+  topology exported by `build_diagram_topology(computer.diagram)`. It does **not** imply
+  `Computer` is a wiring node in compile/sim.
+- **Plant cluster** = `build_diagram_topology(hybrid.plant)`.
+- **Boundary edges** = dashed links between **cluster boundaries** (computer ports ↔ plant ports),
+  labeled `ZOH` / `sample` per `BoundaryConnection.direction`.
+- **World inputs** (`r`, etc.) attach to the computer or plant cluster border — same convention
+  as continuous diagram boundary ports.
+
 **Files:**
 
 | Module | Role |
@@ -40,18 +69,20 @@ surface from [Phase 0](00-wiring-refactor.md).
 ```text
 hybrid.plot_diagram()
   → build_hybrid_topology(hybrid)
-       ├── build_diagram_topology(hybrid.step)      # step cluster
-       ├── build_diagram_topology(hybrid.continuous) # plant cluster
-       └── boundary edges from hybrid.connections   # ZOH / sample labels
+       ├── build_diagram_topology(hybrid.plant)           # plant cluster
+       ├── build_diagram_topology(hybrid.computer.diagram) # step internals
+       ├── wrap step topology in Computer cluster metadata
+       └── boundary edges from hybrid.connections         # ZOH / sample labels
   → Graphviz: two subgraph clusters + dashed boundary edges
-  → schedule subtitle (dt_base, optional fire summary)
+  → schedule subtitle on Computer cluster (dt_base, optional fire summary)
 ```
 
-**`BoundaryTopologyEdge`:** `direction`, `step_port`, `continuous_port`, label (`ZOH` / `sample`).
+**`BoundaryTopologyEdge`:** `direction`, `computer_port`, `plant_port`, label (`ZOH` / `sample`).
 
-**Not in topology:** orchestrator hold buffers (sim-time); optional subtitle annotation only.
+**Not in topology:** computer cross-rate hold buffers (sim-time); optional debug annotation only.
 
-**Mermaid:** extend `mermaid.py` exporter or compose two existing exports + boundary links.
+**Mermaid:** extend `mermaid.py` exporter or compose two existing exports + boundary links +
+Computer wrapper node.
 
 ## Wiring shortcuts
 
@@ -67,27 +98,30 @@ Detecting `StepSystem` + `DynamicSystem` and silently returning `HybridDiagram` 
 
 ```python
 def hybrid_closed_loop(
-    step_side: System | StepDiagramSystem,
-    continuous_plant: System | DiagramSystem,
+    computer_side: System | StepDiagramSystem,
+    plant: System | DiagramSystem,
     *,
     schedule: StepSchedule | float,
-    step_out: str = "u",
+    computer_out: str = "u",
     plant_in: str = "u",
     plant_out: str = "y",
-    step_in: str = "y",
+    computer_in: str = "y",
     ref_port: str = "r",
     output_port: str = "y",
+    extra_boundaries: list[BoundaryConnection] | None = None,
 ) -> HybridDiagram:
-    """Canonical sampled-controller ↔ continuous-plant feedback topology."""
+    """Canonical Computer ↔ plant feedback; supports extra boundary channels."""
 ```
 
 Behavior:
 
-1. Wrap leaf `step_side` in `StepDiagramSystem` if needed (`ctl` id).
+1. Wrap leaf `computer_side` in `StepDiagramSystem` if needed (`ctl` id).
 2. Wrap leaf plant in `DiagramSystem` if needed (`plant` id).
-3. Expose `r` on step diagram boundary; expose `y` on plant diagram boundary.
-4. `connect_boundary(step_to_plant)` and `connect_boundary(plant_to_step)`.
-5. `schedule=float` → `StepSchedule(dt_base=float)`.
+3. Build `Computer(step_diagram, schedule)`.
+4. Expose `r` on computer diagram boundary; expose `y` on plant diagram boundary.
+5. `connect_boundary(computer_to_plant)` and `connect_boundary(plant_to_computer)` for defaults.
+6. Append `extra_boundaries` for multi-channel (e.g. `v_fb`).
+7. `schedule=float` → `StepSchedule(dt_base=float)`.
 
 Layer 1 facade; Layer 3 contract remains explicit `connect_boundary` on `HybridDiagram`.
 
@@ -113,12 +147,12 @@ Lives in `planning/mpc/` or `hybrid_composition.py` — Phase 6 doc.
 
 | File | Cases |
 | --- | --- |
-| `test_hybrid_topology.py` | boundary edges; cluster ids; schedule label |
+| `test_hybrid_topology.py` | boundary edges; Computer + Plant cluster ids; schedule label on Computer cluster |
 | `test_hybrid_closed_loop.py` | shortcut matches manual `connect_boundary` wiring |
 | `test_step_diagram_topology.py` | step nodes `kind="step_system"` (if not covered in Phase 0/2) |
 
 ## Deferred
 
 - Hold registers as diagram nodes (`expand_scheduled_step` lowering path).
-- Single flat canvas mixing flow + step blocks.
+- Single flat canvas mixing flow + step blocks without Computer/plant clusters.
 - `@` operator polymorphism for hybrid.
