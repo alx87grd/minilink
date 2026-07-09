@@ -1,7 +1,7 @@
 # Hybrid discrete simulation: Master Plan
 
-Status: Phases **0**, **1a**, **1**, **1b**, **2** complete on `dev-hybrid` (July 2026); Phases **3–6**
-pending. Next: [04-computer.md](04-computer.md). Wiring prep:
+Status: Phases **0**, **1a**, **1**, **1b**, **2**, **4** complete on `dev-hybrid` (July 2026); Phases **3**, **5–6**
+pending. Next: [05-hybrid-simulation.md](05-hybrid-simulation.md). Wiring prep:
 [00-wiring-refactor.md](00-wiring-refactor.md).
 
 Program charter for discrete-time blocks, step diagrams, optional discretization, scheduled
@@ -100,7 +100,7 @@ Detail and tick-0 init: [05-hybrid-simulation.md](05-hybrid-simulation.md).
 | **1b** | [01b-facade-mixin-split.md](01b-facade-mixin-split.md) | Façade mixins (`Shared` / `Dynamic` / `Step`); `DiagramSystem` IS-A `DynamicSystem`; MRO sim dispatch — no `_simulate` router | **Done** (`40c8297`) |
 | **2** | [02-step-diagram.md](02-step-diagram.md) | `StepDiagramSystem` (`StepSystem` + static `System`), `StepExecutionPlan`, `compile_step_diagram`, `NumpyStepDiagramEvaluator`; `compute_rollout` on diagrams; `TimedStepSimulator` optional (skipped) | **Done** (`0b7a1fd`) |
 | **3** | [03-discretization.md](03-discretization.md) | `discretize(DynamicSystem, dt)` → `StepSystem` *(optional; not on hybrid critical path)* | — |
-| **4** | [04-computer.md](04-computer.md) | Dual runtime: sync rollout vs **`Computer`** (stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers) | — |
+| **4** | [04-computer.md](04-computer.md) | Dual runtime: sync rollout vs **`Computer`** (stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers) | **Done** |
 | **5** | [05-hybrid-simulation.md](05-hybrid-simulation.md) | `HybridDiagram` (`computer` + `plant`), `HybridSimulator`, `rk4_rollout_zoh` | **5a** trivial schedule + SMC · **5b** cascade + non-trivial `fire` |
 | **5c** | [05c-hybrid-viz-shortcuts.md](05c-hybrid-viz-shortcuts.md) | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop` | plot after **5a**; milestone done after **5b** |
 | **6** | [06-mpc-step-block.md](06-mpc-step-block.md) | `MPCStepBlock` in `planning/mpc/` | **6a** stateless (`n=0`) · **6b** warm-start (`n = decision_dimension`, state = **`z`**) |
@@ -228,7 +228,7 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 | **1b** | Three façade mixins; `DiagramSystem(DynamicSystem)`; `Simulator` / `StaticSimulator` isinstance collapse; `test_facades_split.py`; DESIGN / README sync | **Done** |
 | **2** | Step diagram topology + sync **`compute_rollout`**; **`StepExecutionPlan`**; partial-fire hooks for **`Computer`** | **Done** |
 | **3** *(optional)* | `discretize` euler/rk4 match continuous integration over fixed `dt` |
-| **4** | **`Computer`**: stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers; **`compute_rollout` ≠ Computer** when multi-rate |
+| **4** | **`Computer`**: stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers; **`compute_rollout` ≠ Computer** when multi-rate | **Done** |
 | **5a** | `HybridSimulator` matches hand-rolled SMC (or test double); **multi-channel** boundary; one-tick delay enforced |
 | **5b** | Cascade hybrid: filter fast + slow block; non-trivial `fire` parity |
 | **5c** | `plot_hybrid_diagram` topology; `hybrid_closed_loop` matches manual `connect_boundary` |
@@ -251,8 +251,8 @@ MPC failure policy in Phase 6.
 | 3 | **1b** | Façade mixin split; `DiagramSystem(DynamicSystem)`; sim boundaries; `test_facades_split.py` | **Done** |
 | 4 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `step_compiler.py`, diagram `StepEvaluator`, partial-fire hooks, closed-loop + `compute_rollout` tests | **Done** |
 | 5 | 2 | `TimedStepSimulator` (tests only) | skipped (`compute_rollout` covers Phase 2) |
-| 6 | 3 | `discretize` verb + tests *(optional — anytime after step 4)* |
-| 7 | 4 | `StepSchedule`, **`Computer`** (`tick(u)`, double buffer, `from_rates`), `test_computer.py` |
+| 6 | 3 | **`discretize` postponed** — proceed **2 → 4 → 5**; optional verb lands later if needed |
+| 7 | 4 | `StepSchedule`, **`Computer`** (`tick(u)`, double buffer, `from_rates`), `test_computer.py` | **Done** |
 | 8 | 5 | `rk4_rollout_zoh` |
 | 9 | 5 | `HybridDiagram` (`computer` + `plant`), `HybridSimulator` (multi-channel boundary) |
 | 10 | 5 | `SMCBlock` + hybrid demo **(5a)** |
@@ -269,7 +269,7 @@ MPC failure policy in Phase 6.
 - **Phase 1 before Phase 1b** — `StepSystem` + `compute_rollout` landed before façade split.
 - **Phase 1b before Phase 2** — `DiagramSystem` IS-A `DynamicSystem`; MRO dispatch frozen.
 - **Phase 2 before Phase 4 and Phase 5** — step compile + partial-fire hooks exist.
-- **Phase 3 optional** — not required for hybrid MPC/SMC; may land anytime after Phase 2 (step 4).
+- **Phase 3 postponed** — not required for hybrid MPC/SMC; proceed **2 → 4 → 5** after Phase 2.
 - **Phase 4 before Phase 5** — hybrid always orchestrates the step side.
 - **5a before 5b** — trivial schedule before multi-rate cascade.
 - **5a before 5c plot** — `HybridDiagram` exists; **5c milestone complete after 5b**.

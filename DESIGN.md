@@ -66,7 +66,7 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing |
+| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, solvers, forcing |
 | `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; more frequency tools planned |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |

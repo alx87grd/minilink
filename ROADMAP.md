@@ -174,9 +174,9 @@ continuous plants — not full Simulink parity. Plan:
 - [x] **Phase 0** — `WiredDiagramMixin` in `core/wiring.py`; `DiagramSystem` delegates;
   continuous diagram API unchanged
 - [x] **Phase 1** — `StepSystem`, `StepRollout`, `compile()` step branch, `compute_rollout` / `plot_rollout`
-- [ ] **Phase 2** — `StepDiagramSystem`, `compile_step_diagram`
-- [ ] **Phase 3** — `discretize()` *(optional)*
-- [ ] **Phase 4** — `StepSchedule`, `ScheduledStepOrchestrator`
+- [x] **Phase 2** — `StepDiagramSystem`, `compile_step_diagram`, `compute_rollout`
+- [ ] **Phase 3** — `discretize()` *(postponed; optional)*
+- [x] **Phase 4** — `StepSchedule`, `Computer` (`.tick(u)`, double buffer)
 - [ ] **Phase 5** — `HybridDiagram`, `HybridSimulator`, SMC / cascade hybrids
 - [ ] **Phase 5c** — `plot_hybrid_diagram`, `hybrid_closed_loop`
 - [ ] **Phase 6** — `MPCStepBlock` + MPC demo refactor (drop hand-rolled outer loops)
