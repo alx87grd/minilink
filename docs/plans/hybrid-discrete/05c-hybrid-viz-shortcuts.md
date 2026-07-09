@@ -79,7 +79,9 @@ hybrid.plot_diagram()
 
 **`BoundaryTopologyEdge`:** `direction`, `computer_port`, `plant_port`, label (`ZOH` / `sample`).
 
-**Not in topology:** computer cross-rate hold buffers (sim-time); optional debug annotation only.
+**Not in topology:** Computer cross-rate hold buffers (sim-time double buffer); optional debug
+annotation only. **`plot_diagram`** shows **Computer** cluster wrapping flattened step-diagram
+internals — visual overlay, not a compile node.
 
 **Mermaid:** extend `mermaid.py` exporter or compose two existing exports + boundary links +
 Computer wrapper node.

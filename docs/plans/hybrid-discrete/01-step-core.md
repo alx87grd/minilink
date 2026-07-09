@@ -125,6 +125,11 @@ class StepRollout:
   semantics.
 - Phase 2 diagram rollouts return the same type.
 
+**Two pipelines (Phase 2 vs 4):** `StepDiagramSystem` is **topology**. **`compute_rollout`**
+(Pipeline A) fires every block synchronously. **`Computer.tick(u)`** (Pipeline B,
+[Phase 4](04-computer.md)) applies a **firing schedule** with internal buffers — not the same
+dynamics when `fire` is non-trivial.
+
 **Not in Phase 1:** `TimedStepSimulator` (Phase 2 diagram stopgap),
 **`Computer`** (Phase 4), hybrid plant integration (Phase 5).
 

@@ -102,23 +102,24 @@ wraps `Computer(step_diagram, schedule)`.
 
 ## `HybridSimulator`
 
-**Always** calls **`computer.tick`** on the discrete side (single-rate = trivial `fire`). Owns
-boundary buffers and plant rollout.
+**Always** calls **`computer.tick(u)`** on the discrete side (single-rate = trivial `fire`). Owns
+**`x_plant`**, hybrid boundary buffers, and plant rollout. Does **not** pass **`k`** into
+Computer — **`computer.k`** is the single discrete index; HybridSimulator derives
+**`t_k = t0 + computer.k * dt_base`** for the plant.
 
 ### Tick order and buffers
 
-Logical order each base tick **`k`** (hybrid simulator also tracks **`t_k = t0 + k · dt_base`**
-for the **plant only**):
+Logical order each **base tick** (let **`k = computer.k`** at tick start; plant time
+**`t_k = t0 + k · dt_base`**):
 
-1. **Sample (read)** — assemble `u_computer` from **`sample_buffers`** (plant outputs latched at end
-   of tick `k-1`) and world refs on computer-diagram boundaries.
-2. **Step** — `computer.tick(x_computer, u_computer, k)` → boundary outputs (**`k` only** into step
-   diagram eval — no `t` on `StepSystem` leaves).
-3. **ZOH (write)** — computer boundary outputs → **`zoh_buffers`** → assemble `u_plant`.
-4. **Flow** — `rk4_rollout_zoh(x_plant, u_plant, t_k, dt_base, dt_inner=...)` — **plant
-   uses float `t`**.
-5. **Sample (write)** — plant boundary outputs at `t_k + dt_base` → **`sample_buffers`** for tick
-   `k+1`.
+1. **Sample (read)** — assemble boundary vector **`u`** for the computer diagram from
+   **`sample_buffers`** (plant outputs latched at end of tick `k-1`) and world refs.
+2. **Computer** — **`outs = computer.tick(u)`** (stateful; internal **`k`** advances; leaf blocks
+   receive **`k`** internally — no **`t`**).
+3. **ZOH (write)** — **`outs`** → **`zoh_buffers`** → assemble **`u_plant`**.
+4. **Flow** — **`rk4_rollout_zoh(x_plant, u_plant, t_k, dt_base, dt_inner=...)`**.
+5. **Sample (write)** — plant boundary outputs at **`t_k + dt_base`** → **`sample_buffers`** for
+   the next tick.
 
 **Coordinate split:** computer side = **`k` (int)**; continuous plant = **`t` (float)**. Do not pass
 `t_k` into `StepSystem.step` or step-diagram port gather.
@@ -130,7 +131,7 @@ of interval `k-1`, not the state after integrating interval `k`.
 
 - **`sample_buffers`**: evaluate plant diagram outputs at `(x_plant_0, u_plant_0, t_0)` where
   `u_plant_0` is nominal / zero hold before the first step command (document chosen default).
-- **`zoh_buffers`**: empty until the first `computer.tick` completes.
+- **`zoh_buffers`**: empty until the first **`computer.tick(u)`** completes.
 - Do **not** pass raw `x_plant` into computer inputs — boundary samples only.
 
 ### `rk4_rollout_zoh`

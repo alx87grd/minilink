@@ -19,6 +19,19 @@ Wiring, gather, `tf`, and `check_algebraic_loops` come from [Phase 0](00-wiring-
 **`WiredDiagramMixin`** — do not re-extract. Leaf compile + `rollout()` live in
 [Phase 1](01-step-core.md) — do not duplicate.
 
+## Dual runtime (topology vs scheduled sim)
+
+`StepDiagramSystem` is primarily a **topology spec** (step funcs, port compute, connections).
+Phase 2 compile produces a shared **`StepExecutionPlan`**. Two runtimes consume it:
+
+| Pipeline | Entry | Firing | Role |
+| --- | --- | --- | --- |
+| **Synchronous** | `compile()` / **`compute_rollout`** | All blocks every index | Teaching, discrete analysis baseline |
+| **Scheduled** | **`Computer.tick(u)`** ([Phase 4](04-computer.md)) | `StepSchedule.fire` / Hz helpers | Clocked sim, hybrid step side |
+
+**`compute_rollout` assumes synchronous firing.** When `schedule.fire` is non-trivial,
+scheduled dynamics live on **`Computer` only** — do not expect rollout parity.
+
 ## `StepDiagramSystem`
 
 - Same module as `DiagramSystem`: **`minilink/core/diagram.py`**.
@@ -32,7 +45,7 @@ Wiring, gather, `tf`, and `check_algebraic_loops` come from [Phase 0](00-wiring-
 - Static-only step diagrams (`n=0`, no `StepSystem` state) are allowed — signal-flow only, empty
   `step_ops` (same pattern as static-only flow diagrams).
 
-Mark compile path **`TODO: User Architectural Review`** until closed-loop tests pass.
+Mark compile path complete (`0b7a1fd`); **`Computer`** adds scheduled runtime in Phase 4.
 
 ### Init pattern (mirror Phase 1b)
 
@@ -173,9 +186,9 @@ Full computer / tick logic: [Phase 4](04-computer.md).
 
 ## Run
 
-### `rollout()` / `compute_rollout` (Phase 1 — reuse)
+### `rollout()` / `compute_rollout` (Pipeline A — synchronous)
 
-Primary path — no new public runner:
+Primary **clock-free** path — every block fires every index:
 
 ```python
 diagram.compute_rollout(n_steps=50)
