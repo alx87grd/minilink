@@ -340,12 +340,12 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 
 | Package | Owns |
 | --- | --- |
-| `core` | `System`, façade mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem`, ports, `Trajectory`, sets, costs |
+| `core` | `System`, `StepSystem`, façade mixins, `DiagramSystem`, `StepDiagramSystem`, `HybridDiagram`, ports, `Trajectory`, `StepRollout`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
 | `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`) |
-| `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
-| `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
-| `simulation` | `Simulator`, `HybridSimulator`, `Computer`, solvers, time grids |
+| `analysis` | `linearize`, `structural`, `equilibria`, `modal`, `discretize`, `sample_static` |
+| `core/compile` | `ExecutionPlan`, `DynamicsEvaluator`, `StepEvaluator`, step-diagram evaluators |
+| `simulation` | `Simulator`, `HybridSimulator`, `Computer`, `HybridSimResult`, solvers, time grids |
 | `graphical` | plots, diagrams, animation (`Animator` + renderers) |
 | `planning` | `PlanningProblem`, planners, transcriptions |
 | `optimization` | `MathematicalProgram`, `Optimizer` |

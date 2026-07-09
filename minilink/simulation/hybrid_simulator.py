@@ -285,14 +285,23 @@ class HybridSimResult:
 
     def as_trajectory_plant(self) -> Trajectory:
         """Plant-side view as :class:`~minilink.core.trajectory.Trajectory`."""
-        u = self.signals.get("u_cmd")
+        u_port = None
+        if self.hybrid is not None:
+            for conn in self.hybrid.connections:
+                if conn.direction == "computer_to_plant":
+                    u_port = conn.plant_port
+                    break
+        u = self.signals.get(u_port) if u_port is not None else None
+        if u is None:
+            u = self.signals.get("u_cmd")
         if u is None:
             u = np.zeros((0, self.n_samples))
+        skip = {u_port, "u_cmd"} - {None}
         return Trajectory(
             t=self.t,
             x=self.x_plant,
             u=u,
-            signals={key: val for key, val in self.signals.items() if key != "u_cmd"},
+            signals={key: val for key, val in self.signals.items() if key not in skip},
         )
 
     def plot(

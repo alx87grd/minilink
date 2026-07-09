@@ -7,6 +7,7 @@ from minilink.control.output import ProportionalController
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.core.hybrid_diagram import HybridDiagram
+from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 from minilink.simulation.computer import Computer, StepSchedule
 
 
@@ -33,7 +34,9 @@ def _build_plant():
 class TestHybridClosedLoop(unittest.TestCase):
     def test_shortcut_matches_manual_wiring(self):
         schedule = StepSchedule(dt_base=0.01)
-        shortcut = hybrid_closed_loop(_build_step_diagram(), _build_plant(), schedule=schedule)
+        shortcut = hybrid_closed_loop(
+            _build_step_diagram(), _build_plant(), schedule=schedule
+        )
 
         manual = HybridDiagram(
             computer=Computer(_build_step_diagram(), schedule),
@@ -67,6 +70,10 @@ class TestHybridClosedLoop(unittest.TestCase):
         )
         self.assertIn("ctl", hybrid.computer.diagram.subsystems)
         self.assertIn("plant", hybrid.plant.subsystems)
+
+    def test_rejects_dynamic_system_as_computer_side(self):
+        with self.assertRaises(TypeError):
+            hybrid_closed_loop(DoubleIntegrator(), Integrator(), schedule=0.01)
 
 
 if __name__ == "__main__":

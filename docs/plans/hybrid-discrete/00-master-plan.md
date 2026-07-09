@@ -1,7 +1,7 @@
 # Hybrid discrete simulation: Master Plan
 
-Status: Phases **0**, **1a**, **1**, **1b**, **2**, **4** complete on `dev-hybrid` (July 2026); Phases **3**, **5–6**
-pending. Next: [05-hybrid-simulation.md](05-hybrid-simulation.md). Wiring prep:
+Status: Phases **0**–**5c** complete on `dev-hybrid` (July 2026); Phase **6**
+pending. Next: [06-mpc-step-block.md](06-mpc-step-block.md). Wiring prep:
 [00-wiring-refactor.md](00-wiring-refactor.md).
 
 Program charter for discrete-time blocks, step diagrams, optional discretization, scheduled
@@ -44,7 +44,7 @@ subset.
 - Shared diagram wiring mixin (Phase 0); continuous `DiagramSystem` API unchanged.
 - `StepSystem` leaf + unified `compile()` step branch + `StepEvaluator.rollout` + `compute_rollout`; `StepDiagramSystem` compile path.
 - `Computer` (`StepDiagramSystem` + `StepSchedule`, `.tick()`) — single- and integer multi-rate.
-- Two-side `HybridDiagram` (`computer` + `plant`) + `HybridSimulator` (one multi-channel boundary; ZOH/sample, `rk4_rollout_zoh`).
+- Two-side `HybridDiagram` (`computer` + `plant`) + `HybridSimulator` (one multi-channel boundary; ZOH/sample, `integrate_zoh`).
 - SMC hybrid (5a), cascade hybrid with non-trivial `fire` (5b), hybrid plot + shortcuts (5c).
 - `MPCStepBlock` stateless (6a) then warm-start via last optimizer **`z`** (6b).
 
@@ -58,7 +58,7 @@ subset.
 | Non-integer sample-rate ratios | Integer divisors of `dt_base` only |
 | `expand_scheduled_step()` lowering | Computer hold buffers (optional later) |
 | Full Simulink / arbitrary multi-clock parity | Narrow **Computer** / hybrid subset |
-| `@` operator returning `HybridDiagram` | `hybrid_closed_loop(..., schedule=...)` |
+| `@` on raw step/flow diagrams (mixed domains) | Two sides + `HybridDiagram`; `Computer @ DiagramSystem` via `hybrid_closed_loop` |
 
 ## Architecture decisions (frozen)
 
@@ -70,7 +70,7 @@ subset.
 | Hybrid step side **always** `Computer.tick` (trivial `fire` in 5a) | Adopt |
 | Multi-rate inside step diagram = **Computer** hold buffers, not graph expansion | Adopt default |
 | Boundary: step→plant **ZOH**, plant→step **sample** with **one-tick delay** | Adopt |
-| `hybrid_closed_loop` facade; **no** `@` across step/flow domains | Adopt |
+| `hybrid_closed_loop` facade; **`Computer @ plant`** for compiled runtimes; no `@` across raw step/flow diagrams | Adopt |
 | 6b warm-start block state = transcription decision **`z`**, not core `Trajectory` flatten | Adopt |
 | Phase 0 mixin only — **no** `WiredDiagram` Protocol (typing widened in Phase 2 / 5c) | Adopt |
 | Evolution kind by **class type** (`StepSystem` vs `DynamicSystem`), not `solver_info["continuous_time_equation"]` | Adopt |
@@ -85,7 +85,7 @@ Each base tick at `t_k = t0 + k · schedule.dt_base`:
 1. **Sample (read)** — plant→step boundary buffers (measurements from end of tick `k-1`).
 2. **Step** — `Computer.tick(...)`.
 3. **ZOH (write)** — step→plant boundary holds for `[t_k, t_k + dt_base)`.
-4. **Flow** — `rk4_rollout_zoh` on continuous plant (`plant_dt_inner` may subdivide).
+4. **Flow** — `integrate_zoh` on continuous plant (`plant_dt_inner` may subdivide).
 5. **Sample (write)** — latch plant outputs for tick `k+1`.
 
 Detail and tick-0 init: [05-hybrid-simulation.md](05-hybrid-simulation.md).

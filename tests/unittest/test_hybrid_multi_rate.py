@@ -110,12 +110,18 @@ class TestHybridMultiRate(unittest.TestCase):
         for _ in range(n_steps):
             k = computer.k
             u_computer = hybrid.computer.diagram.get_u_from_input_ports().copy()
-            u_computer[hybrid.computer.diagram.get_input_port_slice("r")] = _reference(k)
-            u_computer[hybrid.computer.diagram.get_input_port_slice("y_meas")] = y_sample
+            u_computer[hybrid.computer.diagram.get_input_port_slice("r")] = _reference(
+                k
+            )
+            u_computer[hybrid.computer.diagram.get_input_port_slice("y_meas")] = (
+                y_sample
+            )
             outs = computer.tick(u_computer)
             u_plant = np.array([float(outs["u_cmd"][0])])
             x_plant = plant_eval.integrate_zoh(x_plant, u_plant, k * dt_base, dt_base)
-            y_sample = float(plant_eval.outputs(x_plant, u_plant, (k + 1) * dt_base)["y"][0])
+            y_sample = float(
+                plant_eval.outputs(x_plant, u_plant, (k + 1) * dt_base)["y"][0]
+            )
             y_hand.append(y_sample)
 
         sim = HybridSimulator(hybrid, t0=0, n_steps=n_steps)

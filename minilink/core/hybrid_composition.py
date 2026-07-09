@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
-from minilink.core.system import StepSystem, System
+from minilink.core.system import DynamicSystem, StepSystem, System
 from minilink.simulation.computer import Computer, StepSchedule
 
 # Public API
@@ -112,6 +112,11 @@ def hybrid_closed_loop(
 def _as_step_diagram(computer_side: System | StepDiagramSystem) -> StepDiagramSystem:
     if isinstance(computer_side, StepDiagramSystem):
         return computer_side
+    if isinstance(computer_side, DynamicSystem):
+        raise TypeError(
+            "computer_side must be StepSystem or StepDiagramSystem, not "
+            "DynamicSystem; use discretize(plant, dt) for a discrete plant model"
+        )
     if isinstance(computer_side, (StepSystem, System)):
         diagram = StepDiagramSystem()
         diagram.add_subsystem(computer_side, "ctl")

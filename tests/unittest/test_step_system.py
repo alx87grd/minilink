@@ -53,6 +53,15 @@ class TestStepSystem(unittest.TestCase):
         with self.assertRaises(ValueError):
             StepSystem(0)
 
+    def test_solver_info_marks_discrete(self):
+        plant = Accumulator()
+        self.assertFalse(plant.solver_info["continuous_time_equation"])
+
+    def test_compute_trajectory_rejected(self):
+        plant = Accumulator()
+        with self.assertRaises(TypeError):
+            plant.compute_trajectory()
+
 
 if __name__ == "__main__":
     unittest.main()

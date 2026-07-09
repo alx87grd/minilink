@@ -493,6 +493,11 @@ class StepSystem(StepSystemFacades, System):
 
         self.name = "StepSystem"
         self.rollout = None
+        self.solver_info = {
+            "continuous_time_equation": False,
+            "smallest_time_constant": 0.001,
+            "discontinuous_behavior": False,
+        }
 
         if input_dim is not None:
             self.add_input_port("u", dim=input_dim)
@@ -502,6 +507,18 @@ class StepSystem(StepSystemFacades, System):
             )
         if expose_state:
             self.add_output_port("x", dim=self.n, function=self.compute_state)
+
+    def compute_trajectory(self, *args, **kwargs):
+        raise TypeError(
+            "StepSystem uses discrete rollout; call compute_rollout(n_steps, ...) "
+            "or HybridDiagram.compute_forced(...) for hybrid closed loop."
+        )
+
+    def compute_forced(self, *args, **kwargs):
+        raise TypeError(
+            "StepSystem uses discrete rollout; call compute_rollout(n_steps, u=...) "
+            "or HybridDiagram.compute_forced(...) for hybrid closed loop."
+        )
 
     def step(self, x, u, k=0, params=None):
         """

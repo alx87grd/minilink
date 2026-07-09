@@ -80,9 +80,13 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn(("ctl", "u", "plant", "u"), edges)
         self.assertNotIn(("input", "r", "ctl", "r"), edges)
 
-        inputs = {ref.diagram_port: (ref.node_id, ref.port_id) for ref in topology.boundary_inputs}
+        inputs = {
+            ref.diagram_port: (ref.node_id, ref.port_id)
+            for ref in topology.boundary_inputs
+        }
         outputs = {
-            ref.diagram_port: (ref.node_id, ref.port_id) for ref in topology.boundary_outputs
+            ref.diagram_port: (ref.node_id, ref.port_id)
+            for ref in topology.boundary_outputs
         }
         self.assertEqual(inputs["r"], ("ctl", "r"))
         self.assertEqual(outputs["y_meas"], ("plant", "y"))

@@ -40,20 +40,14 @@ def discretize(system: DynamicSystem, dt: float, *, method: str = "rk4") -> Step
             self.name = f"Discretized({source.name})"
             self.params = dict(getattr(source, "params", {}))
             self._dt = dt
-            self._evaluator = None
-
-        def _evaluator_or_compile(self):
-            if self._evaluator is None:
-                self._evaluator = source.compile(backend="numpy")
-            return self._evaluator
+            self._evaluator = source.compile(backend="numpy")
 
         def step(self, x, u, k=0, params=None):
             xp = array_module(x, u)
             x_arr = xp.asarray(x, dtype=float).reshape(source.n)
             u_arr = xp.asarray(u, dtype=float).reshape(source.m)
             t_k = float(k) * self._dt
-            evaluator = self._evaluator_or_compile()
-            x_new = evaluator.rk4_step(x_arr, u_arr, t_k, self._dt)
+            x_new = self._evaluator.rk4_step(x_arr, u_arr, t_k, self._dt)
             return xp.asarray(x_new, dtype=float).reshape(source.n)
 
         def h(self, x, u, k=0, params=None):
@@ -61,8 +55,7 @@ def discretize(system: DynamicSystem, dt: float, *, method: str = "rk4") -> Step
             x_arr = xp.asarray(x, dtype=float).reshape(source.n)
             u_arr = xp.asarray(u, dtype=float).reshape(source.m)
             t_k = float(k) * self._dt
-            evaluator = self._evaluator_or_compile()
-            y = evaluator.outputs(x_arr, u_arr, t_k)
+            y = self._evaluator.outputs(x_arr, u_arr, t_k)
             return xp.asarray(y, dtype=float).reshape(source.p)
 
     return DiscretizedLeaf()

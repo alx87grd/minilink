@@ -14,6 +14,7 @@ from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 
 if TYPE_CHECKING:
     from minilink.simulation.computer import Computer
+    from minilink.simulation.hybrid_simulator import HybridSimResult
 
 _DIRECTION_ALIASES = {
     "step_to_plant": "computer_to_plant",
@@ -57,6 +58,7 @@ class HybridDiagram:
     computer: Computer
     plant: DiagramSystem
     connections: list[BoundaryConnection] = field(default_factory=list)
+    traj: HybridSimResult | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         from minilink.simulation.computer import Computer
@@ -70,7 +72,6 @@ class HybridDiagram:
                 f"HybridDiagram requires DiagramSystem plant, "
                 f"got {type(self.plant).__name__}"
             )
-        self.traj = None
 
     @classmethod
     def from_diagrams(
