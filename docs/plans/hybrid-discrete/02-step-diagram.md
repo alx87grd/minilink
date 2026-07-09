@@ -2,7 +2,7 @@
 
 **After [Phase 0](00-wiring-refactor.md) and [Phase 1](01-step-core.md).** Compose `StepSystem` +
 `StaticSystem` blocks into `StepDiagramSystem`; compile to diagram **`StepEvaluator`**. **No wall
-clock on the diagram** — reuse Phase 1 **`StepRunner`** on the compiled evaluator; `dt_base`
+clock on the diagram** — reuse Phase 1 **`StepEvaluator.rollout`** on the compiled evaluator; `dt_base`
 arrives in Phase 4 for orchestrator / hybrid plant scheduling, not inside leaf `step`.
 
 **Files:** `minilink/core/diagram.py` (add `StepDiagramSystem` beside `DiagramSystem`),
@@ -10,7 +10,7 @@ arrives in Phase 4 for orchestrator / hybrid plant scheduling, not inside leaf `
 (test stopgap only)
 
 Wiring, gather, `tf`, and `check_algebraic_loops` come from [Phase 0](00-wiring-refactor.md)
-**`WiredDiagramMixin`** — do not re-extract. Leaf compile + `StepRunner` live in
+**`WiredDiagramMixin`** — do not re-extract. Leaf compile + `rollout()` live in
 [Phase 1](01-step-core.md) — do not duplicate.
 
 ## `StepDiagramSystem`
@@ -56,7 +56,7 @@ Order: port signals before state advance (same as flow: ports before `f`).
 
 | `system` type | Route |
 | --- | --- |
-| `StepSystem` leaf | `NumpyStepLeafEvaluator` / `JaxStepLeafEvaluator` ([Phase 1](01-step-core.md)) |
+| `StepSystem` leaf | `NumpyStepEvaluator` / `JaxStepEvaluator` ([Phase 1](01-step-core.md)) |
 | `StepDiagramSystem` | `compile_step_diagram` → `NumpyStepDiagramEvaluator` / `JaxStepEvaluator` |
 
 ### Evaluator backends
@@ -71,7 +71,7 @@ Order: port signals before state advance (same as flow: ports before `f`).
 the flow side.
 
 Diagram evaluators implement the same **`.step` / `.h`** surface as leaf evaluators so
-**`StepRunner`** ([Phase 1](01-step-core.md)) works unchanged on compiled closed loops.
+**`rollout()`** ([Phase 1](01-step-core.md)) works unchanged on compiled closed loops.
 
 ### Partial firing (Phase 4 preview)
 
@@ -82,15 +82,15 @@ re-compile per mask. Implementation completes in
 
 ## Run (diagram stopgap)
 
-### `StepRunner` (Phase 1 — reuse)
+### `rollout()` (Phase 1 — reuse)
 
-Closed-loop demos and tests call **`run_steps(diagram.compile(), ...)`** — no new runner in
-Phase 2.
+Closed-loop demos and tests call **`diagram.compile().rollout(...)`** (or `compute_rollout` when
+a façade exists) — no new runner in Phase 2.
 
 ### `TimedStepSimulator` (Phase 2 stopgap)
 
 - Caller may supply `sync_dt` for **logging only**; inner loop calls diagram **`StepEvaluator.step`**
-  with **`k`** via Phase 1 `StepRunner` or direct stepping.
+  with **`k`** via Phase 1 `rollout()` or direct stepping.
 - **Replaced for clocked / multi-rate work** by `ScheduledStepOrchestrator` in
   [Phase 4](04-scheduled-orchestrator.md).
 - **Do not** document in README until Phase 4 lands (or mark deprecated immediately).

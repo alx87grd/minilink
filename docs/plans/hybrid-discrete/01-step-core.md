@@ -6,13 +6,26 @@ no `discretize`.**
 
 Leaf types implement `step(x, u, k)` directly (MPC law, SMC, chess, games, manual difference
 eqs.). [Phase 2 (02-step-diagram.md)](02-step-diagram.md) composes blocks into
-`StepDiagramSystem`; diagram evaluators plug into the same `StepRunner` API defined here.
+`StepDiagramSystem`; diagram evaluators plug into the same **`StepEvaluator.rollout`**
+API defined here.
 
-**Prerequisite:** [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md) lands first
-(`f` on `DynamicSystem` only, typed `compile()`, `StaticSimulator` / `Simulator` split).
+**Prerequisite:** [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md) (`f` on
+`DynamicSystem` only, typed `compile()`, `StaticSimulator` / `Simulator` split).
 
-**Files:** `minilink/core/system.py`, `minilink/core/compile/` (leaf step path),
-`minilink/simulation/step_runner.py`, `minilink/blocks/`, `examples/scripts/step/` (teaching demos)
+**Files:** `minilink/core/system.py`, `minilink/core/step_rollout.py`,
+`minilink/core/compile/evaluators/` (step path), `minilink/blocks/step.py`,
+`examples/scripts/step/` (teaching demos)
+
+## Continuous ↔ step mirror
+
+| Continuous time | Step (discrete index `k`) |
+| --- | --- |
+| `Trajectory` — `(t, x, u)` | **`StepRollout`** — `(k, x, u)` + optional `signals` |
+| `compute_trajectory()` | **`compute_rollout(n_steps, u=...)`** |
+| `plot_trajectory()` | **`plot_rollout()`** |
+| `Simulator` + solvers | **None** — `StepEvaluator.rollout()` is the engine |
+| `IntegrationMixin.integrate` | **`StepRolloutMixin.rollout`** |
+| `self.traj` | **`self.rollout`** |
 
 ## `StepSystem`
 
@@ -35,6 +48,7 @@ class StepSystem(System):
 - Same port/params surface as `DynamicSystem`; **`step` returns next state** (`x_new`), not a
   derivative.
 - **No `f` method** — continuous evolution lives on `DynamicSystem` only ([Phase 1a](01a-evolution-map-refactor.md)).
+- **`n >= 1`**; static IO remains `System` with `n=0` (no `StaticSystem`).
 - **Integer step index `k`**, not float `t` — do not use `n` (state dimension) for the index.
 - **`k=0` default** — same *role* as `t=0` on flow maps; many blocks ignore `k`.
 - **`StepSystem` has no wall time** — `k` is a turn / fire index (chess move, MPC solve index,
@@ -43,6 +57,7 @@ class StepSystem(System):
   for flow), **not** `solver_info["continuous_time_equation"]`.
 - **No sample time on the class** — `StepSchedule.dt_base` ([Phase 4](04-scheduled-orchestrator.md))
   schedules *when* the orchestrator fires; it does **not** become time inside `step()`.
+- **`self.rollout = None`** — convenience cache for the last rollout (parallel `self.traj`).
 
 ### Third slot: evolution vs outputs
 
@@ -57,10 +72,10 @@ class StepSystem(System):
 
 ### Step diagrams and static blocks
 
-When a `StaticSystem` sits in a `StepDiagramSystem` ([Phase 2](02-step-diagram.md)), shared gather
-passes **`k`** into `port.compute(..., third, ...)` (same Python slot as flow `t`). Most static
-blocks ignore the third argument. Flow time-varying sources (`Step` at seconds, `WhiteNoise`) are
-**out of scope** for step diagrams in v1 unless given discrete counterparts.
+When a `System` with `n=0` sits in a `StepDiagramSystem` ([Phase 2](02-step-diagram.md)), shared
+gather passes **`k`** into `port.compute(..., third, ...)` (same Python slot as flow `t`). Most
+static blocks ignore the third argument. Flow time-varying sources (`Step` at seconds,
+`WhiteNoise`) are **out of scope** for step diagrams in v1 unless given discrete counterparts.
 
 ## Evolution kind vs `solver_info`
 
@@ -71,13 +86,44 @@ blocks ignore the third argument. Flow time-varying sources (`Step` at seconds, 
 | What stays in `solver_info`? | **Flow-only hints** on continuous systems |
 | What does `StepSystem` do with `solver_info`? | Inherits `System` defaults; no Phase 1 contract to tune flags |
 
-### Rollout and facades
+## Rollout and facades
 
-- **`Simulator`** rejects `StepSystem` leaves ([Phase 1a](01a-evolution-map-refactor.md) guard).
-- **`compute_trajectory` / `compute_forced`** — **not supported** on `StepSystem` in Phase 1.
-  Use **`compile()` + `StepRunner.run_steps(...)`**. A future façade (`compute_trajectory(n_steps=...)`
-  or timed adapter) is **deferred** — see [01a deferred table](01a-evolution-map-refactor.md#deferred-not-1a).
-- Leaf rollout path: **`compile()`** → `StepEvaluator` → **`run_steps`**.
+- **No `StepSimulator` / `StepRunner` class** — rollout lives on the compiled step evaluator
+  (mirror `integrate` on `DynamicsEvaluator`) plus user facades.
+- **`compute_rollout(n_steps, u=...)`** — primary entry on `StepSystem` (mirror
+  `compute_trajectory`).
+- **`plot_rollout()`** — plots via `StepRollout.as_trajectory()` → existing
+  `plot_time_signals` (Plan A: no `graphical/` changes; x-axis may read `"Time [s]"` in Phase 1).
+- **`compute_trajectory` / `compute_forced`** — not for step leaves; optional friendly
+  `TypeError` on `StepSystem` pointing to `compute_rollout`.
+- **Facade dispatch only** — do **not** add `StepSystem` guards inside `Simulator` /
+  `StaticSimulator`; keep the continuous path clean.
+
+Leaf rollout path: **`compile()`** → `StepEvaluator` → **`rollout(...)`** or
+**`compute_rollout(...)`**.
+
+## `StepRollout` (clock-free result)
+
+**File:** `minilink/core/step_rollout.py` (alongside `trajectory.py`)
+
+```python
+@dataclass(frozen=True)
+class StepRollout:
+    k: np.ndarray       # (N,)  integers 0 … n_steps
+    x: np.ndarray       # (n, N)  Trajectory-compatible layout
+    u: np.ndarray       # (m, N)  ZOH: u[:, k] applied at step k
+    signals: dict[str, np.ndarray] = field(default_factory=dict)  # each (dim, N)
+```
+
+- **`N = n_steps + 1`** state samples at `k = 0, …, n_steps`.
+- Inputs at `k = 0, …, n_steps - 1`; **hold last input** at the final sample for plot width
+  alignment (`u[:, -1] = u[:, -2]` when `n_steps >= 1`).
+- **`as_trajectory()`** — maps `k` → `t` float array for `plot_time_signals` only; no wall-clock
+  semantics.
+- Phase 2 diagram rollouts return the same type.
+
+**Not in Phase 1:** `TimedStepSimulator` (Phase 2 diagram stopgap),
+`ScheduledStepOrchestrator` (Phase 4), hybrid plant integration (Phase 5).
 
 ## Leaf compile (unified `compile()`)
 
@@ -87,62 +133,41 @@ dispatches by type. **No public `compile_step`.**
 **Phase 1** — `compile()` on **`StepSystem` leaf only** (diagram branch in Phase 2); rejects
 `DiagramSystem` / `StepDiagramSystem` with a clear error until Phase 2.
 
+**Dispatch order (leaf):** `DiagramSystem` → **`StepSystem`** → `DynamicSystem` → static
+`n == 0` → `TypeError`.
+
 | Backend | Leaf class | API |
 | --- | --- | --- |
-| NumPy | `NumpyStepLeafEvaluator` | `.step(x, u, k)`, `.h(x, u, k)`, `.outputs(x, u, k)` |
-| JAX (optional) | `JaxStepLeafEvaluator` | same; **separate** JIT from flow (`k` int, not `t` float) |
+| NumPy | `NumpyStepEvaluator` | `.step(x, u, k)`, `.outputs(x, u, k)`, `.rollout(...)` |
+| JAX (optional) | `JaxStepEvaluator` | same; **separate** JIT from flow (`k` int, not `t` float); `rollout` via `jax.lax.scan` |
 
-- Wrap `step` / `h` with frozen `params` and nominal `u` snapshot — same pattern as dynamic leaf.
-- Base **`StepEvaluator`** protocol: `.step`, `.h`, `.outputs` (+ `_p` tier). Diagram evaluators
-  in Phase 2 implement the same surface so **`StepRunner` is unchanged**.
+- Base **`StepEvaluator(OutputEvaluator)`**: `.step`, `.step_p`, `.outputs`, `.outputs_p` (+ `_p`
+  tier). **No `.f`**, **no `.h`** on evaluator — boundary outputs are the `outputs` dict
+  ([Phase 1a](01a-evolution-map-refactor.md)).
+- **`StepRolloutMixin.rollout`** — clock-free loop on integer `k`; input coercion: `u=None`
+  (nominal), constant vector, `(n_steps, m)` sequence, or `callable(k)`.
+- Wrap `step` / port `compute` with frozen `params` and nominal `u` — same pattern as dynamic
+  leaf.
+- Diagram evaluators in Phase 2 implement the same surface so **`rollout` is unchanged**.
 
-**Do not** route `StepSystem` through flow `DynamicsEvaluator` / RK4.
-
-## `StepRunner` (clock-free rollout)
-
-**File:** `minilink/simulation/step_runner.py`
-
-Advance **`N`** steps on integer **`k`**; **no `tf`, no `dt`**. Turn-based games, unit tests,
-teaching demos, algorithmic stepping.
-
-```python
-@dataclass
-class StepResult:
-    k: np.ndarray          # (n_steps + 1,)
-    x: np.ndarray          # (n_steps + 1, n)
-    y: np.ndarray          # (n_steps + 1, p) when recorded
-    u: np.ndarray          # (n_steps, m) inputs applied
-
-def run_steps(
-    evaluator,
-    x0,
-    *,
-    n_steps,
-    u=None,                # constant, sequence, or callable u(k)
-    record_y=True,
-) -> StepResult:
-    ...
-```
-
-Inner loop: `y = evaluator.h(x, u_k, k)` (optional) then `x = evaluator.step(x, u_k, k)`.
-Default `k = 0, 1, …`.
-
-**Not in Phase 1:** `TimedStepSimulator` (Phase 2 diagram stopgap), `ScheduledStepOrchestrator`
-(Phase 4), hybrid plant integration (Phase 5).
+**Do not** route `StepSystem` through flow `DynamicsEvaluator` / RK4 / `IntegrationMixin`.
 
 ## `ZOHHold` (optional leaf)
 
 Step-side hold register for teaching / tests; hybrid plant holds live in `HybridSimulator`
 ([Phase 5](05-hybrid-simulation.md)). Spec: [01a ZOHHold](01a-evolution-map-refactor.md#zohhold-phase-1-leaf--spec-for-downstream).
 
+**File:** `minilink/blocks/step.py`
+
 ## Teaching demos (canonical leaf scripts)
 
 Flat under `examples/scripts/step/`, runnable from repo root. **No** `Simulator`, **no**
-diagrams — use **`compile(block)` + `StepRunner.run_steps`**:
+diagrams — use **`compute_rollout`** (or low-level `compile().rollout(...)`):
 
 ```python
-evaluator = block.compile()
-result = run_steps(evaluator, block.x0, n_steps=20, u=u_seq)
+result = fibonacci.compute_rollout(n_steps=20)
+# or:
+result = fibonacci.compile().rollout(fibonacci.x0, n_steps=20)
 ```
 
 | Demo | File | Teaches |
@@ -161,8 +186,20 @@ python examples/scripts/step/demo_step_logistic_map.py
 
 ## Tests
 
-- `test_step_system.py`: leaf `step`; `h(x, u, k)`; no `f`; `ZOHHold`; `Simulator` / `compute_trajectory` reject step leaf.
-- `test_compile_step_leaf.py`: `compile()` on step leaf; frozen params; `step`/`h` parity.
-- `test_step_runner.py`: clock-free `run_steps`; `StepResult` shapes; optional `u(k)` callable.
+- `test_step_system.py`: leaf `step`; `h(x, u, k)`; no `f`; `ZOHHold`; `self.rollout` attr.
+- `test_compile_step_leaf.py`: `compile()` on step leaf → `NumpyStepEvaluator`; frozen params;
+  `step` parity.
+- `test_step_rollout.py`: `StepRollout` shapes `(n, N)` / `(m, N)`; `u` constant / sequence /
+  `u(k)`; `as_trajectory()`; JAX scan smoke.
+- `test_facades_rollout.py`: `compute_rollout` / `plot_rollout`; optional `compute_trajectory`
+  friendly error on `StepSystem`.
+- Extend `test_evaluator_api.py`: step evaluator has `rollout`, no `f` / `integrate`.
 
 Plus Phase 1a tests in [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md#tests-1a).
+
+## Explicit non-goals (Phase 1)
+
+- `StepDiagramSystem`, `discretize()`, `HybridSimulator`, `game()` step branch
+- `simulation/step_runner.py`, `StepRunner`, `StepSimulator`
+- Deep `StepSystem` guards in `Simulator` / `StaticSimulator`
+- Changes to flow `DiagramSystem` compile or simulation paths
