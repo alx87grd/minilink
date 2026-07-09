@@ -43,6 +43,8 @@ class GraphvizTopologyExporter(TopologyExporter):
 def block_html(node):
     """Return the Graphviz HTML-like label for one topology node."""
     title = f"{node.name}::{node.display_id}"
+    if node.kind == "step_system":
+        title = f"Step: {title}"
     html = (
         f'<TABLE BORDER="0" CELLSPACING="0">\n'
         f"<TR>\n"

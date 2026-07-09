@@ -1,5 +1,8 @@
 # Phase 5: Hybrid Simulation
 
+**Status: Phase 5 core done** (July 2026). **5a** SMC deferred; **5b** multi-rate demo done;
+**5c** composite `plot_diagram` + wiring shortcuts done.
+
 **After [Phase 4](04-computer.md).** v1 hybrid topology: **`Computer`** (discrete side) +
 **`DiagramSystem`** plant (continuous side), linked by **one boundary** with **multi-channel**
 `connect_boundary` edges.

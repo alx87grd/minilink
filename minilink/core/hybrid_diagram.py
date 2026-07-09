@@ -189,6 +189,25 @@ class HybridDiagram:
             result.plot()
         return result
 
+    def plot_diagram(
+        self,
+        filename=None,
+        show_inline=None,
+        show_pdf=None,
+        *,
+        abstract_boundary=True,
+    ):
+        """Render Plant + Computer clusters with boundary ZOH/sample edges."""
+        from minilink.graphical.diagrams.hybrid_dot import plot_hybrid_diagram
+
+        return plot_hybrid_diagram(
+            self,
+            filename=filename,
+            show_inline=show_inline,
+            show_pdf=show_pdf,
+            abstract_boundary=abstract_boundary,
+        )
+
 
 # Internal machinery
 

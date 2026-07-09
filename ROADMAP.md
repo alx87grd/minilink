@@ -178,7 +178,7 @@ continuous plants — not full Simulink parity. Plan:
 - [ ] **Phase 3** — `discretize()` *(postponed; optional)*
 - [x] **Phase 4** — `StepSchedule`, `Computer` (`.tick(u)`, double buffer)
 - [x] **Phase 5** — `HybridDiagram`, `HybridSimulator`, `HybridSimResult`, multi-rate hybrid demo *(SMC deferred)*
-- [ ] **Phase 5c** — `plot_hybrid_diagram` *(partial: `hybrid_closed_loop`, `Computer @ plant` done)*
+- [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz hybrid export *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*
 - [ ] **Phase 6** — `MPCStepBlock` + MPC demo refactor (drop hand-rolled outer loops)
 
 ### 5.6 Estimation and identification

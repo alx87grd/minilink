@@ -1,5 +1,9 @@
 # Phase 5c: Hybrid diagram visualization & wiring shortcuts
 
+**Status: Done** (July 2026). Composite `hybrid.plot_diagram()`, `build_hybrid_topology`,
+Graphviz/Mermaid export, step leaf `kind="step_system"`, and `hybrid_closed_loop` /
+`Computer @ plant` shortcuts.
+
 **After [Phase 5b](05-hybrid-simulation.md)** (or in parallel once `HybridDiagram` exists).
 Makes hybrid systems as easy to **see** and **wire** as continuous `DiagramSystem` today.
 

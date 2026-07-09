@@ -102,7 +102,7 @@ Detail and tick-0 init: [05-hybrid-simulation.md](05-hybrid-simulation.md).
 | **3** | [03-discretization.md](03-discretization.md) | `discretize(DynamicSystem, dt)` → `StepSystem` *(optional; not on hybrid critical path)* | — |
 | **4** | [04-computer.md](04-computer.md) | Dual runtime: sync rollout vs **`Computer`** (stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers) | **Done** |
 | **5** | [05-hybrid-simulation.md](05-hybrid-simulation.md) | `HybridDiagram` (`computer` + `plant`), `HybridSimulator`, `integrate_zoh` | **Done** (core); **SMC deferred** · **5b** multi-rate demo done |
-| **5c** | [05c-hybrid-viz-shortcuts.md](05c-hybrid-viz-shortcuts.md) | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop` | **`hybrid_closed_loop` done**; composite plot pending |
+| **5c** | [05c-hybrid-viz-shortcuts.md](05c-hybrid-viz-shortcuts.md) | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop` | **Done** |
 | **6** | [06-mpc-step-block.md](06-mpc-step-block.md) | `MPCStepBlock` in `planning/mpc/` | **6a** stateless (`n=0`) · **6b** warm-start (`n = decision_dimension`, state = **`z`**) |
 
 **Clock rule:** sample time lives in **`StepSchedule.dt_base`** (Phase 4+). Leaf `step` and
@@ -257,7 +257,7 @@ MPC failure policy in Phase 6.
 | 9 | 5 | `HybridDiagram` (`computer` + `plant`), `HybridSimulator` (multi-channel boundary) | **Done** |
 | 10 | 5 | `SMCBlock` + hybrid demo **(5a)** | *deferred* |
 | 11 | 5 | Cascade hybrid demo **(5b**, non-trivial `fire`) | **Done** |
-| 12 | 5c | `build_hybrid_topology`, `plot_hybrid_diagram`, `hybrid_closed_loop` | partial (`hybrid_closed_loop` **Done**) |
+| 12 | 5c | `build_hybrid_topology`, `plot_hybrid_diagram`, `hybrid_closed_loop` | **Done** |
 | 13 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line MPC demo refactor |
 | 14 | 6 | `MPCStepBlock` warm-start **`z`** state **(6b)** |
 | 15 | all | DESIGN §3 subset · ROADMAP TRL · README hybrid call chain |

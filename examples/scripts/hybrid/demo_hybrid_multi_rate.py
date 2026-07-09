@@ -13,13 +13,13 @@ import numpy as np
 from minilink.blocks.basic import Integrator
 from minilink.control.output import ProportionalController
 from minilink.core.backends import array_module
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.core.hybrid_diagram import HybridDiagram
+from minilink.core.diagram import StepDiagramSystem
+from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.core.system import StepSystem
-from minilink.simulation.computer import Computer, StepSchedule
+from minilink.simulation.computer import StepSchedule
 
 DT_BASE = 0.01
-TF = 1.6
+TF = 2.0
 PLANT_DT_INNER = 0.002
 
 
@@ -46,54 +46,34 @@ class DiscreteLowPass(StepSystem):
 
 def reference(t):
     """Step reference on the computer boundary input."""
-    return np.array([1.0 if t < 0.6 else 0.0])
+    return np.array([1.0 if t < 1.0 else 0.0])
 
 
-def build_step_diagram():
-    diagram = StepDiagramSystem()
-    diagram.add_subsystem(DiscreteLowPass(alpha=0.3), "filter")
-    diagram.add_subsystem(ProportionalController(0.35), "ctl")
-    diagram.add_input_port("r")
-    diagram.add_input_port("y_meas")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("input", "y_meas", "filter", "u")
-    diagram.connect("filter", "y", "ctl", "y")
-    diagram.connect_new_output_port("filter", "y", "y_f")
-    diagram.connect_new_output_port("ctl", "u", "u_cmd")
-    return diagram
+step_diagram = StepDiagramSystem()
+step_diagram.add_subsystem(DiscreteLowPass(alpha=0.6), "filter")
+step_diagram.add_subsystem(ProportionalController(10.0), "ctl")
+step_diagram.add_input_port("r")
+step_diagram.add_input_port("y_meas")
+step_diagram.connect("input", "r", "ctl", "r")
+step_diagram.connect("input", "y_meas", "filter", "u")
+step_diagram.connect("filter", "y", "ctl", "y")
+step_diagram.connect_new_output_port("filter", "y", "y_f")
+step_diagram.connect_new_output_port("ctl", "u", "u_cmd")
 
+schedule = StepSchedule.from_rates(
+    dt_base=DT_BASE,
+    rates_hz={"filter": 100.0, "ctl": 10.0},
+)
 
-def build_plant():
-    plant = DiagramSystem()
-    plant.add_subsystem(Integrator(), "plant")
-    plant.add_input_port("u")
-    plant.connect("input", "u", "plant", "u")
-    plant.connect_new_output_port("plant", "y", "y")
-    return plant
+hybrid = hybrid_closed_loop(
+    step_diagram,
+    Integrator(),
+    schedule=schedule,
+    computer_out="u_cmd",
+    computer_in="y_meas",
+)
 
-
-def build_hybrid():
-    schedule = StepSchedule.from_rates(
-        dt_base=DT_BASE,
-        rates_hz={"filter": 100.0, "ctl": 10.0},
-    )
-    computer = Computer(build_step_diagram(), schedule)
-    hybrid = HybridDiagram(computer=computer, plant=build_plant())
-    hybrid.connect_boundary(
-        direction="computer_to_plant",
-        computer_port="u_cmd",
-        plant_port="u",
-    )
-    hybrid.connect_boundary(
-        direction="plant_to_computer",
-        computer_port="y_meas",
-        plant_port="y",
-    )
-    return hybrid
-
-
-hybrid = build_hybrid()
-hybrid.computer.diagram.plot_diagram()
+hybrid.plot_diagram()
 
 result = hybrid.compute_forced(
     reference,

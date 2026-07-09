@@ -1,7 +1,8 @@
 # Hybrid and step simulation (design only)
 
-Status: Phases **0**, **1a**, **1**, **1b**, **2** complete on `dev-hybrid` (July 2026); Phases **3–6**
-pending. Shard contracts: [hybrid-discrete/00-master-plan.md](hybrid-discrete/00-master-plan.md).
+Status: Phases **0**, **1a**, **1**, **1b**, **2**, **4**, **5**, **5c** complete on `dev-hybrid`
+(July 2026); Phase **3** postponed; Phases **6** pending. Shard contracts:
+[hybrid-discrete/00-master-plan.md](hybrid-discrete/00-master-plan.md).
 
 Architecture for **step maps** (difference equations, jumps, turn-based dynamics),
 step diagrams, **scheduled multi-rate orchestration**, clock-driven hybrid simulation
@@ -65,9 +66,10 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 | **1** | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepEvaluator.rollout` / `compute_rollout` | none | **Done** |
 | **1b** | Façade mixins; `DiagramSystem(DynamicSystem)`; MRO sim dispatch | — | **Done** |
 | **2** | `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator` | none | **Done** |
-| **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure | pending |
-| **4** | `StepSchedule` + **`Computer`** (`tick(u)`, double buffer, Hz helpers) | **`dt_base`** for hybrid alignment only | pending |
-| **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; Computer always on step side | pending |
+| **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure | postponed |
+| **4** | `StepSchedule` + **`Computer`** (`tick(u)`, double buffer, Hz helpers) | **`dt_base`** for hybrid alignment only | **Done** |
+| **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; Computer always on step side | **Done** (SMC deferred) |
+| **5c** | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop` | — | **Done** |
 | **6** | `MPCStepBlock` (6a stateless, 6b warm-start) | uses Phase 4–5 stack | pending |
 
 **Split of concerns:** Phase 4 = sample time + firing **inside** the step diagram. Phase 5 =
@@ -981,10 +983,10 @@ See [00-master-plan.md](hybrid-discrete/00-master-plan.md). Summary:
 | 3 | **1b** | Façade mixins; `DiagramSystem(DynamicSystem)` | **Done** |
 | 4–5 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `compile_step_diagram`, diagram evaluator, `compute_rollout` tests (`TimedStepSimulator` skipped) | **Done** |
 | 6 | 3 | `discretize` *(optional)* | pending |
-| 7 | 4 | `StepSchedule`, **`Computer`** (`tick(u)`, double buffer, `from_rates`), `test_computer.py` | pending |
-| 8–10 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** | pending |
-| 11 | 5 | cascade hybrid demo **(5b)** | pending |
-| 12 | 5c | `plot_hybrid_diagram`, `hybrid_closed_loop` | pending |
+| 7 | 4 | `StepSchedule`, **`Computer`** (`tick(u)`, double buffer, `from_rates`), `test_computer.py` | **Done** |
+| 8–10 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** | **Done** (SMC deferred) |
+| 11 | 5 | cascade hybrid demo **(5b)** | **Done** |
+| 12 | 5c | `plot_hybrid_diagram`, `hybrid_closed_loop` | **Done** |
 | 13 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line demo | pending |
 | 14 | 6 | `MPCStepBlock` warm-start **(6b)** | pending |
 | 15 | all | DESIGN / ROADMAP / README | pending |

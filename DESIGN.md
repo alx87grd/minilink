@@ -172,6 +172,10 @@ serial arms. Joint impedance / task impedance / computed torque use
   mirrors :class:`~minilink.simulation.simulator.Simulator` (`t0`/`tf`, `solve`,
   `solve_forced`); plant steps use :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh`.
   Shortcuts: ``Computer @ plant``, :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`.
+  Visualization: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_diagram` renders Plant +
+  Computer (nested StepDiagram) clusters with dashed ZOH/sample boundary edges;
+  :func:`~minilink.graphical.diagrams.build_hybrid_topology` /
+  :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   See [05-hybrid-simulation.md](docs/plans/hybrid-discrete/05-hybrid-simulation.md).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,

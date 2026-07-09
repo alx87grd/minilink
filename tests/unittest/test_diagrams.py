@@ -65,6 +65,28 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn(("ctl", "u", "plant", "u"), edges)
         self.assertIn(("plant", "y", "output", "y_meas"), edges)
 
+    def test_topology_abstract_boundary_collapses_external_nodes(self):
+        topology = build_diagram_topology(
+            self._make_diagram(),
+            abstract_boundary=True,
+        )
+
+        node_ids = [node.id for node in topology.nodes]
+        self.assertEqual(node_ids, ["ctl", "plant"])
+        edges = [
+            (edge.source_node, edge.source_port, edge.target_node, edge.target_port)
+            for edge in topology.edges
+        ]
+        self.assertIn(("ctl", "u", "plant", "u"), edges)
+        self.assertNotIn(("input", "r", "ctl", "r"), edges)
+
+        inputs = {ref.diagram_port: (ref.node_id, ref.port_id) for ref in topology.boundary_inputs}
+        outputs = {
+            ref.diagram_port: (ref.node_id, ref.port_id) for ref in topology.boundary_outputs
+        }
+        self.assertEqual(inputs["r"], ("ctl", "r"))
+        self.assertEqual(outputs["y_meas"], ("plant", "y"))
+
     def test_mermaid_exporter_returns_deterministic_source(self):
         source = export_diagram_topology(self._make_diagram(), backend="mermaid")
 
