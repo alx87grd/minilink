@@ -66,7 +66,7 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, solvers, forcing |
+| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing |
 | `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; more frequency tools planned |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
@@ -165,6 +165,14 @@ serial arms. Joint impedance / task impedance / computed torque use
 - **StepSystem (discrete leaf):** same port shortcut as `DynamicSystem`; evolution is
   `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`;
   cache `self.rollout`. See [01-step-core.md](docs/plans/hybrid-discrete/01-step-core.md).
+- **Hybrid (computer + plant):** :class:`~minilink.core.hybrid_diagram.HybridDiagram`
+  bundles :class:`~minilink.simulation.computer.Computer` (step side + schedule) and a
+  continuous :class:`DiagramSystem` plant. Boundary channels use ZOH (computer → plant)
+  or sample (plant → computer). :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
+  mirrors :class:`~minilink.simulation.simulator.Simulator` (`t0`/`tf`, `solve`,
+  `solve_forced`); plant steps use :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh`.
+  Shortcuts: ``Computer @ plant``, :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`.
+  See [05-hybrid-simulation.md](docs/plans/hybrid-discrete/05-hybrid-simulation.md).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
@@ -318,6 +326,9 @@ reintroduce `compute_outputs(..., ports=...)`.
   boundary outputs in `Trajectory.signals`; not state evolution)
 - :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
   (clock-free :class:`~minilink.core.step_rollout.StepRollout`; not `Simulator`)
+- :class:`~minilink.core.hybrid_diagram.HybridDiagram` →
+  :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` or façade
+  `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`)
 
 `animate` / `plot_trajectory` live on `SharedSystemFacades` for all kinds when
 `traj=` is provided; auto-sim fallback calls `compute_trajectory` (MRO picks engine).

@@ -185,6 +185,29 @@ class Computer:
         self.k += 1
         return outs
 
+    def __matmul__(self, plant):
+        """
+        Default hybrid feedback: computer boundary ``u`` → plant ``u``,
+        plant ``y`` → computer ``y``.
+
+        Requires ``schedule`` on this runtime; does not cross raw step/flow
+        diagrams — only ``Computer @ DiagramSystem``.
+        """
+        from minilink.core.diagram import DiagramSystem
+        from minilink.core.hybrid_composition import hybrid_closed_loop
+
+        if not isinstance(plant, DiagramSystem):
+            raise TypeError(
+                f"Computer @ plant requires DiagramSystem plant, "
+                f"got {type(plant).__name__}"
+            )
+        return hybrid_closed_loop(
+            self.diagram,
+            plant,
+            schedule=self.schedule,
+            computer=self,
+        )
+
     def divisor(self, sys_id: str) -> int:
         """Return the fire divisor for ``sys_id`` (default 1)."""
         return self.schedule.fire.get(sys_id, 1)

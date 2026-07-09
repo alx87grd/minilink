@@ -344,7 +344,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`) |
 | `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
-| `simulation` | `Simulator`, solvers, time grids |
+| `simulation` | `Simulator`, `HybridSimulator`, `Computer`, solvers, time grids |
 | `graphical` | plots, diagrams, animation (`Animator` + renderers) |
 | `planning` | `PlanningProblem`, planners, transcriptions |
 | `optimization` | `MathematicalProgram`, `Optimizer` |
@@ -360,6 +360,7 @@ Compose:   + / >> / @ / autowire  →  DiagramSystem
 Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
            →  compile  →  solve  →  Trajectory
            StepSystem: compute_rollout  →  StepEvaluator.rollout
+           HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
 
 Compile:   sys.compile(backend)  →  DynamicsEvaluator
 
@@ -391,6 +392,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Extended tour | [examples/notebooks/demo_overview.ipynb](examples/notebooks/demo_overview.ipynb) |
 | Diagrams | `examples/scripts/diagrams/` |
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
+| Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |

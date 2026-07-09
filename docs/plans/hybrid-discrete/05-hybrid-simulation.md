@@ -36,7 +36,7 @@ HybridSimulator @ computer.schedule.dt_base
 │
 ├── boundary ZOH / sample     ← single computer↔plant interface (HybridSimulator only)
 │
-└── rk4_rollout_zoh           ← continuous plant over dt_base (optional inner subdivide)
+└── integrate_zoh           ← continuous plant over dt_base (optional inner subdivide)
 ```
 
 ```text
@@ -107,6 +107,11 @@ wraps `Computer(step_diagram, schedule)`.
 Computer — **`computer.k`** is the single discrete index; HybridSimulator derives
 **`t_k = t0 + computer.k * dt_base`** for the plant.
 
+**Public API** mirrors continuous :class:`~minilink.simulation.simulator.Simulator`:
+construct with **`t0` / `tf`**, then **`solve()`** / **`solve_forced(u)`** →
+:class:`~minilink.simulation.hybrid_simulator.HybridSimResult`. No ``run(n_ticks)``.
+Façades on :class:`HybridDiagram`: ``compute_trajectory`` / ``compute_forced``.
+
 ### Tick order and buffers
 
 Logical order each **base tick** (let **`k = computer.k`** at tick start; plant time
@@ -117,7 +122,7 @@ Logical order each **base tick** (let **`k = computer.k`** at tick start; plant 
 2. **Computer** — **`outs = computer.tick(u)`** (stateful; internal **`k`** advances; leaf blocks
    receive **`k`** internally — no **`t`**).
 3. **ZOH (write)** — **`outs`** → **`zoh_buffers`** → assemble **`u_plant`**.
-4. **Flow** — **`rk4_rollout_zoh(x_plant, u_plant, t_k, dt_base, dt_inner=...)`**.
+4. **Flow** — **`integrate_zoh(x_plant, u_plant, t_k, dt_base, dt_inner=...)`**.
 5. **Sample (write)** — plant boundary outputs at **`t_k + dt_base`** → **`sample_buffers`** for
    the next tick.
 
@@ -134,10 +139,14 @@ of interval `k-1`, not the state after integrating interval `k`.
 - **`zoh_buffers`**: empty until the first **`computer.tick(u)`** completes.
 - Do **not** pass raw `x_plant` into computer inputs — boundary samples only.
 
-### `rk4_rollout_zoh`
+### `integrate_zoh`
+
+Sugar on :class:`~minilink.core.compile.evaluators.integration.IntegrationMixin`
+(wraps existing :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate`
+with repeated ``u_hold`` rows):
 
 ```python
-def rk4_rollout_zoh(
+def integrate_zoh(
     self, x0, u_hold, t0, dt_hold, *, dt_inner: float | None = None
 ) -> np.ndarray:
     """
@@ -154,8 +163,9 @@ def rk4_rollout_zoh(
 
 | Milestone | Content |
 | --- | --- |
-| **5a** | `rk4_rollout_zoh`, hybrid + **trivial schedule**, `SMCBlock` (or generic step controller), hybrid acceptance vs hand-rolled **non-MPC** loop |
-| **5b** | Cascade hybrid — **non-trivial `fire`** (e.g. filter @ 100 Hz + slow `StepSystem` @ 10 Hz); MPC slot filled by [Phase 6a](06-mpc-step-block.md) in demo refresh |
+| **5 core** | `integrate_zoh`, `HybridDiagram`, `HybridSimulator` + `HybridSimResult.plot`, multi-rate demo |
+| **5a** | SMC hybrid *(deferred)* |
+| **5b** | Cascade hybrid — **non-trivial `fire`** (e.g. filter @ 100 Hz + slow `StepSystem` @ 10 Hz) |
 
 ## End-to-end API (5a — single-rate SMC)
 
@@ -174,7 +184,7 @@ hybrid = HybridDiagram(computer=computer, plant=plant)
 hybrid.connect_boundary(direction="computer_to_plant", computer_port="u", plant_port="u")
 hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_port="y")
 
-HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
+HybridSimulator(hybrid, t0=0, tf=TS, plant_dt_inner=SIM_DT).solve_forced(u)
 ```
 
 ## End-to-end API (5b — multi-rate controller)
@@ -187,7 +197,7 @@ computer = Computer(
 hybrid = HybridDiagram(computer=computer, plant=plant)
 hybrid.connect_boundary(direction="computer_to_plant", computer_port="u", plant_port="u")
 hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_port="y")
-HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
+HybridSimulator(hybrid, t0=0, tf=TS, plant_dt_inner=SIM_DT).solve_forced(u)
 ```
 
 ## Control blocks (Phase 5)
@@ -197,7 +207,7 @@ HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
 
 ## Tests
 
-- `test_rk4_rollout_zoh.py` — NumPy/JAX; `dt_inner` subdivides `dt_hold`
+- `test_integrate_zoh.py` — NumPy; `dt_inner` subdivides `dt_hold`
 - `test_hybrid_simulator.py` — **multi-channel** boundary; 5a matches hand-rolled SMC (or test double)
 - `test_hybrid_boundary_connect.py` — invalid boundary wiring; dimension mismatch
 - `test_hybrid_cascade.py` — 5b filter + slow block

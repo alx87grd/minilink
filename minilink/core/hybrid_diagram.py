@@ -1,0 +1,243 @@
+"""
+Hybrid diagrams: scheduled computer side + continuous plant side.
+
+Boundary ports between sides use ZOH (computer → plant) or sample (plant →
+computer). Schedule lives on :class:`~minilink.simulation.computer.Computer`.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
+
+from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+
+if TYPE_CHECKING:
+    from minilink.simulation.computer import Computer
+
+_DIRECTION_ALIASES = {
+    "step_to_plant": "computer_to_plant",
+    "plant_to_step": "plant_to_computer",
+}
+
+BoundaryDirection = Literal["computer_to_plant", "plant_to_computer"]
+
+
+# Public API
+
+
+@dataclass(frozen=True)
+class BoundaryConnection:
+    """One channel across the computer ↔ plant boundary."""
+
+    direction: BoundaryDirection
+    computer_port: str
+    plant_port: str
+
+    def __post_init__(self) -> None:
+        direction = _normalize_direction(self.direction)
+        object.__setattr__(self, "direction", direction)
+
+
+@dataclass
+class HybridDiagram:
+    """
+    Two-side hybrid topology: :class:`Computer` + continuous :class:`DiagramSystem`.
+
+    Parameters
+    ----------
+    computer : Computer
+        Scheduled step runtime (diagram + :class:`~minilink.simulation.computer.StepSchedule`).
+    plant : DiagramSystem
+        Continuous plant diagram.
+    connections : list of BoundaryConnection, optional
+        Multi-channel boundary wiring.
+    """
+
+    computer: Computer
+    plant: DiagramSystem
+    connections: list[BoundaryConnection] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        from minilink.simulation.computer import Computer
+
+        if not isinstance(self.computer, Computer):
+            raise TypeError(
+                f"HybridDiagram requires Computer, got {type(self.computer).__name__}"
+            )
+        if not isinstance(self.plant, DiagramSystem):
+            raise TypeError(
+                f"HybridDiagram requires DiagramSystem plant, "
+                f"got {type(self.plant).__name__}"
+            )
+
+    @classmethod
+    def from_diagrams(
+        cls,
+        step_diagram: StepDiagramSystem,
+        plant: DiagramSystem,
+        schedule,
+        *,
+        connections: list[BoundaryConnection] | None = None,
+    ) -> HybridDiagram:
+        """Wrap ``step_diagram`` and ``schedule`` in a :class:`Computer`."""
+        from minilink.simulation.computer import Computer, StepSchedule
+
+        if not isinstance(schedule, StepSchedule):
+            schedule = StepSchedule(dt_base=float(schedule))
+        computer = Computer(step_diagram, schedule)
+        return cls(computer=computer, plant=plant, connections=list(connections or []))
+
+    def _simulator(
+        self,
+        *,
+        t0=0,
+        tf=10,
+        x0_plant=None,
+        x0_computer=None,
+        n_steps=None,
+        plant_dt_inner=None,
+        compile_backend="numpy",
+        verbose=False,
+    ):
+        from minilink.simulation.hybrid_simulator import HybridSimulator
+
+        return HybridSimulator(
+            self,
+            x0_plant=x0_plant,
+            x0_computer=x0_computer,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            plant_dt_inner=plant_dt_inner,
+            compile_backend=compile_backend,
+            verbose=verbose,
+        )
+
+    def connect_boundary(
+        self,
+        *,
+        direction: BoundaryDirection | str,
+        computer_port: str,
+        plant_port: str,
+    ) -> None:
+        """Append and validate one boundary channel."""
+        direction = _normalize_direction(direction)
+        conn = BoundaryConnection(
+            direction=direction,
+            computer_port=computer_port,
+            plant_port=plant_port,
+        )
+        _validate_boundary_connection(self, conn)
+        self.connections.append(conn)
+
+    def compute_trajectory(
+        self,
+        t0=0,
+        tf=10,
+        *,
+        x0_plant=None,
+        x0_computer=None,
+        n_steps=None,
+        plant_dt_inner=None,
+        compile_backend="numpy",
+        verbose=False,
+        show=False,
+    ):
+        """Simulate with nominal boundary inputs on ``[t0, tf]``."""
+        result = self._simulator(
+            t0=t0,
+            tf=tf,
+            x0_plant=x0_plant,
+            x0_computer=x0_computer,
+            n_steps=n_steps,
+            plant_dt_inner=plant_dt_inner,
+            compile_backend=compile_backend,
+            verbose=verbose,
+        ).solve()
+        if show:
+            result.plot()
+        return result
+
+    def compute_forced(
+        self,
+        u,
+        *,
+        input_port_id=None,
+        t0=0,
+        tf=10,
+        x0_plant=None,
+        x0_computer=None,
+        n_steps=None,
+        plant_dt_inner=None,
+        compile_backend="numpy",
+        verbose=False,
+        show=False,
+    ):
+        """Simulate with prescribed computer-boundary input on ``[t0, tf]``."""
+        result = self._simulator(
+            t0=t0,
+            tf=tf,
+            x0_plant=x0_plant,
+            x0_computer=x0_computer,
+            n_steps=n_steps,
+            plant_dt_inner=plant_dt_inner,
+            compile_backend=compile_backend,
+            verbose=verbose,
+        ).solve_forced(u, input_port_id=input_port_id)
+        if show:
+            result.plot()
+        return result
+
+
+# Internal machinery
+
+
+def _normalize_direction(direction: str) -> BoundaryDirection:
+    key = _DIRECTION_ALIASES.get(direction, direction)
+    if key not in ("computer_to_plant", "plant_to_computer"):
+        raise ValueError(
+            f"direction must be 'computer_to_plant' or 'plant_to_computer', "
+            f"got {direction!r}"
+        )
+    return key  # type: ignore[return-value]
+
+
+def _validate_boundary_connection(
+    hybrid: HybridDiagram, conn: BoundaryConnection
+) -> None:
+    diagram = hybrid.computer.diagram
+    plant = hybrid.plant
+
+    if conn.direction == "computer_to_plant":
+        if conn.computer_port not in diagram.outputs:
+            raise ValueError(
+                f"Unknown computer output port {conn.computer_port!r}; "
+                f"available: {', '.join(diagram.outputs) or '(none)'}"
+            )
+        if conn.plant_port not in plant.inputs:
+            raise ValueError(
+                f"Unknown plant input port {conn.plant_port!r}; "
+                f"available: {', '.join(plant.inputs) or '(none)'}"
+            )
+        c_dim = diagram.outputs[conn.computer_port].dim
+        p_dim = plant.inputs[conn.plant_port].dim
+    else:
+        if conn.computer_port not in diagram.inputs:
+            raise ValueError(
+                f"Unknown computer input port {conn.computer_port!r}; "
+                f"available: {', '.join(diagram.inputs) or '(none)'}"
+            )
+        if conn.plant_port not in plant.outputs:
+            raise ValueError(
+                f"Unknown plant output port {conn.plant_port!r}; "
+                f"available: {', '.join(plant.outputs) or '(none)'}"
+            )
+        c_dim = diagram.inputs[conn.computer_port].dim
+        p_dim = plant.outputs[conn.plant_port].dim
+
+    if c_dim != p_dim:
+        raise ValueError(
+            f"Boundary dimension mismatch on {conn.computer_port!r} ↔ "
+            f"{conn.plant_port!r}: {c_dim} vs {p_dim}"
+        )
