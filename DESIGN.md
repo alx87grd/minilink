@@ -45,7 +45,7 @@ rearrangement) are listed in [ROADMAP.md §5](ROADMAP.md).
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ `SystemFacades` mixin), `DiagramSystem`, shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
+| `core/` | `System` (+ façade mixins: `SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
 | `core/compile/` | `ExecutionPlan`, compiler, NumPy/JAX evaluators |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -177,9 +177,13 @@ serial arms. Joint impedance / task impedance / computed torque use
   `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
   stays unprefixed (one shared root); articulated frames are namespaced
   (``vehicle:body``).
-- **Facades:** user shortcuts only (lazy simulation/graphics); defined on the
-  `core.facades.SystemFacades` mixin so `core/system.py` keeps the math,
-  port, and visualization contracts. `self.traj` is a convenience cache of
+- **Facades:** user shortcuts only (lazy simulation/graphics); split across
+  `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
+  `compute_trajectory`, `plot_trajectory`, `animate`, …),
+  `DynamicSystemFacades` on `DynamicSystem` (continuous `compute_trajectory`,
+  analysis plots, `game`), `StepSystemFacades` on `StepSystem`
+  (`compute_rollout`). **MRO** picks `compute_trajectory` implementation; no
+  façade-layer `isinstance` routers. `self.traj` is a convenience cache of
   the latest facade rollout; library code never reads it as an input.
 
 ### Native-array equation rule
@@ -213,8 +217,10 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
 
 ### `DiagramSystem`
 
-Composes subsystems by named ports; flattens state; compiled `ExecutionPlan` is
-the main execution path (reference recursive path must stay equivalent).
+Subclasses :class:`~minilink.core.system.DynamicSystem` (diagrams are continuous
+evolution systems with a compile fast path). Composes subsystems by named ports;
+flattens state; compiled `ExecutionPlan` is the main execution path (reference
+recursive path must stay equivalent).
 Wiring, port gather, params nesting, and `check_algebraic_loops` live on
 `WiredDiagramMixin` in `wiring.py`; `DiagramSystem` adds flow-only `f`,
 `compile`, and `reconstruct_internal_signals`. Public `DiagramSystem` API is
@@ -301,14 +307,25 @@ only** (not diagram internals). Compiled evaluators expose **`outputs` / `output
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
 reintroduce `compute_outputs(..., ports=...)`.
 
-**Default sim API:** `compute_trajectory` / `compute_forced` route by evolution kind:
+**Default sim API:** `compute_trajectory` / `compute_forced` dispatch by **class MRO**
+(façade mixins), enforced at simulator constructors:
 
-- :class:`DynamicSystem` / :class:`DiagramSystem` → :class:`~minilink.simulation.simulator.Simulator`
-  (ODE integration)
-- static :class:`System` (`n=0`) → :class:`~minilink.simulation.static_simulator.StaticSimulator`
-  (time grid + boundary outputs in `Trajectory.signals`)
-- :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)` (clock-free
-  :class:`~minilink.core.step_rollout.StepRollout`; not `Simulator`)
+- :class:`DynamicSystem` (including :class:`DiagramSystem`) →
+  :class:`~minilink.simulation.simulator.Simulator` (ODE integration or diagram
+  evaluator on a time grid)
+- static :class:`System` leaf (`n=0`) →
+  :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
+  boundary outputs in `Trajectory.signals`; not state evolution)
+- :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
+  (clock-free :class:`~minilink.core.step_rollout.StepRollout`; not `Simulator`)
+
+`animate` / `plot_trajectory` live on `SharedSystemFacades` for all kinds when
+`traj=` is provided; auto-sim fallback calls `compute_trajectory` (MRO picks engine).
+
+**Two static paths:** a static *leaf* (`Gain`, `Step` source) uses
+`StaticSimulator` — empty state, outputs in `traj.signals`. A static-only
+*diagram* (`n=0` stacked state) still subclasses `DynamicSystem` and uses
+`Simulator` with the diagram evaluator (signal-flow on a time grid).
 
 Unconnected inputs use port nominals; time-varying sources belong in the diagram;
 forcing via `compute_forced`. Facades default `compile_backend="numpy"`.

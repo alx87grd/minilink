@@ -1,8 +1,8 @@
 """
 Block diagrams: systems built by connecting other systems.
 
-A :class:`DiagramSystem` is itself a :class:`~minilink.core.system.System`,
-so diagrams nest, simulate, and compile like any other system.
+A :class:`DiagramSystem` is a :class:`~minilink.core.system.DynamicSystem`,
+so diagrams nest, simulate, and compile like any other continuous system.
 """
 
 import numpy as np
@@ -15,7 +15,7 @@ from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
 __all__ = ["DiagramSystem", "validate_diagram_params"]
 
 
-class DiagramSystem(WiredDiagramMixin, System):
+class DiagramSystem(WiredDiagramMixin, DynamicSystem):
     """
     A system composed of subsystems connected through their named ports.
 
@@ -43,7 +43,7 @@ class DiagramSystem(WiredDiagramMixin, System):
         # Registry before System.__init__: its params setter runs during shell init.
         self.subsystems = {}
         self.connections = {}
-        System.__init__(self)
+        System.__init__(self, 0)
         self._init_wiring(name="Diagram")
 
     def f(self, x, u, t=0, params=None):

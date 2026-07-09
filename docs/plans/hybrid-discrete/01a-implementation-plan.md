@@ -458,7 +458,11 @@ if not isinstance(sys, (DynamicSystem, DiagramSystem)):
 
 ### Facade routing: [`minilink/core/facades.py`](minilink/core/facades.py)
 
+> **Superseded by [01b-facade-mixin-split.md](01b-facade-mixin-split.md).** No `_simulate`
+> router; `SharedSystemFacades` / `DynamicSystemFacades` / `StepSystemFacades` with MRO dispatch.
+
 ```python
+# Historical sketch (pre-1b) — do not reintroduce:
 def _simulate(self, *, forced=None, input_port_id=None, **kwargs) -> Trajectory:
     from minilink.core.diagram import DiagramSystem
     from minilink.core.system import DynamicSystem

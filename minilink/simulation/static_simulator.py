@@ -9,7 +9,6 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
-from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO
@@ -36,10 +35,10 @@ class StaticSimulator:
         verbose=False,
         compile_backend=BACKEND_NUMPY,
     ):
-        if isinstance(sys, (DynamicSystem, DiagramSystem)):
+        if isinstance(sys, DynamicSystem):
             raise TypeError(
-                "DynamicSystem and DiagramSystem use Simulator; "
-                "compute_trajectory routes there."
+                "DynamicSystem (including DiagramSystem) uses Simulator via "
+                "compute_trajectory, or construct Simulator directly."
             )
         if sys.n != 0:
             raise TypeError(

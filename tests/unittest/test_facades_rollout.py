@@ -25,11 +25,6 @@ class TestFacadesRollout(unittest.TestCase):
         self.assertEqual(rollout.n_samples, 6)
         np.testing.assert_allclose(rollout.x[0, -1], 5.0)
 
-    def test_compute_trajectory_friendly_error(self):
-        plant = Counter()
-        with self.assertRaisesRegex(TypeError, "compute_rollout"):
-            plant.compute_trajectory()
-
     def test_plot_rollout_headless(self):
         import matplotlib
 

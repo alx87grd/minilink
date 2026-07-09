@@ -1,6 +1,6 @@
 """
-Time-domain ODE simulation of :class:`~minilink.core.system.DynamicSystem` and
-:class:`~minilink.core.diagram.DiagramSystem` models.
+Time-domain ODE simulation of :class:`~minilink.core.system.DynamicSystem` models
+(including :class:`~minilink.core.diagram.DiagramSystem`).
 
 Integrates ``dx/dt = f(x, u, t)`` along a time grid using pluggable solver backends
 (SciPy, Euler, fixed-step RK4). Static ``System`` leaves use
@@ -134,14 +134,13 @@ class Simulator:
         verbose=False,
         compile_backend=BACKEND_NUMPY,
     ):
-        from minilink.core.diagram import DiagramSystem
         from minilink.core.system import DynamicSystem
 
-        if not isinstance(sys, (DynamicSystem, DiagramSystem)):
+        if not isinstance(sys, DynamicSystem):
             if sys.n == 0:
                 raise TypeError(
-                    "Static System leaves use StaticSimulator; "
-                    "compute_trajectory routes there."
+                    "Static System leaves use StaticSimulator via "
+                    "compute_trajectory, or construct StaticSimulator directly."
                 )
             raise TypeError(
                 f"Cannot simulate {type(sys).__name__} with n={sys.n}; "

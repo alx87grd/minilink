@@ -1,11 +1,11 @@
 """
 System convenience facades.
 
-This module defines facade mixins for :class:`~minilink.core.system.System`
-subclasses: :class:`SystemFacades` (shared shortcuts), and
-:class:`StepRolloutFacades` (discrete rollout on :class:`~minilink.core.system.StepSystem`).
+Evolution-aware mixin shortcuts for :class:`~minilink.core.system.System`
+subclasses: :class:`SharedSystemFacades` (all kinds), :class:`DynamicSystemFacades`
+(continuous evolution), and :class:`StepSystemFacades` (discrete rollout).
 
-The mixin is shortcuts only: the mathematical, structural, and visualization
+The mixins are shortcuts only: mathematical, structural, and visualization
 contracts stay in :mod:`minilink.core.system`. Heavy dependencies
 (simulation, graphics) are imported lazily inside each method.
 """
@@ -13,97 +13,19 @@ contracts stay in :mod:`minilink.core.system`. Heavy dependencies
 import numpy as np
 
 
-class StepRolloutFacades:
-    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`."""
-
-    def compute_rollout(
-        self,
-        n_steps,
-        u=None,
-        *,
-        x0=None,
-        compile_backend="numpy",
-        show=False,
-        verbose=False,
-    ):
-        """
-        Convenience shortcut to roll out a discrete-time step system.
-
-        Parameters
-        ----------
-        n_steps : int
-            Number of step transitions to apply.
-        u : array, sequence, callable, or None, optional
-            Input schedule passed to the compiled evaluator rollout.
-        x0 : array, optional
-            Initial state; defaults to :attr:`x0`.
-        compile_backend : str
-            Backend passed to :meth:`compile`.
-        show : bool
-            If ``True``, plot the rollout via :meth:`plot_rollout`.
-
-        Returns
-        -------
-        StepRollout
-            The rollout, also stored in :attr:`rollout`.
-        """
-        ev = self.compile(backend=compile_backend, verbose=verbose)
-        rollout = ev.rollout(x0 if x0 is not None else self.x0, n_steps=n_steps, u=u)
-        self.rollout = rollout
-        if show:
-            self.plot_rollout(rollout)
-        return rollout
-
-    def plot_rollout(
-        self,
-        rollout=None,
-        *,
-        signals=None,
-        backend="matplotlib",
-        show=True,
-    ):
-        """
-        Convenience shortcut to plot sampled step signals.
-
-        If the rollout is not computed yet, it must be provided or available on
-        :attr:`rollout`.
-        """
-        from minilink.graphical.signals import plot_time_signals, resolve_plot_signals
-
-        if signals is None:
-            signals = resolve_plot_signals(self)
-
-        if rollout is not None:
-            return plot_time_signals(
-                self,
-                rollout.as_trajectory(),
-                signals=signals,
-                backend=backend,
-                show=show,
-            )
-
-        if self.rollout is not None:
-            return plot_time_signals(
-                self,
-                self.rollout.as_trajectory(),
-                signals=signals,
-                backend=backend,
-                show=show,
-            )
-
-        raise ValueError(
-            "No rollout available; pass rollout=... or call compute_rollout first."
-        )
-
-
-class SystemFacades:
+class SharedSystemFacades:
     """
-    Mixin providing user-shortcut facades.
+    Mixin providing shortcuts shared by all :class:`~minilink.core.system.System` kinds.
 
     Relies on attributes defined by :class:`~minilink.core.system.System`
     (``n``, ``m``, ``x0``, ``traj``). The latest facade rollout is cached on
     :attr:`traj` as a convenience only; library code never reads it as an
     input.
+
+    On static ``System`` leaves (``n=0``), :meth:`compute_trajectory` and
+    :meth:`compute_forced` use :class:`~minilink.simulation.static_simulator.StaticSimulator`.
+    :class:`DynamicSystem` subclasses override those methods via
+    :class:`DynamicSystemFacades`.
     """
 
     # User Shortcut / Facade API
@@ -118,55 +40,6 @@ class SystemFacades:
 
         return compile_system(self, backend=backend, verbose=verbose)
 
-    def _simulate(
-        self,
-        *,
-        x0=None,
-        t0=0,
-        tf=10,
-        n_steps=None,
-        dt=None,
-        solver=None,
-        compile_backend="numpy",
-        verbose=False,
-    ):
-        """Return the appropriate simulator for this system's evolution map."""
-        from minilink.core.diagram import DiagramSystem
-        from minilink.core.system import DynamicSystem
-
-        if isinstance(self, (DynamicSystem, DiagramSystem)):
-            from minilink.simulation.simulator import Simulator
-
-            return Simulator(
-                self,
-                x0=x0,
-                t0=t0,
-                tf=tf,
-                n_steps=n_steps,
-                dt=dt,
-                solver=solver,
-                compile_backend=compile_backend,
-                verbose=verbose,
-            )
-        if self.n == 0:
-            from minilink.simulation.static_simulator import StaticSimulator
-
-            return StaticSimulator(
-                self,
-                x0=x0,
-                t0=t0,
-                tf=tf,
-                n_steps=n_steps,
-                dt=dt,
-                solver=solver,
-                compile_backend=compile_backend,
-                verbose=verbose,
-            )
-        raise TypeError(
-            f"Cannot simulate {type(self).__name__} with n={self.n}; "
-            "subclass DynamicSystem and implement f(), or StepSystem for discrete evolution."
-        )
-
     def compute_trajectory(
         self,
         t0=0,
@@ -180,27 +53,29 @@ class SystemFacades:
         verbose=False,
     ):
         """
-        Convenience shortcut to simulate the system and return a trajectory.
+        Convenience shortcut to sample boundary IO on a time grid.
 
-        This method is a façade over :class:`minilink.simulation.Simulator` or
-        :class:`minilink.simulation.static_simulator.StaticSimulator` depending
-        on the system type.
-        It uses model defaults such as :attr:`x0` and stores the resulting
-        trajectory in :attr:`traj` for later convenience.
+        On static ``System`` leaves (``n=0``), this uses
+        :class:`~minilink.simulation.static_simulator.StaticSimulator` — not ODE
+        integration. Continuous systems override via
+        :class:`DynamicSystemFacades`.
 
         Parameters
         ----------
         compile_backend : str
-            Passed to :class:`~minilink.simulation.Simulator` (default ``\"numpy\"``).
+            Passed to the simulator (default ``\"numpy\"``).
             Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
 
         Returns
         -------
         Trajectory
-            The simulated trajectory, also stored in :attr:`traj`.
+            The sampled trajectory, also stored in :attr:`traj`.
         """
-        sim = self._simulate(
+        from minilink.simulation.static_simulator import StaticSimulator
+
+        sim = StaticSimulator(
+            self,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -236,11 +111,10 @@ class SystemFacades:
         verbose=False,
     ):
         """
-        Convenience shortcut to simulate the system under a prescribed input.
+        Convenience shortcut to sample boundary IO under a prescribed input.
 
-        This method is a façade over :meth:`_simulate` and
-        :meth:`minilink.simulation.Simulator.solve_forced` or
-        :meth:`minilink.simulation.static_simulator.StaticSimulator.solve_forced`.
+        On static ``System`` leaves, uses
+        :meth:`~minilink.simulation.static_simulator.StaticSimulator.solve_forced`.
 
         Parameters
         ----------
@@ -260,9 +134,12 @@ class SystemFacades:
         Returns
         -------
         Trajectory
-            Simulated state-input trajectory.
+            Sampled state-input trajectory.
         """
-        sim = self._simulate(
+        from minilink.simulation.static_simulator import StaticSimulator
+
+        sim = StaticSimulator(
+            self,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -336,124 +213,6 @@ class SystemFacades:
             self,
             traj,
             signals=signals,
-            backend=backend,
-            show=show,
-        )
-
-    def plot_phase_plane(
-        self,
-        traj=None,
-        *,
-        x_axis=0,
-        y_axis=None,
-        backend="matplotlib",
-        show=True,
-        **kwargs,
-    ):
-        """
-        Convenience shortcut to plot a phase-plane vector field.
-
-        If ``traj`` is provided, or if :attr:`traj` contains a previous
-        simulation result, the sampled state path is overlaid on the vector
-        field. Otherwise only the vector field is plotted.
-        """
-        from minilink.graphical.phase_plane import plot_phase_plane
-
-        if traj is None:
-            traj = self.traj
-        return plot_phase_plane(
-            self,
-            traj,
-            x_axis=x_axis,
-            y_axis=y_axis,
-            backend=backend,
-            show=show,
-            **kwargs,
-        )
-
-    def plot_bode(
-        self,
-        x_bar=None,
-        u_bar=None,
-        *,
-        input_port=None,
-        input_index=0,
-        output_port=None,
-        output_index=0,
-        w=None,
-        n=200,
-        method="fd",
-        t=0.0,
-        params=None,
-        epsilon=1e-6,
-        backend="matplotlib",
-        show=True,
-    ):
-        """
-        Convenience shortcut to plot a selected SISO Bode response.
-
-        ``input_port`` selects a boundary input port and ``input_index`` selects
-        one component inside it. ``output_port`` selects a boundary output port,
-        or an internal diagram output ``(sys_id, port_id)``; ``output_index``
-        selects one component inside that output.
-        """
-        from minilink.analysis.frequency import plot_bode
-
-        if x_bar is None:
-            x_bar = self.x0
-        return plot_bode(
-            self,
-            x_bar,
-            u_bar,
-            input_port=input_port,
-            input_index=input_index,
-            output_port=output_port,
-            output_index=output_index,
-            w=w,
-            n=n,
-            method=method,
-            t=t,
-            params=params,
-            epsilon=epsilon,
-            backend=backend,
-            show=show,
-        )
-
-    def plot_pzmap(
-        self,
-        x_bar=None,
-        u_bar=None,
-        *,
-        input_port=None,
-        input_index=0,
-        output_port=None,
-        output_index=0,
-        method="fd",
-        t=0.0,
-        params=None,
-        epsilon=1e-6,
-        backend="matplotlib",
-        show=True,
-    ):
-        """
-        Convenience shortcut to plot poles and zeros for a selected SISO channel.
-        """
-        from minilink.analysis.frequency import plot_pzmap
-
-        if x_bar is None:
-            x_bar = self.x0
-        return plot_pzmap(
-            self,
-            x_bar,
-            u_bar,
-            input_port=input_port,
-            input_index=input_index,
-            output_port=output_port,
-            output_index=output_index,
-            method=method,
-            t=t,
-            params=params,
-            epsilon=epsilon,
             backend=backend,
             show=show,
         )
@@ -591,6 +350,254 @@ class SystemFacades:
         # Calling display.display() *and* returning the object renders twice.
         return ani_obj
 
+
+class DynamicSystemFacades:
+    """
+    Continuous-time simulation and analysis shortcuts for :class:`~minilink.core.system.DynamicSystem`.
+
+    Overrides :meth:`compute_trajectory` and :meth:`compute_forced` to use
+    :class:`~minilink.simulation.simulator.Simulator`. Inherited by
+    :class:`~minilink.core.diagram.DiagramSystem`.
+    """
+
+    def compute_trajectory(
+        self,
+        t0=0,
+        tf=10,
+        n_steps=None,
+        dt=None,
+        solver=None,
+        show=False,
+        x0=None,
+        compile_backend="numpy",
+        verbose=False,
+    ):
+        """
+        Convenience shortcut to simulate the system and return a trajectory.
+
+        This method is a façade over :class:`~minilink.simulation.simulator.Simulator`.
+        It uses model defaults such as :attr:`x0` and stores the resulting
+        trajectory in :attr:`traj` for later convenience.
+
+        Parameters
+        ----------
+        compile_backend : str
+            Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``\"numpy\"``).
+            Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            to try JAX then fall back to NumPy.
+
+        Returns
+        -------
+        Trajectory
+            The simulated trajectory, also stored in :attr:`traj`.
+        """
+        from minilink.simulation.simulator import Simulator
+
+        sim = Simulator(
+            self,
+            x0=x0,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            dt=dt,
+            solver=solver,
+            compile_backend=compile_backend,
+            verbose=verbose,
+        )
+        traj = sim.solve()
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+
+        return traj
+
+    def compute_forced(
+        self,
+        u,
+        input_port_id=None,
+        t0=0,
+        tf=10,
+        n_steps=None,
+        dt=None,
+        solver=None,
+        show=False,
+        x0=None,
+        compile_backend="numpy",
+        verbose=False,
+    ):
+        """
+        Convenience shortcut to simulate the system under a prescribed input.
+
+        This method is a façade over
+        :meth:`~minilink.simulation.simulator.Simulator.solve_forced`.
+
+        Parameters
+        ----------
+        u : np.ndarray or callable
+            Forced input description.
+            - If ``input_port_id is None``: either a full input trajectory with
+              shape ``(m, n_pts)`` or a callable ``u(t)`` returning the full
+              input vector.
+            - If ``input_port_id`` is provided: either a trajectory for that
+              port only with shape ``(port_dim, n_pts)`` or a callable
+              returning that port signal. Other ports stay at their default
+              values.
+        input_port_id : str, optional
+            Named input port to force while keeping the others at default
+            values.
+
+        Returns
+        -------
+        Trajectory
+            Simulated state-input trajectory.
+        """
+        from minilink.simulation.simulator import Simulator
+
+        sim = Simulator(
+            self,
+            x0=x0,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            dt=dt,
+            solver=solver,
+            compile_backend=compile_backend,
+            verbose=verbose,
+        )
+
+        traj = sim.solve_forced(u, input_port_id=input_port_id)
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+
+        return traj
+
+    def plot_phase_plane(
+        self,
+        traj=None,
+        *,
+        x_axis=0,
+        y_axis=None,
+        backend="matplotlib",
+        show=True,
+        **kwargs,
+    ):
+        """
+        Convenience shortcut to plot a phase-plane vector field.
+
+        If ``traj`` is provided, or if :attr:`traj` contains a previous
+        simulation result, the sampled state path is overlaid on the vector
+        field. Otherwise only the vector field is plotted.
+        """
+        from minilink.graphical.phase_plane import plot_phase_plane
+
+        if traj is None:
+            traj = self.traj
+        return plot_phase_plane(
+            self,
+            traj,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            backend=backend,
+            show=show,
+            **kwargs,
+        )
+
+    def plot_bode(
+        self,
+        x_bar=None,
+        u_bar=None,
+        *,
+        input_port=None,
+        input_index=0,
+        output_port=None,
+        output_index=0,
+        w=None,
+        n=200,
+        method="fd",
+        t=0.0,
+        params=None,
+        epsilon=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot a selected SISO Bode response.
+
+        ``input_port`` selects a boundary input port and ``input_index`` selects
+        one component inside it. ``output_port`` selects a boundary output port,
+        or an internal diagram output ``(sys_id, port_id)``; ``output_index``
+        selects one component inside that output.
+        """
+        from minilink.analysis.frequency import plot_bode
+
+        if x_bar is None:
+            x_bar = self.x0
+        return plot_bode(
+            self,
+            x_bar,
+            u_bar,
+            input_port=input_port,
+            input_index=input_index,
+            output_port=output_port,
+            output_index=output_index,
+            w=w,
+            n=n,
+            method=method,
+            t=t,
+            params=params,
+            epsilon=epsilon,
+            backend=backend,
+            show=show,
+        )
+
+    def plot_pzmap(
+        self,
+        x_bar=None,
+        u_bar=None,
+        *,
+        input_port=None,
+        input_index=0,
+        output_port=None,
+        output_index=0,
+        method="fd",
+        t=0.0,
+        params=None,
+        epsilon=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot poles and zeros for a selected SISO channel.
+        """
+        from minilink.analysis.frequency import plot_pzmap
+
+        if x_bar is None:
+            x_bar = self.x0
+        return plot_pzmap(
+            self,
+            x_bar,
+            u_bar,
+            input_port=input_port,
+            input_index=input_index,
+            output_port=output_port,
+            output_index=output_index,
+            method=method,
+            t=t,
+            params=params,
+            epsilon=epsilon,
+            backend=backend,
+            show=show,
+        )
+
     def modal_analysis(
         self,
         x_bar=None,
@@ -682,4 +689,87 @@ class SystemFacades:
             u0=np.zeros(self.m) if u0 is None else u0,
             t0=t0,
             max_steps=max_steps,
+        )
+
+
+class StepSystemFacades:
+    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`."""
+
+    def compute_rollout(
+        self,
+        n_steps,
+        u=None,
+        *,
+        x0=None,
+        compile_backend="numpy",
+        show=False,
+        verbose=False,
+    ):
+        """
+        Convenience shortcut to roll out a discrete-time step system.
+
+        Parameters
+        ----------
+        n_steps : int
+            Number of step transitions to apply.
+        u : array, sequence, callable, or None, optional
+            Input schedule passed to the compiled evaluator rollout.
+        x0 : array, optional
+            Initial state; defaults to :attr:`x0`.
+        compile_backend : str
+            Backend passed to :meth:`compile`.
+        show : bool
+            If ``True``, plot the rollout via :meth:`plot_rollout`.
+
+        Returns
+        -------
+        StepRollout
+            The rollout, also stored in :attr:`rollout`.
+        """
+        ev = self.compile(backend=compile_backend, verbose=verbose)
+        rollout = ev.rollout(x0 if x0 is not None else self.x0, n_steps=n_steps, u=u)
+        self.rollout = rollout
+        if show:
+            self.plot_rollout(rollout)
+        return rollout
+
+    def plot_rollout(
+        self,
+        rollout=None,
+        *,
+        signals=None,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot sampled step signals.
+
+        If the rollout is not computed yet, it must be provided or available on
+        :attr:`rollout`.
+        """
+        from minilink.graphical.signals import plot_time_signals, resolve_plot_signals
+
+        if signals is None:
+            signals = resolve_plot_signals(self)
+
+        if rollout is not None:
+            return plot_time_signals(
+                self,
+                rollout.as_trajectory(),
+                signals=signals,
+                backend=backend,
+                show=show,
+            )
+
+        if self.rollout is not None:
+            return plot_time_signals(
+                self,
+                self.rollout.as_trajectory(),
+                signals=signals,
+                backend=backend,
+                show=show,
+            )
+
+        raise ValueError(
+            "No rollout available; pass rollout=... or call compute_rollout first."
         )

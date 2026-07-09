@@ -7,21 +7,26 @@ A static IO block is described by output maps on its ports (and optionally
 
 Signal and port metadata live in :mod:`minilink.core.signals`; user shortcut
 methods (``compute_trajectory``, ``plot_*``, ``animate``, ``modal_analysis``, ...)
-live on the :class:`~minilink.core.facades.SystemFacades` mixin.
+live on the :class:`~minilink.core.facades.SharedSystemFacades` mixin and its
+evolution-specific subclasses.
 """
 
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from minilink.core.facades import StepRolloutFacades, SystemFacades
+from minilink.core.facades import (
+    DynamicSystemFacades,
+    SharedSystemFacades,
+    StepSystemFacades,
+)
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
 
-class System(SystemFacades):
+class System(SharedSystemFacades):
     """
       Static input-output shell: ports, parameters, metadata, and facades.
 
@@ -43,8 +48,9 @@ class System(SystemFacades):
       - **Visualization contract**: forward-kinematic geometry for rendering
         and animation.
       - **User shortcut façade**: :meth:`compile`, :meth:`compute_trajectory`,
-        :meth:`render`, :meth:`animate`, :meth:`game` on
-        :class:`~minilink.core.facades.SystemFacades`.
+        :meth:`render`, :meth:`animate` on
+        :class:`~minilink.core.facades.SharedSystemFacades` (continuous analysis
+        and :meth:`game` on :class:`~minilink.core.facades.DynamicSystemFacades`).
 
       Notes on purity
       ---------------
@@ -367,12 +373,16 @@ class System(SystemFacades):
 # Specialized System Types
 
 
-class DynamicSystem(System):
+class DynamicSystem(DynamicSystemFacades, System):
     """
-    A system with continuous states (``n > 0``)
+    A system with continuous evolution ``dx = f(x, u, t; p)``.
 
         dx = f(x, u, t; p)
         y  = h(x, u, t; p)
+
+    Leaf plants use ``n > 0``; :class:`~minilink.core.diagram.DiagramSystem`
+    subclasses this type with ``n = 0`` when the stacked subsystem states sum
+    to zero (signal-flow diagrams still simulate via :class:`~minilink.simulation.simulator.Simulator`).
 
     The constructor can create the standard ports in one line: an input ``u``,
     a primary output ``y`` wired to :meth:`~System.h`, and optionally an
@@ -440,7 +450,7 @@ class DynamicSystem(System):
         return dx
 
 
-class StepSystem(StepRolloutFacades, System):
+class StepSystem(StepSystemFacades, System):
     """
     A system with discrete states (``n >= 1``)
 
@@ -492,18 +502,6 @@ class StepSystem(StepRolloutFacades, System):
             )
         if expose_state:
             self.add_output_port("x", dim=self.n, function=self.compute_state)
-
-    def compute_trajectory(self, *args, **kwargs):
-        raise TypeError(
-            "compute_trajectory is not supported on StepSystem; "
-            "use compute_rollout(n_steps=...) instead."
-        )
-
-    def compute_forced(self, *args, **kwargs):
-        raise TypeError(
-            "compute_forced is not supported on StepSystem; "
-            "use compute_rollout(n_steps=...) instead."
-        )
 
     def step(self, x, u, k=0, params=None):
         """

@@ -105,8 +105,10 @@ side. Any internal signal can be plotted by `"subsystem_id:port_id"` name.
 
 ### One call to simulate, plot, animate
 
-Facade methods cover the common workflows: `compute_trajectory(...)` simulates
-with SciPy or fixed-step solvers and returns a `Trajectory`;
+Facade methods cover the common workflows: `compute_trajectory(...)` samples or
+integrates on a time grid — static leaves via `StaticSimulator` (boundary IO in
+`traj.signals`); continuous plants and diagrams via `Simulator` (SciPy or
+fixed-step solvers) — and returns a `Trajectory`;
 `plot_trajectory(...)` stacks labeled, unit-aware signal plots (matplotlib or
 plotly); `plot_phase_plane(...)` draws vector fields with overlaid
 trajectories; `plot_diagram()` renders the wiring topology (Graphviz/Mermaid).
@@ -327,7 +329,8 @@ see [tests/README.md](tests/README.md).
 Minimal paths for debugging and extending workflows. Contracts:
 [DESIGN.md](DESIGN.md).
 
-Facade methods for common workflows: `compute_trajectory(...)`, `plot_trajectory(...)`,
+Facade methods for common workflows: `compute_trajectory(...)` (static leaves and
+continuous/diagram systems via MRO), `plot_trajectory(...)`,
 `plot_diagram(...)`, `animate(...)`. Use lower-level APIs when you need explicit
 control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 `compile()` / `DynamicsEvaluator`.
@@ -336,7 +339,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 
 | Package | Owns |
 | --- | --- |
-| `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
+| `core` | `System`, façade mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
 | `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`) |
 | `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
@@ -354,7 +357,9 @@ Model:     subclass System → f/h (+ ports or DynamicSystem options)
 Compose:   + / >> / @ / autowire  →  DiagramSystem
            or add_subsystem + connect (+ connect_new_output_port)
 
-Simulate:  compute_trajectory*  →  Simulator  →  compile  →  solve  →  Trajectory
+Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
+           →  compile  →  solve  →  Trajectory
+           StepSystem: compute_rollout  →  StepEvaluator.rollout
 
 Compile:   sys.compile(backend)  →  DynamicsEvaluator
 
