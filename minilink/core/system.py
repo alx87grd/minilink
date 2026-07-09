@@ -97,9 +97,7 @@ class System(SystemFacades):
         self.solver_info = {
             "continuous_time_equation": True,
             "smallest_time_constant": 0.001,
-            "discontinuous_behavior": False,  # Will use a fixed time step
-            "discrete_time_period": None,
-            "require_building": False,  # If True, build before simulating
+            "discontinuous_behavior": False,
         }
 
         # Runtime convenience cache for the last trajectory produced by

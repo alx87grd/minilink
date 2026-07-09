@@ -49,7 +49,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription=DirectCollocationTranscription(
         DirectCollocationOptions(
             tf=4.0,
-            n_steps=20,
+            n_steps=40,
         )
     ),
     options=TrajectoryOptimizationOptions(
