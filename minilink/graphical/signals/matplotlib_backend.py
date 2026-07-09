@@ -157,7 +157,7 @@ def _create_figure(
         ax.legend(loc="upper right")
         lines.append(line)
 
-    axes[-1].set_xlabel("Time [s]", fontsize=FONT_SIZE)
+    axes[-1].set_xlabel(spec.abscissa_label, fontsize=FONT_SIZE)
 
     if show and plt.get_backend().lower() != "agg":
         if block is None:

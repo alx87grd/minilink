@@ -8,11 +8,11 @@ so diagrams nest, simulate, and compile like any other continuous system.
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.system import DynamicSystem, System
+from minilink.core.system import DynamicSystem, StepSystem, System
 from minilink.core.trajectory import Trajectory
 from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
 
-__all__ = ["DiagramSystem", "validate_diagram_params"]
+__all__ = ["DiagramSystem", "StepDiagramSystem", "validate_diagram_params"]
 
 
 class DiagramSystem(WiredDiagramMixin, DynamicSystem):
@@ -128,6 +128,76 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
                 internal_signals[key][:, i] = value
 
         return traj.with_signals(internal_signals)
+
+
+class StepDiagramSystem(WiredDiagramMixin, StepSystem):
+    """
+    A discrete-time diagram composed of :class:`StepSystem` and static blocks.
+
+    The diagram state stacks subsystem states in insertion order,
+
+        x_{k+1} = step(x_k, u_k, k),
+
+    where each local input is gathered from connected output ports, boundary
+    inputs, or port nominal values. The third gather slot is step index ``k``
+    (``int``), not simulation time.
+
+    :meth:`compile` produces a :class:`~minilink.core.compile.evaluators.step_evaluator.StepEvaluator`
+    for fast :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout`.
+    """
+
+    def __init__(self):
+        self.subsystems = {}
+        self.connections = {}
+        System.__init__(self, 0)
+        self.rollout = None
+        self._init_wiring(name="StepDiagram")
+
+    def step(self, x, u, k=0, params=None):
+        """
+        Stacked discrete update ``x_new = [step_1(...); step_2(...); ...]``.
+
+        Interpreted reference; :meth:`compile` produces the fast equivalent.
+        """
+        validate_diagram_params(params, self.subsystems)
+
+        xp = array_module(x, u)
+        x_arr = xp.asarray(x, dtype=float).reshape(self.n)
+        x_new = xp.array(x_arr, copy=True)
+        for sys_id, subsystem in self.subsystems.items():
+            if not isinstance(subsystem, StepSystem):
+                continue
+            local_x = self.get_local_state(x_arr, sys_id)
+            local_u = self.get_local_input(x, u, k, sys_id, params=params)
+            local_params = self._subsystem_params(params, sys_id)
+            piece = subsystem.step(local_x, local_u, k, local_params)
+            start, end = self.state_index[sys_id]
+            x_new[start:end] = xp.asarray(piece, dtype=float).reshape(end - start)
+
+        return x_new
+
+    def compile(self, backend="numpy", bind_params=False, verbose=False):
+        """
+        Compile the step diagram into a stateless step evaluator.
+
+        Parameters
+        ----------
+        backend : str
+            ``'numpy'`` (default) or ``'jax'``.
+        bind_params : bool, optional
+            If ``True``, subsystem ``params`` are deep-copied into the plan.
+        verbose : bool
+            If ``True``, print timed compilation steps.
+
+        Returns
+        -------
+        NumpyStepDiagramEvaluator or JaxStepDiagramEvaluator
+        """
+        from minilink.core.compile.step_compiler import compile_step_diagram
+
+        return compile_step_diagram(
+            self, backend=backend, bind_params=bind_params, verbose=verbose
+        )
 
 
 if __name__ == "__main__":

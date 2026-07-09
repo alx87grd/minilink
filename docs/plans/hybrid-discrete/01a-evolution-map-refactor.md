@@ -5,7 +5,9 @@ Mechanical refactor: move continuous evolution off the `System` shell, split typ
 **compile / evaluator / simulate** paths for static vs dynamic leaves, keep unified user
 verbs where they still apply.
 
-**Status:** complete (implemented on `dev-hybrid`). See [01a-implementation-plan.md](01a-implementation-plan.md).
+**Status:** complete (`d131a89` on `dev-hybrid`). Façade routing superseded by
+[Phase 1b](01b-facade-mixin-split.md) (`40c8297`). See
+[01a-implementation-plan.md](01a-implementation-plan.md).
 
 Full hybrid context: [00-master-plan.md](00-master-plan.md),
 [hybrid-discrete-simulation.md](../hybrid-discrete-simulation.md).
@@ -29,8 +31,8 @@ Full hybrid context: [00-master-plan.md](00-master-plan.md),
 System                         # ports, params, h, metadata, facades — NO f, NO step (n defaults to 0)
 ├── Source(System)             # y = h(t) — compile/sim as static
 ├── DynamicSystem              # dx = f(x,u,t), y = h(·)     ← f lives HERE
-├── StepSystem                 # x_{k+1} = step(x,u,k)      (Phase 1 — after 1a)
-├── DiagramSystem              # stacked f (flow diagrams)
+├── StepSystem                 # x_{k+1} = step(x,u,k)      (Phase 1)
+├── DiagramSystem              # stacked f (flow diagrams) — IS-A DynamicSystem (Phase 1b)
 └── StepDiagramSystem          # stacked step               (Phase 2)
 ```
 
@@ -46,10 +48,10 @@ Single entry: `sys.compile()` / `compile(system, backend=...)`. **No public `com
 | Input | Evaluator | Core API |
 | --- | --- | --- |
 | `DynamicSystem` leaf | `NumpyLeafEvaluator` (`DynamicsEvaluator`) | `.f`, `.h`, `.outputs`, RK4, … |
-| `StaticSystem` / `Source` leaf | **`NumpyStaticLeafEvaluator`** (`StaticEvaluator`) | `.h`, `.outputs` only — **no `.f`** |
+| `System` leaf with `n==0` / `Source` | **`NumpyStaticEvaluator`** (`StaticEvaluator`) | `.outputs` only — **no `.f`** |
 | `DiagramSystem` | `NumpyDiagramEvaluator` | diagram `.f` |
-| `StepSystem` leaf (Phase 1) | `NumpyStepLeafEvaluator` (`StepEvaluator`) | `.step`, `.h`, `.outputs` — **no `.f`** |
-| Bare `System` leaf | `TypeError` | migrate to `StaticSystem` or `DynamicSystem` |
+| `StepSystem` leaf (Phase 1) | `NumpyStepEvaluator` (`StepEvaluator`) | `.step`, `.outputs` — **no `.f`** |
+| `System` leaf with `n>0` (no `f`) | `TypeError` | subclass `DynamicSystem` and implement `f()` |
 
 Dispatch lives in `minilink/core/compile/compiler.py`.
 
@@ -73,21 +75,28 @@ minilink/core/compile/evaluators/
 
 | System kind | Rollout API | Implementation |
 | --- | --- | --- |
-| `StaticSystem` / `Source` | **`compute_trajectory`**, **`compute_forced`** | **`StaticSimulator`** — time grid + `u`; optional `y` in `traj.signals` |
+| `System` leaf (`n==0`) / `Source` | **`compute_trajectory`**, **`compute_forced`** | **`StaticSimulator`** — time grid + `u`; optional outputs in `traj.signals` |
 | `DynamicSystem` / `DiagramSystem` | **`compute_trajectory`**, **`compute_forced`** | **`Simulator`** — ODE solvers + `DynamicsEvaluator` |
-| `StepSystem` (Phase 1) | **`run_steps(...)`** only | **`StepRunner`** — integer `k`, clock-free |
+| `StepSystem` (Phase 1) | **`compute_rollout(...)`** only | **`StepEvaluator.rollout`** — integer `k`, clock-free |
 
 ### `compute_trajectory` on step systems — **deferred**
 
-A future option is `compute_trajectory(n_steps=100)` as a façade over `StepRunner` (clock-free
-rollout, possibly synthetic `t` on `Trajectory` for plotting only). **Not in 1a or Phase 1.**
+A future option is `compute_trajectory(n_steps=100)` as a façade over `StepEvaluator.rollout`
+(clock-free rollout, possibly synthetic `t` on `Trajectory` for plotting only). **Not in 1a or
+Phase 1.**
 
 **Decision (July 2026):** keep **`compute_trajectory` as a time-signal API** for **static and
-dynamic systems only**. `StepSystem` does **not** use this façade yet; callers use
-`compile()` + `StepRunner.run_steps(...)`.
+dynamic systems only**. `StepSystem` user API is **`compute_rollout`**; misuse of
+`compute_trajectory` hits `StaticSimulator` rejection (Phase 1b — no façade router).
 
 Rationale: avoids conflating step index `k` with simulation time `t` before hybrid orchestration
 (Phase 4 `StepSchedule.dt_base`) is landed.
+
+### Facade routing — superseded by Phase 1b
+
+Historical 1a sketch used `_simulate` + `isinstance` routers in `facades.py`. **Landed design:**
+[01b-facade-mixin-split.md](01b-facade-mixin-split.md) — `SharedSystemFacades` /
+`DynamicSystemFacades` / `StepSystemFacades`; MRO picks `compute_trajectory` implementation.
 
 ### `StaticSimulator` (new)
 
@@ -103,21 +112,7 @@ Rationale: avoids conflating step index `k` with simulation time `t` before hybr
 Extract shared time-grid logic to `minilink/simulation/time_grid.py` (used by `Simulator` and
 `StaticSimulator`).
 
-### Facade routing (`minilink/core/facades.py`)
-
-```python
-# compute_trajectory / compute_forced
-if isinstance(self, StepSystem):
-    raise TypeError("StepSystem uses run_steps(...); compute_trajectory is not supported yet.")
-if isinstance(self, (StaticSystem, Source)):
-    return StaticSimulator(self, ...).solve()  # or solve_forced
-if isinstance(self, (DynamicSystem, DiagramSystem)):
-    return Simulator(self, ...).solve()
-```
-
 ---
-
-## Diagram & execution plan
 
 Replace **`if subsystem.n == 0`** skip with **`isinstance(subsystem, DynamicSystem)`** in:
 
@@ -163,10 +158,10 @@ Phase 1 default: **Option 1** as generic `ZOHHold` in `minilink/blocks/`.
 
 | File | Class | → |
 | --- | --- | --- |
-| `benchmarks/systems/network.py` | `SimpleGain` | `StaticSystem` |
+| `benchmarks/systems/network.py` | `SimpleGain` | `System(0)` |
 | | `SimpleIntegrator`, `MultiInputNode` | `DynamicSystem` |
-| `examples/.../demo_dynamic_bicycle_cascade_path_tracking.py` | `PathPlanner` | `StaticSystem` |
-| `examples/.../demo_advanced_autowire.py` | `DemoPathPlanner` | `StaticSystem` |
+| `examples/.../demo_dynamic_bicycle_cascade_path_tracking.py` | `PathPlanner` | `System(0)` |
+| `examples/.../demo_advanced_autowire.py` | `DemoPathPlanner` | `System(0)` |
 
 Preserve user tuning in demos — base class / imports only.
 
@@ -181,11 +176,11 @@ Preserve user tuning in demos — base class / imports only.
 
 | File | Cases |
 | --- | --- |
-| `test_system_evolution_maps.py` | no `System.f`; `DynamicSystem.f`; `StaticSystem` no `f` |
-| `test_compile_static_leaf.py` | `compile(Gain)` → static evaluator; `.outputs` parity; no `.f` |
+| `test_system_evolution_maps.py` | no `System.f`; `DynamicSystem.f`; static `Gain` has no `f` |
+| `test_compile_static.py` | `compile(Gain)` → static evaluator; `.outputs` parity; no `.f` |
 | `test_static_simulator.py` | shapes; `compute_trajectory` on static leaf |
 | `test_compile_pipeline.py` | diagram static+dynamic; state_ops on `DynamicSystem` only |
-| `test_facades_routing.py` | static → `StaticSimulator`, dynamic → `Simulator` |
+| `test_facades_split.py` | static → `StaticSimulator`, dynamic/diagram → `Simulator` (Phase 1b) |
 
 Regression: full `pytest`; `ruff check .`; `ruff format --check .`.
 
@@ -194,8 +189,8 @@ Regression: full `pytest`; `ruff check .`; `ruff format --check .`.
 ## Gates
 
 - **Phase 0 complete** before 1a.
-- **Phase 1a complete** before Phase 1 `StepSystem` / `StepRunner` (clean sibling types).
-- Phase 1 adds `StepSystem` + `StepEvaluator` + `StepRunner` on top of 1a dispatch.
+- **Phase 1a complete** before Phase 1 `StepSystem` / `StepEvaluator.rollout` (clean sibling types).
+- Phase 1 adds `StepSystem` + `StepEvaluator` + `compute_rollout` on top of 1a dispatch.
 
 ---
 

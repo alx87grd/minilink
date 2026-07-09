@@ -60,11 +60,16 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
     verbose : bool
         If ``True``, print timed compilation steps.
     """
-    from minilink.core.diagram import DiagramSystem
+    from minilink.core.diagram import DiagramSystem, StepDiagramSystem
     from minilink.core.system import DynamicSystem, StepSystem
 
     if isinstance(system, DiagramSystem):
         return compile_diagram(system, backend=backend, verbose=verbose)
+
+    if isinstance(system, StepDiagramSystem):
+        from minilink.core.compile.step_compiler import compile_step_diagram
+
+        return compile_step_diagram(system, backend=backend, verbose=verbose)
 
     key = normalize_backend(backend)
 
@@ -161,7 +166,14 @@ def compile_diagram(
     It does **not** make user ``f`` / port ``compute`` implementations pure if they still
     read or mutate other instance state; see :class:`minilink.core.system.System`.
     """
+    from minilink.core.diagram import StepDiagramSystem
     from minilink.core.system import StepSystem
+
+    if isinstance(diagram, StepDiagramSystem):
+        raise TypeError(
+            "StepDiagramSystem must be compiled via compile_step_diagram; "
+            "use StepDiagramSystem.compile() or compile(step_diagram)."
+        )
 
     for sys_id, subsystem in diagram.subsystems.items():
         if isinstance(subsystem, StepSystem):

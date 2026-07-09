@@ -2,30 +2,32 @@
 
 **After [Phase 0](00-wiring-refactor.md), before [Phase 1 step core](01-step-core.md).**  
 **Spec:** [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md)  
-**Status:** ready for implementation (July 2026).
+**Status:** complete (`d131a89` on `dev-hybrid`, July 2026). Façade routing landed in
+[Phase 1b](01b-facade-mixin-split.md) (`40c8297`).
 
 Full hybrid context: [00-master-plan.md](00-master-plan.md).
 
-**Branch:** `dev-hybrid` (Phase 0 complete). **Gate:** 1a before `StepSystem` / `StepRunner`.
+**Branch:** `dev-hybrid`. **Gate:** 1a before `StepSystem` / `compute_rollout`.
 
 ## Implementation checklist
 
-- [ ] Slice 1 — Remove `StaticSystem`; move `f` to `DynamicSystem`; migrate subclasses
-- [ ] Slice 2 — Evaluator modules + JAX split (`jax_utils.py`)
-- [ ] Slice 2 cleanup — remove `get_*_jit`; `rollout`→`integrate`; drop evaluator `h`/`h_p`
-- [ ] Slice 3 — Typed `compile()` dispatch + diagram guards
-- [ ] Slice 4 — `time_grid.py` + `StaticSimulator`
-- [ ] Slice 5 — Facade routing
-- [ ] Slice 6 — Analysis docstrings
-- [ ] Slice 7 — Tests + smoke gate
+- [x] Slice 1 — Remove `StaticSystem`; move `f` to `DynamicSystem`; migrate subclasses
+- [x] Slice 2 — Evaluator modules + JAX split (`jax_utils.py`)
+- [x] Slice 2 cleanup — remove `get_*_jit`; `rollout`→`integrate`; drop evaluator `h`/`h_p`
+- [x] Slice 3 — Typed `compile()` dispatch + diagram guards
+- [x] Slice 4 — `time_grid.py` + `StaticSimulator`
+- [x] Slice 5 — Facade routing *(superseded by 1b mixin split — see below)*
+- [x] Slice 6 — Analysis docstrings
+- [x] Slice 7 — Tests + smoke gate
 
 ---
 
 # Phase 1a: Evolution Map Refactor — Complete Implementation Plan
 
 **Branch:** `dev-hybrid` (Phase 0 complete)  
-**Spec:** [docs/plans/hybrid-discrete/01a-evolution-map-refactor.md](docs/plans/hybrid-discrete/01a-evolution-map-refactor.md)  
-**Gate:** 1a must land before Phase 1 `StepSystem` / `StepRunner`
+**Spec:** [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md)  
+**Status:** complete (`d131a89`)  
+**Gate:** 1a must land before Phase 1 `StepSystem` / `compute_rollout`
 
 ---
 
@@ -119,7 +121,7 @@ OutputEvaluator (ABC)              ← shared by ALL compiled evaluators
     └── JaxDiagramEvaluator        (DiagramSystem)
 ```
 
-**Phase 1 forward-compat:** `StepEvaluator(OutputEvaluator)` adds `step`/`step_p` as a **third sibling** — not under `DynamicsEvaluator`. Discrete **`rollout`** lives on `StepRunner`, not continuous evaluators.
+**Phase 1 forward-compat:** `StepEvaluator(OutputEvaluator)` adds `step`/`step_p` as a **third sibling** — not under `DynamicsEvaluator`. Discrete **`rollout`** lives on `StepEvaluator` / `StepRolloutMixin`, not continuous evaluators.
 
 ### Method matrix
 
@@ -484,7 +486,7 @@ def _simulate(self, *, forced=None, input_port_id=None, **kwargs) -> Trajectory:
 | --- | --- | --- |
 | `System` n==0 (any static block) | `compute_trajectory`, `compute_forced` | `StaticSimulator` |
 | `DynamicSystem` / `DiagramSystem` | `compute_trajectory`, `compute_forced` | `Simulator` |
-| `StepSystem` (Phase 1) | `run_steps` only | `StepRunner` — not in 1a |
+| `StepSystem` (Phase 1) | `compute_rollout` only | `StepEvaluator.rollout` — not in 1a |
 
 ---
 
@@ -576,9 +578,12 @@ Implement per [Simulation paths](#simulation-paths) section.
 
 ---
 
-## Slice 5 — Facade routing
+## Slice 5 — Facade routing *(superseded by Phase 1b)*
 
-Wire `_simulate` router in [`facades.py`](minilink/core/facades.py); update `compute_trajectory` / `compute_forced` docstrings.
+Slice 5 originally wired `_simulate` in [`facades.py`](minilink/core/facades.py). **Landed in
+[01b-facade-mixin-split.md](01b-facade-mixin-split.md):** `SharedSystemFacades` /
+`DynamicSystemFacades` / `StepSystemFacades`; MRO dispatch; `DiagramSystem(DynamicSystem)`.
+Do not reintroduce `_simulate`.
 
 ---
 
@@ -588,7 +593,7 @@ Wire `_simulate` router in [`facades.py`](minilink/core/facades.py); update `com
 | --- | --- |
 | [`linearize.py`](minilink/analysis/linearize.py), [`equilibria.py`](minilink/analysis/equilibria.py), [`phase_plane.py`](minilink/analysis/phase_plane.py) | Docstrings: expect `DynamicSystem` or `DiagramSystem` for `sys.f` |
 | [`backends.py`](minilink/core/backends.py) | `"direct"` mode doc: `DynamicSystem.f` |
-| [`animator.py`](minilink/graphical/animation/animator.py) | **Keep `if self.sys.n > 0:`** — `DiagramSystem` has `f` but is not `DynamicSystem` |
+| [`animator.py`](minilink/graphical/animation/animator.py) | **`isinstance(..., DynamicSystem)`** for Euler sub-steps — `DiagramSystem` qualifies after 1b |
 
 Defer full DESIGN/ROADMAP/README sync to Phase 13.
 
@@ -603,7 +608,7 @@ Defer full DESIGN/ROADMAP/README sync to Phase 13.
 | `test_system_evolution_maps.py` | `System` has no `f`; `DynamicSystem.f`; `Gain` (static block) has no `f`; `StaticSystem` import removed |
 | `test_compile_static.py` | `compile(Gain)` → `NumpyStaticEvaluator`; JAX parity; no `.f` |
 | `test_static_simulator.py` | `Gain.compute_trajectory`: `x.shape==(0,n_pts)`; `signals["y"]`; `Step` source on grid; JAX `compile_backend` |
-| `test_facades_routing.py` | `Gain` → `StaticSimulator`; `Integrator` → `Simulator` |
+| `test_facades_split.py` | `Gain` → `StaticSimulator`; `Integrator` / `DiagramSystem` → `Simulator` (Phase 1b) |
 | `test_evaluator_api.py` | No `get_f_jit`; no `h`/`h_p` on compiled evaluators; `outputs["y"]` parity |
 
 ### Extend existing
@@ -622,7 +627,7 @@ ruff format --check .
 pytest tests/unittest/test_system_evolution_maps.py \
        tests/unittest/test_compile_static.py \
        tests/unittest/test_static_simulator.py \
-       tests/unittest/test_facades_routing.py \
+       tests/unittest/test_facades_split.py \
        tests/unittest/test_compile_pipeline.py \
        tests/unittest/test_wiring_mixin.py \
        tests/unittest/test_blocks.py
@@ -696,7 +701,7 @@ p.compute_trajectory(tf=1.0, n_steps=11)
 
 ## Out of scope (1a)
 
-- `StepSystem`, `StepEvaluator`, `StepRunner`
+- `StepSystem`, `StepEvaluator`, `compute_rollout` — Phase 1 (`700f8ea`)
 - `compute_trajectory` on step systems
 - DESIGN §3 / README full hybrid sync (Phase 13)
 - Rejecting `StepSystem` inside flow diagrams (Phase 2)
@@ -728,7 +733,7 @@ p.compute_trajectory(tf=1.0, n_steps=11)
 6. **Slice 6** — Analysis docstrings
 7. **Slice 7** — Tests + full smoke gate
 
-Mark [01a-evolution-map-refactor.md](docs/plans/hybrid-discrete/01a-evolution-map-refactor.md) **complete** when done; update its hierarchy section to remove `StaticSystem`.
+Mark [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md) **complete** — done (`d131a89`).
 
 ---
 
@@ -766,7 +771,7 @@ jax_evaluator.py (~811 LOC)
 | Triple output path | Leaf JITs `h`, `h_p`, *and* `outputs` separately — three ways to get boundary signals |
 | Redundant public API | `.f(x,u,t)` calls `_jit_f`; `get_f_jit()` returns the same `_jit_f` — historical micro-benchmark shortcut |
 | Duplication | Leaf and diagram each reimplement IVP, `as_scipy_jac`, `rk4_rollout_*`, warm-start (~40 lines × 2) |
-| Naming | `JaxLeafEvaluator`; internal `*_rollout_*` collides with future discrete `rollout` on `StepRunner` |
+| Naming | `JaxLeafEvaluator`; internal `*_rollout_*` collides with discrete `rollout` on `StepEvaluator` |
 | No static JAX path | `Gain.compile(backend="jax")` goes through the dynamic leaf class today |
 
 **Dynamic leaf compile ceremony today (simplified):**

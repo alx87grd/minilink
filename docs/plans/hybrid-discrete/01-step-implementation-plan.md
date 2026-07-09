@@ -1,5 +1,7 @@
 # Phase 1: Step Core — Implementation Plan
 
+**Status:** complete (`700f8ea` on `dev-hybrid`; façade split `40c8297` in Phase 1b).
+
 **Branch:** `dev-hybrid` (Phase 1a landed: `d131a89`)  
 **Spec:** [01-step-core.md](01-step-core.md)  
 **Gate:** Phase 1 before [02-step-diagram.md](02-step-diagram.md)
@@ -29,16 +31,16 @@ dispatches `StepSystem` → `StepEvaluator`; tests + docs gate pass.
 
 ## Implementation slices
 
-| # | Deliverable | Files |
-| --- | --- | --- |
-| 1 | `StepSystem` — `step`/`h` with `k`, port boilerplate, `self.rollout` | `core/system.py` |
-| 2 | `StepRollout` + `as_trajectory()` | `core/step_rollout.py` |
-| 3 | `StepEvaluator`, `StepRolloutMixin`, NumPy + JAX | `compile/evaluators/step_evaluator.py`, `step_rollout.py` (mixin), `jax_utils.py` |
-| 4 | `compile()` `StepSystem` branch before `DynamicSystem` | `compile/compiler.py` |
-| 5 | `compute_rollout`, `plot_rollout`; optional `compute_trajectory` hint | `core/facades.py` |
-| 6 | `ZOHHold` + three demos | `blocks/step.py`, `examples/scripts/step/` |
-| 7 | Tests | `test_step_system`, `test_compile_step_leaf`, `test_step_rollout`, `test_facades_rollout` |
-| 8 | Docs gate | `01-step-core.md`, `00-master-plan.md`, `DESIGN.md`, `README.md` |
+| # | Deliverable | Files | Done |
+| --- | --- | --- | --- |
+| 1 | `StepSystem` — `step`/`h` with `k`, port boilerplate, `self.rollout` | `core/system.py` | yes |
+| 2 | `StepRollout` + `as_trajectory()` | `core/step_rollout.py` | yes |
+| 3 | `StepEvaluator`, `StepRolloutMixin`, NumPy + JAX | `compile/evaluators/step_evaluator.py`, `step_rollout.py` (mixin), `jax_utils.py` | yes |
+| 4 | `compile()` `StepSystem` branch before `DynamicSystem` | `compile/compiler.py` | yes |
+| 5 | `compute_rollout`, `plot_rollout` | `core/facades.py` → `StepSystemFacades` (1b) | yes |
+| 6 | `ZOHHold` + three demos | `blocks/step.py`, `examples/scripts/step/` | yes |
+| 7 | Tests | `test_step_system`, `test_compile_step_leaf`, `test_step_rollout`, `test_facades_rollout` | yes |
+| 8 | Docs gate | `01-step-core.md`, `00-master-plan.md`, `DESIGN.md`, `README.md` | yes |
 
 ## Implementation order
 

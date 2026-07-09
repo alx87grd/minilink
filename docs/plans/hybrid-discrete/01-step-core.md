@@ -1,5 +1,8 @@
 # Phase 1: Step Core (leaf + rollout)
 
+**Status:** complete (`700f8ea` on `dev-hybrid`, July 2026). Façades finalized in
+[Phase 1b](01b-facade-mixin-split.md) (`40c8297`).
+
 **After [Phase 0](00-wiring-refactor.md) and [Phase 1a](01a-evolution-map-refactor.md).**
 Pure difference-equation blocks and **leaf-only** rollout — **no wall clock, no diagrams,
 no `discretize`.**
@@ -93,9 +96,9 @@ static blocks ignore the third argument. Flow time-varying sources (`Step` at se
 - **`compute_rollout(n_steps, u=...)`** — primary entry on `StepSystem` (mirror
   `compute_trajectory`).
 - **`plot_rollout()`** — plots via `StepRollout.as_trajectory()` → existing
-  `plot_time_signals` (Plan A: no `graphical/` changes; x-axis may read `"Time [s]"` in Phase 1).
-- **`compute_trajectory` / `compute_forced`** — not for step leaves; optional friendly
-  `TypeError` on `StepSystem` pointing to `compute_rollout`.
+  `plot_time_signals` with `abscissa_label="Step [k]"` (reuses time plot pipeline).
+- **`compute_trajectory` / `compute_forced`** — not the step user API; Phase 1b removed
+  friendly `TypeError` overrides — misuse hits `StaticSimulator` rejection via MRO.
 - **Facade dispatch only** — do **not** add `StepSystem` guards inside `Simulator` /
   `StaticSimulator`; keep the continuous path clean.
 
@@ -191,8 +194,8 @@ python examples/scripts/step/demo_step_logistic_map.py
   `step` parity.
 - `test_step_rollout.py`: `StepRollout` shapes `(n, N)` / `(m, N)`; `u` constant / sequence /
   `u(k)`; `as_trajectory()`; JAX scan smoke.
-- `test_facades_rollout.py`: `compute_rollout` / `plot_rollout`; optional `compute_trajectory`
-  friendly error on `StepSystem`.
+- `test_facades_rollout.py`: `compute_rollout` / `plot_rollout`.
+- `test_facades_split.py` (Phase 1b): MRO surface; step leaves use `compute_rollout`.
 - Extend `test_evaluator_api.py`: step evaluator has `rollout`, no `f` / `integrate`.
 
 Plus Phase 1a tests in [01a-evolution-map-refactor.md](01a-evolution-map-refactor.md#tests-1a).

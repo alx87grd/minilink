@@ -4,7 +4,8 @@
 `MPCPlanner` can export a **`StepSystem`** leaf for hybrid / step simulation — replacing
 hand-rolled outer loops in MPC demos.
 
-**Requires:** Phases 1–2 (`StepSystem`, `StepDiagramSystem`), Phase 5 (`HybridSimulator`).
+**Requires:** Phases **1–2** (`StepSystem`, `StepDiagramSystem`), Phase **1b** (flow diagram IS-A
+`DynamicSystem`), Phase 5 (`HybridSimulator`).
 Phase 4 orchestrator on the step side when used inside hybrid sim.
 
 **Files:** `minilink/planning/mpc/step_block.py` (name TBD), `minilink/planning/mpc/planner.py`

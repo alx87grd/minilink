@@ -1,6 +1,7 @@
 # Hybrid and step simulation (design only)
 
-Status: Phase 0 complete (July 2026); Phases 1–6 pending.
+Status: Phases **0**, **1a**, **1**, **1b** complete on `dev-hybrid` (July 2026); Phases **2–6**
+pending. Shard contracts: [hybrid-discrete/00-master-plan.md](hybrid-discrete/00-master-plan.md).
 
 Architecture for **step maps** (difference equations, jumps, turn-based dynamics),
 step diagrams, **scheduled multi-rate orchestration**, clock-driven hybrid simulation
@@ -22,15 +23,16 @@ Build in layers on **two fundamental state-evolution maps**:
 | **Flow `f`** | `DynamicSystem` | `dx = f(x, u, t; p)` | ODE / continuous evolution |
 | **Step `step`** | `StepSystem` | `x_{k+1} = step(x, u, k; p)` | One-shot update (difference eq., jump, turn) |
 
-**Static** blocks (`StaticSystem`, `n = 0`) and **output** map `h` are shared across all
+**Static** blocks (`System` with `n = 0`) and **output** map `h` are shared across all
 kinds. **Hybrid** is not a third map — it is **orchestration** that calls flow and step
 engines and decides **when** each applies.
 
 Near-term deliverables (see **[00-master-plan.md](hybrid-discrete/00-master-plan.md)** for full phase list):
 
-0. **Phase 0** — extract shared diagram wiring mixin; validate continuous diagrams unchanged.
-0. **Phase 1a** — move `f` to `DynamicSystem`; typed `compile()` (static / dynamic evaluators); `StaticSimulator`; `compute_trajectory` on static + dynamic only ([01a-evolution-map-refactor.md](hybrid-discrete/01a-evolution-map-refactor.md)).
-1. **Phase 1** — `StepSystem` leaf; unified `compile()` step branch; `StepRunner`; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf.
+0. **Phase 0** — extract shared diagram wiring mixin; validate continuous diagrams unchanged. **Done.**
+0. **Phase 1a** — move `f` to `DynamicSystem`; typed `compile()` (static / dynamic evaluators); `StaticSimulator`; `compute_trajectory` on static + dynamic only. **Done** (`d131a89`).
+1. **Phase 1** — `StepSystem` leaf; unified `compile()` step branch; `StepEvaluator.rollout` / `compute_rollout`; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf. **Done** (`700f8ea`).
+1b. **Phase 1b** — façade mixin split; `DiagramSystem` IS-A `DynamicSystem`; MRO sim dispatch. **Done** (`40c8297`).
 2. **Phase 2** — `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator`.
 3. **Phase 3** — `discretize()` optional conversion tool.
 4. **Phase 4** — `StepSchedule.dt_base` + `ScheduledStepOrchestrator` (single- and multi-rate).
@@ -46,7 +48,9 @@ unchanged; **`ScheduledStepOrchestrator`** fires blocks on schedule with interna
 ## Implementation phases
 
 Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
+[01a-evolution-map-refactor](hybrid-discrete/01a-evolution-map-refactor.md) ·
 [01-step-core](hybrid-discrete/01-step-core.md) ·
+[01b-facade-mixin-split](hybrid-discrete/01b-facade-mixin-split.md) ·
 [02-step-diagram](hybrid-discrete/02-step-diagram.md) ·
 [03-discretization](hybrid-discrete/03-discretization.md) ·
 [04-scheduled-orchestrator](hybrid-discrete/04-scheduled-orchestrator.md) ·
@@ -54,16 +58,17 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 [05c-hybrid-viz-shortcuts](hybrid-discrete/05c-hybrid-viz-shortcuts.md) ·
 [06-mpc-step-block](hybrid-discrete/06-mpc-step-block.md)
 
-| Phase | Delivers | Clock |
-| --- | --- | --- |
-| **0** | `WiredDiagramMixin` / `core/wiring.py` (wiring, gather, `tf`, `check_algebraic_loops`); `DiagramSystem` unchanged API | — |
-| **1a** | `f` on `DynamicSystem`; `StaticEvaluator` + `StaticSimulator`; unified `compile()`; facade routing | — |
-| **1** | `StepSystem`, `ZOHHold`, unified `compile()` step branch, `StepRunner` | none |
-| **2** | `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator` | none (or logging-only in `TimedStepSimulator`) |
-| **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure |
-| **4** | `StepSchedule` + `ScheduledStepOrchestrator` | **`dt_base`** authoritative for clocked step sim |
-| **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; orchestrator always on step side |
-| **6** | `MPCStepBlock` (6a stateless, 6b warm-start) | uses Phase 4–5 stack |
+| Phase | Delivers | Clock | Status |
+| --- | --- | --- | --- |
+| **0** | `WiredDiagramMixin` / `core/wiring.py`; `DiagramSystem` unchanged API | — | **Done** |
+| **1a** | `f` on `DynamicSystem`; `StaticEvaluator` + `StaticSimulator`; unified `compile()` | — | **Done** |
+| **1** | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepEvaluator.rollout` / `compute_rollout` | none | **Done** |
+| **1b** | Façade mixins; `DiagramSystem(DynamicSystem)`; MRO sim dispatch | — | **Done** |
+| **2** | `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator` | none (or logging-only in `TimedStepSimulator`) | pending |
+| **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure | pending |
+| **4** | `StepSchedule` + `ScheduledStepOrchestrator` | **`dt_base`** authoritative for clocked step sim | pending |
+| **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; orchestrator always on step side | pending |
+| **6** | `MPCStepBlock` (6a stateless, 6b warm-start) | uses Phase 4–5 stack | pending |
 
 **Split of concerns:** Phase 4 = sample time + firing **inside** the step diagram. Phase 5 =
 step↔plant boundary ZOH/sample + continuous plant (`rk4_rollout_zoh`). Hybrid **requires Phase 4**
@@ -680,9 +685,9 @@ Not required for Phase 5b orchestrator path.
 
 | Piece | Today | This plan |
 | --- | --- | --- |
-| Static leaf | `StaticSystem`: `y = h(u)` | Unchanged |
+| Static leaf | `System` (`n=0`): boundary `outputs` / `h` on model | Unchanged |
 | Flow leaf | `DynamicSystem`: `dx = f(...)` | Unchanged |
-| Flow diagram | `DiagramSystem` + `compile()` → `DynamicsEvaluator` | Unchanged |
+| Flow diagram | `DiagramSystem` IS-A `DynamicSystem`; `compile()` → `DynamicsEvaluator` | Phase 1b |
 | Step | Out of scope in DESIGN §3 | Layers 1–3 (subset) |
 | MPC demos | Manual Python loop × 7 | Phase **6** via `MPCStepBlock` + `HybridSimulator` |
 | JAX plant rollout | `rk4_rollout_ivp` scan | add `rk4_rollout_zoh` for hybrid inner loop |
@@ -705,8 +710,12 @@ no API or topology regressions.
 
 ## Phase 1: `StepSystem` (leaf + rollout)
 
-**Files:** `minilink/core/system.py`, `minilink/core/compile/` (leaf step path),
-`minilink/simulation/step_runner.py`, `minilink/blocks/`, `examples/scripts/step/`
+**Status:** complete (`700f8ea`). **Landed design:** rollout on compiled `StepEvaluator` via
+`StepRolloutMixin` — **no** `StepRunner` / `step_runner.py`. User API: `compute_rollout`.
+
+**Files:** `minilink/core/system.py`, `minilink/core/step_rollout.py`,
+`minilink/core/compile/evaluators/step_evaluator.py`, `minilink/blocks/step.py`,
+`examples/scripts/step/`
 
 ```python
 class StepSystem(System):
@@ -728,81 +737,64 @@ class StepSystem(System):
   read `solver_info["continuous_time_equation"]` for step semantics (legacy flow default only).
 - Sample period inside `step` via `params` or closed-over discretization only when the **model**
   needs it — not a class-level clock.
-- Parallel continuous work: **`rk4_rollout_zoh`** on flow evaluator (Phase 5).
-- **Leaf compile** — `compile_step(StepSystem)` → `NumpyStepLeafEvaluator` (JAX optional); mirrors
-  flow `compile()` leaf path. `StepSystem.compile()` delegates here. Reject flow `compile()` / RK4.
-- **`StepRunner`** — clock-free `run_steps(evaluator, x0, n_steps=...)`; `StepResult` trajectories.
-  Diagram evaluators (Phase 2) implement the same `.step` / `.h` surface.
-- **Teaching demos** via `compile_step` + `StepRunner`: Fibonacci, discrete accumulator, logistic map —
+- **Leaf compile** — `compile(StepSystem)` → `NumpyStepEvaluator` / `JaxStepEvaluator`; mirrors
+  flow leaf path. Reject flow RK4 on step leaves.
+- **`StepEvaluator.rollout`** + **`compute_rollout`** façade — clock-free; diagram path reuses
+  same mixin in Phase 2.
+- **Teaching demos** via **`compute_rollout`**: Fibonacci, discrete accumulator, logistic map —
   see [01-step-core.md](hybrid-discrete/01-step-core.md#teaching-demos-canonical-leaf-scripts).
 
 ---
 
 ## Phase 2: Step diagram pipeline
 
+**Contract:** [02-step-diagram.md](hybrid-discrete/02-step-diagram.md) — parallel **`StepExecutionPlan`**
+pipeline; flow `ExecutionPlan` / `build_execution_plan` **unchanged**.
+
 ### Shared wiring extraction
 
 Completed in [Phase 0](hybrid-discrete/00-wiring-refactor.md) — `minilink/core/wiring.py` mixin.
-`DiagramSystem` and `StepDiagramSystem` both compose it.
+`DiagramSystem` and `StepDiagramSystem` both compose it. `StepDiagramSystem` IS-A `StepSystem`
+(init via `System.__init__(0)` — mirror Phase 1b `DiagramSystem(DynamicSystem)`).
 
 ### `StepDiagramSystem`
 
-**File:** `minilink/core/diagram.py` — `StepDiagramSystem` **sibling** of `DiagramSystem` in the same module.
+**File:** `minilink/core/diagram.py` — sibling of `DiagramSystem`.
 
-- **`x_{k+1} = step(x, u, k)`** — same stacked loop as flow `DiagramSystem.f`.
-- Evaluator exposes **`step(x, u, k)`** calling each block's `step`.
-- Subsystems: `StepSystem`, `StaticSystem`, `ZOHHold`. Reject `DynamicSystem` at compile.
-- Reuse `build_execution_plan()` topology and `PortOperation` gathers — state advance uses
-  **`step_operations`** (or tagged ops), not flow `StateOperation.f_func → dx`. See
-  [02-step-diagram.md](hybrid-discrete/02-step-diagram.md).
+- **`x_{k+1} = step(x, u, k)`** — interpreted reference; compiled path uses `StepExecutionPlan`.
+- User API: **`compute_rollout`** / **`compile().rollout(...)`** (Phase 1b façades).
+- Subsystems: `StepSystem`, static `System` (`n=0`), `ZOHHold`. Reject `DynamicSystem` at compile.
+- Reuse **`PortOperation`** gathers + `check_algebraic_loops`; evolution via **`StepOperation`**
+  / **`step_ops`** — do not extend flow `StateOperation`.
 
 | Flow | Step |
 | --- | --- |
-| `compile_diagram()` → `DynamicsEvaluator` | `compile_step_diagram()` → `StepEvaluator` |
-| `evaluator.f → dx` | `evaluator.step → x_new` |
-| RK4, rollout, SciPy | stepping only |
+| `compile_diagram()` → `NumpyDiagramEvaluator` | `compile_step_diagram()` → `NumpyStepDiagramEvaluator` |
+| `ExecutionPlan.state_ops` (`f_func → dx`) | `StepExecutionPlan.step_ops` (`step_func → x_new`) |
+| `evaluator.f`, `compute_trajectory`, `Simulator` | `evaluator.step`, `compute_rollout`, `StepRolloutMixin` |
 
 Mark step compile path **`TODO: User Architectural Review`** until closed-loop tests pass.
 
-### `StepRunner` (Phase 1 — reuse)
+### Rollout (Phase 1 — reuse)
 
-**File:** `minilink/simulation/step_runner.py` ([01-step-core.md](hybrid-discrete/01-step-core.md))
+No `StepRunner` / `run_steps`. Diagram evaluators subclass **`StepEvaluator`** and inherit
+**`rollout()`** from **`StepRolloutMixin`** — same as leaf Phase 1.
 
-Clock-free rollout on any evaluator with `.step(x, u, k)` — leaf in Phase 1, diagram in Phase 2:
+### `TimedStepSimulator` (optional stopgap)
 
-```python
-def run_steps(evaluator, x0, *, n_steps, u=None, record_y=True) -> StepResult
-```
+Optional test-only wrapper if `compute_rollout` is insufficient before Phase 4. **Do not**
+document in README until Phase 4 lands. Prefer skipping if tests pass without it.
 
-### `TimedStepSimulator` (Phase 2 stopgap)
-
-**File:** `minilink/simulation/timed_step_simulator.py`
-
-**`TimedStepSimulator`** — uniform grid wrapper (digital control):
-
-```python
-@dataclass
-class TimedStepOptions:
-    tf: float
-    sync_dt: float
-
-def simulate_steps(diagram, x0, *, options) -> StepResult
-```
-
-Multi-rate: **`ScheduledStepOrchestrator`** (Phase 4). Single-rate clocked sim and hybrid use
-Phase 4; Phase 2 `TimedStepSimulator` is a direct-`StepEvaluator` stopgap for tests only —
-**do not** document in README until Phase 4 lands.
-
-### Sibling diagram + shared core (not subclass)
+### Sibling diagram + shared core (not merged compile)
 
 | Layer | Shared? |
 | --- | --- |
-| Port wiring | **Yes** — `core/wiring.py` mixin |
-| Diagram state map | **Yes** — same loop; `dx` vs `x_new` docstring |
-| `ExecutionPlan` | **Topology shared** — step uses `step_operations`, not `f → dx` |
-| Leaf type | **Sibling** — `DynamicSystem` vs `StepSystem` |
-| Evaluator | **Sibling** — `DynamicsEvaluator` vs `StepEvaluator` |
-| Runner / simulator | **Different** — ODE vs `x ← step(...)` |
+| Port wiring | **Yes** — `WiredDiagramMixin` |
+| Port gather recipes | **Yes** — import `_build_gather_sources` / `_state_slice` |
+| Execution plan type | **No** — `StepExecutionPlan` parallel to `ExecutionPlan` |
+| Leaf / diagram type | **Sibling** — `DynamicSystem` / `DiagramSystem` vs `StepSystem` / `StepDiagramSystem` |
+| Evaluator family | **Sibling** — `DynamicsEvaluator` vs `StepEvaluator` |
+| Public rollout | **Step only** — `rollout` / `compute_rollout` (no ODE `Simulator` on step diagrams) |
 
 ---
 
@@ -965,21 +957,23 @@ refactor in 6a; warm-start parity in 6b.
 
 See [00-master-plan.md](hybrid-discrete/00-master-plan.md). Summary:
 
-| Step | Phase | Deliverable |
-| --- | --- | --- |
-| **0** | **0** | `core/wiring.py` mixin + validation gate |
-| 1 | 1 | `StepSystem`, `ZOHHold`, `compile_step` (leaf), `StepRunner`, leaf + runner tests, teaching demos |
-| 2–3 | 2 | `StepDiagramSystem`, `compile_step_diagram`, diagram evaluator, closed-loop tests, `TimedStepSimulator` (tests only) |
-| 4 | 3 | `discretize` *(optional)* |
-| 5 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, tests |
-| 6–8 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** |
-| 9 | 5 | cascade hybrid demo **(5b)** |
-| 10 | 5c | `plot_hybrid_diagram`, `hybrid_closed_loop` |
-| 11 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line demo |
-| 12 | 6 | `MPCStepBlock` warm-start **(6b)** |
-| 13 | all | DESIGN / ROADMAP / README |
+| Step | Phase | Deliverable | Status |
+| --- | --- | --- | --- |
+| **0** | **0** | `core/wiring.py` mixin + validation gate | **Done** |
+| 1 | **1a** | `f` on `DynamicSystem`; typed `compile()`; `StaticSimulator` | **Done** |
+| 2 | **1** | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepEvaluator.rollout`, teaching demos | **Done** |
+| 3 | **1b** | Façade mixins; `DiagramSystem(DynamicSystem)` | **Done** |
+| 4–5 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `compile_step_diagram`, diagram evaluator, `compute_rollout` tests | pending |
+| 6 | 3 | `discretize` *(optional)* | pending |
+| 7 | 4 | `StepSchedule`, `ScheduledStepOrchestrator`, tests | pending |
+| 8–10 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** | pending |
+| 11 | 5 | cascade hybrid demo **(5b)** | pending |
+| 12 | 5c | `plot_hybrid_diagram`, `hybrid_closed_loop` | pending |
+| 13 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line demo | pending |
+| 14 | 6 | `MPCStepBlock` warm-start **(6b)** | pending |
+| 15 | all | DESIGN / ROADMAP / README | pending |
 
-**Gates:** **0 → 1 → 2 → 4 → 5 → 5c → 6.** Phase 3 optional. **5a → 5b.** **6a → 6b.**
+**Gates:** **0 → 1a → 1 → 1b → 2 → 4 → 5 → 5c → 6.** Phase 3 optional. **5a → 5b.** **6a → 6b.**
 
 See [03-discretization.md](hybrid-discrete/03-discretization.md) for the conversion contract.
 

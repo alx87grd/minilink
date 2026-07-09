@@ -22,7 +22,7 @@ Generalize `build_diagram_topology` (`minilink/graphical/diagrams/topology.py`) 
 surface from [Phase 0](00-wiring-refactor.md).
 
 - Step leaf nodes: `kind="step_system"` (vs `"system"`) for styling in `dot.py` `block_html`.
-- `StepDiagramSystem.plot_diagram()` via lazy facade (same pattern as `SystemFacades`).
+- `StepDiagramSystem.plot_diagram()` via lazy façade (same pattern as `SharedSystemFacades`).
 
 ### Hybrid composite plot (new)
 

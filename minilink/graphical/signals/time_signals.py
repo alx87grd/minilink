@@ -10,6 +10,9 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.graphical.common import PlotResult
 
+TIME_ABSCISSA_LABEL = "Time [s]"
+STEP_ABSCISSA_LABEL = "Step [k]"
+
 
 @dataclass(frozen=True)
 class SignalTrace:
@@ -30,6 +33,7 @@ class SignalPlotSpec:
     title: str
     t: np.ndarray
     traces: tuple[SignalTrace, ...]
+    abscissa_label: str = TIME_ABSCISSA_LABEL
 
 
 class LivePlotHandle:
@@ -81,6 +85,7 @@ def build_signal_plot_spec(
     *,
     signals: tuple[str, ...] = ("x", "u"),
     title: str | None = None,
+    abscissa_label: str = TIME_ABSCISSA_LABEL,
 ) -> SignalPlotSpec:
     """Build a one-component-per-row plot specification."""
     requested = _normalize_plot_signals(sys, signals)
@@ -139,6 +144,7 @@ def build_signal_plot_spec(
         title=title or f"Time signals for {sys.name}",
         t=np.asarray(traj.t, dtype=float),
         traces=tuple(traces),
+        abscissa_label=abscissa_label,
     )
 
 
@@ -147,12 +153,18 @@ def plot_time_signals(
     traj,
     *,
     signals: tuple[str, ...] = ("x", "u"),
+    abscissa_label: str = TIME_ABSCISSA_LABEL,
     backend="matplotlib",
     show: bool = True,
     **kwargs,
 ) -> PlotResult:
     """Plot sampled time signals with the selected backend."""
-    spec = build_signal_plot_spec(sys, traj, signals=signals)
+    spec = build_signal_plot_spec(
+        sys,
+        traj,
+        signals=signals,
+        abscissa_label=abscissa_label,
+    )
     if not isinstance(backend, str):
         raise TypeError("Signal plotting backend must be a string.")
     key = backend.strip().lower()
@@ -180,6 +192,7 @@ def open_time_signal_plot(
     traj,
     *,
     signals: tuple[str, ...] = ("x", "u"),
+    abscissa_label: str = TIME_ABSCISSA_LABEL,
     backend="matplotlib",
     show: bool = True,
     **kwargs,
@@ -188,7 +201,13 @@ def open_time_signal_plot(
     signal_names = _normalize_plot_signals(sys, signals)
 
     def spec_builder(next_traj, *, title=None):
-        return build_signal_plot_spec(sys, next_traj, signals=signal_names, title=title)
+        return build_signal_plot_spec(
+            sys,
+            next_traj,
+            signals=signal_names,
+            title=title,
+            abscissa_label=abscissa_label,
+        )
 
     spec = spec_builder(traj)
     if not isinstance(backend, str):

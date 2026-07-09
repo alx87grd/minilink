@@ -1,5 +1,7 @@
 # Phase 1b: Façade mixin split + DiagramSystem IS-A DynamicSystem
 
+**Status:** complete (`40c8297` on `dev-hybrid`, July 2026).
+
 **After [Phase 1 step core](01-step-core.md).** Completes the façade refactor started in
 Phase 1: split `SystemFacades` into evolution-aware mixins, make `DiagramSystem` inherit
 `DynamicSystem`, delete `_simulate`, collapse `(DynamicSystem, DiagramSystem)` isinstance OR
@@ -216,9 +218,9 @@ compile(gain) → NumpyStaticEvaluator
 
 | # | Slice | Done |
 | --- | --- | --- |
-| 1 | Split `facades.py` (Shared / Dynamic / Step); delete `_simulate` | |
-| 2 | `DiagramSystem(DynamicSystem)`; sim isinstance collapse | |
-| 3 | Wire mixins in `system.py`; drop Step overrides | |
-| 4 | Tests + delete `test_facades_routing.py` | |
-| 5 | `DESIGN.md`, `README.md`, simulator messages | |
-| 6 | `ruff` + full `pytest` | |
+| 1 | Split `facades.py` (Shared / Dynamic / Step); delete `_simulate` | yes |
+| 2 | `DiagramSystem(DynamicSystem)`; sim isinstance collapse | yes |
+| 3 | Wire mixins in `system.py`; drop Step overrides | yes |
+| 4 | Tests + delete `test_facades_routing.py` | yes |
+| 5 | `DESIGN.md`, `README.md`, simulator messages | yes |
+| 6 | `ruff` + full `pytest` | yes |

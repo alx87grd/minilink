@@ -71,7 +71,7 @@ the first hybrid-related change **small, reviewable, and test-gated** — only r
 ```text
 minilink/core/
 ├── wiring.py          # NEW — validate_diagram_params, WiredDiagramMixin
-└── diagram.py         # DiagramSystem(WiredDiagramMixin, System) — flow tail only
+└── diagram.py         # DiagramSystem(WiredDiagramMixin, DynamicSystem) — flow (1b IS-A)
 ```
 
 ### Phase 2 (not Phase 0)
@@ -79,16 +79,17 @@ minilink/core/
 ```text
 minilink/core/
 ├── wiring.py          # unchanged
-└── diagram.py         # + StepDiagramSystem(WiredDiagramMixin, System) in the SAME file
+└── diagram.py         # + StepDiagramSystem(WiredDiagramMixin, StepSystem) in the SAME file
 ```
 
 `StepDiagramSystem` lives beside `DiagramSystem` in `diagram.py` — one module for both diagram
 siblings. Hybrid types stay in `hybrid_diagram.py` (Phase 5).
 
-## Class layout after Phase 0
+## Class layout after Phase 0 (+ Phase 1b IS-A)
 
 ```text
-System                          # ports, h, params shell (unchanged)
+System                          # ports, h, params shell
+DynamicSystem                   # f, continuous evolution (Phase 1a)
     │
 WiredDiagramMixin               # wiring.py — all shared diagram machinery
     │
@@ -97,10 +98,13 @@ DiagramSystem                   # diagram.py — f() + flow compile + flow-only 
     .compile()  → compile_diagram → DynamicsEvaluator
 ```
 
+Phase 1b made `DiagramSystem` inherit **`DynamicSystem`** (not bare `System`). Public wiring API
+from Phase 0 is unchanged; sim/compile dispatch uses MRO.
+
 ### Phase 2 addition (same `diagram.py`)
 
 ```text
-StepDiagramSystem(WiredDiagramMixin, System)
+StepDiagramSystem(WiredDiagramMixin, StepSystem)
     .step()
     .compile()  → compile_step_diagram → StepEvaluator
 ```
@@ -211,7 +215,7 @@ compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name 
 | --- | --- |
 | `check_algebraic_loops(DiagramSystem)` | `wiring.py` |
 | `WiredDiagramMixin` with full table above | `wiring.py` |
-| `DiagramSystem(WiredDiagramMixin, System)` | `diagram.py` |
+| `DiagramSystem(WiredDiagramMixin, DynamicSystem)` | `diagram.py` |
 | `compiler.py` imports `check_algebraic_loops` from `wiring` | `compile/` |
 | Validation gate | tests + smoke |
 
@@ -220,7 +224,7 @@ compile/step_compiler.py # compile_step_diagram, step_ops(step_func=...)  (name 
 | Item | Phase |
 | --- | --- |
 | `StepSystem` class body | 1 (`system.py`) |
-| `compile_step` (leaf), `StepRunner`, `NumpyStepLeafEvaluator` | 1 |
+| `compile()` step branch (leaf), `StepEvaluator`, `compute_rollout` | 1 |
 | `StepDiagramSystem` class body | 2 (`diagram.py`) |
 | `compile_step_diagram`, diagram `StepEvaluator`, `JaxStepEvaluator` | 2 |
 | `build_diagram_topology` for step side | **5c** |

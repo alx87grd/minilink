@@ -289,7 +289,7 @@ def _create_figure(spec: SignalPlotSpec, **kwargs):
         ylabel = f"{trace.label} [{trace.unit}]" if trace.unit else trace.label
         fig.update_yaxes(title_text=ylabel, row=row, col=1)
 
-    fig.update_xaxes(title_text="Time [s]", row=len(spec.traces), col=1)
+    fig.update_xaxes(title_text=spec.abscissa_label, row=len(spec.traces), col=1)
     fig.update_layout(
         title=spec.title,
         width=width,

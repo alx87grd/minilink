@@ -3,7 +3,8 @@
 **After [Phase 4](04-scheduled-orchestrator.md).** Two-side topology: **step diagram** (controller)
 + **continuous diagram** (plant), linked by explicit boundary connections.
 
-**Requires:** Phases 1–2 (step compile), Phase 4 (`StepSchedule` + orchestrator on step side).
+**Requires:** Phases **1–2** (step compile), Phase **1b** (`DiagramSystem` IS-A `DynamicSystem` for
+plant side), Phase 4 (`StepSchedule` + orchestrator on step side).
 Phase 3 (`discretize`) **not** required. **MPC hybrid demos** land in
 [Phase 6](06-mpc-step-block.md); Phase 5a validates hybrid with **SMC** or generic `StepSystem` controllers.
 

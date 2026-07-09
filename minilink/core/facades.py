@@ -747,7 +747,11 @@ class StepSystemFacades:
         If the rollout is not computed yet, it must be provided or available on
         :attr:`rollout`.
         """
-        from minilink.graphical.signals import plot_time_signals, resolve_plot_signals
+        from minilink.graphical.signals import (
+            STEP_ABSCISSA_LABEL,
+            plot_time_signals,
+            resolve_plot_signals,
+        )
 
         if signals is None:
             signals = resolve_plot_signals(self)
@@ -757,6 +761,7 @@ class StepSystemFacades:
                 self,
                 rollout.as_trajectory(),
                 signals=signals,
+                abscissa_label=STEP_ABSCISSA_LABEL,
                 backend=backend,
                 show=show,
             )
@@ -766,6 +771,7 @@ class StepSystemFacades:
                 self,
                 self.rollout.as_trajectory(),
                 signals=signals,
+                abscissa_label=STEP_ABSCISSA_LABEL,
                 backend=backend,
                 show=show,
             )

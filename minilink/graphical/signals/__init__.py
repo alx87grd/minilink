@@ -2,6 +2,8 @@
 
 from minilink.graphical.common import PlotResult
 from minilink.graphical.signals.time_signals import (
+    STEP_ABSCISSA_LABEL,
+    TIME_ABSCISSA_LABEL,
     LivePlotHandle,
     SignalPlotSpec,
     SignalTrace,
@@ -16,6 +18,8 @@ __all__ = [
     "PlotResult",
     "SignalPlotSpec",
     "SignalTrace",
+    "STEP_ABSCISSA_LABEL",
+    "TIME_ABSCISSA_LABEL",
     "build_signal_plot_spec",
     "open_time_signal_plot",
     "plot_time_signals",
