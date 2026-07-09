@@ -5,7 +5,7 @@ Mechanical refactor: move continuous evolution off the `System` shell, split typ
 **compile / evaluator / simulate** paths for static vs dynamic leaves, keep unified user
 verbs where they still apply.
 
-**Status:** plan only (July 2026). No implementation in this phase.
+**Status:** ready for implementation — see [01a-implementation-plan.md](01a-implementation-plan.md).
 
 Full hybrid context: [00-master-plan.md](00-master-plan.md),
 [hybrid-discrete-simulation.md](../hybrid-discrete-simulation.md).
