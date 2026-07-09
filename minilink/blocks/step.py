@@ -9,8 +9,8 @@ from minilink.core.system import StepSystem
 class ZOHHold(StepSystem):
     """Command latch: ``x_{k+1} = u_k``, ``y_k = x_k``.
 
-    Teaches the zero-order hold / hold-register pattern used on the step side of
-    hybrid boundaries (plant holds are orchestrated in Phase 5).
+    Teaches the zero-order hold / hold-register pattern on the step side of
+    hybrid boundaries (plant-side holds are handled by :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`).
     """
 
     def __init__(self):

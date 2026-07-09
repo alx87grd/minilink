@@ -48,8 +48,13 @@ class HybridTopology:
     boundary_edges: tuple[BoundaryTopologyEdge, ...]
 
 
-def build_hybrid_topology(hybrid: HybridDiagram, *, abstract_boundary=True) -> HybridTopology:
-    """Build a display/export topology snapshot from a :class:`HybridDiagram`."""
+def build_hybrid_topology(
+    hybrid: HybridDiagram, *, abstract_boundary=True
+) -> HybridTopology:
+    """Build a display/export topology snapshot from a :class:`HybridDiagram`.
+
+    ``abstract_boundary=True`` (default) omits per-side external routing nodes.
+    """
     plant = _prefix_topology(
         build_diagram_topology(hybrid.plant, abstract_boundary=abstract_boundary),
         _PLANT_PREFIX,
@@ -206,7 +211,9 @@ def resolve_plant_boundary_anchor(
     )
 
 
-def _resolve_boundary_port(refs, diagram_port: str, *, fallback_node: str) -> tuple[str, str]:
+def _resolve_boundary_port(
+    refs, diagram_port: str, *, fallback_node: str
+) -> tuple[str, str]:
     for ref in refs:
         if ref.diagram_port == diagram_port:
             return ref.node_id, ref.port_id

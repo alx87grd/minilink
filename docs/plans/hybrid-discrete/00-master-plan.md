@@ -99,9 +99,9 @@ Detail and tick-0 init: [05-hybrid-simulation.md](05-hybrid-simulation.md).
 | **1** | [01-step-core.md](01-step-core.md) | `StepSystem`, `ZOHHold`; unified `compile()` step branch; `StepRollout` + `rollout()` / `compute_rollout`; teaching demos — **no wall time** | **Done** (`700f8ea`) |
 | **1b** | [01b-facade-mixin-split.md](01b-facade-mixin-split.md) | Façade mixins (`Shared` / `Dynamic` / `Step`); `DiagramSystem` IS-A `DynamicSystem`; MRO sim dispatch — no `_simulate` router | **Done** (`40c8297`) |
 | **2** | [02-step-diagram.md](02-step-diagram.md) | `StepDiagramSystem` (`StepSystem` + static `System`), `StepExecutionPlan`, `compile_step_diagram`, `NumpyStepDiagramEvaluator`; `compute_rollout` on diagrams; `TimedStepSimulator` optional (skipped) | **Done** (`0b7a1fd`) |
-| **3** | [03-discretization.md](03-discretization.md) | `discretize(DynamicSystem, dt)` → `StepSystem` *(optional; not on hybrid critical path)* | — |
+| **3** | [03-discretization.md](03-discretization.md) | `discretize(DynamicSystem, dt)` → `StepSystem`; `sample_static` for static controllers *(optional)* | **Done** |
 | **4** | [04-computer.md](04-computer.md) | Dual runtime: sync rollout vs **`Computer`** (stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers) | **Done** |
-| **5** | [05-hybrid-simulation.md](05-hybrid-simulation.md) | `HybridDiagram` (`computer` + `plant`), `HybridSimulator`, `integrate_zoh` | **Done** (core); **SMC deferred** · **5b** multi-rate demo done |
+| **5** | [05-hybrid-simulation.md](05-hybrid-simulation.md) | `HybridDiagram` (`computer` + `plant`), `HybridSimulator`, `integrate_zoh` | **Done** (5a SMC + 5b multi-rate) |
 | **5c** | [05c-hybrid-viz-shortcuts.md](05c-hybrid-viz-shortcuts.md) | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop` | **Done** |
 | **6** | [06-mpc-step-block.md](06-mpc-step-block.md) | `MPCStepBlock` in `planning/mpc/` | **6a** stateless (`n=0`) · **6b** warm-start (`n = decision_dimension`, state = **`z`**) |
 
@@ -117,7 +117,7 @@ side. **`StepEvaluator.rollout`** (Phase 1) is clock-free (games, unit tests, le
 | **1** | Leaf teaching scripts via `compute_rollout`: Fibonacci, discrete accumulator, logistic map (`examples/scripts/step/`) |
 | **2** | Step diagram demos: unity feedback, ZOH+integrator, cascade integrators/ZOH (`demo_step_diagram_*.py`) |
 | **5b** | Filter @ fast rate + slow controller cascade (`fire` divisors) — `demo_hybrid_multi_rate.py` |
-| **5a** | SMC hybrid *(deferred)* |
+| **5a** | Pyro SMC continuous vs hybrid — `demo_smc_pendulum_compare.py` |
 | **5c** | `hybrid.plot_diagram()`; `hybrid_closed_loop(step_ctl, plant, schedule=...)` |
 | **6a** | Refactor `demo_dynamic_bicycle_rate_mpc_straight_line.py` — drop outer loop |
 | **6b** | Same demo — warm-start parity vs shifted-guess hand loop |
@@ -227,9 +227,9 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 | **1** | Leaf `step` / `h(x, u, k)`; unified `compile()` step branch; `StepRollout` + `rollout()` / `compute_rollout`; no `f` on `StepSystem`; `ZOHHold` + teaching demo smoke | **Done** |
 | **1b** | Three façade mixins; `DiagramSystem(DynamicSystem)`; `Simulator` / `StaticSimulator` isinstance collapse; `test_facades_split.py`; DESIGN / README sync | **Done** |
 | **2** | Step diagram topology + sync **`compute_rollout`**; **`StepExecutionPlan`**; partial-fire hooks for **`Computer`** | **Done** |
-| **3** *(optional)* | `discretize` euler/rk4 match continuous integration over fixed `dt` |
+| **3** *(optional)* | `discretize` rk4 matches continuous integration over fixed `dt`; `sample_static` for static blocks | **Done** |
 | **4** | **`Computer`**: stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers; **`compute_rollout` ≠ Computer** when multi-rate | **Done** |
-| **5a** | `HybridSimulator` matches hand-rolled SMC (or test double); **multi-channel** boundary; one-tick delay enforced |
+| **5a** | `HybridSimulator` matches hand-rolled SMC; **multi-channel** boundary; one-tick delay enforced | **Done** |
 | **5b** | Cascade hybrid: filter fast + slow block; non-trivial `fire` parity |
 | **5c** | `plot_hybrid_diagram` topology; `hybrid_closed_loop` matches manual `connect_boundary` |
 | **6a** | Stateless `MPCStepBlock`; straight-line demo via `HybridSimulator`; trajectory matches stateless hand loop |
@@ -251,11 +251,11 @@ MPC failure policy in Phase 6.
 | 3 | **1b** | Façade mixin split; `DiagramSystem(DynamicSystem)`; sim boundaries; `test_facades_split.py` | **Done** |
 | 4 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `step_compiler.py`, diagram `StepEvaluator`, partial-fire hooks, closed-loop + `compute_rollout` tests | **Done** |
 | 5 | 2 | `TimedStepSimulator` (tests only) | skipped (`compute_rollout` covers Phase 2) |
-| 6 | 3 | **`discretize` postponed** — proceed **2 → 4 → 5**; optional verb lands later if needed |
+| 6 | 3 | `discretize` + `sample_static` in `minilink/analysis/discretize.py` | **Done** |
 | 7 | 4 | `StepSchedule`, **`Computer`** (`tick(u)`, double buffer, `from_rates`), `test_computer.py` | **Done** |
 | 8 | 5 | `integrate_zoh` on `IntegrationMixin` | **Done** |
 | 9 | 5 | `HybridDiagram` (`computer` + `plant`), `HybridSimulator` (multi-channel boundary) | **Done** |
-| 10 | 5 | `SMCBlock` + hybrid demo **(5a)** | *deferred* |
+| 10 | 5 | Pyro SMC + hybrid compare demo **(5a)** | **Done** |
 | 11 | 5 | Cascade hybrid demo **(5b**, non-trivial `fire`) | **Done** |
 | 12 | 5c | `build_hybrid_topology`, `plot_hybrid_diagram`, `hybrid_closed_loop` | **Done** |
 | 13 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line MPC demo refactor |

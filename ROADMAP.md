@@ -25,7 +25,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Experimental; math not QA-validated. | Validation tests toward TRL 2. |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Pole-zero, Nyquist, margins, `ss2tf`; reachability costs. |
-| Control | 6 | Linear, LQR, filtered PID; `modelbased.py` (CT, SMC); `robotic.py` (impedance, kinematic, nullspace). | Sliding-mode + traj-following demos; dynamic joint/effector PID wrappers; trajectory LQR. |
+| Control | 6 | Linear, LQR, filtered PID; `modelbased.py` (CT, Pyro-parity SMC); `robotic.py` (impedance, kinematic, nullspace). | SMC traj-following demos; dynamic joint/effector PID wrappers; trajectory LQR. |
 | Blocks | 5 | Routing, nonlinear, filters, sources, transfer function, 1-layer NN. | Multi-layer `MLP`, atomic layers (see neural-blocks plan). |
 | Estimation | 1 | Placeholder only. | Luenberger, Kalman, EKF. |
 | Identification | 2 | Parametric-tier prototype demo only. | `fitting.py` for physical + NN params. |
@@ -125,7 +125,8 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 ### 5.2 Control
 
 - [x] `lqr.py`, `linear.py`, `pid.py` (`FilteredController`)
-- [x] `modelbased.py` — computed torque, sliding mode
+- [x] `modelbased.py` — computed torque, sliding mode (Pyro parity)
+- [ ] **Continuous SMC closed loop** — flag ``discontinuous_behavior`` on diagrams with ``SlidingModeController``; SciPy vs ``rk4_fixedsteps`` parity; ``f_ivp`` algebraic re-evaluation vs expected ``sign(s)`` chattering / Zeno (diagnostic: ``scratch/confirm_smc_solver_bug.py``)
 - [ ] `robotic.py` — joint/effector PD/PID wrappers (kinematic + nullspace landed)
 - [ ] `trajectory_lqr.py` — time-varying LQR along a reference
 - [ ] `mpc.py` (uses `optimization/`) — minilink extra, no pyro equivalent
@@ -175,10 +176,10 @@ continuous plants — not full Simulink parity. Plan:
   continuous diagram API unchanged
 - [x] **Phase 1** — `StepSystem`, `StepRollout`, `compile()` step branch, `compute_rollout` / `plot_rollout`
 - [x] **Phase 2** — `StepDiagramSystem`, `compile_step_diagram`, `compute_rollout`
-- [ ] **Phase 3** — `discretize()` *(postponed; optional)*
+- [x] **Phase 3** — `discretize()`, `sample_static()` in `minilink/analysis/discretize.py`
 - [x] **Phase 4** — `StepSchedule`, `Computer` (`.tick(u)`, double buffer)
-- [x] **Phase 5** — `HybridDiagram`, `HybridSimulator`, `HybridSimResult`, multi-rate hybrid demo *(SMC deferred)*
-- [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz hybrid export *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*
+- [x] **Phase 5** — `HybridDiagram`, `HybridSimulator`, `HybridSimResult`, multi-rate hybrid demo, Pyro SMC hybrid compare *(5a)*
+- [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz export, `abstract_boundary` topology *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*
 - [ ] **Phase 6** — `MPCStepBlock` + MPC demo refactor (drop hand-rolled outer loops)
 
 ### 5.6 Estimation and identification

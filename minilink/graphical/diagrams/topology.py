@@ -58,8 +58,14 @@ class DiagramTopology:
     boundary_outputs: tuple[BoundaryPortRef, ...] = ()
 
 
-def build_diagram_topology(sys_or_diagram, *, abstract_boundary=False) -> DiagramTopology:
-    """Build a display/export topology snapshot from a system or diagram."""
+def build_diagram_topology(
+    sys_or_diagram, *, abstract_boundary=False
+) -> DiagramTopology:
+    """Build a display/export topology snapshot from a system or diagram.
+
+    ``abstract_boundary=True`` removes external Inputs/Outputs routing nodes and
+    records ``boundary_inputs`` / ``boundary_outputs`` anchors on wired ports.
+    """
     if isinstance(sys_or_diagram, WiredDiagramMixin):
         topology = _build_diagram_system_topology(sys_or_diagram)
     else:

@@ -67,7 +67,7 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing |
-| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; more frequency tools planned |
+| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; `discretize` / `sample_static` for step/hybrid wrappers; more frequency tools planned |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
@@ -172,10 +172,16 @@ serial arms. Joint impedance / task impedance / computed torque use
   mirrors :class:`~minilink.simulation.simulator.Simulator` (`t0`/`tf`, `solve`,
   `solve_forced`); plant steps use :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh`.
   Shortcuts: ``Computer @ plant``, :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`.
+  Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
+  :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_forced`, and
+  :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_trajectory` cache the last
+  :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` on ``self.traj``.
   Visualization: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_diagram` renders Plant +
   Computer (nested StepDiagram) clusters with dashed ZOH/sample boundary edges;
   :func:`~minilink.graphical.diagrams.build_hybrid_topology` /
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
+  Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
+  and anchors hybrid edges on wired subsystem ports.
   See [05-hybrid-simulation.md](docs/plans/hybrid-discrete/05-hybrid-simulation.md).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
@@ -250,6 +256,9 @@ not nested. Explicit `add_subsystem` / `connect` remains canonical for general t
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
 with ``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
+:func:`~minilink.graphical.diagrams.build_diagram_topology` accepts
+``abstract_boundary=True`` to omit external Inputs/Outputs routing nodes and record
+``boundary_inputs`` / ``boundary_outputs`` port anchors (used by hybrid export).
 
 Visualization: subsystem `"world"` geometry merges into one shared diagram
 `"world"` frame; only articulated frames get `{sys_id}:` prefixes.
@@ -267,7 +276,7 @@ optional class attribute `feedback_profile`, not inheritance):
 | `siso` | `siso.py` | `y` dim `n` only (decoupled loops) |
 | `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)`` |
 | `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants |
-| `modelbased` | `modelbased.py` | Full state ``x``; model-based torque laws (computed torque, sliding mode) |
+| `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` |
 
 ### `Trajectory`, sets, costs, geometry
 
@@ -334,8 +343,10 @@ reintroduce `compute_outputs(..., ports=...)`.
   :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` or façade
   `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`)
 
-`animate` / `plot_trajectory` live on `SharedSystemFacades` for all kinds when
-`traj=` is provided; auto-sim fallback calls `compute_trajectory` (MRO picks engine).
+`animate` / `plot_trajectory` live on `SharedSystemFacades` for continuous and static
+systems; :class:`~minilink.core.hybrid_diagram.HybridDiagram` mirrors the pattern with
+``self.traj`` (:class:`~minilink.simulation.hybrid_simulator.HybridSimResult`). Auto-sim
+fallback calls `compute_trajectory` (MRO picks engine on homogeneous diagrams).
 
 **Two static paths:** a static *leaf* (`Gain`, `Step` source) uses
 `StaticSimulator` — empty state, outputs in `traj.signals`. A static-only

@@ -111,7 +111,8 @@ integrates on a time grid — static leaves via `StaticSimulator` (boundary IO i
 fixed-step solvers) — and returns a `Trajectory`;
 `plot_trajectory(...)` stacks labeled, unit-aware signal plots (matplotlib or
 plotly); `plot_phase_plane(...)` draws vector fields with overlaid
-trajectories; `plot_diagram()` renders the wiring topology (Graphviz/Mermaid).
+trajectories; `plot_diagram()` renders wiring topology (Graphviz/Mermaid).
+``HybridDiagram.plot_diagram()`` renders the composite plant + scheduled computer view.
 
 `animate()` plays a trajectory through swappable renderers: matplotlib
 (inline HTML in notebooks), plotly, meshcat (3D in the browser), or pygame.
@@ -366,7 +367,8 @@ Compile:   sys.compile(backend)  →  DynamicsEvaluator
 
 Plot:      plot_trajectory*  →  graphical.signals  →  PlotResult
            plot_phase_plane* →  graphical.phase_plane
-           plot_diagram      →  graphical.diagrams (Graphviz/Mermaid)
+           plot_diagram      →  graphical.diagrams (DiagramSystem / StepDiagramSystem)
+           HybridDiagram.plot_diagram  →  hybrid composite (Plant + Computer clusters)
 
 Animate:   animate* / render / game  →  Animator  →  renderer backend
            planner.plot_solution / animate_solution  →  problem.sys.*
@@ -393,6 +395,8 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Diagrams | `examples/scripts/diagrams/` |
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
 | Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
+| Pyro SMC continuous (pendulum) | `examples/scripts/control/demo_sliding_mode_pendulum.py` |
+| Pyro SMC continuous vs hybrid (pendulum) | `examples/scripts/hybrid/demo_smc_pendulum_compare.py` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |

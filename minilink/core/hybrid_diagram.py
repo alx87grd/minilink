@@ -70,6 +70,7 @@ class HybridDiagram:
                 f"HybridDiagram requires DiagramSystem plant, "
                 f"got {type(self.plant).__name__}"
             )
+        self.traj = None
 
     @classmethod
     def from_diagrams(
@@ -144,7 +145,13 @@ class HybridDiagram:
         verbose=False,
         show=False,
     ):
-        """Simulate with nominal boundary inputs on ``[t0, tf]``."""
+        """Simulate with nominal boundary inputs on ``[t0, tf]``.
+
+        Returns
+        -------
+        HybridSimResult
+            Also stored on :attr:`traj`.
+        """
         result = self._simulator(
             t0=t0,
             tf=tf,
@@ -155,6 +162,7 @@ class HybridDiagram:
             compile_backend=compile_backend,
             verbose=verbose,
         ).solve()
+        self.traj = result
         if show:
             result.plot()
         return result
@@ -174,7 +182,13 @@ class HybridDiagram:
         verbose=False,
         show=False,
     ):
-        """Simulate with prescribed computer-boundary input on ``[t0, tf]``."""
+        """Simulate with prescribed computer-boundary input on ``[t0, tf]``.
+
+        Returns
+        -------
+        HybridSimResult
+            Also stored on :attr:`traj`.
+        """
         result = self._simulator(
             t0=t0,
             tf=tf,
@@ -185,9 +199,39 @@ class HybridDiagram:
             compile_backend=compile_backend,
             verbose=verbose,
         ).solve_forced(u, input_port_id=input_port_id)
+        self.traj = result
         if show:
             result.plot()
         return result
+
+    def plot_trajectory(
+        self,
+        traj=None,
+        *,
+        signals=None,
+        abscissa="t",
+        show=True,
+        backend="matplotlib",
+        **kwargs,
+    ):
+        """
+        Plot hybrid boundary channels from the last rollout or an explicit result.
+
+        If ``traj`` is omitted and :attr:`traj` is unset, runs :meth:`compute_trajectory`
+        first (same convenience pattern as :class:`~minilink.core.facades.SharedSystemFacades`).
+        """
+        if traj is None:
+            if self.traj is not None:
+                traj = self.traj
+            else:
+                traj = self.compute_trajectory(show=False)
+        return traj.plot(
+            signals=signals,
+            abscissa=abscissa,
+            show=show,
+            backend=backend,
+            **kwargs,
+        )
 
     def plot_diagram(
         self,
@@ -197,7 +241,11 @@ class HybridDiagram:
         *,
         abstract_boundary=True,
     ):
-        """Render Plant + Computer clusters with boundary ZOH/sample edges."""
+        """Render Plant + Computer clusters with boundary ZOH/sample edges.
+
+        ``abstract_boundary=True`` (default) omits external Inputs/Outputs routing
+        nodes and anchors hybrid edges on the wired subsystem ports.
+        """
         from minilink.graphical.diagrams.hybrid_dot import plot_hybrid_diagram
 
         return plot_hybrid_diagram(
@@ -207,6 +255,16 @@ class HybridDiagram:
             show_pdf=show_pdf,
             abstract_boundary=abstract_boundary,
         )
+
+    def _repr_svg_(self):
+        """Notebook inline SVG for the hybrid topology (IPython / Jupyter)."""
+        from minilink.graphical.diagrams.hybrid_dot import export_hybrid_graphviz
+        from minilink.graphical.diagrams.hybrid_topology import build_hybrid_topology
+
+        graph = export_hybrid_graphviz(build_hybrid_topology(self))
+        if graph is None:
+            return None
+        return graph._repr_image_svg_xml()
 
 
 # Internal machinery

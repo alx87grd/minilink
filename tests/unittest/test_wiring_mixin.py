@@ -1,4 +1,4 @@
-"""Parity tests for WiredDiagramMixin after Phase 0 wiring refactor."""
+"""Parity tests for WiredDiagramMixin wiring and topology export."""
 
 import unittest
 

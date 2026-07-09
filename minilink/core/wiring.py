@@ -1,10 +1,10 @@
 """
 Shared diagram wiring: mixin, params validation, and topology checks.
 
-Evolution-agnostic machinery shared by flow ``DiagramSystem`` (Phase 0) and
-future ``StepDiagramSystem`` (Phase 2). Flow diagrams pass simulation time
-``t`` (float) as the third gather slot; step diagrams will pass step index
-``k`` (int) in the same parameter position.
+Evolution-agnostic machinery shared by :class:`~minilink.core.diagram.DiagramSystem`
+and :class:`~minilink.core.diagram.StepDiagramSystem`. Flow diagrams pass simulation
+time ``t`` (float) as the third gather slot; step diagrams pass step index ``k`` (int)
+in the same parameter position.
 """
 
 from __future__ import annotations
@@ -388,7 +388,7 @@ class WiredDiagramMixin:
         Assemble one subsystem's local input vector from its connected sources.
 
         On flow diagrams the third slot is simulation time ``t`` (float).
-        Step diagrams (Phase 2) pass step index ``k`` (int) in the same position.
+        On step diagrams the third slot is step index ``k`` (int).
 
         Input ports outside ``dependencies`` contribute their constant nominal
         value (used to break false feedthrough when evaluating output ports).

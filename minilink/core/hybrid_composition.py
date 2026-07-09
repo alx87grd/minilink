@@ -156,10 +156,20 @@ def _ensure_computer_boundary_ports(
         return
     subsystem = diagram.subsystems[sys_id]
     if ref_port in subsystem.inputs and ref_port not in diagram.inputs:
-        diagram.add_input_port(ref_port)
+        port = subsystem.inputs[ref_port]
+        diagram.add_input_port(
+            ref_port,
+            dim=port.dim,
+            nominal_value=port.nominal_value,
+        )
         diagram.connect("input", ref_port, sys_id, ref_port)
     if computer_in in subsystem.inputs and computer_in not in diagram.inputs:
-        diagram.add_input_port(computer_in)
+        port = subsystem.inputs[computer_in]
+        diagram.add_input_port(
+            computer_in,
+            dim=port.dim,
+            nominal_value=port.nominal_value,
+        )
         diagram.connect("input", computer_in, sys_id, computer_in)
     if computer_out in subsystem.outputs and computer_out not in diagram.outputs:
         diagram.connect_new_output_port(sys_id, computer_out, computer_out)
@@ -177,7 +187,12 @@ def _ensure_plant_boundary_ports(
         return
     subsystem = diagram.subsystems[sys_id]
     if plant_in in subsystem.inputs and plant_in not in diagram.inputs:
-        diagram.add_input_port(plant_in)
+        port = subsystem.inputs[plant_in]
+        diagram.add_input_port(
+            plant_in,
+            dim=port.dim,
+            nominal_value=port.nominal_value,
+        )
         diagram.connect("input", plant_in, sys_id, plant_in)
     if plant_out in subsystem.outputs and output_port not in diagram.outputs:
         diagram.connect_new_output_port(sys_id, plant_out, output_port)

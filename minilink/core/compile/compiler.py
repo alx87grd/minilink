@@ -179,7 +179,7 @@ def compile_diagram(
         if isinstance(subsystem, StepSystem):
             raise TypeError(
                 f"StepSystem leaf '{sys_id}' cannot be compiled inside a flow "
-                "DiagramSystem; use StepDiagramSystem (Phase 2)."
+                "DiagramSystem; use StepDiagramSystem."
             )
 
     t_total = time.perf_counter() if verbose else None

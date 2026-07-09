@@ -1,8 +1,8 @@
 # Phase 5c: Hybrid diagram visualization & wiring shortcuts
 
 **Status: Done** (July 2026). Composite `hybrid.plot_diagram()`, `build_hybrid_topology`,
-Graphviz/Mermaid export, step leaf `kind="step_system"`, and `hybrid_closed_loop` /
-`Computer @ plant` shortcuts.
+Graphviz/Mermaid export, step leaf `kind="step_system"`, `abstract_boundary` collapse of
+external Inputs/Outputs routing nodes, and `hybrid_closed_loop` / `Computer @ plant` shortcuts.
 
 **After [Phase 5b](05-hybrid-simulation.md)** (or in parallel once `HybridDiagram` exists).
 Makes hybrid systems as easy to **see** and **wire** as continuous `DiagramSystem` today.
@@ -56,6 +56,8 @@ were one flattened topology.
 - **Plant cluster** = `build_diagram_topology(hybrid.plant)`.
 - **Boundary edges** = dashed links between **cluster boundaries** (computer ports ↔ plant ports),
   labeled `ZOH` / `sample` per `BoundaryConnection.direction`.
+- **`abstract_boundary=True`** (default on hybrid export) omits external Inputs/Outputs routing
+  nodes; hybrid edges anchor on wired subsystem ports.
 - **World inputs** (`r`, etc.) attach to the computer or plant cluster border — same convention
   as continuous diagram boundary ports.
 
@@ -155,7 +157,7 @@ Lives in `planning/mpc/` or `hybrid_composition.py` — Phase 6 doc.
 | --- | --- |
 | `test_hybrid_topology.py` | boundary edges; Computer + Plant cluster ids; schedule label on Computer cluster |
 | `test_hybrid_closed_loop.py` | shortcut matches manual `connect_boundary` wiring |
-| `test_step_diagram_topology.py` | step nodes `kind="step_system"` (if not covered in Phase 0/2) |
+| `test_step_diagram_topology.py` | step nodes `kind="step_system"` |
 
 ## Deferred
 

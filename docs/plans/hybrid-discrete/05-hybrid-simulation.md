@@ -1,7 +1,7 @@
 # Phase 5: Hybrid Simulation
 
-**Status: Phase 5 core done** (July 2026). **5a** SMC deferred; **5b** multi-rate demo done;
-**5c** composite `plot_diagram` + wiring shortcuts done.
+**Status: Phase 5 done** (July 2026). **5a** Pyro SMC hybrid compare demo done; **5b** multi-rate
+demo done; **5c** composite `plot_diagram` + wiring shortcuts done.
 
 **After [Phase 4](04-computer.md).** v1 hybrid topology: **`Computer`** (discrete side) +
 **`DiagramSystem`** plant (continuous side), linked by **one boundary** with **multi-channel**
@@ -167,7 +167,7 @@ def integrate_zoh(
 | Milestone | Content |
 | --- | --- |
 | **5 core** | `integrate_zoh`, `HybridDiagram`, `HybridSimulator` + `HybridSimResult.plot`, multi-rate demo |
-| **5a** | SMC hybrid *(deferred)* |
+| **5a** | Pyro SMC continuous vs hybrid compare — `demo_smc_pendulum_compare.py`; `test_smc_hybrid.py` |
 | **5b** | Cascade hybrid — **non-trivial `fire`** (e.g. filter @ 100 Hz + slow `StepSystem` @ 10 Hz) |
 
 ## End-to-end API (5a — single-rate SMC)
@@ -205,7 +205,7 @@ HybridSimulator(hybrid, t0=0, tf=TS, plant_dt_inner=SIM_DT).solve_forced(u)
 
 ## Control blocks (Phase 5)
 
-- **`SMCBlock`** (or documented `StepSystem` pattern) — Phase 5a deliverable.
+- **Static SMC** — `sample_static(SlidingModeController(...), dt)` in a step diagram (Phase 5a).
 - **MPC** — [Phase 6](06-mpc-step-block.md) (`MPCStepBlock`); do not duplicate a second MPC adapter in Phase 5.
 
 ## Tests

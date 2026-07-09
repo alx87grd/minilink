@@ -1,9 +1,9 @@
 """
 Scheduled discrete simulation for compiled step diagrams.
 
-Pipeline B runtime: stateful :class:`Computer` driven by :class:`StepSchedule`.
-Reuses :class:`~minilink.core.compile.step_execution_plan.StepExecutionPlan`
-from the same compile lowering as synchronous ``compute_rollout``.
+Stateful :class:`Computer` runtime driven by :class:`StepSchedule` — same
+:class:`~minilink.core.compile.step_execution_plan.StepExecutionPlan` lowering as
+synchronous ``compute_rollout``, with multi-rate firing and double-buffered signals.
 """
 
 from __future__ import annotations
@@ -90,9 +90,7 @@ class Computer:
         _ = verbose  # reserved for parity with ``StepDiagramSystem.compile``
         key = normalize_backend(backend)
         if key != BACKEND_NUMPY:
-            raise NotImplementedError(
-                "Computer supports backend='numpy' only in Phase 4"
-            )
+            raise NotImplementedError("Computer supports backend='numpy' only")
 
         unknown = set(self.schedule.fire) - set(self.diagram.subsystems)
         if unknown:

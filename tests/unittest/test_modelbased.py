@@ -22,14 +22,37 @@ class TestModelBasedControllers(unittest.TestCase):
             plant.inverse_dynamics(q, dq, np.array([qdd])),
         )
 
-    def test_sliding_mode_output_dim(self):
+    def test_sliding_mode_matches_pyro_law(self):
+        plant = Pendulum(length=1.0, mass=1.0)
+        lam = np.array([2.0])
+        gain = np.array([3.0])
+        nab = np.array([0.2])
+        ctl = SlidingModeController(plant, lam=lam, gain=gain, nab=nab)
+
+        q = np.array([0.3])
+        dq = np.array([-0.15])
+        q_d = np.array([0.0])
+        dq_d = np.array([0.0])
+        r = np.concatenate([q_d, dq_d])
+        boundary = np.concatenate([r, q, dq])
+
+        q_e = q - q_d
+        dq_e = dq - dq_d
+        s = dq_e + lam * q_e
+        ddq_r = -lam * dq_e
+        H = plant.H(q)
+        K = np.diag(gain) + H @ np.diag(nab)
+        expected = plant.inverse_dynamics(q, dq, ddq_r) - K @ np.sign(s)
+
+        np.testing.assert_allclose(ctl.ctl(None, boundary), expected)
+
+    def test_sliding_mode_ports_match_computed_torque(self):
         plant = Pendulum()
         ctl = SlidingModeController(plant)
-        u = ctl.ctl(
-            None,
-            np.array([0.1, 0.0, 0.0, 0.0, 0.0, 0.0]),
-        )
-        self.assertEqual(u.shape, (1,))
+        self.assertIn("r", ctl.inputs)
+        self.assertIn("y", ctl.inputs)
+        self.assertIn("u", ctl.outputs)
+        self.assertEqual(ctl.inputs["y"].dim, 2)
 
 
 if __name__ == "__main__":

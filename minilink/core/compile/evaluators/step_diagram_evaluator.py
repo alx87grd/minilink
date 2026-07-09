@@ -70,7 +70,7 @@ class NumpyStepDiagramEvaluator(StepEvaluator):
         }
 
     def step_block(self, sys_id, x, u, k=0):
-        """Advance a single step subsystem (Phase 4 partial-fire preview)."""
+        """Advance one step-diagram subsystem (subset-firing hook for :class:`~minilink.simulation.computer.Computer`)."""
         signals = self._compute_port_signals(x, u, k)
         x_new = np.asarray(x, dtype=float).reshape(self.n).copy()
         for op in self.plan.step_ops:

@@ -69,7 +69,7 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 | **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure | postponed |
 | **4** | `StepSchedule` + **`Computer`** (`tick(u)`, double buffer, Hz helpers) | **`dt_base`** for hybrid alignment only | **Done** |
 | **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; Computer always on step side | **Done** (SMC deferred) |
-| **5c** | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop` | — | **Done** |
+| **5c** | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop`, `abstract_boundary` topology | — | **Done** |
 | **6** | `MPCStepBlock` (6a stateless, 6b warm-start) | uses Phase 4–5 stack | pending |
 
 **Split of concerns:** Phase 4 = sample time + firing **inside** the step diagram. Phase 5 =

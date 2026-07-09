@@ -59,16 +59,27 @@ class TestHybridSimulator(unittest.TestCase):
         matplotlib.use("Agg")
 
         hybrid = _build_hybrid()
-        result = hybrid.compute_forced(
+        hybrid.compute_forced(
             np.array([1.0]),
             t0=0,
             tf=0.1,
             input_port_id="r",
         )
-        result.plot(
+        hybrid.plot_trajectory(
             signals=("r", "y", "u_cmd", "x_plant"),
             show=False,
         )
+
+    def test_compute_forced_caches_traj(self):
+        hybrid = _build_hybrid()
+        self.assertIsNone(hybrid.traj)
+        result = hybrid.compute_forced(
+            np.array([1.0]),
+            t0=0,
+            tf=0.05,
+            input_port_id="r",
+        )
+        self.assertIs(hybrid.traj, result)
 
 
 if __name__ == "__main__":
