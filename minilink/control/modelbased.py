@@ -6,11 +6,11 @@ import numpy as np
 
 from minilink.control.impedance import _as_dof_vector
 from minilink.core.backends import array_module
-from minilink.core.system import StaticSystem
+from minilink.core.system import System
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
-class ComputedTorqueController(StaticSystem):
+class ComputedTorqueController(System):
     """Computed torque with built-in outer PD on joint space.
 
     Desired acceleration ``qdd = Kp (q_d - q) + Kd (dq_d - dq)`` (regulation
@@ -78,7 +78,7 @@ class ComputedTorqueController(StaticSystem):
         return xp.asarray(tau).reshape(-1)
 
 
-class SlidingModeController(StaticSystem):
+class SlidingModeController(System):
     """Joint-space sliding-mode law on a mechanical plant.
 
     Reference ``r`` is stacked ``[q_d; dq_d]`` (dim ``2·dof``). The reaching

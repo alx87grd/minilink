@@ -37,6 +37,55 @@ class SystemFacades:
 
         return compile_system(self, backend=backend, verbose=verbose)
 
+    def _simulate(
+        self,
+        *,
+        x0=None,
+        t0=0,
+        tf=10,
+        n_steps=None,
+        dt=None,
+        solver=None,
+        compile_backend="numpy",
+        verbose=False,
+    ):
+        """Return the appropriate simulator for this system's evolution map."""
+        from minilink.core.diagram import DiagramSystem
+        from minilink.core.system import DynamicSystem
+
+        if isinstance(self, (DynamicSystem, DiagramSystem)):
+            from minilink.simulation.simulator import Simulator
+
+            return Simulator(
+                self,
+                x0=x0,
+                t0=t0,
+                tf=tf,
+                n_steps=n_steps,
+                dt=dt,
+                solver=solver,
+                compile_backend=compile_backend,
+                verbose=verbose,
+            )
+        if self.n == 0:
+            from minilink.simulation.static_simulator import StaticSimulator
+
+            return StaticSimulator(
+                self,
+                x0=x0,
+                t0=t0,
+                tf=tf,
+                n_steps=n_steps,
+                dt=dt,
+                solver=solver,
+                compile_backend=compile_backend,
+                verbose=verbose,
+            )
+        raise TypeError(
+            f"Cannot simulate {type(self).__name__} with n={self.n}; "
+            "subclass DynamicSystem and implement f()."
+        )
+
     def compute_trajectory(
         self,
         t0=0,
@@ -52,7 +101,9 @@ class SystemFacades:
         """
         Convenience shortcut to simulate the system and return a trajectory.
 
-        This method is a façade over :class:`minilink.simulation.Simulator`.
+        This method is a façade over :class:`minilink.simulation.Simulator` or
+        :class:`minilink.simulation.static_simulator.StaticSimulator` depending
+        on the system type.
         It uses model defaults such as :attr:`x0` and stores the resulting
         trajectory in :attr:`traj` for later convenience.
 
@@ -68,10 +119,7 @@ class SystemFacades:
         Trajectory
             The simulated trajectory, also stored in :attr:`traj`.
         """
-        from minilink.simulation.simulator import Simulator
-
-        sim = Simulator(
-            self,
+        sim = self._simulate(
             x0=x0,
             t0=t0,
             tf=tf,
@@ -109,8 +157,9 @@ class SystemFacades:
         """
         Convenience shortcut to simulate the system under a prescribed input.
 
-        This method is a façade over :class:`minilink.simulation.Simulator`
-        and :meth:`minilink.simulation.Simulator.solve_forced`.
+        This method is a façade over :meth:`_simulate` and
+        :meth:`minilink.simulation.Simulator.solve_forced` or
+        :meth:`minilink.simulation.static_simulator.StaticSimulator.solve_forced`.
 
         Parameters
         ----------
@@ -132,10 +181,7 @@ class SystemFacades:
         Trajectory
             Simulated state-input trajectory.
         """
-        from minilink.simulation.simulator import Simulator
-
-        sim = Simulator(
-            self,
+        sim = self._simulate(
             x0=x0,
             t0=t0,
             tf=tf,

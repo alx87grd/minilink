@@ -1,7 +1,7 @@
 """Signal routing and combination blocks.
 
 Plant-agnostic plumbing for multi-signal diagrams. Each block is a
-:class:`~minilink.core.system.StaticSystem` with explicit named ports whose
+:class:`~minilink.core.system.System` with explicit named ports whose
 dimensions are fixed at construction, so diagram wiring is validated at connect
 time.
 
@@ -14,10 +14,10 @@ time.
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.system import StaticSystem
+from minilink.core.system import System
 
 
-class Sum(StaticSystem):
+class Sum(System):
     """Signed summing junction ``y = Σ sign_i · in_i`` on ports ``in0, in1, …``.
 
     The default ``signs=(1.0, -1.0)`` is the classic tracking-error junction
@@ -45,7 +45,7 @@ class Sum(StaticSystem):
         return signs @ stacked
 
 
-class Gain(StaticSystem):
+class Gain(System):
     """Constant gain ``y = K · u``.
 
     ``K`` may be a full ``(p, m)`` matrix, a 1-D vector (diagonal gain), or a
@@ -79,7 +79,7 @@ class Gain(StaticSystem):
         return K @ u
 
 
-class Mux(StaticSystem):
+class Mux(System):
     """Stack input signals ``in0, in1, …`` into one vector output ``y``.
 
     ``dims`` lists each input-port dimension; the output dimension is their sum.
@@ -102,7 +102,7 @@ class Mux(StaticSystem):
         return u
 
 
-class Demux(StaticSystem):
+class Demux(System):
     """Split one vector input ``u`` into outputs ``out0, out1, …``.
 
     ``dims`` lists each output-port dimension; the input dimension is their sum.

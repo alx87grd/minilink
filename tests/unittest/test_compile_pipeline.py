@@ -24,11 +24,11 @@ from minilink.core.compile.compiler import (
 from minilink.core.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
 from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem, StaticSystem, System
+from minilink.core.system import DynamicSystem, System
 
 
 # Helper: reusable test diagrams
-class _JAXFriendlyPController(StaticSystem):
+class _JAXFriendlyPController(System):
     """P controller using NumPy or JAX ops so ``compile(..., backend='jax')`` traces."""
 
     def __init__(self):
@@ -123,7 +123,7 @@ def _build_feedthrough_loop():
 
     class FeedthroughSystem(System):
         def __init__(self, name):
-            super().__init__(0)
+            super().__init__()
             self.name = name
             self.add_input_port("u")
             self.add_output_port("y", function=self.h, dependencies=("u",))
@@ -283,7 +283,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         diag = DiagramSystem()
         diag.connection_verbose = False
 
-        class Gain(StaticSystem):
+        class Gain(System):
             def __init__(self):
                 super().__init__()
                 self.add_input_port("u")
@@ -326,21 +326,6 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         y = ev.outputs(x, u, 0.0)
         self.assertIn("y_meas", y)
         np.testing.assert_allclose(y["y_meas"], np.array([0.5]), atol=1e-10)
-
-    def test_h_matches_single_boundary_output(self):
-        """h() returns the single external output when exactly one boundary port exists."""
-        diag = _build_closed_loop_with_external_output()
-        ev = compile_diagram(diag)
-        x = np.array([0.5])
-        u = np.array([1.0])
-        np.testing.assert_allclose(ev.h(x, u, 0.0), np.array([0.5]), atol=1e-10)
-
-    def test_h_raises_when_multiple_output_ports(self):
-        """h() is only defined when the diagram exposes exactly one boundary output."""
-        x = np.array([0.5])
-        u = np.array([1.0])
-        with self.assertRaises(NotImplementedError):
-            self.evaluator.h(x, u, 0.0)
 
     def test_bind_params_freezes_snapshot(self):
         """bound_params in plan: mutating subsystem.params does not change dx."""
@@ -431,7 +416,7 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
             for k in d_np:
                 np.testing.assert_allclose(np.asarray(d_jx[k]), d_np[k], atol=1e-5)
 
-    def test_f_and_get_f_jit_match_numpy(self):
+    def test_f_jax_matches_numpy(self):
         diag = _build_small_closed_loop_jax()
         ev_np = compile_diagram(diag, backend="numpy")
         ev_jax = compile_diagram(diag, backend="jax")
@@ -442,34 +427,18 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
 
         dx_np = ev_np.f(x_np, u_np, t)
         np.testing.assert_allclose(np.asarray(ev_jax.f(x_j, u_j, t)), dx_np, atol=1e-5)
-        np.testing.assert_allclose(
-            np.asarray(ev_jax.get_f_jit()(x_j, u_j, t)),
-            dx_np,
-            atol=1e-5,
-        )
 
-    def test_get_outputs_jit_matches_outputs(self):
-        diag = _build_closed_loop_with_external_output_jax()
-        ev = compile_diagram(diag, backend="jax")
-        x_j = jnp.array([0.3], dtype=jnp.float32)
-        u_j = jnp.array([1.2], dtype=jnp.float32)
-        t = 0.1
-        out1 = ev.outputs(x_j, u_j, t)
-        out2 = ev.get_outputs_jit()(x_j, u_j, t)
-        for k in out1:
-            np.testing.assert_allclose(
-                np.asarray(out1[k]), np.asarray(out2[k]), atol=1e-6
-            )
-
-    def test_get_internal_signals_jit_matches_compute_internal_signals(self):
+    def test_internal_signals_jax_matches_numpy(self):
         diag = _build_small_closed_loop_jax()
-        ev = compile_diagram(diag, backend="jax")
-        x_j = jnp.array([0.3], dtype=jnp.float32)
-        u_j = jnp.array([1.2], dtype=jnp.float32)
+        ev_np = compile_diagram(diag, backend="numpy")
+        ev_jax = compile_diagram(diag, backend="jax")
+        x_np, u_np = np.array([0.3]), np.array([1.2])
+        x_j = jnp.array(x_np, dtype=jnp.float32)
+        u_j = jnp.array(u_np, dtype=jnp.float32)
         t = 0.1
-        buf1 = ev.compute_internal_signals(x_j, u_j, t)
-        buf2 = ev.get_internal_signals_jit()(x_j, u_j, t)
-        np.testing.assert_allclose(np.asarray(buf1), np.asarray(buf2), atol=1e-6)
+        buf_np = ev_np.compute_internal_signals(x_np, u_np, t)
+        buf_jx = ev_jax.compute_internal_signals(x_j, u_j, t)
+        np.testing.assert_allclose(np.asarray(buf_jx), buf_np, atol=1e-5)
 
     def test_reference_diagram_f_is_jittable(self):
         diag = _build_small_closed_loop_jax()
@@ -570,14 +539,11 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.evaluator.f_p(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
 
-    def test_outputs_p_and_h_p_single_boundary(self):
+    def test_outputs_p_single_boundary(self):
         params = {"ctl": {"K": np.array([[4.0]])}}
         out = self.evaluator.outputs_p(self.x, self.u, 0.0, params)
         self.assertEqual(set(out), {"y_meas"})
         np.testing.assert_allclose(out["y_meas"], [0.5], atol=1e-10)
-        np.testing.assert_allclose(
-            self.evaluator.h_p(self.x, self.u, 0.0, params), [0.5], atol=1e-10
-        )
 
 
 @pytest.mark.optional
@@ -621,7 +587,7 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(jac["ctl"]["Kp"]), [1.5], atol=1e-5)
 
     def test_grad_flows_through_f_p(self):
-        f_p = self.ev.get_f_p_jit()
+        f_p = self.ev.f_p
 
         def dx0(params):
             return f_p(self.x_j, self.u_j, 0.0, params)[0]

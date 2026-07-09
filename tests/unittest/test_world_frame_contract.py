@@ -8,7 +8,7 @@ import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import SE2
-from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, System
 from minilink.dynamics.catalog.equations.integrators import SimpleIntegrator
 from minilink.graphical.animation.drawables import SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, Point
@@ -20,7 +20,7 @@ from minilink.graphical.animation.visualization import (
 from tests.unittest.graphics_contract_helpers import geometry_smoke, resolve_draw_frame
 
 
-class WorldOnlyPlant(StaticSystem):
+class WorldOnlyPlant(System):
     """World-fixed geometry with an empty ``tf`` (implicit world)."""
 
     def get_kinematic_geometry(self):

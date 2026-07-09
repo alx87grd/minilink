@@ -189,7 +189,7 @@ continuous plants — not full Simulink parity. Plan:
 ### 5.7 Interfaces
 
 - [ ] `gymnasium.py` — diagram as RL env (train outside)
-- [ ] `flax.py`, `torch.py` — external model → `StaticSystem`
+- [ ] `flax.py`, `torch.py` — external model → static `System`
 - [ ] Cosimulation / FMI, multibody import
 
 ### 5.8 Catalog capability gaps (not EoM)

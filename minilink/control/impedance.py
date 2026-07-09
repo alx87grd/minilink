@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, System
 
 
 def _as_dof_vector(value, dof: int):
@@ -17,7 +17,7 @@ def _as_dof_vector(value, dof: int):
     return arr
 
 
-class ImpedanceController(StaticSystem):
+class ImpedanceController(System):
     """Virtual spring-damper on ``[position; rate]``.
 
     The measurement port ``y`` carries ``[pos; rate]`` (dim ``2·dof``). Reference

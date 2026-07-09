@@ -66,7 +66,7 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, solvers, forcing |
+| `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing |
 | `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; more frequency tools planned |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
@@ -151,8 +151,10 @@ serial arms. Joint impedance / task impedance / computed torque use
 
 ### `System`
 
-- **Math:** `f(x,u,t,params)`, `h(x,u,t,params)`; ports use same signature.
-- **Dims:** `n` from constructor; `m` from input ports; `p` from primary output
+- **Math:** `h(x,u,t,params)` on the model and port `compute` functions; continuous
+  evolution `f(x,u,t,params)` is on :class:`DynamicSystem` only (and stacked on
+  :class:`DiagramSystem`).
+- **Dims:** `n` defaults to 0 (static IO shell); `m` from input ports; `p` from primary output
   `"y"` only (aux `"x"` does not change `p`; no `"y"` ⇒ `p==0`).
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
   slices with `get_port_values_from_u(u, "r", "y")`.
@@ -274,17 +276,33 @@ optional class attribute `feedback_profile`, not inheritance):
 
 ## 5. Compilation And Simulation
 
-`compile(system, backend)` → `DynamicsEvaluator` (`numpy`|`jax`|`auto`|`direct`).
+`compile(system, backend)` returns a typed evaluator:
+
+- :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.dynamics_evaluator.DynamicsEvaluator`
+  (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)
+- static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.static_evaluator.StaticEvaluator`
+  (`NumpyStaticEvaluator` / `JaxStaticEvaluator`) — `.outputs` only, no `.f`
+- :class:`DiagramSystem` → diagram evaluator (same dynamics tier as above)
+
+Leaf `compile` accepts `numpy` or `jax` only (`auto` / `direct` are simulator /
+transcription concepts — see :mod:`minilink.core.backends`).
 
 Diagrams → `ExecutionPlan` → diagram evaluator. Internal outputs via
 `reconstruct_internal_signals`; **`outputs()` / `outputs_p()` are boundary outputs
-only** (not diagram internals). Keep `ExecutionPlan.output_slices` and
-`external_output_slices` aligned. Do not reintroduce `compute_outputs(..., ports=...)`.
+only** (not diagram internals). Compiled evaluators expose **`outputs` / `outputs_p`**
+(dict keyed by port id); they do not mirror model `h` as a separate evaluator API.
+Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
+reintroduce `compute_outputs(..., ports=...)`.
 
-**Default sim API:** `compute_trajectory` / `compute_forced` → `Simulator` →
-`Trajectory`. Unconnected inputs use port nominals; time-varying sources belong
-in the diagram; forcing via `compute_forced`. Facades default
-`compile_backend="numpy"`.
+**Default sim API:** `compute_trajectory` / `compute_forced` route by evolution kind:
+
+- :class:`DynamicSystem` / :class:`DiagramSystem` → :class:`~minilink.simulation.simulator.Simulator`
+  (ODE integration)
+- static :class:`System` (`n=0`) → :class:`~minilink.simulation.static_simulator.StaticSimulator`
+  (time grid + boundary outputs in `Trajectory.signals`)
+
+Unconnected inputs use port nominals; time-varying sources belong in the diagram;
+forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler`, `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
@@ -319,7 +337,7 @@ Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table
 and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, built on a
 NumPy precompute so any plant works; linear/nearest only). `precompute` trades the `(N,A,n)`
 successor table for per-sweep recomputation (memory vs time-varying support). `result.controller()`
-returns a `LookupTableController` (a `StaticSystem`, so `controller >> plant` simulates);
+returns a `LookupTableController` (a static `System`, so `controller >> plant` simulates);
 `PolicyEvaluator` gives the cost-to-go of any fixed law. Benchmark: `benchmarks/run_dp_backends.py`.
 
 **Spatial scene** (`planning/spatial/`): two domains — **workspace** `p ∈ ℝ²/ℝ³` and

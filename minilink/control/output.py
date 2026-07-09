@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from minilink.core.system import StaticSystem
+from minilink.core.system import System
 
 
-class ProportionalController(StaticSystem):
+class ProportionalController(System):
     """Output-error proportional control ``u = K (r - y)`` (SISO or MIMO).
 
     ``K`` is a scalar (SISO, a ``1×1`` gain) or an ``(m, p)`` matrix mapping a

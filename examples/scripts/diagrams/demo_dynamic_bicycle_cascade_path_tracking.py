@@ -18,7 +18,7 @@ import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import SE2
-from minilink.core.system import DynamicSystem, StaticSystem, System
+from minilink.core.system import DynamicSystem, System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -59,7 +59,7 @@ class PathPlanner(System):
         path_a: float = A,
         path_lambda: float = LAMBDA,
     ):
-        super().__init__(0)
+        super().__init__()
         self.name = "Path planner"
         self._u_ref = float(u_ref)
         self.path_a = float(path_a)
@@ -83,7 +83,7 @@ class PathPlanner(System):
         return {}
 
 
-class Tracking(StaticSystem):
+class Tracking(System):
     """Pure pursuit targeting ``y(x) = A sin(2 pi x / lambda)`` from planner ``path``.
 
     Parameters
@@ -158,7 +158,7 @@ class Tracking(StaticSystem):
         }
 
 
-class HeadingLoop(StaticSystem):
+class HeadingLoop(System):
     """P loop: heading error → yaw-rate reference ``r_ref`` [rad/s].
 
     Parameters
@@ -222,7 +222,7 @@ class HeadingLoop(StaticSystem):
         }
 
 
-class YawRateLoop(StaticSystem):
+class YawRateLoop(System):
     """P loop: yaw-rate error → steer angle ``delta`` [rad].
 
     Parameters

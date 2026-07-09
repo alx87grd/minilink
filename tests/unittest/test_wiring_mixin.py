@@ -28,7 +28,7 @@ def _build_closed_loop():
 def _build_feedthrough_loop():
     class FeedthroughSystem(System):
         def __init__(self, name):
-            super().__init__(0)
+            super().__init__()
             self.name = name
             self.add_input_port("u")
             self.add_output_port("y", function=self.h, dependencies=("u",))

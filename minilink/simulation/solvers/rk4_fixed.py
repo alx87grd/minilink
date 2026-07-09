@@ -26,7 +26,7 @@ class RK4SolverBackend(SolverBackend):
         t0 = times[0]
         dt = times[1] - times[0]
         n_steps = n_pts - 1
-        x_seq = evaluator.rk4_rollout_ivp(x0, t0, dt, n_steps)  # (n_pts, n)
+        x_seq = evaluator.rk4_integrate_ivp(x0, t0, dt, n_steps)  # (n_pts, n)
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # Debug information
@@ -51,7 +51,7 @@ class RK4SolverBackend(SolverBackend):
         n_pts = times.shape[0]
         t0 = times[0]
         dt = times[1] - times[0]
-        x_seq = evaluator.rk4_rollout_forced(x0, u.T, t0, dt)
+        x_seq = evaluator.rk4_integrate_forced(x0, u.T, t0, dt)
         x_traj = np.asarray(x_seq).T
 
         self.last_debug = {

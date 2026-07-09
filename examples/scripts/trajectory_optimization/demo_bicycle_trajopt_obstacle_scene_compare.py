@@ -104,11 +104,9 @@ def _terminal_x() -> float:
     return U_TARGET * TF
 
 
-def _build_dynamic() -> (
-    tuple[
-        object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
-    ]
-):
+def _build_dynamic() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
     sys = JaxDynamicBicycle()
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * U_TARGET / r_r
@@ -126,11 +124,9 @@ def _build_dynamic() -> (
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
-def _build_kinematic() -> (
-    tuple[
-        object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
-    ]
-):
+def _build_kinematic() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
     sys = JaxKinematicBicycle()
     sys.inputs["u"].lower_bound = np.array([0.0, -DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([V_MAX, DELTA_MAX])
@@ -144,11 +140,9 @@ def _build_kinematic() -> (
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
-def _build_kinematic_rate() -> (
-    tuple[
-        object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
-    ]
-):
+def _build_kinematic_rate() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
     sys = JaxKinematicBicycleRateInputs()
     sys.state.lower_bound[3] = 0.0
     sys.state.upper_bound[3] = V_MAX
@@ -168,11 +162,9 @@ def _build_kinematic_rate() -> (
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
-def _build_dynamic_rate() -> (
-    tuple[
-        object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
-    ]
-):
+def _build_dynamic_rate() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
     sys = JaxDynamicBicycleRateInputs()
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * U_TARGET / r_r

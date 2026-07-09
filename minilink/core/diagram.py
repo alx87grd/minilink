@@ -8,7 +8,7 @@ so diagrams nest, simulate, and compile like any other system.
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.system import System
+from minilink.core.system import DynamicSystem, System
 from minilink.core.trajectory import Trajectory
 from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
 
@@ -43,7 +43,7 @@ class DiagramSystem(WiredDiagramMixin, System):
         # Registry before System.__init__: its params setter runs during shell init.
         self.subsystems = {}
         self.connections = {}
-        System.__init__(self, 0)
+        System.__init__(self)
         self._init_wiring(name="Diagram")
 
     def f(self, x, u, t=0, params=None):
@@ -57,7 +57,7 @@ class DiagramSystem(WiredDiagramMixin, System):
 
         dx_pieces = []
         for sys_id, subsystem in self.subsystems.items():
-            if subsystem.n == 0:
+            if not isinstance(subsystem, DynamicSystem):
                 continue
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id, params=params)

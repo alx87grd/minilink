@@ -19,8 +19,10 @@ Backend strings
 ``"numpy"``      NumPy evaluator. Always available.
 ``"jax"``        JAX evaluator. Hard-requires the ``minilink[jax]`` extra.
 ``"auto"``       Try JAX, fall back to NumPy. Used by the simulator.
-``"direct"``     Use ``system.f`` directly (no compiled evaluator); valid for
-                 some trajectory-optimization transcriptions.
+``"direct"``     Use :meth:`~minilink.core.system.DynamicSystem.f` directly
+                 (no compiled evaluator); valid for some trajectory-optimization
+                 transcriptions on :class:`~minilink.core.system.DynamicSystem`
+                 or :class:`~minilink.core.diagram.DiagramSystem`.
 ================ ============================================================
 
 ``"auto"`` and ``"direct"`` are *simulator* / *transcription* concepts: the

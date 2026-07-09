@@ -4,12 +4,12 @@ import numpy as np
 
 from minilink.blocks.sources import Source
 from minilink.core.diagram import DiagramSystem
-from minilink.core.system import System
+from minilink.core.system import DynamicSystem, System
 
 
 class SimpleGain(System):
     def __init__(self, id_str, gain=2.0):
-        super().__init__(0)
+        super().__init__()
         self.name = id_str
         self.gain = gain
         self.add_input_port("u")
@@ -19,7 +19,7 @@ class SimpleGain(System):
         return u * self.gain
 
 
-class SimpleIntegrator(System):
+class SimpleIntegrator(DynamicSystem):
     def __init__(self, id_str):
         super().__init__(1)
         self.name = id_str
@@ -33,7 +33,7 @@ class SimpleIntegrator(System):
         return u
 
 
-class MultiInputNode(System):
+class MultiInputNode(DynamicSystem):
     def __init__(self, id_str, in_ports):
         super().__init__(1)
         self.name = id_str

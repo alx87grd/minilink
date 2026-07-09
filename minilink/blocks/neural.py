@@ -1,6 +1,6 @@
 """Minimal neural-network static blocks.
 
-These are ordinary :class:`~minilink.core.system.StaticSystem` blocks: weights
+These are ordinary :class:`~minilink.core.system.System` blocks: weights
 are model parameters, inputs and outputs are ports, and training lives outside
 the block.
 """
@@ -8,10 +8,10 @@ the block.
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.system import StaticSystem
+from minilink.core.system import System
 
 
-class NeuralNetwork(StaticSystem):
+class NeuralNetwork(System):
     """One-hidden-layer neural network ``y = W2 tanh(W1 u + b1) + b2``.
 
     Parameters

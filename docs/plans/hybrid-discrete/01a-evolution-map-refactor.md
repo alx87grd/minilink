@@ -5,7 +5,7 @@ Mechanical refactor: move continuous evolution off the `System` shell, split typ
 **compile / evaluator / simulate** paths for static vs dynamic leaves, keep unified user
 verbs where they still apply.
 
-**Status:** ready for implementation — see [01a-implementation-plan.md](01a-implementation-plan.md).
+**Status:** complete (implemented on `dev-hybrid`). See [01a-implementation-plan.md](01a-implementation-plan.md).
 
 Full hybrid context: [00-master-plan.md](00-master-plan.md),
 [hybrid-discrete-simulation.md](../hybrid-discrete-simulation.md).
@@ -26,9 +26,8 @@ Full hybrid context: [00-master-plan.md](00-master-plan.md),
 ## Target class hierarchy
 
 ```text
-System                         # ports, params, h, metadata, facades — NO f, NO step
-├── StaticSystem               # n = 0, y = h(·)
-├── Source(System)             # n = 0, y = h(t) — compile/sim as static
+System                         # ports, params, h, metadata, facades — NO f, NO step (n defaults to 0)
+├── Source(System)             # y = h(t) — compile/sim as static
 ├── DynamicSystem              # dx = f(x,u,t), y = h(·)     ← f lives HERE
 ├── StepSystem                 # x_{k+1} = step(x,u,k)      (Phase 1 — after 1a)
 ├── DiagramSystem              # stacked f (flow diagrams)

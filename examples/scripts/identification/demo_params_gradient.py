@@ -21,7 +21,7 @@ import numpy as np
 
 from minilink.core.backends import array_module, configure_jax
 from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, System
 
 configure_jax(enable_x64=True)
 
@@ -55,7 +55,7 @@ class TraceablePendulum(DynamicSystem):
         return x
 
 
-class TraceableImpedanceController(StaticSystem):
+class TraceableImpedanceController(System):
     """u = Kp (r − θ) − Kd dθ, with full-state measurement (JAX-traceable)."""
 
     def __init__(self):
@@ -130,16 +130,16 @@ n_samples = 400
 ts = dt * jnp.arange(n_samples)
 rs = 1.2 * jnp.sin(0.8 * ts).reshape(-1, 1)
 x0 = jnp.array([0.5, 0.0])
-xs = true_evaluator.rk4_rollout_forced(x0, rs, 0.0, dt)
+xs = true_evaluator.rk4_integrate_forced(x0, rs, 0.0, dt)
 
 # "Measured" state derivatives (in practice: numerical differentiation of
 # logged states; here taken from the true model).
-f_true = true_evaluator.get_f_jit()
+f_true = true_evaluator.f
 dxs = jax.vmap(f_true, in_axes=(0, 0, 0))(xs, rs, ts)
 
 # Equation-error identification: only the plant entry of the nested params
 # dict is supplied; the controller keeps its live defaults.
-f_p = true_evaluator.get_f_p_jit()
+f_p = true_evaluator.f_p
 
 
 def loss(theta):

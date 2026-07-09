@@ -1,10 +1,10 @@
 """
-Time-domain simulation of compiled :class:`~minilink.core.system.System` models.
+Time-domain ODE simulation of :class:`~minilink.core.system.DynamicSystem` and
+:class:`~minilink.core.diagram.DiagramSystem` models.
 
-Integrates the ODE ``dx/dt = f(x, u, t)`` (and ``y = h(x, u, t)`` for outputs) along a
-time grid using pluggable solver backends (SciPy, Euler, fixed-step RK4). State
-dimension ``n`` and input dimension ``m`` come from the wrapped system; each column
-of the returned trajectories is a state or input vector at one time sample.
+Integrates ``dx/dt = f(x, u, t)`` along a time grid using pluggable solver backends
+(SciPy, Euler, fixed-step RK4). Static ``System`` leaves use
+:class:`~minilink.simulation.static_simulator.StaticSimulator` instead.
 
 Public module symbols :data:`COMPILE_BACKEND_AUTO` and :data:`RK4_AUTO_MIN_TIME_POINTS`
 control automatic compile backend selection and optional fixed-step RK4 on long
@@ -134,6 +134,20 @@ class Simulator:
         verbose=False,
         compile_backend=BACKEND_NUMPY,
     ):
+        from minilink.core.diagram import DiagramSystem
+        from minilink.core.system import DynamicSystem
+
+        if not isinstance(sys, (DynamicSystem, DiagramSystem)):
+            if sys.n == 0:
+                raise TypeError(
+                    "Static System leaves use StaticSimulator; "
+                    "compute_trajectory routes there."
+                )
+            raise TypeError(
+                f"Cannot simulate {type(sys).__name__} with n={sys.n}; "
+                "use DynamicSystem for state evolution."
+            )
+
         self.verbose = verbose
         self.sys = sys
         self.sys.refresh()

@@ -36,6 +36,7 @@ from minilink.core.compile.execution_plan import (
     PortOperation,
     StateOperation,
 )
+from minilink.core.system import DynamicSystem
 from minilink.core.wiring import check_algebraic_loops
 
 if TYPE_CHECKING:
@@ -44,13 +45,10 @@ if TYPE_CHECKING:
 
 # Public API
 def compile(system, backend=BACKEND_NUMPY, verbose=False):
-    """Compile a System into a :class:`DynamicsEvaluator`.
+    """Compile a system into a typed evaluator.
 
-    For leaf systems (non-diagram), wraps ``f``/``h`` with frozen params
-    and nominal u snapshot, providing the full evaluator API (RK4, rollout,
-    linearize, etc.).
-
-    For diagrams, delegates to :func:`compile_diagram`.
+    Returns :class:`StaticEvaluator` for static ``System`` leaves (``n=0``),
+    :class:`DynamicsEvaluator` for :class:`DynamicSystem` leaves and diagrams.
 
     Parameters
     ----------
@@ -60,26 +58,48 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
         ``'numpy'`` or ``'jax'``.
     verbose : bool
         If ``True``, print timed compilation steps.
-
-    Returns
-    -------
-    DynamicsEvaluator
     """
     from minilink.core.diagram import DiagramSystem
+    from minilink.core.system import DynamicSystem
 
     if isinstance(system, DiagramSystem):
         return compile_diagram(system, backend=backend, verbose=verbose)
 
     key = normalize_backend(backend)
-    if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.numpy_evaluator import NumpyLeafEvaluator
 
-        return NumpyLeafEvaluator(system)
+    if isinstance(system, DynamicSystem):
+        if key == BACKEND_NUMPY:
+            from minilink.core.compile.evaluators.numpy_evaluator import (
+                NumpyDynamicEvaluator,
+            )
+
+            return NumpyDynamicEvaluator(system)
+        require_jax_numpy()
+        from minilink.core.compile.evaluators.jax_evaluator import JaxDynamicEvaluator
+
+        t_total = time.perf_counter()
+        evaluator = JaxDynamicEvaluator(system, verbose=verbose)
+        if verbose:
+            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+        return evaluator
+
+    if system.n > 0:
+        raise TypeError(
+            f"Cannot compile {type(system).__name__} with n={system.n}; "
+            "subclass DynamicSystem and implement f()."
+        )
+
+    if key == BACKEND_NUMPY:
+        from minilink.core.compile.evaluators.static_evaluator import (
+            NumpyStaticEvaluator,
+        )
+
+        return NumpyStaticEvaluator(system)
     require_jax_numpy()
-    from minilink.core.compile.evaluators.jax_evaluator import JaxLeafEvaluator
+    from minilink.core.compile.evaluators.static_evaluator import JaxStaticEvaluator
 
     t_total = time.perf_counter()
-    evaluator = JaxLeafEvaluator(system, verbose=verbose)
+    evaluator = JaxStaticEvaluator(system, verbose=verbose)
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
     return evaluator
@@ -140,7 +160,9 @@ def compile_diagram(
     if verbose:
         t0 = time.perf_counter()
         n_ports = len(port_execution_order)
-        n_states = sum(1 for s in diagram.subsystems.values() if s.n > 0)
+        n_states = sum(
+            1 for s in diagram.subsystems.values() if isinstance(s, DynamicSystem)
+        )
         print(
             f"[compile] Step 2: Building execution plan "
             f"({n_ports} ports, {n_states} states)...",
@@ -260,7 +282,7 @@ def _build_execution_plan_from_order(
     # 3. Build StateOperation list (subsystems with state)
     state_ops: list[StateOperation] = []
     for sys_id, sys in diagram.subsystems.items():
-        if sys.n > 0:
+        if isinstance(sys, DynamicSystem):
             gather_sources, u_dim = _build_gather_sources(
                 diagram, sys_id, output_slices, dependencies="all"
             )
@@ -369,7 +391,7 @@ def _build_gather_sources(
 def _state_slice(diagram: DiagramSystem, sys_id: str) -> slice:
     """Return the global state-vector slice for a subsystem."""
     sys = diagram.subsystems[sys_id]
-    if sys.n > 0:
+    if isinstance(sys, DynamicSystem):
         start, end = diagram.state_index[sys_id]
         return slice(start, end)
     return slice(0, 0)

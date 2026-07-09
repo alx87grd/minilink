@@ -937,7 +937,7 @@ def _dedupe(candidates):
 
 def _base_system_id(sys) -> str:
     raw = getattr(sys, "name", "") or sys.__class__.__name__
-    if raw in {"System", "DynamicSystem", "StaticSystem"}:
+    if raw in {"System", "DynamicSystem"}:
         raw = sys.__class__.__name__
     return _normalize_identifier(raw)
 

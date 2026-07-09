@@ -1,7 +1,7 @@
 """Static nonlinearity blocks.
 
 Memoryless input-output maps used for actuator and sensor realism. Each is a
-:class:`~minilink.core.system.StaticSystem` with the standard ``u``/``y`` ports
+:class:`~minilink.core.system.System` with the standard ``u``/``y`` ports
 and JAX-traceable equations (``xp.clip`` / ``xp.where``), applied elementwise
 across a signal of dimension ``dim``.
 
@@ -16,10 +16,10 @@ Stateful nonlinearities (rate limiter, hysteresis) are planned as small
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.system import StaticSystem
+from minilink.core.system import System
 
 
-class Saturation(StaticSystem):
+class Saturation(System):
     """Symmetric or asymmetric clip ``y = clip(u, lower, upper)``."""
 
     def __init__(self, lower=-1.0, upper=1.0, dim=1):
@@ -42,7 +42,7 @@ class Saturation(StaticSystem):
         return xp.clip(u, lower, upper)
 
 
-class DeadZone(StaticSystem):
+class DeadZone(System):
     """Dead zone of half-width ``width``: zero inside, shifted outside.
 
     ``y = u - width`` for ``u > width``, ``y = u + width`` for ``u < -width``,
@@ -70,7 +70,7 @@ class DeadZone(StaticSystem):
         return above + below
 
 
-class Relay(StaticSystem):
+class Relay(System):
     """Bang-bang relay ``y = amplitude · sign(u)`` (sign(0) = 0)."""
 
     def __init__(self, amplitude=1.0, dim=1):

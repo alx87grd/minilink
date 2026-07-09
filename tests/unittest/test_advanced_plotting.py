@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, System
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.signals import (
     build_signal_plot_spec,
@@ -29,7 +29,7 @@ class Integrator(DynamicSystem):
         return np.array([x[0]])
 
 
-class PController(StaticSystem):
+class PController(System):
     def __init__(self):
         super().__init__()
         self.params = {"Kp": 5.0}
@@ -43,7 +43,7 @@ class PController(StaticSystem):
         return np.array([Kp * (r[0] - y[0])])
 
 
-class Step(StaticSystem):
+class Step(System):
     def __init__(self):
         super().__init__()
         self.add_output_port("y", function=self.compute)

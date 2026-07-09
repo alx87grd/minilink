@@ -1,11 +1,9 @@
 """
 The System contract: the base class every block, plant, and controller extends.
 
-A system is a named set of input/output ports around the two governing
-equations
-
-    dx = f(x, u, t; p)        state derivative
-    y  = h(x, u, t; p)        output
+A static IO block is described by output maps on its ports (and optionally
+``h`` on the model). Continuous evolution ``dx = f(x, u, t; p)`` lives on
+:class:`DynamicSystem` only.
 
 Signal and port metadata live in :mod:`minilink.core.signals`; user shortcut
 methods (``compute_trajectory``, ``plot_*``, ``animate``, ``modal_analysis``, ...)
@@ -25,42 +23,33 @@ if TYPE_CHECKING:
 
 class System(SystemFacades):
     """
-    Base class describing a dynamical input-output system
+      Static input-output shell: ports, parameters, metadata, and facades.
 
-        dx = f(x, u, t; p)
-        y  = h(x, u, t; p)
+          y  = h(x, u, t; p)   (via port ``compute`` / :meth:`h`)
 
-    A :class:`System` serves several roles at once:
+      Default ``n = 0`` (no states). State dimension :attr:`n` is the number of
+      state slots this block contributes when stacked in a diagram (zero for
+    static blocks). Continuous evolution ``dx = f(x, u, t; p)`` is defined on
+      :class:`DynamicSystem` only.
 
-    - **Core dynamical contract**: it defines a functional modeling interface
-      through :meth:`f` and :meth:`h`, intended to describe the system as a
-      function of ``(x, u, t, params)``.
-    - **Structural model description**: it stores dimensions, ports, state
-      metadata, labels, units, bounds, and nominal values.
-    - **Model defaults and metadata**: it carries default parameters
-      (:attr:`params`), default initial condition (:attr:`x0`), and solver
-      hints (:attr:`solver_info`).
-    - **Visualization contract**: it may describe forward-kinematic geometry
-      for rendering and animation (API still under graphical/animation
-      review). Camera hints (``camera_*`` attributes) configure the animator
-      boundary resolver; pass ``animate(camera=...)`` for custom views.
-    - **User shortcut façade**: it exposes convenience methods such as
-      :meth:`compile`, :meth:`compute_trajectory`, :meth:`render`,
-      :meth:`animate`, and :meth:`game`, defined on the
-      :class:`~minilink.core.facades.SystemFacades` mixin so this module
-      stays focused on the mathematical, structural, and visualization
-      contracts. Camera hints (``camera_target``, ``camera_plot_axes``,
-      ``camera_scale``, ``camera_follow_frame``) are resolved by the animator;
-      custom views use ``animate(camera=...)``.
+      A :class:`System` serves several roles at once:
 
-    Notes on dynamics and purity
-    ----------------------------
-    The intended dynamical contract is **functional/stateless in intent**:
-    overridden :meth:`f` and :meth:`h` should behave as functions of
-    ``(x, u, t, params)`` only. Python cannot enforce purity, so users should
-    avoid relying on hidden mutable instance state inside dynamics or output
-    functions. The object itself still stores model defaults, metadata, and
-    user convenience state.
+      - **IO contract**: output ports (and optional :meth:`h`) as functions of
+        ``(x, u, t, params)``.
+      - **Structural model description**: dimensions, ports, state metadata,
+        labels, units, bounds, and nominal values.
+      - **Model defaults and metadata**: default parameters (:attr:`params`),
+        default initial condition (:attr:`x0`), and solver hints (:attr:`solver_info`).
+      - **Visualization contract**: forward-kinematic geometry for rendering
+        and animation.
+      - **User shortcut façade**: :meth:`compile`, :meth:`compute_trajectory`,
+        :meth:`render`, :meth:`animate`, :meth:`game` on
+        :class:`~minilink.core.facades.SystemFacades`.
+
+      Notes on purity
+      ---------------
+      Overridden :meth:`h` and port ``compute`` functions should behave as
+      functions of ``(x, u, t, params)`` only (convention; not enforced).
     """
 
     #: Opt-in swappable look: a callable ``(plant) -> dict[str, list[prim]]`` or
@@ -72,11 +61,11 @@ class System(SystemFacades):
 
     def __init__(self, n=0):
         """
-        Initialize the system with ``n`` continuous states.
+        Initialize the system with ``n`` continuous states (default 0).
 
-        Systems start with no input or output ports. Add ports explicitly with
-        :meth:`add_input_port` and :meth:`add_output_port`; the input and
-        output dimensions :attr:`m` and :attr:`p` are derived from the ports.
+        Static blocks use ``n = 0``. Systems start with no input or output ports.
+        Add ports with :meth:`add_input_port` and :meth:`add_output_port`; the
+        input and output dimensions :attr:`m` and :attr:`p` are derived from ports.
         """
         # Structural model description
         self.n = int(n)
@@ -128,35 +117,13 @@ class System(SystemFacades):
         self.camera_follow_frame = None
         self.camera_priority = 0.0
 
-    # Core Dynamical Contract
-
-    def f(self, x, u, t=0, params=None):
-        """
-        State derivative ``dx = f(x, u, t; p)``.
-
-        Subclasses should treat this as a function of ``(x, u, t, params)``
-        only; the library does not verify purity (see the class docstring).
-
-        Parameters
-        ----------
-        x : array of shape (n,)
-        u : array of shape (m,)
-        t : float
-        params : dict, optional
-            ``None`` means "use ``self.params``".
-
-        Returns
-        -------
-        dx : array of shape (n,)
-        """
-        dx = np.zeros(self.n)
-        return dx
+    # Core output contract (static IO)
 
     def h(self, x, u, t=0, params=None):
         """
         Output ``y = h(x, u, t; p)``.
 
-        Same purity contract as :meth:`f` (convention only; not enforced).
+        Same purity contract as port ``compute`` (convention only; not enforced).
 
         Parameters
         ----------
@@ -402,22 +369,6 @@ class System(SystemFacades):
 # Specialized System Types
 
 
-class StaticSystem(System):
-    """
-    A block with no internal states (``n = 0``): a pure input-output map
-
-        y = h(u, t; p)
-
-    Static blocks default to no kinematic primitives (empty ``skin``) so diagram
-    animation shows only dynamic plants unless a subclass opts in.
-    """
-
-    def __init__(self):
-        """Initialize with no states and no ports; add ports explicitly."""
-        System.__init__(self, 0)
-        self.name = "StaticSystem"
-
-
 class DynamicSystem(System):
     """
     A system with continuous states (``n > 0``)
@@ -467,6 +418,28 @@ class DynamicSystem(System):
             )
         if expose_state:
             self.add_output_port("x", dim=self.n, function=self.compute_state)
+
+    def f(self, x, u, t=0, params=None):
+        """
+        State derivative ``dx = f(x, u, t; p)``.
+
+        Subclasses should treat this as a function of ``(x, u, t, params)``
+        only; the library does not verify purity.
+
+        Parameters
+        ----------
+        x : array of shape (n,)
+        u : array of shape (m,)
+        t : float
+        params : dict, optional
+            ``None`` means "use ``self.params``".
+
+        Returns
+        -------
+        dx : array of shape (n,)
+        """
+        dx = np.zeros(self.n)
+        return dx
 
 
 if __name__ == "__main__":

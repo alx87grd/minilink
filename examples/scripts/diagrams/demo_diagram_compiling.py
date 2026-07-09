@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, System
 
 # Demo controls.
 PRINT_COMPILE_REPORT = True  # Print compile timing diagnostics.
@@ -24,7 +24,7 @@ class Integrator(DynamicSystem):
         return x
 
 
-class PController(StaticSystem):
+class PController(System):
     def __init__(self):
         super().__init__()
         self.name = "Controller"
@@ -95,7 +95,6 @@ except ImportError as exc:
     print(f"Skipping JAX compile: {exc}")
 else:
     f_compiled_jax = evaluator_jax.f
-    f_compiled_jax_jit = evaluator_jax.get_f_jit()
 
 dx_baseline = f_baseline(x, u)
 dx_compiled_numpy = f_compiled_numpy(x, u)
@@ -105,9 +104,7 @@ print("Baseline:", dx_baseline)
 print("Compiled (numpy):", dx_compiled_numpy)
 if evaluator_jax is not None:
     dx_compiled_jax = f_compiled_jax(x, u)
-    dx_compiled_jax_jit = f_compiled_jax_jit(x, u)
     print("Compiled (jax):", dx_compiled_jax)
-    print("Compiled (jax jit):", dx_compiled_jax_jit)
 
 
 # Benchmarking
@@ -144,10 +141,10 @@ print(f"NumPy Compiled: {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")
 
 if evaluator_jax is not None:
     # Warm up (compilation happens here)
-    f_compiled_jax_jit(x, u).block_until_ready()
+    f_compiled_jax(x, u).block_until_ready()
 
     t0 = time.perf_counter()
     for _ in range(n_iters):
-        f_compiled_jax_jit(x, u).block_until_ready()
+        f_compiled_jax(x, u).block_until_ready()
     dt = time.perf_counter() - t0
     print(f"JAX JIT:        {dt:.4f} s ({n_iters / dt:.0f} evals/sec)")

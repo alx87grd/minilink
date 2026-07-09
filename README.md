@@ -243,11 +243,12 @@ regular minilink mechanical system — including a JAX-traceable variant.
 Minilink keeps the user-facing API small, while the execution path supports
 larger diagrams and repeated simulation or optimization.
 
-- **System hierarchy**: `System` is the mother class. Common subclasses include
-  `DynamicSystem`, `StaticSystem`, mechanical abstractions, source blocks,
-  controllers, catalog plants, and `DiagramSystem`.
-- **Textbook equations**: dynamic models implement `f(x, u, t, params)`, so
-  equation code can stay close to forms like `dx = A @ x + B @ u`.
+- **System hierarchy**: `System` is the base IO shell (`n` defaults to 0 for static
+  blocks). Continuous plants subclass `DynamicSystem` (`f`, `h`). Mechanical
+  abstractions, source blocks, controllers, catalog plants, and `DiagramSystem`
+  compose on top.
+- **Textbook equations**: dynamic models implement `f(x, u, t, params)` on
+  `DynamicSystem`, so equation code can stay close to forms like `dx = A @ x + B @ u`.
 - **Stateless model objects**: a system defines equations, ports, parameters,
   and initial conditions. The evolving state belongs to the simulator and
   returned trajectory, not to hidden mutable block state.
@@ -265,8 +266,8 @@ For example, the class hierarchy can go from a generic system contract to a
 domain-specific model:
 
 ```text
-System
-  -> DynamicSystem
+System                    # static IO shell (n defaults to 0)
+  -> DynamicSystem        # dx = f(x, u, t)
     -> MechanicalSystem
       -> Pendulum
 ```
