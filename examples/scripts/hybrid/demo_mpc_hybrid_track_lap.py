@@ -41,17 +41,33 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
 
 configure_jax(enable_x64=True)
 
-U_TARGET = 20.0
-VX0 = 2.5
-TF_SIM = 16.0
-MPC_DT = 0.2
+# MPC
+U_TARGET = 12.0
+MPC_DT = 0.1
+MPC_HORIZON = 2.0
+MPC_STEPS = 10
+
+# Simulation
+TF_SIM = 20.0
 SIM_DT = 0.005
-OBSTACLE_RADIUS = 0.4
-OBSTACLE_MARGIN = 0.05
-OBSTACLE_CENTERS = ((4.0, -6.2), (-2.0, 5.0), (10.0, 1.5))
+
+# Scene
+OBSTACLE_RADIUS = 0.2
+OBSTACLE_MARGIN = 0.2
+OBSTACLE_CENTERS = ((4.0, -6.2), (-2.0, 7.0), (12.0, 1.5))
+TRACK_WIDTH = 24.0
+TRACK_HEIGHT = 14.0
+TURN_RADIUS = 3.5
+
+# Init
+START_XY = np.array([-(TRACK_WIDTH / 2 - TURN_RADIUS), -(TRACK_HEIGHT / 2)])
+START_THETA = 0.001
+VX0 = 2.5
 
 
-def _rounded_rect_loop(cx=0.0, cy=0.0, width=24.0, height=14.0, radius=3.5):
+def _rounded_rect_loop(
+    cx=0.0, cy=0.0, width=TRACK_WIDTH, height=TRACK_HEIGHT, radius=TURN_RADIUS
+):
     w2, h2, r = width / 2.0, height / 2.0, radius
     hx = w2 - r
 
@@ -79,23 +95,21 @@ track = ReferenceTrack(from_waypoints(loop_xy), half_width=2.0)
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 scene = Scene(obstacles=[Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS])
 
+# Planning model
 sys_mpc = JaxDynamicBicycleRateInputsUY()
-sys_sim = JaxDynamicBicycleRateInputsUY()
-sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
-sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
+sys_mpc.state.lower_bound[6] = 0.0
+sys_mpc.state.upper_bound[6] = 90.0
+sys_mpc.state.lower_bound[7] = -0.55
+sys_mpc.state.upper_bound[7] = 0.55
+sys_mpc.inputs["u"].lower_bound = np.array([-80.0, -2.0])
+sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 
-for sys in (sys_mpc, sys_sim):
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = 90.0
-    sys.state.lower_bound[7] = -0.55
-    sys.state.upper_bound[7] = 0.55
-    sys.inputs["u"].lower_bound = np.array([-80.0, -2.0])
-    sys.inputs["u"].upper_bound = np.array([80.0, 2.0])
-sys_sim.camera_scale = 16.0
 
+# Cost Function
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
+
 cost = (
     QuadraticCost.from_system(
         sys_mpc,
@@ -109,25 +123,23 @@ cost = (
         weight=40.0, shaping=quadratic_excess(threshold=0.1)
     )
     + track.corridor_field(body).as_cost(
-        weight=25.0, shaping=quadratic_hinge(threshold=0.0)
+        weight=50.0, shaping=quadratic_hinge(threshold=0.0)
     )
     + scene.clearance_field(body).as_cost(
-        weight=3.0, shaping=inverse_barrier(epsilon=0.08)
+        weight=6.0, shaping=inverse_barrier(epsilon=0.08)
     )
 )
 
-s0, _ = track.path.project(loop_xy[0])
-tangent = track.path.tangent(s0)
-theta0 = float(np.arctan2(tangent[1], tangent[0]))
-if abs(np.cos(2.0 * theta0)) > 1.0 - 1e-9:
-    theta0 += 1e-4
-x0 = np.array([loop_xy[0, 0], loop_xy[0, 1], theta0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
-sys_sim.x0 = x0.copy()
+########################################################
+# Planner & NLP Solver Parameters
+########################################################
+
+x0 = np.array([START_XY[0], START_XY[1], START_THETA, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 
 planner = MPCPlanner(
     PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost),
     transcription=MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=2.0, n_steps=20)
+        DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
     ),
     options=MPCOptions(
         compile_backend="jax",
@@ -136,8 +148,22 @@ planner = MPCPlanner(
     ),
 )
 
+# Controller Block
 mpc = mpc_stateful_controller(planner, dt_mpc=MPC_DT, step_disp=True)
+
+########################################################
+# Simulation
+########################################################
+
+# Simulation model
+sys_sim = JaxDynamicBicycleRateInputsUY()
+sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
+sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
+sys_sim.camera_scale = 16.0
+sys_sim.x0 = x0.copy()
+
 computer = mpc % MPC_DT
+
 hybrid = computer @ sys_sim
 
 hybrid.plot_diagram()
@@ -149,6 +175,11 @@ result = hybrid.compute_trajectory(
     plant_dt_inner=SIM_DT,
     compile_backend="jax",
 )
+
+########################################################
+# Plotting
+########################################################
+
 hybrid.plot_trajectory()
 hybrid.animate(
     overlays=mpc_animation_overlays(result, planner, scene=scene, track=track)
