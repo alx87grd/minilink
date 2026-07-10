@@ -87,10 +87,10 @@ class TestHybridMultiRate(unittest.TestCase):
         sim = HybridSimulator(hybrid, t0=0, tf=1.6)
         result = sim.solve_forced(_reference, input_port_id="r")
 
-        self.assertEqual(result.n_samples, 160)
-        self.assertIn("y_f", result.signals)
-        self.assertIn("u_cmd", result.signals)
-        self.assertTrue(np.all(np.isfinite(result.x_plant)))
+        self.assertEqual(result.computer.n_samples, 160)
+        self.assertIn("y_f", result.computer.signals)
+        self.assertIn("u_cmd", result.computer.signals)
+        self.assertTrue(np.all(np.isfinite(result.plant.x)))
 
     def test_hand_loop_coarse_parity(self):
         hybrid = _build_hybrid()
@@ -120,7 +120,11 @@ class TestHybridMultiRate(unittest.TestCase):
 
         sim = HybridSimulator(hybrid, t0=0, n_steps=n_steps)
         result = sim.solve_forced(_reference, input_port_id="r")
-        np.testing.assert_allclose(result.signals["y"][0, :n_steps], y_hand, rtol=1e-6)
+        np.testing.assert_allclose(
+            result.computer.signals["y_meas"][0, :n_steps],
+            y_hand,
+            rtol=1e-6,
+        )
 
 
 if __name__ == "__main__":

@@ -70,7 +70,15 @@ class HybridDiagram:
                 f"HybridDiagram requires DiagramSystem plant, "
                 f"got {type(self.plant).__name__}"
             )
+        self.last_result = None
         self.traj = None
+
+    @property
+    def rollout(self):
+        """Tick-indexed computer view from :attr:`last_result` (``None`` if unset)."""
+        if self.last_result is None:
+            return None
+        return self.last_result.computer
 
     @classmethod
     def from_diagrams(
@@ -155,7 +163,7 @@ class HybridDiagram:
         Returns
         -------
         HybridSimResult
-            Also stored on :attr:`traj`.
+            Stored on :attr:`last_result`; plant view on :attr:`traj`.
         """
         result = self._simulator(
             t0=t0,
@@ -167,7 +175,7 @@ class HybridDiagram:
             compile_backend=compile_backend,
             verbose=verbose,
         ).solve()
-        self.traj = result
+        self._cache_result(result)
         if show:
             result.plot()
         return result
@@ -197,7 +205,7 @@ class HybridDiagram:
         Returns
         -------
         HybridSimResult
-            Also stored on :attr:`traj`.
+            Stored on :attr:`last_result`; plant view on :attr:`traj`.
         """
         result = self._simulator(
             t0=t0,
@@ -209,7 +217,7 @@ class HybridDiagram:
             compile_backend=compile_backend,
             verbose=verbose,
         ).solve_forced(u, input_port_id=input_port_id)
-        self.traj = result
+        self._cache_result(result)
         if show:
             result.plot()
         return result
@@ -225,23 +233,105 @@ class HybridDiagram:
         **kwargs,
     ):
         """
-        Plot hybrid boundary channels from the last rollout or an explicit result.
+        Plot plant channels (continuous-time view) from the last rollout or result.
 
         If ``traj`` is omitted and :attr:`traj` is unset, runs :meth:`compute_trajectory`
         first (same convenience pattern as :class:`~minilink.core.facades.SharedSystemFacades`).
+        Pass ``traj=result.computer.as_trajectory()`` and use :meth:`HybridSimResult.plot_computer`
+        on a :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` for tick-indexed
+        computer internals.
         """
+        if traj is None:
+            if self.last_result is None:
+                self.compute_trajectory(show=False, verbose=False)
+            return self.last_result.plot(
+                signals=signals,
+                show=show,
+                backend=backend,
+                **kwargs,
+            )
+        from minilink.simulation.hybrid_simulator import HybridSimResult
+
+        if isinstance(traj, HybridSimResult):
+            return traj.plot(
+                signals=signals,
+                show=show,
+                backend=backend,
+                **kwargs,
+            )
+        from minilink.graphical.signals.time_signals import (
+            TIME_ABSCISSA_LABEL,
+            plot_time_signals,
+        )
+
+        if signals is None:
+            signals = tuple(traj.signals.keys())
+        return plot_time_signals(
+            self.plant,
+            traj,
+            signals=signals,
+            abscissa_label=TIME_ABSCISSA_LABEL,
+            backend=backend,
+            show=show,
+            **kwargs,
+        )
+
+    def animate(
+        self,
+        traj=None,
+        time_factor_video=1.0,
+        is_3d=False,
+        html: bool | None = None,
+        renderer="matplotlib",
+        native: bool = True,
+        scene_title: str | None = None,
+        show: bool = True,
+        save: bool = False,
+        file_name: str = "Animation",
+        camera=None,
+        overlays=None,
+    ):
+        """
+        Animate the continuous plant using the fine :attr:`traj` cache.
+
+        Same kwargs as :meth:`~minilink.core.facades.SharedSystemFacades.animate`
+        on a flow diagram. Uses :attr:`plant` geometry; ``traj`` defaults to the
+        last plant trajectory from :meth:`compute_trajectory` / :meth:`compute_forced`.
+        """
+        from minilink.graphical.animation import Animator
+        from minilink.graphical.common.environment import prefers_inline_animation
+
         if traj is None:
             if self.traj is not None:
                 traj = self.traj
+            elif self.last_result is not None:
+                traj = self.last_result.plant
             else:
-                traj = self.compute_trajectory(show=False, verbose=False)
-        return traj.plot(
-            signals=signals,
-            abscissa=abscissa,
-            show=show,
-            backend=backend,
-            **kwargs,
+                self.compute_trajectory(verbose=False)
+                traj = self.traj
+
+        resolved_html = prefers_inline_animation() if html is None else html
+        animator = Animator(self.plant)
+        show_plot = show and not resolved_html
+        return animator.animate_simulation(
+            traj,
+            time_factor_video=time_factor_video,
+            is_3d=is_3d,
+            html=resolved_html,
+            show=show_plot,
+            save=save,
+            file_name=file_name,
+            renderer=renderer,
+            native=native,
+            scene_title=scene_title,
+            camera=camera,
+            overlays=overlays,
         )
+
+    def _cache_result(self, result) -> None:
+        """Store full hybrid result and plant trajectory cache."""
+        self.last_result = result
+        self.traj = result.plant
 
     def plot_diagram(
         self,

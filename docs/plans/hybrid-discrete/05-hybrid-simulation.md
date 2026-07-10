@@ -114,6 +114,16 @@ Computer — **`computer.k`** is the single discrete index; HybridSimulator deri
 construct with **`t0` / `tf`**, then **`solve()`** / **`solve_forced(u)`** →
 :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`. No ``run(n_ticks)``.
 Façades on :class:`HybridDiagram`: ``compute_trajectory`` / ``compute_forced``.
+Cache: ``self.traj`` = plant :class:`~minilink.core.trajectory.Trajectory`;
+``self.last_result`` = full :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`;
+``self.rollout`` = ``last_result.computer``. ``animate()`` drives plant geometry from
+``self.traj``.
+
+**Result contract:** ``HybridSimResult.computer`` is a tick-indexed
+:class:`~minilink.core.step_rollout.StepRollout`; ``HybridSimResult.plant`` is a
+continuous-time :class:`~minilink.core.trajectory.Trajectory` recorded at
+``plant_dt_inner`` (or ``dt_base`` when unset). ``plot()`` / ``plot_trajectory()`` default
+to the plant view; ``plot_computer()`` covers tick-indexed internals.
 
 ### Tick order and buffers
 
@@ -205,7 +215,7 @@ HybridSimulator(hybrid, t0=0, tf=TS, plant_dt_inner=SIM_DT).solve_forced(u)
 
 ## Control blocks (Phase 5)
 
-- **Static SMC** — `sample_static(SlidingModeController(...), dt)` in a step diagram (Phase 5a).
+- **Static SMC** — `SlidingModeController(...)` in `hybrid_closed_loop(..., schedule=dt)` (Phase 5a).
 - **MPC** — [Phase 6](06-mpc-step-block.md) (`MPCStepBlock`); do not duplicate a second MPC adapter in Phase 5.
 
 ## Tests

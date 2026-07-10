@@ -67,7 +67,7 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing |
-| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; `discretize` / `sample_static` for step/hybrid wrappers; more frequency tools planned |
+| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; `discretize` for continuous→step plant wrappers; more frequency tools planned |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
@@ -170,12 +170,22 @@ serial arms. Joint impedance / task impedance / computed torque use
   continuous :class:`DiagramSystem` plant. Boundary channels use ZOH (computer → plant)
   or sample (plant → computer). :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
   mirrors :class:`~minilink.simulation.simulator.Simulator` (`t0`/`tf`, `solve`,
-  `solve_forced`); plant steps use :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh`.
+  `solve_forced`); plant steps use
+  :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh`
+  with optional ``plant_dt_inner`` for sub-step integration and plant trajectory
+  recording. :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` holds
+  ``computer`` (:class:`~minilink.core.step_rollout.StepRollout`, tick ``k``) and
+  ``plant`` (:class:`~minilink.core.trajectory.Trajectory`, wall time ``t``); default
+  plots use ``plant``.
   Shortcuts: ``Computer @ plant``, :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_forced`, and
-  :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_trajectory` cache the last
-  :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` on ``self.traj``.
+  :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_trajectory` /
+  :meth:`~minilink.core.hybrid_diagram.HybridDiagram.animate` cache the plant
+  :class:`~minilink.core.trajectory.Trajectory` on ``self.traj`` (same quick-access
+  pattern as continuous diagrams) and the full
+  :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` on ``self.last_result``;
+  tick-indexed computer view on ``self.rollout``.
   Visualization: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_diagram` renders Plant +
   Computer (nested StepDiagram) clusters with dashed ZOH/sample boundary edges;
   :func:`~minilink.graphical.diagrams.build_hybrid_topology` /
@@ -345,8 +355,9 @@ reintroduce `compute_outputs(..., ports=...)`.
 
 `animate` / `plot_trajectory` live on `SharedSystemFacades` for continuous and static
 systems; :class:`~minilink.core.hybrid_diagram.HybridDiagram` mirrors the pattern with
-``self.traj`` (:class:`~minilink.simulation.hybrid_simulator.HybridSimResult`). Auto-sim
-fallback calls `compute_trajectory` (MRO picks engine on homogeneous diagrams).
+``self.traj`` (plant :class:`~minilink.core.trajectory.Trajectory`) and
+``self.last_result`` (:class:`~minilink.simulation.hybrid_simulator.HybridSimResult`).
+Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous diagrams).
 
 **Two static paths:** a static *leaf* (`Gain`, `Step` source) uses
 `StaticSimulator` — empty state, outputs in `traj.signals`. A static-only

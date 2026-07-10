@@ -4,7 +4,8 @@
 
 Wraps continuous dynamics + sample time into a **`StepSystem`** leaf for fully discrete plant
 models or teaching. Default hybrid path keeps the plant **continuous** ([Phase 5](05-hybrid-simulation.md));
-static controllers use **`sample_static`** (no internal state).
+static controllers (`n = 0`) plug into :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`
+directly — sample time lives on :class:`~minilink.simulation.computer.StepSchedule`, not on the block.
 
 ## Prerequisites
 
@@ -22,9 +23,6 @@ def discretize(
     method: str = "rk4",
 ) -> StepSystem:
     ...
-
-def sample_static(system: System, dt: float) -> System:
-    ...
 ```
 
 ### Contract
@@ -33,11 +31,9 @@ def sample_static(system: System, dt: float) -> System:
 - **`discretize` output:** New `StepSystem` with `step` closing over `(system, dt, method)`.
 - **Math:** `x_{k+1} = step(x, u, k)` = ZOH integration of `f` over one interval; `dt` in the
   closure, not a `step` argument.
-- **`sample_static` inputs:** static `System` (`n = 0`), e.g. Pyro-parity `SlidingModeController`.
-- **`sample_static` output:** Wrapper with the same boundary ports; `dt` stored in `params`.
+- **Static controllers in hybrid loops:** pass the leaf `System` to `hybrid_closed_loop(..., schedule=dt)`.
   Sampling and ZOH are enforced by `Computer` / `HybridSimulator`.
 
 ## Tests
 
-- `test_discretize.py`: `discretize` RK4 one step matches `rk4_step`; `sample_static` delegates
-  `ctl` output.
+- `test_discretize.py`: `discretize` RK4 one step matches `rk4_step`; `h` delegates to source.

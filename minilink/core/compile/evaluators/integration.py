@@ -52,6 +52,22 @@ class IntegrationMixin:
 
         return x_samples
 
+    def integrate_zoh_rollout(self, x0, u_hold, t0, dt_hold, *, dt_inner=None):
+        """
+        Piecewise-constant ``u_hold`` over ``[t0, t0 + dt_hold]``.
+
+        Returns
+        -------
+        t_samples : ndarray, shape (n_sub + 1,)
+        x_samples : ndarray, shape (n_sub + 1, n)
+        """
+        u_hold, dt_hold, dt_step, u_sequence = self._zoh_hold_sequence(
+            u_hold, dt_hold, dt_inner=dt_inner
+        )
+        x_samples = self.integrate(x0, u_sequence, t0, dt_step)
+        t_samples = t0 + np.arange(x_samples.shape[0], dtype=float) * dt_step
+        return t_samples, x_samples
+
     def integrate_zoh(self, x0, u_hold, t0, dt_hold, *, dt_inner=None):
         """
         Advance state with piecewise-constant ``u_hold`` over ``[t0, t0 + dt_hold]``.
@@ -59,6 +75,12 @@ class IntegrationMixin:
         Returns the final state after RK4 integration. When ``dt_inner`` is
         smaller than ``dt_hold``, the hold interval is subdivided evenly.
         """
+        _, x_samples = self.integrate_zoh_rollout(
+            x0, u_hold, t0, dt_hold, dt_inner=dt_inner
+        )
+        return x_samples[-1]
+
+    def _zoh_hold_sequence(self, u_hold, dt_hold, *, dt_inner=None):
         u_hold = np.asarray(u_hold, dtype=float).reshape(self.m)
         dt_hold = float(dt_hold)
         if dt_hold <= 0.0:
@@ -75,8 +97,7 @@ class IntegrationMixin:
             dt_step = dt_hold / n_sub
 
         u_sequence = np.tile(u_hold, (n_sub, 1))
-        x_samples = self.integrate(x0, u_sequence, t0, dt_step)
-        return x_samples[-1]
+        return u_hold, dt_hold, dt_step, u_sequence
 
     def rk4_step_p(self, x, u, t, dt, params):
         k1 = self.f_p(x, u, t, params)

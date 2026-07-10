@@ -15,6 +15,7 @@ from minilink.graphical.common.plotly_style import (
     PLOTLY_SIGNAL_ROW_HEIGHT,
     PLOTLY_TEMPLATE,
 )
+from minilink.graphical.signals.signal_colors import plotly_color
 from minilink.graphical.signals.time_signals import (
     LivePlotHandle,
     PlotResult,
@@ -281,7 +282,11 @@ def _create_figure(spec: SignalPlotSpec, **kwargs):
                 y=trace.values,
                 mode="lines",
                 name=trace.label,
-                line={"color": _plotly_color(trace.color)},
+                line={
+                    "color": plotly_color(trace.color),
+                    "width": trace.linewidth,
+                },
+                opacity=trace.alpha,
             ),
             row=row,
             col=1,
@@ -314,13 +319,3 @@ def _import_plotly():
             "pip install 'minilink[plotting]'",
         ) from exc
     return go, make_subplots
-
-
-def _plotly_color(color: str) -> str:
-    colors = {
-        "blue": "#0000ff",
-        "tab:blue": "#1f77b4",
-        "tab:red": "#d62728",
-        "tab:green": "#2ca02c",
-    }
-    return colors.get(color, color)

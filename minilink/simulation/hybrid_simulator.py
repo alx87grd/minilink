@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from types import MappingProxyType
 
 import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY
 from minilink.core.hybrid_diagram import HybridDiagram
+from minilink.core.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.computer import Computer
 
@@ -36,7 +36,8 @@ class HybridSimulator:
     n_steps : int, optional
         Override number of base ticks (advanced).
     plant_dt_inner : float, optional
-        RK4 sub-step inside each base tick for the plant.
+        RK4 sub-step inside each base tick for the plant; also sets plant
+        :class:`~minilink.core.trajectory.Trajectory` sample spacing.
     compile_backend : str
         Backend for plant compile (default ``numpy``).
     verbose : bool
@@ -143,16 +144,24 @@ class HybridSimulator:
         )
 
         n_computer = diagram.n
-        n_plant = self.plant.n
         n_ticks = self.n_ticks
+        plant_m = self.plant.m
 
         k_hist = np.zeros(n_ticks, dtype=float)
-        t_hist = np.zeros(n_ticks, dtype=float)
         x_computer_hist = np.zeros((n_computer, n_ticks))
-        x_plant_hist = np.zeros((n_plant, n_ticks))
-        signal_hist = _allocate_signal_hist(diagram, self._p2c, n_ticks)
+        computer_signal_hist = _allocate_signal_hist(
+            diagram, self._p2c, n_ticks, plant_signals=False
+        )
         plant_port_aliases = {
             plant_port: computer_port for plant_port, computer_port in self._p2c
+        }
+
+        plant_signal_names = _collect_plant_signal_names(diagram, self._p2c)
+        t_plant_parts: list[np.ndarray] = []
+        x_plant_parts: list[np.ndarray] = []
+        u_plant_parts: list[np.ndarray] = []
+        plant_signal_parts = {
+            name: [] for name in plant_signal_names
         }
 
         for tick_idx in range(n_ticks):
@@ -177,13 +186,14 @@ class HybridSimulator:
                 zoh_buffers,
                 self._c2p,
             )
-            x_plant = self.plant_eval.integrate_zoh(
+            t_seg, x_seg = self.plant_eval.integrate_zoh_rollout(
                 x_plant,
                 u_plant,
                 t_k,
                 self.dt_base,
                 dt_inner=self.plant_dt_inner,
             )
+            x_plant = x_seg[-1]
             sample_buffers = _sample_plant_outputs(
                 self.plant_eval,
                 x_plant,
@@ -192,27 +202,74 @@ class HybridSimulator:
                 self._p2c,
             )
 
+            if tick_idx == 0:
+                t_append = t_seg
+                x_append = x_seg
+            else:
+                t_append = t_seg[1:]
+                x_append = x_seg[1:]
+
+            t_plant_parts.append(t_append)
+            x_plant_parts.append(x_append)
+            for i in range(x_append.shape[0]):
+                t_i = float(t_append[i])
+                x_i = x_append[i]
+                u_plant_parts.append(np.asarray(u_plant, dtype=float).reshape(plant_m))
+                outs_fine = self.plant_eval.outputs(x_i, u_plant, t_i)
+                for name in plant_signal_names:
+                    if name == "r" and name in diagram.inputs:
+                        sl = diagram.get_input_port_slice(name)
+                        plant_signal_parts[name].append(
+                            np.asarray(u_computer[sl], dtype=float).reshape(-1)
+                        )
+                    elif name in outs_fine:
+                        plant_signal_parts[name].append(
+                            np.asarray(outs_fine[name], dtype=float).reshape(-1)
+                        )
+
             k_hist[tick_idx] = k
-            t_hist[tick_idx] = t_k
             x_computer_hist[:, tick_idx] = computer.x
-            x_plant_hist[:, tick_idx] = x_plant
             _record_tick_signals(
-                signal_hist,
+                computer_signal_hist,
                 diagram,
                 u_computer,
                 outs,
                 sample_buffers,
-                x_plant,
                 tick_idx,
                 plant_port_aliases=plant_port_aliases,
             )
 
-        result = HybridSimResult(
+        t_plant = np.concatenate(t_plant_parts)
+        x_plant_hist = np.vstack(x_plant_parts).T
+        u_plant_fine = np.column_stack(u_plant_parts) if u_plant_parts else np.zeros((plant_m, 0))
+        plant_signals = {}
+        for name, parts in plant_signal_parts.items():
+            if not parts:
+                continue
+            plant_signals[name] = np.column_stack(parts)
+
+        computer_signals = {
+            name: values
+            for name, values in computer_signal_hist.items()
+            if name not in {"x", "u"}
+        }
+
+        computer_rollout = StepRollout(
             k=k_hist,
-            t=t_hist,
-            x_computer=x_computer_hist,
-            x_plant=x_plant_hist,
-            signals=signal_hist,
+            x=x_computer_hist,
+            u=u_traj,
+            signals=computer_signals,
+        )
+        plant_traj = Trajectory(
+            t=t_plant,
+            x=x_plant_hist,
+            u=u_plant_fine,
+            signals=plant_signals,
+        )
+
+        result = HybridSimResult(
+            computer=computer_rollout,
+            plant=plant_traj,
             hybrid=self.hybrid,
         )
         self.last_result = result
@@ -222,119 +279,138 @@ class HybridSimulator:
 @dataclass(frozen=True)
 class HybridSimResult:
     """
-    Hybrid rollout sampled once per base tick.
+    Hybrid rollout with separate computer and plant views.
 
     Parameters
     ----------
-    k : np.ndarray
-        Integer step index at tick start, shape ``(N,)``.
-    t : np.ndarray
-        Wall time ``t0 + k * dt_base``, shape ``(N,)``.
-    x_computer : np.ndarray
-        Computer state after each tick, shape ``(n_computer, N)``.
-    x_plant : np.ndarray
-        Plant state after each tick, shape ``(n_plant, N)``.
-    signals : dict of str to np.ndarray
-        Named boundary channels, each shape ``(dim, N)``.
+    computer : StepRollout
+        Tick-indexed computer diagram state and boundary signals.
+    plant : Trajectory
+        Continuous-time plant state and boundary channels at ``plant_dt_inner``
+        (or ``dt_base`` when inner sub-stepping is unset).
     hybrid : HybridDiagram, optional
         Source diagram for plot labels (optional).
     """
 
-    k: np.ndarray
-    t: np.ndarray
-    x_computer: np.ndarray
-    x_plant: np.ndarray
-    signals: dict[str, np.ndarray] = field(default_factory=dict)
+    computer: StepRollout
+    plant: Trajectory
     hybrid: HybridDiagram | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
-        k = np.asarray(self.k, dtype=float).reshape(-1).copy()
-        t = np.asarray(self.t, dtype=float).reshape(-1).copy()
-        x_computer = np.asarray(self.x_computer, dtype=float).copy()
-        x_plant = np.asarray(self.x_plant, dtype=float).copy()
-
-        if k.ndim != 1 or t.ndim != 1:
-            raise ValueError("k and t must be 1-D arrays")
-        if k.size == 0:
-            raise ValueError("HybridSimResult must contain at least one sample")
-        if t.size != k.size:
-            raise ValueError("t must have the same length as k")
-        if x_computer.ndim != 2 or x_computer.shape[1] != k.size:
-            raise ValueError("x_computer must have shape (n_computer, N)")
-        if x_plant.ndim != 2 or x_plant.shape[1] != k.size:
-            raise ValueError("x_plant must have shape (n_plant, N)")
-
-        signals = {}
-        for name, values in dict(self.signals).items():
-            arr = np.asarray(values, dtype=float).copy()
-            if arr.ndim != 2 or arr.shape[1] != k.size:
-                raise ValueError(
-                    f"Signal {name!r} must have shape (dim, N) where N == k.size"
-                )
-            signals[name] = arr
-
-        object.__setattr__(self, "k", k)
-        object.__setattr__(self, "t", t)
-        object.__setattr__(self, "x_computer", x_computer)
-        object.__setattr__(self, "x_plant", x_plant)
-        object.__setattr__(self, "signals", MappingProxyType(signals))
+        if not isinstance(self.computer, StepRollout):
+            raise TypeError("computer must be a StepRollout")
+        if not isinstance(self.plant, Trajectory):
+            raise TypeError("plant must be a Trajectory")
 
     @property
     def n_samples(self) -> int:
-        return int(self.k.size)
-
-    def as_trajectory_plant(self) -> Trajectory:
-        """Plant-side view as :class:`~minilink.core.trajectory.Trajectory`."""
-        u = self.signals.get("u_cmd")
-        if u is None:
-            u = np.zeros((0, self.n_samples))
-        return Trajectory(
-            t=self.t,
-            x=self.x_plant,
-            u=u,
-            signals={key: val for key, val in self.signals.items() if key != "u_cmd"},
-        )
+        """Number of plant trajectory samples."""
+        return self.plant.n_samples
 
     def plot(
         self,
         *,
         signals: tuple[str, ...] | None = None,
-        abscissa: str = "t",
         show: bool = True,
         backend="matplotlib",
         **kwargs,
     ):
-        """Plot named channels via :func:`~minilink.graphical.signals.time_signals.plot_time_signals`."""
+        """Plot plant channels (continuous-time view)."""
+        return self._plot_view(
+            self.plant,
+            sys=self.hybrid.plant if self.hybrid is not None else None,
+            signals=signals,
+            show=show,
+            backend=backend,
+            abscissa_label=None,
+            **kwargs,
+        )
+
+    def plot_computer(
+        self,
+        *,
+        signals: tuple[str, ...] | None = None,
+        show: bool = True,
+        backend="matplotlib",
+        **kwargs,
+    ):
+        """Plot computer boundary channels on the tick index ``k``."""
+        from minilink.graphical.signals.time_signals import STEP_ABSCISSA_LABEL
+
+        if signals is None:
+            signals = tuple(self.computer.signals.keys())
+        return self._plot_view(
+            self.computer.as_trajectory(),
+            sys=self.hybrid.computer.diagram if self.hybrid is not None else None,
+            signals=signals,
+            show=show,
+            backend=backend,
+            abscissa_label=STEP_ABSCISSA_LABEL,
+            **kwargs,
+        )
+
+    def _plot_view(
+        self,
+        traj,
+        *,
+        sys,
+        signals,
+        show,
+        backend,
+        abscissa_label,
+        **kwargs,
+    ):
         from minilink.graphical.signals.time_signals import (
-            STEP_ABSCISSA_LABEL,
             TIME_ABSCISSA_LABEL,
             plot_time_signals,
         )
 
         if signals is None:
-            signals = tuple(self.signals.keys())
+            names = list(traj.signals.keys())
+            if traj.u.shape[0]:
+                names = ["u", *names]
+            if traj.x.shape[0]:
+                names = ["x", *names]
+            signals = tuple(dict.fromkeys(names))
 
-        traj_signals = dict(self.signals)
-        if "x_plant" in signals:
-            traj_signals["x_plant"] = self.x_plant
-        if "x_computer" in signals:
-            traj_signals["x_computer"] = self.x_computer
-
-        u = traj_signals.get("u_cmd", np.zeros((0, self.n_samples)))
-        plot_t = self.t if abscissa == "t" else self.k
-        traj = Trajectory(t=plot_t, x=self.x_plant, u=u, signals=traj_signals)
-
-        abscissa_label = TIME_ABSCISSA_LABEL if abscissa == "t" else STEP_ABSCISSA_LABEL
-        sys = self.hybrid.plant if self.hybrid is not None else self
+        plot_signals = self._normalize_plot_signal_names(
+            signals,
+            control_key=self._plant_control_signal_key(),
+        )
+        label = abscissa_label or TIME_ABSCISSA_LABEL
+        if sys is None:
+            sys = self.hybrid.plant if self.hybrid is not None else self
         return plot_time_signals(
             sys,
             traj,
-            signals=signals,
-            abscissa_label=abscissa_label,
+            signals=plot_signals,
+            abscissa_label=label,
             backend=backend,
             show=show,
             **kwargs,
         )
+
+    @staticmethod
+    def _normalize_plot_signal_names(
+        signals: tuple[str, ...],
+        *,
+        control_key: str | None,
+    ) -> tuple[str, ...]:
+        """Map boundary control names routed into ``Trajectory.u`` for plotting."""
+        if control_key is None:
+            return signals
+        plot_key = "u"
+        if control_key == plot_key:
+            return signals
+        return tuple(plot_key if name == control_key else name for name in signals)
+
+    def _plant_control_signal_key(self) -> str | None:
+        if self.hybrid is None:
+            return None
+        for conn in self.hybrid.connections:
+            if conn.direction == "computer_to_plant":
+                return conn.computer_port
+        return None
 
 
 # Internal machinery
@@ -413,14 +489,26 @@ def _assemble_computer_u(diagram, forced_u, sample_buffers, p2c):
     return u
 
 
-def _collect_signal_names(diagram, p2c):
+def _collect_computer_signal_names(diagram, p2c):
     names = set(diagram.outputs)
-    for plant_port, computer_port in p2c:
+    for _plant_port, computer_port in p2c:
         names.add(computer_port)
-        names.add(plant_port)
     if "r" in diagram.inputs:
         names.add("r")
     return tuple(sorted(names))
+
+
+def _collect_plant_signal_names(diagram, p2c):
+    names = set()
+    if "r" in diagram.inputs:
+        names.add("r")
+    for plant_port, _computer_port in p2c:
+        names.add(plant_port)
+    return tuple(sorted(names))
+
+
+def _collect_signal_names(diagram, p2c):
+    return _collect_computer_signal_names(diagram, p2c)
 
 
 def _signal_dim(name, diagram, p2c):
@@ -436,10 +524,14 @@ def _signal_dim(name, diagram, p2c):
     raise KeyError(f"Unknown signal {name!r}")
 
 
-def _allocate_signal_hist(diagram, p2c, n_ticks):
+def _allocate_signal_hist(diagram, p2c, n_ticks, *, plant_signals=True):
+    if plant_signals:
+        names = _collect_signal_names(diagram, p2c)
+    else:
+        names = _collect_computer_signal_names(diagram, p2c)
     return {
         name: np.zeros((_signal_dim(name, diagram, p2c), n_ticks))
-        for name in _collect_signal_names(diagram, p2c)
+        for name in names
     }
 
 
@@ -449,7 +541,6 @@ def _record_tick_signals(
     u_computer,
     outs,
     sample_buffers,
-    x_plant,
     tick_idx,
     *,
     plant_port_aliases,
@@ -465,8 +556,6 @@ def _record_tick_signals(
         elif name in diagram.inputs:
             sl = diagram.get_input_port_slice(name)
             values = np.asarray(u_computer[sl], dtype=float).reshape(-1)
-        elif name == "x_plant":
-            values = np.asarray(x_plant, dtype=float).reshape(-1)
         else:
             continue
 

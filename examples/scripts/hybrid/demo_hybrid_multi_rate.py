@@ -82,4 +82,5 @@ result = hybrid.compute_forced(
     input_port_id="r",
     plant_dt_inner=PLANT_DT_INNER,
 )
-hybrid.plot_trajectory(signals=("r", "y", "y_f", "u_cmd", "x_plant"), show=True)
+hybrid.plot_trajectory(signals=("r", "y", "x", "u"), show=True)
+result.plot_computer(signals=("y_f", "u_cmd"), show=True)

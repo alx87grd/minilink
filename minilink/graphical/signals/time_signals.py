@@ -9,6 +9,10 @@ import numpy as np
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.graphical.common import PlotResult
+from minilink.graphical.signals.signal_colors import (
+    color_for_signal,
+    is_internal_signal,
+)
 
 TIME_ABSCISSA_LABEL = "Time [s]"
 STEP_ABSCISSA_LABEL = "Step [k]"
@@ -24,6 +28,8 @@ class SignalTrace:
     unit: str
     values: np.ndarray
     color: str
+    alpha: float = 1.0
+    linewidth: float = 1.5
 
 
 @dataclass(frozen=True)
@@ -101,6 +107,7 @@ def build_signal_plot_spec(
                 break
 
     traces = []
+    internal_index = 0
     for signal_name in requested:
         if signal_name == "x":
             values = np.asarray(traj.x, dtype=float)
@@ -124,8 +131,18 @@ def build_signal_plot_spec(
                 f"Unknown signal(s): {signal_name}. Available signals: {available}"
             )
 
-        color = _color_for_signal(signal_name)
-        for i in range(values.shape[0]):
+        idx = internal_index if is_internal_signal(signal_name) else None
+        if is_internal_signal(signal_name):
+            internal_index += 1
+
+        n_components = values.shape[0]
+        for i in range(n_components):
+            style = color_for_signal(
+                signal_name,
+                component=i,
+                n_components=n_components,
+                internal_index=idx,
+            )
             traces.append(
                 SignalTrace(
                     signal=signal_name,
@@ -133,7 +150,9 @@ def build_signal_plot_spec(
                     label=labels[i],
                     unit=units[i],
                     values=values[i, :],
-                    color=color,
+                    color=style.color,
+                    alpha=style.alpha,
+                    linewidth=style.linewidth,
                 )
             )
 
@@ -317,12 +336,6 @@ def _available_signal_names(sys, traj) -> tuple[str, ...]:
                 if name not in names:
                     names.append(name)
     return tuple(names)
-
-
-def _color_for_signal(name: str) -> str:
-    if name == "x":
-        return "blue"
-    return "tab:red"
 
 
 def _coerce_signal_plot_spec(traj_or_spec, spec_builder, *, title=None):

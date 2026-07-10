@@ -8,6 +8,7 @@ composition.
 
 from __future__ import annotations
 
+from minilink.core.composition import _propagate_animation_camera
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.core.system import StepSystem, System
@@ -128,6 +129,7 @@ def _as_plant_diagram(plant: System | DiagramSystem) -> DiagramSystem:
     if isinstance(plant, System):
         diagram = DiagramSystem()
         diagram.add_subsystem(plant, "plant")
+        _propagate_animation_camera(diagram, plant)
         return diagram
     raise TypeError(
         f"plant must be DiagramSystem or System, got {type(plant).__name__}"

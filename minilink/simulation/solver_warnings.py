@@ -30,7 +30,7 @@ def collect_discontinuous_solver_notes(
         "one evaluation per step. RK4 sub-steps and SciPy adaptive stepping "
         "can produce misleading or unstable results. For digital sample-and-hold "
         "semantics, consider HybridSimulator with a sampled computer model and "
-        "an explicit sample time (hybrid_closed_loop / sample_static)."
+        "an explicit sample time (hybrid_closed_loop)."
     ]
 
     if user_solver == "rk4_fixedsteps":

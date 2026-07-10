@@ -37,6 +37,28 @@ class TestIntegrateZoh(unittest.TestCase):
         x_seq = evaluator.integrate(x0, u_sequence, t0=0.0, dt=dt_step)
         np.testing.assert_allclose(x_final, x_seq[-1], rtol=1e-10, atol=1e-10)
 
+    def test_integrate_zoh_rollout_grid(self):
+        plant = Integrator()
+        evaluator = plant.compile()
+
+        x0 = np.array([0.0])
+        u_hold = np.array([1.0])
+        dt_hold = 0.1
+        dt_inner = 0.02
+
+        t_samples, x_samples = evaluator.integrate_zoh_rollout(
+            x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
+        )
+        n_sub = int(round(dt_hold / dt_inner))
+        self.assertEqual(t_samples.shape[0], n_sub + 1)
+        self.assertEqual(x_samples.shape, (n_sub + 1, 1))
+        np.testing.assert_allclose(t_samples[0], 0.0)
+        np.testing.assert_allclose(t_samples[-1], dt_hold, rtol=1e-12)
+        x_final = evaluator.integrate_zoh(
+            x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
+        )
+        np.testing.assert_allclose(x_samples[-1], x_final)
+
     def test_invalid_dt_raises(self):
         plant = Integrator()
         evaluator = plant.compile()

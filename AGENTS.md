@@ -59,6 +59,7 @@ Reading minilink should feel like a controls/dynamics textbook.
 ### Math naming
 
 - Matrices `A`, `B`, `H`, `M`, `K`; vectors `x`, `u`, `y`, `q`, `v`, `dq`; dims `n`, `m`, `p`.
+- **Leaf = diagram role only** — reserve *leaf* for a subsystem node inside `DiagramSystem` / `StepDiagramSystem` (compile/plan context). Standalone `DynamicSystem` / `StepSystem` wrappers use descriptive type names (e.g. `DiscretizedDynamicSystem`), not `*Leaf`.
 - **Unpack `params` before equations**; **no `self.` in core equation lines** — bind locals first.
 - Lay out 2-D literals one row per line; use `# fmt: off` / `# fmt: on` for alignment.
 - Reader-facing imports stay light in demos; internal packages may import richly when clear.

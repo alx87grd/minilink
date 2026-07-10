@@ -176,7 +176,7 @@ continuous plants — not full Simulink parity. Plan:
   continuous diagram API unchanged
 - [x] **Phase 1** — `StepSystem`, `StepRollout`, `compile()` step branch, `compute_rollout` / `plot_rollout`
 - [x] **Phase 2** — `StepDiagramSystem`, `compile_step_diagram`, `compute_rollout`
-- [x] **Phase 3** — `discretize()`, `sample_static()` in `minilink/analysis/discretize.py`
+- [x] **Phase 3** — `discretize()` in `minilink/analysis/discretize.py`
 - [x] **Phase 4** — `StepSchedule`, `Computer` (`.tick(u)`, double buffer)
 - [x] **Phase 5** — `HybridDiagram`, `HybridSimulator`, `HybridSimResult`, multi-rate hybrid demo, Pyro SMC hybrid compare *(5a)*
 - [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz export, `abstract_boundary` topology *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*

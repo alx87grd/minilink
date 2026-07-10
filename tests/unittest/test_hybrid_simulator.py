@@ -8,6 +8,8 @@ from minilink.blocks.basic import Integrator
 from minilink.control.output import ProportionalController
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_composition import hybrid_closed_loop
+from minilink.core.step_rollout import StepRollout
+from minilink.core.trajectory import Trajectory
 from minilink.simulation.hybrid_simulator import HybridSimulator
 
 
@@ -40,10 +42,13 @@ class TestHybridSimulator(unittest.TestCase):
         sim = HybridSimulator(hybrid, t0=0, tf=0.2)
         result = sim.solve_forced(np.array([1.0]), input_port_id="r")
 
-        self.assertEqual(result.x_computer.shape[0], hybrid.computer.diagram.n)
-        self.assertEqual(result.x_plant.shape[0], hybrid.plant.n)
-        self.assertEqual(result.n_samples, sim.n_ticks)
-        self.assertIn("u_cmd", result.signals)
+        self.assertEqual(result.computer.x.shape[0], hybrid.computer.diagram.n)
+        self.assertEqual(result.plant.x.shape[0], hybrid.plant.n)
+        self.assertEqual(result.computer.n_samples, sim.n_ticks)
+        self.assertGreaterEqual(result.plant.n_samples, sim.n_ticks)
+        self.assertIsInstance(result.computer, StepRollout)
+        self.assertIsInstance(result.plant, Trajectory)
+        self.assertIn("u_cmd", result.computer.signals)
 
     def test_one_tick_measurement_delay(self):
         hybrid = _build_hybrid()
@@ -51,7 +56,7 @@ class TestHybridSimulator(unittest.TestCase):
         result = sim.solve_forced(np.array([1.0]), input_port_id="r")
 
         # Controller at tick 0 sees zero measurement from the initial sample buffer.
-        self.assertAlmostEqual(float(result.signals["u_cmd"][0, 0]), 0.5)
+        self.assertAlmostEqual(float(result.computer.signals["u_cmd"][0, 0]), 0.5)
 
     def test_plot_smoke(self):
         import matplotlib
@@ -66,20 +71,64 @@ class TestHybridSimulator(unittest.TestCase):
             input_port_id="r",
         )
         hybrid.plot_trajectory(
-            signals=("r", "y", "u_cmd", "x_plant"),
+            signals=("r", "y", "u_cmd", "x"),
             show=False,
         )
+
+    def test_plot_smoke_default_computer_out_u(self):
+        """``hybrid_closed_loop`` default ``computer_out='u'`` must not clash with Trajectory.u."""
+        import matplotlib
+
+        matplotlib.use("Agg")
+
+        from minilink.control.modelbased import SlidingModeController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum(length=1.0, mass=1.0)
+        smc = SlidingModeController(plant)
+        hybrid = hybrid_closed_loop(smc, plant, schedule=0.02, computer_in="y", plant_out="y")
+        hybrid.compute_forced(
+            np.array([0.0, 0.0]),
+            t0=0.0,
+            tf=0.1,
+            input_port_id="r",
+            verbose=False,
+        )
+        hybrid.plot_trajectory(show=False)
 
     def test_compute_forced_caches_traj(self):
         hybrid = _build_hybrid()
         self.assertIsNone(hybrid.traj)
+        self.assertIsNone(hybrid.last_result)
         result = hybrid.compute_forced(
             np.array([1.0]),
             t0=0,
             tf=0.05,
             input_port_id="r",
+            verbose=False,
         )
-        self.assertIs(hybrid.traj, result)
+        self.assertIs(hybrid.last_result, result)
+        self.assertIs(hybrid.traj, result.plant)
+        self.assertIs(hybrid.rollout, result.computer)
+
+    def test_animate_uses_plant_traj(self):
+        hybrid = _build_hybrid()
+        hybrid.compute_forced(
+            np.array([1.0]),
+            t0=0,
+            tf=0.05,
+            input_port_id="r",
+            verbose=False,
+        )
+        hybrid.animate(show=False)
+
+    def test_plant_diagram_inherits_camera_scale(self):
+        from minilink.core.hybrid_composition import _as_plant_diagram
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum(length=1.0, mass=1.0)
+        plant_diagram = _as_plant_diagram(plant)
+        self.assertEqual(plant_diagram.camera_scale, plant.camera_scale)
 
 
 if __name__ == "__main__":

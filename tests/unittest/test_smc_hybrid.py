@@ -4,7 +4,6 @@ import unittest
 
 import numpy as np
 
-from minilink.analysis.discretize import sample_static
 from minilink.control.modelbased import SlidingModeController
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
@@ -15,9 +14,8 @@ def _build_hybrid(*, ts=0.05):
     plant = Pendulum(length=1.0, mass=1.0)
     plant.x0 = np.array([2.5, -0.2])
     ctl = SlidingModeController(plant, lam=2.0, gain=6.0, nab=0.12)
-    smc = sample_static(ctl, dt=ts)
     return hybrid_closed_loop(
-        smc,
+        ctl,
         plant,
         schedule=ts,
         computer_in="y",
@@ -73,7 +71,7 @@ class TestSmcHybrid(unittest.TestCase):
         )
         result = sim.solve_forced(ref, input_port_id="r")
         np.testing.assert_allclose(
-            result.signals["y"][0, :n_steps],
+            result.computer.signals["y"][0, :n_steps],
             q_hand,
             rtol=1e-5,
             atol=1e-5,
