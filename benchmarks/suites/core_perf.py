@@ -18,7 +18,7 @@ from benchmarks.simulation import (
     SimulationBenchmarkVariant,
     benchmark_simulation_backend,
 )
-from benchmarks.systems.basic import JaxPendulum
+from benchmarks.systems.basic import JaxPendulum, NumpyPendulum
 from benchmarks.systems.network import make_dense_network
 from minilink.blocks.routing import Gain
 from minilink.blocks.sources import Step
@@ -54,9 +54,17 @@ def run_core_perf_suite(
     return metrics
 
 
+def _pendulum_for_f_benchmark():
+    try:
+        import jax.numpy as jnp  # noqa: F401
+    except ImportError:
+        return NumpyPendulum(damping=0.5)
+    return JaxPendulum(damping=0.5)
+
+
 def _f_evaluator_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     metrics: list[MetricRecord] = []
-    pendulum = JaxPendulum(damping=0.5)
+    pendulum = _pendulum_for_f_benchmark()
     pendulum.x0[0] = 1.0
     x_np = np.array([1.0, 0.0])
     u_np = np.array([0.0])

@@ -188,8 +188,12 @@ class TestHybridTopology(unittest.TestCase):
             self.skipTest("graphviz package not installed")
 
         import os
+        import shutil
         import subprocess
         import tempfile
+
+        if shutil.which("dot") is None:
+            self.skipTest("graphviz dot binary not installed")
 
         graph = export_hybrid_topology(_build_hybrid(), backend="graphviz")
         with tempfile.NamedTemporaryFile(suffix=".gv", delete=False) as tmp:

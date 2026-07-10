@@ -11,10 +11,13 @@ from minilink.core.compile.evaluators.dynamics_evaluator import DynamicsEvaluato
 from minilink.core.compile.evaluators.static_evaluator import NumpyStaticEvaluator
 
 try:
+    import jax  # noqa: F401
+
     from minilink.core.compile.evaluators.static_evaluator import JaxStaticEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
+    JaxStaticEvaluator = None  # type: ignore[misc, assignment]
     _JAX_AVAILABLE = False
 
 

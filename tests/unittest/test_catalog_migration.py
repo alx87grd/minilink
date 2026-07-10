@@ -69,6 +69,18 @@ from tests.unittest.graphics_contract_helpers import (
 )
 
 
+def _have_jax() -> bool:
+    try:
+        import jax  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+_JAX_CATALOG_SYSTEMS = (JaxKinematicBicycle, JaxKinematicBicycleRateInputs)
+
+
 def _zero_f_smoke(system):
     x = np.asarray(system.x0, dtype=float)
     if x.shape != (system.n,):
@@ -250,6 +262,8 @@ class TestCatalogSmoke(unittest.TestCase):
 
         for system in systems:
             with self.subTest(system=system.name):
+                if isinstance(system, _JAX_CATALOG_SYSTEMS) and not _have_jax():
+                    self.skipTest("JAX not installed")
                 _zero_f_smoke(system)
                 _geometry_smoke(system)
 
