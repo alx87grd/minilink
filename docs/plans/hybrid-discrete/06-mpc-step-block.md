@@ -1,217 +1,261 @@
-# Phase 6: MPC `StepBlock` API
+# Phase 6: MPC block for hybrid simulation
 
 **Status: pending** — next hybrid program milestone.
 
-**After [Phase 5](05-hybrid-simulation.md).** Refactor the MPC planning layer so
-`MPCPlanner` can export a **`StepSystem`** leaf for hybrid / step simulation — replacing
-hand-rolled outer loops in MPC demos.
+**After [Phase 5](05-hybrid-simulation.md).** Expose MPC as a step-diagram leaf usable in
+`Computer` / `HybridDiagram`, replacing hand-rolled outer loops in MPC demos.
 
-**Requires:** Phases **1–2** (`StepSystem`, `StepDiagramSystem`), Phase **1b** (flow diagram IS-A
-`DynamicSystem`), Phase 5 (`HybridSimulator`).
-Phase 4 **`Computer`** on the step side when used inside hybrid sim.
+**Requires:** Phases **1–2** (`StepSystem`, `StepDiagramSystem`), Phase **5**
+(`HybridSimulator`), Phase **4** (`Computer`).
 
-**Files:** `minilink/planning/mpc/step_block.py` (name TBD), `minilink/planning/mpc/planner.py`
+**Files:** `minilink/planning/mpc/controller.py`, `minilink/planning/mpc/plan_reconstruct.py`;
+6b adds `step_block.py`, `warm_start.py`.
 
 ## Motivation
 
 Today MPC demos call `MPCPlanner.step(x, initial_guess=...)` inside a Python `while t < tf`
 loop with manual `u_hold`, `SUBSTEPS`, and warm-start shifting. Phase 5 delivers
-`HybridSimulator`; Phase 6 moves MPC **into** the step-diagram contract so demos become:
+`HybridSimulator`; Phase 6 moves MPC **into** the step-diagram contract:
 
 ```python
-hybrid = HybridDiagram(computer=Computer(controller_with_mpc, schedule), plant=plant)
-HybridSimulator(hybrid, ...).solve_forced(u)
+hybrid = HybridDiagram(computer=Computer(step_diagram, schedule), plant=plant_diagram)
+result = hybrid.compute_forced(..., plant_dt_inner=SIM_DT)
 ```
 
-`MPCPlanner` remains the NLP engine; **`MPCStepBlock`** (working name) is the `StepSystem`
-adapter the diagram and **Computer** call.
+`MPCPlanner` remains the compile-once NLP engine; new blocks adapt planner output to diagram
+ports and `Computer.tick`.
 
-## Split of concerns
+## Split: algebraic (6a) vs step (6b)
 
-| Piece | Role |
-| --- | --- |
-| **`MPCPlanner`** | Compile-once NLP; `step(x_start, initial_guess=...)` → `Trajectory` |
-| **`MPCStepBlock`** | `StepSystem` façade: map diagram `u` / `x` ↔ planner call; expose `u_cmd` on `h` |
-| **`HybridSimulator`** | Clock, boundary ZOH/sample, plant — unchanged from Phase 5 |
-
-**Coordinate note:** `MPCStepBlock.step(x, u, k, …)` uses integer **`k`** (Computer fire
-index). `MPCPlanner.step(x_meas, …)` is the planning API — different object, different meaning;
-no wall time on the block ([Phase 1](01-step-core.md)).
-
-## Milestones
-
-| Milestone | Block state | Warm start | Demo |
+| Mode | Base type | State | Mechanism in `Computer.tick` |
 | --- | --- | --- | --- |
-| **6a** | **`n = 0`** — stateless | `initial_guess=None` every tick (planner default) | Refactor straight-line MPC demo |
-| **6b** | **`n > 0`** — packed last plan | Shift previous horizon in `step` | Same demo; match shifted-guess hand loop |
+| **6a stateless** | `System` (`n=0`) | none | **port `compute` only** (same as `SlidingModeController` in hybrid SMC demos) |
+| **6b warm-start** | `StepSystem` (`n=n_z`) | packed decision `z` | port ops solve once (latch) → feedforward outs; **`step` commits `z` only** (no second NLP) |
 
-**Gate:** **6a** before **6b**. **6a** before claiming MPC parity in hybrid acceptance tests.
+**Invalid assumption:** `MPCStepBlock(StepSystem, n=0)` — `StepSystem.__init__` raises if
+`n < 1`. Static blocks use `System(n=0)`; step diagrams compile them as **port ops only**
+(`step_compiler.py` — no `step_ops`).
 
-## `MPCStepBlock` contract (6a — stateless)
+**Why not `step`/`h` for stateless MPC?** `Computer.tick` runs **port ops before step ops**.
+SMC parity relies on algebraic `port.compute` returning control for the **current** tick. A
+`step`+`h` latch would apply **lagged** `u_ff` (solve at end of tick, `h` reads previous latch).
+Stateless MPC must be algebraic.
 
-```python
-class MPCStepBlock(StepSystem):
-  """
-  Stateless MPC controller block for step / hybrid simulation.
+```mermaid
+sequenceDiagram
+  participant C as Computer.tick k
+  participant P as port_ops mpc
+  participant S as step_op mpc 6b only
+  participant NLP as planner.step once
 
-  Diagram inputs ``u`` carry measurements and references (e.g. ``y``, ``r``).
-  Output ``y`` (via ``h``) is the first control move ``u_cmd`` from the planner.
-  """
-
-  def __init__(self, planner: MPCPlanner, *, input_layout: ...):
-      super().__init__(n=0, m=..., p=...)
-      self._planner = planner
-      ...
-
-  def step(self, x, u, k=0, params=None):
-      x_meas = extract_measurement(u, ...)
-      plan = self._planner.step(x_meas, initial_guess=None)
-      self._u_cmd = plan.u[:, 0].copy()
-      return np.array([])   # x_new — empty for n=0
-
-  def h(self, x, u, k=0, params=None):
-      return self._u_cmd
+  C->>P: local_x = z_k-1 or empty
+  P->>NLP: first port triggers _solve_for_tick
+  NLP-->>P: latch plan z
+  P->>P: u_ff x_ff z read latch
+  C->>S: step returns latch.z
+  Note over C: outs = port values; computer.x = z_k
 ```
 
-### 6a rules
-
-- **`n = 0`** — no block state vector; warm-start trajectory is **not** retained across ticks.
-- **`step` is the sole planner call site** per Computer fire (no duplicate solve in `h`).
-- Input unpacking (which entries of `u` are `y`, `r`, etc.) is explicit at construct time or via
-  port metadata — not implicit globals.
-- Factory helper encouraged:
-
-```python
-def mpc_step_block(planner: MPCPlanner, *, y_idx=..., r_idx=...) -> MPCStepBlock: ...
+```mermaid
+flowchart TB
+  subgraph solve [Single planner.step per tick k]
+    S[MPCPlanner.step y]
+    S --> Plan[Trajectory plan]
+    Plan --> Uff["u_ff = plan.u[:,0]"]
+    Plan --> Xff["x_ff = plan.x[:,1]"]
+    Plan --> Zfull["z = packed decision"]
+  end
+  subgraph ports [Three outputs same latch]
+    U[out u_ff]
+    X[out x_ff]
+    Z[out z]
+  end
+  solve --> ports
 ```
 
-### 6a acceptance
+## Order of operations (Computer contract)
 
-- Straight-line MPC demo drops the outer `while` / `SUBSTEPS` loop; uses `HybridSimulator`.
-- Closed-loop trajectory matches **stateless** hand-rolled loop (default guess each tick) within tolerance.
-- One demo refactor only; preserve user tuning constants in the script.
+**`Computer.tick` always runs port ops, then step ops**, per subsystem (`computer.py`). We do
+**not** change that order.
 
-## `MPCStepBlock` contract (6b — warm-start state)
+### Per-tick timeline (one MPC block firing at tick `k`)
 
-Extend the same class (or `MPCStepBlockWarmStart` subclass — prefer **one class**, `n` toggled by
-option) so block state holds the **previous plan** for horizon shifting.
+| Phase | What runs | MPC block sees | MPC block produces |
+| --- | --- | --- | --- |
+| 1. Port ops | Each output port `compute` | `local_x` = **pre-step** state (`z_{k-1}` for 6b; empty for 6a); `local_u` includes `y_k` | Writes `u_ff`, `x_ff`, `z` to signal buffer |
+| 2. Step op | `step` (6b only) | Same `local_x` = `z_{k-1}` | Returns `z_k` → `computer.x` |
+| 3. Commit | `outs` = boundary slices of signal buffer; `k += 1` | — | Plant ZOH uses `outs["u_ff"]` |
+
+Feedforward outputs at tick `k` come from the NLP solved **at** tick `k` using measurement
+`y_k`. That matches hand-loop demos (`solve` then `u_hold = plan.u[:, 0]`). Port-ops-before-step
+does **not** lag `u_ff` as long as the solve happens in port ops (not in `h` after a previous
+tick's step).
+
+### Why not solve in `step` only?
+
+- Port ops run **before** `step` → `h` would expose **previous** tick's plan (one MPC period late).
+- Solving in `step` after port ops → `outs` already committed without current `u_ff`.
+
+**Sole NLP call site: port ops**, via a shared latch. `step` (6b) only **commits** latched `z`.
+
+### Single-solve latch (shared by 6a and 6b)
 
 ```python
-def step(self, x, u, k=0, params=None):
-    x_meas = extract_measurement(u, ...)
-    guess = shift_plan_state(x) if x.size else None
-    plan = self._planner.step(x_meas, initial_guess=guess)
-    return pack_plan_state(plan)   # x_new for next tick
+def _solve_for_tick(self, k, y, z_warm=None):
+    if self._latch_k == k:
+        return self._latch
+    plan = self._planner.step(y, initial_guess=guess_from(z_warm))
+    self._latch_k = k
+    self._latch = TickSolve(plan=plan, z=result.z,
+                           u_ff=plan.u[:, 0], x_ff=plan.x[:, 1])
+    return self._latch
 ```
 
-### State encoding (6b) — use `z`, not a core Trajectory flatten
+Each output port `compute(k, ...)` calls `_solve_for_tick` and returns one field. **First port
+evaluated at tick `k` runs the NLP; the other two read the latch.** Tests assert
+`planner.step` call count == number of MPC fires.
 
-**Do not** add a `Trajectory` → flat vector helper in `minilink/core/`. Flatten layout is
-**transcription-specific** (direct collocation packs `[x.ravel(); u.ravel()]`, shooting packs
-`u.ravel()` only) and already lives on the transcription:
+**Purity note:** port `compute` is conventionally pure in `(x, u, t, params)`. The latch is a
+deliberate, documented exception for multi-output MPC leaves, keyed on integer tick `k` (always
+passed by `Computer`).
 
-```191:224:minilink/planning/trajectory_optimization/direct_collocation.py
-    def pack(
-        self, x: np.ndarray, u: np.ndarray, problem: PlanningProblem
-    ) -> np.ndarray:
-        """Pack sampled state and input matrices into one decision vector."""
-        return np.concatenate((x.reshape(-1), u.reshape(-1)))
+### 6a static vs 6b step
+
+| | **6a `MPCController`** | **6b `MPCStepBlock`** |
+| --- | --- | --- |
+| Base | `System`, `n=0` | `StepSystem`, `n=n_z` |
+| `step_op` | none | `return self._latch.z` (no NLP) |
+| Warm start | `initial_guess=None` | `z_warm` = `local_x` = `z_{k-1}`, shifted via `warm_start.py` |
+| `z` persistence | ephemeral (`signals["z"]` only) | `computer.x` **and** `signals["z"]` after tick `k` |
+
+**Do not use `expose_state=True` for `z` on 6b:** the state port is evaluated in port ops
+**before** `step`, showing `z_{k-1}`. Use explicit output port `z` returning latched `z_k`, and/or
+read `computer.x[:, k]` post-tick.
+
+### Feedforward port semantics
+
+- `u_ff = plan.u[:, 0]` — apply over current MPC interval (matches existing demos).
+- `x_ff = plan.x[:, 1]` — nominal state at the **next** collocation node (for low-level feedback).
+- `z` — packed `last_optimization_result.z`; logging, animation, 6b warm-start seed.
+
+Factory validates `transcription.options.n_steps >= 2`.
+
+## Block contracts
+
+### `MPCController` — Phase 6a
+
+**File:** `minilink/planning/mpc/controller.py`
+
+- Extends `System`, `n=0` (mirror `ProportionalController`)
+- **Input:** `y` (measurement, dim `planner.problem.sys.n`)
+- **Outputs (three ports, one solve):** `u_ff`, `x_ff`, `z` as above
+- **Solve latch:** `_solve_for_tick(k, y, z_warm=None)` — not a `StepSystem.step` in 6a
+- Factory: `mpc_controller(planner)` — validates prepared `MPCPlanner`, `n_steps >= 2`, port dims
+
+### `MPCStepBlock` — Phase 6b (deferred)
+
+- Extends `StepSystem`, `n = transcription.decision_dimension(problem)`
+- **Same three output ports** and **same `_solve_for_tick` latch** as 6a
+- **`step`:** `return self._solve_for_tick(k, y, z_warm=local_x).z`
+- Warm-start shift: `minilink/planning/mpc/warm_start.py` (from straight-line demo logic)
+
+## Diagram outputs → `StepRollout` (no `plan_log`)
+
+```python
+step_diagram.connect_new_output_port("mpc", "u_ff", "u_ff")
+step_diagram.connect_new_output_port("mpc", "x_ff", "x_ff")
+step_diagram.connect_new_output_port("mpc", "z", "z")
+```
+
+`HybridSimulator` records boundary `outs` into `StepRollout.signals`. Shapes per tick:
+`u_ff` `(m,)`, `x_ff` `(n,)`, `z` `(n_z,)`.
+
+6a demo wires `u_ff` to plant; `x_ff` and `z` for optional feedback and post-sim horizon.
+
+**Post-sim reconstruction** — `minilink/planning/mpc/plan_reconstruct.py`:
+
+```python
+def mpc_plans_from_rollout(
+    computer: StepRollout,
+    transcription,
+    problem,
+    *,
+    z_source: str = "signals",
+    t0: float,
+    dt_mpc: float,
+) -> list[tuple[float, Trajectory]]:
     ...
-    def pack_initial_guess(
-        self,
-        problem: PlanningProblem,
-        guess: np.ndarray | Trajectory | None,
-    ) -> np.ndarray:
-        ...
-        if isinstance(guess, Trajectory):
-            resampled = guess.resample(t_new=self.options.t)
-            return self.pack(resampled.x, resampled.u, problem)
-
-        return guess.reshape(-1)
 ```
 
-**`MPCStepBlock` warm-start state = previous optimizer decision `z`**, not a hand-rolled
-trajectory flatten:
+Animation: `HorizonPolyline(mpc_plans_from_rollout(...))` on `hybrid.animate(overlays=[...])`.
 
-| Representation | Role |
+## Phase 6a deliverables
+
+| Item | Detail |
 | --- | --- |
-| **`z`** (`result.z` from last solve) | **Block state `x`** — fixed `n = transcription.decision_dimension(problem)` |
-| **`Trajectory`** | User / demo API; `MPCPlanner.step(..., initial_guess=traj)`; shift logic in trajectory space |
-| **`pack` / `unpack` / `pack_initial_guess`** | Transcription bridge — planning layer only |
+| Block | `MPCController` + `mpc_controller()` |
+| Demo | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py` — generic `HybridDiagram`; **do not edit** `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py` |
+| Tests | `test_mpc_controller.py`; `test_mpc_hybrid_straight_line.py` (stateless parity on `u_ff`) |
+| Exports | `mpc_controller`, `MPCController`, `mpc_plans_from_rollout` from `planning/mpc/__init__.py` |
+
+### Demo wiring (sketch)
 
 ```python
-n_z = planner.transcription.decision_dimension(planner.problem)
-# block constructed with n=n_z when warm_start=True
+mpc = mpc_controller(mpc_planner)
+step_diagram = StepDiagramSystem()
+step_diagram.add_subsystem(mpc, "mpc")
+step_diagram.add_input_port("y")
+step_diagram.connect("input", "y", "mpc", "y")
+step_diagram.connect_new_output_port("mpc", "u_ff", "u_ff")
+step_diagram.connect_new_output_port("mpc", "x_ff", "x_ff")
+step_diagram.connect_new_output_port("mpc", "z", "z")
 
-def step(self, x, u, k=0, params=None):
-    x_meas = extract_measurement(u, ...)
-    z_guess = shift_mpc_initial_guess(
-        x, x_meas, planner.transcription, planner.problem, dt_shift=planner_dt
-    ) if x.size else None
-    plan = self._planner.step(x_meas, initial_guess=z_guess)
-    return np.asarray(self._planner.last_optimization_result.z).copy()
-```
+plant_diagram = DiagramSystem()
+# rate bicycle + Demux(dims=(1,1)) at boundary u
 
-**Warm-start shift** (today's demo logic in `Trajectory` space) becomes a **planning helper**
-(e.g. `minilink/planning/mpc/warm_start.py`):
-
-1. `unpack(z_prev) → (x, u)` on the fixed collocation grid.
-2. Shift / truncate horizon; pin `x[:, 0] = x_meas` (same semantics as straight-line demo).
-3. `pack(x, u)` **or** build a `Trajectory` and call `pack_initial_guess` (resamples to grid).
-
-Either path ends in `z` before the solver; prefer **matrix shift + `pack`** to avoid an extra
-`Trajectory` alloc in the hot loop. **`Trajectory` stays the logging / plotting / user-facing
-type**; it is not the canonical simulation state vector.
-
-**6a:** `n = 0`, no `z` retained. **6b:** `n = decision_dimension`, state is last `z`.
-
-### 6b acceptance
-
-- Same hybrid demo matches **warm-started** hand-rolled loop (shifted `prev_plan` guess) within tolerance.
-- Stateless mode (`n=0` or `warm_start=False`) still works for tests and teaching.
-
-## `MPCPlanner` refactor scope
-
-Minimal surface changes — planner API stays:
-
-```python
-plan = planner.step(x_start, initial_guess=guess)
-```
-
-Phase 6 work:
-
-1. **`mpc_step_block(planner, ...)`** factory in `planning/mpc/`.
-2. Document input/output port layout for bicycle (and one generic template).
-3. **`shift_mpc_initial_guess(z_prev, x_meas, transcription, problem, dt_shift)`** in
-   `planning/mpc/` — factors demo shift logic; **not** a core `Trajectory` flatten tool.
-4. **Do not** move compile-once / `prepare()` into the sim loop — block holds prepared planner from `__init__`.
-
-## Hybrid wiring (6a)
-
-```python
-mpc = mpc_step_block(mpc_planner, ...)
-controller = StepDiagramSystem()
-controller.add_subsystem(mpc, "mpc")
-controller.add_input_port("y")
-controller.connect_new_output_port("mpc", "u", "u")
-
-schedule = StepSchedule(dt_base=MPC_DT)
-hybrid = HybridDiagram(computer=Computer(controller, schedule), plant=plant)
-hybrid.connect_boundary(direction="computer_to_plant", computer_port="u", plant_port="u")
+hybrid = HybridDiagram(computer=Computer(step_diagram, schedule), plant=plant_diagram)
+hybrid.connect_boundary(direction="computer_to_plant", computer_port="u_ff", plant_port="u")
 hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_port="y")
-HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).solve_forced(u)
 ```
 
-## Tests
+**Parity (6a):** stateless — `initial_guess=None` every MPC tick; match hand loop on `u_ff`.
+
+## Explicit non-changes
+
+- No `hybrid_mpc_closed_loop()` shortcut
+- No `MPCPlanner` API changes
+- No `HybridSimulator` / `Computer` tick-order changes
+- Existing `examples/scripts/mpc/*` demos untouched until 6b parity
+
+## Implementation checklist
+
+- [ ] `MPCController` + `mpc_controller()` in `controller.py`
+- [ ] `mpc_plans_from_rollout()` in `plan_reconstruct.py`
+- [ ] Exports; DESIGN / ROADMAP / README updates
+- [ ] `test_mpc_controller.py`, `test_mpc_hybrid_straight_line.py`
+- [ ] Hybrid straight-line demo + horizon overlay from `signals["z"]`
+- [ ] **6b:** `MPCStepBlock`, `warm_start.py`, warm-started demo parity
+
+## Verification
+
+```bash
+conda activate minilink
+ruff check . && ruff format --check .
+pytest tests/unittest/test_mpc_controller.py tests/unittest/test_mpc_hybrid_straight_line.py
+MPLBACKEND=Agg python examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py
+```
+
+## Tests (6a + 6b)
 
 | File | Cases |
 | --- | --- |
-| `test_mpc_step_block.py` | 6a stateless `step`/`h`; port unpack; planner called once per tick |
-| `test_mpc_step_block_warm_start.py` | 6b state pack/shift; guess matches demo shift |
-| `test_mpc_hybrid_demo_parity.py` | hybrid vs hand-rolled straight-line (6a and 6b) |
+| `test_mpc_controller.py` | `u_ff`/`x_ff`/`z` ports; exactly one `planner.step` per tick |
+| `test_mpc_hybrid_straight_line.py` | hybrid vs stateless hand loop on `u_ff` |
+| `test_mpc_step_block.py` (6b) | warm-start `z` state; shift matches demo |
+| `test_mpc_hybrid_demo_parity.py` (6b) | hybrid vs warm-started hand loop |
 
 ## Deferred
 
-- JAX-differentiable MPC inside `step` (planner stays NumPy for v1).
-- Multi-rate MPC inside one diagram (use Phase 5b `fire` on `mpc` sys_id).
-- Exposing full `Trajectory` on diagram boundary every tick (logging via simulator traj only).
+- JAX-differentiable MPC inside block (planner stays NumPy for v1)
+- Multi-rate MPC via `StepSchedule.fire` on `mpc` sys_id
+- `hybrid_mpc_closed_loop()` sugar when a second demo repeats Demux boilerplate

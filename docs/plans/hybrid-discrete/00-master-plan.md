@@ -34,9 +34,8 @@ side (`StepSystem` + static `System` with `n=0`) and flow side (`DynamicSystem` 
 by explicit boundary ZOH/sample edges and driven by `HybridSimulator`.
 
 **Done when:** SMC and cascade hybrids run through `HybridSimulator` with parity vs hand-rolled
-loops; straight-line MPC demo drops its outer `while` / `SUBSTEPS` loop via `MPCStepBlock` +
-`HybridSimulator` (6a stateless, 6b warm-start); DESIGN / ROADMAP / README reflect the new
-subset.
+loops; new hybrid straight-line MPC demo via `MPCController` + `HybridDiagram` (6a stateless,
+6b warm-start `MPCStepBlock`); DESIGN / ROADMAP / README reflect the new subset.
 
 ## v1 scope
 
@@ -47,7 +46,7 @@ subset.
 - `Computer` (`StepDiagramSystem` + `StepSchedule`, `.tick()`) — single- and integer multi-rate.
 - Two-side `HybridDiagram` (`computer` + `plant`) + `HybridSimulator` (one multi-channel boundary; ZOH/sample, `integrate_zoh` / `integrate_zoh_rollout`).
 - SMC hybrid (5a), cascade hybrid with non-trivial `fire` (5b), hybrid plot + shortcuts (5c).
-- `MPCStepBlock` stateless (6a) then warm-start via last optimizer **`z`** (6b).
+- `MPCController` algebraic block (6a) then warm-start `MPCStepBlock` with optimizer **`z`** state (6b).
 
 ### Out of scope (v1)
 
@@ -104,7 +103,7 @@ Detail and tick-0 init: [05-hybrid-simulation.md](05-hybrid-simulation.md).
 | **4** | [04-computer.md](04-computer.md) | Dual runtime: sync rollout vs **`Computer`** (stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers) | **Done** |
 | **5** | [05-hybrid-simulation.md](05-hybrid-simulation.md) | `HybridDiagram`, `HybridSimulator`, `integrate_zoh_rollout`, fine plant `Trajectory`, façade `traj` / `last_result` / `animate` | **Done** (5a SMC + 5b multi-rate + `0ccba60`) |
 | **5c** | [05c-hybrid-viz-shortcuts.md](05c-hybrid-viz-shortcuts.md) | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop` | **Done** |
-| **6** | [06-mpc-step-block.md](06-mpc-step-block.md) | `MPCStepBlock` in `planning/mpc/` | **6a** stateless (`n=0`) · **6b** warm-start (`n = decision_dimension`, state = **`z`**) |
+| **6** | [06-mpc-step-block.md](06-mpc-step-block.md) | `MPCController` + `MPCStepBlock` in `planning/mpc/` | **6a** stateless algebraic (`System`, `n=0`) · **6b** warm-start (`StepSystem`, `n = decision_dimension`, state = **`z`**) |
 
 **Clock rule:** sample time lives in **`StepSchedule.dt_base`** (Phase 4+). Leaf `step` and
 step diagrams stay time-agnostic; hybrid sim **always** uses **`Computer`** on the step
@@ -120,8 +119,8 @@ side. **`StepEvaluator.rollout`** (Phase 1) is clock-free (games, unit tests, le
 | **5b** | Filter @ fast rate + slow controller cascade (`fire` divisors) — `demo_hybrid_multi_rate.py` |
 | **5a** | Pyro SMC continuous vs hybrid — `demo_smc_pendulum_compare.py` |
 | **5c** | `hybrid.plot_diagram()`; `hybrid_closed_loop(step_ctl, plant, schedule=...)` |
-| **6a** | Refactor `demo_dynamic_bicycle_rate_mpc_straight_line.py` — drop outer loop |
-| **6b** | Same demo — warm-start parity vs shifted-guess hand loop |
+| **6a** | New `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py` — stateless parity; existing `mpc/` demo unchanged |
+| **6b** | Warm-start `MPCStepBlock`; parity vs shifted-guess hand loop in `mpc/` demo |
 | **13** | README hybrid call chain; DESIGN §3 subset; ROADMAP TRL checkboxes |
 
 ## Package map
@@ -132,7 +131,7 @@ side. **`StepEvaluator.rollout`** (Phase 1) is clock-free (games, unit tests, le
 | Step + hybrid compile | `minilink/core/compile/` (`step_execution_plan.py`, `step_compiler.py`, `step_diagram_evaluator.py`) |
 | Runners, Computer, hybrid sim | `minilink/simulation/` |
 | `discretize` | `minilink/analysis/discretize.py` |
-| `MPCStepBlock`, warm-start helpers | `minilink/planning/mpc/` |
+| `MPCController`, `MPCStepBlock`, warm-start helpers | `minilink/planning/mpc/` |
 | Hybrid topology / plot | `minilink/graphical/diagrams/` |
 | `hybrid_closed_loop` | `minilink/core/hybrid_composition.py` (or tail of `composition.py`) |
 
@@ -175,8 +174,8 @@ flowchart TB
         HCL[hybrid_closed_loop]
     end
 
-    subgraph P6 [Phase 6 MPC StepBlock]
-        MPC[MPCStepBlock]
+    subgraph P6 [Phase 6 MPC blocks]
+        MPC[MPCController and MPCStepBlock]
     end
 
     subgraph Cont [Continuous core]
@@ -217,7 +216,7 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 | Sample time + multi-rate **inside** step diagram | `StepSchedule` + **`Computer`** | 4 |
 | Step↔plant ZOH/sample + plant integration | `HybridSimulator` | 5 |
 | Hybrid plot + `hybrid_closed_loop` | `graphical/` + `hybrid_composition` | **5c** |
-| MPC planner → `StepSystem` for simulation | `MPCStepBlock` | 6 |
+| MPC planner → hybrid step diagram | `MPCController` (6a) / `MPCStepBlock` (6b) | 6 |
 
 ## Acceptance criteria
 
@@ -233,8 +232,8 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 | **5a** | `HybridSimulator` matches hand-rolled SMC; **multi-channel** boundary; one-tick delay enforced | **Done** |
 | **5b** | Cascade hybrid: filter fast + slow block; non-trivial `fire` parity | **Done** |
 | **5c** | `plot_hybrid_diagram` topology; `hybrid_closed_loop` matches manual `connect_boundary` | **Done** |
-| **6a** | Stateless `MPCStepBlock`; straight-line demo via `HybridSimulator`; trajectory matches stateless hand loop |
-| **6b** | Warm-start via **`z`** shift; same demo matches shifted-guess hand loop |
+| **6a** | Stateless `MPCController` (`u_ff`/`x_ff`/`z` ports, one NLP per tick); hybrid straight-line demo; trajectory matches stateless hand loop on `u_ff` |
+| **6b** | Warm-start `MPCStepBlock` via **`z`** shift; matches shifted-guess hand loop |
 | **13** | DESIGN §3 subset, ROADMAP maturity, README call chain updated | partial — DESIGN / ROADMAP / plans synced; README hybrid chain updated |
 
 Open contracts before implementation (detail in shard docs): ~~`ExecutionPlan` step fork in Phase 2~~
@@ -259,7 +258,7 @@ MPC failure policy in Phase 6.
 | 10 | 5 | Pyro SMC + hybrid compare demo **(5a)** | **Done** |
 | 11 | 5 | Cascade hybrid demo **(5b**, non-trivial `fire`) | **Done** |
 | 12 | 5c | `build_hybrid_topology`, `plot_hybrid_diagram`, `hybrid_closed_loop` | **Done** |
-| 13 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line MPC demo refactor |
+| 13 | 6 | `MPCController` stateless **(6a)** + hybrid straight-line demo |
 | 14 | 6 | `MPCStepBlock` warm-start **`z`** state **(6b)** |
 | 15 | all | DESIGN §3 subset · ROADMAP TRL · README hybrid call chain | partial |
 
@@ -275,4 +274,4 @@ MPC failure policy in Phase 6.
 - **5a before 5b** — trivial schedule before multi-rate cascade.
 - **5a before 5c plot** — `HybridDiagram` exists; **5c milestone complete after 5b**.
 - **Phase 5 before Phase 6** — hybrid sim exists before `MPCStepBlock`.
-- **6a before 6b** — stateless MPC block before warm-start **`z`** state.
+- **6a before 6b** — stateless algebraic `MPCController` before warm-start **`MPCStepBlock`**.
