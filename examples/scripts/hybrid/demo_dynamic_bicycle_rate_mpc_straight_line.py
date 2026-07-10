@@ -26,9 +26,9 @@ from minilink.planning.mpc import (
     MPCDirectCollocationTranscription,
     MPCOptions,
     MPCPlanner,
-    mpc_stateless_controller,
     mpc_plans_from_rollout,
     mpc_stateful_controller,
+    mpc_stateless_controller,
 )
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 from minilink.planning.problems import PlanningProblem

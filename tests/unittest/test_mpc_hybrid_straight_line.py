@@ -17,8 +17,8 @@ from minilink.planning.mpc import (  # noqa: E402
     MPCOptions,
     MPCPlanner,
     mpc_animation_overlays,
-    mpc_stateless_controller,
     mpc_plans_from_rollout,
+    mpc_stateless_controller,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402

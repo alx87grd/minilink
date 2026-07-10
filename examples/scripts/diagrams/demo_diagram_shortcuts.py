@@ -81,13 +81,13 @@ noisy = Step(final_value=[1.0]) >> ImpedanceController() @ PendulumWithNoisePort
 noise = WhiteNoise()
 noisy.add_subsystem(noise, "sensor_noise")
 noisy
-noisy.connect("sensor_noise", "y", "pendulum", "v")
+noisy.connect("sensor_noise", "y", "sys", "v")
 show(
     noisy,
     "Closed loop with explicit sensor noise",
     "Step() >> ImpedanceController() @ Pendulum(), WhiteNoise() -> pendulum.v",
 )
-
+noisy.plot_diagram()
 
 # Equivalent explicit form:
 #
