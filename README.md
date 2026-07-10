@@ -362,6 +362,7 @@ Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator 
            →  compile  →  solve  →  Trajectory
            StepSystem: compute_rollout  →  StepEvaluator.rollout
            HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
+           cache: self.traj (plant Trajectory), self.last_result (full result), self.rollout (computer)
 
 Compile:   sys.compile(backend)  →  DynamicsEvaluator
 
@@ -371,6 +372,7 @@ Plot:      plot_trajectory*  →  graphical.signals  →  PlotResult
            HybridDiagram.plot_diagram  →  hybrid composite (Plant + Computer clusters)
 
 Animate:   animate* / render / game  →  Animator  →  renderer backend
+           HybridDiagram.animate  →  plant geometry + fine plant traj
            planner.plot_solution / animate_solution  →  problem.sys.*
 
 Trajopt:   PlanningProblem + Transcription + TrajectoryOptimizationPlanner

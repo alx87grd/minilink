@@ -1,5 +1,7 @@
 # Phase 4: Computer (scheduled discrete simulation)
 
+**Status: Done** (July 2026).
+
 **After [Phase 2](02-step-diagram.md).** Introduces the **`Computer`** — a **simulation-only**
 runtime for a **`StepDiagramSystem`** topology under a **firing schedule**.
 
@@ -37,7 +39,7 @@ in `minilink/simulation/` beside `Simulator`.
 | Component | Owns |
 | --- | --- |
 | **`Computer`** | Firing schedule; stacked **`x`**; **double signal buffers**; internal tick index **`k`**; **`.tick(u)`** |
-| **`HybridSimulator`** ([Phase 5](05-hybrid-simulation.md)) | `t_k = t0 + k · dt_base`; hybrid boundary ZOH/sample; plant `rk4_rollout_zoh` |
+| **`HybridSimulator`** ([Phase 5](05-hybrid-simulation.md)) | `t_k = t0 + k · dt_base`; hybrid boundary ZOH/sample; plant `integrate_zoh_rollout` |
 | **`StepSystem` leaf** | Pure **`step(x, u, k)`** — **`k` only**, no `dt` / `t` on class |
 
 **`dt_base` on `StepSchedule`** is metadata for hybrid time alignment and user-facing Hz helpers —

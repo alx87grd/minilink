@@ -124,7 +124,7 @@ def hybrid_closed_loop(
 Behavior:
 
 1. Wrap leaf `computer_side` in `StepDiagramSystem` if needed (`ctl` id).
-2. Wrap leaf plant in `DiagramSystem` if needed (`plant` id).
+2. Wrap leaf plant in `DiagramSystem` if needed (`plant` id); copy leaf `camera_*` hints onto plant diagram.
 3. Build `Computer(step_diagram, schedule)`.
 4. Expose `r` on computer diagram boundary; expose `y` on plant diagram boundary.
 5. `connect_boundary(computer_to_plant)` and `connect_boundary(plant_to_computer)` for defaults.

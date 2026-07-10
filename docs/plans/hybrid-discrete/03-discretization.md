@@ -21,19 +21,18 @@ def discretize(
     system: DynamicSystem,
     dt: float,
     method: str = "rk4",
-) -> StepSystem:
+) -> DiscretizedDynamicSystem:
     ...
 ```
 
 ### Contract
 
-- **`discretize` inputs:** `DynamicSystem`, sample time `dt`, method (`rk4` only in v1).
-- **`discretize` output:** New `StepSystem` with `step` closing over `(system, dt, method)`.
-- **Math:** `x_{k+1} = step(x, u, k)` = ZOH integration of `f` over one interval; `dt` in the
-  closure, not a `step` argument.
+- **`discretize` inputs:** `DynamicSystem`, optional ``dt=``, optional extra ``params``; sample time lives in ``params["dt"]``.
+- **`discretize` output:** ``DiscretizedEulerDynamicSystem`` or ``DiscretizedRK4DynamicSystem``; ``step`` / ``h`` forward ``params`` to the source ``f`` / ``h``.
+- **Math:** `x_{k+1} = step(x, u, k; p)` = ZOH integration of `f` over one interval; `t_k = k · p["dt"]`.
 - **Static controllers in hybrid loops:** pass the leaf `System` to `hybrid_closed_loop(..., schedule=dt)`.
   Sampling and ZOH are enforced by `Computer` / `HybridSimulator`.
 
 ## Tests
 
-- `test_discretize.py`: `discretize` RK4 one step matches `rk4_step`; `h` delegates to source.
+- `test_discretize.py`: `discretize` RK4 one step matches `rk4_step`; `h` delegates to source; no `sample_static` (schedule on `Computer` instead).

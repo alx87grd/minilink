@@ -1,5 +1,7 @@
 # Phase 6: MPC `StepBlock` API
 
+**Status: pending** — next hybrid program milestone.
+
 **After [Phase 5](05-hybrid-simulation.md).** Refactor the MPC planning layer so
 `MPCPlanner` can export a **`StepSystem`** leaf for hybrid / step simulation — replacing
 hand-rolled outer loops in MPC demos.
@@ -18,7 +20,7 @@ loop with manual `u_hold`, `SUBSTEPS`, and warm-start shifting. Phase 5 delivers
 
 ```python
 hybrid = HybridDiagram(computer=Computer(controller_with_mpc, schedule), plant=plant)
-HybridSimulator(hybrid, ...).run()
+HybridSimulator(hybrid, ...).solve_forced(u)
 ```
 
 `MPCPlanner` remains the NLP engine; **`MPCStepBlock`** (working name) is the `StepSystem`
@@ -197,7 +199,7 @@ schedule = StepSchedule(dt_base=MPC_DT)
 hybrid = HybridDiagram(computer=Computer(controller, schedule), plant=plant)
 hybrid.connect_boundary(direction="computer_to_plant", computer_port="u", plant_port="u")
 hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_port="y")
-HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
+HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).solve_forced(u)
 ```
 
 ## Tests

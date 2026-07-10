@@ -179,6 +179,7 @@ continuous plants — not full Simulink parity. Plan:
 - [x] **Phase 3** — `discretize()` in `minilink/analysis/discretize.py`
 - [x] **Phase 4** — `StepSchedule`, `Computer` (`.tick(u)`, double buffer)
 - [x] **Phase 5** — `HybridDiagram`, `HybridSimulator`, `HybridSimResult`, multi-rate hybrid demo, Pyro SMC hybrid compare *(5a)*
+- [x] **Phase 5** — fine plant recording (`integrate_zoh_rollout`, `plant_dt_inner`); façade `traj` / `last_result` / `rollout` / `animate()`
 - [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz export, `abstract_boundary` topology *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*
 - [ ] **Phase 6** — `MPCStepBlock` + MPC demo refactor (drop hand-rolled outer loops)
 

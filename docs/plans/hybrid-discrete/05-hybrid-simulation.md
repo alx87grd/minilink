@@ -1,7 +1,9 @@
 # Phase 5: Hybrid Simulation
 
-**Status: Phase 5 done** (July 2026). **5a** Pyro SMC hybrid compare demo done; **5b** multi-rate
-demo done; **5c** composite `plot_diagram` + wiring shortcuts done.
+**Status: Phase 5 done** (July 2026, `0ccba60`). **5a** Pyro SMC hybrid compare demo done; **5b** multi-rate
+demo done; **5c** composite `plot_diagram` + wiring shortcuts done. Fine plant recording at
+``plant_dt_inner`` via ``integrate_zoh_rollout``; façade cache ``traj`` / ``last_result`` /
+``rollout``; ``animate()`` on plant geometry.
 
 **After [Phase 4](04-computer.md).** v1 hybrid topology: **`Computer`** (discrete side) +
 **`DiagramSystem`** plant (continuous side), linked by **one boundary** with **multi-channel**
@@ -170,13 +172,25 @@ def integrate_zoh(
     """
 ```
 
-`HybridSimulator` accepts `plant_dt_inner` (or equivalent) and forwards to the evaluator.
+`HybridSimulator` accepts `plant_dt_inner` (or equivalent) and forwards to
+:meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh_rollout`
+for fine plant trajectory recording (final state from last sample when only integration is needed).
+
+## Fine plant recording (`0ccba60`)
+
+When ``plant_dt_inner < dt_base``, ``HybridSimulator`` records a plant
+:class:`~minilink.core.trajectory.Trajectory` on the inner grid while the computer side stays
+tick-indexed. ``HybridSimResult.plant`` is the default plot/animate view;
+``HybridSimResult.computer`` (and ``hybrid.rollout``) cover tick-indexed internals.
+
+``hybrid_closed_loop`` copies leaf ``camera_scale`` / ``camera_target`` onto the wrapped plant
+diagram so ``hybrid.animate()`` matches direct ``plant.animate()`` framing.
 
 ## Milestones
 
 | Milestone | Content |
 | --- | --- |
-| **5 core** | `integrate_zoh`, `HybridDiagram`, `HybridSimulator` + `HybridSimResult.plot`, multi-rate demo |
+| **5 core** | `integrate_zoh` / `integrate_zoh_rollout`, `HybridDiagram`, `HybridSimulator` + `HybridSimResult.plot`, multi-rate demo, fine plant traj |
 | **5a** | Pyro SMC continuous vs hybrid compare — `demo_smc_pendulum_compare.py`; `test_smc_hybrid.py` |
 | **5b** | Cascade hybrid — **non-trivial `fire`** (e.g. filter @ 100 Hz + slow `StepSystem` @ 10 Hz) |
 
@@ -220,8 +234,9 @@ HybridSimulator(hybrid, t0=0, tf=TS, plant_dt_inner=SIM_DT).solve_forced(u)
 
 ## Tests
 
-- `test_integrate_zoh.py` — NumPy; `dt_inner` subdivides `dt_hold`
-- `test_hybrid_simulator.py` — **multi-channel** boundary; 5a matches hand-rolled SMC (or test double)
+- `test_integrate_zoh.py` — NumPy; `integrate_zoh_rollout` grid; `dt_inner` subdivides `dt_hold`
+- `test_hybrid_fine_recording.py` — fine plant samples vs computer ticks
+- `test_hybrid_simulator.py` — **multi-channel** boundary; cache `traj` / `last_result`; `animate` smoke
 - `test_hybrid_boundary_connect.py` — invalid boundary wiring; dimension mismatch
 - `test_hybrid_cascade.py` — 5b filter + slow block
 - `test_smc_hybrid.py` — 5a smoke

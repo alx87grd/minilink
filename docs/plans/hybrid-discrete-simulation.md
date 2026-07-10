@@ -1,7 +1,7 @@
 # Hybrid and step simulation (design only)
 
-Status: Phases **0**, **1a**, **1**, **1b**, **2**, **4**, **5**, **5c** complete on `dev-hybrid`
-(July 2026); Phase **3** postponed; Phases **6** pending. Shard contracts:
+Status: Phases **0**, **1a**, **1**, **1b**, **2**, **3**, **4**, **5** (5a/5b + fine plant recording), and **5c**
+complete on `dev-hybrid` (July 2026, `0ccba60`). Phase **6** pending. Shard contracts:
 [hybrid-discrete/00-master-plan.md](hybrid-discrete/00-master-plan.md).
 
 Architecture for **step maps** (difference equations, jumps, turn-based dynamics),
@@ -35,7 +35,7 @@ Near-term deliverables (see **[00-master-plan.md](hybrid-discrete/00-master-plan
 1. **Phase 1** — `StepSystem` leaf; unified `compile()` step branch; `StepEvaluator.rollout` / `compute_rollout`; `step(x, u, k)` / `h(x, u, k)`; no wall time on leaf. **Done** (`700f8ea`).
 1b. **Phase 1b** — façade mixin split; `DiagramSystem` IS-A `DynamicSystem`; MRO sim dispatch. **Done** (`40c8297`).
 2. **Phase 2** — `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator`. **Done** (`0b7a1fd`).
-3. **Phase 3** — `discretize()` optional conversion tool.
+3. **Phase 3** — `discretize()` optional conversion tool. **Done.**
 4. **Phase 4** — **`Computer`**: stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers; dual runtime vs sync rollout.
 5. **Phase 5** — `HybridSimulator` + boundary ports; **always** uses Phase 4 on the step side.
 6. **Phase 6** — `MPCStepBlock` API: stateless (6a), then warm-start state (6b); MPC demo refactor.
@@ -66,14 +66,14 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 | **1** | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepEvaluator.rollout` / `compute_rollout` | none | **Done** |
 | **1b** | Façade mixins; `DiagramSystem(DynamicSystem)`; MRO sim dispatch | — | **Done** |
 | **2** | `StepDiagramSystem`, diagram step compile branch, diagram `StepEvaluator` | none | **Done** |
-| **3** | `discretize(DynamicSystem, dt)` → `StepSystem` | `dt` in closure | postponed |
+| **3** | `discretize(DynamicSystem, dt)` → `DiscretizedDynamicSystem` (`StepSystem`) | `dt` in closure | **Done** |
 | **4** | `StepSchedule` + **`Computer`** (`tick(u)`, double buffer, Hz helpers) | **`dt_base`** for hybrid alignment only | **Done** |
-| **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade | **`schedule.dt_base`**; Computer always on step side | **Done** (SMC deferred) |
+| **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade, fine plant traj, `hybrid.animate` | **`schedule.dt_base`**; Computer always on step side | **Done** |
 | **5c** | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop`, `abstract_boundary` topology | — | **Done** |
 | **6** | `MPCStepBlock` (6a stateless, 6b warm-start) | uses Phase 4–5 stack | pending |
 
 **Split of concerns:** Phase 4 = sample time + firing **inside** the step diagram. Phase 5 =
-step↔plant boundary ZOH/sample + continuous plant (`rk4_rollout_zoh`). Hybrid **requires Phase 4**
+step↔plant boundary ZOH/sample + continuous plant (`integrate_zoh` / `integrate_zoh_rollout`). Hybrid **requires Phase 4**
 even for single-rate control (trivial schedule: empty `fire` ⇒ every block every tick).
 
 **Phase 5 milestones:** **5a** — hybrid + trivial schedule + SMC demo; **5b** — cascade hybrid
@@ -256,7 +256,7 @@ schedule = StepSchedule(dt_base=0.01, fire={"filter": 1, "mpc": 10})
 hybrid = HybridDiagram(computer=Computer(controller, schedule), plant=plant)
 hybrid.connect_boundary(direction="computer_to_plant", computer_port="u", plant_port="u")
 hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_port="y")
-HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
+HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).solve_forced(u)
 ```
 
 **Cross-rate rules (Computer, v1):**
@@ -268,8 +268,7 @@ HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
 | Fast consumer ← slow producer | **ZOH** — hold last slow output in buffer |
 | Block divisor `d > 1` | Run `step` every d base ticks; skip otherwise (buffer holds) |
 
-**Debug:** Computer records `buffer_history` (or `HybridSimResult.buffers`) so internal
-holds are plottable like diagram internal signals — without putting hold state in `x`.
+**Debug (deferred):** Computer `buffer_history` export for internal holds — not on `HybridSimResult` yet.
 
 **Defaults:**
 
@@ -482,7 +481,7 @@ while t < tf:
     u = assemble_computer_boundary(hybrid, world, sample_buffers)
     step_out = computer.tick(u)
     u_plant = assemble_plant_inputs(hybrid, zoh_buffers, step_out)
-    x_plant = cont_evaluator.rk4_rollout_zoh(
+    x_plant = cont_evaluator.integrate_zoh(
         x_plant, u_plant, t, dt, dt_inner=plant_dt_inner
     )
     plant_out = cont_evaluator.outputs(x_plant, u_plant, t + dt)
@@ -628,7 +627,7 @@ flowchart TB
 | Reuse continuous wiring for step diagrams? | **Yes** — sibling `StepDiagramSystem` + shared mixin / `ExecutionPlan` |
 | Where does clock live? | **`StepSchedule.dt_base`** (Phase 4+); not on leaf `StepSystem` |
 | Hybrid step side | **Always** `Computer` (trivial `fire` in 5a) |
-| Hybrid plant + boundary | **`HybridSimulator`** — ZOH/sample edges + `rk4_rollout_zoh` |
+| Hybrid plant + boundary | **`HybridSimulator`** — ZOH/sample edges + `integrate_zoh_rollout` |
 
 ### Phase 5a: single-rate hybrid (trivial schedule)
 
@@ -637,7 +636,7 @@ schedule = StepSchedule(dt_base=Ts)  # empty fire => all blocks every tick
 hybrid = HybridDiagram(computer=Computer(controller, schedule), plant=plant)
 hybrid.connect_boundary(direction="computer_to_plant", computer_port="u", plant_port="u")
 hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_port="y")
-HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
+HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).solve_forced(u)
 ```
 
 ### Phase 5b: multi-rate controller (non-trivial fire)
@@ -654,7 +653,7 @@ schedule = StepSchedule(dt_base=0.01, fire={"filter": 1, "mpc": 10})
 hybrid = HybridDiagram(computer=Computer(controller, schedule), plant=plant)
 hybrid.connect_boundary(direction="computer_to_plant", computer_port="u", plant_port="u")
 hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_port="y")
-HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).run()
+HybridSimulator(hybrid, plant_dt_inner=SIM_DT, ...).solve_forced(u)
 ```
 
 ### Optional: expansion lowering
@@ -694,7 +693,7 @@ Not required for Phase 5b Computer path.
 | Flow diagram | `DiagramSystem` IS-A `DynamicSystem`; `compile()` → `DynamicsEvaluator` | Phase 1b |
 | Step | Out of scope in DESIGN §3 | Layers 1–3 (subset) |
 | MPC demos | Manual Python loop × 7 | Phase **6** via `MPCStepBlock` + `HybridSimulator` |
-| JAX plant rollout | `rk4_rollout_ivp` scan | add `rk4_rollout_zoh` for hybrid inner loop |
+| JAX plant rollout | `rk4_rollout_ivp` scan | `integrate_zoh_rollout` for hybrid inner loop |
 | `game()` loop | Euler on `f` | Later: branch for `StepSystem` → `x = step(x, u, k)` |
 
 ---
@@ -860,7 +859,7 @@ See [04-computer.md](hybrid-discrete/04-computer.md).
 
 Validate port dimensions at connect time. `HybridSimulator` keeps **`zoh_buffers`** (step→plant)
 and **`sample_buffers`** (plant→step). See [05-hybrid-simulation.md](hybrid-discrete/05-hybrid-simulation.md)
-for tick-0 buffer init and `rk4_rollout_zoh(..., dt_inner=...)`.
+for tick-0 buffer init and `integrate_zoh_rollout(..., dt_inner=...)`.
 
 ### `HybridSimulator` — `minilink/simulation/hybrid_simulator.py`
 
@@ -869,7 +868,7 @@ Per **`computer.schedule.dt_base`** tick (`t_k = t0 + computer.k * dt_base` at t
 1. **Sample** — plant→computer edges → `sample_buffers` → assemble boundary **`u`**
 2. **Computer** — **`step_out = computer.tick(u)`** (no **`k`** argument; stateful)
 3. **ZOH** — computer→plant edges → `zoh_buffers` → assemble `u_plant`
-4. **Flow** — `rk4_rollout_zoh(x_plant, u_plant, t_k, dt_base, dt_inner=...)`
+4. **Flow** — `integrate_zoh_rollout(x_plant, u_plant, t_k, dt_base, dt_inner=...)`
 
 **5b:** non-trivial **`computer.schedule.fire`** only; plant boundary unchanged.
 
@@ -957,7 +956,8 @@ refactor in 6a; warm-start parity in 6b.
 | 2 | `test_timed_step_simulator.py` | uniform grid via diagram `StepEvaluator.step` |
 | 3 | `test_discretize.py` | conversion over fixed `dt` |
 | 4 | `test_computer.py` | trivial + multi-rate `fire`, buffers |
-| 5 | `test_rk4_rollout_zoh.py` | ZOH rollout; `dt_inner` subdivides hold interval |
+| 5 | `test_integrate_zoh.py` | ZOH integration; `integrate_zoh_rollout` grid; `dt_inner` subdivides hold interval |
+| 5 | `test_hybrid_fine_recording.py` | fine plant `Trajectory` at `plant_dt_inner` |
 | 5 | `test_hybrid_simulator.py` | 5a multi-port boundary; matches hand-rolled SMC |
 | 5 | `test_hybrid_boundary_connect.py` | invalid boundary wiring |
 | 5 | `test_smc_hybrid.py` | 5a smoke |
@@ -982,14 +982,14 @@ See [00-master-plan.md](hybrid-discrete/00-master-plan.md). Summary:
 | 2 | **1** | `StepSystem`, `ZOHHold`, `compile()` step branch, `StepEvaluator.rollout`, teaching demos | **Done** |
 | 3 | **1b** | Façade mixins; `DiagramSystem(DynamicSystem)` | **Done** |
 | 4–5 | **2** | `StepDiagramSystem`, `StepExecutionPlan`, `compile_step_diagram`, diagram evaluator, `compute_rollout` tests (`TimedStepSimulator` skipped) | **Done** |
-| 6 | 3 | `discretize` *(optional)* | pending |
+| 6 | 3 | `discretize` *(optional)* | **Done** |
 | 7 | 4 | `StepSchedule`, **`Computer`** (`tick(u)`, double buffer, `from_rates`), `test_computer.py` | **Done** |
-| 8–10 | 5 | `rk4_rollout_zoh`, hybrid, SMC **(5a)** | **Done** (SMC deferred) |
+| 8–10 | 5 | `integrate_zoh_rollout`, hybrid, SMC **(5a)** | **Done** |
 | 11 | 5 | cascade hybrid demo **(5b)** | **Done** |
 | 12 | 5c | `plot_hybrid_diagram`, `hybrid_closed_loop` | **Done** |
 | 13 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line demo | pending |
 | 14 | 6 | `MPCStepBlock` warm-start **(6b)** | pending |
-| 15 | all | DESIGN / ROADMAP / README | pending |
+| 15 | all | DESIGN / ROADMAP / README | partial |
 
 **Gates:** **0 → 1a → 1 → 1b → 2 → 4 → 5 → 5c → 6.** Phase 3 optional. **5a → 5b.** **6a → 6b.**
 
