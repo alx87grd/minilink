@@ -41,7 +41,10 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
 
 configure_jax(enable_x64=True)
 
-# MPC
+########################################################
+# Quick Parameters
+########################################################
+
 U_TARGET = 12.0
 MPC_DT = 0.1
 MPC_HORIZON = 2.0
@@ -63,6 +66,10 @@ TURN_RADIUS = 3.5
 START_XY = np.array([-(TRACK_WIDTH / 2 - TURN_RADIUS), -(TRACK_HEIGHT / 2)])
 START_THETA = 0.001
 VX0 = 2.5
+
+########################################################
+# Scene Geometry
+########################################################
 
 
 def _rounded_rect_loop(
@@ -95,7 +102,10 @@ track = ReferenceTrack(from_waypoints(loop_xy), half_width=2.0)
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 scene = Scene(obstacles=[Sphere(center, keepout_radius) for center in OBSTACLE_CENTERS])
 
+########################################################
 # Planning model
+########################################################
+
 sys_mpc = JaxDynamicBicycleRateInputsUY()
 sys_mpc.state.lower_bound[6] = 0.0
 sys_mpc.state.upper_bound[6] = 90.0
@@ -105,7 +115,10 @@ sys_mpc.inputs["u"].lower_bound = np.array([-80.0, -2.0])
 sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 
 
+########################################################
 # Cost Function
+########################################################
+
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
@@ -148,11 +161,14 @@ planner = MPCPlanner(
     ),
 )
 
+########################################################
 # Controller Block
+########################################################
+
 mpc = mpc_stateful_controller(planner, dt_mpc=MPC_DT, step_disp=True)
 
 ########################################################
-# Simulation
+# Simulation model
 ########################################################
 
 # Simulation model
@@ -162,11 +178,21 @@ sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = 16.0
 sys_sim.x0 = x0.copy()
 
+########################################################
+# Diagram
+########################################################
+
+# A discrete time block with a tick schedule
 computer = mpc % MPC_DT
 
+# A hybrid diagram with a plant and a computer
 hybrid = computer @ sys_sim
 
 hybrid.plot_diagram()
+
+########################################################
+# Simulation
+########################################################
 
 result = hybrid.compute_trajectory(
     tf=TF_SIM,
