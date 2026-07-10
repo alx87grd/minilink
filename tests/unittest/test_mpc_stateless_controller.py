@@ -1,4 +1,4 @@
-"""Unit tests for stateless MPCController block."""
+"""Unit tests for stateless MPC block."""
 
 import unittest
 from unittest.mock import patch
@@ -14,11 +14,11 @@ from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.system import DynamicSystem  # noqa: E402
 from minilink.planning.mpc import (  # noqa: E402
-    MPCController,
     MPCDirectCollocationTranscription,
     MPCOptions,
     MPCPlanner,
-    mpc_controller,
+    MPCStatelessController,
+    mpc_stateless_controller,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
@@ -43,7 +43,7 @@ class JaxSingleIntegrator(DynamicSystem):
 
 @pytest.mark.optional
 @pytest.mark.jax
-class TestMPCController(unittest.TestCase):
+class TestMPCStatelessController(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
 
@@ -68,8 +68,8 @@ class TestMPCController(unittest.TestCase):
 
     def test_factory_and_port_dims(self):
         planner = self._make_planner()
-        block = mpc_controller(planner)
-        self.assertIsInstance(block, MPCController)
+        block = mpc_stateless_controller(planner)
+        self.assertIsInstance(block, MPCStatelessController)
         self.assertEqual(block.n, 0)
         self.assertEqual(block.inputs["y"].dim, 1)
         self.assertEqual(block.outputs["u_ff"].dim, 1)
@@ -79,7 +79,7 @@ class TestMPCController(unittest.TestCase):
 
     def test_feedforward_slices_match_planner_step(self):
         planner = self._make_planner(0.2)
-        block = mpc_controller(planner)
+        block = mpc_stateless_controller(planner)
         y = np.array([0.2])
         plan = planner.step(y, initial_guess=None)
 
@@ -93,7 +93,7 @@ class TestMPCController(unittest.TestCase):
 
     def test_single_planner_step_per_tick_across_ports(self):
         planner = self._make_planner(0.0)
-        block = mpc_controller(planner)
+        block = mpc_stateless_controller(planner)
         y = np.array([0.1])
 
         with patch.object(
@@ -108,7 +108,7 @@ class TestMPCController(unittest.TestCase):
 
     def test_bad_measurement_dim_raises(self):
         planner = self._make_planner()
-        block = mpc_controller(planner)
+        block = mpc_stateless_controller(planner)
         with self.assertRaises(ValueError):
             block.outputs["u_ff"].compute(None, np.array([0.0, 1.0]), t=0)
 
@@ -116,7 +116,7 @@ class TestMPCController(unittest.TestCase):
         planner = self._make_planner()
         planner.transcription.options.n_steps = 1
         with self.assertRaises(ValueError):
-            mpc_controller(planner)
+            mpc_stateless_controller(planner)
 
 
 if __name__ == "__main__":

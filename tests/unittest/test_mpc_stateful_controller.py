@@ -1,4 +1,4 @@
-"""Unit tests for warm-start MPCStepBlock."""
+"""Unit tests for warm-start MPC stateful controller."""
 
 import unittest
 from unittest.mock import patch
@@ -18,8 +18,8 @@ from minilink.planning.mpc import (  # noqa: E402
     MPCDirectCollocationTranscription,
     MPCOptions,
     MPCPlanner,
-    MPCStepBlock,
-    mpc_step_block,
+    MPCStatefulController,
+    mpc_stateful_controller,
 )
 from minilink.planning.mpc.warm_start import (  # noqa: E402
     mpc_warm_start_guess,
@@ -48,7 +48,7 @@ class JaxSingleIntegrator(DynamicSystem):
 
 @pytest.mark.optional
 @pytest.mark.jax
-class TestMPCStepBlock(unittest.TestCase):
+class TestMPCStatefulController(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
 
@@ -74,8 +74,8 @@ class TestMPCStepBlock(unittest.TestCase):
     def test_factory_and_state_dim(self):
         planner = self._make_planner()
         dt_mpc = 0.2
-        block = mpc_step_block(planner, dt_mpc=dt_mpc)
-        self.assertIsInstance(block, MPCStepBlock)
+        block = mpc_stateful_controller(planner, dt_mpc=dt_mpc)
+        self.assertIsInstance(block, MPCStatefulController)
         n_z = planner.transcription.decision_dimension(planner.problem)
         self.assertEqual(block.n, n_z)
         self.assertEqual(block.outputs["z"].dim, n_z)
@@ -125,7 +125,7 @@ class TestMPCStepBlock(unittest.TestCase):
 
     def test_feedforward_slices_match_planner_step(self):
         planner = self._make_planner(0.2)
-        block = mpc_step_block(planner, dt_mpc=0.2)
+        block = mpc_stateful_controller(planner, dt_mpc=0.2)
         z_prev = block.x0.copy()
         y = np.array([0.2])
 
@@ -146,7 +146,7 @@ class TestMPCStepBlock(unittest.TestCase):
 
     def test_single_planner_step_per_tick_across_ports_and_step(self):
         planner = self._make_planner(0.0)
-        block = mpc_step_block(planner, dt_mpc=0.2)
+        block = mpc_stateful_controller(planner, dt_mpc=0.2)
         z_prev = block.x0.copy()
         y = np.array([0.1])
 
@@ -164,7 +164,7 @@ class TestMPCStepBlock(unittest.TestCase):
         planner = self._make_planner()
         planner.transcription.options.n_steps = 1
         with self.assertRaises(ValueError):
-            mpc_step_block(planner, dt_mpc=0.2)
+            mpc_stateful_controller(planner, dt_mpc=0.2)
 
 
 if __name__ == "__main__":

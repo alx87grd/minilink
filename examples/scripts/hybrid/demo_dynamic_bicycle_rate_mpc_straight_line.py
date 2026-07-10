@@ -26,9 +26,9 @@ from minilink.planning.mpc import (
     MPCDirectCollocationTranscription,
     MPCOptions,
     MPCPlanner,
-    mpc_controller,
+    mpc_stateless_controller,
     mpc_plans_from_rollout,
-    mpc_step_block,
+    mpc_stateful_controller,
 )
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 from minilink.planning.problems import PlanningProblem
@@ -105,9 +105,9 @@ mpc_planner = MPCPlanner(
 )
 
 mpc = (
-    mpc_step_block(mpc_planner, dt_mpc=MPC_DT, step_disp=STEP_DISP)
+    mpc_stateful_controller(mpc_planner, dt_mpc=MPC_DT, step_disp=STEP_DISP)
     if USE_WARM_START
-    else mpc_controller(mpc_planner, step_disp=STEP_DISP)
+    else mpc_stateless_controller(mpc_planner, step_disp=STEP_DISP)
 )
 x0_computer = mpc_default_computer_x0(mpc_planner) if USE_WARM_START else None
 

@@ -1,5 +1,7 @@
 """Minimal hybrid MPC: ``mpc % schedule`` then ``computer @ plant``.
 
+Warm-start via :func:`mpc_stateful_controller` (packed ``z`` on ``Computer.x``).
+
 Run from repo root::
 
     python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
@@ -17,8 +19,9 @@ from minilink.planning.mpc import (
     MPCOptions,
     MPCPlanner,
     mpc_animation_overlays,
-    mpc_controller,
+    mpc_stateful_controller,
 )
+from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -58,25 +61,22 @@ planner = MPCPlanner(
     options=MPCOptions(
         compile_backend="jax",
         optimizer_method="scipy_slsqp",
-        optimizer_options={"maxiter": 80, "ftol": 1e-2},
+        optimizer_options={"maxiter": 50, "ftol": 1.0},
     ),
 )
 
-mpc = mpc_controller(planner, step_disp=STEP_DISP)
-
-# A Discrete Block with a firing schedule
+mpc = mpc_stateful_controller(planner, dt_mpc=MPC_DT, step_disp=STEP_DISP)
 computer = mpc % MPC_DT
-
-# A Hybrid diagram
 hybrid = computer @ sys
 
-# Plot the diagram
 hybrid.plot_diagram()
 
-# Compute the trajectory
-result = hybrid.compute_trajectory(tf=TF_SIM, plant_dt_inner=SIM_DT)
-
-# Plot the trajectory
+result = hybrid.compute_trajectory(
+    tf=TF_SIM,
+    x0_plant=x0,
+    x0_computer=mpc_default_computer_x0(planner),
+    plant_dt_inner=SIM_DT,
+)
 hybrid.plot_trajectory()
 hybrid.animate(
     overlays=mpc_animation_overlays(result, planner, reference_pad=REF_X_PAD)

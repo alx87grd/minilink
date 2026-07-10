@@ -1,4 +1,4 @@
-"""MPC closed-loop lap via HybridDiagram (warm-start MPCStepBlock).
+"""MPC closed-loop lap via HybridDiagram (warm-start MPCStatefulController).
 
 Same track, cost, and plant setup as
 ``examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py`` but
@@ -27,7 +27,7 @@ from minilink.planning.mpc import (
     MPCOptions,
     MPCPlanner,
     mpc_plans_from_rollout,
-    mpc_step_block,
+    mpc_stateful_controller,
 )
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 from minilink.planning.problems import PlanningProblem
@@ -204,7 +204,7 @@ mpc_planner = MPCPlanner(
 
 lap_length = loop_track.path.total_length
 
-mpc = mpc_step_block(mpc_planner, dt_mpc=MPC_DT, step_disp=STEP_DISP)
+mpc = mpc_stateful_controller(mpc_planner, dt_mpc=MPC_DT, step_disp=STEP_DISP)
 z0_computer = mpc_default_computer_x0(mpc_planner)
 hybrid = mpc.export_to_computer() @ sys_sim
 

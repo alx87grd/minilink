@@ -1,4 +1,4 @@
-"""Warm-start MPC step block for hybrid simulation (Phase 6b)."""
+"""Stateful warm-start MPC controller for hybrid simulation (Phase 6b)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from minilink.planning.mpc.tick_latch import MPCTickLatch
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 
 
-class MPCStepBlock(StepSystem):
+class MPCStatefulController(StepSystem):
     """
     Warm-start MPC block with packed optimizer state on ``Computer.x``.
 
@@ -34,7 +34,7 @@ class MPCStepBlock(StepSystem):
     ) -> None:
         n, m, n_z = validate_mpc_planner(planner)
         super().__init__(n_z, expose_state=False)
-        self.name = "MPC Step Block"
+        self.name = "MPC Stateful Controller"
         self._planner = planner
         self._latch = MPCTickLatch(
             planner,
@@ -121,12 +121,12 @@ class MPCStepBlock(StepSystem):
         return np.asarray(z_new, dtype=float).reshape(self.n).copy()
 
 
-def mpc_step_block(
+def mpc_stateful_controller(
     planner: MPCPlanner,
     *,
     dt_mpc: float,
     step_disp: bool = False,
     t0: float = 0.0,
-) -> MPCStepBlock:
-    """Build a warm-start :class:`MPCStepBlock` from a prepared :class:`MPCPlanner`."""
-    return MPCStepBlock(planner, dt_mpc=dt_mpc, step_disp=step_disp, t0=t0)
+) -> MPCStatefulController:
+    """Build a warm-start :class:`MPCStatefulController` from a prepared :class:`MPCPlanner`."""
+    return MPCStatefulController(planner, dt_mpc=dt_mpc, step_disp=step_disp, t0=t0)

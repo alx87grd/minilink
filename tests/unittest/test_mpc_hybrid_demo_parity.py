@@ -22,7 +22,7 @@ from minilink.planning.mpc import (  # noqa: E402
     MPCDirectCollocationTranscription,
     MPCOptions,
     MPCPlanner,
-    mpc_step_block,
+    mpc_stateful_controller,
 )
 from minilink.planning.mpc.warm_start import (  # noqa: E402
     mpc_default_computer_x0,
@@ -169,7 +169,7 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
 
 
 def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
-    mpc = mpc_step_block(planner, dt_mpc=MPC_DT)
+    mpc = mpc_stateful_controller(planner, dt_mpc=MPC_DT)
     z0 = mpc_default_computer_x0(planner)
 
     step_diagram = StepDiagramSystem()

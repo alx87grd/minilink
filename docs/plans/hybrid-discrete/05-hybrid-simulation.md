@@ -230,7 +230,7 @@ HybridSimulator(hybrid, t0=0, tf=TS, plant_dt_inner=SIM_DT).solve_forced(u)
 ## Control blocks (Phase 5)
 
 - **Static SMC** — `SlidingModeController(...)` in `hybrid_closed_loop(..., schedule=dt)` (Phase 5a).
-- **MPC** — [Phase 6](06-mpc-step-block.md) (`MPCStepBlock`); do not duplicate a second MPC adapter in Phase 5.
+- **MPC** — [Phase 6](06-mpc-step-block.md) (`MPCStatefulController`); do not duplicate a second MPC adapter in Phase 5.
 
 ## Tests
 

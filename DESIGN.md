@@ -181,8 +181,8 @@ serial arms. Joint impedance / task impedance / computed torque use
   ``Computer @ plant`` and :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`
   (same port auto-wiring as continuous ``ctl @ plant`` via
   :func:`~minilink.core.composition.resolve_standard_feedback`);
-  :meth:`~minilink.planning.mpc.controller.MPCController.export_to_computer` /
-  :meth:`~minilink.planning.mpc.step_block.MPCStepBlock.export_to_computer` for warm-start MPC.
+  :meth:`~minilink.planning.mpc.controller.MPCStatelessController.export_to_computer` /
+  :meth:`~minilink.planning.mpc.step_block.MPCStatefulController.export_to_computer` for warm-start MPC.
   Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
   exposes standard ``u`` / ``y`` ports for hybrid composition.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
@@ -200,10 +200,10 @@ serial arms. Joint impedance / task impedance / computed torque use
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
   See [05-hybrid-simulation.md](docs/plans/hybrid-discrete/05-hybrid-simulation.md).
-- **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCController`
+- **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCStatelessController`
   is a static ``System`` (``n=0``) leaf: one :meth:`~minilink.planning.mpc.planner.MPCPlanner.step`
   per Computer tick (memoized across output ports ``u_ff``, ``x_ff``, ``z``).
-  :class:`~minilink.planning.mpc.step_block.MPCStepBlock` (Phase 6b) is a
+  :class:`~minilink.planning.mpc.step_block.MPCStatefulController` (Phase 6b) is a
   :class:`StepSystem` with packed decision state ``z``; warm-start via
   :func:`~minilink.planning.mpc.warm_start.mpc_warm_start_guess` from
   ``Computer.x``.   Post-sim horizons:

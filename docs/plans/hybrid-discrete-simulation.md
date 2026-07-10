@@ -38,7 +38,7 @@ Near-term deliverables (see **[00-master-plan.md](hybrid-discrete/00-master-plan
 3. **Phase 3** — `discretize()` optional conversion tool. **Done.**
 4. **Phase 4** — **`Computer`**: stateful **`tick(u)`**, double buffer, `StepSchedule` + Hz helpers; dual runtime vs sync rollout.
 5. **Phase 5** — `HybridSimulator` + boundary ports; **always** uses Phase 4 on the step side.
-6. **Phase 6** — `MPCStepBlock` API: stateless (6a), then warm-start state (6b); MPC demo refactor.
+6. **Phase 6** — `MPCStatefulController` API: stateless (6a), then warm-start state (6b); MPC demo refactor.
 
 Multi-rate cascade (e.g. 10 Hz MPC + 100 Hz filter) keeps the logical `StepDiagramSystem`
 unchanged; **`Computer`** fires blocks on schedule with internal hold buffers.
@@ -70,7 +70,7 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 | **4** | `StepSchedule` + **`Computer`** (`tick(u)`, double buffer, Hz helpers) | **`dt_base`** for hybrid alignment only | **Done** |
 | **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade, fine plant traj, `hybrid.animate` | **`schedule.dt_base`**; Computer always on step side | **Done** |
 | **5c** | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop`, `abstract_boundary` topology | — | **Done** |
-| **6** | `MPCStepBlock` (6a stateless, 6b warm-start) | uses Phase 4–5 stack | **Done** |
+| **6** | `MPCStatefulController` (6a stateless, 6b warm-start) | uses Phase 4–5 stack | **Done** |
 
 **Split of concerns:** Phase 4 = sample time + firing **inside** the step diagram. Phase 5 =
 step↔plant boundary ZOH/sample + continuous plant (`integrate_zoh` / `integrate_zoh_rollout`). Hybrid **requires Phase 4**
@@ -78,7 +78,7 @@ even for single-rate control (trivial schedule: empty `fire` ⇒ every block eve
 
 **Phase 5 milestones:** **5a** — hybrid + trivial schedule + SMC demo; **5b** — cascade hybrid
 with non-trivial `fire`; **5c** — `plot_hybrid_diagram` + `hybrid_closed_loop`. **Phase 6
-milestones:** **6a** — stateless `MPCStepBlock` + straight-line MPC demo; **6b** — block state
+milestones:** **6a** — stateless `MPCStatefulController` + straight-line MPC demo; **6b** — block state
 holds last optimizer **`z`** for warm-start parity.
 
 ---
@@ -100,7 +100,7 @@ SMC demos use the **minimal** case (one command edge + one measurement edge, pos
 
 | Use case | Controller (step side) | Plant (flow side) | Sample time |
 | --- | --- | --- | --- |
-| **MPC closed loop** | `MPCStepBlock` ([Phase 6](hybrid-discrete/06-mpc-step-block.md)) | `DynamicBicycle` (or other catalog plant) | `Ts` = MPC period |
+| **MPC closed loop** | `MPCStatefulController` ([Phase 6](hybrid-discrete/06-mpc-step-block.md)) | `DynamicBicycle` (or other catalog plant) | `Ts` = MPC period |
 | **Sliding-mode control (SMC)** | `SMCBlock` or generic sampled `StepSystem` controller | same continuous plant | `Ts` = SMC period |
 
 **Boundary semantics (Phase 5):**
@@ -141,7 +141,7 @@ Phase 5a topology (trivial `StepSchedule`, empty `fire`):
   mode; validates `HybridSimulator` — **no second sim path**.
 - Controller step diagram may be a **single leaf** (`SMCBlock` / generic `StepSystem`) plus static
   blocks; no multi-rate expansion required yet.
-- **MPC hybrid demo** — [Phase 6a](hybrid-discrete/06-mpc-step-block.md) (`MPCStepBlock` stateless).
+- **MPC hybrid demo** — [Phase 6a](hybrid-discrete/06-mpc-step-block.md) (`MPCStatefulController` stateless).
 
 **Acceptance:** closed-loop sim matches hand-rolled **SMC** (or agreed test-double) loop within
 tolerance; plant inputs held piecewise-constant between samples on every step→plant edge.
@@ -556,8 +556,8 @@ heterogeneous blocks in one diagram class before event scheduling exists.
 | **5a** | Hybrid + trivial schedule + SMC | Multi-rate controller; MPC |
 | **5b** | Cascade hybrid (non-trivial `fire`) | Expansion lowering; MPC |
 | **5c** | `plot_hybrid_diagram`, `hybrid_closed_loop` | `@` across domains |
-| **6a** | `MPCStepBlock` stateless + MPC hybrid demo | Warm-start state |
-| **6b** | `MPCStepBlock` with last `z` state | — |
+| **6a** | `MPCStatefulController` stateless + MPC hybrid demo | Warm-start state |
+| **6b** | `MPCStatefulController` with last `z` state | — |
 | **Future** | events, guards, `expand_scheduled_step` | — |
 
 **Gates:** **Phase 0 before Phase 1a.** **Phase 1a before Phase 1.** Phase 2 before 4 and 5. **Phase 4 before Phase 5.**
@@ -599,7 +599,7 @@ flowchart TB
     end
 
     subgraph p6 [Phase 6 MPC StepBlock]
-        MPC[MPCStepBlock]
+        MPC[MPCStatefulController]
     end
 
     WIR --> SDS
@@ -692,7 +692,7 @@ Not required for Phase 5b Computer path.
 | Flow leaf | `DynamicSystem`: `dx = f(...)` | Unchanged |
 | Flow diagram | `DiagramSystem` IS-A `DynamicSystem`; `compile()` → `DynamicsEvaluator` | Phase 1b |
 | Step | Out of scope in DESIGN §3 | Layers 1–3 (subset) |
-| MPC demos | Manual Python loop × 7 | Phase **6** via `MPCStepBlock` + `HybridSimulator` |
+| MPC demos | Manual Python loop × 7 | Phase **6** via `MPCStatefulController` + `HybridSimulator` |
 | JAX plant rollout | `rk4_rollout_ivp` scan | `integrate_zoh_rollout` for hybrid inner loop |
 | `game()` loop | Euler on `f` | Later: branch for `StepSystem` → `x = step(x, u, k)` |
 
@@ -872,7 +872,7 @@ Per **`computer.schedule.dt_base`** tick (`t_k = t0 + computer.k * dt_base` at t
 
 **5b:** non-trivial **`computer.schedule.fire`** only; plant boundary unchanged.
 
-### `MPCStepBlock` — `minilink/planning/mpc/` ([Phase 6](hybrid-discrete/06-mpc-step-block.md))
+### `MPCStatefulController` — `minilink/planning/mpc/` ([Phase 6](hybrid-discrete/06-mpc-step-block.md))
 
 - **6a:** `StepSystem` with **`n = 0`** — wraps `MPCPlanner.step`; no warm-start state.
 - **6b:** same block with **`n > 0`** — packed last plan in `x` for shifted `initial_guess`.
@@ -889,7 +889,7 @@ Per **`computer.schedule.dt_base`** tick (`t_k = t0 + computer.k * dt_base` at t
 | **5a** | SMC + plant hybrid | trivial schedule |
 | **5b** | Cascade: filter fast + slow step block | non-trivial `fire`; MPC slot in 6a refresh |
 | **5c** | `plot_hybrid_diagram` on SMC/MPC hybrid | `hybrid_closed_loop` shortcut |
-| **6a** | Refactor straight-line MPC demo | stateless `MPCStepBlock` |
+| **6a** | Refactor straight-line MPC demo | stateless `MPCStatefulController` |
 | **6b** | Same MPC demo | warm-start state parity |
 
 ---
@@ -921,7 +921,7 @@ refactor in 6a; warm-start parity in 6b.
 - **Phase 5a:** single-rate hybrid (trivial schedule) + SMC.
 - **Phase 5b:** multi-block controller at integer multiples of `schedule.dt_base`.
 - **Phase 5c:** hybrid diagram plot + `hybrid_closed_loop` shortcut.
-- **Phase 6:** `MPCStepBlock` + MPC demo refactor (6a stateless, 6b warm-start).
+- **Phase 6:** `MPCStatefulController` + MPC demo refactor (6a stateless, 6b warm-start).
 - DESIGN / ROADMAP / README sync on implementation.
 
 ### Deferred
@@ -964,8 +964,8 @@ refactor in 6a; warm-start parity in 6b.
 | 5 | `test_hybrid_cascade.py` | 5b filter + slow block |
 | 5c | `test_hybrid_topology.py` | hybrid plot topology; boundary edges |
 | 5c | `test_hybrid_closed_loop.py` | shortcut vs manual `connect_boundary` |
-| 6 | `test_mpc_step_block.py` | 6a stateless MPC block |
-| 6 | `test_mpc_step_block_warm_start.py` | 6b plan state pack/shift |
+| 6 | `test_mpc_stateful_controller.py` | 6a stateless MPC block |
+| 6 | `test_mpc_stateful_controller_warm_start.py` | 6b plan state pack/shift |
 | 6 | `test_mpc_hybrid_demo_parity.py` | hybrid warm-start vs hand-rolled `mpc/` straight-line demo |
 | — | `test_expand_computer.py` | optional expansion lowering |
 
@@ -987,8 +987,8 @@ See [00-master-plan.md](hybrid-discrete/00-master-plan.md). Summary:
 | 8–10 | 5 | `integrate_zoh_rollout`, hybrid, SMC **(5a)** | **Done** |
 | 11 | 5 | cascade hybrid demo **(5b)** | **Done** |
 | 12 | 5c | `plot_hybrid_diagram`, `hybrid_closed_loop` | **Done** |
-| 13 | 6 | `MPCController` stateless **(6a)** + hybrid straight-line demo | **Done** |
-| 14 | 6 | `MPCStepBlock` warm-start **`z`** state **(6b)** | **Done** |
+| 13 | 6 | `MPCStatelessController` stateless **(6a)** + hybrid straight-line demo | **Done** |
+| 14 | 6 | `MPCStatefulController` warm-start **`z`** state **(6b)** | **Done** |
 | 15 | all | DESIGN / ROADMAP / README | partial |
 
 **Gates:** **0 → 1a → 1 → 1b → 2 → 4 → 5 → 5c → 6.** Phase 3 optional. **5a → 5b.** **6a → 6b.**
@@ -1002,7 +1002,7 @@ See [03-discretization.md](hybrid-discrete/03-discretization.md) for the convers
 - Textbook math: `dx = f(...)`, `x_{k+1} = step(...)`; bare `f` / `step` / `h` on equation paths.
 - Complexity in Computers + simulators; thin leaf types (pure `step`).
 - Reuse port gather / `ExecutionPlan`; no blind fork.
-- `MPCStepBlock` in `planning/mpc/`; warm-start in block state **6b** only.
+- `MPCStatefulController` in `planning/mpc/`; warm-start in block state **6b** only.
 - Preserve user demo tuning; one demo refactor only.
 - Pre-push: `ruff check .`, `ruff format --check .`, proportionate `pytest`.
 
@@ -1016,6 +1016,6 @@ See [03-discretization.md](hybrid-discrete/03-discretization.md) for the convers
   (holds in Computer hold buffers; optional expansion lowering later).
 - Hybrid v1: **`schedule.dt_base`** + Computer on step side + boundary in `HybridSimulator`.
 - **5a** SMC at one `Ts`; **5b** cascade via non-trivial `fire`.
-- **6a** MPC via stateless `MPCStepBlock`; **6b** warm-start matches shifted-guess demos.
+- **6a** MPC via stateless `MPCStatefulController`; **6b** warm-start matches shifted-guess demos.
 - MPC demos drop hand-rolled outer loops; same `HybridSimulator` API.
 - Future switched/hybrid: same `f` and `step` atoms + event scheduler — no leaf rewrite.

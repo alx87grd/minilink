@@ -146,7 +146,7 @@ Reject `DynamicSystem` at wiring time. Lower priority than `hybrid_closed_loop`.
 
 ```python
 def hybrid_mpc_loop(mpc_block, plant, *, mpc_dt: float, ...) -> HybridDiagram:
-    """`hybrid_closed_loop` + `MPCStepBlock` defaults."""
+    """`hybrid_closed_loop` + `MPCStatefulController` defaults."""
 ```
 
 Lives in `planning/mpc/` or `hybrid_composition.py` — Phase 6 doc.

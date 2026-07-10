@@ -15,8 +15,8 @@ from minilink.planning.mpc import (  # noqa: E402
     MPCDirectCollocationTranscription,
     MPCOptions,
     MPCPlanner,
-    mpc_controller,
-    mpc_step_block,
+    mpc_stateless_controller,
+    mpc_stateful_controller,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
@@ -49,20 +49,20 @@ def _planner():
 class TestMpcExportComputer(unittest.TestCase):
     def test_step_block_defaults_schedule(self):
         planner = _planner()
-        mpc = mpc_step_block(planner, dt_mpc=0.2)
+        mpc = mpc_stateful_controller(planner, dt_mpc=0.2)
         computer = mpc.export_to_computer()
         self.assertIsInstance(computer, Computer)
         self.assertAlmostEqual(computer.schedule.dt_base, 0.2)
 
     def test_step_block_rejects_mismatched_schedule(self):
         planner = _planner()
-        mpc = mpc_step_block(planner, dt_mpc=0.2)
+        mpc = mpc_stateful_controller(planner, dt_mpc=0.2)
         with self.assertRaises(ValueError):
             mpc.export_to_computer(0.1)
 
     def test_controller_requires_schedule(self):
         planner = _planner()
-        mpc = mpc_controller(planner)
+        mpc = mpc_stateless_controller(planner)
         with self.assertRaises(ValueError):
             mpc.export_to_computer()
         computer = mpc.export_to_computer(0.2)

@@ -1,4 +1,4 @@
-"""Algebraic MPC controller block for step / hybrid simulation (Phase 6a)."""
+"""Stateless algebraic MPC controller for step / hybrid simulation (Phase 6a)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from minilink.planning.mpc.planner import MPCPlanner
 from minilink.planning.mpc.tick_latch import MPCTickLatch
 
 
-class MPCController(System):
+class MPCStatelessController(System):
     """
     Stateless MPC feedforward block for step diagrams and hybrid simulation.
 
@@ -26,7 +26,7 @@ class MPCController(System):
         n, m, n_z = validate_mpc_planner(planner)
 
         super().__init__()
-        self.name = "MPC Controller"
+        self.name = "MPC Stateless Controller"
         self._planner = planner
         self._latch = MPCTickLatch(planner, step_disp=step_disp)
 
@@ -75,6 +75,8 @@ class MPCController(System):
         return self._latch.solve_for_tick(t, self._measurement(u)).z
 
 
-def mpc_controller(planner: MPCPlanner, *, step_disp: bool = False) -> MPCController:
-    """Build a stateless :class:`MPCController` from a prepared :class:`MPCPlanner`."""
-    return MPCController(planner, step_disp=step_disp)
+def mpc_stateless_controller(
+    planner: MPCPlanner, *, step_disp: bool = False
+) -> MPCStatelessController:
+    """Build a stateless :class:`MPCStatelessController` from a prepared :class:`MPCPlanner`."""
+    return MPCStatelessController(planner, step_disp=step_disp)

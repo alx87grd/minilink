@@ -1,6 +1,6 @@
 # Phase 6: MPC block for hybrid simulation
 
-**Status: 6a and 6b done** — `MPCController`, `MPCStepBlock`, hybrid demo, warm-start parity.
+**Status: 6a and 6b done** — `MPCStatelessController`, `MPCStatefulController`, hybrid demo, warm-start parity.
 
 **After [Phase 5](05-hybrid-simulation.md).** Expose MPC as a step-diagram leaf usable in
 `Computer` / `HybridDiagram`, replacing hand-rolled outer loops in MPC demos.
@@ -32,7 +32,7 @@ ports and `Computer.tick`.
 | **6a stateless** | `System` (`n=0`) | none | **port `compute` only** (same as `SlidingModeController` in hybrid SMC demos) |
 | **6b warm-start** | `StepSystem` (`n=n_z`) | packed decision `z` | port ops solve once (latch) → feedforward outs; **`step` commits `z` only** (no second NLP) |
 
-**Invalid assumption:** `MPCStepBlock(StepSystem, n=0)` — `StepSystem.__init__` raises if
+**Invalid assumption:** `MPCStatefulController(StepSystem, n=0)` — `StepSystem.__init__` raises if
 `n < 1`. Static blocks use `System(n=0)`; step diagrams compile them as **port ops only**
 (`step_compiler.py` — no `step_ops`).
 
@@ -121,7 +121,7 @@ passed by `Computer`).
 
 ### 6a static vs 6b step
 
-| | **6a `MPCController`** | **6b `MPCStepBlock`** |
+| | **6a `MPCStatelessController`** | **6b `MPCStatefulController`** |
 | --- | --- | --- |
 | Base | `System`, `n=0` | `StepSystem`, `n=n_z` |
 | `step_op` | none | `return self._latch.z` (no NLP) |
@@ -142,7 +142,7 @@ Factory validates `transcription.options.n_steps >= 2`.
 
 ## Block contracts
 
-### `MPCController` — Phase 6a
+### `MPCStatelessController` — Phase 6a
 
 **File:** `minilink/planning/mpc/controller.py`
 
@@ -150,9 +150,9 @@ Factory validates `transcription.options.n_steps >= 2`.
 - **Input:** `y` (measurement, dim `planner.problem.sys.n`)
 - **Outputs (three ports, one solve):** `u_ff`, `x_ff`, `z` as above
 - **Solve latch:** `_solve_for_tick(k, y, z_warm=None)` — not a `StepSystem.step` in 6a
-- Factory: `mpc_controller(planner)` — validates prepared `MPCPlanner`, `n_steps >= 2`, port dims
+- Factory: `mpc_stateless_controller(planner)` — validates prepared `MPCPlanner`, `n_steps >= 2`, port dims
 
-### `MPCStepBlock` — Phase 6b (pending)
+### `MPCStatefulController` — Phase 6b (pending)
 
 *(User-facing name: warm-start MPC step block; not a separate “DynamicStepBlock” type.)*
 
@@ -196,15 +196,15 @@ Animation: `HorizonPolyline(mpc_plans_from_rollout(...))` on `hybrid.animate(ove
 
 | Item | Detail |
 | --- | --- |
-| Block | `MPCController` + `mpc_controller()` |
+| Block | `MPCStatelessController` + `mpc_stateless_controller()` |
 | Demo | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py` — generic `HybridDiagram`; **do not edit** `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py` |
-| Tests | `test_mpc_controller.py`; `test_mpc_hybrid_straight_line.py` (stateless parity on `u_ff`) |
-| Exports | `mpc_controller`, `MPCController`, `mpc_plans_from_rollout` from `planning/mpc/__init__.py` |
+| Tests | `test_mpc_stateless_controller.py`; `test_mpc_hybrid_straight_line.py` (stateless parity on `u_ff`) |
+| Exports | `mpc_stateless_controller`, `MPCStatelessController`, `mpc_plans_from_rollout` from `planning/mpc/__init__.py` |
 
 ### Demo wiring (sketch)
 
 ```python
-mpc = mpc_controller(mpc_planner)
+mpc = mpc_stateless_controller(mpc_planner)
 step_diagram = StepDiagramSystem()
 step_diagram.add_subsystem(mpc, "mpc")
 step_diagram.add_input_port("y")
@@ -223,7 +223,7 @@ hybrid.connect_boundary(direction="plant_to_computer", computer_port="y", plant_
 
 **Parity (6a):** stateless — `initial_guess=None` every MPC tick; match hand loop on `u_ff`.
 
-## Phase 6b implementation plan (warm-start `MPCStepBlock`)
+## Phase 6b implementation plan (warm-start `MPCStatefulController`)
 
 **Goal:** Match the warm-started hand loop in
 `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py` (shifted
@@ -239,7 +239,7 @@ existing MPC demo tolerances). Stateless 6a hybrid demo stays unchanged.
 ```mermaid
 sequenceDiagram
   participant C as Computer.tick k
-  participant P as port_ops MPCStepBlock
+  participant P as port_ops MPCStatefulController
   participant L as MPCTickLatch
   participant W as warm_start
   participant NLP as planner.step
@@ -265,11 +265,11 @@ same latched `z`.
 | File | Role |
 | --- | --- |
 | `minilink/planning/mpc/warm_start.py` | Shift logic extracted from MPC straight-line demo |
-| `minilink/planning/mpc/step_block.py` | `MPCStepBlock`, `mpc_step_block()` factory |
+| `minilink/planning/mpc/step_block.py` | `MPCStatefulController`, `mpc_stateful_controller()` factory |
 | `minilink/planning/mpc/tick_latch.py` | Route `z_warm` through `warm_start` (not raw `z` passthrough) |
 | `minilink/planning/mpc/controller.py` | Optional: shared port wiring helper (avoid duplicating three `add_output_port` blocks) |
 | `minilink/planning/mpc/plan_reconstruct.py` | Optional: `z_source="x"` for `computer.x` history |
-| `tests/unittest/test_mpc_step_block.py` | Unit: warm shift, one solve/tick, `step` commits `z` |
+| `tests/unittest/test_mpc_stateful_controller.py` | Unit: warm shift, one solve/tick, `step` commits `z` |
 | `tests/unittest/test_mpc_hybrid_warm_start_parity.py` | Integration: hybrid vs warm-started hand loop on `u_ff` |
 
 ### `warm_start.py` API
@@ -315,20 +315,20 @@ def solve_for_tick(self, k, y, *, z_warm=None, dt_mpc=None, initial_guess=None):
         guess = None  # 6a: planner default inside step()
 ```
 
-`MPCController` port ops keep `z_warm=None`. `MPCStepBlock` port ops and `step`
+`MPCStatelessController` port ops keep `z_warm=None`. `MPCStatefulController` port ops and `step`
 pass `z_warm=x` (local state) and `dt_mpc` from the block.
 
-### `MPCStepBlock` contract
+### `MPCStatefulController` contract
 
 ```python
-class MPCStepBlock(StepSystem):
+class MPCStatefulController(StepSystem):
     def __init__(self, planner: MPCPlanner, *, dt_mpc: float):
         n_z = planner.transcription.decision_dimension(planner.problem)
         super().__init__(n_z, expose_state=False)
         self._planner = planner
         self._latch = MPCTickLatch(planner)
         self._dt_mpc = float(dt_mpc)
-        # input y + outputs u_ff, x_ff, z (same dims / deps as MPCController)
+        # input y + outputs u_ff, x_ff, z (same dims / deps as MPCStatelessController)
 
     def step(self, x, u, k=0, params=None):
         y = self._measurement(u)
@@ -343,8 +343,8 @@ class MPCStepBlock(StepSystem):
     # x_ff, z analogous
 ```
 
-Factory **`mpc_step_block(planner, *, dt_mpc)`** — same validation as
-`mpc_controller` (`prepare()`, `n_steps >= 2`).
+Factory **`mpc_stateful_controller(planner, *, dt_mpc)`** — same validation as
+`mpc_stateless_controller` (`prepare()`, `n_steps >= 2`).
 
 **`x0` for `Computer.reset`:** packed default trajectory:
 
@@ -363,7 +363,7 @@ z0 = planner.transcription.pack_initial_guess(
 **Latch reset:** Call `block._latch.reset_latch()` from `Computer.reset` or
 document that hybrid re-build / explicit reset clears memo between runs. If
 `Computer.reset` does not reach blocks today, add a minimal hook or reset latch
-in `mpc_step_block` factory doc + test setup.
+in `mpc_stateful_controller` factory doc + test setup.
 
 ### Shared port wiring (optional refactor)
 
@@ -381,7 +381,7 @@ Keep public surface unchanged; no new user-facing abstractions.
 
 | Option | Pros | Choice |
 | --- | --- | --- |
-| Flag on existing hybrid demo | One script, A/B | **Preferred:** `USE_WARM_START = True` switches `mpc_controller` ↔ `mpc_step_block` |
+| Flag on existing hybrid demo | One script, A/B | **Preferred:** `USE_WARM_START = True` switches `mpc_stateless_controller` ↔ `mpc_stateful_controller` |
 | Separate hybrid warm-start demo | Clear filenames | Defer unless flag gets noisy |
 
 When warm-start is on:
@@ -396,14 +396,14 @@ When warm-start is on:
 
 | File | Cases |
 | --- | --- |
-| `test_mpc_step_block.py` | `n == decision_dimension`; `step` returns latched `z`; port ops use `z_warm=local_x`; `warm_start.shift_plan_trajectory` matches demo mask on toy plan; exactly one `planner.step` per tick |
-| `test_mpc_hybrid_warm_start_parity.py` | Same bicycle rate setup as hybrid demo; warm `MPCStepBlock` hybrid vs extracted warm hand loop on `u_ff` at MPC fires (skip or relax if JAX MPC flaky in CI) |
+| `test_mpc_stateful_controller.py` | `n == decision_dimension`; `step` returns latched `z`; port ops use `z_warm=local_x`; `warm_start.shift_plan_trajectory` matches demo mask on toy plan; exactly one `planner.step` per tick |
+| `test_mpc_hybrid_warm_start_parity.py` | Same bicycle rate setup as hybrid demo; warm `MPCStatefulController` hybrid vs extracted warm hand loop on `u_ff` at MPC fires (skip or relax if JAX MPC flaky in CI) |
 
-Reuse planner fixtures from `test_mpc_controller.py` where possible.
+Reuse planner fixtures from `test_mpc_stateless_controller.py` where possible.
 
 ### Exports and docs
 
-- `from minilink.planning.mpc import MPCStepBlock, mpc_step_block`
+- `from minilink.planning.mpc import MPCStatefulController, mpc_stateful_controller`
 - `DESIGN.md` — hybrid MPC subsection: 6b state = packed `z`, warm-start path
 - `ROADMAP.md` — check 6b when parity lands
 - `README.md` — one line in hybrid / MPC examples if demo flag exists
@@ -413,7 +413,7 @@ Reuse planner fixtures from `test_mpc_controller.py` where possible.
 
 1. **`warm_start.py`** + unit tests on `shift_plan_trajectory` (Trajectory-only, no planner).
 2. **`tick_latch.py`** — `dt_mpc` + `mpc_warm_start_guess` integration; 6a tests still pass (`z_warm=None`).
-3. **`step_block.py`** + `test_mpc_step_block.py`.
+3. **`step_block.py`** + `test_mpc_stateful_controller.py`.
 4. **Hybrid demo flag** + `test_mpc_hybrid_warm_start_parity.py`.
 5. **Docs / exports**; optional `plan_reconstruct` `z_source="x"`.
 6. **Verification** (below).
@@ -421,9 +421,9 @@ Reuse planner fixtures from `test_mpc_controller.py` where possible.
 ### Phase 6b deliverables checklist
 
 - [x] `warm_start.py` (`shift_plan_trajectory`, `mpc_warm_start_guess`)
-- [x] `MPCStepBlock` + `mpc_step_block()` in `step_block.py`
+- [x] `MPCStatefulController` + `mpc_stateful_controller()` in `step_block.py`
 - [x] `MPCTickLatch` warm-start routing (`dt_mpc`, not raw `z`)
-- [x] `test_mpc_step_block.py`
+- [x] `test_mpc_stateful_controller.py`
 - [x] `test_mpc_hybrid_demo_parity.py` (full baseline vs `mpc/` hand loop)
 - [x] `test_mpc_hybrid_warm_start_parity.py`
 - [x] Hybrid demo warm-start switch (`USE_WARM_START`)
@@ -438,12 +438,12 @@ Reuse planner fixtures from `test_mpc_controller.py` where possible.
 
 ## Implementation checklist
 
-- [x] `MPCController` + `mpc_controller()` in `controller.py`
+- [x] `MPCStatelessController` + `mpc_stateless_controller()` in `controller.py`
 - [x] `mpc_plans_from_rollout()` in `plan_reconstruct.py`
 - [x] Exports; DESIGN / ROADMAP / README updates
-- [x] `test_mpc_controller.py`, `test_mpc_hybrid_straight_line.py`
+- [x] `test_mpc_stateless_controller.py`, `test_mpc_hybrid_straight_line.py`
 - [x] Hybrid straight-line demo + horizon overlay from `signals["z"]`
-- [x] **6b:** `MPCStepBlock`, `warm_start.py`, warm-started demo parity
+- [x] **6b:** `MPCStatefulController`, `warm_start.py`, warm-started demo parity
 
 ## Verification
 
@@ -452,14 +452,14 @@ Reuse planner fixtures from `test_mpc_controller.py` where possible.
 ```bash
 conda activate minilink
 ruff check . && ruff format --check .
-pytest tests/unittest/test_mpc_controller.py tests/unittest/test_mpc_hybrid_straight_line.py
+pytest tests/unittest/test_mpc_stateless_controller.py tests/unittest/test_mpc_hybrid_straight_line.py
 MPLBACKEND=Agg python examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py
 ```
 
 **6b (after implementation):**
 
 ```bash
-pytest tests/unittest/test_mpc_step_block.py tests/unittest/test_mpc_hybrid_warm_start_parity.py tests/unittest/test_mpc_hybrid_demo_parity.py
+pytest tests/unittest/test_mpc_stateful_controller.py tests/unittest/test_mpc_hybrid_warm_start_parity.py tests/unittest/test_mpc_hybrid_demo_parity.py
 MPLBACKEND=Agg python examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py  # warm-start on
 ```
 
@@ -467,9 +467,9 @@ MPLBACKEND=Agg python examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_stra
 
 | File | Cases |
 | --- | --- |
-| `test_mpc_controller.py` | `u_ff`/`x_ff`/`z` ports; exactly one `planner.step` per tick |
+| `test_mpc_stateless_controller.py` | `u_ff`/`x_ff`/`z` ports; exactly one `planner.step` per tick |
 | `test_mpc_hybrid_straight_line.py` | hybrid vs stateless hand loop on `u_ff` |
-| `test_mpc_step_block.py` (6b) | warm-start `z` state; shift matches demo; one solve per tick |
+| `test_mpc_stateful_controller.py` (6b) | warm-start `z` state; shift matches demo; one solve per tick |
 | `test_mpc_hybrid_demo_parity.py` (6b) | full hybrid warm-start vs `mpc/` hand loop (`u_ff`, plant `x`) |
 | `test_mpc_hybrid_warm_start_parity.py` (6b) | hybrid vs warm-started hand loop on `u_ff` |
 

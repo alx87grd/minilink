@@ -17,7 +17,7 @@ from minilink.planning.mpc import (  # noqa: E402
     MPCOptions,
     MPCPlanner,
     mpc_animation_overlays,
-    mpc_controller,
+    mpc_stateless_controller,
     mpc_plans_from_rollout,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
@@ -83,7 +83,7 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
     )
 
     mpc_dt = 1.0 / mpc_hz
-    mpc = mpc_controller(mpc_planner)
+    mpc = mpc_stateless_controller(mpc_planner)
     hybrid = (mpc % mpc_dt) @ sys_sim
     return hybrid, mpc_planner, transcription, template_problem
 
