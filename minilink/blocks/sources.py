@@ -22,7 +22,7 @@ class Source(System):
 
     def __init__(self, p):
 
-        System.__init__(self, 0)
+        super().__init__()
 
         self.name = "Source"
         self.params = {"value": np.zeros(p)}

@@ -98,7 +98,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Control | `pyro/control/lqr.py` | linearize_and_synthesize_lqr_controller | `minilink/control/lqr.py` | linearize + synthesize_lqr | **Done** |  |
 | Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/lqr.py` | — | **TODO** | Trajectory stabilization demos |
 | Control | `pyro/control/nonlinear.py` | ComputedTorqueController | `minilink/control/modelbased.py` | ComputedTorqueController | **Done** |  |
-| Control | `pyro/control/nonlinear.py` | SlidingModeController | `minilink/control/modelbased.py` | SlidingModeController | **Done** | Simplified law; traj-following demos TODO |
+| Control | `pyro/control/nonlinear.py` | SlidingModeController | `minilink/control/modelbased.py` | SlidingModeController | **Done** | Pyro `K(q) sign(s)` law; traj-following demos TODO |
 | Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/robotic.py` | JointImpedance, TaskImpedance, TaskKinematic, TaskKinematicNullspace | **Partial** | Dynamic joint/effector PID wrappers TODO |
 | Control | `pyro/control/reinforcementlearning.py` | stable_baseline3_controller | `minilink/interfaces/` | — | **TODO** | Train outside; gymnasium stub |
 | Analysis | `pyro/analysis/simulation.py` | Trajectory | `minilink/core/trajectory.py` | Trajectory | **Done** |  |
@@ -403,9 +403,11 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | `examples/scripts/engine/demo_physics_many_spheres.py` | engine |
 | `examples/scripts/identification/demo_params_gradient.py` | identification |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | mpc |
+| `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_fast_stadium_lap.py` | mpc |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_multi_obstacle_scene.py` | mpc |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_obstacle.py` | mpc |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py` | mpc |
+| `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py` | mpc |
 | `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_wide_circuit_lap.py` | mpc |
 | `examples/scripts/optimization/demo_basic_optim.py` | optimization |
 | `examples/scripts/optimization/demo_optim_plot.py` | optimization |

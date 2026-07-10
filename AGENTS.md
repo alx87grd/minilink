@@ -13,6 +13,7 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | [README.md](README.md) | User workflows, install, examples table |
 | [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior |
 | [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, priority checkboxes |
+| [docs/plans/hybrid-discrete/00-master-plan.md](docs/plans/hybrid-discrete/00-master-plan.md) | Hybrid/step phase status when landing hybrid milestones |
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy |
 
@@ -28,6 +29,7 @@ Do not add new markdown guides unless asked. Keep [README call chains](README.md
 - **Incremental refactoring**: no broad restructures unless the user asks.
 - **Preserve user edits**: never revert or "clean up" manual changes the user made in demos, notebooks, examples, or scratch code — commented-out plots, tuning constants (`TF`, gains, step times), disabled sections, exploratory variables — unless they explicitly ask you to change those lines. Commit/review passes must not overwrite user-tuned script state.
 - **Docs are contract**: update DESIGN / ROADMAP / README when public behavior or maturity claims change.
+- **Familiar patterns first**: do not introduce programming concepts or advanced Python styles absent from the repo and the user's prior choices (e.g. `typing.Protocol`, metaclasses) unless there is a strong runtime or maintainability reason. Static-typing-only wins are not enough on their own — prefer patterns already in use (mixins, unions, duck typing). If the tradeoff is unclear, validate with the user before landing the pattern.
 
 ## Textbook style
 
@@ -58,6 +60,7 @@ Reading minilink should feel like a controls/dynamics textbook.
 ### Math naming
 
 - Matrices `A`, `B`, `H`, `M`, `K`; vectors `x`, `u`, `y`, `q`, `v`, `dq`; dims `n`, `m`, `p`.
+- **Leaf = diagram role only** — reserve *leaf* for a subsystem node inside `DiagramSystem` / `StepDiagramSystem` (compile/plan context). Standalone `DynamicSystem` / `StepSystem` wrappers use descriptive type names (e.g. `DiscretizedDynamicSystem`), not `*Leaf`.
 - **Unpack `params` before equations**; **no `self.` in core equation lines** — bind locals first.
 - Lay out 2-D literals one row per line; use `# fmt: off` / `# fmt: on` for alignment.
 - Reader-facing imports stay light in demos; internal packages may import richly when clear.
@@ -66,6 +69,7 @@ Reading minilink should feel like a controls/dynamics textbook.
 
 Details in [DESIGN.md](DESIGN.md).
 
+- **Continuous-time core is the priority** — `DynamicSystem`, flow diagrams, `Simulator`, and analysis on `f` are the main framework. `StepSystem` / hybrid are subsidiary utilities for discrete control in the loop (MPC, SMC). On trade-offs, keep the continuous path clean; step/hybrid add-ons use sibling types and separate compile/sim paths — do not complicate flow `compile()`, `DiagramSystem`, or `Simulator`.
 - Equation paths stay **native-array**; conversions at boundaries only.
 - `params is None` → object defaults; any other `params` overrides — never `params or self.params`.
 - **Inheritance** for core system types; **composition** for diagrams and optional behaviors.

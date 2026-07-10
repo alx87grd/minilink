@@ -5,7 +5,7 @@ Run from the repo root:
     python examples/scripts/diagrams/demo_advanced_autowire.py
 """
 
-from minilink.core.system import StaticSystem, System
+from minilink.core.system import System
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 
 
@@ -13,7 +13,7 @@ class DemoPathPlanner(System):
     """Small source block mirroring the bicycle cascade planner ports."""
 
     def __init__(self):
-        super().__init__(0)
+        super().__init__()
         self.name = "Path planner"
         self.add_output_port("u_ref", dim=1, function=self.h_u_ref, dependencies=())
         self.add_output_port("path", dim=2, function=self.h_path, dependencies=())
@@ -25,7 +25,7 @@ class DemoPathPlanner(System):
         return [2.0, 20.0]
 
 
-class DemoTracking(StaticSystem):
+class DemoTracking(System):
     """Small tracking block with the same ports as the bicycle cascade demo."""
 
     def __init__(self):
@@ -44,7 +44,7 @@ class DemoTracking(StaticSystem):
         return [0.0]
 
 
-class DemoHeadingLoop(StaticSystem):
+class DemoHeadingLoop(System):
     """Small heading loop with the same ports as the bicycle cascade demo."""
 
     def __init__(self):
@@ -63,7 +63,7 @@ class DemoHeadingLoop(StaticSystem):
         return [0.0]
 
 
-class DemoYawRateLoop(StaticSystem):
+class DemoYawRateLoop(System):
     """Small yaw-rate loop with the same ports as the bicycle cascade demo."""
 
     def __init__(self):
@@ -82,7 +82,7 @@ class DemoYawRateLoop(StaticSystem):
         return [0.0]
 
 
-class DemoVelocityLoop(StaticSystem):
+class DemoVelocityLoop(System):
     """Small velocity loop with the same ports as the bicycle cascade demo."""
 
     def __init__(self):

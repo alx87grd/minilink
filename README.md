@@ -105,11 +105,14 @@ side. Any internal signal can be plotted by `"subsystem_id:port_id"` name.
 
 ### One call to simulate, plot, animate
 
-Facade methods cover the common workflows: `compute_trajectory(...)` simulates
-with SciPy or fixed-step solvers and returns a `Trajectory`;
+Facade methods cover the common workflows: `compute_trajectory(...)` samples or
+integrates on a time grid — static leaves via `StaticSimulator` (boundary IO in
+`traj.signals`); continuous plants and diagrams via `Simulator` (SciPy or
+fixed-step solvers) — and returns a `Trajectory`;
 `plot_trajectory(...)` stacks labeled, unit-aware signal plots (matplotlib or
 plotly); `plot_phase_plane(...)` draws vector fields with overlaid
-trajectories; `plot_diagram()` renders the wiring topology (Graphviz/Mermaid).
+trajectories; `plot_diagram()` renders wiring topology (Graphviz/Mermaid).
+``HybridDiagram.plot_diagram()`` renders the composite plant + scheduled computer view.
 
 `animate()` plays a trajectory through swappable renderers: matplotlib
 (inline HTML in notebooks), plotly, meshcat (3D in the browser), or pygame.
@@ -243,11 +246,12 @@ regular minilink mechanical system — including a JAX-traceable variant.
 Minilink keeps the user-facing API small, while the execution path supports
 larger diagrams and repeated simulation or optimization.
 
-- **System hierarchy**: `System` is the mother class. Common subclasses include
-  `DynamicSystem`, `StaticSystem`, mechanical abstractions, source blocks,
-  controllers, catalog plants, and `DiagramSystem`.
-- **Textbook equations**: dynamic models implement `f(x, u, t, params)`, so
-  equation code can stay close to forms like `dx = A @ x + B @ u`.
+- **System hierarchy**: `System` is the base IO shell (`n` defaults to 0 for static
+  blocks). Continuous plants subclass `DynamicSystem` (`f`, `h`). Mechanical
+  abstractions, source blocks, controllers, catalog plants, and `DiagramSystem`
+  compose on top.
+- **Textbook equations**: dynamic models implement `f(x, u, t, params)` on
+  `DynamicSystem`, so equation code can stay close to forms like `dx = A @ x + B @ u`.
 - **Stateless model objects**: a system defines equations, ports, parameters,
   and initial conditions. The evolving state belongs to the simulator and
   returned trajectory, not to hidden mutable block state.
@@ -265,8 +269,8 @@ For example, the class hierarchy can go from a generic system contract to a
 domain-specific model:
 
 ```text
-System
-  -> DynamicSystem
+System                    # static IO shell (n defaults to 0)
+  -> DynamicSystem        # dx = f(x, u, t)
     -> MechanicalSystem
       -> Pendulum
 ```
@@ -326,7 +330,8 @@ see [tests/README.md](tests/README.md).
 Minimal paths for debugging and extending workflows. Contracts:
 [DESIGN.md](DESIGN.md).
 
-Facade methods for common workflows: `compute_trajectory(...)`, `plot_trajectory(...)`,
+Facade methods for common workflows: `compute_trajectory(...)` (static leaves and
+continuous/diagram systems via MRO), `plot_trajectory(...)`,
 `plot_diagram(...)`, `animate(...)`. Use lower-level APIs when you need explicit
 control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 `compile()` / `DynamicsEvaluator`.
@@ -335,12 +340,12 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 
 | Package | Owns |
 | --- | --- |
-| `core` | `System`, `SystemFacades`, `DiagramSystem`, ports, `Trajectory`, sets, costs |
+| `core` | `System`, façade mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
 | `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`) |
 | `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
-| `simulation` | `Simulator`, solvers, time grids |
+| `simulation` | `Simulator`, `HybridSimulator`, `Computer`, solvers, time grids |
 | `graphical` | plots, diagrams, animation (`Animator` + renderers) |
 | `planning` | `PlanningProblem`, planners, transcriptions |
 | `optimization` | `MathematicalProgram`, `Optimizer` |
@@ -353,15 +358,21 @@ Model:     subclass System → f/h (+ ports or DynamicSystem options)
 Compose:   + / >> / @ / autowire  →  DiagramSystem
            or add_subsystem + connect (+ connect_new_output_port)
 
-Simulate:  compute_trajectory*  →  Simulator  →  compile  →  solve  →  Trajectory
+Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
+           →  compile  →  solve  →  Trajectory
+           StepSystem: compute_rollout  →  StepEvaluator.rollout
+           HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
+           cache: self.traj (plant Trajectory), self.last_result (full result), self.rollout (computer)
 
 Compile:   sys.compile(backend)  →  DynamicsEvaluator
 
 Plot:      plot_trajectory*  →  graphical.signals  →  PlotResult
            plot_phase_plane* →  graphical.phase_plane
-           plot_diagram      →  graphical.diagrams (Graphviz/Mermaid)
+           plot_diagram      →  graphical.diagrams (DiagramSystem / StepDiagramSystem)
+           HybridDiagram.plot_diagram  →  hybrid composite (Plant + Computer clusters)
 
 Animate:   animate* / render / game  →  Animator  →  renderer backend
+           HybridDiagram.animate  →  plant geometry + fine plant traj
            planner.plot_solution / animate_solution  →  problem.sys.*
 
 Trajopt:   PlanningProblem + Transcription + TrajectoryOptimizationPlanner
@@ -384,6 +395,14 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Feature tour | [examples/notebooks/demo_showcase.ipynb](examples/notebooks/demo_showcase.ipynb) |
 | Extended tour | [examples/notebooks/demo_overview.ipynb](examples/notebooks/demo_overview.ipynb) |
 | Diagrams | `examples/scripts/diagrams/` |
+| Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
+| Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
+| Minimal hybrid MPC warm-start (`mpc % dt` then `computer @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` |
+| Minimal hybrid MPC track + obstacles (warm-start, `mpc % dt`) | `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` · [notebook](examples/notebooks/demo_mpc_hybrid_track_lap.ipynb) |
+| Pyro SMC continuous (pendulum) | `examples/scripts/control/demo_sliding_mode_pendulum.py` |
+| Pyro SMC continuous vs hybrid (pendulum) | `examples/scripts/hybrid/demo_smc_pendulum_compare.py` |
+| Hybrid MPC straight-line warm-start (`MPCStatefulController`; `STEP_DISP=True`; set `USE_WARM_START=False` for stateless 6a) | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py` |
+| Hybrid MPC closed-loop lap (compact track + obstacles) | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |
@@ -394,7 +413,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
 | Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` |
-| MPC (rate-MPC bicycle demos; obstacle preset: `demo_dynamic_bicycle_rate_mpc_obstacle.py [small\|large]`) | `examples/scripts/mpc/` |
+| MPC (rate-MPC bicycle demos; compile-once `MPCPlanner`; legacy per-step trajopt: `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`; obstacle preset: `demo_dynamic_bicycle_rate_mpc_obstacle.py [small\|large]`; spatial scene guide: `demo_mpc_spatial_scene_guide.py`) | `examples/scripts/mpc/` · [spatial scene notebook](examples/notebooks/demo_mpc_spatial_scene_guide.ipynb) |
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |

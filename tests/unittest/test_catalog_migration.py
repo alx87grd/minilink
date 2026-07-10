@@ -53,6 +53,8 @@ from minilink.dynamics.catalog.vehicles.steering import (
     ConstantSpeedKinematicCar,
     HolonomicMobileRobot,
     HolonomicMobileRobot3D,
+    JaxKinematicBicycle,
+    JaxKinematicBicycleRateInputs,
     KinematicBicycle,
     KinematicCar,
     UdeSRacecar,
@@ -65,6 +67,18 @@ from tests.unittest.graphics_contract_helpers import (
 from tests.unittest.graphics_contract_helpers import (
     resolved_primitive_count as _primitive_count,
 )
+
+
+def _have_jax() -> bool:
+    try:
+        import jax  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+_JAX_CATALOG_SYSTEMS = (JaxKinematicBicycle, JaxKinematicBicycleRateInputs)
 
 
 def _zero_f_smoke(system):
@@ -168,7 +182,6 @@ class TestCatalogSmoke(unittest.TestCase):
             (Boat2DWithCurrent(), 2),
             (QuarterCarOnRoughTerrain(), 1),
             (MountainCar(), 1),
-            (KinematicBicycle(), 1),
             (HolonomicMobileRobot(), 1),
             (HolonomicMobileRobot3D(), 1),
             (LongitudinalFrontWheelDriveCarWithTorqueInput(), 1),
@@ -221,6 +234,8 @@ class TestCatalogSmoke(unittest.TestCase):
             UnderactuatedRotatingCartPole(),
             CartPole(),
             KinematicBicycle(),
+            JaxKinematicBicycle(),
+            JaxKinematicBicycleRateInputs(),
             KinematicCar(),
             ConstantSpeedKinematicCar(),
             HolonomicMobileRobot(),
@@ -247,6 +262,8 @@ class TestCatalogSmoke(unittest.TestCase):
 
         for system in systems:
             with self.subTest(system=system.name):
+                if isinstance(system, _JAX_CATALOG_SYSTEMS) and not _have_jax():
+                    self.skipTest("JAX not installed")
                 _zero_f_smoke(system)
                 _geometry_smoke(system)
 

@@ -135,7 +135,14 @@ def plot_phase_plane(
     show: bool = True,
     **kwargs,
 ) -> PlotResult:
-    """Plot a phase-plane vector field with an optional trajectory overlay."""
+    """Plot a phase-plane vector field with an optional trajectory overlay.
+
+    Parameters
+    ----------
+    sys : DynamicSystem
+        Continuous-time model whose ``f`` defines the vector field (leaf
+        subclass or wired diagram with stacked ``f``).
+    """
     backend_key = _normalize_backend(backend)
     if backend_key != "matplotlib":
         raise ValueError(

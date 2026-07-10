@@ -80,7 +80,6 @@ class MatplotlibLivePlotHandle(LivePlotHandle):
             ax.set_ylabel(ylabel)
             ax.relim()
             ax.autoscale_view()
-            ax.legend(loc="upper right")
 
         if title is not None:
             self.axes[0].set_title(title)
@@ -147,17 +146,16 @@ def _create_figure(
             spec.t,
             trace.values,
             color=trace.color,
-            linewidth=1.5,
-            alpha=0.8,
+            linewidth=trace.linewidth,
+            alpha=trace.alpha,
             label=trace.label,
         )
         ylabel = _ylabel_with_unit(trace.label, trace.unit)
         ax.set_ylabel(ylabel, fontsize=FONT_SIZE, multialignment="center")
         style_trajectory_subplot(ax)
-        ax.legend(loc="upper right")
         lines.append(line)
 
-    axes[-1].set_xlabel("Time [s]", fontsize=FONT_SIZE)
+    axes[-1].set_xlabel(spec.abscissa_label, fontsize=FONT_SIZE)
 
     if show and plt.get_backend().lower() != "agg":
         if block is None:

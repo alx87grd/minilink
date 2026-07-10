@@ -210,7 +210,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         diagram.connect("plant", "x", "controller", "x")
         diagram.connect("controller", "u", "plant", "u")
 
-        traj = diagram.compute_trajectory(tf=8.0)
+        traj = diagram.compute_trajectory(tf=8.0, verbose=False)
         self.assertLess(np.linalg.norm(traj.x[:, -1]), 0.3)
 
     def test_policy_evaluator_matches_optimal_value(self):

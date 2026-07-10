@@ -67,7 +67,7 @@ def apply_pid_params(pid):
 
 def simulate_traj(pid):
     apply_pid_params(pid)
-    xs = np_evaluator.rk4_rollout_forced(diagram.x0, plot_u_knots, 0.0, DT)
+    xs = np_evaluator.rk4_integrate_forced(diagram.x0, plot_u_knots, 0.0, DT)
     return Trajectory(t=plot_t, x=xs.T, u=plot_u_knots.T)
 
 

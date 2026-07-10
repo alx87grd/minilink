@@ -53,6 +53,8 @@ class SimulationBackendBenchmarkResult:
     truth_mean_solve_time: float
     speedup_vs_truth: float
     rel_err_l2: float
+    candidate_x_final: np.ndarray
+    truth_x_final: np.ndarray
     nfev: int
     njev: int
     n_t: int
@@ -177,6 +179,8 @@ def benchmark_simulation_backend(
         truth_mean_solve_time=truth_run.mean_solve_s,
         speedup_vs_truth=speedup,
         rel_err_l2=_relative_l2_error(candidate_run.x_mean, truth_run.x_mean),
+        candidate_x_final=np.asarray(candidate_run.x_mean, dtype=float).copy(),
+        truth_x_final=np.asarray(truth_run.x_mean, dtype=float).copy(),
         nfev=int(candidate_run.debug["nfev"]),
         njev=int(candidate_run.debug["njev"]),
         n_t=int(candidate_run.debug["n_t"]),

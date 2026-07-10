@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "suite": "core_perf",
+  "description": "Minimal baseline fixture for unit tests.",
+  "regression_factor": 4.0,
+  "recorded_at": "2026-01-01",
+  "host_hint": "test",
+  "metrics": [
+    {
+      "id": "test.speed.ratio",
+      "gate": "speed",
+      "direction": "higher_better",
+      "value": 8.0,
+      "unit": "ratio"
+    },
+    {
+      "id": "test.accuracy.percent",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 0.1,
+      "max_allowed": 1.0,
+      "unit": "percent"
+    },
+    {
+      "id": "test.truth.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [1.0, 0.0],
+      "atol": 0.05,
+      "rtol": 0.05,
+      "unit": "state"
+    }
+  ]
+}

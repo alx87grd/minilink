@@ -9,6 +9,13 @@ import numpy as np
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.graphical.common import PlotResult
+from minilink.graphical.signals.signal_colors import (
+    color_for_signal,
+    is_internal_signal,
+)
+
+TIME_ABSCISSA_LABEL = "Time [s]"
+STEP_ABSCISSA_LABEL = "Step [k]"
 
 
 @dataclass(frozen=True)
@@ -21,6 +28,8 @@ class SignalTrace:
     unit: str
     values: np.ndarray
     color: str
+    alpha: float = 1.0
+    linewidth: float = 1.5
 
 
 @dataclass(frozen=True)
@@ -30,6 +39,7 @@ class SignalPlotSpec:
     title: str
     t: np.ndarray
     traces: tuple[SignalTrace, ...]
+    abscissa_label: str = TIME_ABSCISSA_LABEL
 
 
 class LivePlotHandle:
@@ -81,6 +91,7 @@ def build_signal_plot_spec(
     *,
     signals: tuple[str, ...] = ("x", "u"),
     title: str | None = None,
+    abscissa_label: str = TIME_ABSCISSA_LABEL,
 ) -> SignalPlotSpec:
     """Build a one-component-per-row plot specification."""
     requested = _normalize_plot_signals(sys, signals)
@@ -96,6 +107,7 @@ def build_signal_plot_spec(
                 break
 
     traces = []
+    internal_index = 0
     for signal_name in requested:
         if signal_name == "x":
             values = np.asarray(traj.x, dtype=float)
@@ -119,8 +131,18 @@ def build_signal_plot_spec(
                 f"Unknown signal(s): {signal_name}. Available signals: {available}"
             )
 
-        color = _color_for_signal(signal_name)
-        for i in range(values.shape[0]):
+        idx = internal_index if is_internal_signal(signal_name) else None
+        if is_internal_signal(signal_name):
+            internal_index += 1
+
+        n_components = values.shape[0]
+        for i in range(n_components):
+            style = color_for_signal(
+                signal_name,
+                component=i,
+                n_components=n_components,
+                internal_index=idx,
+            )
             traces.append(
                 SignalTrace(
                     signal=signal_name,
@@ -128,7 +150,9 @@ def build_signal_plot_spec(
                     label=labels[i],
                     unit=units[i],
                     values=values[i, :],
-                    color=color,
+                    color=style.color,
+                    alpha=style.alpha,
+                    linewidth=style.linewidth,
                 )
             )
 
@@ -139,6 +163,7 @@ def build_signal_plot_spec(
         title=title or f"Time signals for {sys.name}",
         t=np.asarray(traj.t, dtype=float),
         traces=tuple(traces),
+        abscissa_label=abscissa_label,
     )
 
 
@@ -147,12 +172,18 @@ def plot_time_signals(
     traj,
     *,
     signals: tuple[str, ...] = ("x", "u"),
+    abscissa_label: str = TIME_ABSCISSA_LABEL,
     backend="matplotlib",
     show: bool = True,
     **kwargs,
 ) -> PlotResult:
     """Plot sampled time signals with the selected backend."""
-    spec = build_signal_plot_spec(sys, traj, signals=signals)
+    spec = build_signal_plot_spec(
+        sys,
+        traj,
+        signals=signals,
+        abscissa_label=abscissa_label,
+    )
     if not isinstance(backend, str):
         raise TypeError("Signal plotting backend must be a string.")
     key = backend.strip().lower()
@@ -180,6 +211,7 @@ def open_time_signal_plot(
     traj,
     *,
     signals: tuple[str, ...] = ("x", "u"),
+    abscissa_label: str = TIME_ABSCISSA_LABEL,
     backend="matplotlib",
     show: bool = True,
     **kwargs,
@@ -188,7 +220,13 @@ def open_time_signal_plot(
     signal_names = _normalize_plot_signals(sys, signals)
 
     def spec_builder(next_traj, *, title=None):
-        return build_signal_plot_spec(sys, next_traj, signals=signal_names, title=title)
+        return build_signal_plot_spec(
+            sys,
+            next_traj,
+            signals=signal_names,
+            title=title,
+            abscissa_label=abscissa_label,
+        )
 
     spec = spec_builder(traj)
     if not isinstance(backend, str):
@@ -298,12 +336,6 @@ def _available_signal_names(sys, traj) -> tuple[str, ...]:
                 if name not in names:
                     names.append(name)
     return tuple(names)
-
-
-def _color_for_signal(name: str) -> str:
-    if name == "x":
-        return "blue"
-    return "tab:red"
 
 
 def _coerce_signal_plot_spec(traj_or_spec, spec_builder, *, title=None):

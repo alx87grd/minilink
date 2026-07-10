@@ -111,8 +111,8 @@ class DynamicBicycle(DynamicSystem):
         self.tire_model_r = LinearTire()
 
         # Graphics-only attributes (2-D centerline look)
-        self.wheel_len = 0.6
-        self.wheel_width = 0.2
+        self.wheel_len = 0.76
+        self.wheel_width = 0.27
 
         # Graphics-only attributes for the 3-D four-wheel look (read by
         # ``car_skin_3d`` / ``tf``). They live on the base plant so the 3-D
@@ -129,7 +129,7 @@ class DynamicBicycle(DynamicSystem):
 
         # Default 2-D skin (black centerline chassis) and a camera that tracks
         # the body frame.
-        self.skin = partial(car_skin_2d, color="black")
+        self.skin = partial(car_skin_2d, color="#1a1a1a")
         self.camera_follow_frame = "body"
 
     def M(self, q, params=None):
@@ -320,20 +320,32 @@ class DynamicBicycle(DynamicSystem):
         return {
             "body": [
                 Arrow(
-                    base=(-b, 0.0), vector=v_r_loc, scale=0.2, color="blue", linewidth=2
+                    base=(-b, 0.0),
+                    vector=v_r_loc,
+                    scale=0.2,
+                    color="blue",
+                    linewidth=1.25,
                 ),
                 Arrow(
-                    base=(a, 0.0), vector=v_f_loc, scale=0.2, color="blue", linewidth=2
+                    base=(a, 0.0),
+                    vector=v_f_loc,
+                    scale=0.2,
+                    color="blue",
+                    linewidth=1.25,
                 ),
                 Arrow(
                     base=(-b, 0.0),
                     vector=F_r_loc,
                     scale=0.001,
                     color="red",
-                    linewidth=2,
+                    linewidth=1.25,
                 ),
                 Arrow(
-                    base=(a, 0.0), vector=F_f_loc, scale=0.001, color="red", linewidth=2
+                    base=(a, 0.0),
+                    vector=F_f_loc,
+                    scale=0.001,
+                    color="red",
+                    linewidth=1.25,
                 ),
             ]
         }
@@ -589,6 +601,11 @@ class JaxDynamicBicycle(DynamicBicycle):
         jnp = require_jax_numpy()
         return jnp.asarray(x)
 
+    def _u_in(self, x, u):
+        jnp = require_jax_numpy()
+        w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
+        return jnp.array([w_rear[0], delta[0]])
+
 
 class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
     """JAX-traceable :class:`DynamicBicycle` with rate inputs.
@@ -666,6 +683,46 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
     def _u_in(self, x, u):
         # Wheel rate and steer are integrated states here, not input ports.
         return x[6:8]
+
+
+class JaxDynamicBicycleRateInputsUY(JaxDynamicBicycleRateInputs):
+    """JAX rate-input bicycle with standard ``u`` / ``y`` ports for composition shortcuts.
+
+    Same dynamics as :class:`JaxDynamicBicycleRateInputs`; input ``u`` is
+    ``[w_rear_dot, delta_dot]`` and output ``y`` is the full state measurement.
+    """
+
+    def __init__(self):
+        from minilink.core.signals import VectorSignal
+
+        super(JaxDynamicBicycleRateInputs, self).__init__()
+        self.name = "JAX Dynamic Bicycle (rate inputs, u/y ports)"
+
+        self.n = 8
+        self.state = VectorSignal("x", dim=self.n)
+        self.x0 = np.zeros(self.n)
+        self.state.labels = [
+            "x",
+            "y",
+            "theta",
+            "vx",
+            "vy",
+            "yaw_rate",
+            "w_rear",
+            "delta",
+        ]
+        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
+
+        self.inputs = {}
+        self.add_input_port(
+            "u",
+            dim=2,
+            nominal_value=np.zeros(2),
+            labels=["w_rear_dot", "delta_dot"],
+            units=["rad/s^2", "rad/s^2"],
+        )
+        self.outputs = {}
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
 
 
 if __name__ == "__main__":

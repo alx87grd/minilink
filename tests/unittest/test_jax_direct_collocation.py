@@ -226,7 +226,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         sys = JaxSingleIntegrator()
         evaluator = sys.compile(backend="jax", verbose=False)
 
-        x = evaluator.rk4_rollout_forced(
+        x = evaluator.rk4_integrate_forced(
             np.array([0.0]),
             np.ones((5, 1)),
             0.0,

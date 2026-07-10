@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, System
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.signals import (
     build_signal_plot_spec,
@@ -29,7 +29,7 @@ class Integrator(DynamicSystem):
         return np.array([x[0]])
 
 
-class PController(StaticSystem):
+class PController(System):
     def __init__(self):
         super().__init__()
         self.params = {"Kp": 5.0}
@@ -43,7 +43,7 @@ class PController(StaticSystem):
         return np.array([Kp * (r[0] - y[0])])
 
 
-class Step(StaticSystem):
+class Step(System):
     def __init__(self):
         super().__init__()
         self.add_output_port("y", function=self.compute)
@@ -240,6 +240,18 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertIn("u[0]", labels)
         self.assertIn("extra[0]", labels)
         self.assertIn("extra[1]", labels)
+
+    def test_signal_spec_assigns_distinct_tier_colors(self):
+        traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
+        spec = build_signal_plot_spec(
+            self.diagram,
+            traj_plus,
+            signals=("x", "step:y", "ctl:u"),
+        )
+        colors = {trace.signal: trace.color for trace in spec.traces}
+        self.assertNotEqual(colors["x"], colors["step:y"])
+        self.assertNotEqual(colors["step:y"], colors["ctl:u"])
+        self.assertNotEqual(colors["x"], colors["ctl:u"])
 
     def test_unknown_signal_reports_available_names(self):
         with self.assertRaisesRegex(ValueError, "ctl:u"):

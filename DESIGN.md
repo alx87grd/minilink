@@ -45,7 +45,7 @@ rearrangement) are listed in [ROADMAP.md §5](ROADMAP.md).
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ `SystemFacades` mixin), `DiagramSystem`, signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
+| `core/` | `System` (+ façade mixins: `SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
 | `core/compile/` | `ExecutionPlan`, compiler, NumPy/JAX evaluators |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -66,8 +66,8 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, solvers, forcing |
-| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; more frequency tools planned |
+| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing |
+| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; `discretize` for continuous→step plant wrappers; more frequency tools planned |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
@@ -111,15 +111,30 @@ holds canonical textbook ODEs (integrator chains, `VanderPol`) with graphics,
 labels, and bounds for teaching demos — the name overlap (`Integrator` vs
 `SimpleIntegrator`) is intentional given those roles.
 
-### Scope: continuous time only
+### Continuous-time core; step/hybrid subsidiary
 
-Minilink is continuous-time only by decision (June 2026). Digital control and
-discrete dynamics (ZOH/delay blocks, sampled controllers, RNNs, mixed-rate
-simulation) are out of scope; the framework may assume continuous-time `f`.
-If discrete time ever enters scope, it is a framework design project on
-`System` and `core/compile/` scheduling — not an incremental patch.
+Minilink's **primary framework** is continuous-time: `DynamicSystem`, flow
+`DiagramSystem`, `compile` → `DynamicsEvaluator`, `Simulator`, and analysis on
+`f`. Plants, control design, teaching, and most library growth target this path.
 
-**Dynamics root:** `DynamicSystem` with `f`, `h`. Reusable bases in
+**Step and hybrid** are a **narrow parallel add-on** — not a second framework of
+equal weight. They exist so discrete control laws (MPC, SMC, sampled regulators)
+can close the loop on a continuous plant without hand-rolled outer `while` loops.
+Scope and contracts: [hybrid-discrete master plan](docs/plans/hybrid-discrete/00-master-plan.md)
+(subset only — not full Simulink / discrete-dynamics parity).
+
+**Design trade-off rule:** when step or hybrid work conflicts with continuous-time
+clarity, **prefer the continuous core**. Add-ons must stay on **sibling types and
+separate compile/sim paths** (`StepSystem` beside `DynamicSystem`, not a flag on
+`f`; `HybridDiagram` as two-side glue, not a merged heterogeneous diagram) so
+flow APIs, evaluators, and `DiagramSystem` behavior remain unchanged. Do not fold
+discrete scheduling, sample-time metadata, or mixed `f`/`step` semantics into
+`DynamicSystem`, flow `compile()`, or `Simulator` unless there is a clear
+flow-side benefit.
+
+**Dynamics root (continuous):** `DynamicSystem` with `f`, `h`. **Discrete leaf (subsidiary):**
+:class:`StepSystem` with `step`, `h` and integer index `k` — no `f`, no wall clock on the
+leaf. Reusable bases in
 `dynamics/abstraction` (`StateSpaceSystem`, `LTISystem`, `MechanicalSystem`,
 `GeneralizedMechanicalSystem`). `StateSpaceSystem` builds its matrices through
 methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)` (so
@@ -138,13 +153,64 @@ serial arms. Joint impedance / task impedance / computed torque use
 
 ### `System`
 
-- **Math:** `f(x,u,t,params)`, `h(x,u,t,params)`; ports use same signature.
-- **Dims:** `n` from constructor; `m` from input ports; `p` from primary output
+- **Math:** `h(x,u,t,params)` on the model and port `compute` functions; continuous
+  evolution `f(x,u,t,params)` is on :class:`DynamicSystem` only (and stacked on
+  :class:`DiagramSystem`).
+- **Dims:** `n` defaults to 0 (static IO shell); `m` from input ports; `p` from primary output
   `"y"` only (aux `"x"` does not change `p`; no `"y"` ⇒ `p==0`).
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
   slices with `get_port_values_from_u(u, "r", "y")`.
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
+- **StepSystem (discrete leaf):** same port shortcut as `DynamicSystem`; evolution is
+  `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`;
+  cache `self.rollout`. See [01-step-core.md](docs/plans/hybrid-discrete/01-step-core.md).
+- **Hybrid (computer + plant):** :class:`~minilink.core.hybrid_diagram.HybridDiagram`
+  bundles :class:`~minilink.simulation.computer.Computer` (step side + schedule) and a
+  continuous :class:`DiagramSystem` plant. Boundary channels use ZOH (computer → plant)
+  or sample (plant → computer). :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
+  mirrors :class:`~minilink.simulation.simulator.Simulator` (`t0`/`tf`, `solve`,
+  `solve_forced`); plant steps use
+  :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh`
+  with optional ``plant_dt_inner`` for sub-step integration and plant trajectory
+  recording. :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` holds
+  ``computer`` (:class:`~minilink.core.step_rollout.StepRollout`, tick ``k``) and
+  ``plant`` (:class:`~minilink.core.trajectory.Trajectory`, wall time ``t``); default
+  plots use ``plant``.
+  Shortcuts: ``block % schedule`` → :class:`~minilink.simulation.computer.Computer`;
+  ``Computer @ plant`` and :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`
+  (same port auto-wiring as continuous ``ctl @ plant`` via
+  :func:`~minilink.core.composition.resolve_standard_feedback`);
+  :meth:`~minilink.planning.mpc.controller.MPCStatelessController.export_to_computer` /
+  :meth:`~minilink.planning.mpc.step_block.MPCStatefulController.export_to_computer` for warm-start MPC.
+  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
+  exposes standard ``u`` / ``y`` ports for hybrid composition.
+  Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
+  :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_forced`, and
+  :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_trajectory` /
+  :meth:`~minilink.core.hybrid_diagram.HybridDiagram.animate` cache the plant
+  :class:`~minilink.core.trajectory.Trajectory` on ``self.traj`` (same quick-access
+  pattern as continuous diagrams) and the full
+  :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` on ``self.last_result``;
+  tick-indexed computer view on ``self.rollout``.
+  Visualization: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_diagram` renders Plant +
+  Computer (nested StepDiagram) clusters with dashed ZOH/sample boundary edges;
+  :func:`~minilink.graphical.diagrams.build_hybrid_topology` /
+  :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
+  Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
+  and anchors hybrid edges on wired subsystem ports.
+  See [05-hybrid-simulation.md](docs/plans/hybrid-discrete/05-hybrid-simulation.md).
+- **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCStatelessController`
+  is a static ``System`` (``n=0``) leaf: one :meth:`~minilink.planning.mpc.planner.MPCPlanner.step`
+  per Computer tick (memoized across output ports ``u_ff``, ``x_ff``, ``z``).
+  :class:`~minilink.planning.mpc.step_block.MPCStatefulController` (Phase 6b) is a
+  :class:`StepSystem` with packed decision state ``z``; warm-start via
+  :func:`~minilink.planning.mpc.warm_start.mpc_warm_start_guess` from
+  ``Computer.x``.   Post-sim horizons:
+  :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
+  default animation overlays:
+  :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
+  See [06-mpc-step-block.md](docs/plans/hybrid-discrete/06-mpc-step-block.md).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
@@ -157,9 +223,13 @@ serial arms. Joint impedance / task impedance / computed torque use
   `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
   stays unprefixed (one shared root); articulated frames are namespaced
   (``vehicle:body``).
-- **Facades:** user shortcuts only (lazy simulation/graphics); defined on the
-  `core.facades.SystemFacades` mixin so `core/system.py` keeps the math,
-  port, and visualization contracts. `self.traj` is a convenience cache of
+- **Facades:** user shortcuts only (lazy simulation/graphics); split across
+  `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
+  `compute_trajectory`, `plot_trajectory`, `animate`, …),
+  `DynamicSystemFacades` on `DynamicSystem` (continuous `compute_trajectory`,
+  analysis plots, `game`), `StepSystemFacades` on `StepSystem`
+  (`compute_rollout`). **MRO** picks `compute_trajectory` implementation; no
+  façade-layer `isinstance` routers. `self.traj` is a convenience cache of
   the latest facade rollout; library code never reads it as an input.
 
 ### Native-array equation rule
@@ -193,8 +263,14 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
 
 ### `DiagramSystem`
 
-Composes subsystems by named ports; flattens state; compiled `ExecutionPlan` is
-the main execution path (reference recursive path must stay equivalent).
+Subclasses :class:`~minilink.core.system.DynamicSystem` (diagrams are continuous
+evolution systems with a compile fast path). Composes subsystems by named ports;
+flattens state; compiled `ExecutionPlan` is the main execution path (reference
+recursive path must stay equivalent).
+Wiring, port gather, params nesting, and `check_algebraic_loops` live on
+`WiredDiagramMixin` in `wiring.py`; `DiagramSystem` adds flow-only `f`,
+`compile`, and `reconstruct_internal_signals`. Public `DiagramSystem` API is
+unchanged (methods inherited from the mixin).
 `connect()` validates port existence and dimensions at wiring time and is
 quiet by default (`connection_verbose=False`; set `True` for one line per connection).
 
@@ -208,6 +284,9 @@ not nested. Explicit `add_subsystem` / `connect` remains canonical for general t
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
 with ``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
+:func:`~minilink.graphical.diagrams.build_diagram_topology` accepts
+``abstract_boundary=True`` to omit external Inputs/Outputs routing nodes and record
+``boundary_inputs`` / ``boundary_outputs`` port anchors (used by hybrid export).
 
 Visualization: subsystem `"world"` geometry merges into one shared diagram
 `"world"` frame; only articulated frames get `{sys_id}:` prefixes.
@@ -225,7 +304,7 @@ optional class attribute `feedback_profile`, not inheritance):
 | `siso` | `siso.py` | `y` dim `n` only (decoupled loops) |
 | `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)`` |
 | `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants |
-| `modelbased` | `modelbased.py` | Full state ``x``; model-based torque laws (computed torque, sliding mode) |
+| `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` |
 
 ### `Trajectory`, sets, costs, geometry
 
@@ -257,21 +336,106 @@ optional class attribute `feedback_profile`, not inheritance):
 
 ## 5. Compilation And Simulation
 
-`compile(system, backend)` → `DynamicsEvaluator` (`numpy`|`jax`|`auto`|`direct`).
+`compile(system, backend)` returns a typed evaluator:
+
+- :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.dynamics_evaluator.DynamicsEvaluator`
+  (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)
+- :class:`StepSystem` leaf → :class:`~minilink.core.compile.evaluators.step_evaluator.StepEvaluator`
+  (`NumpyStepEvaluator` / `JaxStepEvaluator`) — `.step`, `.outputs`, `.rollout`; no `.f`
+- static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.static_evaluator.StaticEvaluator`
+  (`NumpyStaticEvaluator` / `JaxStaticEvaluator`) — `.outputs` only, no `.f`
+- :class:`DiagramSystem` → diagram evaluator (same dynamics tier as above)
+
+Leaf `compile` accepts `numpy` or `jax` only (`auto` / `direct` are simulator /
+transcription concepts — see :mod:`minilink.core.backends`).
 
 Diagrams → `ExecutionPlan` → diagram evaluator. Internal outputs via
 `reconstruct_internal_signals`; **`outputs()` / `outputs_p()` are boundary outputs
-only** (not diagram internals). Keep `ExecutionPlan.output_slices` and
-`external_output_slices` aligned. Do not reintroduce `compute_outputs(..., ports=...)`.
+only** (not diagram internals). Compiled evaluators expose **`outputs` / `outputs_p`**
+(dict keyed by port id); they do not mirror model `h` as a separate evaluator API.
+Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
+reintroduce `compute_outputs(..., ports=...)`.
 
-**Default sim API:** `compute_trajectory` / `compute_forced` → `Simulator` →
-`Trajectory`. Unconnected inputs use port nominals; time-varying sources belong
-in the diagram; forcing via `compute_forced`. Facades default
-`compile_backend="numpy"`.
+**Default sim API:** `compute_trajectory` / `compute_forced` dispatch by **class MRO**
+(façade mixins), enforced at simulator constructors:
+
+- :class:`DynamicSystem` (including :class:`DiagramSystem`) →
+  :class:`~minilink.simulation.simulator.Simulator` (ODE integration or diagram
+  evaluator on a time grid)
+- static :class:`System` leaf (`n=0`) →
+  :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
+  boundary outputs in `Trajectory.signals`; not state evolution)
+- :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
+  (clock-free :class:`~minilink.core.step_rollout.StepRollout`; not `Simulator`)
+- :class:`~minilink.core.hybrid_diagram.HybridDiagram` →
+  :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` or façade
+  `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`)
+
+`animate` / `plot_trajectory` live on `SharedSystemFacades` for continuous and static
+systems; :class:`~minilink.core.hybrid_diagram.HybridDiagram` mirrors the pattern with
+``self.traj`` (plant :class:`~minilink.core.trajectory.Trajectory`) and
+``self.last_result`` (:class:`~minilink.simulation.hybrid_simulator.HybridSimResult`).
+Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous diagrams).
+
+**Two static paths:** a static *leaf* (`Gain`, `Step` source) uses
+`StaticSimulator` — empty state, outputs in `traj.signals`. A static-only
+*diagram* (`n=0` stacked state) still subclasses `DynamicSystem` and uses
+`Simulator` with the diagram evaluator (signal-flow on a time grid).
+
+Unconnected inputs use port nominals; time-varying sources belong in the diagram;
+forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler`, `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
 ([ROADMAP.md](ROADMAP.md) P1).
+
+### Discontinuous closed loops — known issues
+
+Controllers with discontinuous laws (e.g. :class:`~minilink.control.modelbased.SlidingModeController`
+``sign(s)``) on a **continuous** :class:`DiagramSystem` closed loop are supported today,
+but several solver/logging behaviors are misleading until a dedicated hybrid or
+event-handling path lands ([ROADMAP.md](ROADMAP.md) §5.2).
+
+**Algebraic feedback during integration.** Nominal closed-loop runs integrate
+``f_ivp(x, t)`` — the diagram evaluator re-solves feedback at **every** call to
+``f``. There is no sample-and-hold on the controller torque inside a step.
+
+**Fixed-step RK4 (`rk4_fixedsteps`).** Each step evaluates ``f`` at four intermediate
+states (k1–k4). ``u`` and ``sign(s)`` can **flip sign between sub-steps** while the
+weighted RK4 update **nearly cancels**, leaving ``x`` almost unchanged on the output
+grid. The plant can look stationary even though instantaneous dynamics at the grid
+point imply large ``ddq``.
+
+**What the trajectory records.** :class:`~minilink.core.trajectory.Trajectory` stores
+``x`` (and boundary ``u``) on the **output time grid only**. It does **not** log
+internal RK4 sub-step torques. :meth:`~minilink.core.diagram.DiagramSystem.reconstruct_internal_signals`
+and ``plot_trajectory`` evaluate ``ctl:u`` and ``f(x, u, t)`` at those **grid states**
+— equivalent to the k1/start-of-interval algebraic map, **not** the effective
+piecewise dynamics integrated over ``[t_k, t_k + dt]``. Therefore:
+
+- Reconstructed ``ctl:u`` can appear **smooth or constant** while sub-step torques oscillate.
+- ``f``-based ``ddq`` at a grid point can **disagree** with ``Δdq/Δt`` from the stored
+  state (especially under ``rk4_fixedsteps``).
+- This is **not** a compile-backend bug; NumPy and JAX evaluators show the same pattern.
+
+**SciPy adaptive solvers.** ``scipy`` / ``scipy_stiff`` / ``scipy_lsoda`` on the same
+closed loop may stall, overflow, or take extreme substeps near switching (Zeno-like
+behavior). Prefer **explicit Euler with a small ``dt``** or **hybrid** sampling for
+discontinuous mechanical SMC demos.
+
+**Hybrid contrast.** :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
+holds controller torque constant between computer ticks (ZOH) and samples plant outputs
+at tick boundaries — the intended semantics for digital SMC. See
+``examples/scripts/hybrid/demo_smc_pendulum_compare.py``.
+
+**Diagnostics.** ``scratch/confirm_smc_solver_bug.py`` compares solvers, ``ddq_f`` vs
+numerical ``Δdq/Δt``, and RK4 k1–k4 cancellation on the pendulum SMC demo.
+
+**Mitigation (landed):** [docs/plans/discontinuous-solver-selection.md](docs/plans/discontinuous-solver-selection.md)
+— ``SlidingModeController`` sets ``discontinuous_behavior``; diagrams aggregate the flag;
+auto ``select_solver`` picks **Euler** with finer default ``dt``; ``UserWarning`` on every
+discontinuous solve (stronger when forcing ``rk4_fixedsteps`` / ``scipy_*``). Evolution
+kind is class-type routing only — ``solver_info["continuous_time_equation"]`` was removed.
 
 ## 6. Optimization And Planning
 
@@ -302,7 +466,7 @@ Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table
 and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, built on a
 NumPy precompute so any plant works; linear/nearest only). `precompute` trades the `(N,A,n)`
 successor table for per-sweep recomputation (memory vs time-varying support). `result.controller()`
-returns a `LookupTableController` (a `StaticSystem`, so `controller >> plant` simulates);
+returns a `LookupTableController` (a static `System`, so `controller >> plant` simulates);
 `PolicyEvaluator` gives the cost-to-go of any fixed law. Benchmark: `benchmarks/run_dp_backends.py`.
 
 **Spatial scene** (`planning/spatial/`): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
@@ -330,6 +494,11 @@ from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrappe
 `corridor_field(body).as_constraint(lower=0)` for a hard tube. Probe semantics match
 clearance (subtract body radius). Compose with obstacles:
 `X = bounds & scene.clearance_field(body).as_constraint() & track.corridor_field(body).as_constraint()`.
+
+**Workspace cost raster** (`grid.sample_field_costs`, `plotting.plot_cost_field` /
+`plot_cost_field_3d` / `plot_cost_field_exports`): rasterize shaped ``FieldCost`` terms
+at workspace points ``p = (x, y)`` with a **point probe** body (heading-independent).
+Build viz costs with ``bind(sys, point_probe())``; MPC may still use ``car_outline``.
 
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
 sources every concern from the problem — collision `problem.X.contains` (optional

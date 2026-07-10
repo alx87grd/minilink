@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink.core.system import (
     DynamicSystem,
-    StaticSystem,
     System,
     VectorSignal,
 )
@@ -37,7 +36,7 @@ class TestCoreComponents(unittest.TestCase):
             System(n=-1)
 
     def test_static_system(self):
-        sys = StaticSystem()
+        sys = System()
         self.assertEqual(sys.n, 0)
         self.assertEqual(sys.m, 0)
         self.assertEqual(sys.p, 0)

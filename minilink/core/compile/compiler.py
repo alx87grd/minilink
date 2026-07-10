@@ -3,9 +3,9 @@ Diagram compiler: topology analysis and execution plan construction.
 
 This module provides the complete compilation pipeline:
 
-1. :func:`check_algebraic_loops` — Standalone depth-first search-based
-   algebraic loop detection.  Returns the topological execution order
-   of output ports.
+1. :func:`~minilink.core.wiring.check_algebraic_loops` — Standalone depth-first
+   search-based algebraic loop detection (implemented in ``wiring.py``,
+   re-exported here). Returns the topological execution order of output ports.
    Can be imported independently by :class:`~minilink.core.diagram.DiagramSystem`
    for use after manual wiring.
 
@@ -36,6 +36,8 @@ from minilink.core.compile.execution_plan import (
     PortOperation,
     StateOperation,
 )
+from minilink.core.system import DynamicSystem
+from minilink.core.wiring import check_algebraic_loops
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -43,13 +45,11 @@ if TYPE_CHECKING:
 
 # Public API
 def compile(system, backend=BACKEND_NUMPY, verbose=False):
-    """Compile a System into a :class:`DynamicsEvaluator`.
+    """Compile a system into a typed evaluator.
 
-    For leaf systems (non-diagram), wraps ``f``/``h`` with frozen params
-    and nominal u snapshot, providing the full evaluator API (RK4, rollout,
-    linearize, etc.).
-
-    For diagrams, delegates to :func:`compile_diagram`.
+    Returns :class:`StaticEvaluator` for static ``System`` leaves (``n=0``),
+    :class:`StepEvaluator` for :class:`StepSystem` leaves,
+    :class:`DynamicsEvaluator` for :class:`DynamicSystem` leaves and diagrams.
 
     Parameters
     ----------
@@ -59,26 +59,69 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
         ``'numpy'`` or ``'jax'``.
     verbose : bool
         If ``True``, print timed compilation steps.
-
-    Returns
-    -------
-    DynamicsEvaluator
     """
-    from minilink.core.diagram import DiagramSystem
+    from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+    from minilink.core.system import DynamicSystem, StepSystem
 
     if isinstance(system, DiagramSystem):
         return compile_diagram(system, backend=backend, verbose=verbose)
 
-    key = normalize_backend(backend)
-    if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.numpy_evaluator import NumpyLeafEvaluator
+    if isinstance(system, StepDiagramSystem):
+        from minilink.core.compile.step_compiler import compile_step_diagram
 
-        return NumpyLeafEvaluator(system)
+        return compile_step_diagram(system, backend=backend, verbose=verbose)
+
+    key = normalize_backend(backend)
+
+    if isinstance(system, StepSystem):
+        if key == BACKEND_NUMPY:
+            from minilink.core.compile.evaluators.step_evaluator import (
+                NumpyStepEvaluator,
+            )
+
+            return NumpyStepEvaluator(system)
+        require_jax_numpy()
+        from minilink.core.compile.evaluators.step_evaluator import JaxStepEvaluator
+
+        t_total = time.perf_counter()
+        evaluator = JaxStepEvaluator(system, verbose=verbose)
+        if verbose:
+            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+        return evaluator
+
+    if isinstance(system, DynamicSystem):
+        if key == BACKEND_NUMPY:
+            from minilink.core.compile.evaluators.numpy_evaluator import (
+                NumpyDynamicEvaluator,
+            )
+
+            return NumpyDynamicEvaluator(system)
+        require_jax_numpy()
+        from minilink.core.compile.evaluators.jax_evaluator import JaxDynamicEvaluator
+
+        t_total = time.perf_counter()
+        evaluator = JaxDynamicEvaluator(system, verbose=verbose)
+        if verbose:
+            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+        return evaluator
+
+    if system.n > 0:
+        raise TypeError(
+            f"Cannot compile {type(system).__name__} with n={system.n}; "
+            "subclass DynamicSystem and implement f(), or StepSystem for discrete evolution."
+        )
+
+    if key == BACKEND_NUMPY:
+        from minilink.core.compile.evaluators.static_evaluator import (
+            NumpyStaticEvaluator,
+        )
+
+        return NumpyStaticEvaluator(system)
     require_jax_numpy()
-    from minilink.core.compile.evaluators.jax_evaluator import JaxLeafEvaluator
+    from minilink.core.compile.evaluators.static_evaluator import JaxStaticEvaluator
 
     t_total = time.perf_counter()
-    evaluator = JaxLeafEvaluator(system, verbose=verbose)
+    evaluator = JaxStaticEvaluator(system, verbose=verbose)
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
     return evaluator
@@ -123,6 +166,22 @@ def compile_diagram(
     It does **not** make user ``f`` / port ``compute`` implementations pure if they still
     read or mutate other instance state; see :class:`minilink.core.system.System`.
     """
+    from minilink.core.diagram import StepDiagramSystem
+    from minilink.core.system import StepSystem
+
+    if isinstance(diagram, StepDiagramSystem):
+        raise TypeError(
+            "StepDiagramSystem must be compiled via compile_step_diagram; "
+            "use StepDiagramSystem.compile() or compile(step_diagram)."
+        )
+
+    for sys_id, subsystem in diagram.subsystems.items():
+        if isinstance(subsystem, StepSystem):
+            raise TypeError(
+                f"StepSystem leaf '{sys_id}' cannot be compiled inside a flow "
+                "DiagramSystem; use StepDiagramSystem."
+            )
+
     t_total = time.perf_counter() if verbose else None
 
     # Step 1: Algebraic loop detection
@@ -139,7 +198,9 @@ def compile_diagram(
     if verbose:
         t0 = time.perf_counter()
         n_ports = len(port_execution_order)
-        n_states = sum(1 for s in diagram.subsystems.values() if s.n > 0)
+        n_states = sum(
+            1 for s in diagram.subsystems.values() if isinstance(s, DynamicSystem)
+        )
         print(
             f"[compile] Step 2: Building execution plan "
             f"({n_ports} ports, {n_states} states)...",
@@ -205,82 +266,6 @@ def build_execution_plan(
     )
 
 
-def check_algebraic_loops(
-    diagram: DiagramSystem,
-) -> list[tuple[str, str]]:
-    """Detect algebraic loops and return the topological port execution order.
-
-    Uses depth-first search over output-port dependency edges.  An algebraic
-    loop exists when a cycle contains only direct-feedthrough paths (i.e.,
-    output ports whose ``dependencies`` include the input ports that close
-    the cycle).
-
-    This function is **standalone** and can be called independently of
-    :func:`build_execution_plan` — for example, right after wiring a diagram
-    to validate its topology before simulation.
-
-    Parameters
-    ----------
-    diagram : DiagramSystem
-        The wired diagram to analyse.
-
-    Returns
-    -------
-    list[tuple[str, str]]
-        Output ports ``(sys_id, port_id)`` in valid topological order
-        (dependencies before dependents).
-
-    Raises
-    ------
-    RuntimeError
-        If an algebraic loop is detected, with the full cycle path in the
-        error message.
-    """
-    visited: set[tuple[str, str]] = set()
-    stack: list[tuple[str, str]] = []
-    stack_set: set[tuple[str, str]] = set()
-    order: list[tuple[str, str]] = []
-
-    def visit_port(sys_id: str, port_id: str) -> None:
-        node = (sys_id, port_id)
-
-        if node in stack_set:
-            cycle_start_idx = stack.index(node)
-            cycle_path = stack[cycle_start_idx:] + [node]
-            cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
-            raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
-
-        if node in visited:
-            return
-
-        stack.append(node)
-        stack_set.add(node)
-
-        port = diagram.subsystems[sys_id].outputs.get(port_id)
-        if port is not None:
-            deps = port.dependencies
-            sys_inputs = diagram.subsystems[sys_id].inputs
-            input_deps = sys_inputs.keys() if deps == "all" else deps
-
-            for in_port_id in input_deps:
-                source = diagram.connections[sys_id].get(in_port_id)
-                if source is not None:
-                    src_sys_id, src_port_id = source
-                    if src_sys_id != "input":
-                        visit_port(src_sys_id, src_port_id)
-
-        stack.pop()
-        stack_set.remove(node)
-        visited.add(node)
-        order.append(node)
-
-    for sys_id, subsystem in diagram.subsystems.items():
-        for port_id in subsystem.outputs:
-            visit_port(sys_id, port_id)
-
-    return order
-
-
 # Private helpers
 def _build_execution_plan_from_order(
     diagram: DiagramSystem,
@@ -335,7 +320,7 @@ def _build_execution_plan_from_order(
     # 3. Build StateOperation list (subsystems with state)
     state_ops: list[StateOperation] = []
     for sys_id, sys in diagram.subsystems.items():
-        if sys.n > 0:
+        if isinstance(sys, DynamicSystem):
             gather_sources, u_dim = _build_gather_sources(
                 diagram, sys_id, output_slices, dependencies="all"
             )
@@ -444,7 +429,7 @@ def _build_gather_sources(
 def _state_slice(diagram: DiagramSystem, sys_id: str) -> slice:
     """Return the global state-vector slice for a subsystem."""
     sys = diagram.subsystems[sys_id]
-    if sys.n > 0:
+    if isinstance(sys, DynamicSystem):
         start, end = diagram.state_index[sys_id]
         return slice(start, end)
     return slice(0, 0)

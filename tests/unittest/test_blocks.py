@@ -43,7 +43,7 @@ class TestBlocks(unittest.TestCase):
         evaluator = plant.compile()
 
         u_sequence = np.ones((3, 1))
-        x = evaluator.rollout(np.array([0.0]), u_sequence, t0=0.0, dt=0.1)
+        x = evaluator.integrate(np.array([0.0]), u_sequence, t0=0.0, dt=0.1)
 
         np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.1, 0.2, 0.3]))
 
@@ -52,7 +52,7 @@ class TestBlocks(unittest.TestCase):
         evaluator = plant.compile()
 
         u_sequence = np.ones((2, 1))
-        x = evaluator.rollout_p(
+        x = evaluator.integrate_p(
             np.array([0.0]),
             u_sequence,
             t0=0.0,
@@ -94,6 +94,19 @@ class TestBlocks(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(dx), [8.0])
         np.testing.assert_allclose(np.asarray(y), [3.0])
         np.testing.assert_allclose(np.asarray(u_cmd), [5.0])
+
+    def test_gain_jax_static_compile(self):
+        pytest.importorskip("jax")
+        import jax.numpy as jnp
+
+        from minilink.blocks.routing import Gain
+        from minilink.core.compile.evaluators.static_evaluator import JaxStaticEvaluator
+
+        gain = Gain(K=2.0, dim=1)
+        ev = gain.compile(backend="jax")
+        self.assertIsInstance(ev, JaxStaticEvaluator)
+        out = ev.outputs(jnp.array([]), jnp.array([3.0]), 0.0)
+        np.testing.assert_allclose(np.asarray(out["y"]), [6.0])
 
 
 if __name__ == "__main__":

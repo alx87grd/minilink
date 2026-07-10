@@ -1,13 +1,11 @@
 """
 System convenience facades.
 
-This module defines :class:`SystemFacades`, the mixin that gives every
-:class:`~minilink.core.system.System` its user-shortcut methods
-(:meth:`~SystemFacades.compile`, :meth:`~SystemFacades.compute_trajectory`,
-:meth:`~SystemFacades.plot_trajectory`, :meth:`~SystemFacades.animate`,
-:meth:`~SystemFacades.modal_analysis`, ...).
+Evolution-aware mixin shortcuts for :class:`~minilink.core.system.System`
+subclasses: :class:`SharedSystemFacades` (all kinds), :class:`DynamicSystemFacades`
+(continuous evolution), and :class:`StepSystemFacades` (discrete rollout).
 
-The mixin is shortcuts only: the mathematical, structural, and visualization
+The mixins are shortcuts only: mathematical, structural, and visualization
 contracts stay in :mod:`minilink.core.system`. Heavy dependencies
 (simulation, graphics) are imported lazily inside each method.
 """
@@ -15,14 +13,19 @@ contracts stay in :mod:`minilink.core.system`. Heavy dependencies
 import numpy as np
 
 
-class SystemFacades:
+class SharedSystemFacades:
     """
-    Mixin providing user-shortcut facades.
+    Mixin providing shortcuts shared by all :class:`~minilink.core.system.System` kinds.
 
     Relies on attributes defined by :class:`~minilink.core.system.System`
     (``n``, ``m``, ``x0``, ``traj``). The latest facade rollout is cached on
     :attr:`traj` as a convenience only; library code never reads it as an
     input.
+
+    On static ``System`` leaves (``n=0``), :meth:`compute_trajectory` and
+    :meth:`compute_forced` use :class:`~minilink.simulation.static_simulator.StaticSimulator`.
+    :class:`DynamicSystem` subclasses override those methods via
+    :class:`DynamicSystemFacades`.
     """
 
     # User Shortcut / Facade API
@@ -47,30 +50,35 @@ class SystemFacades:
         show=False,
         x0=None,
         compile_backend="numpy",
-        verbose=False,
+        verbose=True,
     ):
         """
-        Convenience shortcut to simulate the system and return a trajectory.
+        Convenience shortcut to sample boundary IO on a time grid.
 
-        This method is a façade over :class:`minilink.simulation.Simulator`.
-        It uses model defaults such as :attr:`x0` and stores the resulting
-        trajectory in :attr:`traj` for later convenience.
+        On static ``System`` leaves (``n=0``), this uses
+        :class:`~minilink.simulation.static_simulator.StaticSimulator` — not ODE
+        integration. Continuous systems override via
+        :class:`DynamicSystemFacades`.
 
         Parameters
         ----------
         compile_backend : str
-            Passed to :class:`~minilink.simulation.Simulator` (default ``\"numpy\"``).
+            Passed to the simulator (default ``\"numpy\"``).
             Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
+        verbose : bool
+            Print simulator setup (solver, ``dt``, compile backend). Default
+            ``True`` for interactive ``compute_trajectory`` calls; library
+            helpers pass ``verbose=False``.
 
         Returns
         -------
         Trajectory
-            The simulated trajectory, also stored in :attr:`traj`.
+            The sampled trajectory, also stored in :attr:`traj`.
         """
-        from minilink.simulation.simulator import Simulator
+        from minilink.simulation.static_simulator import StaticSimulator
 
-        sim = Simulator(
+        sim = StaticSimulator(
             self,
             x0=x0,
             t0=t0,
@@ -104,13 +112,13 @@ class SystemFacades:
         show=False,
         x0=None,
         compile_backend="numpy",
-        verbose=False,
+        verbose=True,
     ):
         """
-        Convenience shortcut to simulate the system under a prescribed input.
+        Convenience shortcut to sample boundary IO under a prescribed input.
 
-        This method is a façade over :class:`minilink.simulation.Simulator`
-        and :meth:`minilink.simulation.Simulator.solve_forced`.
+        On static ``System`` leaves, uses
+        :meth:`~minilink.simulation.static_simulator.StaticSimulator.solve_forced`.
 
         Parameters
         ----------
@@ -126,15 +134,18 @@ class SystemFacades:
         input_port_id : str, optional
             Named input port to force while keeping the others at default
             values.
+        verbose : bool
+            Print simulator setup. Default ``True``; pass ``False`` from library
+            helpers.
 
         Returns
         -------
         Trajectory
-            Simulated state-input trajectory.
+            Sampled state-input trajectory.
         """
-        from minilink.simulation.simulator import Simulator
+        from minilink.simulation.static_simulator import StaticSimulator
 
-        sim = Simulator(
+        sim = StaticSimulator(
             self,
             x0=x0,
             t0=t0,
@@ -204,7 +215,7 @@ class SystemFacades:
                 self, self.traj, signals=signals, backend=backend, show=show
             )
 
-        traj = self.compute_trajectory(show=False)
+        traj = self.compute_trajectory(show=False, verbose=False)
         return plot_time_signals(
             self,
             traj,
@@ -212,6 +223,284 @@ class SystemFacades:
             backend=backend,
             show=show,
         )
+
+    def get_diagram(self):
+        """
+        Convenience shortcut returning a renderable diagram representation.
+        """
+        from minilink.graphical.diagrams import get_diagram
+
+        return get_diagram(self)
+
+    def _repr_svg_(self):
+        """
+        Convenience notebook representation for the system diagram.
+        """
+        g = self.get_diagram()
+        if g is None:
+            return None
+        return g._repr_image_svg_xml()
+
+    def plot_diagram(self, filename=None, show_inline=None, show_pdf=None):
+        """
+        Convenience shortcut to render the system diagram.
+
+        ``show_inline`` and ``show_pdf`` default to ``None`` and auto-resolve
+        via :func:`minilink.graphical.common.environment.is_inline_capable`:
+        Jupyter / Colab get inline SVG only (no viewer pop-up, no disk write),
+        while bare scripts and IPython REPLs get the legacy render-to-temp-file
+        + open-in-OS-PDF-viewer behavior. Pass explicit booleans to override;
+        pass ``filename`` to force a specific on-disk output.
+        """
+        from minilink.graphical.diagrams import plot_diagram
+
+        return plot_diagram(
+            self,
+            show_inline=show_inline,
+            show_pdf=show_pdf,
+            filename=filename,
+        )
+
+    def render(
+        self,
+        x,
+        u,
+        t,
+        is_3d=False,
+        renderer="matplotlib",
+        camera=None,
+        overlays=None,
+    ):
+        """
+        Convenience shortcut rendering a single frame of the system.
+
+        ``camera`` accepts an optional override: a constant 4x4 or a
+        ``camera(frames, x, u, t)`` callable.
+        """
+        from minilink.graphical.animation import Animator
+
+        animator = Animator(self)
+        return animator.show(
+            x,
+            u,
+            t,
+            is_3d=is_3d,
+            renderer=renderer,
+            camera=camera,
+            overlays=overlays,
+        )
+
+    def animate(
+        self,
+        traj=None,
+        time_factor_video=1.0,
+        is_3d=False,
+        html: bool | None = None,
+        renderer="matplotlib",
+        native: bool = True,
+        scene_title: str | None = None,
+        show: bool = True,
+        save: bool = False,
+        file_name: str = "Animation",
+        camera=None,
+        overlays=None,
+    ):
+        """
+        Convenience shortcut to animate a trajectory of this system.
+
+        ``html=None`` auto-resolves via
+        :func:`minilink.graphical.common.environment.prefers_inline_animation`:
+        ``True`` in Colab and in local Jupyter with a non-interactive
+        matplotlib backend (``inline`` / ``agg``); ``False`` for bare
+        script, IPython REPL, and Jupyter with an interactive backend
+        (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``).
+        ``native=True`` (default) drives each backend's own animation
+        engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
+        Pass ``native=False`` to fall back to the per-frame Python-loop
+        playback (useful for debugging or when the native path's limitations
+        matter — e.g. meshcat freezes per-frame dynamic geometry such as a
+        ``TorqueArrow`` sweep; see ``DESIGN.md`` §4.7). ``camera`` accepts an
+        optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
+        callable). ``save=True`` with ``renderer="matplotlib"`` writes a GIF
+        via ImageMagick (``{file_name}.gif``).
+        """
+        from minilink.graphical.animation import Animator
+        from minilink.graphical.common.environment import prefers_inline_animation
+
+        if traj is None:
+            if self.traj is not None:
+                traj = self.traj
+            else:
+                traj = self.compute_trajectory(verbose=False)
+
+        resolved_html = prefers_inline_animation() if html is None else html
+
+        animator = Animator(self)
+        show_plot = show and not resolved_html
+        ani_obj = animator.animate_simulation(
+            traj,
+            time_factor_video=time_factor_video,
+            is_3d=is_3d,
+            html=resolved_html,
+            show=show_plot,
+            save=save,
+            file_name=file_name,
+            renderer=renderer,
+            native=native,
+            scene_title=scene_title,
+            camera=camera,
+            overlays=overlays,
+        )
+
+        # For html output, return the IPython.display.HTML object and let the
+        # notebook auto-display it via the standard last-expression rule.
+        # Calling display.display() *and* returning the object renders twice.
+        return ani_obj
+
+
+class DynamicSystemFacades:
+    """
+    Continuous-time simulation and analysis shortcuts for :class:`~minilink.core.system.DynamicSystem`.
+
+    Overrides :meth:`compute_trajectory` and :meth:`compute_forced` to use
+    :class:`~minilink.simulation.simulator.Simulator`. Inherited by
+    :class:`~minilink.core.diagram.DiagramSystem`.
+    """
+
+    def compute_trajectory(
+        self,
+        t0=0,
+        tf=10,
+        n_steps=None,
+        dt=None,
+        solver=None,
+        show=False,
+        x0=None,
+        compile_backend="numpy",
+        verbose=True,
+        solver_warnings="warn",
+    ):
+        """
+        Convenience shortcut to simulate the system and return a trajectory.
+
+        This method is a façade over :class:`~minilink.simulation.simulator.Simulator`.
+        It uses model defaults such as :attr:`x0` and stores the resulting
+        trajectory in :attr:`traj` for later convenience.
+
+        Parameters
+        ----------
+        compile_backend : str
+            Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``\"numpy\"``).
+            Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            to try JAX then fall back to NumPy.
+        verbose : bool
+            Print solver selection, time grid, and compile backend (default
+            ``True`` for interactive use).
+        solver_warnings : str
+            ``\"warn\"`` (default), ``\"error\"``, or ``\"ignore\"`` for discontinuous-loop
+            warnings (see :mod:`minilink.simulation.solver_warnings`).
+
+        Returns
+        -------
+        Trajectory
+            The simulated trajectory, also stored in :attr:`traj`.
+        """
+        from minilink.simulation.simulator import Simulator
+
+        sim = Simulator(
+            self,
+            x0=x0,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            dt=dt,
+            solver=solver,
+            compile_backend=compile_backend,
+            verbose=verbose,
+            solver_warnings=solver_warnings,
+        )
+        traj = sim.solve()
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+
+        return traj
+
+    def compute_forced(
+        self,
+        u,
+        input_port_id=None,
+        t0=0,
+        tf=10,
+        n_steps=None,
+        dt=None,
+        solver=None,
+        show=False,
+        x0=None,
+        compile_backend="numpy",
+        verbose=True,
+        solver_warnings="warn",
+    ):
+        """
+        Convenience shortcut to simulate the system under a prescribed input.
+
+        This method is a façade over
+        :meth:`~minilink.simulation.simulator.Simulator.solve_forced`.
+
+        Parameters
+        ----------
+        u : np.ndarray or callable
+            Forced input description.
+            - If ``input_port_id is None``: either a full input trajectory with
+              shape ``(m, n_pts)`` or a callable ``u(t)`` returning the full
+              input vector.
+            - If ``input_port_id`` is provided: either a trajectory for that
+              port only with shape ``(port_dim, n_pts)`` or a callable
+              returning that port signal. Other ports stay at their default
+              values.
+        input_port_id : str, optional
+            Named input port to force while keeping the others at default
+            values.
+        verbose : bool
+            Print solver selection and time grid (default ``True``).
+        solver_warnings : str
+            ``\"warn\"`` (default), ``\"error\"``, or ``\"ignore\"`` for discontinuous-loop
+            warnings (see :mod:`minilink.simulation.solver_warnings`).
+
+        Returns
+        -------
+        Trajectory
+            Simulated state-input trajectory.
+        """
+        from minilink.simulation.simulator import Simulator
+
+        sim = Simulator(
+            self,
+            x0=x0,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            dt=dt,
+            solver=solver,
+            compile_backend=compile_backend,
+            verbose=verbose,
+            solver_warnings=solver_warnings,
+        )
+
+        traj = sim.solve_forced(u, input_port_id=input_port_id)
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+
+        return traj
 
     def plot_phase_plane(
         self,
@@ -331,134 +620,6 @@ class SystemFacades:
             show=show,
         )
 
-    def get_diagram(self):
-        """
-        Convenience shortcut returning a renderable diagram representation.
-        """
-        from minilink.graphical.diagrams import get_diagram
-
-        return get_diagram(self)
-
-    def _repr_svg_(self):
-        """
-        Convenience notebook representation for the system diagram.
-        """
-        g = self.get_diagram()
-        if g is None:
-            return None
-        return g._repr_image_svg_xml()
-
-    def plot_diagram(self, filename=None, show_inline=None, show_pdf=None):
-        """
-        Convenience shortcut to render the system diagram.
-
-        ``show_inline`` and ``show_pdf`` default to ``None`` and auto-resolve
-        via :func:`minilink.graphical.common.environment.is_inline_capable`:
-        Jupyter / Colab get inline SVG only (no viewer pop-up, no disk write),
-        while bare scripts and IPython REPLs get the legacy render-to-temp-file
-        + open-in-OS-PDF-viewer behavior. Pass explicit booleans to override;
-        pass ``filename`` to force a specific on-disk output.
-        """
-        from minilink.graphical.diagrams import plot_diagram
-
-        return plot_diagram(
-            self,
-            show_inline=show_inline,
-            show_pdf=show_pdf,
-            filename=filename,
-        )
-
-    def render(
-        self,
-        x,
-        u,
-        t,
-        is_3d=False,
-        renderer="matplotlib",
-        camera=None,
-        overlays=None,
-    ):
-        """
-        Convenience shortcut rendering a single frame of the system.
-
-        ``camera`` accepts an optional override: a constant 4x4 or a
-        ``camera(frames, x, u, t)`` callable.
-        """
-        from minilink.graphical.animation import Animator
-
-        animator = Animator(self)
-        return animator.show(
-            x,
-            u,
-            t,
-            is_3d=is_3d,
-            renderer=renderer,
-            camera=camera,
-            overlays=overlays,
-        )
-
-    def animate(
-        self,
-        traj=None,
-        time_factor_video=1.0,
-        is_3d=False,
-        html: bool | None = None,
-        renderer="matplotlib",
-        native: bool = True,
-        scene_title: str | None = None,
-        show: bool = True,
-        camera=None,
-        overlays=None,
-    ):
-        """
-        Convenience shortcut to animate a trajectory of this system.
-
-        ``html=None`` auto-resolves via
-        :func:`minilink.graphical.common.environment.prefers_inline_animation`:
-        ``True`` in Colab and in local Jupyter with a non-interactive
-        matplotlib backend (``inline`` / ``agg``); ``False`` for bare
-        script, IPython REPL, and Jupyter with an interactive backend
-        (``qt`` / ``widget`` / ``macosx`` / ``tk`` / ``nbagg``).
-        ``native=True`` (default) drives each backend's own animation
-        engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
-        Pass ``native=False`` to fall back to the per-frame Python-loop
-        playback (useful for debugging or when the native path's limitations
-        matter — e.g. meshcat freezes per-frame dynamic geometry such as a
-        ``TorqueArrow`` sweep; see ``DESIGN.md`` §4.7). ``camera`` accepts an
-        optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
-        callable).
-        """
-        from minilink.graphical.animation import Animator
-        from minilink.graphical.common.environment import prefers_inline_animation
-
-        if traj is None:
-            if self.traj is not None:
-                traj = self.traj
-            else:
-                traj = self.compute_trajectory()
-
-        resolved_html = prefers_inline_animation() if html is None else html
-
-        animator = Animator(self)
-        show_plot = show and not resolved_html
-        ani_obj = animator.animate_simulation(
-            traj,
-            time_factor_video=time_factor_video,
-            is_3d=is_3d,
-            html=resolved_html,
-            show=show_plot,
-            renderer=renderer,
-            native=native,
-            scene_title=scene_title,
-            camera=camera,
-            overlays=overlays,
-        )
-
-        # For html output, return the IPython.display.HTML object and let the
-        # notebook auto-display it via the standard last-expression rule.
-        # Calling display.display() *and* returning the object renders twice.
-        return ani_obj
-
     def modal_analysis(
         self,
         x_bar=None,
@@ -550,4 +711,93 @@ class SystemFacades:
             u0=np.zeros(self.m) if u0 is None else u0,
             t0=t0,
             max_steps=max_steps,
+        )
+
+
+class StepSystemFacades:
+    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`."""
+
+    def compute_rollout(
+        self,
+        n_steps,
+        u=None,
+        *,
+        x0=None,
+        compile_backend="numpy",
+        show=False,
+        verbose=False,
+    ):
+        """
+        Convenience shortcut to roll out a discrete-time step system.
+
+        Parameters
+        ----------
+        n_steps : int
+            Number of step transitions to apply.
+        u : array, sequence, callable, or None, optional
+            Input schedule passed to the compiled evaluator rollout.
+        x0 : array, optional
+            Initial state; defaults to :attr:`x0`.
+        compile_backend : str
+            Backend passed to :meth:`compile`.
+        show : bool
+            If ``True``, plot the rollout via :meth:`plot_rollout`.
+
+        Returns
+        -------
+        StepRollout
+            The rollout, also stored in :attr:`rollout`.
+        """
+        ev = self.compile(backend=compile_backend, verbose=verbose)
+        rollout = ev.rollout(x0 if x0 is not None else self.x0, n_steps=n_steps, u=u)
+        self.rollout = rollout
+        if show:
+            self.plot_rollout(rollout)
+        return rollout
+
+    def plot_rollout(
+        self,
+        rollout=None,
+        *,
+        signals=None,
+        backend="matplotlib",
+        show=True,
+    ):
+        """
+        Convenience shortcut to plot sampled step signals.
+
+        If the rollout is not computed yet, it must be provided or available on
+        :attr:`rollout`.
+        """
+        from minilink.graphical.signals import (
+            STEP_ABSCISSA_LABEL,
+            plot_time_signals,
+            resolve_plot_signals,
+        )
+
+        if signals is None:
+            signals = resolve_plot_signals(self)
+
+        if rollout is not None:
+            return plot_time_signals(
+                self,
+                rollout.as_trajectory(),
+                signals=signals,
+                abscissa_label=STEP_ABSCISSA_LABEL,
+                backend=backend,
+                show=show,
+            )
+
+        if self.rollout is not None:
+            return plot_time_signals(
+                self,
+                self.rollout.as_trajectory(),
+                signals=signals,
+                abscissa_label=STEP_ABSCISSA_LABEL,
+                backend=backend,
+                show=show,
+            )
+
+        raise ValueError(
+            "No rollout available; pass rollout=... or call compute_rollout first."
         )

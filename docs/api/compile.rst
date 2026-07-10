@@ -10,6 +10,12 @@ Compile
 .. automodule:: minilink.core.backends
    :members:
 
+.. automodule:: minilink.core.compile.evaluators.dynamics_evaluator
+   :members:
+
+.. automodule:: minilink.core.compile.evaluators.static_evaluator
+   :members:
+
 .. automodule:: minilink.core.compile.evaluators.evaluator
    :members:
 

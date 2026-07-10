@@ -109,7 +109,7 @@ try:
         step = max(1, traj.x.shape[1] // 12)
         poses = [traj.x[:, i] for i in range(0, traj.x.shape[1], step)]
         scene.plot(
-            bounds=((-6, 22), (-6, 13)), robot=body, states=poses, ax=ax, show=False
+            bounds=((-6, 22), (-6, 13)), body=body, states=poses, ax=ax, show=False
         )
         planner.plot_tree(ax=ax, show=False)
         ax.set_title(f"{name}: {len(planner.tree.nodes)} nodes")

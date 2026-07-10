@@ -7,7 +7,7 @@ import numpy as np
 
 from minilink.core.costs import QuadraticCost
 from minilink.core.sets import BallSet, BoxSet, SingletonSet
-from minilink.core.system import DynamicSystem, System
+from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
@@ -41,15 +41,22 @@ from minilink.planning.trajectory_optimization.shooting import (
 
 class TestPlanningArchitecture(unittest.TestCase):
     def make_system(self):
-        sys = System(n=2)
-        sys.add_input_port("u")
-        sys.add_output_port("y", dim=2, function=sys.h)
-        sys.state.lower_bound = np.array([-1.0, -2.0])
-        sys.state.upper_bound = np.array([1.0, 2.0])
-        sys.inputs["u"].lower_bound = np.array([-3.0])
-        sys.inputs["u"].upper_bound = np.array([4.0])
-        sys.x0 = np.array([0.1, -0.2])
-        return sys
+        class TestPlant(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, output_dim=2, y_dependencies=())
+                self.state.lower_bound = np.array([-1.0, -2.0])
+                self.state.upper_bound = np.array([1.0, 2.0])
+                self.inputs["u"].lower_bound = np.array([-3.0])
+                self.inputs["u"].upper_bound = np.array([4.0])
+                self.x0 = np.array([0.1, -0.2])
+
+            def f(self, x, u, t=0, params=None):
+                return np.zeros(2)
+
+            def h(self, x, u, t=0, params=None):
+                return x
+
+        return TestPlant()
 
     def make_single_integrator(self):
         class SingleIntegrator(DynamicSystem):
@@ -475,7 +482,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_single_integrator()
         evaluator = sys.compile(backend="numpy", verbose=False)
 
-        x = evaluator.rk4_rollout_forced(
+        x = evaluator.rk4_integrate_forced(
             np.array([0.0]),
             np.ones((5, 1)),
             0.0,

@@ -1,4 +1,4 @@
-"""Equilibrium linearization of any :class:`~minilink.core.system.System`.
+"""Equilibrium linearization of :class:`~minilink.core.system.DynamicSystem` models.
 
 ``linearize_matrices`` returns the first-order matrices
 
@@ -40,8 +40,9 @@ def linearize_matrices(
 
     Parameters
     ----------
-    sys : System
-        System or diagram to linearize.
+    sys : DynamicSystem
+        Continuous-time model whose ``f`` defines the dynamics (leaf subclass
+        or wired diagram with stacked ``f``).
     x_bar : array of shape (n,)
         Operating-point state.
     u_bar : array of shape (m,), optional
@@ -292,8 +293,8 @@ def selectports(sys, ubar, inputs, outputs, method, *, t, params):
         import jax.numpy as jnp
 
         evaluator = sys.compile(backend="jax")
-        dynamics = evaluator.get_f_jit()
-        outputs = evaluator.get_outputs_jit()
+        dynamics = evaluator.f
+        outputs = evaluator.outputs
     except Exception as exc:
         method = selectmethod("jax", reason=exc)
         return method, finitef, finiteh, ubar[inputindex]

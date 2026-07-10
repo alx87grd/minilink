@@ -44,7 +44,7 @@ pid2.params["u_min"] = -np.inf
 pid2.params["u_max"] = np.inf
 
 diagram2 = step >> pid2 >> sat >> sys
-diagram2.connect("sys", "y", "pid2", "y")
+diagram2.connect("sys", "y", "ctl", "y")
 diagram2.plot_diagram()
 
 diagram2.compute_trajectory(tf=20)

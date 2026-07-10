@@ -180,8 +180,7 @@ def _evaluator_inputs(
 def _compiled_f(evaluator, backend: str | None):
     if backend != "jax":
         return evaluator.f
-    get_f_jit = getattr(evaluator, "get_f_jit", None)
-    return get_f_jit() if callable(get_f_jit) else evaluator.f
+    return evaluator.f
 
 
 def _loop_time(f, x, u, t: float, n_calls: int) -> float:

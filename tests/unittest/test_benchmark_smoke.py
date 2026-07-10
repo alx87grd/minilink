@@ -27,12 +27,16 @@ from benchmarks.simulation import (
     benchmark_simulation_backend,
     benchmark_simulation_matrix,
 )
+from benchmarks.step_evaluators import (
+    StepEvaluatorBenchmarkVariant,
+    benchmark_step_evaluators,
+)
 from benchmarks.trajopt import (
     TrajectoryOptimizationBenchmarkConfig,
     TrajectoryOptimizationBenchmarkVariant,
     benchmark_trajectory_optimization,
 )
-from minilink.core.system import DynamicSystem
+from minilink.core.system import DynamicSystem, StepSystem
 from minilink.planning.search.rrt import RRTPlanner
 
 
@@ -47,6 +51,19 @@ class _TinyStable(DynamicSystem):
 
     def h(self, x, u, t=0, params=None):
         return x
+
+
+class _TinyStep(StepSystem):
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        self.name = "TinyStep"
+        self.x0 = np.array([1.0])
+
+    def step(self, x, u, k=0, params=None):
+        return np.asarray([x[0] + u[0]], dtype=float)
+
+    def h(self, x, u, k=0, params=None):
+        return np.asarray(x, dtype=float)
 
 
 class TestBenchmarkSmoke(unittest.TestCase):
@@ -64,6 +81,22 @@ class TestBenchmarkSmoke(unittest.TestCase):
             variants=(
                 FEvaluatorBenchmarkVariant("native", None),
                 FEvaluatorBenchmarkVariant("numpy", "numpy"),
+            ),
+        )
+        self.assertEqual(len(result.rows), 2)
+        self.assertGreaterEqual(result.rows[1].loop_s, 0.0)
+
+    def test_step_evaluator_benchmark_returns_rows(self):
+        step_sys = _TinyStep()
+        result = benchmark_step_evaluators(
+            step_sys,
+            np.array([1.0]),
+            np.array([0.0]),
+            k=0,
+            n_calls=2,
+            variants=(
+                StepEvaluatorBenchmarkVariant("native", None),
+                StepEvaluatorBenchmarkVariant("numpy", "numpy"),
             ),
         )
         self.assertEqual(len(result.rows), 2)
@@ -106,6 +139,8 @@ class TestBenchmarkSmoke(unittest.TestCase):
         )
         self.assertEqual(result.mean_time, result.mean_solve_time)
         self.assertGreater(result.mean_solve_time, 0.0)
+        self.assertEqual(result.candidate_x_final.shape, (1,))
+        self.assertEqual(result.truth_x_final.shape, (1,))
 
         matrix = benchmark_simulation_matrix(
             self._sys,
@@ -135,6 +170,172 @@ class TestBenchmarkSmoke(unittest.TestCase):
         self.assertEqual(row.planner, "rrt")
         self.assertEqual(row.backend, "brute_force")
         self.assertGreater(row.elapsed_s, 0.0)
+
+
+class TestBenchmarkRegression(unittest.TestCase):
+    def test_baseline_json_loads(self):
+        from pathlib import Path
+
+        from benchmarks.baseline import load_baseline
+
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "fixtures"
+            / "benchmark_baseline"
+            / "minimal_core_perf.json"
+        )
+        baseline = load_baseline(fixture)
+        self.assertEqual(baseline.suite, "core_perf")
+        self.assertEqual(len(baseline.metrics), 3)
+
+    def test_compare_metrics_passes_when_equal(self):
+        from benchmarks.baseline import BaselineFile, MetricRecord, compare_metrics
+
+        baseline = BaselineFile(
+            schema_version=1,
+            suite="core_perf",
+            description="",
+            regression_factor=4.0,
+            recorded_at="",
+            host_hint="",
+            metrics=(
+                MetricRecord(
+                    id="test.speed.ratio",
+                    gate="speed",
+                    direction="higher_better",
+                    value=8.0,
+                    unit="ratio",
+                ),
+            ),
+        )
+        recorded = [
+            MetricRecord(
+                id="test.speed.ratio",
+                gate="speed",
+                direction="higher_better",
+                value=8.0,
+                unit="ratio",
+            )
+        ]
+        result = compare_metrics(recorded, baseline, factor=4.0)
+        self.assertFalse(result.failed)
+
+    def test_compare_metrics_fails_on_large_drop(self):
+        from benchmarks.baseline import BaselineFile, MetricRecord, compare_metrics
+
+        baseline = BaselineFile(
+            schema_version=1,
+            suite="core_perf",
+            description="",
+            regression_factor=4.0,
+            recorded_at="",
+            host_hint="",
+            metrics=(
+                MetricRecord(
+                    id="test.speed.ratio",
+                    gate="speed",
+                    direction="higher_better",
+                    value=10.0,
+                    unit="ratio",
+                ),
+            ),
+        )
+        recorded = [
+            MetricRecord(
+                id="test.speed.ratio",
+                gate="speed",
+                direction="higher_better",
+                value=1.0,
+                unit="ratio",
+            )
+        ]
+        result = compare_metrics(recorded, baseline, factor=4.0)
+        self.assertTrue(result.failed)
+
+    def test_compare_accuracy_fails_above_ceiling(self):
+        from benchmarks.baseline import BaselineFile, MetricRecord, compare_metrics
+
+        baseline = BaselineFile(
+            schema_version=1,
+            suite="core_perf",
+            description="",
+            regression_factor=4.0,
+            recorded_at="",
+            host_hint="",
+            metrics=(
+                MetricRecord(
+                    id="test.accuracy.percent",
+                    gate="accuracy",
+                    direction="lower_better",
+                    value=0.1,
+                    max_allowed=1.0,
+                    unit="percent",
+                ),
+            ),
+        )
+        recorded = [
+            MetricRecord(
+                id="test.accuracy.percent",
+                gate="accuracy",
+                direction="lower_better",
+                value=2.0,
+                max_allowed=1.0,
+                unit="percent",
+            )
+        ]
+        result = compare_metrics(recorded, baseline, factor=4.0)
+        self.assertTrue(result.failed)
+
+    def test_compare_vector_match_x_tf(self):
+        from benchmarks.baseline import BaselineFile, MetricRecord, compare_metrics
+
+        baseline = BaselineFile(
+            schema_version=1,
+            suite="core_perf",
+            description="",
+            regression_factor=4.0,
+            recorded_at="",
+            host_hint="",
+            metrics=(
+                MetricRecord(
+                    id="test.truth.x_tf",
+                    gate="accuracy",
+                    direction="vector_match",
+                    value=[1.0, 0.0],
+                    atol=0.05,
+                    rtol=0.05,
+                    unit="state",
+                ),
+            ),
+        )
+        recorded = [
+            MetricRecord(
+                id="test.truth.x_tf",
+                gate="accuracy",
+                direction="vector_match",
+                value=[1.0, 0.0],
+                atol=0.05,
+                rtol=0.05,
+                unit="state",
+            )
+        ]
+        result = compare_metrics(recorded, baseline, factor=4.0)
+        self.assertFalse(result.failed)
+
+    def test_core_perf_suite_returns_metrics(self):
+        from benchmarks.suites.core_perf import CorePerfSuiteConfig, run_core_perf_suite
+
+        metrics = run_core_perf_suite(
+            CorePerfSuiteConfig(
+                pendulum_n_calls=2,
+                diagram_n_calls=2,
+                sim_n_runs=1,
+                static_n_steps=5,
+            )
+        )
+        ids = {metric.id for metric in metrics}
+        self.assertIn("diagram_dense_f.numpy.dx_residual", ids)
+        self.assertIn("sim.diagram_dense.truth.x_tf", ids)
 
 
 if __name__ == "__main__":

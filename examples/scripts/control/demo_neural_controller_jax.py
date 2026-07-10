@@ -48,7 +48,7 @@ diagram.compute_trajectory()
 diagram.plot_trajectory()
 
 evaluator = diagram.compile(backend="jax")
-f_p = evaluator.get_f_p_jit()
+f_p = evaluator.f_p
 
 print("Compiled diagram with state order:", list(diagram.subsystems.keys()))
 

@@ -2,7 +2,7 @@ import numpy as np
 
 from minilink.blocks.sources import Step
 from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, System
 
 # Custom blocks
 
@@ -19,7 +19,7 @@ class Integrator(DynamicSystem):
         return np.array([x[0]])
 
 
-class PController(StaticSystem):
+class PController(System):
     def __init__(self):
         super().__init__()
 

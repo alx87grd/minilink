@@ -1,55 +1,21 @@
 """
 Block diagrams: systems built by connecting other systems.
 
-A :class:`DiagramSystem` is itself a :class:`~minilink.core.system.System`,
-so diagrams nest, simulate, and compile like any other system.
+A :class:`DiagramSystem` is a :class:`~minilink.core.system.DynamicSystem`,
+so diagrams nest, simulate, and compile like any other continuous system.
 """
-
-from collections.abc import Mapping
 
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.signals import VectorSignal
-from minilink.core.system import System
+from minilink.core.system import DynamicSystem, StepSystem, System
 from minilink.core.trajectory import Trajectory
+from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
+
+__all__ = ["DiagramSystem", "StepDiagramSystem", "validate_diagram_params"]
 
 
-def validate_diagram_params(params, subsystem_ids):
-    """Validate the nested diagram params contract.
-
-    ``params`` must be ``None`` or a mapping keyed by subsystem id whose values
-    are per-subsystem params dicts. Missing subsystem ids are allowed (those
-    subsystems fall back to their live ``self.params``); unknown ids raise so
-    sys-id typos fail loudly instead of silently using defaults.
-
-    Called once at public entry points (``DiagramSystem.f``, the evaluators'
-    parametric tier, the ``params`` setter), not inside the recursion.
-
-    Parameters
-    ----------
-    params : None or Mapping
-        Candidate diagram-level params, e.g. ``{"plant": {"m": 1.0}}``.
-    subsystem_ids : container of str
-        Valid subsystem ids (e.g. ``diagram.subsystems``).
-    """
-    if params is None:
-        return
-    if not isinstance(params, Mapping):
-        raise TypeError(
-            "diagram params must be a mapping keyed by subsystem id "
-            f"(e.g. {{'plant': {{...}}}}), got {type(params).__name__}"
-        )
-    unknown = [key for key in params if key not in subsystem_ids]
-    if unknown:
-        names = ", ".join(repr(key) for key in unknown)
-        available = ", ".join(repr(key) for key in subsystem_ids)
-        raise ValueError(
-            f"Unknown subsystem ids in diagram params: {names}; available: {available}"
-        )
-
-
-class DiagramSystem(System):
+class DiagramSystem(WiredDiagramMixin, DynamicSystem):
     """
     A system composed of subsystems connected through their named ports.
 
@@ -73,264 +39,12 @@ class DiagramSystem(System):
     evaluator used by simulation and optimization.
     """
 
-    # Construction And Wiring
-
     def __init__(self):
-        # Nodes: sys_id -> System
+        # Registry before System.__init__: its params setter runs during shell init.
         self.subsystems = {}
-        # Edges: target sys_id -> {input port id -> (source sys_id, port id) or None}
         self.connections = {}
-
         System.__init__(self, 0)
-
-        self.name = "Diagram"
-
-        # Print one line per new connection when True.
-        self.connection_verbose = False
-
-        # Default entry/output ports remembered by the composition shortcuts
-        # (`+`, `>>`, `@`); see minilink.core.composition.
-        self._composition_entry = None
-        self._composition_output = None
-
-        self.compute_state_properties()
-
-    def add_subsystem(self, sys, sys_id):
-        """Add a subsystem under a unique id, with all its inputs unconnected."""
-        self.subsystems[sys_id] = sys
-        self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
-
-        self.compute_state_properties()
-
-    def subsystem_id(self, subsystem):
-        """Return the diagram id for a subsystem instance added to this diagram."""
-        matches = [
-            sys_id for sys_id, sub in self.subsystems.items() if sub is subsystem
-        ]
-        if len(matches) == 1:
-            return matches[0]
-        if not matches:
-            raise ValueError(
-                "Subsystem is not part of this diagram. "
-                f"Available ids: {', '.join(self.subsystems) or '(none)'}"
-            )
-        rendered = ", ".join(matches)
-        raise ValueError(
-            "Subsystem appears more than once in this diagram "
-            f"({rendered}); use an explicit 'sys_id:port' name instead."
-        )
-
-    def subsystem_signal(self, subsystem, port_id: str) -> str:
-        """Return ``'{sys_id}:{port_id}'`` for a subsystem output port."""
-        sys_id = self.subsystem_id(subsystem)
-        outputs = self.subsystems[sys_id].outputs
-        if port_id not in outputs:
-            raise ValueError(
-                f"Unknown output port {port_id!r} on subsystem {sys_id!r}; "
-                f"available: {', '.join(outputs) or '(none)'}"
-            )
-        return f"{sys_id}:{port_id}"
-
-    def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
-        """
-        Connect a source output port to a target input port.
-
-        ``source_sys_id="input"`` connects from a diagram boundary input;
-        ``target_sys_id="output"`` connects to a diagram boundary output
-        (used by :meth:`connect_new_output_port`). Existence and dimension
-        are validated immediately so wiring mistakes fail at connect time,
-        not at compile or simulation time.
-        """
-        if source_sys_id == "input":
-            if source_port_id not in self.inputs:
-                raise ValueError(
-                    f"Unknown diagram input port '{source_port_id}'; "
-                    f"available: {', '.join(self.inputs) or '(none)'}"
-                )
-            source_port = self.inputs[source_port_id]
-        else:
-            if source_sys_id not in self.subsystems:
-                raise ValueError(
-                    f"Unknown source subsystem '{source_sys_id}'; "
-                    f"available: {', '.join(self.subsystems) or '(none)'}"
-                )
-            source_outputs = self.subsystems[source_sys_id].outputs
-            if source_port_id not in source_outputs:
-                raise ValueError(
-                    f"Unknown output port '{source_sys_id}:{source_port_id}'; "
-                    f"available: {', '.join(source_outputs) or '(none)'}"
-                )
-            source_port = source_outputs[source_port_id]
-
-        if target_sys_id == "output":
-            if target_port_id not in self.outputs:
-                raise ValueError(
-                    f"Unknown diagram output port '{target_port_id}'; "
-                    f"available: {', '.join(self.outputs) or '(none)'}"
-                )
-            target_port = self.outputs[target_port_id]
-        else:
-            if target_sys_id not in self.subsystems:
-                raise ValueError(
-                    f"Unknown target subsystem '{target_sys_id}'; "
-                    f"available: {', '.join(self.subsystems) or '(none)'}"
-                )
-            target_inputs = self.subsystems[target_sys_id].inputs
-            if target_port_id not in target_inputs:
-                raise ValueError(
-                    f"Unknown input port '{target_sys_id}:{target_port_id}'; "
-                    f"available: {', '.join(target_inputs) or '(none)'}"
-                )
-            target_port = target_inputs[target_port_id]
-
-        if source_port.dim != target_port.dim:
-            raise ValueError(
-                f"Port dimension mismatch: {source_sys_id}:{source_port_id} "
-                f"has dim {source_port.dim}, {target_sys_id}:{target_port_id} "
-                f"has dim {target_port.dim}"
-            )
-
-        self.connections.setdefault(target_sys_id, {})[target_port_id] = (
-            source_sys_id,
-            source_port_id,
-        )
-
-        if self.connection_verbose:
-            print(
-                f"Connected {source_sys_id}:{source_port_id} "
-                f"to {target_sys_id}:{target_port_id}"
-            )
-
-    def connect_new_output_port(
-        self, source_sys_id, source_port_id, output_port_id, dependencies="all"
-    ):
-        """Expose a subsystem output port as a new diagram boundary output."""
-        port = self.subsystems[source_sys_id].outputs[source_port_id]
-
-        def compute(x, u, t, params=None):
-            return self.compute_subsys_output_port(
-                x, u, t, source_sys_id, source_port_id, params=params
-            )
-
-        self.add_output_port(
-            output_port_id,
-            dim=port.dim,
-            function=compute,
-            dependencies=dependencies,
-        )
-
-        self.connect(source_sys_id, source_port_id, "output", output_port_id)
-
-    def compute_state_properties(self):
-        """
-        Rebuild the flattened state metadata from the subsystems.
-
-        The stacked state vector is ``x = [x_1; x_2; ...]`` in subsystem
-        insertion order; :attr:`state_index` maps each subsystem id to its
-        ``(start, end)`` indices in the stacked vector. State labels are
-        prefixed with the subsystem id whenever the same label appears in
-        several subsystems.
-        """
-        state_index = {}
-        idx = 0
-        for sys_id, subsystem in self.subsystems.items():
-            state_index[sys_id] = (idx, idx + subsystem.n)
-            idx += subsystem.n
-
-        owned_labels = [
-            (sys_id, label)
-            for sys_id, subsystem in self.subsystems.items()
-            for label in subsystem.state.labels
-        ]
-        label_counts = {}
-        for _, label in owned_labels:
-            label_counts[label] = label_counts.get(label, 0) + 1
-        labels = [
-            f"{sys_id}:{label}" if label_counts[label] > 1 else label
-            for sys_id, label in owned_labels
-        ]
-
-        self.n = idx
-        self.state_index = state_index
-        self.state = VectorSignal("x", dim=self.n)
-        self.x0 = np.zeros(self.n)
-
-        if self.subsystems:
-            substates = [sub.state for sub in self.subsystems.values()]
-            self.state.labels = labels
-            self.state.units = [unit for s in substates for unit in s.units]
-            self.state.upper_bound = np.concatenate([s.upper_bound for s in substates])
-            self.state.lower_bound = np.concatenate([s.lower_bound for s in substates])
-            self.state.nominal_value = np.concatenate(
-                [s.nominal_value for s in substates]
-            )
-            self.x0 = np.concatenate([sub.x0 for sub in self.subsystems.values()])
-
-    def refresh(self):
-        """Refresh all subsystems and rebuild the flattened state metadata.
-
-        Compiled evaluators are snapshots: recompile after structural changes.
-        """
-        for subsystem in self.subsystems.values():
-            subsystem.refresh()
-        self.compute_state_properties()
-
-    def autowire(
-        self,
-        *,
-        strict: bool = False,
-        validate: bool = True,
-    ) -> "DiagramSystem":
-        """
-        Conservatively connect unconnected inputs when one safe source matches.
-
-        This is an optional diagram-building shortcut. It does not overwrite
-        existing connections and returns ``self`` so it can be used fluently.
-        """
-        from minilink.core.composition import autowire
-
-        return autowire(self, strict=strict, validate=validate)
-
-    # Parameters
-
-    @property
-    def params(self):
-        """Nested live view ``{sys_id: subsystem.params}``.
-
-        Subsystems remain the single source of truth: the dict is assembled
-        fresh on each access from live references, so mutating
-        ``diagram.params["plant"]["m"]`` mutates that subsystem's params —
-        the same semantics as mutating ``sys.params`` on a leaf system.
-        """
-        return {
-            sys_id: subsystem.params for sys_id, subsystem in self.subsystems.items()
-        }
-
-    @params.setter
-    def params(self, value):
-        validate_diagram_params(value, self.subsystems)
-        if value is None:
-            return
-        for sys_id, subsystem_params in value.items():
-            self.subsystems[sys_id].params = subsystem_params
-
-    def _subsystem_params(self, params, sys_id):
-        """Route nested diagram params to one subsystem (strict contract).
-
-        ``None`` → ``None`` (subsystem uses its live ``self.params``);
-        a mapping → ``params.get(sys_id)`` (missing id → ``None`` → defaults).
-        Anything else is a contract violation.
-        """
-        if params is None:
-            return None
-        if isinstance(params, Mapping):
-            return params.get(sys_id)
-        raise TypeError(
-            "Diagram params must be a mapping keyed by subsystem id "
-            f"(e.g. {{'plant': {{...}}}}), got {type(params).__name__}"
-        )
-
-    # Dynamics (reference recursive path)
+        self._init_wiring(name="Diagram")
 
     def f(self, x, u, t=0, params=None):
         """
@@ -343,7 +57,7 @@ class DiagramSystem(System):
 
         dx_pieces = []
         for sys_id, subsystem in self.subsystems.items():
-            if subsystem.n == 0:
+            if not isinstance(subsystem, DynamicSystem):
                 continue
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id, params=params)
@@ -355,63 +69,6 @@ class DiagramSystem(System):
         if not dx_pieces:
             return xp.array([])
         return xp.concatenate([xp.asarray(dx).reshape(-1) for dx in dx_pieces])
-
-    def get_local_state(self, x, sys_id):
-        """Extract one subsystem's state from the stacked state vector."""
-        start, end = self.state_index[sys_id]
-        return x[start:end]
-
-    def get_local_input(self, x, u, t, sys_id, dependencies="all", params=None):
-        """
-        Assemble one subsystem's local input vector from its connected sources.
-
-        Input ports outside ``dependencies`` contribute their constant nominal
-        value (used to break false feedthrough when evaluating output ports).
-        """
-        subsystem = self.subsystems[sys_id]
-
-        pieces = []
-        for port_id, port in subsystem.inputs.items():
-            if dependencies != "all" and port_id not in dependencies:
-                port_u = port.get_default_value()
-            else:
-                port_u = self.get_subsys_input_port(
-                    x, u, t, sys_id, port_id, params=params
-                )
-            pieces.append(port_u)
-
-        xp = array_module(x, u, *pieces)
-        if not pieces:
-            return xp.array([])
-        return xp.concatenate([xp.asarray(piece).reshape(-1) for piece in pieces])
-
-    def get_subsys_input_port(self, x, u, t, sys_id, port_id, params=None):
-        """Value of one subsystem input port: connected source or nominal fallback."""
-        source = self.connections[sys_id][port_id]
-
-        if source is None:
-            return self.subsystems[sys_id].inputs[port_id].get_default_value()
-
-        source_sys_id, source_port_id = source
-
-        if source_sys_id == "input":
-            return self.get_port_values_from_u(u)[source_port_id]
-        return self.compute_subsys_output_port(
-            x, u, t, source_sys_id, source_port_id, params=params
-        )
-
-    def compute_subsys_output_port(self, x, u, t, sys_id, port_id, params=None):
-        """Evaluate one subsystem output port, recursing through its sources."""
-        port = self.subsystems[sys_id].outputs[port_id]
-        local_x = self.get_local_state(x, sys_id)
-        local_u = self.get_local_input(
-            x, u, t, sys_id, port.dependencies, params=params
-        )
-        local_params = self._subsystem_params(params, sys_id)
-
-        return port.compute(local_x, local_u, t, local_params)
-
-    # Compile And Analysis
 
     def compile(self, backend="numpy", bind_params=False, verbose=False):
         """
@@ -439,24 +96,6 @@ class DiagramSystem(System):
         return compile_diagram(
             self, backend=backend, bind_params=bind_params, verbose=verbose
         )
-
-    def check_algebraic_loops(self):
-        """
-        Detect algebraic loops and return the topological port execution order.
-
-        Raises
-        ------
-        RuntimeError
-            If an algebraic loop is found (with full cycle path in the message).
-
-        Returns
-        -------
-        list of (sys_id, port_id)
-            Topologically sorted output-port schedule.
-        """
-        from minilink.core.compile.compiler import check_algebraic_loops
-
-        return check_algebraic_loops(self)
 
     def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
         """
@@ -490,50 +129,75 @@ class DiagramSystem(System):
 
         return traj.with_signals(internal_signals)
 
-    # Visualization / Kinematic Contract
 
-    # Subsystem articulated frames are namespaced (``vehicle:body``). ``world`` is
-    # shared globally — world-fixed geometry from every subsystem merges under
-    # ``"world"``; the animator injects the identity root via ``ensure_world_frame``.
+class StepDiagramSystem(WiredDiagramMixin, StepSystem):
+    """
+    A discrete-time diagram composed of :class:`StepSystem` and static blocks.
 
-    def get_kinematic_geometry(self):
-        return {}
+    The diagram state stacks subsystem states in insertion order,
 
-    def tf(self, x, u, t=0, params=None):
-        from minilink.graphical.animation.visualization import (
-            namespace_subsystem_frames,
-        )
+        x_{k+1} = step(x_k, u_k, k),
 
-        frames = {}
+    where each local input is gathered from connected output ports, boundary
+    inputs, or port nominal values. The third gather slot is step index ``k``
+    (``int``), not simulation time.
+
+    :meth:`compile` produces a :class:`~minilink.core.compile.evaluators.step_evaluator.StepEvaluator`
+    for fast :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout`.
+    """
+
+    def __init__(self):
+        self.subsystems = {}
+        self.connections = {}
+        System.__init__(self, 0)
+        self.rollout = None
+        self._init_wiring(name="StepDiagram")
+
+    def step(self, x, u, k=0, params=None):
+        """
+        Stacked discrete update ``x_new = [step_1(...); step_2(...); ...]``.
+
+        Interpreted reference; :meth:`compile` produces the fast equivalent.
+        """
+        validate_diagram_params(params, self.subsystems)
+
+        xp = array_module(x, u)
+        x_arr = xp.asarray(x, dtype=float).reshape(self.n)
+        x_new = xp.array(x_arr, copy=True)
         for sys_id, subsystem in self.subsystems.items():
-            local_x = self.get_local_state(x, sys_id)
-            local_u = self.get_local_input(x, u, t, sys_id)
-            sub_frames = dict(subsystem.tf(local_x, local_u, t))
-            frames.update(namespace_subsystem_frames(sub_frames, sys_id))
-        return frames
+            if not isinstance(subsystem, StepSystem):
+                continue
+            local_x = self.get_local_state(x_arr, sys_id)
+            local_u = self.get_local_input(x, u, k, sys_id, params=params)
+            local_params = self._subsystem_params(params, sys_id)
+            piece = subsystem.step(local_x, local_u, k, local_params)
+            start, end = self.state_index[sys_id]
+            x_new[start:end] = xp.asarray(piece, dtype=float).reshape(end - start)
 
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        from minilink.graphical.animation.visualization import (
-            merge_geometry,
-            merge_subsystem_geometry,
+        return x_new
+
+    def compile(self, backend="numpy", bind_params=False, verbose=False):
+        """
+        Compile the step diagram into a stateless step evaluator.
+
+        Parameters
+        ----------
+        backend : str
+            ``'numpy'`` (default) or ``'jax'``.
+        bind_params : bool, optional
+            If ``True``, subsystem ``params`` are deep-copied into the plan.
+        verbose : bool
+            If ``True``, print timed compilation steps.
+
+        Returns
+        -------
+        NumpyStepDiagramEvaluator or JaxStepDiagramEvaluator
+        """
+        from minilink.core.compile.step_compiler import compile_step_diagram
+
+        return compile_step_diagram(
+            self, backend=backend, bind_params=bind_params, verbose=verbose
         )
-
-        merged: dict[str, list] = {}
-        for sys_id, subsystem in self.subsystems.items():
-            local_x = self.get_local_state(x, sys_id)
-            local_u = self.get_local_input(x, u, t, sys_id)
-            sub_kin: dict[str, list] = {}
-            sub_dyn: dict[str, list] = {}
-            merge_subsystem_geometry(
-                sub_kin, subsystem.get_kinematic_geometry(), sys_id
-            )
-            merge_subsystem_geometry(
-                sub_dyn,
-                subsystem.get_dynamic_geometry(local_x, local_u, t),
-                sys_id,
-            )
-            merged = merge_geometry(merged, sub_kin, sub_dyn)
-        return merged
 
 
 if __name__ == "__main__":
@@ -548,6 +212,8 @@ if __name__ == "__main__":
     diagram.connect("input", "r", "ctl", "r")
     diagram.connect("plant", "y", "ctl", "y")
     diagram.connect("ctl", "u", "plant", "u")
+
+    diagram.plot_diagram()
 
     evaluator = diagram.compile()
     print(evaluator.f(x=np.array([0.5]), u=np.array([1.0]), t=0.0))

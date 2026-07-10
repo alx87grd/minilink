@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from minilink.core.backends import array_module
-from minilink.core.system import DynamicSystem, StaticSystem
+from minilink.core.system import DynamicSystem, System
 
 
 def _as_dof_vector(value, dof: int):
@@ -17,7 +16,7 @@ def _as_dof_vector(value, dof: int):
     return arr
 
 
-class ImpedanceController(StaticSystem):
+class ImpedanceController(System):
     """Virtual spring-damper on ``[position; rate]``.
 
     The measurement port ``y`` carries ``[pos; rate]`` (dim ``2·dof``). Reference
@@ -89,7 +88,6 @@ class ImpedanceController(StaticSystem):
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        xp = array_module(u)
 
         n = self.dof
         ref_dim = self.inputs["r"].dim
@@ -97,8 +95,8 @@ class ImpedanceController(StaticSystem):
         pos = u[ref_dim : ref_dim + n]
         rate = u[ref_dim + n : ref_dim + 2 * n]
 
-        Kp = xp.asarray(_as_dof_vector(params["Kp"], n))
-        Kd = xp.asarray(_as_dof_vector(params["Kd"], n))
+        Kp = params["Kp"]
+        Kd = params["Kd"]
 
         if ref_dim == n:
             u_cmd = Kp * (r - pos) - Kd * rate
@@ -200,12 +198,11 @@ class ImpedanceIntegralController(DynamicSystem):
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        xp = array_module(x)
 
         n = self.dof
-        kp = xp.asarray(_as_dof_vector(params["kp"], n))
-        ki = xp.asarray(_as_dof_vector(params["ki"], n))
-        kd = xp.asarray(_as_dof_vector(params["kd"], n))
+        kp = params["kp"]
+        ki = params["ki"]
+        kd = params["kd"]
 
         e_int = x
         ref_dim, r, pos, rate = self._split_measurement(u)

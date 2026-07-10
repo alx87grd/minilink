@@ -80,7 +80,7 @@ def animate_modal(
 
     Trajectories use absolute states ``x = x_bar + Δx(t)`` so the original
     plant kinematics apply. Calls :func:`modal_analysis`, then
-    :meth:`~minilink.core.facades.SystemFacades.animate` once per mode.
+    :meth:`~minilink.core.facades.SharedSystemFacades.animate` once per mode.
 
     Parameters
     ----------

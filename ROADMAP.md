@@ -25,7 +25,7 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
 | Contact engine (`dynamics/engines/`) | 1 | Experimental; math not QA-validated. | Validation tests toward TRL 2. |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Pole-zero, Nyquist, margins, `ss2tf`; reachability costs. |
-| Control | 6 | Linear, LQR, filtered PID; `modelbased.py` (CT, SMC); `robotic.py` (impedance, kinematic, nullspace). | Sliding-mode + traj-following demos; dynamic joint/effector PID wrappers; trajectory LQR. |
+| Control | 6 | Linear, LQR, filtered PID; `modelbased.py` (CT, Pyro-parity SMC); `robotic.py` (impedance, kinematic, nullspace). | SMC traj-following demos; dynamic joint/effector PID wrappers; trajectory LQR. |
 | Blocks | 5 | Routing, nonlinear, filters, sources, transfer function, 1-layer NN. | Multi-layer `MLP`, atomic layers (see neural-blocks plan). |
 | Estimation | 1 | Placeholder only. | Luenberger, Kalman, EKF. |
 | Identification | 2 | Parametric-tier prototype demo only. | `fitting.py` for physical + NN params. |
@@ -125,7 +125,8 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 ### 5.2 Control
 
 - [x] `lqr.py`, `linear.py`, `pid.py` (`FilteredController`)
-- [x] `modelbased.py` — computed torque, sliding mode
+- [x] `modelbased.py` — computed torque, sliding mode (Pyro parity)
+- [x] **Continuous SMC closed loop** — [discontinuous-solver-selection.md](docs/plans/discontinuous-solver-selection.md): SMC `solver_info` flag, diagram aggregation, auto **Euler** + finer `dt`, forced-solver warnings (see also [DESIGN.md §5 — Discontinuous closed loops](DESIGN.md#discontinuous-closed-loops--known-issues))
 - [ ] `robotic.py` — joint/effector PD/PID wrappers (kinematic + nullspace landed)
 - [ ] `trajectory_lqr.py` — time-varying LQR along a reference
 - [ ] `mpc.py` (uses `optimization/`) — minilink extra, no pyro equivalent
@@ -149,6 +150,9 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 ### 5.5 Planning
 
 - [x] Trajectory optimization (direct collocation, shooting, multiple shooting)
+- [x] **MPC compile-once** — `planning/mpc/` (`MPCPlanner`, parametric
+  `x_start`, JAX direct collocation; primary demos under `examples/scripts/mpc/`;
+  legacy per-step trajopt reference: `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`)
 - [ ] **Scene params** — `ProblemParameters.scene`, transcription merge helpers,
   indexed overrides in `Scene` / `StateField` (moving obstacles, scenario sweeps,
   MPC without scene rebuild).
@@ -162,6 +166,24 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] `search/` — `RRTPlanner`, `RRTStarPlanner`, extenders, steering, tree
 - [ ] Trajectory post-filter (Butterworth `filtfilt`)
 
+### 5.5a Step / hybrid simulation (subsidiary)
+
+Narrow add-on for discrete control in the loop (MPC, SMC, sampled regulators) on
+continuous plants — not full Simulink parity. Plan:
+[docs/plans/hybrid-discrete/00-master-plan.md](docs/plans/hybrid-discrete/00-master-plan.md).
+
+- [x] **Phase 0** — `WiredDiagramMixin` in `core/wiring.py`; `DiagramSystem` delegates;
+  continuous diagram API unchanged
+- [x] **Phase 1** — `StepSystem`, `StepRollout`, `compile()` step branch, `compute_rollout` / `plot_rollout`
+- [x] **Phase 2** — `StepDiagramSystem`, `compile_step_diagram`, `compute_rollout`
+- [x] **Phase 3** — `discretize()` in `minilink/analysis/discretize.py`
+- [x] **Phase 4** — `StepSchedule`, `Computer` (`.tick(u)`, double buffer)
+- [x] **Phase 5** — `HybridDiagram`, `HybridSimulator`, `HybridSimResult`, multi-rate hybrid demo, Pyro SMC hybrid compare *(5a)*
+- [x] **Phase 5** — fine plant recording (`integrate_zoh_rollout`, `plant_dt_inner`); façade `traj` / `last_result` / `rollout` / `animate()`
+- [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz export, `abstract_boundary` topology *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*
+- [x] **Phase 6a** — `MPCStatelessController` (algebraic block, `u_ff`/`x_ff`/`z`), hybrid straight-line demo, `mpc_plans_from_rollout`
+- [x] **Phase 6b** — warm-start `MPCStatefulController` (`StepSystem`, state = optimizer `z`), `warm_start` helpers
+
 ### 5.6 Estimation and identification
 
 - [ ] `estimation/luenberger.py`, `kalman.py`, `ekf.py`, `recursive.py`
@@ -170,7 +192,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 ### 5.7 Interfaces
 
 - [ ] `gymnasium.py` — diagram as RL env (train outside)
-- [ ] `flax.py`, `torch.py` — external model → `StaticSystem`
+- [ ] `flax.py`, `torch.py` — external model → static `System`
 - [ ] Cosimulation / FMI, multibody import
 
 ### 5.8 Catalog capability gaps (not EoM)
@@ -186,8 +208,10 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 ### 5.10 Out of scope (by decision)
 
-Discrete time (ZOH/delay, digital control), RNNs, mixed-rate simulation,
-differentiable-rollout library, hybrid/events — see [DESIGN.md §3](DESIGN.md).
+Full Simulink / arbitrary multi-clock hybrid parity, event-driven switching
+(guards, impacts), RNN policy blocks, differentiable-rollout library — see
+[DESIGN.md §3](DESIGN.md). The **narrow** step/hybrid subset in §5.5a is in
+scope as a subsidiary program; it does not replace the continuous-time core.
 Pygame game framework (`sys2game`) — no first-class port unless reversed.
 
 ## 6. Pyro 2.0 port status

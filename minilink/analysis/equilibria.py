@@ -15,8 +15,9 @@ def find_equilibrium(sys, x_guess, u=None, *, t=0.0, params=None, tol=1e-9):
 
     Parameters
     ----------
-    sys : System
-        System whose ``f`` defines the dynamics.
+    sys : DynamicSystem
+        Continuous-time model whose ``f`` defines the dynamics (leaf subclass
+        or wired diagram with stacked ``f``).
     x_guess : array of shape (n,)
         Initial guess for the equilibrium state.
     u : array of shape (m,), optional
