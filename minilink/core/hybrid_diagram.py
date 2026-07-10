@@ -262,10 +262,13 @@ class HybridDiagram:
         from minilink.graphical.signals.time_signals import (
             TIME_ABSCISSA_LABEL,
             plot_time_signals,
+            resolve_plot_signals,
         )
 
         if signals is None:
-            signals = tuple(traj.signals.keys())
+            signals = resolve_plot_signals(self.plant)
+            if traj.u.shape[0]:
+                signals = tuple(dict.fromkeys((*signals, "u")))
         return plot_time_signals(
             self.plant,
             traj,
@@ -311,6 +314,9 @@ class HybridDiagram:
                 traj = self.traj
 
         resolved_html = prefers_inline_animation() if html is None else html
+        from minilink.core.hybrid_composition import refresh_plant_animation_camera
+
+        refresh_plant_animation_camera(self.plant)
         animator = Animator(self.plant)
         show_plot = show and not resolved_html
         return animator.animate_simulation(

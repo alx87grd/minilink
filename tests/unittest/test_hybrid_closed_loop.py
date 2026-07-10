@@ -33,7 +33,9 @@ def _build_plant():
 class TestHybridClosedLoop(unittest.TestCase):
     def test_shortcut_matches_manual_wiring(self):
         schedule = StepSchedule(dt_base=0.01)
-        shortcut = hybrid_closed_loop(_build_step_diagram(), _build_plant(), schedule=schedule)
+        shortcut = hybrid_closed_loop(
+            _build_step_diagram(), _build_plant(), schedule=schedule
+        )
 
         manual = HybridDiagram(
             computer=Computer(_build_step_diagram(), schedule),
@@ -53,6 +55,13 @@ class TestHybridClosedLoop(unittest.TestCase):
         self.assertEqual(len(shortcut.connections), len(manual.connections))
         self.assertEqual(shortcut.connections[0], manual.connections[0])
         self.assertEqual(shortcut.connections[1], manual.connections[1])
+
+    def test_computer_matmul_leaf_plant(self):
+        computer = Computer(_build_step_diagram(), StepSchedule(dt_base=0.01))
+        hybrid = computer @ Integrator()
+        self.assertEqual(len(hybrid.connections), 2)
+        self.assertEqual(hybrid.connections[0].computer_port, "u")
+        self.assertEqual(hybrid.connections[1].computer_port, "y")
 
     def test_computer_matmul_plant(self):
         computer = Computer(_build_step_diagram(), StepSchedule(dt_base=0.01))

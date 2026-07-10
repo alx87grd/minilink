@@ -177,7 +177,14 @@ serial arms. Joint impedance / task impedance / computed torque use
   ``computer`` (:class:`~minilink.core.step_rollout.StepRollout`, tick ``k``) and
   ``plant`` (:class:`~minilink.core.trajectory.Trajectory`, wall time ``t``); default
   plots use ``plant``.
-  Shortcuts: ``Computer @ plant``, :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`.
+  Shortcuts: ``block % schedule`` → :class:`~minilink.simulation.computer.Computer`;
+  ``Computer @ plant`` and :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`
+  (same port auto-wiring as continuous ``ctl @ plant`` via
+  :func:`~minilink.core.composition.resolve_standard_feedback`);
+  :meth:`~minilink.planning.mpc.controller.MPCController.export_to_computer` /
+  :meth:`~minilink.planning.mpc.step_block.MPCStepBlock.export_to_computer` for warm-start MPC.
+  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
+  exposes standard ``u`` / ``y`` ports for hybrid composition.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_forced`, and
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_trajectory` /
@@ -193,6 +200,17 @@ serial arms. Joint impedance / task impedance / computed torque use
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
   See [05-hybrid-simulation.md](docs/plans/hybrid-discrete/05-hybrid-simulation.md).
+- **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCController`
+  is a static ``System`` (``n=0``) leaf: one :meth:`~minilink.planning.mpc.planner.MPCPlanner.step`
+  per Computer tick (memoized across output ports ``u_ff``, ``x_ff``, ``z``).
+  :class:`~minilink.planning.mpc.step_block.MPCStepBlock` (Phase 6b) is a
+  :class:`StepSystem` with packed decision state ``z``; warm-start via
+  :func:`~minilink.planning.mpc.warm_start.mpc_warm_start_guess` from
+  ``Computer.x``.   Post-sim horizons:
+  :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
+  default animation overlays:
+  :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
+  See [06-mpc-step-block.md](docs/plans/hybrid-discrete/06-mpc-step-block.md).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in

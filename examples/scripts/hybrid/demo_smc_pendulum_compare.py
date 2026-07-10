@@ -15,7 +15,6 @@ Run from the repo root::
     python examples/scripts/hybrid/demo_smc_pendulum_compare.py
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.control.modelbased import SlidingModeController

@@ -1,7 +1,7 @@
 # Hybrid and step simulation (design only)
 
-Status: Phases **0**, **1a**, **1**, **1b**, **2**, **3**, **4**, **5** (5a/5b + fine plant recording), and **5c**
-complete on `dev-hybrid` (July 2026, `0ccba60`). Phase **6** pending. Shard contracts:
+Status: Phases **0**, **1a**, **1**, **1b**, **2**, **3**, **4**, **5** (5a/5b + fine plant recording), **5c**, and **6** (6a/6b)
+complete on `dev-hybrid` (July 2026). Shard contracts:
 [hybrid-discrete/00-master-plan.md](hybrid-discrete/00-master-plan.md).
 
 Architecture for **step maps** (difference equations, jumps, turn-based dynamics),
@@ -70,7 +70,7 @@ Split contracts: [00-wiring-refactor](hybrid-discrete/00-wiring-refactor.md) ·
 | **4** | `StepSchedule` + **`Computer`** (`tick(u)`, double buffer, Hz helpers) | **`dt_base`** for hybrid alignment only | **Done** |
 | **5** | `HybridDiagram`, `HybridSimulator`, SMC / cascade, fine plant traj, `hybrid.animate` | **`schedule.dt_base`**; Computer always on step side | **Done** |
 | **5c** | `plot_hybrid_diagram`, `build_hybrid_topology`, `hybrid_closed_loop`, `abstract_boundary` topology | — | **Done** |
-| **6** | `MPCStepBlock` (6a stateless, 6b warm-start) | uses Phase 4–5 stack | pending |
+| **6** | `MPCStepBlock` (6a stateless, 6b warm-start) | uses Phase 4–5 stack | **Done** |
 
 **Split of concerns:** Phase 4 = sample time + firing **inside** the step diagram. Phase 5 =
 step↔plant boundary ZOH/sample + continuous plant (`integrate_zoh` / `integrate_zoh_rollout`). Hybrid **requires Phase 4**
@@ -966,7 +966,7 @@ refactor in 6a; warm-start parity in 6b.
 | 5c | `test_hybrid_closed_loop.py` | shortcut vs manual `connect_boundary` |
 | 6 | `test_mpc_step_block.py` | 6a stateless MPC block |
 | 6 | `test_mpc_step_block_warm_start.py` | 6b plan state pack/shift |
-| 6 | `test_mpc_hybrid_demo_parity.py` | hybrid vs hand-rolled MPC |
+| 6 | `test_mpc_hybrid_demo_parity.py` | hybrid warm-start vs hand-rolled `mpc/` straight-line demo |
 | — | `test_expand_computer.py` | optional expansion lowering |
 
 ---
@@ -987,8 +987,8 @@ See [00-master-plan.md](hybrid-discrete/00-master-plan.md). Summary:
 | 8–10 | 5 | `integrate_zoh_rollout`, hybrid, SMC **(5a)** | **Done** |
 | 11 | 5 | cascade hybrid demo **(5b)** | **Done** |
 | 12 | 5c | `plot_hybrid_diagram`, `hybrid_closed_loop` | **Done** |
-| 13 | 6 | `MPCStepBlock` stateless **(6a)** + straight-line demo | pending |
-| 14 | 6 | `MPCStepBlock` warm-start **(6b)** | pending |
+| 13 | 6 | `MPCController` stateless **(6a)** + hybrid straight-line demo | **Done** |
+| 14 | 6 | `MPCStepBlock` warm-start **`z`** state **(6b)** | **Done** |
 | 15 | all | DESIGN / ROADMAP / README | partial |
 
 **Gates:** **0 → 1a → 1 → 1b → 2 → 4 → 5 → 5c → 6.** Phase 3 optional. **5a → 5b.** **6a → 6b.**

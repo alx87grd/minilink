@@ -160,9 +160,7 @@ class HybridSimulator:
         t_plant_parts: list[np.ndarray] = []
         x_plant_parts: list[np.ndarray] = []
         u_plant_parts: list[np.ndarray] = []
-        plant_signal_parts = {
-            name: [] for name in plant_signal_names
-        }
+        plant_signal_parts = {name: [] for name in plant_signal_names}
 
         for tick_idx in range(n_ticks):
             k = computer.k
@@ -241,7 +239,9 @@ class HybridSimulator:
 
         t_plant = np.concatenate(t_plant_parts)
         x_plant_hist = np.vstack(x_plant_parts).T
-        u_plant_fine = np.column_stack(u_plant_parts) if u_plant_parts else np.zeros((plant_m, 0))
+        u_plant_fine = (
+            np.column_stack(u_plant_parts) if u_plant_parts else np.zeros((plant_m, 0))
+        )
         plant_signals = {}
         for name, parts in plant_signal_parts.items():
             if not parts:
@@ -360,26 +360,34 @@ class HybridSimResult:
         abscissa_label,
         **kwargs,
     ):
+        from minilink.core.system import System
         from minilink.graphical.signals.time_signals import (
             TIME_ABSCISSA_LABEL,
             plot_time_signals,
+            resolve_plot_signals,
         )
 
+        if sys is None:
+            sys = self.hybrid.plant if self.hybrid is not None else self
+
         if signals is None:
-            names = list(traj.signals.keys())
+            if isinstance(sys, System):
+                signals = resolve_plot_signals(sys)
+            else:
+                names = []
+                if traj.x.shape[0]:
+                    names.append("x")
+                if traj.u.shape[0]:
+                    names.append("u")
+                signals = tuple(names)
             if traj.u.shape[0]:
-                names = ["u", *names]
-            if traj.x.shape[0]:
-                names = ["x", *names]
-            signals = tuple(dict.fromkeys(names))
+                signals = tuple(dict.fromkeys((*signals, "u")))
 
         plot_signals = self._normalize_plot_signal_names(
             signals,
             control_key=self._plant_control_signal_key(),
         )
         label = abscissa_label or TIME_ABSCISSA_LABEL
-        if sys is None:
-            sys = self.hybrid.plant if self.hybrid is not None else self
         return plot_time_signals(
             sys,
             traj,
@@ -530,8 +538,7 @@ def _allocate_signal_hist(diagram, p2c, n_ticks, *, plant_signals=True):
     else:
         names = _collect_computer_signal_names(diagram, p2c)
     return {
-        name: np.zeros((_signal_dim(name, diagram, p2c), n_ticks))
-        for name in names
+        name: np.zeros((_signal_dim(name, diagram, p2c), n_ticks)) for name in names
     }
 
 

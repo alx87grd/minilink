@@ -8,7 +8,11 @@ composition.
 
 from __future__ import annotations
 
-from minilink.core.composition import _propagate_animation_camera
+from minilink.core.composition import (
+    _propagate_animation_camera,
+    default_computer_boundary_ports,
+    resolve_standard_feedback,
+)
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.core.system import StepSystem, System
@@ -107,7 +111,80 @@ def hybrid_closed_loop(
     return hybrid
 
 
+def refresh_plant_animation_camera(plant_diagram: DiagramSystem) -> None:
+    """Sync plant diagram camera hints from its plant subsystem(s)."""
+    if plant_diagram.subsystems:
+        _propagate_animation_camera(plant_diagram, *plant_diagram.subsystems.values())
+
+
+def resolve_hybrid_feedback_ports(
+    computer_side: System | StepDiagramSystem,
+    plant: System | DiagramSystem,
+) -> tuple[str, str, str, str]:
+    """
+    Return ``(computer_out, computer_in, plant_in, plant_out)`` for standard wiring.
+
+    Uses the same rules as :func:`~minilink.core.composition.resolve_standard_feedback`.
+    """
+    controller = _computer_leaf(computer_side)
+    plant_leaf = _plant_leaf(plant)
+    wiring = resolve_standard_feedback(controller, plant_leaf, diagram=None)
+    return (
+        wiring.control_out,
+        wiring.measurement_in,
+        wiring.plant_in,
+        wiring.plant_out,
+    )
+
+
 # Internal machinery
+
+
+def _computer_leaf(computer_side: System | StepDiagramSystem) -> System:
+    if isinstance(computer_side, StepDiagramSystem):
+        if len(computer_side.subsystems) != 1:
+            raise ValueError(
+                "auto wiring requires a single-subsystem step diagram or leaf block"
+            )
+        return next(iter(computer_side.subsystems.values()))
+    return computer_side
+
+
+def _plant_leaf(plant: System | DiagramSystem) -> System:
+    if isinstance(plant, DiagramSystem):
+        if len(plant.subsystems) != 1:
+            raise ValueError(
+                "auto wiring requires a single-subsystem plant diagram or leaf plant"
+            )
+        return next(iter(plant.subsystems.values()))
+    return plant
+
+
+def expose_computer_boundary_ports(diagram: StepDiagramSystem) -> None:
+    """Expose standard measurement and control ports on a step diagram boundary."""
+    if len(diagram.subsystems) != 1:
+        return
+    sys_id = next(iter(diagram.subsystems))
+    controller = diagram.subsystems[sys_id]
+    measurement_in, control_out = default_computer_boundary_ports(controller)
+    _ensure_computer_boundary_ports(
+        diagram,
+        sys_id=sys_id,
+        ref_port="r",
+        computer_in=measurement_in,
+        computer_out=control_out,
+    )
+    if "r" in controller.inputs and "r" not in diagram.inputs:
+        port = controller.inputs["r"]
+        diagram.add_input_port(
+            "r",
+            dim=port.dim,
+            nominal_value=port.nominal_value,
+        )
+        diagram.connect("input", "r", sys_id, "r")
+    for extra_out in ("x_ff", "z"):
+        if extra_out in controller.outputs and extra_out not in diagram.outputs:
+            diagram.connect_new_output_port(sys_id, extra_out, extra_out)
 
 
 def _as_step_diagram(computer_side: System | StepDiagramSystem) -> StepDiagramSystem:
@@ -121,6 +198,11 @@ def _as_step_diagram(computer_side: System | StepDiagramSystem) -> StepDiagramSy
         f"computer_side must be StepDiagramSystem or System, "
         f"got {type(computer_side).__name__}"
     )
+
+
+def as_step_diagram(computer_side: System | StepDiagramSystem) -> StepDiagramSystem:
+    """Wrap *computer_side* in a :class:`StepDiagramSystem` when needed."""
+    return _as_step_diagram(computer_side)
 
 
 def _as_plant_diagram(plant: System | DiagramSystem) -> DiagramSystem:

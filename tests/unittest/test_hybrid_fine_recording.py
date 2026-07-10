@@ -17,7 +17,9 @@ class TestHybridFineRecording(unittest.TestCase):
         plant = Pendulum(length=1.0, mass=1.0)
         plant.x0 = np.array([0.5, 0.0])
         ctl = SlidingModeController(plant, lam=2.0, gain=4.0, nab=0.1)
-        hybrid = hybrid_closed_loop(ctl, plant, schedule=0.1, computer_in="y", plant_out="y")
+        hybrid = hybrid_closed_loop(
+            ctl, plant, schedule=0.1, computer_in="y", plant_out="y"
+        )
 
         sim = HybridSimulator(
             hybrid,

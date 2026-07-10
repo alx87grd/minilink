@@ -57,7 +57,9 @@ def benchmark_step_evaluators(
     k: int = 0,
     *,
     n_calls: int = 100_000,
-    variants: tuple[StepEvaluatorBenchmarkVariant, ...] = DEFAULT_STEP_EVALUATOR_VARIANTS,
+    variants: tuple[
+        StepEvaluatorBenchmarkVariant, ...
+    ] = DEFAULT_STEP_EVALUATOR_VARIANTS,
 ) -> StepEvaluatorBenchmarkResult:
     """Benchmark ``system.step`` and compiled evaluator variants on one sample."""
     rows: list[StepEvaluatorBenchmarkRow] = []

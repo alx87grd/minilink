@@ -86,7 +86,9 @@ class TestHybridSimulator(unittest.TestCase):
 
         plant = Pendulum(length=1.0, mass=1.0)
         smc = SlidingModeController(plant)
-        hybrid = hybrid_closed_loop(smc, plant, schedule=0.02, computer_in="y", plant_out="y")
+        hybrid = hybrid_closed_loop(
+            smc, plant, schedule=0.02, computer_in="y", plant_out="y"
+        )
         hybrid.compute_forced(
             np.array([0.0, 0.0]),
             t0=0.0,
@@ -95,6 +97,41 @@ class TestHybridSimulator(unittest.TestCase):
             verbose=False,
         )
         hybrid.plot_trajectory(show=False)
+
+    def test_plot_defaults_states_and_inputs_only(self):
+        from minilink.control.modelbased import SlidingModeController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+        from minilink.graphical.signals.time_signals import (
+            build_signal_plot_spec,
+            resolve_plot_signals,
+        )
+
+        plant = Pendulum(length=1.0, mass=1.0)
+        smc = SlidingModeController(plant)
+        hybrid = hybrid_closed_loop(
+            smc, plant, schedule=0.02, computer_in="y", plant_out="y"
+        )
+        result = hybrid.compute_forced(
+            np.array([0.0, 0.0]),
+            t0=0.0,
+            tf=0.1,
+            input_port_id="r",
+            verbose=False,
+        )
+        self.assertIn("y", result.plant.signals)
+        signals = resolve_plot_signals(hybrid.plant)
+        if result.plant.u.shape[0]:
+            signals = tuple(dict.fromkeys((*signals, "u")))
+        spec = build_signal_plot_spec(
+            hybrid.plant,
+            result.plant,
+            signals=signals,
+        )
+        plotted = {trace.signal for trace in spec.traces}
+        self.assertIn("x", plotted)
+        self.assertIn("u", plotted)
+        self.assertNotIn("y", plotted)
+        self.assertNotIn("r", plotted)
 
     def test_compute_forced_caches_traj(self):
         hybrid = _build_hybrid()
@@ -129,6 +166,19 @@ class TestHybridSimulator(unittest.TestCase):
         plant = Pendulum(length=1.0, mass=1.0)
         plant_diagram = _as_plant_diagram(plant)
         self.assertEqual(plant_diagram.camera_scale, plant.camera_scale)
+
+    def test_hybrid_animate_refreshes_plant_camera_scale(self):
+        from minilink.blocks.basic import Integrator
+        from minilink.control.output import ProportionalController
+        from minilink.core.hybrid_composition import hybrid_closed_loop
+
+        plant = Integrator()
+        plant.camera_scale = 3.0
+        hybrid = hybrid_closed_loop(ProportionalController(0.5), plant, schedule=0.01)
+        self.assertEqual(hybrid.plant.camera_scale, 3.0)
+        plant.camera_scale = 9.0
+        hybrid.animate(show=False)
+        self.assertEqual(hybrid.plant.camera_scale, 9.0)
 
 
 if __name__ == "__main__":

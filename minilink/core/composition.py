@@ -8,6 +8,8 @@ Public functions (also reachable as operators on :class:`System`):
   (``feedback="auto"``, ``"y"``, or ``"qdq"``).
 - :func:`closed_loop_qdq` — ``closed_loop(..., feedback="qdq")`` alias.
 - :func:`autowire` — conservatively fill unconnected inputs.
+- :func:`resolve_standard_feedback` — shared port names for ``@`` closed loops
+  and hybrid ``Computer @ plant``.
 
 Shortcut-built diagrams remember a default *entry* input and *output* port
 (``diagram._composition_entry`` / ``_composition_output``, initialized by
@@ -43,13 +45,45 @@ def _animated_geometry_source(obj):
     return None
 
 
+def _subsystem_id_for_leaf(diagram: DiagramSystem, leaf: System) -> str | None:
+    """Return ``sys_id`` when *leaf* is a direct subsystem of *diagram*."""
+    for sys_id, subsystem in diagram.subsystems.items():
+        if subsystem is leaf:
+            return sys_id
+    return None
+
+
+def _namespaced_camera_follow_frame(
+    diagram: DiagramSystem, animated: System, follow: str | None
+) -> str | None:
+    if follow is None:
+        return None
+    if ":" in follow:
+        return follow
+    sys_id = _subsystem_id_for_leaf(diagram, animated)
+    if sys_id is None:
+        return follow
+    return f"{sys_id}:{follow}"
+
+
 def _propagate_animation_camera(diagram, *sources):
-    """Copy ``camera_scale`` / ``camera_target`` from a plant-like *sources*."""
+    """Copy camera hints from a plant-like *source* onto *diagram*."""
     for source in sources:
         animated = _animated_geometry_source(source)
+        if (
+            animated is None
+            and isinstance(source, System)
+            and not isinstance(source, DiagramSystem)
+        ):
+            animated = source
         if animated is not None:
             diagram.camera_scale = animated.camera_scale
             diagram.camera_target = np.array(animated.camera_target, dtype=float).copy()
+            diagram.camera_follow_frame = _namespaced_camera_follow_frame(
+                diagram,
+                animated,
+                getattr(animated, "camera_follow_frame", None),
+            )
             return
 
 
@@ -161,18 +195,38 @@ def closed_loop(
     controller_id = _add_system_to_diagram(diagram, controller, role="ctl")
     plant_id = _add_system_to_diagram(diagram, plant, role="sys")
 
-    wiring = _resolve_closed_loop_feedback(
-        controller,
-        plant,
-        diagram,
-        feedback=feedback,
-        measurement_port=measurement_port,
-        plant_output_port=plant_output_port,
-        controller_id=controller_id,
-        plant_id=plant_id,
+    using_defaults = (
+        measurement_port == "y"
+        and plant_output_port == "y"
+        and control_port == "u"
+        and plant_input_port == "u"
     )
-    measurement_port = wiring.measurement_port
-    plant_output_port = wiring.plant_output_port
+    if feedback in ("auto", "qdq", "y") and using_defaults:
+        wiring = resolve_standard_feedback(
+            controller,
+            plant,
+            diagram,
+            feedback=feedback,
+            controller_id=controller_id,
+            plant_id=plant_id,
+        )
+    else:
+        wiring = resolve_standard_feedback(
+            controller,
+            plant,
+            diagram,
+            feedback=feedback,
+            measurement_in=measurement_port,
+            plant_out=plant_output_port,
+            control_out=control_port,
+            plant_in=plant_input_port,
+            controller_id=controller_id,
+            plant_id=plant_id,
+        )
+    measurement_port = wiring.measurement_in
+    plant_output_port = wiring.plant_out
+    control_port = wiring.control_out
+    plant_input_port = wiring.plant_in
 
     _require_input(controller, ref_port, f"controller reference port {ref_port!r}")
     _require_input(
@@ -691,32 +745,88 @@ def _require_same_dim(left_dim: int, right_dim: int, left_label: str, right_labe
 
 
 @dataclass(frozen=True)
-class _FeedbackWiring:
-    measurement_port: str
-    plant_output_port: str
+class StandardFeedbackWiring:
+    """Resolved port names for controller/computer ↔ plant feedback."""
+
+    control_out: str
+    measurement_in: str
+    plant_in: str
+    plant_out: str
     mux_id: str | None = None
 
 
-def _resolve_closed_loop_feedback(
+def resolve_standard_feedback(
     controller,
     plant,
-    diagram: DiagramSystem,
+    diagram: DiagramSystem | None = None,
     *,
-    feedback: str,
-    measurement_port: str,
-    plant_output_port: str,
-    controller_id: str,
-    plant_id: str,
-) -> _FeedbackWiring:
+    feedback: str = "auto",
+    measurement_in: str | None = None,
+    plant_out: str | None = None,
+    control_out: str | None = None,
+    plant_in: str | None = None,
+    controller_id: str = "ctl",
+    plant_id: str = "plant",
+) -> StandardFeedbackWiring:
+    """
+    Choose standard feedback port names shared by ``closed_loop`` and hybrid wiring.
+
+    Unset ``control_out`` / ``plant_in`` resolve to ``u`` (or ``u_ff`` / single port).
+    Unset ``measurement_in`` / ``plant_out`` use ``feedback`` auto rules (``y``, ``qdq``, ``x``).
+    """
     if feedback not in _VALID_FEEDBACK:
         raise ValueError(
             f"feedback must be one of {sorted(_VALID_FEEDBACK)!r}, got {feedback!r}"
         )
 
-    using_defaults = measurement_port == "y" and plant_output_port == "y"
+    resolved_control = control_out or _default_control_out(controller)
+    resolved_plant_in = plant_in or _default_plant_in(plant)
 
+    if measurement_in is not None and plant_out is not None:
+        return StandardFeedbackWiring(
+            resolved_control,
+            measurement_in,
+            resolved_plant_in,
+            plant_out,
+        )
+
+    path = _resolve_feedback_path(
+        controller,
+        plant,
+        diagram,
+        feedback=feedback,
+        plant_output_port=plant_out or "y",
+        controller_id=controller_id,
+        plant_id=plant_id,
+    )
+    return StandardFeedbackWiring(
+        resolved_control,
+        path.measurement_in,
+        resolved_plant_in,
+        path.plant_out,
+        path.mux_id,
+    )
+
+
+@dataclass(frozen=True)
+class _FeedbackPath:
+    measurement_in: str
+    plant_out: str
+    mux_id: str | None = None
+
+
+def _resolve_feedback_path(
+    controller,
+    plant,
+    diagram: DiagramSystem | None,
+    *,
+    feedback: str,
+    plant_output_port: str,
+    controller_id: str,
+    plant_id: str,
+) -> _FeedbackPath:
     if feedback == "qdq":
-        return _feedback_wiring_qdq(
+        return _feedback_path_qdq(
             controller, plant, diagram, plant_output_port=plant_output_port
         )
 
@@ -731,35 +841,36 @@ def _resolve_closed_loop_feedback(
                     attempted="y",
                 )
             )
-        return _FeedbackWiring("y", "y")
+        return _FeedbackPath("y", "y")
 
-    if using_defaults:
-        if _y_feedback_available(controller, plant):
-            return _FeedbackWiring("y", "y")
-        qdq_n = _plant_qdq_dof(plant)
-        if (
-            qdq_n is not None
-            and "y" in controller.inputs
-            and controller.inputs["y"].dim == 2 * qdq_n
-        ):
-            mux_id = _add_qdq_mux(diagram, qdq_n)
-            return _FeedbackWiring("y", plant_output_port, mux_id)
-        if _x_feedback_available(controller, plant):
-            return _FeedbackWiring("x", "x")
-        raise ValueError(
-            _feedback_mismatch_message(
-                controller,
-                plant,
-                controller_id,
-                plant_id,
-                attempted="auto",
-            )
+    if _y_feedback_available(controller, plant):
+        return _FeedbackPath("y", "y")
+
+    qdq_n = _plant_qdq_dof(plant)
+    if (
+        diagram is not None
+        and qdq_n is not None
+        and "y" in controller.inputs
+        and controller.inputs["y"].dim == 2 * qdq_n
+    ):
+        mux_id = _add_qdq_mux(diagram, qdq_n)
+        return _FeedbackPath("y", plant_output_port, mux_id)
+
+    if _x_feedback_available(controller, plant):
+        return _FeedbackPath("x", "x")
+
+    raise ValueError(
+        _feedback_mismatch_message(
+            controller,
+            plant,
+            controller_id,
+            plant_id,
+            attempted="auto",
         )
+    )
 
-    return _FeedbackWiring(measurement_port, plant_output_port)
 
-
-def _feedback_wiring_qdq(controller, plant, diagram, *, plant_output_port: str):
+def _feedback_path_qdq(controller, plant, diagram, *, plant_output_port: str):
     if "y" not in controller.inputs:
         raise ValueError(
             "feedback='qdq' requires controller measurement port 'y'; "
@@ -775,8 +886,33 @@ def _feedback_wiring_qdq(controller, plant, diagram, *, plant_output_port: str):
             f"feedback='qdq' expects controller.y dim {2 * qdq_n} "
             f"(2 * plant dof), got {controller.inputs['y'].dim}"
         )
+    if diagram is None:
+        raise ValueError("feedback='qdq' requires a diagram for Mux insertion")
     mux_id = _add_qdq_mux(diagram, qdq_n)
-    return _FeedbackWiring("y", plant_output_port, mux_id)
+    return _FeedbackPath("y", plant_output_port, mux_id)
+
+
+def _default_control_out(sys) -> str:
+    if "u" in sys.outputs:
+        return "u"
+    if "u_ff" in sys.outputs:
+        return "u_ff"
+    return _default_output_port(sys)
+
+
+def _default_plant_in(sys) -> str:
+    return _default_input_port(sys)
+
+
+def default_computer_boundary_ports(controller) -> tuple[str, str]:
+    """Return ``(measurement_in, control_out)`` for step-diagram boundary expose."""
+    if "y" in controller.inputs:
+        measurement_in = "y"
+    elif "x" in controller.inputs:
+        measurement_in = "x"
+    else:
+        measurement_in = _default_input_port(controller)
+    return measurement_in, _default_control_out(controller)
 
 
 def _add_qdq_mux(diagram: DiagramSystem, dof: int) -> str:

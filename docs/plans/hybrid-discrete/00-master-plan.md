@@ -1,8 +1,7 @@
 # Hybrid discrete simulation: Master Plan
 
-Status: Phases **0**, **1a**, **1**, **1b**, **2**, **3**, **4**, **5** (5a/5b + fine plant recording), and **5c**
-complete on `dev-hybrid` (July 2026, `0ccba60`). Phase **6** pending. Next:
-[06-mpc-step-block.md](06-mpc-step-block.md). Wiring prep:
+Status: Phases **0**, **1a**, **1**, **1b**, **2**, **3**, **4**, **5** (5a/5b + fine plant recording), **5c**, **6a**, and **6b**
+complete on `dev-hybrid`. Next wiring prep:
 [00-wiring-refactor.md](00-wiring-refactor.md).
 
 Program charter for discrete-time blocks, step diagrams, optional discretization, scheduled
@@ -232,8 +231,8 @@ full `StepEvaluator.step` on every tick. Phase 3 (`discretize`) is optional — 
 | **5a** | `HybridSimulator` matches hand-rolled SMC; **multi-channel** boundary; one-tick delay enforced | **Done** |
 | **5b** | Cascade hybrid: filter fast + slow block; non-trivial `fire` parity | **Done** |
 | **5c** | `plot_hybrid_diagram` topology; `hybrid_closed_loop` matches manual `connect_boundary` | **Done** |
-| **6a** | Stateless `MPCController` (`u_ff`/`x_ff`/`z` ports, one NLP per tick); hybrid straight-line demo; trajectory matches stateless hand loop on `u_ff` |
-| **6b** | Warm-start `MPCStepBlock` via **`z`** shift; matches shifted-guess hand loop |
+| **6a** | Stateless `MPCController` (`u_ff`/`x_ff`/`z` ports, one NLP per tick); hybrid straight-line demo; trajectory matches stateless hand loop on `u_ff` | **Done** |
+| **6b** | Warm-start `MPCStepBlock` via **`z`** shift; matches shifted-guess hand loop | **Done** |
 | **13** | DESIGN §3 subset, ROADMAP maturity, README call chain updated | partial — DESIGN / ROADMAP / plans synced; README hybrid chain updated |
 
 Open contracts before implementation (detail in shard docs): ~~`ExecutionPlan` step fork in Phase 2~~

@@ -368,6 +368,12 @@ class System(SharedSystemFacades):
 
         return closed_loop(self, other)
 
+    def __mod__(self, schedule: object):
+        """Return a scheduled :class:`~minilink.simulation.computer.Computer`."""
+        from minilink.simulation.computer import as_computer
+
+        return as_computer(self, schedule)
+
 
 # Specialized System Types
 

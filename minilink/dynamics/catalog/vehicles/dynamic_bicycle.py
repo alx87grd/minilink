@@ -685,6 +685,46 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
         return x[6:8]
 
 
+class JaxDynamicBicycleRateInputsUY(JaxDynamicBicycleRateInputs):
+    """JAX rate-input bicycle with standard ``u`` / ``y`` ports for composition shortcuts.
+
+    Same dynamics as :class:`JaxDynamicBicycleRateInputs`; input ``u`` is
+    ``[w_rear_dot, delta_dot]`` and output ``y`` is the full state measurement.
+    """
+
+    def __init__(self):
+        from minilink.core.signals import VectorSignal
+
+        super(JaxDynamicBicycleRateInputs, self).__init__()
+        self.name = "JAX Dynamic Bicycle (rate inputs, u/y ports)"
+
+        self.n = 8
+        self.state = VectorSignal("x", dim=self.n)
+        self.x0 = np.zeros(self.n)
+        self.state.labels = [
+            "x",
+            "y",
+            "theta",
+            "vx",
+            "vy",
+            "yaw_rate",
+            "w_rear",
+            "delta",
+        ]
+        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
+
+        self.inputs = {}
+        self.add_input_port(
+            "u",
+            dim=2,
+            nominal_value=np.zeros(2),
+            labels=["w_rear_dot", "delta_dot"],
+            units=["rad/s^2", "rad/s^2"],
+        )
+        self.outputs = {}
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
+
+
 if __name__ == "__main__":
     sys = JaxDynamicBicycleRateInputs()
     # sys = DynamicBicycleCar3D()

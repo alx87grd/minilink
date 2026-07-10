@@ -10,6 +10,8 @@ matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
+from minilink.core.composition import _propagate_animation_camera
+from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation import Animator
@@ -117,6 +119,21 @@ class TestResolveCameraFromHints(unittest.TestCase):
             s, {}, np.zeros(2), np.zeros(1), 0.0, override=custom
         )
         np.testing.assert_array_equal(T, camera_matrix(plot_axes=(0, 2), scale=3.0))
+
+
+class TestPropagateAnimationCamera(unittest.TestCase):
+    def test_namespaces_follow_frame_on_diagram(self):
+        plant = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
+        plant.skin = lambda _self: {"body": []}
+        plant.camera_follow_frame = "body"
+        plant.camera_scale = 6.0
+
+        diagram = DiagramSystem()
+        diagram.add_subsystem(plant, "bike")
+
+        _propagate_animation_camera(diagram, plant)
+        self.assertEqual(diagram.camera_follow_frame, "bike:body")
+        self.assertEqual(diagram.camera_scale, 6.0)
 
 
 class TestAnimatorPipesCameraToRenderer(unittest.TestCase):

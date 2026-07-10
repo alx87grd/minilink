@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -18,9 +19,55 @@ from minilink.core.compile.evaluators.numpy_evaluator import _gather_u
 from minilink.core.compile.execution_plan import PortOperation
 from minilink.core.compile.step_compiler import build_step_execution_plan
 from minilink.core.compile.step_execution_plan import StepExecutionPlan, StepOperation
-from minilink.core.diagram import StepDiagramSystem
+from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+
+if TYPE_CHECKING:
+    from minilink.core.system import System
 
 # Public API
+
+
+def as_computer(
+    side: "System | StepDiagramSystem",
+    schedule: StepSchedule | float,
+) -> Computer:
+    """
+    Build a :class:`Computer` from a step block or :class:`StepDiagramSystem`.
+
+    Wraps a leaf in a step diagram, exposes standard boundary ports, and attaches
+    ``schedule``. Use the ``%`` operator as shorthand: ``computer = block % dt``.
+    """
+    from minilink.core.hybrid_composition import (
+        _as_step_diagram,
+        expose_computer_boundary_ports,
+    )
+    from minilink.core.system import DynamicSystem, System
+
+    if isinstance(side, Computer):
+        raise TypeError("operand is already a Computer")
+    if isinstance(side, DiagramSystem) and not isinstance(side, StepDiagramSystem):
+        raise TypeError(
+            f"as_computer() requires a step block or StepDiagramSystem, "
+            f"got flow {type(side).__name__}"
+        )
+    if isinstance(side, DynamicSystem) and side.n > 0:
+        raise TypeError(
+            f"continuous plant {side.name!r} belongs in Simulator, not Computer"
+        )
+    if not isinstance(side, (StepDiagramSystem, System)):
+        raise TypeError(
+            f"as_computer() expected System or StepDiagramSystem, "
+            f"got {type(side).__name__}"
+        )
+
+    if isinstance(schedule, StepSchedule):
+        step_schedule = schedule
+    else:
+        step_schedule = StepSchedule(dt_base=float(schedule))
+
+    diagram = _as_step_diagram(side)
+    expose_computer_boundary_ports(diagram)
+    return Computer(diagram, step_schedule)
 
 
 @dataclass
@@ -122,6 +169,10 @@ class Computer:
         self.x = x_init.copy()
         self.signal_read = np.zeros(self.plan.signal_dim, dtype=float)
         self.signal_write = np.zeros(self.plan.signal_dim, dtype=float)
+        for sys in self.diagram.subsystems.values():
+            latch = getattr(sys, "_latch", None)
+            if latch is not None and hasattr(latch, "reset_latch"):
+                latch.reset_latch()
 
     def tick(self, u) -> dict[str, np.ndarray]:
         """
@@ -185,25 +236,35 @@ class Computer:
 
     def __matmul__(self, plant):
         """
-        Default hybrid feedback: computer boundary ``u`` → plant ``u``,
-        plant ``y`` → computer ``y``.
+        Hybrid feedback using standard port auto-wiring.
 
-        Requires ``schedule`` on this runtime; does not cross raw step/flow
-        diagrams — only ``Computer @ DiagramSystem``.
+        ``computer @ plant`` returns a :class:`~minilink.core.hybrid_diagram.HybridDiagram`
+        with the same port-resolution rules as continuous ``ctl @ plant``.
         """
-        from minilink.core.diagram import DiagramSystem
-        from minilink.core.hybrid_composition import hybrid_closed_loop
+        from minilink.core.hybrid_composition import (
+            hybrid_closed_loop,
+            resolve_hybrid_feedback_ports,
+        )
+        from minilink.core.system import System
 
-        if not isinstance(plant, DiagramSystem):
+        if not isinstance(plant, (System, DiagramSystem)):
             raise TypeError(
-                f"Computer @ plant requires DiagramSystem plant, "
+                f"Computer @ plant requires System or DiagramSystem, "
                 f"got {type(plant).__name__}"
             )
+        computer_out, computer_in, plant_in, plant_out = resolve_hybrid_feedback_ports(
+            self.diagram,
+            plant,
+        )
         return hybrid_closed_loop(
             self.diagram,
             plant,
             schedule=self.schedule,
             computer=self,
+            computer_out=computer_out,
+            computer_in=computer_in,
+            plant_in=plant_in,
+            plant_out=plant_out,
         )
 
     def divisor(self, sys_id: str) -> int:
