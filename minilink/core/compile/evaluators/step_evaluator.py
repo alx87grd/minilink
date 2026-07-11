@@ -138,7 +138,6 @@ class JaxStepEvaluator(StepEvaluator, TraceTierMixin):
         self._outputs_jit_fn = tiers["_outputs_jit_fn"]
         self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
         self._jit_rollout = build_jit_step_rollout(jax, jnp, self._step_jit_fn)
-        # Phase 3 (deferred): _trace_rollout via build_trace_step_rollout(step_trace_fn)
 
     def step(self, x, u, k=0):
         return self._step_jit_fn(self.jnp.asarray(x), self.jnp.asarray(u), k)

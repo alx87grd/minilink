@@ -60,8 +60,8 @@ class IntegrationMixin:
         """
         Piecewise-constant ``u_hold`` over ``[t0, t0 + dt_hold]``.
 
-        Phase 3 (deferred): JAX evaluators have no ZOH scan yet; ``integrate_zoh_trace``
-        would fuse holds via ``integrate_trace`` (not implemented).
+        JAX dynamics evaluators use the inherited Python-loop path here (no fused
+        ZOH scan). ``integrate_zoh_trace`` is not exposed on JAX evaluators.
 
         Returns
         -------

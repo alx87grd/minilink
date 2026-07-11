@@ -400,9 +400,6 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
     def compute_internal_signals(self, x, u, t=0.0):
         return self._jit_internal_signals(x, u, t)
 
-    # Phase 3 (deferred): compute_internal_signals_trace → _internal_signals_eager
-    # (thin wiring like f_trace; implement when AD through diagram internals is needed)
-
     def compute_internal_signals_dict(self, x, u, t=0.0):
         signals = self.compute_internal_signals(x, u, t)
         return {
