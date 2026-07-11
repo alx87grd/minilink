@@ -187,12 +187,17 @@ minilink/core/compile/evaluators/
 
 ### Internal private names (rename for clarity)
 
+Leaf / static evaluators (tier builders in ``jax_utils``):
+
 | Old | New |
 | --- | --- |
-| `_f_eager` | `_f_trace_fn` |
-| `_f_p_eager` | `_f_trace_p_fn` |
 | `_jit_f` | `_f_jit_fn` |
-| `f_raw` in builders | `f_bound_fn` or `trace_f_fn` local |
+| `_f_eager` (diagram only) | unchanged — trace tier calls ``_f_eager`` / ``_f_p_eager`` directly |
+
+Diagram and step-diagram evaluators **keep** legacy ``_jit_*`` attribute names
+(``_jit_f``, ``_jit_step``, …). Only the public ``*_trace`` siblings are new.
+``JaxIntegrationMixin`` receives short-lived aliases (``_f_jit_fn = _jit_f``) at
+compile time on diagrams.
 
 ### `TraceTierMixin` (JAX evaluators only)
 
@@ -280,7 +285,8 @@ The following examples heavily utilize the `evaluator`, but rely strictly on the
 - [x] `f_trace`, `f_trace_p`, `outputs_trace`, `outputs_trace_p`
 - [x] `step_trace`, `step_trace_p` on step evaluators
 - [x] `f_jit` / `f_jit_p` aliases (`register_jit_aliases`)
-- [x] Internal rename `_f_eager` → `_f_trace_fn` (diagram); tier builders for leaves
+- [x] Tier builders for leaf/static/step leaves (`build_*_leaf_tiers`)
+- [x] Diagram evaluators: public `*_trace` only; internal `_jit_*` unchanged
 - [x] Tests: `test_evaluator_tiers.py`
 - [x] Consumers: `c_export.py`, notebook, `dynamics_function`
 

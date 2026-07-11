@@ -172,15 +172,15 @@ class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        self._step_trace_fn = self._make_step_fn()
-        self._step_trace_p_fn = self._make_step_p_fn()
-        self._outputs_trace_fn = self._make_outputs_fn()
-        self._outputs_trace_p_fn = self._make_outputs_p_fn()
-        self._step_jit_fn = jax.jit(self._step_trace_fn)
-        self._step_jit_p_fn = jax.jit(self._step_trace_p_fn)
-        self._outputs_jit_fn = jax.jit(self._outputs_trace_fn)
-        self._outputs_jit_p_fn = jax.jit(self._outputs_trace_p_fn)
-        self._jit_rollout = build_jit_step_rollout(jax, jnp, self._step_jit_fn)
+        self._step_fn = self._make_step_fn()
+        self._step_p_fn = self._make_step_p_fn()
+        self._outputs_fn = self._make_outputs_fn()
+        self._outputs_p_fn = self._make_outputs_p_fn()
+        self._jit_step = jax.jit(self._step_fn)
+        self._jit_step_p = jax.jit(self._step_p_fn)
+        self._jit_outputs = jax.jit(self._outputs_fn)
+        self._jit_outputs_p = jax.jit(self._outputs_p_fn)
+        self._jit_rollout = build_jit_step_rollout(jax, jnp, self._jit_step)
 
     def _make_step_fn(self):
         from minilink.core.compile.evaluators.jax_utils import gather_u_jax
@@ -291,7 +291,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
 
     def step(self, x, u, k=0):
         return np.asarray(
-            self._step_jit_fn(
+            self._jit_step(
                 self.jnp.asarray(x, dtype=self._dtype),
                 self.jnp.asarray(u, dtype=self._dtype),
                 k,
@@ -301,7 +301,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
 
     def step_trace(self, x, u, k=0):
         """Pre-JIT flat step for JAX composition."""
-        return self._step_trace_fn(
+        return self._step_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -309,7 +309,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
 
     def step_p(self, x, u, k, params):
         return np.asarray(
-            self._step_jit_p_fn(
+            self._jit_step_p(
                 self.jnp.asarray(x, dtype=self._dtype),
                 self.jnp.asarray(u, dtype=self._dtype),
                 k,
@@ -320,7 +320,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
 
     def step_trace_p(self, x, u, k, params):
         """Pre-JIT parametric step for JAX composition."""
-        return self._step_trace_p_fn(
+        return self._step_p_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -328,7 +328,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
         )
 
     def outputs(self, x, u, k=0):
-        out = self._outputs_jit_fn(
+        out = self._jit_outputs(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -337,14 +337,14 @@ class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
 
     def outputs_trace(self, x, u, k=0):
         """Pre-JIT boundary outputs for JAX composition."""
-        return self._outputs_trace_fn(
+        return self._outputs_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
         )
 
     def outputs_p(self, x, u, k, params):
-        out = self._outputs_jit_p_fn(
+        out = self._jit_outputs_p(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -354,7 +354,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
 
     def outputs_trace_p(self, x, u, k, params):
         """Pre-JIT parametric boundary outputs for JAX composition."""
-        return self._outputs_trace_p_fn(
+        return self._outputs_p_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
