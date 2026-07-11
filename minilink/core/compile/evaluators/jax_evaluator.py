@@ -15,18 +15,19 @@ import numpy as np
 from minilink.core.compile.evaluators.dynamics_evaluator import DynamicsEvaluator
 from minilink.core.compile.evaluators.jax_utils import (
     JaxIntegrationMixin,
-    build_jit_dynamic_leaf,
+    build_dynamic_leaf_tiers,
     build_jit_rk4_integrate_forced,
     build_jit_rk4_integrate_ivp,
     check_jax_compatible,
     gather_u_jax,
 )
+from minilink.core.compile.evaluators.tiers import TraceTierMixin, register_jit_aliases
 from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.diagram import validate_diagram_params
 from minilink.core.system import DynamicSystem
 
 
-class JaxDynamicEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
+class JaxDynamicEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin):
     """Compiled evaluator for a :class:`DynamicSystem` using JAX."""
 
     def __init__(self, system: DynamicSystem, verbose=False):
@@ -84,20 +85,25 @@ class JaxDynamicEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
                 flush=True,
             )
 
-        jits = build_jit_dynamic_leaf(jax, system, frozen_p, u_nom)
-        self._jit_f = jits["f"]
-        self._jit_f_p = jits["f_p"]
-        self._jit_f_ivp = jits["f_ivp"]
-        self._jit_jac_f_params = jits["jac_f_params"]
-        self._jit_jac_ivp = jits["jac_ivp"]
-        self._jit_outputs = jits["outputs"]
-        self._jit_outputs_p = jits["outputs_p"]
+        tiers = build_dynamic_leaf_tiers(jax, system, frozen_p, u_nom)
+        self._f_trace_fn = tiers["_f_trace_fn"]
+        self._f_trace_p_fn = tiers["_f_trace_p_fn"]
+        self._f_jit_fn = tiers["_f_jit_fn"]
+        self._f_jit_p_fn = tiers["_f_jit_p_fn"]
+        self._f_ivp_trace_fn = tiers["_f_ivp_trace_fn"]
+        self._f_ivp_jit_fn = tiers["_f_ivp_jit_fn"]
+        self._jac_f_params_jit_fn = tiers["_jac_f_params_jit_fn"]
+        self._jac_ivp_jit_fn = tiers["_jac_ivp_jit_fn"]
+        self._outputs_trace_fn = tiers["_outputs_trace_fn"]
+        self._outputs_trace_p_fn = tiers["_outputs_trace_p_fn"]
+        self._outputs_jit_fn = tiers["_outputs_jit_fn"]
+        self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
 
         self._jit_rk4_integrate_ivp = build_jit_rk4_integrate_ivp(
-            jax, jnp, self._jit_f_ivp
+            jax, jnp, self._f_ivp_jit_fn
         )
         self._jit_rk4_integrate_forced = build_jit_rk4_integrate_forced(
-            jax, jnp, self._jit_f
+            jax, jnp, self._f_jit_fn
         )
 
         if verbose:
@@ -106,11 +112,11 @@ class JaxDynamicEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
             print("[compile] Step 2: Warm-starting JIT cache...", end="", flush=True)
 
         try:
-            self._jit_f(dummy_x, dummy_u, dummy_t)
-            self._jit_f_p(dummy_x, dummy_u, dummy_t, frozen_p)
-            self._jit_f_ivp(dummy_x, dummy_t)
-            self._jit_outputs(dummy_x, dummy_u, dummy_t)
-            self._jit_outputs_p(dummy_x, dummy_u, dummy_t, frozen_p)
+            self._f_jit_fn(dummy_x, dummy_u, dummy_t)
+            self._f_jit_p_fn(dummy_x, dummy_u, dummy_t, frozen_p)
+            self._f_ivp_jit_fn(dummy_x, dummy_t)
+            self._outputs_jit_fn(dummy_x, dummy_u, dummy_t)
+            self._outputs_jit_p_fn(dummy_x, dummy_u, dummy_t, frozen_p)
         except Exception as e:
             raise RuntimeError(
                 f"\n\nBlock '{system.name}' failed during JAX warm-start.\n"
@@ -122,29 +128,48 @@ class JaxDynamicEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
     def f(self, x, u, t=0.0):
-        return self._jit_f(x, u, t)
+        return self._f_jit_fn(x, u, t)
+
+    def f_trace(self, x, u, t=0.0):
+        """Pre-JIT flat callable for JAX composition."""
+        return self._f_trace_fn(x, u, t)
 
     def f_scipy(self, x, u, t=0.0):
         x = self.jnp.asarray(x)
         u = self.jnp.asarray(u)
-        return np.asarray(self._jit_f(x, u, t))
+        return np.asarray(self._f_jit_fn(x, u, t))
 
     def outputs(self, x, u, t=0.0):
-        return self._jit_outputs(x, u, t)
+        return self._outputs_jit_fn(x, u, t)
+
+    def outputs_trace(self, x, u, t=0.0):
+        """Pre-JIT boundary outputs for JAX composition."""
+        return self._outputs_trace_fn(x, u, t)
 
     def f_p(self, x, u, t, params):
-        return self._jit_f_p(x, u, t, params)
+        return self._f_jit_p_fn(x, u, t, params)
+
+    def f_trace_p(self, x, u, t, params):
+        """Pre-JIT parametric dynamics for JAX composition."""
+        return self._f_trace_p_fn(x, u, t, params)
 
     def outputs_p(self, x, u, t, params):
-        return self._jit_outputs_p(x, u, t, params)
+        return self._outputs_jit_p_fn(x, u, t, params)
+
+    def outputs_trace_p(self, x, u, t, params):
+        """Pre-JIT parametric boundary outputs for JAX composition."""
+        return self._outputs_trace_p_fn(x, u, t, params)
 
     def jacobian_f_params(self, x, u, t, params):
         if params is None:
             raise ValueError("jacobian_f_params requires an explicit params pytree")
-        return self._jit_jac_f_params(x, u, t, params)
+        return self._jac_f_params_jit_fn(x, u, t, params)
 
 
-class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
+register_jit_aliases(JaxDynamicEvaluator, ("f", "outputs"))
+
+
+class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin):
     """JAX-compatible evaluator for a compiled diagram."""
 
     def __init__(self, plan: ExecutionPlan, diagram, verbose=False):
@@ -195,29 +220,30 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
                 flush=True,
             )
 
-        _f_eager = self._f_eager
-        self._jit_f = jax.jit(_f_eager)
+        self._f_trace_fn = self._f_eager
+        self._f_trace_p_fn = self._f_p_eager
+        self._outputs_trace_fn = self._external_outputs_eager
+        self._outputs_trace_p_fn = self._outputs_p_eager
         u_nom = self._u_nominal
-        self._jit_f_ivp = jax.jit(lambda x, t: _f_eager(x, u_nom, t))
-        self._jit_jac_ivp = jax.jit(jax.jacfwd(self._jit_f_ivp, argnums=0))
+        self._f_jit_fn = jax.jit(self._f_trace_fn)
+        self._f_jit_p_fn = jax.jit(self._f_trace_p_fn)
+        self._f_ivp_trace_fn = lambda x, t: self._f_trace_fn(x, u_nom, t)
+        self._f_ivp_jit_fn = jax.jit(self._f_ivp_trace_fn)
+        self._jac_ivp_jit_fn = jax.jit(jax.jacfwd(self._f_ivp_jit_fn, argnums=0))
 
         self._jit_rk4_integrate_ivp = build_jit_rk4_integrate_ivp(
-            jax, jnp, self._jit_f_ivp
+            jax, jnp, self._f_ivp_jit_fn
         )
         self._jit_rk4_integrate_forced = build_jit_rk4_integrate_forced(
-            jax, jnp, self._jit_f
+            jax, jnp, self._f_jit_fn
         )
 
-        self._jit_outputs = jax.jit(
-            lambda x, u, t: self._external_outputs_eager(x, u, t)
-        )
+        self._outputs_jit_fn = jax.jit(self._outputs_trace_fn)
         self._jit_internal_signals = jax.jit(
             lambda x, u, t: self._internal_signals_eager(x, u, t)
         )
-
-        self._jit_f_p = jax.jit(self._f_p_eager)
-        self._jit_outputs_p = jax.jit(self._outputs_p_eager)
-        self._jit_jac_f_params = jax.jit(jax.jacfwd(self._f_p_eager, argnums=3))
+        self._outputs_jit_p_fn = jax.jit(self._outputs_trace_p_fn)
+        self._jac_f_params_jit_fn = jax.jit(jax.jacfwd(self._f_trace_p_fn, argnums=3))
 
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
@@ -229,9 +255,9 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
         dummy_t = 0.0
 
         try:
-            self._jit_f(dummy_x, dummy_u, dummy_t)
-            self._jit_f_ivp(dummy_x, dummy_t)
-            self._jit_outputs(dummy_x, dummy_u, dummy_t)
+            self._f_jit_fn(dummy_x, dummy_u, dummy_t)
+            self._f_ivp_jit_fn(dummy_x, dummy_t)
+            self._outputs_jit_fn(dummy_x, dummy_u, dummy_t)
             self._jit_internal_signals(dummy_x, dummy_u, dummy_t)
         except Exception as e:
             raise RuntimeError(
@@ -242,8 +268,8 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
             sys_id: sub.params for sys_id, sub in diagram.subsystems.items()
         }
         try:
-            self._jit_f_p(dummy_x, dummy_u, dummy_t, params_nominal)
-            self._jit_outputs_p(dummy_x, dummy_u, dummy_t, params_nominal)
+            self._f_jit_p_fn(dummy_x, dummy_u, dummy_t, params_nominal)
+            self._outputs_jit_p_fn(dummy_x, dummy_u, dummy_t, params_nominal)
         except Exception:
             pass
 
@@ -298,12 +324,16 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
         return dtype if dtype is not None else jnp.float32
 
     def f(self, x, u, t=0.0):
-        return self._jit_f(x, u, t)
+        return self._f_jit_fn(x, u, t)
+
+    def f_trace(self, x, u, t=0.0):
+        """Pre-JIT flat callable for JAX composition."""
+        return self._f_trace_fn(x, u, t)
 
     def f_scipy(self, x, u, t=0.0):
         x = self._jnp.asarray(x)
         u = self._jnp.asarray(u)
-        return np.asarray(self._jit_f(x, u, t))
+        return np.asarray(self._f_jit_fn(x, u, t))
 
     def _f_eager(self, x, u, t=0.0):
         jnp = self._jnp
@@ -339,15 +369,29 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
         }
 
     def outputs(self, x, u, t=0.0):
-        return self._jit_outputs(x, u, t)
+        return self._outputs_jit_fn(x, u, t)
+
+    def outputs_trace(self, x, u, t=0.0):
+        """Pre-JIT boundary outputs for JAX composition."""
+        return self._outputs_trace_fn(x, u, t)
 
     def f_p(self, x, u, t, params):
         validate_diagram_params(params, self._subsystem_ids)
-        return self._jit_f_p(x, u, t, params)
+        return self._f_jit_p_fn(x, u, t, params)
+
+    def f_trace_p(self, x, u, t, params):
+        """Pre-JIT parametric dynamics for JAX composition."""
+        validate_diagram_params(params, self._subsystem_ids)
+        return self._f_trace_p_fn(x, u, t, params)
 
     def outputs_p(self, x, u, t, params):
         validate_diagram_params(params, self._subsystem_ids)
-        return self._jit_outputs_p(x, u, t, params)
+        return self._outputs_jit_p_fn(x, u, t, params)
+
+    def outputs_trace_p(self, x, u, t, params):
+        """Pre-JIT parametric boundary outputs for JAX composition."""
+        validate_diagram_params(params, self._subsystem_ids)
+        return self._outputs_trace_p_fn(x, u, t, params)
 
     def jacobian_f_params(self, x, u, t, params):
         if params is None:
@@ -355,7 +399,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
                 "jacobian_f_params requires an explicit nested params pytree"
             )
         validate_diagram_params(params, self._subsystem_ids)
-        return self._jit_jac_f_params(x, u, t, params)
+        return self._jac_f_params_jit_fn(x, u, t, params)
 
     def compute_internal_signals(self, x, u, t=0.0):
         return self._jit_internal_signals(x, u, t)
@@ -387,3 +431,6 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin):
             y_out = op.compute_func(local_x, local_u, t, op_params)
             signals = signals.at[op.out_slice].set(y_out)
         return signals
+
+
+register_jit_aliases(JaxDiagramEvaluator, ("f", "outputs"))

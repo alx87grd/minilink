@@ -88,86 +88,169 @@ def gather_u_jax(gather_sources, u_dim, signals, u, jnp, dtype):
     return jnp.concatenate(pieces, axis=0) if pieces else jnp.array([], dtype=dtype)
 
 
-def build_jit_static_outputs(jax, system, frozen_p):
-    """JIT output-tier callables for a static ``System`` (no ``f``)."""
+def build_static_output_tiers(jax, system, frozen_p):
+    """Build fast (JIT) and trace tiers for a static ``System`` (no ``f``)."""
     output_items = tuple((pid, port.compute) for pid, port in system.outputs.items())
 
-    def _outputs_frozen(x, u, t):
+    def _outputs_trace_fn(x, u, t):
         return {pid: fn(x, u, t, frozen_p) for pid, fn in output_items}
 
-    def _outputs_param(x, u, t, p):
+    def _outputs_trace_p_fn(x, u, t, p):
         return {pid: fn(x, u, t, p) for pid, fn in output_items}
 
     if output_items:
-        return jax.jit(_outputs_frozen), jax.jit(_outputs_param)
-    empty = jax.jit(lambda x, u, t: {})
-    empty_p = jax.jit(lambda x, u, t, p: {})
-    return empty, empty_p
+        return {
+            "_outputs_trace_fn": _outputs_trace_fn,
+            "_outputs_trace_p_fn": _outputs_trace_p_fn,
+            "_outputs_jit_fn": jax.jit(_outputs_trace_fn),
+            "_outputs_jit_p_fn": jax.jit(_outputs_trace_p_fn),
+        }
+
+    def _empty_trace(x, u, t):
+        return {}
+
+    def _empty_trace_p(x, u, t, p):
+        return {}
+
+    return {
+        "_outputs_trace_fn": _empty_trace,
+        "_outputs_trace_p_fn": _empty_trace_p,
+        "_outputs_jit_fn": jax.jit(_empty_trace),
+        "_outputs_jit_p_fn": jax.jit(_empty_trace_p),
+    }
+
+
+def build_jit_static_outputs(jax, system, frozen_p):
+    """JIT output-tier callables for a static ``System`` (no ``f``)."""
+    tiers = build_static_output_tiers(jax, system, frozen_p)
+    return tiers["_outputs_jit_fn"], tiers["_outputs_jit_p_fn"]
+
+
+def build_dynamic_leaf_tiers(jax, system, frozen_p, u_nom):
+    """Build fast (JIT) and trace (pre-JIT) tiers for a :class:`DynamicSystem` leaf."""
+    f_raw = system.f
+    output_items = tuple((pid, port.compute) for pid, port in system.outputs.items())
+
+    def _f_trace_fn(x, u, t):
+        return f_raw(x, u, t, frozen_p)
+
+    def _f_trace_p_fn(x, u, t, p):
+        return f_raw(x, u, t, p)
+
+    _f_jit_fn = jax.jit(_f_trace_fn)
+    _f_jit_p_fn = jax.jit(_f_trace_p_fn)
+
+    def _f_ivp_trace_fn(x, t):
+        return _f_trace_fn(x, u_nom, t)
+
+    _f_ivp_jit_fn = jax.jit(_f_ivp_trace_fn)
+    _jac_f_params_jit_fn = jax.jit(jax.jacfwd(_f_trace_p_fn, argnums=3))
+    _jac_ivp_jit_fn = jax.jit(jax.jacfwd(_f_ivp_jit_fn, argnums=0))
+
+    def _outputs_trace_fn(x, u, t):
+        return {pid: fn(x, u, t, frozen_p) for pid, fn in output_items}
+
+    def _outputs_trace_p_fn(x, u, t, p):
+        return {pid: fn(x, u, t, p) for pid, fn in output_items}
+
+    if output_items:
+        _outputs_jit_fn = jax.jit(_outputs_trace_fn)
+        _outputs_jit_p_fn = jax.jit(_outputs_trace_p_fn)
+    else:
+
+        def _outputs_trace_fn(x, u, t):
+            return {}
+
+        def _outputs_trace_p_fn(x, u, t, p):
+            return {}
+
+        _outputs_jit_fn = jax.jit(_outputs_trace_fn)
+        _outputs_jit_p_fn = jax.jit(_outputs_trace_p_fn)
+
+    return {
+        "_f_trace_fn": _f_trace_fn,
+        "_f_trace_p_fn": _f_trace_p_fn,
+        "_f_jit_fn": _f_jit_fn,
+        "_f_jit_p_fn": _f_jit_p_fn,
+        "_f_ivp_trace_fn": _f_ivp_trace_fn,
+        "_f_ivp_jit_fn": _f_ivp_jit_fn,
+        "_jac_f_params_jit_fn": _jac_f_params_jit_fn,
+        "_jac_ivp_jit_fn": _jac_ivp_jit_fn,
+        "_outputs_trace_fn": _outputs_trace_fn,
+        "_outputs_trace_p_fn": _outputs_trace_p_fn,
+        "_outputs_jit_fn": _outputs_jit_fn,
+        "_outputs_jit_p_fn": _outputs_jit_p_fn,
+    }
 
 
 def build_jit_dynamic_leaf(jax, system, frozen_p, u_nom):
     """JIT ``f`` and output tiers for a :class:`DynamicSystem` leaf."""
-    f_raw = system.f
+    tiers = build_dynamic_leaf_tiers(jax, system, frozen_p, u_nom)
+    return {
+        "f": tiers["_f_jit_fn"],
+        "f_p": tiers["_f_jit_p_fn"],
+        "f_ivp": tiers["_f_ivp_jit_fn"],
+        "jac_f_params": tiers["_jac_f_params_jit_fn"],
+        "jac_ivp": tiers["_jac_ivp_jit_fn"],
+        "outputs": tiers["_outputs_jit_fn"],
+        "outputs_p": tiers["_outputs_jit_p_fn"],
+    }
+
+
+def build_step_leaf_tiers(jax, system, frozen_p):
+    """Build fast (JIT) and trace tiers for a :class:`StepSystem` leaf."""
+    step_raw = system.step
     output_items = tuple((pid, port.compute) for pid, port in system.outputs.items())
 
-    jit_f = jax.jit(lambda x, u, t: f_raw(x, u, t, frozen_p))
-    jit_f_p = jax.jit(lambda x, u, t, p: f_raw(x, u, t, p))
-    jit_f_ivp = jax.jit(lambda x, t: f_raw(x, u_nom, t, frozen_p))
-    jit_jac_f_params = jax.jit(
-        jax.jacfwd(lambda x, u, t, p: f_raw(x, u, t, p), argnums=3)
-    )
-    jit_jac_ivp = jax.jit(jax.jacfwd(jit_f_ivp, argnums=0))
+    def _step_trace_fn(x, u, k):
+        return step_raw(x, u, k, frozen_p)
 
-    def _outputs_frozen(x, u, t):
-        return {pid: fn(x, u, t, frozen_p) for pid, fn in output_items}
+    def _step_trace_p_fn(x, u, k, p):
+        return step_raw(x, u, k, p)
 
-    def _outputs_param(x, u, t, p):
-        return {pid: fn(x, u, t, p) for pid, fn in output_items}
+    _step_jit_fn = jax.jit(_step_trace_fn)
+    _step_jit_p_fn = jax.jit(_step_trace_p_fn)
+
+    def _outputs_trace_fn(x, u, k):
+        return {pid: fn(x, u, k, frozen_p) for pid, fn in output_items}
+
+    def _outputs_trace_p_fn(x, u, k, p):
+        return {pid: fn(x, u, k, p) for pid, fn in output_items}
 
     if output_items:
-        jit_outputs = jax.jit(_outputs_frozen)
-        jit_outputs_p = jax.jit(_outputs_param)
+        _outputs_jit_fn = jax.jit(_outputs_trace_fn)
+        _outputs_jit_p_fn = jax.jit(_outputs_trace_p_fn)
     else:
-        jit_outputs = jax.jit(lambda x, u, t: {})
-        jit_outputs_p = jax.jit(lambda x, u, t, p: {})
+
+        def _outputs_trace_fn(x, u, k):
+            return {}
+
+        def _outputs_trace_p_fn(x, u, k, p):
+            return {}
+
+        _outputs_jit_fn = jax.jit(_outputs_trace_fn)
+        _outputs_jit_p_fn = jax.jit(_outputs_trace_p_fn)
 
     return {
-        "f": jit_f,
-        "f_p": jit_f_p,
-        "f_ivp": jit_f_ivp,
-        "jac_f_params": jit_jac_f_params,
-        "jac_ivp": jit_jac_ivp,
-        "outputs": jit_outputs,
-        "outputs_p": jit_outputs_p,
+        "_step_trace_fn": _step_trace_fn,
+        "_step_trace_p_fn": _step_trace_p_fn,
+        "_step_jit_fn": _step_jit_fn,
+        "_step_jit_p_fn": _step_jit_p_fn,
+        "_outputs_trace_fn": _outputs_trace_fn,
+        "_outputs_trace_p_fn": _outputs_trace_p_fn,
+        "_outputs_jit_fn": _outputs_jit_fn,
+        "_outputs_jit_p_fn": _outputs_jit_p_fn,
     }
 
 
 def build_jit_step_leaf(jax, system, frozen_p):
     """JIT ``step`` and output tiers for a :class:`StepSystem` leaf."""
-    step_raw = system.step
-    output_items = tuple((pid, port.compute) for pid, port in system.outputs.items())
-
-    jit_step = jax.jit(lambda x, u, k: step_raw(x, u, k, frozen_p))
-    jit_step_p = jax.jit(lambda x, u, k, p: step_raw(x, u, k, p))
-
-    def _outputs_frozen(x, u, k):
-        return {pid: fn(x, u, k, frozen_p) for pid, fn in output_items}
-
-    def _outputs_param(x, u, k, p):
-        return {pid: fn(x, u, k, p) for pid, fn in output_items}
-
-    if output_items:
-        jit_outputs = jax.jit(_outputs_frozen)
-        jit_outputs_p = jax.jit(_outputs_param)
-    else:
-        jit_outputs = jax.jit(lambda x, u, k: {})
-        jit_outputs_p = jax.jit(lambda x, u, k, p: {})
-
+    tiers = build_step_leaf_tiers(jax, system, frozen_p)
     return {
-        "step": jit_step,
-        "step_p": jit_step_p,
-        "outputs": jit_outputs,
-        "outputs_p": jit_outputs_p,
+        "step": tiers["_step_jit_fn"],
+        "step_p": tiers["_step_jit_p_fn"],
+        "outputs": tiers["_outputs_jit_fn"],
+        "outputs_p": tiers["_outputs_jit_p_fn"],
     }
 
 
@@ -192,17 +275,17 @@ class JaxIntegrationMixin:
     """Shared IVP integration overrides for JAX dynamic evaluators."""
 
     def f_ivp(self, x, t=0.0):
-        return self._jit_f_ivp(x, t)
+        return self._f_ivp_jit_fn(x, t)
 
     def f_ivp_scipy(self, x, t=0.0):
         x = self.jnp.asarray(x)
-        return np.asarray(self._jit_f_ivp(x, t))
+        return np.asarray(self._f_ivp_jit_fn(x, t))
 
     def as_scipy_jac(self):
-        return lambda t, x: np.asarray(self._jit_jac_ivp(self.jnp.asarray(x), t))
+        return lambda t, x: np.asarray(self._jac_ivp_jit_fn(self.jnp.asarray(x), t))
 
     def rk4_step_ivp(self, x, t, dt):
-        f = self._jit_f_ivp
+        f = self._f_ivp_jit_fn
         k1 = f(x, t)
         k2 = f(x + 0.5 * dt * k1, t + 0.5 * dt)
         k3 = f(x + 0.5 * dt * k2, t + 0.5 * dt)

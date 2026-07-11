@@ -355,19 +355,33 @@ def export_system_to_c(
     t_jax = jax.numpy.array(t_sample, dtype=jax.numpy.float32)
 
     # DynamicSystem uses f, StepSystem uses step, Static uses outputs
-    if hasattr(evaluator, "f"):
+    if hasattr(evaluator, "f_trace"):
+
+        def func(x, u):
+            return evaluator.f_trace(x, u, t_jax)
+    elif hasattr(evaluator, "step_trace"):
+
+        def func(x, u):
+            return evaluator.step_trace(x, u, 0)
+    elif hasattr(evaluator, "outputs_trace"):
+
+        def func(x, u):
+            return evaluator.outputs_trace(x, u, t_jax)
+    elif hasattr(evaluator, "f"):
 
         def func(x, u):
             return evaluator.f(x, u, t_jax)
     elif hasattr(evaluator, "step"):
 
         def func(x, u):
-            return evaluator.step(x, u, 0, t_jax)  # k=0
+            return evaluator.step(x, u, 0)
     else:
 
         def func(x, u):
             return evaluator.outputs(x, u, t_jax)
 
+    # Trace tier avoids evaluator-level JIT; disable_jit still needed when
+    # subsystem f()/compute() embed jax.jit (e.g. FilteredController).
     with jax.disable_jit():
         closed_jaxpr = jax.make_jaxpr(func)(x_jax, u_jax)
 

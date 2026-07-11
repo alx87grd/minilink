@@ -355,6 +355,21 @@ Diagrams → `ExecutionPlan` → diagram evaluator. Internal outputs via
 `reconstruct_internal_signals`; **`outputs()` / `outputs_p()` are boundary outputs
 only** (not diagram internals). Compiled evaluators expose **`outputs` / `outputs_p`**
 (dict keyed by port id); they do not mirror model `h` as a separate evaluator API.
+
+**Evaluator execution tiers (JAX).** Default methods (`.f`, `.f_p`, `.outputs`, …)
+are the **fast tier** — JIT-compiled on JAX, eager on NumPy. JAX evaluators also
+expose a **trace tier** (`.f_trace`, `.f_trace_p`, …): pre-JIT flat callables for
+composition inside outer `jit` / `grad` / `vmap` (trajopt transcription, C export).
+Optional `_jit` aliases (`.f_jit` ≡ `.f`) document the fast tier. NumPy evaluators
+do not expose trace-tier methods. `has_trace_tier` is `True` on JAX evaluators.
+
+|  | Bound | Parametric |
+| --- | --- | --- |
+| Fast (default) | `f` ≡ `f_jit` | `f_p` ≡ `f_jit_p` |
+| Trace (JAX only) | `f_trace` | `f_trace_p` |
+
+Same 2×2 for `outputs`, `step`, and integration helpers as they land.
+
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
 reintroduce `compute_outputs(..., ports=...)`.
 

@@ -123,14 +123,17 @@ building intuition about a plant before designing a controller.
 
 Wired diagrams compile into a flat execution plan. The NumPy backend removes
 the recursive port-resolution overhead; the JAX backend JIT-compiles dynamics
-and outputs, and keeps them traceable for autodiff:
+and outputs for fast simulation. For autodiff inside an outer `jit`, use the
+**trace tier** (pre-JIT flat callables):
 
 ```python
 evaluator = diagram.compile(backend="jax")
-dx = evaluator.f(x, u, 0.0)              # JIT-compiled flat dynamics
+dx = evaluator.f(x, u, 0.0)              # fast tier (JIT)
 
 import jax
-A = jax.jacfwd(lambda x: evaluator.f(x, u, 0.0))(x)   # exact linearization
+loss_and_grad = jax.jit(jax.value_and_grad(
+    lambda theta: jnp.mean((evaluator.f_trace_p(x, u, 0.0, {"plant": theta}) - dx_ref) ** 2)
+))
 ```
 
 ### Hybrid and discrete control

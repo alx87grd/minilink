@@ -1,6 +1,6 @@
 # Evaluator trace tier — naming scheme and implementation plan
 
-Status: **approved design** (July 2026). Implementation not yet landed.
+Status: **phase 1 landed** (July 2026).
 
 Follow-up to JAX evaluator export review: separate the **fast default tier**
 (JIT on JAX, eager NumPy) from an optional **trace tier** (pre-JIT, composable
@@ -229,8 +229,8 @@ This makes “missing cell” visible in code review.
 ### Phase 0 — Docs and plan (this document)
 
 - [x] Approve naming scheme (Scheme 1 + `_jit` aliases).
-- [ ] Add row to [docs/plans/README.md](README.md).
-- [ ] Short pointer in [DESIGN.md](../../DESIGN.md) §5 (after phase 1 lands).
+- [x] Add row to [docs/plans/README.md](README.md).
+- [x] Short pointer in [DESIGN.md](../../DESIGN.md) §5 (after phase 1 lands).
 
 ### Phase 0.5 — Codebase Audit for API Consumers
 
@@ -241,7 +241,10 @@ Because this refactor **preserves existing method signatures** (like `.f`, `.f_p
 **Requires Update (Breaking / Stale API usages):**
 1. **`minilink/interfaces/c_export.py`**:
    - *Current*: Wraps `evaluator.f` and `evaluator.step` in `jax.disable_jit()` to bypass the opaque primitive block.
-   - *Action*: Update to use `evaluator.f_trace` and `evaluator.step_trace` natively. Remove `jax.disable_jit()` from this specific call path entirely.
+   - *Action*: Update to use `evaluator.f_trace` and `evaluator.step_trace` natively.
+     Keep `jax.disable_jit()` around `make_jaxpr` only when subsystem `f()` embeds
+     its own `jax.jit` (e.g. `FilteredController`); evaluator-level JIT is avoided
+     via the trace tier.
 2. **`examples/notebooks/demo_stateless_functional_jax.ipynb`**:
    - *Current*: Calls `f_jit = evaluator.get_f_jit()` and `f_p = evaluator.get_f_p_jit()`. (These methods were previously removed from the codebase but stale references remain).
    - *Action*: Update to use the standard fast-tier aliases `evaluator.f_jit` or `evaluator.f` and `evaluator.f_jit_p` or `evaluator.f_p`.
@@ -356,8 +359,8 @@ loss_and_grad = jax.jit(jax.value_and_grad(
 
 - **No breaking changes** to existing method signatures.
 - **`get_f_jit`**: remains removed; use `f` or `f_jit`.
-- **Trajopt/MPC**: no change required (keep raw `sys.f` in NLP).
-- **`dynamics_function`**: optional later `tier="trace"` for reconstruction; not phase 1.
+- **Trajopt/MPC**: JAX transcriptions use `f_trace` / `f_trace_p` via
+  `dynamics_function` when `has_trace_tier` (avoids nested JIT).
 - **Deprecations**: none planned for v1.
 
 ---

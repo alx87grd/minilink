@@ -14,6 +14,11 @@ from minilink.core.compile.evaluators.output_evaluator import (
     outputs_from_ports,
 )
 from minilink.core.compile.evaluators.step_rollout_mixin import StepRolloutMixin
+from minilink.core.compile.evaluators.tiers import (
+    NoTraceTierMixin,
+    TraceTierMixin,
+    register_jit_aliases,
+)
 from minilink.core.step_rollout import StepRollout
 from minilink.core.system import StepSystem
 
@@ -37,7 +42,7 @@ class StepEvaluator(OutputEvaluator, StepRolloutMixin):
         ...
 
 
-class NumpyStepEvaluator(StepEvaluator):
+class NumpyStepEvaluator(NoTraceTierMixin, StepEvaluator):
     """Compiled evaluator for a :class:`StepSystem` using NumPy."""
 
     def __init__(self, system: StepSystem):
@@ -64,7 +69,7 @@ class NumpyStepEvaluator(StepEvaluator):
         return outputs_from_ports(self._system, x, u, k, params)
 
 
-class JaxStepEvaluator(StepEvaluator):
+class JaxStepEvaluator(StepEvaluator, TraceTierMixin):
     """Compiled evaluator for a :class:`StepSystem` using JAX."""
 
     def __init__(self, system: StepSystem, verbose=False):
@@ -77,8 +82,8 @@ class JaxStepEvaluator(StepEvaluator):
         import jax.numpy as jnp
 
         from minilink.core.compile.evaluators.jax_utils import (
-            build_jit_step_leaf,
             build_jit_step_rollout,
+            build_step_leaf_tiers,
             check_jax_compatible,
         )
 
@@ -123,24 +128,50 @@ class JaxStepEvaluator(StepEvaluator):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        jits = build_jit_step_leaf(jax, system, frozen_p)
-        self._jit_step = jits["step"]
-        self._jit_step_p = jits["step_p"]
-        self._jit_outputs = jits["outputs"]
-        self._jit_outputs_p = jits["outputs_p"]
-        self._jit_rollout = build_jit_step_rollout(jax, jnp, self._jit_step)
+        tiers = build_step_leaf_tiers(jax, system, frozen_p)
+        self._step_trace_fn = tiers["_step_trace_fn"]
+        self._step_trace_p_fn = tiers["_step_trace_p_fn"]
+        self._step_jit_fn = tiers["_step_jit_fn"]
+        self._step_jit_p_fn = tiers["_step_jit_p_fn"]
+        self._outputs_trace_fn = tiers["_outputs_trace_fn"]
+        self._outputs_trace_p_fn = tiers["_outputs_trace_p_fn"]
+        self._outputs_jit_fn = tiers["_outputs_jit_fn"]
+        self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
+        self._jit_rollout = build_jit_step_rollout(jax, jnp, self._step_jit_fn)
 
     def step(self, x, u, k=0):
-        return self._jit_step(self.jnp.asarray(x), self.jnp.asarray(u), k)
+        return self._step_jit_fn(self.jnp.asarray(x), self.jnp.asarray(u), k)
+
+    def step_trace(self, x, u, k=0):
+        """Pre-JIT flat step for JAX composition."""
+        return self._step_trace_fn(self.jnp.asarray(x), self.jnp.asarray(u), k)
 
     def step_p(self, x, u, k, params):
-        return self._jit_step_p(self.jnp.asarray(x), self.jnp.asarray(u), k, params)
+        return self._step_jit_p_fn(self.jnp.asarray(x), self.jnp.asarray(u), k, params)
+
+    def step_trace_p(self, x, u, k, params):
+        """Pre-JIT parametric step for JAX composition."""
+        return self._step_trace_p_fn(
+            self.jnp.asarray(x), self.jnp.asarray(u), k, params
+        )
 
     def outputs(self, x, u, k=0):
-        return self._jit_outputs(self.jnp.asarray(x), self.jnp.asarray(u), k)
+        return self._outputs_jit_fn(self.jnp.asarray(x), self.jnp.asarray(u), k)
+
+    def outputs_trace(self, x, u, k=0):
+        """Pre-JIT boundary outputs for JAX composition."""
+        return self._outputs_trace_fn(self.jnp.asarray(x), self.jnp.asarray(u), k)
 
     def outputs_p(self, x, u, k, params):
-        return self._jit_outputs_p(self.jnp.asarray(x), self.jnp.asarray(u), k, params)
+        return self._outputs_jit_p_fn(
+            self.jnp.asarray(x), self.jnp.asarray(u), k, params
+        )
+
+    def outputs_trace_p(self, x, u, k, params):
+        """Pre-JIT parametric boundary outputs for JAX composition."""
+        return self._outputs_trace_p_fn(
+            self.jnp.asarray(x), self.jnp.asarray(u), k, params
+        )
 
     def rollout(self, x0, *, n_steps, u=None, record_outputs=True):
         if record_outputs and self.p:
@@ -160,3 +191,6 @@ class JaxStepEvaluator(StepEvaluator):
         k = np.arange(n_steps + 1, dtype=float)
         u_np = np.asarray(u_samples, dtype=float)
         return StepRollout(k=k, x=x_samples, u=u_np, signals={})
+
+
+register_jit_aliases(JaxStepEvaluator, ("step", "outputs"))
