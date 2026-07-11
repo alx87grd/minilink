@@ -115,6 +115,12 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 
 Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.0:
 
+### 5.0 Compile (evaluators)
+
+- [ ] **Integration API rename** — `rk4_integrate_{zoh,linear,ivp}`, `euler_integrate_{zoh,ivp}`,
+  full `_p` / JAX `_trace` grid, lazy rollout JIT
+  ([evaluator-integration-api.md](docs/plans/evaluator-integration-api.md))
+
 ### 5.1 Analysis
 
 - [x] Linearize (→ matrices/`LTISystem`), ctrb/obsv, equilibria, modal, Bode (selected channel)
