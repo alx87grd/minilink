@@ -60,6 +60,9 @@ class IntegrationMixin:
         """
         Piecewise-constant ``u_hold`` over ``[t0, t0 + dt_hold]``.
 
+        Phase 3 (deferred): JAX evaluators have no ZOH scan yet; ``integrate_zoh_trace``
+        would fuse holds via ``integrate_trace`` (not implemented).
+
         Returns
         -------
         t_samples : ndarray, shape (n_sub + 1,)

@@ -369,7 +369,11 @@ def build_jit_step_leaf(jax, system, frozen_p):
 
 
 def build_jit_step_rollout(jax, jnp, jit_step):
-    """JIT a scan-based rollout for a compiled step function."""
+    """JIT a scan-based rollout for a compiled step function.
+
+    Phase 3 (deferred): ``build_trace_step_rollout`` + ``rollout_trace`` /
+    ``rollout_trace_p`` siblings using ``step_trace`` (not implemented yet).
+    """
 
     def _rollout(x0, u_steps):
         ks = jnp.arange(u_steps.shape[0])

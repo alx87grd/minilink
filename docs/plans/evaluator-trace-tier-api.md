@@ -288,13 +288,25 @@ The following examples heavily utilize the `evaluator`, but rely strictly on the
 - [x] Fast-tier gap: `rk4_integrate_forced_p`
 - [x] Tests in `test_evaluator_tiers.py`
 
-### Phase 3 — Step rollouts and diagram internals
+### Phase 3 — Step rollouts and diagram internals (deferred)
 
-**Deliver:**
+**Not rename-only.** Phase 1–2 added trace siblings next to existing fast-tier methods
+(`f` / `f_trace`). Phase 3 items below are **new public methods** (or new JAX paths)
+that do not exist yet — do not land stubs until a consumer needs them.
 
-- `rollout_trace`, `rollout_trace_p`
-- `compute_internal_signals_trace` (diagram) if required by tests/demos
-- `integrate_zoh*` trace/param siblings as needed
+| Planned surface | Exists today? | Phase 3 work |
+| --- | --- | --- |
+| `rollout` / `rollout_p` | Yes (`StepRolloutMixin`, JAX `_jit_rollout`) | **New:** `build_trace_step_rollout` + `rollout_trace` / `rollout_trace_p` scan over `step_trace` |
+| `compute_internal_signals` | Yes (diagram JIT + `_internal_signals_eager`) | **Thin wiring:** `compute_internal_signals_trace` → eager fn (like `f_trace`) |
+| `integrate_zoh` / `integrate_zoh_rollout` | Yes (NumPy loop on `IntegrationMixin` only) | **New:** JAX ZOH scan + `integrate_zoh_trace` (no JAX ZOH path today) |
+| `integrate_zoh_p`, `integrate_zoh_trace_p` | No | **New** (optional; grid gaps in plan table) |
+
+**Policy:** add `# Phase 3 (deferred): …` comments at extension points; implement only
+when a test or demo requires AD through that path.
+
+- [ ] `rollout_trace`, `rollout_trace_p`
+- [ ] `compute_internal_signals_trace` (diagram) if required by tests/demos
+- [ ] `integrate_zoh*` trace/param siblings as needed
 
 ### Phase 4 — Warm-start and compile flags (orthogonal cleanup)
 
