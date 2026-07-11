@@ -358,10 +358,12 @@ only** (not diagram internals). Compiled evaluators expose **`outputs` / `output
 
 **Evaluator execution tiers (JAX).** Default methods (`.f`, `.f_p`, `.outputs`, …)
 are the **fast tier** — JIT-compiled on JAX, eager on NumPy. JAX evaluators also
-expose a **trace tier** (`.f_trace`, `.f_trace_p`, …): pre-JIT flat callables for
-composition inside outer `jit` / `grad` / `vmap` (trajopt transcription, C export).
-Optional `_jit` aliases (`.f_jit` ≡ `.f`) document the fast tier. NumPy evaluators
-do not expose trace-tier methods. `has_trace_tier` is `True` on JAX evaluators.
+expose a **trace tier** (`.f_trace`, `.f_trace_p`, `.rk4_step_trace`, …):
+pre-JIT flat callables for composition inside outer `jit` / `grad` / `vmap`
+(identification losses, C export). Optional `_jit` aliases (`.f_jit` ≡ `.f`)
+document the fast tier. NumPy evaluators reject `*_trace` / `*_jit` attributes.
+`has_trace_tier` is `True` on JAX evaluators. Details:
+[docs/plans/evaluator-trace-tier-api.md](docs/plans/evaluator-trace-tier-api.md).
 
 |  | Bound | Parametric |
 | --- | --- | --- |
@@ -465,8 +467,9 @@ kind is class-type routing only — ``solver_info["continuous_time_equation"]`` 
 
 **Trajopt:** planner → transcription → `MathematicalProgram` → `Optimizer` →
 `Trajectory`. Single backend-native transcription classes; no parallel JAX
-transcription types. Transcriptions compile the system (`numpy`/`jax`) and
-route `problem.params.system` through the parametric tier `f_p`;
+transcription types. NumPy transcriptions build constraints via
+`dynamics_function` (compiled evaluator, trace tier when JAX). **JAX transcriptions**
+embed `problem.sys.f` directly in the NLP (not evaluator `f` / `f_trace`).
 `compile_backend="direct"` calls `system.f` uncompiled (escape hatch).
 A `MathematicalProgram` carries the native backend of its callables in its
 `backend` field, and the `Optimizer` compiles with it by default.

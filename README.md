@@ -123,8 +123,9 @@ building intuition about a plant before designing a controller.
 
 Wired diagrams compile into a flat execution plan. The NumPy backend removes
 the recursive port-resolution overhead; the JAX backend JIT-compiles dynamics
-and outputs for fast simulation. For autodiff inside an outer `jit`, use the
-**trace tier** (pre-JIT flat callables):
+and outputs for fast simulation (`evaluator.f`, `evaluator.rk4_step`, …).
+For autodiff inside an outer `jit`, use the **trace tier** (pre-JIT siblings:
+`f_trace`, `f_trace_p`, `rk4_step_trace`, …):
 
 ```python
 evaluator = diagram.compile(backend="jax")

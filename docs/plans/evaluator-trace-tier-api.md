@@ -1,12 +1,37 @@
 # Evaluator trace tier — naming scheme and implementation plan
 
-Status: **phase 2 landed** (integration trace tier, July 2026).
+Status: **phases 1–2 landed** (July 2026); phases 3–5 deferred. PR #65.
 
 Follow-up to JAX evaluator export review: separate the **fast default tier**
 (JIT on JAX, eager NumPy) from an optional **trace tier** (pre-JIT, composable
 in outer `jit` / `grad` / `vmap` / C export). Contracts in code today:
 [DESIGN.md](../../DESIGN.md) §5 (Compilation), evaluator modules under
 `minilink/core/compile/evaluators/`.
+
+---
+
+## Implementation status (July 2026)
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| **0** Docs / plan | Done | This document, [DESIGN.md](../../DESIGN.md) §5, [README.md](../../README.md) |
+| **1** Core trace (`f`, `outputs`, `step`) | **Landed** | `tiers.py`; all JAX leaf + diagram evaluators; `test_evaluator_tiers.py` |
+| **2** Integration trace | **Landed** | `JaxIntegrationMixin` in `jax_utils.py`; RK4/Euler/integrate/forced rollouts |
+| **3** Rollout / ZOH / diagram internals | **Deferred** | New APIs only; comments at extension points — see [Phase 3](#phase-3--step-rollouts-and-diagram-internals-deferred) |
+| **4** `warm_start` compile flag | Not started | Orthogonal cleanup |
+| **5** Tier benchmarks | Not started | `benchmarks/jax_evaluator_tiers.py` |
+
+**Consumers updated:** `c_export.py` (trace + scoped `disable_jit`), `transcription.dynamics_function`
+(NumPy + reconstruct path), stale notebook `get_f_jit` reference.
+
+**Not on JAX trajopt hot path:** direct collocation / shooting / multiple shooting JAX
+transcriptions call `problem.sys.f` in the NLP — unchanged. `dynamics_function` trace
+tier affects NumPy transcribe and post-solve `reconstruct_result` only.
+
+**Gaps (intentional):** `f_ivp_trace`; `integrate_zoh*` JAX/trace; `rollout_trace`;
+`compute_internal_signals_trace`. See tier tables below.
+
+Diagnostic: `benchmarks/run_trajopt_timing_breakdown.py` (end-to-end phase timing).
 
 ---
 
@@ -21,9 +46,8 @@ in outer `jit` / `grad` / `vmap` / C export). Contracts in code today:
 5. **Backward compatible** — existing `f`, `f_p`, `rk4_integrate_forced`, …
    behavior unchanged; add siblings and aliases only.
 
-Non-goals for v1: changing trajopt/MPC transcription (they already use raw
-`sys.f` in the NLP hot path); removing compile-time warm-start; renaming
-`compile(backend="jax")`.
+Non-goals for v1: JAX trajopt NLP hot path (already uses raw `sys.f`); removing
+compile-time warm-start; renaming `compile(backend="jax")`.
 
 ---
 
@@ -100,10 +124,8 @@ NumPy: first row, first two columns only.
 
 **Special (keep names, reimplement internals):**
 
-- `jacobian_f_params` — implement via `f_trace_p` + `jacfwd` (already AD on
-  trace core today; align implementation explicitly).
-- `f_ivp` / `f_ivp_scipy` — fast tier only; add `f_ivp_trace` as thin wrapper
-  over `f_trace` with nominal `u` (phase 2).
+- `jacobian_f_params` — JIT `jacfwd` on `_f_trace_p_fn` (trace core).
+- `f_ivp` / `f_ivp_scipy` — fast tier only; **`f_ivp_trace` not landed** (optional).
 
 ### Tier 2 — single-step integration (phase 2)
 
@@ -121,19 +143,18 @@ JAX fast tier: keep current behavior (may call JIT `f` inside JIT scan wrappers)
 JAX trace tier: RK4/Euler formulas call `f_trace` / `f_trace_p`; rollout-level
 trace helpers JIT **once** over the scan (single fused graph for AD).
 
-### Tier 3 — trajectory / rollout (phase 2–3)
+### Tier 3 — trajectory / rollout (phase 2 partial, phase 3 deferred)
 
 | Bound fast | Param fast | Bound trace | Param trace |
 | --- | --- | --- | --- |
-| `rk4_integrate_forced` | `rk4_integrate_forced_p` * | `rk4_integrate_forced_trace` | `rk4_integrate_forced_trace_p` * |
+| `rk4_integrate_forced` | `rk4_integrate_forced_p` | `rk4_integrate_forced_trace` | `rk4_integrate_forced_trace_p` |
 | `rk4_integrate_ivp` | — | `rk4_integrate_ivp_trace` | — |
 | `integrate` | `integrate_p` | `integrate_trace` | `integrate_trace_p` |
-| `integrate_zoh` | `integrate_zoh_p` * | `integrate_zoh_trace` | … |
-| `integrate_zoh_rollout` | … | … | … |
-| `rollout` | `rollout_p` | `rollout_trace` | `rollout_trace_p` |
+| `integrate_zoh` | `integrate_zoh_p` * | `integrate_zoh_trace` * | … |
+| `integrate_zoh_rollout` | … * | … * | … |
+| `rollout` | `rollout_p` | `rollout_trace` * | `rollout_trace_p` * |
 
-\* **Gap today:** forced RK4 / ZOH rollouts lack parametric fast-tier siblings;
-add when implementing trace rollouts for API symmetry.
+\* **Phase 3 / gaps:** ZOH and step `rollout_trace` not landed; `integrate_zoh_p` NumPy-only today.
 
 ### Tier 4 — diagram / bridges (phase 3, as needed)
 
@@ -153,14 +174,16 @@ Introduce a small shared module for the naming contract and helpers:
 
 ```
 minilink/core/compile/evaluators/
-  tiers.py              # TraceTierMixin, alias helpers, AttributeError messages
-  jax_utils.py          # build_jit_*, build_trace_*, build_jit_rk4_*, build_trace_rk4_*
+  tiers.py              # TraceTierMixin, NoTraceTierMixin, register_jit_aliases
+  jax_utils.py          # tier builders + JaxIntegrationMixin (trace + JIT integration)
   jax_evaluator.py      # JaxDynamicEvaluator, JaxDiagramEvaluator
   step_evaluator.py
   step_diagram_evaluator.py
-  integration.py        # NumPy IntegrationMixin (unchanged public surface)
-  jax_integration.py    # JAX-only integration overrides (optional split from jax_utils)
+  static_evaluator.py
+  integration.py        # NumPy IntegrationMixin
 ```
+
+(`jax_integration.py` split deferred — integration overrides live in `jax_utils.py`.)
 
 ### Internal private names (rename for clarity)
 
@@ -177,8 +200,8 @@ Responsibilities:
 
 1. Expose `_f_trace_fn` / `_f_trace_p_fn` callables built at compile time.
 2. Register `_jit` aliases pointing at existing fast methods.
-3. Provide `_require_jax_trace(name)` for uniform errors on NumPy backends.
-4. Optional: `has_trace_tier: bool` property (`True` on JAX, absent on NumPy).
+3. `NoTraceTierMixin.__getattr__` rejects `*_trace` / `*_jit` suffixes on NumPy backends.
+4. `has_trace_tier: bool` property (`True` on JAX, absent on NumPy).
 
 Pattern for each quantity `q` (e.g. dynamics `f`):
 
@@ -238,19 +261,10 @@ This section catalogs exactly where the evaluator API is currently consumed acro
 
 Because this refactor **preserves existing method signatures** (like `.f`, `.f_p`, `.rk4_step`), most consuming scripts will continue to work exactly as they do today. However, scripts that hacked into internal structures or rely on stale API methods must be updated.
 
-**Requires Update (Breaking / Stale API usages):**
-1. **`minilink/interfaces/c_export.py`**:
-   - *Current*: Wraps `evaluator.f` and `evaluator.step` in `jax.disable_jit()` to bypass the opaque primitive block.
-   - *Action*: Update to use `evaluator.f_trace` and `evaluator.step_trace` natively.
-     Keep `jax.disable_jit()` around `make_jaxpr` only when subsystem `f()` embeds
-     its own `jax.jit` (e.g. `FilteredController`); evaluator-level JIT is avoided
-     via the trace tier.
-2. **`examples/notebooks/demo_stateless_functional_jax.ipynb`**:
-   - *Current*: Calls `f_jit = evaluator.get_f_jit()` and `f_p = evaluator.get_f_p_jit()`. (These methods were previously removed from the codebase but stale references remain).
-   - *Action*: Update to use the standard fast-tier aliases `evaluator.f_jit` or `evaluator.f` and `evaluator.f_jit_p` or `evaluator.f_p`.
-3. **`minilink/planning/trajectory_optimization/transcription.py`**:
-   - *Current*: In `dynamics_function`, it calls `evaluator.f` inside the transcription constraints. When `compile_backend="jax"`, this results in embedding the JIT-compiled fast-tier function directly inside the MathematicalProgram's constraint graph, causing a nested JIT.
-   - *Action*: Update to conditionally check for `getattr(evaluator, "has_trace_tier", False)`. If True (JAX), use `f_trace` / `f_trace_p` so the NLP graph compiles globally without nested JITs. If False (NumPy), fall back to the fast tier `f` / `f_p`.
+**Requires Update (done in PR #65):**
+1. **`minilink/interfaces/c_export.py`** — uses `f_trace` / `step_trace`; `disable_jit` only around `make_jaxpr` when subsystem `f()` embeds `jax.jit`.
+2. **`examples/notebooks/demo_stateless_functional_jax.ipynb`** — `evaluator.f_jit` instead of removed `get_f_jit()`.
+3. **`minilink/planning/trajectory_optimization/transcription.py`** — `dynamics_function` uses `f_trace` / `f_trace_p` when `has_trace_tier` (NumPy transcribe + reconstruct; not JAX NLP hot path).
 
 **No Update Required (Standard API consumers):**
 The following examples heavily utilize the `evaluator`, but rely strictly on the standard public fast-tier methods (`f`, `f_p`, `rk4_step`, `rk4_step_p`, `jacobian_f_params`, `objective`, `constraint_violations`), which remain **fully supported**:
@@ -261,25 +275,14 @@ The following examples heavily utilize the `evaluator`, but rely strictly on the
 - All MPC demos in `examples/scripts/mpc/` (use `rk4_step`, `objective`, `constraint_violations` natively)
 - All benchmarks in `benchmarks/` (use `f`, `step`, `euler_step`)
 
-### Phase 1 — Core trace callables (MVP)
+### Phase 1 — Core trace callables
 
-**Files:** `tiers.py`, `jax_utils.py`, `jax_evaluator.py`, `static_evaluator.py`,
-`step_evaluator.py`, `step_diagram_evaluator.py`.
-
-**Deliver:**
-
-- `f_trace`, `f_trace_p`, `outputs_trace`, `outputs_trace_p`
-- `step_trace`, `step_trace_p`, `outputs_trace` on step evaluators
-- `f_jit` / `f_jit_p` aliases (properties or class aliases)
-- Rename internal `_f_eager` → `_trace_f`
-- Tests: `test_evaluator_tiers.py` — parity, NumPy rejection, alias identity
-- Update `test_evaluator_api.py` if needed
-
-**Consumers (optional in same PR or immediate follow-up):**
-
-- `interfaces/c_export.py` → use `f_trace` instead of `evaluator.f` + `disable_jit`. This resolves the opaque primitive block issue fundamentally.
-- *Future feature*: `interfaces/c_export.py` can use `f_trace_p` to generate parameterized C code (where gains/params become C function arguments instead of baked-in `const` arrays).
-- Stale notebook reference to removed `get_f_jit()`
+- [x] `f_trace`, `f_trace_p`, `outputs_trace`, `outputs_trace_p`
+- [x] `step_trace`, `step_trace_p` on step evaluators
+- [x] `f_jit` / `f_jit_p` aliases (`register_jit_aliases`)
+- [x] Internal rename `_f_eager` → `_f_trace_fn` (diagram); tier builders for leaves
+- [x] Tests: `test_evaluator_tiers.py`
+- [x] Consumers: `c_export.py`, notebook, `dynamics_function`
 
 ### Phase 2 — Integration trace tier
 
@@ -324,14 +327,15 @@ when a test or demo requires AD through that path.
 
 ## Testing policy
 
-| Test | Purpose |
+| Test | Status |
 | --- | --- |
-| `f` vs `f_trace` numeric parity | Same math, different dispatch |
-| `f_jit is f` | Alias contract |
-| NumPy `f_trace` raises | Backend guard |
-| `jax.jit(jax.grad(loss))` with `f_trace_p` | Smoke AD (optional marker `@pytest.mark.jax`) |
-| `make_jaxpr(f_trace)(...)` | C-export path |
-| Grid coverage parametrized | `@pytest.mark.parametrize("method", TIER_MATRIX)` |
+| `f` vs `f_trace` numeric parity | [x] |
+| `f_jit` class alias ≡ `f` | [x] |
+| NumPy `f_trace` / `rk4_step_trace` raises | [x] |
+| `jax.jit(jax.grad(loss))` with `f_trace_p` | [x] |
+| Integration trace parity (`rk4_step_trace`, `integrate_trace`) | [x] |
+| `make_jaxpr(f_trace)` (C-export) | manual / `demo_c_export` |
+| Grid coverage parametrized | [ ] future |
 
 Follow [tests/README.md](../../tests/README.md): stable public API → tests justified.
 
@@ -339,11 +343,12 @@ Follow [tests/README.md](../../tests/README.md): stable public API → tests jus
 
 ## Documentation updates (when landing code)
 
-| Doc | Update |
+| Doc | Status |
 | --- | --- |
-| [DESIGN.md](../../DESIGN.md) §5 | 2×2 tier table, JAX-only trace note |
-| [README.md](../../README.md) §Compiled execution | Replace “traceable for autodiff” wording; show `f_trace` example |
-| [AGENTS.md](../../AGENTS.md) | Only if compile API changes (`warm_start` flag) |
+| [DESIGN.md](../../DESIGN.md) §5 | [x] tier table + integration note |
+| [README.md](../../README.md) §Compiled execution | [x] `f_trace` example |
+| [AGENTS.md](../../AGENTS.md) | unchanged (`warm_start` not landed) |
+| [docs/plans/README.md](README.md) | [x] |
 
 Example README snippet (after phase 1):
 
@@ -362,8 +367,9 @@ loss_and_grad = jax.jit(jax.value_and_grad(
 
 - **No breaking changes** to existing method signatures.
 - **`get_f_jit`**: remains removed; use `f` or `f_jit`.
-- **Trajopt/MPC**: JAX transcriptions use `f_trace` / `f_trace_p` via
-  `dynamics_function` when `has_trace_tier` (avoids nested JIT).
+- **Trajopt/MPC:** JAX NLP transcriptions still use `problem.sys.f` directly.
+  `dynamics_function` uses trace tier when `has_trace_tier` (NumPy transcribe,
+  `reconstruct_result`).
 - **Deprecations**: none planned for v1.
 
 ---
@@ -383,6 +389,6 @@ loss_and_grad = jax.jit(jax.value_and_grad(
 
 ## Tracking
 
-Implementation PRs should reference phase numbers above and tick checkboxes in
-follow-up edits to this file. When phase 1 lands, add a ROADMAP checkbox under
-compile/JAX maturity if appropriate.
+Phases 1–2 landed in PR #65. Phase 3+ deferred until a consumer needs AD through
+rollout / ZOH / diagram internals. Optional follow-up: `benchmarks/jax_evaluator_tiers.py`,
+`compile(..., warm_start=True)`.
