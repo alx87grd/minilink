@@ -77,7 +77,7 @@ release process by themselves.
 
 **P0** — Docs/contracts aligned with code; compiled vs reference path parity.
 
-**P1** — Dynamic evaluator API review; ~~diagram parametric evaluators (`f_p`,
+**P1** — **Parametric primitives** (`Shape`, `Set`, `CostFunction` reading `params` at call time); Dynamic evaluator API review; ~~diagram parametric evaluators (`f_p`,
 `h_p`)~~ done; diagram validation; top-level `minilink` exports; NLP hardening.
 
 **P2** — ~~Analysis seed~~ done (remaining frequency tools). ~~Blocks round-out~~
@@ -126,7 +126,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 - [x] `lqr.py`, `linear.py`, `pid.py` (`FilteredController`)
 - [x] `modelbased.py` — computed torque, sliding mode (Pyro parity)
-- [x] **Continuous SMC closed loop** — [discontinuous-solver-selection.md](docs/plans/discontinuous-solver-selection.md): SMC `solver_info` flag, diagram aggregation, auto **Euler** + finer `dt`, forced-solver warnings (see also [DESIGN.md §5 — Discontinuous closed loops](DESIGN.md#discontinuous-closed-loops--known-issues))
+- [x] **Continuous SMC closed loop** — SMC `solver_info` flag, diagram aggregation, auto **Euler** + finer `dt`, forced-solver warnings (see also [DESIGN.md §5 — Discontinuous closed loops](DESIGN.md#discontinuous-closed-loops--known-issues))
 - [ ] `robotic.py` — joint/effector PD/PID wrappers (kinematic + nullspace landed)
 - [ ] `trajectory_lqr.py` — time-varying LQR along a reference
 - [ ] `mpc.py` (uses `optimization/`) — minilink extra, no pyro equivalent
@@ -156,7 +156,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [ ] **Scene params** — `ProblemParameters.scene`, transcription merge helpers,
   indexed overrides in `Scene` / `StateField` (moving obstacles, scenario sweeps,
   MPC without scene rebuild).
-- [ ] **Parametric `core/` primitives** (deferred follow-up) — call-time `params`
+- [ ] **Parametric `core/` primitives** (promoted to P1) — call-time `params`
   overrides on `Shape.sdf`, `Set.margin`, and `CostFunction.g`/`h` (e.g. `BallSet`
   center/radius, `QuadraticCost` weights). Signatures exist; frozen attributes are the
   only source of truth today.
@@ -169,8 +169,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 ### 5.5a Step / hybrid simulation (subsidiary)
 
 Narrow add-on for discrete control in the loop (MPC, SMC, sampled regulators) on
-continuous plants — not full Simulink parity. Plan:
-[docs/plans/hybrid-discrete/00-master-plan.md](docs/plans/hybrid-discrete/00-master-plan.md).
+continuous plants — not full Simulink parity. Minilink remains focused on continuous-time as the primary framework. If the hybrid module matures significantly, it may become the default for discontinuous dynamics.
 
 - [x] **Phase 0** — `WiredDiagramMixin` in `core/wiring.py`; `DiagramSystem` delegates;
   continuous diagram API unchanged
@@ -193,6 +192,7 @@ continuous plants — not full Simulink parity. Plan:
 
 - [ ] `gymnasium.py` — diagram as RL env (train outside)
 - [ ] `flax.py`, `torch.py` — external model → static `System`
+- [ ] `ros2.py` — ROS 2 node exporter (wraps a minilink block as a ROS 2 node)
 - [ ] Cosimulation / FMI, multibody import
 
 ### 5.8 Catalog capability gaps (not EoM)

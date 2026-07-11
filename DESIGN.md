@@ -120,14 +120,16 @@ Minilink's **primary framework** is continuous-time: `DynamicSystem`, flow
 **Step and hybrid** are a **narrow parallel add-on** — not a second framework of
 equal weight. They exist so discrete control laws (MPC, SMC, sampled regulators)
 can close the loop on a continuous plant without hand-rolled outer `while` loops.
-Scope and contracts: [hybrid-discrete master plan](docs/plans/hybrid-discrete/00-master-plan.md)
+can close the loop on a continuous plant without hand-rolled outer `while` loops.
 (subset only — not full Simulink / discrete-dynamics parity).
 
 **Design trade-off rule:** when step or hybrid work conflicts with continuous-time
 clarity, **prefer the continuous core**. Add-ons must stay on **sibling types and
 separate compile/sim paths** (`StepSystem` beside `DynamicSystem`, not a flag on
 `f`; `HybridDiagram` as two-side glue, not a merged heterogeneous diagram) so
-flow APIs, evaluators, and `DiagramSystem` behavior remain unchanged. Do not fold
+flow APIs, evaluators, and `DiagramSystem` behavior remain unchanged. 
+
+*Rationale:* We rejected adding a `time_domain` flag to `DynamicSystem` or inheriting from it because it reverses the mathematical meaning of `f` (from $dx$ to $x_{new}$), breaks textbook ODE clarity, and confuses analysis tools. Evolution kind must always be determined by type (`isinstance(sys, StepSystem)`), not a solver flag. Do not fold
 discrete scheduling, sample-time metadata, or mixed `f`/`step` semantics into
 `DynamicSystem`, flow `compile()`, or `Simulator` unless there is a clear
 flow-side benefit.
@@ -164,7 +166,7 @@ serial arms. Joint impedance / task impedance / computed torque use
   `y_dependencies` create standard `u`/`y`/`x`.
 - **StepSystem (discrete leaf):** same port shortcut as `DynamicSystem`; evolution is
   `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`;
-  cache `self.rollout`. See [01-step-core.md](docs/plans/hybrid-discrete/01-step-core.md).
+  cache `self.rollout`.
 - **Hybrid (computer + plant):** :class:`~minilink.core.hybrid_diagram.HybridDiagram`
   bundles :class:`~minilink.simulation.computer.Computer` (step side + schedule) and a
   continuous :class:`DiagramSystem` plant. Boundary channels use ZOH (computer → plant)
@@ -199,7 +201,7 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
-  See [05-hybrid-simulation.md](docs/plans/hybrid-discrete/05-hybrid-simulation.md).
+  and anchors hybrid edges on wired subsystem ports.
 - **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCStatelessController`
   is a static ``System`` (``n=0``) leaf: one :meth:`~minilink.planning.mpc.planner.MPCPlanner.step`
   per Computer tick (memoized across output ports ``u_ff``, ``x_ff``, ``z``).
@@ -210,7 +212,7 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
   default animation overlays:
   :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
-  See [06-mpc-step-block.md](docs/plans/hybrid-discrete/06-mpc-step-block.md).
+  :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
@@ -431,7 +433,7 @@ at tick boundaries — the intended semantics for digital SMC. See
 **Diagnostics.** ``scratch/confirm_smc_solver_bug.py`` compares solvers, ``ddq_f`` vs
 numerical ``Δdq/Δt``, and RK4 k1–k4 cancellation on the pendulum SMC demo.
 
-**Mitigation (landed):** [docs/plans/discontinuous-solver-selection.md](docs/plans/discontinuous-solver-selection.md)
+**Mitigation (landed):**
 — ``SlidingModeController`` sets ``discontinuous_behavior``; diagrams aggregate the flag;
 auto ``select_solver`` picks **Euler** with finer default ``dt``; ``UserWarning`` on every
 discontinuous solve (stronger when forcing ``rk4_fixedsteps`` / ``scipy_*``). Evolution

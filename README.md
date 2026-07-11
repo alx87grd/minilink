@@ -133,6 +133,22 @@ import jax
 A = jax.jacfwd(lambda x: evaluator.f(x, u, 0.0))(x)   # exact linearization
 ```
 
+### Hybrid and discrete control
+
+Discrete control laws (like digital MPC or sampled Sliding Mode Control) can close the loop on continuous plants without breaking the continuous-time core or solver guarantees. `StepSystem` defines discrete logic, and `Computer` schedules it. The `%` and `@` operators build a `HybridDiagram` with Zero-Order Hold (ZOH) and sampling:
+
+```python
+from minilink.planning.mpc.controller import MPCStatelessController
+
+# controller is a discrete leaf; plant is a continuous DynamicSystem
+controller = MPCStatelessController(planner, ...)
+computer = controller % 0.1  # schedule to tick every 0.1s
+diagram = computer @ plant   # wire via hybrid ZOH/sample boundaries
+
+diagram.compute_trajectory(tf=10.0)  # solves the plant exactly between ticks
+diagram.animate()
+```
+
 ### Analyze and design
 
 Characterize a plant and design a controller from the same `System`. `analysis`
@@ -178,12 +194,13 @@ diagram.compute_trajectory(tf=8.0)
 diagram.plot_trajectory()
 ```
 
-### Trajectory optimization
+### Planning, search, and optimization
 
-Planning problems combine a system, boundary conditions, and a cost; pluggable
-transcriptions (direct collocation, single/multiple shooting) turn them into
-nonlinear programs solved by SciPy or Ipopt, optionally with JAX-exact
-gradients:
+`PlanningProblem` combines a continuous system, start/goal boundaries, cost functions, and spatial geometry (`Scene`, `Shape`, `Set`). The same problem definition powers multiple planners:
+
+- **Trajectory Optimization**: Pluggable transcriptions (direct collocation, shooting) turn problems into nonlinear programs solved by SciPy or Ipopt (with exact JAX gradients).
+- **Search (RRT / RRT*)**: Kinodynamic and steering extenders grow trees through collision-free state space.
+- **Policy Synthesis**: Value iteration / dynamic programming over a `StateSpaceGrid` computes global cost-to-go and discrete optimal policies.
 
 ```python
 import numpy as np
@@ -356,6 +373,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 Model:     subclass System → f/h (+ ports or DynamicSystem options)
 
 Compose:   + / >> / @ / autowire  →  DiagramSystem
+           hybrid: block % dt  →  Computer; Computer @ plant  →  HybridDiagram
            or add_subsystem + connect (+ connect_new_output_port)
 
 Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
