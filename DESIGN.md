@@ -368,7 +368,8 @@ do not expose trace-tier methods. `has_trace_tier` is `True` on JAX evaluators.
 | Fast (default) | `f` ≡ `f_jit` | `f_p` ≡ `f_jit_p` |
 | Trace (JAX only) | `f_trace` | `f_trace_p` |
 
-Same 2×2 for `outputs`, `step`, and integration helpers as they land.
+Same 2×2 for `outputs`, `step`, and integration helpers (`rk4_step`, `integrate`,
+`rk4_integrate_forced`, …) on JAX dynamics evaluators.
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
 reintroduce `compute_outputs(..., ports=...)`.

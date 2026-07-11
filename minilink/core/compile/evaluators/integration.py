@@ -4,7 +4,11 @@ import numpy as np
 
 
 class IntegrationMixin:
-    """RK4 / Euler integration on :meth:`f` and :meth:`f_p`."""
+    """RK4 / Euler integration on :meth:`f` and :meth:`f_p`.
+
+    JAX evaluators override these helpers via :class:`JaxIntegrationMixin` and
+    expose trace-tier siblings (``rk4_step_trace``, ``integrate_trace``, …).
+    """
 
     def rk4_step(self, x, u, t, dt):
         k1 = self.f(x, u, t)

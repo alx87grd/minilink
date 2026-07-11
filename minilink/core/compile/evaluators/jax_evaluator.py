@@ -16,8 +16,6 @@ from minilink.core.compile.evaluators.dynamics_evaluator import DynamicsEvaluato
 from minilink.core.compile.evaluators.jax_utils import (
     JaxIntegrationMixin,
     build_dynamic_leaf_tiers,
-    build_jit_rk4_integrate_forced,
-    build_jit_rk4_integrate_ivp,
     check_jax_compatible,
     gather_u_jax,
 )
@@ -99,12 +97,7 @@ class JaxDynamicEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
         self._outputs_jit_fn = tiers["_outputs_jit_fn"]
         self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
 
-        self._jit_rk4_integrate_ivp = build_jit_rk4_integrate_ivp(
-            jax, jnp, self._f_ivp_jit_fn
-        )
-        self._jit_rk4_integrate_forced = build_jit_rk4_integrate_forced(
-            jax, jnp, self._f_jit_fn
-        )
+        self._setup_integration_tiers(jax, jnp)
 
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
@@ -231,12 +224,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
         self._f_ivp_jit_fn = jax.jit(self._f_ivp_trace_fn)
         self._jac_ivp_jit_fn = jax.jit(jax.jacfwd(self._f_ivp_jit_fn, argnums=0))
 
-        self._jit_rk4_integrate_ivp = build_jit_rk4_integrate_ivp(
-            jax, jnp, self._f_ivp_jit_fn
-        )
-        self._jit_rk4_integrate_forced = build_jit_rk4_integrate_forced(
-            jax, jnp, self._f_jit_fn
-        )
+        self._setup_integration_tiers(jax, jnp)
 
         self._outputs_jit_fn = jax.jit(self._outputs_trace_fn)
         self._jit_internal_signals = jax.jit(

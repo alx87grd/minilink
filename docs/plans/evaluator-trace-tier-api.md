@@ -1,6 +1,6 @@
 # Evaluator trace tier — naming scheme and implementation plan
 
-Status: **phase 1 landed** (July 2026).
+Status: **phase 2 landed** (integration trace tier, July 2026).
 
 Follow-up to JAX evaluator export review: separate the **fast default tier**
 (JIT on JAX, eager NumPy) from an optional **trace tier** (pre-JIT, composable
@@ -283,19 +283,10 @@ The following examples heavily utilize the `evaluator`, but rely strictly on the
 
 ### Phase 2 — Integration trace tier
 
-**Files:** `jax_utils.py`, `JaxIntegrationMixin`, `integration.py` (docstrings only).
-
-**Deliver:**
-
-- `rk4_step_trace`, `rk4_step_trace_p`
-- `rk4_integrate_forced_trace`, `rk4_integrate_ivp_trace`
-- `integrate_trace`, `integrate_trace_p`
-- Fill fast-tier gaps: `rk4_integrate_forced_p` (if low cost)
-
-**Consumers:**
-
-- `examples/scripts/identification/demo_params_gradient.py` → `f_trace_p` in loss
-- `examples/scripts/control/demo_pid_autotuning_jax.py` → `rk4_step_trace_p`
+- [x] `rk4_step_trace`, `rk4_step_trace_p`, `rk4_step_ivp_trace`, `euler_step_trace`, `euler_step_ivp_trace`
+- [x] `rk4_integrate_forced_trace`, `rk4_integrate_ivp_trace`, `integrate_trace`, `integrate_trace_p`
+- [x] Fast-tier gap: `rk4_integrate_forced_p`
+- [x] Tests in `test_evaluator_tiers.py`
 
 ### Phase 3 — Step rollouts and diagram internals
 

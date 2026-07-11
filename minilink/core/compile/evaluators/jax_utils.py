@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from minilink.core.compile.evaluators.tiers import register_jit_aliases
 from minilink.core.compile.execution_plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
@@ -29,7 +30,35 @@ def check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
         ) from e
 
 
-def build_jit_rk4_integrate_ivp(jax, jnp, f_ivp):
+def _rk4_step_from_f(f):
+    """One RK4 step ``(x, u, t, dt) -> x_next`` using dynamics callable ``f(x, u, t)``."""
+
+    def rk4_step(x, u, t, dt):
+        k1 = f(x, u, t)
+        k2 = f(x + 0.5 * dt * k1, u, t + 0.5 * dt)
+        k3 = f(x + 0.5 * dt * k2, u, t + 0.5 * dt)
+        k4 = f(x + dt * k3, u, t + dt)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+    return rk4_step
+
+
+def _rk4_step_ivp_from_f(f):
+    """One RK4 IVP step ``(x, t, dt) -> x_next`` using ``f(x, t)``."""
+
+    def rk4_step_ivp(x, t, dt):
+        k1 = f(x, t)
+        k2 = f(x + 0.5 * dt * k1, t + 0.5 * dt)
+        k3 = f(x + 0.5 * dt * k2, t + 0.5 * dt)
+        k4 = f(x + dt * k3, t + dt)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+    return rk4_step_ivp
+
+
+def build_trace_rk4_integrate_ivp(jax, jnp, f_ivp):
+    """Pre-JIT IVP rollout — single fused scan over ``f_ivp``."""
+
     def _rk4_integrate_ivp(x0_, t0_, dt_, n_steps_):
         def body(carry, _):
             x, t = carry
@@ -43,10 +72,16 @@ def build_jit_rk4_integrate_ivp(jax, jnp, f_ivp):
         (_, _), xs = jax.lax.scan(body, (x0_, t0_), jnp.arange(n_steps_))
         return jnp.concatenate((x0_[None, :], xs), axis=0)
 
-    return jax.jit(_rk4_integrate_ivp, static_argnums=3)
+    return _rk4_integrate_ivp
 
 
-def build_jit_rk4_integrate_forced(jax, jnp, f):
+def build_jit_rk4_integrate_ivp(jax, jnp, f_ivp):
+    return jax.jit(build_trace_rk4_integrate_ivp(jax, jnp, f_ivp), static_argnums=3)
+
+
+def build_trace_rk4_integrate_forced(jax, jnp, f):
+    """Pre-JIT forced rollout — single fused scan over ``f``."""
+
     def _rk4_integrate_forced(x0_, u_knots_, t0_, dt_):
         def body(carry, u_pair):
             x, t = carry
@@ -66,7 +101,86 @@ def build_jit_rk4_integrate_forced(jax, jnp, f):
         )
         return jnp.concatenate((x0_[None, :], xs), axis=0)
 
-    return jax.jit(_rk4_integrate_forced)
+    return _rk4_integrate_forced
+
+
+def build_jit_rk4_integrate_forced(jax, jnp, f):
+    return jax.jit(build_trace_rk4_integrate_forced(jax, jnp, f))
+
+
+def build_trace_rk4_integrate_forced_p(jax, jnp, f_p):
+    """Pre-JIT parametric forced rollout."""
+
+    def _rk4_integrate_forced_p(x0_, u_knots_, t0_, dt_, params_):
+        def body(carry, u_pair):
+            x, t = carry
+            u0, u1 = u_pair
+            umid = 0.5 * (u0 + u1)
+            k1 = f_p(x, u0, t, params_)
+            k2 = f_p(x + 0.5 * dt_ * k1, umid, t + 0.5 * dt_, params_)
+            k3 = f_p(x + 0.5 * dt_ * k2, umid, t + 0.5 * dt_, params_)
+            k4 = f_p(x + dt_ * k3, u1, t + dt_, params_)
+            x_next = x + (dt_ / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+            return (x_next, t + dt_), x_next
+
+        (_, _), xs = jax.lax.scan(
+            body,
+            (x0_, t0_),
+            (u_knots_[:-1], u_knots_[1:]),
+        )
+        return jnp.concatenate((x0_[None, :], xs), axis=0)
+
+    return _rk4_integrate_forced_p
+
+
+def build_jit_rk4_integrate_forced_p(jax, jnp, f_p):
+    return jax.jit(build_trace_rk4_integrate_forced_p(jax, jnp, f_p))
+
+
+def build_trace_integrate(jax, jnp, f):
+    """Pre-JIT ZOH input rollout over ``u_sequence`` with shape ``(N, m)``."""
+    rk4_step = _rk4_step_from_f(f)
+
+    def _integrate(x0_, u_sequence_, t0_, dt_):
+        def body(carry, u_k):
+            x, t = carry
+            x_next = rk4_step(x, u_k, t, dt_)
+            return (x_next, t + dt_), x_next
+
+        (_, _), xs = jax.lax.scan(body, (x0_, t0_), u_sequence_)
+        return jnp.concatenate((x0_[None, :], xs), axis=0)
+
+    return _integrate
+
+
+def build_jit_integrate(jax, jnp, f):
+    return jax.jit(build_trace_integrate(jax, jnp, f))
+
+
+def build_trace_integrate_p(jax, jnp, f_p):
+    """Pre-JIT parametric ZOH input rollout."""
+
+    def rk4_step_p(x, u, t, dt, params):
+        k1 = f_p(x, u, t, params)
+        k2 = f_p(x + 0.5 * dt * k1, u, t + 0.5 * dt, params)
+        k3 = f_p(x + 0.5 * dt * k2, u, t + 0.5 * dt, params)
+        k4 = f_p(x + dt * k3, u, t + dt, params)
+        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+    def _integrate_p(x0_, u_sequence_, t0_, dt_, params_):
+        def body(carry, u_k):
+            x, t = carry
+            x_next = rk4_step_p(x, u_k, t, dt_, params_)
+            return (x_next, t + dt_), x_next
+
+        (_, _), xs = jax.lax.scan(body, (x0_, t0_), u_sequence_)
+        return jnp.concatenate((x0_[None, :], xs), axis=0)
+
+    return _integrate_p
+
+
+def build_jit_integrate_p(jax, jnp, f_p):
+    return jax.jit(build_trace_integrate_p(jax, jnp, f_p))
 
 
 def gather_u_jax(gather_sources, u_dim, signals, u, jnp, dtype):
@@ -274,6 +388,33 @@ def build_jit_step_rollout(jax, jnp, jit_step):
 class JaxIntegrationMixin:
     """Shared IVP integration overrides for JAX dynamic evaluators."""
 
+    def _setup_integration_tiers(self, jax, jnp) -> None:
+        """Bind fast (JIT) and trace integration callables after ``f`` tiers exist."""
+        self._rk4_integrate_ivp_trace_fn = build_trace_rk4_integrate_ivp(
+            jax, jnp, self._f_ivp_trace_fn
+        )
+        self._rk4_integrate_forced_trace_fn = build_trace_rk4_integrate_forced(
+            jax, jnp, self._f_trace_fn
+        )
+        self._rk4_integrate_forced_trace_p_fn = build_trace_rk4_integrate_forced_p(
+            jax, jnp, self._f_trace_p_fn
+        )
+        self._integrate_trace_fn = build_trace_integrate(jax, jnp, self._f_trace_fn)
+        self._integrate_trace_p_fn = build_trace_integrate_p(
+            jax, jnp, self._f_trace_p_fn
+        )
+        self._jit_rk4_integrate_ivp = build_jit_rk4_integrate_ivp(
+            jax, jnp, self._f_ivp_jit_fn
+        )
+        self._jit_rk4_integrate_forced = build_jit_rk4_integrate_forced(
+            jax, jnp, self._f_jit_fn
+        )
+        self._jit_rk4_integrate_forced_p = build_jit_rk4_integrate_forced_p(
+            jax, jnp, self._f_jit_p_fn
+        )
+        self._integrate_jit_fn = build_jit_integrate(jax, jnp, self._f_jit_fn)
+        self._integrate_jit_p_fn = build_jit_integrate_p(jax, jnp, self._f_jit_p_fn)
+
     def f_ivp(self, x, t=0.0):
         return self._f_ivp_jit_fn(x, t)
 
@@ -284,17 +425,55 @@ class JaxIntegrationMixin:
     def as_scipy_jac(self):
         return lambda t, x: np.asarray(self._jac_ivp_jit_fn(self.jnp.asarray(x), t))
 
+    def rk4_step(self, x, u, t, dt):
+        return _rk4_step_from_f(self._f_jit_fn)(x, u, t, dt)
+
+    def rk4_step_trace(self, x, u, t, dt):
+        """Pre-JIT RK4 step for JAX composition."""
+        return _rk4_step_from_f(self._f_trace_fn)(x, u, t, dt)
+
+    def rk4_step_p(self, x, u, t, dt, params):
+        return _rk4_step_from_f(
+            lambda x_, u_, t_: self._f_jit_p_fn(x_, u_, t_, params)
+        )(x, u, t, dt)
+
+    def rk4_step_trace_p(self, x, u, t, dt, params):
+        """Pre-JIT parametric RK4 step for JAX composition."""
+        return _rk4_step_from_f(
+            lambda x_, u_, t_: self._f_trace_p_fn(x_, u_, t_, params)
+        )(x, u, t, dt)
+
+    def euler_step(self, x, u, t, dt):
+        return x + dt * self._f_jit_fn(x, u, t)
+
+    def euler_step_trace(self, x, u, t, dt):
+        """Pre-JIT Euler step for JAX composition."""
+        return x + dt * self._f_trace_fn(x, u, t)
+
     def rk4_step_ivp(self, x, t, dt):
-        f = self._f_ivp_jit_fn
-        k1 = f(x, t)
-        k2 = f(x + 0.5 * dt * k1, t + 0.5 * dt)
-        k3 = f(x + 0.5 * dt * k2, t + 0.5 * dt)
-        k4 = f(x + dt * k3, t + dt)
-        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        return _rk4_step_ivp_from_f(self._f_ivp_jit_fn)(x, t, dt)
+
+    def rk4_step_ivp_trace(self, x, t, dt):
+        """Pre-JIT IVP RK4 step for JAX composition."""
+        return _rk4_step_ivp_from_f(self._f_ivp_trace_fn)(x, t, dt)
+
+    def euler_step_ivp(self, x, t, dt):
+        return x + dt * self._f_ivp_jit_fn(x, t)
+
+    def euler_step_ivp_trace(self, x, t, dt):
+        """Pre-JIT IVP Euler step for JAX composition."""
+        return x + dt * self._f_ivp_trace_fn(x, t)
 
     def rk4_integrate_ivp(self, x0, t0, dt, n_steps):
         jnp = self.jnp
         return self._jit_rk4_integrate_ivp(
+            jnp.asarray(x0), jnp.asarray(t0), jnp.asarray(dt), n_steps
+        )
+
+    def rk4_integrate_ivp_trace(self, x0, t0, dt, n_steps):
+        """Pre-JIT IVP rollout for JAX composition."""
+        jnp = self.jnp
+        return self._rk4_integrate_ivp_trace_fn(
             jnp.asarray(x0), jnp.asarray(t0), jnp.asarray(dt), n_steps
         )
 
@@ -303,3 +482,71 @@ class JaxIntegrationMixin:
         return self._jit_rk4_integrate_forced(
             jnp.asarray(x0), jnp.asarray(u_knots), jnp.asarray(t0), jnp.asarray(dt)
         )
+
+    def rk4_integrate_forced_trace(self, x0, u_knots, t0, dt):
+        """Pre-JIT forced rollout for JAX composition."""
+        jnp = self.jnp
+        return self._rk4_integrate_forced_trace_fn(
+            jnp.asarray(x0), jnp.asarray(u_knots), jnp.asarray(t0), jnp.asarray(dt)
+        )
+
+    def rk4_integrate_forced_p(self, x0, u_knots, t0, dt, params):
+        jnp = self.jnp
+        return self._jit_rk4_integrate_forced_p(
+            jnp.asarray(x0),
+            jnp.asarray(u_knots),
+            jnp.asarray(t0),
+            jnp.asarray(dt),
+            params,
+        )
+
+    def rk4_integrate_forced_trace_p(self, x0, u_knots, t0, dt, params):
+        """Pre-JIT parametric forced rollout for JAX composition."""
+        jnp = self.jnp
+        return self._rk4_integrate_forced_trace_p_fn(
+            jnp.asarray(x0),
+            jnp.asarray(u_knots),
+            jnp.asarray(t0),
+            jnp.asarray(dt),
+            params,
+        )
+
+    def integrate(self, x0, u_sequence, t0, dt):
+        jnp = self.jnp
+        return self._integrate_jit_fn(
+            jnp.asarray(x0), jnp.asarray(u_sequence), jnp.asarray(t0), jnp.asarray(dt)
+        )
+
+    def integrate_trace(self, x0, u_sequence, t0, dt):
+        """Pre-JIT ZOH-input rollout for JAX composition."""
+        jnp = self.jnp
+        return self._integrate_trace_fn(
+            jnp.asarray(x0), jnp.asarray(u_sequence), jnp.asarray(t0), jnp.asarray(dt)
+        )
+
+    def integrate_p(self, x0, u_sequence, t0, dt, params):
+        jnp = self.jnp
+        return self._integrate_jit_p_fn(
+            jnp.asarray(x0),
+            jnp.asarray(u_sequence),
+            jnp.asarray(t0),
+            jnp.asarray(dt),
+            params,
+        )
+
+    def integrate_trace_p(self, x0, u_sequence, t0, dt, params):
+        """Pre-JIT parametric ZOH-input rollout for JAX composition."""
+        jnp = self.jnp
+        return self._integrate_trace_p_fn(
+            jnp.asarray(x0),
+            jnp.asarray(u_sequence),
+            jnp.asarray(t0),
+            jnp.asarray(dt),
+            params,
+        )
+
+
+register_jit_aliases(
+    JaxIntegrationMixin,
+    ("rk4_step", "integrate", "rk4_integrate_forced"),
+)

@@ -73,6 +73,47 @@ class TestEvaluatorTiersNumPy(unittest.TestCase):
             _ = ev.f_trace
         self.assertIn(TRACE_TIER_MSG, str(ctx.exception))
 
+    def test_numpy_rk4_step_trace_raises(self):
+        ev = compile(Integrator(), backend="numpy")
+        with self.assertRaises(AttributeError) as ctx:
+            _ = ev.rk4_step_trace
+        self.assertIn(TRACE_TIER_MSG, str(ctx.exception))
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+@unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
+class TestIntegrationTiersJax(unittest.TestCase):
+    def setUp(self):
+        self.ev = compile(Integrator(), backend="jax")
+        self.x = jnp.array([0.2])
+        self.u = jnp.array([1.0])
+        self.t = 0.0
+        self.dt = 0.01
+        self.params = {"k": 1.0}
+
+    def test_rk4_step_trace_parity(self):
+        np.testing.assert_allclose(
+            np.asarray(self.ev.rk4_step_trace(self.x, self.u, self.t, self.dt)),
+            np.asarray(self.ev.rk4_step(self.x, self.u, self.t, self.dt)),
+            atol=1e-6,
+        )
+
+    def test_integrate_trace_parity(self):
+        u_seq = jnp.array([[1.0], [0.5], [0.0]])
+        np.testing.assert_allclose(
+            np.asarray(self.ev.integrate_trace(self.x, u_seq, self.t, self.dt)),
+            np.asarray(self.ev.integrate(self.x, u_seq, self.t, self.dt)),
+            atol=1e-6,
+        )
+
+    def test_rk4_integrate_forced_p_fast_tier(self):
+        u_knots = jnp.array([[1.0], [0.5], [0.0]])
+        out = self.ev.rk4_integrate_forced_p(
+            self.x, u_knots, self.t, self.dt, self.params
+        )
+        self.assertEqual(out.shape, (3, 1))
+
 
 @pytest.mark.optional
 @pytest.mark.jax
