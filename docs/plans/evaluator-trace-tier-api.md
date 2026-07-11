@@ -166,16 +166,16 @@ minilink/core/compile/evaluators/
 
 | Old | New |
 | --- | --- |
-| `_f_eager` | `_trace_f` |
-| `_f_p_eager` | `_trace_f_p` |
-| `_jit_f` | `_jit_f` (keep) |
-| `f_raw` in builders | `f_bound` or `trace_f` local |
+| `_f_eager` | `_f_trace_fn` |
+| `_f_p_eager` | `_f_trace_p_fn` |
+| `_jit_f` | `_f_jit_fn` |
+| `f_raw` in builders | `f_bound_fn` or `trace_f_fn` local |
 
 ### `TraceTierMixin` (JAX evaluators only)
 
 Responsibilities:
 
-1. Expose `_trace_*` callables built at compile time.
+1. Expose `_f_trace_fn` / `_f_trace_p_fn` callables built at compile time.
 2. Register `_jit` aliases pointing at existing fast methods.
 3. Provide `_require_jax_trace(name)` for uniform errors on NumPy backends.
 4. Optional: `has_trace_tier: bool` property (`True` on JAX, absent on NumPy).
@@ -184,16 +184,20 @@ Pattern for each quantity `q` (e.g. dynamics `f`):
 
 ```python
 # compile time
-self._jit_f = jax.jit(...)
-self._trace_f = _f_eager   # or closure over system.f + frozen_p
+self._f_jit_fn = jax.jit(...)
+self._f_trace_fn = _f_eager   # or closure over system.f + frozen_p
 
 # public
 def f(self, x, u, t=0.0):
-    return self._jit_f(x, u, t)
+    """Evaluates the dynamics (fast tier / JIT)."""
+    return self._f_jit_fn(x, u, t)
 
-@property
-def f_trace(self):
-    return self._trace_f
+# We use a private backing callable (_f_trace_fn) and a method wrapper (f_trace) 
+# to maintain exact symmetry with _f_jit_fn and f, which guarantees perfect 
+# IDE auto-complete and docstring support without leaking dynamic callables.
+def f_trace(self, x, u, t=0.0):
+    """Pre-JIT flat callable for JAX composition."""
+    return self._f_trace_fn(x, u, t)
 
 f_jit = f  # alias at class level or property
 ```
@@ -228,6 +232,32 @@ This makes “missing cell” visible in code review.
 - [ ] Add row to [docs/plans/README.md](README.md).
 - [ ] Short pointer in [DESIGN.md](../../DESIGN.md) §5 (after phase 1 lands).
 
+### Phase 0.5 — Codebase Audit for API Consumers
+
+This section catalogs exactly where the evaluator API is currently consumed across tools, examples, and demos, and what updates will be required. 
+
+Because this refactor **preserves existing method signatures** (like `.f`, `.f_p`, `.rk4_step`), most consuming scripts will continue to work exactly as they do today. However, scripts that hacked into internal structures or rely on stale API methods must be updated.
+
+**Requires Update (Breaking / Stale API usages):**
+1. **`minilink/interfaces/c_export.py`**:
+   - *Current*: Wraps `evaluator.f` and `evaluator.step` in `jax.disable_jit()` to bypass the opaque primitive block.
+   - *Action*: Update to use `evaluator.f_trace` and `evaluator.step_trace` natively. Remove `jax.disable_jit()` from this specific call path entirely.
+2. **`examples/notebooks/demo_stateless_functional_jax.ipynb`**:
+   - *Current*: Calls `f_jit = evaluator.get_f_jit()` and `f_p = evaluator.get_f_p_jit()`. (These methods were previously removed from the codebase but stale references remain).
+   - *Action*: Update to use the standard fast-tier aliases `evaluator.f_jit` or `evaluator.f` and `evaluator.f_jit_p` or `evaluator.f_p`.
+3. **`minilink/planning/trajectory_optimization/transcription.py`**:
+   - *Current*: In `dynamics_function`, it calls `evaluator.f` inside the transcription constraints. When `compile_backend="jax"`, this results in embedding the JIT-compiled fast-tier function directly inside the MathematicalProgram's constraint graph, causing a nested JIT.
+   - *Action*: Update to conditionally check for `getattr(evaluator, "has_trace_tier", False)`. If True (JAX), use `f_trace` / `f_trace_p` so the NLP graph compiles globally without nested JITs. If False (NumPy), fall back to the fast tier `f` / `f_p`.
+
+**No Update Required (Standard API consumers):**
+The following examples heavily utilize the `evaluator`, but rely strictly on the standard public fast-tier methods (`f`, `f_p`, `rk4_step`, `rk4_step_p`, `jacobian_f_params`, `objective`, `constraint_violations`), which remain **fully supported**:
+- `examples/scripts/control/demo_neural_controller_jax.py` (uses `f_p`)
+- `examples/scripts/control/demo_pid_autotuning_jax.py` (uses `rk4_step_p`, `rk4_integrate_forced`)
+- `examples/scripts/identification/demo_params_gradient.py` (uses `jacobian_f_params`, `f_p`, `f`)
+- `examples/scripts/engine/demo_physics_many_spheres.py` (uses `f`)
+- All MPC demos in `examples/scripts/mpc/` (use `rk4_step`, `objective`, `constraint_violations` natively)
+- All benchmarks in `benchmarks/` (use `f`, `step`, `euler_step`)
+
 ### Phase 1 — Core trace callables (MVP)
 
 **Files:** `tiers.py`, `jax_utils.py`, `jax_evaluator.py`, `static_evaluator.py`,
@@ -244,7 +274,8 @@ This makes “missing cell” visible in code review.
 
 **Consumers (optional in same PR or immediate follow-up):**
 
-- `interfaces/c_export.py` → use `f_trace` instead of `evaluator.f` + `disable_jit`
+- `interfaces/c_export.py` → use `f_trace` instead of `evaluator.f` + `disable_jit`. This resolves the opaque primitive block issue fundamentally.
+- *Future feature*: `interfaces/c_export.py` can use `f_trace_p` to generate parameterized C code (where gains/params become C function arguments instead of baked-in `const` arrays).
 - Stale notebook reference to removed `get_f_jit()`
 
 ### Phase 2 — Integration trace tier
