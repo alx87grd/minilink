@@ -15,6 +15,10 @@ from minilink.core.compile.execution_plan import (
 )
 from minilink.core.step_rollout import StepRollout
 
+# =============================================================================
+# Public API — gather_u
+# =============================================================================
+
 
 def gather_u(
     gather_sources: tuple[tuple[int, object, int], ...],
@@ -67,6 +71,11 @@ def gather_u(
             raise RuntimeError(f"Unknown source_type={src_type}")
         idx += dim
     return local_u
+
+
+# =============================================================================
+# Public API — StepRolloutMixin
+# =============================================================================
 
 
 class StepRolloutMixin:

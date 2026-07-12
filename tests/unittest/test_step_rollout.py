@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin, gather_u
+from minilink.core.compile.evaluators.step_rollout import gather_u
 from minilink.core.compile.execution_plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
@@ -72,12 +72,6 @@ class TestGatherU(unittest.TestCase):
     def test_unknown_source_raises(self):
         with self.assertRaises(RuntimeError):
             gather_u(((99, 0, 1),), 1, np.zeros(1), np.zeros(1))
-
-
-class TestStepRolloutMixinPublic(unittest.TestCase):
-    def test_mixin_importable_from_step_rollout_module(self):
-        self.assertTrue(hasattr(StepRolloutMixin, "rollout"))
-        self.assertTrue(hasattr(StepRolloutMixin, "rollout_p"))
 
 
 class TestStepRollout(unittest.TestCase):
