@@ -724,12 +724,15 @@ class StepSystemFacades:
         *,
         x0=None,
         compile_backend="numpy",
-        record_boundary_outputs=True,
         show=False,
         verbose=False,
     ):
         """
         Convenience shortcut to roll out a discrete-time step system.
+
+        Returns a state-only :class:`~minilink.core.step_rollout.StepRollout`.
+        Boundary output logging belongs in :class:`~minilink.simulation.computer.Computer`
+        or :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` — not here.
 
         Parameters
         ----------
@@ -741,10 +744,6 @@ class StepSystemFacades:
             Initial state; defaults to :attr:`x0`.
         compile_backend : str
             Backend passed to :meth:`compile`.
-        record_boundary_outputs : bool
-            When ``True`` and the compiled evaluator exposes boundary outputs,
-            sample them into ``StepRollout.signals`` via
-            :func:`~minilink.simulation.step_recording.record_boundary_outputs`.
         show : bool
             If ``True``, plot the rollout via :meth:`plot_rollout`.
 
@@ -753,14 +752,8 @@ class StepSystemFacades:
         StepRollout
             The rollout, also stored in :attr:`rollout`.
         """
-        from minilink.simulation.step_recording import (
-            record_boundary_outputs as attach_boundary_outputs,
-        )
-
         ev = self.compile(backend=compile_backend, verbose=verbose)
         rollout = ev.rollout(x0 if x0 is not None else self.x0, n_steps=n_steps, u=u)
-        if record_boundary_outputs:
-            rollout = attach_boundary_outputs(rollout, ev)
         self.rollout = rollout
         if show:
             self.plot_rollout(rollout)

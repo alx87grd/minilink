@@ -13,10 +13,10 @@ def record_boundary_outputs(
     """
     Sample compiled boundary outputs at each step index in ``rollout``.
 
-    Evaluator rollouts return state and input samples only; call this helper
-    (or :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout` with
-    ``record_boundary_outputs=True``) when ``StepRollout.signals`` should
-    hold boundary port histories for plotting or logging.
+    Evaluator rollouts return state and input samples only. Call this helper from
+    simulation orchestrators when ``StepRollout.signals`` should hold boundary
+    port histories — for example after a synchronous reference rollout outside
+    :class:`~minilink.simulation.computer.Computer`.
 
     Parameters
     ----------

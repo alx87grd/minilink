@@ -404,9 +404,9 @@ reintroduce `compute_outputs(..., ports=...)`.
 - static :class:`System` leaf (`n=0`) →
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
-- :class:`StepSystem` → `compile().rollout(...)` (state-only) or `compute_rollout(n_steps=...)`
-  (clock-free :class:`~minilink.core.step_rollout.StepRollout`; boundary output logging via
-  :func:`~minilink.simulation.step_recording.record_boundary_outputs` or the façade; not `Simulator`)
+- :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
+  (state-only :class:`~minilink.core.step_rollout.StepRollout`; signal logging via
+  :class:`~minilink.simulation.computer.Computer` / :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`; not `Simulator`)
 - :class:`~minilink.core.hybrid_diagram.HybridDiagram` →
   :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` or façade
   `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`)
