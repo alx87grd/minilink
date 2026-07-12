@@ -6,6 +6,7 @@ visualizing dynamical systems.
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
 Start here: [showcase notebook](examples/notebooks/demo_showcase.ipynb) ·
+[compile → evaluator intro](examples/notebooks/demo_compile_evaluator.ipynb) ·
 [Colab demo](https://drive.google.com/file/d/1N2sxPMVqFs0HQeSpY9zdv7nvUFrfXoov/view?usp=sharing)
 
 ## Why minilink
@@ -421,6 +422,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Interest | Start here |
 | --- | --- |
 | Feature tour | [examples/notebooks/demo_showcase.ipynb](examples/notebooks/demo_showcase.ipynb) |
+| Compile → evaluator → fast dynamics primitives | [examples/notebooks/demo_compile_evaluator.ipynb](examples/notebooks/demo_compile_evaluator.ipynb) |
 | Extended tour | [examples/notebooks/demo_overview.ipynb](examples/notebooks/demo_overview.ipynb) |
 | Diagrams | `examples/scripts/diagrams/` |
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
