@@ -6,11 +6,16 @@ import numpy as np
 
 from minilink.core.compile.evaluators.numpy_evaluator import _gather_u
 from minilink.core.compile.evaluators.step_evaluator import StepEvaluator
+from minilink.core.compile.evaluators.tiers import (
+    NoTraceTierMixin,
+    TraceTierMixin,
+    register_jit_aliases,
+)
 from minilink.core.compile.step_execution_plan import StepExecutionPlan
 from minilink.core.diagram import validate_diagram_params
 
 
-class NumpyStepDiagramEvaluator(StepEvaluator):
+class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator):
     """Stateless NumPy evaluator for a compiled step diagram."""
 
     def __init__(self, plan: StepExecutionPlan, diagram):
@@ -103,7 +108,7 @@ class NumpyStepDiagramEvaluator(StepEvaluator):
         return signals
 
 
-class JaxStepDiagramEvaluator(StepEvaluator):
+class JaxStepDiagramEvaluator(StepEvaluator, TraceTierMixin):
     """JAX evaluator for a compiled step diagram."""
 
     def __init__(self, plan: StepExecutionPlan, diagram, verbose=False):
@@ -167,10 +172,14 @@ class JaxStepDiagramEvaluator(StepEvaluator):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        self._jit_step = jax.jit(self._make_step_fn())
-        self._jit_step_p = jax.jit(self._make_step_p_fn())
-        self._jit_outputs = jax.jit(self._make_outputs_fn())
-        self._jit_outputs_p = jax.jit(self._make_outputs_p_fn())
+        self._step_fn = self._make_step_fn()
+        self._step_p_fn = self._make_step_p_fn()
+        self._outputs_fn = self._make_outputs_fn()
+        self._outputs_p_fn = self._make_outputs_p_fn()
+        self._jit_step = jax.jit(self._step_fn)
+        self._jit_step_p = jax.jit(self._step_p_fn)
+        self._jit_outputs = jax.jit(self._outputs_fn)
+        self._jit_outputs_p = jax.jit(self._outputs_p_fn)
         self._jit_rollout = build_jit_step_rollout(jax, jnp, self._jit_step)
 
     def _make_step_fn(self):
@@ -290,6 +299,14 @@ class JaxStepDiagramEvaluator(StepEvaluator):
             dtype=float,
         )
 
+    def step_trace(self, x, u, k=0):
+        """Pre-JIT flat step for JAX composition."""
+        return self._step_fn(
+            self.jnp.asarray(x, dtype=self._dtype),
+            self.jnp.asarray(u, dtype=self._dtype),
+            k,
+        )
+
     def step_p(self, x, u, k, params):
         return np.asarray(
             self._jit_step_p(
@@ -301,6 +318,15 @@ class JaxStepDiagramEvaluator(StepEvaluator):
             dtype=float,
         )
 
+    def step_trace_p(self, x, u, k, params):
+        """Pre-JIT parametric step for JAX composition."""
+        return self._step_p_fn(
+            self.jnp.asarray(x, dtype=self._dtype),
+            self.jnp.asarray(u, dtype=self._dtype),
+            k,
+            params,
+        )
+
     def outputs(self, x, u, k=0):
         out = self._jit_outputs(
             self.jnp.asarray(x, dtype=self._dtype),
@@ -308,6 +334,14 @@ class JaxStepDiagramEvaluator(StepEvaluator):
             k,
         )
         return {pid: np.asarray(val, dtype=float) for pid, val in out.items()}
+
+    def outputs_trace(self, x, u, k=0):
+        """Pre-JIT boundary outputs for JAX composition."""
+        return self._outputs_fn(
+            self.jnp.asarray(x, dtype=self._dtype),
+            self.jnp.asarray(u, dtype=self._dtype),
+            k,
+        )
 
     def outputs_p(self, x, u, k, params):
         out = self._jit_outputs_p(
@@ -317,6 +351,15 @@ class JaxStepDiagramEvaluator(StepEvaluator):
             params,
         )
         return {pid: np.asarray(val, dtype=float) for pid, val in out.items()}
+
+    def outputs_trace_p(self, x, u, k, params):
+        """Pre-JIT parametric boundary outputs for JAX composition."""
+        return self._outputs_p_fn(
+            self.jnp.asarray(x, dtype=self._dtype),
+            self.jnp.asarray(u, dtype=self._dtype),
+            k,
+            params,
+        )
 
     def rollout(self, x0, *, n_steps, u=None, record_outputs=True):
         if record_outputs and self.p:
@@ -338,3 +381,6 @@ class JaxStepDiagramEvaluator(StepEvaluator):
         from minilink.core.step_rollout import StepRollout
 
         return StepRollout(k=k, x=x_samples, u=u_np, signals={})
+
+
+register_jit_aliases(JaxStepDiagramEvaluator, ("step", "outputs"))

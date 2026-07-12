@@ -53,6 +53,8 @@ release process by themselves.
 
 - Separated model / compile / simulate / optimize / plan / graphics.
 - `ExecutionPlan` + NumPy/JAX evaluators; shared `Trajectory`.
+- **JAX evaluator trace tier** — fast vs trace execution tiers on compiled
+  evaluators ([evaluator-trace-tier-api.md](docs/plans/evaluator-trace-tier-api.md)).
 - Composition shortcuts (`+`, `>>`, `@`, `autowire`) → ordinary `DiagramSystem`.
 - Explicit ports; `DynamicSystem` textbook ports via constructor options.
 - Pure `MathematicalProgram` + `Optimizer`; backend-native trajopt transcriptions.

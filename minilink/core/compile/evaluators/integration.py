@@ -4,7 +4,11 @@ import numpy as np
 
 
 class IntegrationMixin:
-    """RK4 / Euler integration on :meth:`f` and :meth:`f_p`."""
+    """RK4 / Euler integration on :meth:`f` and :meth:`f_p`.
+
+    JAX evaluators override these helpers via :class:`JaxIntegrationMixin` and
+    expose trace-tier siblings (``rk4_step_trace``, ``integrate_trace``, …).
+    """
 
     def rk4_step(self, x, u, t, dt):
         k1 = self.f(x, u, t)
@@ -55,6 +59,9 @@ class IntegrationMixin:
     def integrate_zoh_rollout(self, x0, u_hold, t0, dt_hold, *, dt_inner=None):
         """
         Piecewise-constant ``u_hold`` over ``[t0, t0 + dt_hold]``.
+
+        JAX dynamics evaluators use the inherited Python-loop path here (no fused
+        ZOH scan). ``integrate_zoh_trace`` is not exposed on JAX evaluators.
 
         Returns
         -------
