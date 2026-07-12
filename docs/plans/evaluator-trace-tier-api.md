@@ -65,23 +65,28 @@ Do not use `_jax` (clashes with `compile(backend="jax")`) or `_raw` on evaluator
 | `step` | `step_p` | `step_trace` | `step_trace_p` |
 
 Special: `jacobian_f_params` uses JIT `jacfwd` on the trace core.
-`f_ivp` / `f_ivp_scipy` are fast tier only (no public `f_ivp_trace`).
+`f_ivp` / `f_ivp_p` / `f_ivp_scipy` are fast tier (no public `f_ivp_trace`).
 
 ### Integration (JAX dynamics evaluators)
+
+See [evaluator-integration-api.md](evaluator-integration-api.md) for the full
+`rk4` / `euler` × `zoh` / `linear` / `ivp` × bound / `_p` / `_trace` grid.
 
 | Bound fast | Param fast | Bound trace | Param trace |
 | --- | --- | --- | --- |
 | `rk4_step` | `rk4_step_p` | `rk4_step_trace` | `rk4_step_trace_p` |
-| `rk4_step_ivp` | — | `rk4_step_ivp_trace` | — |
-| `euler_step` | — | `euler_step_trace` | — |
-| `euler_step_ivp` | — | `euler_step_ivp_trace` | — |
-| `rk4_integrate_forced` | `rk4_integrate_forced_p` | `rk4_integrate_forced_trace` | `rk4_integrate_forced_trace_p` |
-| `rk4_integrate_ivp` | — | `rk4_integrate_ivp_trace` | — |
-| `integrate` | `integrate_p` | `integrate_trace` | `integrate_trace_p` |
+| `euler_step` | `euler_step_p` | `euler_step_trace` | `euler_step_trace_p` |
+| `rk4_step_ivp` | `rk4_step_ivp_p` | `rk4_step_ivp_trace` | `rk4_step_ivp_trace_p` |
+| `euler_step_ivp` | `euler_step_ivp_p` | `euler_step_ivp_trace` | `euler_step_ivp_trace_p` |
+| `rk4_integrate_zoh` | `rk4_integrate_zoh_p` | `rk4_integrate_zoh_trace` | `rk4_integrate_zoh_trace_p` |
+| `rk4_integrate_linear` | `rk4_integrate_linear_p` | `rk4_integrate_linear_trace` | `rk4_integrate_linear_trace_p` |
+| `rk4_integrate_ivp` | `rk4_integrate_ivp_p` | `rk4_integrate_ivp_trace` | `rk4_integrate_ivp_trace_p` |
+| `euler_integrate_zoh` | `euler_integrate_zoh_p` | `euler_integrate_zoh_trace` | `euler_integrate_zoh_trace_p` |
+| `euler_integrate_ivp` | `euler_integrate_ivp_p` | `euler_integrate_ivp_trace` | `euler_integrate_ivp_trace_p` |
 
-NumPy: `IntegrationMixin` Python loops on `self.f` / `self.f_p` (unchanged).
+NumPy: `IntegrationMixin` Python loops on `self.f` / `self.f_p`.
 
-JAX fast tier: scanned rollouts where listed; single-step helpers may call JIT `f`.
+JAX fast tier: scanned rollouts (lazy JIT on first call); single-step helpers call JIT `f`.
 JAX trace tier: RK4/Euler call `f_trace` / `f_trace_p`; rollout trace helpers fuse
 one scan for AD.
 
@@ -89,8 +94,7 @@ one scan for AD.
 
 | Surface | Notes |
 | --- | --- |
-| `integrate_zoh`, `integrate_zoh_rollout` | Inherited Python-loop path; no `integrate_zoh_trace` |
-| `integrate_zoh_p` | NumPy only |
+| `integrate_zoh_trace` | Sugar over RK4 ZOH; deferred |
 | `rollout`, `rollout_p` (step) | Fast `_jit_rollout` only; no `rollout_trace` |
 | `compute_internal_signals` (diagram) | JIT fast tier; no `compute_internal_signals_trace` |
 | `f_scipy`, `as_scipy_*` | Fast tier bridges only |
@@ -101,18 +105,15 @@ one scan for AD.
 
 ```
 minilink/core/compile/evaluators/
+  evaluators.py         # ABCs: Output / Dynamics / Step / Static
+  numpy_evaluators.py   # all Numpy* + IntegrationMixin + StepRolloutMixin
+  jax_evaluators.py     # all Jax* + JaxIntegrationMixin + helpers
   tiers.py              # TraceTierMixin, NoTraceTierMixin, register_jit_aliases
-  jax_utils.py          # tier builders, JaxIntegrationMixin
-  jax_evaluator.py      # JaxDynamicEvaluator, JaxDiagramEvaluator
-  step_evaluator.py
-  step_diagram_evaluator.py
-  static_evaluator.py
-  integration.py        # NumPy IntegrationMixin
 ```
 
 ### Internal naming
 
-**Leaf evaluators** (built via `build_*_leaf_tiers` in `jax_utils`):
+**Leaf evaluators** (built via `build_dynamic_leaf_tiers` in `jax_evaluators`):
 
 - Fast: `_f_jit_fn`, `_step_jit_fn`, `_outputs_jit_fn`, …
 - Trace: `_f_trace_fn`, `_step_trace_fn`, …
@@ -136,8 +137,8 @@ def f_trace(self, x, u, t=0.0):
     return self._f_trace_fn(x, u, t)
 ```
 
-Integration builders: `build_trace_*` defines the scan; `build_jit_*` wraps with
-`jax.jit(build_trace_*(...))`.
+Integration: trace closures at setup; fast rollouts `jax.jit` lazily on first call.
+No compile-time dummy warm-start.
 
 ---
 
@@ -171,7 +172,9 @@ C-export path: manual / `demo_c_export`.
 
 ## Compatibility
 
-- No breaking changes to existing fast-tier signatures.
+- No breaking changes to existing fast-tier signatures for `f` / `outputs` / `step`.
+- Integration rollouts renamed: `integrate` → `rk4_integrate_zoh`,
+  `rk4_integrate_forced` → `rk4_integrate_linear` (clean rename).
 - `get_f_jit` removed; use `f` or `f_jit`.
 - Missing grid cells: no attribute or explicit `NotImplementedError` with reason.
 
@@ -181,10 +184,9 @@ C-export path: manual / `demo_c_export`.
 
 | Item | Notes |
 | --- | --- |
-| `rollout_trace`, `rollout_trace_p` | `build_trace_step_rollout` over `step_trace` |
+| `rollout_trace`, `rollout_trace_p` | Scan over `step_trace` |
 | `compute_internal_signals_trace` | Thin wiring to `_internal_signals_eager` |
-| `integrate_zoh_trace` | JAX ZOH scan |
-| `compile(..., warm_start=True)` | Centralized warm-start |
+| `integrate_zoh_trace` | JAX ZOH sugar scan |
 | `benchmarks/jax_evaluator_tiers.py` | Fast vs trace AD benchmarks |
 
 ---
@@ -199,3 +201,4 @@ C-export path: manual / `demo_c_export`.
 | No `_trace` on NumPy | Clear backend guard |
 | Param suffix always last | Matches `f_p`, `outputs_p` |
 | Diagram keeps `_jit_*` internals | Avoid rename churn on large compile paths |
+| No compile-time warm-start | First real call pays XLA; lazy rollout JIT |

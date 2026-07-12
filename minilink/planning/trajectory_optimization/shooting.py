@@ -231,7 +231,7 @@ class ShootingTranscription(Transcription):
             evaluator = problem.sys.compile(backend=key, verbose=False)
 
             def rollout(u):
-                x_samples = evaluator.rk4_integrate_forced(
+                x_samples = evaluator.rk4_integrate_linear(
                     x0,
                     u.T,
                     float(self.options.t[0]),

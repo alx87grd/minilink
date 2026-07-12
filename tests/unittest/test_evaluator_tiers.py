@@ -38,7 +38,7 @@ class TestEvaluatorTiersJax(unittest.TestCase):
         )
 
     def test_f_jit_alias_identity(self):
-        from minilink.core.compile.evaluators.jax_evaluator import JaxDynamicEvaluator
+        from minilink.core.compile.evaluators.jax_evaluators import JaxDynamicEvaluator
 
         self.assertIs(JaxDynamicEvaluator.f_jit, JaxDynamicEvaluator.f)
         self.assertIs(JaxDynamicEvaluator.f_jit_p, JaxDynamicEvaluator.f_p)
@@ -99,20 +99,41 @@ class TestIntegrationTiersJax(unittest.TestCase):
             atol=1e-6,
         )
 
-    def test_integrate_trace_parity(self):
+    def test_rk4_integrate_zoh_trace_parity(self):
         u_seq = jnp.array([[1.0], [0.5], [0.0]])
         np.testing.assert_allclose(
-            np.asarray(self.ev.integrate_trace(self.x, u_seq, self.t, self.dt)),
-            np.asarray(self.ev.integrate(self.x, u_seq, self.t, self.dt)),
+            np.asarray(self.ev.rk4_integrate_zoh_trace(self.x, u_seq, self.t, self.dt)),
+            np.asarray(self.ev.rk4_integrate_zoh(self.x, u_seq, self.t, self.dt)),
             atol=1e-6,
         )
 
-    def test_rk4_integrate_forced_p_fast_tier(self):
+    def test_rk4_integrate_linear_p_fast_tier(self):
         u_knots = jnp.array([[1.0], [0.5], [0.0]])
-        out = self.ev.rk4_integrate_forced_p(
+        out = self.ev.rk4_integrate_linear_p(
             self.x, u_knots, self.t, self.dt, self.params
         )
         self.assertEqual(out.shape, (3, 1))
+
+    def test_euler_integrate_zoh_trace_parity(self):
+        u_seq = jnp.array([[1.0], [0.5], [0.0]])
+        np.testing.assert_allclose(
+            np.asarray(
+                self.ev.euler_integrate_zoh_trace(self.x, u_seq, self.t, self.dt)
+            ),
+            np.asarray(self.ev.euler_integrate_zoh(self.x, u_seq, self.t, self.dt)),
+            atol=1e-6,
+        )
+
+    def test_f_ivp_p_matches_f_ivp_with_frozen(self):
+        np.testing.assert_allclose(
+            np.asarray(self.ev.f_ivp_p(self.x, self.t, self.params)),
+            np.asarray(self.ev.f_ivp(self.x, self.t)),
+            atol=1e-6,
+        )
+
+    def test_euler_step_p(self):
+        out = self.ev.euler_step_p(self.x, self.u, self.t, self.dt, self.params)
+        self.assertEqual(out.shape, (1,))
 
 
 @pytest.mark.optional
@@ -130,7 +151,7 @@ class TestStepEvaluatorTiersJax(unittest.TestCase):
         ev = compile(IdentityStep(), backend="jax")
         x = jnp.array([1.0])
         u = jnp.array([0.0])
-        from minilink.core.compile.evaluators.step_evaluator import JaxStepEvaluator
+        from minilink.core.compile.evaluators.jax_evaluators import JaxStepEvaluator
 
         np.testing.assert_allclose(
             np.asarray(ev.step_trace(x, u, 0)),

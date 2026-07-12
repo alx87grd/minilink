@@ -7,8 +7,8 @@ import pytest
 
 from minilink.blocks.basic import Integrator
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.dynamics_evaluator import DynamicsEvaluator
-from minilink.core.compile.evaluators.step_evaluator import NumpyStepEvaluator
+from minilink.core.compile.evaluators.evaluators import DynamicsEvaluator
+from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepEvaluator
 from minilink.core.system import StepSystem
 
 try:

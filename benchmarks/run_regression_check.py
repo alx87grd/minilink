@@ -103,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
 
     suites = _suite_specs(args.tiny)
     if args.suite == "all":
-        selected = suites
+        selected = tuple(suites.values())
     else:
         selected = (suites[args.suite],)
 

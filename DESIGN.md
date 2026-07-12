@@ -173,7 +173,7 @@ serial arms. Joint impedance / task impedance / computed torque use
   or sample (plant → computer). :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
   mirrors :class:`~minilink.simulation.simulator.Simulator` (`t0`/`tf`, `solve`,
   `solve_forced`); plant steps use
-  :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh`
+  :meth:`~minilink.core.compile.evaluators.numpy_evaluators.IntegrationMixin.integrate_zoh`
   with optional ``plant_dt_inner`` for sub-step integration and plant trajectory
   recording. :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` holds
   ``computer`` (:class:`~minilink.core.step_rollout.StepRollout`, tick ``k``) and
@@ -340,11 +340,11 @@ optional class attribute `feedback_profile`, not inheritance):
 
 `compile(system, backend)` returns a typed evaluator:
 
-- :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.dynamics_evaluator.DynamicsEvaluator`
+- :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.DynamicsEvaluator`
   (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)
-- :class:`StepSystem` leaf → :class:`~minilink.core.compile.evaluators.step_evaluator.StepEvaluator`
+- :class:`StepSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.StepEvaluator`
   (`NumpyStepEvaluator` / `JaxStepEvaluator`) — `.step`, `.outputs`, `.rollout`; no `.f`
-- static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.static_evaluator.StaticEvaluator`
+- static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.evaluators.StaticEvaluator`
   (`NumpyStaticEvaluator` / `JaxStaticEvaluator`) — `.outputs` only, no `.f`
 - :class:`DiagramSystem` → diagram evaluator (same dynamics tier as above)
 
@@ -370,8 +370,12 @@ document the fast tier. NumPy evaluators reject `*_trace` / `*_jit` attributes.
 | Fast (default) | `f` ≡ `f_jit` | `f_p` ≡ `f_jit_p` |
 | Trace (JAX only) | `f_trace` | `f_trace_p` |
 
-Same 2×2 for `outputs`, `step`, and integration helpers (`rk4_step`, `integrate`,
-`rk4_integrate_forced`, …) on JAX dynamics evaluators.
+Same 2×2 for `outputs`, `step`, and integration helpers
+(`rk4_step`, `rk4_integrate_zoh`, `rk4_integrate_linear`, `euler_integrate_*`, …)
+on JAX dynamics evaluators. Layout:
+`evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`.
+Integration naming:
+[docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md).
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
 reintroduce `compute_outputs(..., ports=...)`.

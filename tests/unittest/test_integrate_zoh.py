@@ -16,7 +16,7 @@ class TestIntegrateZoh(unittest.TestCase):
         u_hold = np.array([2.0])
         x_final = evaluator.integrate_zoh(x0, u_hold, t0=0.0, dt_hold=0.1)
 
-        x_seq = evaluator.integrate(x0, u_hold.reshape(1, 1), t0=0.0, dt=0.1)
+        x_seq = evaluator.rk4_integrate_zoh(x0, u_hold.reshape(1, 1), t0=0.0, dt=0.1)
         np.testing.assert_allclose(x_final, x_seq[-1])
 
     def test_subdivided_dt_inner(self):
@@ -34,7 +34,7 @@ class TestIntegrateZoh(unittest.TestCase):
         n_sub = int(round(dt_hold / dt_inner))
         u_sequence = np.ones((n_sub, 1))
         dt_step = dt_hold / n_sub
-        x_seq = evaluator.integrate(x0, u_sequence, t0=0.0, dt=dt_step)
+        x_seq = evaluator.rk4_integrate_zoh(x0, u_sequence, t0=0.0, dt=dt_step)
         np.testing.assert_allclose(x_final, x_seq[-1], rtol=1e-10, atol=1e-10)
 
     def test_integrate_zoh_rollout_grid(self):

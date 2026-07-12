@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.compile.evaluators.numpy_evaluator import _gather_u
+from minilink.core.compile.evaluators.numpy_evaluators import _gather_u
 from minilink.core.diagram import StepDiagramSystem
 from minilink.core.system import StepSystem, System
 from minilink.simulation.computer import Computer, StepSchedule

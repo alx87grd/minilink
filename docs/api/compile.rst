@@ -10,17 +10,11 @@ Compile
 .. automodule:: minilink.core.backends
    :members:
 
-.. automodule:: minilink.core.compile.evaluators.dynamics_evaluator
+.. automodule:: minilink.core.compile.evaluators.evaluators
    :members:
 
-.. automodule:: minilink.core.compile.evaluators.static_evaluator
+.. automodule:: minilink.core.compile.evaluators.numpy_evaluators
    :members:
 
-.. automodule:: minilink.core.compile.evaluators.evaluator
-   :members:
-
-.. automodule:: minilink.core.compile.evaluators.numpy_evaluator
-   :members:
-
-.. automodule:: minilink.core.compile.evaluators.jax_evaluator
+.. automodule:: minilink.core.compile.evaluators.jax_evaluators
    :members:

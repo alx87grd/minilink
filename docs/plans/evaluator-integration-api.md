@@ -1,11 +1,11 @@
-# Evaluator integration API — naming and compile plan
+# Evaluator integration API — naming, layout, and compile plan
 
 Architecture plan for dynamics evaluator **integration** methods (RK4 / Euler steps
-and rollouts). Complements the trace-tier contract in
+and rollouts), plus by-backend file layout. Complements the trace-tier contract in
 [evaluator-trace-tier-api.md](evaluator-trace-tier-api.md). Contracts in code:
 [DESIGN.md](../../DESIGN.md) §5.
 
-Status: **approved plan** (not yet implemented in code).
+Status: **implemented**.
 
 ---
 
@@ -24,6 +24,41 @@ linear `u`**, not integrator order.
 
 ---
 
+## Locked decisions
+
+| Decision | Choice |
+| --- | --- |
+| Layout | By backend: `evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py` |
+| Step / Static | Same backend files |
+| Rename policy | **Clean rename** — AGENTS pre-1.0 no-alias; fix all call sites in the same change |
+| Step names | Short canonical `rk4_step` / `euler_step` (ZOH implied). No `*_step_zoh` aliases |
+| Rollout names | Full grammar: `rk4_integrate_{zoh,linear,ivp}`, `euler_integrate_{zoh,ivp}` |
+| Warm-start | **No** dummy JIT invocations at evaluator `__init__` / compile |
+| Compatibility check | Keep `make_jaxpr` / `check_jax_compatible` (traceability, not XLA warm) |
+| Rollout JIT | Bind `jax.jit` lazily on first call |
+| Math style | RK4/Euler equations **inline** in the method body |
+| WIP files | Delete untracked `dynamic_evaluator.py` / `dynamic_diagram_evaluator.py` |
+
+---
+
+## Target package layout
+
+```
+minilink/core/compile/evaluators/
+  evaluators.py          # ABCs only
+  numpy_evaluators.py    # all Numpy* + NumPy IntegrationMixin
+  jax_evaluators.py      # all Jax* + JaxIntegrationMixin + JAX helpers
+  tiers.py               # TraceTierMixin / NoTraceTierMixin / register_jit_aliases
+  __init__.py            # public re-exports
+```
+
+Delete after cutover: `dynamics_evaluator.py`, `evaluator.py`, `numpy_evaluator.py`,
+`jax_evaluator.py`, `jax_utils.py`, `integration.py`, `static_evaluator.py`,
+`step_evaluator.py`, `step_diagram_evaluator.py`, `step_rollout_mixin.py`,
+`output_evaluator.py`, WIP `dynamic_*.py`.
+
+---
+
 ## Naming grammar
 
 ```
@@ -38,10 +73,8 @@ linear `u`**, not integrator order.
 | Param | `_p` — runtime params pytree (always last) |
 | Trace | `_trace`, `_trace_p` — **JAX only** (pre-JIT for outer `jit` / `grad`) |
 
-**Aliases:** `rk4_step` ≡ `rk4_step_zoh`, `euler_step` ≡ `euler_step_zoh`.
-
-**Deprecated (one release):** `integrate` → `rk4_integrate_zoh`,
-`rk4_integrate_forced` → `rk4_integrate_linear` (+ trace/`_p` siblings).
+**Steps:** public names omit `_zoh` — `rk4_step` / `euler_step` are the ZOH single-step
+APIs. Rollouts always include the input model token.
 
 ### Intentionally absent
 
@@ -49,6 +82,8 @@ linear `u`**, not integrator order.
 | --- | --- |
 | `*_step_linear`, `euler_integrate_linear` | Linear `u` needs `u_{k+1}` — rollout-only, RK4 only |
 | NumPy `*_trace` | `NoTraceTierMixin` rejects trace tier |
+| `*_step_zoh` aliases | Clean rename; ZOH is implied for steps |
+| Compile-time warm-start / `warm_start=` profiles | First real call pays XLA cost |
 
 IVP `_p` means **parametric plant params** with **nominal `u` fixed at compile**:
 `f_ivp_p(x, t, params) ≡ f_p(x, u_nom, t, params)`.
@@ -61,19 +96,19 @@ IVP `_p` means **parametric plant params** with **nominal `u` fixed at compile**
 
 | Bound (fast) | Param (`_p`) | Trace (JAX) | Trace param (JAX) |
 | --- | --- | --- | --- |
-| `rk4_step_zoh` | `rk4_step_zoh_p` | `rk4_step_zoh_trace` | `rk4_step_zoh_trace_p` |
-| `euler_step_zoh` | `euler_step_zoh_p` | `euler_step_zoh_trace` | `euler_step_zoh_trace_p` |
+| `rk4_step` | `rk4_step_p` | `rk4_step_trace` | `rk4_step_trace_p` |
+| `euler_step` | `euler_step_p` | `euler_step_trace` | `euler_step_trace_p` |
 | `rk4_step_ivp` | `rk4_step_ivp_p` | `rk4_step_ivp_trace` | `rk4_step_ivp_trace_p` |
 | `euler_step_ivp` | `euler_step_ivp_p` | `euler_step_ivp_trace` | `euler_step_ivp_trace_p` |
 
 ```python
-rk4_step_zoh(x, u, t, dt)
-rk4_step_zoh_p(x, u, t, dt, params)
+rk4_step(x, u, t, dt)
+rk4_step_p(x, u, t, dt, params)
 rk4_step_ivp(x, t, dt)
 rk4_step_ivp_p(x, t, dt, params)
 ```
 
-Steps compose over `f` / `f_p` / `f_ivp_p` — **no separate JIT program per step**.
+Steps compose over `f` / `f_p` / `f_ivp` / `f_ivp_p` — **no separate JIT program per step**.
 
 ### Rollouts
 
@@ -106,9 +141,7 @@ Euler rollouts mirror RK4 shapes and semantics.
 | `integrate_zoh_p` | Parametric twin |
 | `integrate_zoh_rollout` | Returns `(t_samples, x_samples)` |
 
-JAX trace for sugar: optional — delegate to expanded `rk4_integrate_zoh_trace`.
-
-### Old → new map
+### Old → new map (hard rename)
 
 | Old | New |
 | --- | --- |
@@ -120,11 +153,6 @@ JAX trace for sugar: optional — delegate to expanded `rk4_integrate_zoh_trace`
 | `rk4_integrate_forced_p` | `rk4_integrate_linear_p` |
 | `rk4_integrate_forced_trace` | `rk4_integrate_linear_trace` |
 | `rk4_integrate_forced_trace_p` | `rk4_integrate_linear_trace_p` |
-| `rk4_step` | `rk4_step_zoh` (alias) |
-| `rk4_step_p` | `rk4_step_zoh_p` (alias) |
-| `rk4_step_trace` | `rk4_step_zoh_trace` (alias) |
-| `rk4_step_trace_p` | `rk4_step_zoh_trace_p` (alias) |
-| `euler_step` | `euler_step_zoh` (alias) |
 
 ---
 
@@ -144,7 +172,7 @@ Deferred (separate from this plan): `rollout_trace` on step diagrams,
 
 | | NumPy | JAX |
 | --- | --- | --- |
-| fast | ✓ | ✓ (JIT for rollouts) |
+| fast | ✓ | ✓ (JIT for rollouts, lazy) |
 | `_p` | ✓ | ✓ |
 | `_trace` | `AttributeError` | ✓ |
 | `_trace_p` | `AttributeError` | ✓ |
@@ -153,44 +181,28 @@ Deferred (separate from this plan): `rollout_trace` on step diagrams,
 
 ## JAX implementation
 
-### Single source of truth (fast vs trace)
+### Textbook math, inline
 
-```text
-build_trace_{integrator}_{input}(..., f_trace or f_trace_p)
-build_jit_* = jax.jit(build_trace_*)
-```
+Single-step and scan bodies show RK4/Euler equations at the method (no distant
+`_rk4_step_from_f` indirection on the public path). NumPy and JAX may duplicate
+formulas for readability. Trace-tier siblings sit next to fast methods in the
+same section.
 
-Steps call `f` / `f_trace` inline — no duplicate RK4/Euler formulas between tiers.
-
-NumPy and JAX still duplicate rollout **loop vs scan** bodies today; optional
-follow-up: shared formula helpers in one module.
-
-### Compile cost — lazy by default
+### Compile cost — no warm-start
 
 | At `compile(backend="jax")` | Cost |
 | --- | --- |
 | `jax.jit(...)` wrappers | Cheap (no XLA until first call) |
-| `build_trace_*` closures | Cheap |
-| Warm-start (default) | **`f`, `f_p`, `f_ivp`, `outputs` only** |
+| Trace closures | Cheap |
+| Dummy JIT warm-start | **None** |
 
-**API surface ≠ compile cost.** Each distinct **rollout JIT** compiles on **first use**
-unless warm-started.
+**API surface ≠ compile cost.** Each distinct **rollout JIT** compiles on **first use**.
 
 | Do | Don't |
 | --- | --- |
-| Lazy `jax.jit` bind on first rollout call | Eager warm-start all integrators |
+| Lazy `jax.jit` bind on first rollout call | Eager warm-start at `__init__` |
 | Steps as `f` composition (no step JIT) | Separate XLA per step variant |
-| Optional `compile(..., warm_start=...)` | Block full API out of compile fear |
-
-**`warm_start` profiles** (future `compile` flag):
-
-| Profile | Warm dummy calls |
-| --- | --- |
-| `False` / `"core"` (default) | `f`, `f_p`, `outputs` |
-| `"sim"` | + `rk4_integrate_ivp` |
-| `"trajopt"` | + `rk4_integrate_linear` |
-| `"ad"` | trace smoke / consumer-driven |
-| `"all"` | every rollout (debug) |
+| `make_jaxpr` compatibility check | `compile(..., warm_start=...)` profiles |
 
 ---
 
@@ -198,36 +210,32 @@ unless warm-started.
 
 | Rename | ~Files |
 | --- | --- |
-| `integrate` → `rk4_integrate_zoh` | 5 (mostly tests + `integrate_zoh`) |
-| `rk4_integrate_forced` → `rk4_integrate_linear` | 8 (solver, shooting, demos, tests) |
-| Step ZOH aliases | 0 (alias-only) |
+| `integrate` → `rk4_integrate_zoh` | tests + `integrate_zoh` sugar |
+| `rk4_integrate_forced` → `rk4_integrate_linear` | solver, shooting, demos, tests |
+| `rk4_step` | unchanged |
 
 ---
 
 ## Implementation order
 
-1. **Plumbing:** `f_ivp_p` / `_f_ivp_trace_p_fn` on leaf + diagram evaluators; fix NumPy
+1. **Docs:** this file (status + locked decisions + layout).
+2. **File reorg:** `evaluators.py` / `numpy_evaluators.py` / `jax_evaluators.py`;
+   remove warm-start; rewire imports; delete old + WIP modules.
+3. **Plumbing:** `f_ivp_p` / `_f_ivp_trace_p_fn`; fix NumPy
    `euler_step_ivp` → `x + dt * f_ivp(x, t)`.
-2. **Euler rollouts:** `euler_integrate_zoh` / `_p` / `_trace` / `_trace_p`,
-   `euler_integrate_ivp` (+ `_p`, trace siblings) — NumPy mixin + JAX builders.
-3. **Fill `_p` gaps:** `euler_step_zoh_p`, `*_step_ivp_p`, `*_integrate_ivp_p`,
-   NumPy `rk4_integrate_linear_p`.
-4. **RK4 renames** + deprecation aliases + call-site updates.
-5. **Step ZOH aliases** on evaluator classes.
-6. **Lazy rollout JIT** in `JaxIntegrationMixin` (defer `jax.jit` until first call).
-7. **Solvers:** `EulerSolverBackend` → `euler_integrate_ivp` / `euler_integrate_zoh`.
-8. **Tests:** fast ≈ trace parity; `f_p(frozen) ≈ f`; NumPy `_p` guards.
-9. **Docs:** [DESIGN.md](../../DESIGN.md) §5 integration table; deprecations in
-   [evaluator-trace-tier-api.md](evaluator-trace-tier-api.md).
+4. **API grid + renames:** Euler rollouts, full `_p` / `_trace` grid, clean rename
+   of `integrate` / `rk4_integrate_forced`, lazy rollout JIT.
+5. **Solvers:** `EulerSolverBackend` → `euler_integrate_ivp` / `euler_integrate_zoh`.
+6. **Tests + contracts:** DESIGN §5, ROADMAP §5.0, trace-tier plan paths.
 
 ---
 
-## Relation to trace tier (landed separately)
+## Relation to trace tier (landed)
 
 PR [#65](https://github.com/alx87grd/minilink/pull/65) adds JAX fast vs trace on
-`f`, `outputs`, `step`, and current integration names (`integrate`, `rk4_integrate_forced`, …).
-This plan **renames** those integration surfaces and **extends** Euler + full `_p` /
-`_trace` grid. Implement after or merge with trace-tier branch before release.
+`f`, `outputs`, `step`, and (pre-rename) integration names. This plan **renames**
+those integration surfaces, **extends** Euler + full `_p` / `_trace` grid, and
+**reorganizes** evaluator files by backend.
 
 ---
 
@@ -235,9 +243,11 @@ This plan **renames** those integration surfaces and **extends** Euler + full `_
 
 | Decision | Rationale |
 | --- | --- |
-| `zoh` / `linear` / `ivp` in names | States input model, not integrator |
+| `zoh` / `linear` / `ivp` in rollout names | States input model, not integrator |
+| Short step names (no `*_zoh`) | ZOH is the only sensible single-step input model |
 | No Euler linear | Linear `u` is rollout-only; RK4 only |
 | Full `_p` grid | Parametric ID / MPC need runtime params everywhere |
 | Full JAX `_trace` grid | AD composition; no compile until used |
-| Lazy rollout JIT | Large API, small default compile tax |
-| Steps alias `*_zoh` | ZOH is the only sensible single-step input model |
+| Lazy rollout JIT; no warm-start | Large API, small default compile tax |
+| Clean rename (no aliases) | AGENTS pre-1.0 no-alias rule |
+| By-backend file layout | Crystal-clear for human readers |

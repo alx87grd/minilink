@@ -482,7 +482,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_single_integrator()
         evaluator = sys.compile(backend="numpy", verbose=False)
 
-        x = evaluator.rk4_integrate_forced(
+        x = evaluator.rk4_integrate_linear(
             np.array([0.0]),
             np.ones((5, 1)),
             0.0,

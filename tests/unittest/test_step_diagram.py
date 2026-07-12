@@ -8,7 +8,7 @@ from minilink.blocks.basic import Integrator
 from minilink.blocks.routing import Gain
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.step_diagram_evaluator import (
+from minilink.core.compile.evaluators.numpy_evaluators import (
     NumpyStepDiagramEvaluator,
 )
 from minilink.core.diagram import StepDiagramSystem
