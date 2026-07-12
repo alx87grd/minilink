@@ -48,6 +48,7 @@ minilink/core/compile/evaluators/
   evaluators.py          # ABCs only
   numpy_evaluators.py    # all Numpy* + NumPy IntegrationMixin
   jax_evaluators.py      # all Jax* + JaxIntegrationMixin + JAX helpers
+  step_rollout.py        # gather_u + StepRolloutMixin (shared NumPy/JAX)
   tiers.py               # TraceTierMixin / NoTraceTierMixin / register_jit_aliases
   __init__.py            # public re-exports
 ```

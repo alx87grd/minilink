@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY, normalize_backend
-from minilink.core.compile.evaluators.numpy_evaluators import _gather_u
+from minilink.core.compile.evaluators.step_rollout import gather_u
 from minilink.core.compile.execution_plan import PortOperation
 from minilink.core.compile.step_compiler import build_step_execution_plan
 from minilink.core.compile.step_execution_plan import StepExecutionPlan, StepOperation
@@ -212,7 +212,7 @@ class Computer:
 
             for op in self.port_ops_by_sys.get(sys_id, ()):
                 local_x = x_work[op.local_x_slice]
-                local_u = _gather_u(op.gather_sources, op.u_dim, read, u_arr)
+                local_u = gather_u(op.gather_sources, op.u_dim, read, u_arr)
                 write[op.out_slice] = op.compute_func(
                     local_x, local_u, k_tick, op.bound_params
                 )
@@ -220,7 +220,7 @@ class Computer:
             step_op = self.step_op_by_sys.get(sys_id)
             if step_op is not None:
                 local_x = x_work[step_op.local_x_slice]
-                local_u = _gather_u(step_op.gather_sources, step_op.u_dim, read, u_arr)
+                local_u = gather_u(step_op.gather_sources, step_op.u_dim, read, u_arr)
                 x_work[step_op.local_x_slice] = step_op.step_func(
                     local_x, local_u, k_tick, step_op.bound_params
                 )

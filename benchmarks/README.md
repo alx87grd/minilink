@@ -38,7 +38,7 @@ python benchmarks/run_diagram_f_speed.py         # f() call speed, dense diagram
 python benchmarks/run_step_speed.py            # step() call speed, leaf StepSystem
 python benchmarks/run_step_diagram_speed.py    # step() call speed, step diagram
 python benchmarks/run_simulator_standard.py      # one variant on standard cases
-python benchmarks/run_simulator_speed_matrix.py  # solver x backend sweep
+python benchmarks/run_simulator_speed_matrix.py  # solver x backend sweep (euler vs euler_fixedsteps)
 python benchmarks/run_simulator_speed_manual.py  # hand-picked simulator runs
 python benchmarks/run_optimizer_backends.py      # NLP solver presets on textbook problems
 python benchmarks/run_trajopt_backends.py        # trajopt transcription x backend sweep

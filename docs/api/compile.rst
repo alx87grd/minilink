@@ -13,6 +13,9 @@ Compile
 .. automodule:: minilink.core.compile.evaluators.evaluators
    :members:
 
+.. automodule:: minilink.core.compile.evaluators.step_rollout
+   :members:
+
 .. automodule:: minilink.core.compile.evaluators.numpy_evaluators
    :members:
 

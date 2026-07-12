@@ -16,16 +16,11 @@ from minilink.core.compile.evaluators.evaluators import (
     StepEvaluator,
     outputs_from_ports,
 )
+from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin, gather_u
 from minilink.core.compile.evaluators.tiers import NoTraceTierMixin
-from minilink.core.compile.execution_plan import (
-    EXTERNAL_INPUT,
-    INTERNAL_SIGNAL,
-    NOMINAL,
-    ExecutionPlan,
-)
+from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.compile.step_execution_plan import StepExecutionPlan
 from minilink.core.diagram import validate_diagram_params
-from minilink.core.step_rollout import StepRollout
 from minilink.core.system import DynamicSystem, StepSystem, System
 
 # =============================================================================
@@ -297,147 +292,6 @@ class IntegrationMixin:
 
 
 # =============================================================================
-# Public API — StepRolloutMixin
-# =============================================================================
-
-
-class StepRolloutMixin:
-    """Advance ``x_{k+1} = step(x, u, k)`` over integer step indices."""
-
-    n: int
-    m: int
-    p: int
-    _u_nominal: np.ndarray
-
-    def _coerce_rollout_inputs(self, n_steps, u):
-        if n_steps < 0:
-            raise ValueError("n_steps must be nonnegative")
-
-        u_nominal = np.asarray(self._u_nominal, dtype=float).reshape(self.m)
-
-        if u is None:
-            u_steps = (
-                np.tile(u_nominal, (n_steps, 1)) if n_steps else np.zeros((0, self.m))
-            )
-        elif callable(u):
-            u_steps = np.asarray(
-                [np.asarray(u(k), dtype=float).reshape(self.m) for k in range(n_steps)]
-            )
-        else:
-            u_arr = np.asarray(u, dtype=float)
-            if u_arr.ndim == 1:
-                if u_arr.shape != (self.m,):
-                    raise ValueError(f"Constant u must have shape ({self.m},)")
-                u_steps = np.tile(u_arr, (n_steps, 1))
-            elif u_arr.ndim == 2:
-                if u_arr.shape != (n_steps, self.m):
-                    raise ValueError(
-                        f"u sequence must have shape ({n_steps}, {self.m})"
-                    )
-                u_steps = u_arr
-            else:
-                raise ValueError(
-                    "u must be None, a constant vector, a sequence, or callable(k)"
-                )
-
-        n_samples = n_steps + 1
-        u_samples = np.zeros((self.m, n_samples), dtype=float)
-        if n_samples:
-            if n_steps:
-                u_samples[:, :n_steps] = u_steps.T
-                u_samples[:, -1] = u_samples[:, n_steps - 1]
-            elif self.m:
-                u_samples[:, 0] = u_nominal
-
-        return u_samples
-
-    def _init_signal_buffers(self, x, u, k, n_samples, outputs_fn):
-        if not self.p:
-            return {}
-        out = outputs_fn(x, u, k)
-        signals = {}
-        for port_id, values in out.items():
-            dim = int(np.asarray(values, dtype=float).reshape(-1).size)
-            signals[port_id] = np.zeros((dim, n_samples), dtype=float)
-            signals[port_id][:, k] = np.asarray(values, dtype=float).reshape(dim)
-        return signals
-
-    def _write_outputs(self, signals, x, u, k, outputs_fn):
-        if not signals:
-            return
-        out = outputs_fn(x, u, k)
-        for port_id, values in out.items():
-            arr = np.asarray(values, dtype=float).reshape(-1)
-            signals[port_id][:, k] = arr
-
-    def rollout(self, x0, *, n_steps, u=None, record_outputs=True) -> StepRollout:
-        x0 = np.asarray(x0, dtype=float).reshape(self.n)
-        n_samples = n_steps + 1
-        k = np.arange(n_samples, dtype=float)
-        x_samples = np.zeros((self.n, n_samples), dtype=float)
-        x_samples[:, 0] = x0
-
-        u_samples = self._coerce_rollout_inputs(n_steps, u)
-
-        signals = {}
-        if record_outputs and self.p:
-            signals = self._init_signal_buffers(
-                x_samples[:, 0], u_samples[:, 0], 0, n_samples, self.outputs
-            )
-
-        for step_k in range(n_steps):
-            u_k = u_samples[:, step_k]
-            x_samples[:, step_k + 1] = self.step(x_samples[:, step_k], u_k, step_k)
-            if record_outputs and self.p:
-                self._write_outputs(
-                    signals,
-                    x_samples[:, step_k + 1],
-                    u_k,
-                    step_k + 1,
-                    self.outputs,
-                )
-
-        return StepRollout(k=k, x=x_samples, u=u_samples, signals=signals)
-
-    def rollout_p(
-        self, x0, *, n_steps, u=None, params, record_outputs=True
-    ) -> StepRollout:
-        x0 = np.asarray(x0, dtype=float).reshape(self.n)
-        n_samples = n_steps + 1
-        k = np.arange(n_samples, dtype=float)
-        x_samples = np.zeros((self.n, n_samples), dtype=float)
-        x_samples[:, 0] = x0
-
-        u_samples = self._coerce_rollout_inputs(n_steps, u)
-
-        signals = {}
-        if record_outputs and self.p:
-            signals = self._init_signal_buffers(
-                x_samples[:, 0],
-                u_samples[:, 0],
-                0,
-                n_samples,
-                lambda x, u, kk: self.outputs_p(x, u, kk, params),
-            )
-
-        for step_k in range(n_steps):
-            u_k = u_samples[:, step_k]
-            x_samples[:, step_k + 1] = self.step_p(
-                x_samples[:, step_k], u_k, step_k, params
-            )
-            if record_outputs and self.p:
-                self._write_outputs(
-                    signals,
-                    x_samples[:, step_k + 1],
-                    u_k,
-                    step_k + 1,
-                    lambda x, u, kk: self.outputs_p(x, u, kk, params),
-                )
-
-        return StepRollout(k=k, x=x_samples, u=u_samples, signals=signals)
-
-
-# =============================================================================
 # Public API — NumpyDynamicEvaluator
 # =============================================================================
 
@@ -496,7 +350,7 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
         dx = np.zeros(self.plan.state_dim)
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             dx[op.local_x_slice] = op.f_func(local_x, local_u, t, op.bound_params)
         return dx
 
@@ -506,7 +360,7 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
         dx = np.zeros(self.plan.state_dim)
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             op_params = None if params is None else params.get(op.sys_id)
             dx[op.local_x_slice] = op.f_func(local_x, local_u, t, op_params)
         return dx
@@ -544,7 +398,7 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
         signals = np.zeros(self.plan.signal_dim)
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             signals[op.out_slice] = op.compute_func(
                 local_x, local_u, t, op.bound_params
             )
@@ -556,7 +410,7 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
         signals = np.zeros(self.plan.signal_dim)
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             op_params = None if params is None else params.get(op.sys_id)
             signals[op.out_slice] = op.compute_func(local_x, local_u, t, op_params)
         return signals
@@ -649,7 +503,7 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
         x_new = np.asarray(x, dtype=float).reshape(self.n).copy()
         for op in self.plan.step_ops:
             local_x = x_new[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             x_new[op.local_x_slice] = op.step_func(local_x, local_u, k, op.bound_params)
         return x_new
 
@@ -659,7 +513,7 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
         x_new = np.asarray(x, dtype=float).reshape(self.n).copy()
         for op in self.plan.step_ops:
             local_x = x_new[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             op_params = None if params is None else params.get(op.sys_id)
             x_new[op.local_x_slice] = op.step_func(local_x, local_u, k, op_params)
         return x_new
@@ -694,7 +548,7 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
             if op.sys_id != sys_id:
                 continue
             local_x = x_new[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             x_new[op.local_x_slice] = op.step_func(local_x, local_u, k, op.bound_params)
         return x_new
 
@@ -703,7 +557,7 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
         x_arr = np.asarray(x, dtype=float).reshape(self.n)
         for op in self.plan.port_ops:
             local_x = x_arr[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             signals[op.out_slice] = op.compute_func(
                 local_x, local_u, k, op.bound_params
             )
@@ -714,36 +568,7 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
         x_arr = np.asarray(x, dtype=float).reshape(self.n)
         for op in self.plan.port_ops:
             local_x = x_arr[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, signals, u)
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             op_params = None if params is None else params.get(op.sys_id)
             signals[op.out_slice] = op.compute_func(local_x, local_u, k, op_params)
         return signals
-
-
-# =============================================================================
-# Internal machinery
-# =============================================================================
-
-
-def _gather_u(
-    gather_sources: tuple[tuple[int, object, int], ...],
-    u_dim: int,
-    signals: np.ndarray,
-    u: np.ndarray,
-) -> np.ndarray:
-    if u_dim == 0:
-        return np.array([])
-
-    local_u = np.empty(u_dim)
-    idx = 0
-    for src_type, src_val, dim in gather_sources:
-        if src_type == INTERNAL_SIGNAL:
-            local_u[idx : idx + dim] = signals[src_val]
-        elif src_type == NOMINAL:
-            local_u[idx : idx + dim] = src_val
-        elif src_type == EXTERNAL_INPUT:
-            local_u[idx : idx + dim] = u[src_val]
-        else:
-            raise RuntimeError(f"Unknown source_type={src_type}")
-        idx += dim
-    return local_u

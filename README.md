@@ -124,6 +124,11 @@ building intuition about a plant before designing a controller.
 Wired diagrams compile into a flat execution plan. The NumPy backend removes
 the recursive port-resolution overhead; the JAX backend JIT-compiles dynamics
 and outputs for fast simulation (`evaluator.f`, `evaluator.rk4_step`, …).
+Integration rollouts use explicit names — e.g. `rk4_integrate_zoh`,
+`rk4_integrate_linear`, `euler_integrate_zoh` (replacing the old bare `integrate`
+and `rk4_integrate_forced`). Fixed-step `Simulator` presets: `euler` follows the
+simulation time grid knot-by-knot; `euler_fixedsteps` uses uniform spacing via
+compiled Euler rollouts.
 For autodiff inside an outer `jit`, use the **trace tier** (pre-JIT siblings:
 `f_trace`, `f_trace_p`, `rk4_step_trace`, …):
 

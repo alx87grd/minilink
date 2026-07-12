@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.compile.evaluators.numpy_evaluators import _gather_u
+from minilink.core.compile.evaluators.step_rollout import gather_u
 from minilink.core.diagram import StepDiagramSystem
 from minilink.core.system import StepSystem, System
 from minilink.simulation.computer import Computer, StepSchedule
@@ -77,14 +77,14 @@ def _hand_tick(computer: Computer, u) -> dict[str, np.ndarray]:
             continue
         for op in computer.port_ops_by_sys.get(sys_id, ()):
             local_x = x_work[op.local_x_slice]
-            local_u = _gather_u(op.gather_sources, op.u_dim, read, u_arr)
+            local_u = gather_u(op.gather_sources, op.u_dim, read, u_arr)
             write[op.out_slice] = op.compute_func(
                 local_x, local_u, k_tick, op.bound_params
             )
         step_op = computer.step_op_by_sys.get(sys_id)
         if step_op is not None:
             local_x = x_work[step_op.local_x_slice]
-            local_u = _gather_u(step_op.gather_sources, step_op.u_dim, read, u_arr)
+            local_u = gather_u(step_op.gather_sources, step_op.u_dim, read, u_arr)
             x_work[step_op.local_x_slice] = step_op.step_func(
                 local_x, local_u, k_tick, step_op.bound_params
             )

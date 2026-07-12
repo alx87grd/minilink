@@ -373,9 +373,24 @@ document the fast tier. NumPy evaluators reject `*_trace` / `*_jit` attributes.
 Same 2×2 for `outputs`, `step`, and integration helpers
 (`rk4_step`, `rk4_integrate_zoh`, `rk4_integrate_linear`, `euler_integrate_*`, …)
 on JAX dynamics evaluators. Layout:
-`evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`.
+`evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`,
+`step_rollout.py` (`gather_u`, `StepRolloutMixin`).
 Integration naming:
 [docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md).
+
+**Integration rename (pre-1.0).** Rollout methods use explicit integrator + input
+model tokens — no bare `integrate`:
+
+| Old | New |
+| --- | --- |
+| `integrate` | `rk4_integrate_zoh` |
+| `integrate_p` | `rk4_integrate_zoh_p` |
+| `rk4_integrate_forced` | `rk4_integrate_linear` |
+| `rk4_integrate_forced_p` | `rk4_integrate_linear_p` |
+
+Trace-tier JAX twins follow the same pattern (`*_trace`, `*_trace_p`). See
+[docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md)
+for the full grid.
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
 reintroduce `compute_outputs(..., ports=...)`.
@@ -410,7 +425,8 @@ Unconnected inputs use port nominals; time-varying sources belong in the diagram
 forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
-`euler`, `euler_fixedsteps`, `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
+`euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
+`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
 ([ROADMAP.md](ROADMAP.md) P1).
 
 ### Discontinuous closed loops — known issues

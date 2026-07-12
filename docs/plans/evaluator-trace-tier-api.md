@@ -106,8 +106,9 @@ one scan for AD.
 ```
 minilink/core/compile/evaluators/
   evaluators.py         # ABCs: Output / Dynamics / Step / Static
-  numpy_evaluators.py   # all Numpy* + IntegrationMixin + StepRolloutMixin
+  numpy_evaluators.py   # all Numpy* + IntegrationMixin
   jax_evaluators.py     # all Jax* + JaxIntegrationMixin + helpers
+  step_rollout.py       # gather_u + StepRolloutMixin (shared NumPy/JAX)
   tiers.py              # TraceTierMixin, NoTraceTierMixin, register_jit_aliases
 ```
 

@@ -9,4 +9,4 @@ Architecture and port plans. Contracts in code: [DESIGN.md](../../DESIGN.md), [R
 | [neural-blocks-collection.md](neural-blocks-collection.md) | MLP / neural blocks roadmap | Future |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle model layering | Reference |
 | [evaluator-trace-tier-api.md](evaluator-trace-tier-api.md) | JAX fast vs trace evaluator tiers | Reference |
-| [evaluator-integration-api.md](evaluator-integration-api.md) | Integration naming (RK4/Euler ZOH/linear/IVP) + lazy compile | Approved plan |
+| [evaluator-integration-api.md](evaluator-integration-api.md) | Integration naming (RK4/Euler ZOH/linear/IVP) + lazy compile | Implemented |

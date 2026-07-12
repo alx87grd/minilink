@@ -16,7 +16,7 @@ from minilink.core.compile.evaluators.evaluators import (
     StaticEvaluator,
     StepEvaluator,
 )
-from minilink.core.compile.evaluators.numpy_evaluators import StepRolloutMixin
+from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin
 from minilink.core.compile.evaluators.tiers import TraceTierMixin, register_jit_aliases
 from minilink.core.compile.execution_plan import (
     EXTERNAL_INPUT,

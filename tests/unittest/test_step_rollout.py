@@ -1,4 +1,4 @@
-"""StepRollout container and evaluator rollout tests."""
+"""StepRollout container, gather_u, and evaluator rollout tests."""
 
 import unittest
 
@@ -6,6 +6,12 @@ import numpy as np
 import pytest
 
 from minilink.core.compile.compiler import compile
+from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin, gather_u
+from minilink.core.compile.execution_plan import (
+    EXTERNAL_INPUT,
+    INTERNAL_SIGNAL,
+    NOMINAL,
+)
 from minilink.core.step_rollout import StepRollout
 from minilink.core.system import StepSystem
 from minilink.core.trajectory import Trajectory
@@ -28,6 +34,50 @@ class AffineStep(StepSystem):
 
     def h(self, x, u, k=0, params=None):
         return np.array([x[0]])
+
+
+class TestGatherU(unittest.TestCase):
+    def test_nominal_source(self):
+        sources = ((NOMINAL, np.array([1.0, 2.0]), 2),)
+        local_u = gather_u(sources, 2, np.zeros(0), np.zeros(0))
+        np.testing.assert_allclose(local_u, [1.0, 2.0])
+
+    def test_external_input_source(self):
+        sources = ((EXTERNAL_INPUT, slice(1, 2), 1), (EXTERNAL_INPUT, slice(0, 2), 2))
+        boundary_u = np.array([3.0, 4.0, 5.0])
+        local_u = gather_u(sources, 3, np.zeros(0), boundary_u)
+        np.testing.assert_allclose(local_u, [4.0, 3.0, 4.0])
+
+    def test_internal_signal_source(self):
+        sources = ((INTERNAL_SIGNAL, slice(2, 3), 1), (INTERNAL_SIGNAL, slice(0, 2), 2))
+        signals = np.array([9.0, 8.0, 7.0])
+        local_u = gather_u(sources, 3, signals, np.zeros(0))
+        np.testing.assert_allclose(local_u, [7.0, 9.0, 8.0])
+
+    def test_mixed_sources(self):
+        sources = (
+            (NOMINAL, np.array([0.5]), 1),
+            (EXTERNAL_INPUT, slice(0, 1), 1),
+            (INTERNAL_SIGNAL, slice(1, 2), 1),
+        )
+        signals = np.array([1.0, 2.0])
+        boundary_u = np.array([3.0])
+        local_u = gather_u(sources, 3, signals, boundary_u)
+        np.testing.assert_allclose(local_u, [0.5, 3.0, 2.0])
+
+    def test_zero_dim_returns_empty(self):
+        local_u = gather_u((), 0, np.zeros(0), np.zeros(0))
+        self.assertEqual(local_u.shape, (0,))
+
+    def test_unknown_source_raises(self):
+        with self.assertRaises(RuntimeError):
+            gather_u(((99, 0, 1),), 1, np.zeros(1), np.zeros(1))
+
+
+class TestStepRolloutMixinPublic(unittest.TestCase):
+    def test_mixin_importable_from_step_rollout_module(self):
+        self.assertTrue(hasattr(StepRolloutMixin, "rollout"))
+        self.assertTrue(hasattr(StepRolloutMixin, "rollout_p"))
 
 
 class TestStepRollout(unittest.TestCase):
