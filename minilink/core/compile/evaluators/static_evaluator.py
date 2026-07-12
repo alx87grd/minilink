@@ -11,6 +11,11 @@ from minilink.core.compile.evaluators.output_evaluator import (
     OutputEvaluator,
     outputs_from_ports,
 )
+from minilink.core.compile.evaluators.tiers import (
+    NoTraceTierMixin,
+    TraceTierMixin,
+    register_jit_aliases,
+)
 from minilink.core.system import DynamicSystem, System
 
 
@@ -18,7 +23,7 @@ class StaticEvaluator(OutputEvaluator):
     """Compiled evaluator for stateless IO blocks — no evolution map."""
 
 
-class NumpyStaticEvaluator(StaticEvaluator):
+class NumpyStaticEvaluator(NoTraceTierMixin, StaticEvaluator):
     """NumPy evaluator for a static ``System`` leaf (``n == 0``)."""
 
     def __init__(self, system: System):
@@ -41,7 +46,7 @@ class NumpyStaticEvaluator(StaticEvaluator):
         return outputs_from_ports(self._system, x, u, t, params)
 
 
-class JaxStaticEvaluator(StaticEvaluator):
+class JaxStaticEvaluator(StaticEvaluator, TraceTierMixin):
     """JAX evaluator for a static ``System`` leaf."""
 
     def __init__(self, system: System, verbose=False):
@@ -54,7 +59,7 @@ class JaxStaticEvaluator(StaticEvaluator):
         import jax.numpy as jnp
 
         from minilink.core.compile.evaluators.jax_utils import (
-            build_jit_static_outputs,
+            build_static_output_tiers,
             check_jax_compatible,
         )
 
@@ -101,9 +106,11 @@ class JaxStaticEvaluator(StaticEvaluator):
                 flush=True,
             )
 
-        self._jit_outputs, self._jit_outputs_p = build_jit_static_outputs(
-            jax, system, frozen_p
-        )
+        tiers = build_static_output_tiers(jax, system, frozen_p)
+        self._outputs_trace_fn = tiers["_outputs_trace_fn"]
+        self._outputs_trace_p_fn = tiers["_outputs_trace_p_fn"]
+        self._outputs_jit_fn = tiers["_outputs_jit_fn"]
+        self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
 
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
@@ -111,8 +118,8 @@ class JaxStaticEvaluator(StaticEvaluator):
             print("[compile] Step 2: Warm-starting JIT cache...", end="", flush=True)
 
         try:
-            self._jit_outputs(dummy_x, dummy_u, dummy_t)
-            self._jit_outputs_p(dummy_x, dummy_u, dummy_t, frozen_p)
+            self._outputs_jit_fn(dummy_x, dummy_u, dummy_t)
+            self._outputs_jit_p_fn(dummy_x, dummy_u, dummy_t, frozen_p)
         except Exception as e:
             raise RuntimeError(
                 f"\n\nBlock '{system.name}' failed during JAX warm-start.\n"
@@ -124,7 +131,18 @@ class JaxStaticEvaluator(StaticEvaluator):
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
     def outputs(self, x, u, t=0.0):
-        return self._jit_outputs(x, u, t)
+        return self._outputs_jit_fn(x, u, t)
+
+    def outputs_trace(self, x, u, t=0.0):
+        """Pre-JIT boundary outputs for JAX composition."""
+        return self._outputs_trace_fn(x, u, t)
 
     def outputs_p(self, x, u, t, params):
-        return self._jit_outputs_p(x, u, t, params)
+        return self._outputs_jit_p_fn(x, u, t, params)
+
+    def outputs_trace_p(self, x, u, t, params):
+        """Pre-JIT parametric boundary outputs for JAX composition."""
+        return self._outputs_trace_p_fn(x, u, t, params)
+
+
+register_jit_aliases(JaxStaticEvaluator, ("outputs",))

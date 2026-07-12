@@ -8,4 +8,4 @@ Architecture and port plans. Contracts in code: [DESIGN.md](../../DESIGN.md), [R
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Planning stack layout | Reference |
 | [neural-blocks-collection.md](neural-blocks-collection.md) | MLP / neural blocks roadmap | Future |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle model layering | Reference |
-| [evaluator-trace-tier-api.md](evaluator-trace-tier-api.md) | JAX `_trace` / `_jit` evaluator tier naming and rollout | Approved design |
+| [evaluator-trace-tier-api.md](evaluator-trace-tier-api.md) | JAX fast vs trace evaluator tiers | Reference |

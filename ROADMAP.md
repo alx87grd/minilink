@@ -53,6 +53,8 @@ release process by themselves.
 
 - Separated model / compile / simulate / optimize / plan / graphics.
 - `ExecutionPlan` + NumPy/JAX evaluators; shared `Trajectory`.
+- **JAX evaluator trace tier** — fast vs trace execution tiers on compiled
+  evaluators ([evaluator-trace-tier-api.md](docs/plans/evaluator-trace-tier-api.md)).
 - Composition shortcuts (`+`, `>>`, `@`, `autowire`) → ordinary `DiagramSystem`.
 - Explicit ports; `DynamicSystem` textbook ports via constructor options.
 - Pure `MathematicalProgram` + `Optimizer`; backend-native trajopt transcriptions.
@@ -114,6 +116,13 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 ## 5. Future
 
 Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.0:
+
+### 5.0 Compile (evaluators)
+
+- [x] JAX trace tier (`f_trace`, integration trace, `tiers.py`, tests)
+- [ ] Trace tier gaps — `rollout_trace`, `integrate_zoh_trace`, `compute_internal_signals_trace`, public `f_ivp_trace`
+- [ ] `compile(..., warm_start=True)` centralization
+- [ ] `benchmarks/jax_evaluator_tiers.py`
 
 ### 5.1 Analysis
 

@@ -11,6 +11,7 @@ import numpy as np
 
 from minilink.core.compile.evaluators.dynamics_evaluator import DynamicsEvaluator
 from minilink.core.compile.evaluators.output_evaluator import outputs_from_ports
+from minilink.core.compile.evaluators.tiers import NoTraceTierMixin
 from minilink.core.compile.execution_plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
@@ -21,7 +22,7 @@ from minilink.core.diagram import validate_diagram_params
 from minilink.core.system import DynamicSystem
 
 
-class NumpyDynamicEvaluator(DynamicsEvaluator):
+class NumpyDynamicEvaluator(NoTraceTierMixin, DynamicsEvaluator):
     """Compiled evaluator for a :class:`DynamicSystem` using NumPy."""
 
     def __init__(self, system: DynamicSystem):
@@ -72,7 +73,7 @@ def _gather_u(
     return local_u
 
 
-class NumpyDiagramEvaluator(DynamicsEvaluator):
+class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator):
     """Stateless NumPy evaluator for a compiled diagram."""
 
     def __init__(self, plan: ExecutionPlan, diagram):

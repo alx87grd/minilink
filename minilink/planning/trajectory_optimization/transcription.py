@@ -55,6 +55,10 @@ def dynamics_function(problem: PlanningProblem, compile_backend: str):
         return lambda x, u, t: problem.sys.f(x, u, t, params)
 
     evaluator = problem.sys.compile(backend=key, verbose=False)
+    if getattr(evaluator, "has_trace_tier", False):
+        if params is None:
+            return lambda x, u, t: evaluator.f_trace(x, u, t)
+        return lambda x, u, t: evaluator.f_trace_p(x, u, t, params)
     if params is None:
         return lambda x, u, t: evaluator.f(x, u, t)
     return lambda x, u, t: evaluator.f_p(x, u, t, params)
