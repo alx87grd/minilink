@@ -90,13 +90,23 @@ JAX fast tier: scanned rollouts (lazy JIT on first call); single-step helpers ca
 JAX trace tier: RK4/Euler call `f_trace` / `f_trace_p`; rollout trace helpers fuse
 one scan for AD.
 
+### Step rollouts (fast tier)
+
+| Bound fast | Param fast | Notes |
+| --- | --- | --- |
+| `rollout` | `rollout_p` | State-only :class:`~minilink.core.step_rollout.StepRollout` ``(k, x, u)``; JAX uses ``_rollout_jit_fn`` scan |
+
+Signal histories are **not** evaluator output — they belong to
+:class:`~minilink.simulation.computer.Computer` and
+:class:`~minilink.simulation.hybrid_simulator.HybridSimulator`.
+
 ### Not exposed on JAX (gaps)
 
 | Surface | Notes |
 | --- | --- |
 | `integrate_zoh_trace` | Sugar over RK4 ZOH; deferred |
-| `rollout`, `rollout_p` (step) | Fast `_rollout_jit_fn` scan; state-only — log via :class:`~minilink.simulation.computer.Computer` / hybrid sim |
-| `compute_internal_signals` (diagram) | JIT fast tier; no `compute_internal_signals_trace` |
+| `rollout_trace`, `rollout_trace_p` | Scan over `step_trace` for AD; deferred |
+| `compute_internal_signals_trace` | `_internal_signals_trace_fn` exists internally; no public trace wrapper yet |
 | `f_scipy`, `as_scipy_*` | Fast tier bridges only |
 
 ---

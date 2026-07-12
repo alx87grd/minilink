@@ -165,8 +165,9 @@ serial arms. Joint impedance / task impedance / computed torque use
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
 - **StepSystem (discrete leaf):** same port shortcut as `DynamicSystem`; evolution is
-  `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`;
-  cache `self.rollout`.
+  `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`
+  (state-only ``k/x/u``); cache `self.rollout`. Boundary signal histories:
+  :class:`~minilink.simulation.computer.Computer` / hybrid sim, not evaluators.
 - **Hybrid (computer + plant):** :class:`~minilink.core.hybrid_diagram.HybridDiagram`
   bundles :class:`~minilink.simulation.computer.Computer` (step side + schedule) and a
   continuous :class:`DiagramSystem` plant. Boundary channels use ZOH (computer → plant)
@@ -201,7 +202,6 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
-  and anchors hybrid edges on wired subsystem ports.
 - **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCStatelessController`
   is a static ``System`` (``n=0``) leaf: one :meth:`~minilink.planning.mpc.planner.MPCPlanner.step`
   per Computer tick (memoized across output ports ``u_ff``, ``x_ff``, ``z``).
@@ -211,7 +211,6 @@ serial arms. Joint impedance / task impedance / computed torque use
   ``Computer.x``.   Post-sim horizons:
   :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
   default animation overlays:
-  :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
   :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
@@ -405,7 +404,8 @@ reintroduce `compute_outputs(..., ports=...)`.
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
 - :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
-  (state-only :class:`~minilink.core.step_rollout.StepRollout`; signal logging via
+  (state-only :class:`~minilink.core.step_rollout.StepRollout` ``(k, x, u)``; evaluators
+  and the façade do not record boundary signals — logging is owned by
   :class:`~minilink.simulation.computer.Computer` / :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`; not `Simulator`)
 - :class:`~minilink.core.hybrid_diagram.HybridDiagram` →
   :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` or façade

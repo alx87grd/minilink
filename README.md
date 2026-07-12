@@ -387,7 +387,8 @@ Compose:   + / >> / @ / autowire  →  DiagramSystem
 
 Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
            →  compile  →  solve  →  Trajectory
-           StepSystem: compute_rollout  →  StepEvaluator.rollout
+           StepSystem: compute_rollout  →  StepEvaluator.rollout (state-only k/x/u)
+           StepDiagram + schedule: Computer.tick  →  signal histories (not evaluator rollout)
            HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
            cache: self.traj (plant Trajectory), self.last_result (full result), self.rollout (computer)
 

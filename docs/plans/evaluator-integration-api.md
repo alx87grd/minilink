@@ -164,8 +164,10 @@ Euler rollouts mirror RK4 shapes and semantics.
 | **`_p`** | Every integrator that evaluates dynamics — NumPy and JAX |
 | **`_trace` / `_trace_p`** | JAX only; mirror fast / `_p` one-for-one |
 
-Deferred (separate from this plan): `rollout_trace` on step diagrams,
-`compute_internal_signals_trace`, `integrate_zoh_trace` on JAX.
+Deferred (separate from this plan): `rollout_trace` / `rollout_trace_p` on step
+evaluators, public `compute_internal_signals_trace`, `integrate_zoh_trace` on JAX.
+Fast step `rollout` / `rollout_p` are implemented (state-only; signal logging in
+:class:`~minilink.simulation.computer.Computer` / hybrid sim).
 
 ---
 
