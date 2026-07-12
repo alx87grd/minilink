@@ -1,4 +1,4 @@
-"""Explicit Euler integration on the simulation time grid."""
+"""Variable-step explicit Euler on the simulation time grid."""
 
 import numpy as np
 
@@ -6,7 +6,7 @@ from minilink.simulation.solvers.solver import SolverBackend
 
 
 class EulerSolverBackend(SolverBackend):
-    """Explicit Euler on the ``times`` grid (fixed ``dt`` between knots)."""
+    """Explicit Euler with per-interval ``dt = times[i+1] - times[i]``."""
 
     def __init__(self) -> None:
         self.last_debug = None
@@ -19,11 +19,13 @@ class EulerSolverBackend(SolverBackend):
         args=None,
     ) -> np.ndarray:
         n_pts = times.shape[0]
-        t0 = times[0]
-        dt = times[1] - times[0]
-        n_steps = n_pts - 1
-        x_seq = evaluator.euler_integrate_ivp(x0, t0, dt, n_steps)
-        x_traj = np.asarray(x_seq).T
+        n = evaluator.n
+        x_traj = np.zeros((n, n_pts), dtype=float)
+        x_traj[:, 0] = x0
+
+        for i in range(n_pts - 1):
+            dt = times[i + 1] - times[i]
+            x_traj[:, i + 1] = evaluator.euler_step_ivp(x_traj[:, i], times[i], dt)
 
         self.last_debug = {
             "solver": "euler",
@@ -44,12 +46,13 @@ class EulerSolverBackend(SolverBackend):
         args=None,
     ) -> np.ndarray:
         n_pts = times.shape[0]
-        t0 = times[0]
-        dt = times[1] - times[0]
-        # Hold u[:, i] over each interval → ZOH sequence of length n_pts - 1
-        u_sequence = np.asarray(u[:, : n_pts - 1].T)
-        x_seq = evaluator.euler_integrate_zoh(x0, u_sequence, t0, dt)
-        x_traj = np.asarray(x_seq).T
+        n = evaluator.n
+        x_traj = np.zeros((n, n_pts), dtype=float)
+        x_traj[:, 0] = x0
+
+        for i in range(n_pts - 1):
+            dt = times[i + 1] - times[i]
+            x_traj[:, i + 1] = evaluator.euler_step(x_traj[:, i], u[:, i], times[i], dt)
 
         self.last_debug = {
             "solver": "euler",

@@ -32,6 +32,7 @@ from minilink.simulation.sim_reporting import (
 )
 from minilink.simulation.solver_warnings import emit_discontinuous_solver_warnings
 from minilink.simulation.solvers.euler import EulerSolverBackend
+from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
 
@@ -79,6 +80,7 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
         },
     ),
     "euler": ("euler", {}),
+    "euler_fixedsteps": ("euler_fixed", {}),
     "rk4_fixedsteps": ("rk4", {}),
 }
 
@@ -127,7 +129,10 @@ class Simulator:
     dt : float, optional
         Step size when ``n_steps`` is not set.
     solver : str, optional
-        Solver mode; if ``None``, chosen by :meth:`select_solver`.
+        Solver mode; if ``None``, chosen by :meth:`select_solver`. Use
+        ``"euler"`` for variable ``dt`` per output knot, or
+        ``"euler_fixedsteps"`` for uniform grids via compiled Euler rollouts
+        (same pattern as ``"rk4_fixedsteps"``).
     verbose : bool
         Print setup information (default quiet).
     compile_backend : str
@@ -534,6 +539,8 @@ class Simulator:
             return SciPySolverBackend()
         if solver_backend_key == "euler":
             return EulerSolverBackend()
+        if solver_backend_key == "euler_fixed":
+            return EulerFixedStepSolverBackend()
         if solver_backend_key == "rk4":
             return RK4SolverBackend()
         raise ValueError(f"Unknown solver '{solver_backend_key}'")

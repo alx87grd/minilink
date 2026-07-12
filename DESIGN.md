@@ -410,7 +410,7 @@ Unconnected inputs use port nominals; time-varying sources belong in the diagram
 forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
-`euler`, `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
+`euler`, `euler_fixedsteps`, `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
 ([ROADMAP.md](ROADMAP.md) P1).
 
 ### Discontinuous closed loops — known issues
