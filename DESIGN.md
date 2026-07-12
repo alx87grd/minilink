@@ -343,7 +343,7 @@ optional class attribute `feedback_profile`, not inheritance):
 - :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.DynamicsEvaluator`
   (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)
 - :class:`StepSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.StepEvaluator`
-  (`NumpyStepEvaluator` / `JaxStepEvaluator`) — `.step`, `.outputs`, `.rollout`; no `.f`
+  (`NumpyStepEvaluator` / `JaxStepEvaluator`) — `.step`, `.outputs`, state-only `.rollout`; no `.f`
 - static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.evaluators.StaticEvaluator`
   (`NumpyStaticEvaluator` / `JaxStaticEvaluator`) — `.outputs` only, no `.f`
 - :class:`DiagramSystem` → diagram evaluator (same dynamics tier as above)
@@ -404,8 +404,9 @@ reintroduce `compute_outputs(..., ports=...)`.
 - static :class:`System` leaf (`n=0`) →
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
-- :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
-  (clock-free :class:`~minilink.core.step_rollout.StepRollout`; not `Simulator`)
+- :class:`StepSystem` → `compile().rollout(...)` (state-only) or `compute_rollout(n_steps=...)`
+  (clock-free :class:`~minilink.core.step_rollout.StepRollout`; boundary output logging via
+  :func:`~minilink.simulation.step_recording.record_boundary_outputs` or the façade; not `Simulator`)
 - :class:`~minilink.core.hybrid_diagram.HybridDiagram` →
   :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` or façade
   `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`)

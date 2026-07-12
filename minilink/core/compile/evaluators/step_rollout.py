@@ -133,32 +133,14 @@ class StepRolloutMixin:
 
         return u_samples
 
-    def _init_signal_buffers(self, x, u, k, n_samples, outputs_fn):
-        if not self.p:
-            return {}
-        out = outputs_fn(x, u, k)
-        signals = {}
-        for port_id, values in out.items():
-            dim = int(np.asarray(values, dtype=float).reshape(-1).size)
-            signals[port_id] = np.zeros((dim, n_samples), dtype=float)
-            signals[port_id][:, k] = np.asarray(values, dtype=float).reshape(dim)
-        return signals
-
-    def _write_outputs(self, signals, x, u, k, outputs_fn):
-        if not signals:
-            return
-        out = outputs_fn(x, u, k)
-        for port_id, values in out.items():
-            arr = np.asarray(values, dtype=float).reshape(-1)
-            signals[port_id][:, k] = arr
-
-    def rollout(self, x0, *, n_steps, u=None, record_outputs=True) -> StepRollout:
+    def rollout(self, x0, *, n_steps, u=None) -> StepRollout:
         """
         Roll out ``x_{k+1} = step(x_k, u_k, k)`` for ``n_steps`` transitions.
 
-        Returns a :class:`~minilink.core.step_rollout.StepRollout` with
+        Returns a state-only :class:`~minilink.core.step_rollout.StepRollout` with
         ``k.shape == (n_steps + 1,)``, ``x.shape == (n, n_steps + 1)``, and
-        ``u.shape == (m, n_steps + 1)``.
+        ``u.shape == (m, n_steps + 1)``. Boundary output histories belong in
+        simulation helpers — see :func:`~minilink.simulation.step_recording.record_boundary_outputs`.
         """
         x0 = np.asarray(x0, dtype=float).reshape(self.n)
         n_samples = n_steps + 1
@@ -168,29 +150,13 @@ class StepRolloutMixin:
 
         u_samples = self._coerce_rollout_inputs(n_steps, u)
 
-        signals = {}
-        if record_outputs and self.p:
-            signals = self._init_signal_buffers(
-                x_samples[:, 0], u_samples[:, 0], 0, n_samples, self.outputs
-            )
-
         for step_k in range(n_steps):
             u_k = u_samples[:, step_k]
             x_samples[:, step_k + 1] = self.step(x_samples[:, step_k], u_k, step_k)
-            if record_outputs and self.p:
-                self._write_outputs(
-                    signals,
-                    x_samples[:, step_k + 1],
-                    u_k,
-                    step_k + 1,
-                    self.outputs,
-                )
 
-        return StepRollout(k=k, x=x_samples, u=u_samples, signals=signals)
+        return StepRollout(k=k, x=x_samples, u=u_samples)
 
-    def rollout_p(
-        self, x0, *, n_steps, u=None, params, record_outputs=True
-    ) -> StepRollout:
+    def rollout_p(self, x0, *, n_steps, u=None, params) -> StepRollout:
         """Parametric twin of :meth:`rollout`."""
         x0 = np.asarray(x0, dtype=float).reshape(self.n)
         n_samples = n_steps + 1
@@ -200,28 +166,10 @@ class StepRolloutMixin:
 
         u_samples = self._coerce_rollout_inputs(n_steps, u)
 
-        signals = {}
-        if record_outputs and self.p:
-            signals = self._init_signal_buffers(
-                x_samples[:, 0],
-                u_samples[:, 0],
-                0,
-                n_samples,
-                lambda x, u, kk: self.outputs_p(x, u, kk, params),
-            )
-
         for step_k in range(n_steps):
             u_k = u_samples[:, step_k]
             x_samples[:, step_k + 1] = self.step_p(
                 x_samples[:, step_k], u_k, step_k, params
             )
-            if record_outputs and self.p:
-                self._write_outputs(
-                    signals,
-                    x_samples[:, step_k + 1],
-                    u_k,
-                    step_k + 1,
-                    lambda x, u, kk: self.outputs_p(x, u, kk, params),
-                )
 
-        return StepRollout(k=k, x=x_samples, u=u_samples, signals=signals)
+        return StepRollout(k=k, x=x_samples, u=u_samples)

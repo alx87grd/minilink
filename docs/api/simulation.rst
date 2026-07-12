@@ -4,6 +4,9 @@ Simulation
 .. automodule:: minilink.simulation.simulator
    :members:
 
+.. automodule:: minilink.simulation.step_recording
+   :members:
+
 .. automodule:: minilink.simulation.input_interpolation
    :members:
 

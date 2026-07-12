@@ -1131,12 +1131,7 @@ class JaxStepEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
             self.jnp.asarray(x), self.jnp.asarray(u), k, params
         )
 
-    def rollout(self, x0, *, n_steps, u=None, record_outputs=True):
-        if record_outputs and self.p:
-            return super().rollout(
-                x0, n_steps=n_steps, u=u, record_outputs=record_outputs
-            )
-
+    def rollout(self, x0, *, n_steps, u=None):
         jnp = self.jnp
         x0 = jnp.asarray(x0, dtype=float).reshape(self.n)
         u_samples = self._coerce_rollout_inputs(n_steps, u)
@@ -1148,7 +1143,7 @@ class JaxStepEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
         x_samples = np.asarray(x_path, dtype=float).T
         k = np.arange(n_steps + 1, dtype=float)
         u_np = np.asarray(u_samples, dtype=float)
-        return StepRollout(k=k, x=x_samples, u=u_np, signals={})
+        return StepRollout(k=k, x=x_samples, u=u_np)
 
 
 register_jit_aliases(JaxStepEvaluator, ("step", "outputs"))
@@ -1406,12 +1401,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
             params,
         )
 
-    def rollout(self, x0, *, n_steps, u=None, record_outputs=True):
-        if record_outputs and self.p:
-            return super().rollout(
-                x0, n_steps=n_steps, u=u, record_outputs=record_outputs
-            )
-
+    def rollout(self, x0, *, n_steps, u=None):
         jnp = self.jnp
         x0 = jnp.asarray(x0, dtype=float).reshape(self.n)
         u_samples = self._coerce_rollout_inputs(n_steps, u)
@@ -1423,7 +1413,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
         x_samples = np.asarray(x_path, dtype=float).T
         k = np.arange(n_steps + 1, dtype=float)
         u_np = np.asarray(u_samples, dtype=float)
-        return StepRollout(k=k, x=x_samples, u=u_np, signals={})
+        return StepRollout(k=k, x=x_samples, u=u_np)
 
 
 register_jit_aliases(JaxStepDiagramEvaluator, ("step", "outputs"))

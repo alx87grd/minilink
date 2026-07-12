@@ -95,7 +95,7 @@ one scan for AD.
 | Surface | Notes |
 | --- | --- |
 | `integrate_zoh_trace` | Sugar over RK4 ZOH; deferred |
-| `rollout`, `rollout_p` (step) | Fast `_jit_rollout` only; no `rollout_trace` |
+| `rollout`, `rollout_p` (step) | Fast `_jit_rollout` scan; state-only — use :func:`~minilink.simulation.step_recording.record_boundary_outputs` or :class:`~minilink.simulation.computer.Computer` for logging |
 | `compute_internal_signals` (diagram) | JIT fast tier; no `compute_internal_signals_trace` |
 | `f_scipy`, `as_scipy_*` | Fast tier bridges only |
 

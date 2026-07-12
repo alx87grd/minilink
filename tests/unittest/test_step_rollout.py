@@ -121,12 +121,21 @@ class TestStepRollout(unittest.TestCase):
         rollout = ev.rollout(plant.x0, n_steps=2, u=u_of_k)
         np.testing.assert_allclose(rollout.u[0, :2], [0.0, 1.0])
 
-    def test_record_outputs(self):
+    def test_rollout_state_only_by_default(self):
         plant = AffineStep()
         ev = compile(plant)
         rollout = ev.rollout(plant.x0, n_steps=2, u=np.array([0.0]))
-        self.assertIn("y", rollout.signals)
-        np.testing.assert_allclose(rollout.signals["y"][0], rollout.x[0])
+        self.assertEqual(len(rollout.signals), 0)
+
+    def test_record_boundary_outputs(self):
+        from minilink.simulation.step_recording import record_boundary_outputs
+
+        plant = AffineStep()
+        ev = compile(plant)
+        rollout = ev.rollout(plant.x0, n_steps=2, u=np.array([0.0]))
+        logged = record_boundary_outputs(rollout, ev)
+        self.assertIn("y", logged.signals)
+        np.testing.assert_allclose(logged.signals["y"][0], rollout.x[0])
 
 
 @pytest.mark.optional
@@ -149,13 +158,9 @@ class TestStepRolloutJax(unittest.TestCase):
 
         plant = JaxFriendlyStep()
         ev = compile(plant, backend="jax")
-        rollout = ev.rollout(
-            plant.x0, n_steps=4, u=np.array([1.0]), record_outputs=False
-        )
+        rollout = ev.rollout(plant.x0, n_steps=4, u=np.array([1.0]))
         ev_np = compile(plant, backend="numpy")
-        ref = ev_np.rollout(
-            plant.x0, n_steps=4, u=np.array([1.0]), record_outputs=False
-        )
+        ref = ev_np.rollout(plant.x0, n_steps=4, u=np.array([1.0]))
         np.testing.assert_allclose(rollout.x, ref.x, atol=1e-5)
 
 
