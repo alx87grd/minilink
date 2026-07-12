@@ -127,16 +127,6 @@ class TestStepRollout(unittest.TestCase):
         rollout = ev.rollout(plant.x0, n_steps=2, u=np.array([0.0]))
         self.assertEqual(len(rollout.signals), 0)
 
-    def test_record_boundary_outputs(self):
-        from minilink.simulation.step_recording import record_boundary_outputs
-
-        plant = AffineStep()
-        ev = compile(plant)
-        rollout = ev.rollout(plant.x0, n_steps=2, u=np.array([0.0]))
-        logged = record_boundary_outputs(rollout, ev)
-        self.assertIn("y", logged.signals)
-        np.testing.assert_allclose(logged.signals["y"][0], rollout.x[0])
-
 
 @pytest.mark.optional
 @pytest.mark.jax

@@ -748,53 +748,29 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
                 flush=True,
             )
 
-        _f_eager = self._f_eager
-        self._jit_f = jax.jit(_f_eager)
+        self._f_jit_fn = jax.jit(self._f_trace_fn)
         u_nom = self._u_nominal
-        self._jit_f_ivp = jax.jit(lambda x, t: _f_eager(x, u_nom, t))
-        self._jit_jac_ivp = jax.jit(jax.jacfwd(self._jit_f_ivp, argnums=0))
+        self._f_ivp_trace_fn = lambda x, t: self._f_trace_fn(x, u_nom, t)
+        self._f_ivp_jit_fn = jax.jit(self._f_ivp_trace_fn)
+        self._jac_ivp_jit_fn = jax.jit(jax.jacfwd(self._f_ivp_jit_fn, argnums=0))
 
-        self._jit_outputs = jax.jit(
-            lambda x, u, t: self._external_outputs_eager(x, u, t)
-        )
-        self._jit_internal_signals = jax.jit(
-            lambda x, u, t: self._internal_signals_eager(x, u, t)
-        )
+        self._outputs_jit_fn = jax.jit(self._outputs_trace_fn)
+        self._internal_signals_jit_fn = jax.jit(self._internal_signals_trace_fn)
 
-        self._jit_f_p = jax.jit(self._f_p_eager)
-        self._jit_outputs_p = jax.jit(self._outputs_p_eager)
-        self._jit_jac_f_params = jax.jit(jax.jacfwd(self._f_p_eager, argnums=3))
-
-        self._f_trace_fn = self._f_eager
-        self._f_trace_p_fn = self._f_p_eager
-        self._f_jit_fn = self._jit_f
-        self._f_jit_p_fn = self._jit_f_p
-        self._f_ivp_trace_fn = lambda x, t: _f_eager(x, u_nom, t)
+        self._f_jit_p_fn = jax.jit(self._f_trace_p_fn)
+        self._outputs_jit_p_fn = jax.jit(self._outputs_trace_p_fn)
+        self._jac_f_params_jit_fn = jax.jit(jax.jacfwd(self._f_trace_p_fn, argnums=3))
 
         def _f_ivp_trace_p_fn(x, t, p):
-            return self._f_p_eager(x, u_nom, t, p)
+            return self._f_trace_p_fn(x, u_nom, t, p)
 
         self._f_ivp_trace_p_fn = _f_ivp_trace_p_fn
-        self._f_ivp_jit_fn = self._jit_f_ivp
         self._f_ivp_jit_p_fn = jax.jit(_f_ivp_trace_p_fn)
-        self._jac_ivp_jit_fn = self._jit_jac_ivp
 
         self._setup_integration_tiers(jax, jnp)
 
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
-
-    def _external_outputs_eager(self, x, u, t):
-        dtype = self._infer_dtype(x, u)
-        signals = self._compute_port_signals(x, u, t, dtype)
-        return {
-            port_id: signals[sl]
-            for port_id, sl in self.plan.external_output_slices.items()
-        }
-
-    def _internal_signals_eager(self, x, u, t):
-        dtype = self._infer_dtype(x, u)
-        return self._compute_port_signals(x, u, t, dtype)
 
     def _check_jax_compatibility(self, diagram, jax, jnp):
         for sys_id, sys in diagram.subsystems.items():
@@ -832,18 +808,18 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
         return dtype if dtype is not None else jnp.float32
 
     def f(self, x, u, t=0.0):
-        return self._jit_f(x, u, t)
+        return self._f_jit_fn(x, u, t)
 
     def f_trace(self, x, u, t=0.0):
         """Pre-JIT flat callable for JAX composition."""
-        return self._f_eager(x, u, t)
+        return self._f_trace_fn(x, u, t)
 
     def f_scipy(self, x, u, t=0.0):
         x = self._jnp.asarray(x)
         u = self._jnp.asarray(u)
-        return np.asarray(self._jit_f(x, u, t))
+        return np.asarray(self._f_jit_fn(x, u, t))
 
-    def _f_eager(self, x, u, t=0.0):
+    def _f_trace_fn(self, x, u, t=0.0):
         jnp = self._jnp
         dtype = self._infer_dtype(x, u)
         signals = self._compute_port_signals(x, u, t, dtype)
@@ -855,7 +831,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
             dx = dx.at[op.local_x_slice].set(dx_piece)
         return dx
 
-    def _f_p_eager(self, x, u, t, params):
+    def _f_trace_p_fn(self, x, u, t, params):
         jnp = self._jnp
         dtype = self._infer_dtype(x, u)
         signals = self._compute_port_signals_p(x, u, t, dtype, params)
@@ -868,7 +844,7 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
             dx = dx.at[op.local_x_slice].set(dx_piece)
         return dx
 
-    def _outputs_p_eager(self, x, u, t, params):
+    def _outputs_trace_p_fn(self, x, u, t, params):
         dtype = self._infer_dtype(x, u)
         signals = self._compute_port_signals_p(x, u, t, dtype, params)
         return {
@@ -877,29 +853,29 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
         }
 
     def outputs(self, x, u, t=0.0):
-        return self._jit_outputs(x, u, t)
+        return self._outputs_jit_fn(x, u, t)
 
     def outputs_trace(self, x, u, t=0.0):
         """Pre-JIT boundary outputs for JAX composition."""
-        return self._external_outputs_eager(x, u, t)
+        return self._outputs_trace_fn(x, u, t)
 
     def f_p(self, x, u, t, params):
         validate_diagram_params(params, self._subsystem_ids)
-        return self._jit_f_p(x, u, t, params)
+        return self._f_jit_p_fn(x, u, t, params)
 
     def f_trace_p(self, x, u, t, params):
         """Pre-JIT parametric dynamics for JAX composition."""
         validate_diagram_params(params, self._subsystem_ids)
-        return self._f_p_eager(x, u, t, params)
+        return self._f_trace_p_fn(x, u, t, params)
 
     def outputs_p(self, x, u, t, params):
         validate_diagram_params(params, self._subsystem_ids)
-        return self._jit_outputs_p(x, u, t, params)
+        return self._outputs_jit_p_fn(x, u, t, params)
 
     def outputs_trace_p(self, x, u, t, params):
         """Pre-JIT parametric boundary outputs for JAX composition."""
         validate_diagram_params(params, self._subsystem_ids)
-        return self._outputs_p_eager(x, u, t, params)
+        return self._outputs_trace_p_fn(x, u, t, params)
 
     def jacobian_f_params(self, x, u, t, params):
         if params is None:
@@ -907,10 +883,22 @@ class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin
                 "jacobian_f_params requires an explicit nested params pytree"
             )
         validate_diagram_params(params, self._subsystem_ids)
-        return self._jit_jac_f_params(x, u, t, params)
+        return self._jac_f_params_jit_fn(x, u, t, params)
 
     def compute_internal_signals(self, x, u, t=0.0):
-        return self._jit_internal_signals(x, u, t)
+        return self._internal_signals_jit_fn(x, u, t)
+
+    def _outputs_trace_fn(self, x, u, t=0.0):
+        dtype = self._infer_dtype(x, u)
+        signals = self._compute_port_signals(x, u, t, dtype)
+        return {
+            port_id: signals[sl]
+            for port_id, sl in self.plan.external_output_slices.items()
+        }
+
+    def _internal_signals_trace_fn(self, x, u, t=0.0):
+        dtype = self._infer_dtype(x, u)
+        return self._compute_port_signals(x, u, t, dtype)
 
     def compute_internal_signals_dict(self, x, u, t=0.0):
         signals = self.compute_internal_signals(x, u, t)
@@ -1095,7 +1083,7 @@ class JaxStepEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
         self._outputs_trace_p_fn = tiers["_outputs_trace_p_fn"]
         self._outputs_jit_fn = tiers["_outputs_jit_fn"]
         self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
-        self._jit_rollout = build_jit_step_rollout(jax, jnp, self._step_jit_fn)
+        self._rollout_jit_fn = build_jit_step_rollout(jax, jnp, self._step_jit_fn)
 
     def step(self, x, u, k=0):
         return self._step_jit_fn(self.jnp.asarray(x), self.jnp.asarray(u), k)
@@ -1139,7 +1127,7 @@ class JaxStepEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
             x_path = x0.reshape(1, self.n)
         else:
             u_steps = jnp.asarray(u_samples[:, :n_steps].T)
-            x_path = self._jit_rollout(x0, u_steps)
+            x_path = self._rollout_jit_fn(x0, u_steps)
         x_samples = np.asarray(x_path, dtype=float).T
         k = np.arange(n_steps + 1, dtype=float)
         u_np = np.asarray(u_samples, dtype=float)
@@ -1212,17 +1200,17 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        self._step_fn = self._make_step_fn()
-        self._step_p_fn = self._make_step_p_fn()
-        self._outputs_fn = self._make_outputs_fn()
-        self._outputs_p_fn = self._make_outputs_p_fn()
-        self._jit_step = jax.jit(self._step_fn)
-        self._jit_step_p = jax.jit(self._step_p_fn)
-        self._jit_outputs = jax.jit(self._outputs_fn)
-        self._jit_outputs_p = jax.jit(self._outputs_p_fn)
-        self._jit_rollout = build_jit_step_rollout(jax, jnp, self._jit_step)
+        self._step_trace_fn = self._make_step_trace_fn()
+        self._step_trace_p_fn = self._make_step_trace_p_fn()
+        self._outputs_trace_fn = self._make_outputs_trace_fn()
+        self._outputs_trace_p_fn = self._make_outputs_trace_p_fn()
+        self._step_jit_fn = jax.jit(self._step_trace_fn)
+        self._step_jit_p_fn = jax.jit(self._step_trace_p_fn)
+        self._outputs_jit_fn = jax.jit(self._outputs_trace_fn)
+        self._outputs_jit_p_fn = jax.jit(self._outputs_trace_p_fn)
+        self._rollout_jit_fn = build_jit_step_rollout(jax, jnp, self._step_jit_fn)
 
-    def _make_step_fn(self):
+    def _make_step_trace_fn(self):
         plan = self.plan
         jnp = self.jnp
         dtype = self._dtype
@@ -1251,7 +1239,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
         return _step
 
-    def _make_step_p_fn(self):
+    def _make_step_trace_p_fn(self):
         plan = self.plan
         jnp = self.jnp
         dtype = self._dtype
@@ -1282,7 +1270,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
         return _step_p
 
-    def _make_outputs_fn(self):
+    def _make_outputs_trace_fn(self):
         plan = self.plan
         jnp = self.jnp
         dtype = self._dtype
@@ -1305,7 +1293,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
         return _outputs
 
-    def _make_outputs_p_fn(self):
+    def _make_outputs_trace_p_fn(self):
         plan = self.plan
         jnp = self.jnp
         dtype = self._dtype
@@ -1331,7 +1319,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
     def step(self, x, u, k=0):
         return np.asarray(
-            self._jit_step(
+            self._step_jit_fn(
                 self.jnp.asarray(x, dtype=self._dtype),
                 self.jnp.asarray(u, dtype=self._dtype),
                 k,
@@ -1341,7 +1329,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
     def step_trace(self, x, u, k=0):
         """Pre-JIT flat step for JAX composition."""
-        return self._step_fn(
+        return self._step_trace_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -1349,7 +1337,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
     def step_p(self, x, u, k, params):
         return np.asarray(
-            self._jit_step_p(
+            self._step_jit_p_fn(
                 self.jnp.asarray(x, dtype=self._dtype),
                 self.jnp.asarray(u, dtype=self._dtype),
                 k,
@@ -1360,7 +1348,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
     def step_trace_p(self, x, u, k, params):
         """Pre-JIT parametric step for JAX composition."""
-        return self._step_p_fn(
+        return self._step_trace_p_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -1368,7 +1356,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
         )
 
     def outputs(self, x, u, k=0):
-        out = self._jit_outputs(
+        out = self._outputs_jit_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -1377,14 +1365,14 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
     def outputs_trace(self, x, u, k=0):
         """Pre-JIT boundary outputs for JAX composition."""
-        return self._outputs_fn(
+        return self._outputs_trace_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
         )
 
     def outputs_p(self, x, u, k, params):
-        out = self._jit_outputs_p(
+        out = self._outputs_jit_p_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -1394,7 +1382,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
     def outputs_trace_p(self, x, u, k, params):
         """Pre-JIT parametric boundary outputs for JAX composition."""
-        return self._outputs_p_fn(
+        return self._outputs_trace_p_fn(
             self.jnp.asarray(x, dtype=self._dtype),
             self.jnp.asarray(u, dtype=self._dtype),
             k,
@@ -1409,7 +1397,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
             x_path = x0.reshape(1, self.n)
         else:
             u_steps = jnp.asarray(u_samples[:, :n_steps].T)
-            x_path = self._jit_rollout(x0, u_steps)
+            x_path = self._rollout_jit_fn(x0, u_steps)
         x_samples = np.asarray(x_path, dtype=float).T
         k = np.arange(n_steps + 1, dtype=float)
         u_np = np.asarray(u_samples, dtype=float)

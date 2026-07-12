@@ -95,7 +95,7 @@ one scan for AD.
 | Surface | Notes |
 | --- | --- |
 | `integrate_zoh_trace` | Sugar over RK4 ZOH; deferred |
-| `rollout`, `rollout_p` (step) | Fast `_jit_rollout` scan; state-only — log via :class:`~minilink.simulation.computer.Computer` / hybrid sim |
+| `rollout`, `rollout_p` (step) | Fast `_rollout_jit_fn` scan; state-only — log via :class:`~minilink.simulation.computer.Computer` / hybrid sim |
 | `compute_internal_signals` (diagram) | JIT fast tier; no `compute_internal_signals_trace` |
 | `f_scipy`, `as_scipy_*` | Fast tier bridges only |
 
@@ -114,17 +114,15 @@ minilink/core/compile/evaluators/
 
 ### Internal naming
 
-**Leaf evaluators** (built via `build_dynamic_leaf_tiers` in `jax_evaluators`):
+**Leaf and diagram evaluators** share one convention:
 
-- Fast: `_f_jit_fn`, `_step_jit_fn`, `_outputs_jit_fn`, …
-- Trace: `_f_trace_fn`, `_step_trace_fn`, …
+- Fast: `_f_jit_fn`, `_step_jit_fn`, `_outputs_jit_fn`, `_rollout_jit_fn`, …
+- Trace: `_f_trace_fn`, `_step_trace_fn`, `_outputs_trace_fn`, …
 
-**Diagram evaluators** keep legacy `_jit_*` attributes (`_jit_f`, `_jit_step`, …).
-Trace public methods call eager paths (`_f_eager`, `_step_fn`, …) directly.
-`JaxDiagramEvaluator` sets short-lived aliases (`_f_jit_fn = _jit_f`) so
-`JaxIntegrationMixin` shares one implementation.
+Leaf tiers are built via ``build_dynamic_leaf_tiers`` / ``build_step_leaf_tiers``.
+Diagram evaluators define trace closures as methods, then ``jax.jit`` them at compile time.
 
-### Pattern (leaf)
+### Pattern (leaf and diagram)
 
 ```python
 # compile time
@@ -186,7 +184,7 @@ C-export path: manual / `demo_c_export`.
 | Item | Notes |
 | --- | --- |
 | `rollout_trace`, `rollout_trace_p` | Scan over `step_trace` |
-| `compute_internal_signals_trace` | Thin wiring to `_internal_signals_eager` |
+| `compute_internal_signals_trace` | Thin wiring to `_internal_signals_trace_fn` |
 | `integrate_zoh_trace` | JAX ZOH sugar scan |
 | `benchmarks/jax_evaluator_tiers.py` | Fast vs trace AD benchmarks |
 
@@ -201,5 +199,5 @@ C-export path: manual / `demo_c_export`.
 | `_jit` aliases optional | Document fast tier without breaking `f` |
 | No `_trace` on NumPy | Clear backend guard |
 | Param suffix always last | Matches `f_p`, `outputs_p` |
-| Diagram keeps `_jit_*` internals | Avoid rename churn on large compile paths |
+| Unified `_trace_fn` / `_jit_fn` internals | Same naming for leaf and diagram evaluators |
 | No compile-time warm-start | First real call pays XLA; lazy rollout JIT |

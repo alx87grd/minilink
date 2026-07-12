@@ -139,11 +139,9 @@ class StepRolloutMixin:
 
         Returns a state-only :class:`~minilink.core.step_rollout.StepRollout` with
         ``k.shape == (n_steps + 1,)``, ``x.shape == (n, n_steps + 1)``, and
-        ``u.shape == (m, n_steps + 1)``. Signal histories are filled by
-        :class:`~minilink.simulation.computer.Computer`,
-        :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`, or
-        :func:`~minilink.simulation.step_recording.record_boundary_outputs`
-        when a synchronous reference rollout needs boundary samples.
+        ``u.shape == (m, n_steps + 1)``. Signal histories are owned by
+        :class:`~minilink.simulation.computer.Computer` and
+        :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`.
         """
         x0 = np.asarray(x0, dtype=float).reshape(self.n)
         n_samples = n_steps + 1
