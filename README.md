@@ -447,6 +447,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |
+| C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/demo_c_export_proportional.py` · `demo_c_export.py` |
 | Solver benchmarks | [examples/notebooks/simulation_benchmark.ipynb](examples/notebooks/simulation_benchmark.ipynb) (uses repo-root `benchmarks/`) |
 
 Catalog plants live under `minilink.dynamics.catalog.*`.

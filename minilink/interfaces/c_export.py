@@ -1,4 +1,9 @@
+import ctypes
 import math
+import platform
+import subprocess
+import tempfile
+from pathlib import Path
 
 import jax
 import numpy as np
@@ -24,7 +29,7 @@ def clean_name(v):
         return None
     import re
 
-    return "var_" + re.sub(r"[^a-zA-Z0-9]", "_", str(v))
+    return re.sub(r"[^a-zA-Z0-9]", "_", str(v))
 
 
 def transpile_jaxpr_to_c(closed_jaxpr, func_name="evaluate"):
@@ -386,3 +391,71 @@ def export_system_to_c(
         closed_jaxpr = jax.make_jaxpr(func)(x_jax, u_jax)
 
     return transpile_jaxpr_to_c(closed_jaxpr, func_name)
+
+
+def compile_c_shared(c_source, work_dir=None):
+    """Compile C source to a shared library; return the library path.
+
+    Uses ``cc -shared -fPIC``. Raises ``RuntimeError`` if the compiler is
+    missing or the build fails.
+    """
+    work = (
+        Path(tempfile.mkdtemp(prefix="minilink_c_export_"))
+        if work_dir is None
+        else Path(work_dir)
+    )
+    work.mkdir(parents=True, exist_ok=True)
+    src_path = work / "exported.c"
+    suffix = ".dylib" if platform.system() == "Darwin" else ".so"
+    lib_path = work / f"exported{suffix}"
+    src_path.write_text(c_source)
+
+    cmd = ["cc", "-shared", "-fPIC", "-O0", "-o", str(lib_path), str(src_path)]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "C export round-trip requires a C compiler (`cc` not found on PATH)."
+        ) from exc
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Failed to compile exported C:\n"
+            f"command: {' '.join(cmd)}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+    return lib_path
+
+
+def _c_float_arg(arr):
+    """Match ``transpile_jaxpr_to_c``: size-1 inputs are passed by value."""
+    arr = np.asarray(arr, dtype=np.float32).ravel()
+    if arr.size == 1:
+        return ctypes.c_float(float(arr[0]))
+    return arr.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
+
+def load_exported_c(c_source, func_name, n_out, work_dir=None):
+    """Compile generated C and return a Python ``(x, u) -> y`` callable.
+
+    Calls the exported function by argument order (``x``, ``u``, then the
+    output buffer). Does not depend on mangled C identifier names.
+    """
+    lib_path = compile_c_shared(c_source, work_dir=work_dir)
+    lib = ctypes.CDLL(str(lib_path))
+    c_func = getattr(lib, func_name)
+    c_func.restype = None
+
+    def evaluate(x, u):
+        x_arr = np.ascontiguousarray(np.asarray(x, dtype=np.float32).ravel())
+        u_arr = np.ascontiguousarray(np.asarray(u, dtype=np.float32).ravel())
+        out = np.zeros(n_out, dtype=np.float32)
+        c_func(
+            _c_float_arg(x_arr),
+            _c_float_arg(u_arr),
+            out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        )
+        return out
+
+    evaluate.lib_path = lib_path
+    return evaluate
