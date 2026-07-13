@@ -75,13 +75,13 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
 
     if isinstance(system, StepSystem):
         if key == BACKEND_NUMPY:
-            from minilink.core.compile.evaluators.step_evaluator import (
+            from minilink.core.compile.evaluators.numpy_evaluators import (
                 NumpyStepEvaluator,
             )
 
             return NumpyStepEvaluator(system)
         require_jax_numpy()
-        from minilink.core.compile.evaluators.step_evaluator import JaxStepEvaluator
+        from minilink.core.compile.evaluators.jax_evaluators import JaxStepEvaluator
 
         t_total = time.perf_counter()
         evaluator = JaxStepEvaluator(system, verbose=verbose)
@@ -91,13 +91,13 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
 
     if isinstance(system, DynamicSystem):
         if key == BACKEND_NUMPY:
-            from minilink.core.compile.evaluators.numpy_evaluator import (
+            from minilink.core.compile.evaluators.numpy_evaluators import (
                 NumpyDynamicEvaluator,
             )
 
             return NumpyDynamicEvaluator(system)
         require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluator import JaxDynamicEvaluator
+        from minilink.core.compile.evaluators.jax_evaluators import JaxDynamicEvaluator
 
         t_total = time.perf_counter()
         evaluator = JaxDynamicEvaluator(system, verbose=verbose)
@@ -112,13 +112,13 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
         )
 
     if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.static_evaluator import (
+        from minilink.core.compile.evaluators.numpy_evaluators import (
             NumpyStaticEvaluator,
         )
 
         return NumpyStaticEvaluator(system)
     require_jax_numpy()
-    from minilink.core.compile.evaluators.static_evaluator import JaxStaticEvaluator
+    from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
 
     t_total = time.perf_counter()
     evaluator = JaxStaticEvaluator(system, verbose=verbose)
@@ -218,7 +218,7 @@ def compile_diagram(
     # Create evaluator (steps 0, 3, 4 handled inside for JAX)
     key = normalize_backend(backend)
     if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.numpy_evaluator import (
+        from minilink.core.compile.evaluators.numpy_evaluators import (
             NumpyDiagramEvaluator,
         )
 
@@ -226,7 +226,7 @@ def compile_diagram(
     else:
         # key == BACKEND_JAX (normalize_backend already validated)
         require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
+        from minilink.core.compile.evaluators.jax_evaluators import JaxDiagramEvaluator
 
         evaluator = JaxDiagramEvaluator(plan, diagram, verbose=verbose)
 

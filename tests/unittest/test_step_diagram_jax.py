@@ -8,7 +8,7 @@ import pytest
 from minilink.blocks.routing import Gain
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.step_diagram_evaluator import (
+from minilink.core.compile.evaluators.jax_evaluators import (
     JaxStepDiagramEvaluator,
 )
 from minilink.core.diagram import StepDiagramSystem

@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.step_evaluator import NumpyStepEvaluator
+from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepEvaluator
 from minilink.core.system import StepSystem
 
 

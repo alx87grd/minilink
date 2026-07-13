@@ -102,6 +102,7 @@ TRUTH_SIMULATION_VARIANT = SimulationBenchmarkVariant("scipy_ultra", "numpy")
 
 DEFAULT_SOLVERS: tuple[str, ...] = (
     "euler",
+    "euler_fixedsteps",
     "rk4_fixedsteps",
     "scipy",
     "scipy_stiff",
@@ -128,6 +129,8 @@ def integration_method_for_solver_mode(solver_mode: str) -> str:
         "scipy_ultra": "DOP853",
     }
     if solver_mode == "euler":
+        return "euler"
+    if solver_mode == "euler_fixedsteps":
         return "euler"
     if solver_mode == "rk4_fixedsteps":
         return "RK4"

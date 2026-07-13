@@ -112,6 +112,7 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Docs/markdown only | skip pytest |
 | Narrow module + tests already updated | `pytest path/to/test_foo.py` |
 | Cross-cutting or before handoff/push | `pytest` |
+| Compile backend, simulator, or trajopt changes (big review pass) | `python benchmarks/run_regression_check.py --suite all` |
 
 Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for pygame smoke; `sphinx-build` only when editing `docs/` (separate Docs workflow).
 
@@ -122,6 +123,14 @@ Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for py
 Use conda env **`minilink`** from [environment.yml](environment.yml); setup in [README.md#install](README.md#install) (`PYTHONPATH` = repo root).
 
 After substantial changes: `pytest` (proportionate to risk), ruff on touched Python, smoke scripts when user-facing. JAX twin plants: nominal + nontrivial parameter test. Headless: `MPLBACKEND=Agg`; full suite notes in [tests/README.md](tests/README.md).
+
+**Big review pass** (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes): run the committed regression baselines before handoff:
+
+```bash
+python benchmarks/run_regression_check.py --suite all
+```
+
+Use `--update` only after intentional perf or trajectory changes; review the JSON diff before committing. See [benchmarks/README.md](benchmarks/README.md).
 
 ## Revision pass
 

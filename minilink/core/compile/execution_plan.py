@@ -7,8 +7,8 @@ in an immutable and flattened form, all the information needed to evaluate a
 or recursive calls.
 
 The plan is consumed by evaluator backends
-(:class:`~minilink.core.compile.evaluators.numpy_evaluator.NumpyDiagramEvaluator`,
-:class:`~minilink.core.compile.evaluators.jax_evaluator.JaxDiagramEvaluator`) which walk through the
+(:class:`~minilink.core.compile.evaluators.numpy_evaluators.NumpyDiagramEvaluator`,
+:class:`~minilink.core.compile.evaluators.jax_evaluators.JaxDiagramEvaluator`) which walk through the
 operation lists in topological order to compute state derivatives and outputs.
 """
 

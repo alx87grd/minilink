@@ -38,6 +38,11 @@ def collect_discontinuous_solver_notes(
             "Forced rk4_fixedsteps: sub-step torques may oscillate and cancel; "
             "ctl:u on the output grid may not match the effective integrated torque."
         )
+    elif user_solver == "euler_fixedsteps":
+        notes.append(
+            "Forced euler_fixedsteps: uses uniform-dt compiled rollouts; prefer "
+            "solver='euler' when the time grid is non-uniform."
+        )
     elif user_solver is not None and (
         user_solver == "scipy" or user_solver.startswith("scipy_")
     ):

@@ -355,5 +355,57 @@ class TestNewSimulator(unittest.TestCase):
         np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
 
 
+class TestEulerSolverModes(unittest.TestCase):
+    def setUp(self):
+        self.plant = StableLinearSystem()
+        self.ev = self.plant.compile(backend="numpy", verbose=False)
+
+    def test_euler_variable_dt_on_nonuniform_grid(self):
+        from minilink.simulation.solvers.euler import EulerSolverBackend
+
+        times = np.array([0.0, 0.05, 0.2, 0.25])
+        backend = EulerSolverBackend()
+        x_traj = backend.integrate(self.ev, times, self.plant.x0)
+
+        self.assertEqual(x_traj.shape, (1, times.size))
+        self.assertEqual(backend.last_debug["solver"], "euler")
+
+    def test_euler_fixedsteps_matches_euler_on_uniform_grid(self):
+        from minilink.simulation.solvers.euler import EulerSolverBackend
+        from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
+
+        times = np.linspace(0.0, 0.2, 4)
+        generic = EulerSolverBackend()
+        fixed = EulerFixedStepSolverBackend()
+        x_generic = generic.integrate(self.ev, times, self.plant.x0)
+        x_fixed = fixed.integrate(self.ev, times, self.plant.x0)
+
+        np.testing.assert_allclose(x_generic, x_fixed, rtol=0.0, atol=1e-12)
+        self.assertEqual(fixed.last_debug["solver"], "euler_fixedsteps")
+
+    def test_euler_fixedsteps_rejects_nonuniform_grid(self):
+        from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
+
+        times = np.array([0.0, 0.05, 0.2, 0.25])
+        backend = EulerFixedStepSolverBackend()
+
+        with self.assertRaises(ValueError):
+            backend.integrate(self.ev, times, self.plant.x0)
+
+    def test_simulator_accepts_euler_fixedsteps(self):
+        sim = Simulator(
+            StableLinearSystem(),
+            tf=0.2,
+            n_steps=3,
+            solver="euler_fixedsteps",
+            verbose=False,
+        )
+        traj = sim.solve()
+
+        self.assertEqual(sim.solver_mode, "euler_fixedsteps")
+        self.assertEqual(sim.last_debug["solver"], "euler_fixedsteps")
+        self.assertEqual(traj.x.shape, (1, 3))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -730,6 +730,10 @@ class StepSystemFacades:
         """
         Convenience shortcut to roll out a discrete-time step system.
 
+        Returns a state-only :class:`~minilink.core.step_rollout.StepRollout`.
+        Boundary output logging belongs in :class:`~minilink.simulation.computer.Computer`
+        or :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` — not here.
+
         Parameters
         ----------
         n_steps : int

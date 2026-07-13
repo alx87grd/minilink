@@ -123,14 +123,23 @@ building intuition about a plant before designing a controller.
 
 Wired diagrams compile into a flat execution plan. The NumPy backend removes
 the recursive port-resolution overhead; the JAX backend JIT-compiles dynamics
-and outputs, and keeps them traceable for autodiff:
+and outputs for fast simulation (`evaluator.f`, `evaluator.rk4_step`, …).
+Integration rollouts use explicit names — e.g. `rk4_integrate_zoh`,
+`rk4_integrate_linear`, `euler_integrate_zoh` (replacing the old bare `integrate`
+and `rk4_integrate_forced`). Fixed-step `Simulator` presets: `euler` follows the
+simulation time grid knot-by-knot; `euler_fixedsteps` uses uniform spacing via
+compiled Euler rollouts.
+For autodiff inside an outer `jit`, use the **trace tier** (pre-JIT siblings:
+`f_trace`, `f_trace_p`, `rk4_step_trace`, …):
 
 ```python
 evaluator = diagram.compile(backend="jax")
-dx = evaluator.f(x, u, 0.0)              # JIT-compiled flat dynamics
+dx = evaluator.f(x, u, 0.0)              # fast tier (JIT)
 
 import jax
-A = jax.jacfwd(lambda x: evaluator.f(x, u, 0.0))(x)   # exact linearization
+loss_and_grad = jax.jit(jax.value_and_grad(
+    lambda theta: jnp.mean((evaluator.f_trace_p(x, u, 0.0, {"plant": theta}) - dx_ref) ** 2)
+))
 ```
 
 ### Hybrid and discrete control
@@ -378,7 +387,8 @@ Compose:   + / >> / @ / autowire  →  DiagramSystem
 
 Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
            →  compile  →  solve  →  Trajectory
-           StepSystem: compute_rollout  →  StepEvaluator.rollout
+           StepSystem: compute_rollout  →  StepEvaluator.rollout (state-only k/x/u)
+           StepDiagram + schedule: Computer.tick  →  signal histories (not evaluator rollout)
            HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
            cache: self.traj (plant Trajectory), self.last_result (full result), self.rollout (computer)
 

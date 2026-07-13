@@ -24,6 +24,7 @@ class TestFacadesRollout(unittest.TestCase):
         self.assertIs(plant.rollout, rollout)
         self.assertEqual(rollout.n_samples, 6)
         np.testing.assert_allclose(rollout.x[0, -1], 5.0)
+        self.assertEqual(len(rollout.signals), 0)
 
     def test_plot_rollout_headless(self):
         import matplotlib
