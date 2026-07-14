@@ -23,8 +23,8 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; catalog arms on `Manipulator`. | Optional `JaxManipulator`; `f_ext` port if approved. |
 | Dynamics abstraction | 6 | `MechanicalSystem` + `Manipulator` (`p`, `pdot`, FK/J); catalog arms rebased. | `JaxManipulator` if needed; external wrench port. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
-| Contact engine (`dynamics/engines/`) | 1 | Experimental hand-rolled contact; math not QA-validated. | Prefer MJX (or similar) leaf path in §5.11 over growing a Drake-scale in-house contact stack. |
-| External multibody leaf (MJX, …) | 0 | Vision only — see §5.11. Continuous `DynamicSystem` wrapper around an external JAX multibody/contact engine for complex plants. | Architecture sketch + spike (load model → `f`/`step` ports → closed-loop with minilink controllers). |
+| Contact engine (`dynamics/engines/`) | 1 | Experimental hand-rolled contact; math not QA-validated. | Prefer MJX (or similar) leaf path in [§5.11](#511-strategic-vision--landscape-position--mjx-multibody-leaf) over a Drake-scale in-house contact stack. |
+| External multibody leaf (MJX, …) | 0 | Vision only — [§5.11](#511-strategic-vision--landscape-position--mjx-multibody-leaf). Thin `DynamicSystem` wrapper around an external JAX multibody/contact engine for complex plants. | Architecture sign-off + spike (load model → `f`/`step` ports → closed-loop with minilink controllers). |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Pole-zero, Nyquist, margins, `ss2tf`; reachability costs. |
 | Control | 6 | Linear, LQR, filtered PID; `modelbased.py` (CT, Pyro-parity SMC); `robotic.py` (impedance, kinematic, nullspace). | SMC traj-following demos; dynamic joint/effector PID wrappers; trajectory LQR. |
 | Blocks | 5 | Routing, nonlinear, filters, sources, transfer function, 1-layer NN. | Multi-layer `MLP`, atomic layers (see neural-blocks plan). |
@@ -105,10 +105,10 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 - Frequency completion; obstacle/Pacejka/stochastic layers (if approved)
 - Pyro migration guide in README; TRL 8 demos per tool band
 
-**P5 (vision, not scheduled)** — External multibody leaf (**MJX-first**
-`DynamicSystem` wrapper for complex plants / contact); see
-[§5.11](#511-vision--multibody-via-external-engines-mjx-first). Does not
-displace P0–P4; gated on review-queue architecture sign-off.
+**P5 (vision, not scheduled)** — Strategic landscape position + external
+multibody leaf (**MJX-first**); see
+[§5.11](#511-strategic-vision--landscape-position--mjx-multibody-leaf).
+Does not displace P0–P4; gated on review-queue architecture sign-off.
 
 ## 4. Review queue (needs maintainer sign-off)
 
@@ -118,9 +118,10 @@ displace P0–P4; gated on review-queue architecture sign-off.
 - Dynamic bicycle module split.
 - Graphics/camera contract consolidation (`KinematicModel` delegate) — optional follow-up.
 - **Pyro game demos** — port via interactive animation or explicitly drop.
-- **MJX (external multibody) leaf vision** — package home, continuous vs
-  discrete adapter split, and deprecate-vs-keep for hand-rolled
-  `dynamics/engines/` contact ([§5.11](#511-vision--multibody-via-external-engines-mjx-first)).
+- **Strategic vision §5.11** — landscape positioning wording; MJX leaf package
+  home; continuous vs discrete adapter split; deprecate-vs-keep for hand-rolled
+  `dynamics/engines/` contact
+  ([§5.11](#511-strategic-vision--landscape-position--mjx-multibody-leaf)).
 
 ## 5. Future
 
@@ -235,105 +236,155 @@ scope as a subsidiary program; it does not replace the continuous-time core.
 Pygame game framework (`sys2game`) — no first-class port unless reversed.
 
 **In scope as leaves (not as core rewrite):** wrapping an external multibody /
-contact engine (MJX first) as a `DynamicSystem` — §5.11. That is *using*
-MJX for complex plants, not *rebuilding* MJX/Drake inside minilink.
+contact engine (MJX first) as a `DynamicSystem` — [§5.11](#511-strategic-vision--landscape-position--mjx-multibody-leaf).
+That is *using* MJX for complex plants, not *rebuilding* MJX/Drake inside
+minilink.
 
-### 5.11 Vision — Multibody via external engines (MJX-first)
+### 5.11 Strategic vision — landscape position + MJX multibody leaf
 
 **Status:** directional vision (TRL 0). Needs maintainer architecture sign-off
-before a spike lands in-tree. Does **not** change the continuous-core grammar.
+before a spike lands in-tree. Does **not** change the continuous-core grammar
+([DESIGN.md §3](DESIGN.md#continuous-time-core-stephybrid-subsidiary)).
 
-#### Intent
+This entry is the product-strategy companion to the pyro port (§6) and the
+feature backlog (§5.0–5.10). It answers: *what kind of tool is minilink, next
+to Simulink / MATLAB / Drake / MuJoCo / CasADi / …, and how do complex robots
+enter without becoming a physics OS?*
 
-Textbook catalog plants and `Manipulator` remain the default teaching /
-controls surface. For **complex multibody + contact** (multi-DoF robots,
-manipulation scenes), prefer a **thin `DynamicSystem` leaf** that wraps an
-external JAX-native engine — starting with **MuJoCo MJX** — rather than growing
-an in-house Drake-scale MultibodyPlant or competing as a physics engine.
+#### What this entry holds (outline)
+
+| Block | Contents |
+| --- | --- |
+| **A. North star** | One-sentence product claim and sweet-spot sentence |
+| **B. Landscape map** | Quick positioning vs the major toolboxes |
+| **C. Own / borrow / refuse** | Capability split that protects the edge |
+| **D. Multibody strategy** | MJX-first `DynamicSystem` leaf (architecture sketch) |
+| **E. Constraints** | Non-negotiable integration laws |
+| **F. Delivery plan** | Phased spike → leaf → demos → grads (when scheduled) |
+| **G. Non-goals** | Explicit anti-scope so later PRs stay honest |
+
+#### A. North star
+
+> Compose, simulate, differentiate, and train **causal dynamical systems** in
+> one Python/JAX object model — textbook-readable continuous `f`, Systems
+> diagrams, control/planning tools, and NN/ID as peer blocks.
+
+**Sweet spot:** between Pyro’s teaching clarity and Drake/CasADi industrial
+depth — owning the **NN-in-the-diagram + JAX-through-`f`** middle — with complex
+multibody/contact **borrowed** via an optional engine leaf (MJX-first).
+
+```text
+                    industrial depth / contact / DAE
+                         ▲
+                         │  Simulink + Simscape / MATLAB CST+…
+                         │       Drake
+                         │    MuJoCo / MJX
+            Modelica ────┤
+                         │
+   composition ◄─────────┼─────────────────► opt/OCP-only
+   diagrams              │              CasADi / acados
+          python-control │
+                         │         Brax (batch RL physics)
+                         │
+                         ▼
+              teaching clarity / differentiable Python
+
+                 ★ minilink: diagrams × continuous f
+                   × JAX × control/planning × NN blocks
+                   (+ MJX leaf for complex Multibody)
+```
+
+#### B. Landscape map — positioning vs alternatives
+
+| Toolbox | They own | Minilink stance | Edge we keep |
+| --- | --- | --- | --- |
+| **Simulink** (+ Stateflow / Simscape) | GUI, codegen, DAE / algebraic loops, industrial hybrid charts | Code-first causal Systems; **no** GUI/DAE/network product | Open Python, operators (`@`, `>>`), JAX grads |
+| **MATLAB** (Control System Toolbox, etc.) | Classical LTI / frequency design, industry default | Interop candidate (ss/tf); own **nonlinear closed loops** | Nonlinear diagrams + planning + learning in one stack |
+| **Drake** | MultibodyPlant, contact, events/witness hybrid, MathProg depth | Complement / upstream reduced-order + control/ML lab; complex robots via **engine leaf**, not a second MbP | Textbook `f`, JAX compile/trace, teaching UX |
+| **MuJoCo / MJX** | Fast contact sim; JAX (MJX) plant rollouts | **Wrap as `DynamicSystem`**, do not rebuild; they keep physics identity | Diagrammed control, HybridDiagram, trajopt/DP/RRT, animate around that plant |
+| **CasADi** | Symbolic graph → AD → NLP/OCP; codegen | Systems-first; MathProg/JAX transcriptions on Systems | Full diagram/sim/teach/NN surface CasADi lacks |
+| **acados / Crocoddyl** | Fast deployed MPC / DDP | Optional later solver/wrapper; MPC remains a HybridDiagram citizen | Broader Systems lab, not a solver package |
+| **Pinocchio** | Fast RBD + derivatives | Optional second **contact-light** engine leaf | Same façade story as MJX leaf |
+| **Modelica / OpenModelica** | Acausal physical networks | Stay **causal ODE/blocks** (better for AD/NN) | Explicit `f` and ports |
+| **python-control** | Classical LTI workflows | Frequency/LTI neighbor; not a competitor for nonlinear Systems | Nonlinear + planning + JAX |
+| **Brax / Warp / DiffTaichi** | Massive batched differentiable physics for RL | Neighbor in JAX ecosystem; batch only as a *tool* over leaves if needed | Interpretable Systems + classical/modern control |
+| **Pyro** (lineage) | Teaching plants, phase plane, DP/RRT soul | **Successor** with ports, compile/JAX, HybridDiagram, MathProg | Structural spine Drake-ish; soul Pyro-ish |
+
+**One-liner claim to own:** *Systems-first, JAX-differentiable control lab —
+not another Multibody OS, not an OCP modeling language, not a Simulink GUI.*
+
+#### C. Own / borrow / refuse
+
+| Own (identity) | Borrow (leaves / deps) | Refuse (anti-identity) |
+| --- | --- | --- |
+| Causal `System` / `DynamicSystem` / `DiagramSystem`, ports, feedthrough | MJX (and later Pinocchio) for complex Multibody + contact | Drake-scale hydroelastic / SceneGraph product |
+| NumPy clarity + JAX compile / trace / `f_p` | MuJoCo assets / model formats behind the leaf | Context-in-`f`, unified xc/xd/xa leaf framework |
+| Control, analysis, trajopt, DP, RRT, animate/game | SciPy / Ipopt (and maybe acados later) as optimizers | CasADi SX/MX as the user-facing modeling language |
+| NN / residual / ID as peer Systems | Gym / Flax / Torch at `interfaces/` | Brax-style “we are the RL physics engine” |
+| Narrow HybridDiagram (ZOH computer ↔ plant) | Engine-internal contact stepping | Simulink DAE loops / Stateflow / diagram witnesses as core |
+
+#### D. Multibody strategy — MJX-first leaf
+
+Textbook catalog + `Manipulator` stay the default teaching / controls surface.
+For **complex multibody + contact**, prefer a thin adapter leaf:
 
 ```text
 minilink controller / NN / HybridDiagram
         │  ports u, y (and optional q, dq, …)
         ▼
-  MjxPlant(DynamicSystem)     ← thin adapter leaf
+  MjxPlant(DynamicSystem)     ← thin adapter (optional extra)
         │
         ▼
-     MJX model / data         ← owns contact, constraints, assets
+     MJX model / data         ← contact, constraints, assets
 ```
 
 Continuous EoM stay first-class at the leaf boundary when the engine exposes
-them (`f` / mass-matrix / bias style); timestepped contact advance may also
-appear as an optional discrete path without polluting `DynamicSystem` itself
-(sibling `StepSystem` or documented ZOH/`HybridDiagram` usage — same law as
-§5.5a).
+them (`f` / mass-matrix / bias style). Timestepped contact advance may appear
+as a sibling `StepSystem` or documented HybridDiagram usage — **same law as
+§5.5a**, without merging discrete into `DynamicSystem`.
 
-#### Why this fits the competitive edge
+#### E. Architectural constraints (non-negotiable)
 
-| Keep (minilink identity) | Borrow (engine leaf) | Do not become |
-| --- | --- | --- |
-| Causal Systems diagrams, `f(x,u,t,params)`, compile/JAX tiers | MJX articulated bodies, contacts, assets | Drake/MJX competitor as a physics OS |
-| Control, trajopt, DP/RRT, analysis, animate | Fast/differentiable plant rollouts | Simulink DAE / Stateflow framework |
-| NN / ID as peer Systems on the same diagram | Gradients through the plant when MJX+JAX allow | CasADi-only OCP language |
+1. **Leaf, not core** — home under `dynamics/engines/` or `interfaces/`
+   (TBD at TRL 3); `System` / `DynamicSystem` / `DiagramSystem` unchanged.
+2. **Args/results purity** — `f` / `h` / `step` take `(x, u, t, params)`; no
+   Context-shaped equation API.
+3. **Optional dependency** — `minilink[mjx]` (or lazy import); default install
+   and catalog demos stay free of MJX.
+4. **Params** — engine knobs map into nested diagram `params` where practical.
+5. **Graphics** — bridge `tf` / frame geometry / Meshcat; no second viz stack in
+   core.
+6. **Contact hardness stays in the engine** — no diagram-level DAE or witness
+   framework only to host MJX.
 
-Position vs toolboxes (summary of strategy discussion):
-
-- **vs Drake** — compose and differentiate control/learning *around* complex
-  plants; do not re-implement MultibodyPlant / hydroelastic as the product.
-- **vs MJX/MuJoCo** — they own physics; we own diagrammed control, hybrid digital
-  loops, planning tools, and teaching UX wired to that plant.
-- **vs CasADi / acados** — Systems-first; use engine leaf + minilink MathProg /
-  JAX transcriptions rather than becoming an SX/MX modeling language.
-- **vs Simulink** — code-first causal diagrams; no GUI/DAE/network ambition.
-- **vs Brax** — not a batched RL engine; batch later only as a tool facade over
-  the same leaf if needed.
-
-#### Architectural constraints (non-negotiable)
-
-1. **Leaf, not core** — adapter lives under `dynamics/engines/` or
-   `interfaces/` (placement TBD at TRL 3); `System` / `DynamicSystem` /
-   `DiagramSystem` contracts unchanged
-   ([DESIGN.md §3](DESIGN.md#continuous-time-core-stephybrid-subsidiary)).
-2. **Args/results purity** — leaf still implements `f` / `h` (and/or `step`)
-   with `(x, u, t, params)`; no Context-shaped equation API.
-3. **Optional dependency** — MJX/MuJoCo lazy or extra (`minilink[mjx]`);
-   default install and catalog demos stay free of it.
-4. **Params story** — engine knobs map into nested `params` (diagram-compatible)
-   where practical; freeze vs call-time overrides follow the same tiers as other
-   plants.
-5. **Graphics** — prefer bridge to existing `tf` / frame-keyed geometry or
-   Meshcat overlays; do not fork a second viz stack in core.
-6. **Contact hardness stays in the engine** — minilink Simulator keeps ODE /
-   HybridDiagram semantics; do not add diagram-level DAE or witness frameworks
-   just to host MJX.
-
-#### Suggested phases (when scheduled)
+#### F. Delivery plan (when scheduled under P5)
 
 | Phase | Outcome | Exit |
 | --- | --- | --- |
-| **0 — Spike** | Load a simple MJX model; map state/actuation to ports; `f` or fixed-step rollout; compare energy / one closed loop (`ctl @ plant`) | Architecture note + go/no-go |
-| **1 — Leaf MVP** | `MjxPlant` (name TBD) as `DynamicSystem`; Nominal + nontrivial params test; JAX twin or trace-tier path | TRL 2–3 |
-| **2 — Control demos** | Impedance / PD / MPC or HybridDiagram on an arm or mobile base from MJX assets | TRL 8 demo |
-| **3 — Differentiable hooks** | Document what is `grad`-able (MJX limitations honest); one ID or residual-NN demo through the leaf | Aligns with JAX edge |
+| **0 — Spike** | Load a simple MJX model; map state/actuation → ports; `f` or fixed-step rollout; one `ctl @ plant` closed loop | Architecture note + go/no-go |
+| **1 — Leaf MVP** | `MjxPlant` (name TBD) as `DynamicSystem`; nominal + nontrivial params test; JAX/trace path where feasible | TRL 2–3 |
+| **2 — Control demos** | Impedance / PD / MPC or HybridDiagram on arm or mobile base from MJX assets | TRL 8 demo |
+| **3 — Differentiable hooks** | Honest doc of what is `grad`-able; one ID or residual-NN demo through the leaf | Aligns with JAX edge |
 | **4 — Optional batch façade** | `vmap`-style rollouts as a *tool*, not a new System kind | Only if demos demand it |
 
-Pinocchio (or similar) may appear later as a second engine leaf for
-contact-light RBD/derivatives; MJX is the contact-capable default candidate.
+Pinocchio (or peer) may follow as a contact-light RBD leaf; MJX remains the
+contact-capable default candidate.
 
-#### Explicit non-goals for this track
+#### G. Explicit non-goals
 
-- Replacing the pyro catalog with MJX models for teaching plants
-- Making MJX a required backend for `compile(backend="jax")`
+- Replacing the pyro catalog with MJX for teaching plants
+- Making MJX required for `compile(backend="jax")`
 - Diagram-level algebraic-loop / DAE solving for contact
 - Feature parity with Drake `MultibodyPlant` + `SceneGraph`
-- Shipping a second hand-rolled contact solver that races MJX
+- Racing MJX with a second hand-rolled contact solver
+- Competing as a batched RL physics engine (Brax/MJX identity)
 
-#### Review queue hooks
+#### Review hooks
 
-Before implementation: confirm package home (`dynamics/engines/` vs
-`interfaces/`), naming (`MjxPlant` vs `MuJoCoSystem`), continuous-`f` vs
-discrete-step adapter split, and whether hand-rolled `dynamics/engines/`
-contact is quarantined-for-deprecate once Phase 1 exists
-(add to [§4 Review queue](#4-review-queue-needs-maintainer-sign-off)).
+Before implementation ([§4](#4-review-queue-needs-maintainer-sign-off)): confirm
+landscape wording, package home, naming (`MjxPlant` vs `MuJoCoSystem`),
+continuous-`f` vs discrete-step adapter split, and deprecate-vs-keep for
+hand-rolled `dynamics/engines/` contact once Phase 1 exists.
 
 ## 6. Pyro 2.0 port status
 
