@@ -105,6 +105,8 @@ class TrajectoryOptimizationBenchmarkResult:
 def jax_trajopt_available() -> bool:
     """Return whether JAX trajectory-optimization variants can run."""
     try:
+        import jax  # noqa: F401
+
         from minilink.dynamics.catalog.pendulum.cartpole import (
             JaxCartPole,  # noqa: F401
         )

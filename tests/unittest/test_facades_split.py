@@ -4,11 +4,11 @@ import unittest
 
 from minilink.blocks.basic import Integrator
 from minilink.blocks.routing import Gain
-from minilink.core.compile.evaluators.numpy_evaluator import (
+from minilink.core.compile.evaluators.numpy_evaluators import (
     NumpyDiagramEvaluator,
     NumpyDynamicEvaluator,
+    NumpyStaticEvaluator,
 )
-from minilink.core.compile.evaluators.static_evaluator import NumpyStaticEvaluator
 from minilink.core.diagram import DiagramSystem
 from minilink.core.facades import (
     DynamicSystemFacades,

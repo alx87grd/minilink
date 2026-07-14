@@ -6,7 +6,9 @@ visualizing dynamical systems.
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
 Start here: [showcase notebook](examples/notebooks/demo_showcase.ipynb) ·
-[Colab demo](https://drive.google.com/file/d/1N2sxPMVqFs0HQeSpY9zdv7nvUFrfXoov/view?usp=sharing)
+[compile → evaluator intro](examples/notebooks/demo_compile_evaluator.ipynb) ·
+[notebooks folder](examples/notebooks/README.md) ·
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/notebooks)
 
 ## Why minilink
 
@@ -123,14 +125,39 @@ building intuition about a plant before designing a controller.
 
 Wired diagrams compile into a flat execution plan. The NumPy backend removes
 the recursive port-resolution overhead; the JAX backend JIT-compiles dynamics
-and outputs, and keeps them traceable for autodiff:
+and outputs for fast simulation (`evaluator.f`, `evaluator.rk4_step`, …).
+Integration rollouts use explicit names — e.g. `rk4_integrate_zoh`,
+`rk4_integrate_linear`, `euler_integrate_zoh` (replacing the old bare `integrate`
+and `rk4_integrate_forced`). Fixed-step `Simulator` presets: `euler` follows the
+simulation time grid knot-by-knot; `euler_fixedsteps` uses uniform spacing via
+compiled Euler rollouts.
+For autodiff inside an outer `jit`, use the **trace tier** (pre-JIT siblings:
+`f_trace`, `f_trace_p`, `rk4_step_trace`, …):
 
 ```python
 evaluator = diagram.compile(backend="jax")
-dx = evaluator.f(x, u, 0.0)              # JIT-compiled flat dynamics
+dx = evaluator.f(x, u, 0.0)              # fast tier (JIT)
 
 import jax
-A = jax.jacfwd(lambda x: evaluator.f(x, u, 0.0))(x)   # exact linearization
+loss_and_grad = jax.jit(jax.value_and_grad(
+    lambda theta: jnp.mean((evaluator.f_trace_p(x, u, 0.0, {"plant": theta}) - dx_ref) ** 2)
+))
+```
+
+### Hybrid and discrete control
+
+Discrete control laws (like digital MPC or sampled Sliding Mode Control) can close the loop on continuous plants without breaking the continuous-time core or solver guarantees. `StepSystem` defines discrete logic, and `Computer` schedules it. The `%` and `@` operators build a `HybridDiagram` with Zero-Order Hold (ZOH) and sampling:
+
+```python
+from minilink.planning.mpc.controller import MPCStatelessController
+
+# controller is a discrete leaf; plant is a continuous DynamicSystem
+controller = MPCStatelessController(planner, ...)
+computer = controller % 0.1  # schedule to tick every 0.1s
+diagram = computer @ plant   # wire via hybrid ZOH/sample boundaries
+
+diagram.compute_trajectory(tf=10.0)  # solves the plant exactly between ticks
+diagram.animate()
 ```
 
 ### Analyze and design
@@ -178,12 +205,13 @@ diagram.compute_trajectory(tf=8.0)
 diagram.plot_trajectory()
 ```
 
-### Trajectory optimization
+### Planning, search, and optimization
 
-Planning problems combine a system, boundary conditions, and a cost; pluggable
-transcriptions (direct collocation, single/multiple shooting) turn them into
-nonlinear programs solved by SciPy or Ipopt, optionally with JAX-exact
-gradients:
+`PlanningProblem` combines a continuous system, start/goal boundaries, cost functions, and spatial geometry (`Scene`, `Shape`, `Set`). The same problem definition powers multiple planners:
+
+- **Trajectory Optimization**: Pluggable transcriptions (direct collocation, shooting) turn problems into nonlinear programs solved by SciPy or Ipopt (with exact JAX gradients).
+- **Search (RRT / RRT*)**: Kinodynamic and steering extenders grow trees through collision-free state space.
+- **Policy Synthesis**: Value iteration / dynamic programming over a `StateSpaceGrid` computes global cost-to-go and discrete optimal policies.
 
 ```python
 import numpy as np
@@ -356,11 +384,13 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 Model:     subclass System → f/h (+ ports or DynamicSystem options)
 
 Compose:   + / >> / @ / autowire  →  DiagramSystem
+           hybrid: block % dt  →  Computer; Computer @ plant  →  HybridDiagram
            or add_subsystem + connect (+ connect_new_output_port)
 
 Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
            →  compile  →  solve  →  Trajectory
-           StepSystem: compute_rollout  →  StepEvaluator.rollout
+           StepSystem: compute_rollout  →  StepEvaluator.rollout (state-only k/x/u)
+           StepDiagram + schedule: Computer.tick  →  signal histories (not evaluator rollout)
            HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
            cache: self.traj (plant Trajectory), self.last_result (full result), self.rollout (computer)
 
@@ -393,6 +423,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Interest | Start here |
 | --- | --- |
 | Feature tour | [examples/notebooks/demo_showcase.ipynb](examples/notebooks/demo_showcase.ipynb) |
+| Compile → evaluator → fast dynamics primitives | [examples/notebooks/demo_compile_evaluator.ipynb](examples/notebooks/demo_compile_evaluator.ipynb) |
 | Extended tour | [examples/notebooks/demo_overview.ipynb](examples/notebooks/demo_overview.ipynb) |
 | Diagrams | `examples/scripts/diagrams/` |
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
@@ -414,9 +445,10 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Optimization | `examples/scripts/optimization/` |
 | Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` |
 | MPC (rate-MPC bicycle demos; compile-once `MPCPlanner`; legacy per-step trajopt: `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`; obstacle preset: `demo_dynamic_bicycle_rate_mpc_obstacle.py [small\|large]`; spatial scene guide: `demo_mpc_spatial_scene_guide.py`) | `examples/scripts/mpc/` · [spatial scene notebook](examples/notebooks/demo_mpc_spatial_scene_guide.ipynb) |
-| Trajectory optimization | `examples/scripts/trajectory_optimization/` |
+| Trajectory optimization | `examples/scripts/trajectory_optimization/` · [notebook](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |
+| C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/demo_c_export_proportional.py` · `demo_c_export.py` |
 | Solver benchmarks | [examples/notebooks/simulation_benchmark.ipynb](examples/notebooks/simulation_benchmark.ipynb) (uses repo-root `benchmarks/`) |
 
 Catalog plants live under `minilink.dynamics.catalog.*`.

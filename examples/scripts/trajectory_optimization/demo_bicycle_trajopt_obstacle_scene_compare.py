@@ -1,4 +1,4 @@
-"""Compare obstacle-scene TrajOpt across four JAX bicycle plants.
+"""Compare obstacle-scene TrajOpt across six JAX plants.
 
 Run from repo root::
 
@@ -8,13 +8,15 @@ Same single-obstacle mission as
 ``demo_kinematic_bicycle_trajopt_obstacle_scene.py``, solved with direct
 collocation on (simplest → most complex by state dimension):
 
+- :class:`~minilink.dynamics.catalog.vehicles.steering.JaxHolonomicMobileRobot` (n=2)
 - :class:`~minilink.dynamics.catalog.vehicles.steering.JaxKinematicBicycle` (n=3)
+- :class:`~minilink.dynamics.catalog.vehicles.steering.JaxDynamicHolonomicMobileRobot` (n=4)
 - :class:`~minilink.dynamics.catalog.vehicles.steering.JaxKinematicBicycleRateInputs` (n=5)
 - :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycle` (n=6)
 - :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs` (n=8)
 
 Prints solve-time summary, shows side-by-side path and speed plots, then plays
-four animations (one per plant).
+six animations (one per plant).
 """
 
 from __future__ import annotations
@@ -34,6 +36,8 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
 from minilink.dynamics.catalog.vehicles.steering import (
+    JaxDynamicHolonomicMobileRobot,
+    JaxHolonomicMobileRobot,
     JaxKinematicBicycle,
     JaxKinematicBicycleRateInputs,
 )
@@ -71,7 +75,14 @@ OBSTACLE_REPULSION_WEIGHT = 1000.0
 OBSTACLE_REPULSION_EPS = 1.0
 PLOT_BOUNDS = ((-2.0, U_TARGET * TF + 2.0), (-3.5, 2.0))
 
-PATH_COLORS = ("tab:blue", "tab:orange", "tab:green", "tab:red")
+PATH_COLORS = (
+    "tab:blue",
+    "tab:orange",
+    "tab:green",
+    "tab:red",
+    "tab:purple",
+    "tab:brown",
+)
 
 
 @dataclass(frozen=True)
@@ -93,15 +104,53 @@ class SolveRun:
 
 
 MODEL_CASES = (
-    ModelCase("kinematic", "Kinematic", PATH_COLORS[0]),
-    ModelCase("kinematic_rate", "Kinematic rate", PATH_COLORS[1]),
-    ModelCase("dynamic", "Dynamic", PATH_COLORS[2]),
-    ModelCase("dynamic_rate", "Dynamic rate", PATH_COLORS[3]),
+    ModelCase("holonomic", "Holonomic", PATH_COLORS[0]),
+    ModelCase("kinematic", "Kinematic", PATH_COLORS[1]),
+    ModelCase("holonomic_dyn", "Holonomic dyn", PATH_COLORS[2]),
+    ModelCase("kinematic_rate", "Kinematic rate", PATH_COLORS[3]),
+    ModelCase("dynamic", "Dynamic", PATH_COLORS[4]),
+    ModelCase("dynamic_rate", "Dynamic rate", PATH_COLORS[5]),
 )
 
 
 def _terminal_x() -> float:
     return U_TARGET * TF
+
+
+def _build_holonomic() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
+    sys = JaxHolonomicMobileRobot()
+    sys.inputs["u"].lower_bound = np.array([0.0, -V_MAX])
+    sys.inputs["u"].upper_bound = np.array([V_MAX, V_MAX])
+
+    x_start = np.array([0.0, Y_START])
+    x_ref = np.array([_terminal_x(), Y_GOAL])
+    ubar = np.array([U_TARGET, 0.0])
+    Q = np.diag([0.0, 10.0])
+    R = np.diag([0.5, 0.5])
+    S = np.diag([1.0, 10.0])
+    return sys, x_start, x_ref, ubar, Q, R, S
+
+
+def _build_holonomic_dyn() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
+    sys = JaxDynamicHolonomicMobileRobot()
+    sys.state.lower_bound[2] = 0.0
+    sys.state.upper_bound[2] = V_MAX
+    sys.state.lower_bound[3] = -V_MAX
+    sys.state.upper_bound[3] = V_MAX
+    sys.inputs["u"].lower_bound = np.array([-SPEED_DOT_MAX, -SPEED_DOT_MAX])
+    sys.inputs["u"].upper_bound = np.array([SPEED_DOT_MAX, SPEED_DOT_MAX])
+
+    x_start = np.array([0.0, Y_START, U_0, 0.0])
+    x_ref = np.array([_terminal_x(), Y_GOAL, U_TARGET, 0.0])
+    ubar = np.array([0.0, 0.0])
+    Q = np.diag([0.0, 10.0, 0.1, 0.1])
+    R = np.diag([1.0, 1.0])
+    S = np.diag([1.0, 10.0, 10.0, 1.0])
+    return sys, x_start, x_ref, ubar, Q, R, S
 
 
 def _build_dynamic() -> tuple[
@@ -198,6 +247,8 @@ def _build_dynamic_rate() -> tuple[
 
 
 BUILDERS = {
+    "holonomic": _build_holonomic,
+    "holonomic_dyn": _build_holonomic_dyn,
     "dynamic": _build_dynamic,
     "kinematic": _build_kinematic,
     "kinematic_rate": _build_kinematic_rate,
@@ -206,6 +257,10 @@ BUILDERS = {
 
 
 def _speed_profile(case: ModelCase, traj: Trajectory) -> np.ndarray:
+    if case.key == "holonomic":
+        return np.hypot(traj.u[0, :], traj.u[1, :])
+    if case.key == "holonomic_dyn":
+        return np.hypot(traj.x[2, :], traj.x[3, :])
     if case.key == "kinematic":
         return traj.u[0, :]
     if case.key == "kinematic_rate":
@@ -251,7 +306,7 @@ def _solve_case(case: ModelCase, scene: Scene) -> SolveRun:
 
 
 def _print_summary(runs: list[SolveRun]) -> None:
-    print("\nTrajOpt obstacle scene — bicycle model comparison")
+    print("\nTrajOpt obstacle scene — model comparison")
     print(f"  tf={TF}s, n_steps={N_STEPS}, u_target={U_TARGET} m/s")
     print(
         f"  obstacle={OBSTACLE_CENTER}, keepout R={OBSTACLE_RADIUS + OBSTACLE_MARGIN}"
@@ -269,7 +324,7 @@ def _print_summary(runs: list[SolveRun]) -> None:
 
 
 def _plot_paths(runs: list[SolveRun], scene: Scene) -> None:
-    fig, axes = plt.subplots(2, 2, figsize=(11.0, 9.0), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 3, figsize=(14.0, 9.0), sharex=True, sharey=True)
     for ax, run in zip(axes.ravel(), runs, strict=True):
         scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title="")
         ax.plot(

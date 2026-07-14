@@ -1,0 +1,341 @@
+{
+  "schema_version": 1,
+  "suite": "integration_check",
+  "description": "End-to-end regression: trajectory checkpoint goldens and solve-time gates.",
+  "regression_factor": 4.0,
+  "recorded_at": "2026-07-12",
+  "host_hint": "Linux-6.12.94+-x86_64-with-glibc2.39",
+  "metrics": [
+    {
+      "id": "sim.double_pendulum.rk4_numpy.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.08161841249966528,
+      "unit": "s",
+      "notes": "catalog DoublePendulum, tf=10 s, dt=0.01"
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.rel_err_l2",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 0.005262472210419053,
+      "unit": "percent",
+      "max_allowed": 1.0,
+      "notes": "candidate x_tf vs live scipy_ultra truth"
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.truth.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -3.8675024017531747,
+        7.855890422348269,
+        -3.285237831420524,
+        8.771167223980942
+      ],
+      "unit": "state",
+      "atol": 0.05,
+      "rtol": 0.05,
+      "notes": "live scipy_ultra truth x_tf vs stored golden"
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -3.8674542601403323,
+        7.85574988635515,
+        -3.2855878732568384,
+        8.771724612790127
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01,
+      "notes": "candidate final state vs stored golden"
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -1.5707963267948966,
+        0.5,
+        0.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.checkpoint_t1",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -3.6973374112186113,
+        -0.46967211136408243,
+        -4.929771817006293,
+        4.463849596658606
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.checkpoint_t2p5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -2.8967335899365096,
+        0.6748687998208961,
+        2.4309534417610243,
+        2.8228983123813873
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.checkpoint_t5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -4.448772948611702,
+        -0.3839477076018598,
+        2.6765662400313164,
+        -2.1405138307675284
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.checkpoint_t7p5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -4.627810778518122,
+        0.23474922434978782,
+        -3.648923311326107,
+        4.996523160063729
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.double_pendulum.rk4_numpy.checkpoint_t10",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -3.8674542601403323,
+        7.85574988635515,
+        -3.2855878732568384,
+        8.771724612790127
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.04972179650212638,
+      "unit": "s",
+      "notes": "showcase Pendulum x0[0]=2, tf=10 s, dt=0.01"
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.rel_err_l2",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 1.17559134411829e-05,
+      "unit": "percent",
+      "max_allowed": 1.0,
+      "notes": "candidate x_tf vs live scipy_ultra truth"
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.truth.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -1.2358505742619008,
+        2.7031692875375133
+      ],
+      "unit": "state",
+      "atol": 0.05,
+      "rtol": 0.05,
+      "notes": "live scipy_ultra truth x_tf vs stored golden"
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -1.235850338482138,
+        2.7031695454160505
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01,
+      "notes": "candidate final state vs stored golden"
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        2.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.checkpoint_t2p5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -1.123429051192269,
+        2.8855054507610864
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.checkpoint_t5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -1.0038635057522218,
+        -3.0579133412926174
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.checkpoint_t7p5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        1.9963912643195718,
+        0.17949143592952432
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "sim.showcase_pendulum.rk4_numpy.checkpoint_t10",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -1.235850338482138,
+        2.7031695454160505
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.total_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 1.0965155450103339,
+      "unit": "s",
+      "notes": "showcase cart-pole swing-up, scipy_slsqp, compile_backend=jax"
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.025753447000170127,
+      "unit": "s",
+      "notes": "optimizer wall time only"
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.success",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 0.0,
+      "unit": "flag",
+      "max_allowed": 0.0,
+      "notes": "0 means success"
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.eq_inf",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 2.963020160281706e-05,
+      "unit": "abs",
+      "max_allowed": 0.001
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.cost",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 66.71988306676984,
+      "unit": "cost",
+      "notes": "optimum cost; current run must not exceed baseline value"
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        3.141592653589793,
+        0.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -2.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.checkpoint_t2",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -0.6876614645562651,
+        2.5350767370031337,
+        0.3654378869079208,
+        2.316334306741223
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    },
+    {
+      "id": "trajopt.showcase_cartpole.jax_slsqp.checkpoint_t4",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        3.141592653589793,
+        0.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.01,
+      "rtol": 0.01
+    }
+  ]
+}

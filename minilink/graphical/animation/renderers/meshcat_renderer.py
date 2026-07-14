@@ -324,6 +324,8 @@ class MeshcatCanvas:
 
     def update_primitive(self, i: int, primitive, transform_matrix):
         path = self._base_path(i)
+        # Meshcat/umsgpack cannot serialize JAX arrays — convert at this boundary.
+        transform_matrix = np.asarray(transform_matrix, dtype=float)
 
         if isinstance(primitive, Point):
             local_pt = np.append(primitive.pt, 1.0)
@@ -385,6 +387,7 @@ def _rigid_effective_transform(primitive, transform_matrix, tf):
     meshcat keyframing only the transform animates, so per-frame geometry is
     frozen at ``t=0`` (use ``native=False`` for frame-accurate dynamic geometry).
     """
+    transform_matrix = np.asarray(transform_matrix, dtype=float)
     if isinstance(primitive, Point):
         local_pt = np.append(primitive.pt, 1.0)
         world_pt = transform_matrix @ local_pt

@@ -54,10 +54,16 @@ class DoubleIntegrator(DynamicSystem):
         self.outputs["y"].units = ["m"]
 
     def f(self, x, u, t=0.0, params=None):
-        return np.array([x[1], u[0]])
+        from minilink.core.backends import array_module
+
+        xp = array_module(x)
+        return xp.array([x[1], u[0]])
 
     def h(self, x, u, t=0.0, params=None):
-        return np.array([x[0]])
+        from minilink.core.backends import array_module
+
+        xp = array_module(x)
+        return xp.array([x[0]])
 
     def get_kinematic_geometry(self):
         return {}

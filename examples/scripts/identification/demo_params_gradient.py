@@ -130,7 +130,7 @@ n_samples = 400
 ts = dt * jnp.arange(n_samples)
 rs = 1.2 * jnp.sin(0.8 * ts).reshape(-1, 1)
 x0 = jnp.array([0.5, 0.0])
-xs = true_evaluator.rk4_integrate_forced(x0, rs, 0.0, dt)
+xs = true_evaluator.rk4_integrate_linear(x0, rs, 0.0, dt)
 
 # "Measured" state derivatives (in practice: numerical differentiation of
 # logged states; here taken from the true model).

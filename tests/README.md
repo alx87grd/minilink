@@ -44,8 +44,9 @@ Regenerate manifest: `python tests/fixtures/kinematic_baseline/regenerate_manife
 Shared fixtures: `graphics_contract_helpers.py` (draw-list resolution),
 `planning_helpers.py` (RRT holonomic obstacle scene).
 
-Benchmark **performance** helpers live under repo-root `benchmarks/`; import smoke
-only in `test_benchmark_smoke.py` (not correctness asserts).
+Benchmark **performance** and end-to-end regression helpers live under repo-root
+`benchmarks/`; import smoke only in `test_benchmark_smoke.py` (not full regression
+asserts). Manual overall check: `python benchmarks/run_regression_check.py --suite all`.
 
 `tests/manual/` and `tests/bugs/` are removed — use `examples/scripts/` for
 smoke scripts and unittest for contracts.

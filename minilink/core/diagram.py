@@ -142,7 +142,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
     inputs, or port nominal values. The third gather slot is step index ``k``
     (``int``), not simulation time.
 
-    :meth:`compile` produces a :class:`~minilink.core.compile.evaluators.step_evaluator.StepEvaluator`
+    :meth:`compile` produces a :class:`~minilink.core.compile.evaluators.evaluators.StepEvaluator`
     for fast :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout`.
     """
 

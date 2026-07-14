@@ -7,13 +7,13 @@ import pytest
 
 from minilink.blocks.routing import Gain
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.dynamics_evaluator import DynamicsEvaluator
-from minilink.core.compile.evaluators.static_evaluator import NumpyStaticEvaluator
+from minilink.core.compile.evaluators.evaluators import DynamicsEvaluator
+from minilink.core.compile.evaluators.numpy_evaluators import NumpyStaticEvaluator
 
 try:
     import jax  # noqa: F401
 
-    from minilink.core.compile.evaluators.static_evaluator import JaxStaticEvaluator
+    from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:

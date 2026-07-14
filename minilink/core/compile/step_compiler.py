@@ -84,14 +84,14 @@ def compile_step_diagram(
 
     key = normalize_backend(backend)
     if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.step_diagram_evaluator import (
+        from minilink.core.compile.evaluators.numpy_evaluators import (
             NumpyStepDiagramEvaluator,
         )
 
         evaluator = NumpyStepDiagramEvaluator(plan, diagram)
     else:
         require_jax_numpy()
-        from minilink.core.compile.evaluators.step_diagram_evaluator import (
+        from minilink.core.compile.evaluators.jax_evaluators import (
             JaxStepDiagramEvaluator,
         )
 

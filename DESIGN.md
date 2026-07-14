@@ -120,14 +120,16 @@ Minilink's **primary framework** is continuous-time: `DynamicSystem`, flow
 **Step and hybrid** are a **narrow parallel add-on** — not a second framework of
 equal weight. They exist so discrete control laws (MPC, SMC, sampled regulators)
 can close the loop on a continuous plant without hand-rolled outer `while` loops.
-Scope and contracts: [hybrid-discrete master plan](docs/plans/hybrid-discrete/00-master-plan.md)
+can close the loop on a continuous plant without hand-rolled outer `while` loops.
 (subset only — not full Simulink / discrete-dynamics parity).
 
 **Design trade-off rule:** when step or hybrid work conflicts with continuous-time
 clarity, **prefer the continuous core**. Add-ons must stay on **sibling types and
 separate compile/sim paths** (`StepSystem` beside `DynamicSystem`, not a flag on
 `f`; `HybridDiagram` as two-side glue, not a merged heterogeneous diagram) so
-flow APIs, evaluators, and `DiagramSystem` behavior remain unchanged. Do not fold
+flow APIs, evaluators, and `DiagramSystem` behavior remain unchanged. 
+
+*Rationale:* We rejected adding a `time_domain` flag to `DynamicSystem` or inheriting from it because it reverses the mathematical meaning of `f` (from $dx$ to $x_{new}$), breaks textbook ODE clarity, and confuses analysis tools. Evolution kind must always be determined by type (`isinstance(sys, StepSystem)`), not a solver flag. Do not fold
 discrete scheduling, sample-time metadata, or mixed `f`/`step` semantics into
 `DynamicSystem`, flow `compile()`, or `Simulator` unless there is a clear
 flow-side benefit.
@@ -163,15 +165,16 @@ serial arms. Joint impedance / task impedance / computed torque use
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
   `y_dependencies` create standard `u`/`y`/`x`.
 - **StepSystem (discrete leaf):** same port shortcut as `DynamicSystem`; evolution is
-  `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`;
-  cache `self.rollout`. See [01-step-core.md](docs/plans/hybrid-discrete/01-step-core.md).
+  `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`
+  (state-only ``k/x/u``); cache `self.rollout`. Boundary signal histories:
+  :class:`~minilink.simulation.computer.Computer` / hybrid sim, not evaluators.
 - **Hybrid (computer + plant):** :class:`~minilink.core.hybrid_diagram.HybridDiagram`
   bundles :class:`~minilink.simulation.computer.Computer` (step side + schedule) and a
   continuous :class:`DiagramSystem` plant. Boundary channels use ZOH (computer → plant)
   or sample (plant → computer). :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
   mirrors :class:`~minilink.simulation.simulator.Simulator` (`t0`/`tf`, `solve`,
   `solve_forced`); plant steps use
-  :meth:`~minilink.core.compile.evaluators.integration.IntegrationMixin.integrate_zoh`
+  :meth:`~minilink.core.compile.evaluators.numpy_evaluators.IntegrationMixin.integrate_zoh`
   with optional ``plant_dt_inner`` for sub-step integration and plant trajectory
   recording. :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` holds
   ``computer`` (:class:`~minilink.core.step_rollout.StepRollout`, tick ``k``) and
@@ -199,7 +202,6 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
-  See [05-hybrid-simulation.md](docs/plans/hybrid-discrete/05-hybrid-simulation.md).
 - **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCStatelessController`
   is a static ``System`` (``n=0``) leaf: one :meth:`~minilink.planning.mpc.planner.MPCPlanner.step`
   per Computer tick (memoized across output ports ``u_ff``, ``x_ff``, ``z``).
@@ -210,7 +212,6 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
   default animation overlays:
   :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
-  See [06-mpc-step-block.md](docs/plans/hybrid-discrete/06-mpc-step-block.md).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
@@ -338,11 +339,11 @@ optional class attribute `feedback_profile`, not inheritance):
 
 `compile(system, backend)` returns a typed evaluator:
 
-- :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.dynamics_evaluator.DynamicsEvaluator`
+- :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.DynamicsEvaluator`
   (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)
-- :class:`StepSystem` leaf → :class:`~minilink.core.compile.evaluators.step_evaluator.StepEvaluator`
-  (`NumpyStepEvaluator` / `JaxStepEvaluator`) — `.step`, `.outputs`, `.rollout`; no `.f`
-- static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.static_evaluator.StaticEvaluator`
+- :class:`StepSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.StepEvaluator`
+  (`NumpyStepEvaluator` / `JaxStepEvaluator`) — `.step`, `.outputs`, state-only `.rollout`; no `.f`
+- static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.evaluators.StaticEvaluator`
   (`NumpyStaticEvaluator` / `JaxStaticEvaluator`) — `.outputs` only, no `.f`
 - :class:`DiagramSystem` → diagram evaluator (same dynamics tier as above)
 
@@ -353,6 +354,43 @@ Diagrams → `ExecutionPlan` → diagram evaluator. Internal outputs via
 `reconstruct_internal_signals`; **`outputs()` / `outputs_p()` are boundary outputs
 only** (not diagram internals). Compiled evaluators expose **`outputs` / `outputs_p`**
 (dict keyed by port id); they do not mirror model `h` as a separate evaluator API.
+
+**Evaluator execution tiers (JAX).** Default methods (`.f`, `.f_p`, `.outputs`, …)
+are the **fast tier** — JIT-compiled on JAX, eager on NumPy. JAX evaluators also
+expose a **trace tier** (`.f_trace`, `.f_trace_p`, `.rk4_step_trace`, …):
+pre-JIT flat callables for composition inside outer `jit` / `grad` / `vmap`
+(identification losses, C export). Optional `_jit` aliases (`.f_jit` ≡ `.f`)
+document the fast tier. NumPy evaluators reject `*_trace` / `*_jit` attributes.
+`has_trace_tier` is `True` on JAX evaluators. Details:
+[docs/plans/evaluator-trace-tier-api.md](docs/plans/evaluator-trace-tier-api.md).
+
+|  | Bound | Parametric |
+| --- | --- | --- |
+| Fast (default) | `f` ≡ `f_jit` | `f_p` ≡ `f_jit_p` |
+| Trace (JAX only) | `f_trace` | `f_trace_p` |
+
+Same 2×2 for `outputs`, `step`, and integration helpers
+(`rk4_step`, `rk4_integrate_zoh`, `rk4_integrate_linear`, `euler_integrate_*`, …)
+on JAX dynamics evaluators. Layout:
+`evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`,
+`step_rollout.py` (`gather_u`, `StepRolloutMixin`).
+Integration naming:
+[docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md).
+
+**Integration rename (pre-1.0).** Rollout methods use explicit integrator + input
+model tokens — no bare `integrate`:
+
+| Old | New |
+| --- | --- |
+| `integrate` | `rk4_integrate_zoh` |
+| `integrate_p` | `rk4_integrate_zoh_p` |
+| `rk4_integrate_forced` | `rk4_integrate_linear` |
+| `rk4_integrate_forced_p` | `rk4_integrate_linear_p` |
+
+Trace-tier JAX twins follow the same pattern (`*_trace`, `*_trace_p`). See
+[docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md)
+for the full grid.
+
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
 reintroduce `compute_outputs(..., ports=...)`.
 
@@ -366,7 +404,9 @@ reintroduce `compute_outputs(..., ports=...)`.
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
 - :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
-  (clock-free :class:`~minilink.core.step_rollout.StepRollout`; not `Simulator`)
+  (state-only :class:`~minilink.core.step_rollout.StepRollout` ``(k, x, u)``; evaluators
+  and the façade do not record boundary signals — logging is owned by
+  :class:`~minilink.simulation.computer.Computer` / :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`; not `Simulator`)
 - :class:`~minilink.core.hybrid_diagram.HybridDiagram` →
   :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` or façade
   `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`)
@@ -386,7 +426,8 @@ Unconnected inputs use port nominals; time-varying sources belong in the diagram
 forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
-`euler`, `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
+`euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
+`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
 ([ROADMAP.md](ROADMAP.md) P1).
 
 ### Discontinuous closed loops — known issues
@@ -431,7 +472,7 @@ at tick boundaries — the intended semantics for digital SMC. See
 **Diagnostics.** ``scratch/confirm_smc_solver_bug.py`` compares solvers, ``ddq_f`` vs
 numerical ``Δdq/Δt``, and RK4 k1–k4 cancellation on the pendulum SMC demo.
 
-**Mitigation (landed):** [docs/plans/discontinuous-solver-selection.md](docs/plans/discontinuous-solver-selection.md)
+**Mitigation (landed):**
 — ``SlidingModeController`` sets ``discontinuous_behavior``; diagrams aggregate the flag;
 auto ``select_solver`` picks **Euler** with finer default ``dt``; ``UserWarning`` on every
 discontinuous solve (stronger when forcing ``rk4_fixedsteps`` / ``scipy_*``). Evolution
@@ -447,8 +488,9 @@ kind is class-type routing only — ``solver_info["continuous_time_equation"]`` 
 
 **Trajopt:** planner → transcription → `MathematicalProgram` → `Optimizer` →
 `Trajectory`. Single backend-native transcription classes; no parallel JAX
-transcription types. Transcriptions compile the system (`numpy`/`jax`) and
-route `problem.params.system` through the parametric tier `f_p`;
+transcription types. NumPy transcriptions build constraints via
+`dynamics_function` (compiled evaluator, trace tier when JAX). **JAX transcriptions**
+embed `problem.sys.f` directly in the NLP (not evaluator `f` / `f_trace`).
 `compile_backend="direct"` calls `system.f` uncompiled (escape hatch).
 A `MathematicalProgram` carries the native backend of its callables in its
 `backend` field, and the `Optimizer` compiles with it by default.

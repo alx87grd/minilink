@@ -337,6 +337,39 @@ class TestBenchmarkRegression(unittest.TestCase):
         self.assertIn("diagram_dense_f.numpy.dx_residual", ids)
         self.assertIn("sim.diagram_dense.truth.x_tf", ids)
 
+    def test_integration_check_suite_returns_metrics(self):
+        from benchmarks.suites.integration_check import (
+            IntegrationCheckSuiteConfig,
+            run_integration_check_suite,
+        )
+
+        metrics = run_integration_check_suite(
+            IntegrationCheckSuiteConfig(sim_n_runs=1, trajopt_n_runs=1)
+        )
+        ids = {metric.id for metric in metrics}
+        self.assertIn("sim.double_pendulum.rk4_numpy.checkpoint_t0", ids)
+        self.assertIn("sim.showcase_pendulum.rk4_numpy.x_tf", ids)
+        if any(metric.id.startswith("trajopt.showcase_cartpole") for metric in metrics):
+            self.assertIn("trajopt.showcase_cartpole.jax_slsqp.total_s", ids)
+
+    def test_integration_baseline_json_loads(self):
+        from pathlib import Path
+
+        from benchmarks.baseline import load_baseline
+
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / ".."
+            / "benchmarks"
+            / "baselines"
+            / "integration_check.json"
+        ).resolve()
+        if not fixture.is_file():
+            self.skipTest("integration baseline missing")
+        baseline = load_baseline(fixture)
+        self.assertEqual(baseline.suite, "integration_check")
+        self.assertGreater(len(baseline.metrics), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

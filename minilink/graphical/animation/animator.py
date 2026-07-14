@@ -204,9 +204,14 @@ class Animator:
         frames = []
         for frame_idx in range(schedule.n_frames):
             sim_idx = sim_index_for_frame(frame_idx, schedule)
-            x = traj.x[:, sim_idx]
-            u = traj.u[:, sim_idx] if len(traj.u) > 0 else np.array([])
-            t = traj.t[sim_idx]
+            # Convert at the graphics boundary (JAX TrajOpt trajectories stay JAX until here).
+            x = np.asarray(traj.x[:, sim_idx], dtype=float)
+            u = (
+                np.asarray(traj.u[:, sim_idx], dtype=float)
+                if len(traj.u) > 0
+                else np.array([])
+            )
+            t = float(np.asarray(traj.t[sim_idx]))
             frames.append(
                 self._resolve_frame(
                     x,

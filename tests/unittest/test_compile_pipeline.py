@@ -21,7 +21,7 @@ from minilink.core.compile.compiler import (
     check_algebraic_loops,
     compile_diagram,
 )
-from minilink.core.compile.evaluators.numpy_evaluator import NumpyDiagramEvaluator
+from minilink.core.compile.evaluators.numpy_evaluators import NumpyDiagramEvaluator
 from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, System
@@ -383,7 +383,7 @@ try:
     import jax
     import jax.numpy as jnp
 
-    from minilink.core.compile.evaluators.jax_evaluator import JaxDiagramEvaluator
+    from minilink.core.compile.evaluators.jax_evaluators import JaxDiagramEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
