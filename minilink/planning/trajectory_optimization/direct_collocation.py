@@ -167,13 +167,17 @@ class DirectCollocationTranscription(Transcription):
     ) -> Trajectory:
         """Read ``(x, u)`` from the optimizer result."""
         x, u = self.unpack(result.z, problem)
+        # Public trajectories are NumPy — convert off any JAX optimizer arrays here.
+        x = np.asarray(x, dtype=float)
+        u = np.asarray(u, dtype=float)
+        t = np.asarray(self.options.t, dtype=float)
         dynamics = dynamics_function(problem, compile_backend)
         dx = np.zeros_like(x)
-        for k, t_k in enumerate(self.options.t):
-            dx[:, k] = dynamics(x[:, k], u[:, k], float(t_k))
+        for k, t_k in enumerate(t):
+            dx[:, k] = np.asarray(dynamics(x[:, k], u[:, k], float(t_k)), dtype=float)
 
         traj = Trajectory(
-            t=self.options.t,
+            t=t,
             x=x,
             u=u,
             signals={

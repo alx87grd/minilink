@@ -2,7 +2,7 @@ from functools import partial
 
 import numpy as np
 
-from minilink.core.backends import require_jax_numpy
+from minilink.core.backends import array_module, require_jax_numpy
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
@@ -235,6 +235,58 @@ class HolonomicMobileRobot(DynamicSystem):
         }
 
 
+class DynamicHolonomicMobileRobot(DynamicSystem):
+    """Holonomic 2D point with acceleration inputs.
+
+    State ``x = [x, y, vx, vy]``; input ``u = [ax, ay]``.
+    """
+
+    def __init__(self):
+        super().__init__(n=4, input_dim=2, output_dim=4, expose_state=True)
+        self.name = "Dynamic Holonomic Mobile Robot"
+        self.state.labels = ["x", "y", "vx", "vy"]
+        self.state.units = ["m", "m", "m/s", "m/s"]
+        self.inputs["u"].labels = ["ax", "ay"]
+        self.inputs["u"].units = ["m/s^2", "m/s^2"]
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
+
+        # Graphic parameters (not part of the EoM)
+        self.camera_scale = 10.0
+        self.camera_follow_frame = "body"
+
+    def f(self, x, u, t=0.0, params=None):
+        xp = array_module(x)
+        # double integrator in the plane: position integrates velocity, velocity integrates accel
+        return xp.array([x[2], x[3], u[0], u[1]])
+
+    def h(self, x, u, t=0.0, params=None):
+        return x
+
+    def get_kinematic_geometry(self):
+        return {
+            "body": [
+                Circle(radius=0.25, center=[0.0, 0.0, 0.0], color="blue", fill=True)
+            ]
+        }
+
+    def tf(self, x, u, t=0, params=None):
+        return {"body": translation(x[0], x[1], 0.0)}
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return {
+            "body": [
+                Arrow(
+                    base=(0.0, 0.0),
+                    vector=(x[2], x[3]),
+                    scale=0.4,
+                    color="red",
+                    linewidth=2,
+                )
+            ]
+        }
+
+
 class HolonomicMobileRobot3D(DynamicSystem):
     """Holonomic 3D point robot."""
 
@@ -407,6 +459,39 @@ class JaxKinematicBicycleRateInputs(JaxKinematicBicycle):
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {}
+
+
+class JaxHolonomicMobileRobot(HolonomicMobileRobot):
+    """JAX-traceable :class:`HolonomicMobileRobot`."""
+
+    def __init__(self):
+        super().__init__()
+        self.name = "JAX Holonomic Mobile Robot"
+
+    def f(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        return jnp.asarray(u)
+
+    def h(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        return jnp.asarray(x)
+
+
+class JaxDynamicHolonomicMobileRobot(DynamicHolonomicMobileRobot):
+    """JAX-traceable :class:`DynamicHolonomicMobileRobot`."""
+
+    def __init__(self):
+        super().__init__()
+        self.name = "JAX Dynamic Holonomic Mobile Robot"
+
+    def f(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        # double integrator in the plane: position integrates velocity, velocity integrates accel
+        return jnp.array([x[2], x[3], u[0], u[1]])
+
+    def h(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        return jnp.asarray(x)
 
 
 if __name__ == "__main__":

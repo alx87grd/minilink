@@ -51,8 +51,11 @@ from minilink.dynamics.catalog.vehicles.propulsion import (
 )
 from minilink.dynamics.catalog.vehicles.steering import (
     ConstantSpeedKinematicCar,
+    DynamicHolonomicMobileRobot,
     HolonomicMobileRobot,
     HolonomicMobileRobot3D,
+    JaxDynamicHolonomicMobileRobot,
+    JaxHolonomicMobileRobot,
     JaxKinematicBicycle,
     JaxKinematicBicycleRateInputs,
     KinematicBicycle,
@@ -78,7 +81,12 @@ def _have_jax() -> bool:
         return False
 
 
-_JAX_CATALOG_SYSTEMS = (JaxKinematicBicycle, JaxKinematicBicycleRateInputs)
+_JAX_CATALOG_SYSTEMS = (
+    JaxKinematicBicycle,
+    JaxKinematicBicycleRateInputs,
+    JaxHolonomicMobileRobot,
+    JaxDynamicHolonomicMobileRobot,
+)
 
 
 def _zero_f_smoke(system):
@@ -126,6 +134,17 @@ class TestCatalogSmoke(unittest.TestCase):
         np.testing.assert_allclose(
             bicycle.f(np.array([0.0, 0.0, 0.0]), np.array([2.0, 0.0])),
             [2.0, 0.0, 0.0],
+        )
+
+        np.testing.assert_allclose(
+            HolonomicMobileRobot().f(np.array([1.0, 2.0]), np.array([3.0, 4.0])),
+            [3.0, 4.0],
+        )
+        np.testing.assert_allclose(
+            DynamicHolonomicMobileRobot().f(
+                np.array([1.0, 2.0, 3.0, 4.0]), np.array([5.0, 6.0])
+            ),
+            [3.0, 4.0, 5.0, 6.0],
         )
 
         car = LongitudinalFrontWheelDriveCarWithWheelSlipInput()
@@ -183,6 +202,7 @@ class TestCatalogSmoke(unittest.TestCase):
             (QuarterCarOnRoughTerrain(), 1),
             (MountainCar(), 1),
             (HolonomicMobileRobot(), 1),
+            (DynamicHolonomicMobileRobot(), 1),
             (HolonomicMobileRobot3D(), 1),
             (LongitudinalFrontWheelDriveCarWithTorqueInput(), 1),
             (CartPole(), 1),
@@ -239,6 +259,9 @@ class TestCatalogSmoke(unittest.TestCase):
             KinematicCar(),
             ConstantSpeedKinematicCar(),
             HolonomicMobileRobot(),
+            DynamicHolonomicMobileRobot(),
+            JaxHolonomicMobileRobot(),
+            JaxDynamicHolonomicMobileRobot(),
             HolonomicMobileRobot3D(),
             UdeSRacecar(),
             LongitudinalFrontWheelDriveCarWithWheelSlipInput(),
