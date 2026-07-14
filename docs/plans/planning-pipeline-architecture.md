@@ -7,6 +7,11 @@ Consolidates two architecture reviews:
 1. **Input/output contract** — should all planners return the same result shape?
 2. **Trajopt + MPC compile path** — transcription unification and runtime obstacle updates without re-JIT.
 
+Companion (Section **C** — MPC controller / multi-rate export / plan broadcast
+exposure): [mpc-controller-architecture.md](mpc-controller-architecture.md).
+Sections A/B here and C are orthogonal: A/B change planner results and
+parametric NLP; C changes how MPC is exported into simulation and real nodes.
+
 Implemented contracts live in [DESIGN.md](../../DESIGN.md) §6 and [ROADMAP.md](../../ROADMAP.md) §5.5.
 
 ---
@@ -142,7 +147,7 @@ Migration: non-breaking first — add wrappers and `compute_path_plan()` / `comp
 4. **A5–A7, B7** — docs and planner dispatch helpers
 5. **B8–B9** — optional unification and trajopt sweeps
 
-Sections A and B are orthogonal: parametric MPC changes **how** path planners compile; result wrappers change **what** planners return.
+Sections A and B are orthogonal: parametric MPC changes **how** path planners compile; result wrappers change **what** planners return. Section C ([mpc-controller-architecture.md](mpc-controller-architecture.md)) is orthogonal again: multi-rate Computer export and ctl-rate nominal exposure for MPC closed-loop / deploy.
 
 ---
 
@@ -152,3 +157,4 @@ Sections A and B are orthogonal: parametric MPC changes **how** path planners co
 - Mandatory LQR wrapper under `planning/`
 - Forcing policy fields into MPC or trajopt results
 - Hard moving-obstacle constraints in the first parametric scene pass
+- MPCController facade / plan broadcaster / multi-rate export (see Section C)

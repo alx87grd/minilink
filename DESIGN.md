@@ -212,6 +212,9 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
   default animation overlays:
   :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
+  **Draft next contract** (not implemented): multi-rate Computer export with
+  plan_flat + ctl-rate nominal broadcast — see
+  [docs/plans/mpc-controller-architecture.md](docs/plans/mpc-controller-architecture.md).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
@@ -479,6 +482,12 @@ discontinuous solve (stronger when forcing ``rk4_fixedsteps`` / ``scipy_*``). Ev
 kind is class-type routing only — ``solver_info["continuous_time_equation"]`` was removed.
 
 ## 6. Optimization And Planning
+
+Draft architecture notes (design only):
+[planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)
+(PathPlan / parametric scene) and
+[mpc-controller-architecture.md](docs/plans/mpc-controller-architecture.md)
+(MPCController facade / multi-rate export).
 
 **NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;
 `Optimizer` binds method preset (`scipy_slsqp`, `scipy_trust_constr`, `ipopt`).

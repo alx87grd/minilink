@@ -201,6 +201,10 @@ continuous plants — not full Simulink parity. Minilink remains focused on cont
 - [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz export, `abstract_boundary` topology *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*
 - [x] **Phase 6a** — `MPCStatelessController` (algebraic block, `u_ff`/`x_ff`/`z`), hybrid straight-line demo, `mpc_plans_from_rollout`
 - [x] **Phase 6b** — warm-start `MPCStatefulController` (`StepSystem`, state = optimizer `z`), `warm_start` helpers
+- [ ] **Phase 6c (draft)** — MPCController facade; multi-rate Computer export
+  (solver @ `dt_mpc` + plan broadcaster @ `dt_ctl`); `plan_flat` codec; ctl-rate
+  `u_nom`/`x_nom`/(optional `du`/`dx`) ports; `compute_command` for RAS/ROS wrap
+  ([mpc-controller-architecture.md](docs/plans/mpc-controller-architecture.md))
 
 ### 5.6 Estimation and identification
 
@@ -211,7 +215,9 @@ continuous plants — not full Simulink parity. Minilink remains focused on cont
 
 - [ ] `gymnasium.py` — diagram as RL env (train outside)
 - [ ] `flax.py`, `torch.py` — external model → static `System`
-- [ ] `ros2.py` — ROS 2 node exporter (wraps a minilink block as a ROS 2 node)
+- [ ] `ros2.py` — ROS 2 node exporter (wraps a minilink block as a ROS 2 node);
+  MPC path should wrap `compute_command` / `plan_flat` from
+  [mpc-controller-architecture.md](docs/plans/mpc-controller-architecture.md)
 - [ ] Cosimulation / FMI
 - [ ] **External multibody engine leaf (MJX-first candidate)** — optional
   `DynamicSystem` (or sibling `StepSystem`) wrapper for complex multibody +

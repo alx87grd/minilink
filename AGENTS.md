@@ -15,6 +15,7 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, priority checkboxes |
 
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
+| [docs/plans/mpc-controller-architecture.md](docs/plans/mpc-controller-architecture.md) | MPC facade / multi-rate export draft (when that contract lands) |
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy |
 
 Do not add new markdown guides unless asked. Keep [README call chains](README.md#call-chains) minimal.
