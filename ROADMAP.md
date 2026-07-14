@@ -23,7 +23,8 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; catalog arms on `Manipulator`. | Optional `JaxManipulator`; `f_ext` port if approved. |
 | Dynamics abstraction | 6 | `MechanicalSystem` + `Manipulator` (`p`, `pdot`, FK/J); catalog arms rebased. | `JaxManipulator` if needed; external wrench port. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
-| Contact engine (`dynamics/engines/`) | 1 | Experimental; math not QA-validated. | Validation tests toward TRL 2. |
+| Contact engine (`dynamics/engines/`) | 1 | Experimental hand-rolled contact; math not QA-validated. | Validate toward TRL 2 **or** prefer external engine leaf ([§5.9](#59-quarantine-graduation), [§5.7](#57-interfaces)). |
+| External multibody leaf (MJX, …) | 0 | Optional `DynamicSystem` wrapper around an external JAX multibody/contact engine — backlog under [§5.7](#57-interfaces) / [§5.9](#59-quarantine-graduation), not the product-vision center ([§5.11](#511-product-vision--landscape-position)). | Architecture sign-off + spike when scheduled. |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Pole-zero, Nyquist, margins, `ss2tf`; reachability costs. |
 | Control | 6 | Linear, LQR, filtered PID; `modelbased.py` (CT, Pyro-parity SMC); `robotic.py` (impedance, kinematic, nullspace). | SMC traj-following demos; dynamic joint/effector PID wrappers; trajectory LQR. |
 | Blocks | 5 | Routing, nonlinear, filters, sources, transfer function, 1-layer NN. | Multi-layer `MLP`, atomic layers (see neural-blocks plan). |
@@ -104,6 +105,10 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 - Frequency completion; obstacle/Pacejka/stochastic layers (if approved)
 - Pyro migration guide in README; TRL 8 demos per tool band
 
+**P5 (vision, not scheduled)** — Product vision + landscape position; see
+[§5.11](#511-product-vision--landscape-position). Does not displace P0–P4;
+gated on review-queue sign-off of the wording.
+
 ## 4. Review queue (needs maintainer sign-off)
 
 - Public export policy for `minilink/__init__.py`.
@@ -112,6 +117,12 @@ done (routing, nonlinear, filters, `TrajectorySource`, PID, MIMO proportional).
 - Dynamic bicycle module split.
 - Graphics/camera contract consolidation (`KinematicModel` delegate) — optional follow-up.
 - **Pyro game demos** — port via interactive animation or explicitly drop.
+- **Product vision §5.11** — wording of vision, positioning table, and
+  practices list
+  ([§5.11](#511-product-vision--landscape-position)).
+- **External multibody leaf (MJX, …)** — package home (`dynamics/engines/` vs
+  `interfaces/`), continuous vs discrete adapter split, deprecate-vs-keep for
+  hand-rolled contact ([§5.7](#57-interfaces), [§5.9](#59-quarantine-graduation)).
 
 ## 5. Future
 
@@ -201,7 +212,12 @@ continuous plants — not full Simulink parity. Minilink remains focused on cont
 - [ ] `gymnasium.py` — diagram as RL env (train outside)
 - [ ] `flax.py`, `torch.py` — external model → static `System`
 - [ ] `ros2.py` — ROS 2 node exporter (wraps a minilink block as a ROS 2 node)
-- [ ] Cosimulation / FMI, multibody import
+- [ ] Cosimulation / FMI
+- [ ] **External multibody engine leaf (MJX-first candidate)** — optional
+  `DynamicSystem` (or sibling `StepSystem`) wrapper for complex multibody +
+  contact plants; thin adapter, lazy/`minilink[mjx]` extra; catalog teaching
+  plants stay default. Spike when scheduled: load model → ports →
+  `ctl @ plant`. Not the product center ([§5.11](#511-product-vision--landscape-position)).
 
 ### 5.8 Catalog capability gaps (not EoM)
 
@@ -212,15 +228,103 @@ continuous plants — not full Simulink parity. Minilink remains focused on cont
 ### 5.9 Quarantine graduation
 
 - [ ] `symbolic/` as dynamics-authoring tool
-- [ ] Contact engine validation (`dynamics/engines/`)
+- [ ] Hand-rolled contact in `dynamics/engines/` — graduate **or** deprecate in
+  favor of an external engine leaf ([§5.7](#57-interfaces)) once that leaf is
+  TRL ≥ 3
 
 ### 5.10 Out of scope (by decision)
 
 Full Simulink / arbitrary multi-clock hybrid parity, event-driven switching
-(guards, impacts), RNN policy blocks, differentiable-rollout library — see
-[DESIGN.md §3](DESIGN.md). The **narrow** step/hybrid subset in §5.5a is in
-scope as a subsidiary program; it does not replace the continuous-time core.
-Pygame game framework (`sys2game`) — no first-class port unless reversed.
+(guards, impacts) as a *framework* feature, RNN policy blocks, becoming a
+standalone batched RL physics engine — see [DESIGN.md §3](DESIGN.md). The
+**narrow** step/hybrid subset in §5.5a is in scope as a subsidiary program; it
+does not replace the continuous-time core. Pygame game framework (`sys2game`) —
+no first-class port unless reversed.
+
+**In scope as leaves (not as core rewrite):** optional wrappers around external
+multibody/contact engines ([§5.7](#57-interfaces)) — *using* those engines for
+complex plants, not rebuilding a physics OS inside minilink.
+
+### 5.11 Product vision & landscape position
+
+**Status:** directional vision — wording needs maintainer sign-off
+([§4](#4-review-queue-needs-maintainer-sign-off)). Companion to the feature
+backlog (§5.0–5.10) and pyro port (§6). Does **not** change core contracts
+([DESIGN.md](DESIGN.md)).
+
+#### Product vision
+
+Minilink is a **Python/JAX block-diagram toolbox** for **modeling, simulating,
+controlling, optimizing, and learning** with dynamical systems — with equations
+that read like textbook math (`dx = f(x,u,t;p)`).
+
+**Distinct edge:** one object model for plants, controllers, diagrams, and
+NN/ID blocks. Compose (`@`, `>>`), simulate, analyze, optimize
+trajectories/policies, and differentiate / `jit` through the same `f` via
+compile backends — without splitting a “sim stack” from a “learning stack.”
+
+**Primary use cases**
+
+1. **Model & teach** — readable continuous plants (catalog or custom
+   `DynamicSystem`) and closed-loop diagrams.
+2. **Control** — classical, model-based, and hybrid digital loops (sampled
+   MPC/SMC) on those diagrams.
+3. **Optimize** — trajopt / MPC / planning (search, DP) posed on the same
+   `System` and costs/sets.
+4. **Learn** — identify parameters, residual dynamics, or NN policies with
+   gradients through compiled dynamics.
+5. **Scale out plants later** — optional external multibody engines as leaves
+   when needed ([§5.7](#57-interfaces)); not the product center.
+
+**Not trying to be:** a Simulink GUI/DAE product, a Multibody/contact OS, an
+OCP modeling language, or a batched RL physics engine.
+
+#### Positioning vs other toolboxes
+
+| Toolbox | They own | Minilink vs them |
+| --- | --- | --- |
+| **Simulink** (+ Stateflow/Simscape) | Industrial diagrams, GUI, DAE, codegen | Same block-diagram idea; code-first, causal, open, differentiable — no GUI/DAE ambition |
+| **MATLAB** (CST etc.) | Classical LTI / frequency design | Neighbor for LTI; we center nonlinear systems + optimize/learn in one Python stack |
+| **Drake** | Multibody, contact, events, deep MathProg | Complement for teaching / reduced-order / JAX-learning loops; not a second MultibodyPlant |
+| **MuJoCo / MJX** | Fast multibody + contact physics | Physics backend we can wrap later; they don’t own control-diagram + optimize/learn UX |
+| **CasADi** | Symbolic AD → NLP/OCP | Opt is a *tool on Systems*; we own diagram/sim/control/learn surface around it |
+| **acados / Crocoddyl** | Fast deployed MPC/DDP | Solver peers; we stay the Systems lab that can call solvers |
+| **Pinocchio** | Fast RBD + derivatives | Algorithm/engine peer — not a diagram framework |
+| **Modelica** | Acausal physical networks | We stay causal ODE/blocks (better fit for AD and learning) |
+| **python-control** | Classical control in Python | Interop; they stop at LTI, we continue nonlinear + optimize/learn |
+| **Brax / similar** | Batched differentiable physics for RL | Neighbor in JAX; we are Systems+control+opt, not an RL physics engine |
+| **Pyro** | Teaching dynamics lineage | Successor: keep readability; add diagrams, compile/JAX, optimize, learn |
+
+**Claim:** *Systems-first lab for simulate → control → optimize → learn in
+Python/JAX — not a physics OS, not an OCP language, not a Simulink
+replacement.*
+
+#### Practices to incorporate
+
+- **Freeze the composition grammar early** — `System` / ports / diagrams /
+  continuous `f` stay stable; grow capability in leaves and tools, not by
+  redefining the core.
+- **Put hard physics behind optional leaves** — deep multibody/contact (when
+  needed) as adapters, never as a rewrite of `DynamicSystem` or
+  `DiagramSystem`.
+- **Expose structure, don’t black-box dynamics** — compiled evaluators,
+  parametric `f_p`, Jacobians, and optimize/learn paths share one dynamics
+  surface.
+- **Succeed in parallel, retire on a calendar** — new APIs land beside old ones
+  (quarantine / extras); migrate demos/tests, then deprecate with an explicit
+  window.
+- **Demo-gate maturity** — representative closed-loops and cross-pillar scripts
+  (sim + control + optimize/learn) before calling a band done.
+- **Document hybrid sample semantics** — ZOH / sample timing for discrete
+  control on continuous plants is part of the contract, not tribal knowledge.
+- **Validate wiring, don’t solve diagram DAEs** — detect algebraic loops; keep
+  the graph causal/explicit.
+- **Lock build vs run** — wire/validate/compile freezes structure; simulation
+  and optimization run on that freeze (params overrides stay call-time where
+  designed).
+- **Be hard where the identity is** — parity gates on compile vs reference, JAX
+  twins, discontinuous closed-loop solver behavior; don’t spend the budget on a
+  second physics OS.
 
 ## 6. Pyro 2.0 port status
 
