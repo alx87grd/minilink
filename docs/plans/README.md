@@ -6,6 +6,7 @@ Architecture and port plans. Contracts in code: [DESIGN.md](../../DESIGN.md), [R
 | --- | --- | --- |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro 2.0 demo/tool backlog | Ongoing |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Planning stack layout | Reference |
+| [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Draft |
 | [neural-blocks-collection.md](neural-blocks-collection.md) | MLP / neural blocks roadmap | Future |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle model layering | Reference |
 | [evaluator-trace-tier-api.md](evaluator-trace-tier-api.md) | JAX fast vs trace evaluator tiers | Reference |
