@@ -121,6 +121,17 @@ Solving one does not clear the other (DP may hold policy + rolled-out traj).
 RH only requires `solve_trajectory_from`. Internal NLP `bind(x0)` is not on
 the Planner ABC — called inside parametric `solve_trajectory_from`.
 
+**Optional kwargs convention** (traj-family; ABC stays `**kwargs`):
+
+| Kwarg | Meaning | Who uses it |
+| --- | --- | --- |
+| `params=None` | Scene / bind façade (\(p\)); `None` ≡ bind \(x_0\) only for parametric NLP | TOP / MPC; others omit or ignore |
+| `initial_guess=None` | Optional seed (schedule and/or packed decision vector) | NLP / local methods; RRT etc. omit |
+
+`initial_guess` is a **seed**, not warm-start *policy*. The planner does not
+orchestrate “reuse last online plan”; that lives on
+`RecedingHorizonController` (below).
+
 ```mermaid
 classDiagram
   class Planner {
@@ -134,7 +145,7 @@ classDiagram
   }
   class TrajectoryOptimizationPlanner {
     +prepare()
-    +solve_trajectory_from(x0, params)
+    +solve_trajectory_from(x0, params, initial_guess)
   }
   Planner <|-- TrajectoryOptimizationPlanner
   TrajectoryOptimizationPlanner --> TrajectoryPlan
@@ -152,10 +163,16 @@ Two modes:
 | `parametric` | `ParametricMathematicalProgram` + `bind(p)` | `prepare` then `solve_trajectory_from` |
 
 Today’s `MPCPlanner` folds into parametric TOP; keep a thin alias pre-1.0.
-Public `solve_trajectory_from(x0, params=None)` always accepts `params`
-(façade); `params is None` ≡ today’s `bind(x0)`. Scene keys later.
+Public `solve_trajectory_from(x0, params=None, initial_guess=None)` always
+accepts `params` and `initial_guess` (façade); `params is None` ≡ today’s
+`bind(x0)`. Scene keys later. Offline `solve_trajectory` takes the same
+optional `initial_guess`.
 
 `bind` is evaluator-internal: SciPy sees only `z`; evaluator injects bound `x0`.
+
+**Footnote:** batch TOP may keep an offline convenience `warm_start: bool`
+meaning “reuse `last_trajectory_plan` as seed.” That is **not** the RH
+product flag — online warm-start orchestration is RH-only.
 
 ---
 
@@ -172,6 +189,8 @@ TrajectoryPlan
 
 Keeps `Trajectory` as pure `(t,x,u)` schedule. Wrapper carries solve extras
 (metadata, warm \(z\), optional knot rates). Symmetry with future `PolicyPlan`.
+`warm_state` is a **result** artifact for the next caller; using it is not
+automatic inside the planner.
 
 ---
 
@@ -179,12 +198,18 @@ Keeps `Trajectory` as pure `(t,x,u)` schedule. Wrapper carries solve extras
 
 Holds a planner duck with `solve_trajectory_from`. Runs:
 
-1. Tick → latch `TrajectoryPlan`
-2. `Command` / ports (`plan_flat`, `u_ff`, `x_ff`, `z`, `success`)
-3. `export_to_computer` / `__matmul__(plant)`
-4. `compute_command` for deploy nodes (ROS-agnostic)
+1. Tick → (optional) warm-start: if enabled, build a seed via
+   `warm_start.py` from the latched plan / `warm_state`
+2. Call `planner.solve_trajectory_from(x0, params=…, initial_guess=seed)`
+   and latch the returned `TrajectoryPlan`
+3. `Command` / ports (`plan_flat`, `u_ff`, `x_ff`, `z`, `success`)
+4. `export_to_computer` / `__matmul__(plant)`
+5. `compute_command` for deploy nodes (ROS-agnostic)
 
 Default applied `u` for `@`: **`u_ff`** (ZOH). Broadcast `u_nom`/`x_nom` later.
+
+Warm-start *policy* (`warm_start=True` on the controller) is owned here — not
+on the Planner ABC / generic from-API.
 
 ---
 
@@ -193,8 +218,8 @@ Default applied `u` for `@`: **`u_ff`** (ZOH). Broadcast `u_nom`/`x_nom` later.
 | Concern | Home |
 | --- | --- |
 | Transcription / pack \(z\) / parametric NLP | Planner / trajopt (+ mpc until merge) |
-| Warm-start helpers | `planning/mpc/warm_start.py` (or shared) |
-| Tick latch / export / `@` | `RecedingHorizonController` |
+| Warm-start helpers (pure; seed from prior plan) | `planning/mpc/warm_start.py` (or shared) — used by RH (and tests/demos), not planner API |
+| Tick latch / export / `@` / warm-start orchestration | `RecedingHorizonController` |
 | Flatten | `TrajectoryPlan` |
 | Overlays / plans_from_rollout | Free tools under `planning/mpc/` |
 

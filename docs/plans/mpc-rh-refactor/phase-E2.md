@@ -26,9 +26,9 @@ pytest tests/unittest/test_mpc_planner.py \
 | Step | Work |
 | --- | --- |
 | E2.1 | `RecedingHorizonController(planner, dt_mpc=…, warm_start=True)` |
-| E2.2 | Tick latch → `Command` |
+| E2.2 | Tick: optional warm-start helpers → `solve_trajectory_from(..., initial_guess=seed)` → latch |
 | E2.3 | `compute_command(y, …)` |
-| E2.4 | Warm-start via `mpc/warm_start.py` |
+| E2.4 | Warm-start via `mpc/warm_start.py` (orchestration here, not on Planner) |
 | E2.5 | `as_step_block` / `export_to_computer` / `__matmul__` |
 | E2.6 | Tests vs `solve_trajectory_from` + export smoke |
 

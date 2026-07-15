@@ -1,6 +1,6 @@
 # Phase E0 — Foundation
 
-**Status:** implemented (verify gate green before merge)  
+**Status:** done (landed on `dev-mpc-v2`)  
 **Parent:** [phases.md](phases.md) · contracts: [vision.md](vision.md)
 
 ## Goal

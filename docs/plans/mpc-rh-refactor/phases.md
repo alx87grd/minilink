@@ -68,8 +68,8 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 
 | Phase | Goal | Card |
 | --- | --- | --- |
-| **E0** | Types, `problem.tf`, strip options `tf`, `solve` rename | [phase-E0.md](phase-E0.md) **(full)** |
-| **E1** | `MPCPlanner.solve_trajectory_from` → `TrajectoryPlan` | [phase-E1.md](phase-E1.md) |
+| **E0** | Types, `problem.tf`, strip options `tf`, `solve` rename | [phase-E0.md](phase-E0.md) **(done)** |
+| **E1** | `MPCPlanner.solve_trajectory_from` → `TrajectoryPlan` | [phase-E1.md](phase-E1.md) **(done)** |
 | **E2** | `RecedingHorizonController` tick + export / `@` | [phase-E2.md](phase-E2.md) |
 | **E3** | Migrate flagship demos to RH | [phase-E3.md](phase-E3.md) |
 | **E4** | Merge parametric MPC into TOP | [phase-E4.md](phase-E4.md) |
@@ -91,10 +91,9 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 
 ## Start here
 
-1. **E0.1–E0.4** — result types + `PlanningProblem.tf` + strip options `tf` ([phase-E0.md](phase-E0.md)).
-2. **E0.5** — `compute_solution` → `solve` rename (mechanical blast early).
-3. **E1** — `solve_trajectory_from` on `MPCPlanner`.
-4. **E2** — `RecedingHorizonController` with `compute_command` + `__matmul__`.
-5. **E3.1** — migrate `demo_mpc_hybrid_minimal.py` to `rhc @ plant`.
+1. **E0** — done ([phase-E0.md](phase-E0.md)).
+2. **E1** — done ([phase-E1.md](phase-E1.md)).
+3. **E2** — `RecedingHorizonController` with warm-start orchestration + `compute_command` + `__matmul__` ([phase-E2.md](phase-E2.md)).
+4. **E3.1** — migrate `demo_mpc_hybrid_minimal.py` to `rhc @ plant`.
 
 Defer E4 until E2–E3 green. Retire PoC leaves (E5) after demos moved.

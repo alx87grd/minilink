@@ -29,7 +29,8 @@ class MPCPlanner(Planner):
     ----------
     problem : PlanningProblem
         Template problem frozen at construction (cost, sets, reference ``x_start``).
-        Only ``x_start`` varies at runtime via :meth:`step`.
+        Online entry is :meth:`solve_trajectory_from`; :meth:`step` returns the
+        bare schedule for hand loops.
     transcription : MPCDirectCollocationTranscription
         Parametric direct-collocation transcription.
     options : MPCOptions, optional
@@ -183,6 +184,32 @@ class MPCPlanner(Planner):
 
         return trajectory
 
+    def solve_trajectory_from(
+        self,
+        x0,
+        *,
+        params=None,
+        initial_guess: np.ndarray | Trajectory | None = None,
+    ) -> TrajectoryPlan:
+        """
+        Online traj-family solve from measured ``x0``.
+
+        Parameters
+        ----------
+        x0 : array_like
+            Measured initial state.
+        params : mapping, optional
+            Scene / bind façade. ``None`` or ``{}`` uses today's ``bind(x0)``
+            only. Non-empty keys are rejected until scene support (E7).
+        initial_guess : ndarray or Trajectory, optional
+            NLP seed (schedule and/or packed ``z``). Warm-start *policy*
+            (reuse last latch) is owned by ``RecedingHorizonController``, not
+            this method.
+        """
+        _reject_unknown_online_params(params)
+        self.step(x0, initial_guess=initial_guess)
+        return self.require_trajectory_plan()
+
     def solve(
         self,
         *,
@@ -196,9 +223,10 @@ class MPCPlanner(Planner):
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
     ) -> TrajectoryPlan:
-        """Offline traj-family entry wrapping :meth:`step` at ``problem.x_start``."""
-        self.step(self.problem.x_start, initial_guess=initial_guess)
-        return self.require_trajectory_plan()
+        """Offline traj-family entry at ``problem.x_start``."""
+        return self.solve_trajectory_from(
+            self.problem.x_start, initial_guess=initial_guess
+        )
 
     def _make_optimizer_backend(self) -> ScipyMinimizeOptimizer:
         method = self.options.optimizer_method
@@ -215,3 +243,19 @@ class MPCPlanner(Planner):
         existing = kwargs.get("options", {})
         kwargs["options"] = {**existing, **dict(self.options.optimizer_options)}
         return ScipyMinimizeOptimizer(**kwargs)
+
+
+def _reject_unknown_online_params(params) -> None:
+    """Reject non-empty online ``params`` until scene support lands (E7)."""
+    if params is None:
+        return
+    if not hasattr(params, "keys"):
+        raise TypeError(
+            f"params must be a mapping or None; got {type(params).__name__}."
+        )
+    keys = list(params.keys())
+    if keys:
+        raise ValueError(
+            "MPCPlanner.solve_trajectory_from does not accept params keys yet "
+            f"(got {keys!r}). Pass params=None or {{}} until scene support."
+        )
