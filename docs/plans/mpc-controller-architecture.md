@@ -22,7 +22,7 @@ Today’s shape is directionally right for Minilink, but the roles are blurred:
 | NLP engine | [`MPCPlanner`](../../minilink/planning/mpc/planner.py) | Good — compile-once `prepare` / `step` |
 | Diagram leaf | [`MPCStatelessController`](../../minilink/planning/mpc/controller.py) / [`MPCStatefulController`](../../minilink/planning/mpc/step_block.py) | Thin adapters hard-tied to `MPCPlanner`; export is a single-rate leaf |
 | Latch / feedforward | [`MPCTickLatch`](../../minilink/planning/mpc/tick_latch.py) | Only slices `u_ff` / `x_ff` / `z` at MPC tick rate |
-| Plan wire format | NLP `z` only | No standard Trajectory flatten/reconstruct for consumers |
+| Plan wire format | NLP `z` only | No `Trajectory.to_flat` / `from_flat` wire for consumers |
 | High-rate nominals | none | No bundled interpolator; callers cannot easily get `u_nom(t)` / `x_nom(t)` between solves |
 | Deploy surface | none | No clocked tick API for a real node |
 | Debug | `step_disp` + post-hoc overlays | No shared live debug mode across hand-loop / hybrid / node |
@@ -220,7 +220,8 @@ Owns: planner, `dt_mpc`, optional default `dt_ctl`, warm-start, latch, debug, la
 | `reset` / `last_*` / `plot_*` / `debug_*` | shared |
 | default `x0_computer` helper | used by façade / traj API so aim demos skip manual packing |
 
-`MPCCommand`: `plan`, `plan_flat`, `t0_abs`, `u_ff`, `x_ff`, `z`, `metadata`.
+`MPCCommand`: `plan`, `plan_flat` (= `plan.to_flat()`), `u_ff`, `x_ff`, `z`, `metadata`.
+(Prefer absolute times already stored in `plan.t` when latching for broadcast — no parallel `t0_abs` field unless a relative-horizon backend forces it.)
 
 **Auto-wire for `@`:** resolve plant feedback as today’s hybrid rules (`y` in, `u` out) but source computer_out from facade `applied_u` defaulting to **`u_nom`** (then `u_ff` / `u`). Boundary still exposes `plan_flat`, `x_nom`, … for optional extra wires.
 ### C3. Boundary ports to expose (for any downstream law)
@@ -230,7 +231,7 @@ The **exported Computer** boundary must expose enough for feedforward **or** fee
 | Port / signal | Rate | Purpose |
 | --- | --- | --- |
 | `y` (in) | sample / plant | measurement into solver (and available to user law) |
-| `plan_flat` (out) | updates on MPC fire; held between | whole drafted plan via `PlanCodec` — reconstruct anytime |
+| `plan_flat` (out) | updates on MPC fire; held between | `Trajectory.to_flat()` of latest plan — reconstruct with `Trajectory.from_flat` |
 | `u_nom` (out) | **ctl rate** | time-interp nominal input |
 | `x_nom` (out) | **ctl rate** | time-interp nominal state |
 | `du_nom` (out) | ctl rate | nominal input rate (when enabled) |
@@ -255,6 +256,7 @@ Same information model as the exported Computer:
 cmd = mpc.compute_command(y_meas, warm_state=z_prev)
 # publish cmd.plan_flat (+ metadata); high-rate side uses same eval helpers as broadcaster
 ref = PlanBroadcaster.from_flat(cmd.plan_flat).evaluate(t_wall)
+# or: plan = Trajectory.from_flat(cmd.plan_flat); ...
 # user node: u = their_law(ref, y_meas)
 ```
 
@@ -271,22 +273,37 @@ Requirements: one NLP per MPC tick; high-rate path is interp-only; fail-soft hoo
 | Static / dynamic horizon plots | tuning + closed-loop viz ([`mpc_animation_overlays`](../../minilink/planning/mpc/animation_overlays.py)) |
 | Failure dump | last `z`, `plan_flat`, residuals |
 
-### C6. `PlanCodec` + broadcaster (internal to export; also callable)
+### C6. Trajectory flatten + broadcaster
 
-#### C6a. `PlanCodec`
+#### C6a. Flatten / inflate on `Trajectory` (chosen — not a separate PlanCodec)
 
-Standard `pack` / `unpack` for the whole drafted plan (self-describing header + `t,x,u` payload). Round-trip required. **Not** NLP `z`. Used as the wire between solver → broadcaster and as the public `plan_flat` port.
+**Decision:** put the standard wire encode/decode on [`Trajectory`](../../minilink/core/trajectory.py) itself — same home as `save` / `load` / `resample`. Do **not** introduce a public `PlanCodec` type.
 
-Chosen layout (fixed, documented):
+```python
+plan_flat = plan.to_flat()                 # self-describing 1-D float array
+plan      = Trajectory.from_flat(plan_flat)
+# optional: Trajectory.flat_shapes(plan_flat) → (n, m, N)
+```
 
-- Header: `n`, `m`, `N`, `t0_abs`, and time-grid description (`dt` or full `t` length)
+Layout (fixed, documented on `Trajectory`):
+
+- Small header: `n`, `m`, `N` (and version / flags if needed)
 - Payload: `t` (`N`), then flattened `x` `(n, N)`, then flattened `u` `(m, N)`
-- Round-trip: `unpack(pack(plan)) == plan` (within float tolerance)
-- Optional: `PlanCodec.view_shapes(plan_flat) → (n, m, N)`
+- Core channels only in v1 (`signals` out of flat wire unless a later flag says otherwise)
+- Round-trip: `Trajectory.from_flat(traj.to_flat())` matches `t,x,u` within float tolerance
+- **Not** the NLP decision vector `z` (that stays transcription-specific)
+
+Why on `Trajectory`:
+
+- The drafted plan *is* a trajectory; flatten is a general wire form (sim, MPC port, RAS), not an MPC-only codec
+- Matches existing persistence style (`save`/`load`) on the same object
+- Keeps `planning/mpc/` free of a parallel “plan bag” type
+
+MPC latch / Computer port still named `plan_flat` for clarity; its value is always `latest_plan.to_flat()`. Absolute time for broadcasting lives in `plan.t` (solver writes absolute knot times when latching, or shifts relative knots once at latch).
 
 #### C6b. Broadcaster sub-block (inside exported Computer)
 
-- Input: latched `plan_flat` (+ absolute time basis from solver)
+- Input: latched `plan_flat` (inflate via `Trajectory.from_flat` or cached plan)
 - On each **ctl** fire: evaluate at schedule time → `u_nom`, `x_nom`, optional `du_nom`, `dx_nom`
 - Same evaluate helpers callable outside diagrams for RAS
 - Horizon end policy: clamp / hold last knot (configurable)
@@ -299,12 +316,12 @@ Chosen layout (fixed, documented):
 
 ### P0 — Planner tuning
 
-Prepare / `step`, inspect plan, `PlanCodec` round-trip, scene plots — no plant loop.
+Prepare / `step`, inspect plan, `Trajectory.to_flat` / `from_flat` round-trip, scene plots — no plant loop.
 
 ### P1 — Export surface validation
 
 - Multi-rate `export_to_computer(dt_ctl, dt_mpc)` builds solver+broadcaster diagram
-- Port inventory present; `plan_flat` unpack restores full plan
+- Port inventory present; `Trajectory.from_flat(plan_flat)` restores full plan
 - Dense sample of `u_nom`/`x_nom` matches `Trajectory.resample` / knot interp
 - `du_nom`/`dx_nom` sanity vs FD / `f`
 
@@ -331,6 +348,7 @@ Prepare / `step`, inspect plan, `PlanCodec` round-trip, scene plots — no plant
 | `MPCTickSolve` | `MPCCommand` + latched plan feeding broadcaster |
 | Single `% MPC_DT` demos | Aim path uses facade defaults; explicit `%` / `export_to_computer(dt_ctl=..., dt_mpc=...)` still OK |
 | Manual `mpc_default_computer_x0` | Facade supplies default computer `x0` for traj |
+| No traj wire flatten | `Trajectory.to_flat` / `from_flat` (core); MPC port is that vector |
 | `Trajectory.resample` | Interp backend for broadcaster |
 | Downstream trackers | **Out of scope** as library; demos may show ad-hoc wiring |
 | Package home | Stay in `planning/mpc/`; ROADMAP `control/mpc.py` obsolete or re-export note |
@@ -343,6 +361,7 @@ Prepare / `step`, inspect plan, `PlanCodec` round-trip, scene plots — no plant
 
 - Shipping a downstream control-law library (tracking, LQR-on-error, cascade helpers as products)
 - Implementing the rewrite in this documentation pass
+- A separate public `PlanCodec` type (use `Trajectory.to_flat` / `from_flat`)
 - Shooting MPC, acados binding, or ROS2 package
 - Trajopt / MPC transcription merge (B8 in [planning-pipeline-architecture.md](planning-pipeline-architecture.md))
 - NLP inside continuous `Simulator`
@@ -353,13 +372,13 @@ Prepare / `step`, inspect plan, `PlanCodec` round-trip, scene plots — no plant
 ## Suggested implementation order
 
 1. `PathPlan` / `SolveMetadata` (A) if needed for clean `MPCCommand`
-2. `PlanCodec` + round-trip tests
-3. Broadcaster leaf + evaluate helpers
+2. **`Trajectory.to_flat` / `from_flat` + round-trip tests** (core)
+3. Broadcaster leaf + evaluate helpers (consume `Trajectory` / flat)
 4. `MPCController.export_to_computer` → multi-rate bundle (`StepSchedule.fire`) + default `dt_ctl` / warm-start / `x0_computer`
 5. **`MPCController.__matmul__` / `mpc_closed_loop`** aim path (defaults → `hybrid_closed_loop`, applied `u_nom`)
 6. Expose full boundary port set; keep solver-only escape hatch
 7. Rewrite hybrid minimal demo to `mpc @ plant`; keep one explicit multi-rate diagram demo
-8. Hand-loop / RAS `compute_command` aligned with same codec/eval
+8. Hand-loop / RAS `compute_command` aligned with same flatten/eval
 9. Debug overlays for nominals vs plant
 
 ---
@@ -372,6 +391,7 @@ Prepare / `step`, inspect plan, `PlanCodec` round-trip, scene plots — no plant
 | Import any planner? | **Receding-horizon path surface only** (not RRT/DP) |
 | Default export? | **Multi-rate Computer**: solver @ `dt_mpc` + broadcaster @ `dt_ctl` |
 | Beginner closed loop? | **`mpc @ plant`** with defaults (`dt_ctl`, warm-start, applied `u_nom`) |
-| Baseline public artifact? | **Drafted plan** (`plan_flat` + reconstruct) and **ctl-rate nominals** |
+| Baseline public artifact? | **Drafted plan** (`plan` + `plan.to_flat()`) and **ctl-rate nominals** |
+| Flat wire API home? | **`Trajectory.to_flat` / `from_flat`** — not a separate PlanCodec |
 | Ship FF/FB laws? | **No** — expose ports/info; users wire laws; aim path is pure FF `u_nom` |
-| RAS / ROS? | Shared `compute_command` + codec/eval helpers; `ros2.py` later |
+| RAS / ROS? | Shared `compute_command` + traj flatten/eval helpers; `ros2.py` later |
