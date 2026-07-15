@@ -341,13 +341,34 @@ latching. Inside a JAX-friendly step graph, prefer holding **`(t,x,u)` or
 - `dx`: prefer `f(x_nom, u_nom, t)` from planning model; `du`: FD/spline on `u` knots
 - If model `f` unavailable, fall back to FD on `x` and mark `dx_source="fd"`
 
-**Traceability aim (honest scope):**
+**Traceability aim (honest scope + future JAX NLP):**
 
-- **Must:** NumPy Computer + broadcaster work; flatten round-trip on `Trajectory`
-- **Should:** `pack_horizon` / `unpack_horizon` / `eval_nominal` stay free of
-  `np.asarray` / `float()` forcing so they are JAX-traceable with `xp`
-- **Not required in v1:** making the whole MPC NLP tick (SciPy SLSQP) JAX-traceable
-- **Not required in v1:** a JIT’d hybrid Computer that embeds the NLP
+Today’s SciPy SLSQP **MPC solve is not JAX-traceable** — that is fine for v1.
+Everything **around** the solve should stay **full native / `xp`-clean** so a
+future JAX NLP backend can drop in without rewriting the controller, broadcast,
+or deploy surface:
+
+| Piece | Traceable now? | Notes |
+| --- | --- | --- |
+| `pack_horizon` / `unpack_horizon` / `eval_nominal` / `du`,`dx` helpers | **Yes — require** | No `np.asarray` / `float()` / Python branching on data |
+| Warm-start shift on `(t,x,u)` or packed `z` | **Yes — require** | Same xp path |
+| Parametric program `J`,`h`,`g` / transcription defects (already JAX DC) | **Keep** | Compile-once path stays; solver backend is the plug |
+| Broadcaster leaf math | **Yes — require** | Array in → nominals out |
+| `MPCController` glue / latch bookkeeping | Host Python OK | Calls into native helpers; does not pollute them |
+| SciPy (or other host) NLP tick | **No (today)** | Host callback; result converted at boundary to arrays / `Trajectory` |
+| Future JAX NLP tick | **Target** | Same `step(x0, warm)` contract; returns arrays; no SciPy |
+
+Rule: **solver backend is swappable; horizon wire + nominal broadcast + warm-start
+math are not solver-specific and must stay equation-path clean.** Do not freeze
+NumPy-only APIs into those helpers “because MPC isn’t JIT yet.”
+
+- **Must (v1):** NumPy Computer + broadcaster; `Trajectory` flatten round-trip;
+  native helpers free of host coercion
+- **Should (v1):** JAX `jit` smoke tests on `eval_nominal` / pack/unpack /
+  warm-start shift (no NLP inside the jit)
+- **Later:** JAX NLP backend behind the same RH `step` surface; Computer may then
+  run a fully traced ctl+solve path if desired
+- **Not required in v1:** JIT’d hybrid Computer that embeds the SciPy NLP
 
 ---
 
@@ -356,14 +377,15 @@ latching. Inside a JAX-friendly step graph, prefer holding **`(t,x,u)` or
 ### P0 — Planner tuning
 
 Prepare / `step`, inspect plan, `Trajectory.to_flat` / `from_flat` round-trip,
-native `pack_horizon`/`unpack_horizon` parity, scene plots — no plant loop.
+native `pack_horizon`/`unpack_horizon` parity (+ JAX jit smoke on helpers), scene
+plots — no plant loop.
 
 ### P1 — Export surface validation
 
 - Multi-rate `export_to_computer(dt_ctl, dt_mpc)` builds solver+broadcaster diagram
 - Port inventory present; `Trajectory.from_flat(plan_flat)` restores full plan
 - Dense sample of `u_nom`/`x_nom` matches `Trajectory.resample` / knot interp
-- `eval_nominal` matches resample; optional JAX `jit` smoke on `eval_nominal`
+- `eval_nominal` matches resample; **JAX `jit` smoke** on `eval_nominal` / pack
 - `du_nom`/`dx_nom` sanity vs FD / `f`
 
 ### P2 — Closed-loop hybrid (user wires law)
@@ -389,8 +411,8 @@ native `pack_horizon`/`unpack_horizon` parity, scene plots — no plant loop.
 | `MPCTickSolve` | `MPCCommand` + latched plan feeding broadcaster |
 | Single `% MPC_DT` demos | Aim path uses facade defaults; explicit `%` / `export_to_computer(dt_ctl=..., dt_mpc=...)` still OK |
 | Manual `mpc_default_computer_x0` | Facade supplies default computer `x0` for traj |
-| No traj wire flatten | `Trajectory.to_flat` / `from_flat` (core); MPC port is that vector |
-| `Trajectory.resample` | Interp backend for broadcaster |
+| No traj wire flatten | `Trajectory.to_flat` / `from_flat` (NumPy report); native `pack_horizon` / `eval_nominal` for traceable math |
+| `Trajectory.resample` | NumPy convenience; broadcaster math uses `eval_nominal` (xp) |
 | Downstream trackers | **Out of scope** as library; demos may show ad-hoc wiring |
 | Package home | Stay in `planning/mpc/`; ROADMAP `control/mpc.py` obsolete or re-export note |
 
@@ -403,6 +425,9 @@ native `pack_horizon`/`unpack_horizon` parity, scene plots — no plant loop.
 - Shipping a downstream control-law library (tracking, LQR-on-error, cascade helpers as products)
 - Implementing the rewrite in this documentation pass
 - A separate public `PlanCodec` type (use `Trajectory.to_flat` / `from_flat`)
+- A public `JaxTraj` twin of `Trajectory` (use native-array helpers instead)
+- Making `Trajectory` itself JAX-traceable (stays NumPy reporting object per DESIGN)
+- Making the SciPy MPC NLP tick JAX-traceable
 - Shooting MPC, acados binding, or ROS2 package
 - Trajopt / MPC transcription merge (B8 in [planning-pipeline-architecture.md](planning-pipeline-architecture.md))
 - NLP inside continuous `Simulator`
@@ -413,8 +438,8 @@ native `pack_horizon`/`unpack_horizon` parity, scene plots — no plant loop.
 ## Suggested implementation order
 
 1. `PathPlan` / `SolveMetadata` (A) if needed for clean `MPCCommand`
-2. **`Trajectory.to_flat` / `from_flat` + round-trip tests** (core)
-3. Broadcaster leaf + evaluate helpers (consume `Trajectory` / flat)
+2. **`Trajectory.to_flat` / `from_flat`** (NumPy) + native **`pack_horizon` / `unpack_horizon` / `eval_nominal`** (+ optional JAX jit smoke)
+3. Broadcaster leaf using `eval_nominal` (NumPy Computer first)
 4. `MPCController.export_to_computer` → multi-rate bundle (`StepSchedule.fire`) + default `dt_ctl` / warm-start / `x0_computer`
 5. **`MPCController.__matmul__` / `mpc_closed_loop`** aim path (defaults → `hybrid_closed_loop`, applied `u_nom`)
 6. Expose full boundary port set; keep solver-only escape hatch
@@ -433,6 +458,7 @@ native `pack_horizon`/`unpack_horizon` parity, scene plots — no plant loop.
 | Default export? | **Multi-rate Computer**: solver @ `dt_mpc` + broadcaster @ `dt_ctl` |
 | Beginner closed loop? | **`mpc @ plant`** with defaults (`dt_ctl`, warm-start, applied `u_nom`) |
 | Baseline public artifact? | **Drafted plan** (`plan` + `plan.to_flat()`) and **ctl-rate nominals** |
-| Flat wire API home? | **`Trajectory.to_flat` / `from_flat`** — not a separate PlanCodec |
+| Flat wire API home? | **`Trajectory.to_flat` / `from_flat`** (NumPy report) — not PlanCodec |
+| JAX-traceable path? | **Native helpers** `pack_horizon` / `eval_nominal` with `xp` — not JaxTraj, not a traceable Trajectory |
 | Ship FF/FB laws? | **No** — expose ports/info; users wire laws; aim path is pure FF `u_nom` |
 | RAS / ROS? | Shared `compute_command` + traj flatten/eval helpers; `ros2.py` later |
