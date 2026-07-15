@@ -23,7 +23,7 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 TF = 5.0
 SIM_DT = 0.001
-TS = 0.2
+TS = 0.05
 REF = np.array([0.0, 0.0])
 
 plant = Pendulum(length=1.0, mass=1.0)
