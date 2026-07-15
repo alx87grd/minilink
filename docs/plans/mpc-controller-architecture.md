@@ -191,30 +191,414 @@ adapters). See §8.
 
 ---
 
-## 5. Brainstorm sketches (ideas, not fixed)
+## 5. Architecture options — class systems & contracts
 
-### 5.1 Layering ideas for “what MPC is”
+Below are **candidate architectures** to address R1–R11. They are alternatives
+to discuss, not a pick. Shared building blocks any option can reuse:
 
-**Idea A — Planner owns NLP; thin System adapters export**  
-Close to PoC. Clear Planner-vs-System law. Weak if every new backend needs a new
-block class.
+| Building block | Role | Notes |
+| --- | --- | --- |
+| `Trajectory.to_flat` / `from_flat` (idea) | R4, R7 wire | NumPy report / ports / RAS |
+| `pack_horizon` / `eval_nominal` (idea) | R6, R10 | xp-native interp / rates |
+| `PlanningProblem` + `Planner` | offline orchestration | already exists |
+| `PathPlan` / `PolicyPlan` (plan A) | typed results | draft elsewhere |
 
-**Idea B — Facade controller imports a planner / horizon backend**  
-User-facing object for hand-loop, export, RAS. Planner stays a tool. Matches
-“MPC controller could import any type of planner” exploration.
+### How to read each option
 
-**Idea C — Export is a multi-rate Computer (tick + broadcast)**  
-Default product is not a lone leaf: slow replan tick + fast nominal interpolator
-sub-block; boundary exposes plan + nominals. Satisfies R1+R5+R6 as one package.
+For each: **class diagram (sketch)** → **key contracts (methods/ports)** →
+**how it hits the requirements** → **tradeoffs**.
 
-**Idea D — Rename for honesty**  
-If backends include RRT/DP-rollout, “MPC” may be too narrow; a generic
-“receding-horizon controller” name may fit — with `MPC*` as the NLP-flavored
-entry. Naming unsettled.
+---
 
-These can combine (e.g. B+C). **No pick is locked.**
+### Option α — Evolve the PoC leaves (planner + block twins)
 
-### 5.2 Drafted-plan wire (R4, R7)
+Closest to today’s Phase 6a/6b. Grow ports and helpers; little new façade.
+
+```mermaid
+classDiagram
+  class Planner {
+    +problem
+    +compute_solution()
+  }
+  class MPCPlanner {
+    +prepare()
+    +step(x0) Trajectory
+  }
+  class MPCStatelessController {
+    +planner
+    +ports y u_ff x_ff z plan_flat
+  }
+  class MPCStatefulController {
+    +planner
+    +state z
+    +step()
+    +ports y u_ff x_ff z plan_flat
+  }
+  class PlanBroadcaster {
+    +ports plan_flat t
+    +ports u_nom x_nom du_nom dx_nom
+  }
+  class Trajectory {
+    +to_flat()
+    +from_flat()
+  }
+
+  Planner <|-- MPCPlanner
+  MPCStatelessController --> MPCPlanner : holds
+  MPCStatefulController --> MPCPlanner : holds
+  PlanBroadcaster ..> Trajectory : unpack / interp
+  MPCStatelessController ..> Trajectory : plan_flat
+  MPCStatefulController ..> Trajectory : plan_flat
+```
+
+**Contracts (sketch)**
+
+```text
+MPCPlanner
+  prepare()
+  step(x0, *, initial_guess=None) -> Trajectory   # later PathPlan
+
+MPC*Controller  (System | StepSystem)
+  inputs:  y
+  outputs: plan_flat, u_ff, x_ff, z [, success]
+  export_to_computer(schedule) -> Computer        # single-rate replan
+
+PlanBroadcaster  (System, user-wired)
+  inputs:  plan_flat  (+ time via t / schedule)
+  outputs: u_nom, x_nom [, du_nom, dx_nom]
+
+# Aim closed loop stays hand-assembled:
+#   computer = mpc % dt_mpc
+#   # user wires broadcaster into a larger step diagram OR plant-side algebra
+#   hybrid = computer @ plant
+```
+
+**Requirements fit**
+
+| R | Fit |
+| --- | --- |
+| R1 | Strong if both leaf types kept |
+| R2 | Weak unless methods duplicated on planner or a new free function |
+| R3 | Partial — three APIs (planner / leaf / broadcaster) |
+| R4–R7 | Addable (`plan_flat` + `Trajectory` flatten + broadcaster) |
+| R8 | Weak — no single `mpc @ plant` object |
+| R9 | Scattered |
+| R10 | Helpers can stay xp-clean |
+| R11 | Weak — still hard-tied to `MPCPlanner` |
+
+**Tradeoffs:** smallest delta from PoC; hardest aim UX and multi-planner story;
+users assemble multi-rate themselves.
+
+---
+
+### Option β — Receding-horizon facade + horizon source + bundled multi-rate export
+
+User-facing **controller facade** imports a duck-typed **horizon source**;
+default export is a **tick + broadcast** Computer. Closest to the sketches in
+§6 / earlier discussion (formerly C0/C8 ideas).
+
+```mermaid
+classDiagram
+  class Planner {
+    +compute_solution()
+  }
+  class MPCPlanner {
+    +prepare()
+    +step(x0)
+    +generate_horizon(x0) PathPlan
+  }
+  class HorizonSource {
+    <<duck>>
+    +generate_horizon(x0) PathPlan
+    +prepare()*
+    +warm_state_dim*
+  }
+  class RecedingHorizonController {
+    +source
+    +dt_mpc
+    +dt_ctl
+    +compute_command(y) Command
+    +export_to_computer() Computer
+    +__matmul__(plant) HybridDiagram
+  }
+  class MPCController {
+    <<alias NLP-flavored>>
+  }
+  class TickBlock {
+    <<System or StepSystem>>
+    +ports y plan_flat z success
+  }
+  class BroadcastBlock {
+    <<System or StepSystem>>
+    +ports plan_flat u_nom x_nom ...
+  }
+  class Trajectory {
+    +to_flat()
+    +from_flat()
+  }
+
+  Planner <|-- MPCPlanner
+  MPCPlanner ..|> HorizonSource
+  RecedingHorizonController --> HorizonSource : imports
+  MPCController --|> RecedingHorizonController
+  RecedingHorizonController --> TickBlock : builds
+  RecedingHorizonController --> BroadcastBlock : builds
+  TickBlock --> HorizonSource : calls per dt_mpc
+  BroadcastBlock ..> Trajectory : flat + eval_nominal
+```
+
+**Contracts (sketch)**
+
+```text
+# Duck-typed — not necessarily a formal ABC
+HorizonSource
+  generate_horizon(x0, *, warm_start=None, params=None) -> PathPlan
+  prepare()?                  # optional
+  warm_state_dim -> int       # 0 if none
+  default_warm_state()? 
+
+RecedingHorizonController / MPCController
+  __init__(source, *, dt_mpc, dt_ctl=..., warm_start=..., applied_u=..., debug=...)
+  compute_command(y, *, warm_state=None, t=None, k=None) -> Command
+      Command: plan, plan_flat, u_ff, x_ff, z?, metadata
+  export_to_computer(dt_ctl=None, dt_mpc=None, *, bundle=True) -> Computer
+      # bundle=True → StepDiagram{TickBlock, BroadcastBlock} + StepSchedule.fire
+  __matmul__(plant) -> HybridDiagram   # defaults → hybrid_closed_loop
+  as_stateless_block() / as_step_block()  # escape hatches (R1)
+  reset(), last_*, plot_*/debug_*
+
+TickBlock
+  inputs: y
+  outputs: plan_flat, z?, success, u_ff?, x_ff?
+  # fires at dt_mpc; latches plan_flat
+
+BroadcastBlock
+  inputs: plan_flat (held)
+  outputs: u_nom, x_nom [, du_nom, dx_nom] [, tau]
+  # fires at dt_ctl; xp-native eval_nominal
+
+# Other planners (R11 ideas):
+RRTPlanner.as_horizon_source() -> HorizonSource
+TrajectoryOptimizationPlanner.as_horizon_source() -> HorizonSource
+PolicyPlan.as_horizon_source(tf, dt) -> HorizonSource   # via rollout
+```
+
+**Requirements fit**
+
+| R | Fit |
+| --- | --- |
+| R1 | Bundle export + leaf escapes |
+| R2 | `compute_command` first-class |
+| R3 | One facade for tune/sim/deploy hooks |
+| R4–R7 | `plan_flat` + broadcast built into default export |
+| R5 | Ports exposed; no law library |
+| R6 | Broadcast sub-block in default Computer |
+| R8 | Strong — `mpc @ plant` |
+| R9 | Natural home on facade |
+| R10 | Tick may call host NLP; helpers xp-clean |
+| R11 | HorizonSource adapters |
+
+**Tradeoffs:** more new types; clearest separation of **replan** vs **broadcast** vs
+**planner algorithm**; best path for R8/R11. Naming (`MPC*` vs `RH*`) still open.
+
+---
+
+### Option γ — Planner-centric export (planner *is* the product)
+
+Push export / `@` / RAS onto the **planner** (or a mixin), minimize façades.
+Blocks are thin generated views of the planner.
+
+```mermaid
+classDiagram
+  class Planner {
+    +problem
+    +compute_solution()
+  }
+  class RecedingCapable {
+    <<mixin or soft API>>
+    +step(x0) PathPlan
+    +compute_command(y) Command
+    +export_to_computer() Computer
+    +__matmul__(plant)
+  }
+  class MPCPlanner {
+    +prepare()
+  }
+  class RRTPlanner
+  class TrajectoryOptimizationPlanner
+  class DynamicProgrammingPlanner {
+    +compute_solution() PolicyPlan
+  }
+  class GeneratedComputer {
+    <<from export_to_computer>>
+  }
+
+  Planner <|-- MPCPlanner
+  Planner <|-- RRTPlanner
+  Planner <|-- TrajectoryOptimizationPlanner
+  Planner <|-- DynamicProgrammingPlanner
+  RecedingCapable <|.. MPCPlanner
+  RecedingCapable <|.. RRTPlanner
+  RecedingCapable <|.. TrajectoryOptimizationPlanner
+  DynamicProgrammingPlanner ..> RecedingCapable : via PolicyPlan.rollout adapter?
+  RecedingCapable --> GeneratedComputer : export
+```
+
+**Contracts (sketch)**
+
+```text
+Planner                          # offline: compute_solution() as today
+
+RecedingCapable  (mixin / convention)
+  step(x0, ...) -> PathPlan
+  compute_command(y, ...) -> Command
+  export_to_computer(...) -> Computer   # may embed broadcast
+  __matmul__(plant) -> HybridDiagram
+
+# Aim:
+hybrid = mpc_planner @ plant          # planner acts like controller
+# or
+hybrid = rrt_planner @ plant          # if RRT implements RecedingCapable
+
+# DP stays awkward: either
+policy = dp.compute_solution()
+hybrid = policy.as_horizon_source(...).export...   # still needs an object
+# or policy.controller() @ plant for true feedback (not RH)
+```
+
+**Requirements fit**
+
+| R | Fit |
+| --- | --- |
+| R1–R7 | Possible if mixin builds same multi-rate Computer |
+| R2 | `compute_command` on planner |
+| R8 | `planner @ plant` is very short — but overloads Planner role |
+| R9 | Lives on planner — mixes offline orchestration with online runtime |
+| R10 | OK for helpers |
+| R11 | Forces every algorithm into RecedingCapable or special cases DP |
+
+**Tradeoffs:** fewest named products for NLP-MPC demos; blurs textbook split
+(“planners are tools, controllers are systems”); DP/RRT capability uneven;
+harder dependency law (`search` may grow hybrid/export imports).
+
+---
+
+### Option δ — Formal planner subclass split + separate online runtime
+
+Heavier structure: fork orchestrators by result family; online RH is a separate
+runtime type that only accepts path-producing online solvers.
+
+```mermaid
+classDiagram
+  class Planner {
+    +problem
+  }
+  class PathPlanner {
+    +compute_path_plan() PathPlan
+  }
+  class PolicyPlanner {
+    +compute_policy_plan() PolicyPlan
+  }
+  class OnlinePathSolver {
+    <<ABC or duck>>
+    +generate_horizon(x0) PathPlan
+  }
+  class MPCOnlineSolver
+  class RRTOnlineSolver
+  class PolicyRolloutSolver
+  class RHRuntime {
+    +solver OnlinePathSolver
+    +compute_command()
+    +export_to_computer()
+    +__matmul__(plant)
+  }
+  class PathPlan
+  class PolicyPlan
+
+  Planner <|-- PathPlanner
+  Planner <|-- PolicyPlanner
+  PathPlanner <|-- TrajectoryOptimizationPlanner
+  PathPlanner <|-- RRTPlanner
+  PathPlanner <|-- MPCPlanner
+  PolicyPlanner <|-- DynamicProgrammingPlanner
+  OnlinePathSolver <|-- MPCOnlineSolver
+  OnlinePathSolver <|-- RRTOnlineSolver
+  OnlinePathSolver <|-- PolicyRolloutSolver
+  PolicyPlan --> PolicyRolloutSolver : builds
+  RHRuntime --> OnlinePathSolver
+  PathPlanner ..> PathPlan
+  PolicyPlanner ..> PolicyPlan
+```
+
+**Contracts (sketch)**
+
+```text
+PathPlanner.compute_path_plan() -> PathPlan
+PolicyPlanner.compute_policy_plan() -> PolicyPlan
+PolicyPlan.rollout(x0, tf, dt) -> PathPlan
+PolicyPlan.controller() -> System
+
+OnlinePathSolver.generate_horizon(x0, ...) -> PathPlan
+
+RHRuntime(solver, dt_mpc, dt_ctl, ...)
+  # same export / @ / compute_command surface as Option β facade
+```
+
+**Requirements fit**
+
+| R | Fit |
+| --- | --- |
+| R1–R10 | Same as β if `RHRuntime` matches the facade export story |
+| R11 | Strong typing of path vs policy offline; online still needs adapters |
+| Textbook | Clearer offline taxonomy; denser hierarchy (conflicts with “familiar patterns first” / plan A’s “no deep fork”) |
+
+**Tradeoffs:** most explicit contracts; most ceremony and hierarchy; may fight
+existing planning-pipeline draft (“keep one Planner ABC”). Consider only if
+result wrappers alone feel too weak.
+
+---
+
+## 5b. Side-by-side comparison
+
+| Concern | α PoC leaves | β Facade + source | γ Planner-centric | δ Class fork + runtime |
+| --- | --- | --- | --- | --- |
+| Delta from today | Smallest | Medium | Medium–large | Largest |
+| Aim `… @ plant` | Weak | Strong (`mpc @ plant`) | Strong (`planner @ plant`) | Strong (`runtime @ plant`) |
+| RAS `compute_command` | Bolt-on | First-class | On planner | On runtime |
+| Default plan + broadcast | User wires | Bundled export | Bundled if mixin does | Bundled if runtime does |
+| Multi-planner RH (R11) | Weak | Adapters | Uneven mixin | Explicit online solvers |
+| Planner vs System law | Clear | Clear | **Blurred** | Clear but heavy |
+| Aligns with plan A (one Planner ABC) | Yes | Yes | Yes (soft) | **No** (fork) |
+| Risk | Stuck in ceremony | New façade type to learn | Wrong abstraction | Over-engineering |
+
+**Shared open choices inside every option**
+
+- Flatten home: `Trajectory` methods vs module helpers only  
+- Default applied `u` for `@`: `u_nom` vs `u_ff`  
+- Broadcast inside Computer vs continuous-side algebraic leaf  
+- `MPCController` naming vs `RecedingHorizonController`  
+
+---
+
+## 5c. Discussion prompts (pick later)
+
+1. Is **aim UX (R8)** valuable enough to justify a façade / runtime (β/δ) over α?
+2. Is **importing RRT/DP into the same RH loop (R11)** a first-milestone need, or phase-2?
+3. Do we accept **blurring Planner-as-controller (γ)** for shortness, or keep tools vs systems sharp (α/β)?
+4. Does plan A’s “one Planner ABC” rule out δ, or is RH important enough to revisit that?
+
+---
+
+## 6. Brainstorm sketches (lighter ideas — still not fixed)
+
+### 6.1 Layering one-liners (maps to options)
+
+- **α:** Planner owns NLP; System leaves grow ports; user assembles broadcast.
+- **β:** Facade imports horizon source; export = tick + broadcast Computer.
+- **γ:** Planner gains `@` / export (mixin).
+- **δ:** Path/Policy planner classes + separate `RHRuntime`.
+
+### 6.2 Drafted-plan wire (R4, R7)
 
 **Idea:**
 
@@ -227,7 +611,7 @@ plan  →  flat vector  →  port / RAS payload  →  reconstruct plan
 - Flatten API brainstorm: `Trajectory.to_flat` / `from_flat` (NumPy report);
   optional xp-native `pack_horizon` / `unpack_horizon` for traceable math (R10).
 
-### 5.3 High-rate nominal broadcast (R6)
+### 6.3 High-rate nominal broadcast (R6)
 
 **Idea — two rates:**
 
@@ -242,9 +626,9 @@ plan  →  flat vector  →  port / RAS payload  →  reconstruct plan
 - `dx`: prefer model `f(x_nom, u_nom, t)` when available; else FD
 
 **Packaging brainstorm:** export builds a small step diagram + `StepSchedule.fire`
-(multi-rate already exists on `Computer`) with a broadcast sub-block.
+(multi-rate already exists on `Computer`) with a broadcast sub-block (esp. β/δ).
 
-### 5.4 Downstream laws (R5)
+### 6.4 Downstream laws (R5)
 
 **Requirement emphasis:** expose information, don’t ship the law library.
 
@@ -262,7 +646,7 @@ Minimum exposure brainstorm:
 Auto-wire for aim demos may pick one applied `u` (e.g. `u_nom` or `u_ff`) —
 exact default still open.
 
-### 5.5 Aim closed loop (R8)
+### 6.5 Aim closed loop (R8)
 
 **Desire:**
 
@@ -271,31 +655,25 @@ exact default still open.
 hybrid = mpc @ plant
 ```
 
-Brainstorm defaults worth designing for (values TBD): replan period, faster
-broadcast period, warm-start on/off, applied-port choice, computer `x0`.
+Who is `mpc`? Option α: awkward. β: facade. γ: planner. δ: runtime.
 
-Today’s ceremony (`stateful controller` → `% dt` → `@` → manual `x0_computer`)
-is the **pain** this requirement targets.
+### 6.6 Real node (R2)
 
-### 5.6 Real node (R2)
-
-**Idea:** same facade tick as the diagram latch:
+**Idea:** same tick as the diagram latch:
 
 ```text
-cmd = mpc.compute_command(y, warm_state=...)
+cmd = product.compute_command(y, warm_state=...)
 # publish plan_flat / u / metadata; high-rate side evals nominals from latched plan
 ```
 
-Diagram export and RAS should share plan flatten + nominal-eval helpers.
-
-### 5.7 Debug (R9)
+### 6.7 Debug (R9)
 
 Shared debug flag / levels across hand-loop, hybrid, and node; overlays of
 nominals vs plant; horizon history; keep timing prints.
 
 ---
 
-## 6. Feature checklist by development phase (requirements view)
+## 7. Feature checklist by development phase (requirements view)
 
 ### P0 — Planner tuning
 
@@ -327,7 +705,7 @@ nominals vs plant; horizon history; keep timing prints.
 
 ---
 
-## 7. JAX requirements (R10) — clarity
+## 8. JAX requirements (R10) — clarity
 
 | Piece | Expectation |
 | --- | --- |
@@ -342,9 +720,9 @@ should not freeze into NumPy-only APIs just because today’s NLP is host-side.*
 
 ---
 
-## 8. Planner contract brainstorm (R11) — coupled review
+## 9. Planner contract brainstorm (R11) — coupled review
 
-### 8.1 Tension
+### 9.1 Tension
 
 Calling raw `Planner.compute_solution()` every control tick is a poor fit:
 
@@ -354,7 +732,7 @@ Calling raw `Planner.compute_solution()` every control tick is a poor fit:
 
 Yet we still want **RRT / DP / trajopt** to participate somehow.
 
-### 8.2 Modes to keep distinct (brainstorm taxonomy)
+### 9.2 Modes to keep distinct (brainstorm taxonomy)
 
 | Mode | Meaning | Example |
 | --- | --- | --- |
@@ -363,13 +741,14 @@ Yet we still want **RRT / DP / trajopt** to participate somehow.
 | **H3 — Problem composition** | Offline artifact shapes online NLP | DP cost-to-go as terminal cost; track path as soft cost |
 
 Closed-loop export (sim/RAS) cares first about **H1**. H2/H3 are valuable but
-different API seams.
+different API seams. Options β/δ make H1 a first-class import; α keeps it
+inside `MPCPlanner` only; γ pushes H1 onto every planner unevenly.
 
-### 8.3 Organization ideas (still open)
+### 9.3 Organization ideas (still open)
 
 **Idea — keep one `Planner` ABC** (matches planning-pipeline draft A): shared
 `PlanningProblem`; split **results** (`PathPlan` vs `PolicyPlan`); avoid deep
-`PathPlanner`/`PolicyPlanner` class trees.
+`PathPlanner`/`PolicyPlanner` class trees. (Favors α/β/γ over δ.)
 
 **Idea — soft capabilities / adapters** instead of deep subclasses:
 
@@ -380,13 +759,13 @@ different API seams.
 
 **Idea — explicit online surface** the closed-loop product imports, e.g. duck
 typing along the lines of “given `x0`, return a drafted path plan” — name TBD
-(`horizon source`, `receding backend`, …).
+(`horizon source`, `receding backend`, …). (Central to β.)
 
 **Idea — package placement:** adapters near `planning/` core; NLP-MPC + export
 bundle under `planning/mpc/`; avoid forcing `search/` / DP to import MPC
 internals.
 
-### 8.4 Open questions (Planner review)
+### 9.4 Open questions (Planner review)
 
 - Exact names and whether mixins help or hurt textbook clarity
 - Whether `PolicyPlan.rollout` is required before RH+DP demos
@@ -395,27 +774,28 @@ internals.
 
 ---
 
-## 9. Consistency map — conversation topics ↔ requirements
+## 10. Consistency map — conversation topics ↔ requirements
 
 | What was asked | Where captured |
 | --- | --- |
-| Planner vs block vs export; import planners | §3, §5.1, §8 |
-| Static + stepping export; hybrid with continuous plant | R1, §5.1 Idea C |
-| RAS / real pipeline methods | R2, §5.6 |
-| Debug plots / prints | R9, §5.7 |
-| Phases: tune → closed loop → deploy, one source | R3, §6 |
-| Flattened drafted plan as baseline out | R4, R7, §5.2 |
-| Downstream FF→FB via **exposure**, not law toolkit | R5, §5.4 |
-| Faster nominal `u(t)`,`x(t)` (+ rates); export may include broadcast sub-block | R6, §5.3 |
-| Aim `mpc @ plant` with defaults | R8, §5.5 |
-| Flatten on `Trajectory`? | §5.2 (preference, not lock) |
-| JAX: NLP not traceable now; plumbing stay traceable for future JAX NLP | R10, §7 |
-| RRT/DP/trajopt with RH; Planner contract / sub-contracts | R11, §8 |
+| Planner vs block vs export; import planners | §3, §5 options, §9 |
+| Static + stepping export; hybrid with continuous plant | R1, §5 |
+| RAS / real pipeline methods | R2, §6.6 |
+| Debug plots / prints | R9, §6.7 |
+| Phases: tune → closed loop → deploy, one source | R3, §7 |
+| Flattened drafted plan as baseline out | R4, R7, §6.2 |
+| Downstream FF→FB via **exposure**, not law toolkit | R5, §6.4 |
+| Faster nominal `u(t)`,`x(t)` (+ rates); export may include broadcast sub-block | R6, §6.3 |
+| Aim `mpc @ plant` with defaults | R8, §6.5 |
+| Flatten on `Trajectory`? | §6.2 (preference, not lock) |
+| JAX: NLP not traceable now; plumbing stay traceable for future JAX NLP | R10, §8 |
+| RRT/DP/trajopt with RH; Planner contract / sub-contracts | R11, §9 |
 
 ---
 
-## 10. Explicitly *not* decided here
+## 11. Explicitly *not* decided here
 
+- Which of Options α / β / γ / δ (or a hybrid)
 - Final class diagram / public names
 - Whether multi-rate Computer is the only export shape
 - Default applied port (`u_nom` vs `u_ff`)
@@ -426,18 +806,18 @@ internals.
 
 ---
 
-## 11. Suggested next steps (process, not implementation commit)
+## 12. Suggested next steps (process, not implementation commit)
 
 1. Agree which **R-*** are must-have for the first rewrite milestone.
-2. Pick a **thin vertical slice** (e.g. flatten + nominal broadcast exposure +
-   aim `@` with NLP-MPC only) before multi-planner adapters.
-3. Align with plan A (`PathPlan` / `PolicyPlan`) before locking RH import types.
-4. Revisit §3 questions with the slice in hand — then write the real DESIGN
-   contract.
+2. Prefer an architecture option (§5) — or say which requirements force β vs α.
+3. Pick a **thin vertical slice** (e.g. flatten + nominal broadcast + aim `@`
+   with NLP-MPC only) before multi-planner adapters.
+4. Align with plan A (`PathPlan` / `PolicyPlan`) before locking RH import types.
+5. Revisit §3 with the slice in hand — then write the real DESIGN contract.
 
 ---
 
-## 12. Non-goals of *this* document
+## 13. Non-goals of *this* document
 
 - Implementing the rewrite
 - Freezing architecture as “the” Minilink MPC design
