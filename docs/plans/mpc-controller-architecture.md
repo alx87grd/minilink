@@ -1,12 +1,15 @@
 # MPC / receding-horizon architecture — requirements & brainstorm
 
-Status: **approved requirements** (July 2026). Implementation master plan:
-[receding-horizon-implementation-plan.md](receding-horizon-implementation-plan.md)
-(that file wins on names/API when this brainstorm differs).
+Status: **approved requirements** (July 2026). Implementation plan (canonical):
+[mpc-rh-refactor/](mpc-rh-refactor/) — [vision](mpc-rh-refactor/vision.md) +
+[phases](mpc-rh-refactor/phases.md). Legacy pointer:
+[receding-horizon-implementation-plan.md](receding-horizon-implementation-plan.md).
+When this brainstorm differs, **mpc-rh-refactor wins** on names/API.
 
 > **Decision Preamble:** Target **Option β** (facade + planner with
-> `solve_trajectory_from`) for MPC / receding horizon. See the master plan for
-> phases: RH façade on today’s `MPCPlanner` first, then merge into parametric
+> `solve_trajectory_from`) for MPC / receding horizon. See
+> [mpc-rh-refactor/phases.md](mpc-rh-refactor/phases.md): RH façade on today’s
+> `MPCPlanner` first, then merge into parametric
 > `TrajectoryOptimizationPlanner`; no separate `HorizonSource` type.
 >
 > *See [planning-pipeline-architecture.md](planning-pipeline-architecture.md) for
