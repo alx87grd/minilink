@@ -1,7 +1,9 @@
 """MPC lap pursuit on a wide technical circuit with eight obstacles.
 
 Wide asymmetric loop (bottom chicane, fast right sweeper, tight left hairpin).
-Uses compile-once :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`.
+Uses compile-once :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
+with :class:`~minilink.planning.mpc.ModelPredictiveController` deploy ticks
+(``compute_command``).
 
 Run from repo root::
 
@@ -20,7 +22,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
 )
 from minilink.graphical.animation.primitives import HorizonPolyline, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
-from minilink.planning.initial_guess import default_initial_trajectory
+from minilink.planning.mpc import ModelPredictiveController
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
@@ -286,6 +288,9 @@ mpc_planner = TrajectoryOptimizationPlanner(
         optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
     ),
 )
+mpc = ModelPredictiveController(
+    mpc_planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True
+)
 
 lap_length = loop_track.path.total_length
 
@@ -297,7 +302,6 @@ progress_hist = [s_start]
 x = x0.copy()
 t = 0.0
 u_hold = np.zeros(sys_sim.m)
-prev_plan = None
 next_mpc_t = 0.0
 
 print("MPC wide-circuit lap pursuit (rate inputs)")
@@ -310,32 +314,9 @@ print(
 
 while t < TF_SIM - 1e-12:
     if t >= next_mpc_t - 1e-12:
-        guess = None
-        if prev_plan is not None and prev_plan.n_samples >= 3:
-            t_shift = prev_plan.t + MPC_DT
-            mask = t_shift <= MPC_HORIZON + 1e-9
-            if np.count_nonzero(mask) >= 3:
-                x_guess = prev_plan.x[:, mask].copy()
-                x_guess[:, 0] = x
-                guess = Trajectory(
-                    t=t_shift[mask] - t,
-                    x=x_guess,
-                    u=prev_plan.u[:, mask],
-                )
-        else:
-            guess = default_initial_trajectory(
-                template_problem,
-                mpc_planner.transcription.initial_guess_time_grid(template_problem),
-            )
-
-        plan = mpc_planner.step(x, initial_guess=guess)
-        res = mpc_planner.last_optimization_result
-        print(
-            f"MPC @ t={t:.2f}s  success={res.success}  "
-            f"solve={res.solve_time_s:.3f}s  step={mpc_planner.last_step_time_s:.3f}s"
-        )
-        prev_plan = plan
-        u_hold = plan.u[:, 0].copy()
+        cmd = mpc.compute_command(x, t=t)
+        plan = cmd.plan.trajectory
+        u_hold = cmd.u_ff.copy()
         mpc_plans.append(
             (t, Trajectory(t=plan.t + t, x=plan.x.copy(), u=plan.u.copy()))
         )

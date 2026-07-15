@@ -149,12 +149,11 @@ loss_and_grad = jax.jit(jax.value_and_grad(
 Discrete control laws (like digital MPC or sampled Sliding Mode Control) can close the loop on continuous plants without breaking the continuous-time core or solver guarantees. `StepSystem` defines discrete logic, and `Computer` schedules it. The `%` and `@` operators build a `HybridDiagram` with Zero-Order Hold (ZOH) and sampling:
 
 ```python
-from minilink.planning.mpc.controller import MPCStatelessController
+from minilink.planning.mpc import ModelPredictiveController
 
 # controller is a discrete leaf; plant is a continuous DynamicSystem
-controller = MPCStatelessController(planner, ...)
-computer = controller % 0.1  # schedule to tick every 0.1s
-diagram = computer @ plant   # wire via hybrid ZOH/sample boundaries
+mpc = ModelPredictiveController(planner, dt_mpc=0.1, warm_start=True)
+diagram = mpc @ plant  # schedule + hybrid ZOH/sample wiring
 
 diagram.compute_trajectory(tf=10.0)  # solves the plant exactly between ticks
 diagram.animate()
@@ -433,8 +432,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Hybrid MPC track + obstacles (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` · [notebook](examples/notebooks/demo_mpc_hybrid_track_lap.ipynb) |
 | Pyro SMC continuous (pendulum) | `examples/scripts/control/demo_sliding_mode_pendulum.py` |
 | Pyro SMC continuous vs hybrid (pendulum) | `examples/scripts/hybrid/demo_smc_pendulum_compare.py` |
-| Hybrid MPC straight-line warm-start (`MPCStatefulController`; `STEP_DISP=True`; set `USE_WARM_START=False` for stateless 6a) | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py` |
-| Hybrid MPC closed-loop lap (compact track + obstacles) | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` |
+| Hand-loop MPC closed-loop / obstacle / stadium (``compute_command``) | `examples/scripts/mpc/` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |

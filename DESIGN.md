@@ -184,8 +184,8 @@ serial arms. Joint impedance / task impedance / computed torque use
   ``Computer @ plant`` and :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`
   (same port auto-wiring as continuous ``ctl @ plant`` via
   :func:`~minilink.core.composition.resolve_standard_feedback`);
-  :meth:`~minilink.planning.mpc.controller.MPCStatelessController.export_to_computer` /
-  :meth:`~minilink.planning.mpc.step_block.MPCStatefulController.export_to_computer` for warm-start MPC.
+  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.export_to_computer`
+  for warm-start MPC (also via ``mpc % schedule``).
   Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
   exposes standard ``u`` / ``y`` ports for hybrid composition.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,

@@ -127,17 +127,3 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
             dt_mpc=self._dt_mpc,
         ).z
         return np.asarray(z_new, dtype=float).reshape(self.n).copy()
-
-
-def mpc_stateful_controller(
-    planner: TrajectoryOptimizationPlanner,
-    *,
-    dt_mpc: float,
-    step_disp: bool = False,
-    t0: float = 0.0,
-    debug: bool = False,
-) -> MPCStatefulController:
-    """Build warm-start MPC block (alias of ``ModelPredictiveController(..., warm_start=True)``)."""
-    return MPCStatefulController(
-        planner, dt_mpc=dt_mpc, step_disp=step_disp, t0=t0, debug=debug
-    )

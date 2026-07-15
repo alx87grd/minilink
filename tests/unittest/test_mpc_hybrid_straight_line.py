@@ -13,9 +13,9 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
     JaxDynamicBicycleRateInputsUY,
 )
 from minilink.planning.mpc import (
+    ModelPredictiveController,
     mpc_animation_overlays,
     mpc_plans_from_rollout,
-    mpc_stateless_controller,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -88,7 +88,7 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
     )
 
     mpc_dt = 1.0 / mpc_hz
-    mpc = mpc_stateless_controller(mpc_planner, dt_mpc=mpc_dt)
+    mpc = ModelPredictiveController(mpc_planner, dt_mpc=mpc_dt, warm_start=False)
     hybrid = (mpc % mpc_dt) @ sys_sim
     return hybrid, mpc_planner, transcription, template_problem
 

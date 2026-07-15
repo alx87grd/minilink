@@ -45,7 +45,7 @@ class TestAsComputer(unittest.TestCase):
         from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
             JaxDynamicBicycleRateInputsUY,
         )
-        from minilink.planning.mpc import mpc_stateless_controller
+        from minilink.planning.mpc import ModelPredictiveController
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
             DirectCollocationOptions,
@@ -76,7 +76,9 @@ class TestAsComputer(unittest.TestCase):
                 optimizer_options={"maxiter": 5, "ftol": 1e-1},
             ),
         )
-        computer = mpc_stateless_controller(planner, dt_mpc=0.2) % 0.2
+        computer = (
+            ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False) % 0.2
+        )
         self.assertIn("y", computer.diagram.inputs)
         self.assertIn("u_ff", computer.diagram.outputs)
 

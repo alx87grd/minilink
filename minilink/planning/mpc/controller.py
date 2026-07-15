@@ -90,17 +90,3 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
     def _compute_z(self, x, u, t=0, params=None):
         del x, params
         return self._latch.solve_for_tick(t, self._measurement(u)).z
-
-
-def mpc_stateless_controller(
-    planner: TrajectoryOptimizationPlanner,
-    *,
-    dt_mpc: float,
-    step_disp: bool = False,
-    t0: float = 0.0,
-    debug: bool = False,
-) -> MPCStatelessController:
-    """Build algebraic MPC block (alias of ``ModelPredictiveController(..., warm_start=False)``)."""
-    return MPCStatelessController(
-        planner, dt_mpc=dt_mpc, step_disp=step_disp, t0=t0, debug=debug
-    )

@@ -202,8 +202,8 @@ continuous plants — not full Simulink parity. Minilink remains focused on cont
 - [x] **Phase 5** — `HybridDiagram`, `HybridSimulator`, `HybridSimResult`, multi-rate hybrid demo, Pyro SMC hybrid compare *(5a)*
 - [x] **Phase 5** — fine plant recording (`integrate_zoh_rollout`, `plant_dt_inner`); façade `traj` / `last_result` / `rollout` / `animate()`
 - [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz export, `abstract_boundary` topology *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*
-- [x] **Phase 6a** — `MPCStatelessController` (algebraic block, `u_ff`/`x_ff`/`z`), hybrid straight-line demo, `mpc_plans_from_rollout`
-- [x] **Phase 6b** — warm-start `MPCStatefulController` (`StepSystem`, state = optimizer `z`), `warm_start` helpers
+- [x] **Phase 6a–6b / E2–E5** — `ModelPredictiveController` (algebraic or warm-start
+  `StepSystem`, ports `u_ff`/`x_ff`/`z`), hybrid demos, `mpc_plans_from_rollout`
 
 ### 5.6 Estimation and identification
 

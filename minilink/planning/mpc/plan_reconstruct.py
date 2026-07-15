@@ -6,13 +6,15 @@ import numpy as np
 
 from minilink.core.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
-from minilink.planning.mpc.transcription import MPCDirectCollocationTranscription
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.trajectory_optimization.direct_collocation import (
+    DirectCollocationTranscription,
+)
 
 
 def mpc_plans_from_rollout(
     computer: StepRollout,
-    transcription: MPCDirectCollocationTranscription,
+    transcription: DirectCollocationTranscription,
     problem: PlanningProblem,
     *,
     z_source: str = "signals",
@@ -27,7 +29,7 @@ def mpc_plans_from_rollout(
     ----------
     computer : StepRollout
         Tick-indexed computer rollout from :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`.
-    transcription : MPCDirectCollocationTranscription
+    transcription : DirectCollocationTranscription
         Collocation transcription used by the MPC block.
     problem : PlanningProblem
         Template planning problem (system / cost layout).

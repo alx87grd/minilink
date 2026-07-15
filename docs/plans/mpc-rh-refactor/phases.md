@@ -22,8 +22,8 @@ Branch: **`dev-mpc-v2`** (hybrid + MPC controllers present; same full stack as
 | Demo | Role |
 | --- | --- |
 | `demo_dynamic_bicycle_rate_mpc_straight_line.py` | **On** `compute_command` (product warm-start) |
-| `demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | Full closed-loop lap — still `planner.step` hand loop |
-| Obstacle / stadium / wide / multi-obstacle | Smoke optional — still `planner.step` until E5 pressure |
+| `demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | Full closed-loop lap — migrate to `compute_command` in E5 |
+| Obstacle / stadium / wide / multi-obstacle | Migrate to `compute_command` in E5 |
 | `demo_mpc_spatial_scene_guide.py` | Teaching / scene API |
 | `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py` | Per-tick trajopt reference (keep as reference) |
 
@@ -54,17 +54,17 @@ flowchart LR
   E2[E2 ModelPredictiveController]
   E3[E3 Demo migration]
   E4[E4 TOP merge]
+  E5[E5 Retire PoC]
   E6[E6 Polish]
   E7[E7 Scene params]
   E8[E8 Broadcast backends]
 
-  E0 --> E1 --> E2 --> E3 --> E4 --> E6 --> E7 --> E8
+  E0 --> E1 --> E2 --> E3 --> E4 --> E5 --> E6 --> E7 --> E8
 ```
 
-E0–E3 done: foundation → online from-API → System-family controller →
-flagship demos. E5 (PoC leaf retirement) waits until remaining demos/tests
-leave aliases — see [phase-E5.md](phase-E5.md). E8 dual-rate contract is
-locked early; implementation stays last.
+E0–E4 done: foundation → online from-API → controller → flagships → TOP
+parametric merge. E5 retires PoC factories — see [phase-E5.md](phase-E5.md).
+E8 dual-rate contract is locked early; implementation stays last.
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
 demos set finite `tf=` for trajopt/MPC); transcription options carry
@@ -79,7 +79,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | **E2** | `ModelPredictiveController` System family + `@` | [phase-E2.md](phase-E2.md) **(done)** |
 | **E3** | Migrate flagship demos to controller | [phase-E3.md](phase-E3.md) **(done)** |
 | **E4** | Merge parametric MPC into TOP | [phase-E4.md](phase-E4.md) **(done)** |
-| **E5** | Retire PoC controller leaves | [phase-E5.md](phase-E5.md) |
+| **E5** | Retire PoC controller leaves | [phase-E5.md](phase-E5.md) **(done)** |
 | **E6** | Observability polish | [phase-E6.md](phase-E6.md) |
 | **E7** | Parametric scene (pipeline B) | [phase-E7.md](phase-E7.md) |
 | **E8** | Broadcast + dual-rate export | [phase-E8.md](phase-E8.md) **(contract locked)** |
@@ -92,7 +92,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-B | E1 + E2 | MPC + `ModelPredictiveController` + export tests | landed |
 | PR-C | E3 | hybrid parity + smoke demos | landed |
 | PR-D | E4 | MPC + trajopt + hybrid + controller | landed |
-| PR-E | E5 | after remaining demos/tests on controller | later |
+| PR-E | E5 | after remaining demos/tests on controller | landed |
 | PR-F+ | E6–E8 | phase gates | later |
 
 ## Start here
@@ -102,8 +102,5 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 3. **E2** — done ([phase-E2.md](phase-E2.md)).
 4. **E3** — done ([phase-E3.md](phase-E3.md)).
 5. **E4** — done ([phase-E4.md](phase-E4.md)).
-6. **E5** — expand [phase-E5.md](phase-E5.md) before coding (retire PoC leaves).
-
-E5 retires PoC factories only after remaining hand-loop demos, the track-lap
-notebook, and unittest call sites move to `ModelPredictiveController` (or an
-explicit thin-alias policy is chosen when expanding that card).
+6. **E5** — done ([phase-E5.md](phase-E5.md)).
+7. **E6** — expand [phase-E6.md](phase-E6.md) before coding (observability polish).

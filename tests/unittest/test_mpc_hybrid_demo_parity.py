@@ -19,7 +19,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
     JaxDynamicBicycleRateInputs,
 )
 from minilink.planning.mpc import (
-    mpc_stateful_controller,
+    ModelPredictiveController,
 )
 from minilink.planning.mpc.warm_start import (  # noqa: E402
     mpc_default_computer_x0,
@@ -173,7 +173,7 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
 
 
 def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
-    mpc = mpc_stateful_controller(planner, dt_mpc=MPC_DT)
+    mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
     z0 = mpc_default_computer_x0(planner)
 
     step_diagram = StepDiagramSystem()
