@@ -52,7 +52,15 @@ These are still **open**. Any sketch in §5–§8 is a candidate, not the answer
 
 2. **Should “MPC” mean NLP-MPC only, or any receding-horizon drafted plan?**
    - Narrow: parametric NLP + hybrid export.
-   - Broad: same RH loop for trajopt / RRT / DP-rollout backends.
+   - Broad: same **control loop** for trajopt / RRT / DP-rollout backends.
+   - **Clarification:** “receding horizon” is a **loop pattern** (re-plan from
+     current `x` each tick, apply action, repeat). It does **not** require a
+     special RH planner class — repeatedly solving an ordinary
+     `PlanningProblem` / trajopt each step is already that idea (often
+     inefficient). Specialized `MPCPlanner` (compile-once, warm-start) is an
+     **optimization**, not the definition of the concept. Naming (“MPC” vs
+     “receding-horizon control”) may deserve renaming if backends are general
+     planners.
 
 3. **How does this couple to the global `Planner` contract?**
    - Keep one `Planner` ABC + split results (`PathPlan` / `PolicyPlan`)?
@@ -293,9 +301,17 @@ users assemble multi-rate themselves.
 
 ### Option β — Receding-horizon facade + horizon source + bundled multi-rate export
 
-User-facing **controller facade** imports a duck-typed **horizon source**;
-default export is a **tick + broadcast** Computer. Closest to the sketches in
-§6 / earlier discussion (formerly C0/C8 ideas).
+User-facing **controller facade** imports something that can produce a path from
+`x0` each tick; default export is a **tick + broadcast** Computer.
+
+**Clarification (not a “must”):** this does **not** require a specialized
+`RecedingHorizonPlanner` algorithm class. The tick can call an ordinary
+`TrajectoryOptimizationPlanner.compute_solution()` after updating `x_start`
+(or an adapter that does that). That *is* still the RH / “plan-and-update”
+idea — typically less efficient than compile-once parametric MPC, but valid.
+“Horizon source” here is only a **name for the online tick adapter** (could
+wrap a regular planner), not a claim that RH needs different math than
+open-loop planning.
 
 ```mermaid
 classDiagram
@@ -308,7 +324,7 @@ classDiagram
     +generate_horizon(x0) PathPlan
   }
   class HorizonSource {
-    <<duck>>
+    <<duck - adapter name only>>
     +generate_horizon(x0) PathPlan
     +prepare()*
     +warm_state_dim*
@@ -350,12 +366,16 @@ classDiagram
 **Contracts (sketch)**
 
 ```text
-# Duck-typed — not necessarily a formal ABC
+# Duck-typed adapter — wrap MPCPlanner.step OR “re-solve PlanningProblem each tick”
 HorizonSource
   generate_horizon(x0, *, warm_start=None, params=None) -> PathPlan
-  prepare()?                  # optional
+  prepare()?                  # optional (compile-once NLP); no-op for naive re-solve
   warm_state_dim -> int       # 0 if none
   default_warm_state()? 
+
+# Equivalent naive adapter (perfectly valid RH loop, usually slower):
+#   problem' = problem with x_start = x0
+#   PathPlan(trajopt.compute_solution())   # or RRT, etc.
 
 RecedingHorizonController / MPCController
   __init__(source, *, dt_mpc, dt_ctl=..., warm_start=..., applied_u=..., debug=...)
@@ -379,8 +399,9 @@ BroadcastBlock
 
 # Other planners (R11 ideas):
 RRTPlanner.as_horizon_source() -> HorizonSource
-TrajectoryOptimizationPlanner.as_horizon_source() -> HorizonSource
+TrajectoryOptimizationPlanner.as_horizon_source() -> HorizonSource  # re-solve each tick
 PolicyPlan.as_horizon_source(tf, dt) -> HorizonSource   # via rollout
+MPCPlanner.as_horizon_source() -> HorizonSource         # compile-once step
 ```
 
 **Requirements fit**
@@ -396,10 +417,11 @@ PolicyPlan.as_horizon_source(tf, dt) -> HorizonSource   # via rollout
 | R8 | Strong — `mpc @ plant` |
 | R9 | Natural home on facade |
 | R10 | Tick may call host NLP; helpers xp-clean |
-| R11 | HorizonSource adapters |
+| R11 | HorizonSource adapters (incl. naive re-solve) |
 
 **Tradeoffs:** more new types; clearest separation of **replan** vs **broadcast** vs
 **planner algorithm**; best path for R8/R11. Naming (`MPC*` vs `RH*`) still open.
+Does **not** force a special planning algorithm — only a place to put the loop.
 
 ---
 
@@ -580,12 +602,14 @@ result wrappers alone feel too weak.
 
 ---
 
-## 5c. Discussion prompts (pick later)
+5c. Discussion prompts (pick later)
 
 1. Is **aim UX (R8)** valuable enough to justify a façade / runtime (β/δ) over α?
 2. Is **importing RRT/DP into the same RH loop (R11)** a first-milestone need, or phase-2?
 3. Do we accept **blurring Planner-as-controller (γ)** for shortness, or keep tools vs systems sharp (α/β)?
 4. Does plan A’s “one Planner ABC” rule out δ, or is RH important enough to revisit that?
+5. If naive “re-solve trajopt/RRT each tick” is enough for demos, how much specialize
+   `MPCPlanner` vs treat it as one efficient backend among equals?
 
 ---
 
@@ -724,13 +748,20 @@ should not freeze into NumPy-only APIs just because today’s NLP is host-side.*
 
 ### 9.1 Tension
 
-Calling raw `Planner.compute_solution()` every control tick is a poor fit:
+Calling raw `Planner.compute_solution()` every control tick **does work** as a
+receding-horizon / “plan-and-act” loop if you refresh `x_start` (or equivalent)
+each time. That *is* the idea — classic textbook MPC is exactly “solve an
+open-loop OCP from the current state, apply the first move, repeat.” Efficiency
+motivates compile-once / warm-start MPC, not the definition of the pattern.
 
-- RRT/trajopt bind start in `PlanningProblem` unless rebuilt
-- DP returns a **policy table**, not a horizon
-- Only `MPCPlanner.step(x0)` is shaped for online RH today
+Practical frictions today (API shape, not theory):
 
-Yet we still want **RRT / DP / trajopt** to participate somehow.
+- RRT/trajopt bind start in `PlanningProblem` unless rebuilt/`replace` each tick
+- DP returns a **policy table**, not a path unless you **roll out**
+- Only `MPCPlanner.step(x0)` is shaped for cheap online RH today
+
+So we still want adapters — but **naive re-solve of a regular planner each
+tick remains a valid horizon backend**, not a conceptual mistake.
 
 ### 9.2 Modes to keep distinct (brainstorm taxonomy)
 
