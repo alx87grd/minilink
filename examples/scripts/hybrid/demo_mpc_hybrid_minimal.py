@@ -16,15 +16,17 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
 )
 from minilink.planning.mpc import (
     ModelPredictiveController,
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
     mpc_animation_overlays,
 )
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 configure_jax(enable_x64=True)
@@ -42,7 +44,7 @@ x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 x0 = np.array([0.0, 3.0, 0.0, U_TARGET * 0.8, 0.0, 0.0, (U_TARGET * 0.8) / r_r, 0.0])
 sys.x0 = x0.copy()
 
-planner = MPCPlanner(
+planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys,
         tf=2.0,
@@ -56,11 +58,10 @@ planner = MPCPlanner(
             ubar=np.zeros(2),
         ),
     ),
-    transcription=MPCDirectCollocationTranscription(
-        DirectCollocationOptions(n_steps=20)
-    ),
-    options=MPCOptions(
+    transcription=DirectCollocationTranscription(DirectCollocationOptions(n_steps=20)),
+    options=TrajectoryOptimizationOptions(
         compile_backend="jax",
+        record_solve_time=True,
         optimizer_method="scipy_slsqp",
         optimizer_options={"maxiter": 50, "ftol": 1.0},
     ),

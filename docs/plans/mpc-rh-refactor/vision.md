@@ -14,7 +14,8 @@ decision; implement via [phases.md](phases.md).
 
 The controller holds any plan-producing solver with
 `solve_trajectory_from`. In demos the planner is usually compile-once
-trajopt (`MPCPlanner` → parametric TOP) — not a second planner ABC.
+trajopt (`TrajectoryOptimizationPlanner` + optional `compile_parametric_program`)
+— not a second planner ABC.
 
 ## Big picture
 
@@ -56,7 +57,7 @@ flowchart LR
 | --- | --- |
 | `PlanningProblem` | Math task, incl. continuous \(T\) (`tf`) |
 | `Planner` | Tool: how to compute a solution |
-| `TrajectoryOptimizationPlanner` | NLP trajopt; batch or parametric compile-once |
+| `TrajectoryOptimizationPlanner` | NLP trajopt; rebuild each solve, optional parametric compile |
 | `TrajectoryPlan` | Traj-family result: schedule + metadata + warm_state |
 | `ModelPredictiveController` | Online product: Minilink `System` family — tick / latch / ports / `@ plant` |
 | `Computer` / `HybridDiagram` | Existing step/hybrid host |
@@ -150,7 +151,7 @@ classDiagram
     +solve_policy_from(x0) PolicyPlan
   }
   class TrajectoryOptimizationPlanner {
-    +prepare()
+    +compile_parametric_program()
     +solve_trajectory_from(x0, params, initial_guess)
   }
   Planner <|-- TrajectoryOptimizationPlanner
@@ -161,25 +162,35 @@ classDiagram
 
 ## `TrajectoryOptimizationPlanner` + MPC merge
 
-Two modes:
+Single `__init__`. Public solve methods always work; parametric NLP is an
+**optional acceleration** (not a second planner type).
 
-| Mode | Artifact | Entry |
-| --- | --- | --- |
-| `batch` | Fixed `MathematicalProgram` | `solve_trajectory` (re-transcribe) |
-| `parametric` | `ParametricMathematicalProgram` + `bind(p)` | `prepare` then `solve_trajectory_from` |
+```python
+planner = TrajectoryOptimizationPlanner(problem, transcription=…, options=…)
+plan = planner.solve_trajectory()            # always rebuild MathematicalProgram
+plan = planner.solve_trajectory_from(x0)     # rebuild with x0 if not compiled
 
-Today’s `MPCPlanner` folds into parametric TOP; keep a thin alias pre-1.0.
-Public `solve_trajectory_from(x0, params=None, initial_guess=None)` always
-accepts `params` and `initial_guess` (façade); `params is None` ≡ today’s
-`bind(x0)`. Scene keys later. Offline `solve_trajectory` takes the same
-optional `initial_guess`.
+planner.compile_parametric_program()         # build ParametricMathematicalProgram + JIT
+plan = planner.solve_trajectory_from(x0)     # bind(x0) + solve only (fast)
+```
+
+| Call | Behavior |
+| --- | --- |
+| `solve_trajectory` | Always re-transcribe a fresh `MathematicalProgram` |
+| `solve_trajectory_from` | Fast bind path if `has_parametric_program`; else rebuild (one-time warn on TOP) |
+| `compile_parametric_program` | Explicit second step; idempotent |
+
+Today’s `MPCPlanner` is deleted; MPC demos / controllers use TOP and compile
+for from-solves. Controllers auto-call `compile_parametric_program()` so ticks
+never re-transcribe. Public `solve_trajectory_from(x0, params=None,
+initial_guess=None)` accepts `params` and `initial_guess`; `params is None`
+≡ bind `x0` only. Scene keys later (E7).
 
 `bind` is evaluator-internal: SciPy sees only `z`; evaluator injects bound `x0`.
 
-**Footnote:** batch TOP may keep an offline convenience `warm_start: bool`
-meaning “reuse `last_trajectory_plan` as seed.” That is **not** the
-controller product flag — online warm-start orchestration is on
-`ModelPredictiveController` only.
+**Footnote:** offline TOP may keep convenience `warm_start: bool` meaning
+“reuse `last_trajectory_plan` as seed.” That is **not** the controller product
+flag — online warm-start orchestration is on `ModelPredictiveController` only.
 
 ---
 

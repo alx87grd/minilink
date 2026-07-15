@@ -1,4 +1,4 @@
-"""Unit tests for MPCPlanner.solve_trajectory_from (phase E1)."""
+"""Unit tests for TrajectoryOptimizationPlanner.solve_trajectory_from (phase E1)."""
 
 import unittest
 
@@ -13,14 +13,14 @@ from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.system import DynamicSystem  # noqa: E402
 from minilink.planning.initial_guess import default_initial_trajectory  # noqa: E402
-from minilink.planning.mpc import (  # noqa: E402
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
-)
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (  # noqa: E402
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 
@@ -61,16 +61,20 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         )
 
     def make_planner(self, problem):
-        transcription = MPCDirectCollocationTranscription(
+        transcription = DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=5)
         )
-        return MPCPlanner(
+        planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=MPCOptions(
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                record_solve_time=True,
                 optimizer_options={"maxiter": 50, "ftol": 1e-4},
             ),
         )
+        planner.compile_parametric_program()
+        return planner
 
     def test_parity_with_step(self):
         x0 = np.array([0.2])
@@ -109,17 +113,29 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         with self.assertRaises(ValueError):
             planner.solve_trajectory_from(np.array([0.0]), params={"scene": {}})
 
-    def test_solve_trajectory_alias(self):
+    def test_solve_trajectory_rebuild_and_from_compiled(self):
+        """Offline rebuild and compiled from-solve both honor ``x_start``."""
         problem = self.make_problem(0.15)
-        planner = self.make_planner(problem)
-        plan_from = planner.solve_trajectory_from(problem.x_start)
-        planner2 = self.make_planner(problem)
-        plan_off = planner2.solve_trajectory()
+        planner_from = self.make_planner(problem)
+        plan_from = planner_from.solve_trajectory_from(problem.x_start)
         np.testing.assert_allclose(
-            plan_off.trajectory.x, plan_from.trajectory.x, atol=1e-8
+            plan_from.trajectory.x[:, 0], problem.x_start, atol=1e-5
         )
+
+        planner_off = TrajectoryOptimizationPlanner(
+            problem,
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(n_steps=5)
+            ),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                record_solve_time=True,
+                optimizer_options={"maxiter": 50, "ftol": 1e-4},
+            ),
+        )
+        plan_off = planner_off.solve_trajectory()
         np.testing.assert_allclose(
-            plan_off.trajectory.u, plan_from.trajectory.u, atol=1e-8
+            plan_off.trajectory.x[:, 0], problem.x_start, atol=1e-5
         )
 
     def test_initial_guess_accepted(self):

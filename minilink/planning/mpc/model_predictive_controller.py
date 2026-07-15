@@ -12,9 +12,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from minilink.planning.mpc.command import Command
+from minilink.planning.trajectory_optimization.planner import (
+    reject_unknown_online_params,
+)
 
 if TYPE_CHECKING:
-    from minilink.planning.mpc.planner import MPCPlanner
+    from minilink.planning.trajectory_optimization.planner import (
+        TrajectoryOptimizationPlanner,
+    )
 
 
 class ModelPredictiveControllerMixin:
@@ -25,7 +30,7 @@ class ModelPredictiveControllerMixin:
     ``_debug``, and optional warm-start via ``_z_warm_for_command``.
     """
 
-    _planner: MPCPlanner
+    _planner: TrajectoryOptimizationPlanner
     _latch: object
     _dt_mpc: float
     _t0: float
@@ -70,8 +75,9 @@ class ModelPredictiveControllerMixin:
         y : array_like
             Measured plant state (diagram input ``y``).
         params : mapping, optional
-            Passed to :meth:`~MPCPlanner.solve_trajectory_from` (rejected until E7
-            if non-empty keys).
+            Passed to
+            :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.solve_trajectory_from`
+            (rejected until E7 if non-empty keys).
         k : int, optional
             Tick index. Default: increment internal deploy counter.
         t : float, optional
@@ -88,9 +94,7 @@ class ModelPredictiveControllerMixin:
         else:
             t_solve = float(t)
 
-        from minilink.planning.mpc.planner import _reject_unknown_online_params
-
-        _reject_unknown_online_params(params)
+        reject_unknown_online_params(params)
         y_arr = np.asarray(y, dtype=float).reshape(-1)
         z_warm = self._z_warm_for_command()
         tick = self._latch.solve_for_tick(
@@ -167,7 +171,7 @@ class ModelPredictiveControllerMixin:
 
 
 def ModelPredictiveController(
-    planner: MPCPlanner,
+    planner: TrajectoryOptimizationPlanner,
     *,
     dt_mpc: float,
     warm_start: bool = True,
@@ -180,8 +184,8 @@ def ModelPredictiveController(
 
     Parameters
     ----------
-    planner : MPCPlanner
-        Prepared compile-once planner.
+    planner : TrajectoryOptimizationPlanner
+        Trajopt planner (auto-compiles parametric NLP when needed).
     dt_mpc : float
         Replan period (required for both warm-start modes).
     warm_start : bool, optional

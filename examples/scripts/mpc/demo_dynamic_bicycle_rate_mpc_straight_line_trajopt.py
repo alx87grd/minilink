@@ -3,7 +3,7 @@
 Reference for the pre-compile-once workflow: each MPC tick builds a new
 :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
 and re-JIT-compiles the NLP. For production-style closed loop use
-``demo_dynamic_bicycle_rate_mpc_straight_line.py`` (:class:`~minilink.planning.mpc.planner.MPCPlanner`).
+``demo_dynamic_bicycle_rate_mpc_straight_line.py`` (:class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`).
 
 Run from repo root::
 

@@ -9,9 +9,11 @@ from minilink.planning.mpc._block_common import validate_mpc_planner
 from minilink.planning.mpc.model_predictive_controller import (
     ModelPredictiveControllerMixin,
 )
-from minilink.planning.mpc.planner import MPCPlanner
 from minilink.planning.mpc.tick_latch import MPCTickLatch
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationPlanner,
+)
 
 
 class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
@@ -24,7 +26,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
 
     def __init__(
         self,
-        planner: MPCPlanner,
+        planner: TrajectoryOptimizationPlanner,
         *,
         dt_mpc: float,
         step_disp: bool = False,
@@ -71,8 +73,8 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         )
 
     @property
-    def planner(self) -> MPCPlanner:
-        """Prepared compile-once planner."""
+    def planner(self) -> TrajectoryOptimizationPlanner:
+        """Compiled trajopt planner (parametric NLP)."""
         return self._planner
 
     @property
@@ -128,7 +130,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
 
 
 def mpc_stateful_controller(
-    planner: MPCPlanner,
+    planner: TrajectoryOptimizationPlanner,
     *,
     dt_mpc: float,
     step_disp: bool = False,

@@ -169,9 +169,12 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 ### 5.5 Planning
 
 - [x] Trajectory optimization (direct collocation, shooting, multiple shooting)
-- [x] **MPC compile-once** — `planning/mpc/` (`MPCPlanner`, parametric
-  `x_start`, JAX direct collocation; primary demos under `examples/scripts/mpc/`;
-  legacy per-step trajopt reference: `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`)
+- [x] **MPC / trajopt compile-once** —
+  `TrajectoryOptimizationPlanner.compile_parametric_program` +
+  `solve_trajectory_from` (parametric `x0`); controllers in `planning/mpc/`;
+  primary demos under `examples/scripts/mpc/` and `examples/scripts/hybrid/`;
+  legacy per-step trajopt reference:
+  `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`
 - [ ] **Scene params** — `ProblemParameters.scene`, transcription merge helpers,
   indexed overrides in `Scene` / `StateField` (moving obstacles, scenario sweeps,
   MPC without scene rebuild).

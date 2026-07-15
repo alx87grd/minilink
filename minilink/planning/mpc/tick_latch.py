@@ -7,8 +7,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.trajectory import Trajectory
-from minilink.planning.mpc.planner import MPCPlanner
 from minilink.planning.mpc.warm_start import mpc_warm_start_guess
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationPlanner,
+)
 
 
 @dataclass
@@ -27,13 +29,13 @@ class MPCTickLatch:
 
     Port ``compute`` paths on MPC blocks call :meth:`solve_for_tick`; the first
     call at a new ``k`` runs the NLP via
-    :meth:`~MPCPlanner.solve_trajectory_from`, later calls at the same ``k``
-    read the latch.
+    :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`, later calls
+    at the same ``k`` read the latch.
     """
 
     def __init__(
         self,
-        planner: MPCPlanner,
+        planner: TrajectoryOptimizationPlanner,
         *,
         step_disp: bool = False,
         dt_mpc: float | None = None,
@@ -77,8 +79,7 @@ class MPCTickLatch:
         result = self._planner.last_optimization_result
         if result is None:
             raise RuntimeError(
-                "MPCPlanner.solve_trajectory_from did not store "
-                "last_optimization_result"
+                "solve_trajectory_from did not store last_optimization_result"
             )
 
         n = int(self._planner.problem.sys.n)

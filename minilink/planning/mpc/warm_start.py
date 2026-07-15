@@ -6,7 +6,9 @@ import numpy as np
 
 from minilink.core.trajectory import Trajectory
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.mpc.planner import MPCPlanner
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationPlanner,
+)
 
 
 def shift_plan_trajectory(
@@ -43,13 +45,14 @@ def shift_plan_trajectory(
 def mpc_warm_start_guess(
     z_prev,
     y,
-    planner: MPCPlanner,
+    planner: TrajectoryOptimizationPlanner,
     *,
     dt_mpc: float,
     k: int = 0,
 ) -> Trajectory:
     """
-    Build an ``initial_guess`` Trajectory for :meth:`~MPCPlanner.step`.
+    Build an ``initial_guess`` Trajectory for
+    :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`.
 
     At tick ``k == 0`` (or when shift fails), returns the default collocation guess.
     Otherwise unpacks ``z_prev``, shifts on the transcription grid, and pins the
@@ -89,7 +92,7 @@ def mpc_warm_start_guess(
 def warm_start_guess_from_prev_plan(
     prev_plan: Trajectory | None,
     x_meas,
-    planner: MPCPlanner,
+    planner: TrajectoryOptimizationPlanner,
     *,
     dt_shift: float,
     horizon: float,
@@ -117,7 +120,7 @@ def warm_start_guess_from_prev_plan(
     return default_initial_trajectory(problem, t_grid)
 
 
-def mpc_default_computer_x0(planner: MPCPlanner) -> np.ndarray:
+def mpc_default_computer_x0(planner: TrajectoryOptimizationPlanner) -> np.ndarray:
     """Packed default decision vector for ``Computer.reset`` / ``x0_computer``."""
     problem = planner.problem
     guess = default_initial_trajectory(

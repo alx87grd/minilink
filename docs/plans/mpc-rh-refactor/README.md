@@ -13,13 +13,12 @@ sequencing.
 | --- | --- |
 | [vision.md](vision.md) | Locked end-goal contracts (Planner 2×2, `TrajectoryPlan`, `ModelPredictiveController`) |
 | [phases.md](phases.md) | E0–E8 order, gates, PR slices, start-here |
-| [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E3 done; others stubs) |
+| [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E4 done; others stubs) |
 
-**Active phase:** [phase-E4.md](phase-E4.md) — expand before coding; cite it in the PR.
+**Active phase:** [phase-E5.md](phase-E5.md) — expand before coding; cite it in the PR.
 
-**Progress:** E0–E3 landed on `dev-mpc-v2` (types → online from-API →
-`ModelPredictiveController` → flagship demos). Next structural work is E4
-(TOP parametric merge).
+**Progress:** E0–E4 landed on `dev-mpc-v2` (types → online from-API →
+controller → demos → TOP owns parametric NLP). Next is E5 (PoC leaf retirement).
 
 ## Related requirements (background only)
 

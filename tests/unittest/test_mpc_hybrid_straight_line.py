@@ -12,17 +12,19 @@ from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
     JaxDynamicBicycleRateInputsUY,
 )
-from minilink.planning.mpc import (  # noqa: E402
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
+from minilink.planning.mpc import (
     mpc_animation_overlays,
     mpc_plans_from_rollout,
     mpc_stateless_controller,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
+from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 from minilink.simulation.hybrid_simulator import HybridSimulator  # noqa: E402
 
@@ -71,14 +73,15 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
     template_problem = PlanningProblem(
         sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon
     )
-    transcription = MPCDirectCollocationTranscription(
+    transcription = DirectCollocationTranscription(
         DirectCollocationOptions(n_steps=mpc_steps)
     )
-    mpc_planner = MPCPlanner(
+    mpc_planner = TrajectoryOptimizationPlanner(
         template_problem,
         transcription=transcription,
-        options=MPCOptions(
+        options=TrajectoryOptimizationOptions(
             compile_backend="jax",
+            record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": 80, "ftol": 1e-2},
         ),

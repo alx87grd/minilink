@@ -16,16 +16,18 @@ from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.hybrid_diagram import HybridDiagram  # noqa: E402
 from minilink.core.system import DynamicSystem, StepSystem, System  # noqa: E402
-from minilink.planning.mpc import (  # noqa: E402
+from minilink.planning.mpc import (
     Command,
     ModelPredictiveController,
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
+from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 
@@ -61,12 +63,16 @@ class TestModelPredictiveController(unittest.TestCase):
         problem = PlanningProblem(
             sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0
         )
-        return MPCPlanner(
+        return TrajectoryOptimizationPlanner(
             problem,
-            transcription=MPCDirectCollocationTranscription(
+            transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=MPCOptions(optimizer_options={"maxiter": 50, "ftol": 1e-4}),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                record_solve_time=True,
+                optimizer_options={"maxiter": 50, "ftol": 1e-4},
+            ),
         )
 
     def test_factory_warm_start_types(self):
@@ -144,12 +150,12 @@ class TestModelPredictiveController(unittest.TestCase):
         x0_computer = mpc_default_computer_x0(planner)
 
         n_solve = []
-        n_prepare = []
+        n_compile_parametric = []
         n_plant_compile = []
         n_computer_compile = []
 
         _solve = planner.solve_trajectory_from
-        _prepare = planner.prepare
+        _compile_parametric = planner.compile_parametric_program
         _plant_compile = plant.compile
         _computer_compile = Computer.compile
         _hs_init = HybridSimulator.__init__
@@ -158,9 +164,9 @@ class TestModelPredictiveController(unittest.TestCase):
             n_solve.append(1)
             return _solve(*args, **kwargs)
 
-        def prepare_w(*args, **kwargs):
-            n_prepare.append(1)
-            return _prepare(*args, **kwargs)
+        def compile_parametric_w(*args, **kwargs):
+            n_compile_parametric.append(1)
+            return _compile_parametric(*args, **kwargs)
 
         def plant_compile_w(*args, **kwargs):
             n_plant_compile.append(1)
@@ -176,7 +182,7 @@ class TestModelPredictiveController(unittest.TestCase):
             return _hs_init(self, *args, **kwargs)
 
         planner.solve_trajectory_from = solve_w
-        planner.prepare = prepare_w
+        planner.compile_parametric_program = compile_parametric_w
         Computer.compile = computer_compile_w
         HybridSimulator.__init__ = hs_init_w
         try:
@@ -189,12 +195,12 @@ class TestModelPredictiveController(unittest.TestCase):
             )
         finally:
             planner.solve_trajectory_from = _solve
-            planner.prepare = _prepare
+            planner.compile_parametric_program = _compile_parametric
             Computer.compile = _computer_compile
             HybridSimulator.__init__ = _hs_init
 
         self.assertEqual(len(n_solve), n_ticks)
-        self.assertEqual(len(n_prepare), 0)
+        self.assertEqual(len(n_compile_parametric), 0)
         self.assertEqual(len(n_plant_compile), 1)
         self.assertEqual(len(n_computer_compile), 1)
 

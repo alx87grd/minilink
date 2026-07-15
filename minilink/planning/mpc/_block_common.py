@@ -4,23 +4,47 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from minilink.planning.mpc.planner import MPCPlanner
-
 if TYPE_CHECKING:
     from minilink.simulation.computer import Computer, StepSchedule
 
 
-def validate_mpc_planner(planner: MPCPlanner) -> tuple[int, int, int]:
-    """Validate a prepared planner and return ``(n, m, n_z)``."""
-    if not isinstance(planner, MPCPlanner):
-        raise TypeError(f"MPC block requires MPCPlanner, got {type(planner)}")
-    if planner.program_evaluator is None:
-        raise RuntimeError("MPCPlanner.prepare() must run before MPC block")
+def validate_mpc_planner(planner) -> tuple[int, int, int]:
+    """Validate a plan-producing planner and return ``(n, m, n_z)``.
+
+    Accepts a duck-typed
+    :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
+    (or compatible) with ``compile_parametric_program``,
+    ``has_parametric_program``, and ``solve_trajectory_from``. Auto-compiles
+    when needed so MPC ticks never re-transcribe.
+    """
+    missing = [
+        name
+        for name in (
+            "compile_parametric_program",
+            "has_parametric_program",
+            "solve_trajectory_from",
+        )
+        if not hasattr(planner, name)
+    ]
+    if missing:
+        raise TypeError(
+            "MPC block requires a TrajectoryOptimizationPlanner-compatible "
+            f"planner with {missing}; got {type(planner).__name__}."
+        )
 
     n_steps = int(planner.transcription.options.n_steps)
     if n_steps < 2:
         raise ValueError(
             f"MPC block requires transcription n_steps >= 2 for x_ff, got {n_steps}"
+        )
+
+    if not planner.has_parametric_program:
+        planner.compile_parametric_program()
+
+    if not planner.has_parametric_program:
+        raise RuntimeError(
+            "planner.compile_parametric_program() did not produce a parametric "
+            "program (check compile_backend='jax' and transcription support)."
         )
 
     sys = planner.problem.sys

@@ -14,10 +14,7 @@ from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.system import DynamicSystem  # noqa: E402
 from minilink.core.trajectory import Trajectory  # noqa: E402
-from minilink.planning.mpc import (  # noqa: E402
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
+from minilink.planning.mpc import (
     MPCStatefulController,
     mpc_stateful_controller,
 )
@@ -26,8 +23,13 @@ from minilink.planning.mpc.warm_start import (  # noqa: E402
     shift_plan_trajectory,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
+from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 
@@ -63,13 +65,17 @@ class TestMPCStatefulController(unittest.TestCase):
         problem = PlanningProblem(
             sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0
         )
-        transcription = MPCDirectCollocationTranscription(
+        transcription = DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=5)
         )
-        planner = MPCPlanner(
+        planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=MPCOptions(optimizer_options={"maxiter": 50, "ftol": 1e-4}),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                record_solve_time=True,
+                optimizer_options={"maxiter": 50, "ftol": 1e-4},
+            ),
         )
         return planner
 

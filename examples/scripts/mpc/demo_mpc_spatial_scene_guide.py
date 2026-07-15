@@ -255,7 +255,10 @@ planner = TrajectoryOptimizationPlanner(
     ),
 )
 print(f"  horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
-print("  Next: planner.solve(...) or MPCPlanner closed loop in the notebook")
+print(
+    "  Next: TrajectoryOptimizationPlanner.solve(...) "
+    "or compile_parametric_program + closed loop in the notebook"
+)
 
 if SHOW_PLOTS:
     _, ax_scene = scene.plot(

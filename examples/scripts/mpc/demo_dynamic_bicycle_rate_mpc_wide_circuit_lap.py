@@ -1,7 +1,7 @@
 """MPC lap pursuit on a wide technical circuit with eight obstacles.
 
 Wide asymmetric loop (bottom chicane, fast right sweeper, tight left hairpin).
-Uses compile-once :class:`~minilink.planning.mpc.planner.MPCPlanner`.
+Uses compile-once :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`.
 
 Run from repo root::
 
@@ -21,11 +21,6 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
 from minilink.graphical.animation.primitives import HorizonPolyline, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.mpc import (
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
@@ -41,6 +36,11 @@ from minilink.planning.spatial.shaping import (
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 # --- Wide circuit geometry (asymmetric CCW loop) ---
@@ -274,12 +274,12 @@ x0 = np.array(
 sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 
 template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
-mpc_planner = MPCPlanner(
+mpc_planner = TrajectoryOptimizationPlanner(
     template_problem,
-    transcription=MPCDirectCollocationTranscription(
+    transcription=DirectCollocationTranscription(
         DirectCollocationOptions(n_steps=MPC_STEPS)
     ),
-    options=MPCOptions(
+    options=TrajectoryOptimizationOptions(
         compile_backend="jax",
         optimizer_method="scipy_slsqp",
         record_solve_time=True,

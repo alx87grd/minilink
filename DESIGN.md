@@ -202,13 +202,15 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
-- **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCStatelessController`
-  is a static ``System`` (``n=0``) leaf: one :meth:`~minilink.planning.mpc.planner.MPCPlanner.step`
-  per Computer tick (memoized across output ports ``u_ff``, ``x_ff``, ``z``).
-  :class:`~minilink.planning.mpc.step_block.MPCStatefulController` (Phase 6b) is a
-  :class:`StepSystem` with packed decision state ``z``; warm-start via
+- **MPC hybrid block:** :func:`~minilink.planning.mpc.ModelPredictiveController`
+  returns a static ``System`` (``n=0``) or :class:`StepSystem` (``warm_start=True``)
+  that holds a
+  :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
+  with :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.compile_parametric_program`
+  so each Computer tick is bind + solve (memoized across ports ``u_ff``,
+  ``x_ff``, ``z``). Warm-start via
   :func:`~minilink.planning.mpc.warm_start.mpc_warm_start_guess` from
-  ``Computer.x``.   Post-sim horizons:
+  ``Computer.x``. Post-sim horizons:
   :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
   default animation overlays:
   :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
@@ -490,15 +492,21 @@ require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 `Planner.solve()` → `TrajectoryPlan` (traj family) or `PolicyPlan` (policy
 family).
 
-**Trajopt:** planner → transcription → `MathematicalProgram` → `Optimizer` →
-`TrajectoryPlan`. Knot count `n_steps` lives on transcription options; the time
-grid is `linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native transcription
-classes; no parallel JAX transcription types. NumPy transcriptions build
-constraints via `dynamics_function` (compiled evaluator, trace tier when JAX).
-**JAX transcriptions** embed `problem.sys.f` directly in the NLP (not evaluator
-`f` / `f_trace`). `compile_backend="direct"` calls `system.f` uncompiled (escape
-hatch). A `MathematicalProgram` carries the native backend of its callables in
-its `backend` field, and the `Optimizer` compiles with it by default.
+**Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
+`TrajectoryPlan`. Offline `solve_trajectory` always rebuilds a fresh
+`MathematicalProgram`. Optional `compile_parametric_program()` builds a
+`ParametricMathematicalProgram` (``h(z, x0)``) once so
+`solve_trajectory_from(x0)` is bind + solve only (receding-horizon / MPC path);
+without compile, from-solves rebuild with a one-time speed warning. Knot count
+`n_steps` lives on transcription options; the time grid is
+`linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
+transcription classes; no parallel JAX transcription types. NumPy transcriptions
+build constraints via `dynamics_function` (compiled evaluator, trace tier when
+JAX). **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not
+evaluator `f` / `f_trace`). `compile_backend="direct"` calls `system.f`
+uncompiled (escape hatch). A `MathematicalProgram` carries the native backend of
+its callables in its `backend` field, and the `Optimizer` compiles with it by
+default.
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*

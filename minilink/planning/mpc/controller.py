@@ -9,8 +9,10 @@ from minilink.planning.mpc._block_common import validate_mpc_planner
 from minilink.planning.mpc.model_predictive_controller import (
     ModelPredictiveControllerMixin,
 )
-from minilink.planning.mpc.planner import MPCPlanner
 from minilink.planning.mpc.tick_latch import MPCTickLatch
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationPlanner,
+)
 
 
 class MPCStatelessController(ModelPredictiveControllerMixin, System):
@@ -23,7 +25,7 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
 
     def __init__(
         self,
-        planner: MPCPlanner,
+        planner: TrajectoryOptimizationPlanner,
         *,
         dt_mpc: float,
         step_disp: bool = False,
@@ -70,8 +72,8 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
         )
 
     @property
-    def planner(self) -> MPCPlanner:
-        """Prepared compile-once planner."""
+    def planner(self) -> TrajectoryOptimizationPlanner:
+        """Compiled trajopt planner (parametric NLP)."""
         return self._planner
 
     def _measurement(self, u) -> np.ndarray:
@@ -91,7 +93,7 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
 
 
 def mpc_stateless_controller(
-    planner: MPCPlanner,
+    planner: TrajectoryOptimizationPlanner,
     *,
     dt_mpc: float,
     step_disp: bool = False,

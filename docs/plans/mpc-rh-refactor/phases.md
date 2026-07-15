@@ -78,7 +78,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | **E1** | `MPCPlanner.solve_trajectory_from` → `TrajectoryPlan` | [phase-E1.md](phase-E1.md) **(done)** |
 | **E2** | `ModelPredictiveController` System family + `@` | [phase-E2.md](phase-E2.md) **(done)** |
 | **E3** | Migrate flagship demos to controller | [phase-E3.md](phase-E3.md) **(done)** |
-| **E4** | Merge parametric MPC into TOP | [phase-E4.md](phase-E4.md) |
+| **E4** | Merge parametric MPC into TOP | [phase-E4.md](phase-E4.md) **(done)** |
 | **E5** | Retire PoC controller leaves | [phase-E5.md](phase-E5.md) |
 | **E6** | Observability polish | [phase-E6.md](phase-E6.md) |
 | **E7** | Parametric scene (pipeline B) | [phase-E7.md](phase-E7.md) |
@@ -91,7 +91,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-A | E0 | planning + MPC + hybrid tests | landed |
 | PR-B | E1 + E2 | MPC + `ModelPredictiveController` + export tests | landed |
 | PR-C | E3 | hybrid parity + smoke demos | landed |
-| PR-D | E4 | MPC + trajopt + hybrid + controller | next |
+| PR-D | E4 | MPC + trajopt + hybrid + controller | landed |
 | PR-E | E5 | after remaining demos/tests on controller | later |
 | PR-F+ | E6–E8 | phase gates | later |
 
@@ -101,7 +101,8 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 2. **E1** — done ([phase-E1.md](phase-E1.md)).
 3. **E2** — done ([phase-E2.md](phase-E2.md)).
 4. **E3** — done ([phase-E3.md](phase-E3.md)).
-5. **E4** — expand [phase-E4.md](phase-E4.md) before coding (TOP merge).
+5. **E4** — done ([phase-E4.md](phase-E4.md)).
+6. **E5** — expand [phase-E5.md](phase-E5.md) before coding (retire PoC leaves).
 
 E5 retires PoC factories only after remaining hand-loop demos, the track-lap
 notebook, and unittest call sites move to `ModelPredictiveController` (or an

@@ -1,12 +1,16 @@
 """Generic trajectory-optimization planner orchestration."""
 
+from __future__ import annotations
+
 import time
+import warnings
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_NUMPY
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
+from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -16,6 +20,7 @@ from minilink.optimization.optimizer import (
     OptimizationProgressCallback,
     Optimizer,
 )
+from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.optimization.reporting import (
     DISP_RULE_DIV,
     DISP_RULE_MAIN,
@@ -49,9 +54,14 @@ class TrajectoryOptimizationOptions:
     ``solve_disp`` prints a Minilink trajectory-optimization preamble and
     report. It is separate from SciPy's ``options['disp']``.
 
+    ``step_disp`` prints per-tick timing on the parametric / from-solve path.
+
     ``record_history=True`` reconstructs a full :class:`Trajectory` per
     optimizer iterate — convenient for live plots and teaching, but it adds
     one rollout/unpack per iteration; leave it off for production solves.
+
+    Parametric compile (:meth:`TrajectoryOptimizationPlanner.compile_parametric_program`)
+    currently requires ``compile_backend='jax'``.
     """
 
     compile_backend: str = BACKEND_NUMPY
@@ -64,6 +74,7 @@ class TrajectoryOptimizationOptions:
     callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
     record_solve_time: bool = False
     solve_disp: bool = False
+    step_disp: bool = False
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -73,7 +84,20 @@ class TrajectoryOptimizationPlanner(Planner):
     A transcription owns the decision-vector layout and method-specific
     constraints. This planner owns the domain workflow:
     ``problem -> transcription -> mathematical program -> optimizer -> trajectory``.
+
+    Offline :meth:`solve_trajectory` always rebuilds a fresh
+    :class:`~minilink.optimization.mathematical_program.MathematicalProgram`.
+    Online :meth:`solve_trajectory_from` rebuilds with the measured ``x0``
+    unless :meth:`compile_parametric_program` has been called, in which case
+    each from-solve is bind + solve only.
     """
+
+    _USER_OPTIMIZER_METHODS = {
+        "scipy_slsqp": (
+            "scipy_minimize",
+            {"scipy_method": "SLSQP", "options": {"disp": False}},
+        ),
+    }
 
     def __init__(
         self,
@@ -90,6 +114,19 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimizer: Optimizer | None = None
         self.last_optimization_result: OptimizationResult | None = None
         self.iteration_history: list[TrajectoryOptimizationIteration] = []
+        self.program = None
+        self.program_evaluator = None
+        self.optimizer_backend: ScipyMinimizeOptimizer | None = None
+        self._dynamics = None
+        self.compile_time_s: float | None = None
+        self.last_solve_time_s: float | None = None
+        self.last_step_time_s: float | None = None
+        self._warned_uncompiled_from = False
+
+    @property
+    def has_parametric_program(self) -> bool:
+        """True after a successful :meth:`compile_parametric_program`."""
+        return self.program_evaluator is not None and self.optimizer_backend is not None
 
     def solve(
         self,
@@ -106,7 +143,7 @@ class TrajectoryOptimizationPlanner(Planner):
         initial_guess: np.ndarray | Trajectory | None = None,
         warm_start: bool | None = None,
     ) -> TrajectoryPlan:
-        """Compute and store a trajectory-optimization solution."""
+        """Compute and store a trajectory-optimization solution (always rebuild)."""
         workflow_t0 = time.perf_counter()
         compile_backend = self.options.compile_backend
         guess = self._resolve_initial_guess(initial_guess, warm_start)
@@ -177,6 +214,222 @@ class TrajectoryOptimizationPlanner(Planner):
 
         return plan
 
+    def compile_parametric_program(self) -> None:
+        """Build and JIT-compile a parametric NLP once (idempotent).
+
+        Requires ``options.compile_backend='jax'`` and a transcription that
+        implements :meth:`~Transcription.transcribe_parametric` (direct
+        collocation).
+        """
+        if self.has_parametric_program:
+            return
+
+        compile_backend = normalize_backend(
+            self.options.compile_backend, allow_direct=True
+        )
+        if compile_backend != BACKEND_JAX:
+            raise ValueError(
+                "compile_parametric_program requires compile_backend='jax' "
+                f"(got {self.options.compile_backend!r})."
+            )
+        if not hasattr(self.transcription, "transcribe_parametric"):
+            raise TypeError(
+                f"{type(self.transcription).__name__} does not support "
+                "transcribe_parametric; use DirectCollocationTranscription."
+            )
+
+        from minilink.planning.trajectory_optimization.parametric_evaluator import (
+            JaxParametricProgramEvaluator,
+        )
+
+        t0 = time.perf_counter()
+        self.program = self.transcription.transcribe_parametric(
+            self.problem,
+            compile_backend=compile_backend,
+        )
+
+        guess = default_initial_trajectory(
+            self.problem,
+            self.transcription.initial_guess_time_grid(self.problem),
+        )
+        z0 = self.transcription.pack_initial_guess(self.problem, guess)
+
+        self.program_evaluator = JaxParametricProgramEvaluator(
+            self.program,
+            sample_z=z0,
+            sample_x0=self.problem.x_start,
+        )
+        self.program_evaluator.bind(self.problem.x_start)
+
+        params = self.problem.params.system
+        evaluator = self.problem.sys.compile(backend=compile_backend, verbose=False)
+        if params is None:
+            self._dynamics = evaluator.f
+        else:
+            self._dynamics = lambda x, u, t: evaluator.f_p(x, u, t, params)
+
+        self.optimizer_backend = self._make_parametric_optimizer_backend()
+        self.compile_time_s = time.perf_counter() - t0
+
+    def solve_trajectory_from(
+        self,
+        x0,
+        *,
+        params=None,
+        initial_guess: np.ndarray | Trajectory | None = None,
+    ) -> TrajectoryPlan:
+        """
+        Online traj-family solve from measured ``x0``.
+
+        Parameters
+        ----------
+        x0 : array_like
+            Measured initial state.
+        params : mapping, optional
+            Scene / bind façade. ``None`` or ``{}`` binds ``x0`` only.
+            Non-empty keys are rejected until scene support (E7).
+        initial_guess : ndarray or Trajectory, optional
+            NLP seed (schedule and/or packed ``z``). Warm-start *policy*
+            (reuse last latch) is owned by ``ModelPredictiveController``, not
+            this method.
+
+        Notes
+        -----
+        Fast bind path when :attr:`has_parametric_program`; otherwise rebuilds
+        the NLP with ``x_start`` replaced (one-time warning suggesting
+        :meth:`compile_parametric_program`).
+        """
+        reject_unknown_online_params(params)
+        if self.has_parametric_program:
+            return self._solve_trajectory_from_parametric(
+                x0, initial_guess=initial_guess
+            )
+        return self._solve_trajectory_from_rebuild(x0, initial_guess=initial_guess)
+
+    def step(
+        self,
+        x0,
+        *,
+        initial_guess: np.ndarray | Trajectory | None = None,
+    ) -> Trajectory:
+        """Solve one from-tick and return the bare schedule (hand loops)."""
+        return self.solve_trajectory_from(x0, initial_guess=initial_guess).trajectory
+
+    def _solve_trajectory_from_parametric(
+        self,
+        x0,
+        *,
+        initial_guess: np.ndarray | Trajectory | None = None,
+    ) -> TrajectoryPlan:
+        if self.program_evaluator is None or self.optimizer_backend is None:
+            raise RuntimeError(
+                "compile_parametric_program() must run before parametric from-solve."
+            )
+
+        step_t0 = time.perf_counter()
+        x_arr = np.asarray(x0, dtype=float).reshape(-1)
+        n = int(self.problem.sys.n)
+        if x_arr.shape != (n,):
+            raise ValueError(f"x0 must have shape ({n},)")
+
+        problem_k = replace(
+            self.problem,
+            x_start=x_arr,
+            X0=SingletonSet(x_arr),
+        )
+        self.program_evaluator.bind(x_arr)
+
+        if initial_guess is None:
+            initial_guess = default_initial_trajectory(
+                problem_k,
+                self.transcription.initial_guess_time_grid(problem_k),
+            )
+        z0 = self.transcription.pack_initial_guess(problem_k, initial_guess)
+
+        record_solve_time = self.options.record_solve_time or self.options.step_disp
+        if record_solve_time:
+            solve_t0 = time.perf_counter()
+
+        result = self.optimizer_backend.solve(
+            self.program_evaluator,
+            z0,
+        )
+
+        if record_solve_time:
+            self.last_solve_time_s = time.perf_counter() - solve_t0
+            result = OptimizationResult(
+                z=result.z,
+                success=result.success,
+                cost=result.cost,
+                message=result.message,
+                stats=result.stats,
+                solve_time_s=self.last_solve_time_s,
+            )
+        else:
+            self.last_solve_time_s = None
+
+        trajectory = self.transcription.reconstruct_result(
+            result,
+            problem=problem_k,
+            dynamics=self._dynamics,
+        )
+        self.last_step_time_s = time.perf_counter() - step_t0
+        self.last_optimization_result = result
+        plan = self._store_trajectory_plan(
+            TrajectoryPlan(
+                trajectory=trajectory,
+                metadata=SolveMetadata(
+                    success=bool(result.success),
+                    message=str(result.message),
+                    cost=result.cost,
+                    solve_time_s=result.solve_time_s,
+                    stats=dict(result.stats),
+                ),
+                warm_state=result.z,
+            )
+        )
+
+        if self.options.step_disp:
+            print(
+                f"TOP step: success={result.success} "
+                f"solve={self.last_solve_time_s:.6g}s "
+                f"step={self.last_step_time_s:.6g}s"
+            )
+
+        return plan
+
+    def _solve_trajectory_from_rebuild(
+        self,
+        x0,
+        *,
+        initial_guess: np.ndarray | Trajectory | None = None,
+    ) -> TrajectoryPlan:
+        if not self._warned_uncompiled_from:
+            warnings.warn(
+                "TrajectoryOptimizationPlanner.solve_trajectory_from is rebuilding "
+                "the NLP each call. Call compile_parametric_program() once for "
+                "fast bind-only from-solves (requires compile_backend='jax').",
+                UserWarning,
+                stacklevel=3,
+            )
+            self._warned_uncompiled_from = True
+
+        x_arr = np.asarray(x0, dtype=float).reshape(-1)
+        n = int(self.problem.sys.n)
+        if x_arr.shape != (n,):
+            raise ValueError(f"x0 must have shape ({n},)")
+
+        saved_problem = self.problem
+        self.problem = replace(
+            saved_problem,
+            x_start=x_arr,
+            X0=SingletonSet(x_arr),
+        )
+        try:
+            return self.solve_trajectory(initial_guess=initial_guess, warm_start=False)
+        finally:
+            self.problem = saved_problem
+
     def _make_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray
     ) -> Optimizer:
@@ -187,6 +440,23 @@ class TrajectoryOptimizationPlanner(Planner):
             use_hessian=self.options.use_hessian,
             options=dict(self.options.optimizer_options),
         )
+
+    def _make_parametric_optimizer_backend(self) -> ScipyMinimizeOptimizer:
+        method = self.options.optimizer_method
+        if method not in self._USER_OPTIMIZER_METHODS:
+            valid = ", ".join(sorted(self._USER_OPTIMIZER_METHODS))
+            raise ValueError(
+                f"Unknown optimizer method {method!r} for parametric compile. "
+                f"Expected one of: {valid}."
+            )
+
+        _, preset = self._USER_OPTIMIZER_METHODS[method]
+        kwargs = {}
+        for key, value in preset.items():
+            kwargs[key] = dict(value) if isinstance(value, dict) else value
+        existing = kwargs.get("options", {})
+        kwargs["options"] = {**existing, **dict(self.options.optimizer_options)}
+        return ScipyMinimizeOptimizer(**kwargs)
 
     def _resolve_initial_guess(
         self,
@@ -355,3 +625,19 @@ class TrajectoryOptimizationPlanner(Planner):
         if value is None:
             return None
         return type(value).__name__
+
+
+def reject_unknown_online_params(params) -> None:
+    """Reject non-empty online ``params`` until scene support lands (E7)."""
+    if params is None:
+        return
+    if not hasattr(params, "keys"):
+        raise TypeError(
+            f"params must be a mapping or None; got {type(params).__name__}."
+        )
+    keys = list(params.keys())
+    if keys:
+        raise ValueError(
+            "solve_trajectory_from does not accept params keys yet "
+            f"(got {keys!r}). Pass params=None or {{}} until scene support."
+        )

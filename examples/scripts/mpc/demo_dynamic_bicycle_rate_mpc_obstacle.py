@@ -26,15 +26,15 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.mpc import (
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 PRESETS = {
@@ -153,18 +153,19 @@ x0 = np.array([0.0, 3.0, 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 
 template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
-mpc_planner = MPCPlanner(
+mpc_planner = TrajectoryOptimizationPlanner(
     template_problem,
-    transcription=MPCDirectCollocationTranscription(
+    transcription=DirectCollocationTranscription(
         DirectCollocationOptions(n_steps=MPC_STEPS)
     ),
-    options=MPCOptions(
+    options=TrajectoryOptimizationOptions(
         compile_backend="jax",
         optimizer_method="scipy_slsqp",
         record_solve_time=True,
         optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
     ),
 )
+mpc_planner.compile_parametric_program()
 
 t_hist = [0.0]
 x_hist = [x0.copy()]

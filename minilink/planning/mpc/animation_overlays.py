@@ -11,13 +11,12 @@ from minilink.graphical.animation.primitives import (
     TrajectoryPolyline,
 )
 from minilink.planning.mpc.plan_reconstruct import mpc_plans_from_rollout
-from minilink.planning.mpc.planner import MPCPlanner
 from minilink.simulation.hybrid_simulator import HybridSimResult
 
 
 def mpc_animation_overlays(
     result: HybridSimResult,
-    planner: MPCPlanner,
+    planner,
     *,
     scene=None,
     track=None,
@@ -38,8 +37,8 @@ def mpc_animation_overlays(
     ----------
     result : HybridSimResult
         Output of :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`.
-    planner : MPCPlanner
-        MPC block planner (transcription and template problem).
+    planner :
+        Trajopt planner (transcription and template problem).
     scene : Scene, optional
         Collision scene drawn via :meth:`~minilink.planning.spatial.scene.Scene.as_visualizer`.
     track : Track, optional

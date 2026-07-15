@@ -1,10 +1,13 @@
 """
-Beta compile-once MPC planning pipeline.
+Beta receding-horizon MPC control blocks on trajectory optimization.
 
-This package is experimental. It currently supports JAX direct collocation with
-a singleton initial boundary ``X0`` whose point is supplied at runtime via
-:meth:`~minilink.planning.mpc.planner.MPCPlanner.step`. Terminal boundaries,
-non-singleton ``X0``, and shooting transcriptions are not yet supported.
+Controllers accept a
+:class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
+(or duck-typed compatible planner). Call
+:meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.compile_parametric_program`
+or let the controller auto-compile so ticks bind + solve only. Terminal
+boundaries, non-singleton ``X0``, and shooting transcriptions are not yet
+supported.
 """
 
 from minilink.planning.mpc.animation_overlays import mpc_animation_overlays
@@ -16,9 +19,7 @@ from minilink.planning.mpc.controller import (
 from minilink.planning.mpc.model_predictive_controller import (
     ModelPredictiveController,
 )
-from minilink.planning.mpc.options import MPCOptions
 from minilink.planning.mpc.plan_reconstruct import mpc_plans_from_rollout
-from minilink.planning.mpc.planner import MPCPlanner
 from minilink.planning.mpc.step_block import (
     MPCStatefulController,
     mpc_stateful_controller,
@@ -36,8 +37,6 @@ __all__ = [
     "mpc_animation_overlays",
     "MPCStatelessController",
     "MPCDirectCollocationTranscription",
-    "MPCOptions",
-    "MPCPlanner",
     "MPCStatefulController",
     "mpc_stateless_controller",
     "mpc_default_computer_x0",

@@ -1,6 +1,6 @@
 """Receding-horizon MPC for straight-line tracking on the rate-input bicycle.
 
-Uses compile-once :class:`~minilink.planning.mpc.planner.MPCPlanner` with
+Uses compile-once :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner` with
 :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs`
 and :class:`~minilink.planning.mpc.ModelPredictiveController` deploy ticks
 (``compute_command``). The plant integrates with RK4 at ``SIM_HZ`` between MPC
@@ -27,13 +27,15 @@ from minilink.graphical.animation.primitives import (
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.mpc import (
     ModelPredictiveController,
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 U_TARGET = 4.0
@@ -90,12 +92,12 @@ x0 = np.array([0.0, 3.0, 0.0, U_TARGET * 0.8, 0.0, 0.0, (U_TARGET * 0.8) / r_r, 
 sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 
 template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
-mpc_planner = MPCPlanner(
+mpc_planner = TrajectoryOptimizationPlanner(
     template_problem,
-    transcription=MPCDirectCollocationTranscription(
+    transcription=DirectCollocationTranscription(
         DirectCollocationOptions(n_steps=MPC_STEPS)
     ),
-    options=MPCOptions(
+    options=TrajectoryOptimizationOptions(
         compile_backend="jax",
         optimizer_method="scipy_slsqp",
         record_solve_time=True,

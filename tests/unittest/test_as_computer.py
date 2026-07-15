@@ -45,32 +45,33 @@ class TestAsComputer(unittest.TestCase):
         from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
             JaxDynamicBicycleRateInputsUY,
         )
-        from minilink.planning.mpc import (
-            MPCDirectCollocationTranscription,
-            MPCOptions,
-            MPCPlanner,
-            mpc_stateless_controller,
-        )
+        from minilink.planning.mpc import mpc_stateless_controller
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
             DirectCollocationOptions,
+            DirectCollocationTranscription,
+        )
+        from minilink.planning.trajectory_optimization.planner import (
+            TrajectoryOptimizationOptions,
+            TrajectoryOptimizationPlanner,
         )
 
         configure_jax(enable_x64=True)
         sys = JaxDynamicBicycleRateInputsUY()
         x0 = sys.x0.copy()
-        planner = MPCPlanner(
+        planner = TrajectoryOptimizationPlanner(
             PlanningProblem(
                 sys=sys,
                 tf=1.0,
                 x_start=x0,
                 cost=QuadraticCost.from_system(sys, xbar=x0),
             ),
-            transcription=MPCDirectCollocationTranscription(
+            transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=MPCOptions(
+            options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
+                record_solve_time=True,
                 optimizer_method="scipy_slsqp",
                 optimizer_options={"maxiter": 5, "ftol": 1e-1},
             ),
