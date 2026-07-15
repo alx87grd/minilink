@@ -203,7 +203,7 @@ class MPCPlanner(Planner):
             only. Non-empty keys are rejected until scene support (E7).
         initial_guess : ndarray or Trajectory, optional
             NLP seed (schedule and/or packed ``z``). Warm-start *policy*
-            (reuse last latch) is owned by ``RecedingHorizonController``, not
+            (reuse last latch) is owned by ``ModelPredictiveController``, not
             this method.
         """
         _reject_unknown_online_params(params)

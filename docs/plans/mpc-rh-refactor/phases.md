@@ -14,7 +14,7 @@ Branch: **`dev-mpc-v2`** (hybrid + MPC controllers present; same full stack as
 
 | Demo | Role |
 | --- | --- |
-| `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` | Flagship → target `rhc @ plant` |
+| `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` | Flagship → target `mpc @ plant` |
 | `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` | Richer hybrid + scene |
 
 **MPC hand-loop demos** — keep green:
@@ -46,7 +46,7 @@ phase’s pytest list.
 flowchart LR
   E0[E0 Foundation]
   E1[E1 Online surface]
-  E2[E2 RH facade]
+  E2[E2 ModelPredictiveController]
   E3[E3 Demo migration]
   E4[E4 TOP merge]
   E6[E6 Polish]
@@ -56,9 +56,10 @@ flowchart LR
   E0 --> E1 --> E2 --> E3 --> E4 --> E6 --> E7 --> E8
 ```
 
-E2 includes `compute_command` **and** `export_to_computer` / `__matmul__`;
-E3 migrates hybrid minimal to `rhc @ plant`. E5 (PoC leaf retirement) sits
-after demos move — see [phase-E5.md](phase-E5.md).
+E2 lands `ModelPredictiveController` (`compute_command` **and**
+`export_to_computer` / `__matmul__` on the System); E3 migrates hybrid
+minimal to `mpc @ plant`. E5 (PoC leaf retirement) sits after demos move —
+see [phase-E5.md](phase-E5.md).
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
 demos set finite `tf=` for trajopt/MPC); transcription options carry
@@ -70,8 +71,8 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | --- | --- | --- |
 | **E0** | Types, `problem.tf`, strip options `tf`, `solve` rename | [phase-E0.md](phase-E0.md) **(done)** |
 | **E1** | `MPCPlanner.solve_trajectory_from` → `TrajectoryPlan` | [phase-E1.md](phase-E1.md) **(done)** |
-| **E2** | `RecedingHorizonController` tick + export / `@` | [phase-E2.md](phase-E2.md) |
-| **E3** | Migrate flagship demos to RH | [phase-E3.md](phase-E3.md) |
+| **E2** | `ModelPredictiveController` System family + `@` | [phase-E2.md](phase-E2.md) **(ready)** |
+| **E3** | Migrate flagship demos to controller | [phase-E3.md](phase-E3.md) |
 | **E4** | Merge parametric MPC into TOP | [phase-E4.md](phase-E4.md) |
 | **E5** | Retire PoC controller leaves | [phase-E5.md](phase-E5.md) |
 | **E6** | Observability polish | [phase-E6.md](phase-E6.md) |
@@ -83,17 +84,18 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR | Contents | Gate focus |
 | --- | --- | --- |
 | PR-A | E0 | planning + MPC + hybrid tests |
-| PR-B | E1 + E2 | MPC + RH + export tests |
+| PR-B | E1 + E2 | MPC + `ModelPredictiveController` + export tests |
 | PR-C | E3 | hybrid parity + smoke demos |
-| PR-D | E4 | MPC + trajopt + hybrid + RH |
-| PR-E | E5 | after all demos on RH |
+| PR-D | E4 | MPC + trajopt + hybrid + controller |
+| PR-E | E5 | after all demos on controller |
 | PR-F+ | E6–E8 | phase gates |
 
 ## Start here
 
 1. **E0** — done ([phase-E0.md](phase-E0.md)).
 2. **E1** — done ([phase-E1.md](phase-E1.md)).
-3. **E2** — `RecedingHorizonController` with warm-start orchestration + `compute_command` + `__matmul__` ([phase-E2.md](phase-E2.md)).
-4. **E3.1** — migrate `demo_mpc_hybrid_minimal.py` to `rhc @ plant`.
+3. **E2** — `ModelPredictiveController` System family (`warm_start` → System /
+   StepSystem) + `compute_command` + `@` ([phase-E2.md](phase-E2.md)).
+4. **E3.1** — migrate `demo_mpc_hybrid_minimal.py` to `mpc @ plant`.
 
 Defer E4 until E2–E3 green. Retire PoC leaves (E5) after demos moved.

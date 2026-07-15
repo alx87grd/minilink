@@ -7,13 +7,14 @@ decision; implement via [phases.md](phases.md).
 
 > Describe a **deterministic planning task** once (`PlanningProblem`).
 > Solve it offline or online with a **Planner** that returns a typed
-> **TrajectoryPlan**. Drive a plant in closed loop by wrapping any
-> plan-producing solver in a **RecedingHorizonController** that re-plans
-> from measured \(x\) each tick, latches the drafted horizon, and exports
-> as a discrete control block / hybrid `Computer`.
+> **TrajectoryPlan**. Drive a plant in closed loop with a
+> **ModelPredictiveController** — a Minilink `System` that re-plans from
+> measured \(x\) each tick (receding-horizon *loop*), latches the drafted
+> horizon, and wires into hybrid via `%` / `export_to_computer` / `@ plant`.
 
-“MPC” in demos = compile-once trajopt used as the `solve_trajectory_from`
-planner inside that controller — not a second planner ABC.
+The controller holds any plan-producing solver with
+`solve_trajectory_from`. In demos the planner is usually compile-once
+trajopt (`MPCPlanner` → parametric TOP) — not a second planner ABC.
 
 ## Big picture
 
@@ -33,15 +34,15 @@ flowchart LR
   end
 
   subgraph online["Online plan-and-act"]
-    RHC["RecedingHorizonController"]
+    MPC["ModelPredictiveController<br/>System / StepSystem"]
     CMD["Command / ports"]
     COMP["Computer"]
     PLANT["DynamicSystem"]
     HYB["HybridDiagram"]
 
-    TOP -->|"solve_trajectory_from"| RHC
-    RHC -->|compute_command| CMD
-    RHC -->|export / matmul| COMP
+    TOP -->|"solve_trajectory_from"| MPC
+    MPC -->|compute_command| CMD
+    MPC -->|"% / export / matmul"| COMP
     COMP --> HYB
     PLANT --> HYB
   end
@@ -57,26 +58,30 @@ flowchart LR
 | `Planner` | Tool: how to compute a solution |
 | `TrajectoryOptimizationPlanner` | NLP trajopt; batch or parametric compile-once |
 | `TrajectoryPlan` | Traj-family result: schedule + metadata + warm_state |
-| `RecedingHorizonController` | Online product: tick / latch / ports / `@ plant` |
+| `ModelPredictiveController` | Online product: Minilink `System` family — tick / latch / ports / `@ plant` |
 | `Computer` / `HybridDiagram` | Existing step/hybrid host |
 
-**No `HorizonSource`.** RH calls `planner.solve_trajectory_from(...)`.
+**No `HorizonSource`.** The controller calls `planner.solve_trajectory_from(...)`.
 
-**Laws:** continuous core stays clean; planners are tools; RH is the System
-façade; one Planner ABC; RH is a loop pattern, not a special algorithm class.
+**Laws:** continuous core stays clean; planners are tools;
+`ModelPredictiveController` **is** the discrete control `System` (not a
+non-System object that only exports a leaf); one Planner ABC; receding
+horizon is a **loop pattern** on that System, not a special algorithm class.
+
+**Naming:** product type is **`ModelPredictiveController`**. Former vision
+name `RecedingHorizonController` is retired. No second product alias
+(`MPCController`); casual “MPC” means this controller + NLP planner backend.
 
 ## Aim UX
 
 ```python
 plan = planner.solve()
-rhc = RecedingHorizonController(planner, dt_mpc=0.2)
-hybrid = rhc @ plant
+mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
+hybrid = mpc @ plant
 hybrid.compute_trajectory(tf=10.0)
 
-cmd = rhc.compute_command(y)
+cmd = mpc.compute_command(y)
 ```
-
-`MPCController` may be a thin alias for NLP defaults.
 
 ---
 
@@ -89,7 +94,7 @@ Owns: `sys`, `X`/`U`/`X0`/`Xf`, `x_start`/`x_goal`, `cost`, **`tf`**
 | --- | --- |
 | Continuous \(T\) | `PlanningProblem.tf` only — `None` unset, `+inf` infinite-horizon, or finite |
 | Knot count \(N\) | Transcription options (`n_steps`) only — **no** options `tf` |
-| Replan period | `RecedingHorizonController.dt_mpc` |
+| Replan period | `ModelPredictiveController.dt_mpc` |
 | Sim length | Simulator / hybrid `tf` (different object) |
 
 Finite trajopt/MPC grids: \(t = \mathrm{linspace}(0, T, N)\) via
@@ -118,8 +123,9 @@ Short offline entry: **`solve()`** replaces `compute_solution` (dispatch by
 
 Solving one does not clear the other (DP may hold policy + rolled-out traj).
 
-RH only requires `solve_trajectory_from`. Internal NLP `bind(x0)` is not on
-the Planner ABC — called inside parametric `solve_trajectory_from`.
+`ModelPredictiveController` only requires `solve_trajectory_from`. Internal
+NLP `bind(x0)` is not on the Planner ABC — called inside parametric
+`solve_trajectory_from`.
 
 **Optional kwargs convention** (traj-family; ABC stays `**kwargs`):
 
@@ -130,7 +136,7 @@ the Planner ABC — called inside parametric `solve_trajectory_from`.
 
 `initial_guess` is a **seed**, not warm-start *policy*. The planner does not
 orchestrate “reuse last online plan”; that lives on
-`RecedingHorizonController` (below).
+`ModelPredictiveController` (below).
 
 ```mermaid
 classDiagram
@@ -171,8 +177,9 @@ optional `initial_guess`.
 `bind` is evaluator-internal: SciPy sees only `z`; evaluator injects bound `x0`.
 
 **Footnote:** batch TOP may keep an offline convenience `warm_start: bool`
-meaning “reuse `last_trajectory_plan` as seed.” That is **not** the RH
-product flag — online warm-start orchestration is RH-only.
+meaning “reuse `last_trajectory_plan` as seed.” That is **not** the
+controller product flag — online warm-start orchestration is on
+`ModelPredictiveController` only.
 
 ---
 
@@ -194,22 +201,41 @@ automatic inside the planner.
 
 ---
 
-## `RecedingHorizonController`
+## `ModelPredictiveController` — System family
 
-Holds a planner duck with `solve_trajectory_from`. Runs:
+Product constructor (factory or dual subclasses) returns a **real Minilink
+wireable block** — not a non-System orchestrator that builds a separate leaf.
+
+| `warm_start` | Concrete type | Diagram state |
+| --- | --- | --- |
+| `False` | subclass of `System` (`n = 0`) | none |
+| `True` | subclass of `StepSystem` | packed NLP \(z\) on `Computer.x` |
+
+Both share orchestration (mixin / private helpers):
 
 1. Tick → (optional) warm-start: if enabled, build a seed via
-   `warm_start.py` from the latched plan / `warm_state`
+   `warm_start.py` from latched plan / `warm_state`
 2. Call `planner.solve_trajectory_from(x0, params=…, initial_guess=seed)`
    and latch the returned `TrajectoryPlan`
-3. `Command` / ports (`plan_flat`, `u_ff`, `x_ff`, `z`, `success`)
-4. `export_to_computer` / `__matmul__(plant)`
-5. `compute_command` for deploy nodes (ROS-agnostic)
+3. Ports (`plan_flat`, `u_ff`, `x_ff`, `z`, `success`) on the System
+4. `compute_command(y, …) -> Command` (deploy / RAS; ROS-agnostic)
+5. `%` / `export_to_computer` / `__matmul__(plant)` on **this** instance
+   (the controller *is* the `%` / `@` leaf)
+
+```text
+ModelPredictiveController(...)
+        │
+        ├─ warm_start=False ──► Algebraic System
+        └─ warm_start=True  ──► StepSystem (z on Computer.x)
+```
 
 Default applied `u` for `@`: **`u_ff`** (ZOH). Broadcast `u_nom`/`x_nom` later.
 
 Warm-start *policy* (`warm_start=True` on the controller) is owned here — not
 on the Planner ABC / generic from-API.
+
+PoC `MPCStatelessController` / `MPCStatefulController` promote into this
+family; keep thin factory aliases until demos migrate (E3) / names retire (E5).
 
 ---
 
@@ -218,8 +244,8 @@ on the Planner ABC / generic from-API.
 | Concern | Home |
 | --- | --- |
 | Transcription / pack \(z\) / parametric NLP | Planner / trajopt (+ mpc until merge) |
-| Warm-start helpers (pure; seed from prior plan) | `planning/mpc/warm_start.py` (or shared) — used by RH (and tests/demos), not planner API |
-| Tick latch / export / `@` / warm-start orchestration | `RecedingHorizonController` |
+| Warm-start helpers (pure; seed from prior plan) | `planning/mpc/warm_start.py` (or shared) — used by the controller (and tests/demos), not planner API |
+| Tick latch / ports / `%` / `@` / warm-start orchestration | `ModelPredictiveController` (on the System) |
 | Flatten | `TrajectoryPlan` |
 | Overlays / plans_from_rollout | Free tools under `planning/mpc/` |
 
@@ -229,11 +255,12 @@ on the Planner ABC / generic from-API.
 
 | Piece | Home |
 | --- | --- |
-| `TrajectoryPlan`, `SolveMetadata` | `planning/results.py` (new) |
-| RH controller, `Command`, latch | `planning/mpc/` |
+| `TrajectoryPlan`, `SolveMetadata` | `planning/results.py` |
+| `ModelPredictiveController`, `Command`, latch | `planning/mpc/` |
 | PoC leaves | Keep until demos migrate; retire later |
 
-Planners must not import hybrid/ROS. RH may import `Computer` / hybrid.
+Planners must not import hybrid/ROS. `ModelPredictiveController` may import
+`Computer` / hybrid.
 
 ## Out of scope
 

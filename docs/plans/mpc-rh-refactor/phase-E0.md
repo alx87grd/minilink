@@ -22,7 +22,7 @@ transcription, and rename `compute_solution` → `solve` with dual result slots 
 
 ## Constraints
 
-- No `RecedingHorizonController` (E2).
+- No `ModelPredictiveController` (E2).
 - No real `solve_trajectory_from` body (E1) — ABC stubs only.
 - No TOP/MPC merge (E4).
 - Demos/tests/benchmarks always prescribe `PlanningProblem(..., tf=...)`.

@@ -18,7 +18,7 @@ No separate MPC NLP engine; demos import TOP or alias only.
 pytest tests/unittest/test_mpc_planner.py \
        tests/unittest/test_jax_direct_collocation.py \
        tests/unittest/test_planning_architecture.py \
-       tests/unittest/test_receding_horizon_controller.py \
+       tests/unittest/test_model_predictive_controller.py \
        tests/unittest/test_mpc_hybrid_*.py
 ```
 

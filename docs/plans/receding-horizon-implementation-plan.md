@@ -2,6 +2,10 @@
 
 **Canonical docs moved** to [`mpc-rh-refactor/`](mpc-rh-refactor/).
 
+Product controller type (canonical): **`ModelPredictiveController`**
+(System family) — see [mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md).
+Former name `RecedingHorizonController` is retired there.
+
 | Doc | Role |
 | --- | --- |
 | [mpc-rh-refactor/README.md](mpc-rh-refactor/README.md) | Index, branch, how to read |

@@ -5,7 +5,8 @@
 
 ## Goal
 
-Expose the generic traj-family online API on `MPCPlanner` without RH yet:
+Expose the generic traj-family online API on `MPCPlanner` without the
+controller System yet:
 
 ```python
 plan = mpc.solve_trajectory_from(x0, params=None, initial_guess=None)  # TrajectoryPlan
@@ -17,7 +18,7 @@ Layering (vision):
 | --- | --- |
 | Planner `solve_trajectory_from` | \(x_0\), optional `params`, optional `initial_guess` |
 | `TrajectoryPlan.warm_state` | Result artifact (packed \(z\)) |
-| RH + `warm_start.py` | Warm-start *orchestration* from last latch (E2) |
+| `ModelPredictiveController` + `warm_start.py` | Warm-start *orchestration* from last latch (E2) |
 
 No planner kwarg named `warm_start` on the from-API.
 
@@ -27,7 +28,7 @@ No planner kwarg named `warm_start` on the from-API.
 | --- | --- |
 | `minilink/planning/mpc/planner.py` | Add `solve_trajectory_from`; route `solve` / `solve_trajectory` through it |
 | `tests/unittest/test_mpc_solve_trajectory_from.py` | New unit tests |
-| [vision.md](vision.md) | Already patched for kwargs / RH warm-start (this refinement) |
+| [vision.md](vision.md) | Kwargs / controller warm-start (E1 refinement) |
 
 ## Steps
 
@@ -43,7 +44,7 @@ No planner kwarg named `warm_start` on the from-API.
 
 ## Constraints
 
-- No `RecedingHorizonController` / RH `warm_start=True` (E2).
+- No `ModelPredictiveController` / controller `warm_start=True` (E2).
 - No demo migration (E3).
 - No TOP parametric merge (E4).
 - Hand demos may keep calling `step`.
@@ -59,7 +60,7 @@ ruff check . && ruff format --check .
 ## Exit
 
 - Online contract on `MPCPlanner`; `solve` / `solve_trajectory` share that path
-- Vision kwargs / RH warm-start story stays consistent
+- Vision kwargs / controller warm-start story stays consistent
 - Demos not required to migrate
 
 Next: [phase-E2.md](phase-E2.md).

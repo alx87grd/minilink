@@ -6,11 +6,15 @@ Status: **approved requirements** (July 2026). Implementation plan (canonical):
 [receding-horizon-implementation-plan.md](receding-horizon-implementation-plan.md).
 When this brainstorm differs, **mpc-rh-refactor wins** on names/API.
 
-> **Decision Preamble:** Target **Option β** (facade + planner with
+**Canonical product name:** [`ModelPredictiveController`](mpc-rh-refactor/vision.md)
+(Minilink System family). Former brainstorm name `RecedingHorizonController`
+is retired in the canonical folder — treat sketch labels below as historical.
+
+> **Decision Preamble:** Target **Option β** (controller System + planner with
 > `solve_trajectory_from`) for MPC / receding horizon. See
-> [mpc-rh-refactor/phases.md](mpc-rh-refactor/phases.md): RH façade on today’s
-> `MPCPlanner` first, then merge into parametric
-> `TrajectoryOptimizationPlanner`; no separate `HorizonSource` type.
+> [mpc-rh-refactor/phases.md](mpc-rh-refactor/phases.md):
+> `ModelPredictiveController` on today’s `MPCPlanner` first, then merge into
+> parametric `TrajectoryOptimizationPlanner`; no separate `HorizonSource` type.
 >
 > *See [planning-pipeline-architecture.md](planning-pipeline-architecture.md) for
 > `TrajectoryPlan` / parametric NLP background.*
