@@ -23,7 +23,7 @@ Implemented contracts live in [DESIGN.md](../../DESIGN.md) §6 and [ROADMAP.md](
 
 | Family | Planners | Primary artifact | Wrapper (proposed) |
 | --- | --- | --- | --- |
-| Path | trajopt, RRT/RRT*, MPC | open-loop `Trajectory` `(t, x, u)` | `PathPlan` + `SolveMetadata` |
+| Trajectory | trajopt, RRT/RRT*, MPC | open-loop `Trajectory` `(t, x, u)` | `TrajectoryPlan` + `SolveMetadata` |
 | Policy | DP (LQR stays in `control/`) | value field + greedy table / controller factory | `PolicyPlan` + `SolveMetadata` |
 
 Do **not** force every planner to return both a trajectory and a policy. Open-loop schedules and closed-loop laws are different mathematical objects; conversions belong at explicit boundaries (`PolicyPlan.rollout()`, `DynamicProgrammingResult.controller()`, `TrajectorySource >> plant`).
@@ -79,14 +79,16 @@ Improvement IDs are tracking labels for ROADMAP / implementation PRs.
 | ID | Improvement | Notes |
 | --- | --- | --- |
 | **A1** | Add `SolveMetadata` (`success`, `message`, `solve_time_s`, `cost`, `iterations`) | Shared by all planners |
-| **A2** | Add `PathPlan(trajectory, metadata)` | Wraps trajopt / RRT / MPC output |
+| **A2** | Add `TrajectoryPlan(trajectory, metadata)` | Wraps trajopt / RRT / MPC output |
 | **A3** | Add `PolicyPlan(policy, metadata)` with `controller()` and `rollout()` | Wraps `DynamicProgrammingResult` |
 | **A4** | Wire metadata from existing side channels | Trajopt/MPC ← `OptimizationResult`; RRT ← `reached_goal`; DP ← `delta` |
 | **A5** | Optional `Planner.result_kind` marker (`"path"` / `"policy"`) | Typing aid only; no class split |
-| **A6** | `plot_solution()` accepts `PathPlan \| Trajectory` | Policy planners keep explicit rollout for plots |
-| **A7** | Document in DESIGN §6 and README call chains | Contract sync |
+| **A6** | `plot_solution()` accepts `TrajectoryPlan \| Trajectory` | Policy planners keep explicit rollout for plots |
+| **A7** | `TrajectoryPlan.to_flat()` | Extract `(t, x, u)` for generic `Controller` continuous/discrete ports |
+| **A8** | Document in DESIGN §6 and README call chains | Contract sync |
+| **A9** | **Runtime Loop Artifacts** | `TrajectoryPlan` (with `warm_state`) and `PolicyPlan` are the standard payloads consumed by online `TickBlock` controllers |
 
-Migration: non-breaking first — add wrappers and `compute_path_plan()` / `compute_policy_plan()`; keep bare `Trajectory` / `DynamicProgrammingResult` from `compute_solution()` until pre-1.0 cleanup.
+Migration: non-breaking first — add wrappers and `compute_trajectory_plan()` / `compute_policy_plan()`; keep bare `Trajectory` / `DynamicProgrammingResult` from `compute_solution()` until pre-1.0 cleanup.
 
 ### B. Parametric transcription and runtime scene
 
@@ -96,11 +98,12 @@ Migration: non-breaking first — add wrappers and `compute_path_plan()` / `comp
 | **B2** | Extend `JaxParametricProgramEvaluator.bind(p)` | `J(z, p_scene)`, `h(z, p_x0)`, optional `g(z, p_scene)` |
 | **B3** | Add `ProblemParameters.scene` + `SceneParameters` | Roadmap item; centers `(K, dim)`, radii, `active` mask |
 | **B4** | Add `ObstacleBank(K, dim)` with JAX-traceable `sdf(p, params)` | Inactive slots → large SDF, excluded from min |
-| **B5** | `MPCPlanner.step(x_start, scene_params=...)` | Per-tick perception update without re-JIT |
+| **B5** | `TrajectoryOptimizationPlanner.solve_from(x, params=...)` | Per-tick perception update without re-JIT (when parametric) |
 | **B6** | Perception-update MPC demo + compile-once timing test | Mirror `test_mpc_planner.py` pattern |
 | **B7** | Document parametric NLP + obstacle-bank semantics in DESIGN §6 | Contract sync |
 | **B8** | Fold MPC transcription into `DirectCollocationTranscription` parametric mode | Optional refactor; reduces duplication |
 | **B9** | Trajopt scenario sweeps via same parametric evaluator | Vary scene arrays without re-JIT |
+| **B10**| **Online Tick Parametric Feed** | In MPC, `p` (scene, etc.) is fed dynamically every tick from the controller loop without recompiling |
 
 **Obstacle update policy (application layer):** nearest-free-slot for new detections; deactivate far slots; if detections exceed `K`, keep closest `K` or rare re-`prepare()` with larger capacity.
 
@@ -115,7 +118,7 @@ Migration: non-breaking first — add wrappers and `compute_path_plan()` / `comp
 | Unified `PlanningProblem` input? | **Yes — keep** |
 | Split planner ABC hierarchies? | **No** |
 | One result with trajectory + policy always? | **No** |
-| Result families? | **`PathPlan` vs `PolicyPlan` + shared `SolveMetadata`** |
+| Result families? | **`TrajectoryPlan` vs `PolicyPlan` + shared `SolveMetadata`** |
 | Recompile when obstacle moves? | **No** — fixed `K` bank + dynamic arrays in JIT args |
 | Variable obstacle count? | **Pad to `K` + `active` mask** |
 | Weight-only to hide obstacles? | **Not for min/union clearance**; mask or `+∞` SDF |
@@ -127,7 +130,7 @@ Migration: non-breaking first — add wrappers and `compute_path_plan()` / `comp
 
 > **PlanningProblem** — what to achieve.  
 > **Planner** — how to compute it.  
-> **PathPlan** — open-loop schedule.  
+> **TrajectoryPlan** — open-loop schedule.  
 > **PolicyPlan** — closed-loop law.  
 > **Parametric NLP** — compile structure once; bind numeric scenario data each tick.  
 > **Trajectory from simulation** — verified behavior of either plan type.
@@ -142,7 +145,7 @@ Migration: non-breaking first — add wrappers and `compute_path_plan()` / `comp
 4. **A5–A7, B7** — docs and planner dispatch helpers
 5. **B8–B9** — optional unification and trajopt sweeps
 
-Sections A and B are orthogonal: parametric MPC changes **how** path planners compile; result wrappers change **what** planners return.
+Sections A and B are orthogonal: parametric MPC changes **how** trajectory planners compile; result wrappers change **what** planners return.
 
 ---
 

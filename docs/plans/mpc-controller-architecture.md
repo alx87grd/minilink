@@ -1,8 +1,11 @@
 # MPC / receding-horizon architecture — requirements & brainstorm
 
-Status: **brainstorm / requirements draft** (July 2026). **Not** a locked
-architecture. No implementation claim in this phase. Suitable to merge as a
-design-notes doc under `docs/plans/`.
+Status: **approved design** (July 2026). 
+> **Decision Preamble:** After review, Minilink officially targets **Option β (Facade + Source)** for the MPC/Receding Horizon architecture. 
+> 1. **Phase 1 Implementation:** We will first implement the Option β slice using `TrajectoryOptimizationPlanner` in parametric mode (compile-once NLP) to get the core flattening, hybrid tick, and broadcast pipelines correct.
+> 2. **Phase 2 Implementation:** We will generalize the `HorizonSource` adapter to wrap other planners (RRT, Trajopt, DP) in the same online loop.
+> 
+> *See [planning-pipeline-architecture.md](planning-pipeline-architecture.md) for how `TrajectoryPlan` and its `warm_state` act as the standard output contract for these solvers.*
 
 Companion brainstorm: [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
 (planner I/O families, parametric NLP / scene). This doc focuses on **MPC /
@@ -59,8 +62,8 @@ This document lists **requirements discussed**, **open questions**, and
 
 | Layer today | What it does | Gap vs desired |
 | --- | --- | --- |
-| `MPCPlanner` | compile-once NLP; `step(x0)` | Good kernel; hard-tied to “is the MPC system” |
-| `MPCStatelessController` / `MPCStatefulController` | algebraic / warm-start leaves; `u_ff`/`x_ff`/`z` | Single-rate; only first-move slices; only `MPCPlanner` |
+| `TrajectoryOptimizationPlanner` (parametric) | compile-once NLP; `solve_from(x0)` | Good kernel; hard-tied to “is the MPC system” in PoC |
+| `MPCStatelessController` / `MPCStatefulController` | algebraic / warm-start leaves; `u_ff`/`x_ff`/`z` | Single-rate; only first-move slices; only specific planners |
 | `MPCTickLatch` | one NLP per tick | No plan flatten port; no ctl-rate nominals |
 | Hybrid demos | `mpc % dt` then `computer @ plant` | Ceremony-heavy vs aim `mpc @ plant` |
 | Deploy / RAS | none | No clocked tick API aimed at a real node |
@@ -86,13 +89,13 @@ These are still **open**. Any sketch in §5–§8 is a candidate, not the answer
      current `x` each tick, apply action, repeat). It does **not** require a
      special RH planner class — repeatedly solving an ordinary
      `PlanningProblem` / trajopt each step is already that idea (often
-     inefficient). Specialized `MPCPlanner` (compile-once, warm-start) is an
-     **optimization**, not the definition of the concept. Naming (“MPC” vs
-     “receding-horizon control”) may deserve renaming if backends are general
-     planners.
+     inefficient). A parametric `TrajectoryOptimizationPlanner` (compile-once, warm-start) is an
+     **optimization**, not the definition of the concept.
+
+   **Decision:** The former `MPCPlanner` class is officially deprecated and its capabilities are merged into `TrajectoryOptimizationPlanner`. Fast, compile-once behavior is now just a "parametric mode" of the generic planner. The overarching control block (`RecedingHorizonController`) will accept *any* generic planner, completely decoupling the control loop from the solver implementation.
 
 3. **How does this couple to the global `Planner` contract?**
-   - Keep one `Planner` ABC + split results (`PathPlan` / `PolicyPlan`)?
+   - Keep one `Planner` ABC + split results (`TrajectoryPlan` / `PolicyPlan`)?
    - Add specialized subclasses / mixins / adapters?
    - What minimal “online tick” surface do closed-loop exporters need?
 
@@ -207,6 +210,8 @@ Debug mode covering development phases:
 - dynamic / animation overlays (horizon history, nominals vs plant)
 - failure dumps (last plan / warm state / residuals as available)
 
+**Decision:** Observability hooks must remain **ROS-agnostic** and rely purely on native Minilink methods. The controller exposes telemetry (`get_solve_metadata()`, `get_nominal(t, include_derivatives)`) and fast dynamic update hooks (`update_animation(handles)`). Downstream deployment nodes (like ROS2) or debug scripts (`step_disp`) call these methods to handle actual logging and visualization without polluting the library core.
+
 ### R10 — JAX posture
 
 - **Today’s SciPy (or host) NLP tick need not be JAX-traceable.**
@@ -222,7 +227,7 @@ Debug mode covering development phases:
 
 Tools that can **solve a trajectory (or plan artifact) from the current measured
 state** must be **swappable** inside the generic online plan-and-act algorithm
-(§4b). The closed-loop product should not be hard-wired only to `MPCPlanner`.
+(§4b). The closed-loop product should not be hard-wired only to a specific planner.
 
 Enforce / provide a clear shared surface (duck typing, adapter factory, or small
 ABC — choice open) so trajopt, compile-once NLP-MPC, RRT, DP-rollout, etc. plug
@@ -273,7 +278,7 @@ efficiency.
 broadcast) without rewriting the closed-loop product.
 
 ```text
-solve_from(x, *, params=None, warm_start=None) -> PathPlan
+solve_from(x, *, params=None, warm_start=None) -> TrajectoryPlan
 # interim: Trajectory + metadata OK
 # adapter OK: refresh PlanningProblem.x_start (+ params), compute_solution()
 ```
@@ -364,7 +369,7 @@ Case A ⊂ Case B with empty/static scene.
 - `ProblemParameters.scene` / `SceneParameters`
 - `ObstacleBank(K)` + `active` mask; JAX-traceable SDF
 - Parametric bind \(p\) (scene, not only \(x0\)); soft costs first
-- `MPCPlanner.step(..., scene_params=...)` without re-JIT
+- `TrajectoryOptimizationPlanner.solve_from(..., params=...)` without re-JIT
 
 **This plan adds the closed-loop / block side:**
 
@@ -409,7 +414,7 @@ to discuss, not a pick. Shared building blocks any option can reuse:
 | `solve_from(x, params=…)` surface (idea) | R11, R12 | Swappable online backends |
 | Scene / `ObstacleBank` / parametric \(p\) (plan B) | R12 | Perception → cost/feasibility |
 | `PlanningProblem` + `Planner` | offline orchestration | already exists |
-| `PathPlan` / `PolicyPlan` (plan A) | typed results | draft elsewhere |
+| `TrajectoryPlan` / `PolicyPlan` (plan A) | typed results | draft elsewhere |
 
 ### How to read each option
 
@@ -428,7 +433,7 @@ classDiagram
     +problem
     +compute_solution()
   }
-  class MPCPlanner {
+  class TrajectoryOptimizationPlanner {
     +prepare()
     +step(x0) Trajectory
   }
@@ -451,9 +456,9 @@ classDiagram
     +from_flat()
   }
 
-  Planner <|-- MPCPlanner
-  MPCStatelessController --> MPCPlanner : holds
-  MPCStatefulController --> MPCPlanner : holds
+  Planner <|-- TrajectoryOptimizationPlanner
+  MPCStatelessController --> TrajectoryOptimizationPlanner : holds
+  MPCStatefulController --> TrajectoryOptimizationPlanner : holds
   PlanBroadcaster ..> Trajectory : unpack / interp
   MPCStatelessController ..> Trajectory : plan_flat
   MPCStatefulController ..> Trajectory : plan_flat
@@ -462,9 +467,9 @@ classDiagram
 **Contracts (sketch)**
 
 ```text
-MPCPlanner
+TrajectoryOptimizationPlanner
   prepare()
-  step(x0, *, initial_guess=None) -> Trajectory   # later PathPlan
+  step(x0, *, initial_guess=None) -> Trajectory   # later TrajectoryPlan
 
 MPC*Controller  (System | StepSystem)
   inputs:  y
@@ -492,7 +497,7 @@ PlanBroadcaster  (System, user-wired)
 | R8 | Weak — no single `mpc @ plant` object |
 | R9 | Scattered |
 | R10 | Helpers can stay xp-clean |
-| R11 | Weak — still hard-tied to `MPCPlanner` |
+| R11 | Weak — still hard-tied to `TrajectoryOptimizationPlanner` |
 
 **Tradeoffs:** smallest delta from PoC; hardest aim UX and multi-planner story;
 users assemble multi-rate themselves.
@@ -518,14 +523,14 @@ classDiagram
   class Planner {
     +compute_solution()
   }
-  class MPCPlanner {
+  class TrajectoryOptimizationPlanner {
     +prepare()
     +step(x0)
-    +generate_horizon(x0) PathPlan
+    +generate_horizon(x0) TrajectoryPlan
   }
   class HorizonSource {
     <<duck - adapter name only>>
-    +generate_horizon(x0) PathPlan
+    +generate_horizon(x0) TrajectoryPlan
     +prepare()*
     +warm_state_dim*
   }
@@ -553,8 +558,8 @@ classDiagram
     +from_flat()
   }
 
-  Planner <|-- MPCPlanner
-  MPCPlanner ..|> HorizonSource
+  Planner <|-- TrajectoryOptimizationPlanner
+  TrajectoryOptimizationPlanner ..|> HorizonSource
   RecedingHorizonController --> HorizonSource : imports
   MPCController --|> RecedingHorizonController
   RecedingHorizonController --> TickBlock : builds
@@ -566,16 +571,16 @@ classDiagram
 **Contracts (sketch)**
 
 ```text
-# Duck-typed adapter — wrap MPCPlanner.step OR “re-solve PlanningProblem each tick”
+# Duck-typed adapter — wrap TrajectoryOptimizationPlanner.step OR “re-solve PlanningProblem each tick”
 HorizonSource
-  generate_horizon(x0, *, params=None, warm_start=None) -> PathPlan
+  generate_horizon(x0, *, params=None, warm_start=None) -> TrajectoryPlan
   prepare()?                  # optional (compile-once NLP); no-op for naive re-solve
   warm_state_dim -> int       # 0 if none
   default_warm_state()? 
 
 # Equivalent naive adapter (valid loop):
 #   apply params to PlanningProblem / Scene / cost; x_start = x0
-#   PathPlan(planner.compute_solution())
+#   TrajectoryPlan(planner.compute_solution())
 
 RecedingHorizonController / MPCController
   __init__(source, *, dt_mpc, dt_ctl=..., warm_start=..., applied_u=..., debug=...)
@@ -599,7 +604,7 @@ BroadcastBlock
 RRTPlanner.as_horizon_source() -> HorizonSource
 TrajectoryOptimizationPlanner.as_horizon_source() -> HorizonSource
 PolicyPlan.as_horizon_source(tf, dt) -> HorizonSource
-MPCPlanner.as_horizon_source() -> HorizonSource
+TrajectoryOptimizationPlanner.as_horizon_source() -> HorizonSource
 ```
 
 **Requirements fit**
@@ -637,12 +642,12 @@ classDiagram
   }
   class RecedingCapable {
     <<mixin or soft API>>
-    +step(x0) PathPlan
+    +step(x0) TrajectoryPlan
     +compute_command(y) Command
     +export_to_computer() Computer
     +__matmul__(plant)
   }
-  class MPCPlanner {
+  class TrajectoryOptimizationPlanner {
     +prepare()
   }
   class RRTPlanner
@@ -654,11 +659,11 @@ classDiagram
     <<from export_to_computer>>
   }
 
-  Planner <|-- MPCPlanner
+  Planner <|-- TrajectoryOptimizationPlanner
   Planner <|-- RRTPlanner
   Planner <|-- TrajectoryOptimizationPlanner
   Planner <|-- DynamicProgrammingPlanner
-  RecedingCapable <|.. MPCPlanner
+  RecedingCapable <|.. TrajectoryOptimizationPlanner
   RecedingCapable <|.. RRTPlanner
   RecedingCapable <|.. TrajectoryOptimizationPlanner
   DynamicProgrammingPlanner ..> RecedingCapable : via PolicyPlan.rollout adapter?
@@ -671,7 +676,7 @@ classDiagram
 Planner                          # offline: compute_solution() as today
 
 RecedingCapable  (mixin / convention)
-  step(x0, ...) -> PathPlan
+  step(x0, ...) -> TrajectoryPlan
   compute_command(y, ...) -> Command
   export_to_computer(...) -> Computer   # may embed broadcast
   __matmul__(plant) -> HybridDiagram
@@ -714,15 +719,15 @@ classDiagram
   class Planner {
     +problem
   }
-  class PathPlanner {
-    +compute_path_plan() PathPlan
+  class TrajectoryPlanner {
+    +compute_trajectory_plan() TrajectoryPlan
   }
   class PolicyPlanner {
     +compute_policy_plan() PolicyPlan
   }
   class OnlinePathSolver {
     <<ABC or duck>>
-    +generate_horizon(x0) PathPlan
+    +generate_horizon(x0) TrajectoryPlan
   }
   class MPCOnlineSolver
   class RRTOnlineSolver
@@ -733,33 +738,33 @@ classDiagram
     +export_to_computer()
     +__matmul__(plant)
   }
-  class PathPlan
+  class TrajectoryPlan
   class PolicyPlan
 
-  Planner <|-- PathPlanner
+  Planner <|-- TrajectoryPlanner
   Planner <|-- PolicyPlanner
-  PathPlanner <|-- TrajectoryOptimizationPlanner
-  PathPlanner <|-- RRTPlanner
-  PathPlanner <|-- MPCPlanner
+  Planner <|-- TrajectoryOptimizationPlanner
+  TrajectoryPlanner <|-- RRTPlanner
+  Planner <|-- TrajectoryOptimizationPlanner
   PolicyPlanner <|-- DynamicProgrammingPlanner
   OnlinePathSolver <|-- MPCOnlineSolver
   OnlinePathSolver <|-- RRTOnlineSolver
   OnlinePathSolver <|-- PolicyRolloutSolver
   PolicyPlan --> PolicyRolloutSolver : builds
   RHRuntime --> OnlinePathSolver
-  PathPlanner ..> PathPlan
+  TrajectoryPlanner ..> TrajectoryPlan
   PolicyPlanner ..> PolicyPlan
 ```
 
 **Contracts (sketch)**
 
 ```text
-PathPlanner.compute_path_plan() -> PathPlan
+TrajectoryPlanner.compute_trajectory_plan() -> TrajectoryPlan
 PolicyPlanner.compute_policy_plan() -> PolicyPlan
-PolicyPlan.rollout(x0, tf, dt) -> PathPlan
+PolicyPlan.rollout(x0, tf, dt) -> TrajectoryPlan
 PolicyPlan.controller() -> System
 
-OnlinePathSolver.generate_horizon(x0, ...) -> PathPlan
+OnlinePathSolver.generate_horizon(x0, ...) -> TrajectoryPlan
 
 RHRuntime(solver, dt_mpc, dt_ctl, ...)
   # same export / @ / compute_command surface as Option β facade
@@ -808,7 +813,7 @@ result wrappers alone feel too weak.
 3. Do we accept **blurring Planner-as-controller (γ)** for shortness, or keep tools vs systems sharp (α/β)?
 4. Does plan A’s “one Planner ABC” rule out δ, or is RH important enough to revisit that?
 5. If naive “re-solve trajopt/RRT each tick” is enough for demos, how much specialize
-   `MPCPlanner` vs treat it as one efficient backend among equals?
+   `TrajectoryOptimizationPlanner` vs treat it as one efficient backend among equals?
 
 ---
 
@@ -961,7 +966,7 @@ Practical frictions today (API shape, not theory):
 
 - RRT/trajopt bind start in `PlanningProblem` unless rebuilt/`replace` each tick
 - DP returns a **policy table**, not a path unless you **roll out**
-- Only `MPCPlanner.step(x0)` is shaped for cheap online use today
+- Only `TrajectoryOptimizationPlanner.step(x0)` is shaped for cheap online use today
 
 Adapters help UX — but **naive re-solve of a regular planner each tick remains
 a valid backend**, and **changing only \(x\)** is enough for the scheme; cost,
@@ -977,13 +982,13 @@ sets, and \(T\) can stay fixed or can also vary as `params`.
 
 Closed-loop export (sim/RAS) cares first about **H1**. H2/H3 are valuable but
 different API seams. Options β/δ make H1 a first-class import; α keeps it
-inside `MPCPlanner` only; γ pushes H1 onto every planner unevenly.
+inside `TrajectoryOptimizationPlanner` only; γ pushes H1 onto every planner unevenly.
 
 ### 9.3 Organization ideas (still open)
 
 **Idea — keep one `Planner` ABC** (matches planning-pipeline draft A): shared
-`PlanningProblem`; split **results** (`PathPlan` vs `PolicyPlan`); avoid deep
-`PathPlanner`/`PolicyPlanner` class trees. (Favors α/β/γ over δ.)
+`PlanningProblem`; split **results** (`TrajectoryPlan` vs `PolicyPlan`); avoid deep
+`TrajectoryPlanner`/`PolicyPlanner` class trees. (Favors α/β/γ over δ.)
 
 **Idea — soft capabilities / adapters** instead of deep subclasses:
 
@@ -1054,7 +1059,7 @@ internals.
 2. Prefer an architecture option (§5) — or say which requirements force β vs α.
 3. Pick a **thin vertical slice** (e.g. flatten + nominal broadcast + aim `@`
    with NLP-MPC only) before multi-planner adapters.
-4. Align with plan A (`PathPlan` / `PolicyPlan`) before locking RH import types.
+4. Align with plan A (`TrajectoryPlan` / `PolicyPlan`) before locking RH import types.
 5. Revisit §3 with the slice in hand — then write the real DESIGN contract.
 
 ---
