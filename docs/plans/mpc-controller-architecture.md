@@ -1,15 +1,44 @@
 # MPC / receding-horizon architecture — requirements & brainstorm
 
 Status: **brainstorm / requirements draft** (July 2026). **Not** a locked
-architecture. No implementation claim in this phase.
+architecture. No implementation claim in this phase. Suitable to merge as a
+design-notes doc under `docs/plans/`.
 
 Companion brainstorm: [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
-(planner I/O families, parametric NLP). This doc focuses on **MPC / closed-loop
-export / broadcast / deploy** and how that couples to a wider **Planner**
-contract review.
+(planner I/O families, parametric NLP / scene). This doc focuses on **MPC /
+closed-loop export / broadcast / deploy** and how that couples to a wider
+**Planner** contract review.
 
 PoC baseline (what exists today): [DESIGN.md](../../DESIGN.md) step/hybrid +
 Phase 6a–6b; code under [`minilink/planning/mpc/`](../../minilink/planning/mpc/).
+
+### Document map
+
+| § | Content |
+| --- | --- |
+| 1–3 | Why review; PoC gaps; open questions |
+| 4 | Requirements **R1–R12** |
+| 4b–4c | Minimal online plan-and-act loop; swappable backends; perception/`params` |
+| 5 | Architecture options **α–δ** (class systems & contracts) |
+| 6–9 | Sketches, phases, JAX, Planner contract |
+| 10–13 | Consistency map; not decided; next steps; non-goals |
+
+### Requirements at a glance
+
+| ID | Summary |
+| --- | --- |
+| R1 | Static and/or stepping export; hybrid with continuous plant |
+| R2 | RAS / deploy tick API |
+| R3 | One source: tune → closed-loop → deploy |
+| R4 | Baseline out = whole drafted plan |
+| R5 | Expose ports for FF→FB; don’t ship law toolkit |
+| R6 | Faster nominal broadcast `u_nom`/`x_nom`/(rates) |
+| R7 | Standard plan flatten / reconstruct |
+| R8 | Aim UX ≈ `mpc @ plant` with defaults |
+| R9 | Shared debug (prints / plots / overlays) |
+| R10 | Host NLP OK; plumbing stay JAX-traceable |
+| R11 | Swappable `solve_from(x[, params])` backends |
+| R12 | Runtime scene/cost/`params` inputs (perception); couple to plan B |
 
 ---
 
@@ -875,7 +904,8 @@ nominals vs plant; horizon history; keep timing prints.
 - [ ] Single / multi tick from `x0` with warm start where applicable
 - [ ] Inspect full plan; flatten round-trip
 - [ ] Plots / cost-field guides / timing
-- [ ] Parametric scene updates when that work lands (other plan)
+- [ ] Parametric scene / `params` tick inputs (R12); couple to ObstacleBank / plan B
+- [ ] Swappable backend adapter smoke (trajopt re-solve and/or MPC step)
 
 ### P1 — Open-loop / export surface
 
@@ -997,6 +1027,9 @@ internals.
 | RRT/DP/trajopt with RH; Planner contract / sub-contracts | R11, §4b, §9 |
 | Minimal loop = solve from measured \(x\); RH not mandatory | §4b |
 | Cost / feasibility / horizon as problem params, not loop core | §4b |
+| Swappable `solve_from(x, params=…)` backends | R11, §4b |
+| Perception → scene/cost params as tick inputs | R12, §4c |
+| Couple to planning-pipeline §B / ObstacleBank | R12, §4c |
 
 ---
 
@@ -1004,10 +1037,12 @@ internals.
 
 - Which of Options α / β / γ / δ (or a hybrid)
 - Final class diagram / public names
+- Exact `solve_from` / HorizonSource naming and enforcement style (duck vs ABC)
+- Port shape for runtime `params` / scene (R12)
 - Whether multi-rate Computer is the only export shape
 - Default applied port (`u_nom` vs `u_ff`)
 - Exact flatten layout / header
-- Whether to implement planner-class forks vs adapters
+- Soft-cost-only vs hard parametric feasibility in v1 (align with plan B)
 - ROS2 package, acados, shooting MPC, tracker library
 - Updating DESIGN/ROADMAP in this brainstorm (doc-only for now)
 
