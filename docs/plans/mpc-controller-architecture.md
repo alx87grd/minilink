@@ -602,7 +602,7 @@ result wrappers alone feel too weak.
 
 ---
 
-5c. Discussion prompts (pick later)
+## 5c. Discussion prompts (pick later)
 
 1. Is **aim UX (R8)** valuable enough to justify a façade / runtime (β/δ) over α?
 2. Is **importing RRT/DP into the same RH loop (R11)** a first-milestone need, or phase-2?
