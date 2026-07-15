@@ -5,7 +5,7 @@
 
 ## Goal
 
-Prove aim UX (`rhc @ plant`, `PlanningProblem(horizon=T)`); keep NLP math
+Prove aim UX (`rhc @ plant`, `PlanningProblem(tf=T)`); keep NLP math
 identical.
 
 ## Exit

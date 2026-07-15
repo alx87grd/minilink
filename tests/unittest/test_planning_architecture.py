@@ -85,6 +85,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         return PlanningProblem(
             sys=sys,
+            tf=1.0,
             x_start=np.array([0.0]),
             x_goal=np.array([1.0]),
             cost=cost,
@@ -114,11 +115,36 @@ class TestPlanningArchitecture(unittest.TestCase):
         problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]))
 
         np.testing.assert_allclose(problem.x_start, sys.x0)
+        self.assertIsNone(problem.tf)
         self.assertTrue(problem.X.contains(np.array([0.0, 0.0])))
         self.assertTrue(problem.U.contains(np.array([0.0])))
         self.assertFalse(problem.U.contains(np.array([10.0])))
         self.assertTrue(problem.has_goal)
         self.assertFalse(problem.has_cost)
+
+    def test_planning_problem_tf_validation_and_grid(self):
+        sys = self.make_system()
+        with self.assertRaisesRegex(ValueError, "tf must be positive"):
+            PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), tf=0.0)
+        infinite = PlanningProblem(
+            sys=sys, x_goal=np.array([0.0, 0.0]), tf=float("inf")
+        )
+        self.assertTrue(np.isposinf(infinite.tf))
+        with self.assertRaisesRegex(ValueError, "finite problem.tf"):
+            infinite.require_finite_tf()
+        problem = PlanningProblem(
+            sys=sys,
+            x_goal=np.array([0.0, 0.0]),
+            cost=QuadraticCost.from_system(sys),
+            tf=2.0,
+        )
+        options = DirectCollocationOptions(n_steps=5)
+        np.testing.assert_allclose(options.t(problem), np.linspace(0.0, 2.0, 5))
+        self.assertAlmostEqual(options.dt(problem), 0.5)
+        self.assertNotIn("tf", options.__dataclass_fields__)
+        unset = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]))
+        with self.assertRaisesRegex(ValueError, "finite problem.tf"):
+            options.t(unset)
 
     def test_planning_problem_open_boundary_sets_use_representatives(self):
         sys = self.make_system()
@@ -237,18 +263,20 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(guess.x[:, 0], x_start)
         np.testing.assert_allclose(guess.x[:, -1], x_goal)
 
-    def test_planner_require_result_before_solve(self):
+    def test_planner_require_trajectory_plan_before_solve(self):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
-        problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost)
+        problem = PlanningProblem(
+            sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost, tf=1.0
+        )
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(tf=1.0, n_steps=5)
+                DirectCollocationOptions(n_steps=5)
             ),
         )
         with self.assertRaises(ValueError):
-            planner.require_result()
+            planner.require_trajectory_plan()
 
     def test_mathematical_program_constraints_are_backend_neutral(self):
         program = MathematicalProgram(
@@ -285,12 +313,14 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_solver_skeletons_validate_architecture_inputs(self):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
-        problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost)
+        problem = PlanningProblem(
+            sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost, tf=1.0
+        )
 
         to = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(tf=1.0, n_steps=5)
+                DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(compile_backend="numpy"),
         )
@@ -314,7 +344,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(tf=1.0, n_steps=5)
+                DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
                 compile_backend="numpy",
@@ -322,8 +352,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
 
-        traj = planner.compute_solution()
-
+        traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
@@ -341,7 +370,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(tf=1.0, n_steps=5)
+                DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
                 compile_backend="numpy",
@@ -352,7 +381,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         stdout = io.StringIO()
 
         with contextlib.redirect_stdout(stdout):
-            planner.compute_solution()
+            planner.solve()
 
         report = stdout.getvalue()
         self.assertIn("Trajectory Optimization Program", report)
@@ -364,7 +393,7 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_generic_trajopt_planner_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
         transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
+            DirectCollocationOptions(n_steps=5)
         )
         planner = TrajectoryOptimizationPlanner(
             problem,
@@ -376,9 +405,8 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
 
-        traj = planner.compute_solution()
-        warm_started = planner.compute_solution(warm_start=True)
-
+        traj = planner.solve().trajectory
+        warm_started = planner.solve(warm_start=True).trajectory
         self.assertTrue(planner.last_optimization_result.success)
         self.assertEqual(planner.last_program.metadata["compile_backend"], "direct")
         self.assertGreater(len(planner.iteration_history), 0)
@@ -387,7 +415,7 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_shooting_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
-        transcription = ShootingTranscription(ShootingOptions(tf=1.0, n_steps=5))
+        transcription = ShootingTranscription(ShootingOptions(n_steps=5))
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
@@ -397,8 +425,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
 
-        traj = planner.compute_solution()
-
+        traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
         self.assertEqual(planner.last_program.metadata["compile_backend"], "numpy")
         self.assertEqual(planner.last_program.n_z, problem.sys.m * 5)
@@ -410,7 +437,7 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_multiple_shooting_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
         transcription = MultipleShootingTranscription(
-            MultipleShootingOptions(tf=1.0, n_steps=5)
+            MultipleShootingOptions(n_steps=5)
         )
         planner = TrajectoryOptimizationPlanner(
             problem,
@@ -421,8 +448,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
 
-        traj = planner.compute_solution()
-
+        traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
         self.assertEqual(planner.last_program.metadata["compile_backend"], "numpy")
         self.assertEqual(planner.last_program.n_z, (problem.sys.n + problem.sys.m) * 5)
@@ -463,7 +489,7 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_shooting_packs_trajectory_guess_as_inputs_only(self):
         problem = self.make_single_integrator_problem()
-        transcription = ShootingTranscription(ShootingOptions(tf=1.0, n_steps=5))
+        transcription = ShootingTranscription(ShootingOptions(n_steps=5))
         guess = default_initial_trajectory(
             problem,
             transcription.initial_guess_time_grid(problem),
@@ -546,9 +572,7 @@ class TestPlanningArchitecture(unittest.TestCase):
                 return super().pack_initial_guess(problem, guess)
 
         problem = self.make_single_integrator_problem()
-        transcription = RecordingTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
-        )
+        transcription = RecordingTranscription(DirectCollocationOptions(n_steps=5))
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
@@ -558,8 +582,8 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
 
-        first = planner.compute_solution()
-        planner.compute_solution()
+        first = planner.solve().trajectory
+        planner.solve()
 
         self.assertIs(transcription.guesses[1], first)
 

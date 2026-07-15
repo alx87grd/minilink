@@ -76,9 +76,11 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     )
     sys_sim.x0 = x0.copy()
 
-    template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
+    template_problem = PlanningProblem(
+        sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon
+    )
     transcription = MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=mpc_horizon, n_steps=mpc_steps)
+        DirectCollocationOptions(n_steps=mpc_steps)
     )
     mpc_planner = MPCPlanner(
         template_problem,

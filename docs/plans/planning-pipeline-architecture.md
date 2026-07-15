@@ -60,7 +60,7 @@ flowchart TD
     OPT --> OUT
 ```
 
-**Trajopt:** three transcriptions (collocation, shooting, multiple shooting); re-transcribes + re-JITs each `compute_solution()` on the JAX path.
+**Trajopt:** three transcriptions (collocation, shooting, multiple shooting); re-transcribes + re-JITs each `solve()` on the JAX path.
 
 **MPC:** direct collocation only; compile once; `J(z)` and `g(z)` frozen; only `h(z, x0)` parametric via `bind(x0)`.
 
@@ -88,7 +88,7 @@ Improvement IDs are tracking labels for ROADMAP / implementation PRs.
 | **A8** | Document in DESIGN §6 and README call chains | Contract sync |
 | **A9** | **Runtime Loop Artifacts** | `TrajectoryPlan` (with `warm_state`) and `PolicyPlan` are the standard payloads consumed by online `TickBlock` controllers |
 
-Migration: non-breaking first — add wrappers and `compute_trajectory_plan()` / `compute_policy_plan()`; keep bare `Trajectory` / `DynamicProgrammingResult` from `compute_solution()` until pre-1.0 cleanup.
+Migration: non-breaking first — add wrappers and `compute_trajectory_plan()` / `compute_policy_plan()`; keep bare `Trajectory` / `DynamicProgrammingResult` from `solve()` until pre-1.0 cleanup.
 
 ### B. Parametric transcription and runtime scene
 

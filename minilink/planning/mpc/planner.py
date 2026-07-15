@@ -18,6 +18,7 @@ from minilink.planning.mpc.parametric_evaluator import JaxParametricProgramEvalu
 from minilink.planning.mpc.transcription import MPCDirectCollocationTranscription
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.results import SolveMetadata, TrajectoryPlan
 
 
 class MPCPlanner(Planner):
@@ -159,7 +160,19 @@ class MPCPlanner(Planner):
         )
         self.last_step_time_s = time.perf_counter() - step_t0
         self.last_optimization_result = result
-        stored = self._store_result(trajectory)
+        self._store_trajectory_plan(
+            TrajectoryPlan(
+                trajectory=trajectory,
+                metadata=SolveMetadata(
+                    success=bool(result.success),
+                    message=str(result.message),
+                    cost=result.cost,
+                    solve_time_s=result.solve_time_s,
+                    stats=dict(result.stats),
+                ),
+                warm_state=result.z,
+            )
+        )
 
         if self.options.step_disp:
             print(
@@ -168,15 +181,24 @@ class MPCPlanner(Planner):
                 f"step={self.last_step_time_s:.6g}s"
             )
 
-        return stored
+        return trajectory
 
-    def compute_solution(
+    def solve(
         self,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> Trajectory:
+    ) -> TrajectoryPlan:
         """Single-shot solve at the template problem's ``x_start``."""
-        return self.step(self.problem.x_start, initial_guess=initial_guess)
+        return self.solve_trajectory(initial_guess=initial_guess)
+
+    def solve_trajectory(
+        self,
+        *,
+        initial_guess: np.ndarray | Trajectory | None = None,
+    ) -> TrajectoryPlan:
+        """Offline traj-family entry wrapping :meth:`step` at ``problem.x_start``."""
+        self.step(self.problem.x_start, initial_guess=initial_guess)
+        return self.require_trajectory_plan()
 
     def _make_optimizer_backend(self) -> ScipyMinimizeOptimizer:
         method = self.options.optimizer_method

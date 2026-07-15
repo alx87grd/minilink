@@ -1,50 +1,33 @@
 # Phase E0 — Foundation
 
-**Status:** next / active  
+**Status:** implemented (verify gate green before merge)  
 **Parent:** [phases.md](phases.md) · contracts: [vision.md](vision.md)
 
 ## Goal
 
-Land types, `PlanningProblem.horizon`, grid resolve, and the `solve` rename
-with **no functional change** for demos. Prefer a clean rename in one PR over
-long-lived aliases.
+Land types, move continuous \(T\) to `PlanningProblem.tf`, strip `tf` from
+transcription, and rename `compute_solution` → `solve` with dual result slots —
+**no functional change** for demos that set `tf=` explicitly on the problem.
 
 ## Scope
 
 | Step | Work |
 | --- | --- |
-| E0.1 | Add `planning/results.py`: `SolveMetadata`, `TrajectoryPlan` (`trajectory`, `metadata`, `warm_state`, `x_dot`/`u_dot=None`, `to_flat`/`from_flat` minimal) |
-| E0.2 | Optional `PlanningProblem.horizon`; validation \(T>0\) |
-| E0.3 | Grid resolve helper: prefer `problem.horizon`, else `options.tf`; conflict → **hard error** |
-| E0.4 | Wire resolve into MPC + trajopt collocation time-grid construction (behavior-identical if demos still pass `tf=` only) |
-| E0.5 | `Planner`: dual slots `last_trajectory_plan` / `last_policy_plan`; `solve()` replaces `compute_solution` **repo-wide** (~40–60 call sites) |
-| E0.6 | Stub typed methods as `NotImplementedError` on base; TOP/MPC/RRT/DP route `solve()` to current bodies and store into the right slot (may wrap bare `Trajectory` as `TrajectoryPlan` with partial metadata) |
+| E0.1 | Add `planning/results.py`: `SolveMetadata`, `TrajectoryPlan`, `PolicyPlan` |
+| E0.2 | `PlanningProblem.tf` (`None` / finite / `+inf`; demos set finite `tf=` for trajopt) |
+| E0.3 | `FixedGridOptions`: **`n_steps` only** — delete options `tf` |
+| E0.4 | Grids from `problem.tf` + `n_steps` (`linspace(0, T, N)`) in MPC + trajopt |
+| E0.5 | `Planner`: dual slots; `solve()` replaces `compute_solution` repo-wide |
+| E0.6 | Stub typed methods on base; TOP/MPC/RRT/DP store wrapped plans |
 
-## Files likely touched
+## Constraints
 
-| Area | Paths |
-| --- | --- |
-| New | `minilink/planning/results.py` |
-| Problem | `minilink/planning/problems.py` |
-| Planner ABC + subclasses | `minilink/planning/planner.py`, trajopt, `planning/mpc/`, RRT, DP |
-| Grid / horizon | MPC prepare/transcribe + trajopt collocation time-grid helpers |
-| Call sites | demos, tests, any `compute_solution` usage |
+- No `RecedingHorizonController` (E2).
+- No real `solve_trajectory_from` body (E1) — ABC stubs only.
+- No TOP/MPC merge (E4).
+- Demos/tests/benchmarks always prescribe `PlanningProblem(..., tf=...)`.
 
-Export `TrajectoryPlan` / `SolveMetadata` from the planning package public
-surface if there is an established `__init__` pattern — match neighborhood.
-
-## Constraints (do not expand)
-
-- No `RecedingHorizonController` yet (E2).
-- No `solve_trajectory_from` behavioral API yet (E1) — stubs on the ABC only.
-- Do not merge `MPCPlanner` into TOP (E4).
-- Do not change demo UX/plots; demos may keep passing `tf=` only.
-- Do not reinvent requirements brainstorms — see related docs linked from
-  [README.md](README.md).
-
-## Tests / demos
-
-**Gate (automated)**
+## Gate
 
 ```bash
 pytest tests/unittest/test_mpc_planner.py \
@@ -55,30 +38,7 @@ pytest tests/unittest/test_mpc_planner.py \
 ruff check . && ruff format --check .
 ```
 
-**Smoke (manual / optional):**
+## Exit
 
-- `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py`
-- One trajopt demo (e.g. holonomic corridor or cartpole)
-- One RRT demo
-
-**Exit criteria**
-
-- All gate tests green
-- Demos unchanged functionally
-- Public name is `planner.solve()`, not `compute_solution`
-- `problem.horizon` + resolve helper exist; conflict with `options.tf` errors
-
-## Suggested PR
-
-**PR-A** — this phase alone. Cite this file in the PR body.
-
-## Start sequence within E0
-
-1. E0.1–E0.3 — types + horizon + resolve (can land with focused tests first)
-2. E0.4 — wire into grids (behavior-identical)
-3. E0.5 — rename blast (`compute_solution` → `solve`)
-4. E0.6 — ABC stubs + slot storage on subclasses
-
-## Done when
-
-Hand off to [phase-E1.md](phase-E1.md) with green gate and rename complete.
+- Gate green; `planner.solve()` is the public name
+- Transcription has no `tf`; `problem.tf` + `n_steps` build the grid

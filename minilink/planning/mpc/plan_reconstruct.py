@@ -57,7 +57,7 @@ def mpc_plans_from_rollout(
     else:
         raise ValueError("z_source must be 'signals' or 'x'")
 
-    t_grid = np.asarray(transcription.options.t, dtype=float).reshape(-1)
+    t_grid = np.asarray(transcription.options.t(problem), dtype=float).reshape(-1)
     plans: list[tuple[float, Trajectory]] = []
 
     for col in range(computer.n_samples):

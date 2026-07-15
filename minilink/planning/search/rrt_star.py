@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.trajectory import Trajectory
+from minilink.planning.results import TrajectoryPlan
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.tree import Node, Tree
@@ -118,7 +118,11 @@ class RRTStarPlanner(RRTPlanner):
         self.best_goal_cost: float | None = None
         self.history: list[RRTStarSnapshot] = []
 
-    def compute_solution(self) -> Trajectory:
+    def solve(self) -> TrajectoryPlan:
+        """Offline traj-family entry."""
+        return self.solve_trajectory()
+
+    def solve_trajectory(self) -> TrajectoryPlan:
         """Grow an RRT* until goal convergence, patience, or ``max_nodes``."""
         options = self.options
         self._validate_nearest_backend()
@@ -197,7 +201,7 @@ class RRTStarPlanner(RRTPlanner):
             if not options.return_best_effort:
                 raise RuntimeError("RRT* failed to reach goal within max_nodes")
 
-        return self._store_result(self.tree.extract_trajectory(self.solution_node))
+        return self._finish_trajectory(self.tree.extract_trajectory(self.solution_node))
 
     def animate_convergence(self, **kwargs):
         """Animate recorded RRT* history (requires ``record_history=True``)."""

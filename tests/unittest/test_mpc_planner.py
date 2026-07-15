@@ -54,13 +54,14 @@ class TestMPCPlanner(unittest.TestCase):
         )
         return PlanningProblem(
             sys=sys,
+            tf=1.0,
             x_start=np.array([x_start]),
             cost=cost,
         )
 
     def make_planner(self, problem):
         transcription = MPCDirectCollocationTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
+            DirectCollocationOptions(n_steps=5)
         )
         return MPCPlanner(
             problem,
@@ -102,8 +103,10 @@ class TestMPCPlanner(unittest.TestCase):
         traj = planner.step(x_start)
         np.testing.assert_allclose(traj.x[:, 0], x_start, atol=1e-5)
 
-    def test_compute_solution_alias(self):
+    def test_solve_returns_trajectory_plan(self):
         problem = self.make_problem(0.1)
         planner = self.make_planner(problem)
-        traj = planner.compute_solution()
+        plan = planner.solve()
+        traj = plan.trajectory
         np.testing.assert_allclose(traj.x[:, 0], problem.x_start, atol=1e-5)
+        self.assertIs(planner.last_trajectory_plan, plan)

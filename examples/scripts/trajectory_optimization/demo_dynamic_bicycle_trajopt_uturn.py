@@ -50,6 +50,7 @@ cost = QuadraticCost.from_system(
 )
 problem = PlanningProblem(
     sys=sys,
+    tf=TF,
     x_start=x_start,
     cost=cost,
 )
@@ -57,10 +58,7 @@ problem = PlanningProblem(
 planner = TrajectoryOptimizationPlanner(
     problem,
     transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(
-            tf=TF,
-            n_steps=N_STEPS,
-        )
+        DirectCollocationOptions(n_steps=N_STEPS)
     ),
     options=TrajectoryOptimizationOptions(
         compile_backend="jax",
@@ -74,9 +72,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
 )
 
-traj = planner.compute_solution()
-
-
+traj = planner.solve().trajectory
 planner.plot_solution(signals=("x", "u"))
 sys.traj = traj
 # sys.animate(renderer="meshcat")

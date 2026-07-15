@@ -273,11 +273,11 @@ x0 = np.array(
 )
 sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 
-template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
+template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
 mpc_planner = MPCPlanner(
     template_problem,
     transcription=MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+        DirectCollocationOptions(n_steps=MPC_STEPS)
     ),
     options=MPCOptions(
         compile_backend="jax",

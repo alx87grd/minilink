@@ -41,6 +41,7 @@ cost = QuadraticCost.from_system(
 )
 problem = PlanningProblem(
     sys=sys,
+    tf=5.0,
     x_start=x_start,
     x_goal=x_goal,
     cost=cost,
@@ -59,9 +60,7 @@ else:
 
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(tf=5.0, n_steps=50)
-    ),
+    transcription=DirectCollocationTranscription(DirectCollocationOptions(n_steps=50)),
     options=TrajectoryOptimizationOptions(
         # compile_backend="jax",
         solve_disp=PRINT_SOLVE_REPORT,
@@ -74,6 +73,6 @@ planner = TrajectoryOptimizationPlanner(
     ),
 )
 
-traj = planner.compute_solution()
+traj = planner.solve().trajectory
 # planner.plot_solution(signals=("x", "u"), backend="plotly")
 planner.problem.sys.animate(traj)

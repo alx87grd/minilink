@@ -101,8 +101,8 @@ class DirectCollocationTranscription(Transcription):
         import jax.numpy as jnp
 
         cost = problem.require_cost()
-        t = jnp.asarray(self.options.t)
-        dt = jnp.asarray(self.options.dt)
+        t = jnp.asarray(self.options.t(problem))
+        dt = jnp.asarray(self.options.dt(problem))
         n = int(problem.sys.n)
         m = int(problem.sys.m)
         n_steps = int(self.options.n_steps)
@@ -170,7 +170,7 @@ class DirectCollocationTranscription(Transcription):
         # Public trajectories are NumPy — convert off any JAX optimizer arrays here.
         x = np.asarray(x, dtype=float)
         u = np.asarray(u, dtype=float)
-        t = np.asarray(self.options.t, dtype=float)
+        t = np.asarray(self.options.t(problem), dtype=float)
         dynamics = dynamics_function(problem, compile_backend)
         dx = np.zeros_like(x)
         for k, t_k in enumerate(t):
@@ -222,14 +222,14 @@ class DirectCollocationTranscription(Transcription):
             raise ValueError("Direct collocation requires an initial guess")
 
         if isinstance(guess, Trajectory):
-            resampled = guess.resample(t_new=self.options.t)
+            resampled = guess.resample(t_new=self.options.t(problem))
             return self.pack(resampled.x, resampled.u, problem)
 
         return guess.reshape(-1)
 
     def initial_guess_time_grid(self, problem: PlanningProblem) -> np.ndarray:
         """Return the collocation time grid."""
-        return self.options.t
+        return self.options.t(problem)
 
     def decision_bounds(
         self, problem: PlanningProblem
@@ -257,7 +257,12 @@ class DirectCollocationTranscription(Transcription):
         cost = problem.require_cost()
         x, u = self.unpack(z, problem)
         return trajectory_cost(
-            cost, x, u, self.options.t, self.options.dt, problem.params.cost
+            cost,
+            x,
+            u,
+            self.options.t(problem),
+            self.options.dt(problem),
+            problem.params.cost,
         )
 
     def _dynamics_residual(
@@ -267,12 +272,12 @@ class DirectCollocationTranscription(Transcription):
         dynamics,
     ) -> np.ndarray:
         x, u = self.unpack(z, problem)
-        t = self.options.t
+        t = self.options.t(problem)
 
         dx = np.column_stack(
             [dynamics(x[:, k], u[:, k], float(t_k)) for k, t_k in enumerate(t)]
         )
-        return trapezoidal_defect(x, dx, self.options.dt).reshape(-1)
+        return trapezoidal_defect(x, dx, self.options.dt(problem)).reshape(-1)
 
     def _add_boundary_constraints(
         self,
@@ -287,7 +292,7 @@ class DirectCollocationTranscription(Transcription):
         ):
             if boundary is None:
                 continue
-            t_i = float(self.options.t[index])
+            t_i = float(self.options.t(problem)[index])
 
             if isinstance(boundary, SingletonSet):
 
@@ -319,7 +324,7 @@ class DirectCollocationTranscription(Transcription):
             def state_margins(z):
                 x, _ = self.unpack(z, problem)
                 margins = []
-                for k, t_k in enumerate(self.options.t):
+                for k, t_k in enumerate(self.options.t(problem)):
                     margin = problem.X.margin(
                         x[:, k],
                         t=float(t_k),
@@ -335,7 +340,7 @@ class DirectCollocationTranscription(Transcription):
             def input_margins(z):
                 x, u = self.unpack(z, problem)
                 margins = []
-                for k, t_k in enumerate(self.options.t):
+                for k, t_k in enumerate(self.options.t(problem)):
                     margin = problem.U.margin(
                         u[:, k],
                         x=x[:, k],

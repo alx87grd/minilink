@@ -24,6 +24,7 @@ from minilink.optimization.reporting import (
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.results import SolveMetadata, TrajectoryPlan
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
 )
@@ -90,12 +91,21 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimization_result: OptimizationResult | None = None
         self.iteration_history: list[TrajectoryOptimizationIteration] = []
 
-    def compute_solution(
+    def solve(
         self,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
         warm_start: bool | None = None,
-    ) -> Trajectory:
+    ) -> TrajectoryPlan:
+        """Offline trajopt entry (``solve_trajectory``)."""
+        return self.solve_trajectory(initial_guess=initial_guess, warm_start=warm_start)
+
+    def solve_trajectory(
+        self,
+        *,
+        initial_guess: np.ndarray | Trajectory | None = None,
+        warm_start: bool | None = None,
+    ) -> TrajectoryPlan:
         """Compute and store a trajectory-optimization solution."""
         workflow_t0 = time.perf_counter()
         compile_backend = self.options.compile_backend
@@ -140,20 +150,32 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_program = program
         self.last_optimizer = optimizer
         self.last_optimization_result = optimization_result
-        stored = self._store_result(trajectory)
+        plan = self._store_trajectory_plan(
+            TrajectoryPlan(
+                trajectory=trajectory,
+                metadata=SolveMetadata(
+                    success=bool(optimization_result.success),
+                    message=str(optimization_result.message),
+                    cost=optimization_result.cost,
+                    solve_time_s=optimization_result.solve_time_s,
+                    stats=dict(optimization_result.stats),
+                ),
+                warm_state=optimization_result.z,
+            )
+        )
 
         if self.options.solve_disp:
             self._print_solve_report(
                 optimizer=optimizer,
                 result=optimization_result,
-                trajectory=stored,
+                trajectory=plan.trajectory,
                 transcribe_s=transcribe_s,
                 compile_s=compile_s,
                 reconstruct_s=reconstruct_s,
                 total_s=total_s,
             )
 
-        return stored
+        return plan
 
     def _make_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray
@@ -175,8 +197,8 @@ class TrajectoryOptimizationPlanner(Planner):
             return initial_guess
 
         use_warm_start = self.options.warm_start if warm_start is None else warm_start
-        if use_warm_start and isinstance(self.last_result, Trajectory):
-            return self.last_result
+        if use_warm_start and self.last_trajectory_plan is not None:
+            return self.last_trajectory_plan.trajectory
 
         if self.options.initial_guess is not None:
             return self.options.initial_guess

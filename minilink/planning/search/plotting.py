@@ -49,7 +49,7 @@ def plot_tree(
                 states[:, x_axis], states[:, y_axis], color=tree_color, lw=0.4, zorder=1
             )
 
-    if planner.last_result is not None:
+    if planner.last_trajectory_plan is not None:
         if path_style == "waypoints":
             waypoints = _solution_waypoints(planner)
             if waypoints is not None:
@@ -62,7 +62,7 @@ def plot_tree(
                     label="path",
                 )
         else:
-            traj = planner.last_result
+            traj = planner.last_trajectory_plan.trajectory
             ax.plot(
                 traj.x[x_axis],
                 traj.x[y_axis],
@@ -130,8 +130,8 @@ def animate_search(
                 states[:, x_axis], states[:, y_axis], color=tree_color, lw=0.4, zorder=1
             )
             drawn.append(line)
-        if target >= len(edges) and planner.last_result is not None:
-            traj = planner.last_result
+        if target >= len(edges) and planner.last_trajectory_plan is not None:
+            traj = planner.last_trajectory_plan.trajectory
             ax.plot(traj.x[x_axis], traj.x[y_axis], color=path_color, lw=2.5, zorder=3)
         return drawn
 
@@ -173,7 +173,7 @@ def animate_convergence(
     history = getattr(planner, "history", None)
     if not history:
         raise ValueError(
-            "No search history recorded; run compute_solution with record_history=True"
+            "No search history recorded; run solve with record_history=True"
         )
 
     if ax is None:
@@ -362,7 +362,7 @@ def _search_title(step):
 
 def _require_tree(planner):
     if getattr(planner, "tree", None) is None:
-        raise ValueError("No search tree yet; call compute_solution() first")
+        raise ValueError("No search tree yet; call solve() first")
     return planner.tree
 
 

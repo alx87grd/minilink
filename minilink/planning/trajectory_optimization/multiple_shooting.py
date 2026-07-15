@@ -86,8 +86,8 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         import jax.numpy as jnp
 
         cost = problem.require_cost()
-        t = jnp.asarray(self.options.t)
-        dt = jnp.asarray(self.options.dt)
+        t = jnp.asarray(self.options.t(problem))
+        dt = jnp.asarray(self.options.dt(problem))
         n = int(problem.sys.n)
         m = int(problem.sys.m)
         n_steps = int(self.options.n_steps)
@@ -147,7 +147,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
 
     def _make_step(self, problem: PlanningProblem, compile_backend: str):
         f = dynamics_function(problem, compile_backend)
-        dt = self.options.dt
+        dt = self.options.dt(problem)
 
         def step(x, u0, u1, t):
             return rk4_step_between_knots(f, x, u0, u1, t, dt)
@@ -157,7 +157,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     def _dynamics_residual(self, z: np.ndarray, problem: PlanningProblem, step):
         x, u = self.unpack(z, problem)
         residuals = []
-        for k, t_k in enumerate(self.options.t[:-1]):
+        for k, t_k in enumerate(self.options.t(problem)[:-1]):
             x_next = step(x[:, k], u[:, k], u[:, k + 1], float(t_k))
             residuals.append(x[:, k + 1] - x_next)
 

@@ -150,9 +150,9 @@ cost = (
 x0 = np.array([START_XY[0], START_XY[1], START_THETA, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 
 planner = MPCPlanner(
-    PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost),
+    PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON),
     transcription=MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+        DirectCollocationOptions(n_steps=MPC_STEPS)
     ),
     options=MPCOptions(
         compile_backend="jax",

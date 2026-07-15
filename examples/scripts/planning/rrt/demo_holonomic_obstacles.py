@@ -157,8 +157,7 @@ def run_rrt_vs_rrt_star():
             seed=SEED, goal_tolerance=GOAL_TOLERANCE, max_nodes=MAX_NODES
         ),
     )
-    rrt_traj = rrt.compute_solution()
-
+    rrt_traj = rrt.solve().trajectory
     rrt_star = RRTStarPlanner(
         problem,
         extender=extender,
@@ -171,8 +170,7 @@ def run_rrt_vs_rrt_star():
             convergence_patience=CONVERGENCE_PATIENCE,
         ),
     )
-    rrt_star_traj = rrt_star.compute_solution()
-
+    rrt_star_traj = rrt_star.solve().trajectory
     print(
         f"RRT:  {len(rrt.tree.nodes)} nodes, "
         f"{path_hops(rrt)} hops, cost={path_cost(rrt):.2f}, "
@@ -233,7 +231,7 @@ def run_extender_comparison():
                 max_nodes=EXTENDER_MAX_NODES,
             ),
         )
-        traj = planner.compute_solution()
+        traj = planner.solve().trajectory
         goal_error = float(np.linalg.norm(traj.x[:, -1] - X_GOAL))
         planners[label] = planner
         print(

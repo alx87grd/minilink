@@ -90,7 +90,7 @@ for name, cfg in runs.items():
     planner = RRTPlanner(
         problem, options=RRTOptions(seed=2, goal_bias=0.2, max_nodes=20000), **cfg
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     elapsed = time.time() - t0
 
     goal_err = float(np.linalg.norm(traj.x[:, -1] - x_goal))

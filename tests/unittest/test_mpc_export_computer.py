@@ -32,11 +32,12 @@ def _planner():
     return MPCPlanner(
         PlanningProblem(
             sys=sys,
+            tf=1.0,
             x_start=x0,
             cost=QuadraticCost.from_system(sys, xbar=x0),
         ),
         transcription=MPCDirectCollocationTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
+            DirectCollocationOptions(n_steps=5)
         ),
         options=MPCOptions(
             compile_backend="jax",

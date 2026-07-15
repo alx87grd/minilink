@@ -77,7 +77,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
             seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
         ),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
@@ -99,7 +99,7 @@ def test_kdtree_requires_euclidean_metric():
         options=RRTOptions(seed=0, nearest_backend="kd_tree"),
     )
     with pytest.raises(ValueError, match="metric=euclidean"):
-        planner.compute_solution()
+        planner.solve()
 
 
 def test_unknown_nearest_backend_raises():
@@ -110,7 +110,7 @@ def test_unknown_nearest_backend_raises():
         options=RRTOptions(seed=0, nearest_backend="invalid"),
     )
     with pytest.raises(ValueError, match="nearest_backend"):
-        planner.compute_solution()
+        planner.solve()
 
 
 # --- kinodynamic ----------------------------------------------------------
@@ -123,7 +123,7 @@ def test_kinodynamic_reaches_goal_and_stays_free():
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
         options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
@@ -139,7 +139,7 @@ def test_kinodynamic_random_controls_reaches_goal():
         extender=KinodynamicExtender(controls=12, horizon=0.6, n_substeps=6),
         options=RRTOptions(seed=1, goal_tolerance=0.6, max_nodes=6000),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.6
 
@@ -148,11 +148,17 @@ def test_seeded_run_is_deterministic():
     problem, _ = make_holonomic_obstacle_problem()
 
     def run():
-        return RRTPlanner(
-            problem,
-            extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-            options=RRTOptions(seed=7, goal_tolerance=0.5, max_nodes=4000),
-        ).compute_solution()
+        return (
+            RRTPlanner(
+                problem,
+                extender=KinodynamicExtender(
+                    controls=COMPASS, horizon=0.6, n_substeps=6
+                ),
+                options=RRTOptions(seed=7, goal_tolerance=0.5, max_nodes=4000),
+            )
+            .solve()
+            .trajectory
+        )
 
     a, b = run(), run()
     assert a.x.shape == b.x.shape
@@ -171,7 +177,7 @@ def test_steering_reaches_goal_and_stays_free():
         ),
         options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
@@ -251,7 +257,7 @@ def test_dubins_rrt_reaches_goal_pose():
         metric=dubins.distance,
         options=RRTOptions(seed=0, goal_bias=0.2, max_nodes=8000),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - x_goal) < 0.6
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
@@ -292,7 +298,7 @@ def test_reached_goal_false_on_budget_exhaustion():
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
         options=RRTOptions(seed=0, max_nodes=10, goal_bias=0.0),
     )
-    planner.compute_solution()
+    planner.solve()
     assert not planner.reached_goal
     assert planner.solution_node is not None
 
@@ -307,7 +313,7 @@ def test_return_best_effort_false_raises():
         ),
     )
     with pytest.raises(RuntimeError, match="failed to reach goal"):
-        planner.compute_solution()
+        planner.solve()
 
 
 def test_free_state_sampling_stays_in_X():
@@ -388,7 +394,7 @@ def test_plot_tree_and_animate_search_smoke():
         extender=KinodynamicExtender(controls=COMPASS),
         options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=2000),
     )
-    planner.compute_solution()
+    planner.solve()
 
     fig, ax = planner.plot_tree(x_axis=0, y_axis=1, show=False)
     assert fig is not None and ax is not None
@@ -419,7 +425,7 @@ def test_rrt_star_reaches_goal():
         extender=make_steering_extender(),
         options=RRTStarOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
@@ -434,7 +440,7 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
             seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
         ),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     assert planner.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all(X.contains(traj.x[:, i]) for i in range(traj.x.shape[1]))
@@ -448,9 +454,9 @@ def test_rrt_star_improves_path_cost_over_rrt():
     for seed in range(12):
         options = RRTStarOptions(seed=seed, goal_tolerance=0.5, max_nodes=3000)
         rrt = RRTPlanner(problem, extender=extender, options=options)
-        rrt.compute_solution()
+        rrt.solve()
         star = RRTStarPlanner(problem, extender=extender, options=options)
-        star.compute_solution()
+        star.solve()
         if rrt.reached_goal and star.reached_goal:
             rrt_costs.append(path_cost(rrt))
             star_costs.append(path_cost(star))
@@ -475,8 +481,8 @@ def test_rewire_false_is_at_least_as_costly():
             seed=5, goal_tolerance=0.5, max_nodes=2500, rewire=False
         ),
     )
-    with_rewire.compute_solution()
-    without_rewire.compute_solution()
+    with_rewire.solve()
+    without_rewire.solve()
     assert with_rewire.reached_goal
     assert without_rewire.reached_goal
     assert path_cost(with_rewire) <= path_cost(without_rewire) + 1e-9
@@ -489,7 +495,7 @@ def test_rrt_star_is_deterministic():
 
     def run():
         planner = RRTStarPlanner(problem, extender=extender, options=options)
-        traj = planner.compute_solution()
+        traj = planner.solve().trajectory
         return traj, path_cost(planner)
 
     (traj_a, cost_a), (traj_b, cost_b) = run(), run()
@@ -542,7 +548,7 @@ def test_search_callback_invoked_on_rrt():
             live_plot_every=1,
         ),
     )
-    planner.compute_solution()
+    planner.solve()
     assert calls
     assert all(step.iteration > 0 for step in calls)
     assert calls[-1].phase == "explore"
@@ -570,7 +576,7 @@ def test_live_plot_after_goal_only_skips_explore_phase():
             live_plot_after_goal_only=True,
         ),
     )
-    planner.compute_solution()
+    planner.solve()
     assert planner.reached_goal
     assert calls
     assert all(phase == "optimize" for phase in calls)
@@ -614,8 +620,8 @@ def test_optimize_after_goal_runs_longer_and_refines_cost():
             convergence_patience=400,
         ),
     )
-    first_hit.compute_solution()
-    optimized.compute_solution()
+    first_hit.solve()
+    optimized.solve()
 
     assert first_hit.reached_goal
     assert optimized.reached_goal
@@ -637,7 +643,7 @@ def test_convergence_patience_stops_search():
             convergence_patience=50,
         ),
     )
-    planner.compute_solution()
+    planner.solve()
     assert planner.reached_goal
     assert planner.converged
     assert planner.iterations < 8000
@@ -656,7 +662,7 @@ def test_record_history_for_animation():
             history_stride=25,
         ),
     )
-    planner.compute_solution()
+    planner.solve()
     assert len(planner.history) >= 2
     assert planner.history[0].iteration == 1
     assert all(frame.tree_edges for frame in planner.history[1:])

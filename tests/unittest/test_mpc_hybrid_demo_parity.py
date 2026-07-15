@@ -90,9 +90,9 @@ def _configure_bicycle_systems():
 
 
 def _make_planner(sys_mpc, cost, x0):
-    problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
+    problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
     transcription = MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+        DirectCollocationOptions(n_steps=MPC_STEPS)
     )
     planner = MPCPlanner(
         problem,

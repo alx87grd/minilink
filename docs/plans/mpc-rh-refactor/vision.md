@@ -20,7 +20,7 @@ planner inside that controller — not a second planner ABC.
 ```mermaid
 flowchart LR
   subgraph task["Task description"]
-    PP["PlanningProblem<br/>sys, sets, cost, horizon T, params"]
+    PP["PlanningProblem<br/>sys, sets, cost, tf, params"]
   end
 
   subgraph offline["Offline / tuning"]
@@ -53,7 +53,7 @@ flowchart LR
 
 | Object | Role |
 | --- | --- |
-| `PlanningProblem` | Math task, incl. continuous \(T\) (`horizon`) |
+| `PlanningProblem` | Math task, incl. continuous \(T\) (`tf`) |
 | `Planner` | Tool: how to compute a solution |
 | `TrajectoryOptimizationPlanner` | NLP trajopt; batch or parametric compile-once |
 | `TrajectoryPlan` | Traj-family result: schedule + metadata + warm_state |
@@ -82,18 +82,19 @@ cmd = rhc.compute_command(y)
 
 ## `PlanningProblem`
 
-Owns: `sys`, `X`/`U`/`X0`/`Xf`, `x_start`/`x_goal`, `cost`, **`horizon`**
-(continuous \(T\)), `params`, `metadata`.
+Owns: `sys`, `X`/`U`/`X0`/`Xf`, `x_start`/`x_goal`, `cost`, **`tf`**
+(continuous planning horizon \(T\)), `params`, `metadata`.
 
 | Quantity | Home |
 | --- | --- |
-| Continuous \(T\) | `PlanningProblem.horizon` (optional; RRT/DP may ignore) |
-| Knot count \(N\) | Transcription options only |
+| Continuous \(T\) | `PlanningProblem.tf` only — `None` unset, `+inf` infinite-horizon, or finite |
+| Knot count \(N\) | Transcription options (`n_steps`) only — **no** options `tf` |
 | Replan period | `RecedingHorizonController.dt_mpc` |
-| Sim length | Simulator / hybrid `tf` |
+| Sim length | Simulator / hybrid `tf` (different object) |
 
-Compatibility: prefer `problem.horizon` for the NLP grid; else `options.tf`.
-**Hard error** if both set and disagree. Cost does **not** carry \(T\).
+Finite trajopt/MPC grids: \(t = \mathrm{linspace}(0, T, N)\) via
+`require_finite_tf()`. Cost does **not** carry \(T\). RRT/DP may leave `tf`
+unset or use `+inf`.
 
 ---
 

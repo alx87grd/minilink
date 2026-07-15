@@ -109,7 +109,7 @@ planner = DynamicProgrammingPlanner(
     ),
 )
 t_xnext = time.perf_counter()
-result = planner.solve_steps(n_steps)
+result = planner.solve_steps(n_steps).policy
 planner.clean_infeasible_set()
 t_done = time.perf_counter()
 

@@ -116,7 +116,7 @@ if LIVE_PLOT:
     )
 
 t0 = time.perf_counter()
-traj = planner.compute_solution()
+traj = planner.solve().trajectory
 elapsed = time.perf_counter() - t0
 
 goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))

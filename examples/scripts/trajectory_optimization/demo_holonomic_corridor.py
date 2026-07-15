@@ -124,6 +124,7 @@ path_cost = track.distance_field(body).as_cost(
 )
 problem = PlanningProblem(
     sys=sys,
+    tf=TF,
     x_start=X_START,
     x_goal=X_GOAL,
     X=X,
@@ -132,7 +133,7 @@ problem = PlanningProblem(
 )
 
 transcription = DirectCollocationTranscription(
-    DirectCollocationOptions(tf=TF, n_steps=N_STEPS)
+    DirectCollocationOptions(n_steps=N_STEPS)
 )
 planner = TrajectoryOptimizationPlanner(
     problem,
@@ -143,7 +144,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
 )
 
-t_grid = transcription.options.t
+t_grid = transcription.initial_guess_time_grid(problem)
 s_start, _ = track.path.project(X_START)
 s_goal, _ = track.path.project(X_GOAL)
 arc = np.linspace(s_start, s_goal, t_grid.size)
@@ -154,8 +155,7 @@ guess = Trajectory(
     u=np.gradient(xy, t_grid, axis=0).T,
 )
 
-traj = planner.compute_solution(initial_guess=guess)
-
+traj = planner.solve(initial_guess=guess).trajectory
 distances = [
     float(track.distance_field(body).value(traj.x[:, k])) for k in range(traj.n_samples)
 ]

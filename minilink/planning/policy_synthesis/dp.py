@@ -38,6 +38,7 @@ from minilink.planning.policy_synthesis.discretizer import (
     print_build_complete,
 )
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.results import PolicyPlan, SolveMetadata
 
 #: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
 BACKEND_LOOP = "loop"
@@ -182,11 +183,15 @@ class DynamicProgrammingPlanner(Planner):
         if self.options.backend == BACKEND_JAX:
             self.grid.ensure_jax_transition(self.options.final_time)
 
-    def compute_solution(self) -> DynamicProgrammingResult:
+    def solve(self) -> PolicyPlan:
+        """Offline policy-family entry."""
+        return self.solve_policy()
+
+    def solve_policy(self) -> PolicyPlan:
         """Run value iteration until convergence (or ``max_iterations``)."""
         return self._solve(max_iterations=self.options.max_iterations, stop_on_tol=True)
 
-    def solve_steps(self, n: int) -> DynamicProgrammingResult:
+    def solve_steps(self, n: int) -> PolicyPlan:
         """Run exactly ``n`` backward sweeps (finite-horizon / time-varying)."""
         return self._solve(max_iterations=int(n), stop_on_tol=False)
 
@@ -197,7 +202,7 @@ class DynamicProgrammingPlanner(Planner):
         Their value is pinned to the penalty and their policy to the action
         nearest the system's nominal input, mirroring pyro's cleanup pass.
         """
-        result = self.require_result()
+        result = self.require_policy_plan().policy
         default_action = self.grid.nearest_action(
             self.problem.sys.get_u_from_input_ports()
         )
@@ -265,7 +270,15 @@ class DynamicProgrammingPlanner(Planner):
         result = DynamicProgrammingResult(
             grid=grid, J=J, pi=pi, iterations=k, delta=delta, history=history
         )
-        return self._store_result(result)
+        return self._finish_policy(result)
+
+    def _finish_policy(self, result: DynamicProgrammingResult) -> PolicyPlan:
+        return self._store_policy_plan(
+            PolicyPlan(
+                policy=result,
+                metadata=SolveMetadata(success=True),
+            )
+        )
 
     def _vectorized_step(self, J, t):
         """Vectorized Bellman backup over the precomputed lookup table (NumPy)."""
@@ -576,7 +589,7 @@ class DynamicProgrammingPlanner(Planner):
             delta=float(delta),
             history=None,
         )
-        return self._store_result(result)
+        return self._finish_policy(result)
 
     def _jax_step(self, jax, jnp):
         """Return (and cache) the jitted single Bellman backup."""
@@ -707,4 +720,4 @@ class DynamicProgrammingPlanner(Planner):
             delta=delta,
             history=history,
         )
-        return self._store_result(result)
+        return self._finish_policy(result)

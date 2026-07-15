@@ -72,6 +72,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         )
         return PlanningProblem(
             sys=sys,
+            tf=1.0,
             x_start=np.array([0.0]),
             x_goal=np.array([1.0]),
             cost=cost,
@@ -97,7 +98,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(tf=1.0, n_steps=5)
+                DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
@@ -122,8 +123,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         self.assertTrue(program_evaluator.has_gradient)
         self.assertTrue(program_evaluator.has_jacobian_h)
 
-        traj = planner.compute_solution()
-
+        traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
@@ -132,7 +132,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=ShootingTranscription(ShootingOptions(tf=1.0, n_steps=5)),
+            transcription=ShootingTranscription(ShootingOptions(n_steps=5)),
             options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
                 optimizer_options={"maxiter": 100, "ftol": 1e-9},
@@ -158,8 +158,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         self.assertTrue(program_evaluator.has_jacobian_h)
         self.assertTrue(program_evaluator.has_jacobian_g)
 
-        traj = planner.compute_solution()
-
+        traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
@@ -169,7 +168,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=MultipleShootingTranscription(
-                MultipleShootingOptions(tf=1.0, n_steps=5)
+                MultipleShootingOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
@@ -195,8 +194,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         self.assertTrue(program_evaluator.has_gradient)
         self.assertTrue(program_evaluator.has_jacobian_h)
 
-        traj = planner.compute_solution()
-
+        traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-7)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-7)
@@ -205,11 +203,12 @@ class TestJaxDirectCollocation(unittest.TestCase):
         base = self.make_single_integrator_problem()
         problem = PlanningProblem(
             sys=base.sys,
+            tf=1.0,
             x_start=np.array([0.0]),
             Xf=BallSet(center=np.array([1.0]), radius=0.1),
             cost=base.cost,
         )
-        tr = DirectCollocationTranscription(DirectCollocationOptions(tf=1.0, n_steps=5))
+        tr = DirectCollocationTranscription(DirectCollocationOptions(n_steps=5))
         guess = default_initial_trajectory(problem, tr.initial_guess_time_grid(problem))
         program = tr.transcribe(problem, compile_backend="jax")
         z0 = tr.pack_initial_guess(problem, guess)

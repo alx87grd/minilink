@@ -53,7 +53,7 @@ def run_quadratic_regulator():
             alpha=1.0, tol=0.5, max_iterations=1000, out_of_bound_cost=inf, verbose=True
         ),
     )
-    result = planner.compute_solution()
+    result = planner.solve().policy
     planner.clean_infeasible_set()
 
     plotting.plot_value(grid, result.J, vmax=inf)
@@ -104,7 +104,7 @@ def run_minimum_time():
             alpha=1.0, tol=1e-3, max_iterations=800, out_of_bound_cost=inf, verbose=True
         ),
     )
-    result = planner.compute_solution()
+    result = planner.solve().policy
     planner.clean_infeasible_set()
 
     plotting.plot_value(grid, result.J, vmax=inf)

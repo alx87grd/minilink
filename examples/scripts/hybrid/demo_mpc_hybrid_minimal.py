@@ -45,6 +45,7 @@ sys.x0 = x0.copy()
 planner = MPCPlanner(
     PlanningProblem(
         sys=sys,
+        tf=2.0,
         x_start=x0,
         cost=QuadraticCost.from_system(
             sys,
@@ -56,7 +57,7 @@ planner = MPCPlanner(
         ),
     ),
     transcription=MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=2.0, n_steps=20)
+        DirectCollocationOptions(n_steps=20)
     ),
     options=MPCOptions(
         compile_backend="jax",

@@ -28,7 +28,7 @@ Legacy monolith pointer: [../receding-horizon-implementation-plan.md](../recedin
 ## Locked one-liner
 
 ```text
-PlanningProblem (+ horizon T)
+PlanningProblem (+ tf)
   → Planner.solve / solve_trajectory[_from]
   → TrajectoryPlan
   → RecedingHorizonController  →  compute_command / @ plant

@@ -123,11 +123,11 @@ print(f"  mpc_hz={MPC_HZ}, sim_hz={SIM_HZ}, horizon={MPC_HORIZON}s")
 while t < TF_SIM - 1e-12:
     # Re-solve direct collocation at MPC rate; warm-start from shifted prev plan.
     if t >= next_mpc_t - 1e-12:
-        problem = PlanningProblem(sys=sys_mpc, x_start=x, cost=cost)
+        problem = PlanningProblem(sys=sys_mpc, x_start=x, cost=cost, tf=MPC_HORIZON)
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+                DirectCollocationOptions(n_steps=MPC_STEPS)
             ),
             options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
@@ -152,7 +152,7 @@ while t < TF_SIM - 1e-12:
                     u=prev_plan.u[:, mask],
                 )
 
-        plan = planner.compute_solution(initial_guess=guess)
+        plan = planner.solve(initial_guess=guess).trajectory
         res = planner.last_optimization_result
         print(f"MPC @ t={t:.2f}s  success={res.success}  solve={res.solve_time_s:.3f}s")
         prev_plan = plan

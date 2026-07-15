@@ -235,12 +235,14 @@ obstacle_cost = clearance_field.as_cost(
 cost = stability_cost + path_cost + corridor_cost + obstacle_cost
 
 _section("Step 8: PlanningProblem")
-problem = PlanningProblem(sys=sys_mpc, x_start=x0, X=X, cost=cost)
-print("  soft spatial costs only: PlanningProblem(sys, x_start=x, cost=cost)")
+problem = PlanningProblem(sys=sys_mpc, x_start=x0, X=X, cost=cost, tf=MPC_HORIZON)
+print(
+    "  soft spatial costs only: PlanningProblem(sys, x_start=x, cost=cost, tf=MPC_HORIZON)"
+)
 
 _section("Step 9: direct collocation planner (not solved)")
 transcription = DirectCollocationTranscription(
-    DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+    DirectCollocationOptions(n_steps=MPC_STEPS)
 )
 planner = TrajectoryOptimizationPlanner(
     problem,
@@ -253,7 +255,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
 )
 print(f"  horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
-print("  Next: planner.compute_solution(...) or MPCPlanner closed loop in the notebook")
+print("  Next: planner.solve(...) or MPCPlanner closed loop in the notebook")
 
 if SHOW_PLOTS:
     _, ax_scene = scene.plot(

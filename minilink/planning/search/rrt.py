@@ -18,6 +18,7 @@ from minilink.core.sets import BallSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.results import SolveMetadata, TrajectoryPlan
 from minilink.planning.search.metric import euclidean
 from minilink.planning.search.tree import (
     NEAREST_BACKENDS,
@@ -67,7 +68,7 @@ class RRTPlanner(Planner):
     Attributes
     ----------
     reached_goal : bool
-        Set by :meth:`compute_solution`; ``True`` only when the goal region is reached.
+        Set by :meth:`solve`; ``True`` only when the goal region is reached.
     solution_node : Node or None
         Tree node whose parent chain defines the returned trajectory.
     """
@@ -90,7 +91,11 @@ class RRTPlanner(Planner):
         self.iterations: int = 0
         self._sample_box = BoxSet.from_system_state(problem.sys)
 
-    def compute_solution(self) -> Trajectory:
+    def solve(self) -> TrajectoryPlan:
+        """Offline traj-family entry."""
+        return self.solve_trajectory()
+
+    def solve_trajectory(self) -> TrajectoryPlan:
         """Grow the tree until the goal region is reached or the budget is spent."""
         options = self.options
         self._validate_nearest_backend()
@@ -122,7 +127,7 @@ class RRTPlanner(Planner):
                 self.reached_goal = True
                 self.solution_node = node
                 self._on_search_step(phase="explore")
-                return self._store_result(self.tree.extract_trajectory(node))
+                return self._finish_trajectory(self.tree.extract_trajectory(node))
 
             self._on_search_step(phase="explore")
 
@@ -131,7 +136,15 @@ class RRTPlanner(Planner):
         self.solution_node = closest
         if not options.return_best_effort:
             raise RuntimeError("RRT failed to reach goal within max_nodes")
-        return self._store_result(self.tree.extract_trajectory(closest))
+        return self._finish_trajectory(self.tree.extract_trajectory(closest))
+
+    def _finish_trajectory(self, trajectory: Trajectory) -> TrajectoryPlan:
+        return self._store_trajectory_plan(
+            TrajectoryPlan(
+                trajectory=trajectory,
+                metadata=SolveMetadata(success=bool(self.reached_goal)),
+            )
+        )
 
     def plot_tree(self, **kwargs):
         """Plot the final tree and solution path (lazy matplotlib import).

@@ -276,12 +276,12 @@ def _solve_case(case: ModelCase, scene: Scene) -> SolveRun:
         shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
     )
     problem = PlanningProblem(
-        sys=sys, x_start=x_start, cost=tracking_cost + obstacle_cost
+        sys=sys, tf=TF, x_start=x_start, cost=tracking_cost + obstacle_cost
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(tf=TF, n_steps=N_STEPS)
+            DirectCollocationOptions(n_steps=N_STEPS)
         ),
         options=TrajectoryOptimizationOptions(
             compile_backend="jax",
@@ -291,7 +291,7 @@ def _solve_case(case: ModelCase, scene: Scene) -> SolveRun:
     )
 
     t0 = time.perf_counter()
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     total_s = time.perf_counter() - t0
     result = planner.last_optimization_result
     return SolveRun(

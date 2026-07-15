@@ -55,8 +55,8 @@ class MPCDirectCollocationTranscription:
         import jax.numpy as jnp
 
         cost = problem.require_cost()
-        t = jnp.asarray(self.options.t)
-        dt = jnp.asarray(self.options.dt)
+        t = jnp.asarray(self.options.t(problem))
+        dt = jnp.asarray(self.options.dt(problem))
         n = int(problem.sys.n)
         m = int(problem.sys.m)
         n_steps = int(self.options.n_steps)
@@ -133,11 +133,11 @@ class MPCDirectCollocationTranscription:
         """Read ``(x, u)`` from the optimizer result using a cached dynamics fn."""
         x, u = self.unpack(result.z, problem)
         dx = np.zeros_like(x)
-        for k, t_k in enumerate(self.options.t):
+        for k, t_k in enumerate(self.options.t(problem)):
             dx[:, k] = dynamics(x[:, k], u[:, k], float(t_k))
 
         traj = Trajectory(
-            t=self.options.t,
+            t=self.options.t(problem),
             x=x,
             u=u,
             signals={"dx": dx},
@@ -183,7 +183,7 @@ class MPCDirectCollocationTranscription:
             return
 
         index = -1
-        t_i = float(self.options.t[index])
+        t_i = float(self.options.t(problem)[index])
 
         if isinstance(boundary, SingletonSet):
 
@@ -215,7 +215,7 @@ class MPCDirectCollocationTranscription:
             def state_margins(z):
                 x, _ = self.unpack(z, problem)
                 margins = []
-                for k, t_k in enumerate(self.options.t):
+                for k, t_k in enumerate(self.options.t(problem)):
                     margin = problem.X.margin(
                         x[:, k],
                         t=float(t_k),
@@ -231,7 +231,7 @@ class MPCDirectCollocationTranscription:
             def input_margins(z):
                 x, u = self.unpack(z, problem)
                 margins = []
-                for k, t_k in enumerate(self.options.t):
+                for k, t_k in enumerate(self.options.t(problem)):
                     margin = problem.U.margin(
                         u[:, k],
                         x=x[:, k],

@@ -237,14 +237,15 @@ problem = PlanningProblem(
     x_start=np.array([-2.0, 1.0, 0.0, 0.0]),
     x_goal=x_goal,
     cost=QuadraticCost.from_system(sys, Q=np.diag([1.0, 1.0, 0.0, 0.0]), xbar=x_goal),
+    tf=5.0,
 )
 planner = TrajectoryOptimizationPlanner(
     problem,
     transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(tf=5.0, n_steps=50)
+        DirectCollocationOptions(n_steps=50)
     ),
 )
-traj = planner.compute_solution()
+traj = planner.solve().trajectory
 sys.animate(traj)
 ```
 

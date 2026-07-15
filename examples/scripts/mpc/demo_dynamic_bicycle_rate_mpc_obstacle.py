@@ -152,11 +152,11 @@ cost = TrackingWithObstacleCost(
 x0 = np.array([0.0, 3.0, 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 
-template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
+template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
 mpc_planner = MPCPlanner(
     template_problem,
     transcription=MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+        DirectCollocationOptions(n_steps=MPC_STEPS)
     ),
     options=MPCOptions(
         compile_backend="jax",

@@ -58,7 +58,7 @@ def mpc_warm_start_guess(
     problem = planner.problem
     transcription = planner.transcription
     t_grid = transcription.initial_guess_time_grid(problem)
-    horizon = float(transcription.options.tf)
+    horizon = problem.require_finite_tf()
 
     if int(k) <= 0:
         return default_initial_trajectory(problem, t_grid)
@@ -69,7 +69,7 @@ def mpc_warm_start_guess(
     z_arr = np.asarray(z_prev, dtype=float).reshape(-1)
     x_mat, u_mat = transcription.unpack(z_arr, problem)
     plan = Trajectory(
-        t=np.asarray(transcription.options.t, dtype=float).reshape(-1),
+        t=np.asarray(transcription.options.t(problem), dtype=float).reshape(-1),
         x=x_mat,
         u=u_mat,
     )

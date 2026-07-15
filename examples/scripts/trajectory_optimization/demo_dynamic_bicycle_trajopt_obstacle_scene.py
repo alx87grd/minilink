@@ -91,11 +91,11 @@ obstacle_cost = scene.clearance_field(bind(sys, point_probe())).as_cost(
 )
 cost = tracking_cost + obstacle_cost
 
-problem = PlanningProblem(sys=sys, x_start=x_start, cost=cost)
+problem = PlanningProblem(sys=sys, x_start=x_start, cost=cost, tf=TF)
 planner = TrajectoryOptimizationPlanner(
     problem,
     transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(tf=TF, n_steps=N_STEPS)
+        DirectCollocationOptions(n_steps=N_STEPS)
     ),
     options=TrajectoryOptimizationOptions(
         compile_backend="jax",
@@ -107,8 +107,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
 )
 
-traj = planner.compute_solution()
-
+traj = planner.solve().trajectory
 planner.plot_solution(signals=("x", "u"))
 sys.traj = traj
 sys.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45)])

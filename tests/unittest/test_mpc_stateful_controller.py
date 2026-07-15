@@ -60,9 +60,11 @@ class TestMPCStatefulController(unittest.TestCase):
             R=np.eye(1),
             S=np.zeros((1, 1)),
         )
-        problem = PlanningProblem(sys=sys, x_start=np.array([x_start]), cost=cost)
+        problem = PlanningProblem(
+            sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0
+        )
         transcription = MPCDirectCollocationTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
+            DirectCollocationOptions(n_steps=5)
         )
         planner = MPCPlanner(
             problem,

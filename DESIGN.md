@@ -483,26 +483,32 @@ kind is class-type routing only — ``solver_info["continuous_time_equation"]`` 
 **NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;
 `Optimizer` binds method preset (`scipy_slsqp`, `scipy_trust_constr`, `ipopt`).
 
-**Planning:** `PlanningProblem` owns system, sets, cost. `X0`/`Xf` authoritative;
-`x_start`/`x_goal` are shortcuts/representative points.
+**Planning:** `PlanningProblem` owns system, sets, cost, and continuous horizon
+`tf` (`None` unset, `+inf` infinite-horizon, or a finite length — trajopt/MPC
+require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
+`x_start`/`x_goal` are shortcuts/representative points. Offline entry is
+`Planner.solve()` → `TrajectoryPlan` (traj family) or `PolicyPlan` (policy
+family).
 
 **Trajopt:** planner → transcription → `MathematicalProgram` → `Optimizer` →
-`Trajectory`. Single backend-native transcription classes; no parallel JAX
-transcription types. NumPy transcriptions build constraints via
-`dynamics_function` (compiled evaluator, trace tier when JAX). **JAX transcriptions**
-embed `problem.sys.f` directly in the NLP (not evaluator `f` / `f_trace`).
-`compile_backend="direct"` calls `system.f` uncompiled (escape hatch).
-A `MathematicalProgram` carries the native backend of its callables in its
-`backend` field, and the `Optimizer` compiles with it by default.
+`TrajectoryPlan`. Knot count `n_steps` lives on transcription options; the time
+grid is `linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native transcription
+classes; no parallel JAX transcription types. NumPy transcriptions build
+constraints via `dynamics_function` (compiled evaluator, trace tier when JAX).
+**JAX transcriptions** embed `problem.sys.f` directly in the NLP (not evaluator
+`f` / `f_trace`). `compile_backend="direct"` calls `system.f` uncompiled (escape
+hatch). A `MathematicalProgram` carries the native backend of its callables in
+its `backend` field, and the `Optimizer` compiles with it by default.
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
 comes from a `BoxSet`/`BoxInputSet` (so it stays finite), grid *validity* from
 `X.contains`/`U.contains` (so `X = bounds & free` still works), and successors from a
 forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the grid, not
-on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `compute_solution`
-to tolerance, `solve_steps` for a fixed horizon — returning a cost-to-go `J` and greedy policy
-`pi` (action ids); out-of-domain transitions are charged a finite `out_of_bound_cost` (pyro's
+on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
+to tolerance, `solve_steps` for a fixed horizon — returning a `PolicyPlan` whose
+`.policy` holds cost-to-go `J` and greedy policy `pi` (action ids); out-of-domain
+transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`). Three interchangeable backward-step backends share this workflow: `loop` (per-node
 Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table, the default),
 and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, built on a
@@ -547,19 +553,19 @@ sources every concern from the problem — collision `problem.X.contains` (optio
 orchestrator `edge_resolution` densification along edges), goal `problem.Xf`/`x_goal`,
 free-space sampling from `problem.X` (direct `Set.sample` or rejection from state
 bounds), dynamics `problem.sys.f` — so the system stays pure. After
-`compute_solution()`, `reached_goal` and `solution_node` report success vs
+`solve()`, `reached_goal` and `solution_node` report success vs
 best-effort fallback (`return_best_effort`). The two swappable pieces are an injected
 `TrajectoryExtender` (`propose(from, toward, problem, rng) → Iterable[Edge]`:
 `KinodynamicExtender` forward-integrates controls, `SteeringExtender` connects exactly
 via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callable
 (nearest-neighbour distance). Every system is an ODE, so an `Edge` always carries real
-`(t,x,u)`; `compute_solution() → Trajectory`. `RRTStarPlanner` extends the attach step
+`(t,x,u)`; `solve() → Trajectory`. `RRTStarPlanner` extends the attach step
 with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
 `optimize_after_goal`, the search continues after the first goal connection until
 the best goal cost stops improving for `convergence_patience` extensions;
 `record_history` + `animate_convergence` replay tree growth and path refinement.
-``live_plot`` / ``callback`` redraw the tree during ``compute_solution`` (pyro-style);
+``live_plot`` / ``callback`` redraw the tree during ``solve`` (pyro-style);
 ``live_plot_after_goal_only`` limits updates to the RRT* post-goal convergence phase.
 ``RRTOptions.nearest_backend`` selects brute-force or SciPy ``cKDTree`` nearest/near
 queries (Euclidean L2 only — requires ``metric=euclidean``); see

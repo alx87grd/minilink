@@ -287,7 +287,7 @@ broadcast) without rewriting the closed-loop product.
 ```text
 solve_from(x, *, params=None, warm_start=None) -> TrajectoryPlan
 # interim: Trajectory + metadata OK
-# adapter OK: refresh PlanningProblem.x_start (+ params), compute_solution()
+# adapter OK: refresh PlanningProblem.x_start (+ params), solve()
 ```
 
 | Must for swap-in | Why |
@@ -438,7 +438,7 @@ Closest to today’s Phase 6a/6b. Grow ports and helpers; little new façade.
 classDiagram
   class Planner {
     +problem
-    +compute_solution()
+    +solve()
   }
   class TrajectoryOptimizationPlanner {
     +prepare()
@@ -518,7 +518,7 @@ User-facing **controller facade** imports something that can produce a path from
 
 **Clarification (not a “must”):** this does **not** require a specialized
 `RecedingHorizonPlanner` algorithm class. The tick can call an ordinary
-`TrajectoryOptimizationPlanner.compute_solution()` after updating `x_start`
+`TrajectoryOptimizationPlanner.solve()` after updating `x_start`
 (or an adapter that does that). That *is* still the RH / “plan-and-update”
 idea — typically less efficient than compile-once parametric MPC, but valid.
 “Horizon source” here is only a **name for the online tick adapter** (could
@@ -528,7 +528,7 @@ open-loop planning.
 ```mermaid
 classDiagram
   class Planner {
-    +compute_solution()
+    +solve()
   }
   class TrajectoryOptimizationPlanner {
     +prepare()
@@ -587,7 +587,7 @@ HorizonSource
 
 # Equivalent naive adapter (valid loop):
 #   apply params to PlanningProblem / Scene / cost; x_start = x0
-#   TrajectoryPlan(planner.compute_solution())
+#   TrajectoryPlan(planner.solve())
 
 RecedingHorizonController / MPCController
   __init__(source, *, dt_mpc, dt_ctl=..., warm_start=..., applied_u=..., debug=...)
@@ -645,7 +645,7 @@ Blocks are thin generated views of the planner.
 classDiagram
   class Planner {
     +problem
-    +compute_solution()
+    +solve()
   }
   class RecedingCapable {
     <<mixin or soft API>>
@@ -660,7 +660,7 @@ classDiagram
   class RRTPlanner
   class TrajectoryOptimizationPlanner
   class DynamicProgrammingPlanner {
-    +compute_solution() PolicyPlan
+    +solve() PolicyPlan
   }
   class GeneratedComputer {
     <<from export_to_computer>>
@@ -680,7 +680,7 @@ classDiagram
 **Contracts (sketch)**
 
 ```text
-Planner                          # offline: compute_solution() as today
+Planner                          # offline: solve() as today
 
 RecedingCapable  (mixin / convention)
   step(x0, ...) -> TrajectoryPlan
@@ -694,7 +694,7 @@ hybrid = mpc_planner @ plant          # planner acts like controller
 hybrid = rrt_planner @ plant          # if RRT implements RecedingCapable
 
 # DP stays awkward: either
-policy = dp.compute_solution()
+policy = dp.solve()
 hybrid = policy.as_horizon_source(...).export...   # still needs an object
 # or policy.controller() @ plant for true feedback (not RH)
 ```
@@ -962,7 +962,7 @@ should not freeze into NumPy-only APIs just because today’s NLP is host-side.*
 
 See **§4b** for the generic loop vs RH specialization.
 
-Calling raw `Planner.compute_solution()` every control tick **does work** as a
+Calling raw `Planner.solve()` every control tick **does work** as a
 plan-and-act loop if you refresh `x_start` (or equivalent) each time. That *is*
 the core idea. Classic textbook MPC is “solve an open-loop problem from the
 current state, apply an action, repeat” — often with a finite moving horizon,

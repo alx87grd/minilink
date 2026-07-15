@@ -60,14 +60,15 @@ E2 includes `compute_command` **and** `export_to_computer` / `__matmul__`;
 E3 migrates hybrid minimal to `rhc @ plant`. E5 (PoC leaf retirement) sits
 after demos move — see [phase-E5.md](phase-E5.md).
 
-Default conflict rule: **hard error** if both `problem.horizon` and
-`options.tf` are set and disagree.
+Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
+demos set finite `tf=` for trajopt/MPC); transcription options carry
+`n_steps` only.
 
 ## Phase index
 
 | Phase | Goal | Card |
 | --- | --- | --- |
-| **E0** | Types, `horizon`, `solve` rename — no demo behavior change | [phase-E0.md](phase-E0.md) **(full)** |
+| **E0** | Types, `problem.tf`, strip options `tf`, `solve` rename | [phase-E0.md](phase-E0.md) **(full)** |
 | **E1** | `MPCPlanner.solve_trajectory_from` → `TrajectoryPlan` | [phase-E1.md](phase-E1.md) |
 | **E2** | `RecedingHorizonController` tick + export / `@` | [phase-E2.md](phase-E2.md) |
 | **E3** | Migrate flagship demos to RH | [phase-E3.md](phase-E3.md) |
@@ -90,7 +91,7 @@ Default conflict rule: **hard error** if both `problem.horizon` and
 
 ## Start here
 
-1. **E0.1–E0.3** — `TrajectoryPlan` / `SolveMetadata` + `PlanningProblem.horizon` + resolve helper ([phase-E0.md](phase-E0.md)).
+1. **E0.1–E0.4** — result types + `PlanningProblem.tf` + strip options `tf` ([phase-E0.md](phase-E0.md)).
 2. **E0.5** — `compute_solution` → `solve` rename (mechanical blast early).
 3. **E1** — `solve_trajectory_from` on `MPCPlanner`.
 4. **E2** — `RecedingHorizonController` with `compute_command` + `__matmul__`.
