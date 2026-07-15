@@ -22,7 +22,7 @@ contracts in [vision.md](vision.md).
 | In Phase F | In [planning-ui-simplification.md](../planning-ui-simplification.md) |
 | --- | --- |
 | Delete compat shims | Flat `TrajectoryOptimizationPlanner` kwargs |
-| Rename private MPC blocks | Default `transcription`, tier-2 `options=` |
+| **Delete** `controller.py` / `step_block.py`; private `_MpcBlock` impl | Default `transcription`, tier-2 `options=` |
 | Shared track geometry / hand-loop helpers | RRT / DP family alignment (UI-5 / UI-6) |
 | Stale `MPCPlanner` doc strings | README / DESIGN constructor examples |
 | Test file consolidation | — |
@@ -60,22 +60,44 @@ Remaining work is **debt and duplication**, not missing MPC features.
 
 ---
 
-## F.2 — Internal naming (medium risk)
+## F.2 — Retire PoC implementation modules (medium risk)
 
-E5 kept `MPCStatelessController` / `MPCStatefulController` as **private**
-factory backends (`controller.py`, `step_block.py`). Names still read like
-public API.
+E5 removed `MPCStatelessController` / `MPCStatefulController` from **`mpc/__init__`
+and demos** — the product surface is only `ModelPredictiveController`. Those
+PoC **names and files should not remain** as a second “controller family” in
+the codebase; they are leftover implementation split, not a public contract.
 
-| Today | Proposed |
+**What still exists today (internal only):**
+
+| File | Class | Role |
+| --- | --- | --- |
+| `controller.py` | `MPCStatelessController` | `warm_start=False` → `System` ports |
+| `step_block.py` | `MPCStatefulController` | `warm_start=True` → `StepSystem` + packed `z` |
+
+`ModelPredictiveController()` imports these and returns one or the other. Tests
+already go through the factory (`test_mpc_stateless_controller.py` names are
+legacy only).
+
+**Why two implementations can stay (privately):** minilink needs different
+bases — algebraic `System` vs discrete-state `StepSystem` for warm-start.
+**What must go:** PoC module names, separate `controller.py` / `step_block.py`
+as if they were product types.
+
+**Proposed F.2 work:**
+
+| Step | Action |
 | --- | --- |
-| `MPCStatelessController` | `_StatelessMpcBlock` (or colocate in `model_predictive_controller.py`) |
-| `MPCStatefulController` | `_StatefulMpcBlock` |
-| `export_mpc_to_computer` error strings | Describe role (“stateless block, `warm_start=False`”) not class name |
+| F.2.1 | Move implementations into `model_predictive_controller.py` (or single `mpc/_blocks.py`) as `_StatelessMpcBlock` / `_StatefulMpcBlock` — leading underscore, no “Controller” in public-facing names |
+| F.2.2 | Delete `controller.py` and `step_block.py` |
+| F.2.3 | Update `_block_common.py` docstrings / errors to refer to warm-start mode, not PoC class names |
+| F.2.4 | Optionally rename tests to `test_mpc_warm_start_false.py` / `test_mpc_warm_start_true.py` or fold into `test_model_predictive_controller.py` (see F.3) |
+
+**Non-goals:** Merging `System` and `StepSystem` paths into one class; renaming
+`ModelPredictiveController` (locked product name).
 
 **Gate:** `test_mpc_stateless_controller.py`, `test_mpc_stateful_controller.py`,
-`test_mpc_export_computer.py`, `test_model_predictive_controller.py`.
-
-**Non-goal:** Renaming `ModelPredictiveController` (locked product name).
+`test_mpc_export_computer.py`, `test_model_predictive_controller.py`,
+`test_mpc_hybrid_*.py`.
 
 ---
 
@@ -83,11 +105,11 @@ public API.
 
 | Today | Proposal |
 | --- | --- |
-| `test_mpc_stateless_controller.py` | Fold into `test_model_predictive_controller.py` if overlap is obvious |
-| `test_mpc_stateful_controller.py` | Same for warm-start / `z` ports |
+| `test_mpc_stateless_controller.py` | Fold into `test_model_predictive_controller.py` or rename to warm-start-mode tests |
+| `test_mpc_stateful_controller.py` | Same |
 | Keep separate | `test_mpc_hybrid_*.py`, `test_mpc_planner.py`, `test_mpc_solve_trajectory_from.py` |
 
-Do not shrink coverage; skip if rename-only diff is cleaner.
+Do not shrink coverage; skip if module collapse (F.2) already forces test renames only.
 
 ---
 
@@ -181,7 +203,7 @@ python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
 | PR | Contents |
 | --- | --- |
 | PR-F1 | F.1 shims + doc path fixes |
-| PR-F2 | F.2 private block rename + tests |
+| PR-F2 | F.2 collapse PoC modules into private blocks + delete `controller.py` / `step_block.py` |
 | PR-F3 | F.4 demo helpers (optional F.3 test fold) |
 | PR-UI-* | Per [planning-ui-simplification.md](../planning-ui-simplification.md) — separate from F unless same demo file |
 
