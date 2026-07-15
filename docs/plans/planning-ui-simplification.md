@@ -12,7 +12,7 @@ contracts in [mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md).
 | Doc | Relationship |
 | --- | --- |
 | [mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md) | Contracts this plan must preserve |
-| [mpc-rh-refactor/phase-F-cleanup.md](mpc-rh-refactor/phase-F-cleanup.md) | Post-MPC refactor hygiene (shims, rename, demo dedup) — API work deferred here |
+| [mpc-rh-refactor/phase-F-cleanup.md](mpc-rh-refactor/phase-F-cleanup.md) | Post-refactor hygiene guidelines (stub until E8); API work is this plan |
 | [mpc-rh-refactor/](mpc-rh-refactor/) | MPC refactor phases E0–E8 |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Parametric NLP / result wrappers (orthogonal) |
 

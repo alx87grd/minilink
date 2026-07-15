@@ -60,7 +60,7 @@ flowchart LR
   E8[E8 Broadcast backends]
 
   E0 --> E1 --> E2 --> E3 --> E4 --> E5 --> E6 --> E7 --> E8
-  E8 --> F[Phase F cleanup]
+  E8 --> F[Phase F stub]
   E8 --> UI[Planning UI plan]
 ```
 
@@ -68,10 +68,9 @@ E0–E4 done: foundation → online from-API → controller → flagships → TO
 parametric merge. E5 retires PoC factories — see [phase-E5.md](phase-E5.md).
 E8 dual-rate contract is locked early; implementation stays last.
 
-**Post-refactor cleanup:** [phase-F-cleanup.md](phase-F-cleanup.md) — shims,
-rename, demo dedup (after E8). **Constructor UX:**
-[planning-ui-simplification.md](../planning-ui-simplification.md) — flat
-planner kwargs (UI-1+); cross-linked from Phase F.
+**After E8:** expand [phase-F-cleanup.md](phase-F-cleanup.md) with a concrete
+hygiene task list (generic guidelines until then). Constructor UX:
+[planning-ui-simplification.md](../planning-ui-simplification.md).
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
 demos set finite `tf=` for trajopt/MPC); transcription options carry
@@ -90,7 +89,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | **E6** | Observability polish | [phase-E6.md](phase-E6.md) |
 | **E7** | Parametric scene (pipeline B) | [phase-E7.md](phase-E7.md) |
 | **E8** | Broadcast + dual-rate export | [phase-E8.md](phase-E8.md) **(contract locked)** |
-| **F** | Post-refactor cleanup (hygiene) | [phase-F-cleanup.md](phase-F-cleanup.md) **(planning)** |
+| **F** | Post-refactor cleanup (expand after E8) | [phase-F-cleanup.md](phase-F-cleanup.md) **(stub)** |
 
 ## Suggested PR slicing
 
@@ -102,7 +101,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-D | E4 | MPC + trajopt + hybrid + controller | landed |
 | PR-E | E5 | after remaining demos/tests on controller | landed |
 | PR-F+ | E6–E8 | phase gates | later |
-| PR-F-hygiene | Phase F ([phase-F-cleanup.md](phase-F-cleanup.md)) | F gate | after E8 |
+| PR-F-hygiene | Phase F — expand card after E8, then land | F gate | after E8 |
 | PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | UI-1+ gates | after E8 (parallel with F) |
 
 ## Start here
@@ -114,5 +113,5 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 5. **E4** — done ([phase-E4.md](phase-E4.md)).
 6. **E5** — done ([phase-E5.md](phase-E5.md)).
 7. **E6** — expand [phase-E6.md](phase-E6.md) before coding (observability polish).
-8. **F** — [phase-F-cleanup.md](phase-F-cleanup.md) after E8 (hygiene); API UX in
-   [planning-ui-simplification.md](../planning-ui-simplification.md).
+8. **F** — after E8: expand [phase-F-cleanup.md](phase-F-cleanup.md), then hygiene
+   PRs; API UX per [planning-ui-simplification.md](../planning-ui-simplification.md).
