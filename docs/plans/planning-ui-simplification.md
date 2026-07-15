@@ -3,9 +3,9 @@
 Status: **draft plan** (July 2026). User architectural decisions **locked** for v1
 shape; implementation not started.
 
-**Scope:** Trajectory-optimization and MPC **construction ergonomics** — not a
-change to the locked planning contracts in
-[mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md).
+**Scope:** **Planner-family** construction ergonomics (trajopt, RRT, DP) aligned
+with Simulation / Optimizer patterns — not a change to the locked planning
+contracts in [mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md).
 
 **Related plans:**
 
@@ -47,9 +47,13 @@ ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
 ```
 
 The fix is **not** recipes that hide physics or merge pipeline stages. It is
-**Simulator-style defaults** on `TrajectoryOptimizationPlanner`: flatten
-constructor kwargs, default transcription, keep advanced types available but
-off the simple path.
+**Simulator-style defaults** across the planner family: flatten constructor
+kwargs where Options dataclasses are mandatory on the default path, keep
+advanced types available but off the simple path.
+
+**Reference modules (already aligned — do not change):** `Simulator`,
+`Optimizer`, `linearize(..., method=)`, `ModelPredictiveController`,
+`HybridDiagram.compute_trajectory`, `sys.compile(backend=)`.
 
 ---
 
@@ -136,6 +140,116 @@ cmd = mpc.compute_command(y, t=t)
 
 **Future (out of v1):** auto transcription selection when multiple methods are
 mature — analogous to `Simulator.select_solver()`.
+
+---
+
+## Planner family alignment
+
+All deterministic planners share the same textbook stack:
+
+```text
+PlanningProblem  →  discretization / method seam  →  Planner  →  typed result
+```
+
+| Planner family | Discretization / method seam (keep explicit) | Ceremony to flatten |
+| --- | --- | --- |
+| Trajopt / MPC | `transcription` (default `"direct_collocation"`) | `*Options` dataclass imports on default path |
+| RRT / RRT* | `extender` (+ `metric`) | `RRTOptions` / `RRTStarOptions` imports for common knobs |
+| DP | `StateSpaceGrid` (`x_grid_shape`, `u_grid_shape`, `dt`) | `DynamicProgrammingOptions` imports for common knobs |
+
+**Rule:** the middle column is a **fundamental building block** (like
+`Simulator`'s time grid — user must choose resolution or connection law).
+Options dataclasses are **workflow** detail — flatten onto the planner ctor
+when beginners tune them in every demo.
+
+### Family consistency map
+
+| Layer | Trajopt (TOP) | RRT | DP |
+| --- | --- | --- | --- |
+| Continuous problem | `PlanningProblem.tf` | same | same (+ cost) |
+| Discretization precision | `n_steps` on planner | `extender` params | `StateSpaceGrid` shapes, `dt` |
+| Method preset | `transcription="direct_collocation"` | extender type (steering / kinodynamic) | `backend="numpy"\|"jax"\|"loop"` |
+| Workflow knobs | `optimizer_method`, `optimizer_options` | `max_nodes`, `goal_bias`, `seed` | `alpha`, `tol`, `max_iterations` |
+| Result | `TrajectoryPlan` | `TrajectoryPlan` | `PolicyPlan` |
+
+### RRT / RRT* — target UX (UI-5)
+
+**Today:** `options=None` already defaults internally — better than TOP — but
+demos import `RRTOptions` / `RRTStarOptions` for routine tuning.
+
+**Tier 1 (proposed):**
+
+```python
+from minilink.planning.problems import PlanningProblem
+from minilink.planning.search.rrt import RRTPlanner
+from minilink.planning.search.extenders import SteeringExtender
+
+problem = PlanningProblem(sys=sys, x_start=x0, x_goal=x_goal, X=X)
+
+planner = RRTPlanner(
+    problem,
+    SteeringExtender(max_distance=1.0, resolution=0.05),
+    max_nodes=5000,
+    goal_bias=0.1,
+    seed=0,
+)
+plan = planner.solve()
+```
+
+**RRT*:**
+
+```python
+planner = RRTStarPlanner(
+    problem,
+    extender,
+    optimize_after_goal=True,
+    cost_tol=0.05,
+    convergence_patience=500,
+    max_nodes=8000,
+)
+```
+
+**Tier 2:** `options=RRTStarOptions(live_plot=True, callback=..., nearest_backend="cKDTree")`.
+
+**Keep explicit:** `extender`, `metric` override — not ceremony.
+
+### Dynamic programming — target UX (UI-6)
+
+**Today:** `DynamicProgrammingOptions` optional; `StateSpaceGrid` already uses
+flat kwargs (good).
+
+**Tier 1 (proposed):**
+
+```python
+from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
+from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+grid = StateSpaceGrid(problem, x_grid_shape=(101, 101), u_grid_shape=(41,), dt=0.05)
+
+planner = DynamicProgrammingPlanner(
+    problem,
+    grid=grid,
+    backend="numpy",
+    alpha=1.0,
+    tol=0.1,
+    max_iterations=1000,
+)
+policy_plan = planner.solve()
+```
+
+**Tier 2:** `options=DynamicProgrammingOptions(record_history=True, verbose=True, interpolation="cubic")`.
+
+**Keep explicit:** `StateSpaceGrid` construction — discretization precision,
+analogous to trajopt `n_steps`.
+
+### Out of scope for planner-family flattening
+
+| Area | Why |
+| --- | --- |
+| `planning/spatial/` scene composition | Domain teaching API; many types are intentional |
+| `DiagramSystem` wiring | Structural, not solver-preset |
+| `PlanningProblem` / `ProblemParameters` | Math task — stay dataclasses |
+| Simulation / control / analysis | Already Simulator-style |
 
 ---
 
@@ -254,6 +368,32 @@ Independent of mpc-rh-refactor E6–E8; can land on `dev-mpc-v2` when approved.
 Migrate remaining MPC/trajopt scripts to flat kwargs when touched — **do not**
 bulk-rewrite user-tuned demo constants or commented sections (AGENTS.md).
 
+### UI-5 — RRT / RRT* constructor flattening
+
+| Work | Detail |
+| --- | --- |
+| Flat kwargs on `RRTPlanner.__init__` | `max_nodes`, `goal_bias`, `seed`, `goal_tolerance`, `edge_resolution`, … |
+| Flat kwargs on `RRTStarPlanner.__init__` | `optimize_after_goal`, `cost_tol`, `convergence_patience`, `gamma`, `rewire`, … |
+| Internal | kwargs → `RRTOptions` / `RRTStarOptions`; tier-2 `options=` unchanged |
+| Defaults | Same as today's `RRTOptions()` / `RRTStarOptions()` |
+| Docs | One RRT demo + README row uses tier 1 |
+
+**Gate:** `pytest tests/unittest/test_rrt.py -q`
+
+### UI-6 — Dynamic programming constructor flattening
+
+| Work | Detail |
+| --- | --- |
+| Flat kwargs on `DynamicProgrammingPlanner.__init__` | `backend`, `alpha`, `tol`, `max_iterations`, `interpolation`, `out_of_bound_cost`, `final_time`, `verbose` |
+| Internal | kwargs → `DynamicProgrammingOptions`; tier-2 `options=` unchanged |
+| `StateSpaceGrid` | No change — stays explicit flat ctor |
+| Docs | `demo_basics.py` tier-1 example optional |
+
+**Gate:** `pytest tests/unittest/test_dynamic_programming.py -q`
+
+**Sequencing:** UI-5 / UI-6 after UI-1 lands — reuse the same ctor-flattening
+machinery and documentation pattern; do not block MPC/trajopt on RRT/DP.
+
 ---
 
 ## Migration map
@@ -265,6 +405,8 @@ bulk-rewrite user-tuned demo constants or commented sections (AGENTS.md).
 | Teaching notebooks (spatial guide) | Keep explicit step-by-step; optional tier-1 summary cell |
 | `DirectCollocationOptions` class | Remain for internal/tier-2; remove from README imports |
 | `TrajectoryOptimizationOptions` class | Internal + tier-2 only |
+| `RRTOptions` / `RRTStarOptions` | Internal + tier-2 after UI-5 |
+| `DynamicProgrammingOptions` | Internal + tier-2 after UI-6 |
 
 ---
 
@@ -272,9 +414,11 @@ bulk-rewrite user-tuned demo constants or commented sections (AGENTS.md).
 
 1. **Hello-world MPC** uses ≤3 planning imports and **zero** options dataclasses.
 2. **Vision pipeline** unchanged: `PlanningProblem` → `TrajectoryOptimizationPlanner` → `ModelPredictiveController`.
-3. **Advanced users** retain `transcription=` objects and `options=` without behavior regression.
+3. **Advanced users** retain `transcription=` / `options=` (and RRT/DP tier-2) without behavior regression.
 4. **Parity** with `Simulator` / `Optimizer` mental model documented in DESIGN.
 5. All existing MPC + trajopt unit tests green after UI-1.
+6. **Planner family:** RRT and DP tier-1 paths need zero `*Options` imports for routine demos (UI-5 / UI-6).
+7. **Fundamental seams** stay visible: `extender`, `StateSpaceGrid`, `transcription` (when non-default).
 
 ---
 
@@ -290,10 +434,12 @@ bulk-rewrite user-tuned demo constants or commented sections (AGENTS.md).
 
 | PR | Contents |
 | --- | --- |
-| PR-UI-A | UI-1 constructor + tests |
+| PR-UI-A | UI-1 TOP constructor + tests |
 | PR-UI-B | UI-2 README / DESIGN / vision snippet |
-| PR-UI-C | UI-3 helpers + optional demo touch-ups |
+| PR-UI-C | UI-3 TOP helpers + optional demo touch-ups |
+| PR-UI-D | UI-5 RRT / RRT* flattening + tests |
+| PR-UI-E | UI-6 DP flattening + tests |
 
-This document is the **source of truth** for planning UI simplification.
-Constructor flattening takes precedence over ad-hoc recipe-layer sketches in
-other cleanup notes.
+This document is the **source of truth** for planning UI simplification
+across the **planner family**. Constructor flattening takes precedence over
+ad-hoc recipe-layer sketches in other cleanup notes.
