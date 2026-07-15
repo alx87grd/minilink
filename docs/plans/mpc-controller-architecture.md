@@ -189,12 +189,31 @@ Debug mode covering development phases:
   keep `Trajectory` as the NumPy reporting bag (DESIGN), and keep equation-path
   helpers xp-clean.
 
-### R11 — Planner diversity with the RH / feedback-planning idea
+### R11 — Swappable online planning backends
 
-It would be valuable if **RRT, DP, trajopt, …** could combine with
-**online plan-and-act from the current state** — not only NLP-MPC — and if the
-closed-loop surface could **import** more than one planner kind. Coupled to the
-**Planner** contract review. See §8 (modes) and **§8.0 (minimal loop contract)**.
+Tools that can **solve a trajectory (or plan artifact) from the current measured
+state** must be **swappable** inside the generic online plan-and-act algorithm
+(§4b). The closed-loop product should not be hard-wired only to `MPCPlanner`.
+
+Enforce / provide a clear shared surface (duck typing, adapter factory, or small
+ABC — choice open) so trajopt, compile-once NLP-MPC, RRT, DP-rollout, etc. plug
+into the **same** tick → latch → broadcast / apply path. See **§4b**.
+
+### R12 — Runtime problem parameters (perception / scene / cost / feasibility)
+
+Beyond \(x\), design the online loop for **time-varying planning parameters** —
+especially obstacle avoidance from a **perception pipeline**:
+
+- **Baseline (pure path tracking):** tick may need only \(y \approx x\); track /
+  cost can be fixed at problem build.
+- **Perception avoidance:** the online block needs **inputs** for obstacle /
+  scene (or cost-shaping / feasibility) updates so each tick replans with a live
+  environment.
+
+Couples to [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
+§B (parametric scene, `ObstacleBank`, `ProblemParameters.scene`, bind without
+re-JIT) and spatial **scene → cost / field** exports. Treat params as
+**first-class tick inputs** now, not a retrofit. See **§4c**.
 
 ---
 
@@ -207,111 +226,159 @@ loop, versus what is just **problem parameterization**?
 
 At each control tick:
 
-1. Read a measurement of state (or state estimate) \(x\).
-2. Solve a **planning problem** that uses that \(x\) as the start / initial
-   condition.
-3. Obtain a control-relevant artifact (typically a **trajectory** / drafted
-   plan, or at least an applied \(u\)).
-4. Apply an action to the plant (first move, held \(u\), \(u_{\mathrm{nom}}(t)\), …).
-5. Repeat.
+1. Read measurement \(x\) (or estimate).
+2. Optionally read **runtime planning parameters** \(p\) (scene, cost, refs, …) —
+   needed for perception avoidance; may be fixed/empty for pure tracking (§4c).
+3. Solve a planning problem using \(x\) as start (and \(p\) when provided).
+4. Obtain a drafted plan / applied \(u\).
+5. Apply an action; repeat.
 
-That is **feedback via online planning** (“plan, act, replan”). It works even
-if you naively re-solve an ordinary trajopt / RRT with an updated `x_start`
-every step. Efficiency tricks (compile-once, warm-start) are optional.
+That is **feedback via online planning**. Naive re-solve of ordinary trajopt/RRT
+with updated `x_start` already qualifies. Compile-once / warm-start are optional
+efficiency.
+
+### Swappable backends (R11) — enforce a common online surface
+
+**Framework need:** anything that implements the minimal online surface is
+**drop-in swappable** in this loop (same tick wiring, export, `compute_command`,
+broadcast) without rewriting the closed-loop product.
+
+```text
+solve_from(x, *, params=None, warm_start=None) -> PathPlan
+# interim: Trajectory + metadata OK
+# adapter OK: refresh PlanningProblem.x_start (+ params), compute_solution()
+```
+
+| Must for swap-in | Why |
+| --- | --- |
+| Accept current **\(x\)** as start | Loop core |
+| Accept optional **`params`** for online problem data | R12 |
+| Return drafted **path** (prefer) | R4 / broadcast |
+| Same call shape across backends | Swappability |
+
+| Backend | Meets surface how |
+| --- | --- |
+| Ordinary trajopt | Refresh `x_start` (+ params); re-solve each tick |
+| Compile-once NLP-MPC | `step(x, scene_params=…)` / bind \(p\) |
+| RRT / RRT\* | Replan from \(x\) (params may reshape clearance) |
+| DP rollout | Roll out \(\pi\) from \(x\) |
+
+Prefer documenting/enforcing this surface so “MPC block” means **online planning
+loop**, not “only SciPy collocation.”
 
 ### Is “receding horizon” necessary?
 
 **No — not for the generic scheme to work.**
 
-| Term | Meaning | Required for plan-and-act loop? |
-| --- | --- | --- |
-| **Online replan from current \(x\)** | Refresh start; solve again; apply action | **Yes — this is the core** |
-| **Finite horizon \(T\)** that advances with time (“receding”) | Classic MPC OCP setup | **No** — common *instance*, not the definition |
-| **Shrinking horizon to fixed \(t_f\)** | Alternate finite-horizon policy | Optional |
-| **Global replan to goal each tick** (e.g. RRT) | Path may not be a short sliding window | Still the core loop; not classic RH |
-| **Warm start / parametric NLP** | Speed / reliability | Optional |
-| **Use only first move** vs track whole plan | Application policy | Optional (R4/R5 expose either) |
-
-So “MPC” as a product name may be too narrow; the flexible framework is an
-**online planning control loop**. Classic RH-MPC is one efficient backend + one
-common finite-horizon problem family.
-
-### What *must* a planner expose for that loop?
-
-**Minimal contract (idea — still a brainstorm):**
-
-```text
-given current measurement x (and optional overrides),
-produce a plan / command usable this tick
-```
-
-Concretely, something in this neighborhood:
-
-```text
-# thinnest useful surface
-solve_from(x, *, params=None) -> PathPlan   # or Trajectory (+ metadata)
-
-# equivalently, today-shaped API:
-# mutate / replace PlanningProblem.x_start (or X0), then compute_solution()
-```
-
-Required:
-
-| Must | Why |
+| Term | Required for plan-and-act? |
 | --- | --- |
-| Accept **current state** \(x\) as start | Core of the loop |
-| Return something that yields **applied \(u\)** and preferably a **drafted trajectory** | R4 / plant actuation / broadcast |
+| Online replan from current \(x\) | **Yes — core** |
+| Finite sliding horizon \(T\) (“receding”) | **No** — common instance |
+| Warm start / parametric NLP | Optional efficiency |
+| First-move-only vs whole-plan apply | Optional application policy |
 
-Not required for the *scheme* to work (these are **planning problem parameters** — may be fixed or updated each tick):
+### Core vs problem parameters
 
-| Parameter of the problem | Role | Core to the loop? |
-| --- | --- | --- |
-| Cost \(J\) / weights / references | Shapes the plan | No — problem data |
-| Feasibility / sets \(X,U\) / obstacles | Constraints | No — problem data |
-| Time horizon \(t_f\), \(N\), knot grid | Finite-horizon OCP setup | No — problem data (RH or not) |
-| Goal \(x_g\) / \(X_f\) | Terminal aim | No — problem data |
-| Scene / perception params | Environment | No — optional tick overrides (useful, not definitional) |
-| Warm-start vector \(z\) | Speed | No — efficiency |
-| Compile-once parametric NLP | Speed | No — efficiency |
+| | Role |
+| --- | --- |
+| **Required each tick** | \(x\) (measurement); ideally a path out |
+| **Problem parameters** (fixed or live) | Cost, feasibility/sets/obstacles, horizon \(T\), goal, **scene/perception**, refs |
+| **Efficiency only** | Warm-start \(z\), compile-once NLP |
 
-Updating those parameters each tick (time-varying ref, moving obstacles,
-shrinking \(T\)) is **allowed** and often useful; it is still the same loop —
-just a richer `params` bag on top of **required** \(x\).
+Changing only \(x\) is enough for the scheme to *be* feedback planning.
+Updating cost shaping / feasibility from perception is **the same loop** with a
+richer \(p\) — design for \(p\) early (R12), even when demos use Case A tracking.
 
-### DP nuance
+**DP:** pure \(\pi(x)\) feedback is valid but not “solve a trajectory from \(x\)”
+unless rolled out to a path.
 
-A pure **policy** (DP table) can close the loop **without** producing a
-trajectory each tick (`u = π(x)`). That is another valid feedback scheme, but
-it is **not** “solve a trajectory from \(x\)” — unless you **roll out** \(π\)
-to get a drafted plan (then it fits the minimal contract above). Keep those
-paths distinct when organizing Planner results (path vs policy).
-
-### Naming implication for the framework
-
-Prefer thinking:
+### Naming implication
 
 ```text
-OnlinePlanningLoop / plan-and-act controller
-  └─ uses a Planner (or adapter) that can solve_from(x)
-       ├─ naive: ordinary PlanningProblem + compute_solution each tick
-       ├─ efficient: compile-once MPC NLP (MPCPlanner)
-       └─ other: RRT from x, trajopt from x, DP rollout, …
+OnlinePlanningLoop
+  └─ swappable: solve_from(x, params=…)
+       ├─ naive trajopt/RRT re-solve
+       ├─ compile-once MPC NLP
+       └─ DP rollout / …
 ```
 
-“Receding horizon” remains good vocabulary for the **finite sliding-horizon
-OCP** case — not a mandatory type in the class tree for the loop to be valid.
+---
+
+## 4c. Runtime `params` & perception — couple to scene/cost wiring (R12)
+
+### Why now
+
+If the online block only inputs \(y \approx x\), obstacle avoidance from
+**perception** has nowhere to enter. Tracking without obstacles can hard-code
+the track at build time. Avoidance needs **online** obstacle → cost / feasibility
+updates.
+
+```text
+perception / scene source --p (scene, cost shaping, …)--> online planning block
+plant measurement         --y ≈ x ----------------------> online planning block
+                                                     --> plan_flat, u_nom, …
+```
+
+### Two operating cases
+
+| Case | Tick inputs | Problem data |
+| --- | --- | --- |
+| **A — Pure tracking** | \(y\) | Track / weights / horizon fixed at build (or static params) |
+| **B — Perception avoidance** | \(y\) **+** perception/scene (or cost/feasibility) params | Structure fixed (e.g. max \(K\) obstacles); **numeric** centers/radii/`active` (or weights) update each tick |
+
+Case A ⊂ Case B with empty/static scene.
+
+### Link to planning-pipeline §B + spatial costs
+
+[planning-pipeline-architecture.md](planning-pipeline-architecture.md) §B:
+
+- `ProblemParameters.scene` / `SceneParameters`
+- `ObstacleBank(K)` + `active` mask; JAX-traceable SDF
+- Parametric bind \(p\) (scene, not only \(x0\)); soft costs first
+- `MPCPlanner.step(..., scene_params=...)` without re-JIT
+
+**This plan adds the closed-loop / block side:**
+
+| Need | Notes |
+| --- | --- |
+| Diagram / RAS **inputs for \(p\)** | Named ports or packed param vector — TBD |
+| Wire perception → online block | Same hybrid world as \(y\) |
+| Backends use one `params` language | Prefer `ProblemParameters`-like bag; scene exports already become **costs / fields** |
+| Reuse spatial scene→cost path | Runtime overrides on that path — not a parallel obstacle API |
+| R10 | Param arrays stay xp-clean for future JAX NLP |
+
+### Brainstorm: `params` bag
+
+```text
+params (tick) ~ ProblemParameters-like
+  scene: centers, radii, active, …     # ObstacleBank
+  cost: optional weight / bar overrides
+  # x0 usually from y; may also appear explicitly
+```
+
+Tracking demo: no scene ports or `active=False`.  
+Avoidance demo: perception fills bank → soft cost (later feasibility) each tick.
+
+### Open questions (R12)
+
+- Port shape: structured dict vs flat `p` vs many named ports
+- Soft-cost-only v1 vs hard parametric feasibility (align with plan B)
+- Naive backends: rebuild Scene/cost each tick vs true parametric bind
+- RRT clearance consuming the same scene bag
 
 ---
 
 ## 5. Architecture options — class systems & contracts
 
-Below are **candidate architectures** to address R1–R11. They are alternatives
+Below are **candidate architectures** to address R1–R12. They are alternatives
 to discuss, not a pick. Shared building blocks any option can reuse:
 
 | Building block | Role | Notes |
 | --- | --- | --- |
 | `Trajectory.to_flat` / `from_flat` (idea) | R4, R7 wire | NumPy report / ports / RAS |
 | `pack_horizon` / `eval_nominal` (idea) | R6, R10 | xp-native interp / rates |
+| `solve_from(x, params=…)` surface (idea) | R11, R12 | Swappable online backends |
+| Scene / `ObstacleBank` / parametric \(p\) (plan B) | R12 | Perception → cost/feasibility |
 | `PlanningProblem` + `Planner` | offline orchestration | already exists |
 | `PathPlan` / `PolicyPlan` (plan A) | typed results | draft elsewhere |
 
@@ -472,40 +539,38 @@ classDiagram
 ```text
 # Duck-typed adapter — wrap MPCPlanner.step OR “re-solve PlanningProblem each tick”
 HorizonSource
-  generate_horizon(x0, *, warm_start=None, params=None) -> PathPlan
+  generate_horizon(x0, *, params=None, warm_start=None) -> PathPlan
   prepare()?                  # optional (compile-once NLP); no-op for naive re-solve
   warm_state_dim -> int       # 0 if none
   default_warm_state()? 
 
-# Equivalent naive adapter (perfectly valid RH loop, usually slower):
-#   problem' = problem with x_start = x0
-#   PathPlan(trajopt.compute_solution())   # or RRT, etc.
+# Equivalent naive adapter (valid loop):
+#   apply params to PlanningProblem / Scene / cost; x_start = x0
+#   PathPlan(planner.compute_solution())
 
 RecedingHorizonController / MPCController
   __init__(source, *, dt_mpc, dt_ctl=..., warm_start=..., applied_u=..., debug=...)
-  compute_command(y, *, warm_state=None, t=None, k=None) -> Command
+  compute_command(y, *, params=None, warm_state=None, t=None, k=None) -> Command
       Command: plan, plan_flat, u_ff, x_ff, z?, metadata
   export_to_computer(dt_ctl=None, dt_mpc=None, *, bundle=True) -> Computer
-      # bundle=True → StepDiagram{TickBlock, BroadcastBlock} + StepSchedule.fire
-  __matmul__(plant) -> HybridDiagram   # defaults → hybrid_closed_loop
-  as_stateless_block() / as_step_block()  # escape hatches (R1)
+  __matmul__(plant) -> HybridDiagram
+  as_stateless_block() / as_step_block()
   reset(), last_*, plot_*/debug_*
 
 TickBlock
-  inputs: y
+  inputs: y [, params / scene]
   outputs: plan_flat, z?, success, u_ff?, x_ff?
-  # fires at dt_mpc; latches plan_flat
+  # fires at dt_mpc; calls generate_horizon(y, params=…)
 
 BroadcastBlock
   inputs: plan_flat (held)
   outputs: u_nom, x_nom [, du_nom, dx_nom] [, tau]
-  # fires at dt_ctl; xp-native eval_nominal
 
-# Other planners (R11 ideas):
+# Swappable backends (R11):
 RRTPlanner.as_horizon_source() -> HorizonSource
-TrajectoryOptimizationPlanner.as_horizon_source() -> HorizonSource  # re-solve each tick
-PolicyPlan.as_horizon_source(tf, dt) -> HorizonSource   # via rollout
-MPCPlanner.as_horizon_source() -> HorizonSource         # compile-once step
+TrajectoryOptimizationPlanner.as_horizon_source() -> HorizonSource
+PolicyPlan.as_horizon_source(tf, dt) -> HorizonSource
+MPCPlanner.as_horizon_source() -> HorizonSource
 ```
 
 **Requirements fit**
@@ -522,9 +587,10 @@ MPCPlanner.as_horizon_source() -> HorizonSource         # compile-once step
 | R9 | Natural home on facade |
 | R10 | Tick may call host NLP; helpers xp-clean |
 | R11 | HorizonSource adapters (incl. naive re-solve) |
+| R12 | `params` / scene on tick + `compute_command` |
 
 **Tradeoffs:** more new types; clearest separation of **replan** vs **broadcast** vs
-**planner algorithm**; best path for R8/R11. Naming (`MPC*` vs `RH*`) still open.
+**planner algorithm**; best path for R8/R11/R12. Naming (`MPC*` vs `RH*`) still open.
 Does **not** force a special planning algorithm — only a place to put the loop.
 
 ---
@@ -852,20 +918,24 @@ should not freeze into NumPy-only APIs just because today’s NLP is host-side.*
 
 ### 9.1 Tension
 
+See **§4b** for the generic loop vs RH specialization.
+
 Calling raw `Planner.compute_solution()` every control tick **does work** as a
-receding-horizon / “plan-and-act” loop if you refresh `x_start` (or equivalent)
-each time. That *is* the idea — classic textbook MPC is exactly “solve an
-open-loop OCP from the current state, apply the first move, repeat.” Efficiency
-motivates compile-once / warm-start MPC, not the definition of the pattern.
+plan-and-act loop if you refresh `x_start` (or equivalent) each time. That *is*
+the core idea. Classic textbook MPC is “solve an open-loop problem from the
+current state, apply an action, repeat” — often with a finite moving horizon,
+but the **horizon itself is problem data**, not what makes feedback planning
+work. Efficiency motivates compile-once / warm-start MPC.
 
 Practical frictions today (API shape, not theory):
 
 - RRT/trajopt bind start in `PlanningProblem` unless rebuilt/`replace` each tick
 - DP returns a **policy table**, not a path unless you **roll out**
-- Only `MPCPlanner.step(x0)` is shaped for cheap online RH today
+- Only `MPCPlanner.step(x0)` is shaped for cheap online use today
 
-So we still want adapters — but **naive re-solve of a regular planner each
-tick remains a valid horizon backend**, not a conceptual mistake.
+Adapters help UX — but **naive re-solve of a regular planner each tick remains
+a valid backend**, and **changing only \(x\)** is enough for the scheme; cost,
+sets, and \(T\) can stay fixed or can also vary as `params`.
 
 ### 9.2 Modes to keep distinct (brainstorm taxonomy)
 
