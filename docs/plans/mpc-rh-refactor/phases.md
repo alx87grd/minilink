@@ -59,12 +59,17 @@ flowchart LR
   E7[E7 Scene params]
   E8[E8 Broadcast backends]
 
-  E0 --> E1 --> E2 --> E3 --> E4 --> E5 --> E6 --> E7 --> E8
+  E0 --> E1 --> E2 --> E3 --> E4 --> E5 -->   E6 --> E7 --> E8
+  E8 --> F[Phase F cleanup]
 ```
 
 E0–E4 done: foundation → online from-API → controller → flagships → TOP
 parametric merge. E5 retires PoC factories — see [phase-E5.md](phase-E5.md).
 E8 dual-rate contract is locked early; implementation stays last.
+
+**Post-refactor cleanup (parallel planning):** [phase-F-cleanup.md](phase-F-cleanup.md)
+— dead-code prune, demo dedup, beginner **recipe** layer. Land after E6–E8;
+F.1/F.4 can start earlier (inventory in that card).
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
 demos set finite `tf=` for trajopt/MPC); transcription options carry
@@ -83,6 +88,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | **E6** | Observability polish | [phase-E6.md](phase-E6.md) |
 | **E7** | Parametric scene (pipeline B) | [phase-E7.md](phase-E7.md) |
 | **E8** | Broadcast + dual-rate export | [phase-E8.md](phase-E8.md) **(contract locked)** |
+| **F** | Cleanup, dedup, beginner recipes | [phase-F-cleanup.md](phase-F-cleanup.md) **(planning)** |
 
 ## Suggested PR slicing
 
@@ -94,6 +100,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-D | E4 | MPC + trajopt + hybrid + controller | landed |
 | PR-E | E5 | after remaining demos/tests on controller | landed |
 | PR-F+ | E6–E8 | phase gates | later |
+| PR-G | Phase F (shims, recipes, README) | F gate in phase-F card | after E8 |
 
 ## Start here
 
@@ -104,3 +111,5 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 5. **E4** — done ([phase-E4.md](phase-E4.md)).
 6. **E5** — done ([phase-E5.md](phase-E5.md)).
 7. **E6** — expand [phase-E6.md](phase-E6.md) before coding (observability polish).
+8. **F** — track [phase-F-cleanup.md](phase-F-cleanup.md) while E6–E8 land; execute
+   after E8 gate.
