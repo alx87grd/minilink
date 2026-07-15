@@ -8,9 +8,13 @@ non-singleton ``X0``, and shooting transcriptions are not yet supported.
 """
 
 from minilink.planning.mpc.animation_overlays import mpc_animation_overlays
+from minilink.planning.mpc.command import Command
 from minilink.planning.mpc.controller import (
     MPCStatelessController,
     mpc_stateless_controller,
+)
+from minilink.planning.mpc.model_predictive_controller import (
+    ModelPredictiveController,
 )
 from minilink.planning.mpc.options import MPCOptions
 from minilink.planning.mpc.plan_reconstruct import mpc_plans_from_rollout
@@ -27,6 +31,8 @@ from minilink.planning.mpc.warm_start import (
 )
 
 __all__ = [
+    "Command",
+    "ModelPredictiveController",
     "mpc_animation_overlays",
     "MPCStatelessController",
     "MPCDirectCollocationTranscription",

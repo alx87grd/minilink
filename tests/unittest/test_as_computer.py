@@ -75,7 +75,7 @@ class TestAsComputer(unittest.TestCase):
                 optimizer_options={"maxiter": 5, "ftol": 1e-1},
             ),
         )
-        computer = mpc_stateless_controller(planner) % 0.2
+        computer = mpc_stateless_controller(planner, dt_mpc=0.2) % 0.2
         self.assertIn("y", computer.diagram.inputs)
         self.assertIn("u_ff", computer.diagram.outputs)
 

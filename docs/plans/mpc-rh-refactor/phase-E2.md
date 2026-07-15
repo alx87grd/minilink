@@ -1,6 +1,6 @@
 # Phase E2 — `ModelPredictiveController`
 
-**Status:** ready (docs locked; implement next)  
+**Status:** done  
 **Depends on:** [E1](phase-E1.md) · contracts: [vision.md](vision.md)
 
 ## Goal

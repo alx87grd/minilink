@@ -152,7 +152,11 @@ class TestMPCStatefulController(unittest.TestCase):
         z_prev = block.x0.copy()
         y = np.array([0.1])
 
-        with patch.object(planner, "step", wraps=planner.step) as step_mock:
+        with patch.object(
+            planner,
+            "solve_trajectory_from",
+            wraps=planner.solve_trajectory_from,
+        ) as step_mock:
             block.outputs["u_ff"].compute(z_prev, y, t=3)
             block.outputs["x_ff"].compute(z_prev, y, t=3)
             block.outputs["z"].compute(z_prev, y, t=3)

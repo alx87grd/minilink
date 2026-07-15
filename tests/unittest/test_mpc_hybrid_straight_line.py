@@ -85,7 +85,7 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
     )
 
     mpc_dt = 1.0 / mpc_hz
-    mpc = mpc_stateless_controller(mpc_planner)
+    mpc = mpc_stateless_controller(mpc_planner, dt_mpc=mpc_dt)
     hybrid = (mpc % mpc_dt) @ sys_sim
     return hybrid, mpc_planner, transcription, template_problem
 

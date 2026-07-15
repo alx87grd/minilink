@@ -217,10 +217,14 @@ Both share orchestration (mixin / private helpers):
    `warm_start.py` from latched plan / `warm_state`
 2. Call `planner.solve_trajectory_from(x0, params=…, initial_guess=seed)`
    and latch the returned `TrajectoryPlan`
-3. Ports (`plan_flat`, `u_ff`, `x_ff`, `z`, `success`) on the System
+3. Ports (`u_ff`, `x_ff`, `z`, …) on the System
 4. `compute_command(y, …) -> Command` (deploy / RAS; ROS-agnostic)
 5. `%` / `export_to_computer` / `__matmul__(plant)` on **this** instance
    (the controller *is* the `%` / `@` leaf)
+6. Optional live debug figure (`init_debug_figure` / `update_debug_figure`)
+
+Owns replan period **`dt_mpc`**: warm-start \(\tau\)-shift, Computer schedule,
+and tick clock \(t_{\mathrm{solve}} = t_0 + k\,\Delta t_{\mathrm{mpc}}\).
 
 ```text
 ModelPredictiveController(...)
@@ -229,7 +233,32 @@ ModelPredictiveController(...)
         └─ warm_start=True  ──► StepSystem (z on Computer.x)
 ```
 
-Default applied `u` for `@`: **`u_ff`** (ZOH). Broadcast `u_nom`/`x_nom` later.
+### Time frames
+
+| Symbol | Meaning |
+| --- | --- |
+| \(k\) | Discrete replan tick |
+| \(t\) | Absolute sim or real time: \(t_{\mathrm{solve}} = t_0 + k\,\Delta t_{\mathrm{mpc}}\) |
+| \(\tau\) | Plan-local; **\(\tau = 0\)** at the solve instant |
+
+`TrajectoryPlan.trajectory.t` is plan-local \(\tau\). `Command` carries `k`
+and `t_solve`.
+
+### Deploy vs single-rate sim (E2)
+
+- Deploy: `compute_command` → `Command` (`plan`, `u_ff`, …).
+- Sim default: `%` / `@` applies **`u_ff`** (ZOH) at \(\Delta t_{\mathrm{mpc}}\).
+
+### Broadcast + dual-rate (E8 — not E2)
+
+Independent high-rate query (no NLP):
+
+- `get_nominal(t, *, include_derivatives=False)` → \(u,x\) [, rates] from
+  last latched plan (\(\tau = t - t_{\mathrm{solve}}\)).
+
+Sim: `export_to_computer(dt_ctl=…)` builds a **multi-rate** `Computer`
+(replan leaf at \(\Delta t_{\mathrm{mpc}}\) + broadcast leaf at \(\Delta t_{\mathrm{ctl}}\)).
+See [phase-E8.md](phase-E8.md).
 
 Warm-start *policy* (`warm_start=True` on the controller) is owned here — not
 on the Planner ABC / generic from-API.

@@ -61,13 +61,13 @@ class TestMpcExportComputer(unittest.TestCase):
         with self.assertRaises(ValueError):
             mpc.export_to_computer(0.1)
 
-    def test_controller_requires_schedule(self):
+    def test_algebraic_defaults_schedule_from_dt_mpc(self):
         planner = _planner()
-        mpc = mpc_stateless_controller(planner)
-        with self.assertRaises(ValueError):
-            mpc.export_to_computer()
-        computer = mpc.export_to_computer(0.2)
+        mpc = mpc_stateless_controller(planner, dt_mpc=0.2)
+        computer = mpc.export_to_computer()
         self.assertAlmostEqual(computer.schedule.dt_base, 0.2)
+        with self.assertRaises(ValueError):
+            mpc.export_to_computer(0.1)
 
 
 if __name__ == "__main__":

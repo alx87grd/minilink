@@ -1,27 +1,25 @@
-"""Stateful warm-start MPC controller for hybrid simulation (Phase 6b)."""
+"""Warm-start StepSystem MPC controller — ModelPredictiveController family."""
 
 from __future__ import annotations
 
 import numpy as np
 
 from minilink.core.system import StepSystem
-from minilink.planning.mpc._block_common import (
-    export_mpc_to_computer,
-    validate_mpc_planner,
+from minilink.planning.mpc._block_common import validate_mpc_planner
+from minilink.planning.mpc.model_predictive_controller import (
+    ModelPredictiveControllerMixin,
 )
 from minilink.planning.mpc.planner import MPCPlanner
 from minilink.planning.mpc.tick_latch import MPCTickLatch
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 
 
-class MPCStatefulController(StepSystem):
+class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
     """
     Warm-start MPC block with packed optimizer state on ``Computer.x``.
 
-    Diagram input ``y`` is the plant measurement. State ``x`` is the packed
-    decision vector ``z`` from the previous tick. Outputs ``u_ff``, ``x_ff``,
-    and ``z`` come from one :meth:`~MPCPlanner.step` per tick (memoized on the
-    block); :meth:`step` commits the latched ``z`` without a second NLP.
+    ``warm_start=True`` product sibling. State ``x`` is packed ``z`` from the
+    previous tick. Ports and :meth:`step` share one NLP per tick via the latch.
     """
 
     def __init__(
@@ -31,18 +29,25 @@ class MPCStatefulController(StepSystem):
         dt_mpc: float,
         step_disp: bool = False,
         t0: float = 0.0,
+        debug: bool = False,
     ) -> None:
         n, m, n_z = validate_mpc_planner(planner)
         super().__init__(n_z, expose_state=False)
         self.name = "MPC Stateful Controller"
         self._planner = planner
+        self._dt_mpc = float(dt_mpc)
+        self._t0 = float(t0)
+        self._debug = bool(debug)
+        self._deploy_k = 0
+        self._last_command = None
+        self._debug_handles = None
+        self._debug_sys = None
         self._latch = MPCTickLatch(
             planner,
             step_disp=step_disp,
-            dt_mpc=dt_mpc,
-            t0=t0,
+            dt_mpc=self._dt_mpc,
+            t0=self._t0,
         )
-        self._dt_mpc = float(dt_mpc)
         self.x0 = mpc_default_computer_x0(planner)
 
         self.add_input_port("y", dim=n)
@@ -75,9 +80,10 @@ class MPCStatefulController(StepSystem):
         """Per-tick solve memo (reset via :meth:`MPCTickLatch.reset_latch`)."""
         return self._latch
 
-    def export_to_computer(self, schedule=None):
-        """Return a :class:`~minilink.simulation.computer.Computer` using block ``dt_mpc``."""
-        return export_mpc_to_computer(self, schedule, dt_mpc=self._dt_mpc)
+    def _z_warm_for_command(self):
+        if self._last_command is not None:
+            return self._last_command.z
+        return None
 
     def _measurement(self, u) -> np.ndarray:
         return np.asarray(u, dtype=float).reshape(self.inputs["y"].dim)
@@ -127,6 +133,9 @@ def mpc_stateful_controller(
     dt_mpc: float,
     step_disp: bool = False,
     t0: float = 0.0,
+    debug: bool = False,
 ) -> MPCStatefulController:
-    """Build a warm-start :class:`MPCStatefulController` from a prepared :class:`MPCPlanner`."""
-    return MPCStatefulController(planner, dt_mpc=dt_mpc, step_disp=step_disp, t0=t0)
+    """Build warm-start MPC block (alias of ``ModelPredictiveController(..., warm_start=True)``)."""
+    return MPCStatefulController(
+        planner, dt_mpc=dt_mpc, step_disp=step_disp, t0=t0, debug=debug
+    )

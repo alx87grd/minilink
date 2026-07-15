@@ -1,34 +1,53 @@
-"""Stateless algebraic MPC controller for step / hybrid simulation (Phase 6a)."""
+"""Algebraic (no warm-start state) MPC controller — ModelPredictiveController family."""
 
 from __future__ import annotations
 
 import numpy as np
 
 from minilink.core.system import System
-from minilink.planning.mpc._block_common import (
-    export_mpc_to_computer,
-    validate_mpc_planner,
+from minilink.planning.mpc._block_common import validate_mpc_planner
+from minilink.planning.mpc.model_predictive_controller import (
+    ModelPredictiveControllerMixin,
 )
 from minilink.planning.mpc.planner import MPCPlanner
 from minilink.planning.mpc.tick_latch import MPCTickLatch
 
 
-class MPCStatelessController(System):
+class MPCStatelessController(ModelPredictiveControllerMixin, System):
     """
-    Stateless MPC feedforward block for step diagrams and hybrid simulation.
+    Algebraic MPC feedforward block (``warm_start=False`` product sibling).
 
-    Diagram input ``y`` is the plant measurement (typically full state). Outputs
-    ``u_ff``, ``x_ff``, and ``z`` come from one :meth:`~MPCPlanner.step` per
-    integer tick ``k`` (Computer fire index), memoized on the block.
+    Owns ``dt_mpc`` for Computer schedule / ``@``. Outputs ``u_ff``, ``x_ff``,
+    and ``z`` come from one NLP per integer tick ``k`` (latch-memoized).
     """
 
-    def __init__(self, planner: MPCPlanner, *, step_disp: bool = False) -> None:
+    def __init__(
+        self,
+        planner: MPCPlanner,
+        *,
+        dt_mpc: float,
+        step_disp: bool = False,
+        t0: float = 0.0,
+        debug: bool = False,
+    ) -> None:
         n, m, n_z = validate_mpc_planner(planner)
 
         super().__init__()
         self.name = "MPC Stateless Controller"
         self._planner = planner
-        self._latch = MPCTickLatch(planner, step_disp=step_disp)
+        self._dt_mpc = float(dt_mpc)
+        self._t0 = float(t0)
+        self._debug = bool(debug)
+        self._deploy_k = 0
+        self._last_command = None
+        self._debug_handles = None
+        self._debug_sys = None
+        self._latch = MPCTickLatch(
+            planner,
+            step_disp=step_disp,
+            dt_mpc=self._dt_mpc,
+            t0=self._t0,
+        )
 
         self.add_input_port("y", dim=n)
         self.add_output_port(
@@ -55,10 +74,6 @@ class MPCStatelessController(System):
         """Prepared compile-once planner."""
         return self._planner
 
-    def export_to_computer(self, schedule=None):
-        """Return a :class:`~minilink.simulation.computer.Computer` scheduled at ``schedule``."""
-        return export_mpc_to_computer(self, schedule)
-
     def _measurement(self, u) -> np.ndarray:
         return np.asarray(u, dtype=float).reshape(self.inputs["y"].dim)
 
@@ -76,7 +91,14 @@ class MPCStatelessController(System):
 
 
 def mpc_stateless_controller(
-    planner: MPCPlanner, *, step_disp: bool = False
+    planner: MPCPlanner,
+    *,
+    dt_mpc: float,
+    step_disp: bool = False,
+    t0: float = 0.0,
+    debug: bool = False,
 ) -> MPCStatelessController:
-    """Build a stateless :class:`MPCStatelessController` from a prepared :class:`MPCPlanner`."""
-    return MPCStatelessController(planner, step_disp=step_disp)
+    """Build algebraic MPC block (alias of ``ModelPredictiveController(..., warm_start=False)``)."""
+    return MPCStatelessController(
+        planner, dt_mpc=dt_mpc, step_disp=step_disp, t0=t0, debug=debug
+    )

@@ -71,13 +71,13 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | --- | --- | --- |
 | **E0** | Types, `problem.tf`, strip options `tf`, `solve` rename | [phase-E0.md](phase-E0.md) **(done)** |
 | **E1** | `MPCPlanner.solve_trajectory_from` → `TrajectoryPlan` | [phase-E1.md](phase-E1.md) **(done)** |
-| **E2** | `ModelPredictiveController` System family + `@` | [phase-E2.md](phase-E2.md) **(ready)** |
+| **E2** | `ModelPredictiveController` System family + `@` | [phase-E2.md](phase-E2.md) **(done)** |
 | **E3** | Migrate flagship demos to controller | [phase-E3.md](phase-E3.md) |
 | **E4** | Merge parametric MPC into TOP | [phase-E4.md](phase-E4.md) |
 | **E5** | Retire PoC controller leaves | [phase-E5.md](phase-E5.md) |
 | **E6** | Observability polish | [phase-E6.md](phase-E6.md) |
 | **E7** | Parametric scene (pipeline B) | [phase-E7.md](phase-E7.md) |
-| **E8** | Broadcast + other backends | [phase-E8.md](phase-E8.md) |
+| **E8** | Broadcast + dual-rate export | [phase-E8.md](phase-E8.md) **(contract locked)** |
 
 ## Suggested PR slicing
 
@@ -94,8 +94,8 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 
 1. **E0** — done ([phase-E0.md](phase-E0.md)).
 2. **E1** — done ([phase-E1.md](phase-E1.md)).
-3. **E2** — `ModelPredictiveController` System family (`warm_start` → System /
-   StepSystem) + `compute_command` + `@` ([phase-E2.md](phase-E2.md)).
-4. **E3.1** — migrate `demo_mpc_hybrid_minimal.py` to `mpc @ plant`.
+3. **E2** — done ([phase-E2.md](phase-E2.md)).
+4. **E3.1** — migrate `demo_mpc_hybrid_minimal.py` to `mpc @ plant`
+   ([phase-E3.md](phase-E3.md)).
 
 Defer E4 until E2–E3 green. Retire PoC leaves (E5) after demos moved.

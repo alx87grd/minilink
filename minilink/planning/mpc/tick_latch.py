@@ -23,10 +23,12 @@ class MPCTickSolve:
 
 class MPCTickLatch:
     """
-    Memoize ``planner.step`` once per integer tick ``k``.
+    Memoize one planner solve per integer tick ``k``.
 
     Port ``compute`` paths on MPC blocks call :meth:`solve_for_tick`; the first
-    call at a new ``k`` runs the NLP, later calls at the same ``k`` read the latch.
+    call at a new ``k`` runs the NLP via
+    :meth:`~MPCPlanner.solve_trajectory_from`, later calls at the same ``k``
+    read the latch.
     """
 
     def __init__(
@@ -70,23 +72,27 @@ class MPCTickLatch:
                 k=k_int,
             )
 
-        plan = self._planner.step(y_arr, initial_guess=guess)
+        traj_plan = self._planner.solve_trajectory_from(y_arr, initial_guess=guess)
+        traj = traj_plan.trajectory
         result = self._planner.last_optimization_result
         if result is None:
-            raise RuntimeError("MPCPlanner.step did not store last_optimization_result")
+            raise RuntimeError(
+                "MPCPlanner.solve_trajectory_from did not store "
+                "last_optimization_result"
+            )
 
         n = int(self._planner.problem.sys.n)
         m = int(self._planner.problem.sys.m)
-        if plan.n_samples < 2:
+        if traj.n_samples < 2:
             raise RuntimeError(
                 "MPC plan must have at least two samples for x_ff = plan.x[:, 1]"
             )
 
         latch = MPCTickSolve(
-            plan=plan,
+            plan=traj,
             z=np.asarray(result.z, dtype=float).reshape(-1),
-            u_ff=np.asarray(plan.u[:, 0], dtype=float).reshape(m),
-            x_ff=np.asarray(plan.x[:, 1], dtype=float).reshape(n),
+            u_ff=np.asarray(traj.u[:, 0], dtype=float).reshape(m),
+            x_ff=np.asarray(traj.x[:, 1], dtype=float).reshape(n),
         )
         self._latch_k = k_int
         self._latch = latch

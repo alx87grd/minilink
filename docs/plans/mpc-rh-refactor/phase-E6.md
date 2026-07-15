@@ -5,9 +5,10 @@
 
 ## Goal
 
-`ModelPredictiveController` telemetry (last plan, `get_solve_metadata`,
-optional `step_disp`); keep animation / plan-history helpers as tools;
-document deploy wrap pattern (`compute_command` loop) — **no ROS2 package**.
+Polish `ModelPredictiveController` telemetry helpers (e.g.
+`get_solve_metadata`); keep animation / plan-history tools; document an
+external-node wrap around the existing E2 `compute_command` loop — **no ROS2
+package**. Deploy API itself is E2, not invented here.
 
 ## Exit / gate
 
