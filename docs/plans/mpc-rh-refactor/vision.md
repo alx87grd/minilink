@@ -248,6 +248,9 @@ and `t_solve`.
 
 - Deploy: `compute_command` → `Command` (`plan`, `u_ff`, …).
 - Sim default: `%` / `@` applies **`u_ff`** (ZOH) at \(\Delta t_{\mathrm{mpc}}\).
+- Hybrid tip: `compute_trajectory` defaults to `compile_backend="numpy"`; with
+  fine `plant_dt_inner`, pass `"jax"` for JAX plants or plant rollout dominates
+  wall time (NLP `solve=` alone understates cost).
 
 ### Broadcast + dual-rate (E8 — not E2)
 

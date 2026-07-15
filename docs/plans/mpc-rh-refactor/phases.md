@@ -14,24 +14,29 @@ Branch: **`dev-mpc-v2`** (hybrid + MPC controllers present; same full stack as
 
 | Demo | Role |
 | --- | --- |
-| `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` | Flagship → target `mpc @ plant` |
-| `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` | Richer hybrid + scene |
+| `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` | Flagship — **on** `ModelPredictiveController` + `mpc @ plant` |
+| `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` | Richer hybrid + scene — **on** product API (script); notebook may lag |
 
 **MPC hand-loop demos** — keep green:
 
 | Demo | Role |
 | --- | --- |
-| `demo_dynamic_bicycle_rate_mpc_straight_line.py` | Minimal compile-once + hand loop |
-| `demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | Full closed-loop lap |
-| Obstacle / stadium / wide variants | Smoke optional per phase |
+| `demo_dynamic_bicycle_rate_mpc_straight_line.py` | **On** `compute_command` (product warm-start) |
+| `demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | Full closed-loop lap — still `planner.step` hand loop |
+| Obstacle / stadium / wide / multi-obstacle | Smoke optional — still `planner.step` until E5 pressure |
 | `demo_mpc_spatial_scene_guide.py` | Teaching / scene API |
-| `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py` | Per-tick trajopt reference |
+| `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py` | Per-tick trajopt reference (keep as reference) |
+
+**Hybrid tip:** `compute_trajectory` defaults to `compile_backend="numpy"`.
+Fine `plant_dt_inner` with that default makes plant rollout dominate wall
+time; JAX plants should pass `compile_backend="jax"` (see hybrid demos).
 
 **Tests** — gate whenever touching `Planner` / MPC / hybrid:
 
 | Area | Tests |
 | --- | --- |
 | MPC NLP | `tests/unittest/test_mpc_planner.py` |
+| Product controller | `test_model_predictive_controller.py` |
 | MPC blocks / hybrid | `test_mpc_stateless_controller.py`, `test_mpc_stateful_controller.py`, `test_mpc_export_computer.py`, `test_mpc_hybrid_*.py` |
 | JAX collocation | `tests/unittest/test_jax_direct_collocation.py` |
 | Planning contracts | `tests/unittest/test_planning_architecture.py` |
@@ -56,10 +61,10 @@ flowchart LR
   E0 --> E1 --> E2 --> E3 --> E4 --> E6 --> E7 --> E8
 ```
 
-E2 lands `ModelPredictiveController` (`compute_command` **and**
-`export_to_computer` / `__matmul__` on the System); E3 migrates hybrid
-minimal to `mpc @ plant`. E5 (PoC leaf retirement) sits after demos move —
-see [phase-E5.md](phase-E5.md).
+E0–E3 done: foundation → online from-API → System-family controller →
+flagship demos. E5 (PoC leaf retirement) waits until remaining demos/tests
+leave aliases — see [phase-E5.md](phase-E5.md). E8 dual-rate contract is
+locked early; implementation stays last.
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
 demos set finite `tf=` for trajopt/MPC); transcription options carry
@@ -81,14 +86,14 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 
 ## Suggested PR slicing
 
-| PR | Contents | Gate focus |
-| --- | --- | --- |
-| PR-A | E0 | planning + MPC + hybrid tests |
-| PR-B | E1 + E2 | MPC + `ModelPredictiveController` + export tests |
-| PR-C | E3 | hybrid parity + smoke demos |
-| PR-D | E4 | MPC + trajopt + hybrid + controller |
-| PR-E | E5 | after all demos on controller |
-| PR-F+ | E6–E8 | phase gates |
+| PR | Contents | Gate focus | Status on `dev-mpc-v2` |
+| --- | --- | --- | --- |
+| PR-A | E0 | planning + MPC + hybrid tests | landed |
+| PR-B | E1 + E2 | MPC + `ModelPredictiveController` + export tests | landed |
+| PR-C | E3 | hybrid parity + smoke demos | landed |
+| PR-D | E4 | MPC + trajopt + hybrid + controller | next |
+| PR-E | E5 | after remaining demos/tests on controller | later |
+| PR-F+ | E6–E8 | phase gates | later |
 
 ## Start here
 
@@ -98,4 +103,6 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 4. **E3** — done ([phase-E3.md](phase-E3.md)).
 5. **E4** — expand [phase-E4.md](phase-E4.md) before coding (TOP merge).
 
-Retire PoC leaves (E5) after remaining demos move off aliases.
+E5 retires PoC factories only after remaining hand-loop demos, the track-lap
+notebook, and unittest call sites move to `ModelPredictiveController` (or an
+explicit thin-alias policy is chosen when expanding that card).

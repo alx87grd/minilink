@@ -75,4 +75,11 @@ ruff check . && ruff format --check .
 - README hybrid rows describe the product API
 - Behavior comparable to pre-migration (NLP path unchanged)
 
+## Note (perf footgun)
+
+Hybrid `compute_trajectory` defaults to `compile_backend="numpy"`. With a fine
+`plant_dt_inner`, plant ZOH rollout can dominate wall time even when NLP
+`solve=` looks fast. JAX-modeled plants should pass `compile_backend="jax"`
+(as the migrated hybrid demos do).
+
 Next: [phase-E4.md](phase-E4.md).

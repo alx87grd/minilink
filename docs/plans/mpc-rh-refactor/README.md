@@ -17,6 +17,10 @@ sequencing.
 
 **Active phase:** [phase-E4.md](phase-E4.md) — expand before coding; cite it in the PR.
 
+**Progress:** E0–E3 landed on `dev-mpc-v2` (types → online from-API →
+`ModelPredictiveController` → flagship demos). Next structural work is E4
+(TOP parametric merge).
+
 ## Related requirements (background only)
 
 - [../mpc-controller-architecture.md](../mpc-controller-architecture.md) — R1–R12, Option β
@@ -34,4 +38,5 @@ PlanningProblem (+ tf)
   → ModelPredictiveController (System family)  →  compute_command / @ plant
 ```
 
-First demo target after E2: `demo_mpc_hybrid_minimal.py` → `mpc @ plant`.
+Flagship hybrid demos and straight-line deploy path use that stack (E3 done).
+Remaining hand-loop / notebook call sites migrate before or with E5.
