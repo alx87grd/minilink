@@ -189,13 +189,117 @@ Debug mode covering development phases:
   keep `Trajectory` as the NumPy reporting bag (DESIGN), and keep equation-path
   helpers xp-clean.
 
-### R11 — Planner diversity with the RH concept
+### R11 — Planner diversity with the RH / feedback-planning idea
 
-It would be valuable if **RRT, DP, trajopt, …** could combine with the
-**receding-horizon** idea — not only NLP-MPC — and if the MPC / RH control
-surface could **import** more than one planner kind. This is tightly coupled to
-reviewing the **Planner contract** (and possibly soft sub-contracts /
-adapters). See §8.
+It would be valuable if **RRT, DP, trajopt, …** could combine with
+**online plan-and-act from the current state** — not only NLP-MPC — and if the
+closed-loop surface could **import** more than one planner kind. Coupled to the
+**Planner** contract review. See §8 (modes) and **§8.0 (minimal loop contract)**.
+
+---
+
+## 4b. Minimal “MPC-in-the-generic-sense” loop — core vs parameters
+
+Discussion clarification: what is **necessary** for a planner type to sit in this
+loop, versus what is just **problem parameterization**?
+
+### The generic scheme (core)
+
+At each control tick:
+
+1. Read a measurement of state (or state estimate) \(x\).
+2. Solve a **planning problem** that uses that \(x\) as the start / initial
+   condition.
+3. Obtain a control-relevant artifact (typically a **trajectory** / drafted
+   plan, or at least an applied \(u\)).
+4. Apply an action to the plant (first move, held \(u\), \(u_{\mathrm{nom}}(t)\), …).
+5. Repeat.
+
+That is **feedback via online planning** (“plan, act, replan”). It works even
+if you naively re-solve an ordinary trajopt / RRT with an updated `x_start`
+every step. Efficiency tricks (compile-once, warm-start) are optional.
+
+### Is “receding horizon” necessary?
+
+**No — not for the generic scheme to work.**
+
+| Term | Meaning | Required for plan-and-act loop? |
+| --- | --- | --- |
+| **Online replan from current \(x\)** | Refresh start; solve again; apply action | **Yes — this is the core** |
+| **Finite horizon \(T\)** that advances with time (“receding”) | Classic MPC OCP setup | **No** — common *instance*, not the definition |
+| **Shrinking horizon to fixed \(t_f\)** | Alternate finite-horizon policy | Optional |
+| **Global replan to goal each tick** (e.g. RRT) | Path may not be a short sliding window | Still the core loop; not classic RH |
+| **Warm start / parametric NLP** | Speed / reliability | Optional |
+| **Use only first move** vs track whole plan | Application policy | Optional (R4/R5 expose either) |
+
+So “MPC” as a product name may be too narrow; the flexible framework is an
+**online planning control loop**. Classic RH-MPC is one efficient backend + one
+common finite-horizon problem family.
+
+### What *must* a planner expose for that loop?
+
+**Minimal contract (idea — still a brainstorm):**
+
+```text
+given current measurement x (and optional overrides),
+produce a plan / command usable this tick
+```
+
+Concretely, something in this neighborhood:
+
+```text
+# thinnest useful surface
+solve_from(x, *, params=None) -> PathPlan   # or Trajectory (+ metadata)
+
+# equivalently, today-shaped API:
+# mutate / replace PlanningProblem.x_start (or X0), then compute_solution()
+```
+
+Required:
+
+| Must | Why |
+| --- | --- |
+| Accept **current state** \(x\) as start | Core of the loop |
+| Return something that yields **applied \(u\)** and preferably a **drafted trajectory** | R4 / plant actuation / broadcast |
+
+Not required for the *scheme* to work (these are **planning problem parameters** — may be fixed or updated each tick):
+
+| Parameter of the problem | Role | Core to the loop? |
+| --- | --- | --- |
+| Cost \(J\) / weights / references | Shapes the plan | No — problem data |
+| Feasibility / sets \(X,U\) / obstacles | Constraints | No — problem data |
+| Time horizon \(t_f\), \(N\), knot grid | Finite-horizon OCP setup | No — problem data (RH or not) |
+| Goal \(x_g\) / \(X_f\) | Terminal aim | No — problem data |
+| Scene / perception params | Environment | No — optional tick overrides (useful, not definitional) |
+| Warm-start vector \(z\) | Speed | No — efficiency |
+| Compile-once parametric NLP | Speed | No — efficiency |
+
+Updating those parameters each tick (time-varying ref, moving obstacles,
+shrinking \(T\)) is **allowed** and often useful; it is still the same loop —
+just a richer `params` bag on top of **required** \(x\).
+
+### DP nuance
+
+A pure **policy** (DP table) can close the loop **without** producing a
+trajectory each tick (`u = π(x)`). That is another valid feedback scheme, but
+it is **not** “solve a trajectory from \(x\)” — unless you **roll out** \(π\)
+to get a drafted plan (then it fits the minimal contract above). Keep those
+paths distinct when organizing Planner results (path vs policy).
+
+### Naming implication for the framework
+
+Prefer thinking:
+
+```text
+OnlinePlanningLoop / plan-and-act controller
+  └─ uses a Planner (or adapter) that can solve_from(x)
+       ├─ naive: ordinary PlanningProblem + compute_solution each tick
+       ├─ efficient: compile-once MPC NLP (MPCPlanner)
+       └─ other: RRT from x, trajopt from x, DP rollout, …
+```
+
+“Receding horizon” remains good vocabulary for the **finite sliding-horizon
+OCP** case — not a mandatory type in the class tree for the loop to be valid.
 
 ---
 
@@ -820,7 +924,9 @@ internals.
 | Aim `mpc @ plant` with defaults | R8, §6.5 |
 | Flatten on `Trajectory`? | §6.2 (preference, not lock) |
 | JAX: NLP not traceable now; plumbing stay traceable for future JAX NLP | R10, §8 |
-| RRT/DP/trajopt with RH; Planner contract / sub-contracts | R11, §9 |
+| RRT/DP/trajopt with RH; Planner contract / sub-contracts | R11, §4b, §9 |
+| Minimal loop = solve from measured \(x\); RH not mandatory | §4b |
+| Cost / feasibility / horizon as problem params, not loop core | §4b |
 
 ---
 
