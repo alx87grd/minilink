@@ -13,9 +13,16 @@ Related plans:
 - [planning-pipeline-architecture.md](planning-pipeline-architecture.md) — `TrajectoryPlan` / parametric NLP
 - [standard-planning-problems.md](standard-planning-problems.md) — problem taxonomy (stochastic later; **out of this scope**)
 
-Grounded in today’s code: `PlanningProblem`, `Planner`,
-`TrajectoryOptimizationPlanner`, `MPCPlanner` + `MPC*Controller` leaves,
-hybrid `Computer @ plant`.
+Grounded in today’s code (**`dev-alex`**, July 2026):
+
+- Present: `PlanningProblem`, `Planner`, `TrajectoryOptimizationPlanner`,
+  `MPCPlanner` (`prepare` / `step` / `compute_solution`),
+  `MPCStatelessController` / `MPCStatefulController`, `MPCTickLatch`,
+  `Computer` / `HybridDiagram` / hybrid demos
+  (`examples/scripts/hybrid/demo_mpc_hybrid_minimal.py`, track lap),
+  hand-loop MPC demos under `examples/scripts/mpc/`.
+- Implementation branch for this refactor: **`dev-alex`** (do not stage plan
+  work on a divergent MPC-only branch without cherry-picking).
 
 ---
 
@@ -951,89 +958,302 @@ flowchart TD
 
 ## 6. Migration from today’s PoC
 
-| Today | End goal |
+| Today (`dev-alex`) | End goal |
 | --- | --- |
-| `MPCPlanner` | Parametric mode of `TrajectoryOptimizationPlanner` (+ thin alias) |
-| `MPCStatelessController` / `MPCStatefulController` | Generated / replaced by RH `as_*_block` / export |
-| `MPCTickLatch` → `u_ff`,`x_ff`,`z` | Latch holds `TrajectoryPlan`; expose `plan_flat` |
-| Hand `while` closed-loop demos | Same NLP via `compute_command` or `rhc @ plant` |
-| `mpc % dt` then `computer @ plant` | `rhc @ plant` (still builds `Computer` under the hood) |
-| Scene baked at build | Later: `params.scene` / ObstacleBank (pipeline B) |
+| `MPCPlanner.step` → bare `Trajectory` | `solve_trajectory_from` → `TrajectoryPlan` |
+| `Planner.compute_solution` | `solve()` + typed 2×2 |
+| `MPCStateless/StatefulController` + latch | Absorbed / replaced by `RecedingHorizonController` export |
+| Hand `while` closed-loop demos | Prefer `rhc.compute_command` or `rhc @ plant` |
+| `mpc % dt` then `computer @ plant` | `rhc @ plant` (builds `Computer` under the hood) |
+| `MPCPlanner` sibling of TOP | Parametric mode of `TrajectoryOptimizationPlanner` |
+| Scene baked at build | Later: `params.scene` / ObstacleBank |
 
-**Important sequencing choice (recommended)**
-
-1. Land **RH façade + `TrajectoryPlan`** on **today’s `MPCPlanner`** by adding
-   `solve_trajectory_from` (thin wrap of `step` → `TrajectoryPlan`).
-2. Prove `compute_command` + `rhc @ plant` on `demo_mpc_hybrid_minimal`.
-3. **Then** merge compile-once into `TrajectoryOptimizationPlanner`.
-4. Scene parametric / broadcast / other planners’ `solve_trajectory_from` after that.
-
-Do **not** block aim UX on the planner merge.
+**Sequencing rule:** land types + `solve_trajectory_from` + RH façade; prove on
+`demo_mpc_hybrid_minimal` (`rhc @ plant`) early — hybrid host already exists
+here. Hand-loop demos migrate in parallel or next.
 
 ---
 
-## 7. Implementation phases (for approval)
+## 7. Execution plan — multi-phase with checkpoints
 
-### Phase 0 — Plan approval (this doc)
+Vision (§1–§5) stays; this section is **how to land it**. Each phase has:
+deliverables → automated gate → smoke demos → exit criteria.
+Do not start the next phase until the gate is green unless noted otherwise.
 
-- [ ] Agree vision diagrams and roles (§1–§4)
-- [ ] Agree default names: `RecedingHorizonController` (+ optional `MPCController` alias)
-- [ ] Agree default applied port: `u_ff` (ZOH); broadcast deferred
-- [x] Agree **no `HorizonSource`** — RH takes planner with `solve_trajectory_from`
-- [ ] Agree Phase 1 uses `solve_trajectory_from` on `MPCPlanner`, merge into TOP later
+### 7.0 Baseline inventory (what must keep working)
 
-### Phase 1 — Result contract + RH façade v0
+**Hybrid MPC demos** — primary closed-loop regression:
 
-**Deliverables**
+| Demo | Role |
+| --- | --- |
+| `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` | Flagship `mpc % dt` → `computer @ plant` |
+| `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` | Richer hybrid + scene |
 
-1. Optional `PlanningProblem.horizon` (\(T\)); trajopt/MPC resolve grid with
-   problem \(T\) preferred, else `options.tf` (no demo breakage)
-2. `SolveMetadata`, `TrajectoryPlan` (+ `to_flat` / `from_flat` minimal)
-3. **Rename `Planner.compute_solution` → `solve`** across library, tests, demos,
-   benchmarks, README/DESIGN pointers (mechanical; include `PolicyEvaluator` if
-   it shares the name). Wire `solve()` as dispatcher to typed methods as they land.
-4. `MPCPlanner.solve_trajectory_from` → `TrajectoryPlan` (wrap `step`; `params` accepted, unused keys error later)
-5. `RecedingHorizonController(planner, …)` with:
-   - `compute_command`
-   - `export_to_computer` / `__matmul__`
-   - latch holding full plan; ports include `plan_flat` (and keep `u_ff`/`x_ff`/`z`)
-6. Migrate `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` to
-   `PlanningProblem(..., horizon=T)` + `rhc @ plant` (`n_steps` still on options)
-7. Tests: command vs `step` parity; warm-start parity; horizon resolve
-   (problem-only / options-only / conflict)
+**MPC demos (hand-loop)** — also keep green:
 
-**Exit:** one source of truth for tick API; \(T\) vs \(N\) split visible in one
-demo; PoC leaves can remain temporarily.
+| Demo | Role |
+| --- | --- |
+| `demo_dynamic_bicycle_rate_mpc_straight_line.py` | Minimal compile-once + hand loop |
+| `demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | Full closed-loop lap |
+| `demo_dynamic_bicycle_rate_mpc_obstacle.py` / multi-obstacle / stadium / wide | Smoke optional per phase |
+| `demo_mpc_spatial_scene_guide.py` | Teaching / scene API |
+| `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py` | Per-tick trajopt reference |
 
-### Phase 2 — Planner merge (parametric TOP)
+**Tests** — gate whenever touching `Planner` / MPC / hybrid:
 
-- Fold `MPCPlanner` prepare/step into `TrajectoryOptimizationPlanner`
-  parametric mode (`solve_trajectory_from`)
-- Transcription options emphasize `n_steps`; `tf` becomes fallback / deprecated
-  as task source
-- Deprecate public `MPCPlanner` (alias OK pre-1.0)
-- Sync DESIGN §6 / ROADMAP / standard-planning-problems (\(T\) vs \(N\)); update demos
+| Area | Tests |
+| --- | --- |
+| MPC NLP | `tests/unittest/test_mpc_planner.py` |
+| MPC blocks / hybrid | `test_mpc_stateless_controller.py`, `test_mpc_stateful_controller.py`, `test_mpc_export_computer.py`, `test_mpc_hybrid_*.py` |
+| JAX collocation | `tests/unittest/test_jax_direct_collocation.py` |
+| Planning contracts | `tests/unittest/test_planning_architecture.py` |
+| RRT / DP | `test_rrt.py`, `test_dynamic_programming.py` |
 
-### Phase 3 — Observability polish
+**Always before push (repo rule):** `ruff check .` && `ruff format --check .`,
+plus the phase’s pytest list below.
 
-- RH `debug` / telemetry hooks (`get_solve_metadata`, last plan)
-- Keep overlays as tools; optional façade helpers
-- Document RAS wrap pattern (no ROS2 package yet)
+### 7.1 Dependency tracks
 
-### Phase 4 — Parametric scene + optional varying \(T\) (pipeline B / R12)
+```mermaid
+flowchart LR
+  E0[E0 Foundation]
+  E1[E1 Online surface]
+  E2[E2 RH facade]
+  E3[E3 Demo migration]
+  E4[E4 TOP merge]
+  E6[E6 Polish]
+  E7[E7 Scene params]
+  E8[E8 Broadcast backends]
 
-- `ProblemParameters.scene`, `ObstacleBank`
-- `solve_trajectory_from(..., params=)` without re-JIT
-- Optional RH input ports for scene
-- Perception demo
-- Design note / optional spike: runtime \(T\) with **fixed \(N\)** (time-scale
-  param) for varying-horizon RH — not required to close Phase 4
+  E0 --> E1 --> E2 --> E3 --> E4 --> E6 --> E7 --> E8
+```
 
-### Phase 5 — Broadcast + swappable backends
+Hybrid host **already on `dev-alex`** — E2 includes `compute_command` **and**
+`export_to_computer` / `__matmul__`; E3 migrates `demo_mpc_hybrid_minimal` to
+`rhc @ plant` (no separate hybrid-blocker track).
 
-- Multi-rate `BroadcastBlock` (`u_nom`/`x_nom`)
-- `solve_trajectory_from` on batch trajopt / RRT (smoke)
-- DP via `solve_trajectory_from` + rollout only if needed
+Default conflict rule: **hard error** if both `problem.horizon` and
+`options.tf` set and disagree.
+
+---
+
+### E0 — Foundation (no behavior change for demos)
+
+**Goal:** types + problem field + rename; demos keep calling old patterns via
+thin aliases only where needed — prefer clean rename in one PR.
+
+| Step | Work |
+| --- | --- |
+| E0.1 | Add `planning/results.py`: `SolveMetadata`, `TrajectoryPlan` (`trajectory`, `metadata`, `warm_state`, `x_dot`/`u_dot=None`, `to_flat`/`from_flat` minimal) |
+| E0.2 | Optional `PlanningProblem.horizon`; validation \(T>0\) |
+| E0.3 | Grid resolve helper: prefer `problem.horizon`, else `options.tf`; conflict → error |
+| E0.4 | Wire resolve into MPC + trajopt collocation time-grid construction (behavior-identical if demos still pass `tf=` only) |
+| E0.5 | `Planner`: dual slots `last_trajectory_plan` / `last_policy_plan`; `solve()` replaces `compute_solution` repo-wide |
+| E0.6 | Stub typed methods as `NotImplementedError` on base; TOP/MPC/RRT/DP route `solve()` to current bodies and store into the right slot (may still wrap bare `Trajectory` as `TrajectoryPlan(metadata=partial)` ) |
+
+**Gate (automated)**
+
+```bash
+pytest tests/unittest/test_mpc_planner.py \
+       tests/unittest/test_jax_direct_collocation.py \
+       tests/unittest/test_planning_architecture.py \
+       tests/unittest/test_rrt.py \
+       tests/unittest/test_dynamic_programming.py
+ruff check . && ruff format --check .
+```
+
+**Smoke (manual / optional CI):**
+`demo_dynamic_bicycle_rate_mpc_straight_line.py`,
+`demo_holonomic_corridor.py` (or one cartpole trajopt),
+one RRT demo.
+
+**Exit:** all gate tests green; demos unchanged functionally; public name is
+`planner.solve()` not `compute_solution`.
+
+---
+
+### E1 — Online surface on `MPCPlanner`
+
+**Goal:** traj-family online API without RH controller yet.
+
+| Step | Work |
+| --- | --- |
+| E1.1 | `MPCPlanner.solve_trajectory_from(x0, *, params=None, warm_start=None) -> TrajectoryPlan` wrapping `step`; fill metadata from `OptimizationResult`; `warm_state=z` |
+| E1.2 | `solve_trajectory()` ≡ `solve_trajectory_from(problem.x_start)` |
+| E1.3 | `solve()` → `solve_trajectory()` (return `TrajectoryPlan`; temporary `.trajectory` unwrap only if a call site still needs bare `Trajectory` — prefer updating call sites) |
+| E1.4 | Unit tests: metadata round-trip; `params` non-`None` unused keys → error; parity of `.trajectory` vs old `step` |
+
+**Gate**
+
+```bash
+pytest tests/unittest/test_mpc_planner.py tests/unittest/test_mpc_solve_trajectory_from.py  # new
+```
+
+**Smoke:** straight-line demo still uses `step` **or** switched to
+`solve_trajectory_from` with same plots (either OK).
+
+**Exit:** online contract exists on MPC; hand demos not required to migrate yet.
+
+---
+
+### E2 — `RecedingHorizonController` (command + hybrid export)
+
+**Goal:** product façade — deploy tick **and** `rhc @ plant` (hybrid already
+on `dev-alex`). Evolve today’s latch / export helpers; PoC leaves can remain
+until demos migrate.
+
+| Step | Work |
+| --- | --- |
+| E2.1 | `RecedingHorizonController(planner, dt_mpc=…, warm_start=True)` |
+| E2.2 | Tick latch → `Command` (`plan`, `plan_flat`, `u_ff`, `x_ff`, `warm_state`, `metadata`) |
+| E2.3 | `compute_command(y, *, params=None, warm_state=None, t=None, k=None)` |
+| E2.4 | Warm-start via existing `mpc/warm_start.py` helpers |
+| E2.5 | `as_step_block` / `export_to_computer` / `__matmul__` (reuse `_block_common` patterns) |
+| E2.6 | Tests: command vs `solve_trajectory_from`; warm-start parity vs stateful controller tests; export smoke |
+
+**Gate**
+
+```bash
+pytest tests/unittest/test_mpc_planner.py \
+       tests/unittest/test_mpc_stateful_controller.py \
+       tests/unittest/test_mpc_export_computer.py \
+       tests/unittest/test_receding_horizon_controller.py  # new
+```
+
+**Smoke:** `compute_command` in a tiny loop **or** partial hybrid export unit test.
+
+**Exit:** RH can tick and export; PoC controllers still used by demos until E3.
+
+---
+
+### E3 — Migrate flagship demos to RH
+
+**Goal:** prove aim UX; keep NLP math identical.
+
+| Step | Work |
+| --- | --- |
+| E3.1 | Migrate **`demo_mpc_hybrid_minimal.py`** → `PlanningProblem(horizon=T)` + `rhc @ plant` |
+| E3.2 | Migrate **`demo_dynamic_bicycle_rate_mpc_straight_line.py`** → `compute_command` hand loop (or hybrid if easy) |
+| E3.3 | Optional: hybrid track lap + closed-loop lap |
+| E3.4 | Update README / demo docstrings; keep PoC leaves only if other demos still need them |
+
+**Gate**
+
+```bash
+pytest tests/unittest/test_mpc_planner.py \
+       tests/unittest/test_receding_horizon_controller.py \
+       tests/unittest/test_mpc_hybrid_straight_line.py \
+       tests/unittest/test_mpc_hybrid_warm_start_parity.py
+```
+
+**Smoke (required):**
+
+```bash
+python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
+python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
+```
+
+**Exit:** hybrid minimal uses `rhc @ plant`; behavior comparable to today.
+
+---
+
+### E4 — Merge compile-once into `TrajectoryOptimizationPlanner`
+
+**Goal:** one trajopt class; `MPCPlanner` thin alias.
+
+| Step | Work |
+| --- | --- |
+| E4.1 | `compile_mode="batch"|"parametric"` on TOP options |
+| E4.2 | Move parametric prepare/bind/`solve_trajectory_from` from `MPCPlanner` into TOP |
+| E4.3 | Prefer shared collocation + `transcribe_parametric` (or façade temporarily) |
+| E4.4 | `MPCPlanner` → factory/alias around parametric TOP |
+| E4.5 | Update `examples/scripts/mpc/*` + hybrid MPC demos; trajopt demos stay batch |
+| E4.6 | Sync DESIGN §6 / ROADMAP maturity notes |
+
+**Gate**
+
+```bash
+pytest tests/unittest/test_mpc_planner.py \
+       tests/unittest/test_jax_direct_collocation.py \
+       tests/unittest/test_planning_architecture.py \
+       tests/unittest/test_receding_horizon_controller.py \
+       tests/unittest/test_mpc_hybrid_*.py
+```
+
+**Smoke:** hybrid minimal + one trajopt demo + straight-line.
+
+**Exit:** no separate MPC NLP engine; demos import TOP or alias only.
+
+---
+
+### E5 — Retire PoC leaves (optional cleanup)
+
+**Goal:** after demos/tests use RH only, remove or thin-wrap
+`MPCStatelessController` / `MPCStatefulController` (pre-1.0 rename cleanly).
+
+| Step | Work |
+| --- | --- |
+| E5.1 | Point remaining call sites at RH export |
+| E5.2 | Delete or deprecate PoC leaf modules; keep warm_start/overlays tools |
+| E5.3 | Shrink hybrid tests to RH surface |
+
+**Gate:** full MPC/hybrid unittest set green.
+
+**Exit:** one controller product (`RecedingHorizonController`).
+
+---
+
+### E6 — Observability polish
+
+- RH telemetry: last plan, `get_solve_metadata`, optional `step_disp` forward
+- Keep `mpc_animation_overlays` / plan-history helpers as tools
+- Doc: deploy wrap pattern (`compute_command` loop) — no ROS2 package
+
+**Gate:** existing MPC + RH tests; smoke straight-line with overlays if applicable.
+
+---
+
+### E7 — Parametric scene (pipeline B)
+
+- `ObstacleBank`, `ProblemParameters.scene`, `bind(p)` beyond `x0`
+- Demo: moving / perception-style obstacle with compile-once timing test
+- Soft costs first
+
+**Gate:** new parametric-scene tests + `test_mpc_planner.py`; smoke
+multi-obstacle or new perception demo.
+
+---
+
+### E8 — Broadcast + other backends
+
+- Multi-rate nominal broadcast (`u_nom`/`x_nom`); optional fill `x_dot`/`u_dot`
+- `solve_trajectory_from` smoke on batch TOP / RRT
+- DP rollout → traj only if needed
+
+**Gate:** targeted new tests; one multi-rate hybrid or hand-loop broadcast demo.
+
+---
+
+### 7.2 Suggested PR slicing
+
+| PR | Contents | Gate focus |
+| --- | --- | --- |
+| PR-A | E0 (results + horizon + `solve` rename) | planning + MPC + hybrid tests |
+| PR-B | E1 + E2 (online API + RH command/export/`@`) | MPC + RH + export tests |
+| PR-C | E3 (migrate hybrid_minimal + straight-line) | hybrid parity + smoke demos |
+| PR-D | E4 (TOP merge) | MPC + trajopt + hybrid + RH |
+| PR-E | E5 (retire PoC leaves) | after all demos on RH |
+| PR-F+ | E6–E8 | phase gates |
+
+### 7.3 What to do **first** (start here on `dev-alex`)
+
+1. **E0.1–E0.3** — `TrajectoryPlan` / `SolveMetadata` + `PlanningProblem.horizon` + resolve helper.
+2. **E0.5** — `compute_solution` → `solve` rename (mechanical blast early).
+3. **E1** — `solve_trajectory_from` on `MPCPlanner`.
+4. **E2** — `RecedingHorizonController` with `compute_command` + `__matmul__`.
+5. **E3.1** — migrate `demo_mpc_hybrid_minimal.py` to `rhc @ plant` (first UX win).
+
+Defer E4 (TOP merge) until E2–E3 green. E5 leaf retirement after demos moved.
 
 ---
 
@@ -1049,8 +1269,8 @@ demo; PoC leaves can remain temporarily.
 | Warm-start / overlays | stay under `planning/mpc/` as helpers until merge |
 | Quarantine | none for this work |
 
-Dependency law: RH façade may import `Computer` / hybrid composition (same
-as today’s MPC export). Planners must not grow hybrid/ROS imports.
+Dependency law: Planners must not grow hybrid/ROS imports. RH façade may
+import `Computer` / hybrid composition from E2 (host already on `dev-alex`).
 
 ---
 
@@ -1066,34 +1286,34 @@ as today’s MPC export). Planners must not grow hybrid/ROS imports.
 
 ## 10. Open decisions (checkboxes for sign-off)
 
-Please mark / reply before implementation:
+Defaults below match §7 execution plan (reply to change any):
 
-1. [ ] **Name:** ship `RecedingHorizonController` as public; `MPCController` as alias?
-2. [ ] **Phase 1 kernel:** adapter on today’s `MPCPlanner` before TOP merge?
-3. [ ] **Default `@` applied signal:** `u_ff` (ZOH), not `u_nom` yet?
-4. [ ] **Flatten:** methods on `TrajectoryPlan` (not bare `Trajectory`)?
-5. [x] **No `HorizonSource`:** RH holds planner with `solve_trajectory_from` (locked)
-6. [ ] **PoC leaves:** keep `MPCStateless/StatefulController` until Phase 2, then generate-from-façade or delete?
-7. [ ] **Doc sync:** update DESIGN/ROADMAP only after Phase 1 lands (vs with this approval)?
-8. [x] **Continuous \(T\):** optional `PlanningProblem.horizon`; **`n_steps` stays on transcription** (locked by this revision)
-9. [ ] **Conflict rule** when both `problem.horizon` and `options.tf` set: problem wins vs hard error?
-10. [x] **Mother 2×2 + `solve()`:** typed `solve_trajectory` / `solve_policy` / `*_from`; short offline **`solve()`** replaces `compute_solution` (repo-wide rename, ~40–60 sites); no `compute_solution` alias (locked)
-10b. [x] **Dual result slots:** `last_trajectory_plan` + `last_policy_plan` (not one `last_result`); DP may hold policy and rolled-out traj together (locked)
-10c. [x] **`TrajectoryPlan` rates:** optional reserved `x_dot` / `u_dot` (default `None`); not required at solve; ctl-rate eval stays on broadcast (locked)
-11. [x] **TOP modes:** `compile_mode="batch"|"parametric"`; `solve_trajectory_from(..., params=None)` façade for Phase 4 (locked)
-12. [x] **Merge:** Phase 1 `solve_trajectory_from` on `MPCPlanner`; Phase 2 fold into parametric TOP (locked)
+1. [x] **Name:** `RecedingHorizonController` public; `MPCController` optional alias
+2. [x] **Order:** `MPCPlanner.solve_trajectory_from` + RH façade **before** TOP merge (E1–E3 before E4)
+3. [x] **Default applied `u`:** `u_ff` (ZOH); broadcast later (E8)
+4. [x] **Flatten:** on `TrajectoryPlan`
+5. [x] **No `HorizonSource`**
+6. [x] **PoC leaves:** keep until E3 demos migrate; retire in E5
+7. [x] **Doc sync:** README at E3; DESIGN/ROADMAP with E4
+8. [x] **Continuous \(T\):** `PlanningProblem.horizon`; `n_steps` on transcription
+9. [x] **Conflict rule:** hard error if `problem.horizon` and `options.tf` disagree
+10. [x] **Mother 2×2 + `solve()`**; dual slots; optional `x_dot`/`u_dot`
+11. [x] **TOP modes** batch/parametric; merge in E4
+12. [x] **Implementation branch:** `dev-alex` (hybrid + MPC controllers present)
 
 ---
 
 ## 11. Approval summary
 
-When this doc is approved, engineering starts at **Phase 1** with the
-vision locked as:
+Vision locked. Work on **`dev-alex`**. Engineering starts at **E0** (§7.3):
 
 ```text
-PlanningProblem (incl. continuous T)  →  Planner (TOP ± parametric)  →  TrajectoryPlan
-         n_steps on transcription only         ↓ solve_trajectory_from(x0)
-                                    RecedingHorizonController(planner)  →  Command / Computer / @ plant
+PlanningProblem (+ horizon T)
+  → Planner.solve / solve_trajectory[_from]
+  → TrajectoryPlan
+  → RecedingHorizonController  →  compute_command / @ plant
 ```
 
-Reply with decisions on §10 (or “approve all defaults”) to proceed.
+First demo target: `demo_mpc_hybrid_minimal.py` → `rhc @ plant`.
+
+Reply “approve execution plan” (or request changes to §7) to begin E0.
