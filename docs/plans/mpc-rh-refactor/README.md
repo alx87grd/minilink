@@ -14,6 +14,7 @@ sequencing.
 | [vision.md](vision.md) | Locked end-goal contracts (Planner 2×2, `TrajectoryPlan`, `ModelPredictiveController`) |
 | [phases.md](phases.md) | E0–E8 order, gates, PR slices, start-here |
 | [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E5 done; others stubs) |
+| [phase-F-cleanup.md](phase-F-cleanup.md) | Post-refactor hygiene — points to [planning UI plan](../planning-ui-simplification.md) for constructor UX |
 
 **Active phase:** [phase-E6.md](phase-E6.md) — expand before coding; cite it in the PR.
 
@@ -22,6 +23,7 @@ is E6 (observability polish).
 
 ## Related requirements (background only)
 
+- [../planning-ui-simplification.md](../planning-ui-simplification.md) — flat planner-family constructor UX (post-refactor; Phase F points here)
 - [../mpc-controller-architecture.md](../mpc-controller-architecture.md) — R1–R12, Option β
 - [../planning-pipeline-architecture.md](../planning-pipeline-architecture.md) — result wrappers / parametric NLP
 - [../standard-planning-problems.md](../standard-planning-problems.md) — problem taxonomy (stochastic out of scope)
