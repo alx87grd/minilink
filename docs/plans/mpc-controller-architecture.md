@@ -1,16 +1,20 @@
 # MPC / receding-horizon architecture — requirements & brainstorm
 
-Status: **approved design** (July 2026). 
-> **Decision Preamble:** After review, Minilink officially targets **Option β (Facade + Source)** for the MPC/Receding Horizon architecture. 
-> 1. **Phase 1 Implementation:** We will first implement the Option β slice using `TrajectoryOptimizationPlanner` in parametric mode (compile-once NLP) to get the core flattening, hybrid tick, and broadcast pipelines correct.
-> 2. **Phase 2 Implementation:** We will generalize the `HorizonSource` adapter to wrap other planners (RRT, Trajopt, DP) in the same online loop.
-> 
-> *See [planning-pipeline-architecture.md](planning-pipeline-architecture.md) for how `TrajectoryPlan` and its `warm_state` act as the standard output contract for these solvers.*
+Status: **approved requirements** (July 2026). Implementation master plan:
+[receding-horizon-implementation-plan.md](receding-horizon-implementation-plan.md)
+(that file wins on names/API when this brainstorm differs).
+
+> **Decision Preamble:** Target **Option β** (facade + planner with
+> `solve_trajectory_from`) for MPC / receding horizon. See the master plan for
+> phases: RH façade on today’s `MPCPlanner` first, then merge into parametric
+> `TrajectoryOptimizationPlanner`; no separate `HorizonSource` type.
+>
+> *See [planning-pipeline-architecture.md](planning-pipeline-architecture.md) for
+> `TrajectoryPlan` / parametric NLP background.*
 
 Companion brainstorm: [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
 (planner I/O families, parametric NLP / scene). This doc focuses on **MPC /
-closed-loop export / broadcast / deploy** and how that couples to a wider
-**Planner** contract review.
+closed-loop export / broadcast / deploy** requirements (R1–R12).
 
 PoC baseline (what exists today): [DESIGN.md](../../DESIGN.md) step/hybrid +
 Phase 6a–6b; code under [`minilink/planning/mpc/`](../../minilink/planning/mpc/).
