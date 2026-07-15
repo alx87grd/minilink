@@ -14,6 +14,7 @@ sequencing.
 | [vision.md](vision.md) | Locked end-goal contracts (Planner 2×2, `TrajectoryPlan`, `ModelPredictiveController`) |
 | [phases.md](phases.md) | E0–E8 order, gates, PR slices, start-here |
 | [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E5 done; others stubs) |
+| [phase-F-cleanup.md](phase-F-cleanup.md) | Post-refactor cleanup & beginner recipe layer (planning) |
 
 **Active phase:** [phase-E6.md](phase-E6.md) — expand before coding; cite it in the PR.
 
