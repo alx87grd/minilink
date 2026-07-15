@@ -7,7 +7,7 @@ Companion to [planning-pipeline-architecture.md](planning-pipeline-architecture.
 | Plan | Focus |
 | --- | --- |
 | **A / B** ([planning-pipeline-architecture.md](planning-pipeline-architecture.md)) | PathPlan / PolicyPlan results; parametric scene NLP |
-| **C** (this doc) | MPCController facade; multi-rate Computer export; plan broadcast exposure |
+| **C** (this doc) | RH/MPC facade; multi-rate export; plan broadcast; **horizon-source contract (C8)** |
 
 Implemented PoC contracts live in [DESIGN.md](../../DESIGN.md) (step/hybrid + Phase 6a–6b) and [ROADMAP.md](../../ROADMAP.md) §5.5 / §5.5a.
 
@@ -58,12 +58,18 @@ flowchart TD
   MPC --> Node
 ```
 
-1. **`RecedingHorizonPlanner` (planner / tool)** — owns transcription, compile, `step(x0, warm_start=…) → PathPlan`. Lives under `planning/`. Not a `System`. `MPCPlanner` is the first implementation.
+1. **Horizon backend (planner / tool)** — anything that can emit a drafted
+   `PathPlan` from the current `x0` each tick (see **C8**). `MPCPlanner.step`
+   is the first backend; trajopt / RRT / DP-rollout adapters share the same
+   surface. Not a `System`.
 
-2. **`MPCController` (control facade)** — holds any receding-horizon path backend. Owns warm-start, latch, debug, last plan/metadata. **Single source** for hand loops, export, and real nodes.
+2. **`RecedingHorizonController` facade** (aim alias **`MPCController`** when the
+   backend is NLP-MPC) — holds a **horizon source**, warm-start policy, latch,
+   debug, last plan/metadata. **Single source** for hand loops, export, and
+   real nodes. Does **not** require the backend to be `MPCPlanner`.
 
 3. **Multi-rate Computer export (chosen packaging)** — `export_to_computer` / `%` builds a **`StepDiagramSystem` + `StepSchedule`**, not a lone NLP leaf:
-   - **Solver sub-block** fires at `dt_mpc` (warm-start `StepSystem` or cold static+latch)
+   - **Tick sub-block** fires at `dt_mpc` (calls `generate_horizon`)
    - **Broadcaster sub-block** fires at faster `dt_ctl` ([`StepSchedule.fire`](../../minilink/simulation/computer.py) divisors)
    - Broadcaster time-interpolates the latched drafted plan and exposes **nominal** ports
    - Boundary exposes **everything a downstream law needs**; Minilink does **not** ship FF/FB tracker blocks as the product of this work
@@ -73,11 +79,179 @@ flowchart TD
 5. **Beginner path = `mpc @ plant`** — same mental model as `ctl @ plant` / `computer @ plant`. The facade carries schedule defaults and auto-wires a safe applied-`u` so the first working closed loop is one composition line (see C0). Advanced ports stay exposed; beginners need not name them.
 
 **Not chosen:** embedding stabilizers / tracking laws in the MPC package.  
-**Not chosen:** a separate user-facing downstream-law toolkit as a deliverable — only **exposure** (ports + codec + broadcaster inside the export).  
-**Not chosen:** “any `Planner`” literally — require a receding-horizon path surface.  
-**Not chosen:** continuous `DiagramSystem` hosting the NLP — NLP stays on the Computer; interpolation broadcasts on the faster Computer tick.
+**Not chosen:** a separate user-facing downstream-law toolkit as a deliverable — only **exposure** (ports + flatten + broadcaster inside the export).  
+**Not chosen:** forking `Planner` into deep `TrajectoryPlanner` / `PolicyPlanner` class trees — keep one ABC + result families + a thin horizon-source surface (**C8**).  
+**Not chosen:** continuous `DiagramSystem` hosting the NLP — tick side stays on the Computer; interpolation broadcasts on the faster Computer tick.
 
 Default for “RAS”: generic `compute_command` + same `plan_flat` / nominal-eval helpers the broadcaster uses internally (aligns with future [`ros2.py`](../../ROADMAP.md) wrapping).
+
+---
+
+## C8. Planner contracts compatible with receding horizon
+
+Coupled with [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
+(A/B: `PathPlan` / `PolicyPlan`). Goal: RRT, trajopt, DP, and NLP-MPC can all
+participate in the **same receding-horizon control loop** without pretending
+they are the same offline algorithm.
+
+### What “compatible with MPC/RH” actually means
+
+Three combination modes (do not conflate them):
+
+| Mode | Meaning | Example |
+| --- | --- | --- |
+| **H1 — Horizon backend swap** | Each tick, some tool emits a drafted `PathPlan` from `x0`; RH controller latches + broadcasts | NLP-MPC `step`; RRT from `x0`; trajopt re-solve; DP **rollout** |
+| **H2 — Cascade / warm refine** | One planner proposes a path; another refines it as warm start | RRT → trajopt/MPC; previous tick plan → shift warm start |
+| **H3 — Problem composition** | Offline artifact shapes the online NLP (not a horizon swap) | DP cost-to-go as terminal cost; reference path as soft tracking cost |
+
+`RecedingHorizonController` **imports H1** (required). H2 is options on the
+horizon source (`warm_start=`). H3 lives in `PlanningProblem` construction, not
+in the controller import type.
+
+### Keep one `Planner` ABC; specialize results and capabilities — not deep subclasses
+
+Align with plan A: **one** [`Planner`](../../minilink/planning/planner.py) +
+declarative [`PlanningProblem`](../../minilink/planning/problems.py).
+
+```mermaid
+flowchart TD
+  PP[PlanningProblem]
+  P[Planner ABC]
+  Path[PathPlan plus metadata]
+  Pol[PolicyPlan plus metadata]
+  HS[HorizonSource duck surface]
+  RH[RecedingHorizonController]
+  Export[multi-rate Computer]
+
+  PP --> P
+  P -->|"trajopt RRT MPC"| Path
+  P -->|"DP"| Pol
+  Path -->|"native or adapter"| HS
+  Pol -->|"rollout adapter"| HS
+  HS --> RH
+  RH --> Export
+```
+
+| Layer | Contract | Notes |
+| --- | --- | --- |
+| **Input** | `PlanningProblem` | Shared; do not fork problem types per algorithm |
+| **Orchestrator** | `Planner` | `compute_solution()` offline / batch; soft `result_kind` `"path"` / `"policy"` |
+| **Path result** | `PathPlan` | Open-loop `(t,x,u)` + metadata |
+| **Policy result** | `PolicyPlan` | `controller()`, **`rollout(x0, horizon) → PathPlan`** |
+| **Online tick** | **Horizon source** (duck-typed) | What the RH controller imports |
+
+**Do not** make the RH facade call `Planner.compute_solution()` blindly each
+tick (RRT would ignore fresh `x0` unless the problem is rebuilt; DP returns a
+table, not a horizon).
+
+### Horizon-source surface (what RH actually needs)
+
+Duck-typed — familiar pattern, not `typing.Protocol`:
+
+```python
+# Required
+source.generate_horizon(x0, *, warm_start=None, params=None) -> PathPlan
+
+# Optional but useful
+source.prepare()                       # compile-once NLP, DP table already built, …
+source.warm_state_dim -> int           # 0 if none; else dim of warm vector for StepSystem
+source.default_warm_state() -> array   # for Computer x0
+# n, m from problem.sys / resulting PathPlan
+```
+
+`PathPlan` is the **only** tick output family the RH controller understands.
+Policies enter only via **`rollout → PathPlan`** (or via H3 problem composition).
+
+### How each current planner family maps
+
+| Family | Offline `compute_solution` | As horizon source (H1) | Notes |
+| --- | --- | --- | --- |
+| **NLP-MPC** (`MPCPlanner`) | `step(x_start)` thin `compute_solution` | **Native:** `generate_horizon` ≡ `step` | Primary; warm `z`; xp-clean around SciPy |
+| **Trajopt** | Full re-transcribe/solve → `Trajectory` | Adapter: set `x0`, optional warm guess, solve → `PathPlan` | Slow RH demo; tests facade without parametric NLP |
+| **RRT / RRT\*** | Tree search from `problem.x_start` → `Trajectory` | Adapter: each tick `x_start=x0` → `PathPlan` | Sampling RH; usually `warm_state_dim=0`; optional later: reuse tree |
+| **DP** | Value/policy table → `PolicyPlan` | Adapter: **`policy.rollout(x0, tf=…, dt=…)` → `PathPlan`** | Does **not** re-run VI each tick. For closed-loop DP feedback prefer `controller()` continuous `@`, not RH |
+| **Future JAX NLP** | Same as MPC | Same `generate_horizon` | Drop-in backend; helpers already xp-clean |
+
+### Specialized “sub-contracts” — capabilities over class trees
+
+Avoid deep trees (`PathPlanner` / `SamplingPlanner` / …). Prefer **soft
+capabilities + adapters**:
+
+| Capability | Who | Evidence |
+| --- | --- | --- |
+| `result_kind == "path"` | trajopt, RRT, MPC | Returns / wraps `PathPlan` |
+| `result_kind == "policy"` | DP | Returns / wraps `PolicyPlan` |
+| `as_horizon_source(...)` | those that can do H1 | Duck object with `generate_horizon` |
+| `supports_warm_start` | MPC, trajopt | `warm_state_dim > 0` or accepts `warm_start=` |
+
+```python
+path_planner.as_horizon_source()             # default: re-solve / replan from x0
+policy_plan.as_horizon_source(tf=, dt=)      # rollout wrapper
+mpc_planner.as_horizon_source()              # identity / self
+```
+
+Optional later: a small mixin with abstract `generate_horizon` — still **one**
+`Planner` tree.
+
+### Naming the facade
+
+| Name | Use |
+| --- | --- |
+| **`RecedingHorizonController`** | Accurate generic facade (any horizon source) |
+| **`MPCController`** | Alias or thin subclass when source is NLP-MPC — keeps aim demos sounding like MPC |
+
+### Package organization
+
+```text
+planning/
+  planner.py              # Planner ABC
+  problems.py             # PlanningProblem
+  results.py              # PathPlan, PolicyPlan, SolveMetadata  (plan A)
+  horizon.py              # duck docs + as_horizon_source adapters
+  mpc/                    # NLP-MPC backend + RH controller export/broadcast
+  trajectory_optimization/
+  search/
+  policy_synthesis/
+```
+
+RH export/broadcast lives next to the closed-loop product (`planning/mpc/`);
+horizon adapters live in `planning/horizon.py` so search/DP do **not** import
+`mpc/` internals. Dependency: `mpc/` → `horizon.py`; not the reverse.
+
+### Example compositions
+
+```python
+# H1 NLP-MPC (aim)
+rh = MPCController(mpc_planner, dt_mpc=0.1)
+hybrid = rh @ plant
+
+# H1 RRT receding horizon (same controller machinery)
+rh = RecedingHorizonController(rrt.as_horizon_source(), dt_mpc=0.5)
+hybrid = rh @ plant
+
+# H1 DP rollout as drafted plan (open-loop FF of greedy policy)
+rh = RecedingHorizonController(policy.as_horizon_source(tf=2.0, dt=0.1), dt_mpc=0.1)
+hybrid = rh @ plant
+
+# H2 cascade (sketch): RRT proposes, MPC refines
+guess = rrt.as_horizon_source().generate_horizon(x0)
+plan = mpc_planner.generate_horizon(x0, warm_start=guess.trajectory)
+
+# H3: PlanningProblem carries DP terminal / track cost — then normal MPCPlanner
+```
+
+### Decisions (C8)
+
+| Question | Decision |
+| --- | --- |
+| One `Planner` ABC? | **Yes** (with plan A) |
+| Fork Path/Policy planner class trees? | **No** — split **results** + soft capabilities |
+| What does RH controller import? | **Horizon source** (`generate_horizon → PathPlan`), not raw `Planner` |
+| Can RRT/trajopt drive RH? | **Yes** via `as_horizon_source` adapters |
+| Can DP drive RH? | **Yes** via **`PolicyPlan.rollout` → PathPlan**; VI stays offline |
+| DP closed-loop feedback? | Prefer `controller()` continuous path; RH rollout is a different use |
+| Where do adapters live? | `planning/horizon.py` (no search→mpc dependency) |
+| Facade name? | `RecedingHorizonController` + `MPCController` alias for NLP-MPC demos |
 
 ---
 
@@ -427,7 +601,8 @@ plots — no plant loop.
 - A separate public `PlanCodec` type (use `Trajectory.to_flat` / `from_flat`)
 - A public `JaxTraj` twin of `Trajectory` (use native-array helpers instead)
 - Making `Trajectory` itself JAX-traceable (stays NumPy reporting object per DESIGN)
-- Making the SciPy MPC NLP tick JAX-traceable
+- Making the **SciPy** MPC NLP tick JAX-traceable (host solver today; JAX NLP is a later backend)
+- Freezing NumPy-only helpers for pack / nominal / warm-start (those stay xp-clean for the JAX NLP day)
 - Shooting MPC, acados binding, or ROS2 package
 - Trajopt / MPC transcription merge (B8 in [planning-pipeline-architecture.md](planning-pipeline-architecture.md))
 - NLP inside continuous `Simulator`
@@ -438,14 +613,15 @@ plots — no plant loop.
 ## Suggested implementation order
 
 1. `PathPlan` / `SolveMetadata` (A) if needed for clean `MPCCommand`
-2. **`Trajectory.to_flat` / `from_flat`** (NumPy) + native **`pack_horizon` / `unpack_horizon` / `eval_nominal`** (+ optional JAX jit smoke)
-3. Broadcaster leaf using `eval_nominal` (NumPy Computer first)
+2. **`Trajectory.to_flat` / `from_flat`** (NumPy) + native **`pack_horizon` / `unpack_horizon` / `eval_nominal` / warm-start shift** (+ **required** JAX jit smoke on those helpers — no NLP inside)
+3. Broadcaster leaf using `eval_nominal` (NumPy Computer first; math stays xp-clean)
 4. `MPCController.export_to_computer` → multi-rate bundle (`StepSchedule.fire`) + default `dt_ctl` / warm-start / `x0_computer`
 5. **`MPCController.__matmul__` / `mpc_closed_loop`** aim path (defaults → `hybrid_closed_loop`, applied `u_nom`)
 6. Expose full boundary port set; keep solver-only escape hatch
 7. Rewrite hybrid minimal demo to `mpc @ plant`; keep one explicit multi-rate diagram demo
 8. Hand-loop / RAS `compute_command` aligned with same flatten/eval
 9. Debug overlays for nominals vs plant
+10. *(Later, separate)* JAX NLP backend behind the same RH `step` / parametric program surface
 
 ---
 
@@ -459,6 +635,7 @@ plots — no plant loop.
 | Beginner closed loop? | **`mpc @ plant`** with defaults (`dt_ctl`, warm-start, applied `u_nom`) |
 | Baseline public artifact? | **Drafted plan** (`plan` + `plan.to_flat()`) and **ctl-rate nominals** |
 | Flat wire API home? | **`Trajectory.to_flat` / `from_flat`** (NumPy report) — not PlanCodec |
-| JAX-traceable path? | **Native helpers** `pack_horizon` / `eval_nominal` with `xp` — not JaxTraj, not a traceable Trajectory |
+| JAX today? | **Helpers xp-clean** (pack / eval / warm-start); SciPy NLP host-only |
+| JAX later? | Same RH `step` + helpers; swap in full JAX NLP without rewriting broadcast/export |
 | Ship FF/FB laws? | **No** — expose ports/info; users wire laws; aim path is pure FF `u_nom` |
 | RAS / ROS? | Shared `compute_command` + traj flatten/eval helpers; `ros2.py` later |
