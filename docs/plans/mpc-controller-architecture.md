@@ -173,7 +173,7 @@ sequenceDiagram
   end
   Note over Solver: Every dt_mpc within same Computer
   Comp->>Solver: fire
-  Solver->>Bcast: update latched plan_flat t0_abs
+  Solver->>Bcast: update latched plan_flat
 ```
 
 Canonical export sketch (explicit):
@@ -275,40 +275,79 @@ Requirements: one NLP per MPC tick; high-rate path is interp-only; fail-soft hoo
 
 ### C6. Trajectory flatten + broadcaster
 
-#### C6a. Flatten / inflate on `Trajectory` (chosen — not a separate PlanCodec)
+#### C6a. Flatten / inflate — two layers (NumPy report vs native math)
 
-**Decision:** put the standard wire encode/decode on [`Trajectory`](../../minilink/core/trajectory.py) itself — same home as `save` / `load` / `resample`. Do **not** introduce a public `PlanCodec` type.
+**DESIGN fact:** [`Trajectory`](../../minilink/core/trajectory.py) is already a
+**NumPy reporting / I/O object** ([DESIGN.md](../../DESIGN.md) §4: convert at
+boundaries — evaluators, solvers, plotting, `Trajectory`). Its constructor
+`np.asarray`’s and copies. Making `Trajectory` itself JAX-traceable would fight
+that contract and the textbook “report bag” role.
+
+**Chosen split:**
+
+| Layer | API | Backend | Role |
+| --- | --- | --- | --- |
+| Report / wire (Python, ports, RAS, plots) | `Trajectory.to_flat()` / `Trajectory.from_flat()` | NumPy | Human artifact; Computer `plan_flat` port; save/round-trip |
+| Traceable math (optional) | bare helpers `pack_horizon(t,x,u)` / `unpack_horizon(flat, n,m,N)` and `eval_nominal(t, t_knots, x_knots, u_knots)` | **native** via `xp = array_module(...)` | JIT / AD / ctl-rate interp inside equation paths |
 
 ```python
-plan_flat = plan.to_flat()                 # self-describing 1-D float array
+# Boundary (NumPy Trajectory)
+plan_flat = plan.to_flat()
 plan      = Trajectory.from_flat(plan_flat)
-# optional: Trajectory.flat_shapes(plan_flat) → (n, m, N)
+
+# Equation / JIT path (no Trajectory object)
+flat = pack_horizon(t, x, u)                    # xp-native in → flat native out
+t, x, u = unpack_horizon(flat, n=n, m=m, N=N)  # shapes fixed at prepare /
+u_nom, x_nom = eval_nominal(t_query, t, x, u)  # linear interp, xp-native
 ```
 
-Layout (fixed, documented on `Trajectory`):
+Layout for both layers (same byte/layout contract):
 
-- Small header: `n`, `m`, `N` (and version / flags if needed)
-- Payload: `t` (`N`), then flattened `x` `(n, N)`, then flattened `u` `(m, N)`
-- Core channels only in v1 (`signals` out of flat wire unless a later flag says otherwise)
-- Round-trip: `Trajectory.from_flat(traj.to_flat())` matches `t,x,u` within float tolerance
-- **Not** the NLP decision vector `z` (that stays transcription-specific)
+- Header: `n`, `m`, `N` (and version / flags if needed)
+- Payload: `t` (`N`), flattened `x` `(n, N)`, flattened `u` `(m, N)`
+- Core channels only in v1
+- Round-trip on NumPy side; native helpers preserve dtype/device of inputs
 
-Why on `Trajectory`:
+**Not chosen: a public `JaxTraj` type** (for now). Reasons:
 
-- The drafted plan *is* a trajectory; flatten is a general wire form (sim, MPC port, RAS), not an MPC-only codec
-- Matches existing persistence style (`save`/`load`) on the same object
-- Keeps `planning/mpc/` free of a parallel “plan bag” type
+- Dual traj classes (`Trajectory` vs `JaxTraj`) add a second vocabulary for the
+  same `(t,x,u)` math — weak fit for “familiar patterns first” and pre-1.0
+  simplicity.
+- Minilink already solves hybrid algebra with **functions + `xp`**, not parallel
+  container types (geometry SDF, costs, plants use native arrays; report bags
+  stay NumPy).
+- Broadcaster only needs **`(t,x,u)` arrays + `eval_nominal`**, not a full traj
+  object under JIT.
+- Revisit a tiny named tuple / dataclass of native arrays only if call sites
+  drown in bare `t,x,u` triples — name it then (`HorizonArrays` or similar),
+  still not a JAX twin of `Trajectory`.
 
-MPC latch / Computer port still named `plan_flat` for clarity; its value is always `latest_plan.to_flat()`. Absolute time for broadcasting lives in `plan.t` (solver writes absolute knot times when latching, or shifts relative knots once at latch).
+MPC port still named `plan_flat`; value is `latest_plan.to_flat()` at the
+Computer boundary. Absolute time for broadcasting lives in knot `t` when
+latching. Inside a JAX-friendly step graph, prefer holding **`(t,x,u)` or
+`flat` as arrays** and calling `eval_nominal` — do not round-trip through
+`Trajectory` on the hot path.
 
 #### C6b. Broadcaster sub-block (inside exported Computer)
 
-- Input: latched `plan_flat` (inflate via `Trajectory.from_flat` or cached plan)
-- On each **ctl** fire: evaluate at schedule time → `u_nom`, `x_nom`, optional `du_nom`, `dx_nom`
-- Same evaluate helpers callable outside diagrams for RAS
+- Input: latched `plan_flat` (Python/Computer: inflate or keep arrays)
+- On each **ctl** fire: `eval_nominal(t_sched, …)` → `u_nom`, `x_nom`, optional `du_nom`, `dx_nom`
+- Implement `eval_nominal` (and optional derivative helpers) as **native-array**
+  functions so a future JAX Computer / JIT wrap can trace them; hybrid NumPy
+  Computer today remains the default path
+- Fixed horizon `N` (and `n`,`m`) known after `prepare` → static shapes for JIT
+- Same helpers callable outside diagrams for RAS
 - Horizon end policy: clamp / hold last knot (configurable)
 - `dx`: prefer `f(x_nom, u_nom, t)` from planning model; `du`: FD/spline on `u` knots
 - If model `f` unavailable, fall back to FD on `x` and mark `dx_source="fd"`
+
+**Traceability aim (honest scope):**
+
+- **Must:** NumPy Computer + broadcaster work; flatten round-trip on `Trajectory`
+- **Should:** `pack_horizon` / `unpack_horizon` / `eval_nominal` stay free of
+  `np.asarray` / `float()` forcing so they are JAX-traceable with `xp`
+- **Not required in v1:** making the whole MPC NLP tick (SciPy SLSQP) JAX-traceable
+- **Not required in v1:** a JIT’d hybrid Computer that embeds the NLP
 
 ---
 
@@ -316,13 +355,15 @@ MPC latch / Computer port still named `plan_flat` for clarity; its value is alwa
 
 ### P0 — Planner tuning
 
-Prepare / `step`, inspect plan, `Trajectory.to_flat` / `from_flat` round-trip, scene plots — no plant loop.
+Prepare / `step`, inspect plan, `Trajectory.to_flat` / `from_flat` round-trip,
+native `pack_horizon`/`unpack_horizon` parity, scene plots — no plant loop.
 
 ### P1 — Export surface validation
 
 - Multi-rate `export_to_computer(dt_ctl, dt_mpc)` builds solver+broadcaster diagram
 - Port inventory present; `Trajectory.from_flat(plan_flat)` restores full plan
 - Dense sample of `u_nom`/`x_nom` matches `Trajectory.resample` / knot interp
+- `eval_nominal` matches resample; optional JAX `jit` smoke on `eval_nominal`
 - `du_nom`/`dx_nom` sanity vs FD / `f`
 
 ### P2 — Closed-loop hybrid (user wires law)
