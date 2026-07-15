@@ -122,3 +122,91 @@ class TestModelPredictiveController(unittest.TestCase):
         cmd = mpc.compute_command(np.array([0.0]), k=0)
         fig2 = mpc.update_debug_figure(cmd)
         self.assertIsNotNone(fig2)
+
+    def test_hybrid_one_nlp_per_tick_and_compile_once(self):
+        """Latch + compile-once: no per-tick re-prepare / re-compile / multi-solve."""
+        from unittest.mock import patch
+
+        from minilink.planning.mpc.warm_start import mpc_default_computer_x0
+        from minilink.simulation.computer import Computer
+        from minilink.simulation.hybrid_simulator import HybridSimulator
+
+        planner = self._make_planner(0.0)
+        plant = JaxSingleIntegrator()
+        plant.x0 = np.array([0.0])
+        dt_mpc = 0.2
+        tf = 1.0
+        n_ticks = int(round(tf / dt_mpc))
+
+        mpc = ModelPredictiveController(planner, dt_mpc=dt_mpc, warm_start=True)
+        hybrid = mpc @ plant
+        x0 = np.array([0.0])
+        x0_computer = mpc_default_computer_x0(planner)
+
+        n_solve = []
+        n_prepare = []
+        n_plant_compile = []
+        n_computer_compile = []
+
+        _solve = planner.solve_trajectory_from
+        _prepare = planner.prepare
+        _plant_compile = plant.compile
+        _computer_compile = Computer.compile
+        _hs_init = HybridSimulator.__init__
+
+        def solve_w(*args, **kwargs):
+            n_solve.append(1)
+            return _solve(*args, **kwargs)
+
+        def prepare_w(*args, **kwargs):
+            n_prepare.append(1)
+            return _prepare(*args, **kwargs)
+
+        def plant_compile_w(*args, **kwargs):
+            n_plant_compile.append(1)
+            return _plant_compile(*args, **kwargs)
+
+        def computer_compile_w(self, *args, **kwargs):
+            n_computer_compile.append(1)
+            return _computer_compile(self, *args, **kwargs)
+
+        def hs_init_w(self, *args, **kwargs):
+            hyb = args[0] if args else kwargs["hybrid"]
+            hyb.plant.compile = plant_compile_w
+            return _hs_init(self, *args, **kwargs)
+
+        planner.solve_trajectory_from = solve_w
+        planner.prepare = prepare_w
+        Computer.compile = computer_compile_w
+        HybridSimulator.__init__ = hs_init_w
+        try:
+            hybrid.compute_trajectory(
+                tf=tf,
+                x0_plant=x0,
+                x0_computer=x0_computer,
+                compile_backend="numpy",
+                verbose=False,
+            )
+        finally:
+            planner.solve_trajectory_from = _solve
+            planner.prepare = _prepare
+            Computer.compile = _computer_compile
+            HybridSimulator.__init__ = _hs_init
+
+        self.assertEqual(len(n_solve), n_ticks)
+        self.assertEqual(len(n_prepare), 0)
+        self.assertEqual(len(n_plant_compile), 1)
+        self.assertEqual(len(n_computer_compile), 1)
+
+        # Ports + step on one discrete tick share the latch.
+        leaf = ModelPredictiveController(planner, dt_mpc=dt_mpc, warm_start=True)
+        z = leaf.x0.copy()
+        y = np.array([0.05])
+        with patch.object(
+            planner, "solve_trajectory_from", wraps=planner.solve_trajectory_from
+        ) as mock_solve:
+            leaf.outputs["u_ff"].compute(z, y, t=4)
+            leaf.outputs["x_ff"].compute(z, y, t=4)
+            leaf.outputs["z"].compute(z, y, t=4)
+            leaf.step(z, y, k=4)
+            self.assertEqual(mock_solve.call_count, 1)

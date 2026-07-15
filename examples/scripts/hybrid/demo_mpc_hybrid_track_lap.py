@@ -1,8 +1,8 @@
 """Minimal hybrid MPC on a compact track with obstacles.
 
 Same rounded-rectangle loop and sphere scene as
-``demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py``, using warm-start
-``mpc % schedule`` and ``computer @ plant``.
+``demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py``, using
+``ModelPredictiveController`` (``warm_start=True``) and ``mpc @ plant``.
 
 Run from repo root::
 
@@ -18,11 +18,11 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputsUY,
 )
 from minilink.planning.mpc import (
+    ModelPredictiveController,
     MPCDirectCollocationTranscription,
     MPCOptions,
     MPCPlanner,
     mpc_animation_overlays,
-    mpc_stateful_controller,
 )
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 from minilink.planning.problems import PlanningProblem
@@ -165,7 +165,7 @@ planner = MPCPlanner(
 # Controller Block
 ########################################################
 
-mpc = mpc_stateful_controller(planner, dt_mpc=MPC_DT, step_disp=True)
+mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True)
 
 ########################################################
 # Simulation model
@@ -182,11 +182,8 @@ sys_sim.x0 = x0.copy()
 # Diagram
 ########################################################
 
-# A discrete time block with a tick schedule
-computer = mpc % MPC_DT
-
-# A hybrid diagram with a plant and a computer
-hybrid = computer @ sys_sim
+# Hybrid: mpc @ plant (single-rate Computer under the hood)
+hybrid = mpc @ sys_sim
 
 hybrid.plot_diagram()
 

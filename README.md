@@ -429,8 +429,8 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Diagrams | `examples/scripts/diagrams/` |
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
 | Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
-| Minimal hybrid MPC warm-start (`mpc % dt` then `computer @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` |
-| Minimal hybrid MPC track + obstacles (warm-start, `mpc % dt`) | `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` · [notebook](examples/notebooks/demo_mpc_hybrid_track_lap.ipynb) |
+| Minimal hybrid MPC (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` |
+| Hybrid MPC track + obstacles (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` · [notebook](examples/notebooks/demo_mpc_hybrid_track_lap.ipynb) |
 | Pyro SMC continuous (pendulum) | `examples/scripts/control/demo_sliding_mode_pendulum.py` |
 | Pyro SMC continuous vs hybrid (pendulum) | `examples/scripts/hybrid/demo_smc_pendulum_compare.py` |
 | Hybrid MPC straight-line warm-start (`MPCStatefulController`; `STEP_DISP=True`; set `USE_WARM_START=False` for stateless 6a) | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py` |

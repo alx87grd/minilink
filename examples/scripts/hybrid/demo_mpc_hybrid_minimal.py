@@ -1,6 +1,6 @@
-"""Minimal hybrid MPC: ``mpc % schedule`` then ``computer @ plant``.
+"""Minimal hybrid MPC: ``ModelPredictiveController`` then ``mpc @ plant``.
 
-Warm-start via :func:`mpc_stateful_controller` (packed ``z`` on ``Computer.x``).
+Warm-start via ``warm_start=True`` (packed ``z`` on ``Computer.x``).
 
 Run from repo root::
 
@@ -15,11 +15,11 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputsUY,
 )
 from minilink.planning.mpc import (
+    ModelPredictiveController,
     MPCDirectCollocationTranscription,
     MPCOptions,
     MPCPlanner,
     mpc_animation_overlays,
-    mpc_stateful_controller,
 )
 from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 from minilink.planning.problems import PlanningProblem
@@ -32,7 +32,7 @@ configure_jax(enable_x64=True)
 U_TARGET = 4.0
 TF_SIM = 5.0
 MPC_DT = 0.2
-SIM_DT = 0.002
+SIM_DT = 0.01
 STEP_DISP = True
 REF_X_PAD = 20.0
 
@@ -66,9 +66,10 @@ planner = MPCPlanner(
     ),
 )
 
-mpc = mpc_stateful_controller(planner, dt_mpc=MPC_DT, step_disp=STEP_DISP)
-computer = mpc % MPC_DT
-hybrid = computer @ sys
+mpc = ModelPredictiveController(
+    planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
+)
+hybrid = mpc @ sys
 
 hybrid.plot_diagram()
 
@@ -77,6 +78,7 @@ result = hybrid.compute_trajectory(
     x0_plant=x0,
     x0_computer=mpc_default_computer_x0(planner),
     plant_dt_inner=SIM_DT,
+    compile_backend="jax",
 )
 hybrid.plot_trajectory()
 hybrid.animate(
