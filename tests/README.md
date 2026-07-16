@@ -17,6 +17,7 @@ Six-layer vision (detail): [docs/plans/test-benchmark-consolidation.md](../docs/
 | **Human** | Daily dev | `pytest` |
 | **Human** | Before push | `ruff check . && ruff format --check . && pytest` |
 | **Human** | Big sim/trajopt/MPC change | `python benchmarks/run_regression_check.py --suite all` |
+| **Human** | Backend/perf investigation (new machine, GPU) | `python benchmarks/run_study.py --list` |
 | **Human** | Demo/catalog sanity | `python examples/scripts/_smoke/run_catalog_smokes.py --fast` |
 | **Agent** | Pre-push / handoff | Same as human “Before push”; scope pytest per [AGENTS.md](../AGENTS.md) |
 | **Agent** | Compile/sim/trajopt edits | Add L2 regression (command below) |
@@ -53,9 +54,30 @@ python examples/scripts/_smoke/run_flagship_graphics.py
 # L5 — visual checklist (local only; you confirm pixels)
 python examples/scripts/_smoke/run_graphics_visual_check.py
 
-# L3 — benchmark tables (local only; not a gate)
+# L3 — backend/computer performance exploration (local; prints tables, no CI gate)
 python benchmarks/run_study.py --list
+python benchmarks/run_study.py --preset f_eval --plant pendulum      # native vs NumPy vs JAX f()
+python benchmarks/run_study.py --preset sim --mode matrix            # solver × backend sweep
+python benchmarks/run_study.py --preset trajopt --mode backends       # trajopt backend sweep
+python benchmarks/run_study.py --preset dp                           # DP loop/numpy/jax
+python benchmarks/run_study.py --preset rrt_nearest                  # RRT nearest backends
+# Detail: benchmarks/README.md
 ```
+
+### Performance / backends — L2 vs L3
+
+| | **L2** `run_regression_check.py` | **L3** `run_study.py` |
+| --- | --- | --- |
+| **Purpose** | Pass/fail vs committed JSON baselines | Explore tables on *your* machine/GPU |
+| **Speed** | Gated: `speedup`, `solve_s`, `nlp_s` (CI: factor 6×) | Report only — compare runs yourself |
+| **Accuracy** | Gated: trajectory goldens, `rel_err_l2`, checkpoints | — |
+| **CI** | ✅ `regression` job | ❌ never |
+| **When** | After compile/sim/trajopt/MPC changes; before merge | New machine, backend tuning, perf investigation |
+
+L2 suites: `core_perf` (compile/`f()` speed ratios + sim accuracy), `integration`, `solve_speed`, `e4`, `f_mpc`.
+Full catalog: [benchmarks/README.md](../benchmarks/README.md).
+
+`test_benchmark_smoke.py` (in `pytest`) only checks that benchmark **helpers import and return rows** — it does not measure or gate performance.
 
 ### Agent — copy/paste
 
@@ -67,7 +89,8 @@ Rules: [AGENTS.md](../AGENTS.md). **Do not invent commands** — use this table.
 | Docs/markdown only | skip pytest |
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or handoff | `pytest` |
-| Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Compile / `Simulator` / trajopt / MPC | L2: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Backend perf exploration (no gate) | L3: `python benchmarks/run_study.py --list` → see [benchmarks/README.md](../benchmarks/README.md) |
 | User-facing demo/smoke change | `python examples/scripts/_smoke/run_catalog_smokes.py --fast` and/or `run_flagship_demos.py` |
 
 L1 discovery path: `tests/unittest/` only. Demos live under `examples/scripts/` — **L6 smokes, not duplicated in L1**.
