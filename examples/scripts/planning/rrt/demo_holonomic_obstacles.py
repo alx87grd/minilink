@@ -256,10 +256,33 @@ def run_extender_comparison():
     plt.show()
 
 
-if RUN_SCENE_INTRO:
-    run_scene_intro()
+def run_smoke(*, seed: int = 0, max_nodes: int = 500) -> None:
+    """Headless L6 smoke: one RRT solve on the holonomic obstacle scene."""
+    _, scene, _, problem = make_holonomic_problem()
+    del scene
+    extender = make_steering_extender(max_distance=0.6, resolution=0.05)
+    planner = RRTPlanner(
+        problem,
+        extender,
+        seed=seed,
+        goal_tolerance=GOAL_TOLERANCE,
+        max_nodes=max_nodes,
+    )
+    traj = planner.solve().trajectory
+    goal_error = float(np.linalg.norm(traj.x[:, -1] - X_GOAL))
+    if goal_error > GOAL_TOLERANCE * 3.0:
+        raise RuntimeError(f"RRT smoke did not reach goal (error={goal_error:.2f})")
 
-run_rrt_vs_rrt_star()
 
-if RUN_EXTENDER_COMPARISON:
-    run_extender_comparison()
+def main() -> None:
+    if RUN_SCENE_INTRO:
+        run_scene_intro()
+
+    run_rrt_vs_rrt_star()
+
+    if RUN_EXTENDER_COMPARISON:
+        run_extender_comparison()
+
+
+if __name__ == "__main__":
+    main()

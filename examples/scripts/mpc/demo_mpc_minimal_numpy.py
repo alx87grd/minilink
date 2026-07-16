@@ -39,41 +39,62 @@ MPC_DT = 0.2
 SIM_DT = 0.01
 STEP_DISP = True
 
-sys = SingleIntegrator()
-x0 = np.array([0.5])
-x_goal = np.array([2.0])
-sys.x0 = x0.copy()
 
-planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(
-        sys=sys,
-        tf=1.0,
-        x_start=x0,
-        x_goal=x_goal,
-        cost=QuadraticCost.from_system(
-            sys,
-            Q=np.eye(1),
-            R=0.1 * np.eye(1),
-            S=np.zeros((1, 1)),
-            xbar=x_goal,
+def _build_hybrid(*, maxiter: int, step_disp: bool):
+    sys = SingleIntegrator()
+    x0 = np.array([0.5])
+    x_goal = np.array([2.0])
+    sys.x0 = x0.copy()
+
+    planner = TrajectoryOptimizationPlanner(
+        PlanningProblem(
+            sys=sys,
+            tf=1.0,
+            x_start=x0,
+            x_goal=x_goal,
+            cost=QuadraticCost.from_system(
+                sys,
+                Q=np.eye(1),
+                R=0.1 * np.eye(1),
+                S=np.zeros((1, 1)),
+                xbar=x_goal,
+            ),
         ),
-    ),
-    n_steps=8,
-    transcription="direct_collocation",
-    compile_backend="numpy",
-    optimizer_options={"maxiter": 80, "ftol": 1e-6},
-)
+        n_steps=8,
+        transcription="direct_collocation",
+        compile_backend="numpy",
+        optimizer_options={"maxiter": maxiter, "ftol": 1e-6},
+    )
 
-mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
-)
-hybrid = mpc @ sys
+    mpc = ModelPredictiveController(
+        planner, dt_mpc=MPC_DT, warm_start=True, step_disp=step_disp
+    )
+    return mpc @ sys, x0
 
-hybrid.plot_diagram()
-hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    compile_backend="numpy",
-)
-hybrid.plot_trajectory()
+
+def run_smoke(*, tf: float = 0.5) -> None:
+    """Headless L6 smoke: short NumPy-rebuild MPC rollout."""
+    hybrid, x0 = _build_hybrid(maxiter=40, step_disp=False)
+    hybrid.compute_trajectory(
+        tf=tf,
+        x0_plant=x0,
+        plant_dt_inner=SIM_DT,
+        compile_backend="numpy",
+    )
+
+
+def main() -> None:
+    hybrid, x0 = _build_hybrid(maxiter=80, step_disp=STEP_DISP)
+
+    hybrid.plot_diagram()
+    hybrid.compute_trajectory(
+        tf=TF_SIM,
+        x0_plant=x0,
+        plant_dt_inner=SIM_DT,
+        compile_backend="numpy",
+    )
+    hybrid.plot_trajectory()
+
+
+if __name__ == "__main__":
+    main()

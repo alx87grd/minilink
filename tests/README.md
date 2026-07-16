@@ -1,6 +1,18 @@
 # Test suite organization
 
-The default pytest discovery lives in `tests/unittest`.
+The default pytest discovery lives in `tests/unittest`. Full vision:
+[docs/plans/test-benchmark-consolidation.md](../docs/plans/test-benchmark-consolidation.md).
+
+## Six layers (L1 → L6)
+
+| Layer | Purpose | Command | CI |
+| --- | --- | --- | ---: |
+| **L1** Contracts | API types, shapes, compile/sim/MPC behavior | `pytest` | ✅ |
+| **L2** Regression | Accuracy goldens + guarded NLP/trajopt solve time | `python benchmarks/run_regression_check.py --suite all` | ✅ |
+| **L3** Benchmark utility | Machine/GPU exploration tables | `python benchmarks/run_study.py --list` | ❌ |
+| **L4** Graphics auto | Draw-list + headless PNG smoke | `pytest tests/unittest/test_flagship_graphics_contract.py` | ✅ |
+| **L5** Graphics visual | You confirm Meshcat/MPL/Plotly locally | `python examples/scripts/_smoke/run_graphics_visual_check.py` | ❌ |
+| **L6** Smoke runners | Catalog + flagship demos must not throw | `run_catalog_smokes.py`, `run_flagship_demos.py` | ✅ (pytest subprocess) |
 
 ## Local environment
 
@@ -37,7 +49,7 @@ graphics frame keys, catalog equation references)—not implementation trivia or
 third-party print formatting. Prefer one parametrized or table-driven test over
 many near-duplicate files.
 
-**Domain modules** (~21 files after L1 consolidation): `test_core`, `test_backends`,
+**Domain modules** (22 files after L1 consolidation): `test_core`, `test_backends`,
 `test_compile`, `test_diagrams`, `test_simulation`, `test_step_discrete`,
 `test_hybrid`, `test_dynamics_catalog`, `test_mechanical_robotics`, `test_blocks`,
 `test_control_analysis`, `test_costs_optimizer`, `test_planning`, `test_mpc`,
@@ -66,6 +78,7 @@ lives under repo-root `benchmarks/`; pytest smoke-tests helpers in
 ```bash
 python examples/scripts/_smoke/run_catalog_smokes.py --fast
 python examples/scripts/_smoke/run_flagship_demos.py
+python examples/scripts/_smoke/run_all_demos.py --flagship-only --continue-on-error
 ```
 
 Pytest: `tests/unittest/test_smoke_runners.py`. **Layer L4** graphics headless:

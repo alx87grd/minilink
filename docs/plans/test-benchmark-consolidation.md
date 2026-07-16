@@ -1,6 +1,6 @@
 # Test & benchmark consolidation plan
 
-Status: **L1 + L2 + L3 + L6 + L4 partial** landed; L5 visual check stub remains local-only.
+Status: **Complete** — L1–L6 vision landed; optional G1 perceptual PNG hash remains a nightly/local enhancement only.
 
 ---
 
@@ -88,7 +88,7 @@ python benchmarks/run_regression_check.py --suite all --tiny --factor 6 \
 
 **Refresh baselines (intentional change only):** `--update` + review JSON diff.
 
-**Status:** ✅ unified runner + 5 suites + CI job landed; ⬜ per-module consolidation into one scenario registry still todo.
+**Status:** ✅ unified runner + 5 suites + CI job landed.
 
 ---
 
@@ -106,14 +106,16 @@ across machines you own.
 | `run_dp_backends.py`, `run_rrt_nearest_backends.py` | DP / RRT backend sweep |
 | `run_pyro_minilink_parity.py` | External Pyro env comparison |
 
-**Planned:** single entry `run_study.py --preset sim_matrix|trajopt|…` (Phase 3).
+**Planned:** `python benchmarks/run_study.py --preset …` ✅ landed.
 
-**Command today:**
+**Command:**
 
 ```bash
-python benchmarks/run_simulator_speed_matrix.py
-python benchmarks/run_trajopt_backends.py
+python benchmarks/run_study.py --list
+python benchmarks/run_study.py --preset sim --mode matrix
 ```
+
+Legacy `run_*_speed.py` scripts are deprecation shims forwarding to `run_study.py`.
 
 **Rule:** Results are **for you on your machine** — do not commit as gates unless
 folding a representative scenario into L2 with factor tolerance.
@@ -165,7 +167,7 @@ python examples/scripts/_smoke/run_graphics_visual_check.py
 
 **CI:** skip L5 entirely. **Agent workflow:** run L4, then tell user “run L5 locally.”
 
-**Status:** ⬜ not implemented — design in §Flagship graphics validation.
+**Status:** ✅ L5 checklist script (`run_graphics_visual_check.py`); local-only, not CI.
 
 ---
 
@@ -188,7 +190,7 @@ python examples/scripts/_smoke/run_flagship_demos.py
 python examples/scripts/_smoke/run_all_demos.py --timeout 120
 ```
 
-**Status:** ⬜ planned Phase 5 — today catalog breadth still in `test_catalog_migration.py`.
+**Status:** ✅ catalog registry + aggregators; 11 flagship demos in manifest.
 
 ---
 
@@ -199,10 +201,10 @@ python examples/scripts/_smoke/run_all_demos.py --timeout 120
 | API / type / module contracts | L1 | `pytest` | ✅ |
 | Sim + trajopt accuracy goldens | L2 | `run_regression_check.py --suite all` | ✅ accuracy |
 | NLP/trajopt solve time regression | L2 | same + speed suffixes | ✅ partial |
-| New GPU / machine benchmarks | L3 | `run_study.py` (+ legacy shims) | ✅ |
-| Graphics pipelines run, PNG exists | L4 | pytest graphics + smoke scripts | ✅ partial |
+| New GPU / machine benchmarks | L3 | `run_study.py` (+ legacy shims) | ❌ |
+| Graphics pipelines run, PNG exists | L4 | pytest graphics + smoke scripts | ✅ |
 | You eyeball Meshcat / Plotly / MPL | L5 | `run_graphics_visual_check.py` | ❌ |
-| Catalog + demos don't crash | L6 | `run_catalog_smokes.py`, demo aggregators | ⬜ planned |
+| Catalog + demos don't crash | L6 | `run_catalog_smokes.py`, `run_flagship_demos.py` | ✅ |
 
 ---
 
@@ -215,8 +217,8 @@ python examples/scripts/_smoke/run_all_demos.py --timeout 120
 | 2 | L1 | Merge 91 pytest files → ~22 domain modules | ✅ (21 files) |
 | 3 | L3 | `run_study.py` replaces scattered benchmark CLIs | ✅ |
 | 4 | L6 | Catalog smokes + demo whitelist aggregators | ✅ |
-| 5 | L4 | Flagship graphics headless manifest + pytest | ✅ partial |
-| 6 | L5 | Interactive visual check script for local use | ✅ stub |
+| 5 | L4 | Flagship graphics headless manifest + pytest | ✅ |
+| 6 | L5 | Interactive visual check script for local use | ✅ |
 | 7 | L1 | Shrink catalog unittest to 3-plant contracts only | ✅ (with Phase 4) |
 
 ---
@@ -227,11 +229,10 @@ The repo has grown test and benchmark surface area without periodic cleanup:
 
 | Area | Count today | CI default |
 | --- | ---: | --- |
-| `tests/unittest/test_*.py` | **21 files**, ~**780** `test_*` functions | `pytest` (all collected; optional deps skip at runtime) |
-| `benchmarks/run_*.py` | **15** CLI runners | **not** in CI |
+| `tests/unittest/test_*.py` | **22 files**, ~**780** `test_*` functions | `pytest` (all collected; optional deps skip at runtime) |
+| `benchmarks/run_*.py` | **2** primary + shims | L2 in CI; L3 manual |
 | Gated regression baselines | **5** JSON suites + CI job | ✅ L2 in CI |
-| `examples/scripts/` | **78** demos | not tests (out of scope for merge, noted for overlap) |
-| Catalog pytest surface | **4 files** (~60 tests): migration, plant contracts, manipulators, kinematic manifest | see §Catalog & demo smokes below |
+| `examples/scripts/` | **78** demos | L6 smokes (11 flagship whitelist) |
 
 `tests/README.md` already states the philosophy (contracts over trivia, table-driven over duplicate files). The **six layers above** are the organizing principle; sections below retain the file-level inventory and migration tables from the first draft.
 
@@ -804,21 +805,23 @@ _(catalog/graphics questions above; prior decisions in §Decisions applied)_
 - [x] Update `tests/README.md` with Layer B CI regression note.
 - [x] Update `benchmarks/README.md` with unified suites + CI flags.
 - [x] Update `AGENTS.md` verification table (CI regression job).
-- [ ] Optional: `run_study.py` CLI unification (Phase 3).
+- [x] Optional: `run_study.py` CLI unification (Phase 3).
+- [x] L6 flagship manifest expanded (11 demos).
+- [x] L4 `test_flagship_graphics_contract.py` + flagship graphics manifest.
+- [x] L5 `run_graphics_visual_check.py` checklist.
+- [x] `run_all_demos.py` for optional nightly sweep.
 
 ---
 
 ## Success metrics
 
-| Metric | Now | Target |
+| Metric | Was | Now |
 | --- | ---: | ---: |
-| Pytest files | 91 | ~22 (+1 smoke subprocess, +1 flagship graphics) |
-| Catalog plant coverage | 4 pytest files | 1 contract file + catalog `smoke.py` per module + 1 aggregator |
-| Flagship demo visual check | kinematic manifest only | G0 draw-list + G1 optional frame hash |
-| Benchmark `run_*.py` | 15 | 2 (+ shims during deprecation) |
-| Independent contract checks | ~780 tests | ~780 tests (± small dedupe wins) |
-| Documented test layers | implicit | 4 layers in `tests/README.md` |
-| Time to find “where is X tested?” | high | one domain file per concern |
+| Pytest files | 91 | **22** |
+| Catalog plant coverage | 4 pytest files | `test_dynamics_catalog.py` + L6 smokes |
+| Flagship demo visual check | kinematic manifest only | G0 draw-list + L4 PNG smoke + L5 checklist |
+| Benchmark `run_*.py` | 15 | **2** primary (`run_regression_check`, `run_study`) + shims |
+| Documented test layers | implicit | **L1–L6** in `tests/README.md` |
 
 ---
 

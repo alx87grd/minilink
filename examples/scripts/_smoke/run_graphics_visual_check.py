@@ -6,10 +6,12 @@ graphics output channels so you can verify Meshcat, Matplotlib, and Plotly.
 Usage (from repo root)::
 
     python examples/scripts/_smoke/run_graphics_visual_check.py
+    python examples/scripts/_smoke/run_graphics_visual_check.py --run-headless
 """
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -48,28 +50,55 @@ CHECKS = (
 )
 
 
-def main() -> int:
+def _resolve_cmd(cmd: list[str]) -> list[str]:
+    resolved: list[str] = []
+    for part in cmd:
+        if part.endswith(".py"):
+            resolved.append(str(REPO_ROOT / part))
+        else:
+            resolved.append(part)
+    return resolved
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="L5 graphics visual checklist (local)")
+    parser.add_argument(
+        "--run-headless",
+        action="store_true",
+        help="Run L4 kinematic PNG smoke only (no interactive prompt)",
+    )
+    args = parser.parse_args(argv)
+
     print("Minilink L5 graphics visual check")
     print("Run each item below and confirm output looks correct.\n")
     for index, (label, cmd) in enumerate(CHECKS, start=1):
-        rel = [str(Path(part)) if part.endswith(".py") else part for part in cmd]
-        full_cmd = []
-        for part in rel:
-            if part.endswith(".py"):
-                full_cmd.append(str(REPO_ROOT / part))
-            else:
-                full_cmd.append(part)
+        full_cmd = _resolve_cmd(cmd)
         print(f"{index}. {label}")
         print(f"   {' '.join(full_cmd)}\n")
 
+    if args.run_headless:
+        cmd = _resolve_cmd(
+            [
+                sys.executable,
+                "examples/scripts/_smoke/run_flagship_graphics.py",
+                "--out",
+                "artifacts/gfx-smoke",
+            ]
+        )
+        subprocess.run(cmd, cwd=REPO_ROOT, check=False)
+        print(f"Inspect PNGs under {REPO_ROOT / 'artifacts/gfx-smoke'}")
+        return 0
+
     answer = input("Run Matplotlib kinematic smoke now? [y/N] ").strip().lower()
     if answer == "y":
-        cmd = [
-            sys.executable,
-            str(REPO_ROOT / "examples/scripts/_smoke/run_flagship_graphics.py"),
-            "--out",
-            str(REPO_ROOT / "artifacts/gfx-smoke"),
-        ]
+        cmd = _resolve_cmd(
+            [
+                sys.executable,
+                "examples/scripts/_smoke/run_flagship_graphics.py",
+                "--out",
+                "artifacts/gfx-smoke",
+            ]
+        )
         subprocess.run(cmd, cwd=REPO_ROOT, check=False)
         print(f"Inspect PNGs under {REPO_ROOT / 'artifacts/gfx-smoke'}")
     return 0

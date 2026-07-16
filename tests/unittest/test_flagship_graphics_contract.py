@@ -41,7 +41,7 @@ def _load_plant(entry: dict):
 class TestFlagshipGraphicsContract(unittest.TestCase):
     def test_manifest_nonempty(self):
         manifest = _load_manifest()
-        self.assertGreaterEqual(len(manifest), 3)
+        self.assertGreaterEqual(len(manifest), 6)
 
     def test_kinematic_draw_list_contract(self):
         manifest = _load_manifest()
