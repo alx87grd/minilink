@@ -9,10 +9,8 @@ Validates that:
 """
 
 import unittest
-
 import numpy as np
 import pytest
-
 from minilink.blocks.basic import Integrator
 from minilink.control.output import ProportionalController
 from minilink.core.backends import array_module
@@ -27,7 +25,6 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, System
 
 
-# Helper: reusable test diagrams
 class _JAXFriendlyPController(System):
     """P controller using NumPy or JAX ops so ``compile(..., backend='jax')`` traces."""
 
@@ -72,15 +69,12 @@ def _build_small_closed_loop_jax():
     """Same wiring as :func:`_build_small_closed_loop` with JAX-traceable blocks."""
     diag = DiagramSystem()
     diag.connection_verbose = False
-
     ctl = _JAXFriendlyPController()
     plant = _JAXFriendlyIntegrator()
     ctl.params["Kp"] = 2.5
-
     diag.add_subsystem(ctl, "ctl")
     diag.add_subsystem(plant, "plant")
     diag.add_input_port("r")
-
     diag.connect("input", "r", "ctl", "r")
     diag.connect("plant", "y", "ctl", "y")
     diag.connect("ctl", "u", "plant", "u")
@@ -97,14 +91,11 @@ def _build_small_closed_loop():
     """Step → ProportionalController → Integrator → feedback to controller."""
     diag = DiagramSystem()
     diag.connection_verbose = False
-
     ctl = ProportionalController(2.5)
     plant = Integrator()
-
     diag.add_subsystem(ctl, "ctl")
     diag.add_subsystem(plant, "plant")
     diag.add_input_port("r")
-
     diag.connect("input", "r", "ctl", "r")
     diag.connect("plant", "y", "ctl", "y")
     diag.connect("ctl", "u", "plant", "u")
@@ -136,14 +127,12 @@ def _build_feedthrough_loop():
     diag.add_subsystem(FeedthroughSystem("A"), "A")
     diag.add_subsystem(FeedthroughSystem("B"), "B")
     diag.add_subsystem(FeedthroughSystem("C"), "C")
-
     diag.connect("A", "y", "B", "u")
     diag.connect("B", "y", "C", "u")
     diag.connect("C", "y", "A", "u")
     return diag
 
 
-# Tests
 class TestCheckAlgebraicLoops(unittest.TestCase):
     """Test standalone algebraic loop detection."""
 
@@ -152,7 +141,6 @@ class TestCheckAlgebraicLoops(unittest.TestCase):
         order = check_algebraic_loops(diag)
         self.assertIsInstance(order, list)
         self.assertGreaterEqual(len(order), 1)
-        # All entries are (sys_id, port_id) tuples
         for sys_id, port_id in order:
             self.assertIn(sys_id, diag.subsystems)
 
@@ -165,7 +153,6 @@ class TestCheckAlgebraicLoops(unittest.TestCase):
     def test_chain_no_loop(self):
         """A → B → C (no loop) should succeed."""
         diag = _build_feedthrough_loop()
-        # Remove the closing edge C → A to break the loop
         diag.connections["A"]["u"] = None
         order = check_algebraic_loops(diag)
         self.assertGreaterEqual(len(order), 3)
@@ -190,7 +177,6 @@ class TestBuildExecutionPlan(unittest.TestCase):
     def test_output_slices_keys(self):
         diag = _build_small_closed_loop()
         plan = build_execution_plan(diag)
-        # Every subsystem output port should have a slice
         for sys_id, sys in diag.subsystems.items():
             for port_id in sys.outputs:
                 self.assertIn((sys_id, port_id), plan.output_slices)
@@ -205,8 +191,7 @@ class TestBuildExecutionPlan(unittest.TestCase):
         plan = build_execution_plan(diag)
         self.assertIn("y_meas", plan.external_output_slices)
         self.assertEqual(
-            plan.external_output_slices["y_meas"],
-            plan.output_slices[("plant", "y")],
+            plan.external_output_slices["y_meas"], plan.output_slices["plant", "y"]
         )
 
 
@@ -250,13 +235,8 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         diag = _build_small_closed_loop()
         x = np.array([0.5])
         u = np.array([2.0])
-        params = {
-            "ctl": {"K": np.array([[4.0]])},
-            "plant": {"k": 3.0},
-        }
-
+        params = {"ctl": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
         dx = diag.f(x, u, 0.0, params=params)
-
         np.testing.assert_allclose(dx, np.array([18.0]), atol=1e-10)
 
     def test_compute_internal_signals_non_empty(self):
@@ -269,7 +249,6 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         x = np.array([0.5])
         u = np.array([1.0])
         d = self.evaluator.compute_internal_signals_dict(x, u, 0.0)
-        # Plant output y = x for Integrator
         np.testing.assert_allclose(d["plant:y"], np.array([0.5]), atol=1e-10)
 
     def test_compute_internal_signals(self):
@@ -295,7 +274,6 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         diag.add_subsystem(Gain(), "gain")
         diag.add_input_port("u")
         diag.connect("input", "u", "gain", "u")
-
         evaluator = compile_diagram(diag)
         dx = evaluator.f(np.array([]), np.array([3.0]), 0.0)
         self.assertEqual(dx.shape, (0,))
@@ -306,7 +284,6 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         u = np.array([1.0])
         signals = self.evaluator.compute_internal_signals_dict(x, u, 0.0)
         self.assertIsInstance(signals, dict)
-        # All subsystem output ports should be present
         for sys_id, sys in self.diag.subsystems.items():
             for port_id in sys.outputs:
                 self.assertIn(f"{sys_id}:{port_id}", signals)
@@ -334,7 +311,6 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         x = np.array([0.3])
         u = np.array([1.0])
         t = 0.0
-
         ev = compile_diagram(diag, bind_params=True)
         dx1 = ev.f(x, u, t)
         plant.params["k"] = 99.0
@@ -348,12 +324,11 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         x = np.array([0.3])
         u = np.array([1.0])
         t = 0.0
-
         ev = compile_diagram(diag, bind_params=False)
         dx1 = ev.f(x, u, t)
         plant.params["k"] = 99.0
         dx2 = ev.f(x, u, t)
-        self.assertGreater(np.abs(dx2 - dx1).max(), 1e-6)
+        self.assertGreater(np.abs(dx2 - dx1).max(), 1e-06)
 
     def test_f_as_callable(self):
         fn = self.evaluator.f
@@ -378,11 +353,9 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         self.assertIsNotNone(plan_bound.port_ops[0].bound_params)
 
 
-# JAX tests (skipped if JAX not installed)
 try:
     import jax
     import jax.numpy as jnp
-
     from minilink.core.compile.evaluators.jax_evaluators import JaxDiagramEvaluator
 
     _JAX_AVAILABLE = True
@@ -404,41 +377,38 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
             ev_np = compile_diagram(diag, backend="numpy")
             ev_jax = compile_diagram(diag, backend="jax")
             self.assertIsInstance(ev_jax, JaxDiagramEvaluator)
-
-            x_np, u_np = np.array([0.5]), np.array([1.0])
+            x_np, u_np = (np.array([0.5]), np.array([1.0]))
             x_j = jnp.array([0.5], dtype=jnp.float32)
             u_j = jnp.array([1.0], dtype=jnp.float32)
             t = 0.0
-
             d_np = ev_np.outputs(x_np, u_np, t)
             d_jx = ev_jax.outputs(x_j, u_j, t)
             self.assertEqual(set(d_np.keys()), set(d_jx.keys()))
             for k in d_np:
-                np.testing.assert_allclose(np.asarray(d_jx[k]), d_np[k], atol=1e-5)
+                np.testing.assert_allclose(np.asarray(d_jx[k]), d_np[k], atol=1e-05)
 
     def test_f_jax_matches_numpy(self):
         diag = _build_small_closed_loop_jax()
         ev_np = compile_diagram(diag, backend="numpy")
         ev_jax = compile_diagram(diag, backend="jax")
-        x_np, u_np = np.array([0.3]), np.array([1.2])
+        x_np, u_np = (np.array([0.3]), np.array([1.2]))
         x_j = jnp.array(x_np, dtype=jnp.float32)
         u_j = jnp.array(u_np, dtype=jnp.float32)
         t = 0.1
-
         dx_np = ev_np.f(x_np, u_np, t)
-        np.testing.assert_allclose(np.asarray(ev_jax.f(x_j, u_j, t)), dx_np, atol=1e-5)
+        np.testing.assert_allclose(np.asarray(ev_jax.f(x_j, u_j, t)), dx_np, atol=1e-05)
 
     def test_internal_signals_jax_matches_numpy(self):
         diag = _build_small_closed_loop_jax()
         ev_np = compile_diagram(diag, backend="numpy")
         ev_jax = compile_diagram(diag, backend="jax")
-        x_np, u_np = np.array([0.3]), np.array([1.2])
+        x_np, u_np = (np.array([0.3]), np.array([1.2]))
         x_j = jnp.array(x_np, dtype=jnp.float32)
         u_j = jnp.array(u_np, dtype=jnp.float32)
         t = 0.1
         buf_np = ev_np.compute_internal_signals(x_np, u_np, t)
         buf_jx = ev_jax.compute_internal_signals(x_j, u_j, t)
-        np.testing.assert_allclose(np.asarray(buf_jx), buf_np, atol=1e-5)
+        np.testing.assert_allclose(np.asarray(buf_jx), buf_np, atol=1e-05)
 
     def test_reference_diagram_f_is_jittable(self):
         diag = _build_small_closed_loop_jax()
@@ -448,25 +418,19 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         x_j = jnp.array(x_np, dtype=jnp.float32)
         u_j = jnp.array(u_np, dtype=jnp.float32)
         t = 0.1
-
         dx_jit = jax.jit(lambda xx, uu: diag.f(xx, uu, t))(x_j, u_j)
-
         np.testing.assert_allclose(
-            np.asarray(dx_jit),
-            ev_np.f(x_np, u_np, t),
-            atol=1e-5,
+            np.asarray(dx_jit), ev_np.f(x_np, u_np, t), atol=1e-05
         )
 
 
-# Diagram params contract (nested {sys_id: {...}})
 class TestDiagramParamsContract(unittest.TestCase):
     """Nested params routing and the ``DiagramSystem.params`` live view."""
 
     def setUp(self):
-        self.diag = _build_small_closed_loop()  # ctl K=2.5, plant k=1.0
+        self.diag = _build_small_closed_loop()
         self.x = np.array([0.5])
         self.u = np.array([2.0])
-        # Closed loop: dx = k * K * (r - x), with r - x = 1.5 here.
 
     def test_params_property_is_nested_live_view(self):
         params = self.diag.params
@@ -495,8 +459,6 @@ class TestDiagramParamsContract(unittest.TestCase):
             self.diag.f(self.x, self.u, 0.0, params={"plnt": {"k": 3.0}})
 
     def test_flat_leaf_style_dict_raises(self):
-        # The old pass-through heuristic is gone: leaf-style keys are
-        # unknown subsystem ids and must fail loudly.
         with self.assertRaises(ValueError):
             self.diag.f(self.x, self.u, 0.0, params={"Kp": 4.0})
 
@@ -517,7 +479,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
     def test_f_p_matches_recursive_reference(self):
         params = {"ctl": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
         for x_val, u_val, t in [(0.3, 1.2, 0.1), (0.0, 0.0, 0.0), (-5.0, 10.0, 0.0)]:
-            x, u = np.array([x_val]), np.array([u_val])
+            x, u = (np.array([x_val]), np.array([u_val]))
             np.testing.assert_allclose(
                 self.evaluator.f_p(x, u, t, params),
                 self.diag.f(x, u, t, params=params),
@@ -553,7 +515,7 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
     """JAX parametric tier: ``f_p``, ``outputs_p``, gradients w.r.t. params."""
 
     def setUp(self):
-        self.diag = _build_closed_loop_with_external_output_jax()  # Kp=2.5, k=1.0
+        self.diag = _build_closed_loop_with_external_output_jax()
         self.ev = compile_diagram(self.diag, backend="jax")
         self.ev_np = compile_diagram(self.diag, backend="numpy")
         self.x_j = jnp.array([0.5], dtype=jnp.float32)
@@ -566,7 +528,7 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         np.testing.assert_allclose(
             np.asarray(self.ev.f_p(self.x_j, self.u_j, 0.0, params)),
             self.ev_np.f_p(self.x_np, self.u_np, 0.0, params),
-            atol=1e-5,
+            atol=1e-05,
         )
 
     def test_outputs_p_matches_numpy(self):
@@ -575,16 +537,15 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         out_n = self.ev_np.outputs_p(self.x_np, self.u_np, 0.0, params)
         self.assertEqual(set(out_j), set(out_n))
         for key in out_n:
-            np.testing.assert_allclose(np.asarray(out_j[key]), out_n[key], atol=1e-5)
+            np.testing.assert_allclose(np.asarray(out_j[key]), out_n[key], atol=1e-05)
 
     def test_jacobian_f_params_analytic(self):
-        # dx = k * Kp * (r - x): d(dx)/dk = Kp (r - x), d(dx)/dKp = k (r - x)
         params = {"ctl": {"Kp": 2.5}, "plant": {"k": 1.0}}
         jac = self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, params)
         np.testing.assert_allclose(
-            np.asarray(jac["plant"]["k"]), [2.5 * 1.5], atol=1e-5
+            np.asarray(jac["plant"]["k"]), [2.5 * 1.5], atol=1e-05
         )
-        np.testing.assert_allclose(np.asarray(jac["ctl"]["Kp"]), [1.5], atol=1e-5)
+        np.testing.assert_allclose(np.asarray(jac["ctl"]["Kp"]), [1.5], atol=1e-05)
 
     def test_grad_flows_through_f_p(self):
         f_p = self.ev.f_p
@@ -600,32 +561,19 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
             self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, None)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_compile_static.py ---
-
-"""Typed compile() dispatch for static System leaves."""
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_compile_static.py
 from minilink.blocks.routing import Gain
 from minilink.core.compile.compiler import compile
 from minilink.core.compile.evaluators.evaluators import DynamicsEvaluator
 from minilink.core.compile.evaluators.numpy_evaluators import NumpyStaticEvaluator
 
 try:
-    import jax  # noqa: F401
-
+    import jax
     from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
-    JaxStaticEvaluator = None  # type: ignore[misc, assignment]
+    JaxStaticEvaluator = None
     _JAX_AVAILABLE = False
 
 
@@ -657,18 +605,10 @@ class TestCompileStaticJax(unittest.TestCase):
         u = np.array([2.0])
         out_np = ev_np.outputs(np.array([]), u, 0.0)
         out_jx = ev_jx.outputs(np.array([]), u, 0.0)
-        np.testing.assert_allclose(np.asarray(out_jx["y"]), out_np["y"], atol=1e-5)
+        np.testing.assert_allclose(np.asarray(out_jx["y"]), out_np["y"], atol=1e-05)
 
 
-# --- merged from test_compile_step_leaf.py ---
-
-"""compile() dispatch for StepSystem leaves."""
-
-import unittest
-
-import numpy as np
-
-from minilink.core.compile.compiler import compile
+# from test_compile_step_leaf.py
 from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepEvaluator
 from minilink.core.system import StepSystem
 
@@ -700,25 +640,7 @@ class TestCompileStepLeaf(unittest.TestCase):
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_evaluator_api.py ---
-
-"""Compiled evaluator public API contracts."""
-
-import unittest
-
-import numpy as np
-import pytest
-
-from minilink.blocks.basic import Integrator
-from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.evaluators import DynamicsEvaluator
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepEvaluator
-from minilink.core.system import StepSystem
-
+# from test_evaluator_api.py
 try:
     import jax.numpy as jnp
 
@@ -749,6 +671,7 @@ class TestEvaluatorApi(unittest.TestCase):
         self.assertFalse(hasattr(ev, "get_f_jit"))
 
     def test_step_evaluator_has_rollout_not_integrate(self):
+
         class IdentityStep(StepSystem):
             def __init__(self):
                 super().__init__(n=1)
@@ -773,26 +696,15 @@ class TestEvaluatorApiJax(unittest.TestCase):
         plant = Integrator()
         ev_np = compile(plant, backend="numpy")
         ev_jx = compile(plant, backend="jax")
-        x_np, u_np = np.array([0.2]), np.array([1.0])
-        x_j, u_j = jnp.array(x_np), jnp.array(u_np)
+        x_np, u_np = (np.array([0.2]), np.array([1.0]))
+        x_j, u_j = (jnp.array(x_np), jnp.array(u_np))
         np.testing.assert_allclose(
-            np.asarray(ev_jx.f(x_j, u_j, 0.0)), ev_np.f(x_np, u_np, 0.0), atol=1e-5
+            np.asarray(ev_jx.f(x_j, u_j, 0.0)), ev_np.f(x_np, u_np, 0.0), atol=1e-05
         )
 
 
-# --- merged from test_evaluator_tiers.py ---
-
-"""Evaluator fast vs trace tier contracts."""
-
-import unittest
-
-import numpy as np
-import pytest
-
-from minilink.blocks.basic import Integrator
-from minilink.core.compile.compiler import compile
+# from test_evaluator_tiers.py
 from minilink.core.compile.evaluators.tiers import TRACE_TIER_MSG
-from minilink.core.system import StepSystem
 
 try:
     import jax
@@ -818,7 +730,7 @@ class TestEvaluatorTiersJax(unittest.TestCase):
         np.testing.assert_allclose(
             np.asarray(self.ev.f_trace(self.x, self.u, self.t)),
             np.asarray(self.ev.f(self.x, self.u, self.t)),
-            atol=1e-6,
+            atol=1e-06,
         )
 
     def test_f_jit_alias_identity(self):
@@ -835,11 +747,11 @@ class TestEvaluatorTiersJax(unittest.TestCase):
         np.testing.assert_allclose(
             np.asarray(self.ev.f_trace_p(self.x, self.u, self.t, frozen)),
             np.asarray(self.ev.f(self.x, self.u, self.t)),
-            atol=1e-6,
+            atol=1e-06,
         )
 
     def test_trace_tier_composable_in_outer_jit(self):
-        x, u, t = self.x, self.u, self.t
+        x, u, t = (self.x, self.u, self.t)
 
         @jax.jit
         def loss(theta):
@@ -880,7 +792,7 @@ class TestIntegrationTiersJax(unittest.TestCase):
         np.testing.assert_allclose(
             np.asarray(self.ev.rk4_step_trace(self.x, self.u, self.t, self.dt)),
             np.asarray(self.ev.rk4_step(self.x, self.u, self.t, self.dt)),
-            atol=1e-6,
+            atol=1e-06,
         )
 
     def test_rk4_integrate_zoh_trace_parity(self):
@@ -888,7 +800,7 @@ class TestIntegrationTiersJax(unittest.TestCase):
         np.testing.assert_allclose(
             np.asarray(self.ev.rk4_integrate_zoh_trace(self.x, u_seq, self.t, self.dt)),
             np.asarray(self.ev.rk4_integrate_zoh(self.x, u_seq, self.t, self.dt)),
-            atol=1e-6,
+            atol=1e-06,
         )
 
     def test_rk4_integrate_linear_p_fast_tier(self):
@@ -905,14 +817,14 @@ class TestIntegrationTiersJax(unittest.TestCase):
                 self.ev.euler_integrate_zoh_trace(self.x, u_seq, self.t, self.dt)
             ),
             np.asarray(self.ev.euler_integrate_zoh(self.x, u_seq, self.t, self.dt)),
-            atol=1e-6,
+            atol=1e-06,
         )
 
     def test_f_ivp_p_matches_f_ivp_with_frozen(self):
         np.testing.assert_allclose(
             np.asarray(self.ev.f_ivp_p(self.x, self.t, self.params)),
             np.asarray(self.ev.f_ivp(self.x, self.t)),
-            atol=1e-6,
+            atol=1e-06,
         )
 
     def test_euler_step_p(self):
@@ -925,6 +837,7 @@ class TestIntegrationTiersJax(unittest.TestCase):
 @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
 class TestStepEvaluatorTiersJax(unittest.TestCase):
     def test_step_trace_parity(self):
+
         class IdentityStep(StepSystem):
             def __init__(self):
                 super().__init__(n=1)
@@ -938,34 +851,22 @@ class TestStepEvaluatorTiersJax(unittest.TestCase):
         from minilink.core.compile.evaluators.jax_evaluators import JaxStepEvaluator
 
         np.testing.assert_allclose(
-            np.asarray(ev.step_trace(x, u, 0)),
-            np.asarray(ev.step(x, u, 0)),
-            atol=1e-6,
+            np.asarray(ev.step_trace(x, u, 0)), np.asarray(ev.step(x, u, 0)), atol=1e-06
         )
         self.assertIs(JaxStepEvaluator.step_jit, JaxStepEvaluator.step)
 
 
-# --- merged from test_mathematical_program_evaluators.py ---
-
-"""Unit tests for pure mathematical programs and compiled evaluators."""
-
-import numpy as np
-import pytest
-
+# from test_mathematical_program_evaluators.py
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import MathematicalProgram
 
 
 def test_mathematical_program_is_pure_description_without_z0():
+
     def J(z: np.ndarray):
         return z @ z
 
-    program = MathematicalProgram(
-        n_z=2,
-        J=J,
-        metadata={"source": "test"},
-    )
-
+    program = MathematicalProgram(n_z=2, J=J, metadata={"source": "test"})
     assert program.backend == "numpy"
     assert program.n_z == 2
     assert not hasattr(program, "z0")
@@ -974,24 +875,18 @@ def test_mathematical_program_is_pure_description_without_z0():
 
 def test_mathematical_program_validates_bounds_dimension():
     with pytest.raises(ValueError, match="lower bounds must have shape"):
-        MathematicalProgram(
-            n_z=2,
-            J=lambda z: z @ z,
-            lower=np.zeros(3),
-        )
+        MathematicalProgram(n_z=2, J=lambda z: z @ z, lower=np.zeros(3))
 
 
 def test_mathematical_program_validates_bounds_order():
     with pytest.raises(ValueError, match="lower bounds must be less"):
         MathematicalProgram(
-            n_z=1,
-            J=lambda z: z[0] * z[0],
-            lower=np.array([2.0]),
-            upper=np.array([1.0]),
+            n_z=1, J=lambda z: z[0] * z[0], lower=np.array([2.0]), upper=np.array([1.0])
         )
 
 
 def test_numpy_evaluator_objective_constraints_and_derivatives():
+
     def J(z: np.ndarray):
         return z[0] ** 2 + z[1] ** 2
 
@@ -1014,34 +909,21 @@ def test_numpy_evaluator_objective_constraints_and_derivatives():
         return np.eye(2)
 
     program = MathematicalProgram(
-        n_z=2,
-        J=J,
-        h=h,
-        g=g,
-        grad_J=grad_J,
-        hess_J=hess_J,
-        jac_h=jac_h,
-        jac_g=jac_g,
+        n_z=2, J=J, h=h, g=g, grad_J=grad_J, hess_J=hess_J, jac_h=jac_h, jac_g=jac_g
     )
     program_evaluator = compile_program_evaluator(
-        program,
-        sample_z=np.array([0.5, 0.5]),
+        program, sample_z=np.array([0.5, 0.5])
     )
-
     assert program_evaluator.backend == "numpy"
     assert program_evaluator.n_h == 1
     assert program_evaluator.n_g == 2
     assert program_evaluator.objective(np.array([1.0, 2.0])) == pytest.approx(5.0)
     np.testing.assert_allclose(program_evaluator.equality_residual([0.25, 0.75]), [0.0])
     np.testing.assert_allclose(
-        program_evaluator.inequality_margin([0.25, 0.75]),
-        [0.25, 0.75],
+        program_evaluator.inequality_margin([0.25, 0.75]), [0.25, 0.75]
     )
     np.testing.assert_allclose(program_evaluator.gradient([1.0, 2.0]), [2.0, 4.0])
-    np.testing.assert_allclose(
-        program_evaluator.hessian([1.0, 2.0]),
-        2.0 * np.eye(2),
-    )
+    np.testing.assert_allclose(program_evaluator.hessian([1.0, 2.0]), 2.0 * np.eye(2))
     np.testing.assert_allclose(program_evaluator.jacobian_h([1.0, 2.0]), [[1.0, 1.0]])
     np.testing.assert_allclose(program_evaluator.jacobian_g([1.0, 2.0]), np.eye(2))
 
@@ -1049,7 +931,6 @@ def test_numpy_evaluator_objective_constraints_and_derivatives():
 def test_numpy_evaluator_empty_constraints():
     program = MathematicalProgram(n_z=1, J=lambda z: z[0] ** 2)
     program_evaluator = compile_program_evaluator(program, sample_z=np.array([1.0]))
-
     assert program_evaluator.n_h == 0
     assert program_evaluator.n_g == 0
     np.testing.assert_allclose(program_evaluator.equality_residual([1.0]), [])
@@ -1060,15 +941,11 @@ def test_numpy_evaluator_empty_constraints():
 
 def test_numpy_evaluator_reports_bad_constraint_shape():
     program = MathematicalProgram(
-        n_z=2,
-        J=lambda z: z @ z,
-        h=lambda z: np.array([z[0]]),
+        n_z=2, J=lambda z: z @ z, h=lambda z: np.array([z[0]])
     )
     program_evaluator = compile_program_evaluator(
-        program,
-        sample_z=np.array([0.0, 0.0]),
+        program, sample_z=np.array([0.0, 0.0])
     )
-
     with pytest.raises(ValueError, match="decision vector must have shape"):
         program_evaluator.objective(np.array([1.0, 2.0, 3.0]))
 
@@ -1088,24 +965,12 @@ def test_jax_evaluator_autodiff_when_available():
 
     program = MathematicalProgram(n_z=2, J=J, h=h, g=g)
     program_evaluator = compile_program_evaluator(
-        program,
-        backend="jax",
-        sample_z=jnp.array([0.5, 0.5]),
-        use_hessian=True,
+        program, backend="jax", sample_z=jnp.array([0.5, 0.5]), use_hessian=True
     )
-
     assert program_evaluator.backend == "jax"
     assert program_evaluator.objective([1.0, 2.0]) == pytest.approx(5.0)
     np.testing.assert_allclose(program_evaluator.gradient([1.0, 2.0]), [2.0, 4.0])
-    np.testing.assert_allclose(
-        program_evaluator.hessian([1.0, 2.0]),
-        2.0 * np.eye(2),
-    )
-    np.testing.assert_allclose(
-        program_evaluator.jacobian_h([1.0, 2.0]),
-        [[1.0, 1.0]],
-    )
+    np.testing.assert_allclose(program_evaluator.hessian([1.0, 2.0]), 2.0 * np.eye(2))
+    np.testing.assert_allclose(program_evaluator.jacobian_h([1.0, 2.0]), [[1.0, 1.0]])
     np.testing.assert_allclose(program_evaluator.jacobian_g([1.0, 2.0]), np.eye(2))
-
-    # Keep the imported symbol used so linters do not mark it as dead in some configs.
     assert jax is not None

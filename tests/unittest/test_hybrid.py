@@ -1,9 +1,7 @@
 """Tests for :class:`~minilink.core.hybrid_diagram.HybridDiagram` boundary wiring."""
 
 import unittest
-
 import numpy as np
-
 from minilink.blocks.basic import Integrator
 from minilink.control.output import ProportionalController
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
@@ -37,14 +35,10 @@ class TestHybridBoundaryConnect(unittest.TestCase):
         plant = _build_plant_diagram()
         hybrid = HybridDiagram(computer=computer, plant=plant)
         hybrid.connect_boundary(
-            direction="computer_to_plant",
-            computer_port="u",
-            plant_port="u",
+            direction="computer_to_plant", computer_port="u", plant_port="u"
         )
         hybrid.connect_boundary(
-            direction="plant_to_computer",
-            computer_port="y",
-            plant_port="y",
+            direction="plant_to_computer", computer_port="y", plant_port="y"
         )
         self.assertEqual(len(hybrid.connections), 2)
 
@@ -54,19 +48,12 @@ class TestHybridBoundaryConnect(unittest.TestCase):
         def wide_output(x, u, t=0, params=None):
             return np.array([0.0, 0.0])
 
-        step_diagram.add_output_port(
-            "u2",
-            dim=2,
-            function=wide_output,
-            dependencies=(),
-        )
+        step_diagram.add_output_port("u2", dim=2, function=wide_output, dependencies=())
         computer = Computer(step_diagram, StepSchedule(dt_base=0.01))
         hybrid = HybridDiagram(computer=computer, plant=_build_plant_diagram())
         with self.assertRaises(ValueError):
             hybrid.connect_boundary(
-                direction="computer_to_plant",
-                computer_port="u2",
-                plant_port="u",
+                direction="computer_to_plant", computer_port="u2", plant_port="u"
             )
 
     def test_unknown_port_raises(self):
@@ -74,131 +61,69 @@ class TestHybridBoundaryConnect(unittest.TestCase):
         hybrid = HybridDiagram(computer=computer, plant=_build_plant_diagram())
         with self.assertRaises(ValueError):
             hybrid.connect_boundary(
-                direction="computer_to_plant",
-                computer_port="missing",
-                plant_port="u",
+                direction="computer_to_plant", computer_port="missing", plant_port="u"
             )
 
     def test_legacy_direction_alias(self):
         conn = BoundaryConnection(
-            direction="step_to_plant",
-            computer_port="u",
-            plant_port="u",
+            direction="step_to_plant", computer_port="u", plant_port="u"
         )
         self.assertEqual(conn.direction, "computer_to_plant")
 
     def test_from_diagrams(self):
         hybrid = HybridDiagram.from_diagrams(
-            _build_computer_diagram(),
-            _build_plant_diagram(),
-            schedule=0.01,
+            _build_computer_diagram(), _build_plant_diagram(), schedule=0.01
         )
         self.assertIsNotNone(hybrid.computer)
         self.assertEqual(hybrid.plant.n, 1)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_hybrid_closed_loop.py ---
-
-"""Tests for :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`."""
-
-import unittest
-
-from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+# from test_hybrid_closed_loop.py
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.core.hybrid_diagram import HybridDiagram
-from minilink.simulation.computer import Computer, StepSchedule
-
-
-def _build_step_diagram():
-    diagram = StepDiagramSystem()
-    diagram.add_subsystem(ProportionalController(0.5), "ctl")
-    diagram.add_input_port("r")
-    diagram.add_input_port("y")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("input", "y", "ctl", "y")
-    diagram.connect_new_output_port("ctl", "u", "u")
-    return diagram
-
-
-def _build_plant():
-    plant = DiagramSystem()
-    plant.add_subsystem(Integrator(), "plant")
-    plant.add_input_port("u")
-    plant.connect("input", "u", "plant", "u")
-    plant.connect_new_output_port("plant", "y", "y")
-    return plant
 
 
 class TestHybridClosedLoop(unittest.TestCase):
     def test_shortcut_matches_manual_wiring(self):
         schedule = StepSchedule(dt_base=0.01)
         shortcut = hybrid_closed_loop(
-            _build_step_diagram(), _build_plant(), schedule=schedule
+            _build_computer_diagram(), _build_plant_diagram(), schedule=schedule
         )
-
         manual = HybridDiagram(
-            computer=Computer(_build_step_diagram(), schedule),
-            plant=_build_plant(),
+            computer=Computer(_build_computer_diagram(), schedule),
+            plant=_build_plant_diagram(),
         )
         manual.connect_boundary(
-            direction="computer_to_plant",
-            computer_port="u",
-            plant_port="u",
+            direction="computer_to_plant", computer_port="u", plant_port="u"
         )
         manual.connect_boundary(
-            direction="plant_to_computer",
-            computer_port="y",
-            plant_port="y",
+            direction="plant_to_computer", computer_port="y", plant_port="y"
         )
-
         self.assertEqual(len(shortcut.connections), len(manual.connections))
         self.assertEqual(shortcut.connections[0], manual.connections[0])
         self.assertEqual(shortcut.connections[1], manual.connections[1])
 
     def test_computer_matmul_leaf_plant(self):
-        computer = Computer(_build_step_diagram(), StepSchedule(dt_base=0.01))
+        computer = Computer(_build_computer_diagram(), StepSchedule(dt_base=0.01))
         hybrid = computer @ Integrator()
         self.assertEqual(len(hybrid.connections), 2)
         self.assertEqual(hybrid.connections[0].computer_port, "u")
         self.assertEqual(hybrid.connections[1].computer_port, "y")
 
     def test_computer_matmul_plant(self):
-        computer = Computer(_build_step_diagram(), StepSchedule(dt_base=0.01))
-        hybrid = computer @ _build_plant()
+        computer = Computer(_build_computer_diagram(), StepSchedule(dt_base=0.01))
+        hybrid = computer @ _build_plant_diagram()
         self.assertEqual(len(hybrid.connections), 2)
 
     def test_leaf_system_wrapping(self):
         hybrid = hybrid_closed_loop(
-            ProportionalController(0.3),
-            Integrator(),
-            schedule=0.01,
+            ProportionalController(0.3), Integrator(), schedule=0.01
         )
         self.assertIn("ctl", hybrid.computer.diagram.subsystems)
         self.assertIn("plant", hybrid.plant.subsystems)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_hybrid_simulator.py ---
-
-"""Tests for :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`."""
-
-import unittest
-
-import numpy as np
-
-from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.core.hybrid_composition import hybrid_closed_loop
+# from test_hybrid_simulator.py
 from minilink.core.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.hybrid_simulator import HybridSimulator
@@ -212,19 +137,12 @@ def _build_hybrid():
     step_diagram.connect("input", "r", "ctl", "r")
     step_diagram.connect("input", "y", "ctl", "y")
     step_diagram.connect_new_output_port("ctl", "u", "u_cmd")
-
     plant = DiagramSystem()
     plant.add_subsystem(Integrator(), "plant")
     plant.add_input_port("u")
     plant.connect("input", "u", "plant", "u")
     plant.connect_new_output_port("plant", "y", "y")
-
-    return hybrid_closed_loop(
-        step_diagram,
-        plant,
-        schedule=0.01,
-        computer_out="u_cmd",
-    )
+    return hybrid_closed_loop(step_diagram, plant, schedule=0.01, computer_out="u_cmd")
 
 
 class TestHybridSimulator(unittest.TestCase):
@@ -232,7 +150,6 @@ class TestHybridSimulator(unittest.TestCase):
         hybrid = _build_hybrid()
         sim = HybridSimulator(hybrid, t0=0, tf=0.2)
         result = sim.solve_forced(np.array([1.0]), input_port_id="r")
-
         self.assertEqual(result.computer.x.shape[0], hybrid.computer.diagram.n)
         self.assertEqual(result.plant.x.shape[0], hybrid.plant.n)
         self.assertEqual(result.computer.n_samples, sim.n_ticks)
@@ -245,33 +162,21 @@ class TestHybridSimulator(unittest.TestCase):
         hybrid = _build_hybrid()
         sim = HybridSimulator(hybrid, t0=0, tf=0.05, n_steps=5)
         result = sim.solve_forced(np.array([1.0]), input_port_id="r")
-
-        # Controller at tick 0 sees zero measurement from the initial sample buffer.
         self.assertAlmostEqual(float(result.computer.signals["u_cmd"][0, 0]), 0.5)
 
     def test_plot_smoke(self):
         import matplotlib
 
         matplotlib.use("Agg")
-
         hybrid = _build_hybrid()
-        hybrid.compute_forced(
-            np.array([1.0]),
-            t0=0,
-            tf=0.1,
-            input_port_id="r",
-        )
-        hybrid.plot_trajectory(
-            signals=("r", "y", "u_cmd", "x"),
-            show=False,
-        )
+        hybrid.compute_forced(np.array([1.0]), t0=0, tf=0.1, input_port_id="r")
+        hybrid.plot_trajectory(signals=("r", "y", "u_cmd", "x"), show=False)
 
     def test_plot_smoke_default_computer_out_u(self):
         """``hybrid_closed_loop`` default ``computer_out='u'`` must not clash with Trajectory.u."""
         import matplotlib
 
         matplotlib.use("Agg")
-
         from minilink.control.modelbased import SlidingModeController
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
@@ -281,11 +186,7 @@ class TestHybridSimulator(unittest.TestCase):
             smc, plant, schedule=0.02, computer_in="y", plant_out="y"
         )
         hybrid.compute_forced(
-            np.array([0.0, 0.0]),
-            t0=0.0,
-            tf=0.1,
-            input_port_id="r",
-            verbose=False,
+            np.array([0.0, 0.0]), t0=0.0, tf=0.1, input_port_id="r", verbose=False
         )
         hybrid.plot_trajectory(show=False)
 
@@ -303,21 +204,13 @@ class TestHybridSimulator(unittest.TestCase):
             smc, plant, schedule=0.02, computer_in="y", plant_out="y"
         )
         result = hybrid.compute_forced(
-            np.array([0.0, 0.0]),
-            t0=0.0,
-            tf=0.1,
-            input_port_id="r",
-            verbose=False,
+            np.array([0.0, 0.0]), t0=0.0, tf=0.1, input_port_id="r", verbose=False
         )
         self.assertIn("y", result.plant.signals)
         signals = resolve_plot_signals(hybrid.plant)
         if result.plant.u.shape[0]:
             signals = tuple(dict.fromkeys((*signals, "u")))
-        spec = build_signal_plot_spec(
-            hybrid.plant,
-            result.plant,
-            signals=signals,
-        )
+        spec = build_signal_plot_spec(hybrid.plant, result.plant, signals=signals)
         plotted = {trace.signal for trace in spec.traces}
         self.assertIn("x", plotted)
         self.assertIn("u", plotted)
@@ -329,11 +222,7 @@ class TestHybridSimulator(unittest.TestCase):
         self.assertIsNone(hybrid.traj)
         self.assertIsNone(hybrid.last_result)
         result = hybrid.compute_forced(
-            np.array([1.0]),
-            t0=0,
-            tf=0.05,
-            input_port_id="r",
-            verbose=False,
+            np.array([1.0]), t0=0, tf=0.05, input_port_id="r", verbose=False
         )
         self.assertIs(hybrid.last_result, result)
         self.assertIs(hybrid.traj, result.plant)
@@ -342,11 +231,7 @@ class TestHybridSimulator(unittest.TestCase):
     def test_animate_uses_plant_traj(self):
         hybrid = _build_hybrid()
         hybrid.compute_forced(
-            np.array([1.0]),
-            t0=0,
-            tf=0.05,
-            input_port_id="r",
-            verbose=False,
+            np.array([1.0]), t0=0, tf=0.05, input_port_id="r", verbose=False
         )
         hybrid.animate(show=False)
 
@@ -372,26 +257,13 @@ class TestHybridSimulator(unittest.TestCase):
         self.assertEqual(hybrid.plant.camera_scale, 9.0)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_hybrid_topology.py ---
-
-"""Tests for hybrid diagram topology export and rendering."""
-import unittest
-import numpy as np
-from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
+# from test_hybrid_topology.py
 from minilink.core.backends import array_module
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.core.hybrid_diagram import HybridDiagram
 from minilink.core.system import StepSystem
 from minilink.graphical.diagrams.hybrid_topology import (
     build_hybrid_topology,
     export_hybrid_topology,
 )
-from minilink.simulation.computer import Computer, StepSchedule
 
 
 class DiscreteLowPass(StepSystem):
@@ -413,7 +285,7 @@ class DiscreteLowPass(StepSystem):
         return xp.asarray(x, dtype=float).reshape(1).copy()
 
 
-def _build_step_diagram_hybrid_topology():
+def _build_step_diagram():
     diagram = StepDiagramSystem()
     diagram.add_subsystem(DiscreteLowPass(alpha=0.3), "filter")
     diagram.add_subsystem(ProportionalController(0.35), "ctl")
@@ -427,21 +299,12 @@ def _build_step_diagram_hybrid_topology():
     return diagram
 
 
-def _build_plant_hybrid_topology():
-    plant = DiagramSystem()
-    plant.add_subsystem(Integrator(), "plant")
-    plant.add_input_port("u")
-    plant.connect("input", "u", "plant", "u")
-    plant.connect_new_output_port("plant", "y", "y")
-    return plant
-
-
 def _build_hybrid_hybrid_topology():
     schedule = StepSchedule.from_rates(
         dt_base=0.01, rates_hz={"filter": 100.0, "ctl": 10.0}
     )
-    computer = Computer(_build_step_diagram_hybrid_topology(), schedule)
-    plant = _build_plant_hybrid_topology()
+    computer = Computer(_build_step_diagram(), schedule)
+    plant = _build_plant_diagram()
     hybrid = HybridDiagram(computer=computer, plant=plant)
     hybrid.connect_boundary(
         direction="computer_to_plant", computer_port="u_cmd", plant_port="u"
@@ -584,90 +447,14 @@ class TestHybridTopology(unittest.TestCase):
         self.assertIn("dt_base=0.01", source)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_hybrid_multi_rate.py ---
-
-"""Multi-rate hybrid simulation: scheduled computer + continuous plant."""
-import unittest
-import numpy as np
-from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
-from minilink.core.backends import array_module
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.core.hybrid_diagram import HybridDiagram
-from minilink.core.system import StepSystem
-from minilink.simulation.computer import Computer, StepSchedule
-from minilink.simulation.hybrid_simulator import HybridSimulator
-
-
-class DiscreteLowPass_hybrid_multi_rate(StepSystem):
-    def __init__(self, alpha=0.25):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.params = {"alpha": float(alpha)}
-        self.x0 = np.zeros(1)
-
-    def step(self, x, u, k=0, params=None):
-        params = self.params if params is None else params
-        alpha = params["alpha"]
-        xp = array_module(x, u)
-        x = xp.asarray(x, dtype=float).reshape(1)
-        u = xp.asarray(u, dtype=float).reshape(1)
-        return xp.array([alpha * x[0] + (1.0 - alpha) * u[0]])
-
-    def h(self, x, u, k=0, params=None):
-        xp = array_module(x)
-        return xp.asarray(x, dtype=float).reshape(1).copy()
-
-
-def _build_step_diagram_hybrid_multi_rate():
-    diagram = StepDiagramSystem()
-    diagram.add_subsystem(DiscreteLowPass_hybrid_multi_rate(alpha=0.3), "filter")
-    diagram.add_subsystem(ProportionalController(0.35), "ctl")
-    diagram.add_input_port("r")
-    diagram.add_input_port("y_meas")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("input", "y_meas", "filter", "u")
-    diagram.connect("filter", "y", "ctl", "y")
-    diagram.connect_new_output_port("filter", "y", "y_f")
-    diagram.connect_new_output_port("ctl", "u", "u_cmd")
-    return diagram
-
-
-def _build_plant_hybrid_multi_rate():
-    plant = DiagramSystem()
-    plant.add_subsystem(Integrator(), "plant")
-    plant.add_input_port("u")
-    plant.connect("input", "u", "plant", "u")
-    plant.connect_new_output_port("plant", "y", "y")
-    return plant
-
-
-def _build_hybrid_hybrid_multi_rate():
-    schedule = StepSchedule.from_rates(
-        dt_base=0.01, rates_hz={"filter": 100.0, "ctl": 10.0}
-    )
-    computer = Computer(_build_step_diagram_hybrid_multi_rate(), schedule)
-    plant = _build_plant_hybrid_multi_rate()
-    hybrid = HybridDiagram(computer=computer, plant=plant)
-    hybrid.connect_boundary(
-        direction="computer_to_plant", computer_port="u_cmd", plant_port="u"
-    )
-    hybrid.connect_boundary(
-        direction="plant_to_computer", computer_port="y_meas", plant_port="y"
-    )
-    return hybrid
-
-
+# from test_hybrid_multi_rate.py
 def _reference(k):
     return np.array([1.0 if k < 60 else 0.0])
 
 
 class TestHybridMultiRate(unittest.TestCase):
     def test_scheduled_hybrid_runs(self):
-        hybrid = _build_hybrid_hybrid_multi_rate()
+        hybrid = _build_hybrid_hybrid_topology()
         sim = HybridSimulator(hybrid, t0=0, tf=1.6)
         result = sim.solve_forced(_reference, input_port_id="r")
         self.assertEqual(result.computer.n_samples, 160)
@@ -676,7 +463,7 @@ class TestHybridMultiRate(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(result.plant.x)))
 
     def test_hand_loop_coarse_parity(self):
-        hybrid = _build_hybrid_hybrid_multi_rate()
+        hybrid = _build_hybrid_hybrid_topology()
         dt_base = hybrid.computer.schedule.dt_base
         plant_eval = hybrid.plant.compile()
         computer = hybrid.computer
@@ -711,24 +498,9 @@ class TestHybridMultiRate(unittest.TestCase):
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_hybrid_fine_recording.py ---
-
-"""Fine plant trajectory recording in hybrid simulation."""
-
-import unittest
-
-import numpy as np
-
+# from test_hybrid_fine_recording.py
 from minilink.control.modelbased import SlidingModeController
-from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.core.step_rollout import StepRollout
-from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.simulation.hybrid_simulator import HybridSimulator
 
 
 class TestHybridFineRecording(unittest.TestCase):
@@ -739,43 +511,20 @@ class TestHybridFineRecording(unittest.TestCase):
         hybrid = hybrid_closed_loop(
             ctl, plant, schedule=0.1, computer_in="y", plant_out="y"
         )
-
-        sim = HybridSimulator(
-            hybrid,
-            t0=0.0,
-            tf=0.5,
-            plant_dt_inner=0.01,
-        )
+        sim = HybridSimulator(hybrid, t0=0.0, tf=0.5, plant_dt_inner=0.01)
         result = sim.solve_forced(np.array([0.0, 0.0]), input_port_id="r")
-
         self.assertIsInstance(result.computer, StepRollout)
         self.assertIsInstance(result.plant, Trajectory)
         self.assertGreater(result.plant.n_samples, result.computer.n_samples)
         self.assertEqual(result.computer.n_samples, sim.n_ticks)
-
         dt_median = np.median(np.diff(result.plant.t))
         self.assertAlmostEqual(dt_median, 0.01, places=5)
-
         tick_end = hybrid.computer.schedule.dt_base * sim.n_ticks
         np.testing.assert_allclose(result.plant.t[0], 0.0)
-        np.testing.assert_allclose(result.plant.t[-1], tick_end, rtol=1e-9)
+        np.testing.assert_allclose(result.plant.t[-1], tick_end, rtol=1e-09)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_smc_hybrid.py ---
-
-"""Hybrid SMC on a pendulum: HybridSimulator vs hand-rolled ZOH loop."""
-import unittest
-import numpy as np
-from minilink.control.modelbased import SlidingModeController
-from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.simulation.hybrid_simulator import HybridSimulator
-
-
+# from test_smc_hybrid.py
 def _build_hybrid_smc_hybrid(*, ts=0.05):
     plant = Pendulum(length=1.0, mass=1.0)
     plant.x0 = np.array([2.5, -0.2])
@@ -815,7 +564,3 @@ class TestSmcHybrid(unittest.TestCase):
         np.testing.assert_allclose(
             result.computer.signals["y"][0, :n_steps], q_hand, rtol=1e-05, atol=1e-05
         )
-
-
-if __name__ == "__main__":
-    unittest.main()

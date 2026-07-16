@@ -1,9 +1,7 @@
 """StepSystem leaf contract tests."""
 
 import unittest
-
 import numpy as np
-
 from minilink.blocks.step import ZOHHold
 from minilink.core.system import StepSystem
 
@@ -54,15 +52,7 @@ class TestStepSystem(unittest.TestCase):
             StepSystem(0)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_step_diagram.py ---
-
-"""Tests for StepDiagramSystem wiring and interpreted step."""
-import unittest
-import numpy as np
+# from test_step_diagram.py
 from minilink.blocks.basic import Integrator
 from minilink.blocks.routing import Gain
 from minilink.core.backends import array_module
@@ -162,13 +152,7 @@ class TestStepDiagram(unittest.TestCase):
             x = x_ev
 
 
-# --- merged from test_step_diagram_topology.py ---
-
-"""Tests for step-diagram topology export."""
-import unittest
-from minilink.core.backends import array_module
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem
+# from test_step_diagram_topology.py
 from minilink.graphical.diagrams import build_diagram_topology
 from minilink.graphical.diagrams.dot import block_html
 
@@ -209,23 +193,8 @@ class TestStepDiagramTopology(unittest.TestCase):
         self.assertIn("Step:", html)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_step_diagram_rollout.py ---
-
-"""Rollout parity tests for compiled step diagrams."""
-
-import unittest
-
-import numpy as np
-
+# from test_step_diagram_rollout.py
 from minilink.control.output import ProportionalController
-from minilink.core.backends import array_module
-from minilink.core.compile.compiler import compile
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem
 
 
 class DiscreteAccumulator(StepSystem):
@@ -269,7 +238,7 @@ def _manual_unity_feedback_rollout(r_value, K, n_steps, x0=0.0):
         xs.append(x)
     k = np.arange(n_steps + 1, dtype=float)
     x_arr = np.array(xs, dtype=float).reshape(1, -1)
-    return k, x_arr
+    return (k, x_arr)
 
 
 class TestStepDiagramRollout(unittest.TestCase):
@@ -278,25 +247,20 @@ class TestStepDiagramRollout(unittest.TestCase):
         r = 1.0
         n_steps = 25
         k_ref, x_ref = _manual_unity_feedback_rollout(r, 0.3, n_steps)
-
         ev = compile(diagram)
         rollout = ev.rollout(diagram.x0, n_steps=n_steps, u=np.array([r]))
-
         np.testing.assert_allclose(rollout.k, k_ref)
         np.testing.assert_allclose(rollout.x, x_ref, rtol=1e-10, atol=1e-10)
-        # ``rollout.u`` is the diagram boundary input (reference ``r``), not plant command.
         np.testing.assert_allclose(rollout.u[0, :], r)
 
     def test_compute_rollout_matches_compile_rollout(self):
         diagram = _build_unity_feedback(K=0.5)
         n_steps = 15
         r = 2.0
-
         via_facade = diagram.compute_rollout(n_steps=n_steps, u=np.array([r]))
         via_eval = diagram.compile().rollout(
             diagram.x0, n_steps=n_steps, u=np.array([r])
         )
-
         np.testing.assert_allclose(via_facade.x, via_eval.x)
         np.testing.assert_allclose(via_facade.u, via_eval.u)
 
@@ -308,21 +272,12 @@ class TestStepDiagramRollout(unittest.TestCase):
         u_boundary = np.array([r])
         for k in range(n_steps):
             x = diagram.step(x, u_boundary, k=k)
-
         rollout = diagram.compile().rollout(diagram.x0, n_steps=n_steps, u=u_boundary)
         np.testing.assert_allclose(x, rollout.x[:, -1], rtol=1e-10, atol=1e-10)
 
 
-# --- merged from test_step_rollout.py ---
-
-"""StepRollout container, gather_u, and evaluator rollout tests."""
-
-import unittest
-
-import numpy as np
+# from test_step_rollout.py
 import pytest
-
-from minilink.core.compile.compiler import compile
 from minilink.core.compile.evaluators.step_rollout import gather_u
 from minilink.core.compile.execution_plan import (
     EXTERNAL_INPUT,
@@ -330,11 +285,10 @@ from minilink.core.compile.execution_plan import (
     NOMINAL,
 )
 from minilink.core.step_rollout import StepRollout
-from minilink.core.system import StepSystem
 from minilink.core.trajectory import Trajectory
 
 try:
-    import jax  # noqa: F401
+    import jax
 
     _JAX_AVAILABLE = True
 except ImportError:
@@ -394,9 +348,7 @@ class TestGatherU(unittest.TestCase):
 class TestStepRollout(unittest.TestCase):
     def test_shapes(self):
         rollout = StepRollout(
-            k=np.arange(4, dtype=float),
-            x=np.zeros((1, 4)),
-            u=np.zeros((1, 4)),
+            k=np.arange(4, dtype=float), x=np.zeros((1, 4)), u=np.zeros((1, 4))
         )
         self.assertEqual(rollout.n_samples, 4)
         self.assertEqual(rollout.n, 1)
@@ -468,25 +420,11 @@ class TestStepRolloutJax(unittest.TestCase):
         rollout = ev.rollout(plant.x0, n_steps=4, u=np.array([1.0]))
         ev_np = compile(plant, backend="numpy")
         ref = ev_np.rollout(plant.x0, n_steps=4, u=np.array([1.0]))
-        np.testing.assert_allclose(rollout.x, ref.x, atol=1e-5)
+        np.testing.assert_allclose(rollout.x, ref.x, atol=1e-05)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_step_diagram_jax.py ---
-
-"""JAX compile smoke for step diagrams."""
-import unittest
-import numpy as np
-import pytest
-from minilink.blocks.routing import Gain
-from minilink.core.backends import array_module
-from minilink.core.compile.compiler import compile
+# from test_step_diagram_jax.py
 from minilink.core.compile.evaluators.jax_evaluators import JaxStepDiagramEvaluator
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem
 
 try:
     import jax
@@ -527,18 +465,7 @@ class TestStepDiagramJax(unittest.TestCase):
         np.testing.assert_allclose(rollout.x, ref.x, rtol=1e-10, atol=1e-10)
 
 
-# --- merged from test_facades_rollout.py ---
-
-"""Step rollout facade tests."""
-
-import unittest
-
-import numpy as np
-
-from minilink.blocks.basic import Integrator
-from minilink.core.system import StepSystem
-
-
+# from test_facades_rollout.py
 class Counter(StepSystem):
     def __init__(self):
         super().__init__(n=1)
@@ -571,7 +498,3 @@ class TestFacadesRollout(unittest.TestCase):
     def test_compute_rollout_only_on_step_system(self):
         with self.assertRaises(AttributeError):
             Integrator().compute_rollout(n_steps=3)
-
-
-if __name__ == "__main__":
-    unittest.main()

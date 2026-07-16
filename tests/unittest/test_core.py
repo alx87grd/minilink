@@ -1,12 +1,6 @@
 import unittest
-
 import numpy as np
-
-from minilink.core.system import (
-    DynamicSystem,
-    System,
-    VectorSignal,
-)
+from minilink.core.system import DynamicSystem, System, VectorSignal
 
 
 class TestCoreComponents(unittest.TestCase):
@@ -52,7 +46,6 @@ class TestCoreComponents(unittest.TestCase):
     def test_add_input_port_dim_defaults(self):
         sys = System()
         sys.add_input_port("y", dim=2)
-
         self.assertEqual(sys.m, 2)
         np.testing.assert_array_equal(sys.inputs["y"].nominal_value, np.zeros(2))
         self.assertEqual(sys.inputs["y"].labels, ["y[0]", "y[1]"])
@@ -64,10 +57,8 @@ class TestCoreComponents(unittest.TestCase):
         sys = System()
         sys.add_input_port("y", nominal_value=[1.0, 2.0])
         self.assertEqual(sys.inputs["y"].dim, 2)
-
         sys.add_input_port("z", labels=["z0", "z1"], units=["m", "m"])
         self.assertEqual(sys.inputs["z"].dim, 2)
-
         with self.assertRaisesRegex(ValueError, "nominal_value"):
             sys.add_input_port("bad", dim=2, nominal_value=[1.0, 2.0, 3.0])
 
@@ -75,7 +66,6 @@ class TestCoreComponents(unittest.TestCase):
         sys = System()
         sys.add_output_port("x", dim=2, function=sys.compute_state)
         self.assertEqual(sys.p, 0)
-
         sys.add_output_port("y", dim=3, function=sys.h)
         self.assertEqual(sys.p, 3)
 
@@ -89,28 +79,17 @@ class TestCoreComponents(unittest.TestCase):
         sys = System()
         sys.add_input_port("r")
         sys.add_input_port("y", dim=2)
-
         u = np.array([1.0, 2.0, 3.0])
         signals = sys.get_port_values_from_u(u)
         np.testing.assert_array_equal(signals["r"], np.array([1.0]))
         np.testing.assert_array_equal(signals["y"], np.array([2.0, 3.0]))
-
         np.testing.assert_array_equal(sys.get_port_values_from_u(u, "r"), [1.0])
         r, y = sys.get_port_values_from_u(u, "r", "y")
         np.testing.assert_array_equal(r, [1.0])
         np.testing.assert_array_equal(y, [2.0, 3.0])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_composition.py ---
-
-import unittest
-
-import numpy as np
-
+# from test_composition.py
 from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.impedance import ImpedanceController
@@ -137,7 +116,7 @@ class AugmentedMechanicalPlant(MechanicalSystem):
         self.outputs["y"].nominal_value = np.zeros(3)
 
     def x2q(self, x):
-        return x[0:1], x[1:2]
+        return (x[0:1], x[1:2])
 
     def f(self, x, u, t=0.0, params=None):
         q, v = self.x2q(x)
@@ -149,60 +128,39 @@ class AugmentedMechanicalPlant(MechanicalSystem):
 class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_add_operator_adds_subsystems_without_wiring(self):
         diagram = Step(final_value=[1.0]) + ProportionalController() + Integrator()
-
         self.assertIsInstance(diagram, DiagramSystem)
-        self.assertEqual(
-            list(diagram.subsystems),
-            ["ref", "ctl", "sys"],
-        )
+        self.assertEqual(list(diagram.subsystems), ["ref", "ctl", "sys"])
         self.assertEqual(diagram.connections["ctl"]["r"], None)
         self.assertEqual(diagram.connections["ctl"]["y"], None)
         self.assertEqual(diagram.connections["sys"]["u"], None)
 
     def test_add_operator_uniquifies_repeated_subsystem_ids(self):
         diagram = Integrator() + Integrator()
-
         self.assertEqual(list(diagram.subsystems), ["sys", "sys2"])
         self.assertEqual(diagram.connections["sys"]["u"], None)
         self.assertEqual(diagram.connections["sys2"]["u"], None)
 
     def test_series_operator_wires_source_to_default_input(self):
         diagram = Step(final_value=[1.0], step_time=0.0) >> Integrator()
-
         self.assertEqual(diagram.connections["sys"]["u"], ("ref", "y"))
         self.assertEqual(diagram.connections["output"]["y"], ("sys", "y"))
 
     def test_series_operator_exposes_first_input_and_final_output(self):
         diagram = Integrator() >> Integrator()
-
         self.assertIn("u", diagram.inputs)
         self.assertEqual(diagram.connections["sys"]["u"], ("input", "u"))
-        self.assertEqual(
-            diagram.connections["sys2"]["u"],
-            ("sys", "y"),
-        )
+        self.assertEqual(diagram.connections["sys2"]["u"], ("sys", "y"))
         self.assertEqual(diagram.connections["output"]["y"], ("sys2", "y"))
-
         dx = diagram.f(np.array([1.0, 2.0]), np.array([3.0]))
         np.testing.assert_allclose(dx, np.array([3.0, 1.0]))
 
     def test_matmul_operator_builds_closed_loop_diagram(self):
         diagram = ImpedanceController() @ Pendulum()
-
         self.assertIn("r", diagram.inputs)
         self.assertIn("y", diagram.outputs)
-        self.assertEqual(
-            diagram.connections["ctl"]["r"],
-            ("input", "r"),
-        )
-        self.assertEqual(
-            diagram.connections["ctl"]["y"],
-            ("sys", "y"),
-        )
-        self.assertEqual(
-            diagram.connections["sys"]["u"],
-            ("ctl", "u"),
-        )
+        self.assertEqual(diagram.connections["ctl"]["r"], ("input", "r"))
+        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
         self.assertEqual(diagram.connections["output"]["y"], ("sys", "y"))
         self.assertEqual(diagram.outputs["y"].dim, 2)
 
@@ -218,24 +176,16 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
             np.array([[0.1]]),
         )
         diagram = controller @ plant
-
-        self.assertEqual(
-            diagram.connections["ctl"]["x"],
-            ("sys", "x"),
-        )
-        self.assertEqual(
-            diagram.connections["sys"]["u"],
-            ("ctl", "u"),
-        )
+        self.assertEqual(diagram.connections["ctl"]["x"], ("sys", "x"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
 
     def test_series_operator_flattens_source_into_closed_loop_diagram(self):
         diagram = (
             Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
         )
-
         self.assertEqual(list(diagram.subsystems), ["ref", "ctl", "sys"])
         self.assertFalse(
-            any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
+            any((isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values()))
         )
         self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "y"))
         self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
@@ -246,15 +196,10 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_add_operator_flattens_diagrams_without_cross_wiring(self):
         left = Step(final_value=[1.0]) + Integrator()
         right = ImpedanceController() @ Pendulum()
-
         diagram = left + right
-
-        self.assertEqual(
-            list(diagram.subsystems),
-            ["ref", "sys", "ctl", "sys2"],
-        )
+        self.assertEqual(list(diagram.subsystems), ["ref", "sys", "ctl", "sys2"])
         self.assertFalse(
-            any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
+            any((isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values()))
         )
         self.assertEqual(diagram.connections["sys"]["u"], None)
         self.assertEqual(diagram.connections["ctl"]["r"], ("input", "r"))
@@ -264,22 +209,14 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_series_operator_flattens_diagram_to_diagram_boundary(self):
         left = Step(final_value=[1.0], step_time=0.0) >> ProportionalController()
         right = Integrator() >> Integrator()
-
         diagram = left >> right
-
-        self.assertEqual(
-            list(diagram.subsystems),
-            ["ref", "ctl", "sys", "sys2"],
-        )
+        self.assertEqual(list(diagram.subsystems), ["ref", "ctl", "sys", "sys2"])
         self.assertFalse(
-            any(isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values())
+            any((isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values()))
         )
         self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "y"))
         self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
-        self.assertEqual(
-            diagram.connections["sys2"]["u"],
-            ("sys", "y"),
-        )
+        self.assertEqual(diagram.connections["sys2"]["u"], ("sys", "y"))
         self.assertEqual(diagram.connections["output"]["y"], ("sys2", "y"))
         self.assertNotIn("u", diagram.inputs)
 
@@ -287,30 +224,17 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         diagram = (
             Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
         )
-
         with self.assertRaisesRegex(ValueError, "no available boundary input"):
             WhiteNoise() >> diagram
-
         self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
         diagram = (
             Step(final_value=[1.0]) + ProportionalController() + Integrator()
         ).autowire(strict=True)
-
-        self.assertEqual(
-            diagram.connections["ctl"]["r"],
-            ("ref", "y"),
-        )
-        self.assertEqual(
-            diagram.connections["ctl"]["y"],
-            ("sys", "y"),
-        )
-        self.assertEqual(
-            diagram.connections["sys"]["u"],
-            ("ctl", "u"),
-        )
-
+        self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "y"))
+        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
         diagram.connect("ref", "y", "sys", "u")
         diagram.autowire(strict=True)
         self.assertEqual(diagram.connections["sys"]["u"], ("ref", "y"))
@@ -319,46 +243,24 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         diagram = (
             Step(final_value=[1.0]) + ImpedanceController() + Pendulum()
         ).autowire(strict=True)
-
-        self.assertEqual(
-            diagram.connections["ctl"]["r"],
-            ("ref", "y"),
-        )
-        self.assertEqual(
-            diagram.connections["ctl"]["y"],
-            ("sys", "y"),
-        )
-        self.assertEqual(
-            diagram.connections["sys"]["u"],
-            ("ctl", "u"),
-        )
+        self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "y"))
+        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
 
     def test_autowire_strict_refuses_ambiguous_matches(self):
         diagram = ProportionalController() + ProportionalController() + Integrator()
-
         with self.assertRaisesRegex(ValueError, "Ambiguous autowire target"):
             diagram.autowire(strict=True)
-
         self.assertEqual(diagram.connections["ctl"]["y"], None)
         self.assertEqual(diagram.connections["ctl2"]["y"], None)
         self.assertEqual(diagram.connections["sys"]["u"], None)
 
     def test_closed_loop_qdq_inserts_mux(self):
         diagram = closed_loop_qdq(ImpedanceController(), Pendulum())
-
         self.assertIn("mux", diagram.subsystems)
-        self.assertEqual(
-            diagram.connections["ctl"]["y"],
-            ("mux", "y"),
-        )
-        self.assertEqual(
-            diagram.connections["mux"]["in0"],
-            ("sys", "q"),
-        )
-        self.assertEqual(
-            diagram.connections["mux"]["in1"],
-            ("sys", "dq"),
-        )
+        self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
+        self.assertEqual(diagram.connections["mux"]["in0"], ("sys", "q"))
+        self.assertEqual(diagram.connections["mux"]["in1"], ("sys", "dq"))
 
     def test_closed_loop_qdq_two_link_requires_matching_controller_dim(self):
         with self.assertRaisesRegex(ValueError, "feedback='qdq' expects"):
@@ -370,30 +272,15 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
 
     def test_closed_loop_auto_uses_mux_for_augmented_plant(self):
         diagram = closed_loop(ImpedanceController(), AugmentedMechanicalPlant())
-
         self.assertIn("mux", diagram.subsystems)
-        self.assertEqual(
-            diagram.connections["ctl"]["y"],
-            ("mux", "y"),
-        )
+        self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
 
     def test_closed_loop_feedback_y_raises_on_dim_mismatch(self):
         with self.assertRaisesRegex(ValueError, "Cannot wire closed-loop feedback"):
             closed_loop(ImpedanceController(), AugmentedMechanicalPlant(), feedback="y")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_standard_feedback.py ---
-
-"""Tests for :func:`~minilink.core.composition.resolve_standard_feedback`."""
-
-import unittest
-
-from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
+# from test_standard_feedback.py
 from minilink.core.composition import closed_loop, resolve_standard_feedback
 
 
@@ -413,6 +300,7 @@ class TestStandardFeedback(unittest.TestCase):
         self.assertIn("sys", diagram.subsystems)
 
     def test_u_ff_control_out(self):
+
         class _MpcLike:
             name = "mpc"
             inputs = {"y": type("P", (), {"dim": 1})()}
@@ -426,17 +314,7 @@ class TestStandardFeedback(unittest.TestCase):
         self.assertEqual(wiring.control_out, "u_ff")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_system_evolution_maps.py ---
-
-"""Evolution-map typing on the System hierarchy."""
-
-import unittest
-
-from minilink.blocks.basic import Integrator
+# from test_system_evolution_maps.py
 from minilink.blocks.routing import Gain
 from minilink.core.system import System
 

@@ -1,7 +1,5 @@
 import unittest
-
 import pytest
-
 from minilink.blocks.basic import Integrator
 from minilink.control.output import ProportionalController
 from minilink.core.diagram import DiagramSystem
@@ -17,27 +15,21 @@ from minilink.graphical.diagrams import (
 class TestDiagrams(unittest.TestCase):
     def test_system_block_html_includes_named_ports(self):
         html = get_system_block_html(ProportionalController(), "ctl")
-
         self.assertIn("P Controller::ctl", html)
         self.assertIn('PORT="r"', html)
         self.assertIn('PORT="u"', html)
 
     def test_system_diagram_contains_block_label(self):
         pytest.importorskip("graphviz")
-
         graph = get_diagram(Integrator())
-
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
         self.assertIn('PORT="y"', graph.source)
 
     def test_diagram_graph_contains_subsystems_and_connections(self):
         pytest.importorskip("graphviz")
-
         diagram = self._make_diagram()
-
         graph = get_diagram(diagram)
-
         self.assertIsNotNone(graph)
         self.assertIn("ctl", graph.source)
         self.assertIn("plant", graph.source)
@@ -46,15 +38,12 @@ class TestDiagrams(unittest.TestCase):
 
     def test_plot_diagram_no_display_returns_graph(self):
         pytest.importorskip("graphviz")
-
         graph = plot_diagram(Integrator(), show_inline=False, show_pdf=False)
-
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
 
     def test_topology_builder_contains_ports_and_edges(self):
         topology = build_diagram_topology(self._make_diagram())
-
         node_ids = [node.id for node in topology.nodes]
         self.assertEqual(node_ids, ["input", "ctl", "plant", "output"])
         edges = [
@@ -66,11 +55,7 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn(("plant", "y", "output", "y_meas"), edges)
 
     def test_topology_abstract_boundary_collapses_external_nodes(self):
-        topology = build_diagram_topology(
-            self._make_diagram(),
-            abstract_boundary=True,
-        )
-
+        topology = build_diagram_topology(self._make_diagram(), abstract_boundary=True)
         node_ids = [node.id for node in topology.nodes]
         self.assertEqual(node_ids, ["ctl", "plant"])
         edges = [
@@ -79,7 +64,6 @@ class TestDiagrams(unittest.TestCase):
         ]
         self.assertIn(("ctl", "u", "plant", "u"), edges)
         self.assertNotIn(("input", "r", "ctl", "r"), edges)
-
         inputs = {
             ref.diagram_port: (ref.node_id, ref.port_id)
             for ref in topology.boundary_inputs
@@ -93,7 +77,6 @@ class TestDiagrams(unittest.TestCase):
 
     def test_mermaid_exporter_returns_deterministic_source(self):
         source = export_diagram_topology(self._make_diagram(), backend="mermaid")
-
         self.assertIn("flowchart LR", source)
         self.assertIn('ctl["P Controller::ctl"]', source)
         self.assertIn('input -- "r -> r" --> ctl', source)
@@ -113,22 +96,9 @@ class TestDiagrams(unittest.TestCase):
         return diagram
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_wiring_mixin.py ---
-
-"""Parity tests for WiredDiagramMixin wiring and topology export."""
-
-import unittest
-
+# from test_wiring_mixin.py
 import numpy as np
-
-from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
 from minilink.core.compile.compiler import check_algebraic_loops
-from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
 from minilink.graphical.diagrams import build_diagram_topology
@@ -147,6 +117,7 @@ def _build_closed_loop():
 
 
 def _build_feedthrough_loop():
+
     class FeedthroughSystem(System):
         def __init__(self, name):
             super().__init__()
@@ -176,7 +147,6 @@ class TestWiringMixin(unittest.TestCase):
     def test_topology_parity(self):
         diagram = _build_closed_loop()
         diagram.connect_new_output_port("plant", "y", "y_meas")
-
         topology = build_diagram_topology(diagram)
         node_ids = [node.id for node in topology.nodes]
         self.assertEqual(node_ids, ["input", "ctl", "plant", "output"])
@@ -201,13 +171,10 @@ class TestWiringMixin(unittest.TestCase):
         x = np.array([0.25])
         u = np.array([1.0])
         t = 0.5
-
         plant_y = diagram.compute_subsys_output_port(x, u, t, "plant", "y")
         ctl_u = diagram.compute_subsys_output_port(x, u, t, "ctl", "u")
-
         np.testing.assert_allclose(plant_y, np.array([0.25]))
         np.testing.assert_allclose(ctl_u, np.array([2.5 * (1.0 - 0.25)]))
-
         local_u = diagram.get_local_input(x, u, t, "ctl")
         self.assertEqual(local_u.shape, (2,))
 
@@ -248,7 +215,6 @@ class TestWiringMixin(unittest.TestCase):
         u = np.array([1.0])
         dt = 0.1
         n_steps = 10
-
         x_ref = x0.copy()
         x_comp = x0.copy()
         for step in range(n_steps):
@@ -258,28 +224,16 @@ class TestWiringMixin(unittest.TestCase):
             np.testing.assert_allclose(dx_comp, dx_ref, atol=1e-10)
             x_ref = x_ref + dx_ref * dt
             x_comp = x_comp + dx_comp * dt
-
         np.testing.assert_allclose(x_comp, x_ref, atol=1e-10)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_facades_split.py ---
-
-"""Façade mixin split: MRO surface, sim guards, compile types."""
-
-import unittest
-
-from minilink.blocks.basic import Integrator
+# from test_facades_split.py
 from minilink.blocks.routing import Gain
 from minilink.core.compile.evaluators.numpy_evaluators import (
     NumpyDiagramEvaluator,
     NumpyDynamicEvaluator,
     NumpyStaticEvaluator,
 )
-from minilink.core.diagram import DiagramSystem
 from minilink.core.facades import (
     DynamicSystemFacades,
     SharedSystemFacades,
@@ -369,7 +323,3 @@ class TestCompileTypes(unittest.TestCase):
     def test_compile_diagram_diagram_evaluator(self):
         diagram = _unity_feedback_diagram()
         self.assertIsInstance(diagram.compile(), NumpyDiagramEvaluator)
-
-
-if __name__ == "__main__":
-    unittest.main()

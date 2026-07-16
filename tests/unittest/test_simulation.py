@@ -2,10 +2,8 @@ import unittest
 import warnings
 from types import SimpleNamespace
 from unittest.mock import patch
-
 import numpy as np
 import pytest
-
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 from minilink.simulation.simulator import (
@@ -17,7 +15,7 @@ from minilink.simulation.simulator import (
 
 def _have_jax() -> bool:
     try:
-        import jax  # noqa: F401
+        import jax
 
         return True
     except ImportError:
@@ -77,7 +75,7 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             StableLinearSystem(),
             tf=1.0,
-            n_steps=10_000,
+            n_steps=10000,
             compile_backend="numpy",
             verbose=False,
         )
@@ -107,7 +105,7 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             StableLinearSystem(),
             tf=1.0,
-            n_steps=10_000,
+            n_steps=10000,
             compile_backend="jax",
             verbose=False,
         )
@@ -133,7 +131,7 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             DiscontinuousLinearSystem(),
             tf=1.0,
-            n_steps=10_000,
+            n_steps=10000,
             compile_backend="jax",
             solver_warnings="ignore",
             verbose=False,
@@ -222,16 +220,13 @@ class TestNewSimulator(unittest.TestCase):
             y=np.array([[1.0]]),
         )
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
-
         with patch(
             "minilink.simulation.solvers.scipy_ivp.solve_ivp",
             return_value=failed_solution,
         ):
             with self.assertRaises(RuntimeError) as ctx:
                 sim.solve()
-
         self.assertIn("integration failed", str(ctx.exception))
-        # Failure path: debug lives on the SciPy backend (no try/finally on Simulator)
         sb = sim.solver_backend
         self.assertIs(sb.last_solve_ivp_solution, failed_solution)
         self.assertFalse(sb.last_debug["success"])
@@ -243,7 +238,6 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
         traj = sim.solve()
-
         self.assertIs(sim.last_traj, traj)
         self.assertEqual(sim.last_debug["solver"], "euler")
         self.assertEqual(traj.x.shape, (1, 3))
@@ -254,7 +248,6 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
         bad_u = np.zeros((3, 1))
-
         with self.assertRaises(ValueError):
             sim.solve_forced(bad_u)
 
@@ -262,35 +255,21 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
-
         traj = sim.solve_forced(lambda t: 10.0 * t)
-
         np.testing.assert_allclose(traj.u, np.array([[0.0, 1.0, 2.0]]))
 
     def test_solve_forced_accepts_constant_vector(self):
         sim = Simulator(
             TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
-
         traj = sim.solve_forced(np.array([3.0, 4.0]))
-
-        np.testing.assert_allclose(
-            traj.u,
-            np.array(
-                [
-                    [3.0, 3.0, 3.0],
-                    [4.0, 4.0, 4.0],
-                ]
-            ),
-        )
+        np.testing.assert_allclose(traj.u, np.array([[3.0, 3.0, 3.0], [4.0, 4.0, 4.0]]))
 
     def test_solve_forced_accepts_scalar_on_one_named_port(self):
         sim = Simulator(
             TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
-
         traj = sim.solve_forced(5.0, input_port_id="left")
-
         np.testing.assert_allclose(traj.u[0, :], np.array([5.0, 5.0, 5.0]))
         np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
 
@@ -303,9 +282,7 @@ class TestNewSimulator(unittest.TestCase):
             verbose=False,
         )
         u_traj = np.zeros((1, 3))
-
         traj = sim.solve_forced(u_traj)
-
         self.assertEqual(sim.last_debug["solver"], "rk4_fixedsteps")
         np.testing.assert_allclose(traj.u, u_traj)
         np.testing.assert_allclose(traj.x[:, 0], [1.0])
@@ -316,7 +293,6 @@ class TestNewSimulator(unittest.TestCase):
         traj = sys.compute_trajectory(
             tf=0.2, n_steps=3, solver="euler", show=False, verbose=False
         )
-
         self.assertIs(sys.traj, traj)
         self.assertEqual(traj.x.shape, (1, 3))
         self.assertEqual(traj.u.shape, (1, 3))
@@ -325,22 +301,14 @@ class TestNewSimulator(unittest.TestCase):
     def test_wrapper_compute_forced_accepts_full_input_trajectory(self):
         sys = StableLinearSystem()
         u_traj = np.array([[0.0, 0.5, 1.0]])
-
         traj = sys.compute_forced(
-            u_traj,
-            tf=0.2,
-            n_steps=3,
-            solver="euler",
-            show=False,
-            verbose=False,
+            u_traj, tf=0.2, n_steps=3, solver="euler", show=False, verbose=False
         )
-
         self.assertIs(sys.traj, traj)
         np.testing.assert_allclose(traj.u, u_traj)
 
     def test_wrapper_compute_forced_samples_callable_on_one_named_port(self):
         sys = TwoPortLinearSystem()
-
         traj = sys.compute_forced(
             lambda t: 10.0 * t,
             input_port_id="left",
@@ -350,7 +318,6 @@ class TestNewSimulator(unittest.TestCase):
             show=False,
             verbose=False,
         )
-
         np.testing.assert_allclose(traj.u[0, :], np.array([0.0, 1.0, 2.0]))
         np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
 
@@ -366,7 +333,6 @@ class TestEulerSolverModes(unittest.TestCase):
         times = np.array([0.0, 0.05, 0.2, 0.25])
         backend = EulerSolverBackend()
         x_traj = backend.integrate(self.ev, times, self.plant.x0)
-
         self.assertEqual(x_traj.shape, (1, times.size))
         self.assertEqual(backend.last_debug["solver"], "euler")
 
@@ -379,7 +345,6 @@ class TestEulerSolverModes(unittest.TestCase):
         fixed = EulerFixedStepSolverBackend()
         x_generic = generic.integrate(self.ev, times, self.plant.x0)
         x_fixed = fixed.integrate(self.ev, times, self.plant.x0)
-
         np.testing.assert_allclose(x_generic, x_fixed, rtol=0.0, atol=1e-12)
         self.assertEqual(fixed.last_debug["solver"], "euler_fixedsteps")
 
@@ -388,7 +353,6 @@ class TestEulerSolverModes(unittest.TestCase):
 
         times = np.array([0.0, 0.05, 0.2, 0.25])
         backend = EulerFixedStepSolverBackend()
-
         with self.assertRaises(ValueError):
             backend.integrate(self.ev, times, self.plant.x0)
 
@@ -401,31 +365,18 @@ class TestEulerSolverModes(unittest.TestCase):
             verbose=False,
         )
         traj = sim.solve()
-
         self.assertEqual(sim.solver_mode, "euler_fixedsteps")
         self.assertEqual(sim.last_debug["solver"], "euler_fixedsteps")
         self.assertEqual(traj.x.shape, (1, 3))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_static_simulator.py ---
-
-"""StaticSimulator records boundary outputs on a time grid."""
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_static_simulator.py
 from minilink.blocks.routing import Gain
 from minilink.blocks.sources import Step
 from minilink.simulation.static_simulator import StaticSimulator
 
 try:
-    import jax  # noqa: F401
+    import jax
 
     _JAX_AVAILABLE = True
 except ImportError:
@@ -443,9 +394,7 @@ class TestStaticSimulator(unittest.TestCase):
 
     def test_step_source_signals_on_grid(self):
         step = Step(
-            initial_value=np.array([0.0]),
-            final_value=np.array([1.0]),
-            step_time=0.5,
+            initial_value=np.array([0.0]), final_value=np.array([1.0]), step_time=0.5
         )
         traj = step.compute_trajectory(t0=0, tf=1, n_steps=3, verbose=False)
         self.assertEqual(traj.x.shape, (0, 3))
@@ -474,22 +423,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
         self.assertIn("y", traj.signals)
 
 
-# --- merged from test_discontinuous_solvers.py ---
-
-"""Regression tests: discontinuous closed-loop solver behavior (SMC pendulum).
-
-SciPy adaptive solvers (``scipy``, ``scipy_stiff``, …) on this loop can hang
-for minutes near switching surfaces — do **not** include them in default smoke
-runs. Euler vs RK4 comparisons use short horizons and fixed ``dt`` only.
-"""
-
-
-import unittest
-
-import numpy as np
-import pytest
-
-from minilink.blocks.sources import Step
+# from test_discontinuous_solvers.py
 from minilink.control.modelbased import SlidingModeController
 from minilink.core.composition import closed_loop_qdq
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
@@ -529,12 +463,7 @@ def _max_ddq_consistency_error(diagram, traj):
 
 def _integrate(diagram, *, solver, dt=DT_COARSE, tf=TF):
     return diagram.compute_trajectory(
-        tf=tf,
-        dt=dt,
-        solver=solver,
-        solver_warnings="ignore",
-        show=False,
-        verbose=False,
+        tf=tf, dt=dt, solver=solver, solver_warnings="ignore", show=False, verbose=False
     )
 
 
@@ -545,31 +474,20 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 
     def test_auto_solver_selects_euler(self):
         sim = Simulator(
-            self.diagram,
-            tf=TF,
-            dt=DT_COARSE,
-            solver_warnings="ignore",
-            verbose=False,
+            self.diagram, tf=TF, dt=DT_COARSE, solver_warnings="ignore", verbose=False
         )
         self.assertEqual(sim.solver_mode, "euler")
 
     def test_auto_dt_uses_discontinuous_scale(self):
-        sim = Simulator(
-            self.diagram,
-            tf=0.01,
-            solver_warnings="ignore",
-            verbose=False,
-        )
+        sim = Simulator(self.diagram, tf=0.01, solver_warnings="ignore", verbose=False)
         expected_dt = 0.001 * DISCONTINUOUS_AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
         traj_euler = _integrate(self.diagram, solver="euler")
         traj_rk4 = _integrate(self.diagram, solver="rk4_fixedsteps")
-
         err_euler = _max_ddq_consistency_error(self.diagram, traj_euler)
         err_rk4 = _max_ddq_consistency_error(self.diagram, traj_rk4)
-
         self.assertLess(
             err_euler,
             err_rk4,
@@ -579,10 +497,8 @@ class TestDiscontinuousSolvers(unittest.TestCase):
     def test_rk4_coarse_dt_can_freeze_state_while_euler_moves(self):
         traj_euler = _integrate(self.diagram, solver="euler")
         traj_rk4 = _integrate(self.diagram, solver="rk4_fixedsteps")
-
         dq_motion_euler = float(np.max(np.abs(np.diff(traj_euler.x[1]))))
         dq_motion_rk4 = float(np.max(np.abs(np.diff(traj_rk4.x[1]))))
-
         self.assertGreater(
             dq_motion_euler,
             dq_motion_rk4,
@@ -590,28 +506,14 @@ class TestDiscontinuousSolvers(unittest.TestCase):
         )
 
     @pytest.mark.skip(
-        reason=(
-            "SciPy adaptive solvers on discontinuous SMC closed loops can hang "
-            "for minutes (Zeno-like refinement near sign(s) switches); not for smoke."
-        )
+        reason="SciPy adaptive solvers on discontinuous SMC closed loops can hang for minutes (Zeno-like refinement near sign(s) switches); not for smoke."
     )
     def test_scipy_adaptive_on_smc_not_for_smoke(self):
         """Documented skip — run manually only with a long timeout if needed."""
         _integrate(self.diagram, solver="scipy_stiff", tf=0.5)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_integrate_zoh.py ---
-
-"""Tests for :meth:`IntegrationMixin.integrate_zoh`."""
-
-import unittest
-
-import numpy as np
-
+# from test_integrate_zoh.py
 from minilink.blocks.basic import Integrator
 
 
@@ -619,23 +521,19 @@ class TestIntegrateZoh(unittest.TestCase):
     def test_single_step_matches_integrate(self):
         plant = Integrator()
         evaluator = plant.compile()
-
         x0 = np.array([0.0])
         u_hold = np.array([2.0])
         x_final = evaluator.integrate_zoh(x0, u_hold, t0=0.0, dt_hold=0.1)
-
         x_seq = evaluator.rk4_integrate_zoh(x0, u_hold.reshape(1, 1), t0=0.0, dt=0.1)
         np.testing.assert_allclose(x_final, x_seq[-1])
 
     def test_subdivided_dt_inner(self):
         plant = Integrator()
         evaluator = plant.compile()
-
         x0 = np.array([0.0])
         u_hold = np.array([1.0])
         dt_hold = 0.1
         dt_inner = 0.02
-
         x_final = evaluator.integrate_zoh(
             x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
         )
@@ -648,12 +546,10 @@ class TestIntegrateZoh(unittest.TestCase):
     def test_integrate_zoh_rollout_grid(self):
         plant = Integrator()
         evaluator = plant.compile()
-
         x0 = np.array([0.0])
         u_hold = np.array([1.0])
         dt_hold = 0.1
         dt_inner = 0.02
-
         t_samples, x_samples = evaluator.integrate_zoh_rollout(
             x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
         )
@@ -674,19 +570,7 @@ class TestIntegrateZoh(unittest.TestCase):
             evaluator.integrate_zoh(np.array([0.0]), np.array([1.0]), 0.0, 0.0)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_computer.py ---
-
-"""Tests for scheduled :class:`~minilink.simulation.computer.Computer` runtime."""
-
-import unittest
-
-import numpy as np
-
-from minilink.core.backends import array_module
+# from test_computer.py
 from minilink.core.compile.evaluators.step_rollout import gather_u
 from minilink.core.diagram import StepDiagramSystem
 from minilink.core.system import StepSystem, System
@@ -753,7 +637,6 @@ def _hand_tick(computer: Computer, u) -> dict[str, np.ndarray]:
     write[:] = read
     x_work = computer.x.copy()
     u_arr = np.asarray(u, dtype=float).reshape(computer.diagram.m)
-
     for sys_id in computer.all_sys_ids:
         if k_tick % computer.divisor(sys_id) != 0:
             continue
@@ -770,8 +653,7 @@ def _hand_tick(computer: Computer, u) -> dict[str, np.ndarray]:
             x_work[step_op.local_x_slice] = step_op.step_func(
                 local_x, local_u, k_tick, step_op.bound_params
             )
-
-    computer.signal_read, computer.signal_write = write, read
+    computer.signal_read, computer.signal_write = (write, read)
     computer.x = x_work
     outs = {
         port_id: computer.signal_read[sl].copy()
@@ -783,21 +665,17 @@ def _hand_tick(computer: Computer, u) -> dict[str, np.ndarray]:
 
 class TestComputer(unittest.TestCase):
     def test_single_rate_matches_rollout(self):
-        # Direct boundary -> plant wiring: boundary u is external, not a held
-        # internal signal, so parallel gather-from-read matches sync rollout.
         diagram = _build_direct_plant()
         schedule = StepSchedule(dt_base=0.01)
         computer = Computer(diagram, schedule)
         computer.compile()
         computer.reset()
-
         n_steps = 20
         u_val = 1.0
         xs = [computer.x.copy()]
         for _ in range(n_steps):
             computer.tick(np.array([u_val]))
             xs.append(computer.x.copy())
-
         rollout = diagram.compute_rollout(n_steps=n_steps, u=np.array([u_val]))
         np.testing.assert_allclose(xs[-1], rollout.x[:, -1], rtol=1e-10, atol=1e-10)
         for i in range(1, n_steps + 1):
@@ -809,11 +687,9 @@ class TestComputer(unittest.TestCase):
         diagram.add_input_port("u")
         diagram.connect("input", "u", "blk", "u")
         diagram.connect_new_output_port("blk", "y", "y")
-
         computer = Computer(diagram, StepSchedule(dt_base=0.01))
         computer.compile()
         computer.reset()
-
         self.assertEqual(computer.k, 0)
         outs = computer.tick(np.array([2.0]))
         self.assertAlmostEqual(float(outs["y"][0]), 2.0)
@@ -827,11 +703,9 @@ class TestComputer(unittest.TestCase):
         computer = Computer(diagram, schedule)
         computer.compile()
         computer.reset()
-
         ref = Computer(diagram, schedule)
         ref.compile()
         ref.reset()
-
         n_steps = 12
         u_val = 1.0
         for _ in range(n_steps):
@@ -843,29 +717,24 @@ class TestComputer(unittest.TestCase):
 
     def test_from_rates_divisors(self):
         schedule = StepSchedule.from_rates(
-            dt_base=0.01,
-            rates_hz={"a": 100.0, "b": 50.0},
+            dt_base=0.01, rates_hz={"a": 100.0, "b": 50.0}
         )
         self.assertEqual(schedule.fire["a"], 1)
         self.assertEqual(schedule.fire["b"], 2)
-
         with self.assertRaises(ValueError):
             StepSchedule.from_rates(dt_base=0.01, rates_hz={"a": 30.0})
-
         with self.assertRaises(ValueError):
             StepSchedule.from_rates(dt_base=0.01, rates_hz={"a": 200.0})
 
     def test_rollout_differs_when_scheduled(self):
         diagram = _build_fast_slow_series()
         sync = diagram.compute_rollout(n_steps=6, u=np.array([1.0]))
-
         schedule = StepSchedule(dt_base=0.01, fire={"fast": 1, "slow": 2})
         computer = Computer(diagram, schedule)
         computer.compile()
         computer.reset()
         for _ in range(6):
             computer.tick(np.array([1.0]))
-
         self.assertFalse(np.allclose(computer.x, sync.x[:, -1]))
 
     def test_reset_replay(self):
@@ -873,18 +742,14 @@ class TestComputer(unittest.TestCase):
         computer = Computer(diagram, StepSchedule(dt_base=0.01))
         computer.compile()
         computer.reset()
-
         n_steps = 10
         for k in range(n_steps):
             computer.tick(np.array([float(k)]))
-
         x_final = computer.x.copy()
         k_final = computer.k
-
         computer.reset()
         for k in range(n_steps):
             computer.tick(np.array([float(k)]))
-
         np.testing.assert_allclose(computer.x, x_final)
         self.assertEqual(computer.k, k_final)
 
@@ -902,19 +767,8 @@ class TestComputer(unittest.TestCase):
             computer.tick(np.array([1.0]))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_as_computer.py ---
-
-"""Tests for :func:`~minilink.simulation.computer.as_computer` and ``%``."""
-
-import unittest
-
-from minilink.blocks.basic import Integrator
+# from test_as_computer.py
 from minilink.control.output import ProportionalController
-from minilink.core.diagram import StepDiagramSystem
 from minilink.simulation.computer import Computer, StepSchedule, as_computer
 
 
@@ -949,7 +803,6 @@ class TestAsComputer(unittest.TestCase):
         pytest = __import__("pytest")
         jax = pytest.importorskip("jax")
         del jax
-
         from minilink.control.mpc import ModelPredictiveController
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
@@ -983,7 +836,7 @@ class TestAsComputer(unittest.TestCase):
                 compile_backend="jax",
                 record_solve_time=True,
                 optimizer_method="scipy_slsqp",
-                optimizer_options={"maxiter": 5, "ftol": 1e-1},
+                optimizer_options={"maxiter": 5, "ftol": 0.1},
             ),
         )
         computer = (
@@ -991,7 +844,3 @@ class TestAsComputer(unittest.TestCase):
         )
         self.assertIn("y", computer.diagram.inputs)
         self.assertIn("u_ff", computer.diagram.outputs)
-
-
-if __name__ == "__main__":
-    unittest.main()

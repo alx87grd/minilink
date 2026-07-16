@@ -5,9 +5,7 @@ Broad catalog plant smoke (instantiate, ``f`` finite, geometry) lives in L6:
 """
 
 import unittest
-
 import numpy as np
-
 from minilink.dynamics.catalog.aerial.drone import (
     ConstantSpeedHelicopterTunnel,
     Drone2D,
@@ -34,9 +32,7 @@ from minilink.dynamics.catalog.mass_spring_damper.linear import (
     ThreeMass,
     TwoMass,
 )
-from minilink.dynamics.catalog.pendulum.cartpole import (
-    CartPole,
-)
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.dynamics.catalog.pendulum.double_pendulum import Acrobot
 from minilink.dynamics.catalog.pendulum.pendulum import (
     Pendulum,
@@ -55,9 +51,7 @@ from minilink.dynamics.catalog.vehicles.steering import (
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
 from minilink.graphical.animation.primitives import Arrow, TorqueArrow
-from tests.unittest.graphics_contract_helpers import (
-    geometry_smoke as _geometry_smoke,
-)
+from tests.unittest.graphics_contract_helpers import geometry_smoke as _geometry_smoke
 from tests.unittest.graphics_contract_helpers import (
     resolved_primitive_count as _primitive_count,
 )
@@ -66,40 +60,33 @@ from tests.unittest.graphics_contract_helpers import (
 class TestCatalogSmoke(unittest.TestCase):
     def test_low_risk_equation_reference_values(self):
         np.testing.assert_allclose(
-            SimpleIntegrator().f(np.array([2.0]), np.array([3.0])),
-            [3.0],
+            SimpleIntegrator().f(np.array([2.0]), np.array([3.0])), [3.0]
         )
         np.testing.assert_allclose(
-            DoubleIntegrator().f(np.array([2.0, 4.0]), np.array([3.0])),
-            [4.0, 3.0],
+            DoubleIntegrator().f(np.array([2.0, 4.0]), np.array([3.0])), [4.0, 3.0]
         )
         np.testing.assert_allclose(
             TripleIntegrator().f(np.array([2.0, 4.0, 6.0]), np.array([3.0])),
             [4.0, 6.0, 3.0],
         )
         np.testing.assert_allclose(
-            VanderPol(mu=0.5).f(np.array([1.0, 2.0]), np.array([0.0])),
-            [2.0, -1.0],
+            VanderPol(mu=0.5).f(np.array([1.0, 2.0]), np.array([0.0])), [2.0, -1.0]
         )
 
     def test_mass_spring_damper_reference_matrices(self):
         single = SingleMass(mass=2.0, k=4.0, b=6.0)
         np.testing.assert_allclose(single.A(), [[0.0, 1.0], [-2.0, -3.0]])
         np.testing.assert_allclose(single.B(), [[0.0], [0.5]])
-
         two = TwoMass(m=1.0, k=2.0, b=0.2, output_mass=1)
         np.testing.assert_allclose(two.C(), [[1.0, 0.0, 0.0, 0.0]])
-
         three = ThreeMass(m=2.0, k=4.0, b=0.0, output_mass=3)
         np.testing.assert_allclose(three.B()[-1], [0.5])
 
     def test_vehicle_reference_values(self):
         bicycle = KinematicBicycle()
         np.testing.assert_allclose(
-            bicycle.f(np.array([0.0, 0.0, 0.0]), np.array([2.0, 0.0])),
-            [2.0, 0.0, 0.0],
+            bicycle.f(np.array([0.0, 0.0, 0.0]), np.array([2.0, 0.0])), [2.0, 0.0, 0.0]
         )
-
         np.testing.assert_allclose(
             HolonomicMobileRobot().f(np.array([1.0, 2.0]), np.array([3.0, 4.0])),
             [3.0, 4.0],
@@ -110,10 +97,8 @@ class TestCatalogSmoke(unittest.TestCase):
             ),
             [3.0, 4.0, 5.0, 6.0],
         )
-
         car = LongitudinalFrontWheelDriveCarWithWheelSlipInput()
         self.assertGreater(car.acceleration(speed=0.0, slip=0.1), 0.0)
-
         mountain = MountainCar()
         np.testing.assert_allclose(mountain.H(np.array([0.0])), [[1.0]])
 
@@ -123,17 +108,13 @@ class TestCatalogSmoke(unittest.TestCase):
         dq = np.zeros(3)
         hover = np.array([drone.params["mass"] * drone.params["gravity"] / 2.0] * 2)
         np.testing.assert_allclose(
-            drone.forward_dynamics(q, dq, hover),
-            np.zeros(3),
-            atol=1e-12,
+            drone.forward_dynamics(q, dq, hover), np.zeros(3), atol=1e-12
         )
-
         rocket = Rocket()
         np.testing.assert_allclose(
             rocket.generalized_force(np.zeros(3), np.zeros(3), np.array([10.0, 0.0])),
             [0.0, 10.0, 0.0],
         )
-
         boat = Boat2D()
         np.testing.assert_allclose(
             boat.generalized_force(np.zeros(3), np.zeros(3), np.array([3.0, 4.0])),
@@ -143,14 +124,11 @@ class TestCatalogSmoke(unittest.TestCase):
     def test_manipulator_kinematics_reference_values(self):
         one = OneLinkManipulator()
         np.testing.assert_allclose(
-            one.forward_kinematics(np.array([0.0])),
-            [0.0, one.params["l1"]],
+            one.forward_kinematics(np.array([0.0])), [0.0, one.params["l1"]]
         )
-
         five = FiveLinkPlanarManipulator()
         np.testing.assert_allclose(
-            five.forward_kinematics(np.zeros(5)),
-            [0.0, np.sum(five.params["l"])],
+            five.forward_kinematics(np.zeros(5)), [0.0, np.sum(five.params["l"])]
         )
 
     def test_pyro_designed_force_velocity_and_torque_arrows_are_present(self):
@@ -172,18 +150,15 @@ class TestCatalogSmoke(unittest.TestCase):
             (CartPole(), 1),
             (SpeedControlledManipulator(2, 2), 1),
         ]
-
         for system, expected in arrow_cases:
             with self.subTest(system=system.name):
                 self.assertEqual(_primitive_count(system, Arrow), expected)
                 _geometry_smoke(system)
-
         boat = Boat2D()
         boat.show_hydrodynamic_forces = True
         self.assertEqual(_primitive_count(boat, Arrow), 2)
         self.assertEqual(_primitive_count(boat, TorqueArrow), 1)
         _geometry_smoke(boat)
-
         torque_cases = [
             (Pendulum(), 1),
             (TwoIndependentPendulums(), 2),
@@ -191,33 +166,13 @@ class TestCatalogSmoke(unittest.TestCase):
             (OneLinkManipulator(), 1),
             (TwoLinkManipulator(), 2),
         ]
-
         for system, expected in torque_cases:
             with self.subTest(system=system.name):
                 self.assertEqual(_primitive_count(system, TorqueArrow), expected)
                 _geometry_smoke(system)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_catalog_plant_contracts.py ---
-
-"""Deep contract checks on representative catalog plants (dynamics + graphics).
-
-Broader catalog coverage lives in L6 ``run_catalog_smokes.py`` and render
-smoke in ``test_graphics.py`` (manifest only — no stored PNGs).
-This file keeps a small set of
-reference-value and integration checks that are expensive to scatter.
-"""
-
-
-import unittest
-
-import numpy as np
-
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+# from test_catalog_plant_contracts.py
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.graphical.animation.camera import resolve_camera_from_hints
@@ -231,7 +186,6 @@ class TestCartPole(unittest.TestCase):
         self.assertEqual(sys.n, 4)
         self.assertEqual(sys.m, 1)
         self.assertEqual(sys.state.labels, ["x", "theta", "dx", "dtheta"])
-
         q = np.array([0.2, 0.3])
         dq = np.array([0.4, 0.5])
         H = sys.H(q)
@@ -256,14 +210,13 @@ class TestCartPole(unittest.TestCase):
         x = np.zeros(sys.n)
         u = np.zeros(sys.m)
         np.testing.assert_allclose(sys.compile("numpy").f(x, u, 0.0), np.zeros(sys.n))
-
         frame = resolve_draw_frame(sys)
         cart_boxes = [
             primitive for primitive in frame["primitives"] if isinstance(primitive, Box)
         ]
         self.assertEqual(len(cart_boxes), 1)
         self.assertEqual(cart_boxes[0].length_z, sys.cart_depth)
-        self.assertTrue(any(isinstance(p, Rod) for p in frame["primitives"]))
+        self.assertTrue(any((isinstance(p, Rod) for p in frame["primitives"])))
         geometry_smoke(sys)
 
 
@@ -273,26 +226,18 @@ class TestDoublePendulum(unittest.TestCase):
         q = np.array([0.2, 0.3])
         dq = np.array([0.4, 0.5])
         c2 = np.cos(q[1])
-        s1, s12 = np.sin(q[0]), np.sin(q[0] + q[1])
+        s1, s12 = (np.sin(q[0]), np.sin(q[0] + q[1]))
         h = np.sin(q[1])
-
         np.testing.assert_allclose(
-            sys.H(q),
-            np.array([[3.0 + 2.0 * c2, 1.0 + c2], [1.0 + c2, 1.0]]),
+            sys.H(q), np.array([[3.0 + 2.0 * c2, 1.0 + c2], [1.0 + c2, 1.0]])
         )
         np.testing.assert_allclose(
             sys.C(q, dq),
-            np.array(
-                [
-                    [-h * dq[1], -h * (dq[0] + dq[1])],
-                    [h * dq[0], 0.0],
-                ]
-            ),
+            np.array([[-h * dq[1], -h * (dq[0] + dq[1])], [h * dq[0], 0.0]]),
         )
         np.testing.assert_allclose(
             sys.g(q), np.array([-19.62 * s1 - 9.81 * s12, -9.81 * s12])
         )
-
         x = np.zeros(sys.n)
         np.testing.assert_allclose(
             sys.compile("numpy").f(x, np.zeros(sys.m), 0.0), np.zeros(sys.n)
@@ -305,7 +250,6 @@ class TestDynamicBicycle(unittest.TestCase):
         sys = DynamicBicycle()
         self.assertEqual(sys.n, 6)
         self.assertEqual(sys.m, 2)
-
         x = np.array([10.0, 3.0, 0.25, 4.0, 0.0, 0.0])
         u = np.zeros(sys.m)
         sys.camera_target[:] = (1.0, -2.0, 0.5)
@@ -313,7 +257,6 @@ class TestDynamicBicycle(unittest.TestCase):
         frames = sys.tf(x, u, 0.0)
         camera = resolve_camera_from_hints(sys, frames, x, u, 0.0)
         np.testing.assert_allclose(camera[:3, 3], np.array([11.0, 1.0, 0.5]))
-
         x = np.array([0.1, -0.2, 0.3, 5.0, 0.4, 0.05])
         dx = sys.f(x, np.array([20.0, 0.1]))
         np.testing.assert_allclose(dx[:3], sys.N(x[:3]) @ x[3:])
@@ -324,22 +267,11 @@ class TestDynamicBicycle(unittest.TestCase):
         x[3] = 1.0
         frame = resolve_draw_frame(sys, x, np.array([10.0, 0.1]), 0.0)
         self.assertEqual(len(frame["primitives"]), 7)
-        self.assertEqual(sum(isinstance(p, Arrow) for p in frame["primitives"]), 4)
+        self.assertEqual(sum((isinstance(p, Arrow) for p in frame["primitives"])), 4)
         geometry_smoke(sys, x, np.array([10.0, 0.1]), 0.0)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_manipulators.py ---
-
-"""Cross-check all catalog manipulator classes."""
-
-import unittest
-
-import numpy as np
-
+# from test_manipulators.py
 from minilink.dynamics.abstraction.manipulator import Manipulator
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkPlanarManipulator,
@@ -372,7 +304,6 @@ class TestManipulatorCatalog(unittest.TestCase):
             with self.subTest(cls=cls.__name__):
                 arm = cls()
                 self.assertLess(arm.camera_scale, 10.0)
-
         speed = SpeedControlledManipulator(2, 2)
         self.assertLess(speed.camera_scale, 10.0)
 
@@ -385,16 +316,12 @@ class TestManipulatorCatalog(unittest.TestCase):
                 dq = np.linspace(-0.3, 0.3, dof)
                 x = arm.q2x(q, dq)
                 np.testing.assert_allclose(
-                    arm.h_p(x, np.zeros(dof)),
-                    arm.forward_kinematics(q),
+                    arm.h_p(x, np.zeros(dof)), arm.forward_kinematics(q)
                 )
-                np.testing.assert_allclose(
-                    arm.h_pdot(x, np.zeros(dof)),
-                    arm.J(q) @ dq,
-                )
+                np.testing.assert_allclose(arm.h_pdot(x, np.zeros(dof)), arm.J(q) @ dq)
 
     def test_jacobian_matches_numeric_forward_kinematics(self):
-        eps = 1e-7
+        eps = 1e-07
         for cls in _MANIPULATORS:
             with self.subTest(cls=cls.__name__):
                 arm = cls()
@@ -411,7 +338,7 @@ class TestManipulatorCatalog(unittest.TestCase):
                         for e in np.eye(dof)
                     ]
                 )
-                np.testing.assert_allclose(J, Jnum, atol=1e-5, rtol=1e-5)
+                np.testing.assert_allclose(J, Jnum, atol=1e-05, rtol=1e-05)
 
     def test_two_link_fk_matches_planar_geometry_tip(self):
         arm = TwoLinkManipulator()
@@ -431,8 +358,7 @@ class TestManipulatorCatalog(unittest.TestCase):
         arm = FiveLinkPlanarManipulator()
         np.testing.assert_allclose(arm.H(np.zeros(5)), np.eye(5))
         np.testing.assert_allclose(
-            arm.inverse_dynamics(np.zeros(5), np.zeros(5), np.ones(5)),
-            np.ones(5),
+            arm.inverse_dynamics(np.zeros(5), np.zeros(5), np.ones(5)), np.ones(5)
         )
 
     def test_torque_arrow_sign_matches_gravity_hold(self):
@@ -467,28 +393,16 @@ class TestManipulatorCatalog(unittest.TestCase):
         speed = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
         q = np.array([0.2, -0.1])
         np.testing.assert_allclose(
-            speed.h_p(q, np.zeros(2)),
-            speed.forward_kinematics(q),
+            speed.h_p(q, np.zeros(2)), speed.forward_kinematics(q)
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_dynamic_bicycle_uy.py ---
-
-"""Tests for :class:`JaxDynamicBicycleRateInputsUY`."""
-
-import unittest
-
-import numpy as np
+# from test_dynamic_bicycle_uy.py
 import pytest
 
 pytest.importorskip("jax")
-
-from minilink.core.backends import configure_jax  # noqa: E402
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
+from minilink.core.backends import configure_jax
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
     JaxDynamicBicycleRateInputsUY,
 )
@@ -511,8 +425,4 @@ class TestDynamicBicycleUY(unittest.TestCase):
         u = np.array([0.5, -0.1])
         dx_named = np.asarray(self.named.f(x, u))
         dx_uy = np.asarray(self.uy.f(x, u))
-        np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-9, atol=1e-9)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)

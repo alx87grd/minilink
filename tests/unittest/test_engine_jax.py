@@ -1,23 +1,19 @@
 """Integration tests for physics DynamicSystem wrapper."""
 
 import unittest
-
 import numpy as np
 import pytest
-
 from minilink.core.diagram import DiagramSystem
 from tests.unittest.graphics_contract_helpers import resolve_draw_frame
 
 pytest.importorskip("jax")
-
-import jax.numpy as jnp  # noqa: E402
-
-from minilink.dynamics.engines.contact_jax import (  # noqa: E402
+import jax.numpy as jnp
+from minilink.dynamics.engines.contact_jax import (
     PlaneModel,
     SphereModel,
     make_world_model,
 )
-from minilink.dynamics.engines.world import PhysicsWorldSystem  # noqa: E402
+from minilink.dynamics.engines.world import PhysicsWorldSystem
 
 
 @pytest.mark.optional
@@ -32,7 +28,6 @@ class TestPhysicsSystemMinilink(unittest.TestCase):
             c_contact=80.0,
         )
         sys = PhysicsWorldSystem(world)
-        # body0 above plane, body1 near plane
         sys.x0 = np.array(
             [
                 0.0,
@@ -82,32 +77,16 @@ class TestPhysicsSystemMinilink(unittest.TestCase):
         diagram.add_subsystem(sys, "physics")
         x = jnp.asarray(sys.x0)
         u = jnp.zeros(diagram.m)
-
         eval_j = diagram.compile(backend="jax")
         dx_raw = jnp.asarray(diagram.f(np.asarray(sys.x0), np.zeros(diagram.m), 0.0))
         dx_cmp = eval_j.f(x, u, 0.0)
-        np.testing.assert_allclose(np.asarray(dx_cmp), np.asarray(dx_raw), atol=1e-7)
+        np.testing.assert_allclose(np.asarray(dx_cmp), np.asarray(dx_raw), atol=1e-07)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_contact_engine_jax.py ---
-
-"""Tests for JAX physics engine core (skip if jax is unavailable)."""
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_contact_engine_jax.py
 pytest.importorskip("jax")
-
-import jax  # noqa: E402
-import jax.numpy as jnp  # noqa: E402
-
-from minilink.dynamics.engines.contact_jax import (  # noqa: E402
+import jax
+from minilink.dynamics.engines.contact_jax import (
     PlaneModel,
     SphereModel,
     make_world_model,
@@ -151,7 +130,7 @@ class TestPhysicsEngineJax(unittest.TestCase):
 
     def test_plane_contact_pushes_up_on_penetration(self):
         world = self._single_world()
-        pos = jnp.array([[0.0, 0.0, 0.1]])  # penetration = 0.4 for r=0.5
+        pos = jnp.array([[0.0, 0.0, 0.1]])
         vel = jnp.array([[0.0, 0.0, 0.0]])
         f = plane_contact_force(world, pos, vel)
         self.assertGreater(float(f[0, 2]), 0.0)
@@ -170,25 +149,9 @@ class TestPhysicsEngineJax(unittest.TestCase):
         jax.make_jaxpr(lambda xx, uu: world_ode(world, xx, uu))(x, u)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_ancf_tire_jax.py ---
-
-"""Tests for the differentiable ANCF tire-ring prototype."""
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_ancf_tire_jax.py
 pytest.importorskip("jax")
-
-import jax  # noqa: E402
-import jax.numpy as jnp  # noqa: E402
-
-from minilink.dynamics.engines.ancf_tire_jax import (  # noqa: E402
+from minilink.dynamics.engines.ancf_tire_jax import (
     ANCFTireSystem,
     ancf_tire_initial_state,
     ancf_tire_ode,
@@ -198,7 +161,6 @@ from minilink.dynamics.engines.ancf_tire_jax import (  # noqa: E402
     unpack_ancf_state,
 )
 from minilink.graphical.animation.camera import resolve_camera_from_hints
-from tests.unittest.graphics_contract_helpers import resolve_draw_frame  # noqa: E402
 
 
 @pytest.mark.optional
@@ -209,11 +171,11 @@ class TestANCFTireJax(unittest.TestCase):
             n_nodes=5,
             radius=0.4,
             mass=4.0,
-            k_stretch=1.0e3,
+            k_stretch=1000.0,
             k_bend=5.0,
             k_area=100.0,
             k_slope=200.0,
-            k_contact=2.0e3,
+            k_contact=2000.0,
             c_contact=20.0,
         )
 
@@ -237,7 +199,7 @@ class TestANCFTireJax(unittest.TestCase):
             n_nodes=8,
             radius=0.4,
             mass=4.0,
-            k_contact=2.0e3,
+            k_contact=2000.0,
             c_contact=20.0,
             mu_static=0.9,
             mu_dynamic=0.75,
@@ -259,11 +221,8 @@ class TestANCFTireJax(unittest.TestCase):
         dx = ancf_tire_ode(model, x, u)
         self.assertEqual(dx.shape, x.shape)
         jax.make_jaxpr(lambda xx, uu: ancf_tire_ode(model, xx, uu))(x, u)
-
         _, tangent = jax.jvp(
-            lambda xx: ancf_tire_ode(model, xx, u),
-            (x,),
-            (jnp.ones_like(x) * 1.0e-4,),
+            lambda xx: ancf_tire_ode(model, xx, u), (x,), (jnp.ones_like(x) * 0.0001,)
         )
         self.assertEqual(tangent.shape, x.shape)
 
@@ -272,17 +231,12 @@ class TestANCFTireJax(unittest.TestCase):
         sys = ANCFTireSystem(model, center=(0.0, 0.0, 1.0))
         x = jnp.asarray(sys.x0)
         u = jnp.zeros(sys.m)
-
         evaluator = sys.compile(backend="jax")
         dx_raw = jnp.asarray(sys.f(np.asarray(sys.x0), np.zeros(sys.m), 0.0))
         dx_cmp = evaluator.f(x, u, 0.0)
         np.testing.assert_allclose(
-            np.asarray(dx_cmp),
-            np.asarray(dx_raw),
-            rtol=1e-5,
-            atol=1e-3,
+            np.asarray(dx_cmp), np.asarray(dx_raw), rtol=1e-05, atol=0.001
         )
-
         frame = resolve_draw_frame(sys, sys.x0, np.zeros(sys.m), 0.0)
         self.assertEqual(len(frame["primitives"]), len(frame["transforms"]))
         self.assertEqual(len(frame["primitives"]), 2 * model.n_nodes + 1)
@@ -292,7 +246,7 @@ class TestANCFTireJax(unittest.TestCase):
             n_nodes=8,
             radius=0.4,
             mass=4.0,
-            k_contact=2.0e3,
+            k_contact=2000.0,
             c_contact=20.0,
             mu_static=0.9,
             mu_dynamic=0.75,
@@ -323,10 +277,8 @@ class TestANCFTireJax(unittest.TestCase):
     def test_camera_is_fixed_by_default_for_forward_motion(self):
         model = make_ancf_tire_model(n_nodes=8, radius=0.4, mass=4.0)
         sys = ANCFTireSystem(model, center=(0.0, 0.0, 1.0))
-
         x_shifted = np.asarray(sys.x0).copy()
         x_shifted[: 6 * model.n_nodes].reshape((model.n_nodes, 6))[:, 0] += 1.0
-
         camera0 = resolve_camera_from_hints(
             sys, sys.tf(sys.x0, np.zeros(sys.m), 0.0), sys.x0, np.zeros(sys.m), 0.0
         )
@@ -338,7 +290,3 @@ class TestANCFTireJax(unittest.TestCase):
             0.0,
         )
         self.assertAlmostEqual(float(camera0[0, 3]), float(camera1[0, 3]))
-
-
-if __name__ == "__main__":
-    unittest.main()

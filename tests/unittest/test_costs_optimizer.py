@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from minilink.core.costs import (
     CostFunction,
     QuadraticCost,
@@ -36,11 +35,7 @@ def test_time_cost_jax_matches_numpy():
 
 def make_quadratic(n: int = 2, m: int = 1) -> QuadraticCost:
     return QuadraticCost(
-        Q=np.eye(n),
-        R=np.eye(m),
-        S=np.zeros((n, n)),
-        xbar=np.zeros(n),
-        ubar=np.zeros(m),
+        Q=np.eye(n), R=np.eye(m), S=np.zeros((n, n)), xbar=np.zeros(n), ubar=np.zeros(m)
     )
 
 
@@ -60,7 +55,6 @@ def test_sum_cost_is_additive():
     s = c1 + c2
     x = np.array([1.0, 2.0])
     u = np.array([3.0])
-
     assert isinstance(s, SumCost)
     assert s.g(x, u) == pytest.approx(c1.g(x, u) + c2.g(x, u))
     assert s.h(x) == pytest.approx(c1.h(x) + c2.h(x))
@@ -69,17 +63,15 @@ def test_sum_cost_is_additive():
 def test_add_flattens_nested_sums():
     c = make_quadratic()
     s = c + c + c
-
     assert isinstance(s, SumCost)
     assert len(s.terms) == 3
 
 
 def test_sum_builtin_uses_radd_zero_seed():
     costs = [make_quadratic() for _ in range(3)]
-    s = sum(costs)  # 0 + c0 + c1 + c2
+    s = sum(costs)
     x = np.array([1.0, 2.0])
     u = np.array([3.0])
-
     assert isinstance(s, SumCost)
     assert s.g(x, u) == pytest.approx(3.0 * costs[0].g(x, u))
 
@@ -88,12 +80,10 @@ def test_scaled_cost_weights():
     c = make_quadratic()
     x = np.array([1.0, 2.0])
     u = np.array([3.0])
-
     weighted = 2.5 * c
     assert isinstance(weighted, ScaledCost)
     assert weighted.g(x, u) == pytest.approx(2.5 * c.g(x, u))
-
-    combo = c + 2.0 * c  # reads as base + weight * other
+    combo = c + 2.0 * c
     assert combo.g(x, u) == pytest.approx(3.0 * c.g(x, u))
 
 
@@ -102,7 +92,6 @@ def test_params_forwarded_to_terms():
     x = np.array([1.0, 2.0])
     u = np.array([3.0])
     base = make_quadratic().g(x, u)
-
     assert s.g(x, u, params={"w": 5.0}) == pytest.approx(base + 5.0)
     assert (3.0 * _ParamCost()).g(x, u, params={"w": 2.0}) == pytest.approx(6.0)
 
@@ -112,7 +101,6 @@ def test_total_cost_on_trajectory():
     s = c + c
     t = np.linspace(0.0, 1.0, 5)
     traj = Trajectory(t=t, x=np.ones((2, 5)), u=np.ones((1, 5)))
-
     assert s.total_cost(traj) == pytest.approx(2.0 * c.total_cost(traj))
 
 
@@ -129,18 +117,13 @@ def test_jax_twin_cost_grad():
     assert np.asarray(gradient).shape == (2,)
 
 
-# --- merged from test_optimizer.py ---
-
-"""Tests for :class:`~minilink.optimization.optimizer.Optimizer` backends."""
-
-import numpy as np
-import pytest
-
+# from test_optimizer.py
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.optimization.optimizer import Optimizer
 
 
 def _quadratic_program() -> MathematicalProgram:
+
     def J(z: np.ndarray):
         return z[0] ** 2
 
@@ -198,7 +181,6 @@ def test_scipy_minimize_disp_prints_report(capsys):
 
 def test_scipy_minimize_progress_callback_z_J_t():
     samples: list[tuple[np.ndarray, float, float]] = []
-
     prog = _quadratic_program()
     opt = Optimizer(
         prog,
@@ -229,12 +211,11 @@ def test_solve_accepts_one_off_initial_guess_without_recompiling():
         method="scipy_slsqp",
         options={"disp": False, "maxiter": 50},
     )
-
     program_evaluator = opt.program_evaluator
     out = opt.solve(z0=np.array([2.0]))
     assert opt.program_evaluator is program_evaluator
     assert out.success
-    assert np.allclose(out.z, [0.0], atol=1e-8)
+    assert np.allclose(out.z, [0.0], atol=1e-08)
 
 
 _IPOPT_QUIET = {"print_level": 0, "max_iter": 200}
@@ -253,7 +234,7 @@ def test_ipopt_unconstrained_quadratic():
     prog = MathematicalProgram(n_z=2, J=J, grad_J=grad_J)
     out = Optimizer(prog, z0=np.zeros(2), method="ipopt", options=_IPOPT_QUIET).solve()
     assert out.success
-    assert np.allclose(out.z, [1.0, 2.0], atol=1e-6)
+    assert np.allclose(out.z, [1.0, 2.0], atol=1e-06)
     assert out.cost is not None and out.cost < 1e-10
 
 
@@ -268,20 +249,13 @@ def test_ipopt_box_bounds():
         return z
 
     prog = MathematicalProgram(
-        n_z=3,
-        J=J,
-        grad_J=grad_J,
-        lower=np.ones(3),
-        upper=np.full(3, np.inf),
+        n_z=3, J=J, grad_J=grad_J, lower=np.ones(3), upper=np.full(3, np.inf)
     )
     out = Optimizer(
-        prog,
-        z0=2.0 * np.ones(3),
-        method="ipopt",
-        options=_IPOPT_QUIET,
+        prog, z0=2.0 * np.ones(3), method="ipopt", options=_IPOPT_QUIET
     ).solve()
     assert out.success
-    assert np.allclose(out.z, np.ones(3), atol=1e-6)
+    assert np.allclose(out.z, np.ones(3), atol=1e-06)
 
 
 @pytest.mark.ipopt
@@ -302,13 +276,10 @@ def test_ipopt_equality_constraint():
 
     prog = MathematicalProgram(n_z=2, J=J, h=h, grad_J=grad_J, jac_h=jac_h)
     out = Optimizer(
-        prog,
-        z0=np.array([-0.5, -0.5]),
-        method="ipopt",
-        options=_IPOPT_QUIET,
+        prog, z0=np.array([-0.5, -0.5]), method="ipopt", options=_IPOPT_QUIET
     ).solve()
     assert out.success
-    assert np.allclose(out.z, [-1.0 / np.sqrt(2.0), -1.0 / np.sqrt(2.0)], atol=1e-5)
+    assert np.allclose(out.z, [-1.0 / np.sqrt(2.0), -1.0 / np.sqrt(2.0)], atol=1e-05)
 
 
 @pytest.mark.ipopt
@@ -337,13 +308,10 @@ def test_ipopt_inequality_with_bounds():
         upper=np.full(2, np.inf),
     )
     out = Optimizer(
-        prog,
-        z0=np.array([0.5, 0.5]),
-        method="ipopt",
-        options=_IPOPT_QUIET,
+        prog, z0=np.array([0.5, 0.5]), method="ipopt", options=_IPOPT_QUIET
     ).solve()
     assert out.success
-    assert np.allclose(out.z, [1.0, 0.0], atol=1e-4)
+    assert np.allclose(out.z, [1.0, 0.0], atol=0.0001)
 
 
 @pytest.mark.ipopt

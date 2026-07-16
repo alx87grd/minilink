@@ -1,8 +1,6 @@
 import unittest
-
 import numpy as np
 import pytest
-
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
@@ -37,6 +35,7 @@ class TestMechanicalSystem(unittest.TestCase):
         np.testing.assert_allclose(dx, np.array([0.0, 2.0]))
 
     def test_f_uses_explicit_params_in_matrix_hooks(self):
+
         class MassSystem(MechanicalSystem):
             def __init__(self):
                 super().__init__(dof=1)
@@ -48,13 +47,13 @@ class TestMechanicalSystem(unittest.TestCase):
         sys = MassSystem()
         x = np.array([0.0, 0.0])
         u = np.array([8.0])
-
         np.testing.assert_allclose(sys.f(x, u), np.array([0.0, 4.0]))
         np.testing.assert_allclose(
             sys.f(x, u, params={"mass": 4.0}), np.array([0.0, 2.0])
         )
 
     def test_inverse_dynamics_uses_explicit_params_in_matrix_hooks(self):
+
         class MassSystem(MechanicalSystem):
             def __init__(self):
                 super().__init__(dof=1)
@@ -67,7 +66,6 @@ class TestMechanicalSystem(unittest.TestCase):
         q = np.array([0.0])
         dq = np.array([0.0])
         acceleration = np.array([3.0])
-
         np.testing.assert_allclose(
             sys.inverse_dynamics(q, dq, acceleration), np.array([6.0])
         )
@@ -81,13 +79,12 @@ class TestMechanicalSystem(unittest.TestCase):
         q = np.array([0.0, 0.0])
         dq = np.array([0.0, 0.0])
         u = np.array([3.0])
-
         np.testing.assert_allclose(
-            sys.generalized_force(q, dq, u),
-            np.array([3.0, 0.0]),
+            sys.generalized_force(q, dq, u), np.array([3.0, 0.0])
         )
 
     def test_forward_and_inverse_dynamics_are_consistent(self):
+
         class MassSystem(MechanicalSystem):
             def H(self, q, params=None):
                 return np.array([[2.0]])
@@ -99,9 +96,7 @@ class TestMechanicalSystem(unittest.TestCase):
         q = np.array([0.0])
         dq = np.array([4.0])
         u = np.array([10.0])
-
         acceleration = sys.forward_dynamics(q, dq, u)
-
         np.testing.assert_allclose(acceleration, np.array([4.0]))
         np.testing.assert_allclose(
             sys.inverse_dynamics(q, dq, acceleration, u),
@@ -123,11 +118,9 @@ class TestMechanicalSystem(unittest.TestCase):
     def test_default_base_is_jax_traceable_if_available(self):
         jax = pytest.importorskip("jax")
         jnp = pytest.importorskip("jax.numpy")
-
         sys = MechanicalSystem(dof=2)
         x = jnp.array([0.1, -0.2, 0.3, 0.4])
         u = jnp.array([1.0, -2.0])
-
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
         np.testing.assert_allclose(
             np.asarray(sys.f(x, u)), np.array([0.3, 0.4, 1.0, -2.0])
@@ -155,17 +148,7 @@ class TestJaxMechanicalInheritance(unittest.TestCase):
         self.assertEqual(a.state.labels, b.state.labels)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_generalized_mechanical.py ---
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_generalized_mechanical.py
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
 )
@@ -174,7 +157,6 @@ from minilink.dynamics.abstraction.generalized_mechanical import (
 class TestGeneralizedMechanicalSystem(unittest.TestCase):
     def test_dimensions_default_to_square_configuration_velocity_system(self):
         sys = GeneralizedMechanicalSystem(dof=2)
-
         self.assertEqual(sys.dof, 2)
         self.assertEqual(sys.pos, 2)
         self.assertEqual(sys.n, 4)
@@ -185,39 +167,31 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
         sys = GeneralizedMechanicalSystem(dof=2)
         x = np.array([0.1, -0.2, 0.3, 0.4])
         u = np.array([1.0, -2.0])
-
         dx = sys.f(x, u)
-
         np.testing.assert_allclose(dx, np.array([0.3, 0.4, 1.0, -2.0]))
 
     def test_nontrivial_kinematic_map(self):
+
         class PlanarBody(GeneralizedMechanicalSystem):
             def __init__(self):
                 super().__init__(dof=3, pos=3, actuators=0)
 
             def N(self, q, params=None):
                 theta = q[2]
-                c, s = np.cos(theta), np.sin(theta)
-                return np.array(
-                    [
-                        [c, -s, 0.0],
-                        [s, c, 0.0],
-                        [0.0, 0.0, 1.0],
-                    ]
-                )
+                c, s = (np.cos(theta), np.sin(theta))
+                return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
 
         sys = PlanarBody()
         q = np.array([1.0, 2.0, np.pi / 2.0])
         v = np.array([1.0, 2.0, 3.0])
         x = sys.qv2x(q, v)
         u = np.zeros(0)
-
         dx = sys.f(x, u)
-
         np.testing.assert_allclose(dx[:3], np.array([-2.0, 1.0, 3.0]), atol=1e-12)
         np.testing.assert_allclose(dx[3:], np.zeros(3))
 
     def test_mixed_inputs_use_generalized_force_hook(self):
+
         class MixedInputBody(GeneralizedMechanicalSystem):
             def __init__(self):
                 super().__init__(dof=2, pos=2, actuators=2)
@@ -230,13 +204,12 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
         sys = MixedInputBody()
         x = np.zeros(4)
         u = np.array([2.0, np.pi / 2.0])
-
         dx = sys.f(x, u)
-
         np.testing.assert_allclose(dx[:2], np.zeros(2))
         np.testing.assert_allclose(dx[2:], np.array([0.0, 2.0]), atol=1e-12)
 
     def test_explicit_params_reach_matrix_hooks(self):
+
         class MassBody(GeneralizedMechanicalSystem):
             def __init__(self):
                 super().__init__(dof=1)
@@ -248,7 +221,6 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
         sys = MassBody()
         x = np.array([0.0, 0.0])
         u = np.array([8.0])
-
         np.testing.assert_allclose(sys.f(x, u), np.array([0.0, 4.0]))
         np.testing.assert_allclose(
             sys.f(x, u, params={"mass": 4.0}), np.array([0.0, 2.0])
@@ -259,13 +231,10 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
         q = np.array([0.0, 0.0])
         v = np.array([0.0, 0.0])
         u = np.array([3.0])
-
-        np.testing.assert_allclose(
-            sys.generalized_force(q, v, u),
-            np.array([3.0, 0.0]),
-        )
+        np.testing.assert_allclose(sys.generalized_force(q, v, u), np.array([3.0, 0.0]))
 
     def test_forward_and_inverse_dynamics_are_consistent(self):
+
         class MassBody(GeneralizedMechanicalSystem):
             def M(self, q, params=None):
                 return np.array([[2.0]])
@@ -277,13 +246,10 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
         q = np.array([0.0])
         v = np.array([4.0])
         u = np.array([10.0])
-
         acceleration = sys.forward_dynamics(q, v, u)
-
         np.testing.assert_allclose(acceleration, np.array([4.0]))
         np.testing.assert_allclose(
-            sys.inverse_dynamics(q, v, acceleration, u),
-            sys.generalized_force(q, v, u),
+            sys.inverse_dynamics(q, v, acceleration, u), sys.generalized_force(q, v, u)
         )
 
     def test_h_equals_state(self):
@@ -297,44 +263,21 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
     def test_default_base_is_jax_traceable_if_available(self):
         jax = pytest.importorskip("jax")
         jnp = pytest.importorskip("jax.numpy")
-
         sys = GeneralizedMechanicalSystem(dof=2)
         x = jnp.array([0.1, -0.2, 0.3, 0.4])
         u = jnp.array([1.0, -2.0])
-
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
         np.testing.assert_allclose(
             np.asarray(sys.f(x, u)), np.array([0.3, 0.4, 1.0, -2.0])
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_mechanical_jax.py ---
-
-"""Optional JAX smoke tests (skip if jax is not installed).
-
-The match-NumPy tests follow the canonical pattern documented in
-``AGENTS.md`` Verification: every JAX twin plant must include both a nominal /
-linear regime check and a non-trivial regime check (custom inertia,
-damping, gravity, or an off-axis input) so the JAX trace and the NumPy
-reference disagree at most by ULP-level rounding.
-"""
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_mechanical_jax.py
 pytest.importorskip("jax")
-
-import jax  # noqa: E402
-import jax.numpy as jnp  # noqa: E402
-
-from minilink.core.backends import configure_jax  # noqa: E402
-from minilink.dynamics.abstraction.mechanical import (  # noqa: E402
+import jax
+import jax.numpy as jnp
+from minilink.core.backends import configure_jax
+from minilink.dynamics.abstraction.mechanical import (
     JaxMechanicalSystem,
     MechanicalSystem,
 )
@@ -344,8 +287,6 @@ from minilink.dynamics.abstraction.mechanical import (  # noqa: E402
 @pytest.mark.jax
 class TestMechanicalSystemJax(unittest.TestCase):
     def setUp(self):
-        # x64 lets the non-trivial-regime check assert ULP-level agreement
-        # with the NumPy reference (float64).
         configure_jax(enable_x64=True)
 
     def test_f_is_jaxpr_traceable(self):
@@ -355,7 +296,6 @@ class TestMechanicalSystemJax(unittest.TestCase):
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
 
     def test_f_matches_numpy_1dof_linear_regime(self):
-        # Nominal regime: small q / dq, identity inertia, zero gravity.
         sys_j = JaxMechanicalSystem(dof=1)
         sys_n = MechanicalSystem(dof=1)
         x = jnp.array([0.2, -0.1])
@@ -364,31 +304,29 @@ class TestMechanicalSystemJax(unittest.TestCase):
         xn = np.array([0.2, -0.1])
         un = np.zeros(1)
         dx_n = sys_n.f(xn, un)
-        np.testing.assert_allclose(np.asarray(dx_j), dx_n, rtol=1e-5, atol=1e-5)
+        np.testing.assert_allclose(np.asarray(dx_j), dx_n, rtol=1e-05, atol=1e-05)
 
     def test_f_matches_numpy_2dof_nontrivial_regime(self):
-        # Non-trivial regime: custom inertia (non-identity, non-diagonal),
-        # custom gravity / damping, and a non-zero input. The dynamics now
-        # exercise C, g, d, and B beyond their default zero / identity.
+
         class _NumpyTwoLink(MechanicalSystem):
             def H(self, q, params=None):
-                m1, m2, l = 1.5, 0.7, 0.4
+                m1, m2, l = (1.5, 0.7, 0.4)
                 c2 = np.cos(q[1])
                 return np.array(
                     [
                         [m1 + m2 + 2 * m2 * l * c2, m2 + m2 * l * c2],
                         [m2 + m2 * l * c2, m2],
-                    ],
+                    ]
                 )
 
             def C(self, q, dq, params=None):
-                m2, l = 0.7, 0.4
+                m2, l = (0.7, 0.4)
                 s2 = np.sin(q[1])
                 return np.array(
                     [
                         [-m2 * l * s2 * dq[1], -m2 * l * s2 * (dq[0] + dq[1])],
                         [m2 * l * s2 * dq[0], 0.0],
-                    ],
+                    ]
                 )
 
             def g(self, q, params=None):
@@ -399,23 +337,23 @@ class TestMechanicalSystemJax(unittest.TestCase):
 
         class _JaxTwoLink(JaxMechanicalSystem):
             def H(self, q, params=None):
-                m1, m2, l = 1.5, 0.7, 0.4
+                m1, m2, l = (1.5, 0.7, 0.4)
                 c2 = jnp.cos(q[1])
                 return jnp.array(
                     [
                         [m1 + m2 + 2 * m2 * l * c2, m2 + m2 * l * c2],
                         [m2 + m2 * l * c2, m2],
-                    ],
+                    ]
                 )
 
             def C(self, q, dq, params=None):
-                m2, l = 0.7, 0.4
+                m2, l = (0.7, 0.4)
                 s2 = jnp.sin(q[1])
                 return jnp.array(
                     [
                         [-m2 * l * s2 * dq[1], -m2 * l * s2 * (dq[0] + dq[1])],
                         [m2 * l * s2 * dq[0], 0.0],
-                    ],
+                    ]
                 )
 
             def g(self, q, params=None):
@@ -426,15 +364,14 @@ class TestMechanicalSystemJax(unittest.TestCase):
 
         sys_n = _NumpyTwoLink(dof=2)
         sys_j = _JaxTwoLink(dof=2)
-
         x = np.array([0.5, -0.7, 0.3, -0.2])
         u = np.array([0.4, -0.6])
-
         dx_n = sys_n.f(x, u)
         dx_j = np.asarray(sys_j.f(jnp.asarray(x), jnp.asarray(u)))
-        np.testing.assert_allclose(dx_j, dx_n, rtol=1e-9, atol=1e-9)
+        np.testing.assert_allclose(dx_j, dx_n, rtol=1e-09, atol=1e-09)
 
     def test_f_uses_explicit_params_in_matrix_hooks(self):
+
         class MassSystem(JaxMechanicalSystem):
             def __init__(self):
                 super().__init__(dof=1)
@@ -446,11 +383,9 @@ class TestMechanicalSystemJax(unittest.TestCase):
         sys = MassSystem()
         x = jnp.array([0.0, 0.0])
         u = jnp.array([8.0])
-
         np.testing.assert_allclose(np.asarray(sys.f(x, u)), np.array([0.0, 4.0]))
         np.testing.assert_allclose(
-            np.asarray(sys.f(x, u, params={"mass": 4.0})),
-            np.array([0.0, 2.0]),
+            np.asarray(sys.f(x, u, params={"mass": 4.0})), np.array([0.0, 2.0])
         )
 
     def test_jax_pendulum_subclasses_numpy_reference(self):
@@ -468,31 +403,19 @@ class TestMechanicalSystemJax(unittest.TestCase):
         x = np.array([0.7, -0.3])
         u = np.array([0.5])
         dx_jx = np.asarray(jx_sys.f(jnp.asarray(x), jnp.asarray(u)))
-        np.testing.assert_allclose(dx_jx, np_sys.f(x, u), rtol=1e-9, atol=1e-9)
+        np.testing.assert_allclose(dx_jx, np_sys.f(x, u), rtol=1e-09, atol=1e-09)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_manipulator.py ---
-
-import unittest
-
-import numpy as np
-
+# from test_manipulator.py
 from minilink.dynamics.abstraction.manipulator import Manipulator
-from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
 class TestMechanicalJointPorts(unittest.TestCase):
     def test_q_and_dq_ports_match_state(self):
         sys = MechanicalSystem(dof=2)
         x = np.array([0.1, -0.2, 0.3, 0.4])
-
         q = sys.h_q(x, np.zeros(sys.m))
         dq = sys.h_dq(x, np.zeros(sys.m))
-
         np.testing.assert_allclose(q, x[:2])
         np.testing.assert_allclose(dq, x[2:])
         self.assertEqual(sys.outputs["q"].dim, 2)
@@ -504,14 +427,13 @@ class TestManipulator(unittest.TestCase):
         sys = Manipulator(dof=2, task_dim=2)
         x = np.array([0.2, -0.1, 0.0, 0.0])
         u = np.zeros(sys.m)
-
         p = sys.h_p(x, u)
         pdot = sys.h_pdot(x, u)
-
         np.testing.assert_allclose(p, np.zeros(2))
         np.testing.assert_allclose(pdot, np.zeros(2))
 
     def test_subclass_forward_kinematics_and_jacobian(self):
+
         class TwoLinkStub(Manipulator):
             def forward_kinematics(self, q, params=None):
                 return np.array([q[0], q[0] + q[1]])
@@ -524,23 +446,11 @@ class TestManipulator(unittest.TestCase):
         dq = np.array([1.0, 2.0])
         x = sys.q2x(q, dq)
         u = np.zeros(sys.m)
-
         np.testing.assert_allclose(sys.h_p(x, u), np.array([0.5, 0.25]))
         np.testing.assert_allclose(sys.h_pdot(x, u), np.array([1.0, 3.0]))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_robotic.py ---
-
-"""Tests for manipulator task ports and robotic wrappers."""
-
-import unittest
-
-import numpy as np
-
+# from test_robotic.py
 from minilink.blocks.sources import Source
 from minilink.control.robotic import (
     JointImpedance,
@@ -577,10 +487,7 @@ class TestRoboticWrappers(unittest.TestCase):
     def test_joint_impedance_closed_loop_qdq(self):
         diagram = closed_loop_qdq(JointImpedance(dof=2), TwoLinkManipulator())
         self.assertIn("mux", diagram.subsystems)
-        self.assertEqual(
-            diagram.connections["ctl"]["y"],
-            ("mux", "y"),
-        )
+        self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
 
     def test_model_joint_impedance_gravity_at_setpoint(self):
         arm = TwoLinkManipulator()
@@ -618,7 +525,6 @@ class TestRoboticWrappers(unittest.TestCase):
         p_d = arm.forward_kinematics(np.array([0.0, 0.0]))
         u = ctl.ctl(None, np.concatenate([p_d, q, dq]))
         self.assertEqual(u.shape, (2,))
-
         p = arm.forward_kinematics(q)
         J = arm.J(q)
         pdot = J @ dq
@@ -639,10 +545,7 @@ class TestRoboticWrappers(unittest.TestCase):
             TaskImpedance(TwoLinkManipulator()), TwoLinkManipulator()
         )
         self.assertIn("mux", diagram.subsystems)
-        self.assertEqual(
-            diagram.connections["ctl"]["y"],
-            ("mux", "y"),
-        )
+        self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
 
     def test_task_kinematic_law(self):
         arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
@@ -663,11 +566,7 @@ class TestRoboticWrappers(unittest.TestCase):
 
     def test_task_kinematic_nullspace_projection(self):
         arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
-        ctl = TaskKinematicNullspace(
-            arm,
-            Kp=[1.0, 1.0],
-            K_null=[10.0] * 5,
-        )
+        ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
         q = np.array([0.1, 0.1, 0.1, 0.1, 0.1])
         p_d = np.array([1.0, 1.0])
         q_null = np.array([-1.0] * 5)
@@ -688,27 +587,15 @@ class TestRoboticWrappers(unittest.TestCase):
         ref_q = Source(5)
         ref_q.params["value"] = np.array([-1.0] * 5)
         ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
-        diagram = (ref_q + (ref_p >> (ctl @ arm))).autowire(strict=True)
+        diagram = (ref_q + (ref_p >> ctl @ arm)).autowire(strict=True)
         self.assertEqual(diagram.connections["ctl"]["r"][1], "y")
         self.assertEqual(diagram.connections["ctl"]["r_null"][1], "y")
         self.assertNotEqual(
-            diagram.connections["ctl"]["r"][0],
-            diagram.connections["ctl"]["r_null"][0],
+            diagram.connections["ctl"]["r"][0], diagram.connections["ctl"]["r_null"][0]
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_inverse_kinematics.py ---
-
-"""Tests for numerical inverse kinematics on Manipulator."""
-
-import unittest
-
-import numpy as np
-
+# from test_inverse_kinematics.py
 from minilink.dynamics.catalog.manipulators.arms import (
     OneLinkManipulator,
     TwoLinkManipulator,
@@ -721,46 +608,35 @@ class TestInverseKinematics(unittest.TestCase):
         q_true = np.array([0.4])
         p = arm.forward_kinematics(q_true)
         q = arm.inverse_kinematics(p, np.array([0.0]))
-        np.testing.assert_allclose(arm.forward_kinematics(q), p, atol=1e-8)
-        np.testing.assert_allclose(q, q_true, atol=1e-8)
+        np.testing.assert_allclose(arm.forward_kinematics(q), p, atol=1e-08)
+        np.testing.assert_allclose(q, q_true, atol=1e-08)
 
     def test_default_q_guess_uses_q_nominal(self):
         arm = OneLinkManipulator()
         q_true = np.array([0.4])
         p = arm.forward_kinematics(q_true)
         q = arm.inverse_kinematics(p)
-        np.testing.assert_allclose(arm.forward_kinematics(q), p, atol=1e-8)
-        np.testing.assert_allclose(q, q_true, atol=1e-8)
+        np.testing.assert_allclose(arm.forward_kinematics(q), p, atol=1e-08)
+        np.testing.assert_allclose(q, q_true, atol=1e-08)
 
     def test_two_link_roundtrip(self):
         arm = TwoLinkManipulator()
         q_true = np.array([0.5, -0.3])
         p = arm.forward_kinematics(q_true)
         q = arm.inverse_kinematics(p, q_true + 0.05)
-        np.testing.assert_allclose(arm.forward_kinematics(q), p, atol=1e-8)
+        np.testing.assert_allclose(arm.forward_kinematics(q), p, atol=1e-08)
 
     def test_two_link_different_branch_from_guess(self):
         arm = TwoLinkManipulator()
         p = arm.forward_kinematics(np.array([0.6, -0.2]))
         q_a = arm.inverse_kinematics(p, np.array([0.2, 0.2]))
         q_b = arm.inverse_kinematics(p, np.array([1.0, -1.0]))
-        np.testing.assert_allclose(arm.forward_kinematics(q_a), p, atol=1e-8)
-        np.testing.assert_allclose(arm.forward_kinematics(q_b), p, atol=1e-8)
+        np.testing.assert_allclose(arm.forward_kinematics(q_a), p, atol=1e-08)
+        np.testing.assert_allclose(arm.forward_kinematics(q_b), p, atol=1e-08)
         self.assertGreater(np.linalg.norm(q_a - q_b), 0.1)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_modelbased.py ---
-
-"""Tests for model-based mechanical controllers."""
-
-import unittest
-
-import numpy as np
-
+# from test_modelbased.py
 from minilink.blocks.sources import Step
 from minilink.control.modelbased import ComputedTorqueController, SlidingModeController
 from minilink.core.composition import closed_loop_qdq
@@ -776,10 +652,7 @@ class TestModelBasedControllers(unittest.TestCase):
         r = np.array([0.5, 0.0])
         u = ctl.ctl(None, np.concatenate([r, q, dq]))
         qdd = 30.0 * (0.5 - 0.2) + 6.0 * (0.0 - 0.1)
-        np.testing.assert_allclose(
-            u,
-            plant.inverse_dynamics(q, dq, np.array([qdd])),
-        )
+        np.testing.assert_allclose(u, plant.inverse_dynamics(q, dq, np.array([qdd])))
 
     def test_sliding_mode_matches_pyro_law(self):
         plant = Pendulum(length=1.0, mass=1.0)
@@ -787,14 +660,12 @@ class TestModelBasedControllers(unittest.TestCase):
         gain = np.array([3.0])
         nab = np.array([0.2])
         ctl = SlidingModeController(plant, lam=lam, gain=gain, nab=nab)
-
         q = np.array([0.3])
         dq = np.array([-0.15])
         q_d = np.array([0.0])
         dq_d = np.array([0.0])
         r = np.concatenate([q_d, dq_d])
         boundary = np.concatenate([r, q, dq])
-
         q_e = q - q_d
         dq_e = dq - dq_d
         s = dq_e + lam * q_e
@@ -802,7 +673,6 @@ class TestModelBasedControllers(unittest.TestCase):
         H = plant.H(q)
         K = np.diag(gain) + H @ np.diag(nab)
         expected = plant.inverse_dynamics(q, dq, ddq_r) - K @ np.sign(s)
-
         np.testing.assert_allclose(ctl.ctl(None, boundary), expected)
 
     def test_sliding_mode_ports_match_computed_torque(self):
@@ -820,14 +690,6 @@ class TestModelBasedControllers(unittest.TestCase):
     def test_closed_loop_qdq_aggregates_discontinuous_behavior(self):
         plant = Pendulum()
         smc = SlidingModeController(plant)
-        ref = Step(
-            initial_value=np.zeros(2),
-            final_value=np.zeros(2),
-            step_time=1.0,
-        )
+        ref = Step(initial_value=np.zeros(2), final_value=np.zeros(2), step_time=1.0)
         diagram = ref >> closed_loop_qdq(smc, plant)
         self.assertTrue(diagram.solver_info["discontinuous_behavior"])
-
-
-if __name__ == "__main__":
-    unittest.main()

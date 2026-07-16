@@ -1,26 +1,20 @@
 """Unit tests for ModelPredictiveController."""
 
 import unittest
-
 import numpy as np
 import pytest
 
 pytest.importorskip("jax")
-
-import jax.numpy as jnp  # noqa: E402
-import matplotlib  # noqa: E402
+import jax.numpy as jnp
+import matplotlib
 
 matplotlib.use("Agg")
-
-from minilink.control.mpc import (
-    Command,
-    ModelPredictiveController,
-)
-from minilink.core.backends import configure_jax  # noqa: E402
-from minilink.core.costs import QuadraticCost  # noqa: E402
-from minilink.core.hybrid_diagram import HybridDiagram  # noqa: E402
-from minilink.core.system import DynamicSystem, StepSystem, System  # noqa: E402
-from minilink.planning.problems import PlanningProblem  # noqa: E402
+from minilink.control.mpc import Command, ModelPredictiveController
+from minilink.core.backends import configure_jax
+from minilink.core.costs import QuadraticCost
+from minilink.core.hybrid_diagram import HybridDiagram
+from minilink.core.system import DynamicSystem, StepSystem, System
+from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -55,10 +49,7 @@ class TestModelPredictiveController(unittest.TestCase):
     def _make_planner(self, x_start=0.0):
         sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(
-            sys,
-            Q=np.zeros((1, 1)),
-            R=np.eye(1),
-            S=np.zeros((1, 1)),
+            sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
         problem = PlanningProblem(
             sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0
@@ -71,7 +62,7 @@ class TestModelPredictiveController(unittest.TestCase):
             options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
                 record_solve_time=True,
-                optimizer_options={"maxiter": 50, "ftol": 1e-4},
+                optimizer_options={"maxiter": 50, "ftol": 0.0001},
             ),
         )
 
@@ -108,7 +99,7 @@ class TestModelPredictiveController(unittest.TestCase):
         self.assertIsNotNone(mpc.get_solve_metadata())
         mpc.reset()
         self.assertIsNone(mpc.last_command)
-        self.assertIsNotNone(mpc.get_solve_metadata())  # planner latch retained
+        self.assertIsNotNone(mpc.get_solve_metadata())
         cmd1 = mpc.compute_command(np.array([0.1]))
         self.assertEqual(cmd1.k, 0)
 
@@ -146,10 +137,9 @@ class TestModelPredictiveController(unittest.TestCase):
         cmd = mpc.compute_command(np.array([0.1]), k=0, t=0.0)
         mpc.generate_nominal_interpolator(derivatives=True)
         u0 = mpc.get_nominal_u(0.0)
-        np.testing.assert_allclose(u0, cmd.u_ff, atol=1e-5)
+        np.testing.assert_allclose(u0, cmd.u_ff, atol=1e-05)
         x0 = mpc.get_nominal_x(0.0)
-        np.testing.assert_allclose(x0, cmd.plan.trajectory.x[:, 0], atol=1e-5)
-        # Mid-horizon sample has finite values; dots exist.
+        np.testing.assert_allclose(x0, cmd.plan.trajectory.x[:, 0], atol=1e-05)
         t_mid = 0.5
         u_m = mpc.get_nominal_u(t_mid)
         self.assertEqual(u_m.shape, (1,))
@@ -157,9 +147,8 @@ class TestModelPredictiveController(unittest.TestCase):
         dx = mpc.get_nominal_x_dot(t_mid)
         self.assertEqual(du.shape, (1,))
         self.assertEqual(dx.shape, (1,))
-        # Clamp past horizon.
-        u_end = mpc.get_nominal_u(1e3)
-        np.testing.assert_allclose(u_end, cmd.plan.trajectory.u[:, -1], atol=1e-5)
+        u_end = mpc.get_nominal_u(1000.0)
+        np.testing.assert_allclose(u_end, cmd.plan.trajectory.u[:, -1], atol=1e-05)
 
     def test_deploy_shaped_two_rate_hand_loop(self):
         """Mirrors RAS: replan + interpolator, then many get_nominal_u."""
@@ -205,7 +194,6 @@ class TestModelPredictiveController(unittest.TestCase):
     def test_hybrid_one_nlp_per_tick_and_compile_once(self):
         """Latch + compile-once: no per-tick re-prepare / re-compile / multi-solve."""
         from unittest.mock import patch
-
         from minilink.control.mpc.utilities import mpc_default_computer_x0
         from minilink.simulation.computer import Computer
         from minilink.simulation.hybrid_simulator import HybridSimulator
@@ -216,17 +204,14 @@ class TestModelPredictiveController(unittest.TestCase):
         dt_mpc = 0.2
         tf = 1.0
         n_ticks = int(round(tf / dt_mpc))
-
         mpc = ModelPredictiveController(planner, dt_mpc=dt_mpc, warm_start=True)
         hybrid = mpc @ plant
         x0 = np.array([0.0])
         x0_computer = mpc_default_computer_x0(planner)
-
         n_solve = []
         n_compile_parametric = []
         n_plant_compile = []
         n_computer_compile = []
-
         _solve = planner.solve_trajectory_from
         _compile_parametric = planner.compile_parametric_program
         _plant_compile = plant.compile
@@ -271,13 +256,10 @@ class TestModelPredictiveController(unittest.TestCase):
             planner.compile_parametric_program = _compile_parametric
             Computer.compile = _computer_compile
             HybridSimulator.__init__ = _hs_init
-
         self.assertEqual(len(n_solve), n_ticks)
         self.assertEqual(len(n_compile_parametric), 0)
         self.assertEqual(len(n_plant_compile), 1)
         self.assertEqual(len(n_computer_compile), 1)
-
-        # Ports + step on one discrete tick share the latch.
         leaf = ModelPredictiveController(planner, dt_mpc=dt_mpc, warm_start=True)
         z = leaf.x0.copy()
         y = np.array([0.05])
@@ -291,44 +273,12 @@ class TestModelPredictiveController(unittest.TestCase):
             self.assertEqual(mock_solve.call_count, 1)
 
 
-# --- merged from test_mpc_algebraic_controller.py ---
-
-"""Unit tests for stateless MPC block."""
-import unittest
+# from test_mpc_algebraic_controller.py
 from unittest.mock import patch
-import numpy as np
-import pytest
 
 pytest.importorskip("jax")
-import jax.numpy as jnp
 from minilink.control.mpc import ModelPredictiveController
-from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
 from minilink.core.system import DynamicSystem, System
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
-)
-
-
-class JaxSingleIntegrator_mpc_algebraic_controller(DynamicSystem):
-    def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
-
-    def f(self, x, u, t=0, params=None):
-        return jnp.array([u[0]])
-
-    def h(self, x, u, t=0, params=None):
-        return x
 
 
 @pytest.mark.optional
@@ -338,7 +288,7 @@ class TestMPCAlgebraicController(unittest.TestCase):
         configure_jax(enable_x64=True)
 
     def _make_planner(self, x_start=0.0):
-        sys = JaxSingleIntegrator_mpc_algebraic_controller()
+        sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
@@ -408,50 +358,11 @@ class TestMPCAlgebraicController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_mpc_warm_start_controller.py ---
-
-"""Unit tests for warm-start MPC stateful controller."""
-import unittest
-from unittest.mock import patch
-import numpy as np
-import pytest
-
+# from test_mpc_warm_start_controller.py
 pytest.importorskip("jax")
-import jax.numpy as jnp
-from minilink.control.mpc import ModelPredictiveController
 from minilink.control.mpc.utilities import _shift_plan_trajectory, mpc_warm_start_guess
-from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
 from minilink.core.system import DynamicSystem, StepSystem
 from minilink.core.trajectory import Trajectory
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
-)
-
-
-class JaxSingleIntegrator_mpc_warm_start_controller(DynamicSystem):
-    def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
-
-    def f(self, x, u, t=0, params=None):
-        return jnp.array([u[0]])
-
-    def h(self, x, u, t=0, params=None):
-        return x
 
 
 @pytest.mark.optional
@@ -461,7 +372,7 @@ class TestMPCWarmStartController(unittest.TestCase):
         configure_jax(enable_x64=True)
 
     def _make_planner(self, x_start=0.0):
-        sys = JaxSingleIntegrator_mpc_warm_start_controller()
+        sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
@@ -554,46 +465,9 @@ class TestMPCWarmStartController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_mpc_planner.py ---
-
-"""Optional parametric TrajectoryOptimizationPlanner tests (MPC compile path)."""
-import unittest
-import numpy as np
-import pytest
-
+# from test_mpc_planner.py
 pytest.importorskip("jax")
-import jax.numpy as jnp
-from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
 from minilink.core.system import DynamicSystem
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
-)
-
-
-class JaxSingleIntegrator_mpc_planner(DynamicSystem):
-    def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
-
-    def f(self, x, u, t=0, params=None):
-        return jnp.array([u[0]])
-
-    def h(self, x, u, t=0, params=None):
-        return x
 
 
 @pytest.mark.optional
@@ -603,7 +477,7 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         configure_jax(enable_x64=True)
 
     def make_problem(self, x_start=0.0):
-        sys = JaxSingleIntegrator_mpc_planner()
+        sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
@@ -663,43 +537,9 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         self.assertIs(planner.last_trajectory_plan, plan)
 
 
-# --- merged from test_mpc_solve_trajectory_from.py ---
-
-"""Unit tests for TrajectoryOptimizationPlanner.solve_trajectory_from."""
-import unittest
-import numpy as np
-import pytest
-
+# from test_mpc_solve_trajectory_from.py
 pytest.importorskip("jax")
-import jax.numpy as jnp
-from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
-from minilink.core.system import DynamicSystem
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
-)
-
-
-class JaxSingleIntegrator_mpc_solve_trajectory_from(DynamicSystem):
-    def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
-
-    def f(self, x, u, t=0, params=None):
-        return jnp.array([u[0]])
-
-    def h(self, x, u, t=0, params=None):
-        return x
 
 
 @pytest.mark.optional
@@ -709,7 +549,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         configure_jax(enable_x64=True)
 
     def make_problem(self, x_start=0.0):
-        sys = JaxSingleIntegrator_mpc_solve_trajectory_from()
+        sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
@@ -805,32 +645,12 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         self.assertIsNotNone(plan.warm_state)
 
 
-# --- merged from test_mpc_export_computer.py ---
-
-"""Tests for MPC :meth:`export_to_computer`."""
-
-import unittest
-
-import pytest
-
+# from test_mpc_export_computer.py
 pytest.importorskip("jax")
-
-from minilink.control.mpc import ModelPredictiveController
-from minilink.core.backends import configure_jax  # noqa: E402
-from minilink.core.costs import QuadraticCost  # noqa: E402
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputsUY,
 )
-from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
-)
-from minilink.simulation.computer import Computer  # noqa: E402
+from minilink.simulation.computer import Computer
 
 
 def _planner():
@@ -839,10 +659,7 @@ def _planner():
     x0 = sys.x0.copy()
     return TrajectoryOptimizationPlanner(
         PlanningProblem(
-            sys=sys,
-            tf=1.0,
-            x_start=x0,
-            cost=QuadraticCost.from_system(sys, xbar=x0),
+            sys=sys, tf=1.0, x_start=x0, cost=QuadraticCost.from_system(sys, xbar=x0)
         ),
         transcription=DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=5)
@@ -851,7 +668,7 @@ def _planner():
             compile_backend="jax",
             record_solve_time=True,
             optimizer_method="scipy_slsqp",
-            optimizer_options={"maxiter": 5, "ftol": 1e-1},
+            optimizer_options={"maxiter": 5, "ftol": 0.1},
         ),
     )
 
@@ -902,25 +719,9 @@ class TestMpcExportComputer(unittest.TestCase):
         self.assertIsInstance(hybrid, HybridDiagram)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_mpc_numpy_rebuild.py ---
-
-"""NumPy rebuild-mode MPC (no JAX parametric compile)."""
-
-import unittest
+# from test_mpc_numpy_rebuild.py
 import warnings
-from unittest.mock import patch
-
-import numpy as np
-
 from minilink.control.mpc import ModelPredictiveController, mpc_default_computer_x0
-from minilink.core.costs import QuadraticCost
-from minilink.core.hybrid_diagram import HybridDiagram
-from minilink.core.system import DynamicSystem, StepSystem, System
-from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -944,23 +745,15 @@ class SingleIntegrator(DynamicSystem):
 def _make_numpy_planner(x_start=0.0):
     sys = SingleIntegrator()
     cost = QuadraticCost.from_system(
-        sys,
-        Q=np.zeros((1, 1)),
-        R=np.eye(1),
-        S=np.zeros((1, 1)),
+        sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
     )
-    problem = PlanningProblem(
-        sys=sys,
-        x_start=np.array([x_start]),
-        cost=cost,
-        tf=1.0,
-    )
+    problem = PlanningProblem(sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0)
     return TrajectoryOptimizationPlanner(
         problem,
         n_steps=5,
         transcription="direct_collocation",
         compile_backend="numpy",
-        optimizer_options={"maxiter": 50, "ftol": 1e-4},
+        optimizer_options={"maxiter": 50, "ftol": 0.0001},
     )
 
 
@@ -968,14 +761,12 @@ class TestMPCNumPyRebuild(unittest.TestCase):
     def test_controller_init_without_parametric_compile(self):
         planner = _make_numpy_planner()
         n_compile = []
-
         with patch.object(
             planner,
             "compile_parametric_program",
             side_effect=lambda: n_compile.append(1),
         ):
             mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
-
         self.assertEqual(len(n_compile), 0)
         self.assertFalse(planner.has_parametric_program)
         self.assertIsInstance(mpc, StepSystem)
@@ -990,11 +781,9 @@ class TestMPCNumPyRebuild(unittest.TestCase):
     def test_compute_command_rebuilds_plan(self):
         planner = _make_numpy_planner(0.1)
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
-
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             cmd = mpc.compute_command(np.array([0.1]), k=0)
-
         rebuild_msgs = [
             w.message
             for w in caught
@@ -1008,7 +797,6 @@ class TestMPCNumPyRebuild(unittest.TestCase):
     def test_rebuild_per_tick_new_program(self):
         planner = _make_numpy_planner(0.0)
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
-
         programs = []
         original_solve = planner.solve_trajectory
 
@@ -1020,7 +808,6 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         with patch.object(planner, "solve_trajectory", side_effect=solve_and_track):
             mpc.compute_command(np.array([0.0]), k=0)
             mpc.compute_command(np.array([0.05]), k=1)
-
         self.assertEqual(len(programs), 2)
         self.assertIsNot(programs[0], programs[1])
 
@@ -1031,11 +818,9 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         dt_mpc = 0.2
         tf = 0.6
         n_ticks = int(round(tf / dt_mpc))
-
         mpc = ModelPredictiveController(planner, dt_mpc=dt_mpc, warm_start=True)
         hybrid = mpc @ plant
         self.assertIsInstance(hybrid, HybridDiagram)
-
         n_solve = []
         n_compile_parametric = []
         _solve = planner.solve_trajectory_from
@@ -1062,60 +847,32 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         finally:
             planner.solve_trajectory_from = _solve
             planner.compile_parametric_program = _compile_parametric
-
         self.assertEqual(len(n_solve), n_ticks)
         self.assertEqual(len(n_compile_parametric), 0)
 
 
-# --- merged from test_mpc_hybrid_straight_line.py ---
-
-"""Stateless MPC hybrid straight-line bicycle vs stateless planner."""
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_mpc_hybrid_straight_line.py
 pytest.importorskip("jax")
-
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
     mpc_plans_from_rollout,
 )
-from minilink.core.backends import configure_jax  # noqa: E402
-from minilink.core.costs import QuadraticCost  # noqa: E402
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
-    JaxDynamicBicycleRateInputsUY,
-)
-from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
-)
-from minilink.simulation.hybrid_simulator import HybridSimulator  # noqa: E402
+from minilink.simulation.hybrid_simulator import HybridSimulator
 
 
 def _build_bicycle_hybrid(*, mpc_hz=5.0):
     configure_jax(enable_x64=True)
-
     u_target = 4.0
     mpc_horizon = 1.0
     mpc_steps = 8
-
     sys_mpc = JaxDynamicBicycleRateInputsUY()
     sys_sim = JaxDynamicBicycleRateInputsUY()
     sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
-
     w_rear_max = 90.0
     delta_max = 0.55
     w_rear_dot_max = 80.0
     delta_dot_max = 2.0
-
     for sys in (sys_mpc, sys_sim):
         sys.state.lower_bound[6] = 0.0
         sys.state.upper_bound[6] = w_rear_max
@@ -1123,7 +880,6 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
         sys.state.upper_bound[7] = delta_max
         sys.inputs["u"].lower_bound = np.array([-w_rear_dot_max, -delta_dot_max])
         sys.inputs["u"].upper_bound = np.array([w_rear_dot_max, delta_dot_max])
-
     r_r = sys_mpc.params["r_r"]
     w_rear_ref = u_target / r_r
     x_ref = np.array([0.0, 0.0, 0.0, u_target, 0.0, 0.0, w_rear_ref, 0.0])
@@ -1135,12 +891,8 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
         xbar=x_ref,
         ubar=np.zeros(2),
     )
-
-    x0 = np.array(
-        [0.0, 3.0, 0.0, u_target * 0.8, 0.0, 0.0, (u_target * 0.8) / r_r, 0.0]
-    )
+    x0 = np.array([0.0, 3.0, 0.0, u_target * 0.8, 0.0, 0.0, u_target * 0.8 / r_r, 0.0])
     sys_sim.x0 = x0.copy()
-
     template_problem = PlanningProblem(
         sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon
     )
@@ -1154,14 +906,13 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
             compile_backend="jax",
             record_solve_time=True,
             optimizer_method="scipy_slsqp",
-            optimizer_options={"maxiter": 80, "ftol": 1e-2},
+            optimizer_options={"maxiter": 80, "ftol": 0.01},
         ),
     )
-
     mpc_dt = 1.0 / mpc_hz
     mpc = ModelPredictiveController(mpc_planner, dt_mpc=mpc_dt, warm_start=False)
-    hybrid = (mpc % mpc_dt) @ sys_sim
-    return hybrid, mpc_planner, transcription, template_problem
+    hybrid = mpc % mpc_dt @ sys_sim
+    return (hybrid, mpc_planner, transcription, template_problem)
 
 
 @pytest.mark.optional
@@ -1170,40 +921,29 @@ class TestMpcHybridStraightLine(unittest.TestCase):
     def test_stateless_u_ff_matches_planner_in_hybrid_sim(self):
         hybrid, mpc_planner, transcription, problem = _build_bicycle_hybrid()
         n_steps = 4
-        sim = HybridSimulator(
-            hybrid,
-            t0=0.0,
-            n_steps=n_steps,
-            plant_dt_inner=0.005,
-        )
+        sim = HybridSimulator(hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.005)
         result = sim.solve()
-
         plant_eval = hybrid.plant.compile()
         u_nom = hybrid.plant.get_u_from_input_ports()
         y0 = np.asarray(
-            plant_eval.outputs(hybrid.plant.x0, u_nom, 0.0)["y"],
-            dtype=float,
+            plant_eval.outputs(hybrid.plant.x0, u_nom, 0.0)["y"], dtype=float
         )
         y_hist = result.computer.signals["y"]
-
         for col in range(n_steps):
             y_k = y0 if col == 0 else y_hist[:, col - 1]
             plan = mpc_planner.step(y_k, initial_guess=None)
             np.testing.assert_allclose(
                 result.computer.signals["u_ff"][:, col],
                 plan.u[:, 0],
-                rtol=1e-4,
-                atol=1e-4,
+                rtol=0.0001,
+                atol=0.0001,
             )
 
     def test_mpc_plans_from_rollout_smoke(self):
         hybrid, _planner, transcription, problem = _build_bicycle_hybrid()
         n_steps = 3
         result = HybridSimulator(
-            hybrid,
-            t0=0.0,
-            n_steps=n_steps,
-            plant_dt_inner=0.005,
+            hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.005
         ).solve()
         plans = mpc_plans_from_rollout(
             result.computer,
@@ -1219,79 +959,36 @@ class TestMpcHybridStraightLine(unittest.TestCase):
         hybrid, planner, _transcription, _problem = _build_bicycle_hybrid()
         n_steps = 3
         result = HybridSimulator(
-            hybrid,
-            t0=0.0,
-            n_steps=n_steps,
-            plant_dt_inner=0.005,
+            hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.005
         ).solve()
-        overlays = mpc_animation_overlays(
-            result,
-            planner,
-            reference_pad=5.0,
-        )
+        overlays = mpc_animation_overlays(result, planner, reference_pad=5.0)
         self.assertEqual(len(overlays), 1)
         self.assertEqual(type(overlays[0]).__name__, "SceneHistory")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_mpc_hybrid_warm_start_parity.py ---
-
-"""Warm-start MPC hybrid straight-line bicycle vs warm-started hand loop."""
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_mpc_hybrid_warm_start_parity.py
 pytest.importorskip("jax")
-
-from minilink.blocks.routing import Demux  # noqa: E402
-from minilink.control.mpc import (
-    ModelPredictiveController,
-)
-from minilink.control.mpc.utilities import (  # noqa: E402
-    mpc_default_computer_x0,
-    mpc_warm_start_guess,
-)
-from minilink.core.backends import configure_jax  # noqa: E402
-from minilink.core.costs import QuadraticCost  # noqa: E402
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem  # noqa: E402
-from minilink.core.hybrid_diagram import HybridDiagram  # noqa: E402
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
+from minilink.blocks.routing import Demux
+from minilink.control.mpc.utilities import mpc_default_computer_x0, mpc_warm_start_guess
+from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
-from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
-)
-from minilink.simulation.computer import Computer, StepSchedule  # noqa: E402
-from minilink.simulation.hybrid_simulator import HybridSimulator  # noqa: E402
+from minilink.simulation.computer import Computer, StepSchedule
 
 
 def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     configure_jax(enable_x64=True)
-
     u_target = 4.0
     mpc_horizon = 1.0
     mpc_steps = 8
-
     sys_mpc = JaxDynamicBicycleRateInputs()
     sys_sim = JaxDynamicBicycleRateInputs()
     sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
-
     w_rear_max = 90.0
     delta_max = 0.55
     w_rear_dot_max = 80.0
     delta_dot_max = 2.0
-
     for sys in (sys_mpc, sys_sim):
         sys.state.lower_bound[6] = 0.0
         sys.state.upper_bound[6] = w_rear_max
@@ -1301,7 +998,6 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
         sys.inputs["w_rear_dot"].upper_bound[0] = w_rear_dot_max
         sys.inputs["delta_dot"].lower_bound[0] = -delta_dot_max
         sys.inputs["delta_dot"].upper_bound[0] = delta_dot_max
-
     r_r = sys_mpc.params["r_r"]
     w_rear_ref = u_target / r_r
     x_ref = np.array([0.0, 0.0, 0.0, u_target, 0.0, 0.0, w_rear_ref, 0.0])
@@ -1313,12 +1009,8 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
         xbar=x_ref,
         ubar=np.zeros(2),
     )
-
-    x0 = np.array(
-        [0.0, 3.0, 0.0, u_target * 0.8, 0.0, 0.0, (u_target * 0.8) / r_r, 0.0]
-    )
+    x0 = np.array([0.0, 3.0, 0.0, u_target * 0.8, 0.0, 0.0, u_target * 0.8 / r_r, 0.0])
     sys_sim.x0 = x0.copy()
-
     template_problem = PlanningProblem(
         sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon
     )
@@ -1332,10 +1024,9 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
             compile_backend="jax",
             record_solve_time=True,
             optimizer_method="scipy_slsqp",
-            optimizer_options={"maxiter": 80, "ftol": 1e-2},
+            optimizer_options={"maxiter": 80, "ftol": 0.01},
         ),
     )
-
     mpc_dt = 1.0 / mpc_hz
     mpc = ModelPredictiveController(mpc_planner, dt_mpc=mpc_dt, warm_start=True)
     step_diagram = StepDiagramSystem()
@@ -1345,7 +1036,6 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     step_diagram.connect_new_output_port("mpc", "u_ff", "u_ff")
     step_diagram.connect_new_output_port("mpc", "x_ff", "x_ff")
     step_diagram.connect_new_output_port("mpc", "z", "z")
-
     plant_diagram = DiagramSystem()
     plant_diagram.add_subsystem(sys_sim, "bike")
     plant_diagram.add_subsystem(Demux(dims=(1, 1)), "split")
@@ -1354,7 +1044,6 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     plant_diagram.connect("split", "out0", "bike", "w_rear_dot")
     plant_diagram.connect("split", "out1", "bike", "delta_dot")
     plant_diagram.connect_new_output_port("bike", "y", "y")
-
     hybrid = HybridDiagram(
         computer=Computer(step_diagram, StepSchedule(dt_base=mpc_dt)),
         plant=plant_diagram,
@@ -1365,9 +1054,8 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     hybrid.connect_boundary(
         direction="plant_to_computer", computer_port="y", plant_port="y"
     )
-
     z0 = mpc_default_computer_x0(mpc_planner)
-    return hybrid, mpc_planner, transcription, template_problem, mpc_dt, z0
+    return (hybrid, mpc_planner, transcription, template_problem, mpc_dt, z0)
 
 
 @pytest.mark.optional
@@ -1379,86 +1067,35 @@ class TestMpcHybridWarmStartParity(unittest.TestCase):
         )
         n_steps = 4
         result = HybridSimulator(
-            hybrid,
-            t0=0.0,
-            n_steps=n_steps,
-            plant_dt_inner=0.005,
-            x0_computer=z0,
+            hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.005, x0_computer=z0
         ).solve()
-
         plant_eval = hybrid.plant.compile()
         u_nom = hybrid.plant.get_u_from_input_ports()
         y0 = np.asarray(
-            plant_eval.outputs(hybrid.plant.x0, u_nom, 0.0)["y"],
-            dtype=float,
+            plant_eval.outputs(hybrid.plant.x0, u_nom, 0.0)["y"], dtype=float
         )
         y_hist = result.computer.signals["y"]
         z_hist = result.computer.x
-
         for col in range(n_steps):
             y_k = y0 if col == 0 else y_hist[:, col - 1]
             z_prev = z0 if col == 0 else z_hist[:, col - 1]
-            guess = mpc_warm_start_guess(
-                z_prev,
-                y_k,
-                mpc_planner,
-                dt_mpc=mpc_dt,
-                k=col,
-            )
+            guess = mpc_warm_start_guess(z_prev, y_k, mpc_planner, dt_mpc=mpc_dt, k=col)
             plan = mpc_planner.step(y_k, initial_guess=guess)
             np.testing.assert_allclose(
                 result.computer.signals["u_ff"][:, col],
                 plan.u[:, 0],
-                rtol=1e-4,
-                atol=1e-4,
+                rtol=0.0001,
+                atol=0.0001,
             )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_mpc_hybrid_demo_parity.py ---
-
-"""Hybrid warm-start MPC vs hand-rolled baseline from mpc/ straight-line demo."""
-
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_mpc_hybrid_demo_parity.py
 pytest.importorskip("jax")
-
-from minilink.blocks.routing import Demux  # noqa: E402
-from minilink.control.mpc import (
-    ModelPredictiveController,
-)
-from minilink.control.mpc.utilities import (  # noqa: E402
+from minilink.control.mpc.utilities import (
     mpc_default_computer_x0,
     warm_start_guess_from_prev_plan,
 )
-from minilink.core.backends import configure_jax  # noqa: E402
-from minilink.core.costs import QuadraticCost  # noqa: E402
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem  # noqa: E402
-from minilink.core.hybrid_diagram import HybridDiagram  # noqa: E402
-from minilink.core.trajectory import Trajectory  # noqa: E402
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
-    JaxDynamicBicycleRateInputs,
-)
-from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
-    TrajectoryOptimizationPlanner,
-)
-from minilink.simulation.computer import Computer, StepSchedule  # noqa: E402
-from minilink.simulation.hybrid_simulator import HybridSimulator  # noqa: E402
 
-# Hand-loop compute_command + RK4 ZOH pattern (parity with hybrid product)
 U_TARGET = 4.0
 TF_SIM = 5.0
 MPC_HZ = 5.0
@@ -1466,11 +1103,10 @@ SIM_HZ = 200.0
 MPC_HORIZON = 2.0
 MPC_STEPS = 20
 MPC_MAXITER = 150
-MPC_FTOL = 1e-2
+MPC_FTOL = 0.01
 MPC_DT = 1.0 / MPC_HZ
 SIM_DT = 1.0 / SIM_HZ
 SUBSTEPS = max(1, int(round(MPC_DT / SIM_DT)))
-
 W_REAR_MAX = 90.0
 DELTA_MAX = 0.55
 W_REAR_DOT_MAX = 80.0
@@ -1479,12 +1115,10 @@ DELTA_DOT_MAX = 2.0
 
 def _configure_bicycle_systems():
     configure_jax(enable_x64=True)
-
     sys_mpc = JaxDynamicBicycleRateInputs()
     sys_sim = JaxDynamicBicycleRateInputs()
     sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
     sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
-
     for sys in (sys_mpc, sys_sim):
         sys.state.lower_bound[6] = 0.0
         sys.state.upper_bound[6] = W_REAR_MAX
@@ -1494,7 +1128,6 @@ def _configure_bicycle_systems():
         sys.inputs["w_rear_dot"].upper_bound[0] = W_REAR_DOT_MAX
         sys.inputs["delta_dot"].lower_bound[0] = -DELTA_DOT_MAX
         sys.inputs["delta_dot"].upper_bound[0] = DELTA_DOT_MAX
-
     r_r = sys_mpc.params["r_r"]
     w_rear_ref = U_TARGET / r_r
     x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, w_rear_ref, 0.0])
@@ -1506,10 +1139,8 @@ def _configure_bicycle_systems():
         xbar=x_ref,
         ubar=np.zeros(2),
     )
-    x0 = np.array(
-        [0.0, 3.0, 0.0, U_TARGET * 0.8, 0.0, 0.0, (U_TARGET * 0.8) / r_r, 0.0]
-    )
-    return sys_mpc, sys_sim, cost, x0
+    x0 = np.array([0.0, 3.0, 0.0, U_TARGET * 0.8, 0.0, 0.0, U_TARGET * 0.8 / r_r, 0.0])
+    return (sys_mpc, sys_sim, cost, x0)
 
 
 def _make_planner(sys_mpc, cost, x0):
@@ -1527,7 +1158,7 @@ def _make_planner(sys_mpc, cost, x0):
             optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
         ),
     )
-    return planner, transcription, problem
+    return (planner, transcription, problem)
 
 
 def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
@@ -1539,29 +1170,21 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
     sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
     planner.compile_parametric_program()
     x0 = np.asarray(problem.x_start, dtype=float).reshape(-1)
-
     t_mpc = []
     u_mpc = []
     x_mpc = []
     t_hist = [0.0]
     x_hist = [x0.copy()]
     u_hist = [np.zeros(sys_sim.m)]
-
     x = x0.copy()
     t = 0.0
     u_hold = np.zeros(sys_sim.m)
     prev_plan = None
     next_mpc_t = 0.0
-
     while t < TF_SIM - 1e-12:
         if t >= next_mpc_t - 1e-12:
             guess = warm_start_guess_from_prev_plan(
-                prev_plan,
-                x,
-                planner,
-                dt_shift=MPC_DT,
-                horizon=MPC_HORIZON,
-                t_anchor=t,
+                prev_plan, x, planner, dt_shift=MPC_DT, horizon=MPC_HORIZON, t_anchor=t
             )
             plan = planner.step(x, initial_guess=guess)
             prev_plan = plan
@@ -1570,7 +1193,6 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
             u_mpc.append(u_hold.copy())
             x_mpc.append(x.copy())
             next_mpc_t += MPC_DT
-
         for _ in range(SUBSTEPS):
             if t >= TF_SIM:
                 break
@@ -1579,7 +1201,6 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
             t_hist.append(t)
             x_hist.append(x.copy())
             u_hist.append(u_hold.copy())
-
     traj = Trajectory(
         t=np.asarray(t_hist, dtype=float),
         x=np.asarray(x_hist, dtype=float).T,
@@ -1596,7 +1217,6 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
 def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
     mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
     z0 = mpc_default_computer_x0(planner)
-
     step_diagram = StepDiagramSystem()
     step_diagram.add_subsystem(mpc, "mpc")
     step_diagram.add_input_port("y", dim=int(sys_mpc.n))
@@ -1604,7 +1224,6 @@ def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
     step_diagram.connect_new_output_port("mpc", "u_ff", "u_ff")
     step_diagram.connect_new_output_port("mpc", "x_ff", "x_ff")
     step_diagram.connect_new_output_port("mpc", "z", "z")
-
     plant_diagram = DiagramSystem()
     plant_diagram.add_subsystem(sys_sim, "bike")
     plant_diagram.add_subsystem(Demux(dims=(1, 1)), "split")
@@ -1613,7 +1232,6 @@ def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
     plant_diagram.connect("split", "out0", "bike", "w_rear_dot")
     plant_diagram.connect("split", "out1", "bike", "delta_dot")
     plant_diagram.connect_new_output_port("bike", "y", "y")
-
     hybrid = HybridDiagram(
         computer=Computer(step_diagram, StepSchedule(dt_base=MPC_DT)),
         plant=plant_diagram,
@@ -1624,7 +1242,7 @@ def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
     hybrid.connect_boundary(
         direction="plant_to_computer", computer_port="y", plant_port="y"
     )
-    return hybrid, z0
+    return (hybrid, z0)
 
 
 def _plant_state_at_times(traj: Trajectory, times):
@@ -1643,19 +1261,13 @@ class TestMpcHybridDemoParity(unittest.TestCase):
     def test_warm_hybrid_matches_hand_loop_baseline(self):
         sys_mpc, sys_sim, cost, x0 = _configure_bicycle_systems()
         sys_sim.x0 = x0.copy()
-
         planner_hand, _transcription, problem = _make_planner(sys_mpc, cost, x0)
         hand = run_hand_loop_warm_mpc(
-            sys_sim=sys_sim,
-            planner=planner_hand,
-            problem=problem,
+            sys_sim=sys_sim, planner=planner_hand, problem=problem
         )
-
         planner_hybrid, _, _ = _make_planner(sys_mpc, cost, x0)
         hybrid, z0 = build_hybrid_warm_mpc(
-            sys_mpc=sys_mpc,
-            sys_sim=sys_sim,
-            planner=planner_hybrid,
+            sys_mpc=sys_mpc, sys_sim=sys_sim, planner=planner_hybrid
         )
         result = HybridSimulator(
             hybrid,
@@ -1666,24 +1278,20 @@ class TestMpcHybridDemoParity(unittest.TestCase):
             x0_computer=z0,
             compile_backend="jax",
         ).solve()
-
         n_mpc = hand["t_mpc"].size
         self.assertEqual(result.computer.n_samples, n_mpc)
-
         u_hybrid = np.asarray(result.computer.signals["u_ff"][:, :n_mpc], dtype=float)
         np.testing.assert_allclose(
             u_hybrid,
             hand["u_mpc"],
-            rtol=1e-4,
-            atol=1e-4,
+            rtol=0.0001,
+            atol=0.0001,
             err_msg="u_ff at MPC fires must match hand-loop u_hold",
         )
-
         plant_eval = hybrid.plant.compile(backend="jax")
         u_nom = hybrid.plant.get_u_from_input_ports()
         y0 = np.asarray(
-            plant_eval.outputs(hybrid.plant.x0, u_nom, 0.0)["y"],
-            dtype=float,
+            plant_eval.outputs(hybrid.plant.x0, u_nom, 0.0)["y"], dtype=float
         )
         y_hist = result.computer.signals["y"]
         for col in range(n_mpc):
@@ -1691,20 +1299,15 @@ class TestMpcHybridDemoParity(unittest.TestCase):
             np.testing.assert_allclose(
                 y_k,
                 hand["x_mpc"][:, col],
-                rtol=1e-4,
-                atol=1e-4,
+                rtol=0.0001,
+                atol=0.0001,
                 err_msg=f"measurement at MPC fire {col}",
             )
-
         x_hybrid_at_mpc = _plant_state_at_times(result.plant, hand["t_mpc"])
         np.testing.assert_allclose(
             x_hybrid_at_mpc,
             hand["x_mpc"],
-            rtol=1e-3,
-            atol=1e-3,
+            rtol=0.001,
+            atol=0.001,
             err_msg="plant state at MPC fire times must match hand loop",
         )
-
-
-if __name__ == "__main__":
-    unittest.main()

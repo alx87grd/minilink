@@ -1,10 +1,8 @@
 """Unit tests for analysis verbs (linearize, structural, equilibria) and LQR."""
 
 import unittest
-
 import numpy as np
 import pytest
-
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.analysis.linearize import (
     LinearizationFallbackWarning,
@@ -32,15 +30,11 @@ class _PortLinearSystem(DynamicSystem):
     def f(self, x, u, t=0, params=None):
         force, bias = self.get_port_values_from_u(u, "force", "bias")
         xp = array_module(x, u)
-
-        # dx = A x + B u
         return xp.array([x[1] + bias[0], -2.0 * x[0] + 3.0 * force[0] + 5.0 * bias[0]])
 
     def h(self, x, u, t=0, params=None):
         _, bias = self.get_port_values_from_u(u, "force", "bias")
         xp = array_module(x, u)
-
-        # y = x0 + 2 bias
         return xp.array([x[0] + 2.0 * bias[0]])
 
     def speed(self, x, u, t=0, params=None):
@@ -69,25 +63,23 @@ def _build_port_diagram():
 
 class TestLinearize(unittest.TestCase):
     def test_recovers_linear_system_matrices(self):
-        # Linearizing a linear plant must return its own A, B (to fd tolerance).
         plant = SingleMass(mass=2.0, k=3.0, b=0.5)
         lti = linearize(plant, x_bar=[0.0, 0.0])
-        np.testing.assert_allclose(lti.A(), plant.A(), atol=1e-5)
-        np.testing.assert_allclose(lti.B(), plant.B(), atol=1e-5)
+        np.testing.assert_allclose(lti.A(), plant.A(), atol=1e-05)
+        np.testing.assert_allclose(lti.B(), plant.B(), atol=1e-05)
 
     def test_pendulum_mode(self):
         lti = linearize(Pendulum(), x_bar=[0.0, 0.0])
-        # downward pendulum: undamped oscillator, A = [[0,1],[-g l m/(m l^2+I),0]]
-        np.testing.assert_allclose(lti.A(), [[0.0, 1.0], [-4.905, 0.0]], atol=1e-4)
+        np.testing.assert_allclose(lti.A(), [[0.0, 1.0], [-4.905, 0.0]], atol=0.0001)
 
     def test_linearize_matrices_returns_raw_matrices(self):
         A, B, C, D = linearize_matrices(
             _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0]
         )
-        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-6)
-        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(D, [[0.0, 2.0]], atol=1e-6)
+        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-06)
+        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(D, [[0.0, 2.0]], atol=1e-06)
 
     def test_linearize_wrapper_matches_matrices(self):
         plant = _PortLinearSystem()
@@ -100,56 +92,44 @@ class TestLinearize(unittest.TestCase):
 
     def test_selected_input_ports_reduce_b_and_d_columns(self):
         A, B, C, D = linearize_matrices(
-            _PortLinearSystem(),
-            x_bar=[1.0, 2.0],
-            u_bar=[3.0, 4.0],
-            inputs=["bias"],
+            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], inputs=["bias"]
         )
         self.assertEqual(B.shape, (2, 1))
         self.assertEqual(D.shape, (1, 1))
-        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(B, [[1.0], [5.0]], atol=1e-6)
-        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(D, [[2.0]], atol=1e-6)
+        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(B, [[1.0], [5.0]], atol=1e-06)
+        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(D, [[2.0]], atol=1e-06)
 
     def test_selected_leaf_output_ports_reduce_c_and_d_rows(self):
         _, B, C, D = linearize_matrices(
-            _PortLinearSystem(),
-            x_bar=[1.0, 2.0],
-            u_bar=[3.0, 4.0],
-            outputs=["speed"],
+            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"]
         )
         self.assertEqual(C.shape, (1, 2))
         self.assertEqual(D.shape, (1, 2))
-        np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-6)
-        np.testing.assert_allclose(C, [[0.0, 1.0]], atol=1e-6)
-        np.testing.assert_allclose(D, [[0.0, 0.0]], atol=1e-6)
+        np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-06)
+        np.testing.assert_allclose(C, [[0.0, 1.0]], atol=1e-06)
+        np.testing.assert_allclose(D, [[0.0, 0.0]], atol=1e-06)
 
     def test_diagram_boundary_output_ports(self):
         diagram = _build_port_diagram()
         A, B, C, D = linearize_matrices(
-            diagram,
-            x_bar=[1.0, 2.0],
-            u_bar=[3.0],
-            outputs=["y_meas"],
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"]
         )
-        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-6)
-        np.testing.assert_allclose(C, [[0.0, 1.0]], atol=1e-6)
-        np.testing.assert_allclose(D, [[0.0]], atol=1e-6)
+        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
+        np.testing.assert_allclose(C, [[0.0, 1.0]], atol=1e-06)
+        np.testing.assert_allclose(D, [[0.0]], atol=1e-06)
 
     def test_diagram_internal_output_ports_fd(self):
         diagram = _build_port_diagram()
         A, B, C, D = linearize_matrices(
-            diagram,
-            x_bar=[1.0, 2.0],
-            u_bar=[3.0],
-            outputs=[("plant", "y")],
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=[("plant", "y")]
         )
-        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-6)
-        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(D, [[0.0]], atol=1e-6)
+        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
+        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(D, [[0.0]], atol=1e-06)
 
     def test_jax_internal_output_falls_back_to_fd_with_warning(self):
         diagram = _build_port_diagram()
@@ -161,10 +141,10 @@ class TestLinearize(unittest.TestCase):
                 outputs=[("plant", "y")],
                 method="jax",
             )
-        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-6)
-        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(D, [[0.0]], atol=1e-6)
+        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
+        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(D, [[0.0]], atol=1e-06)
 
     @pytest.mark.optional
     @pytest.mark.jax
@@ -172,21 +152,13 @@ class TestLinearize(unittest.TestCase):
         pytest.importorskip("jax")
         plant = _PortLinearSystem()
         fd = linearize_matrices(
-            plant,
-            x_bar=[1.0, 2.0],
-            u_bar=[3.0, 4.0],
-            outputs=["speed"],
-            method="fd",
+            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"], method="fd"
         )
         exact = linearize_matrices(
-            plant,
-            x_bar=[1.0, 2.0],
-            u_bar=[3.0, 4.0],
-            outputs=["speed"],
-            method="jax",
+            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"], method="jax"
         )
         for fd_matrix, exact_matrix in zip(fd, exact):
-            np.testing.assert_allclose(fd_matrix, exact_matrix, atol=1e-6)
+            np.testing.assert_allclose(fd_matrix, exact_matrix, atol=1e-06)
 
     @pytest.mark.optional
     @pytest.mark.jax
@@ -194,21 +166,13 @@ class TestLinearize(unittest.TestCase):
         pytest.importorskip("jax")
         diagram = _build_port_diagram()
         fd = linearize_matrices(
-            diagram,
-            x_bar=[1.0, 2.0],
-            u_bar=[3.0],
-            outputs=["y_meas"],
-            method="fd",
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"], method="fd"
         )
         exact = linearize_matrices(
-            diagram,
-            x_bar=[1.0, 2.0],
-            u_bar=[3.0],
-            outputs=["y_meas"],
-            method="jax",
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"], method="jax"
         )
         for fd_matrix, exact_matrix in zip(fd, exact):
-            np.testing.assert_allclose(fd_matrix, exact_matrix, atol=1e-6)
+            np.testing.assert_allclose(fd_matrix, exact_matrix, atol=1e-06)
 
     @pytest.mark.optional
     @pytest.mark.jax
@@ -222,10 +186,10 @@ class TestLinearize(unittest.TestCase):
                 outputs=["bad"],
                 method="jax",
             )
-        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-6)
-        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-6)
-        np.testing.assert_allclose(D, [[0.0, 0.0]], atol=1e-6)
+        np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-06)
+        np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
+        np.testing.assert_allclose(D, [[0.0, 0.0]], atol=1e-06)
 
 
 class TestStructural(unittest.TestCase):
@@ -238,7 +202,7 @@ class TestStructural(unittest.TestCase):
 
     def test_uncontrollable_pair_detected(self):
         A = np.array([[1.0, 0.0], [0.0, 2.0]])
-        B = np.array([[1.0], [0.0]])  # second mode unreachable
+        B = np.array([[1.0], [0.0]])
         result = controllability(A, B)
         self.assertFalse(result.is_full_rank)
         self.assertEqual(result.rank, 1)
@@ -247,7 +211,7 @@ class TestStructural(unittest.TestCase):
 class TestEquilibria(unittest.TestCase):
     def test_pendulum_hanging_equilibrium(self):
         x_eq = find_equilibrium(Pendulum(), x_guess=[0.3, 0.0])
-        np.testing.assert_allclose(x_eq, [0.0, 0.0], atol=1e-6)
+        np.testing.assert_allclose(x_eq, [0.0, 0.0], atol=1e-06)
 
 
 class TestLQR(unittest.TestCase):
@@ -263,11 +227,9 @@ class TestLQR(unittest.TestCase):
         x_bar = [0.0, 0.0]
         Q = np.diag([10.0, 1.0])
         R = np.array([[1.0]])
-
         lti = linearize(plant, x_bar=x_bar)
         expected = lqr(lti.A(), lti.B(), Q, R, xbar=x_bar, ubar=[0.0])
         controller = lqr_at_operating_point(plant, x_bar, Q, R)
-
         np.testing.assert_allclose(controller.params["K"], expected.params["K"])
         np.testing.assert_allclose(
             controller.inputs["r"].nominal_value, expected.inputs["r"].nominal_value
@@ -276,48 +238,31 @@ class TestLQR(unittest.TestCase):
     def test_lqr_closed_loop_stabilizes_inverted_pendulum(self):
         plant = InvertedPendulum()
         controller = lqr_at_operating_point(
-            plant,
-            x_bar=[0.0, 0.0],
-            Q=np.diag([10.0, 1.0]),
-            R=np.array([[1.0]]),
+            plant, x_bar=[0.0, 0.0], Q=np.diag([10.0, 1.0]), R=np.array([[1.0]])
         )
-
         diagram = DiagramSystem()
         diagram.connection_verbose = False
         diagram.add_subsystem(controller, "ctl")
         diagram.add_subsystem(plant, "plant")
-        diagram.connect("plant", "x", "ctl", "x")  # full-state feedback
+        diagram.connect("plant", "x", "ctl", "x")
         diagram.connect("ctl", "u", "plant", "u")
-
-        plant.x0 = np.array([0.2, 0.0])  # small tip from upright
+        plant.x0 = np.array([0.2, 0.0])
         traj = diagram.compute_trajectory(tf=10.0, n_steps=1001, verbose=False)
-        np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=1e-2)
+        np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.01)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_control_linear.py ---
-
-"""Unit tests for control law blocks."""
-
-import unittest
-
-import numpy as np
-
+# from test_control_linear.py
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
 from minilink.control.output import ProportionalController
 from minilink.control.siso import FilteredController
 from minilink.control.state import StateFeedbackController
-from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
 
 class TestProportionalController(unittest.TestCase):
     def test_mimo_error_law(self):
         ctl = ProportionalController([[2.0, 0.0], [0.0, 3.0]])
-        u = ctl.ctl(None, np.array([1.0, 1.0, 0.0, 0.0]))  # r=[1,1], y=[0,0]
+        u = ctl.ctl(None, np.array([1.0, 1.0, 0.0, 0.0]))
         np.testing.assert_allclose(u, [2.0, 3.0])
 
 
@@ -331,7 +276,6 @@ class TestStateFeedbackController(unittest.TestCase):
     def test_state_feedback_law(self):
         K = np.array([[1.0, 2.0]])
         ctl = StateFeedbackController(K, xbar=[0.0, 0.0], ubar=[0.5])
-        # u = ubar - K (x - r), with x=[1,1], r=[0,0]
         u = ctl.ctl(None, np.array([1.0, 1.0, 0.0, 0.0]))
         np.testing.assert_allclose(u, [0.5 - 3.0])
 
@@ -339,34 +283,26 @@ class TestStateFeedbackController(unittest.TestCase):
 class TestImpedanceIntegralController(unittest.TestCase):
     def test_equations(self):
         pid = ImpedanceIntegralController()
-        # integral state derivative is the position error r - position
         np.testing.assert_allclose(
             pid.f(np.array([0.0]), np.array([1.0, 0.2, 0.5])), [0.8]
         )
-        # u = kp e + ki e_int - kd dy_dt = 10*0.8 + 1*0.5 - 1*0.5 = 8.0
         np.testing.assert_allclose(
             pid.ctl(np.array([0.5]), np.array([1.0, 0.2, 0.5])), [8.0]
         )
 
     def test_closed_loop_removes_steady_state_error(self):
-        plant = DoubleIntegrator()  # ddx = u, x port = [position, speed]
+        plant = DoubleIntegrator()
         pid = ImpedanceIntegralController()
         pid.params.update({"kp": 5.0, "ki": 1.0, "kd": 4.0})
-
         setpoint = 1.0
-        pid.inputs["r"].nominal_value = np.array(
-            [setpoint]
-        )  # unconnected r holds setpoint
-
+        pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
         diagram.connection_verbose = False
         diagram.add_subsystem(pid, "pid")
         diagram.add_subsystem(plant, "plant")
-        diagram.connect("plant", "x", "pid", "y")  # feed [position, speed]
+        diagram.connect("plant", "x", "pid", "y")
         diagram.connect("pid", "u", "plant", "u")
-
         traj = diagram.compute_trajectory(tf=40.0, n_steps=4001, verbose=False)
-        # state order: [pid e_int, plant position, plant speed]
         position = traj.x[1, -1]
         speed = traj.x[2, -1]
         self.assertAlmostEqual(position, setpoint, places=2)
@@ -376,11 +312,9 @@ class TestImpedanceIntegralController(unittest.TestCase):
 class TestFilteredController(unittest.TestCase):
     def test_equations(self):
         pid = FilteredController(kp=10.0, ki=1.0, kd=1.0, tau=0.1)
-        # de_int = e = r - y; dy_filt = 0 when y matches the filter state
         np.testing.assert_allclose(
             pid.f(np.array([0.0, 0.2]), np.array([1.0, 0.2])), [0.8, 0.0]
         )
-        # u = kp e + ki e_int - kd dy_filt = 10*0.8 + 1*0.5 = 8.5
         np.testing.assert_allclose(
             pid.ctl(np.array([0.5, 0.2]), np.array([1.0, 0.2])), [8.5]
         )
@@ -401,26 +335,21 @@ class TestFilteredController(unittest.TestCase):
         )
         x = jnp.array([0.0, 0.2])
         u = jnp.array([1.0, 0.2])
-
         jax.make_jaxpr(lambda x, u: pid.f(x, u))(x, u)
 
     def test_closed_loop_removes_steady_state_error(self):
-        plant = DoubleIntegrator()  # ddx = u, y port = position
+        plant = DoubleIntegrator()
         pid = FilteredController()
         pid.params.update({"kp": 5.0, "ki": 1.0, "kd": 4.0})
-
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
-
         diagram = DiagramSystem()
         diagram.connection_verbose = False
         diagram.add_subsystem(pid, "pid")
         diagram.add_subsystem(plant, "plant")
         diagram.connect("plant", "y", "pid", "y")
         diagram.connect("pid", "u", "plant", "u")
-
         traj = diagram.compute_trajectory(tf=40.0, n_steps=4001, verbose=False)
-        # state order: [pid e_int, pid y_filt, plant position, plant speed]
         position = traj.x[2, -1]
         speed = traj.x[3, -1]
         self.assertAlmostEqual(position, setpoint, places=2)
@@ -451,32 +380,16 @@ class TestFilteredControllerMIMO(unittest.TestCase):
     def test_dof_two_diagonal(self):
         pid = FilteredController(dof=2, kp=2.0, ki=1.0, kd=0.5, tau=0.1)
         np.testing.assert_allclose(
-            pid.f(np.zeros(4), np.array([1.0, 2.0, 0.0, 0.0])),
-            [1.0, 2.0, 0.0, 0.0],
+            pid.f(np.zeros(4), np.array([1.0, 2.0, 0.0, 0.0])), [1.0, 2.0, 0.0, 0.0]
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_modal.py ---
-
-"""Unit tests for modal analysis."""
-
+# from test_modal.py
 import os
-import unittest
-
-import numpy as np
-import pytest
-
 from minilink.analysis.linearize import linearize
 from minilink.analysis.modal import animate_modal, modal_analysis
-from minilink.core.backends import array_module
-from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import TwoMass
-from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum, Pendulum
 
 
 class _JAXFriendlyOscillator(DynamicSystem):
@@ -559,16 +472,16 @@ class TestModalJAXLinearization(unittest.TestCase):
         x_bar = [0.0, 0.0]
         fd_poles, _ = modal_analysis(plant, x_bar, method="fd")
         jax_poles, _ = modal_analysis(plant, x_bar, method="jax")
-        np.testing.assert_allclose(np.sort(fd_poles), np.sort(jax_poles), atol=1e-4)
+        np.testing.assert_allclose(np.sort(fd_poles), np.sort(jax_poles), atol=0.0001)
         fd_lti = linearize(plant, x_bar, method="fd")
         jax_lti = linearize(plant, x_bar, method="jax")
-        np.testing.assert_allclose(fd_lti.A(), jax_lti.A(), atol=1e-4)
+        np.testing.assert_allclose(fd_lti.A(), jax_lti.A(), atol=0.0001)
 
 
 class TestInvertedPendulumModes(unittest.TestCase):
     def test_upright_has_unstable_real_mode(self):
         poles, modes = modal_analysis(InvertedPendulum(), x_bar=[0.0, 0.0])
-        self.assertTrue(any(pole.real > 0.0 for pole in poles))
+        self.assertTrue(any((pole.real > 0.0 for pole in poles)))
 
 
 class TestModalAPI(unittest.TestCase):
@@ -577,17 +490,8 @@ class TestModalAPI(unittest.TestCase):
             modal_analysis(Pendulum(), x_bar=[0.0, 0.0], linearization="fd")
 
 
-# --- merged from test_frequency.py ---
-
-"""Tests for frequency-response analysis."""
-
-import numpy as np
-import pytest
-
+# from test_frequency.py
 from minilink.analysis.frequency import bode, pzmap
-from minilink.core.backends import array_module
-from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem
 from minilink.graphical.common import PlotResult
 
 
@@ -615,24 +519,18 @@ class FrequencyPlant(DynamicSystem):
     def f(self, x, u, t=0, params=None):
         force, bias = self.get_port_values_from_u(u, "force", "bias")
         xp = array_module(x, u)
-
-        # dx = -2 x + 3 force0 + 5 force1 + 7 bias
         dx = xp.array([-2.0 * x[0] + 3.0 * force[0] + 5.0 * force[1] + 7.0 * bias[0]])
         return dx
 
     def h(self, x, u, t=0, params=None):
         force, _ = self.get_port_values_from_u(u, "force", "bias")
         xp = array_module(x, u)
-
-        # y = [x + 11 force0, 2 x + 13 force1]
         y = xp.array([x[0] + 11.0 * force[0], 2.0 * x[0] + 13.0 * force[1]])
         return y
 
     def sensor(self, x, u, t=0, params=None):
         _, bias = self.get_port_values_from_u(u, "force", "bias")
         xp = array_module(x, u)
-
-        # sensor = 4 x + 17 bias
         y = xp.array([4.0 * x[0] + 17.0 * bias[0]])
         return y
 
@@ -660,11 +558,10 @@ def test_bode_selects_named_port_and_component():
         output_index=1,
         w=[1.0],
     )
-
-    G = 13.0 + 10.0 / (2.0 + 1.0j)
+    G = 13.0 + 10.0 / (2.0 + 1j)
     np.testing.assert_allclose(w, [1.0])
-    np.testing.assert_allclose(mag, [20.0 * np.log10(abs(G))], atol=1e-6)
-    np.testing.assert_allclose(phase, [np.angle(G) * 180.0 / np.pi], atol=1e-6)
+    np.testing.assert_allclose(mag, [20.0 * np.log10(abs(G))], atol=1e-06)
+    np.testing.assert_allclose(phase, [np.angle(G) * 180.0 / np.pi], atol=1e-06)
 
 
 def test_bode_selects_nonprimary_output_port():
@@ -677,10 +574,9 @@ def test_bode_selects_nonprimary_output_port():
         output_port="sensor",
         w=[1.0],
     )
-
-    G = 17.0 + 28.0 / (2.0 + 1.0j)
-    np.testing.assert_allclose(mag, [20.0 * np.log10(abs(G))], atol=1e-6)
-    np.testing.assert_allclose(phase, [np.angle(G) * 180.0 / np.pi], atol=1e-6)
+    G = 17.0 + 28.0 / (2.0 + 1j)
+    np.testing.assert_allclose(mag, [20.0 * np.log10(abs(G))], atol=1e-06)
+    np.testing.assert_allclose(phase, [np.angle(G) * 180.0 / np.pi], atol=1e-06)
 
 
 def test_bode_selects_internal_diagram_output_port():
@@ -693,10 +589,9 @@ def test_bode_selects_internal_diagram_output_port():
         output_port=("plant", "sensor"),
         w=[1.0],
     )
-
-    G = 17.0 + 28.0 / (2.0 + 1.0j)
-    np.testing.assert_allclose(mag, [20.0 * np.log10(abs(G))], atol=1e-6)
-    np.testing.assert_allclose(phase, [np.angle(G) * 180.0 / np.pi], atol=1e-6)
+    G = 17.0 + 28.0 / (2.0 + 1j)
+    np.testing.assert_allclose(mag, [20.0 * np.log10(abs(G))], atol=1e-06)
+    np.testing.assert_allclose(phase, [np.angle(G) * 180.0 / np.pi], atol=1e-06)
 
 
 def test_pzmap_returns_zeros_poles_and_gain_for_selected_channel():
@@ -710,17 +605,15 @@ def test_pzmap_returns_zeros_poles_and_gain_for_selected_channel():
         output_port="y",
         output_index=1,
     )
-
-    np.testing.assert_allclose(zeros, [-36.0 / 13.0], atol=1e-6)
-    np.testing.assert_allclose(poles, [-2.0], atol=1e-6)
-    np.testing.assert_allclose(gain, 13.0, atol=1e-6)
+    np.testing.assert_allclose(zeros, [-36.0 / 13.0], atol=1e-06)
+    np.testing.assert_allclose(poles, [-2.0], atol=1e-06)
+    np.testing.assert_allclose(gain, 13.0, atol=1e-06)
 
 
 @pytest.mark.optional
 @pytest.mark.jax
 def test_bode_jax_matches_fd_for_selected_channel():
     pytest.importorskip("jax")
-
     plant = FrequencyPlant()
     fd = bode(
         plant,
@@ -744,16 +637,14 @@ def test_bode_jax_matches_fd_for_selected_channel():
         w=[1.0, 10.0],
         method="jax",
     )
-
     for fd_array, exact_array in zip(fd, exact):
-        np.testing.assert_allclose(fd_array, exact_array, atol=1e-6)
+        np.testing.assert_allclose(fd_array, exact_array, atol=1e-06)
 
 
 @pytest.mark.optional
 @pytest.mark.jax
 def test_pzmap_jax_matches_fd_for_selected_channel():
     pytest.importorskip("jax")
-
     plant = FrequencyPlant()
     fd = pzmap(
         plant,
@@ -775,9 +666,8 @@ def test_pzmap_jax_matches_fd_for_selected_channel():
         output_index=1,
         method="jax",
     )
-
     for fd_value, exact_value in zip(fd, exact):
-        np.testing.assert_allclose(fd_value, exact_value, atol=1e-6)
+        np.testing.assert_allclose(fd_value, exact_value, atol=1e-06)
 
 
 def test_plot_bode_facade_returns_plot_result():
@@ -794,7 +684,6 @@ def test_plot_bode_facade_returns_plot_result():
         w=[1.0, 10.0],
         show=False,
     )
-
     assert isinstance(result, PlotResult)
     assert len(result.axes) == 2
     assert "y[1] / force[1]" in result.axes[0].get_ylabel()
@@ -814,29 +703,19 @@ def test_plot_pzmap_facade_returns_plot_result():
         output_index=1,
         show=False,
     )
-
     assert isinstance(result, PlotResult)
     assert result.axes is not None
     assert "y[1] / force[1]" in result.axes.get_title()
     plt.close(result.figure)
 
 
-# --- merged from test_phase_plane.py ---
-
-import unittest
-
+# from test_phase_plane.py
 import matplotlib
-import numpy as np
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-
-from minilink.core.system import DynamicSystem  # noqa: E402
-from minilink.core.trajectory import Trajectory  # noqa: E402
-from minilink.graphical.phase_plane import (  # noqa: E402
-    build_phase_plane_spec,
-    plot_phase_plane,
-)
+import matplotlib.pyplot as plt
+from minilink.core.trajectory import Trajectory
+from minilink.graphical.phase_plane import build_phase_plane_spec, plot_phase_plane
 
 
 class PhasePlaneTestSystem(DynamicSystem):
@@ -886,14 +765,12 @@ class TestPhasePlane(unittest.TestCase):
             bounds=((-1.0, 1.0), (-2.0, 2.0)),
             grid_shape=(3, 2),
         )
-
         self.assertEqual(spec.X.shape, (2, 3))
         self.assertEqual(spec.Y.shape, (2, 3))
         self.assertEqual(spec.x_label, "position")
         self.assertEqual(spec.y_label, "velocity")
         self.assertEqual(spec.x_unit, "m")
         self.assertEqual(spec.y_unit, "m/s")
-
         np.testing.assert_allclose(spec.X[0, 2], 1.0)
         np.testing.assert_allclose(spec.Y[0, 2], -2.0)
         np.testing.assert_allclose(spec.V[0, 2], -1.5)
@@ -901,13 +778,7 @@ class TestPhasePlane(unittest.TestCase):
 
     def test_one_state_system_can_use_same_axis_twice(self):
         sys = OneStateSystem()
-        spec = build_phase_plane_spec(
-            sys,
-            x_axis=0,
-            y_axis=0,
-            grid_shape=(2, 2),
-        )
-
+        spec = build_phase_plane_spec(sys, x_axis=0, y_axis=0, grid_shape=(2, 2))
         self.assertEqual(spec.x_axis, 0)
         self.assertEqual(spec.y_axis, 0)
         np.testing.assert_allclose(spec.V, spec.W)
@@ -920,9 +791,7 @@ class TestPhasePlane(unittest.TestCase):
             x=np.array([[2.0, 4.0], [-1.0, 3.0]]),
             u=np.zeros((0, 2)),
         )
-
         spec = build_phase_plane_spec(sys, traj)
-
         np.testing.assert_allclose(spec.x_bounds, (1.9, 4.1))
         np.testing.assert_allclose(spec.y_bounds, (-1.2, 3.2))
         np.testing.assert_allclose(spec.trajectory.x, np.array([2.0, 4.0]))
@@ -935,15 +804,9 @@ class TestPhasePlane(unittest.TestCase):
             x=np.array([[0.0, 0.5, 1.0], [1.0, 0.0, -1.0]]),
             u=np.zeros((1, 3)),
         )
-
         result = plot_phase_plane(
-            sys,
-            traj,
-            bounds=((-1.0, 1.0), (-1.5, 1.5)),
-            grid_shape=(3, 3),
-            show=False,
+            sys, traj, bounds=((-1.0, 1.0), (-1.5, 1.5)), grid_shape=(3, 3), show=False
         )
-
         self.assertEqual(result.backend, "matplotlib")
         self.assertIsNotNone(result.figure)
         self.assertIs(result.axes.figure, result.figure)
@@ -956,13 +819,9 @@ class TestPhasePlane(unittest.TestCase):
             x=np.array([[0.0, 1.0], [0.0, -1.0]]),
             u=np.zeros((1, 2)),
         )
-
         result = sys.plot_phase_plane(
-            bounds=((-1.0, 1.0), (-1.0, 1.0)),
-            grid_shape=(3, 3),
-            show=False,
+            bounds=((-1.0, 1.0), (-1.0, 1.0)), grid_shape=(3, 3), show=False
         )
-
         self.assertEqual(result.backend, "matplotlib")
         self.assertEqual(len(result.axes.lines), 3)
 
@@ -972,22 +831,8 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="plotly", show=False)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_discretize.py ---
-
-"""Tests for continuous-to-step discretization helpers."""
-
-import unittest
-
-import numpy as np
-
+# from test_discretize.py
 from minilink.analysis.discretize import discretize
-from minilink.control.output import ProportionalController
-from minilink.core.system import DynamicSystem
-from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
 
 def _rk4_step(f, x, u, t, dt, params):
@@ -995,7 +840,7 @@ def _rk4_step(f, x, u, t, dt, params):
     k2 = f(x + 0.5 * dt * k1, u, t + 0.5 * dt, params)
     k3 = f(x + 0.5 * dt * k2, u, t + 0.5 * dt, params)
     k4 = f(x + dt * k3, u, t + dt, params)
-    return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    return x + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
 class _GainIntegrator(DynamicSystem):
@@ -1018,12 +863,11 @@ class TestDiscretize(unittest.TestCase):
         dt = 0.05
         step_leaf = discretize(plant, dt)
         p = step_leaf.params
-
         x0 = np.array([0.2, -0.1])
         u = np.array([0.4])
         x1_ref = _rk4_step(plant.f, x0, u, 0.0, dt, p)
         x1 = step_leaf.step(x0, u, k=0)
-        np.testing.assert_allclose(x1, x1_ref, rtol=1e-9, atol=1e-9)
+        np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
         self.assertEqual(step_leaf.params["dt"], dt)
 
     def test_discretize_h_delegates_to_source(self):
@@ -1031,12 +875,10 @@ class TestDiscretize(unittest.TestCase):
         dt = 0.05
         step_leaf = discretize(plant, dt)
         p = step_leaf.params
-
         x = np.array([0.2, -0.1])
         u = np.array([0.4])
         np.testing.assert_allclose(
-            step_leaf.h(x, u, k=2),
-            plant.h(x, u, t=2 * dt, params=p),
+            step_leaf.h(x, u, k=2), plant.h(x, u, t=2 * dt, params=p)
         )
 
     def test_discretize_euler_matches_source_step(self):
@@ -1044,12 +886,11 @@ class TestDiscretize(unittest.TestCase):
         dt = 0.05
         step_leaf = discretize(plant, dt, method="euler")
         p = step_leaf.params
-
         x0 = np.array([0.2, -0.1])
         u = np.array([0.4])
         x1_ref = x0 + dt * plant.f(x0, u, 0.0, p)
         x1 = step_leaf.step(x0, u, k=0)
-        np.testing.assert_allclose(x1, x1_ref, rtol=1e-9, atol=1e-9)
+        np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
         self.assertEqual(step_leaf.method, "euler")
 
     def test_discretize_accepts_dt_in_params_only(self):
@@ -1061,7 +902,6 @@ class TestDiscretize(unittest.TestCase):
         step_leaf = discretize(plant, 0.1)
         u = np.array([1.0])
         x0 = np.array([0.0])
-
         x_nom = step_leaf.step(x0, u, k=0)
         p_fast = {**step_leaf.params, "gain": 3.0}
         x_fast = step_leaf.step(x0, u, k=0, params=p_fast)
@@ -1093,17 +933,7 @@ class TestDiscretize(unittest.TestCase):
             discretize(ProportionalController(1.0), dt=0.01)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-# --- merged from test_state_space_system.py ---
-
-import unittest
-
-import numpy as np
-import pytest
-
+# from test_state_space_system.py
 from minilink.dynamics.abstraction.state_space import LTISystem, StateSpaceSystem
 
 
@@ -1112,14 +942,12 @@ class TestLTISystem(unittest.TestCase):
         A = np.array([[0.0, 1.0], [-2.0, -3.0]])
         B = np.array([[0.0], [1.0]])
         sys = LTISystem(A, B)
-
         self.assertEqual(sys.n, 2)
         self.assertEqual(sys.m, 1)
         self.assertEqual(sys.p, 2)
         np.testing.assert_allclose(sys.C(), np.eye(2))
         np.testing.assert_allclose(sys.D(), np.zeros((2, 1)))
         self.assertEqual(sys.outputs["y"].dependencies, ())
-
         x = np.array([1.0, 2.0])
         u = np.array([0.5])
         np.testing.assert_allclose(sys.f(x, u), np.array([2.0, -7.5]))
@@ -1131,14 +959,12 @@ class TestLTISystem(unittest.TestCase):
         C = np.array([[1.0, -1.0]])
         D = np.array([[3.0]])
         sys = LTISystem(A, B, C, D)
-
         self.assertIs(sys.A(), A)
         self.assertIs(sys.B(), B)
         self.assertIs(sys.C(), C)
         self.assertIs(sys.D(), D)
         self.assertEqual(sys.p, 1)
         self.assertEqual(sys.outputs["y"].dependencies, ("u",))
-
         x = np.array([2.0, -4.0])
         u = np.array([0.5])
         np.testing.assert_allclose(sys.f(x, u), np.array([-4.0, -0.2]))
@@ -1154,37 +980,25 @@ class TestLTISystem(unittest.TestCase):
     def test_rejects_invalid_dimensions(self):
         with self.assertRaisesRegex(ValueError, "A must be"):
             LTISystem(np.array([[1.0, 2.0]]), np.array([[1.0], [2.0]]))
-
         with self.assertRaisesRegex(ValueError, "B row count"):
             LTISystem(np.eye(2), np.ones((3, 1)))
-
         with self.assertRaisesRegex(ValueError, "C column count"):
             LTISystem(np.eye(2), np.ones((2, 1)), C=np.ones((1, 3)))
-
         with self.assertRaisesRegex(ValueError, "C must be"):
             LTISystem(np.eye(2), np.ones((2, 1)), C=np.ones(2))
-
         with self.assertRaisesRegex(ValueError, "D shape"):
-            LTISystem(
-                np.eye(2),
-                np.ones((2, 1)),
-                C=np.ones((1, 2)),
-                D=np.ones((2, 1)),
-            )
+            LTISystem(np.eye(2), np.ones((2, 1)), C=np.ones((1, 2)), D=np.ones((2, 1)))
 
     @pytest.mark.optional
     @pytest.mark.jax
     def test_jax_arrays_are_preserved_and_traceable_if_available(self):
         jax = pytest.importorskip("jax")
         jnp = pytest.importorskip("jax.numpy")
-
         A = jnp.array([[0.0, 1.0], [-2.0, -3.0]])
         B = jnp.array([[0.0], [1.0]])
         sys = LTISystem(A, B)
-
         self.assertIs(sys.A(), A)
         self.assertIs(sys.B(), B)
-
         x = jnp.array([1.0, 2.0])
         u = jnp.array([0.5])
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
@@ -1195,6 +1009,7 @@ class TestLTISystem(unittest.TestCase):
 
 class TestStateSpaceSystem(unittest.TestCase):
     def test_subclass_builds_matrices_from_params(self):
+
         class Gain(StateSpaceSystem):
             def __init__(self):
                 super().__init__(n=1, m=1, p=1, name="Gain")
@@ -1216,7 +1031,3 @@ class TestStateSpaceSystem(unittest.TestCase):
         np.testing.assert_allclose(
             sys.f(x, u, params={"a": 0.0, "b": 1.0}), np.array([5.0])
         )
-
-
-if __name__ == "__main__":
-    unittest.main()
