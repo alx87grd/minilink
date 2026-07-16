@@ -11,13 +11,19 @@ improved by at least ``cost_tol`` for ``convergence_patience`` consecutive
 successful extensions.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 import numpy as np
 
 from minilink.planning.results import TrajectoryPlan
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
+from minilink.planning.search.rrt import (
+    _RRT_OPTION_KEYS,
+    _UNSET,
+    RRTOptions,
+    RRTPlanner,
+    _merge_rrt_options,
+)
 from minilink.planning.search.tree import Node, Tree
 
 # Public API
@@ -91,13 +97,35 @@ class RRTStarOptions(RRTOptions):
     history_stride: int = 1
 
 
+_RRT_STAR_OPTION_KEYS = _RRT_OPTION_KEYS + (
+    "gamma",
+    "rewire_eta",
+    "rewire",
+    "optimize_after_goal",
+    "cost_tol",
+    "convergence_patience",
+    "record_history",
+    "history_stride",
+)
+
+
+def _coerce_rrt_star_options(options: RRTOptions | None) -> RRTStarOptions:
+    if options is None:
+        return RRTStarOptions()
+    if isinstance(options, RRTStarOptions):
+        return options
+    return RRTStarOptions(
+        **{f.name: getattr(options, f.name) for f in fields(RRTOptions)}
+    )
+
+
 class RRTStarPlanner(RRTPlanner):
     """
     RRT* over a `PlanningProblem`.
 
-    Same constructor as :class:`RRTPlanner`, but ``options`` should be an
-    :class:`RRTStarOptions` instance (a plain :class:`RRTOptions` still works
-    with rewiring defaults).
+    Same constructor as :class:`RRTPlanner`, plus RRT* flat kwargs /
+    :class:`RRTStarOptions`. A plain :class:`RRTOptions` still works with
+    rewiring defaults.
 
     Attributes
     ----------
@@ -111,8 +139,68 @@ class RRTStarPlanner(RRTPlanner):
         Recorded frames when ``record_history`` is enabled.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        problem,
+        extender,
+        *,
+        metric=None,
+        options: RRTOptions | None = None,
+        max_nodes=_UNSET,
+        goal_bias=_UNSET,
+        goal_tolerance=_UNSET,
+        seed=_UNSET,
+        edge_resolution=_UNSET,
+        max_sample_attempts=_UNSET,
+        return_best_effort=_UNSET,
+        callback=_UNSET,
+        live_plot=_UNSET,
+        live_plot_every=_UNSET,
+        live_plot_pause=_UNSET,
+        live_plot_after_goal_only=_UNSET,
+        live_plot_ax=_UNSET,
+        nearest_backend=_UNSET,
+        gamma=_UNSET,
+        rewire_eta=_UNSET,
+        rewire=_UNSET,
+        optimize_after_goal=_UNSET,
+        cost_tol=_UNSET,
+        convergence_patience=_UNSET,
+        record_history=_UNSET,
+        history_stride=_UNSET,
+    ) -> None:
+        from minilink.planning.search.metric import euclidean
+
+        if metric is None:
+            metric = euclidean
+        star_options = _merge_rrt_options(
+            _coerce_rrt_star_options(options),
+            default_factory=RRTStarOptions,
+            allowed_keys=_RRT_STAR_OPTION_KEYS,
+            max_nodes=max_nodes,
+            goal_bias=goal_bias,
+            goal_tolerance=goal_tolerance,
+            seed=seed,
+            edge_resolution=edge_resolution,
+            max_sample_attempts=max_sample_attempts,
+            return_best_effort=return_best_effort,
+            callback=callback,
+            live_plot=live_plot,
+            live_plot_every=live_plot_every,
+            live_plot_pause=live_plot_pause,
+            live_plot_after_goal_only=live_plot_after_goal_only,
+            live_plot_ax=live_plot_ax,
+            nearest_backend=nearest_backend,
+            gamma=gamma,
+            rewire_eta=rewire_eta,
+            rewire=rewire,
+            optimize_after_goal=optimize_after_goal,
+            cost_tol=cost_tol,
+            convergence_patience=convergence_patience,
+            record_history=record_history,
+            history_stride=history_stride,
+        )
+        super().__init__(problem, extender, metric=metric, options=star_options)
         self.converged: bool = False
         self.iterations: int = 0
         self.best_goal_cost: float | None = None

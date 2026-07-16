@@ -28,12 +28,7 @@ from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.plotting import plot_cost_field
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import inverse_barrier
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -94,17 +89,14 @@ cost = tracking_cost + obstacle_cost
 problem = PlanningProblem(sys=sys, x_start=x_start, cost=cost, tf=TF)
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(n_steps=N_STEPS)
-    ),
-    options=TrajectoryOptimizationOptions(
-        compile_backend="jax",
-        solve_disp=True,
-        optimizer_options={
-            "maxiter": 500,
-            "ftol": 1e-1,
-        },
-    ),
+    n_steps=N_STEPS,
+    transcription="direct_collocation",
+    compile_backend="jax",
+    solve_disp=True,
+    optimizer_options={
+        "maxiter": 500,
+        "ftol": 1e-1,
+    },
 )
 
 traj = planner.solve().trajectory

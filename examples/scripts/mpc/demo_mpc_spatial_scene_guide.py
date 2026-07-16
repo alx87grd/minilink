@@ -40,12 +40,7 @@ from minilink.planning.spatial.shaping import (
     quadratic_hinge,
 )
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -241,18 +236,14 @@ print(
 )
 
 _section("Step 9: direct collocation planner (not solved)")
-transcription = DirectCollocationTranscription(
-    DirectCollocationOptions(n_steps=MPC_STEPS)
-)
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=transcription,
-    options=TrajectoryOptimizationOptions(
-        compile_backend="jax",
-        optimizer_method="scipy_slsqp",
-        solve_disp=False,
-        optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
-    ),
+    n_steps=MPC_STEPS,
+    transcription="direct_collocation",
+    compile_backend="jax",
+    optimizer_method="scipy_slsqp",
+    solve_disp=False,
+    optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
 )
 print(f"  horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
 print(

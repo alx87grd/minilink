@@ -15,7 +15,6 @@ from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
 )
-from minilink.control.mpc.utilities import mpc_default_computer_x0
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
@@ -32,12 +31,7 @@ from minilink.planning.spatial.shaping import (
     quadratic_hinge,
 )
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -153,15 +147,12 @@ x0 = np.array([START_XY[0], START_XY[1], START_THETA, VX0, 0.0, 0.0, VX0 / r_r, 
 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON),
-    transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(n_steps=MPC_STEPS)
-    ),
-    options=TrajectoryOptimizationOptions(
-        compile_backend="jax",
-        record_solve_time=True,
-        optimizer_method="scipy_slsqp",
-        optimizer_options={"maxiter": 120, "ftol": 1.0},
-    ),
+    n_steps=MPC_STEPS,
+    transcription="direct_collocation",
+    compile_backend="jax",
+    record_solve_time=True,
+    optimizer_method="scipy_slsqp",
+    optimizer_options={"maxiter": 120, "ftol": 1.0},
 )
 
 ########################################################
@@ -197,7 +188,6 @@ hybrid.plot_diagram()
 result = hybrid.compute_trajectory(
     tf=TF_SIM,
     x0_plant=x0,
-    x0_computer=mpc_default_computer_x0(planner),
     plant_dt_inner=SIM_DT,
     compile_backend="jax",
 )

@@ -26,19 +26,13 @@ from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
 )
-from minilink.control.mpc.utilities import mpc_default_computer_x0
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputsUY,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -47,7 +41,7 @@ configure_jax(enable_x64=True)
 U_TARGET = 4.0
 TF_SIM = 5.0
 TF_MPC = 2.0
-MPC_DT = 3.0
+MPC_DT = 0.2
 DT_BROADCAST = 0.01
 SIM_DT = 0.01
 STEP_DISP = True
@@ -73,13 +67,12 @@ planner = TrajectoryOptimizationPlanner(
             ubar=np.zeros(2),
         ),
     ),
-    transcription=DirectCollocationTranscription(DirectCollocationOptions(n_steps=20)),
-    options=TrajectoryOptimizationOptions(
-        compile_backend="jax",
-        record_solve_time=True,
-        optimizer_method="scipy_slsqp",
-        optimizer_options={"maxiter": 50, "ftol": 1.0},
-    ),
+    n_steps=20,
+    transcription="direct_collocation",
+    compile_backend="jax",
+    record_solve_time=True,
+    optimizer_method="scipy_slsqp",
+    optimizer_options={"maxiter": 50, "ftol": 1.0},
 )
 
 mpc = ModelPredictiveController(
@@ -93,7 +86,6 @@ hybrid.plot_diagram()
 result = hybrid.compute_trajectory(
     tf=TF_SIM,
     x0_plant=x0,
-    x0_computer=mpc_default_computer_x0(planner),
     plant_dt_inner=SIM_DT,
     compile_backend="jax",
 )

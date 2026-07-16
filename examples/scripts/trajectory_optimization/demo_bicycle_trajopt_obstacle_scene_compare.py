@@ -45,12 +45,7 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import inverse_barrier
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -280,14 +275,11 @@ def _solve_case(case: ModelCase, scene: Scene) -> SolveRun:
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=N_STEPS)
-        ),
-        options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
-            record_solve_time=True,
-            optimizer_options={"maxiter": 500, "ftol": 1e-1},
-        ),
+        n_steps=N_STEPS,
+        transcription="direct_collocation",
+        compile_backend="jax",
+        record_solve_time=True,
+        optimizer_options={"maxiter": 500, "ftol": 1e-1},
     )
 
     t0 = time.perf_counter()

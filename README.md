@@ -228,10 +228,6 @@ import numpy as np
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -250,9 +246,8 @@ problem = PlanningProblem(
 )
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(n_steps=50)
-    ),
+    n_steps=50,
+    transcription="direct_collocation",
 )
 traj = planner.solve().trajectory
 sys.animate(traj)

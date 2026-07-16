@@ -14,16 +14,17 @@ sequencing.
 | [vision.md](vision.md) | Locked end-goal contracts (Planner 2×2, `TrajectoryPlan`, `ModelPredictiveController`) |
 | [phases.md](phases.md) | E0–E8 order, gates, PR slices, start-here |
 | [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E8 done) |
-| [phase-F-cleanup.md](phase-F-cleanup.md) | Done: `control/mpc` → next [UI plan](../planning-ui-simplification.md) |
+| [phase-F-cleanup.md](phase-F-cleanup.md) | Done: `control/mpc` |
+| [../planning-ui-simplification.md](../planning-ui-simplification.md) | Done: flat planner constructors |
 
-**Active phase:** [planning-ui-simplification.md](../planning-ui-simplification.md)
+**Active phase:** none (MPC RH closing sequence complete). Pipeline B is a
+later feature.
 
-**Progress:** E0–E8 + Phase F (`control/mpc`) landed on `dev-mpc-v2`. Next:
-planning UI (constructor ceremony). Pipeline B remains a later feature.
+**Progress:** E0–E8 + Phase F + Planning UI landed on `dev-mpc-v2`.
 
 ## Related requirements (background only)
 
-- [../planning-ui-simplification.md](../planning-ui-simplification.md) — flat planner-family constructor UX (after Phase F)
+- [../planning-ui-simplification.md](../planning-ui-simplification.md) — flat planner-family constructor UX (**done**)
 - [../mpc-controller-architecture.md](../mpc-controller-architecture.md) — R1–R12, Option β
 - [../planning-pipeline-architecture.md](../planning-pipeline-architecture.md) — result wrappers / parametric NLP
 - [../standard-planning-problems.md](../standard-planning-problems.md) — problem taxonomy (stochastic out of scope)

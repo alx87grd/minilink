@@ -34,12 +34,7 @@ from minilink.planning.spatial.shaping import (
     quadratic_hinge,
 )
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -229,15 +224,12 @@ sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
 template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
 mpc_planner = TrajectoryOptimizationPlanner(
     template_problem,
-    transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(n_steps=MPC_STEPS)
-    ),
-    options=TrajectoryOptimizationOptions(
-        compile_backend="jax",
-        optimizer_method="scipy_slsqp",
-        record_solve_time=True,
-        optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
-    ),
+    n_steps=MPC_STEPS,
+    transcription="direct_collocation",
+    compile_backend="jax",
+    optimizer_method="scipy_slsqp",
+    record_solve_time=True,
+    optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
 )
 mpc = ModelPredictiveController(
     mpc_planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True

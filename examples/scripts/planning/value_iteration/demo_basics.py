@@ -22,10 +22,7 @@ from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 from minilink.planning.policy_synthesis import plotting
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
-    DynamicProgrammingOptions,
-    DynamicProgrammingPlanner,
-)
+from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
 from minilink.planning.problems import PlanningProblem
 
 MODE = "quadratic"  # "quadratic" | "minimum_time"
@@ -49,9 +46,11 @@ def run_quadratic_regulator():
     planner = DynamicProgrammingPlanner(
         problem,
         grid=grid,
-        options=DynamicProgrammingOptions(
-            alpha=1.0, tol=0.5, max_iterations=1000, out_of_bound_cost=inf, verbose=True
-        ),
+        alpha=1.0,
+        tol=0.5,
+        max_iterations=1000,
+        out_of_bound_cost=inf,
+        verbose=True,
     )
     result = planner.solve().policy
     planner.clean_infeasible_set()
@@ -100,9 +99,11 @@ def run_minimum_time():
     planner = DynamicProgrammingPlanner(
         problem,
         grid=grid,
-        options=DynamicProgrammingOptions(
-            alpha=1.0, tol=1e-3, max_iterations=800, out_of_bound_cost=inf, verbose=True
-        ),
+        alpha=1.0,
+        tol=1e-3,
+        max_iterations=800,
+        out_of_bound_cost=inf,
+        verbose=True,
     )
     result = planner.solve().policy
     planner.clean_infeasible_set()

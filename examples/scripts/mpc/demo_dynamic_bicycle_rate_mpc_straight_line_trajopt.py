@@ -25,12 +25,7 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -126,16 +121,13 @@ while t < TF_SIM - 1e-12:
         problem = PlanningProblem(sys=sys_mpc, x_start=x, cost=cost, tf=MPC_HORIZON)
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=MPC_STEPS)
-            ),
-            options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
-                solve_disp=False,
-                record_solve_time=True,
-                optimizer_method="scipy_slsqp",
-                optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
-            ),
+            n_steps=MPC_STEPS,
+            transcription="direct_collocation",
+            compile_backend="jax",
+            solve_disp=False,
+            record_solve_time=True,
+            optimizer_method="scipy_slsqp",
+            optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
         )
 
         # Shift previous horizon forward by one MPC tick; pin x[:, 0] to measured x.

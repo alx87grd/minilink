@@ -6,12 +6,7 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -47,14 +42,13 @@ problem = PlanningProblem(
 
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=DirectCollocationTranscription(DirectCollocationOptions(n_steps=40)),
-    options=TrajectoryOptimizationOptions(
-        compile_backend="jax",
-        optimizer_method="ipopt",
-        # optimizer_method="scipy_slsqp",
-        # optimizer_options={"maxiter": 500, "ftol": 1e-2},
-        solve_disp=PRINT_SOLVE_REPORT,
-    ),
+    n_steps=40,
+    transcription="direct_collocation",
+    compile_backend="jax",
+    optimizer_method="ipopt",
+    # optimizer_method="scipy_slsqp",
+    # optimizer_options={"maxiter": 500, "ftol": 1e-2},
+    solve_disp=PRINT_SOLVE_REPORT,
 )
 
 traj = planner.solve().trajectory

@@ -186,9 +186,10 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] **Phase F — MPC package home** — product System family in
   `control/mpc/` (`controller.py`, `utilities.py`, `viz.py`); hard-cut
   former `planning/mpc` (see `docs/plans/mpc-rh-refactor/phase-F-cleanup.md`).
-- [ ] **Planning UI simplification** — Simulator-style planner constructors
-  (flat kwargs / defaults for trajopt, then RRT/DP); teach `control.mpc`
-  paths. See `docs/plans/planning-ui-simplification.md`.
+- [x] **Planning UI simplification** — Simulator-style planner constructors
+  (flat kwargs for trajopt / RRT / DP); teach demos use `control.mpc` and
+  explicit `transcription="…"` without `*Options` imports. See
+  `docs/plans/planning-ui-simplification.md`.
 - [ ] **Scene params / online bind (pipeline B)** — *wanted later, not in the
   current RH closing sequence.* `ObstacleBank`, `J(z, p)` / `bind(p)`,
   indexed scene overrides (moving obstacles, scenario sweeps without NLP

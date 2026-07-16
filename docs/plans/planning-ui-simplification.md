@@ -1,7 +1,9 @@
 # Planning UI simplification
 
-Status: **draft plan** (July 2026). User architectural decisions **locked** for v1
-shape; implementation not started.
+Status: **done** (July 2026). Landed as one phase on `dev-mpc-v2` after Phase F:
+flat constructors for TOP / RRT / DP; five teach demos + README without
+`*Options` imports; validation gate green. Teach demos always pass
+`transcription="…"` explicitly; hybrid omits `x0_computer=` (MPC default `x0`).
 
 **Scope:** **Planner-family** construction ergonomics (trajopt, RRT, DP) aligned
 with Simulation / Optimizer patterns — not a change to the locked planning
@@ -12,8 +14,8 @@ contracts in [mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md).
 | Doc | Relationship |
 | --- | --- |
 | [mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md) | Contracts this plan must preserve |
-| [mpc-rh-refactor/phase-F-cleanup.md](mpc-rh-refactor/phase-F-cleanup.md) | Land `control/mpc` **before** this plan so demos teach final import paths |
-| [mpc-rh-refactor/](mpc-rh-refactor/) | MPC refactor E0–E8 done; closing sequence F → this UI plan |
+| [mpc-rh-refactor/phase-F-cleanup.md](mpc-rh-refactor/phase-F-cleanup.md) | Landed `control/mpc` before this plan |
+| [mpc-rh-refactor/](mpc-rh-refactor/) | MPC refactor E0–E8 + F + this UI plan |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Pipeline B / scene bind — later feature, orthogonal |
 
 Implemented contracts today: [DESIGN.md](../../DESIGN.md) §6,
@@ -431,15 +433,9 @@ machinery and documentation pattern; do not block MPC/trajopt on RRT/DP.
 
 ---
 
-## Suggested PR slicing
-
 | PR | Contents |
 | --- | --- |
-| PR-UI-A | UI-1 TOP constructor + tests |
-| PR-UI-B | UI-2 README / DESIGN / vision snippet |
-| PR-UI-C | UI-3 TOP helpers + optional demo touch-ups |
-| PR-UI-D | UI-5 RRT / RRT* flattening + tests |
-| PR-UI-E | UI-6 DP flattening + tests |
+| (landed) | One phase: API flatten + five teach demos + validation + exit docs |
 
 This document is the **source of truth** for planning UI simplification
 across the **planner family**. Constructor flattening takes precedence over

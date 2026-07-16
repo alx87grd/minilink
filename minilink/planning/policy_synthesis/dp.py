@@ -23,7 +23,7 @@ Three interchangeable backward-step engines share this workflow:
 """
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -44,6 +44,20 @@ from minilink.planning.results import PolicyPlan, SolveMetadata
 BACKEND_LOOP = "loop"
 
 # Public API
+
+_UNSET = object()
+
+_DP_OPTION_KEYS = (
+    "backend",
+    "alpha",
+    "tol",
+    "max_iterations",
+    "interpolation",
+    "out_of_bound_cost",
+    "final_time",
+    "record_history",
+    "verbose",
+)
 
 
 @dataclass
@@ -92,6 +106,20 @@ class DynamicProgrammingOptions:
     final_time: float = 0.0
     record_history: bool = False
     verbose: bool = False
+
+
+def _merge_dp_options(
+    options: DynamicProgrammingOptions | None,
+    **flat,
+) -> DynamicProgrammingOptions:
+    base = DynamicProgrammingOptions() if options is None else options
+    updates = {key: value for key, value in flat.items() if value is not _UNSET}
+    unknown = sorted(k for k in updates if k not in _DP_OPTION_KEYS)
+    if unknown:
+        raise ValueError(f"Unknown DynamicProgrammingPlanner kwargs: {unknown}.")
+    if not updates:
+        return base
+    return replace(base, **updates)
 
 
 @dataclass
@@ -171,11 +199,31 @@ class DynamicProgrammingPlanner(Planner):
         *,
         grid: StateSpaceGrid,
         options: DynamicProgrammingOptions | None = None,
+        backend=_UNSET,
+        alpha=_UNSET,
+        tol=_UNSET,
+        max_iterations=_UNSET,
+        interpolation=_UNSET,
+        out_of_bound_cost=_UNSET,
+        final_time=_UNSET,
+        record_history=_UNSET,
+        verbose=_UNSET,
     ) -> None:
         super().__init__(problem)
         self.require_cost()
         self.grid = grid
-        self.options = DynamicProgrammingOptions() if options is None else options
+        self.options = _merge_dp_options(
+            options,
+            backend=backend,
+            alpha=alpha,
+            tol=tol,
+            max_iterations=max_iterations,
+            interpolation=interpolation,
+            out_of_bound_cost=out_of_bound_cost,
+            final_time=final_time,
+            record_history=record_history,
+            verbose=verbose,
+        )
         if self.options.backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
             raise ValueError(f"Unknown backend {self.options.backend!r}")
         self._G = None  # running-cost table, cached when the grid is precomputed

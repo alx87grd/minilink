@@ -34,6 +34,24 @@ from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
 )
 
+_UNSET = object()
+
+_TRAJOPT_OPTION_KEYS = (
+    "compile_backend",
+    "initial_guess",
+    "warm_start",
+    "optimizer_method",
+    "optimizer_options",
+    "use_hessian",
+    "record_history",
+    "callback",
+    "record_solve_time",
+    "solve_disp",
+    "step_disp",
+)
+
+_TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
+
 
 @dataclass(frozen=True)
 class TrajectoryOptimizationIteration:
@@ -103,13 +121,58 @@ class TrajectoryOptimizationPlanner(Planner):
         self,
         problem: PlanningProblem,
         *,
-        transcription: Transcription,
+        transcription: Transcription | str | None = None,
+        n_steps: int | None = None,
         options: TrajectoryOptimizationOptions | None = None,
+        compile_backend=_UNSET,
+        initial_guess=_UNSET,
+        warm_start=_UNSET,
+        optimizer_method=_UNSET,
+        optimizer_options=_UNSET,
+        use_hessian=_UNSET,
+        record_history=_UNSET,
+        callback=_UNSET,
+        record_solve_time=_UNSET,
+        solve_disp=_UNSET,
+        step_disp=_UNSET,
     ) -> None:
+        """
+        Parameters
+        ----------
+        problem : PlanningProblem
+            Continuous-time planning task (requires a cost).
+        transcription : Transcription or str, optional
+            Discretization method. ``None`` defaults to direct collocation.
+            String presets: ``\"direct_collocation\"``, ``\"multiple_shooting\"``.
+            Teach demos should pass the string explicitly.
+        n_steps : int, optional
+            Knot count when ``transcription`` is omitted or a string preset.
+            Required in those cases; ignored when a ``Transcription`` instance
+            already carries its grid (must not conflict if also passed).
+        options : TrajectoryOptimizationOptions, optional
+            Tier-2 workflow bag. Flat kwargs below overlay matching fields.
+        compile_backend, initial_guess, warm_start, optimizer_method,
+        optimizer_options, use_hessian, record_history, callback,
+        record_solve_time, solve_disp, step_disp
+            Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
+        """
         super().__init__(problem)
         self.require_cost()
-        self.transcription = transcription
-        self.options = TrajectoryOptimizationOptions() if options is None else options
+        self.transcription = _resolve_transcription(transcription, n_steps)
+        self.options = _merge_trajopt_options(
+            options,
+            compile_backend=compile_backend,
+            initial_guess=initial_guess,
+            warm_start=warm_start,
+            optimizer_method=optimizer_method,
+            optimizer_options=optimizer_options,
+            use_hessian=use_hessian,
+            record_history=record_history,
+            callback=callback,
+            record_solve_time=record_solve_time,
+            solve_disp=solve_disp,
+            step_disp=step_disp,
+        )
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
         self.last_optimization_result: OptimizationResult | None = None
@@ -629,6 +692,65 @@ class TrajectoryOptimizationPlanner(Planner):
 
 # Reserved online keys for pipeline B (ObstacleBank / J(z, p)); not bound yet.
 _DEFERRED_ONLINE_PARAM_KEYS = frozenset({"scene"})
+
+
+def _resolve_transcription(
+    transcription: Transcription | str | None,
+    n_steps: int | None,
+) -> Transcription:
+    """Resolve string / default / instance transcription for TOP."""
+    if isinstance(transcription, Transcription):
+        if n_steps is not None:
+            existing = getattr(getattr(transcription, "options", None), "n_steps", None)
+            if existing is not None and int(existing) != int(n_steps):
+                raise ValueError(
+                    f"n_steps={n_steps} conflicts with transcription.options.n_steps="
+                    f"{existing}."
+                )
+        return transcription
+
+    if n_steps is None:
+        raise ValueError(
+            "n_steps is required when transcription is omitted or a string preset."
+        )
+    n_steps = int(n_steps)
+    if n_steps < 2:
+        raise ValueError(f"n_steps must be >= 2; got {n_steps}.")
+
+    name = "direct_collocation" if transcription is None else str(transcription)
+    if name == "direct_collocation":
+        from minilink.planning.trajectory_optimization.direct_collocation import (
+            DirectCollocationOptions,
+            DirectCollocationTranscription,
+        )
+
+        return DirectCollocationTranscription(DirectCollocationOptions(n_steps=n_steps))
+    if name == "multiple_shooting":
+        from minilink.planning.trajectory_optimization.multiple_shooting import (
+            MultipleShootingOptions,
+            MultipleShootingTranscription,
+        )
+
+        return MultipleShootingTranscription(MultipleShootingOptions(n_steps=n_steps))
+    raise ValueError(
+        f"Unknown transcription {name!r}. Use one of {_TRANSCRIPTION_PRESETS}, "
+        "None (default direct_collocation), or a Transcription instance."
+    )
+
+
+def _merge_trajopt_options(
+    options: TrajectoryOptimizationOptions | None,
+    **flat,
+) -> TrajectoryOptimizationOptions:
+    """Build options from optional bag + flat kwargs (flats win)."""
+    base = TrajectoryOptimizationOptions() if options is None else options
+    updates = {key: value for key, value in flat.items() if value is not _UNSET}
+    unknown = sorted(k for k in updates if k not in _TRAJOPT_OPTION_KEYS)
+    if unknown:
+        raise ValueError(f"Unknown TrajectoryOptimizationPlanner kwargs: {unknown}.")
+    if not updates:
+        return base
+    return replace(base, **updates)
 
 
 def reject_unknown_online_params(params) -> None:

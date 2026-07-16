@@ -76,6 +76,13 @@ name `RecedingHorizonController` is retired. No second product alias
 ## Aim UX
 
 ```python
+planner = TrajectoryOptimizationPlanner(
+    problem,
+    n_steps=20,
+    transcription="direct_collocation",
+    compile_backend="jax",
+    optimizer_options={"maxiter": 50, "ftol": 1.0},
+)
 plan = planner.solve()
 mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
 hybrid = mpc @ plant
@@ -83,6 +90,9 @@ hybrid.compute_trajectory(tf=10.0)
 
 cmd = mpc.compute_command(y)
 ```
+
+Tier-2 still accepts `transcription=<Transcription>` and
+`options=TrajectoryOptimizationOptions(...)`.
 
 ---
 
@@ -94,7 +104,7 @@ Owns: `sys`, `X`/`U`/`X0`/`Xf`, `x_start`/`x_goal`, `cost`, **`tf`**
 | Quantity | Home |
 | --- | --- |
 | Continuous \(T\) | `PlanningProblem.tf` only — `None` unset, `+inf` infinite-horizon, or finite |
-| Knot count \(N\) | Transcription options (`n_steps`) only — **no** options `tf` |
+| Knot count \(N\) | `TrajectoryOptimizationPlanner` (`n_steps` kwarg / transcription grid) |
 | Replan period | `ModelPredictiveController.dt_mpc` |
 | Sim length | Simulator / hybrid `tf` (different object) |
 

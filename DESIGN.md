@@ -523,7 +523,12 @@ require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 family).
 
 **Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
-`TrajectoryPlan`. Offline `solve_trajectory` always rebuilds a fresh
+`TrajectoryPlan`. **I-level constructors** take flat kwargs
+(`n_steps=…`, `transcription="direct_collocation"`, `compile_backend=…`,
+`optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
+`transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
+and/or `options=TrajectoryOptimizationOptions(...)`. Offline
+`solve_trajectory` always rebuilds a fresh
 `MathematicalProgram`. Optional `compile_parametric_program()` builds a
 `ParametricMathematicalProgram` (``h(z, x0)``) once so
 `solve_trajectory_from(x0, params=None)` is bind + solve only (receding-horizon /
@@ -531,7 +536,8 @@ MPC path); without compile, from-solves rebuild with a one-time speed warning.
 Online ``params`` is an x0-only façade today (`None`/`{}`); reserved key
 ``scene`` raises ``NotImplementedError`` until pipeline B extends the parametric
 tier to ``J(z, p)`` (see ROADMAP scene params). Knot count
-`n_steps` lives on transcription options; the time grid is
+`n_steps` is a planner flat kwarg (or lives on a custom transcription's
+options); the time grid is
 `linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (compiled evaluator, trace tier when
@@ -540,6 +546,11 @@ evaluator `f` / `f_trace`). `compile_backend="direct"` calls `system.f`
 uncompiled (escape hatch). A `MathematicalProgram` carries the native backend of
 its callables in its `backend` field, and the `Optimizer` compiles with it by
 default.
+
+**RRT / DP:** same two-tier idea — flat routine knobs on
+`RRTPlanner` / `RRTStarPlanner` / `DynamicProgrammingPlanner`, with
+`options=` as the advanced escape. Keep fundamental seams explicit
+(`extender`, `StateSpaceGrid`).
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*

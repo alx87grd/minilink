@@ -74,7 +74,8 @@ dual-rate.
 (constructor ceremony). Pipeline B stays a wanted later feature outside this
 sequence.
 
-**Next:** [planning-ui-simplification.md](../planning-ui-simplification.md).
+**Next:** MPC RH closing sequence complete. Pipeline B remains a later feature
+([planning-pipeline-architecture.md](../planning-pipeline-architecture.md)).
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
 demos set finite `tf=` for trajopt/MPC); transcription options carry
@@ -106,7 +107,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-E | E5 | after remaining demos/tests on controller | landed |
 | PR-F+ | E6–E8 | phase gates | E6–E8 landed |
 | PR-F-hygiene | Phase F — expand card, then land | F gate | landed |
-| PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | UI-1+ gates | next |
+| PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | constructor + teach demos | landed |
 
 ## Start here
 
@@ -120,4 +121,4 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 8. **E7** — done slim ([phase-E7.md](phase-E7.md)); pipeline B out of sequence.
 9. **E8** — done ([phase-E8.md](phase-E8.md)).
 10. **F** — done ([phase-F-cleanup.md](phase-F-cleanup.md)).
-11. **UI** — [planning-ui-simplification.md](../planning-ui-simplification.md).
+11. **UI** — done ([planning-ui-simplification.md](../planning-ui-simplification.md)).
