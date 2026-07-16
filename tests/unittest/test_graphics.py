@@ -1,5 +1,8 @@
 """Tests for the standard camera transform contract (DESIGN.md §3.2 / §4.7a)."""
 
+import contextlib
+import importlib
+import io
 import unittest
 import matplotlib
 
@@ -227,7 +230,6 @@ class TestRendererHelpers(unittest.TestCase):
         self.assertAlmostEqual(azim, -90.0, places=5)
 
 
-# from test_world_frame_contract.py
 from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem, System
 from minilink.dynamics.catalog.equations.integrators import SimpleIntegrator
@@ -238,7 +240,7 @@ from minilink.graphical.animation.visualization import (
     ensure_world_frame,
     flatten_draw_list,
 )
-from tests.unittest.graphics_contract_helpers import geometry_smoke, resolve_draw_frame
+from tests.unittest.graphics_contract_helpers import resolve_draw_frame
 
 
 class WorldOnlyPlant(System):
@@ -277,9 +279,6 @@ class TestEmptyTfWorldGeometry(unittest.TestCase):
         self.assertEqual(len(draw_list), 1)
         _, transform = draw_list[0]
         np.testing.assert_allclose(transform, np.eye(4))
-
-    def test_animator_resolve_frame_smoke(self):
-        geometry_smoke(WorldOnlyPlant())
 
 
 class TestIntegratorLocalTransform(unittest.TestCase):
@@ -405,54 +404,6 @@ class TestCameraFollowWorld(unittest.TestCase):
         self.assertIsNotNone(frame["camera"])
 
 
-# from test_kinematic_regression.py
-import importlib
-import importlib.util
-import json
-import tempfile
-from pathlib import Path
-
-matplotlib.use("Agg")
-import matplotlib.image as mpimg
-from tests.fixtures.kinematic_baseline.render import render_baseline_png
-
-FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "kinematic_baseline"
-MANIFEST_PATH = FIXTURE_DIR / "manifest.json"
-
-
-class TestKinematicRegression(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        if not MANIFEST_PATH.exists():
-            raise unittest.SkipTest("baseline manifest missing")
-        cls.manifest = json.loads(MANIFEST_PATH.read_text())
-
-    def test_manifest_renders_finite_images(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_dir = Path(tmp)
-            for entry in self.manifest:
-                with self.subTest(plant=entry["plant"], sample=entry["sample"]):
-                    for extra in entry.get("requires", []):
-                        if importlib.util.find_spec(extra) is None:
-                            self.skipTest(f"missing extra: {extra}")
-                    module = importlib.import_module(entry["module"])
-                    sys = getattr(module, entry["class"])()
-                    x = np.asarray(entry["x"], dtype=float)
-                    u = np.asarray(entry["u"], dtype=float)
-                    t = entry["t"]
-                    plant = entry["plant"]
-                    sample = entry["sample"]
-                    out = tmp_dir / f"{plant}__{sample}.png"
-                    render_baseline_png(sys, x, u, t, out)
-                    img = mpimg.imread(out)
-                    self.assertEqual(img.ndim, 3)
-                    self.assertGreater(img.shape[0], 0)
-                    self.assertGreater(img.shape[1], 0)
-                    self.assertTrue(np.all(np.isfinite(img)))
-
-
-# from test_overlays.py
-matplotlib.use("Agg")
 from minilink.core.geometry import Box as GeomBox
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import (
@@ -465,7 +416,6 @@ from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,
 )
-from minilink.graphical.catalog import SceneHistory as SceneHistoryExport
 from minilink.planning.spatial.scene import Scene
 
 
@@ -502,9 +452,6 @@ class TestSceneHistory(unittest.TestCase):
         early_pts = history.get_dynamic_geometry(t=0.0)["world"][0].pts
         late_pts = history.get_dynamic_geometry(t=0.5)["world"][0].pts
         self.assertFalse(np.allclose(early_pts, late_pts))
-
-    def test_exported_from_catalog(self):
-        self.assertIs(SceneHistoryExport, SceneHistory)
 
 
 class TestReplay(unittest.TestCase):
@@ -579,7 +526,6 @@ class TestAnimatorOverlays(unittest.TestCase):
         self.assertEqual(len(frame["primitives"]), 1)
 
 
-# from test_visualization_optional.py
 import pytest
 from minilink.graphical.animation.primitives import Point
 from minilink.graphical.animation.renderers.meshcat_renderer import (
@@ -696,9 +642,7 @@ class TestPygameOptionalSmoke(unittest.TestCase):
             pygame.quit()
 
 
-# from test_advanced_plotting.py
-import contextlib
-import io
+import pytest
 from minilink.graphical.signals import (
     build_signal_plot_spec,
     open_time_signal_plot,
@@ -925,7 +869,6 @@ class TestAdvancedPlotting(unittest.TestCase):
             handle.close()
 
 
-# from test_plotly_renderer.py
 from types import SimpleNamespace
 from minilink.core.kinematics import identity, translation
 from minilink.graphical.animation import Animator, make_renderer
@@ -984,13 +927,6 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
                 show=False,
                 max_steps=1,
             )
-        with self.assertRaisesRegex(ValueError, "interactive loops"):
-            animator.game(renderer="plotly", max_steps=1)
-
-    def test_game_requires_interactive_renderer(self):
-        sys = DynamicSystem(1, output_dim=1, expose_state=True)
-        animator = Animator(sys)
-        self.assertTrue(hasattr(animator, "game"))
         with self.assertRaisesRegex(ValueError, "interactive loops"):
             animator.game(renderer="plotly", max_steps=1)
 

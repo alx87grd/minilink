@@ -172,7 +172,6 @@ class TestCatalogSmoke(unittest.TestCase):
                 _geometry_smoke(system)
 
 
-# from test_catalog_plant_contracts.py
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.graphical.animation.camera import resolve_camera_from_hints
@@ -271,7 +270,6 @@ class TestDynamicBicycle(unittest.TestCase):
         geometry_smoke(sys, x, np.array([10.0, 0.1]), 0.0)
 
 
-# from test_manipulators.py
 from minilink.dynamics.abstraction.manipulator import Manipulator
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkPlanarManipulator,
@@ -397,7 +395,6 @@ class TestManipulatorCatalog(unittest.TestCase):
         )
 
 
-# from test_dynamic_bicycle_uy.py
 import pytest
 
 pytest.importorskip("jax")

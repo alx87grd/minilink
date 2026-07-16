@@ -273,7 +273,6 @@ class TestModelPredictiveController(unittest.TestCase):
             self.assertEqual(mock_solve.call_count, 1)
 
 
-# from test_mpc_algebraic_controller.py
 from unittest.mock import patch
 
 pytest.importorskip("jax")
@@ -358,7 +357,6 @@ class TestMPCAlgebraicController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
 
 
-# from test_mpc_warm_start_controller.py
 pytest.importorskip("jax")
 from minilink.control.mpc.utilities import _shift_plan_trajectory, mpc_warm_start_guess
 from minilink.core.system import DynamicSystem, StepSystem
@@ -465,7 +463,6 @@ class TestMPCWarmStartController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
 
 
-# from test_mpc_planner.py
 pytest.importorskip("jax")
 from minilink.core.system import DynamicSystem
 
@@ -537,7 +534,6 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         self.assertIs(planner.last_trajectory_plan, plan)
 
 
-# from test_mpc_solve_trajectory_from.py
 pytest.importorskip("jax")
 from minilink.planning.initial_guess import default_initial_trajectory
 
@@ -645,7 +641,6 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         self.assertIsNotNone(plan.warm_state)
 
 
-# from test_mpc_export_computer.py
 pytest.importorskip("jax")
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputsUY,
@@ -719,7 +714,6 @@ class TestMpcExportComputer(unittest.TestCase):
         self.assertIsInstance(hybrid, HybridDiagram)
 
 
-# from test_mpc_numpy_rebuild.py
 import warnings
 from minilink.control.mpc import ModelPredictiveController, mpc_default_computer_x0
 from minilink.planning.trajectory_optimization.planner import (
@@ -851,7 +845,6 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(len(n_compile_parametric), 0)
 
 
-# from test_mpc_hybrid_straight_line.py
 pytest.importorskip("jax")
 from minilink.control.mpc import (
     ModelPredictiveController,
@@ -966,7 +959,6 @@ class TestMpcHybridStraightLine(unittest.TestCase):
         self.assertEqual(type(overlays[0]).__name__, "SceneHistory")
 
 
-# from test_mpc_hybrid_warm_start_parity.py
 pytest.importorskip("jax")
 from minilink.blocks.routing import Demux
 from minilink.control.mpc.utilities import mpc_default_computer_x0, mpc_warm_start_guess
@@ -1089,7 +1081,6 @@ class TestMpcHybridWarmStartParity(unittest.TestCase):
             )
 
 
-# from test_mpc_hybrid_demo_parity.py
 pytest.importorskip("jax")
 from minilink.control.mpc.utilities import (
     mpc_default_computer_x0,

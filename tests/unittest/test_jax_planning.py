@@ -178,7 +178,6 @@ class TestJaxDirectCollocation(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(x).reshape(-1), np.linspace(0.0, 1.0, 5))
 
 
-# from test_jax_kinematic_bicycle.py
 pytest.importorskip("jax")
 from minilink.dynamics.catalog.vehicles.steering import (
     JaxKinematicBicycle,

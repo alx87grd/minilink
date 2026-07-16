@@ -251,7 +251,6 @@ class TestLQR(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.01)
 
 
-# from test_control_linear.py
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
 from minilink.control.output import ProportionalController
 from minilink.control.siso import FilteredController
@@ -384,7 +383,6 @@ class TestFilteredControllerMIMO(unittest.TestCase):
         )
 
 
-# from test_modal.py
 import os
 from minilink.analysis.linearize import linearize
 from minilink.analysis.modal import animate_modal, modal_analysis
@@ -490,7 +488,6 @@ class TestModalAPI(unittest.TestCase):
             modal_analysis(Pendulum(), x_bar=[0.0, 0.0], linearization="fd")
 
 
-# from test_frequency.py
 from minilink.analysis.frequency import bode, pzmap
 from minilink.graphical.common import PlotResult
 
@@ -709,7 +706,6 @@ def test_plot_pzmap_facade_returns_plot_result():
     plt.close(result.figure)
 
 
-# from test_phase_plane.py
 import matplotlib
 
 matplotlib.use("Agg")
@@ -831,7 +827,6 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="plotly", show=False)
 
 
-# from test_discretize.py
 from minilink.analysis.discretize import discretize
 
 
@@ -933,7 +928,6 @@ class TestDiscretize(unittest.TestCase):
             discretize(ProportionalController(1.0), dt=0.01)
 
 
-# from test_state_space_system.py
 from minilink.dynamics.abstraction.state_space import LTISystem, StateSpaceSystem
 
 

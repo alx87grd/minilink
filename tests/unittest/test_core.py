@@ -89,7 +89,6 @@ class TestCoreComponents(unittest.TestCase):
         np.testing.assert_array_equal(y, [2.0, 3.0])
 
 
-# from test_composition.py
 from minilink.blocks.basic import Integrator
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.impedance import ImpedanceController
@@ -280,7 +279,6 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
             closed_loop(ImpedanceController(), AugmentedMechanicalPlant(), feedback="y")
 
 
-# from test_standard_feedback.py
 from minilink.core.composition import closed_loop, resolve_standard_feedback
 
 
@@ -314,7 +312,6 @@ class TestStandardFeedback(unittest.TestCase):
         self.assertEqual(wiring.control_out, "u_ff")
 
 
-# from test_system_evolution_maps.py
 from minilink.blocks.routing import Gain
 from minilink.core.system import System
 

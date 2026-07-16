@@ -52,7 +52,6 @@ class TestStepSystem(unittest.TestCase):
             StepSystem(0)
 
 
-# from test_step_diagram.py
 from minilink.blocks.basic import Integrator
 from minilink.blocks.routing import Gain
 from minilink.core.backends import array_module
@@ -152,7 +151,6 @@ class TestStepDiagram(unittest.TestCase):
             x = x_ev
 
 
-# from test_step_diagram_topology.py
 from minilink.graphical.diagrams import build_diagram_topology
 from minilink.graphical.diagrams.dot import block_html
 
@@ -193,7 +191,6 @@ class TestStepDiagramTopology(unittest.TestCase):
         self.assertIn("Step:", html)
 
 
-# from test_step_diagram_rollout.py
 from minilink.control.output import ProportionalController
 
 
@@ -276,7 +273,6 @@ class TestStepDiagramRollout(unittest.TestCase):
         np.testing.assert_allclose(x, rollout.x[:, -1], rtol=1e-10, atol=1e-10)
 
 
-# from test_step_rollout.py
 import pytest
 from minilink.core.compile.evaluators.step_rollout import gather_u
 from minilink.core.compile.execution_plan import (
@@ -423,7 +419,6 @@ class TestStepRolloutJax(unittest.TestCase):
         np.testing.assert_allclose(rollout.x, ref.x, atol=1e-05)
 
 
-# from test_step_diagram_jax.py
 from minilink.core.compile.evaluators.jax_evaluators import JaxStepDiagramEvaluator
 
 try:
@@ -465,7 +460,6 @@ class TestStepDiagramJax(unittest.TestCase):
         np.testing.assert_allclose(rollout.x, ref.x, rtol=1e-10, atol=1e-10)
 
 
-# from test_facades_rollout.py
 class Counter(StepSystem):
     def __init__(self):
         super().__init__(n=1)

@@ -91,7 +91,6 @@ class TestBlocks(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(out["y"]), [6.0])
 
 
-# from test_signal_blocks.py
 from minilink.blocks.filters import LowPassFilter, NotchFilter, Washout
 from minilink.blocks.nonlinear import DeadZone, Relay, Saturation
 from minilink.blocks.routing import Demux, Gain, Mux, Sum
@@ -198,7 +197,6 @@ class TestTrajectorySource(unittest.TestCase):
         np.testing.assert_allclose(src.h(np.array([]), np.array([]), 0.5), [1.0])
 
 
-# from test_signal_colors.py
 from minilink.graphical.signals.signal_colors import (
     INPUT_COLOR,
     INTERNAL_SIGNAL_COLORS,
@@ -259,7 +257,6 @@ class TestSignalColors(unittest.TestCase):
         self.assertEqual(plotly_color("tab:orange"), "#ff7f0e")
 
 
-# from test_sources_white_noise.py
 from minilink.blocks.sources import WhiteNoise
 
 
@@ -321,7 +318,6 @@ class TestWhiteNoiseSource(unittest.TestCase):
         self.assertNotEqual(y_at_minus_five, y_left_clamped)
 
 
-# from test_neural_blocks.py
 from minilink.blocks.neural import NeuralNetwork
 
 

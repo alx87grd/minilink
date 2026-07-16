@@ -148,7 +148,6 @@ class TestJaxMechanicalInheritance(unittest.TestCase):
         self.assertEqual(a.state.labels, b.state.labels)
 
 
-# from test_generalized_mechanical.py
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
 )
@@ -272,7 +271,6 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
         )
 
 
-# from test_mechanical_jax.py
 pytest.importorskip("jax")
 import jax
 import jax.numpy as jnp
@@ -406,7 +404,6 @@ class TestMechanicalSystemJax(unittest.TestCase):
         np.testing.assert_allclose(dx_jx, np_sys.f(x, u), rtol=1e-09, atol=1e-09)
 
 
-# from test_manipulator.py
 from minilink.dynamics.abstraction.manipulator import Manipulator
 
 
@@ -450,7 +447,6 @@ class TestManipulator(unittest.TestCase):
         np.testing.assert_allclose(sys.h_pdot(x, u), np.array([1.0, 3.0]))
 
 
-# from test_robotic.py
 from minilink.blocks.sources import Source
 from minilink.control.robotic import (
     JointImpedance,
@@ -595,7 +591,6 @@ class TestRoboticWrappers(unittest.TestCase):
         )
 
 
-# from test_inverse_kinematics.py
 from minilink.dynamics.catalog.manipulators.arms import (
     OneLinkManipulator,
     TwoLinkManipulator,
@@ -636,7 +631,6 @@ class TestInverseKinematics(unittest.TestCase):
         self.assertGreater(np.linalg.norm(q_a - q_b), 0.1)
 
 
-# from test_modelbased.py
 from minilink.blocks.sources import Step
 from minilink.control.modelbased import ComputedTorqueController, SlidingModeController
 from minilink.core.composition import closed_loop_qdq

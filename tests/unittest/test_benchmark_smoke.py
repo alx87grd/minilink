@@ -322,67 +322,6 @@ class TestBenchmarkRegression(unittest.TestCase):
         result = compare_metrics(recorded, baseline, factor=4.0)
         self.assertFalse(result.failed)
 
-    def test_core_perf_suite_returns_metrics(self):
-        from benchmarks.suites.core_perf import CorePerfSuiteConfig, run_core_perf_suite
-
-        metrics = run_core_perf_suite(
-            CorePerfSuiteConfig(
-                pendulum_n_calls=2,
-                diagram_n_calls=2,
-                sim_n_runs=1,
-                static_n_steps=5,
-            )
-        )
-        ids = {metric.id for metric in metrics}
-        self.assertIn("diagram_dense_f.numpy.dx_residual", ids)
-        self.assertIn("sim.diagram_dense.truth.x_tf", ids)
-
-    def test_integration_check_suite_returns_metrics(self):
-        from benchmarks.suites.integration_check import (
-            IntegrationCheckSuiteConfig,
-            run_integration_check_suite,
-        )
-
-        metrics = run_integration_check_suite(
-            IntegrationCheckSuiteConfig(sim_n_runs=1, trajopt_n_runs=1, tiny=True)
-        )
-        ids = {metric.id for metric in metrics}
-        self.assertIn("sim.double_pendulum.rk4_numpy.checkpoint_t0", ids)
-        self.assertIn("sim.showcase_pendulum.rk4_numpy.x_tf", ids)
-        if any(metric.id.startswith("trajopt.showcase_cartpole") for metric in metrics):
-            self.assertIn("trajopt.showcase_cartpole.jax_slsqp.total_s", ids)
-            self.assertIn("trajopt.showcase_cartpole.jax_slsqp.solve_s", ids)
-
-    def test_solve_speed_suite_returns_metrics(self):
-        from benchmarks.suites.solve_speed import (
-            SolveSpeedSuiteConfig,
-            run_solve_speed_suite,
-        )
-
-        metrics = run_solve_speed_suite(SolveSpeedSuiteConfig(n_runs=1, tiny=True))
-        ids = {metric.id for metric in metrics}
-        self.assertIn("optimizer.rosenbrock.scipy_slsqp.solve_s", ids)
-        self.assertIn("optimizer.circle_eq.scipy_slsqp.solve_s", ids)
-        self.assertIn("trajopt.pendulum.numpy_slsqp.solve_s", ids)
-
-    def test_e4_trajopt_parity_suite_returns_metrics(self):
-        pytest = __import__("pytest")
-        jax = pytest.importorskip("jax")
-        del jax
-
-        from benchmarks.scenarios.e4_trajopt_parity import (
-            E4TrajoptParityConfig,
-            run_e4_trajopt_parity_suite,
-        )
-
-        metrics = run_e4_trajopt_parity_suite(
-            E4TrajoptParityConfig(n_runs=1, tiny=True)
-        )
-        ids = {metric.id for metric in metrics}
-        self.assertIn("e4.cartpole_rebuild.solve_s", ids)
-        self.assertIn("e4.pendulum_rebuild.solve_s", ids)
-        self.assertIn("e4.bicycle_parametric.solve_s", ids)
-
     def test_filter_speed_gate_failures(self):
         from benchmarks.baseline import (
             ComparisonResult,

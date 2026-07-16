@@ -78,7 +78,6 @@ class TestHybridBoundaryConnect(unittest.TestCase):
         self.assertEqual(hybrid.plant.n, 1)
 
 
-# from test_hybrid_closed_loop.py
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.core.hybrid_diagram import HybridDiagram
 
@@ -123,7 +122,6 @@ class TestHybridClosedLoop(unittest.TestCase):
         self.assertIn("plant", hybrid.plant.subsystems)
 
 
-# from test_hybrid_simulator.py
 from minilink.core.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.hybrid_simulator import HybridSimulator
@@ -257,7 +255,6 @@ class TestHybridSimulator(unittest.TestCase):
         self.assertEqual(hybrid.plant.camera_scale, 9.0)
 
 
-# from test_hybrid_topology.py
 from minilink.core.backends import array_module
 from minilink.core.system import StepSystem
 from minilink.graphical.diagrams.hybrid_topology import (
@@ -447,7 +444,6 @@ class TestHybridTopology(unittest.TestCase):
         self.assertIn("dt_base=0.01", source)
 
 
-# from test_hybrid_multi_rate.py
 def _reference(k):
     return np.array([1.0 if k < 60 else 0.0])
 
@@ -498,7 +494,6 @@ class TestHybridMultiRate(unittest.TestCase):
         )
 
 
-# from test_hybrid_fine_recording.py
 from minilink.control.modelbased import SlidingModeController
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
@@ -524,7 +519,6 @@ class TestHybridFineRecording(unittest.TestCase):
         np.testing.assert_allclose(result.plant.t[-1], tick_end, rtol=1e-09)
 
 
-# from test_smc_hybrid.py
 def _build_hybrid_smc_hybrid(*, ts=0.05):
     plant = Pendulum(length=1.0, mass=1.0)
     plant.x0 = np.array([2.5, -0.2])

@@ -58,10 +58,8 @@ many near-duplicate files.
 `test_flagship_graphics_contract`. Re-merge helper:
 `scripts/merge_l1_tests.py`.
 
-Deep dynamics checks for a few representative plants
-live in `test_dynamics_catalog.py`; broad catalog smoke in L6
-(`run_catalog_smokes.py`); kinematic render smoke in `test_graphics.py`
-(manifest under `tests/fixtures/kinematic_baseline/`).
+Kinematic render smoke (L4): ``run_flagship_graphics.py`` and manifest under
+``tests/fixtures/kinematic_baseline/``.
 Regenerate manifest: `python tests/fixtures/kinematic_baseline/regenerate_manifest.py`.
 
 Shared fixtures: `graphics_contract_helpers.py` (draw-list resolution),

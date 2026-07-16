@@ -385,7 +385,7 @@ def _process_section(
     text = _apply_renames(text, renames)
 
     if marker:
-        return f"\n# from {marker}\n{text}"
+        return f"\n{text}"
     return text + "\n"
 
 

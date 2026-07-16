@@ -561,7 +561,6 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
             self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, None)
 
 
-# from test_compile_static.py
 from minilink.blocks.routing import Gain
 from minilink.core.compile.compiler import compile
 from minilink.core.compile.evaluators.evaluators import DynamicsEvaluator
@@ -608,7 +607,6 @@ class TestCompileStaticJax(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(out_jx["y"]), out_np["y"], atol=1e-05)
 
 
-# from test_compile_step_leaf.py
 from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepEvaluator
 from minilink.core.system import StepSystem
 
@@ -640,7 +638,6 @@ class TestCompileStepLeaf(unittest.TestCase):
         )
 
 
-# from test_evaluator_api.py
 try:
     import jax.numpy as jnp
 
@@ -703,7 +700,6 @@ class TestEvaluatorApiJax(unittest.TestCase):
         )
 
 
-# from test_evaluator_tiers.py
 from minilink.core.compile.evaluators.tiers import TRACE_TIER_MSG
 
 try:
@@ -856,7 +852,6 @@ class TestStepEvaluatorTiersJax(unittest.TestCase):
         self.assertIs(JaxStepEvaluator.step_jit, JaxStepEvaluator.step)
 
 
-# from test_mathematical_program_evaluators.py
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import MathematicalProgram
 

@@ -55,7 +55,6 @@ def test_simulator_re_exports_compile_backend_auto():
     assert sim.COMPILE_BACKEND_AUTO == BACKEND_AUTO
 
 
-# from test_backend_native_math_helpers.py
 import numpy as np
 from minilink.core.costs import QuadraticCost
 from minilink.core.sets import (

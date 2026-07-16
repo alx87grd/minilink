@@ -511,7 +511,6 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertIs(transcription.guesses[1], first)
 
 
-# from test_planning_ui_constructors.py
 import pytest
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
 from minilink.planning.policy_synthesis.dp import (
@@ -719,7 +718,6 @@ class TestHybridDefaultComputerX0(unittest.TestCase):
         )
 
 
-# from test_rrt.py
 from minilink.core.sets import BallSet, BoxSet
 from minilink.dynamics.catalog.vehicles.steering import KinematicBicycle
 from minilink.planning.search.edge import Edge
@@ -1339,7 +1337,6 @@ def test_record_history_for_animation():
     assert all((frame.tree_edges for frame in planner.history[1:]))
 
 
-# from test_spatial.py
 from dataclasses import dataclass
 from minilink.core.backends import array_module
 from minilink.core.geometry import Sphere
@@ -1751,7 +1748,6 @@ def test_plot_cost_field_exports_smoke(tmp_path):
     assert (tmp_path / "combined_3d.png").exists()
 
 
-# from test_reference_paths.py
 import os
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.spatial.collision import bind, disc, point_probe
@@ -1865,7 +1861,6 @@ def test_plot_track_smoke():
     assert len(ax.lines) >= 1
 
 
-# from test_dynamic_programming.py
 from minilink.core.costs import QuadraticCost, TimeCost
 from minilink.core.diagram import DiagramSystem
 from minilink.planning.policy_synthesis.dp import (

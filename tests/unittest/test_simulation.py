@@ -370,7 +370,6 @@ class TestEulerSolverModes(unittest.TestCase):
         self.assertEqual(traj.x.shape, (1, 3))
 
 
-# from test_static_simulator.py
 from minilink.blocks.routing import Gain
 from minilink.blocks.sources import Step
 from minilink.simulation.static_simulator import StaticSimulator
@@ -423,7 +422,6 @@ class TestStaticSimulatorJax(unittest.TestCase):
         self.assertIn("y", traj.signals)
 
 
-# from test_discontinuous_solvers.py
 from minilink.control.modelbased import SlidingModeController
 from minilink.core.composition import closed_loop_qdq
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
@@ -513,7 +511,6 @@ class TestDiscontinuousSolvers(unittest.TestCase):
         _integrate(self.diagram, solver="scipy_stiff", tf=0.5)
 
 
-# from test_integrate_zoh.py
 from minilink.blocks.basic import Integrator
 
 
@@ -570,7 +567,6 @@ class TestIntegrateZoh(unittest.TestCase):
             evaluator.integrate_zoh(np.array([0.0]), np.array([1.0]), 0.0, 0.0)
 
 
-# from test_computer.py
 from minilink.core.compile.evaluators.step_rollout import gather_u
 from minilink.core.diagram import StepDiagramSystem
 from minilink.core.system import StepSystem, System
@@ -767,7 +763,6 @@ class TestComputer(unittest.TestCase):
             computer.tick(np.array([1.0]))
 
 
-# from test_as_computer.py
 from minilink.control.output import ProportionalController
 from minilink.simulation.computer import Computer, StepSchedule, as_computer
 

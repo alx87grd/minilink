@@ -96,7 +96,6 @@ class TestDiagrams(unittest.TestCase):
         return diagram
 
 
-# from test_wiring_mixin.py
 import numpy as np
 from minilink.core.compile.compiler import check_algebraic_loops
 from minilink.core.system import System
@@ -227,7 +226,6 @@ class TestWiringMixin(unittest.TestCase):
         np.testing.assert_allclose(x_comp, x_ref, atol=1e-10)
 
 
-# from test_facades_split.py
 from minilink.blocks.routing import Gain
 from minilink.core.compile.evaluators.numpy_evaluators import (
     NumpyDiagramEvaluator,

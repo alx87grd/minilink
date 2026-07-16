@@ -83,7 +83,6 @@ class TestPhysicsSystemMinilink(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(dx_cmp), np.asarray(dx_raw), atol=1e-07)
 
 
-# from test_contact_engine_jax.py
 pytest.importorskip("jax")
 import jax
 from minilink.dynamics.engines.contact_jax import (
@@ -149,7 +148,6 @@ class TestPhysicsEngineJax(unittest.TestCase):
         jax.make_jaxpr(lambda xx, uu: world_ode(world, xx, uu))(x, u)
 
 
-# from test_ancf_tire_jax.py
 pytest.importorskip("jax")
 from minilink.dynamics.engines.ancf_tire_jax import (
     ANCFTireSystem,

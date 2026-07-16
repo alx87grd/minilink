@@ -117,7 +117,6 @@ def test_jax_twin_cost_grad():
     assert np.asarray(gradient).shape == (2,)
 
 
-# from test_optimizer.py
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.optimization.optimizer import Optimizer
 

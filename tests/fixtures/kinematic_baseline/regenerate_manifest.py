@@ -1,7 +1,7 @@
 """Regenerate ``manifest.json`` after extending the kinematic render-smoke plant set.
 
 Writes PNGs locally (gitignored) for optional visual review. Only the manifest
-is committed; CI uses ``test_kinematic_regression`` render smoke, not pixels.
+is committed; CI uses ``run_flagship_graphics.py`` (L4 smoke), not pixels.
 
 Plant list: ``minilink.dynamics.catalog.smoke_registry.KINEMATIC_RENDER_PLANTS``.
 
