@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "suite": "e4_trajopt_parity",
-  "description": "E4 trajopt parity: cartpole/pendulum TOP rebuild + bicycle MPCPlanner parametric.",
+  "description": "E4 trajopt parity: cartpole/pendulum TOP rebuild + bicycle TOP parametric from-solve.",
   "regression_factor": 4.0,
   "recorded_at": "2026-07-15",
   "host_hint": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
@@ -191,7 +191,7 @@
       "direction": "lower_better",
       "value": 23.964517546186073,
       "unit": "cost",
-      "notes": "JaxDynamicBicycleRateInputs MPCPlanner.solve_trajectory_from, tf=1.0, n_steps=8, jax+slsqp"
+      "notes": "JaxDynamicBicycleRateInputs TrajectoryOptimizationPlanner.solve_trajectory_from, tf=1.0, n_steps=8, jax+slsqp"
     },
     {
       "id": "e4.bicycle_parametric.solve_s",

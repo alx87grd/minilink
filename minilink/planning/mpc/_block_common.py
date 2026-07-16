@@ -63,9 +63,9 @@ def export_mpc_to_computer(
     """
     Build a :class:`~minilink.simulation.computer.Computer` from an MPC block.
 
-    Warm-start :class:`~minilink.planning.mpc.step_block.MPCStatefulController` defaults
-    ``schedule`` from ``dt_mpc`` on the block. Stateless
-    :class:`~minilink.planning.mpc.controller.MPCStatelessController` requires ``schedule``.
+    Warm-start blocks (``ModelPredictiveController(..., warm_start=True)``)
+    default ``schedule`` from ``dt_mpc``. Algebraic (``warm_start=False``)
+    blocks require an explicit ``schedule``.
     """
     from minilink.simulation.computer import StepSchedule, as_computer
 
@@ -73,8 +73,8 @@ def export_mpc_to_computer(
     if schedule is None:
         if block_dt is None:
             raise ValueError(
-                "schedule is required for stateless MPCStatelessController; "
-                "pass export_to_computer(MPC_DT) or use mpc % MPC_DT"
+                "schedule is required for algebraic ModelPredictiveController "
+                "(warm_start=False); pass export_to_computer(dt_mpc) or use mpc % dt"
             )
         schedule = StepSchedule(dt_base=float(block_dt))
     elif block_dt is not None:
