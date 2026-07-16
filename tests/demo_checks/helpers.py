@@ -1,4 +1,4 @@
-"""Shared helpers for L6 smoke runners (catalog, demos, graphics)."""
+"""Shared helpers for demo-check runners (catalog, demos, graphics)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ def configure_headless() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
 
 
-def f_smoke(system) -> None:
+def check_dynamics_f(system) -> None:
     """One ``f`` evaluation at ``x0`` with finite output."""
     x = np.asarray(system.x0, dtype=float)
     if x.shape != (system.n,):
@@ -28,7 +28,7 @@ def f_smoke(system) -> None:
         raise ValueError(f"{system.name}: f returned non-finite values")
 
 
-def geometry_smoke(system, x=None, u=None, t=0.0) -> None:
+def check_geometry_frame(system, x=None, u=None, t=0.0) -> None:
     """Resolve one kinematic frame; transforms must be finite 4×4."""
     x = np.asarray(system.x0 if x is None else x, dtype=float)
     if x.shape != (system.n,):
@@ -45,8 +45,8 @@ def geometry_smoke(system, x=None, u=None, t=0.0) -> None:
             raise ValueError(f"{system.name}: invalid transform matrix")
 
 
-def short_sim_smoke(system, *, tf: float = 0.03, dt: float = 0.01) -> None:
-    """Three-step Euler integration smoke (continuous plants only)."""
+def check_short_simulation(system, *, tf: float = 0.03, dt: float = 0.01) -> None:
+    """Three-step Euler integration (continuous plants only)."""
     from minilink.simulation.simulator import Simulator
 
     x0 = np.asarray(system.x0, dtype=float)
@@ -58,8 +58,8 @@ def short_sim_smoke(system, *, tf: float = 0.03, dt: float = 0.01) -> None:
         raise ValueError(f"{system.name}: simulation state non-finite")
 
 
-def smoke_catalog_plant(system, *, fast: bool) -> None:
-    f_smoke(system)
-    geometry_smoke(system)
+def check_catalog_plant(system, *, fast: bool) -> None:
+    check_dynamics_f(system)
+    check_geometry_frame(system)
     if not fast:
-        short_sim_smoke(system)
+        check_short_simulation(system)

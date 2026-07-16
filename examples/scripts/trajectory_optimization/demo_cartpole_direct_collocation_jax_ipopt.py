@@ -60,7 +60,7 @@ def _build_planner(
 
 
 def run_smoke(*, n_steps: int = 8, maxiter: int = 30) -> None:
-    """Headless L6 smoke: small JAX direct-collocation solve."""
+    """Headless demo check: small JAX direct-collocation solve."""
     planner = _build_planner(n_steps=n_steps, maxiter=maxiter, solve_disp=False)
     result = planner.solve()
     if not result.metadata.success:

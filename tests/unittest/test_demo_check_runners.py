@@ -1,4 +1,4 @@
-"""L6 smoke runner subprocess tests (catalog + flagship demos)."""
+"""Demo-check runner subprocess tests (catalog + flagship demos)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-class TestSmokeRunners(unittest.TestCase):
+class TestDemoCheckRunners(unittest.TestCase):
     def _run(self, script: str, *args: str) -> subprocess.CompletedProcess[str]:
         path = REPO_ROOT / script
         env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
@@ -24,19 +24,19 @@ class TestSmokeRunners(unittest.TestCase):
             check=False,
         )
 
-    def test_catalog_smokes_fast_exit_zero(self):
+    def test_catalog_checks_fast_exit_zero(self):
         proc = self._run(
-            "tests/smoke/run_catalog_smokes.py",
+            "tests/demo_checks/run_catalog_checks.py",
             "--fast",
         )
         if proc.returncode != 0:
             self.fail(
-                f"catalog smokes failed (exit {proc.returncode})\n"
+                f"catalog checks failed (exit {proc.returncode})\n"
                 f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
             )
 
     def test_flagship_demos_exit_zero(self):
-        proc = self._run("tests/smoke/run_flagship_demos.py")
+        proc = self._run("tests/demo_checks/run_flagship_demos.py")
         if proc.returncode != 0:
             self.fail(
                 f"flagship demos failed (exit {proc.returncode})\n"
@@ -44,7 +44,7 @@ class TestSmokeRunners(unittest.TestCase):
             )
 
     def test_flagship_graphics_exit_zero(self):
-        proc = self._run("tests/smoke/run_flagship_graphics.py")
+        proc = self._run("tests/demo_checks/run_flagship_graphics.py")
         if proc.returncode != 0:
             self.fail(
                 f"flagship graphics failed (exit {proc.returncode})\n"

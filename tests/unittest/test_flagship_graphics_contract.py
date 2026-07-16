@@ -1,4 +1,4 @@
-"""G0 flagship graphics draw-list contract (Layer L4).
+"""G0 flagship graphics draw-list contract.
 
 Each manifest entry maps a README-tier demo to a canonical plant pose. Asserts
 finite kinematic transforms and expected primitive counts — no pixel I/O.

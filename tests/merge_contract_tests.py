@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""L1 pytest consolidation: merge domain test modules with in-file deduplication."""
+"""Contract-test consolidation: merge domain test modules with in-file deduplication."""
 
 from __future__ import annotations
 

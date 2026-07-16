@@ -95,7 +95,7 @@ Demos: flat under `examples/scripts/`, runnable from repo root.
 
 **Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points) — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
 
-GitHub **CI** (`.github/workflows/test.yml`) runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (L2). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+GitHub **CI** (`.github/workflows/test.yml`) runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (regression gates). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
 
 **Always before push** (fast; mirrors CI `test` job):
 
@@ -114,11 +114,11 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Docs/markdown only | skip pytest |
 | Narrow module + tests already updated | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or before handoff/push | `pytest` |
-| Compile backend, simulator, or trajopt changes (big review pass) | L2: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Compile backend, simulator, or trajopt changes (big review pass) | Regression gates: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 
-L2 full command and CI `regression` job flags: [tests/README.md#entry-points](tests/README.md#entry-points).
+Regression gates full command and CI `regression` job flags: [tests/README.md#entry-points](tests/README.md#entry-points).
 
-Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for pygame smoke; `sphinx-build` only when editing `docs/` (separate Docs workflow).
+Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for headless pygame; `sphinx-build` only when editing `docs/` (separate Docs workflow).
 
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
 
@@ -126,7 +126,7 @@ Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for py
 
 Use conda env **`minilink`** from [environment.yml](environment.yml); setup in [README.md#install](README.md#install) (`PYTHONPATH` = repo root). **Test entry points:** [tests/README.md#entry-points](tests/README.md#entry-points).
 
-After substantial changes: `pytest` (proportionate to risk), ruff on touched Python, smoke scripts when user-facing. JAX twin plants: nominal + nontrivial parameter test. Headless: `MPLBACKEND=Agg`; full suite notes in [tests/README.md](tests/README.md).
+After substantial changes: `pytest` (proportionate to risk), ruff on touched Python, demo-check scripts when user-facing. JAX twin plants: nominal + nontrivial parameter test. Headless: `MPLBACKEND=Agg`; full suite notes in [tests/README.md](tests/README.md).
 
 **Big review pass** (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes): run the committed regression baselines before handoff:
 
@@ -146,5 +146,5 @@ Final pass after substantial changes — smaller, clearer diff:
 4. Fold or update examples; runnable from repo root.
 5. Sync README (user API), DESIGN (contracts), ROADMAP (maturity if changed).
 6. Tests for new behavior; benchmarks only when performance claims matter.
-7. Verify: **pre-push gate** (ruff + pytest per table above); headless graphics smoke when relevant.
+7. Verify: **pre-push gate** (ruff + pytest per table above); headless graphics checks when relevant.
 8. Handoff: clean `git status`, short summary of changes and verification; run ruff before push if committing.

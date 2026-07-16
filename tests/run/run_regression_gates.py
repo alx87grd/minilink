@@ -1,4 +1,4 @@
-"""L2 — regression (accuracy goldens + backend solve-speed gates).
+"""Regression gates — accuracy goldens + backend solve-speed gates.
 
 **Human (IDE):** open this file and click **Run**.
 

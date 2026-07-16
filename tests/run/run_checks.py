@@ -4,15 +4,15 @@
 
 | CHECK | What |
 | --- | --- |
-| ``l1`` | L1 pytest (daily default) |
-| ``l1_minimal`` | L1 without optional extras |
-| ``l1_headless`` | L1 with headless pygame |
+| ``contract_tests`` | Contract tests via pytest (daily default) |
+| ``contract_tests_minimal`` | Contract tests without optional extras |
+| ``contract_tests_headless`` | Contract tests with headless pygame |
 | ``pre_push`` | ruff + pytest (CI test job) |
-| ``l2`` | L2 regression (full local) |
-| ``l2_ci`` | L2 regression (CI flags) |
-| ``l6`` | L6 catalog + flagship smokes |
-| ``l3_list`` | L3 benchmark preset list |
-| ``l3_f_eval`` | L3 native/NumPy/JAX f() on pendulum |
+| ``regression_gates`` | Regression gates (full local) |
+| ``regression_gates_ci`` | Regression gates (CI flags) |
+| ``demo_checks`` | Catalog + flagship demo checks |
+| ``benchmark_study_list`` | Benchmark study preset list |
+| ``benchmark_study_f_eval`` | Benchmark study: native/NumPy/JAX f() on pendulum |
 """
 
 from __future__ import annotations
@@ -28,16 +28,16 @@ for path in (_ROOT, _CHECKS):
 
 import _common  # noqa: E402
 
-CHECK = "l1"
+CHECK = "contract_tests"
 
 
 def main() -> int:
     match CHECK:
-        case "l1":
+        case "contract_tests":
             return _common.run_pytest()
-        case "l1_minimal":
+        case "contract_tests_minimal":
             return _common.run_pytest(marker="not optional")
-        case "l1_headless":
+        case "contract_tests_headless":
             return _common.run_pytest(headless_pygame=True)
         case "pre_push":
             for step in (_common.run_ruff_check, _common.run_ruff_format_check):
@@ -45,21 +45,23 @@ def main() -> int:
                 if code != 0:
                     return code
             return _common.run_pytest()
-        case "l2":
+        case "regression_gates":
             return _common.run_regression(ci_mode=False)
-        case "l2_ci":
+        case "regression_gates_ci":
             return _common.run_regression(ci_mode=True)
-        case "l6":
-            code = _common.run_smoke_script(
-                "tests/smoke/run_catalog_smokes.py",
+        case "demo_checks":
+            code = _common.run_demo_check_script(
+                "tests/demo_checks/run_catalog_checks.py",
                 ["--fast"],
             )
             if code != 0:
                 return code
-            return _common.run_smoke_script("tests/smoke/run_flagship_demos.py")
-        case "l3_list":
+            return _common.run_demo_check_script(
+                "tests/demo_checks/run_flagship_demos.py"
+            )
+        case "benchmark_study_list":
             return _common.run_study_script(["--list"])
-        case "l3_f_eval":
+        case "benchmark_study_f_eval":
             return _common.run_study_script(
                 ["--preset", "f_eval", "--plant", "pendulum"]
             )

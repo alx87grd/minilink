@@ -12,7 +12,7 @@ from minilink.simulation.simulator import Simulator
 
 
 def run_smoke(*, tf: float = 0.5, show: bool = False) -> None:
-    """Headless L6 smoke: matplotlib native vs non-native one frame each."""
+    """Headless demo check: matplotlib native vs non-native one frame each."""
     sys = Pendulum()
     sys.x0[0] = 2.0
     traj = Simulator(sys, t0=0.0, tf=tf).solve()

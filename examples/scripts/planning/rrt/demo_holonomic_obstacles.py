@@ -257,7 +257,7 @@ def run_extender_comparison():
 
 
 def run_smoke(*, seed: int = 0, max_nodes: int = 500) -> None:
-    """Headless L6 smoke: one RRT solve on the holonomic obstacle scene."""
+    """Headless demo check: one RRT solve on the holonomic obstacle scene."""
     _, scene, _, problem = make_holonomic_problem()
     del scene
     extender = make_steering_extender(max_distance=0.6, resolution=0.05)

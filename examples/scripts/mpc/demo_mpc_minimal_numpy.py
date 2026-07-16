@@ -73,7 +73,7 @@ def _build_hybrid(*, maxiter: int, step_disp: bool):
 
 
 def run_smoke(*, tf: float = 0.5) -> None:
-    """Headless L6 smoke: short NumPy-rebuild MPC rollout."""
+    """Headless demo check: short NumPy-rebuild MPC rollout."""
     hybrid, x0 = _build_hybrid(maxiter=40, step_disp=False)
     hybrid.compute_trajectory(
         tf=tf,

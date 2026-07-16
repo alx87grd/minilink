@@ -1,4 +1,4 @@
-"""L6 — catalog + flagship demo smokes (scripts must not throw).
+"""Demo checks — catalog plants + flagship demos must not throw.
 
 **Human (IDE):** open this file and click **Run**.
 """
@@ -21,13 +21,13 @@ CATALOG_FAST = True  # False → full catalog sweep (slower)
 
 def main() -> int:
     catalog_args = ["--fast"] if CATALOG_FAST else []
-    code = _common.run_smoke_script(
-        "tests/smoke/run_catalog_smokes.py",
+    code = _common.run_demo_check_script(
+        "tests/demo_checks/run_catalog_checks.py",
         catalog_args,
     )
     if code != 0:
         return code
-    return _common.run_smoke_script("tests/smoke/run_flagship_demos.py")
+    return _common.run_demo_check_script("tests/demo_checks/run_flagship_demos.py")
 
 
 if __name__ == "__main__":

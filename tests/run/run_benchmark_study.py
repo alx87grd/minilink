@@ -1,8 +1,8 @@
-"""L3 — backend/computer performance exploration (tables, not CI gates).
+"""Benchmark study — backend/computer performance exploration (tables, not CI gates).
 
 **Human (IDE):** open this file, set ``PRESET`` below, click **Run**.
 
-For pass/fail performance gates use ``run_l2_regression.py`` instead.
+For pass/fail performance gates use ``run_regression_gates.py`` instead.
 """
 
 from __future__ import annotations

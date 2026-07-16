@@ -1,6 +1,6 @@
-"""Catalog plant registry for L6 smoke runners and kinematic render manifests.
+"""Catalog plant registry for demo-check runners and kinematic render manifests.
 
-Single source of truth for which catalog classes get headless smoke coverage.
+Single source of truth for which catalog classes get headless demo-check coverage.
 Import factories only — no matplotlib or simulator imports here.
 """
 
@@ -76,8 +76,8 @@ PlantFactory = Callable[[], Any]
 
 
 @dataclass(frozen=True)
-class CatalogSmokeEntry:
-    """One catalog class exercised by L6 smokes."""
+class CatalogCheckEntry:
+    """One catalog class exercised by catalog demo checks."""
 
     id: str
     factory: PlantFactory
@@ -94,75 +94,75 @@ class KinematicRenderPlant:
     requires: tuple[str, ...] = ()
 
 
-CATALOG_SMOKE_ENTRIES: tuple[CatalogSmokeEntry, ...] = (
-    CatalogSmokeEntry("SimpleIntegrator", SimpleIntegrator),
-    CatalogSmokeEntry("DoubleIntegrator", DoubleIntegrator),
-    CatalogSmokeEntry("TripleIntegrator", TripleIntegrator),
-    CatalogSmokeEntry("VanderPol", lambda: VanderPol(mu=0.5)),
-    CatalogSmokeEntry(
+CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
+    CatalogCheckEntry("SimpleIntegrator", SimpleIntegrator),
+    CatalogCheckEntry("DoubleIntegrator", DoubleIntegrator),
+    CatalogCheckEntry("TripleIntegrator", TripleIntegrator),
+    CatalogCheckEntry("VanderPol", lambda: VanderPol(mu=0.5)),
+    CatalogCheckEntry(
         "TransferFunction",
         lambda: TransferFunction([1.0], [1.0, 1.0]),
     ),
-    CatalogSmokeEntry("SingleMass", SingleMass),
-    CatalogSmokeEntry("TwoMass", TwoMass),
-    CatalogSmokeEntry("ThreeMass", ThreeMass),
-    CatalogSmokeEntry("FloatingSingleMass", FloatingSingleMass),
-    CatalogSmokeEntry("FloatingTwoMass", FloatingTwoMass),
-    CatalogSmokeEntry("FloatingThreeMass", FloatingThreeMass),
-    CatalogSmokeEntry("Pendulum", Pendulum),
-    CatalogSmokeEntry("InvertedPendulum", InvertedPendulum),
-    CatalogSmokeEntry("TwoIndependentPendulums", TwoIndependentPendulums),
-    CatalogSmokeEntry("Acrobot", Acrobot),
-    CatalogSmokeEntry("RotatingCartPole", RotatingCartPole),
-    CatalogSmokeEntry("UnderactuatedRotatingCartPole", UnderactuatedRotatingCartPole),
-    CatalogSmokeEntry("CartPole", CartPole),
-    CatalogSmokeEntry("KinematicBicycle", KinematicBicycle),
-    CatalogSmokeEntry("JaxKinematicBicycle", JaxKinematicBicycle, requires_jax=True),
-    CatalogSmokeEntry(
+    CatalogCheckEntry("SingleMass", SingleMass),
+    CatalogCheckEntry("TwoMass", TwoMass),
+    CatalogCheckEntry("ThreeMass", ThreeMass),
+    CatalogCheckEntry("FloatingSingleMass", FloatingSingleMass),
+    CatalogCheckEntry("FloatingTwoMass", FloatingTwoMass),
+    CatalogCheckEntry("FloatingThreeMass", FloatingThreeMass),
+    CatalogCheckEntry("Pendulum", Pendulum),
+    CatalogCheckEntry("InvertedPendulum", InvertedPendulum),
+    CatalogCheckEntry("TwoIndependentPendulums", TwoIndependentPendulums),
+    CatalogCheckEntry("Acrobot", Acrobot),
+    CatalogCheckEntry("RotatingCartPole", RotatingCartPole),
+    CatalogCheckEntry("UnderactuatedRotatingCartPole", UnderactuatedRotatingCartPole),
+    CatalogCheckEntry("CartPole", CartPole),
+    CatalogCheckEntry("KinematicBicycle", KinematicBicycle),
+    CatalogCheckEntry("JaxKinematicBicycle", JaxKinematicBicycle, requires_jax=True),
+    CatalogCheckEntry(
         "JaxKinematicBicycleRateInputs",
         JaxKinematicBicycleRateInputs,
         requires_jax=True,
     ),
-    CatalogSmokeEntry("KinematicCar", KinematicCar),
-    CatalogSmokeEntry("ConstantSpeedKinematicCar", ConstantSpeedKinematicCar),
-    CatalogSmokeEntry("HolonomicMobileRobot", HolonomicMobileRobot),
-    CatalogSmokeEntry("DynamicHolonomicMobileRobot", DynamicHolonomicMobileRobot),
-    CatalogSmokeEntry(
+    CatalogCheckEntry("KinematicCar", KinematicCar),
+    CatalogCheckEntry("ConstantSpeedKinematicCar", ConstantSpeedKinematicCar),
+    CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),
+    CatalogCheckEntry("DynamicHolonomicMobileRobot", DynamicHolonomicMobileRobot),
+    CatalogCheckEntry(
         "JaxHolonomicMobileRobot", JaxHolonomicMobileRobot, requires_jax=True
     ),
-    CatalogSmokeEntry(
+    CatalogCheckEntry(
         "JaxDynamicHolonomicMobileRobot",
         JaxDynamicHolonomicMobileRobot,
         requires_jax=True,
     ),
-    CatalogSmokeEntry("HolonomicMobileRobot3D", HolonomicMobileRobot3D),
-    CatalogSmokeEntry("UdeSRacecar", UdeSRacecar),
-    CatalogSmokeEntry(
+    CatalogCheckEntry("HolonomicMobileRobot3D", HolonomicMobileRobot3D),
+    CatalogCheckEntry("UdeSRacecar", UdeSRacecar),
+    CatalogCheckEntry(
         "LongitudinalFrontWheelDriveCarWithWheelSlipInput",
         LongitudinalFrontWheelDriveCarWithWheelSlipInput,
     ),
-    CatalogSmokeEntry(
+    CatalogCheckEntry(
         "LongitudinalFrontWheelDriveCarWithTorqueInput",
         LongitudinalFrontWheelDriveCarWithTorqueInput,
     ),
-    CatalogSmokeEntry("QuarterCarOnRoughTerrain", QuarterCarOnRoughTerrain),
-    CatalogSmokeEntry("MountainCar", MountainCar),
-    CatalogSmokeEntry("Drone2D", Drone2D),
-    CatalogSmokeEntry("Drone2DWithSideThruster", Drone2DWithSideThruster),
-    CatalogSmokeEntry("SpeedControlledDrone2D", SpeedControlledDrone2D),
-    CatalogSmokeEntry("ConstantSpeedHelicopterTunnel", ConstantSpeedHelicopterTunnel),
-    CatalogSmokeEntry("Rocket", Rocket),
-    CatalogSmokeEntry("Plane2D", Plane2D),
-    CatalogSmokeEntry("Boat2D", Boat2D),
-    CatalogSmokeEntry("Boat2DWithCurrent", Boat2DWithCurrent),
-    CatalogSmokeEntry(
+    CatalogCheckEntry("QuarterCarOnRoughTerrain", QuarterCarOnRoughTerrain),
+    CatalogCheckEntry("MountainCar", MountainCar),
+    CatalogCheckEntry("Drone2D", Drone2D),
+    CatalogCheckEntry("Drone2DWithSideThruster", Drone2DWithSideThruster),
+    CatalogCheckEntry("SpeedControlledDrone2D", SpeedControlledDrone2D),
+    CatalogCheckEntry("ConstantSpeedHelicopterTunnel", ConstantSpeedHelicopterTunnel),
+    CatalogCheckEntry("Rocket", Rocket),
+    CatalogCheckEntry("Plane2D", Plane2D),
+    CatalogCheckEntry("Boat2D", Boat2D),
+    CatalogCheckEntry("Boat2DWithCurrent", Boat2DWithCurrent),
+    CatalogCheckEntry(
         "SpeedControlledManipulator",
         lambda: SpeedControlledManipulator(2, 2),
     ),
-    CatalogSmokeEntry("OneLinkManipulator", OneLinkManipulator),
-    CatalogSmokeEntry("TwoLinkManipulator", TwoLinkManipulator),
-    CatalogSmokeEntry("ThreeLinkManipulator3D", ThreeLinkManipulator3D),
-    CatalogSmokeEntry("FiveLinkPlanarManipulator", FiveLinkPlanarManipulator),
+    CatalogCheckEntry("OneLinkManipulator", OneLinkManipulator),
+    CatalogCheckEntry("TwoLinkManipulator", TwoLinkManipulator),
+    CatalogCheckEntry("ThreeLinkManipulator3D", ThreeLinkManipulator3D),
+    CatalogCheckEntry("FiveLinkPlanarManipulator", FiveLinkPlanarManipulator),
 )
 
 _VEHICLES = "minilink.dynamics.catalog.vehicles"

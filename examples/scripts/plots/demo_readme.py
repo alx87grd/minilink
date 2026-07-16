@@ -10,7 +10,7 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
 def run_smoke(*, tf: float = 1.0, show: bool = False) -> None:
-    """Headless L6 smoke: impedance pendulum only."""
+    """Headless demo check: impedance pendulum only."""
     controller = ImpedanceController()
     plant = Pendulum()
     plant.x0[0] = 2.0

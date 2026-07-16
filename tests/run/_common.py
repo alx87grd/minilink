@@ -72,6 +72,6 @@ def run_study_script(args: list[str]) -> int:
     return run_command(cmd)
 
 
-def run_smoke_script(relative_path: str, args: list[str] | None = None) -> int:
+def run_demo_check_script(relative_path: str, args: list[str] | None = None) -> int:
     cmd = [sys.executable, str(REPO_ROOT / relative_path), *(args or [])]
     return run_command(cmd)

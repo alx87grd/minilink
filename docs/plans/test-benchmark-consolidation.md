@@ -1,31 +1,33 @@
 # Test & benchmark consolidation plan
 
-Status: **Complete** — L1–L6 vision landed; optional G1 perceptual PNG hash remains a nightly/local enhancement only.
+Status: **Complete** — six-layer vision landed; optional G1 perceptual PNG hash remains a nightly/local enhancement only.
+
+**Current names** (see [tests/README.md](../../tests/README.md#entry-points)): contract tests · regression gates · benchmark study · graphics contract · graphics visual · demo checks. Paths: `tests/demo_checks/`, `tests/run/run_contract_tests.py`, etc.
 
 ---
 
 ## Testing vision (authoritative)
 
 Six layers, bottom to top. **Unit tests belong to library modules (`minilink/`).**
-Demo and catalog scripts are **smoke-run only** (L6), not duplicated in pytest.
+Demo and catalog scripts are **demo-check only** (not duplicated in pytest).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  L6  Smoke runners     catalog + demo scripts — must not throw         │
+│  Demo checks           catalog + demo scripts — must not throw         │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  L5  Graphics visual   you look: Meshcat, Matplotlib, Plotly live      │
+│  Graphics visual       you look: Meshcat, Matplotlib, Plotly live      │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  L4  Graphics auto     agent/CI: runs, saves PNG, finite draw-lists    │
+│  Graphics contract     agent/CI: runs, saves PNG, finite draw-lists    │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  L3  Benchmark utility new machine / GPU — tables, not CI gates        │
+│  Benchmark study       new machine / GPU — tables, not CI gates        │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  L2  Regression        accuracy JSON goldens + guarded compute time      │
+│  Regression gates      accuracy JSON goldens + guarded compute time      │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  L1  Contracts         pytest: API types, shapes, compile/sim behavior   │
+│  Contract tests        pytest: API types, shapes, compile/sim behavior   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Layer 1 — Contracts (pytest, `tests/unittest/`)
+### Contract tests (pytest, `tests/unittest/`)
 
 **Purpose:** Core library correctness without running demos. “This function returns
 the right type/shape; this public API honors DESIGN.”

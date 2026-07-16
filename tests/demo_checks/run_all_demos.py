@@ -1,10 +1,10 @@
-"""Run all example scripts as subprocess smokes (L6 nightly / local sweep).
+"""Run all example scripts as subprocess demo checks (nightly / local sweep).
 
 Usage (from repo root)::
 
-    python tests/smoke/run_all_demos.py --help
-    python tests/smoke/run_all_demos.py --timeout 60 --continue-on-error
-    python tests/smoke/run_all_demos.py --flagship-only
+    python tests/demo_checks/run_all_demos.py --help
+    python tests/demo_checks/run_all_demos.py --timeout 60 --continue-on-error
+    python tests/demo_checks/run_all_demos.py --flagship-only
 """
 
 from __future__ import annotations
@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SMOKE_DIR = Path(__file__).resolve().parent
+CHECKS_DIR = Path(__file__).resolve().parent
 SCRIPTS_ROOT = REPO_ROOT / "examples" / "scripts"
-FLAGSHIP_MANIFEST = SMOKE_DIR / "flagship_manifest.json"
+FLAGSHIP_MANIFEST = CHECKS_DIR / "flagship_manifest.json"
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class DemoRunRow:
 def _discover_scripts() -> list[Path]:
     paths: list[Path] = []
     for path in sorted(SCRIPTS_ROOT.rglob("*.py")):
-        if path.is_relative_to(SMOKE_DIR):
+        if path.is_relative_to(CHECKS_DIR):
             continue
         paths.append(path)
     return paths
@@ -97,7 +97,7 @@ def _print_report(rows: list[DemoRunRow]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Subprocess smoke all example scripts (L6)"
+        description="Subprocess demo checks for all example scripts"
     )
     parser.add_argument(
         "--timeout",

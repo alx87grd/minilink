@@ -429,7 +429,7 @@ def build_cascade_diagram():
 
 
 def run_smoke(*, tf: float = 1.0, show: bool = False) -> None:
-    """Headless L6 smoke: short cascade bicycle trajectory."""
+    """Headless demo check: short cascade bicycle trajectory."""
     diagram = build_cascade_diagram()
     diagram.compute_trajectory(tf=tf, dt=0.02, show=show, verbose=False)
 

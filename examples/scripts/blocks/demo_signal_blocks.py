@@ -74,7 +74,7 @@ step.params["step_time"] = 2.0
 
 
 def run_smoke(*, tf: float = 2.0, show: bool = False) -> None:
-    """Headless L6 smoke: step-driven parallel signal block diagram."""
+    """Headless demo check: step-driven parallel signal block diagram."""
     run_demo(step, name="Signal blocks (parallel, step)", tf=tf, plot_diagram=False)
     t = np.linspace(0.0, tf, max(int(tf / 0.01) + 1, 3))
     sine = TrajectorySource(t, np.sin(2.0 * np.pi * 0.5 * t))

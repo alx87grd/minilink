@@ -1,4 +1,4 @@
-"""Smoke tests that benchmark helpers import and return structured results.
+"""Import guards that benchmark helpers load and return structured results.
 
 Benchmarks measure performance, not correctness; these tests only guard the
 repo-root ``benchmarks/`` package against import and API drift.

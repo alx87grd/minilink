@@ -1,12 +1,12 @@
-"""Interactive graphics visual check (L5) — run locally, confirm with your eyes.
+"""Interactive graphics visual check — run locally, confirm with your eyes.
 
 This script is **not** for CI. It launches or prints commands for the main
 graphics output channels so you can verify Meshcat, Matplotlib, and Plotly.
 
 Usage (from repo root)::
 
-    python tests/smoke/run_graphics_visual_check.py
-    python tests/smoke/run_graphics_visual_check.py --run-headless
+    python tests/demo_checks/run_graphics_visual_check.py
+    python tests/demo_checks/run_graphics_visual_check.py --run-headless
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ CHECKS = (
         "Matplotlib kinematic (catalog manifest PNGs)",
         [
             sys.executable,
-            "tests/smoke/run_flagship_graphics.py",
+            "tests/demo_checks/run_flagship_graphics.py",
             "--out",
-            "artifacts/gfx-smoke",
+            "artifacts/gfx-check",
         ],
     ),
     (
@@ -61,15 +61,15 @@ def _resolve_cmd(cmd: list[str]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="L5 graphics visual checklist (local)")
+    parser = argparse.ArgumentParser(description="Graphics visual checklist (local)")
     parser.add_argument(
         "--run-headless",
         action="store_true",
-        help="Run L4 kinematic PNG smoke only (no interactive prompt)",
+        help="Run headless kinematic PNG check only (no interactive prompt)",
     )
     args = parser.parse_args(argv)
 
-    print("Minilink L5 graphics visual check")
+    print("Minilink graphics visual check")
     print("Run each item below and confirm output looks correct.\n")
     for index, (label, cmd) in enumerate(CHECKS, start=1):
         full_cmd = _resolve_cmd(cmd)
@@ -80,27 +80,27 @@ def main(argv: list[str] | None = None) -> int:
         cmd = _resolve_cmd(
             [
                 sys.executable,
-                "tests/smoke/run_flagship_graphics.py",
+                "tests/demo_checks/run_flagship_graphics.py",
                 "--out",
-                "artifacts/gfx-smoke",
+                "artifacts/gfx-check",
             ]
         )
         subprocess.run(cmd, cwd=REPO_ROOT, check=False)
-        print(f"Inspect PNGs under {REPO_ROOT / 'artifacts/gfx-smoke'}")
+        print(f"Inspect PNGs under {REPO_ROOT / 'artifacts/gfx-check'}")
         return 0
 
-    answer = input("Run Matplotlib kinematic smoke now? [y/N] ").strip().lower()
+    answer = input("Run Matplotlib kinematic PNG check now? [y/N] ").strip().lower()
     if answer == "y":
         cmd = _resolve_cmd(
             [
                 sys.executable,
-                "tests/smoke/run_flagship_graphics.py",
+                "tests/demo_checks/run_flagship_graphics.py",
                 "--out",
-                "artifacts/gfx-smoke",
+                "artifacts/gfx-check",
             ]
         )
         subprocess.run(cmd, cwd=REPO_ROOT, check=False)
-        print(f"Inspect PNGs under {REPO_ROOT / 'artifacts/gfx-smoke'}")
+        print(f"Inspect PNGs under {REPO_ROOT / 'artifacts/gfx-check'}")
     return 0
 
 

@@ -1,8 +1,9 @@
-"""L1 — library contract tests (pytest).
+"""Contract tests — library API and behavior (pytest).
 
 **Human (IDE):** open this file and click **Run** — no terminal needed.
 
-Includes L4 graphics contract and L6 smoke bridge via ``test_smoke_runners.py``.
+Also runs graphics-contract tests and demo-check bridge via
+``test_demo_check_runners.py``.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ for path in (_ROOT, _CHECKS):
 import _common  # noqa: E402
 
 # --- optional IDE toggles (defaults are fine for daily use) ---
-HEADLESS_PYGAME = False  # True → SDL_VIDEODRIVER=dummy for pygame smokes
+HEADLESS_PYGAME = False  # True → SDL_VIDEODRIVER=dummy for pygame tests
 MARKER = None  # e.g. "not optional" for minimal-deps-only run
 EXTRA_ARGS: list[str] = []  # e.g. ["tests/unittest/test_mpc.py"] for one module
 

@@ -7,7 +7,7 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
 def run_smoke(*, tf: float = 1.0, show: bool = False) -> None:
-    """Headless L6 smoke: one closed-loop pendulum trajectory."""
+    """Headless demo check: one closed-loop pendulum trajectory."""
     sys = Pendulum()
     sys.params["m"] = 1.0
     sys.params["l"] = 5.0

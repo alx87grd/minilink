@@ -352,7 +352,7 @@ required for writing model equations.
 
 Use the **`minilink`** conda env above. **Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points).
 
-**Human (IDE):** open [`tests/run/run_l1_tests.py`](tests/run/run_l1_tests.py) and click **Run**.
+**Human (IDE):** open [`tests/run/run_contract_tests.py`](tests/run/run_contract_tests.py) and click **Run**.
 
 **Agent / CI:** [tests/README.md#entry-points](tests/README.md#entry-points).
 

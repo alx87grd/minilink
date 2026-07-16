@@ -19,7 +19,7 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
 def run_smoke(*, tf: float = 1.0, show: bool = False) -> None:
-    """Headless L6 smoke: short closed-loop trajectory, no animation."""
+    """Headless demo check: short closed-loop trajectory, no animation."""
     plant = Pendulum()
     plant.x0 = np.array([np.pi + 0.25, 0.0])
 

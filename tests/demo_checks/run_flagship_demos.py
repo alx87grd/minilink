@@ -1,8 +1,11 @@
-"""Run flagship demo ``run_smoke()`` entry points (L6).
+"""Run flagship demo ``run_smoke()`` entry points (demo-check layer).
+
+Each demo script exposes ``run_smoke()`` — a headless, no-plot entry point used
+by this runner. The function name is unchanged on the demo side.
 
 Usage (from repo root)::
 
-    python tests/smoke/run_flagship_demos.py
+    python tests/demo_checks/run_flagship_demos.py
 """
 
 from __future__ import annotations
@@ -16,16 +19,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-_SMOKE_DIR = Path(__file__).resolve().parent
+_CHECKS_DIR = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-if str(_SMOKE_DIR) not in sys.path:
-    sys.path.insert(0, str(_SMOKE_DIR))
+if str(_CHECKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_CHECKS_DIR))
 
 import helpers as _helpers  # noqa: E402
 
 configure_headless = _helpers.configure_headless
-MANIFEST_PATH = _SMOKE_DIR / "flagship_manifest.json"
+MANIFEST_PATH = _CHECKS_DIR / "flagship_manifest.json"
 
 
 def _load_demo_module(relative_path: str):
@@ -88,7 +91,7 @@ def _print_report(rows: list[DemoRow]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Flagship demo smoke runner (L6)")
+    parser = argparse.ArgumentParser(description="Flagship demo checks")
     parser.add_argument("--demo", default=None, help="Run one manifest id")
     args = parser.parse_args(argv)
     rows = run_flagship_demos(demo_filter=args.demo)

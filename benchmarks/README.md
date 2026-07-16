@@ -1,14 +1,14 @@
 # Benchmarks
 
 Performance tracking and end-to-end numerical regression for minilink — not
-collected by default pytest (pytest only smoke-tests benchmark helpers) and not
+collected by default pytest (pytest only guards benchmark helper imports) and not
 shipped in the pip package. Helpers are grouped by what they measure;
 `common.py` holds shared plumbing, `systems/` holds synthetic fixture systems,
 and `scenarios/` holds canonical integration-check setups.
 
 The modules import minilink exactly like an external user. Nothing inside
-`minilink/` may import from here (the unittest smoke tests in
-`tests/unittest/test_benchmark_smoke.py` may).
+`minilink/` may import from here (the unittest helper guards in
+`tests/unittest/test_benchmark_helpers.py` may).
 
 Benchmark fixtures intentionally differ from unittest planning fixtures: e.g.
 `planning_rrt.holonomic_problem()` uses a dense 18-sphere scene for timing
@@ -63,7 +63,7 @@ python benchmarks/run_regression_check.py --suite solve_speed  # NLP + NumPy tra
 python benchmarks/run_regression_check.py --suite e4           # E4 trajopt/MPC parametric parity
 python benchmarks/run_regression_check.py --suite f_mpc        # F MPC hybrid/hand-loop/dual-rate
 python benchmarks/run_regression_check.py --suite all          # all Layer-B suites
-python benchmarks/run_regression_check.py --suite all --tiny   # CI smoke workload
+python benchmarks/run_regression_check.py --suite all --tiny   # CI reduced workload
 python benchmarks/run_regression_check.py --update           # refresh committed JSON
 python benchmarks/run_e4_trajopt_parity.py --capture         # same as --suite e4 --update
 python benchmarks/run_f_mpc_parity.py --capture              # same as --suite f_mpc --update
@@ -72,7 +72,7 @@ python benchmarks/run_f_mpc_parity.py --capture              # same as --suite f
 ## Regression baselines (Layer B)
 
 All gated suites run through [`run_regression_check.py`](run_regression_check.py).
-Pytest only smoke-tests helpers (`test_benchmark_smoke.py`); **GitHub CI** runs
+Pytest only guards benchmark helpers (`test_benchmark_helpers.py`); **GitHub CI** runs
 `--suite all --tiny` with JAX installed (see below).
 
 | Suite | Baseline | What it gates |

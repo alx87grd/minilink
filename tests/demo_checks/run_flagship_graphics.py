@@ -1,9 +1,9 @@
-"""Headless flagship graphics smoke (L4): kinematic PNGs from manifest.
+"""Headless flagship graphics contract check: kinematic PNGs from manifest.
 
 Usage (from repo root)::
 
-    python tests/smoke/run_flagship_graphics.py
-    python tests/smoke/run_flagship_graphics.py --out /tmp/ml-gfx
+    python tests/demo_checks/run_flagship_graphics.py
+    python tests/demo_checks/run_flagship_graphics.py --out /tmp/ml-gfx
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def run_flagship_graphics(*, out_dir: Path) -> list[tuple[str, str]]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Flagship graphics headless smoke (L4)"
+        description="Flagship graphics headless contract check"
     )
     parser.add_argument(
         "--out",

@@ -1,10 +1,10 @@
-"""Run headless catalog plant smokes (L6).
+"""Run headless catalog plant checks (demo-check layer).
 
 Usage (from repo root)::
 
-    python tests/smoke/run_catalog_smokes.py
-    python tests/smoke/run_catalog_smokes.py --fast
-    python tests/smoke/run_catalog_smokes.py --plant Pendulum
+    python tests/demo_checks/run_catalog_checks.py
+    python tests/demo_checks/run_catalog_checks.py --fast
+    python tests/demo_checks/run_catalog_checks.py --plant Pendulum
 """
 
 from __future__ import annotations
@@ -16,23 +16,23 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-_SMOKE_DIR = Path(__file__).resolve().parent
+_CHECKS_DIR = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-if str(_SMOKE_DIR) not in sys.path:
-    sys.path.insert(0, str(_SMOKE_DIR))
+if str(_CHECKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_CHECKS_DIR))
 
 import helpers as _helpers  # noqa: E402
 
 configure_headless = _helpers.configure_headless
-smoke_catalog_plant = _helpers.smoke_catalog_plant
-from minilink.dynamics.catalog.smoke_registry import (  # noqa: E402
-    CATALOG_SMOKE_ENTRIES,
+check_catalog_plant = _helpers.check_catalog_plant
+from minilink.dynamics.catalog.catalog_check_registry import (  # noqa: E402
+    CATALOG_CHECK_ENTRIES,
 )
 
 
 @dataclass(frozen=True)
-class SmokeRow:
+class CheckRow:
     entry_id: str
     status: str
     message: str = ""
@@ -42,32 +42,32 @@ def _have_jax() -> bool:
     return importlib.util.find_spec("jax") is not None
 
 
-def run_catalog_smokes(
+def run_catalog_checks(
     *,
     fast: bool,
     plant_filter: str | None,
-) -> list[SmokeRow]:
+) -> list[CheckRow]:
     configure_headless()
-    rows: list[SmokeRow] = []
+    rows: list[CheckRow] = []
     jax_ok = _have_jax()
 
-    for entry in CATALOG_SMOKE_ENTRIES:
+    for entry in CATALOG_CHECK_ENTRIES:
         if plant_filter is not None and entry.id != plant_filter:
             continue
         if entry.requires_jax and not jax_ok:
-            rows.append(SmokeRow(entry.id, "skip", "jax not installed"))
+            rows.append(CheckRow(entry.id, "skip", "jax not installed"))
             continue
         try:
             system = entry.factory()
-            smoke_catalog_plant(system, fast=fast)
-        except Exception as exc:  # noqa: BLE001 — smoke aggregator reports all failures
-            rows.append(SmokeRow(entry.id, "fail", str(exc)))
+            check_catalog_plant(system, fast=fast)
+        except Exception as exc:  # noqa: BLE001 — aggregator reports all failures
+            rows.append(CheckRow(entry.id, "fail", str(exc)))
         else:
-            rows.append(SmokeRow(entry.id, "pass"))
+            rows.append(CheckRow(entry.id, "pass"))
     return rows
 
 
-def _print_report(rows: list[SmokeRow]) -> int:
+def _print_report(rows: list[CheckRow]) -> int:
     width = max((len(row.entry_id) for row in rows), default=6)
     for row in rows:
         note = f"  ({row.message})" if row.message else ""
@@ -80,7 +80,7 @@ def _print_report(rows: list[SmokeRow]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Catalog plant smoke runner (L6)")
+    parser = argparse.ArgumentParser(description="Catalog plant demo checks")
     parser.add_argument(
         "--fast",
         action="store_true",
@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Run one catalog entry id (e.g. Pendulum)",
     )
     args = parser.parse_args(argv)
-    rows = run_catalog_smokes(fast=args.fast, plant_filter=args.plant)
+    rows = run_catalog_checks(fast=args.fast, plant_filter=args.plant)
     return _print_report(rows)
 
 

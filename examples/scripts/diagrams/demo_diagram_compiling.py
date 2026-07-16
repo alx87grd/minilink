@@ -79,7 +79,7 @@ def build_diagram() -> DiagramSystem:
 
 
 def run_smoke(*, verbose: bool = False) -> None:
-    """Headless L6 smoke: compile nested diagram and one ``f`` evaluation."""
+    """Headless demo check: compile nested diagram and one ``f`` evaluation."""
     diagram = build_diagram()
     x = np.array([1.0, 2.0])
     u = np.array([])
