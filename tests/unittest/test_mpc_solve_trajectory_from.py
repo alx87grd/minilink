@@ -1,4 +1,4 @@
-"""Unit tests for TrajectoryOptimizationPlanner.solve_trajectory_from (phase E1)."""
+"""Unit tests for TrajectoryOptimizationPlanner.solve_trajectory_from."""
 
 import unittest
 

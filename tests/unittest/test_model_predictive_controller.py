@@ -1,4 +1,4 @@
-"""Unit tests for ModelPredictiveController (phase E2)."""
+"""Unit tests for ModelPredictiveController."""
 
 import unittest
 

@@ -607,7 +607,7 @@ best-effort fallback (`return_best_effort`). The two swappable pieces are an inj
 `KinodynamicExtender` forward-integrates controls, `SteeringExtender` connects exactly
 via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callable
 (nearest-neighbour distance). Every system is an ODE, so an `Edge` always carries real
-`(t,x,u)`; `solve() → Trajectory`. `RRTStarPlanner` extends the attach step
+`(t,x,u)`; `solve() → TrajectoryPlan`. `RRTStarPlanner` extends the attach step
 with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
 `optimize_after_goal`, the search continues after the first goal connection until

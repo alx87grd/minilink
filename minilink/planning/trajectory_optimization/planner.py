@@ -350,7 +350,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Measured initial state.
         params : mapping, optional
             Scene / bind façade. ``None`` or ``{}`` binds ``x0`` only.
-            Non-empty keys are rejected until scene support (E7).
+            Non-empty keys are rejected until pipeline B scene bind.
         initial_guess : ndarray or Trajectory, optional
             NLP seed (schedule and/or packed ``z``). Warm-start *policy*
             (reuse last latch) is owned by ``ModelPredictiveController``, not

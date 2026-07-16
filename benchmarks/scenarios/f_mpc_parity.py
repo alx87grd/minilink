@@ -1,7 +1,7 @@
-"""Phase F MPC parity (hybrid ZOH, hand-loop, dual-rate).
+"""F MPC regression parity (hybrid ZOH, hand-loop, dual-rate).
 
-Compare against ``benchmarks/baselines/f_mpc_parity.json`` after the
-``planning.mpc`` → ``control.mpc`` move.
+Compare against ``benchmarks/baselines/f_mpc_parity.json`` for the landed
+``control/mpc`` product path.
 """
 
 from __future__ import annotations
@@ -215,7 +215,7 @@ def run_dual_rate() -> list[MetricRecord]:
 
 
 def run_f_mpc_parity_suite() -> list[MetricRecord]:
-    """Run all Phase F MPC parity scenarios."""
+    """Run all F MPC parity scenarios."""
     metrics: list[MetricRecord] = []
     metrics.extend(run_hybrid_zoh())
     metrics.extend(run_hand_loop())

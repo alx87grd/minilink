@@ -1,7 +1,6 @@
-"""E4 trajopt before/after parity scenarios (TOP rebuild + MPC parametric).
+"""E4 trajopt regression parity scenarios (TOP rebuild + MPC parametric).
 
-Capture once before the MPC→TOP merge, then compare after. Historical note:
-originally gated Phase E4 of the MPC/RH refactor (now complete).
+Compare against ``benchmarks/baselines/e4_trajopt_parity.json``.
 """
 
 from __future__ import annotations

@@ -412,7 +412,7 @@ Animate:   animate* / render / game  →  Animator  →  renderer backend
 
 Trajopt:   PlanningProblem + TrajectoryOptimizationPlanner
            (flat ``n_steps`` / ``transcription="…"``; optional Transcription)
-           → transcribe → MathematicalProgram → Optimizer → Trajectory
+           → transcribe → MathematicalProgram → Optimizer → TrajectoryPlan
 
 NLP:       MathematicalProgram → Optimizer → OptimizationResult
 ```

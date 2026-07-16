@@ -1,4 +1,4 @@
-"""Phase F MPC before/after parity harness (hybrid / hand-loop / dual-rate).
+"""F MPC regression parity harness (hybrid / hand-loop / dual-rate).
 
 Usage (from repo root)::
 
@@ -27,13 +27,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = REPO_ROOT / "benchmarks" / "baselines" / "f_mpc_parity.json"
 SUITE_NAME = "f_mpc_parity"
 SUITE_DESCRIPTION = (
-    "Phase F MPC parity: hybrid ZOH, compute_command hand-loop, dual-rate."
+    "F MPC parity: hybrid ZOH, compute_command hand-loop, dual-rate."
 )
 DEFAULT_FACTOR = 2.0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Phase F MPC before/after parity")
+    parser = argparse.ArgumentParser(description="F MPC regression parity check")
     parser.add_argument(
         "--capture",
         action="store_true",

@@ -1,4 +1,4 @@
-"""E4 trajopt before/after parity harness (TOP rebuild + MPC parametric).
+"""E4 trajopt regression parity harness (TOP rebuild + MPC parametric).
 
 Usage (from repo root)::
 
@@ -33,7 +33,7 @@ DEFAULT_FACTOR = 4.0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="E4 trajopt before/after parity check")
+    parser = argparse.ArgumentParser(description="E4 trajopt regression parity check")
     parser.add_argument(
         "--capture",
         action="store_true",

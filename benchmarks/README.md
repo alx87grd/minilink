@@ -23,8 +23,8 @@ scene for fast RRT contract tests.
 | [`suites/core_perf.py`](suites/core_perf.py) | Fast compile/`f()`/sim final-state tier-1 gate |
 | [`suites/integration_check.py`](suites/integration_check.py) | Trajectory checkpoint goldens + solve-time gates |
 | [`scenarios/`](scenarios/) | Frozen scenario configs (double pendulum, showcase pendulum, cart-pole trajopt) |
-| [`run_e4_trajopt_parity.py`](run_e4_trajopt_parity.py) | E4 TOP rebuild / MPC parametric before–after parity |
-| [`run_f_mpc_parity.py`](run_f_mpc_parity.py) | Phase F `control/mpc` move — hybrid / hand-loop / dual-rate traj+timing |
+| [`run_e4_trajopt_parity.py`](run_e4_trajopt_parity.py) | E4 trajopt / MPC parametric regression parity |
+| [`run_f_mpc_parity.py`](run_f_mpc_parity.py) | F MPC `control/mpc` regression parity — hybrid / hand-loop / dual-rate |
 | [`baselines/*.json`](baselines/) | Committed golden metrics |
 
 ## Running
@@ -51,10 +51,10 @@ python benchmarks/run_regression_check.py                  # tier-1 core_perf ba
 python benchmarks/run_regression_check.py --suite integration  # trajectory + trajopt gate
 python benchmarks/run_regression_check.py --suite all        # both suites
 python benchmarks/run_regression_check.py --update           # refresh committed JSON
-python benchmarks/run_e4_trajopt_parity.py --capture         # E4 before-merge trajopt baseline
-python benchmarks/run_e4_trajopt_parity.py                   # E4 after-merge compare
-python benchmarks/run_f_mpc_parity.py --capture              # Phase F pre-move MPC baseline
-python benchmarks/run_f_mpc_parity.py                        # Phase F post-move compare
+python benchmarks/run_e4_trajopt_parity.py --capture         # E4 parity: capture baseline JSON
+python benchmarks/run_e4_trajopt_parity.py                   # E4 parity: compare to baseline
+python benchmarks/run_f_mpc_parity.py --capture              # F MPC parity: capture baseline JSON
+python benchmarks/run_f_mpc_parity.py                        # F MPC parity: compare to baseline
 ```
 
 ## Regression baselines
@@ -66,8 +66,8 @@ default pytest (pytest only smoke-tests loader/compare logic):
 | --- | --- | --- |
 | `core_perf` (default) | [`baselines/core_perf.json`](baselines/core_perf.json) | Compile/`f()` speed, diagram `dx` accuracy, sim final-state goldens |
 | `integration` | [`baselines/integration_check.json`](baselines/integration_check.json) | Trajectory checkpoints, showcase cart-pole trajopt (SciPy SLSQP + JAX compile), solve times |
-| E4 trajopt parity | [`baselines/e4_trajopt_parity.json`](baselines/e4_trajopt_parity.json) | Before/after MPC→TOP merge: cartpole + pendulum rebuild, bicycle TOP parametric from-solve |
-| F MPC parity | [`baselines/f_mpc_parity.json`](baselines/f_mpc_parity.json) | Before/after `control/mpc` move: hybrid ZOH, hand-loop, dual-rate (traj + timing, factor 2×) |
+| E4 trajopt parity | [`baselines/e4_trajopt_parity.json`](baselines/e4_trajopt_parity.json) | TOP rebuild + MPC parametric from-solve: cartpole, pendulum, bicycle (traj + timing) |
+| F MPC parity | [`baselines/f_mpc_parity.json`](baselines/f_mpc_parity.json) | `control/mpc` product path: hybrid ZOH, hand-loop, dual-rate (traj + timing, factor 2×) |
 
 **Speed** metrics use a loose multiplicative factor (default **4×**, override with
 `MINILINK_BENCH_REGRESSION_FACTOR`). **Accuracy** metrics use absolute ceilings:
