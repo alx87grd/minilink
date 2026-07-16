@@ -35,10 +35,20 @@ tests behave consistently across machines.
 Tests guard **stable public contracts** (compile evaluators, planning transcriptions,
 graphics frame keys, catalog equation references)—not implementation trivia or
 third-party print formatting. Prefer one parametrized or table-driven test over
-many near-duplicate files. Deep dynamics checks for a few representative plants
-live in `test_catalog_plant_contracts.py`; broad catalog smoke in
-`test_catalog_migration.py`; kinematic render smoke in
-`test_kinematic_regression.py` (manifest under `tests/fixtures/kinematic_baseline/`).
+many near-duplicate files.
+
+**Domain modules** (~21 files after L1 consolidation): `test_core`, `test_backends`,
+`test_compile`, `test_diagrams`, `test_simulation`, `test_step_discrete`,
+`test_hybrid`, `test_dynamics_catalog`, `test_mechanical_robotics`, `test_blocks`,
+`test_control_analysis`, `test_costs_optimizer`, `test_planning`, `test_mpc`,
+`test_graphics`, `test_geometry`, `test_engine_jax`, `test_jax_planning`,
+`test_symbolic`, `test_benchmark_smoke`, `test_smoke_runners`. Re-merge helper:
+`scripts/merge_l1_tests.py`.
+
+Deep dynamics checks for a few representative plants
+live in `test_dynamics_catalog.py`; broad catalog smoke in L6
+(`run_catalog_smokes.py`); kinematic render smoke in `test_graphics.py`
+(manifest under `tests/fixtures/kinematic_baseline/`).
 Regenerate manifest: `python tests/fixtures/kinematic_baseline/regenerate_manifest.py`.
 
 Shared fixtures: `graphics_contract_helpers.py` (draw-list resolution),

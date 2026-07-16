@@ -1,6 +1,6 @@
 # Test & benchmark consolidation plan
 
-Status: **L2 + L6 + L4/L5 stubs landed**; L1 pytest merge (91→~22) and L3 `run_study.py` still todo.
+Status: **L1 + L2 + L6 + L4/L5 stubs landed**; L3 `run_study.py` still todo.
 
 ---
 
@@ -212,12 +212,12 @@ python examples/scripts/_smoke/run_all_demos.py --timeout 120
 | ---: | ---: | --- | --- |
 | 0 | — | This vision doc + inventory table | ✅ |
 | 1 | L2 | Unified `run_regression_check`, `solve_speed`, CI regression job | ✅ |
-| 2 | L1 | Merge 91 pytest files → ~22 domain modules | ⬜ |
+| 2 | L1 | Merge 91 pytest files → ~22 domain modules | ✅ (21 files) |
 | 3 | L3 | `run_study.py` replaces scattered benchmark CLIs | ⬜ |
 | 4 | L6 | Catalog smokes + demo whitelist aggregators | ✅ |
 | 5 | L4 | Flagship graphics headless manifest + pytest | ✅ partial |
 | 6 | L5 | Interactive visual check script for local use | ✅ stub |
-| 7 | L1 | Shrink catalog unittest to 3-plant contracts only | ⬜ (with Phase 4) |
+| 7 | L1 | Shrink catalog unittest to 3-plant contracts only | ✅ (with Phase 4) |
 
 ---
 
@@ -227,7 +227,7 @@ The repo has grown test and benchmark surface area without periodic cleanup:
 
 | Area | Count today | CI default |
 | --- | ---: | --- |
-| `tests/unittest/test_*.py` | **91 files**, ~**780** `test_*` functions | `pytest` (all collected; optional deps skip at runtime) |
+| `tests/unittest/test_*.py` | **21 files**, ~**780** `test_*` functions | `pytest` (all collected; optional deps skip at runtime) |
 | `benchmarks/run_*.py` | **15** CLI runners | **not** in CI |
 | Gated regression baselines | **5** JSON suites + CI job | ✅ L2 in CI |
 | `examples/scripts/` | **78** demos | not tests (out of scope for merge, noted for overlap) |

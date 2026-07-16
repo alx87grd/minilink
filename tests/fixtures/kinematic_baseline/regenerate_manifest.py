@@ -24,7 +24,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from minilink.dynamics.catalog.smoke_registry import KINEMATIC_RENDER_PLANTS  # noqa: E402
+from minilink.dynamics.catalog.smoke_registry import (  # noqa: E402
+    KINEMATIC_RENDER_PLANTS,
+)
 from tests.fixtures.kinematic_baseline.render import render_baseline_png  # noqa: E402
 
 FIXTURE_DIR = Path(__file__).resolve().parent
