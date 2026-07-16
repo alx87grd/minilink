@@ -350,16 +350,15 @@ required for writing model equations.
 
 ## Testing
 
-Use the **`minilink`** conda env above for local development and agent verification.
-From repo root:
+Use the **`minilink`** conda env above. **All entry points (human · agent · CI):**
+[tests/README.md#entry-points](tests/README.md#entry-points).
+
+Daily default from repo root:
 
 ```bash
 conda activate minilink
-python -m pytest
+pytest
 ```
-
-For the full suite including optional backends and headless pygame smoke tests,
-see [tests/README.md](tests/README.md).
 
 ## Call chains
 

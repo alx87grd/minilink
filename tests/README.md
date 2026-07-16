@@ -1,46 +1,108 @@
 # Test suite organization
 
-The default pytest discovery lives in `tests/unittest`. Full vision:
-[docs/plans/test-benchmark-consolidation.md](../docs/plans/test-benchmark-consolidation.md).
+**Entry points (human · agent · CI):** see [Entry points](#entry-points) below — authoritative for all three audiences.
+
+Six-layer vision (detail): [docs/plans/test-benchmark-consolidation.md](../docs/plans/test-benchmark-consolidation.md).
+
+---
+
+## Entry points
+
+**Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (see [README.md#install](../README.md#install)).
+
+### At a glance
+
+| Who | When | Run |
+| --- | --- | --- |
+| **Human** | Daily dev | `pytest` |
+| **Human** | Before push | `ruff check . && ruff format --check . && pytest` |
+| **Human** | Big sim/trajopt/MPC change | `python benchmarks/run_regression_check.py --suite all` |
+| **Human** | Demo/catalog sanity | `python examples/scripts/_smoke/run_catalog_smokes.py --fast` |
+| **Agent** | Pre-push / handoff | Same as human “Before push”; scope pytest per [AGENTS.md](../AGENTS.md) |
+| **Agent** | Compile/sim/trajopt edits | Add L2 regression (command below) |
+| **CI** | Every PR | [`.github/workflows/test.yml`](../.github/workflows/test.yml) — `test` + `regression` jobs |
+
+### Human — copy/paste
+
+```bash
+conda activate minilink
+
+# L1 — default (library contracts; includes L4 contract + L6 smoke bridge via pytest)
+pytest
+
+# Minimal deps only (skips JAX, plotly, pygame, …)
+pytest -m "not optional"
+
+# Headless optional renderers (pygame, full optional set)
+SDL_VIDEODRIVER=dummy pytest
+
+# L2 — regression (pre-handoff on compile / Simulator / trajopt / MPC)
+PYTHONPATH=. python benchmarks/run_regression_check.py --suite all
+
+# L2 — same flags as CI
+PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny \
+  --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup
+
+# L6 — catalog + flagship demos (scripts; also run via test_smoke_runners.py in pytest)
+python examples/scripts/_smoke/run_catalog_smokes.py --fast
+python examples/scripts/_smoke/run_flagship_demos.py
+
+# L4 — graphics headless PNG (optional; also covered by pytest smoke runner)
+python examples/scripts/_smoke/run_flagship_graphics.py
+
+# L5 — visual checklist (local only; you confirm pixels)
+python examples/scripts/_smoke/run_graphics_visual_check.py
+
+# L3 — benchmark tables (local only; not a gate)
+python benchmarks/run_study.py --list
+```
+
+### Agent — copy/paste
+
+Rules: [AGENTS.md](../AGENTS.md). **Do not invent commands** — use this table.
+
+| Situation | Command |
+| --- | --- |
+| Always before push | `ruff check . && ruff format --check .` |
+| Docs/markdown only | skip pytest |
+| Narrow module change | `pytest tests/unittest/test_<domain>.py` |
+| Cross-cutting or handoff | `pytest` |
+| Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| User-facing demo/smoke change | `python examples/scripts/_smoke/run_catalog_smokes.py --fast` and/or `run_flagship_demos.py` |
+
+L1 discovery path: `tests/unittest/` only. Demos live under `examples/scripts/` — **L6 smokes, not duplicated in L1**.
+
+### CI — job → command
+
+Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
+
+| Job | Trigger | Exact steps |
+| --- | --- | --- |
+| **`test`** | Python 3.10–3.13 matrix | `pip install -e ".[dev]"` → `ruff check .` → `ruff format --check .` → `pytest` |
+| **`regression`** | After `test` passes; Python 3.12 + JAX | `pip install -e ".[dev,jax]"` → `PYTHONPATH=$PWD python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+
+What pytest covers in CI: **L1** (all `tests/unittest/`), **L4** (`test_flagship_graphics_contract.py`), **L6 bridge** (`test_smoke_runners.py` subprocesses catalog/flagship/graphics scripts). **L2** is the separate `regression` job. **L3/L5** are not CI.
+
+---
 
 ## Six layers (L1 → L6)
 
-| Layer | Purpose | Command | CI |
-| --- | --- | --- | ---: |
-| **L1** Contracts | API types, shapes, compile/sim/MPC behavior | `pytest` | ✅ |
-| **L2** Regression | Accuracy goldens + guarded NLP/trajopt solve time | `python benchmarks/run_regression_check.py --suite all` | ✅ |
-| **L3** Benchmark utility | Machine/GPU exploration tables | `python benchmarks/run_study.py --list` | ❌ |
-| **L4** Graphics auto | Draw-list + headless PNG smoke | `pytest tests/unittest/test_flagship_graphics_contract.py` | ✅ |
-| **L5** Graphics visual | You confirm Meshcat/MPL/Plotly locally | `python examples/scripts/_smoke/run_graphics_visual_check.py` | ❌ |
-| **L6** Smoke runners | Catalog + flagship demos must not throw | `run_catalog_smokes.py`, `run_flagship_demos.py` | ✅ (pytest subprocess) |
+| Layer | Purpose | Entry command | CI job |
+| --- | --- | --- | --- |
+| **L1** Contracts | API types, shapes, compile/sim/MPC behavior | `pytest` | `test` |
+| **L2** Regression | Accuracy goldens + guarded NLP/trajopt solve time | `run_regression_check.py --suite all` | `regression` |
+| **L3** Benchmark utility | Machine/GPU exploration tables | `run_study.py --list` | — |
+| **L4** Graphics auto | Draw-list + headless PNG smoke | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
+| **L5** Graphics visual | You confirm Meshcat/MPL/Plotly locally | `run_graphics_visual_check.py` | — |
+| **L6** Smoke runners | Catalog + flagship demos must not throw | `run_catalog_smokes.py`, `run_flagship_demos.py` | `test` (via `test_smoke_runners.py`) |
 
 ## Local environment
 
-Setup: [README.md#install](../README.md#install) (conda env **`minilink`**, `PYTHONPATH` = repo root).
-Agent rules: [AGENTS.md](../AGENTS.md).
-
-From repo root:
-
-```bash
-conda activate minilink
-python -m pytest
-```
-
-Full suite (optional deps and headless pygame):
-
-```bash
-conda activate minilink
-SDL_VIDEODRIVER=dummy python -m pytest
-```
-
-Non-interactive:
+Setup: [README.md#install](../README.md#install). Non-interactive:
 
 ```bash
 conda run -n minilink python -m pytest
 ```
-
-Marker policy and pip-only installs are below; prefer the conda env so optional
-tests behave consistently across machines.
 
 ## Philosophy
 
@@ -65,13 +127,11 @@ Regenerate manifest: `python tests/fixtures/kinematic_baseline/regenerate_manife
 Shared fixtures: `graphics_contract_helpers.py` (draw-list resolution),
 `planning_helpers.py` (RRT holonomic obstacle scene).
 
-Benchmark **Layer B** regression (accuracy goldens + NLP/trajopt **solve speed** gates)
-lives under repo-root `benchmarks/`; pytest smoke-tests helpers in
-`test_benchmark_smoke.py`. **CI** runs `python benchmarks/run_regression_check.py
---suite all --tiny` with JAX; local pre-handoff: `--suite all` on a reference machine
-(see [benchmarks/README.md](../benchmarks/README.md)).
+Benchmark **Layer B** regression lives under repo-root `benchmarks/`; helper API
+drift guards in `test_benchmark_smoke.py`. See [Entry points](#entry-points) for
+L2 CI vs local commands and [benchmarks/README.md](../benchmarks/README.md).
 
-**Layer L6** catalog and flagship demo smokes (must not throw):
+**Layer L6** scripts (also invoked from `test_smoke_runners.py` in pytest):
 
 ```bash
 python examples/scripts/_smoke/run_catalog_smokes.py --fast
@@ -79,42 +139,26 @@ python examples/scripts/_smoke/run_flagship_demos.py
 python examples/scripts/_smoke/run_all_demos.py --flagship-only --continue-on-error
 ```
 
-Pytest: `tests/unittest/test_smoke_runners.py`. **Layer L4** graphics headless:
-`python examples/scripts/_smoke/run_flagship_graphics.py`. G0 draw-list contract:
-`tests/unittest/test_flagship_graphics_contract.py`. **Layer L5** visual (local):
-`python examples/scripts/_smoke/run_graphics_visual_check.py`.
+Nightly/manual full demo sweep: `run_all_demos.py`. L4 PNG smoke:
+`run_flagship_graphics.py`. L5 visual: `run_graphics_visual_check.py`.
 
 `tests/manual/` and `tests/bugs/` are removed — use `examples/scripts/` for
 smoke scripts and unittest for contracts.
 
 ## Core behavior without optional extras
 
-Run tests that should pass with only the required project dependencies and the
-`dev` extra installed:
-
 ```bash
 pytest -m "not optional"
 ```
 
-This excludes tests that need optional extras such as JAX, SymPy, meshcat,
-pygame, plotly, or cyipopt.
-
-## Default local run
-
-```bash
-pytest
-```
-
-Optional tests remain collected, but skip at runtime when their dependency is
-not installed.
+Optional tests skip at runtime when their dependency is not installed (see [Marker policy](#marker-policy)).
 
 ## Full functionality run
 
-With the `minilink` conda env (recommended):
+With the **`minilink`** conda env:
 
 ```bash
 conda activate minilink
-SDL_VIDEODRIVER=dummy pytest -m optional
 SDL_VIDEODRIVER=dummy pytest
 ```
 
@@ -122,7 +166,6 @@ Or install all pip extras in another Python 3.10+ environment:
 
 ```bash
 pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt]"
-SDL_VIDEODRIVER=dummy pytest -m optional
 SDL_VIDEODRIVER=dummy pytest
 ```
 

@@ -1,3 +1,5 @@
+# CI — entry points documented in tests/README.md#entry-points
+# Jobs: test (ruff + pytest, py3.10–3.13) → regression (L2, py3.12 + jax)
 name: CI
 
 on:
