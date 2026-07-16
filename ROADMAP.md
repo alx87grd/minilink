@@ -173,8 +173,11 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
   `TrajectoryOptimizationPlanner.compile_parametric_program` +
   `solve_trajectory_from` (parametric `x0`); controllers in `control/mpc/`;
   primary demos under `examples/scripts/mpc/`
-  (`demo_mpc_minimal`, `demo_mpc_dual_rate`, `demo_mpc_path`,
+  (`demo_mpc_minimal`, `demo_mpc_minimal_numpy`, `demo_mpc_dual_rate`, `demo_mpc_path`,
   `demo_mpc_circuit`, `demo_mpc_slalom`, `demo_mpc_spatial`)
+- [x] **NumPy MPC rebuild mode** — `compile_backend='numpy'` or `'direct'` skips
+  parametric compile; each replan tick transcribes + solves via
+  `solve_trajectory_from` (no JAX required).
 - [x] **Online `params` façade (E7 slim)** — `params=None`/`{}` for x0-only;
   reserved `scene` key and `ProblemParameters.scene` placeholder;
   `NotImplementedError` until full bind; latch forwards `params` on

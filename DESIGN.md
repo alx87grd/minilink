@@ -207,10 +207,12 @@ serial arms. Joint impedance / task impedance / computed torque use
 - **MPC hybrid block:** :func:`~minilink.control.mpc.ModelPredictiveController`
   returns a static ``System`` (``n=0``) or :class:`StepSystem` (``warm_start=True``)
   that holds a
-  :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
-  with :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.compile_parametric_program`
-  so each Computer tick is bind + solve (memoized across ports ``u_ff``,
-  ``x_ff``, ``z``). Warm-start via
+  :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`.
+  **JAX path:** :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.compile_parametric_program`
+  once, then each Computer tick is bind + solve (memoized across ports ``u_ff``,
+  ``x_ff``, ``z``). **NumPy/direct path:** each tick rebuilds the NLP via
+  :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.solve_trajectory_from`
+  (no parametric compile). Warm-start via
   :func:`~minilink.control.mpc.utilities.mpc_warm_start_guess` from
   ``Computer.x``. Deploy / hand loop:
   :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.compute_command`
@@ -525,8 +527,10 @@ and/or `options=TrajectoryOptimizationOptions(...)`. Offline
 `solve_trajectory` always rebuilds a fresh
 `MathematicalProgram`. Optional `compile_parametric_program()` builds a
 `ParametricMathematicalProgram` (``h(z, x0)``) once so
-`solve_trajectory_from(x0, params=None)` is bind + solve only (receding-horizon /
-MPC path); without compile, from-solves rebuild with a one-time speed warning.
+`solve_trajectory_from(x0, params=None)` is bind + solve only on the JAX
+parametric path; with ``compile_backend='numpy'`` or ``'direct'``, each
+from-solve rebuilds the NLP (expected for no-JAX MPC). A one-time speed warning
+is emitted only when a JAX planner omits parametric compile.
 Online ``params`` is an x0-only façade today (`None`/`{}`); reserved key
 ``scene`` raises ``NotImplementedError`` until pipeline B extends the parametric
 tier to ``J(z, p)`` (see ROADMAP scene params). Knot count

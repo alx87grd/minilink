@@ -159,6 +159,9 @@ diagram.compute_trajectory(tf=10.0)  # solves the plant exactly between ticks
 diagram.animate()
 ```
 
+With ``compile_backend='numpy'`` on the planner (no JAX install), MPC rebuilds the
+NLP each replan tick — see ``examples/scripts/mpc/demo_mpc_minimal_numpy.py``.
+
 Hand-loop or external deploy node (ROS-agnostic — no ROS2 package in minilink):
 
 ```python
@@ -435,6 +438,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
 | Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
 | Minimal MPC (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/mpc/demo_mpc_minimal.py` |
+| NumPy MPC (rebuild each tick, no JAX) | `examples/scripts/mpc/demo_mpc_minimal_numpy.py` |
 | Dual-rate MPC (`dual_rate_computer` + `u_nom`) | `examples/scripts/mpc/demo_mpc_dual_rate.py` |
 | Path MPC (dual-rate manual deploy / ROS2-style loop) | `examples/scripts/mpc/demo_mpc_path.py` |
 | Circuit MPC full stack (scene → cost → plan → hybrid) | `examples/scripts/mpc/demo_mpc_circuit.py` · [notebook](examples/notebooks/demo_mpc_circuit.ipynb) |
