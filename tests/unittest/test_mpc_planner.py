@@ -1,4 +1,4 @@
-"""Optional beta MPC planner tests."""
+"""Optional parametric TrajectoryOptimizationPlanner tests (MPC compile path)."""
 
 import unittest
 
@@ -12,14 +12,14 @@ import jax.numpy as jnp  # noqa: E402
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.system import DynamicSystem  # noqa: E402
-from minilink.planning.mpc import (  # noqa: E402
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
-)
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (  # noqa: E402
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 
@@ -40,7 +40,7 @@ class JaxSingleIntegrator(DynamicSystem):
 
 @pytest.mark.optional
 @pytest.mark.jax
-class TestMPCPlanner(unittest.TestCase):
+class TestTrajectoryOptimizationPlanner(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
 
@@ -54,21 +54,26 @@ class TestMPCPlanner(unittest.TestCase):
         )
         return PlanningProblem(
             sys=sys,
+            tf=1.0,
             x_start=np.array([x_start]),
             cost=cost,
         )
 
     def make_planner(self, problem):
-        transcription = MPCDirectCollocationTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
+        transcription = DirectCollocationTranscription(
+            DirectCollocationOptions(n_steps=5)
         )
-        return MPCPlanner(
+        planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=MPCOptions(
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                record_solve_time=True,
                 optimizer_options={"maxiter": 50, "ftol": 1e-4},
             ),
         )
+        planner.compile_parametric_program()
+        return planner
 
     def test_step_smoke(self):
         planner = self.make_planner(self.make_problem(0.0))
@@ -102,8 +107,10 @@ class TestMPCPlanner(unittest.TestCase):
         traj = planner.step(x_start)
         np.testing.assert_allclose(traj.x[:, 0], x_start, atol=1e-5)
 
-    def test_compute_solution_alias(self):
+    def test_solve_returns_trajectory_plan(self):
         problem = self.make_problem(0.1)
         planner = self.make_planner(problem)
-        traj = planner.compute_solution()
+        plan = planner.solve()
+        traj = plan.trajectory
         np.testing.assert_allclose(traj.x[:, 0], problem.x_start, atol=1e-5)
+        self.assertIs(planner.last_trajectory_plan, plan)

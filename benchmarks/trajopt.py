@@ -581,7 +581,7 @@ def _planner(
     config: TrajectoryOptimizationBenchmarkConfig,
 ) -> TrajectoryOptimizationPlanner:
     return TrajectoryOptimizationPlanner(
-        _problem(variant),
+        _problem(variant, config),
         transcription=_transcription(variant, config),
         options=TrajectoryOptimizationOptions(
             compile_backend=variant.compile_backend,
@@ -592,13 +592,16 @@ def _planner(
     )
 
 
-def _problem(variant: TrajectoryOptimizationBenchmarkVariant) -> PlanningProblem:
+def _problem(
+    variant: TrajectoryOptimizationBenchmarkVariant,
+    config: TrajectoryOptimizationBenchmarkConfig,
+) -> PlanningProblem:
     if variant.compile_backend == "jax":
         from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 
         _configure_jax(variant)
-        return _cartpole_problem(JaxCartPole())
-    return _cartpole_problem(CartPole())
+        return _cartpole_problem(JaxCartPole(), tf=config.tf)
+    return _cartpole_problem(CartPole(), tf=config.tf)
 
 
 def _transcription(
@@ -607,15 +610,13 @@ def _transcription(
 ):
     if variant.transcription == "collocation":
         return DirectCollocationTranscription(
-            DirectCollocationOptions(tf=config.tf, n_steps=config.n_steps)
+            DirectCollocationOptions(n_steps=config.n_steps)
         )
     if variant.transcription == "shooting":
-        return ShootingTranscription(
-            ShootingOptions(tf=config.tf, n_steps=config.n_steps)
-        )
+        return ShootingTranscription(ShootingOptions(n_steps=config.n_steps))
     if variant.transcription == "multiple_shooting":
         return MultipleShootingTranscription(
-            MultipleShootingOptions(tf=config.tf, n_steps=config.n_steps)
+            MultipleShootingOptions(n_steps=config.n_steps)
         )
     raise NotImplementedError(f"Unknown transcription {variant.transcription!r}")
 
@@ -667,15 +668,15 @@ def _warm_initial_trajectory(
         from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 
         configure_jax(enable_x64=True)
-        problem = _cartpole_problem(JaxCartPole())
+        problem = _cartpole_problem(JaxCartPole(), tf=config.tf)
         transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(tf=config.tf, n_steps=config.n_steps)
+            DirectCollocationOptions(n_steps=config.n_steps)
         )
         compile_backend = "jax"
     else:
-        problem = _cartpole_problem(CartPole())
+        problem = _cartpole_problem(CartPole(), tf=config.tf)
         transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(tf=config.tf, n_steps=config.n_steps)
+            DirectCollocationOptions(n_steps=config.n_steps)
         )
         compile_backend = "numpy"
 
@@ -687,7 +688,7 @@ def _warm_initial_trajectory(
             optimizer_options=_warm_optimizer_options(config),
         ),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     if config.warm_guess_path:
         traj.save(config.warm_guess_path)
     return traj
@@ -703,7 +704,7 @@ def _warm_optimizer_options(
     }
 
 
-def _cartpole_problem(sys) -> PlanningProblem:
+def _cartpole_problem(sys, *, tf: float) -> PlanningProblem:
     sys.inputs["u"].lower_bound[0] = -10.0
     sys.inputs["u"].upper_bound[0] = 10.0
 
@@ -717,7 +718,9 @@ def _cartpole_problem(sys) -> PlanningProblem:
         xbar=x_goal,
         ubar=np.zeros(sys.m),
     )
-    return PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal, cost=cost)
+    return PlanningProblem(
+        sys=sys, x_start=x_start, x_goal=x_goal, cost=cost, tf=float(tf)
+    )
 
 
 def _configure_jax(variant: TrajectoryOptimizationBenchmarkVariant) -> None:

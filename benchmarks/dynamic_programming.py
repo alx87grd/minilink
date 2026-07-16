@@ -88,7 +88,7 @@ def benchmark_backend(
     result = None
     for _ in range(runs):
         t0 = time.perf_counter()
-        result = planner.solve_steps(n_steps)
+        result = planner.solve_steps(n_steps).policy
         elapsed = time.perf_counter() - t0
         if cold_solve_s is None:
             cold_solve_s = elapsed

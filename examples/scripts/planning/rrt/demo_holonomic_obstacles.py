@@ -23,8 +23,8 @@ from minilink.core.sets import BoxSet
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
-from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
+from minilink.planning.search.rrt import RRTPlanner
+from minilink.planning.search.rrt_star import RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
 from minilink.planning.spatial.collision import bind, disc, point_probe
 from minilink.planning.spatial.scene import Scene
@@ -152,27 +152,23 @@ def run_rrt_vs_rrt_star():
 
     rrt = RRTPlanner(
         problem,
-        extender=extender,
-        options=RRTOptions(
-            seed=SEED, goal_tolerance=GOAL_TOLERANCE, max_nodes=MAX_NODES
-        ),
+        extender,
+        seed=SEED,
+        goal_tolerance=GOAL_TOLERANCE,
+        max_nodes=MAX_NODES,
     )
-    rrt_traj = rrt.compute_solution()
-
+    rrt_traj = rrt.solve().trajectory
     rrt_star = RRTStarPlanner(
         problem,
-        extender=extender,
-        options=RRTStarOptions(
-            seed=SEED,
-            goal_tolerance=GOAL_TOLERANCE,
-            max_nodes=MAX_NODES,
-            optimize_after_goal=True,
-            cost_tol=COST_TOL,
-            convergence_patience=CONVERGENCE_PATIENCE,
-        ),
+        extender,
+        seed=SEED,
+        goal_tolerance=GOAL_TOLERANCE,
+        max_nodes=MAX_NODES,
+        optimize_after_goal=True,
+        cost_tol=COST_TOL,
+        convergence_patience=CONVERGENCE_PATIENCE,
     )
-    rrt_star_traj = rrt_star.compute_solution()
-
+    rrt_star_traj = rrt_star.solve().trajectory
     print(
         f"RRT:  {len(rrt.tree.nodes)} nodes, "
         f"{path_hops(rrt)} hops, cost={path_cost(rrt):.2f}, "
@@ -226,14 +222,12 @@ def run_extender_comparison():
     for label, extender in extenders.items():
         planner = RRTPlanner(
             problem,
-            extender=extender,
-            options=RRTOptions(
-                seed=SEED,
-                goal_tolerance=EXTENDER_GOAL_TOLERANCE,
-                max_nodes=EXTENDER_MAX_NODES,
-            ),
+            extender,
+            seed=SEED,
+            goal_tolerance=EXTENDER_GOAL_TOLERANCE,
+            max_nodes=EXTENDER_MAX_NODES,
         )
-        traj = planner.compute_solution()
+        traj = planner.solve().trajectory
         goal_error = float(np.linalg.norm(traj.x[:, -1] - X_GOAL))
         planners[label] = planner
         print(

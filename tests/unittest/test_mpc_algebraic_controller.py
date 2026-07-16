@@ -10,19 +10,18 @@ pytest.importorskip("jax")
 
 import jax.numpy as jnp  # noqa: E402
 
+from minilink.control.mpc import ModelPredictiveController
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
-from minilink.core.system import DynamicSystem  # noqa: E402
-from minilink.planning.mpc import (  # noqa: E402
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
-    MPCStatelessController,
-    mpc_stateless_controller,
-)
+from minilink.core.system import DynamicSystem, System  # noqa: E402
 from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
+from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 
 
@@ -43,7 +42,7 @@ class JaxSingleIntegrator(DynamicSystem):
 
 @pytest.mark.optional
 @pytest.mark.jax
-class TestMPCStatelessController(unittest.TestCase):
+class TestMPCAlgebraicController(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
 
@@ -55,21 +54,28 @@ class TestMPCStatelessController(unittest.TestCase):
             R=np.eye(1),
             S=np.zeros((1, 1)),
         )
-        problem = PlanningProblem(sys=sys, x_start=np.array([x_start]), cost=cost)
-        transcription = MPCDirectCollocationTranscription(
-            DirectCollocationOptions(tf=1.0, n_steps=5)
+        problem = PlanningProblem(
+            sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0
         )
-        planner = MPCPlanner(
+        transcription = DirectCollocationTranscription(
+            DirectCollocationOptions(n_steps=5)
+        )
+        planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=MPCOptions(optimizer_options={"maxiter": 50, "ftol": 1e-4}),
+            options=TrajectoryOptimizationOptions(
+                compile_backend="jax",
+                record_solve_time=True,
+                optimizer_options={"maxiter": 50, "ftol": 1e-4},
+            ),
         )
         return planner
 
     def test_factory_and_port_dims(self):
         planner = self._make_planner()
-        block = mpc_stateless_controller(planner)
-        self.assertIsInstance(block, MPCStatelessController)
+        block = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
+        self.assertIsInstance(block, System)
+        self.assertNotIsInstance(block, DynamicSystem)
         self.assertEqual(block.n, 0)
         self.assertEqual(block.inputs["y"].dim, 1)
         self.assertEqual(block.outputs["u_ff"].dim, 1)
@@ -79,7 +85,7 @@ class TestMPCStatelessController(unittest.TestCase):
 
     def test_feedforward_slices_match_planner_step(self):
         planner = self._make_planner(0.2)
-        block = mpc_stateless_controller(planner)
+        block = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
         y = np.array([0.2])
         plan = planner.step(y, initial_guess=None)
 
@@ -93,13 +99,13 @@ class TestMPCStatelessController(unittest.TestCase):
 
     def test_single_planner_step_per_tick_across_ports(self):
         planner = self._make_planner(0.0)
-        block = mpc_stateless_controller(planner)
+        block = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
         y = np.array([0.1])
 
         with patch.object(
             planner,
-            "step",
-            wraps=planner.step,
+            "solve_trajectory_from",
+            wraps=planner.solve_trajectory_from,
         ) as step_mock:
             block.outputs["u_ff"].compute(None, y, t=3)
             block.outputs["x_ff"].compute(None, y, t=3)
@@ -108,7 +114,7 @@ class TestMPCStatelessController(unittest.TestCase):
 
     def test_bad_measurement_dim_raises(self):
         planner = self._make_planner()
-        block = mpc_stateless_controller(planner)
+        block = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
         with self.assertRaises(ValueError):
             block.outputs["u_ff"].compute(None, np.array([0.0, 1.0]), t=0)
 
@@ -116,7 +122,7 @@ class TestMPCStatelessController(unittest.TestCase):
         planner = self._make_planner()
         planner.transcription.options.n_steps = 1
         with self.assertRaises(ValueError):
-            mpc_stateless_controller(planner)
+            ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
 
 
 if __name__ == "__main__":

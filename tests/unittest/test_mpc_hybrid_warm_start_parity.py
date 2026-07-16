@@ -8,6 +8,13 @@ import pytest
 pytest.importorskip("jax")
 
 from minilink.blocks.routing import Demux  # noqa: E402
+from minilink.control.mpc import (
+    ModelPredictiveController,
+)
+from minilink.control.mpc.utilities import (  # noqa: E402
+    mpc_default_computer_x0,
+    mpc_warm_start_guess,
+)
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem  # noqa: E402
@@ -15,19 +22,14 @@ from minilink.core.hybrid_diagram import HybridDiagram  # noqa: E402
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
     JaxDynamicBicycleRateInputs,
 )
-from minilink.planning.mpc import (  # noqa: E402
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
-    mpc_stateful_controller,
-)
-from minilink.planning.mpc.warm_start import (  # noqa: E402
-    mpc_default_computer_x0,
-    mpc_warm_start_guess,
-)
 from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
+from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 from minilink.simulation.computer import Computer, StepSchedule  # noqa: E402
 from minilink.simulation.hybrid_simulator import HybridSimulator  # noqa: E402
@@ -76,22 +78,25 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     )
     sys_sim.x0 = x0.copy()
 
-    template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
-    transcription = MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=mpc_horizon, n_steps=mpc_steps)
+    template_problem = PlanningProblem(
+        sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon
     )
-    mpc_planner = MPCPlanner(
+    transcription = DirectCollocationTranscription(
+        DirectCollocationOptions(n_steps=mpc_steps)
+    )
+    mpc_planner = TrajectoryOptimizationPlanner(
         template_problem,
         transcription=transcription,
-        options=MPCOptions(
+        options=TrajectoryOptimizationOptions(
             compile_backend="jax",
+            record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": 80, "ftol": 1e-2},
         ),
     )
 
     mpc_dt = 1.0 / mpc_hz
-    mpc = mpc_stateful_controller(mpc_planner, dt_mpc=mpc_dt)
+    mpc = ModelPredictiveController(mpc_planner, dt_mpc=mpc_dt, warm_start=True)
     step_diagram = StepDiagramSystem()
     step_diagram.add_subsystem(mpc, "mpc")
     step_diagram.add_input_port("y", dim=int(sys_mpc.n))

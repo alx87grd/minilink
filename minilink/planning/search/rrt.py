@@ -9,7 +9,7 @@ The only swappable pieces are the injected ``extender`` (how two states connect)
 and ``metric`` (the nearest-neighbour distance).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable
 
 import numpy as np
@@ -18,6 +18,7 @@ from minilink.core.sets import BallSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.results import SolveMetadata, TrajectoryPlan
 from minilink.planning.search.metric import euclidean
 from minilink.planning.search.tree import (
     NEAREST_BACKENDS,
@@ -27,6 +28,25 @@ from minilink.planning.search.tree import (
 )
 
 # Public API
+
+_UNSET = object()
+
+_RRT_OPTION_KEYS = (
+    "max_nodes",
+    "goal_bias",
+    "goal_tolerance",
+    "seed",
+    "edge_resolution",
+    "max_sample_attempts",
+    "return_best_effort",
+    "callback",
+    "live_plot",
+    "live_plot_every",
+    "live_plot_pause",
+    "live_plot_after_goal_only",
+    "live_plot_ax",
+    "nearest_backend",
+)
 
 
 @dataclass
@@ -49,6 +69,23 @@ class RRTOptions:
     nearest_backend: str = "brute_force"
 
 
+def _merge_rrt_options(
+    options: RRTOptions | None,
+    *,
+    default_factory=RRTOptions,
+    allowed_keys=_RRT_OPTION_KEYS,
+    **flat,
+) -> RRTOptions:
+    base = default_factory() if options is None else options
+    updates = {key: value for key, value in flat.items() if value is not _UNSET}
+    unknown = sorted(k for k in updates if k not in allowed_keys)
+    if unknown:
+        raise ValueError(f"Unknown RRT planner kwargs: {unknown}.")
+    if not updates:
+        return base
+    return replace(base, **updates)
+
+
 class RRTPlanner(Planner):
     """
     Rapidly-exploring random tree over a `PlanningProblem`.
@@ -62,12 +99,17 @@ class RRTPlanner(Planner):
     metric : callable
         Pairwise nearest-neighbour distance ``metric(a, b) -> float``.
     options : RRTOptions
-        Loop options.
+        Tier-2 workflow bag. Flat kwargs below overlay matching fields.
+    max_nodes, goal_bias, goal_tolerance, seed, edge_resolution,
+    max_sample_attempts, return_best_effort, callback, live_plot,
+    live_plot_every, live_plot_pause, live_plot_after_goal_only,
+    live_plot_ax, nearest_backend
+        Tier-1 flat mirrors of :class:`RRTOptions`.
 
     Attributes
     ----------
     reached_goal : bool
-        Set by :meth:`compute_solution`; ``True`` only when the goal region is reached.
+        Set by :meth:`solve`; ``True`` only when the goal region is reached.
     solution_node : Node or None
         Tree node whose parent chain defines the returned trajectory.
     """
@@ -75,22 +117,56 @@ class RRTPlanner(Planner):
     def __init__(
         self,
         problem: PlanningProblem,
-        *,
         extender,
+        *,
         metric=euclidean,
         options: RRTOptions | None = None,
+        max_nodes=_UNSET,
+        goal_bias=_UNSET,
+        goal_tolerance=_UNSET,
+        seed=_UNSET,
+        edge_resolution=_UNSET,
+        max_sample_attempts=_UNSET,
+        return_best_effort=_UNSET,
+        callback=_UNSET,
+        live_plot=_UNSET,
+        live_plot_every=_UNSET,
+        live_plot_pause=_UNSET,
+        live_plot_after_goal_only=_UNSET,
+        live_plot_ax=_UNSET,
+        nearest_backend=_UNSET,
     ) -> None:
         super().__init__(problem)
         self.extender = extender
         self.metric = metric
-        self.options = RRTOptions() if options is None else options
+        self.options = _merge_rrt_options(
+            options,
+            max_nodes=max_nodes,
+            goal_bias=goal_bias,
+            goal_tolerance=goal_tolerance,
+            seed=seed,
+            edge_resolution=edge_resolution,
+            max_sample_attempts=max_sample_attempts,
+            return_best_effort=return_best_effort,
+            callback=callback,
+            live_plot=live_plot,
+            live_plot_every=live_plot_every,
+            live_plot_pause=live_plot_pause,
+            live_plot_after_goal_only=live_plot_after_goal_only,
+            live_plot_ax=live_plot_ax,
+            nearest_backend=nearest_backend,
+        )
         self.tree: Tree | None = None
         self.reached_goal: bool = False
         self.solution_node: Node | None = None
         self.iterations: int = 0
         self._sample_box = BoxSet.from_system_state(problem.sys)
 
-    def compute_solution(self) -> Trajectory:
+    def solve(self) -> TrajectoryPlan:
+        """Offline traj-family entry."""
+        return self.solve_trajectory()
+
+    def solve_trajectory(self) -> TrajectoryPlan:
         """Grow the tree until the goal region is reached or the budget is spent."""
         options = self.options
         self._validate_nearest_backend()
@@ -122,7 +198,7 @@ class RRTPlanner(Planner):
                 self.reached_goal = True
                 self.solution_node = node
                 self._on_search_step(phase="explore")
-                return self._store_result(self.tree.extract_trajectory(node))
+                return self._finish_trajectory(self.tree.extract_trajectory(node))
 
             self._on_search_step(phase="explore")
 
@@ -131,7 +207,15 @@ class RRTPlanner(Planner):
         self.solution_node = closest
         if not options.return_best_effort:
             raise RuntimeError("RRT failed to reach goal within max_nodes")
-        return self._store_result(self.tree.extract_trajectory(closest))
+        return self._finish_trajectory(self.tree.extract_trajectory(closest))
+
+    def _finish_trajectory(self, trajectory: Trajectory) -> TrajectoryPlan:
+        return self._store_trajectory_plan(
+            TrajectoryPlan(
+                trajectory=trajectory,
+                metadata=SolveMetadata(success=bool(self.reached_goal)),
+            )
+        )
 
     def plot_tree(self, **kwargs):
         """Plot the final tree and solution path (lazy matplotlib import).

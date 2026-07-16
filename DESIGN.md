@@ -56,7 +56,7 @@ or neural network alike):
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
-| `control/` | control laws and design factories (`linear.py`, `pid.py`, `lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`) |
+| `control/` | control laws and design factories (`linear.py`, `pid.py`, `lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -86,6 +86,8 @@ state-feedback block):
   never catalog content. (The abstraction modules are the shared mathematical
   bases of the library band: `blocks/` builds LTI wiring on them, `control/`
   computed torque, `estimation/` EKFs.)
+- **Exception:** `control/mpc` may import `planning.trajectory_optimization`
+  (receding-horizon controller wraps a traj-family planner).
 - Libraries may ship **factories for their own blocks** with array-in /
   block-out signatures (`control.lqr(A, B, Q, R) -> StateFeedback`,
   `estimation.kalman_design(A, C, Q, R) -> KalmanFilter`); the linearization
@@ -184,8 +186,8 @@ serial arms. Joint impedance / task impedance / computed torque use
   ``Computer @ plant`` and :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`
   (same port auto-wiring as continuous ``ctl @ plant`` via
   :func:`~minilink.core.composition.resolve_standard_feedback`);
-  :meth:`~minilink.planning.mpc.controller.MPCStatelessController.export_to_computer` /
-  :meth:`~minilink.planning.mpc.step_block.MPCStatefulController.export_to_computer` for warm-start MPC.
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.export_to_computer`
+  for warm-start MPC (also via ``mpc % schedule``).
   Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
   exposes standard ``u`` / ``y`` ports for hybrid composition.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
@@ -202,16 +204,42 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
-- **MPC hybrid block (Phase 6a–6b):** :class:`~minilink.planning.mpc.controller.MPCStatelessController`
-  is a static ``System`` (``n=0``) leaf: one :meth:`~minilink.planning.mpc.planner.MPCPlanner.step`
-  per Computer tick (memoized across output ports ``u_ff``, ``x_ff``, ``z``).
-  :class:`~minilink.planning.mpc.step_block.MPCStatefulController` (Phase 6b) is a
-  :class:`StepSystem` with packed decision state ``z``; warm-start via
-  :func:`~minilink.planning.mpc.warm_start.mpc_warm_start_guess` from
-  ``Computer.x``.   Post-sim horizons:
-  :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
+- **MPC hybrid block:** :func:`~minilink.control.mpc.ModelPredictiveController`
+  returns a static ``System`` (``n=0``) or :class:`StepSystem` (``warm_start=True``)
+  that holds a
+  :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`.
+  **JAX path:** :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.compile_parametric_program`
+  once, then each Computer tick is bind + solve (memoized across ports ``u_ff``,
+  ``x_ff``, ``z``). **NumPy/direct path:** each tick rebuilds the NLP via
+  :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.solve_trajectory_from`
+  (no parametric compile). Warm-start via
+  :func:`~minilink.control.mpc.utilities.mpc_warm_start_guess` from
+  ``Computer.x``. Deploy / hand loop:
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.compute_command`
+  → :class:`~minilink.control.mpc.controller.Command`; telemetry via
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.get_solve_metadata`
+  and ``Command.metadata`` (alias of ``plan.metadata``); ``reset()`` clears
+  deploy counter, last command, nominal cache, and tick latch. High-rate
+  nominal (opt-in):
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.generate_nominal_interpolator`
+  then
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.get_nominal_u`
+  / ``get_nominal_x`` / ``get_nominal_u_dot`` / ``get_nominal_x_dot``.
+  Default ``export_to_computer`` / ``mpc @ plant`` apply ``u_ff`` ZOH; advanced
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.dual_rate_computer`
+  (``dt_broadcast``) builds a multi-rate Computer with ``u_nom`` broadcast.
+  **Dual-rate packaging (option A):** ``replan`` and ``broadcast`` share the
+  same MPC object — after each NLP the latch builds ``NominalCache`` via
+  ``generate_nominal_interpolator``; broadcast evaluates ``get_nominal_*``.
+  There is **no** port edge between the leaves (Graphviz correctly shows two
+  islands). Deploy truth remains the two-timer method API; the Computer is
+  convenience packaging, not a pure signal graph. A future port-carried flat
+  plan (option B) would make the edge honest at the cost of one
+  ``dt_broadcast`` lag under parallel tick semantics. External nodes wrap the
+  same methods (no ROS2 package in-tree). Post-sim horizons:
+  :func:`~minilink.control.mpc.viz.mpc_plans_from_rollout`;
   default animation overlays:
-  :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
+  :func:`~minilink.control.mpc.viz.mpc_animation_overlays`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
@@ -256,11 +284,16 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   (numeric leaves required): values vary without retracing, and
   `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
   (see `examples/scripts/identification/demo_params_gradient.py`).
-- **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets` today;
-  a future `scene` tier for spatial overrides is on the roadmap. **Deferred**
-  ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides on base
-  `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types declare
-  `(t, params)` but still read frozen attributes only until a follow-up pass.
+- **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets`
+  today; `scene` is reserved (`None`) for pipeline B spatial overrides.
+  Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
+  or `{}` binds `x0` only; `params={"scene": …}` raises `NotImplementedError`
+  until `ParametricMathematicalProgram` gains `J(z, p)` / `ObstacleBank`
+  ([planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
+  **Deferred** ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides
+  on base `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types
+  declare `(t, params)` but still read frozen attributes only until a follow-up
+  pass.
 
 ### `DiagramSystem`
 
@@ -361,8 +394,7 @@ expose a **trace tier** (`.f_trace`, `.f_trace_p`, `.rk4_step_trace`, …):
 pre-JIT flat callables for composition inside outer `jit` / `grad` / `vmap`
 (identification losses, C export). Optional `_jit` aliases (`.f_jit` ≡ `.f`)
 document the fast tier. NumPy evaluators reject `*_trace` / `*_jit` attributes.
-`has_trace_tier` is `True` on JAX evaluators. Details:
-[docs/plans/evaluator-trace-tier-api.md](docs/plans/evaluator-trace-tier-api.md).
+`has_trace_tier` is `True` on JAX evaluators.
 
 |  | Bound | Parametric |
 | --- | --- | --- |
@@ -374,8 +406,6 @@ Same 2×2 for `outputs`, `step`, and integration helpers
 on JAX dynamics evaluators. Layout:
 `evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`,
 `step_rollout.py` (`gather_u`, `StepRolloutMixin`).
-Integration naming:
-[docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md).
 
 **Integration rename (pre-1.0).** Rollout methods use explicit integrator + input
 model tokens — no bare `integrate`:
@@ -387,9 +417,7 @@ model tokens — no bare `integrate`:
 | `rk4_integrate_forced` | `rk4_integrate_linear` |
 | `rk4_integrate_forced_p` | `rk4_integrate_linear_p` |
 
-Trace-tier JAX twins follow the same pattern (`*_trace`, `*_trace_p`). See
-[docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md)
-for the full grid.
+Trace-tier JAX twins follow the same pattern (`*_trace`, `*_trace_p`).
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
 reintroduce `compute_outputs(..., ports=...)`.
@@ -483,26 +511,54 @@ kind is class-type routing only — ``solver_info["continuous_time_equation"]`` 
 **NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;
 `Optimizer` binds method preset (`scipy_slsqp`, `scipy_trust_constr`, `ipopt`).
 
-**Planning:** `PlanningProblem` owns system, sets, cost. `X0`/`Xf` authoritative;
-`x_start`/`x_goal` are shortcuts/representative points.
+**Planning:** `PlanningProblem` owns system, sets, cost, and continuous horizon
+`tf` (`None` unset, `+inf` infinite-horizon, or a finite length — trajopt/MPC
+require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
+`x_start`/`x_goal` are shortcuts/representative points. Offline entry is
+`Planner.solve()` → `TrajectoryPlan` (traj family) or `PolicyPlan` (policy
+family).
 
-**Trajopt:** planner → transcription → `MathematicalProgram` → `Optimizer` →
-`Trajectory`. Single backend-native transcription classes; no parallel JAX
-transcription types. NumPy transcriptions build constraints via
-`dynamics_function` (compiled evaluator, trace tier when JAX). **JAX transcriptions**
-embed `problem.sys.f` directly in the NLP (not evaluator `f` / `f_trace`).
-`compile_backend="direct"` calls `system.f` uncompiled (escape hatch).
-A `MathematicalProgram` carries the native backend of its callables in its
-`backend` field, and the `Optimizer` compiles with it by default.
+**Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
+`TrajectoryPlan`. **I-level constructors** take flat kwargs
+(`n_steps=…`, `transcription="direct_collocation"`, `compile_backend=…`,
+`optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
+`transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
+and/or `options=TrajectoryOptimizationOptions(...)`. Offline
+`solve_trajectory` always rebuilds a fresh
+`MathematicalProgram`. Optional `compile_parametric_program()` builds a
+`ParametricMathematicalProgram` (``h(z, x0)``) once so
+`solve_trajectory_from(x0, params=None)` is bind + solve only on the JAX
+parametric path; with ``compile_backend='numpy'`` or ``'direct'``, each
+from-solve rebuilds the NLP (expected for no-JAX MPC). A one-time speed warning
+is emitted only when a JAX planner omits parametric compile.
+Online ``params`` is an x0-only façade today (`None`/`{}`); reserved key
+``scene`` raises ``NotImplementedError`` until pipeline B extends the parametric
+tier to ``J(z, p)`` (see ROADMAP scene params). Knot count
+`n_steps` is a planner flat kwarg (or lives on a custom transcription's
+options); the time grid is
+`linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
+transcription classes; no parallel JAX transcription types. NumPy transcriptions
+build constraints via `dynamics_function` (compiled evaluator, trace tier when
+JAX). **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not
+evaluator `f` / `f_trace`). `compile_backend="direct"` calls `system.f`
+uncompiled (escape hatch). A `MathematicalProgram` carries the native backend of
+its callables in its `backend` field, and the `Optimizer` compiles with it by
+default.
+
+**RRT / DP:** same two-tier idea — flat routine knobs on
+`RRTPlanner` / `RRTStarPlanner` / `DynamicProgrammingPlanner`, with
+`options=` as the advanced escape. Keep fundamental seams explicit
+(`extender`, `StateSpaceGrid`).
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
 comes from a `BoxSet`/`BoxInputSet` (so it stays finite), grid *validity* from
 `X.contains`/`U.contains` (so `X = bounds & free` still works), and successors from a
 forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the grid, not
-on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `compute_solution`
-to tolerance, `solve_steps` for a fixed horizon — returning a cost-to-go `J` and greedy policy
-`pi` (action ids); out-of-domain transitions are charged a finite `out_of_bound_cost` (pyro's
+on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
+to tolerance, `solve_steps` for a fixed horizon — returning a `PolicyPlan` whose
+`.policy` holds cost-to-go `J` and greedy policy `pi` (action ids); out-of-domain
+transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`). Three interchangeable backward-step backends share this workflow: `loop` (per-node
 Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table, the default),
 and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, built on a
@@ -527,7 +583,9 @@ geometry: :func:`~minilink.planning.spatial.collision.disc`,
 :func:`~minilink.planning.spatial.collision.car_outline`. Shape obstacles with
 `quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
-obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.
+obstacles, MPC sweeps) need pipeline B (`ObstacleBank` + `J(z, p)` bind) —
+online `params={"scene": …}` is reserved but raises `NotImplementedError`;
+rebuild `Scene` + re-`compile_parametric_program()` until then.
 
 **Reference track** (`planning/spatial/paths.py`, `track.py`): workspace centerlines
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in
@@ -547,19 +605,19 @@ sources every concern from the problem — collision `problem.X.contains` (optio
 orchestrator `edge_resolution` densification along edges), goal `problem.Xf`/`x_goal`,
 free-space sampling from `problem.X` (direct `Set.sample` or rejection from state
 bounds), dynamics `problem.sys.f` — so the system stays pure. After
-`compute_solution()`, `reached_goal` and `solution_node` report success vs
+`solve()`, `reached_goal` and `solution_node` report success vs
 best-effort fallback (`return_best_effort`). The two swappable pieces are an injected
 `TrajectoryExtender` (`propose(from, toward, problem, rng) → Iterable[Edge]`:
 `KinodynamicExtender` forward-integrates controls, `SteeringExtender` connects exactly
 via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callable
 (nearest-neighbour distance). Every system is an ODE, so an `Edge` always carries real
-`(t,x,u)`; `compute_solution() → Trajectory`. `RRTStarPlanner` extends the attach step
+`(t,x,u)`; `solve() → TrajectoryPlan`. `RRTStarPlanner` extends the attach step
 with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
 `optimize_after_goal`, the search continues after the first goal connection until
 the best goal cost stops improving for `convergence_patience` extensions;
 `record_history` + `animate_convergence` replay tree growth and path refinement.
-``live_plot`` / ``callback`` redraw the tree during ``compute_solution`` (pyro-style);
+``live_plot`` / ``callback`` redraw the tree during ``solve`` (pyro-style);
 ``live_plot_after_goal_only`` limits updates to the RRT* post-goal convergence phase.
 ``RRTOptions.nearest_backend`` selects brute-force or SciPy ``cKDTree`` nearest/near
 queries (Euclidean L2 only — requires ``metric=euclidean``); see

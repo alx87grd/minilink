@@ -125,7 +125,36 @@ def resolve_hybrid_feedback_ports(
     Return ``(computer_out, computer_in, plant_in, plant_out)`` for standard wiring.
 
     Uses the same rules as :func:`~minilink.core.composition.resolve_standard_feedback`.
+    Multi-leaf step diagrams (e.g. dual-rate MPC) use boundary ports when present.
     """
+    if (
+        isinstance(computer_side, StepDiagramSystem)
+        and len(computer_side.subsystems) != 1
+    ):
+        if "y" in computer_side.inputs:
+            computer_in = "y"
+        elif "x" in computer_side.inputs:
+            computer_in = "x"
+        else:
+            raise ValueError(
+                "multi-leaf computer diagram needs boundary input 'y' (or 'x')"
+            )
+        if "u_nom" in computer_side.outputs:
+            computer_out = "u_nom"
+        elif "u" in computer_side.outputs:
+            computer_out = "u"
+        elif "u_ff" in computer_side.outputs:
+            computer_out = "u_ff"
+        else:
+            raise ValueError(
+                "multi-leaf computer diagram needs boundary output "
+                "'u_nom', 'u', or 'u_ff'"
+            )
+        plant_leaf = _plant_leaf(plant)
+        plant_in = "u" if "u" in plant_leaf.inputs else next(iter(plant_leaf.inputs))
+        plant_out = "y" if "y" in plant_leaf.outputs else next(iter(plant_leaf.outputs))
+        return computer_out, computer_in, plant_in, plant_out
+
     controller = _computer_leaf(computer_side)
     plant_leaf = _plant_leaf(plant)
     wiring = resolve_standard_feedback(controller, plant_leaf, diagram=None)

@@ -7,22 +7,24 @@ import pytest
 
 pytest.importorskip("jax")
 
+from minilink.control.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
+    mpc_plans_from_rollout,
+)
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
     JaxDynamicBicycleRateInputsUY,
 )
-from minilink.planning.mpc import (  # noqa: E402
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
-    mpc_animation_overlays,
-    mpc_plans_from_rollout,
-    mpc_stateless_controller,
-)
 from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
+from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 from minilink.simulation.hybrid_simulator import HybridSimulator  # noqa: E402
 
@@ -68,22 +70,25 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
     )
     sys_sim.x0 = x0.copy()
 
-    template_problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
-    transcription = MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=mpc_horizon, n_steps=mpc_steps)
+    template_problem = PlanningProblem(
+        sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon
     )
-    mpc_planner = MPCPlanner(
+    transcription = DirectCollocationTranscription(
+        DirectCollocationOptions(n_steps=mpc_steps)
+    )
+    mpc_planner = TrajectoryOptimizationPlanner(
         template_problem,
         transcription=transcription,
-        options=MPCOptions(
+        options=TrajectoryOptimizationOptions(
             compile_backend="jax",
+            record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": 80, "ftol": 1e-2},
         ),
     )
 
     mpc_dt = 1.0 / mpc_hz
-    mpc = mpc_stateless_controller(mpc_planner)
+    mpc = ModelPredictiveController(mpc_planner, dt_mpc=mpc_dt, warm_start=False)
     hybrid = (mpc % mpc_dt) @ sys_sim
     return hybrid, mpc_planner, transcription, template_problem
 

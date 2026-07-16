@@ -38,7 +38,7 @@ planner = RRTPlanner(
     extender=KinodynamicExtender(controls=torques, horizon=0.3, n_substeps=6),
     options=RRTOptions(seed=0, goal_bias=0.05, max_nodes=20000),
 )
-traj = planner.compute_solution()
+traj = planner.solve().trajectory
 print(
     f"pendulum swing-up: {len(planner.tree.nodes)} nodes, "
     f"final theta={traj.x[0, -1]:.2f} rad (goal pi), dtheta={traj.x[1, -1]:.2f} rad/s, "

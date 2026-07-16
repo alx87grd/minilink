@@ -27,12 +27,7 @@ from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -124,6 +119,7 @@ path_cost = track.distance_field(body).as_cost(
 )
 problem = PlanningProblem(
     sys=sys,
+    tf=TF,
     x_start=X_START,
     x_goal=X_GOAL,
     X=X,
@@ -131,19 +127,15 @@ problem = PlanningProblem(
     cost=control_cost + path_cost,
 )
 
-transcription = DirectCollocationTranscription(
-    DirectCollocationOptions(tf=TF, n_steps=N_STEPS)
-)
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=transcription,
-    options=TrajectoryOptimizationOptions(
-        compile_backend="numpy",
-        optimizer_options={"maxiter": 500, "ftol": 1e-1},
-    ),
+    n_steps=N_STEPS,
+    transcription="direct_collocation",
+    compile_backend="numpy",
+    optimizer_options={"maxiter": 500, "ftol": 1e-1},
 )
 
-t_grid = transcription.options.t
+t_grid = planner.transcription.initial_guess_time_grid(problem)
 s_start, _ = track.path.project(X_START)
 s_goal, _ = track.path.project(X_GOAL)
 arc = np.linspace(s_start, s_goal, t_grid.size)
@@ -154,8 +146,7 @@ guess = Trajectory(
     u=np.gradient(xy, t_grid, axis=0).T,
 )
 
-traj = planner.compute_solution(initial_guess=guess)
-
+traj = planner.solve(initial_guess=guess).trajectory
 distances = [
     float(track.distance_field(body).value(traj.x[:, k])) for k in range(traj.n_samples)
 ]

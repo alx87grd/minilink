@@ -121,7 +121,7 @@ def benchmark_nearest_backend(planner_cls, backend, seed):
         options=_make_options(planner_cls, seed, backend),
     )
     t0 = time.perf_counter()
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     elapsed = time.perf_counter() - t0
     goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))
     label = "rrt*" if planner_cls is RRTStarPlanner else "rrt"

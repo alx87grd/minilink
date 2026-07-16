@@ -10,6 +10,13 @@ import pytest
 pytest.importorskip("jax")
 
 from minilink.blocks.routing import Demux  # noqa: E402
+from minilink.control.mpc import (
+    ModelPredictiveController,
+)
+from minilink.control.mpc.utilities import (  # noqa: E402
+    mpc_default_computer_x0,
+    warm_start_guess_from_prev_plan,
+)
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem  # noqa: E402
@@ -18,24 +25,19 @@ from minilink.core.trajectory import Trajectory  # noqa: E402
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
     JaxDynamicBicycleRateInputs,
 )
-from minilink.planning.mpc import (  # noqa: E402
-    MPCDirectCollocationTranscription,
-    MPCOptions,
-    MPCPlanner,
-    mpc_stateful_controller,
-)
-from minilink.planning.mpc.warm_start import (  # noqa: E402
-    mpc_default_computer_x0,
-    warm_start_guess_from_prev_plan,
-)
 from minilink.planning.problems import PlanningProblem  # noqa: E402
-from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
+from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
+    DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.planner import (
+    TrajectoryOptimizationOptions,
+    TrajectoryOptimizationPlanner,
 )
 from minilink.simulation.computer import Computer, StepSchedule  # noqa: E402
 from minilink.simulation.hybrid_simulator import HybridSimulator  # noqa: E402
 
-# Match examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
+# Hand-loop compute_command + RK4 ZOH pattern (parity with hybrid product)
 U_TARGET = 4.0
 TF_SIM = 5.0
 MPC_HZ = 5.0
@@ -90,15 +92,16 @@ def _configure_bicycle_systems():
 
 
 def _make_planner(sys_mpc, cost, x0):
-    problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost)
-    transcription = MPCDirectCollocationTranscription(
-        DirectCollocationOptions(tf=MPC_HORIZON, n_steps=MPC_STEPS)
+    problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
+    transcription = DirectCollocationTranscription(
+        DirectCollocationOptions(n_steps=MPC_STEPS)
     )
-    planner = MPCPlanner(
+    planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=transcription,
-        options=MPCOptions(
+        options=TrajectoryOptimizationOptions(
             compile_backend="jax",
+            record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
         ),
@@ -108,11 +111,12 @@ def _make_planner(sys_mpc, cost, x0):
 
 def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
     """
-    Run the warm-started manual loop from ``mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py``.
+    Run a warm-started manual ``compute_command`` + RK4 ZOH loop.
 
     Returns MPC-fire times, ``u_hold`` commands, plant states at fires, and the fine plant traj.
     """
     sim_evaluator = sys_sim.compile(backend="jax", verbose=False)
+    planner.compile_parametric_program()
     x0 = np.asarray(problem.x_start, dtype=float).reshape(-1)
 
     t_mpc = []
@@ -169,7 +173,7 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
 
 
 def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
-    mpc = mpc_stateful_controller(planner, dt_mpc=MPC_DT)
+    mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
     z0 = mpc_default_computer_x0(planner)
 
     step_diagram = StepDiagramSystem()

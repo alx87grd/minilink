@@ -45,7 +45,6 @@ On a normal local kernel, that cell is a no-op.
 | [demo_stateless_functional_jax.ipynb](demo_stateless_functional_jax.ipynb) | Stateless `f` and JAX tracing |
 | [demo_optimization.ipynb](demo_optimization.ipynb) | Small NLPs |
 | [demo_plots_animations_backends.ipynb](demo_plots_animations_backends.ipynb) | Plot / animate backends |
-| [demo_mpc_spatial_scene_guide.ipynb](demo_mpc_spatial_scene_guide.ipynb) | Spatial MPC recipe |
-| [demo_mpc_hybrid_track_lap.ipynb](demo_mpc_hybrid_track_lap.ipynb) | Hybrid MPC on a track |
+| [demo_mpc_circuit.ipynb](demo_mpc_circuit.ipynb) | Spatial MPC full stack (scene → cost → plan → hybrid deploy) |
 | [demo_bicycle_trajopt_obstacle_scene_compare.ipynb](demo_bicycle_trajopt_obstacle_scene_compare.ipynb) | TrajOpt plant compare |
 | [simulation_benchmark.ipynb](simulation_benchmark.ipynb) | ODE solver benchmarks |

@@ -48,6 +48,7 @@ def build_showcase_cartpole_problem() -> PlanningProblem:
     )
     return PlanningProblem(
         sys=sys,
+        tf=SHOWCASE_TRAJOPT_TF,
         x_start=x_start,
         x_goal=x_goal,
         cost=cost,
@@ -65,10 +66,7 @@ def run_showcase_cartpole_trajopt(*, n_runs: int = 1) -> TrajoptScenarioResult:
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(
-                tf=SHOWCASE_TRAJOPT_TF,
-                n_steps=SHOWCASE_TRAJOPT_N_STEPS,
-            )
+            DirectCollocationOptions(n_steps=SHOWCASE_TRAJOPT_N_STEPS)
         ),
         options=TrajectoryOptimizationOptions(
             compile_backend="jax",
@@ -91,7 +89,7 @@ def run_showcase_cartpole_trajopt(*, n_runs: int = 1) -> TrajoptScenarioResult:
 
     for _ in range(n_runs):
         t0 = time.perf_counter()
-        traj = planner.compute_solution()
+        traj = planner.solve().trajectory
         total_s = time.perf_counter() - t0
         total_times.append(total_s)
 

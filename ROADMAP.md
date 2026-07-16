@@ -55,7 +55,7 @@ release process by themselves.
 - Separated model / compile / simulate / optimize / plan / graphics.
 - `ExecutionPlan` + NumPy/JAX evaluators; shared `Trajectory`.
 - **JAX evaluator trace tier** — fast vs trace execution tiers on compiled
-  evaluators ([evaluator-trace-tier-api.md](docs/plans/evaluator-trace-tier-api.md)).
+  evaluators ([DESIGN.md](DESIGN.md) §5).
 - Composition shortcuts (`+`, `>>`, `@`, `autowire`) → ordinary `DiagramSystem`.
 - Explicit ports; `DynamicSystem` textbook ports via constructor options.
 - Pure `MathematicalProgram` + `Optimizer`; backend-native trajopt transcriptions.
@@ -132,7 +132,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 - [x] **Integration API rename** — `rk4_integrate_{zoh,linear,ivp}`, `euler_integrate_{zoh,ivp}`,
   full `_p` / JAX `_trace` grid, lazy rollout JIT, by-backend evaluator layout
-  ([evaluator-integration-api.md](docs/plans/evaluator-integration-api.md))
+  ([DESIGN.md](DESIGN.md) §5)
 
 ### 5.1 Analysis
 
@@ -169,12 +169,37 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 ### 5.5 Planning
 
 - [x] Trajectory optimization (direct collocation, shooting, multiple shooting)
-- [x] **MPC compile-once** — `planning/mpc/` (`MPCPlanner`, parametric
-  `x_start`, JAX direct collocation; primary demos under `examples/scripts/mpc/`;
-  legacy per-step trajopt reference: `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`)
-- [ ] **Scene params** — `ProblemParameters.scene`, transcription merge helpers,
-  indexed overrides in `Scene` / `StateField` (moving obstacles, scenario sweeps,
-  MPC without scene rebuild).
+- [x] **MPC / trajopt compile-once** —
+  `TrajectoryOptimizationPlanner.compile_parametric_program` +
+  `solve_trajectory_from` (parametric `x0`); controllers in `control/mpc/`;
+  primary demos under `examples/scripts/mpc/`
+  (`demo_mpc_minimal`, `demo_mpc_minimal_numpy`, `demo_mpc_dual_rate`, `demo_mpc_path`,
+  `demo_mpc_circuit`, `demo_mpc_slalom`, `demo_mpc_spatial`)
+- [x] **NumPy MPC rebuild mode** — `compile_backend='numpy'` or `'direct'` skips
+  parametric compile; each replan tick transcribes + solves via
+  `solve_trajectory_from` (no JAX required).
+- [x] **Online `params` façade (E7 slim)** — `params=None`/`{}` for x0-only;
+  reserved `scene` key and `ProblemParameters.scene` placeholder;
+  `NotImplementedError` until full bind; latch forwards `params` on
+  `compute_command`.
+- [x] **Broadcast + dual-rate (E8)** —
+  `generate_nominal_interpolator` + `get_nominal_u/x/u_dot/x_dot`;
+  `dual_rate_computer(dt_broadcast)`; default `@` stays `u_ff` ZOH.
+- [x] **Phase F — MPC package home** — product System family in
+  `control/mpc/` (`controller.py`, `utilities.py`, `viz.py`); hard-cut
+  former `planning/mpc`.
+- [x] **Planning UI simplification** — Simulator-style planner constructors
+  (flat kwargs for trajopt / RRT / DP); teach demos use `control.mpc` and
+  explicit `transcription="…"` without `*Options` imports.
+- [ ] **Scene params / online bind (pipeline B)** — *wanted later.*
+  `ObstacleBank`, `J(z, p)` / `bind(p)`, indexed scene overrides (moving
+  obstacles, scenario sweeps without NLP rebuild). Notes in
+  [planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md).
+- [ ] **Optimizer wiring — parametric trajopt / MPC** — unify
+  `optimizer_method` (SciPy SLSQP, IPOPT, …) across offline rebuild and
+  `compile_parametric_program` fast path; shared `make_optimizer_backend`
+  factory instead of planner-local SciPy-only registry. Analysis and steps in
+  [optimizer-parametric-wiring.md](docs/plans/optimizer-parametric-wiring.md).
 - [ ] **Parametric `core/` primitives** (promoted to P1) — call-time `params`
   overrides on `Shape.sdf`, `Set.margin`, and `CostFunction.g`/`h` (e.g. `BallSet`
   center/radius, `QuadraticCost` weights). Signatures exist; frozen attributes are the
@@ -199,8 +224,8 @@ continuous plants — not full Simulink parity. Minilink remains focused on cont
 - [x] **Phase 5** — `HybridDiagram`, `HybridSimulator`, `HybridSimResult`, multi-rate hybrid demo, Pyro SMC hybrid compare *(5a)*
 - [x] **Phase 5** — fine plant recording (`integrate_zoh_rollout`, `plant_dt_inner`); façade `traj` / `last_result` / `rollout` / `animate()`
 - [x] **Phase 5c** — `HybridDiagram.plot_diagram`, `build_hybrid_topology`, Mermaid/Graphviz export, `abstract_boundary` topology *(shortcuts: `hybrid_closed_loop`, `Computer @ plant`)*
-- [x] **Phase 6a** — `MPCStatelessController` (algebraic block, `u_ff`/`x_ff`/`z`), hybrid straight-line demo, `mpc_plans_from_rollout`
-- [x] **Phase 6b** — warm-start `MPCStatefulController` (`StepSystem`, state = optimizer `z`), `warm_start` helpers
+- [x] **Phase 6a–6b / E2–E5** — `ModelPredictiveController` (algebraic or warm-start
+  `StepSystem`, ports `u_ff`/`x_ff`/`z`), hybrid demos, `mpc_plans_from_rollout`
 
 ### 5.6 Estimation and identification
 

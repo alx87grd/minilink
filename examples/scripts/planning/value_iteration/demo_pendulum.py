@@ -72,7 +72,7 @@ def run_swingup():
             alpha=1.0, tol=0.1, max_iterations=2000, out_of_bound_cost=INF, verbose=True
         ),
     )
-    result = planner.compute_solution()
+    result = planner.solve().policy
     planner.clean_infeasible_set()
 
     plotting.plot_value(grid, result.J, vmax=INF)
@@ -108,7 +108,7 @@ def run_lqr_comparison():
         grid=grid,
         options=DynamicProgrammingOptions(alpha=1.0, tol=0.1, max_iterations=2000),
     )
-    result = planner.compute_solution()
+    result = planner.solve().policy
     planner.clean_infeasible_set()
 
     lqr = lqr_at_operating_point(

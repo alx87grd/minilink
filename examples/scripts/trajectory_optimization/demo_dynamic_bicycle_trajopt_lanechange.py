@@ -5,12 +5,7 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -64,33 +59,26 @@ cost = QuadraticCost.from_system(
 )
 problem = PlanningProblem(
     sys=sys,
+    tf=TF,
     x_start=x_start,
     cost=cost,
 )
 
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(
-            tf=TF,
-            n_steps=N_STEPS,
-        )
-    ),
-    options=TrajectoryOptimizationOptions(
-        compile_backend="jax",
-        # optimizer_method="ipopt",
-        solve_disp=PRINT_SOLVE_REPORT,
-        optimizer_options={
-            "disp": SCIPY_DISP,
-            "maxiter": 500,
-            "ftol": 1e-1,
-        },
-    ),
+    n_steps=N_STEPS,
+    transcription="direct_collocation",
+    compile_backend="jax",
+    # optimizer_method="ipopt",
+    solve_disp=PRINT_SOLVE_REPORT,
+    optimizer_options={
+        "disp": SCIPY_DISP,
+        "maxiter": 500,
+        "ftol": 1e-1,
+    },
 )
 
-traj = planner.compute_solution()
-
-
+traj = planner.solve().trajectory
 planner.plot_solution(signals=("x", "u"))
 sys.traj = traj
 # sys.animate(renderer="meshcat")

@@ -56,7 +56,7 @@ def solve(problem, *, precompute=True, **opt_kwargs):
         alpha=0.95, tol=1e-3, max_iterations=400, **opt_kwargs
     )
     planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
-    return planner, planner.compute_solution()
+    return planner, planner.solve().policy
 
 
 class TestStateSpaceGrid(unittest.TestCase):
@@ -165,7 +165,7 @@ class TestValueIteration(unittest.TestCase):
         problem = make_problem()
         grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(5,), dt=0.1)
         planner = DynamicProgrammingPlanner(problem, grid=grid)
-        result = planner.solve_steps(5)
+        result = planner.solve_steps(5).policy
         self.assertEqual(result.iterations, 5)
 
     def test_out_of_bound_penalty_and_cleanup(self):
@@ -220,7 +220,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         evaluator = PolicyEvaluator(
             problem, grid=result.grid, policy=controller.action, options=planner.options
         )
-        J_pi = evaluator.compute_solution()
+        J_pi = evaluator.solve()
         feasible = result.J < planner.options.out_of_bound_cost - 1.0
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
 

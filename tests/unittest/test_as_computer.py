@@ -40,41 +40,45 @@ class TestAsComputer(unittest.TestCase):
         jax = pytest.importorskip("jax")
         del jax
 
+        from minilink.control.mpc import ModelPredictiveController
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
         from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
             JaxDynamicBicycleRateInputsUY,
         )
-        from minilink.planning.mpc import (
-            MPCDirectCollocationTranscription,
-            MPCOptions,
-            MPCPlanner,
-            mpc_stateless_controller,
-        )
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
             DirectCollocationOptions,
+            DirectCollocationTranscription,
+        )
+        from minilink.planning.trajectory_optimization.planner import (
+            TrajectoryOptimizationOptions,
+            TrajectoryOptimizationPlanner,
         )
 
         configure_jax(enable_x64=True)
         sys = JaxDynamicBicycleRateInputsUY()
         x0 = sys.x0.copy()
-        planner = MPCPlanner(
+        planner = TrajectoryOptimizationPlanner(
             PlanningProblem(
                 sys=sys,
+                tf=1.0,
                 x_start=x0,
                 cost=QuadraticCost.from_system(sys, xbar=x0),
             ),
-            transcription=MPCDirectCollocationTranscription(
-                DirectCollocationOptions(tf=1.0, n_steps=5)
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(n_steps=5)
             ),
-            options=MPCOptions(
+            options=TrajectoryOptimizationOptions(
                 compile_backend="jax",
+                record_solve_time=True,
                 optimizer_method="scipy_slsqp",
                 optimizer_options={"maxiter": 5, "ftol": 1e-1},
             ),
         )
-        computer = mpc_stateless_controller(planner) % 0.2
+        computer = (
+            ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False) % 0.2
+        )
         self.assertIn("y", computer.diagram.inputs)
         self.assertIn("u_ff", computer.diagram.outputs)
 

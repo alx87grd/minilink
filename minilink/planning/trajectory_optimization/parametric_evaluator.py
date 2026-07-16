@@ -2,7 +2,9 @@
 
 import numpy as np
 
-from minilink.planning.mpc.parametric_program import ParametricMathematicalProgram
+from minilink.planning.trajectory_optimization.parametric_program import (
+    ParametricMathematicalProgram,
+)
 
 
 class JaxParametricProgramEvaluator:
@@ -28,7 +30,7 @@ class JaxParametricProgramEvaluator:
             import jax.numpy as jnp
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise ImportError(
-                "JAX is required for the beta MPC planner. "
+                "JAX is required for parametric trajectory optimization. "
                 "Install with `pip install jax jaxlib`."
             ) from exc
 

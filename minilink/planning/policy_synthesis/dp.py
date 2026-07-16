@@ -23,7 +23,7 @@ Three interchangeable backward-step engines share this workflow:
 """
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -38,11 +38,26 @@ from minilink.planning.policy_synthesis.discretizer import (
     print_build_complete,
 )
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.results import PolicyPlan, SolveMetadata
 
 #: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
 BACKEND_LOOP = "loop"
 
 # Public API
+
+_UNSET = object()
+
+_DP_OPTION_KEYS = (
+    "backend",
+    "alpha",
+    "tol",
+    "max_iterations",
+    "interpolation",
+    "out_of_bound_cost",
+    "final_time",
+    "record_history",
+    "verbose",
+)
 
 
 @dataclass
@@ -91,6 +106,20 @@ class DynamicProgrammingOptions:
     final_time: float = 0.0
     record_history: bool = False
     verbose: bool = False
+
+
+def _merge_dp_options(
+    options: DynamicProgrammingOptions | None,
+    **flat,
+) -> DynamicProgrammingOptions:
+    base = DynamicProgrammingOptions() if options is None else options
+    updates = {key: value for key, value in flat.items() if value is not _UNSET}
+    unknown = sorted(k for k in updates if k not in _DP_OPTION_KEYS)
+    if unknown:
+        raise ValueError(f"Unknown DynamicProgrammingPlanner kwargs: {unknown}.")
+    if not updates:
+        return base
+    return replace(base, **updates)
 
 
 @dataclass
@@ -161,7 +190,10 @@ class DynamicProgrammingPlanner(Planner):
     grid : StateSpaceGrid
         Discretization of ``problem``'s state and input spaces.
     options : DynamicProgrammingOptions, optional
-        Workflow options.
+        Tier-2 workflow bag. Flat kwargs below overlay matching fields.
+    backend, alpha, tol, max_iterations, interpolation, out_of_bound_cost,
+    final_time, record_history, verbose
+        Tier-1 flat mirrors of :class:`DynamicProgrammingOptions`.
     """
 
     def __init__(
@@ -170,11 +202,31 @@ class DynamicProgrammingPlanner(Planner):
         *,
         grid: StateSpaceGrid,
         options: DynamicProgrammingOptions | None = None,
+        backend=_UNSET,
+        alpha=_UNSET,
+        tol=_UNSET,
+        max_iterations=_UNSET,
+        interpolation=_UNSET,
+        out_of_bound_cost=_UNSET,
+        final_time=_UNSET,
+        record_history=_UNSET,
+        verbose=_UNSET,
     ) -> None:
         super().__init__(problem)
         self.require_cost()
         self.grid = grid
-        self.options = DynamicProgrammingOptions() if options is None else options
+        self.options = _merge_dp_options(
+            options,
+            backend=backend,
+            alpha=alpha,
+            tol=tol,
+            max_iterations=max_iterations,
+            interpolation=interpolation,
+            out_of_bound_cost=out_of_bound_cost,
+            final_time=final_time,
+            record_history=record_history,
+            verbose=verbose,
+        )
         if self.options.backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
             raise ValueError(f"Unknown backend {self.options.backend!r}")
         self._G = None  # running-cost table, cached when the grid is precomputed
@@ -182,11 +234,15 @@ class DynamicProgrammingPlanner(Planner):
         if self.options.backend == BACKEND_JAX:
             self.grid.ensure_jax_transition(self.options.final_time)
 
-    def compute_solution(self) -> DynamicProgrammingResult:
+    def solve(self) -> PolicyPlan:
+        """Offline policy-family entry."""
+        return self.solve_policy()
+
+    def solve_policy(self) -> PolicyPlan:
         """Run value iteration until convergence (or ``max_iterations``)."""
         return self._solve(max_iterations=self.options.max_iterations, stop_on_tol=True)
 
-    def solve_steps(self, n: int) -> DynamicProgrammingResult:
+    def solve_steps(self, n: int) -> PolicyPlan:
         """Run exactly ``n`` backward sweeps (finite-horizon / time-varying)."""
         return self._solve(max_iterations=int(n), stop_on_tol=False)
 
@@ -197,7 +253,7 @@ class DynamicProgrammingPlanner(Planner):
         Their value is pinned to the penalty and their policy to the action
         nearest the system's nominal input, mirroring pyro's cleanup pass.
         """
-        result = self.require_result()
+        result = self.require_policy_plan().policy
         default_action = self.grid.nearest_action(
             self.problem.sys.get_u_from_input_ports()
         )
@@ -265,7 +321,15 @@ class DynamicProgrammingPlanner(Planner):
         result = DynamicProgrammingResult(
             grid=grid, J=J, pi=pi, iterations=k, delta=delta, history=history
         )
-        return self._store_result(result)
+        return self._finish_policy(result)
+
+    def _finish_policy(self, result: DynamicProgrammingResult) -> PolicyPlan:
+        return self._store_policy_plan(
+            PolicyPlan(
+                policy=result,
+                metadata=SolveMetadata(success=True),
+            )
+        )
 
     def _vectorized_step(self, J, t):
         """Vectorized Bellman backup over the precomputed lookup table (NumPy)."""
@@ -576,7 +640,7 @@ class DynamicProgrammingPlanner(Planner):
             delta=float(delta),
             history=None,
         )
-        return self._store_result(result)
+        return self._finish_policy(result)
 
     def _jax_step(self, jax, jnp):
         """Return (and cache) the jitted single Bellman backup."""
@@ -707,4 +771,4 @@ class DynamicProgrammingPlanner(Planner):
             delta=delta,
             history=history,
         )
-        return self._store_result(result)
+        return self._finish_policy(result)

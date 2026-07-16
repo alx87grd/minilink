@@ -50,7 +50,7 @@ class PolicyEvaluator:
         self.options = DynamicProgrammingOptions() if options is None else options
         self.last_J = None
 
-    def compute_solution(self) -> np.ndarray:
+    def solve(self) -> np.ndarray:
         """Iterate the fixed-policy Bellman update to tolerance and return ``J``."""
         grid = self.grid
         opt = self.options

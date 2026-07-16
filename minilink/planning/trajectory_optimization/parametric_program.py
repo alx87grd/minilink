@@ -1,4 +1,4 @@
-"""Parametric finite-dimensional programs for compile-once MPC."""
+"""Parametric finite-dimensional programs for compile-once trajopt / MPC."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field

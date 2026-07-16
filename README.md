@@ -149,15 +149,27 @@ loss_and_grad = jax.jit(jax.value_and_grad(
 Discrete control laws (like digital MPC or sampled Sliding Mode Control) can close the loop on continuous plants without breaking the continuous-time core or solver guarantees. `StepSystem` defines discrete logic, and `Computer` schedules it. The `%` and `@` operators build a `HybridDiagram` with Zero-Order Hold (ZOH) and sampling:
 
 ```python
-from minilink.planning.mpc.controller import MPCStatelessController
+from minilink.control.mpc import ModelPredictiveController
 
 # controller is a discrete leaf; plant is a continuous DynamicSystem
-controller = MPCStatelessController(planner, ...)
-computer = controller % 0.1  # schedule to tick every 0.1s
-diagram = computer @ plant   # wire via hybrid ZOH/sample boundaries
+mpc = ModelPredictiveController(planner, dt_mpc=0.1, warm_start=True)
+diagram = mpc @ plant  # schedule + hybrid ZOH/sample wiring
 
 diagram.compute_trajectory(tf=10.0)  # solves the plant exactly between ticks
 diagram.animate()
+```
+
+With ``compile_backend='numpy'`` on the planner (no JAX install), MPC rebuilds the
+NLP each replan tick — see ``examples/scripts/mpc/demo_mpc_minimal_numpy.py``.
+
+Hand-loop or external deploy node (ROS-agnostic — no ROS2 package in minilink):
+
+```python
+cmd = mpc.compute_command(y, t=t_wall)  # replan tick → Command
+u = cmd.u_ff
+meta = mpc.get_solve_metadata()         # success / cost / solve_time_s
+# or: cmd.metadata  (same SolveMetadata)
+mpc.reset()                             # clear deploy counter + latch
 ```
 
 ### Analyze and design
@@ -219,10 +231,6 @@ import numpy as np
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
-    DirectCollocationTranscription,
-)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -237,14 +245,14 @@ problem = PlanningProblem(
     x_start=np.array([-2.0, 1.0, 0.0, 0.0]),
     x_goal=x_goal,
     cost=QuadraticCost.from_system(sys, Q=np.diag([1.0, 1.0, 0.0, 0.0]), xbar=x_goal),
+    tf=5.0,
 )
 planner = TrajectoryOptimizationPlanner(
     problem,
-    transcription=DirectCollocationTranscription(
-        DirectCollocationOptions(tf=5.0, n_steps=50)
-    ),
+    n_steps=50,
+    transcription="direct_collocation",
 )
-traj = planner.compute_solution()
+traj = planner.solve().trajectory
 sys.animate(traj)
 ```
 
@@ -405,8 +413,9 @@ Animate:   animate* / render / game  →  Animator  →  renderer backend
            HybridDiagram.animate  →  plant geometry + fine plant traj
            planner.plot_solution / animate_solution  →  problem.sys.*
 
-Trajopt:   PlanningProblem + Transcription + TrajectoryOptimizationPlanner
-           → transcribe → MathematicalProgram → Optimizer → Trajectory
+Trajopt:   PlanningProblem + TrajectoryOptimizationPlanner
+           (flat ``n_steps`` / ``transcription="…"``; optional Transcription)
+           → transcribe → MathematicalProgram → Optimizer → TrajectoryPlan
 
 NLP:       MathematicalProgram → Optimizer → OptimizationResult
 ```
@@ -428,12 +437,15 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Diagrams | `examples/scripts/diagrams/` |
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
 | Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
-| Minimal hybrid MPC warm-start (`mpc % dt` then `computer @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` |
-| Minimal hybrid MPC track + obstacles (warm-start, `mpc % dt`) | `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` · [notebook](examples/notebooks/demo_mpc_hybrid_track_lap.ipynb) |
+| Minimal MPC (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/mpc/demo_mpc_minimal.py` |
+| NumPy MPC (rebuild each tick, no JAX) | `examples/scripts/mpc/demo_mpc_minimal_numpy.py` |
+| Dual-rate MPC (`dual_rate_computer` + `u_nom`) | `examples/scripts/mpc/demo_mpc_dual_rate.py` |
+| Path MPC (dual-rate manual deploy / ROS2-style loop) | `examples/scripts/mpc/demo_mpc_path.py` |
+| Circuit MPC full stack (scene → cost → plan → hybrid) | `examples/scripts/mpc/demo_mpc_circuit.py` · [notebook](examples/notebooks/demo_mpc_circuit.ipynb) |
+| Slalom MPC (straight lane + staggered obstacles) | `examples/scripts/mpc/demo_mpc_slalom.py` |
+| Spatial MPC assemble (fields → `PlanningProblem`) | `examples/scripts/mpc/demo_mpc_spatial.py` |
 | Pyro SMC continuous (pendulum) | `examples/scripts/control/demo_sliding_mode_pendulum.py` |
 | Pyro SMC continuous vs hybrid (pendulum) | `examples/scripts/hybrid/demo_smc_pendulum_compare.py` |
-| Hybrid MPC straight-line warm-start (`MPCStatefulController`; `STEP_DISP=True`; set `USE_WARM_START=False` for stateless 6a) | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_straight_line.py` |
-| Hybrid MPC closed-loop lap (compact track + obstacles) | `examples/scripts/hybrid/demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |
@@ -444,7 +456,6 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
 | Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` |
-| MPC (rate-MPC bicycle demos; compile-once `MPCPlanner`; legacy per-step trajopt: `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`; obstacle preset: `demo_dynamic_bicycle_rate_mpc_obstacle.py [small\|large]`; spatial scene guide: `demo_mpc_spatial_scene_guide.py`) | `examples/scripts/mpc/` · [spatial scene notebook](examples/notebooks/demo_mpc_spatial_scene_guide.ipynb) |
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` · [notebook](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |
