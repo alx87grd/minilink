@@ -195,6 +195,11 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
   `ObstacleBank`, `J(z, p)` / `bind(p)`, indexed scene overrides (moving
   obstacles, scenario sweeps without NLP rebuild). Notes in
   [planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md).
+- [ ] **Optimizer wiring — parametric trajopt / MPC** — unify
+  `optimizer_method` (SciPy SLSQP, IPOPT, …) across offline rebuild and
+  `compile_parametric_program` fast path; shared `make_optimizer_backend`
+  factory instead of planner-local SciPy-only registry. Analysis and steps in
+  [optimizer-parametric-wiring.md](docs/plans/optimizer-parametric-wiring.md).
 - [ ] **Parametric `core/` primitives** (promoted to P1) — call-time `params`
   overrides on `Shape.sdf`, `Set.margin`, and `CostFunction.g`/`h` (e.g. `BallSet`
   center/radius, `QuadraticCost` weights). Signatures exist; frozen attributes are the
