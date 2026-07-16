@@ -12,6 +12,7 @@ The repo has grown test and benchmark surface area without periodic cleanup:
 | `benchmarks/run_*.py` | **15** CLI runners | **not** in CI |
 | Gated regression baselines | **4** JSON suites | manual / pre-handoff only |
 | `examples/scripts/` | **78** demos | not tests (out of scope for merge, noted for overlap) |
+| Catalog pytest surface | **4 files** (~60 tests): migration, plant contracts, manipulators, kinematic manifest | see §Catalog & demo smokes below |
 
 `tests/README.md` already states the philosophy (contracts over trivia, table-driven over duplicate files, benchmarks for perf not correctness). This plan turns that philosophy into a concrete shrink path while **retaining every independent check**.
 
@@ -29,14 +30,14 @@ Stable public APIs that break user code or DESIGN contracts:
 2. **Compile & evaluators** — diagram compile, algebraic loops, execution plan, NumPy/JAX evaluator tiers, parametric compile, math-program evaluators, static/step leaf dispatch.
 3. **Continuous simulation** — `Simulator` solvers/backends, discontinuous closed-loop, ZOH integration, `StaticSimulator`, scheduled `Computer`.
 4. **Discrete & hybrid** — `StepDiagramSystem`, rollouts, hybrid diagram wiring, `HybridSimulator`, multi-rate, fine recording, SMC hybrid parity.
-5. **Dynamics catalog** — import/instantiate smoke for catalog classes; deep contracts on representative plants (equations + graphics keys).
+5. **Dynamics catalog** — deep equation contracts on **2–3 representative plants** only; broad plant coverage moves to **headless catalog smokes** (§Catalog & demo smokes), not per-class unittest loops.
 6. **Mechanical & robotics** — `MechanicalSystem`, `Manipulator`, task ports, IK, model-based controllers.
 7. **Blocks & control** — signal blocks, linear control laws, standard feedback resolution.
 8. **Analysis** — linearize, structural, equilibria, LQR, modal, frequency, phase plane, discretization.
 9. **Planning** — problem/transcription architecture, UI constructors, RRT/RRT\*, spatial collision/fields, reference paths, DP policy synthesis.
 10. **Optimization & costs** — `Optimizer` backends, cost primitives, set helpers.
 11. **MPC product path** — stateless block, warm-start controller, planner compile, hybrid closed-loop parity vs hand loops, NumPy rebuild mode, `export_to_computer`.
-12. **Graphics contract** — camera transform, implicit `world` frame, draw-list keys, kinematic render manifest smoke, overlays, optional pygame/meshcat/plotly.
+12. **Graphics contract** — camera transform, implicit `world` frame, draw-list keys; **flagship demo pipeline smokes** (§Flagship graphics validation); catalog kinematic render via smoke registry (not a 40-class unittest loop).
 
 **Non-goals for Layer A:** wall-clock performance ratios, third-party print formatting, demo script pixel output.
 
@@ -338,9 +339,219 @@ These are imported by suites and smoke tests — **no deletion**, only stop expo
 
 ---
 
+## Catalog & demo smokes (Phase 5)
+
+Today catalog coverage is spread across four pytest modules doing overlapping work:
+
+| Current test file | What it does | ~cost | Replace with |
+| --- | --- | --- | --- |
+| `test_catalog_migration.py` | Reference values for integrators/MSD; arrow/primitive counts for ~15 plants; **`test_catalog_class_smoke`** loops **40+** systems (`f` finite + `geometry_smoke`) | heavy import fan-out | Per-module headless smokes + one aggregator |
+| `test_catalog_plant_contracts.py` | Deep `H/C/g/B` reference matrices + compile + graphics for CartPole, DoublePendulum, DynamicBicycle | keep (contract) | **`test_dynamics_catalog.py`** — 3 plants only |
+| `test_manipulators.py` | Manipulator subclass ports, FK spot checks, camera scale | partial overlap | Fold FK/port checks into **`catalog/manipulators/smoke.py`** + 1 parametrized contract test |
+| `test_kinematic_regression.py` | Manifest-driven Agg PNG render (33 frames, 11 plants) | medium | Same registry as catalog smokes; optional pixel tier for flagships only |
+
+**Principle:** catalog *breadth* (every class instantiates, `f` is finite, frame resolves) belongs in **runnable headless scripts** the user can also run locally; pytest keeps **equation reference values** and **API contracts** that are expensive to recover if they regress silently.
+
+### Recommended layout (not one `__main__` per class)
+
+Putting a 10-line `__main__` in every catalog class file violates the repo’s “hello-world ≤10 lines in core modules” spirit and duplicates JAX-skip logic. Prefer:
+
+```
+minilink/dynamics/catalog/
+  smoke_registry.json          # single source of truth (or Python registry module)
+  pendulum/smoke.py            # one headless runner per catalog *module file*
+  vehicles/smoke.py
+  manipulators/smoke.py
+  ...
+examples/scripts/_smoke/
+  run_catalog_smokes.py        # runs all catalog smokes, structured exit code
+  run_flagship_demos.py          # whitelist of flagship demos in --smoke mode (see below)
+```
+
+Each **`smoke.py`** (colocated with the catalog module it covers):
+
+1. Instantiates every **public plant class** exported from that file.
+2. Runs **`f(x,u)` finiteness** (and `step` if `StepSystem`).
+3. Optionally **3-step Euler** at default `x0` (headless `Simulator`, `tf=0.03`, `MPLBACKEND=Agg`).
+4. Calls shared **`geometry_smoke`** (draw-list finite transforms — no PNG).
+5. Prints one line per class; exits non-zero on failure.
+6. Skips JAX classes when `jax` missing (same policy as today).
+
+Example contract (sketch):
+
+```python
+# minilink/dynamics/catalog/pendulum/smoke.py
+"""Headless catalog smoke for pendulum.py classes. Run: python -m ..."""
+def main() -> int: ...
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+### Aggregator: one helper script
+
+**`examples/scripts/_smoke/run_catalog_smokes.py`** (or `python -m minilink.dynamics.catalog.run_smokes`):
+
+- Discovers smokes via registry (module path → smoke entrypoint).
+- Runs each subprocess with timeout; summarizes pass/fail table.
+- Flags: `--plant pendulum`, `--fast` (skip short sim, only `f` + geometry), `--json`.
+
+**Pytest surface after consolidation:** one test in `test_smoke_scripts.py`:
+
+```python
+def test_catalog_smokes_exit_zero():
+    subprocess.run([sys.executable, "examples/scripts/_smoke/run_catalog_smokes.py", "--fast"], check=True)
+```
+
+Optional nightly job runs full smokes (with 3-step sim). Default CI uses `--fast`.
+
+### What to delete from pytest
+
+| Remove / shrink | Retain |
+| --- | --- |
+| `test_catalog_class_smoke` loop (40+ plants) | Deep matrix tests in `test_catalog_plant_contracts` (3 plants) |
+| Arrow-count table in migration (move spot checks to flagship graphics or 2 plants) | Low-risk **equation literals** for integrators, MSD, 1–2 vehicles (public math) |
+| Duplicate manipulator FK in migration | `test_manipulators` → 1 parametrized port/FK table or merge into catalog contracts |
+| Standalone `test_kinematic_regression` loop | Render step invoked from smoke registry **or** flagship manifest (below) |
+
+### Demo scripts: whitelist smoke, not all 78
+
+Running all 78 demos headless in CI is brittle (user-tuned plots, JAX, meshcat, long MPC). Plan:
+
+1. **Do not** auto-discover every file under `examples/scripts/`.
+2. Maintain a **whitelist manifest** (`examples/scripts/_smoke/flagship_manifest.json`) of ~8–12 **README-tier** demos.
+3. Each whitelisted demo gains a **`run_smoke()`** function (new code at bottom — **does not change default `__main__` behavior** when user runs the demo normally):
+   - Sets `MPLBACKEND=Agg`, `show=False`, short `tf`, minimal `maxiter` where applicable.
+   - Runs the same call chain as the demo but skips `animate(show=True)` unless smoke tier requires one frame.
+   - Preserves user’s commented plots, tuning constants, and disabled sections untouched.
+
+**`run_flagship_demos.py`** iterates the manifest, imports `run_smoke` from each module (dynamic import), collects structured results.
+
+| Tier | Runner | CI |
+| --- | --- | --- |
+| Fast | `run_catalog_smokes.py --fast` + flagship `run_smoke()` without PNG | every PR |
+| Full | catalog smokes + 3-step sim + flagship smokes | nightly or pre-release |
+| Manual | user runs full demos with animation | unchanged |
+
+---
+
+## Flagship graphics validation (Phase 6)
+
+Goal: a **simple visual check** on core demos that exercises the main **graphics output pipelines** without maintaining PNGs for every catalog pose.
+
+### Pipelines to cover
+
+| Pipeline | Exercised by | Current test |
+| --- | --- | --- |
+| Kinematic frame → Matplotlib Agg PNG | catalog plants, `Animator._resolve_frame` | `test_kinematic_regression` |
+| Diagram `plot_trajectory` / `plot_diagram` | most demos | none (implicit) |
+| `animate()` Matplotlib native | `demo_readme`, computed torque, bicycle cascade | none |
+| Overlays (`mpc_animation_overlays`, etc.) | MPC demos | `test_overlays` (unit) |
+| Plotly renderer | trajopt live plot demos | `test_plotly_renderer` (optional) |
+| Meshcat / pygame | engine, interactive demos | optional markers only |
+
+### Three-tier graphics validation
+
+#### Tier G0 — Draw-list contract (pytest, fast) — **keep / extend Layer A**
+
+For each **flagship demo**, at a **canonical terminal state** (fixed seed, short sim):
+
+- Assert `resolve_draw_frame` / diagram boundary frame: finite transforms, primitive count > 0 where expected.
+- Assert stable **frame keys** (primitive types, overlay ids) — no pixel I/O.
+
+One file: **`test_flagship_graphics_contract.py`** (~8 parametrized cases driven by manifest).
+
+#### Tier G1 — Single-frame render smoke (pytest or Layer B-lite)
+
+Extend kinematic fixture pattern to **flagship end-states**:
+
+| Flagship | Canonical capture | Renderer |
+| --- | --- | --- |
+| `demo_readme.py` (impedance @ pendulum) | `t=tf`, diagram plant state | Matplotlib Agg |
+| `demo_computed_torque_pendulum.py` | post-sim pendulum pose | Matplotlib Agg |
+| `demo_dynamic_bicycle_cascade_path_tracking.py` | mid-trajectory bicycle | Matplotlib Agg |
+| `demo_mpc_minimal.py` | terminal plant + MPC overlay frame | Matplotlib Agg + overlay keys |
+| `demo_diagram_compiling.py` or `demo_closed_loop.py` | diagram topology / signals plot | plot_diagram smoke (no PNG) |
+| `demo_cartpole_direct_collocation_jax_ipopt.py` | traj plot only | plot_trajectory finite axes |
+| `demo_holonomic_obstacles.py` | planning scene draw | scene bounds + path polyline |
+| `demo_animation/demo_native_comparison.py` | native vs non-native same frame | Matplotlib Agg (2 frames) |
+
+**Manifest:** `tests/fixtures/flagship_graphics/manifest.json`
+
+Each entry:
+
+```json
+{
+  "id": "readme_impedance_pendulum",
+  "demo": "examples/scripts/plots/demo_readme.py",
+  "smoke_fn": "run_smoke",
+  "capture": "matplotlib_frame",
+  "state": "from_smoke",
+  "hash": "sha256:…",
+  "tolerance": "perceptual"
+}
+```
+
+**Gating options** (pick one in implementation):
+
+| Approach | Pros | Cons |
+| --- | --- | --- |
+| **A. No committed pixels** (today’s kinematic test) | zero flake, fast | only catches crashes, not visual drift |
+| **B. Downsampled perceptual hash** (pHash / average hash) | catches major layout breaks | some CI flake; needs `--update-manifest` |
+| **C. Committed tiny PNG** (64×64) in `tests/fixtures/flagship_graphics/` | precise | repo size; anti-aliasing flake |
+
+**Recommendation:** start with **A for CI** (finite image + non-blank pixel variance threshold, same as kinematic test today); add **B for 3–5 hero frames** locally / nightly once stable.
+
+Regenerator: `python tests/fixtures/flagship_graphics/regenerate_manifest.py` (mirrors kinematic workflow).
+
+#### Tier G2 — Manual / release visual review
+
+- Full `animate()` with user timing; meshcat optional.
+- Not gated in CI.
+
+### Consolidation with catalog smokes
+
+Use **one plant registry** feeding:
+
+1. `run_catalog_smokes.py` (f + geometry + optional sim)
+2. Kinematic manifest entries (static poses — can shrink to 1 pose per plant)
+3. Flagship demos that **use** catalog plants (don't duplicate plant list)
+
+Remove duplicate plant lists in `regenerate_manifest.py`, `test_catalog_migration`, and kinematic JSON — generate from `smoke_registry`.
+
+### Target file map (catalog + graphics)
+
+| Current | Validates | New owner |
+| --- | --- | --- |
+| `test_catalog_migration.py` (bulk) | 40-class smoke | `catalog/*/smoke.py` + `run_catalog_smokes.py` |
+| `test_catalog_migration.py` (refs) | equation literals | `test_dynamics_catalog.py` (small) |
+| `test_catalog_plant_contracts.py` | deep 3-plant | `test_dynamics_catalog.py` |
+| `test_manipulators.py` | manipulator ports/FK | `catalog/manipulators/smoke.py` + 1 contract test |
+| `test_kinematic_regression.py` | PNG finite | `run_catalog_smokes --render` or flagship G1 |
+| `test_overlays.py` | overlay API | keep (unit) |
+| `test_plotly_renderer.py` | plotly | keep `@pytest.mark.plotting` |
+| `test_camera_transform.py`, `test_world_frame_contract.py` | frame math | `test_graphics.py` |
+| (none) | flagship demo pipelines | `test_flagship_graphics_contract.py` + G1 manifest |
+| (none) | demo headless execution | `run_flagship_demos.py` + 1 pytest subprocess |
+
+### Phase 5–6 migration steps
+
+1. Add `smoke_registry` + `pendulum/smoke.py` pilot; wire `run_catalog_smokes.py`.
+2. Port remaining catalog modules; delete `test_catalog_class_smoke` once aggregator passes.
+3. Add `run_smoke()` to first 3 flagship demos; `run_flagship_demos.py` + G0 contract tests.
+4. Add `flagship_graphics/manifest.json` + regenerate script; G1 nightly job optional.
+5. Merge kinematic manifest generation into registry; drop duplicate plant tables.
+
+### Open questions (catalog / graphics)
+
+1. **Registry format:** JSON (easy for tooling) vs Python module (typed, importable) — preference?
+2. **Pixel gate:** acceptable to commit 5 small PNGs for hero demos, or hash-only?
+3. **Demo smoke ownership:** ok to require each new README-tier demo to add `run_smoke()` in the same PR?
+
+---
+
 ## Open questions
 
-_(none — see Decisions above)_
+_(catalog/graphics questions above; prior decisions in §Decisions applied)_
 
 ### Phase 1 — Shared scenario extraction (low risk)
 
@@ -370,7 +581,9 @@ _(none — see Decisions above)_
 
 | Metric | Now | Target |
 | --- | ---: | ---: |
-| Pytest files | 91 | ~22 |
+| Pytest files | 91 | ~22 (+1 smoke subprocess, +1 flagship graphics) |
+| Catalog plant coverage | 4 pytest files | 1 contract file + catalog `smoke.py` per module + 1 aggregator |
+| Flagship demo visual check | kinematic manifest only | G0 draw-list + G1 optional frame hash |
 | Benchmark `run_*.py` | 15 | 2 (+ shims during deprecation) |
 | Independent contract checks | ~780 tests | ~780 tests (± small dedupe wins) |
 | Documented test layers | implicit | 4 layers in `tests/README.md` |
