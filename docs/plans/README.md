@@ -7,6 +7,7 @@ and [ROADMAP.md](../../ROADMAP.md) — do not keep finished implementation plans
 | --- | --- | --- |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro 2.0 demo/tool backlog | Ongoing |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Result families + parametric scene bind (pipeline B) | Partial — A largely landed; B open |
+| [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | Unify solver backend factory for offline + parametric MPC (IPOPT, etc.) | Draft — P1–P5 |
 | [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Draft |
 | [neural-blocks-collection.md](neural-blocks-collection.md) | MLP / neural blocks roadmap | Future |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle model view ports | Draft |
