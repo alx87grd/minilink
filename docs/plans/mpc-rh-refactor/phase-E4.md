@@ -66,8 +66,8 @@ pytest tests/unittest/test_mpc_planner.py \
        tests/unittest/test_mpc_hybrid_warm_start_parity.py \
        tests/unittest/test_mpc_solve_trajectory_from.py
 
-MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
-MPLBACKEND=Agg python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_minimal.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_straight.py
 python benchmarks/run_regression_check.py --suite integration
 ruff check . && ruff format --check .
 ```

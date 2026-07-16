@@ -434,12 +434,13 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Diagrams | `examples/scripts/diagrams/` |
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
 | Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
-| Minimal hybrid MPC (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` |
-| Dual-rate hybrid MPC (`dual_rate_computer` + `u_nom`) | `examples/scripts/hybrid/demo_mpc_hybrid_dual_rate.py` |
-| Hybrid MPC track + obstacles (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` · [notebook](examples/notebooks/demo_mpc_hybrid_track_lap.ipynb) |
+| Minimal MPC (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/mpc/demo_mpc_minimal.py` |
+| Dual-rate MPC (`dual_rate_computer` + `u_nom`) | `examples/scripts/mpc/demo_mpc_dual_rate.py` |
+| Circuit MPC full stack (scene → cost → plan → hybrid) | `examples/scripts/mpc/demo_mpc_circuit.py` · [notebook](examples/notebooks/demo_mpc_circuit.ipynb) |
+| Slalom MPC (straight lane + staggered obstacles) | `examples/scripts/mpc/demo_mpc_slalom.py` |
+| Spatial MPC assemble (fields → `PlanningProblem`) | `examples/scripts/mpc/demo_mpc_spatial.py` |
 | Pyro SMC continuous (pendulum) | `examples/scripts/control/demo_sliding_mode_pendulum.py` |
 | Pyro SMC continuous vs hybrid (pendulum) | `examples/scripts/hybrid/demo_smc_pendulum_compare.py` |
-| Hand-loop MPC closed-loop / obstacle / stadium (``compute_command``) | `examples/scripts/mpc/` |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` |
 | Control | `examples/scripts/control/` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |
@@ -450,7 +451,6 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
 | Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` |
-| MPC (rate-MPC bicycle demos; TOP `compile_parametric_program` + controller; legacy per-step trajopt: `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`; obstacle preset: `demo_dynamic_bicycle_rate_mpc_obstacle.py [small\|large]`; spatial scene guide: `demo_mpc_spatial_scene_guide.py`) | `examples/scripts/mpc/` · [spatial scene notebook](examples/notebooks/demo_mpc_spatial_scene_guide.ipynb) |
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` · [notebook](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |

@@ -14,18 +14,18 @@ Branch: **`dev-mpc-v2`** (hybrid + MPC controllers present; same full stack as
 
 | Demo | Role |
 | --- | --- |
-| `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` | Flagship — **on** `ModelPredictiveController` + `mpc @ plant` |
-| `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` | Richer hybrid + scene — **on** product API (script); notebook may lag |
+| `examples/scripts/mpc/demo_mpc_minimal.py` | Flagship — **on** `ModelPredictiveController` + `mpc @ plant` |
+| `examples/scripts/mpc/demo_mpc_circuit.py` | Richer hybrid + scene — **on** product API (script); notebook may lag |
 
 **MPC hand-loop demos** — keep green:
 
 | Demo | Role |
 | --- | --- |
-| `demo_dynamic_bicycle_rate_mpc_straight_line.py` | **On** `compute_command` (product warm-start) |
-| `demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | Full closed-loop lap — **on** `compute_command` (E5) |
+| `demo_mpc_straight.py` | **On** `compute_command` (product warm-start) |
+| `demo_mpc_circuit.py` | Full closed-loop lap — **on** `compute_command` (E5) |
 | Obstacle / stadium / wide / multi-obstacle | **on** `compute_command` (E5) |
-| `demo_mpc_spatial_scene_guide.py` | Teaching / scene API |
-| `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py` | Per-tick trajopt reference (keep as reference) |
+| `demo_mpc_spatial.py` | Teaching / scene API |
+| `demo_mpc_straight.py  # (legacy recompile demo removed)` | Per-tick trajopt reference (keep as reference) |
 
 **Hybrid tip:** `compute_trajectory` defaults to `compile_backend="numpy"`.
 Fine `plant_dt_inner` with that default makes plant rollout dominate wall

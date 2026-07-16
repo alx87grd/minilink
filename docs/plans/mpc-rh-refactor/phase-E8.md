@@ -71,8 +71,8 @@ ruff check . && ruff format --check .
 pytest tests/unittest/test_model_predictive_controller.py \
        tests/unittest/test_mpc_export_computer.py \
        tests/unittest/test_mpc_*.py -q
-MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
-MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_dual_rate.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_minimal.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_dual_rate.py
 ```
 
 ## Exit

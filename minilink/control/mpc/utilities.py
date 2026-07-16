@@ -25,7 +25,7 @@ def _shift_plan_trajectory(
     """
     Shift a previous MPC plan forward by ``dt_shift`` for warm-starting.
 
-    Mirrors the hand loop in ``examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py``.
+    Mirrors a hand-loop ``compute_command`` + RK4 ZOH deploy pattern.
     Returns ``None`` when the shifted window has fewer than three samples.
     """
     if plan.n_samples < 3:
@@ -104,7 +104,7 @@ def warm_start_guess_from_prev_plan(
     """
     Warm-start guess from a previous solved plan (manual MPC demo contract).
 
-    Mirrors ``examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py``
+    Mirrors a hand-loop ``compute_command`` + RK4 ZOH deploy pattern.
     lines 122–137: shift ``prev_plan`` by ``dt_shift``, pin ``x[:, 0] = x_meas``,
     re-time with ``t_anchor`` (simulation time at the MPC fire).
     """

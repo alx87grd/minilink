@@ -56,9 +56,9 @@ ruff check . && ruff format --check .
 pytest tests/unittest/test_model_predictive_controller.py \
        tests/unittest/test_mpc_*.py \
        tests/unittest/test_planning_architecture.py -q
-MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
-MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_dual_rate.py
-MPLBACKEND=Agg python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_minimal.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_dual_rate.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_straight.py
 ```
 
 Compare: trajectory ~1e-4; timing factor 2.0.

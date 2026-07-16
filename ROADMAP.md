@@ -172,10 +172,9 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] **MPC / trajopt compile-once** —
   `TrajectoryOptimizationPlanner.compile_parametric_program` +
   `solve_trajectory_from` (parametric `x0`); controllers in `control/mpc/`;
-  primary demos under
-  `examples/scripts/mpc/` and `examples/scripts/hybrid/`;
-  legacy per-step trajopt reference:
-  `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`
+  primary demos under `examples/scripts/mpc/`
+  (`demo_mpc_minimal`, `demo_mpc_dual_rate`, `demo_mpc_circuit`,
+  `demo_mpc_slalom`, `demo_mpc_spatial`)
 - [x] **Online `params` façade (E7 slim)** — `params=None`/`{}` for x0-only;
   reserved `scene` key and `ProblemParameters.scene` placeholder;
   `NotImplementedError` until full bind; latch forwards `params` on

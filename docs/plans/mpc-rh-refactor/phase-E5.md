@@ -29,7 +29,7 @@ planner-level teaching loops; update stale PoC names in copy.
 | Call site | Action |
 | --- | --- |
 | Hand-loop bicycle demos (closed-loop / obstacle / stadium / wide / multi) | `compute_command` |
-| `demo_mpc_hybrid_track_lap.ipynb` | product controller + `@ plant` |
+| `demo_mpc_circuit.ipynb` | product controller + `@ plant` |
 | Unittests on `mpc_*_controller` | retarget to `ModelPredictiveController` |
 
 ## Steps

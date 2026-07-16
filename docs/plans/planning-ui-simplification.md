@@ -350,7 +350,7 @@ Independent of mpc-rh-refactor E6–E8; can land on `dev-mpc-v2` when approved.
 | Work | Detail |
 | --- | --- |
 | README planning snippet | Replace Options/transcription nesting with flat kwargs |
-| `demo_mpc_hybrid_minimal.py` | Optional: shorten imports only; preserve tuned constants |
+| `demo_mpc_minimal.py` | Optional: shorten imports only; preserve tuned constants |
 | DESIGN §6 one paragraph | Document two-tier TOP constructor |
 | `docs/plans/mpc-rh-refactor/vision.md` “Aim UX” | Add flat-constructor example alongside existing |
 

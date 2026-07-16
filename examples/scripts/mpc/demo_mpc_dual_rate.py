@@ -1,10 +1,13 @@
-"""Minimal hybrid MPC: ``ModelPredictiveController`` then ``mpc @ plant``.
+"""Dual-rate hybrid MPC: replan at ``dt_mpc``, broadcast ``u_nom`` at ``dt_broadcast``.
 
-Warm-start via ``warm_start=True`` (packed ``z`` on ``Computer.x``).
+Contrasts with default ``mpc @ plant`` (single-rate ``u_ff`` ZOH)::
+
+    computer = mpc.dual_rate_computer(dt_broadcast=0.01)
+    hybrid = computer @ plant
 
 Run from repo root::
 
-    python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
+    python examples/scripts/mpc/demo_mpc_dual_rate.py
 """
 
 import numpy as np
@@ -27,7 +30,9 @@ configure_jax(enable_x64=True)
 
 U_TARGET = 4.0
 TF_SIM = 5.0
-MPC_DT = 0.2
+TF_MPC = 2.0
+MPC_DT = 0.5
+DT_BROADCAST = 0.01
 SIM_DT = 0.01
 STEP_DISP = True
 REF_X_PAD = 20.0
@@ -41,7 +46,7 @@ sys.x0 = x0.copy()
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys,
-        tf=2.0,
+        tf=TF_MPC,
         x_start=x0,
         cost=QuadraticCost.from_system(
             sys,
@@ -63,7 +68,8 @@ planner = TrajectoryOptimizationPlanner(
 mpc = ModelPredictiveController(
     planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
 )
-hybrid = mpc @ sys
+computer = mpc.dual_rate_computer(dt_broadcast=DT_BROADCAST)
+hybrid = computer @ sys
 
 hybrid.plot_diagram()
 

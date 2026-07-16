@@ -37,7 +37,7 @@ from minilink.planning.trajectory_optimization.planner import (
 from minilink.simulation.computer import Computer, StepSchedule  # noqa: E402
 from minilink.simulation.hybrid_simulator import HybridSimulator  # noqa: E402
 
-# Match examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
+# Hand-loop compute_command + RK4 ZOH pattern (parity with hybrid product)
 U_TARGET = 4.0
 TF_SIM = 5.0
 MPC_HZ = 5.0
@@ -111,7 +111,7 @@ def _make_planner(sys_mpc, cost, x0):
 
 def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
     """
-    Run the warm-started manual loop from ``mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py``.
+    Run a warm-started manual ``compute_command`` + RK4 ZOH loop.
 
     Returns MPC-fire times, ``u_hold`` commands, plant states at fires, and the fine plant traj.
     """

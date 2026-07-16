@@ -26,9 +26,9 @@ cmd = mpc.compute_command(y, t=t) # hand-loop / deploy
 
 | Path | Change |
 | --- | --- |
-| `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` | PoC → product + `mpc @ plant` |
-| `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` | Same wiring |
-| `examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py` | Hand loop → `compute_command` |
+| `examples/scripts/mpc/demo_mpc_minimal.py` | PoC → product + `mpc @ plant` |
+| `examples/scripts/mpc/demo_mpc_circuit.py` | Same wiring |
+| `examples/scripts/mpc/demo_mpc_straight.py` | Hand loop → `compute_command` |
 | `README.md` | Examples table copy for hybrid rows |
 | `docs/plans/mpc-rh-refactor/` | Status / active phase |
 
@@ -60,8 +60,8 @@ pytest tests/unittest/test_mpc_planner.py \
 **Smoke (required):**
 
 ```bash
-MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
-MPLBACKEND=Agg python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_minimal.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_mpc_straight.py
 ```
 
 ```bash
@@ -70,7 +70,7 @@ ruff check . && ruff format --check .
 
 ## Exit
 
-- `demo_mpc_hybrid_minimal.py` uses `mpc @ plant`
+- `demo_mpc_minimal.py` uses `mpc @ plant`
 - Straight-line uses `compute_command` with product warm-start
 - README hybrid rows describe the product API
 - Behavior comparable to pre-migration (NLP path unchanged)
