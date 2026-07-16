@@ -1,8 +1,13 @@
+"""Catalog equation reference values and graphics primitive contracts (L1).
+
+Broad catalog plant smoke (instantiate, ``f`` finite, geometry) lives in L6:
+``examples/scripts/_smoke/run_catalog_smokes.py``.
+"""
+
 import unittest
 
 import numpy as np
 
-from minilink.blocks.transfer_function import TransferFunction
 from minilink.dynamics.catalog.aerial.drone import (
     ConstantSpeedHelicopterTunnel,
     Drone2D,
@@ -21,26 +26,19 @@ from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkPlanarManipulator,
     OneLinkManipulator,
     SpeedControlledManipulator,
-    ThreeLinkManipulator3D,
     TwoLinkManipulator,
 )
 from minilink.dynamics.catalog.marine.boat import Boat2D, Boat2DWithCurrent
 from minilink.dynamics.catalog.mass_spring_damper.linear import (
-    FloatingSingleMass,
-    FloatingThreeMass,
-    FloatingTwoMass,
     SingleMass,
     ThreeMass,
     TwoMass,
 )
 from minilink.dynamics.catalog.pendulum.cartpole import (
     CartPole,
-    RotatingCartPole,
-    UnderactuatedRotatingCartPole,
 )
 from minilink.dynamics.catalog.pendulum.double_pendulum import Acrobot
 from minilink.dynamics.catalog.pendulum.pendulum import (
-    InvertedPendulum,
     Pendulum,
     TwoIndependentPendulums,
 )
@@ -50,17 +48,10 @@ from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalFrontWheelDriveCarWithWheelSlipInput,
 )
 from minilink.dynamics.catalog.vehicles.steering import (
-    ConstantSpeedKinematicCar,
     DynamicHolonomicMobileRobot,
     HolonomicMobileRobot,
     HolonomicMobileRobot3D,
-    JaxDynamicHolonomicMobileRobot,
-    JaxHolonomicMobileRobot,
-    JaxKinematicBicycle,
-    JaxKinematicBicycleRateInputs,
     KinematicBicycle,
-    KinematicCar,
-    UdeSRacecar,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
 from minilink.graphical.animation.primitives import Arrow, TorqueArrow
@@ -70,33 +61,6 @@ from tests.unittest.graphics_contract_helpers import (
 from tests.unittest.graphics_contract_helpers import (
     resolved_primitive_count as _primitive_count,
 )
-
-
-def _have_jax() -> bool:
-    try:
-        import jax  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
-
-
-_JAX_CATALOG_SYSTEMS = (
-    JaxKinematicBicycle,
-    JaxKinematicBicycleRateInputs,
-    JaxHolonomicMobileRobot,
-    JaxDynamicHolonomicMobileRobot,
-)
-
-
-def _zero_f_smoke(system):
-    x = np.asarray(system.x0, dtype=float)
-    if x.shape != (system.n,):
-        x = np.zeros(system.n)
-    u = system.get_u_from_input_ports()
-    dx = np.asarray(system.f(x, u, 0.0), dtype=float)
-    assert dx.shape == (system.n,)
-    assert np.all(np.isfinite(dx))
 
 
 class TestCatalogSmoke(unittest.TestCase):
@@ -231,63 +195,6 @@ class TestCatalogSmoke(unittest.TestCase):
         for system, expected in torque_cases:
             with self.subTest(system=system.name):
                 self.assertEqual(_primitive_count(system, TorqueArrow), expected)
-                _geometry_smoke(system)
-
-    def test_catalog_class_smoke(self):
-        systems = [
-            SimpleIntegrator(),
-            DoubleIntegrator(),
-            TripleIntegrator(),
-            VanderPol(),
-            TransferFunction([1.0], [1.0, 1.0]),
-            SingleMass(),
-            TwoMass(),
-            ThreeMass(),
-            FloatingSingleMass(),
-            FloatingTwoMass(),
-            FloatingThreeMass(),
-            Pendulum(),
-            InvertedPendulum(),
-            TwoIndependentPendulums(),
-            Acrobot(),
-            RotatingCartPole(),
-            UnderactuatedRotatingCartPole(),
-            CartPole(),
-            KinematicBicycle(),
-            JaxKinematicBicycle(),
-            JaxKinematicBicycleRateInputs(),
-            KinematicCar(),
-            ConstantSpeedKinematicCar(),
-            HolonomicMobileRobot(),
-            DynamicHolonomicMobileRobot(),
-            JaxHolonomicMobileRobot(),
-            JaxDynamicHolonomicMobileRobot(),
-            HolonomicMobileRobot3D(),
-            UdeSRacecar(),
-            LongitudinalFrontWheelDriveCarWithWheelSlipInput(),
-            LongitudinalFrontWheelDriveCarWithTorqueInput(),
-            QuarterCarOnRoughTerrain(),
-            MountainCar(),
-            Drone2D(),
-            Drone2DWithSideThruster(),
-            SpeedControlledDrone2D(),
-            ConstantSpeedHelicopterTunnel(),
-            Rocket(),
-            Plane2D(),
-            Boat2D(),
-            Boat2DWithCurrent(),
-            SpeedControlledManipulator(2, 2),
-            OneLinkManipulator(),
-            TwoLinkManipulator(),
-            ThreeLinkManipulator3D(),
-            FiveLinkPlanarManipulator(),
-        ]
-
-        for system in systems:
-            with self.subTest(system=system.name):
-                if isinstance(system, _JAX_CATALOG_SYSTEMS) and not _have_jax():
-                    self.skipTest("JAX not installed")
-                _zero_f_smoke(system)
                 _geometry_smoke(system)
 
 

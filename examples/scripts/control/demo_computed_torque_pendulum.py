@@ -17,22 +17,48 @@ from minilink.blocks.sources import Step
 from minilink.control.modelbased import ComputedTorqueController
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-plant = Pendulum()
-plant.x0 = np.array([np.pi + 0.25, 0.0])
 
-ref = Step(
-    initial_value=np.array([0.0, 0.0]),
-    final_value=np.array([np.pi, 0.0]),
-    step_time=0.0,
-)
+def run_smoke(*, tf: float = 1.0, show: bool = False) -> None:
+    """Headless L6 smoke: short closed-loop trajectory, no animation."""
+    plant = Pendulum()
+    plant.x0 = np.array([np.pi + 0.25, 0.0])
 
-ct = ComputedTorqueController(plant)
-ct.params["Kp"] = np.array([25.0])
-ct.params["Kd"] = np.array([8.0])
+    ref = Step(
+        initial_value=np.array([0.0, 0.0]),
+        final_value=np.array([np.pi, 0.0]),
+        step_time=0.0,
+    )
 
-diagram = ref >> ct @ plant
+    ct = ComputedTorqueController(plant)
+    ct.params["Kp"] = np.array([25.0])
+    ct.params["Kd"] = np.array([8.0])
 
-diagram.plot_diagram()
-diagram.compute_trajectory(tf=8.0)
-diagram.plot_trajectory()
-diagram.animate()
+    diagram = ref >> ct @ plant
+    diagram.compute_trajectory(tf=tf, show=show)
+    diagram.plot_trajectory(show=show)
+
+
+def main() -> None:
+    plant = Pendulum()
+    plant.x0 = np.array([np.pi + 0.25, 0.0])
+
+    ref = Step(
+        initial_value=np.array([0.0, 0.0]),
+        final_value=np.array([np.pi, 0.0]),
+        step_time=0.0,
+    )
+
+    ct = ComputedTorqueController(plant)
+    ct.params["Kp"] = np.array([25.0])
+    ct.params["Kd"] = np.array([8.0])
+
+    diagram = ref >> ct @ plant
+
+    diagram.plot_diagram()
+    diagram.compute_trajectory(tf=8.0)
+    diagram.plot_trajectory()
+    diagram.animate()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,6 +1,6 @@
 # Test & benchmark consolidation plan
 
-Status: **vision agreed — L2 partially landed in PR #82**; L1 consolidation, L3–L6 still to build.
+Status: **L2 + L6 + L4/L5 stubs landed**; L1 pytest merge (91→~22) and L3 `run_study.py` still todo.
 
 ---
 
@@ -214,9 +214,9 @@ python examples/scripts/_smoke/run_all_demos.py --timeout 120
 | 1 | L2 | Unified `run_regression_check`, `solve_speed`, CI regression job | ✅ |
 | 2 | L1 | Merge 91 pytest files → ~22 domain modules | ⬜ |
 | 3 | L3 | `run_study.py` replaces scattered benchmark CLIs | ⬜ |
-| 4 | L6 | Catalog smokes + demo whitelist aggregators | ⬜ |
-| 5 | L4 | Flagship graphics headless manifest + pytest | ⬜ |
-| 6 | L5 | Interactive visual check script for local use | ⬜ |
+| 4 | L6 | Catalog smokes + demo whitelist aggregators | ✅ |
+| 5 | L4 | Flagship graphics headless manifest + pytest | ✅ partial |
+| 6 | L5 | Interactive visual check script for local use | ✅ stub |
 | 7 | L1 | Shrink catalog unittest to 3-plant contracts only | ⬜ (with Phase 4) |
 
 ---

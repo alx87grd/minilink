@@ -1,0 +1,22 @@
+[
+  {
+    "id": "signal_blocks",
+    "path": "examples/scripts/blocks/demo_signal_blocks.py",
+    "requires": []
+  },
+  {
+    "id": "computed_torque_pendulum",
+    "path": "examples/scripts/control/demo_computed_torque_pendulum.py",
+    "requires": []
+  },
+  {
+    "id": "demo_closed_loop",
+    "path": "examples/scripts/diagrams/demo_closed_loop.py",
+    "requires": []
+  },
+  {
+    "id": "mpc_minimal",
+    "path": "examples/scripts/mpc/demo_mpc_minimal.py",
+    "requires": ["jax"]
+  }
+]

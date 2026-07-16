@@ -50,6 +50,17 @@ lives under repo-root `benchmarks/`; pytest smoke-tests helpers in
 --suite all --tiny` with JAX; local pre-handoff: `--suite all` on a reference machine
 (see [benchmarks/README.md](../benchmarks/README.md)).
 
+**Layer L6** catalog and flagship demo smokes (must not throw):
+
+```bash
+python examples/scripts/_smoke/run_catalog_smokes.py --fast
+python examples/scripts/_smoke/run_flagship_demos.py
+```
+
+Pytest: `tests/unittest/test_smoke_runners.py`. **Layer L4** graphics headless:
+`python examples/scripts/_smoke/run_flagship_graphics.py`. **Layer L5** visual (local):
+`python examples/scripts/_smoke/run_graphics_visual_check.py`.
+
 `tests/manual/` and `tests/bugs/` are removed — use `examples/scripts/` for
 smoke scripts and unittest for contracts.
 

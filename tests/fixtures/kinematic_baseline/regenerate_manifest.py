@@ -3,6 +3,8 @@
 Writes PNGs locally (gitignored) for optional visual review. Only the manifest
 is committed; CI uses ``test_kinematic_regression`` render smoke, not pixels.
 
+Plant list: ``minilink.dynamics.catalog.smoke_registry.KINEMATIC_RENDER_PLANTS``.
+
 Run from the repo root::
 
     python tests/fixtures/kinematic_baseline/regenerate_manifest.py
@@ -14,7 +16,6 @@ import importlib
 import importlib.util
 import json
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -23,62 +24,19 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from minilink.dynamics.catalog.smoke_registry import KINEMATIC_RENDER_PLANTS  # noqa: E402
 from tests.fixtures.kinematic_baseline.render import render_baseline_png  # noqa: E402
 
 FIXTURE_DIR = Path(__file__).resolve().parent
 MANIFEST_PATH = FIXTURE_DIR / "manifest.json"
 
 
-@dataclass(frozen=True)
-class PlantSpec:
-    name: str
-    module: str
-    cls: str
-    requires: tuple[str, ...] = ()
-
-    def load(self):
-        for extra in self.requires:
-            if importlib.util.find_spec(extra) is None:
-                return None
-        module = importlib.import_module(self.module)
-        return getattr(module, self.cls)()
-
-
-_VEHICLES = "minilink.dynamics.catalog.vehicles"
-_PENDULUM = "minilink.dynamics.catalog.pendulum"
-PLANTS: tuple[PlantSpec, ...] = (
-    PlantSpec("dynamic_bicycle", f"{_VEHICLES}.dynamic_bicycle", "DynamicBicycle"),
-    PlantSpec(
-        "dynamic_bicycle_car3d", f"{_VEHICLES}.dynamic_bicycle", "DynamicBicycleCar3D"
-    ),
-    PlantSpec("kinematic_bicycle", f"{_VEHICLES}.steering", "KinematicBicycle"),
-    PlantSpec(
-        "holonomic_mobile_robot", f"{_VEHICLES}.steering", "HolonomicMobileRobot"
-    ),
-    PlantSpec("pendulum", f"{_PENDULUM}.pendulum", "Pendulum"),
-    PlantSpec("cartpole", f"{_PENDULUM}.cartpole", "CartPole"),
-    PlantSpec(
-        "two_link_manipulator",
-        "minilink.dynamics.catalog.manipulators.arms",
-        "TwoLinkManipulator",
-    ),
-    PlantSpec(
-        "five_link_planar_manipulator",
-        "minilink.dynamics.catalog.manipulators.arms",
-        "FiveLinkPlanarManipulator",
-    ),
-    PlantSpec("drone2d", "minilink.dynamics.catalog.aerial.drone", "Drone2D"),
-    PlantSpec(
-        "simple_integrator",
-        "minilink.dynamics.catalog.equations.integrators",
-        "SimpleIntegrator",
-    ),
-    PlantSpec(
-        "single_mass",
-        "minilink.dynamics.catalog.mass_spring_damper.linear",
-        "SingleMass",
-    ),
-)
+def _load_plant(spec):
+    for extra in spec.requires:
+        if importlib.util.find_spec(extra) is None:
+            return None
+    module = importlib.import_module(spec.module)
+    return getattr(module, spec.cls)()
 
 
 def sample_states(sys):
@@ -103,8 +61,8 @@ def sample_states(sys):
 def main() -> None:
     manifest = []
     skipped = []
-    for spec in PLANTS:
-        sys = spec.load()
+    for spec in KINEMATIC_RENDER_PLANTS:
+        sys = _load_plant(spec)
         if sys is None:
             skipped.append(spec.name)
             print(f"  skip {spec.name} (missing extra: {', '.join(spec.requires)})")
