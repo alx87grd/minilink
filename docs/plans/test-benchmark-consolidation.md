@@ -307,8 +307,40 @@ These are imported by suites and smoke tests — **no deletion**, only stop expo
 
 ### Phase 0 — Inventory lock (this doc)
 
-- [ ] Review mapping table for missing independent checks.
-- [ ] Confirm Layer B suites remain outside default CI (or opt-in job only).
+- [x] Review mapping table for missing independent checks.
+- [x] Layer B includes NLP/trajopt solve-speed gates (`solve_speed` suite + CI job).
+
+---
+
+## Decisions (applied)
+
+1. **CI scope:** GitHub CI runs `run_regression_check.py --suite all --tiny` with
+   `minilink[jax]`, factor **6×**, and `--speed-gate-suffixes solve_s,nlp_s,speedup`.
+   Full `--suite all` (per-baseline factors, all speed metrics) stays the local
+   pre-handoff gate.
+
+2. **Pyro parity:** **Manual Layer C only** — not gated in CI (external Pyro env not
+   reproducible on ubuntu runners). Keep `run_pyro_minilink_parity.py` as a dev study.
+
+3. **`test_planning_architecture.py`:** **Keep monolithic** during consolidation — nested
+   `Test*` classes inside one module; extract shared scenario builders to
+   `benchmarks/scenarios/` when tests and Layer-B parity overlap (Phase 1), not
+   separate data-table files yet.
+
+4. **Layer B vs C (solve speed):** New **`solve_speed`** suite gates standalone
+   `Optimizer.solve_s` and NumPy pendulum trajopt `solve_s`. Existing integration /
+   e4 / f_mpc baselines gate JAX trajopt **`solve_s`** and MPC **`nlp_s`**. Tier-2
+   backend sweeps (`run_trajopt_backends.py`, etc.) remain Layer C.
+
+5. **Examples overlap:** **Tests + Layer-B scenarios are authoritative** for MPC hybrid
+   parity; demos may diverge for pedagogy — shared builders live in
+   `benchmarks/scenarios/f_mpc_parity.py` (Phase 1 extraction).
+
+---
+
+## Open questions
+
+_(none — see Decisions above)_
 
 ### Phase 1 — Shared scenario extraction (low risk)
 
@@ -327,10 +359,10 @@ These are imported by suites and smoke tests — **no deletion**, only stop expo
 
 ### Phase 4 — Docs & CI alignment
 
-- Update `tests/README.md` with new module map and layer definitions.
-- Update `benchmarks/README.md` with two entry points.
-- Update `AGENTS.md` verification table if regression command changes.
-- Optional: add CI job `benchmarks-regression` on `main` only (nightly or pre-release), **not** on every PR.
+- [x] Update `tests/README.md` with Layer B CI regression note.
+- [x] Update `benchmarks/README.md` with unified suites + CI flags.
+- [x] Update `AGENTS.md` verification table (CI regression job).
+- [ ] Optional: `run_study.py` CLI unification (Phase 3).
 
 ---
 
@@ -343,15 +375,6 @@ These are imported by suites and smoke tests — **no deletion**, only stop expo
 | Independent contract checks | ~780 tests | ~780 tests (± small dedupe wins) |
 | Documented test layers | implicit | 4 layers in `tests/README.md` |
 | Time to find “where is X tested?” | high | one domain file per concern |
-
----
-
-## Open questions
-
-1. **CI scope:** Should `run_regression_check.py --suite all --tiny` join CI (smoke only), or stay manual per AGENTS “big review pass”?
-2. **Pyro parity:** Keep as manual study only, or gate any subset once Pyro env is reproducible in CI?
-3. **`test_planning_architecture.py` (23 tests):** Split scenarios into `tests/scenarios/planning/` data tables vs keep monolithic class — preference?
-4. **Examples overlap:** Which demos are authoritative for MPC hybrid parity — test, benchmark, or demo script?
 
 ---
 

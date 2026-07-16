@@ -26,9 +26,7 @@ from benchmarks.scenarios.f_mpc_parity import run_f_mpc_parity_suite
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = REPO_ROOT / "benchmarks" / "baselines" / "f_mpc_parity.json"
 SUITE_NAME = "f_mpc_parity"
-SUITE_DESCRIPTION = (
-    "F MPC parity: hybrid ZOH, compute_command hand-loop, dual-rate."
-)
+SUITE_DESCRIPTION = "F MPC parity: hybrid ZOH, compute_command hand-loop, dual-rate."
 DEFAULT_FACTOR = 2.0
 
 

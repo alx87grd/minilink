@@ -74,6 +74,35 @@ class ComparisonResult:
         return tuple(row for row in self.rows if row.status == "fail")
 
 
+def filter_speed_gate_failures(
+    result: ComparisonResult,
+    *,
+    suffixes: tuple[str, ...],
+) -> ComparisonResult:
+    """Downgrade speed failures whose metric id does not end with a suffix."""
+    if not suffixes:
+        return result
+    rows: list[ComparisonRow] = []
+    for row in result.rows:
+        if row.status != "fail" or row.gate != "speed":
+            rows.append(row)
+            continue
+        if any(row.metric_id.endswith(suffix) for suffix in suffixes):
+            rows.append(row)
+            continue
+        rows.append(
+            ComparisonRow(
+                metric_id=row.metric_id,
+                gate=row.gate,
+                status="skip",
+                baseline_value=row.baseline_value,
+                current_value=row.current_value,
+                message=f"ignored (not in speed gate suffixes: {row.message})",
+            )
+        )
+    return ComparisonResult(rows=tuple(rows))
+
+
 def default_regression_factor() -> float:
     raw = os.environ.get("MINILINK_BENCH_REGRESSION_FACTOR", "").strip()
     if not raw:

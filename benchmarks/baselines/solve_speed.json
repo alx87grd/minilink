@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "suite": "solve_speed",
+  "description": "NLP and trajopt solve wall-time gates (Optimizer + NumPy pendulum trajopt).",
+  "regression_factor": 4.0,
+  "recorded_at": "2026-07-16",
+  "host_hint": "Linux-6.12.94+-x86_64-with-glibc2.39",
+  "metrics": [
+    {
+      "id": "optimizer.rosenbrock.scipy_slsqp.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.0016845880018081516,
+      "unit": "s",
+      "notes": "Rosenbrock (n=5); Optimizer.solve wall time"
+    },
+    {
+      "id": "optimizer.rosenbrock.scipy_slsqp.success",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 0.0,
+      "unit": "flag",
+      "max_allowed": 0.0,
+      "notes": "0 means NLP reported success"
+    },
+    {
+      "id": "trajopt.pendulum.numpy_slsqp.total_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.032736430497607216,
+      "unit": "s",
+      "notes": "catalog Pendulum swing-up, compile_backend=numpy, n_steps=16, scipy_slsqp"
+    },
+    {
+      "id": "trajopt.pendulum.numpy_slsqp.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.03113463900081115,
+      "unit": "s",
+      "notes": "optimizer wall time only"
+    },
+    {
+      "id": "trajopt.pendulum.numpy_slsqp.success",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 0.0,
+      "unit": "flag",
+      "max_allowed": 0.0,
+      "notes": "0 means optimizer reported success"
+    },
+    {
+      "id": "optimizer.circle_eq.scipy_slsqp.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.0002529834964661859,
+      "unit": "s",
+      "notes": "Equality circle; Optimizer.solve wall time"
+    },
+    {
+      "id": "optimizer.circle_eq.scipy_slsqp.success",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 0.0,
+      "unit": "flag",
+      "max_allowed": 0.0,
+      "notes": "0 means NLP reported success"
+    }
+  ]
+}

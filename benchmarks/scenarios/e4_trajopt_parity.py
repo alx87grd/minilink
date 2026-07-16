@@ -6,6 +6,7 @@ Compare against ``benchmarks/baselines/e4_trajopt_parity.json``.
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -58,8 +59,21 @@ VECTOR_RTOL = 1e-4
 SUCCESS_ATOL = 1e-12
 
 
-def run_cartpole_rebuild(*, n_runs: int = 1) -> list[MetricRecord]:
+@dataclass(frozen=True)
+class E4TrajoptParityConfig:
+    """Tunable workload for ``run_e4_trajopt_parity_suite``."""
+
+    n_runs: int = 1
+    tiny: bool = False
+
+
+def run_cartpole_rebuild(
+    *,
+    n_runs: int = 1,
+    tiny: bool = False,
+) -> list[MetricRecord]:
     """Showcase cart-pole swing-up via TOP.solve (JAX + SciPy SLSQP)."""
+    del tiny  # accuracy goldens require full iteration budget
     if not jax_trajopt_available():
         raise ModuleNotFoundError(
             "JAX is required for e4.cartpole_rebuild trajopt parity"
@@ -72,12 +86,16 @@ def run_cartpole_rebuild(*, n_runs: int = 1) -> list[MetricRecord]:
     )
 
 
-def run_pendulum_rebuild(*, n_runs: int = 1) -> list[MetricRecord]:
+def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricRecord]:
     """Small pendulum swing-up via TOP.solve (JAX + SciPy SLSQP)."""
+    del tiny  # accuracy goldens require full iteration budget
     if not jax_trajopt_available():
         raise ModuleNotFoundError(
             "JAX is required for e4.pendulum_rebuild trajopt parity"
         )
+
+    n_steps = PENDULUM_N_STEPS
+    maxiter = PENDULUM_MAXITER
 
     configure_jax(enable_x64=True)
     sys = Pendulum()
@@ -103,13 +121,13 @@ def run_pendulum_rebuild(*, n_runs: int = 1) -> list[MetricRecord]:
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=PENDULUM_N_STEPS)
+            DirectCollocationOptions(n_steps=n_steps)
         ),
         options=TrajectoryOptimizationOptions(
             compile_backend="jax",
             optimizer_method="scipy_slsqp",
             optimizer_options={
-                "maxiter": PENDULUM_MAXITER,
+                "maxiter": maxiter,
                 "ftol": PENDULUM_FTOL,
                 "disp": False,
             },
@@ -152,17 +170,23 @@ def run_pendulum_rebuild(*, n_runs: int = 1) -> list[MetricRecord]:
         result=result,
         notes=(
             "catalog Pendulum TOP.solve swing-up, "
-            f"tf={PENDULUM_TF}, n_steps={PENDULUM_N_STEPS}, jax+slsqp"
+            f"tf={PENDULUM_TF}, n_steps={n_steps}, jax+slsqp"
         ),
     )
 
 
-def run_bicycle_parametric(*, n_runs: int = 1) -> list[MetricRecord]:
+def run_bicycle_parametric(
+    *, n_runs: int = 1, tiny: bool = False
+) -> list[MetricRecord]:
     """Small rate-bicycle MPC tick via current TrajectoryOptimizationPlanner.solve_trajectory_from."""
+    del tiny  # accuracy goldens require full iteration budget
     if not jax_trajopt_available():
         raise ModuleNotFoundError(
             "JAX is required for e4.bicycle_parametric trajopt parity"
         )
+
+    n_steps = BICYCLE_N_STEPS
+    maxiter = BICYCLE_MAXITER
 
     configure_jax(enable_x64=True)
     sys = JaxDynamicBicycleRateInputs()
@@ -202,14 +226,14 @@ def run_bicycle_parametric(*, n_runs: int = 1) -> list[MetricRecord]:
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=BICYCLE_N_STEPS)
+            DirectCollocationOptions(n_steps=n_steps)
         ),
         options=TrajectoryOptimizationOptions(
             compile_backend="jax",
             optimizer_method="scipy_slsqp",
             record_solve_time=True,
             optimizer_options={
-                "maxiter": BICYCLE_MAXITER,
+                "maxiter": maxiter,
                 "ftol": BICYCLE_FTOL,
                 "disp": False,
             },
@@ -256,17 +280,20 @@ def run_bicycle_parametric(*, n_runs: int = 1) -> list[MetricRecord]:
         result=result,
         notes=(
             "JaxDynamicBicycleRateInputs TrajectoryOptimizationPlanner.solve_trajectory_from, "
-            f"tf={BICYCLE_TF}, n_steps={BICYCLE_N_STEPS}, jax+slsqp"
+            f"tf={BICYCLE_TF}, n_steps={n_steps}, jax+slsqp"
         ),
     )
 
 
-def run_e4_trajopt_parity_suite() -> list[MetricRecord]:
+def run_e4_trajopt_parity_suite(
+    config: E4TrajoptParityConfig | None = None,
+) -> list[MetricRecord]:
     """Run all E4 trajopt parity scenarios and return flat metric records."""
+    cfg = config or E4TrajoptParityConfig()
     metrics: list[MetricRecord] = []
-    metrics.extend(run_cartpole_rebuild())
-    metrics.extend(run_pendulum_rebuild())
-    metrics.extend(run_bicycle_parametric())
+    metrics.extend(run_cartpole_rebuild(n_runs=cfg.n_runs, tiny=cfg.tiny))
+    metrics.extend(run_pendulum_rebuild(n_runs=cfg.n_runs, tiny=cfg.tiny))
+    metrics.extend(run_bicycle_parametric(n_runs=cfg.n_runs, tiny=cfg.tiny))
     return metrics
 
 

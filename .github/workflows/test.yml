@@ -36,3 +36,28 @@ jobs:
 
     - name: Test with pytest
       run: pytest
+
+  regression:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies (with JAX)
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,jax]"
+
+    - name: Layer-B regression (solve-speed gates)
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python benchmarks/run_regression_check.py --suite all --tiny \
+          --factor 6 \
+          --speed-gate-suffixes solve_s,nlp_s,speedup

@@ -114,6 +114,9 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Cross-cutting or before handoff/push | `pytest` |
 | Compile backend, simulator, or trajopt changes (big review pass) | `python benchmarks/run_regression_check.py --suite all` |
 
+GitHub CI also runs Layer-B regression automatically (`--suite all --tiny` with JAX;
+NLP/trajopt `solve_s` / `nlp_s` gates). See [benchmarks/README.md](benchmarks/README.md).
+
 Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for pygame smoke; `sphinx-build` only when editing `docs/` (separate Docs workflow).
 
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.

@@ -55,24 +55,32 @@ def build_showcase_cartpole_problem() -> PlanningProblem:
     )
 
 
-def run_showcase_cartpole_trajopt(*, n_runs: int = 1) -> TrajoptScenarioResult:
+def run_showcase_cartpole_trajopt(
+    *,
+    n_runs: int = 1,
+    n_steps: int | None = None,
+    maxiter: int | None = None,
+) -> TrajoptScenarioResult:
     """Showcase cart-pole swing-up with SciPy SLSQP on the JAX compile backend."""
     if not jax_trajopt_available():
         raise ModuleNotFoundError(
             "JAX is required for the showcase cart-pole trajopt check"
         )
 
+    n_steps = SHOWCASE_TRAJOPT_N_STEPS if n_steps is None else n_steps
+    maxiter = SHOWCASE_TRAJOPT_MAXITER if maxiter is None else maxiter
+
     problem = build_showcase_cartpole_problem()
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=SHOWCASE_TRAJOPT_N_STEPS)
+            DirectCollocationOptions(n_steps=n_steps)
         ),
         options=TrajectoryOptimizationOptions(
             compile_backend="jax",
             optimizer_method="scipy_slsqp",
             optimizer_options={
-                "maxiter": SHOWCASE_TRAJOPT_MAXITER,
+                "maxiter": maxiter,
                 "ftol": SHOWCASE_TRAJOPT_FTOL,
                 "disp": False,
             },

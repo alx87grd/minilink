@@ -344,13 +344,76 @@ class TestBenchmarkRegression(unittest.TestCase):
         )
 
         metrics = run_integration_check_suite(
-            IntegrationCheckSuiteConfig(sim_n_runs=1, trajopt_n_runs=1)
+            IntegrationCheckSuiteConfig(sim_n_runs=1, trajopt_n_runs=1, tiny=True)
         )
         ids = {metric.id for metric in metrics}
         self.assertIn("sim.double_pendulum.rk4_numpy.checkpoint_t0", ids)
         self.assertIn("sim.showcase_pendulum.rk4_numpy.x_tf", ids)
         if any(metric.id.startswith("trajopt.showcase_cartpole") for metric in metrics):
             self.assertIn("trajopt.showcase_cartpole.jax_slsqp.total_s", ids)
+            self.assertIn("trajopt.showcase_cartpole.jax_slsqp.solve_s", ids)
+
+    def test_solve_speed_suite_returns_metrics(self):
+        from benchmarks.suites.solve_speed import (
+            SolveSpeedSuiteConfig,
+            run_solve_speed_suite,
+        )
+
+        metrics = run_solve_speed_suite(SolveSpeedSuiteConfig(n_runs=1, tiny=True))
+        ids = {metric.id for metric in metrics}
+        self.assertIn("optimizer.rosenbrock.scipy_slsqp.solve_s", ids)
+        self.assertIn("optimizer.circle_eq.scipy_slsqp.solve_s", ids)
+        self.assertIn("trajopt.pendulum.numpy_slsqp.solve_s", ids)
+
+    def test_e4_trajopt_parity_suite_returns_metrics(self):
+        pytest = __import__("pytest")
+        jax = pytest.importorskip("jax")
+        del jax
+
+        from benchmarks.scenarios.e4_trajopt_parity import (
+            E4TrajoptParityConfig,
+            run_e4_trajopt_parity_suite,
+        )
+
+        metrics = run_e4_trajopt_parity_suite(
+            E4TrajoptParityConfig(n_runs=1, tiny=True)
+        )
+        ids = {metric.id for metric in metrics}
+        self.assertIn("e4.cartpole_rebuild.solve_s", ids)
+        self.assertIn("e4.pendulum_rebuild.solve_s", ids)
+        self.assertIn("e4.bicycle_parametric.solve_s", ids)
+
+    def test_filter_speed_gate_failures(self):
+        from benchmarks.baseline import (
+            ComparisonResult,
+            ComparisonRow,
+            filter_speed_gate_failures,
+        )
+
+        result = ComparisonResult(
+            rows=(
+                ComparisonRow(
+                    metric_id="f.hand_loop.wall_s",
+                    gate="speed",
+                    status="fail",
+                    baseline_value=0.1,
+                    current_value=0.5,
+                    message="slow",
+                ),
+                ComparisonRow(
+                    metric_id="f.hand_loop.nlp_s",
+                    gate="speed",
+                    status="fail",
+                    baseline_value=0.01,
+                    current_value=0.05,
+                    message="slow",
+                ),
+            )
+        )
+        filtered = filter_speed_gate_failures(result, suffixes=("nlp_s", "solve_s"))
+        by_id = {row.metric_id: row.status for row in filtered.rows}
+        self.assertEqual(by_id["f.hand_loop.wall_s"], "skip")
+        self.assertEqual(by_id["f.hand_loop.nlp_s"], "fail")
 
     def test_integration_baseline_json_loads(self):
         from pathlib import Path

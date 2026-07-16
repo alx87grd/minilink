@@ -44,9 +44,11 @@ Regenerate manifest: `python tests/fixtures/kinematic_baseline/regenerate_manife
 Shared fixtures: `graphics_contract_helpers.py` (draw-list resolution),
 `planning_helpers.py` (RRT holonomic obstacle scene).
 
-Benchmark **performance** and end-to-end regression helpers live under repo-root
-`benchmarks/`; import smoke only in `test_benchmark_smoke.py` (not full regression
-asserts). Manual overall check: `python benchmarks/run_regression_check.py --suite all`.
+Benchmark **Layer B** regression (accuracy goldens + NLP/trajopt **solve speed** gates)
+lives under repo-root `benchmarks/`; pytest smoke-tests helpers in
+`test_benchmark_smoke.py`. **CI** runs `python benchmarks/run_regression_check.py
+--suite all --tiny` with JAX; local pre-handoff: `--suite all` on a reference machine
+(see [benchmarks/README.md](../benchmarks/README.md)).
 
 `tests/manual/` and `tests/bugs/` are removed — use `examples/scripts/` for
 smoke scripts and unittest for contracts.
