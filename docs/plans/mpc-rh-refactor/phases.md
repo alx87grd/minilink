@@ -60,17 +60,21 @@ flowchart LR
   E8[E8 Broadcast backends]
 
   E0 --> E1 --> E2 --> E3 --> E4 --> E5 --> E6 --> E7 --> E8
-  E8 --> F[Phase F stub]
-  E8 --> UI[Planning UI plan]
+  E8 --> F[Phase F]
+  F --> UI[Planning UI]
 ```
+
+Pipeline B is intentionally omitted from this graph (later feature).
 
 E0–E8 done: foundation → online from-API → controller → flagships → TOP merge
 → PoC retirement → observability → online `params` façade → broadcast /
-dual-rate. Full pipeline B (`J(z, p)` / ObstacleBank) remains deferred.
-Next: Phase F.
+dual-rate.
 
-**Next:** expand [phase-F-cleanup.md](phase-F-cleanup.md) — parked intent
-includes moving MPC to `control/mpc` and fusing modules. Constructor UX:
+**Closing sequence (locked):** Phase F (`control/mpc`) → planning UI
+(constructor ceremony). Pipeline B stays a wanted later feature outside this
+sequence.
+
+**Next:** expand [phase-F-cleanup.md](phase-F-cleanup.md), then land F; then
 [planning-ui-simplification.md](../planning-ui-simplification.md).
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
@@ -103,7 +107,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-E | E5 | after remaining demos/tests on controller | landed |
 | PR-F+ | E6–E8 | phase gates | E6–E8 landed |
 | PR-F-hygiene | Phase F — expand card, then land | F gate | next |
-| PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | UI-1+ gates | parallel with F |
+| PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | UI-1+ gates | after F |
 
 ## Start here
 
@@ -114,7 +118,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 5. **E4** — done ([phase-E4.md](phase-E4.md)).
 6. **E5** — done ([phase-E5.md](phase-E5.md)).
 7. **E6** — done ([phase-E6.md](phase-E6.md)).
-8. **E7** — done slim ([phase-E7.md](phase-E7.md)); full pipeline B deferred.
+8. **E7** — done slim ([phase-E7.md](phase-E7.md)); pipeline B out of sequence.
 9. **E8** — done ([phase-E8.md](phase-E8.md)).
-10. **F** — expand [phase-F-cleanup.md](phase-F-cleanup.md), then hygiene PRs;
-    API UX per [planning-ui-simplification.md](../planning-ui-simplification.md).
+10. **F** — expand + land [phase-F-cleanup.md](phase-F-cleanup.md) (`control/mpc`).
+11. **UI** — then [planning-ui-simplification.md](../planning-ui-simplification.md).

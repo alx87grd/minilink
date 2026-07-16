@@ -46,7 +46,8 @@ configure_jax(enable_x64=True)
 
 U_TARGET = 4.0
 TF_SIM = 5.0
-MPC_DT = 1.0
+TF_MPC = 2.0
+MPC_DT = 3.0
 DT_BROADCAST = 0.01
 SIM_DT = 0.01
 STEP_DISP = True
@@ -61,7 +62,7 @@ sys.x0 = x0.copy()
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys,
-        tf=2.0,
+        tf=TF_MPC,
         x_start=x0,
         cost=QuadraticCost.from_system(
             sys,

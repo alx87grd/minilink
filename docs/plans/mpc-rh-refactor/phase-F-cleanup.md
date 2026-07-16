@@ -1,8 +1,9 @@
 # Phase F — Post-refactor cleanup
 
-**Status:** stub — **expand with a concrete task list only after [E8](phase-E8.md) is green**  
-**Depends on:** E6–E8 complete (refactor finished before detail cleaning)  
-**Do not start:** while E6–E8 are in flight — avoids churn on interim layout and PoC leftovers
+**Status:** stub — **ready to expand** ([E8](phase-E8.md) green)  
+**Depends on:** E0–E8 complete  
+**Next after F:** [planning-ui-simplification.md](../planning-ui-simplification.md)
+(constructor ceremony). Pipeline B is out of this closing sequence.
 
 ## Goal
 
@@ -16,10 +17,10 @@ debt, sync docs with the landed product API, reduce demo duplication, and
 
 ---
 
-## Parked layout (expand into F.1… after E8)
+## Parked layout (expand into F.1…)
 
-Captured from product review (July 2026). Do **not** implement until E8 is green;
-this section becomes the numbered task list when F is expanded.
+Captured from product review (July 2026). Turn into numbered tasks when
+expanding this card; include E8 files (`nominal.py`, `broadcast_block.py`).
 
 ### Package home
 
@@ -47,9 +48,11 @@ minilink/control/mpc/
 
 - `model_predictive_controller.py` — factory, mixin, `compute_command`, `@`, debug
 - `controller.py` + `step_block.py` — algebraic / warm-start System backends
-- `tick_latch.py`, `command.py`, `_block_common.py`
+- `tick_latch.py`, `command.py`, `_block_common.py` (incl. dual-rate export)
+- `broadcast_block.py` — dual-rate broadcast leaf (option A shared latch)
 
-**Keep separate:** `warm_start.py` (demos + latch), `viz.py` (graphical / hybrid).
+**Keep separate:** `warm_start.py` (demos + latch), `viz.py` (graphical /
+hybrid), `nominal.py` (cache / interp helpers — or fold if tiny).
 
 **Delete:** `planning/mpc/parametric_*.py` shims; then remove `planning/mpc/` entirely.
 
@@ -71,12 +74,11 @@ from minilink.control.mpc import ModelPredictiveController, Command, ...
 
 ## When to expand this card
 
-1. E6, E7, E8 gates pass on `dev-mpc-v2`.
-2. Re-scan demos, tests, and plan docs against [vision.md](vision.md).
-3. Turn **Parked layout** into numbered tasks (F.1 package move, F.2 fuse,
+1. Re-scan demos, tests, and plan docs against [vision.md](vision.md) (E8 done).
+2. Turn **Parked layout** into numbered tasks (F.1 package move, F.2 fuse,
    F.3 retarget/delete, F.4 docs, F.5 gate) in a short expansion PR.
 
-Until then, treat the parked layout as **intent**, not an active work order.
+Until expanded, treat the parked layout as **intent**, not an active work order.
 
 ---
 
@@ -95,21 +97,16 @@ Until then, treat the parked layout as **intent**, not an active work order.
 
 ```mermaid
 flowchart LR
-  E6[E6]
-  E7[E7]
-  E8[E8]
+  E8[E8 done]
   Fexpand[Expand phase-F card]
-  Fwork[Phase F hygiene + control/mpc layout]
-  UI[Planning UI plan]
+  Fwork[Phase F control/mpc]
+  UI[Planning UI ceremony]
 
-  E6 --> E7 --> E8
-  E8 --> Fexpand
-  Fexpand --> Fwork
-  E8 --> UI
+  E8 --> Fexpand --> Fwork --> UI
 ```
 
-UI work may run in parallel with F after E8; coordinate when the same demo or
-README section is edited.
+**Order locked:** F before UI so teaching demos / README land on
+`minilink.control.mpc` once. Pipeline B is not in this graph.
 
 ---
 
@@ -122,6 +119,7 @@ pytest tests/unittest/test_model_predictive_controller.py \
 
 export MPLBACKEND=Agg SDL_VIDEODRIVER=dummy
 python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
+python examples/scripts/hybrid/demo_mpc_hybrid_dual_rate.py
 python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
 ```
 
@@ -130,14 +128,12 @@ python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
 ## Non-goals
 
 - Vision or planner ABC contract changes
-- E6 / E7 / E8 feature work (stay in those cards)
-- Implementing the parked layout before E8
+- Pipeline B / online scene bind (later feature)
 - Physics-hiding presets or merging problem → planner → controller stages
 
 ---
 
 ## Exit
 
-E8 green; F expanded and executed (including `control/mpc` layout); docs and
-exports match product API; optional UI plan landed or scheduled per
-[planning-ui-simplification.md](../planning-ui-simplification.md).
+F expanded and executed (including `control/mpc` layout); docs and exports
+match product API. Then schedule [planning-ui-simplification.md](../planning-ui-simplification.md).

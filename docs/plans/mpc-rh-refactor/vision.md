@@ -185,7 +185,8 @@ for from-solves. Controllers auto-call `compile_parametric_program()` so ticks
 never re-transcribe. Public `solve_trajectory_from(x0, params=None,
 initial_guess=None)` accepts `params` and `initial_guess`; `params is None`
 ≡ bind `x0` only. Scene key reserved (E7 slim → `NotImplementedError`);
-full `J(z, p)` / ObstacleBank bind is pipeline B (deferred after E8).
+full `J(z, p)` / ObstacleBank bind is pipeline B (wanted later; out of the
+F → UI closing sequence).
 
 `bind` is evaluator-internal: SciPy sees only `z`; evaluator injects bound `x0`.
 

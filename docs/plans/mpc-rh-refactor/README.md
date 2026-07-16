@@ -13,18 +13,18 @@ sequencing.
 | --- | --- |
 | [vision.md](vision.md) | Locked end-goal contracts (Planner 2×2, `TrajectoryPlan`, `ModelPredictiveController`) |
 | [phases.md](phases.md) | E0–E8 order, gates, PR slices, start-here |
-| [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E8 done; pipeline B deferred) |
-| [phase-F-cleanup.md](phase-F-cleanup.md) | Post-refactor hygiene + parked `control/mpc` layout (expand next) → [UI plan](../planning-ui-simplification.md) |
+| [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E8 done) |
+| [phase-F-cleanup.md](phase-F-cleanup.md) | Next: `control/mpc` move + hygiene → then [UI plan](../planning-ui-simplification.md) |
 
 **Active phase:** [phase-F-cleanup.md](phase-F-cleanup.md) — expand before coding.
 
-**Progress:** E0–E8 landed on `dev-mpc-v2` (broadcast + dual-rate;
-online `params` façade; full `J(z, p)` / ObstacleBank deferred). Next is
-Phase F (`control/mpc` move / hygiene).
+**Progress:** E0–E8 landed on `dev-mpc-v2`. Closing sequence: **F** (`control/mpc`)
+then **planning UI** (constructor ceremony). Pipeline B (online scene bind) is
+a wanted later feature — **not** in this closing sequence.
 
 ## Related requirements (background only)
 
-- [../planning-ui-simplification.md](../planning-ui-simplification.md) — flat planner-family constructor UX (post-refactor; Phase F points here)
+- [../planning-ui-simplification.md](../planning-ui-simplification.md) — flat planner-family constructor UX (after Phase F)
 - [../mpc-controller-architecture.md](../mpc-controller-architecture.md) — R1–R12, Option β
 - [../planning-pipeline-architecture.md](../planning-pipeline-architecture.md) — result wrappers / parametric NLP
 - [../standard-planning-problems.md](../standard-planning-problems.md) — problem taxonomy (stochastic out of scope)

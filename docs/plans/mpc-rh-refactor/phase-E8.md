@@ -79,4 +79,5 @@ MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_dual_rate.py
 
 Four getters + explicit interpolator; dual-rate sim packaging; deploy-shaped test.
 
-Next: [phase-F-cleanup.md](phase-F-cleanup.md) / pipeline B.
+Next: [phase-F-cleanup.md](phase-F-cleanup.md), then planning UI.
+(Pipeline B is a later feature, not in this closing sequence.)

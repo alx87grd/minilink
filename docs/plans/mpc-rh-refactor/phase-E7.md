@@ -43,8 +43,9 @@ cmd = mpc.compute_command(y, params={"scene": bank})     # NotImplementedError
 
 ## Deferred — full pipeline B (E7-full)
 
-After E8 (or as a dedicated follow-up). Extend existing
-`ParametricMathematicalProgram` — **not** a new NLP type.
+**Out of the current RH closing sequence** (F → UI). Keep as a wanted later
+feature on ROADMAP. Extend existing `ParametricMathematicalProgram` — **not**
+a new NLP type.
 
 | ID | Work |
 | --- | --- |
@@ -76,4 +77,5 @@ pytest tests/unittest/test_model_predictive_controller.py \
 Façade + latch threading + reserved `scene` field; full bind documented as
 deferred.
 
-Next: [phase-E8.md](phase-E8.md).
+Next (closing sequence): [phase-F-cleanup.md](phase-F-cleanup.md) → UI plan.
+Pipeline B remains parked here / ROADMAP.

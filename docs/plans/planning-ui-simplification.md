@@ -12,9 +12,9 @@ contracts in [mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md).
 | Doc | Relationship |
 | --- | --- |
 | [mpc-rh-refactor/vision.md](mpc-rh-refactor/vision.md) | Contracts this plan must preserve |
-| [mpc-rh-refactor/phase-F-cleanup.md](mpc-rh-refactor/phase-F-cleanup.md) | Post-refactor hygiene guidelines (stub until E8); API work is this plan |
-| [mpc-rh-refactor/](mpc-rh-refactor/) | MPC refactor phases E0–E8 |
-| [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Parametric NLP / result wrappers (orthogonal) |
+| [mpc-rh-refactor/phase-F-cleanup.md](mpc-rh-refactor/phase-F-cleanup.md) | Land `control/mpc` **before** this plan so demos teach final import paths |
+| [mpc-rh-refactor/](mpc-rh-refactor/) | MPC refactor E0–E8 done; closing sequence F → this UI plan |
+| [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Pipeline B / scene bind — later feature, orthogonal |
 
 Implemented contracts today: [DESIGN.md](../../DESIGN.md) §6,
 [ROADMAP.md](../../ROADMAP.md) §5.5.
