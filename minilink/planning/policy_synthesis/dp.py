@@ -190,7 +190,10 @@ class DynamicProgrammingPlanner(Planner):
     grid : StateSpaceGrid
         Discretization of ``problem``'s state and input spaces.
     options : DynamicProgrammingOptions, optional
-        Workflow options.
+        Tier-2 workflow bag. Flat kwargs below overlay matching fields.
+    backend, alpha, tol, max_iterations, interpolation, out_of_bound_cost,
+    final_time, record_history, verbose
+        Tier-1 flat mirrors of :class:`DynamicProgrammingOptions`.
     """
 
     def __init__(

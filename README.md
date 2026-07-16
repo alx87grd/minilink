@@ -410,7 +410,8 @@ Animate:   animate* / render / game  →  Animator  →  renderer backend
            HybridDiagram.animate  →  plant geometry + fine plant traj
            planner.plot_solution / animate_solution  →  problem.sys.*
 
-Trajopt:   PlanningProblem + Transcription + TrajectoryOptimizationPlanner
+Trajopt:   PlanningProblem + TrajectoryOptimizationPlanner
+           (flat ``n_steps`` / ``transcription="…"``; optional Transcription)
            → transcribe → MathematicalProgram → Optimizer → Trajectory
 
 NLP:       MathematicalProgram → Optimizer → OptimizationResult
