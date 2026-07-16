@@ -19,6 +19,7 @@ from minilink.control.mpc.utilities import (
     mpc_default_computer_x0,
     mpc_warm_start_guess,
 )
+from minilink.core.backends import BACKEND_JAX, normalize_backend
 from minilink.core.system import StepSystem, System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.results import SolveMetadata, TrajectoryPlan
@@ -436,7 +437,7 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
 
     @property
     def planner(self) -> TrajectoryOptimizationPlanner:
-        """Compiled trajopt planner (parametric NLP)."""
+        """Trajopt planner owned by this block."""
         return self._planner
 
     def _measurement(self, u) -> np.ndarray:
@@ -515,7 +516,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
 
     @property
     def planner(self) -> TrajectoryOptimizationPlanner:
-        """Compiled trajopt planner (parametric NLP)."""
+        """Trajopt planner owned by this block."""
         return self._planner
 
     @property
@@ -722,8 +723,11 @@ def validate_mpc_planner(planner) -> tuple[int, int, int]:
     Accepts a duck-typed
     :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
     (or compatible) with ``compile_parametric_program``,
-    ``has_parametric_program``, and ``solve_trajectory_from``. Auto-compiles
-    when needed so MPC ticks never re-transcribe.
+    ``has_parametric_program``, and ``solve_trajectory_from``.
+
+    ``compile_backend='jax'`` auto-compiles a parametric NLP once (bind + solve
+    each tick). ``compile_backend='numpy'`` or ``'direct'`` skips parametric
+    compile; each tick rebuilds via :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`.
     """
     missing = [
         name
@@ -746,14 +750,18 @@ def validate_mpc_planner(planner) -> tuple[int, int, int]:
             f"MPC block requires transcription n_steps >= 2 for x_ff, got {n_steps}"
         )
 
-    if not planner.has_parametric_program:
-        planner.compile_parametric_program()
+    if (
+        normalize_backend(planner.options.compile_backend, allow_direct=True)
+        == BACKEND_JAX
+    ):
+        if not planner.has_parametric_program:
+            planner.compile_parametric_program()
 
-    if not planner.has_parametric_program:
-        raise RuntimeError(
-            "planner.compile_parametric_program() did not produce a parametric "
-            "program (check compile_backend='jax' and transcription support)."
-        )
+        if not planner.has_parametric_program:
+            raise RuntimeError(
+                "planner.compile_parametric_program() did not produce a parametric "
+                "program (check compile_backend='jax' and transcription support)."
+            )
 
     sys = planner.problem.sys
     n = int(sys.n)

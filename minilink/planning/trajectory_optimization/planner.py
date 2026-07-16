@@ -468,13 +468,15 @@ class TrajectoryOptimizationPlanner(Planner):
         initial_guess: np.ndarray | Trajectory | None = None,
     ) -> TrajectoryPlan:
         if not self._warned_uncompiled_from:
-            warnings.warn(
-                "TrajectoryOptimizationPlanner.solve_trajectory_from is rebuilding "
-                "the NLP each call. Call compile_parametric_program() once for "
-                "fast bind-only from-solves (requires compile_backend='jax').",
-                UserWarning,
-                stacklevel=3,
-            )
+            backend = normalize_backend(self.options.compile_backend, allow_direct=True)
+            if backend == BACKEND_JAX:
+                warnings.warn(
+                    "TrajectoryOptimizationPlanner.solve_trajectory_from is rebuilding "
+                    "the NLP each call. Call compile_parametric_program() once for "
+                    "fast bind-only from-solves (requires compile_backend='jax').",
+                    UserWarning,
+                    stacklevel=3,
+                )
             self._warned_uncompiled_from = True
 
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
