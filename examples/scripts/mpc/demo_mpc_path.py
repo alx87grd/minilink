@@ -1,7 +1,8 @@
 """Dual-rate path-tracking MPC with a ROS2-style manual deploy loop.
 
-Edit ``WAYPOINTS`` below. No hybrid ``Computer`` — the main loop calls the same
-MPC methods a ROS2 node would wire to two timers.
+Big ``=====`` boxes mark the ROS2 copy-paste surface: one ``__init__`` block
+(path → planning problem → planner → ``mpc``) and two timer callbacks.
+Everything else is offline sim / plotting only.
 
 Run from repo root::
 
@@ -36,7 +37,15 @@ from minilink.planning.trajectory_optimization.planner import (
 
 configure_jax(enable_x64=True)
 
-# --- edit the path here (open polyline is fine) ---
+# Offline sim / viz params (not in the ROS2 node).
+TF_SIM = 20.0
+SIM_DT = 0.01
+SHOW_COST_FIELD = True
+CAMERA_SCALE = 14.0
+
+# =============================================================================
+# ROS2 NODE __init__ — copy this whole block once (keep ``mpc`` as a member)
+# =============================================================================
 WAYPOINTS = [
     (0.0, 0.0),
     (12.0, 0.0),
@@ -47,19 +56,14 @@ WAYPOINTS = [
     (75.0, -20.0),
     (75.0, -80.0),
 ]
-
-# --- knobs ---
 U_TARGET = 20.0
 VX0 = 5.0
-TF_SIM = 20.0
 MPC_DT = 0.2
 DT_BROADCAST = 0.01
-SIM_DT = 0.01
 MPC_HORIZON = 2.0
 MPC_STEPS = 10
 PATH_HALF_WIDTH = 5.0
 PATH_COST_WEIGHT = 40.0
-SHOW_COST_FIELD = True
 
 waypoints = np.asarray(WAYPOINTS, dtype=float)
 track = ReferenceTrack(from_waypoints(waypoints), half_width=PATH_HALF_WIDTH)
@@ -86,13 +90,8 @@ cost = QuadraticCost.from_system(
     weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
 )
 
-start_xy = waypoints[0].copy()
-s_start, _ = track.path.project(start_xy)
-tangent = track.path.tangent(s_start)
-theta0 = float(np.arctan2(tangent[1], tangent[0]))
-if abs(np.cos(2.0 * theta0)) > 1.0 - 1e-9:
-    theta0 += 1e-4
-x0 = np.array([start_xy[0], start_xy[1], theta0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
+# First state from sensors / localization (node start).
+x0 = np.array([waypoints[0, 0], waypoints[0, 1], 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON),
@@ -104,8 +103,20 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
 mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True)
+# =============================================================================
+# end ROS2 NODE __init__
+# =============================================================================
 
-# Optional 3-D cost surface (tuning aid); animation covers the rest.
+# Offline: path-aligned IC as a richer stand-in for the first localization sample.
+start_xy = waypoints[0].copy()
+s_start, _ = track.path.project(start_xy)
+tangent = track.path.tangent(s_start)
+theta0 = float(np.arctan2(tangent[1], tangent[0]))
+if abs(np.cos(2.0 * theta0)) > 1.0 - 1e-9:
+    theta0 += 1e-4
+x0 = np.array([start_xy[0], start_xy[1], theta0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
+
+# Offline: optional 3-D cost surface (tuning aid).
 if SHOW_COST_FIELD:
     bounds = (
         (waypoints[:, 0].min() - 4.0, waypoints[:, 0].max() + 4.0),
@@ -119,58 +130,63 @@ if SHOW_COST_FIELD:
     )
     plot_cost_field_3d(grid, title="Path cost field", log_scale=True)
 
-# Plant twin for offline sim only (not part of the ROS2 node).
+# Offline: plant twin + demo clock (ROS2 uses the real vehicle / estimator).
 sys_sim = JaxDynamicBicycleRateInputsUY()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
 sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
-sys_sim.camera_scale = 14.0
+sys_sim.camera_scale = CAMERA_SCALE
 sys_sim.x0 = x0.copy()
 plant = sys_sim.compile(backend="jax", verbose=False)
 
-# ---------------------------------------------------------------------------
-# Deploy loop — paste these two MPC call sites into a ROS2 node:
-#   slow timer  @ MPC_DT       → replan box
-#   fast timer  @ DT_BROADCAST → broadcast box
-#   (here: plant.rk4_step stands in for the real vehicle / estimator)
-# ---------------------------------------------------------------------------
 t = 0.0
-x = x0.copy()
+x = x0.copy()  # in ROS2: measured / estimated plant state
 u_nom = np.zeros(sys_sim.m)
 next_replan_t = 0.0
 next_broadcast_t = 0.0
 t_hist, x_hist, u_hist, mpc_plans = [t], [x.copy()], [u_nom.copy()], []
 
 while t < TF_SIM - 1e-12:
-    # ┌─────────────────────────────────────────────────────────────────────┐
-    # │  ROS2 slow timer (dt_mpc): NLP replan + build nominal interpolator │
-    # └─────────────────────────────────────────────────────────────────────┘
+    # Demo clock stands in for ROS2 timers (``create_timer`` at MPC_DT / DT_BROADCAST).
     if t >= next_replan_t - 1e-12:
+        # =============================================================================
+        # ROS2 NODE slow timer (period = MPC_DT) — copy these 2 lines
+        #   inputs: measured state ``x``, wall time ``t``
+        # =============================================================================
         cmd = mpc.compute_command(x, t=t)
         mpc.generate_nominal_interpolator(derivatives=True)
+        # =============================================================================
+        # end ROS2 NODE slow timer
+        # =============================================================================
+
+        # offline only: stash horizon for animation overlay
         plan = cmd.plan.trajectory
         mpc_plans.append(
             (t, Trajectory(t=plan.t + t, x=plan.x.copy(), u=plan.u.copy()))
         )
         next_replan_t += MPC_DT
 
-    # ┌─────────────────────────────────────────────────────────────────────┐
-    # │  ROS2 fast timer (dt_broadcast): sample latched nominal trajectory  │
-    # └─────────────────────────────────────────────────────────────────────┘
     if t >= next_broadcast_t - 1e-12:
+        # =============================================================================
+        # ROS2 NODE fast timer (period = DT_BROADCAST) — copy these 4 lines
+        #   then publish / apply ``u_nom`` (and optionally x/du/dx) to the plant
+        # =============================================================================
         u_nom = mpc.get_nominal_u(t)
         x_nom = mpc.get_nominal_x(t)
         du_nom = mpc.get_nominal_u_dot(t)
         dx_nom = mpc.get_nominal_x_dot(t)
-        # publish *_nom on the node; offline plant uses u_nom only
+        # =============================================================================
+        # end ROS2 NODE fast timer
+        # =============================================================================
         next_broadcast_t += DT_BROADCAST
 
-    # Offline stand-in for the plant (not part of the node API).
+    # offline only: integrate plant (ROS2 talks to the real vehicle / estimator)
     x = plant.rk4_step(x, u_nom, t, SIM_DT)
     t += SIM_DT
     t_hist.append(t)
     x_hist.append(x.copy())
     u_hist.append(u_nom.copy())
 
+# Offline: animate.
 traj = Trajectory(t=np.asarray(t_hist), x=np.asarray(x_hist).T, u=np.asarray(u_hist).T)
 sys_sim.traj = traj
 sys_sim.animate(
