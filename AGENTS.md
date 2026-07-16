@@ -13,7 +13,7 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | [README.md](README.md) | User workflows, install, examples table |
 | [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior |
 | [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, priority checkboxes |
-
+| [docs/plans/](docs/plans/) | Active design backlog only (delete finished plan docs) |
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy |
 

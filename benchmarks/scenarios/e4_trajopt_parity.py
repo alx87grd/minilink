@@ -1,7 +1,7 @@
 """E4 trajopt before/after parity scenarios (TOP rebuild + MPC parametric).
 
-Capture once before the MPC→TOP merge, then compare after. See
-``docs/plans/mpc-rh-refactor/phase-E4.md``.
+Capture once before the MPC→TOP merge, then compare after. Historical note:
+originally gated Phase E4 of the MPC/RH refactor (now complete).
 """
 
 from __future__ import annotations

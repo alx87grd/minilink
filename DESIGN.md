@@ -287,8 +287,7 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
   or `{}` binds `x0` only; `params={"scene": …}` raises `NotImplementedError`
   until `ParametricMathematicalProgram` gains `J(z, p)` / `ObstacleBank`
-  ([phase-E7.md](docs/plans/mpc-rh-refactor/phase-E7.md),
-  [planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
+  ([planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
   **Deferred** ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides
   on base `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types
   declare `(t, params)` but still read frozen attributes only until a follow-up
@@ -393,8 +392,7 @@ expose a **trace tier** (`.f_trace`, `.f_trace_p`, `.rk4_step_trace`, …):
 pre-JIT flat callables for composition inside outer `jit` / `grad` / `vmap`
 (identification losses, C export). Optional `_jit` aliases (`.f_jit` ≡ `.f`)
 document the fast tier. NumPy evaluators reject `*_trace` / `*_jit` attributes.
-`has_trace_tier` is `True` on JAX evaluators. Details:
-[docs/plans/evaluator-trace-tier-api.md](docs/plans/evaluator-trace-tier-api.md).
+`has_trace_tier` is `True` on JAX evaluators.
 
 |  | Bound | Parametric |
 | --- | --- | --- |
@@ -406,8 +404,6 @@ Same 2×2 for `outputs`, `step`, and integration helpers
 on JAX dynamics evaluators. Layout:
 `evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`,
 `step_rollout.py` (`gather_u`, `StepRolloutMixin`).
-Integration naming:
-[docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md).
 
 **Integration rename (pre-1.0).** Rollout methods use explicit integrator + input
 model tokens — no bare `integrate`:
@@ -419,9 +415,7 @@ model tokens — no bare `integrate`:
 | `rk4_integrate_forced` | `rk4_integrate_linear` |
 | `rk4_integrate_forced_p` | `rk4_integrate_linear_p` |
 
-Trace-tier JAX twins follow the same pattern (`*_trace`, `*_trace_p`). See
-[docs/plans/evaluator-integration-api.md](docs/plans/evaluator-integration-api.md)
-for the full grid.
+Trace-tier JAX twins follow the same pattern (`*_trace`, `*_trace_p`).
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned. Do not
 reintroduce `compute_outputs(..., ports=...)`.

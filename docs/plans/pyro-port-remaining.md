@@ -402,13 +402,12 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | `examples/scripts/engine/demo_physics_in_diagram.py` | engine |
 | `examples/scripts/engine/demo_physics_many_spheres.py` | engine |
 | `examples/scripts/identification/demo_params_gradient.py` | identification |
+| `examples/scripts/mpc/demo_mpc_minimal.py` | mpc |
+| `examples/scripts/mpc/demo_mpc_dual_rate.py` | mpc |
+| `examples/scripts/mpc/demo_mpc_path.py` | mpc |
 | `examples/scripts/mpc/demo_mpc_circuit.py` | mpc |
-| `examples/scripts/mpc/(removed; see demo_mpc_circuit.py)` | mpc |
-| `examples/scripts/mpc/(removed; see demo_mpc_circuit.py)` | mpc |
-| `examples/scripts/mpc/(removed; see demo_mpc_spatial.py)` | mpc |
-| `examples/scripts/mpc/demo_mpc_straight.py` | mpc |
-| `examples/scripts/mpc/demo_mpc_straight.py  # (legacy recompile demo removed)` | mpc |
-| `examples/scripts/mpc/demo_mpc_circuit.py` | mpc |
+| `examples/scripts/mpc/demo_mpc_slalom.py` | mpc |
+| `examples/scripts/mpc/demo_mpc_spatial.py` | mpc |
 | `examples/scripts/optimization/demo_basic_optim.py` | optimization |
 | `examples/scripts/optimization/demo_optim_plot.py` | optimization |
 | `examples/scripts/planning/rrt/demo_car_parking.py` | rrt |
@@ -439,7 +438,7 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 
 | Notebook |
 | --- |
-| `examples/notebooks/demo_dynamic_bicycle_rate_mpc_straight_line.ipynb` |
+| `examples/notebooks/demo_mpc_circuit.ipynb` |
 | `examples/notebooks/demo_optimization.ipynb` |
 | `examples/notebooks/demo_overview.ipynb` |
 | `examples/notebooks/demo_plots_animations_backends.ipynb` |

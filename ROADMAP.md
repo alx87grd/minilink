@@ -55,7 +55,7 @@ release process by themselves.
 - Separated model / compile / simulate / optimize / plan / graphics.
 - `ExecutionPlan` + NumPy/JAX evaluators; shared `Trajectory`.
 - **JAX evaluator trace tier** — fast vs trace execution tiers on compiled
-  evaluators ([evaluator-trace-tier-api.md](docs/plans/evaluator-trace-tier-api.md)).
+  evaluators ([DESIGN.md](DESIGN.md) §5).
 - Composition shortcuts (`+`, `>>`, `@`, `autowire`) → ordinary `DiagramSystem`.
 - Explicit ports; `DynamicSystem` textbook ports via constructor options.
 - Pure `MathematicalProgram` + `Optimizer`; backend-native trajopt transcriptions.
@@ -132,7 +132,7 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 
 - [x] **Integration API rename** — `rk4_integrate_{zoh,linear,ivp}`, `euler_integrate_{zoh,ivp}`,
   full `_p` / JAX `_trace` grid, lazy rollout JIT, by-backend evaluator layout
-  ([evaluator-integration-api.md](docs/plans/evaluator-integration-api.md))
+  ([DESIGN.md](DESIGN.md) §5)
 
 ### 5.1 Analysis
 
@@ -173,8 +173,8 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
   `TrajectoryOptimizationPlanner.compile_parametric_program` +
   `solve_trajectory_from` (parametric `x0`); controllers in `control/mpc/`;
   primary demos under `examples/scripts/mpc/`
-  (`demo_mpc_minimal`, `demo_mpc_dual_rate`, `demo_mpc_circuit`,
-  `demo_mpc_slalom`, `demo_mpc_spatial`)
+  (`demo_mpc_minimal`, `demo_mpc_dual_rate`, `demo_mpc_path`,
+  `demo_mpc_circuit`, `demo_mpc_slalom`, `demo_mpc_spatial`)
 - [x] **Online `params` façade (E7 slim)** — `params=None`/`{}` for x0-only;
   reserved `scene` key and `ProblemParameters.scene` placeholder;
   `NotImplementedError` until full bind; latch forwards `params` on
@@ -184,16 +184,14 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
   `dual_rate_computer(dt_broadcast)`; default `@` stays `u_ff` ZOH.
 - [x] **Phase F — MPC package home** — product System family in
   `control/mpc/` (`controller.py`, `utilities.py`, `viz.py`); hard-cut
-  former `planning/mpc` (see `docs/plans/mpc-rh-refactor/phase-F-cleanup.md`).
+  former `planning/mpc`.
 - [x] **Planning UI simplification** — Simulator-style planner constructors
   (flat kwargs for trajopt / RRT / DP); teach demos use `control.mpc` and
-  explicit `transcription="…"` without `*Options` imports. See
-  `docs/plans/planning-ui-simplification.md`.
-- [ ] **Scene params / online bind (pipeline B)** — *wanted later, not in the
-  current RH closing sequence.* `ObstacleBank`, `J(z, p)` / `bind(p)`,
-  indexed scene overrides (moving obstacles, scenario sweeps without NLP
-  rebuild). Notes in `docs/plans/mpc-rh-refactor/phase-E7.md` (deferred) and
-  `docs/plans/planning-pipeline-architecture.md`.
+  explicit `transcription="…"` without `*Options` imports.
+- [ ] **Scene params / online bind (pipeline B)** — *wanted later.*
+  `ObstacleBank`, `J(z, p)` / `bind(p)`, indexed scene overrides (moving
+  obstacles, scenario sweeps without NLP rebuild). Notes in
+  [planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md).
 - [ ] **Parametric `core/` primitives** (promoted to P1) — call-time `params`
   overrides on `Shape.sdf`, `Set.margin`, and `CostFunction.g`/`h` (e.g. `BallSet`
   center/radius, `QuadraticCost` weights). Signatures exist; frozen attributes are the

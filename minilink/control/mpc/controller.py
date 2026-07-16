@@ -867,7 +867,7 @@ class MPCBroadcastController(System):
     passed as the port ``t`` argument.
 
     Holds a reference to the replan MPC (shared ``NominalCache``) — not a
-    port input. See dual-rate packaging option A in DESIGN / phase-E8.
+    port input. See dual-rate packaging in DESIGN.md (MPC hybrid block).
     """
 
     def __init__(self, mpc, *, dt_broadcast: float, t0: float = 0.0) -> None:

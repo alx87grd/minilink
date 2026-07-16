@@ -436,6 +436,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
 | Minimal MPC (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/mpc/demo_mpc_minimal.py` |
 | Dual-rate MPC (`dual_rate_computer` + `u_nom`) | `examples/scripts/mpc/demo_mpc_dual_rate.py` |
+| Path MPC (dual-rate manual deploy / ROS2-style loop) | `examples/scripts/mpc/demo_mpc_path.py` |
 | Circuit MPC full stack (scene → cost → plan → hybrid) | `examples/scripts/mpc/demo_mpc_circuit.py` · [notebook](examples/notebooks/demo_mpc_circuit.ipynb) |
 | Slalom MPC (straight lane + staggered obstacles) | `examples/scripts/mpc/demo_mpc_slalom.py` |
 | Spatial MPC assemble (fields → `PlanningProblem`) | `examples/scripts/mpc/demo_mpc_spatial.py` |
