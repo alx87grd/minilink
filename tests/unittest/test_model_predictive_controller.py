@@ -138,6 +138,52 @@ class TestModelPredictiveController(unittest.TestCase):
         with self.assertRaises(ValueError):
             mpc.compute_command(np.array([0.0]), params={"foo": 1})
 
+    def test_nominal_interpolator_and_getters(self):
+        planner = self._make_planner(0.1)
+        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
+        with self.assertRaises(RuntimeError):
+            mpc.get_nominal_u(0.0)
+        cmd = mpc.compute_command(np.array([0.1]), k=0, t=0.0)
+        mpc.generate_nominal_interpolator(derivatives=True)
+        u0 = mpc.get_nominal_u(0.0)
+        np.testing.assert_allclose(u0, cmd.u_ff, atol=1e-5)
+        x0 = mpc.get_nominal_x(0.0)
+        np.testing.assert_allclose(x0, cmd.plan.trajectory.x[:, 0], atol=1e-5)
+        # Mid-horizon sample has finite values; dots exist.
+        t_mid = 0.5
+        u_m = mpc.get_nominal_u(t_mid)
+        self.assertEqual(u_m.shape, (1,))
+        du = mpc.get_nominal_u_dot(t_mid)
+        dx = mpc.get_nominal_x_dot(t_mid)
+        self.assertEqual(du.shape, (1,))
+        self.assertEqual(dx.shape, (1,))
+        # Clamp past horizon.
+        u_end = mpc.get_nominal_u(1e3)
+        np.testing.assert_allclose(u_end, cmd.plan.trajectory.u[:, -1], atol=1e-5)
+
+    def test_deploy_shaped_two_rate_hand_loop(self):
+        """Mirrors RAS: replan + interpolator, then many get_nominal_u."""
+        planner = self._make_planner(0.0)
+        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
+        n_solve = []
+        _solve = planner.solve_trajectory_from
+
+        def solve_w(*args, **kwargs):
+            n_solve.append(1)
+            return _solve(*args, **kwargs)
+
+        planner.solve_trajectory_from = solve_w
+        try:
+            mpc.compute_command(np.array([0.0]), t=0.0)
+            mpc.generate_nominal_interpolator(derivatives=True)
+            for i in range(10):
+                t = 0.01 * i
+                u = mpc.get_nominal_u(t)
+                self.assertEqual(u.shape, (1,))
+            self.assertEqual(len(n_solve), 1)
+        finally:
+            planner.solve_trajectory_from = _solve
+
     def test_matmul_returns_hybrid(self):
         planner = self._make_planner()
         sys = planner.problem.sys

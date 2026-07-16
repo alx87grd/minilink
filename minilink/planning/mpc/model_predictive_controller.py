@@ -12,6 +12,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from minilink.planning.mpc.command import Command
+from minilink.planning.mpc.nominal import (
+    NominalCache,
+    build_nominal_cache,
+    eval_signal,
+)
 from minilink.planning.results import SolveMetadata
 from minilink.planning.trajectory_optimization.planner import (
     reject_unknown_online_params,
@@ -21,6 +26,7 @@ if TYPE_CHECKING:
     from minilink.planning.trajectory_optimization.planner import (
         TrajectoryOptimizationPlanner,
     )
+    from minilink.simulation.computer import Computer
 
 
 class ModelPredictiveControllerMixin:
@@ -40,6 +46,8 @@ class ModelPredictiveControllerMixin:
     _last_command: Command | None
     _debug_handles: object | None
     _debug_sys: object | None
+    _nominal_cache: NominalCache | None
+    _replan_divisor: int
 
     @property
     def dt_mpc(self) -> float:
@@ -55,6 +63,13 @@ class ModelPredictiveControllerMixin:
     def last_command(self) -> Command | None:
         """Most recent :meth:`compute_command` result, if any."""
         return self._last_command
+
+    def _replan_k(self, k_tick) -> int:
+        """Map Computer base tick to replan index (dual-rate divisor)."""
+        d = int(getattr(self, "_replan_divisor", 1))
+        if d < 1:
+            d = 1
+        return int(k_tick) // d
 
     def get_solve_metadata(self) -> SolveMetadata | None:
         """
@@ -73,10 +88,79 @@ class ModelPredictiveControllerMixin:
         return None
 
     def reset(self) -> None:
-        """Clear deploy counter, last command, and tick latch memo."""
+        """Clear deploy counter, last command, nominal cache, and tick latch."""
         self._deploy_k = 0
         self._last_command = None
+        self._nominal_cache = None
         self._latch.reset_latch()
+
+    def generate_nominal_interpolator(
+        self, *, derivatives: bool = True
+    ) -> NominalCache:
+        """
+        Build the fast nominal cache from the last latched plan (opt-in).
+
+        Call after :meth:`compute_command` (or a hybrid replan tick) when using
+        high-rate :meth:`get_nominal_u` / dual-rate broadcast. Not invoked by
+        :meth:`compute_command` itself.
+
+        Parameters
+        ----------
+        derivatives : bool, optional
+            If True, attach FD knot rates for ``get_nominal_*_dot``.
+        """
+        plan = self._planner.last_trajectory_plan
+        if plan is None:
+            raise RuntimeError(
+                "generate_nominal_interpolator requires a latched plan; "
+                "call compute_command (or run a replan tick) first."
+            )
+        if self._last_command is not None:
+            t_solve = float(self._last_command.t_solve)
+        else:
+            t_solve = self._latch.last_t_solve
+            if t_solve is None:
+                t_solve = float(self._t0)
+        cache = build_nominal_cache(plan, t_solve, derivatives=bool(derivatives))
+        self._nominal_cache = cache
+        return cache
+
+    def _require_nominal_cache(self) -> NominalCache:
+        cache = getattr(self, "_nominal_cache", None)
+        if cache is None:
+            raise RuntimeError(
+                "nominal interpolator not built; call "
+                "generate_nominal_interpolator() after a replan."
+            )
+        return cache
+
+    def get_nominal_u(self, t: float) -> np.ndarray:
+        """Linear interp of latched plan ``u`` at absolute time ``t``."""
+        cache = self._require_nominal_cache()
+        return eval_signal(cache, t, cache.u)
+
+    def get_nominal_x(self, t: float) -> np.ndarray:
+        """Linear interp of latched plan ``x`` at absolute time ``t``."""
+        cache = self._require_nominal_cache()
+        return eval_signal(cache, t, cache.x)
+
+    def get_nominal_u_dot(self, t: float) -> np.ndarray:
+        """Interp of precomputed ``u`` rates (requires ``derivatives=True``)."""
+        cache = self._require_nominal_cache()
+        if cache.u_dot is None:
+            raise RuntimeError(
+                "u_dot not in cache; call generate_nominal_interpolator(derivatives=True)."
+            )
+        return eval_signal(cache, t, cache.u_dot)
+
+    def get_nominal_x_dot(self, t: float) -> np.ndarray:
+        """Interp of precomputed ``x`` rates (requires ``derivatives=True``)."""
+        cache = self._require_nominal_cache()
+        if cache.x_dot is None:
+            raise RuntimeError(
+                "x_dot not in cache; call generate_nominal_interpolator(derivatives=True)."
+            )
+        return eval_signal(cache, t, cache.x_dot)
 
     def _z_warm_for_command(self):
         """Override on StepSystem: previous packed ``z`` for warm-start."""
@@ -92,6 +176,9 @@ class ModelPredictiveControllerMixin:
     ) -> Command:
         """
         Deploy replan tick: measure ``y`` → NLP → :class:`Command`.
+
+        Does **not** build the nominal interpolator; call
+        :meth:`generate_nominal_interpolator` explicitly for dual-rate / broadcast.
 
         Parameters
         ----------
@@ -145,13 +232,30 @@ class ModelPredictiveControllerMixin:
         return cmd
 
     def export_to_computer(self, schedule=None):
-        """Build a single-rate :class:`~minilink.simulation.computer.Computer`."""
+        """Build a single-rate :class:`~minilink.simulation.computer.Computer` (``u_ff`` ZOH)."""
         from minilink.planning.mpc._block_common import export_mpc_to_computer
 
         return export_mpc_to_computer(self, schedule, dt_mpc=self._dt_mpc)
 
+    def dual_rate_computer(self, dt_broadcast: float) -> Computer:
+        """
+        Advanced multi-rate :class:`~minilink.simulation.computer.Computer`.
+
+        Replan leaf at :attr:`dt_mpc`; broadcast leaf at ``dt_broadcast`` applying
+        :meth:`get_nominal_u`. Requires ``dt_mpc / dt_broadcast`` to be a positive
+        integer. Does not change default :meth:`export_to_computer` / ``@``.
+
+        Leaves share this controller's latch / nominal cache (no port edge
+        between them). Deploy truth remains
+        :meth:`compute_command` + :meth:`generate_nominal_interpolator` +
+        :meth:`get_nominal_u`.
+        """
+        from minilink.planning.mpc._block_common import export_mpc_dual_rate_computer
+
+        return export_mpc_dual_rate_computer(self, dt_broadcast=float(dt_broadcast))
+
     def __matmul__(self, plant):
-        """``mpc @ plant`` → hybrid via ``export_to_computer() @ plant``."""
+        """``mpc @ plant`` → hybrid via ``export_to_computer() @ plant`` (ZOH)."""
         return self.export_to_computer() @ plant
 
     def init_debug_figure(self, sys, **kwargs):

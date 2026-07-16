@@ -21,11 +21,13 @@ class MPCTickSolve:
     z: np.ndarray
     u_ff: np.ndarray
     x_ff: np.ndarray
+    t_solve: float
+    k: int
 
 
 class MPCTickLatch:
     """
-    Memoize one planner solve per integer tick ``k``.
+    Memoize one planner solve per integer replan tick ``k``.
 
     Port ``compute`` paths on MPC blocks call :meth:`solve_for_tick`; the first
     call at a new ``k`` runs the NLP via
@@ -47,6 +49,18 @@ class MPCTickLatch:
         self._t0 = float(t0)
         self._latch_k: int | None = None
         self._latch: MPCTickSolve | None = None
+        self._after_solve = None
+
+    @property
+    def last_t_solve(self) -> float | None:
+        """Absolute solve time of the latched tick, if any."""
+        if self._latch is None:
+            return None
+        return float(self._latch.t_solve)
+
+    def set_after_solve(self, callback) -> None:
+        """Optional hook after a new NLP latch (e.g. dual-rate interpolator)."""
+        self._after_solve = callback
 
     def solve_for_tick(
         self,
@@ -92,14 +106,24 @@ class MPCTickLatch:
                 "MPC plan must have at least two samples for x_ff = plan.x[:, 1]"
             )
 
+        dt = float(dt_mpc) if dt_mpc is not None else self._dt_mpc
+        if dt is None:
+            t_solve = float(self._t0)
+        else:
+            t_solve = float(self._t0 + k_int * dt)
+
         latch = MPCTickSolve(
             plan=traj,
             z=np.asarray(result.z, dtype=float).reshape(-1),
             u_ff=np.asarray(traj.u[:, 0], dtype=float).reshape(m),
             x_ff=np.asarray(traj.x[:, 1], dtype=float).reshape(n),
+            t_solve=t_solve,
+            k=k_int,
         )
         self._latch_k = k_int
         self._latch = latch
+        if self._after_solve is not None:
+            self._after_solve()
         if self._step_disp:
             self._print_step_disp(k_int, result)
         return latch

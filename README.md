@@ -439,6 +439,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Step (discrete leaf, `compute_rollout`) | `examples/scripts/step/` |
 | Hybrid (scheduled computer + continuous plant) | `examples/scripts/hybrid/demo_hybrid_multi_rate.py` |
 | Minimal hybrid MPC (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_minimal.py` |
+| Dual-rate hybrid MPC (`dual_rate_computer` + `u_nom`) | `examples/scripts/hybrid/demo_mpc_hybrid_dual_rate.py` |
 | Hybrid MPC track + obstacles (`ModelPredictiveController` + `mpc @ plant`) | `examples/scripts/hybrid/demo_mpc_hybrid_track_lap.py` · [notebook](examples/notebooks/demo_mpc_hybrid_track_lap.ipynb) |
 | Pyro SMC continuous (pendulum) | `examples/scripts/control/demo_sliding_mode_pendulum.py` |
 | Pyro SMC continuous vs hybrid (pendulum) | `examples/scripts/hybrid/demo_smc_pendulum_compare.py` |

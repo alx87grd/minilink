@@ -44,6 +44,8 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
         self._last_command = None
         self._debug_handles = None
         self._debug_sys = None
+        self._nominal_cache = None
+        self._replan_divisor = 1
         self._latch = MPCTickLatch(
             planner,
             step_disp=step_disp,
@@ -81,12 +83,12 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
 
     def _compute_u_ff(self, x, u, t=0, params=None):
         del x, params
-        return self._latch.solve_for_tick(t, self._measurement(u)).u_ff
+        return self._latch.solve_for_tick(self._replan_k(t), self._measurement(u)).u_ff
 
     def _compute_x_ff(self, x, u, t=0, params=None):
         del x, params
-        return self._latch.solve_for_tick(t, self._measurement(u)).x_ff
+        return self._latch.solve_for_tick(self._replan_k(t), self._measurement(u)).x_ff
 
     def _compute_z(self, x, u, t=0, params=None):
         del x, params
-        return self._latch.solve_for_tick(t, self._measurement(u)).z
+        return self._latch.solve_for_tick(self._replan_k(t), self._measurement(u)).z

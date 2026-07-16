@@ -264,16 +264,24 @@ and `t_solve`.
   fine `plant_dt_inner`, pass `"jax"` for JAX plants or plant rollout dominates
   wall time (NLP `solve=` alone understates cost).
 
-### Broadcast + dual-rate (E8 — not E2)
+### Broadcast + dual-rate (E8)
 
-Independent high-rate query (no NLP):
+High-rate nominal sampling from the latched plan (no NLP on the fast path).
+Interpolator is **opt-in** — not built inside `compute_command`.
 
-- `get_nominal(t, *, include_derivatives=False)` → \(u,x\) [, rates] from
-  last latched plan (\(\tau = t - t_{\mathrm{solve}}\)).
+| Method | Role |
+| --- | --- |
+| `generate_nominal_interpolator(*, derivatives=True)` | Slow post-process → `NominalCache` (FD rates when `derivatives=True`) |
+| `get_nominal_u` / `_x` / `_u_dot` / `_x_dot(t)` | Fast eval → one `ndarray` each; \(\tau = t - t_{\mathrm{solve}}\), clamp to \([0, T]\) |
 
-Sim: `export_to_computer(dt_ctl=…)` builds a **multi-rate** `Computer`
-(replan leaf at \(\Delta t_{\mathrm{mpc}}\) + broadcast leaf at \(\Delta t_{\mathrm{ctl}}\)).
-See [phase-E8.md](phase-E8.md).
+Default sim: `export_to_computer()` / `mpc @ plant` stay **`u_ff` ZOH** at \(\Delta t_{\mathrm{mpc}}\).
+
+Advanced sim: `dual_rate_computer(dt_broadcast)` — replan leaf at `mpc.dt_mpc`,
+broadcast leaf at \(\Delta t_{\mathrm{broadcast}}\) applying `u_nom`. Requires
+`dt_mpc / dt_broadcast` a positive integer. **Option A (locked for E8):** the
+two leaves share the MPC latch / `NominalCache` (no port edge; Graphviz shows
+disconnected islands). Deploy truth stays the method API. See
+[phase-E8.md](phase-E8.md).
 
 Warm-start *policy* (`warm_start=True` on the controller) is owned here — not
 on the Planner ABC / generic from-API.

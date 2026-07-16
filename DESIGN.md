@@ -210,17 +210,32 @@ serial arms. Joint impedance / task impedance / computed torque use
   so each Computer tick is bind + solve (memoized across ports ``u_ff``,
   ``x_ff``, ``z``). Warm-start via
   :func:`~minilink.planning.mpc.warm_start.mpc_warm_start_guess` from
-  ``Computer.x``. Deploy / hand loop:
+  ``Computer.x``.   Deploy / hand loop:
   :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.compute_command`
   → :class:`~minilink.planning.mpc.command.Command`; telemetry via
   :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.get_solve_metadata`
   and ``Command.metadata`` (alias of ``plan.metadata``); ``reset()`` clears
-  deploy counter, last command, and tick latch. External nodes wrap that loop
-  only (no ROS2 package in-tree). Post-sim horizons:
+  deploy counter, last command, nominal cache, and tick latch. High-rate
+  nominal (opt-in):
+  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.generate_nominal_interpolator`
+  then
+  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.get_nominal_u`
+  / ``get_nominal_x`` / ``get_nominal_u_dot`` / ``get_nominal_x_dot``.
+  Default ``export_to_computer`` / ``mpc @ plant`` apply ``u_ff`` ZOH; advanced
+  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.dual_rate_computer`
+  (``dt_broadcast``) builds a multi-rate Computer with ``u_nom`` broadcast.
+  **Dual-rate packaging (option A):** ``replan`` and ``broadcast`` share the
+  same MPC object — after each NLP the latch builds ``NominalCache`` via
+  ``generate_nominal_interpolator``; broadcast evaluates ``get_nominal_*``.
+  There is **no** port edge between the leaves (Graphviz correctly shows two
+  islands). Deploy truth remains the two-timer method API; the Computer is
+  convenience packaging, not a pure signal graph. A future port-carried flat
+  plan (option B) would make the edge honest at the cost of one
+  ``dt_broadcast`` lag under parallel tick semantics. External nodes wrap the
+  same methods (no ROS2 package in-tree). Post-sim horizons:
   :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
   default animation overlays:
   :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
-  High-rate ``get_nominal`` / dual-rate export are later (E8).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in

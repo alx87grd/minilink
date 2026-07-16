@@ -44,6 +44,8 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         self._last_command = None
         self._debug_handles = None
         self._debug_sys = None
+        self._nominal_cache = None
+        self._replan_divisor = 1
         self._latch = MPCTickLatch(
             planner,
             step_disp=step_disp,
@@ -93,7 +95,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
     def _compute_u_ff(self, x, u, t=0, params=None):
         del params
         return self._latch.solve_for_tick(
-            t,
+            self._replan_k(t),
             self._measurement(u),
             z_warm=x,
             dt_mpc=self._dt_mpc,
@@ -102,7 +104,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
     def _compute_x_ff(self, x, u, t=0, params=None):
         del params
         return self._latch.solve_for_tick(
-            t,
+            self._replan_k(t),
             self._measurement(u),
             z_warm=x,
             dt_mpc=self._dt_mpc,
@@ -111,7 +113,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
     def _compute_z(self, x, u, t=0, params=None):
         del params
         return self._latch.solve_for_tick(
-            t,
+            self._replan_k(t),
             self._measurement(u),
             z_warm=x,
             dt_mpc=self._dt_mpc,
@@ -121,7 +123,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         del params
         y = self._measurement(u)
         z_new = self._latch.solve_for_tick(
-            k,
+            self._replan_k(k),
             y,
             z_warm=x,
             dt_mpc=self._dt_mpc,

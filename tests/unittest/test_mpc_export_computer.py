@@ -69,6 +69,29 @@ class TestMpcExportComputer(unittest.TestCase):
         with self.assertRaises(ValueError):
             mpc.export_to_computer(0.1)
 
+    def test_dual_rate_computer_schedule_and_u_nom(self):
+        planner = _planner()
+        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
+        computer = mpc.dual_rate_computer(dt_broadcast=0.05)
+        self.assertIsInstance(computer, Computer)
+        self.assertAlmostEqual(computer.schedule.dt_base, 0.05)
+        self.assertEqual(computer.schedule.fire["replan"], 4)
+        self.assertEqual(computer.schedule.fire["broadcast"], 1)
+        self.assertIn("u_nom", computer.diagram.outputs)
+        self.assertIn("y", computer.diagram.inputs)
+        with self.assertRaises(ValueError):
+            mpc.dual_rate_computer(dt_broadcast=0.07)
+
+    def test_dual_rate_matmul_hybrid(self):
+        from minilink.core.hybrid_diagram import HybridDiagram
+
+        planner = _planner()
+        plant = planner.problem.sys
+        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
+        computer = mpc.dual_rate_computer(dt_broadcast=0.1)
+        hybrid = computer @ plant
+        self.assertIsInstance(hybrid, HybridDiagram)
+
 
 if __name__ == "__main__":
     unittest.main()

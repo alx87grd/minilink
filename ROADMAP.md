@@ -179,6 +179,9 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
   reserved `scene` key and `ProblemParameters.scene` placeholder;
   `NotImplementedError` until full bind; latch forwards `params` on
   `compute_command`.
+- [x] **Broadcast + dual-rate (E8)** —
+  `generate_nominal_interpolator` + `get_nominal_u/x/u_dot/x_dot`;
+  `dual_rate_computer(dt_broadcast)`; default `@` stays `u_ff` ZOH.
 - [ ] **Scene params (pipeline B)** — `ObstacleBank`, `J(z, p)` /
   `bind(p)` on `ParametricMathematicalProgram`, transcription merge helpers,
   indexed overrides in `Scene` / `StateField` (moving obstacles, scenario
