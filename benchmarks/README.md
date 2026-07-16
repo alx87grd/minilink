@@ -20,6 +20,8 @@ scene for fast RRT contract tests.
 | Path | Role |
 | --- | --- |
 | [`run_regression_check.py`](run_regression_check.py) | Single entry point for all committed baselines |
+| [`run_study.py`](run_study.py) | **Layer C** unified machine-exploration presets (replaces tier-2 `run_*_speed.py` / backend sweeps) |
+| [`studies/presets.py`](studies/presets.py) | Preset implementations invoked by `run_study.py` |
 | [`suites/core_perf.py`](suites/core_perf.py) | Fast compile/`f()`/sim final-state tier-1 gate |
 | [`suites/integration_check.py`](suites/integration_check.py) | Trajectory checkpoint goldens + JAX trajopt solve-time gates |
 | [`suites/solve_speed.py`](suites/solve_speed.py) | Standalone NLP + NumPy pendulum trajopt solve wall-time gates |
@@ -36,8 +38,15 @@ want to measure (`minilink[jax]` for JAX variants; `cyipopt` for Ipopt
 variants — both are skipped gracefully when missing):
 
 ```bash
-python benchmarks/run_pendulum_f_speed.py        # f() call speed, single plant
-python benchmarks/run_diagram_f_speed.py         # f() call speed, dense diagram
+python benchmarks/run_study.py --list
+python benchmarks/run_study.py --preset f_eval --plant pendulum
+python benchmarks/run_study.py --preset sim --mode matrix
+python benchmarks/run_study.py --preset trajopt --mode backends
+python benchmarks/run_study.py --preset optimizer
+python benchmarks/run_study.py --preset dp
+python benchmarks/run_study.py --preset rrt_nearest
+python benchmarks/run_pendulum_f_speed.py        # deprecated shim → f_eval pendulum
+python benchmarks/run_diagram_f_speed.py         # deprecated shim → f_eval diagram_dense
 python benchmarks/run_step_speed.py            # step() call speed, leaf StepSystem
 python benchmarks/run_step_diagram_speed.py    # step() call speed, step diagram
 python benchmarks/run_simulator_standard.py      # one variant on standard cases
@@ -111,5 +120,6 @@ python benchmarks/run_regression_check.py --suite all
 python benchmarks/run_regression_check.py --suite integration --update   # after intentional changes
 ```
 
-Review the JSON diff before committing an `--update`. Tier-2 runners (`run_*_speed.py`,
-trajopt/optimizer sweeps, Pyro parity) remain manual Layer-C studies.
+Review the JSON diff before committing an `--update`. Tier-2 runners are **deprecated
+shims** forwarding to [`run_study.py`](run_study.py); Pyro parity remains manual Layer-C
+only (external Pyro env).

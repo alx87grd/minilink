@@ -1,18 +1,16 @@
-"""Flat script: leaf ``step`` — native / NumPy evaluator / JAX evaluator.
+"""Deprecated: use ``python benchmarks/run_study.py --preset step_eval --plant leaf``."""
 
-Run:
-    python benchmarks/run_step_speed.py
-"""
+from __future__ import annotations
 
-import numpy as np
+from benchmarks.run_study import main
 
-from benchmarks.step_evaluators import benchmark_step_evaluators, print_step_benchmark
-from benchmarks.systems.step import LogisticMap
+if __name__ == "__main__":
+    import warnings
 
-sys = LogisticMap()
-x_np = np.array([0.4])
-u_np = np.array([])
-n_calls = 100_000
-
-result = benchmark_step_evaluators(sys, x_np, u_np, k=0, n_calls=n_calls)
-print_step_benchmark(result)
+    warnings.warn(
+        "run_step_speed.py is deprecated; use "
+        "python benchmarks/run_study.py --preset step_eval --plant leaf",
+        DeprecationWarning,
+        stacklevel=1,
+    )
+    raise SystemExit(main(["--preset", "step_eval", "--plant", "leaf"]))

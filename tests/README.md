@@ -42,7 +42,8 @@ many near-duplicate files.
 `test_hybrid`, `test_dynamics_catalog`, `test_mechanical_robotics`, `test_blocks`,
 `test_control_analysis`, `test_costs_optimizer`, `test_planning`, `test_mpc`,
 `test_graphics`, `test_geometry`, `test_engine_jax`, `test_jax_planning`,
-`test_symbolic`, `test_benchmark_smoke`, `test_smoke_runners`. Re-merge helper:
+`test_symbolic`, `test_benchmark_smoke`, `test_smoke_runners`,
+`test_flagship_graphics_contract`. Re-merge helper:
 `scripts/merge_l1_tests.py`.
 
 Deep dynamics checks for a few representative plants
@@ -68,7 +69,8 @@ python examples/scripts/_smoke/run_flagship_demos.py
 ```
 
 Pytest: `tests/unittest/test_smoke_runners.py`. **Layer L4** graphics headless:
-`python examples/scripts/_smoke/run_flagship_graphics.py`. **Layer L5** visual (local):
+`python examples/scripts/_smoke/run_flagship_graphics.py`. G0 draw-list contract:
+`tests/unittest/test_flagship_graphics_contract.py`. **Layer L5** visual (local):
 `python examples/scripts/_smoke/run_graphics_visual_check.py`.
 
 `tests/manual/` and `tests/bugs/` are removed — use `examples/scripts/` for

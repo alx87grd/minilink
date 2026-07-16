@@ -300,4 +300,12 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import warnings
+
+    warnings.warn(
+        "run_pyro_minilink_parity.py is deprecated; use "
+        "python benchmarks/run_study.py --preset pyro_parity -- [args]",
+        DeprecationWarning,
+        stacklevel=1,
+    )
     main()

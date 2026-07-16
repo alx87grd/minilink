@@ -43,6 +43,23 @@ class TestSmokeRunners(unittest.TestCase):
                 f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
             )
 
+    def test_flagship_graphics_exit_zero(self):
+        proc = self._run("examples/scripts/_smoke/run_flagship_graphics.py")
+        if proc.returncode != 0:
+            self.fail(
+                f"flagship graphics failed (exit {proc.returncode})\n"
+                f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+            )
+
+    def test_run_study_list_exit_zero(self):
+        proc = self._run("benchmarks/run_study.py", "--list")
+        if proc.returncode != 0:
+            self.fail(
+                f"run_study --list failed (exit {proc.returncode})\n"
+                f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+            )
+        self.assertIn("f_eval", proc.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

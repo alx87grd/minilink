@@ -1,6 +1,6 @@
 # Test & benchmark consolidation plan
 
-Status: **L1 + L2 + L6 + L4/L5 stubs landed**; L3 `run_study.py` still todo.
+Status: **L1 + L2 + L3 + L6 + L4 partial** landed; L5 visual check stub remains local-only.
 
 ---
 
@@ -140,7 +140,7 @@ pytest tests/unittest/test_graphics.py tests/unittest/test_flagship_graphics_con
 python examples/scripts/_smoke/run_flagship_graphics.py --headless --out /tmp/ml-gfx
 ```
 
-**Status:** ⬜ partial today (`test_kinematic_regression`, `test_overlays`); flagship manifest + aggregator planned (Phase 6).
+**Status:** ✅ kinematic manifest smoke + **`test_flagship_graphics_contract.py`** (G0 draw-list); G1 perceptual hash still optional.
 
 ---
 
@@ -199,8 +199,8 @@ python examples/scripts/_smoke/run_all_demos.py --timeout 120
 | API / type / module contracts | L1 | `pytest` | ✅ |
 | Sim + trajopt accuracy goldens | L2 | `run_regression_check.py --suite all` | ✅ accuracy |
 | NLP/trajopt solve time regression | L2 | same + speed suffixes | ✅ partial |
-| New GPU / machine benchmarks | L3 | `run_*_speed.py`, `run_study.py` (planned) | ❌ |
-| Graphics pipelines run, PNG exists | L4 | pytest graphics + smoke scripts | ⬜ partial |
+| New GPU / machine benchmarks | L3 | `run_study.py` (+ legacy shims) | ✅ |
+| Graphics pipelines run, PNG exists | L4 | pytest graphics + smoke scripts | ✅ partial |
 | You eyeball Meshcat / Plotly / MPL | L5 | `run_graphics_visual_check.py` | ❌ |
 | Catalog + demos don't crash | L6 | `run_catalog_smokes.py`, demo aggregators | ⬜ planned |
 
@@ -213,7 +213,7 @@ python examples/scripts/_smoke/run_all_demos.py --timeout 120
 | 0 | — | This vision doc + inventory table | ✅ |
 | 1 | L2 | Unified `run_regression_check`, `solve_speed`, CI regression job | ✅ |
 | 2 | L1 | Merge 91 pytest files → ~22 domain modules | ✅ (21 files) |
-| 3 | L3 | `run_study.py` replaces scattered benchmark CLIs | ⬜ |
+| 3 | L3 | `run_study.py` replaces scattered benchmark CLIs | ✅ |
 | 4 | L6 | Catalog smokes + demo whitelist aggregators | ✅ |
 | 5 | L4 | Flagship graphics headless manifest + pytest | ✅ partial |
 | 6 | L5 | Interactive visual check script for local use | ✅ stub |

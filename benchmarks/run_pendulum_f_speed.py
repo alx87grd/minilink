@@ -1,20 +1,16 @@
-"""Flat script: JaxPendulum — time ``f`` native / numpy evaluator / jax evaluator.
+"""Deprecated: use ``python benchmarks/run_study.py --preset f_eval --plant pendulum``."""
 
-Run:
-    python benchmarks/run_pendulum_f_speed.py
-"""
+from __future__ import annotations
 
-import numpy as np
+from benchmarks.run_study import main
 
-from benchmarks.f_evaluators import benchmark_f_evaluators, print_f_benchmark
-from benchmarks.systems.basic import JaxPendulum
+if __name__ == "__main__":
+    import warnings
 
-sys = JaxPendulum(damping=0.5)
-sys.x0[0] = 1.0
-
-x_np = np.array([1.0, 0.0])
-u_np = np.array([0.0])
-n_calls = 1000
-
-result = benchmark_f_evaluators(sys, x_np, u_np, t=0.0, n_calls=n_calls)
-print_f_benchmark(result)
+    warnings.warn(
+        "run_pendulum_f_speed.py is deprecated; use "
+        "python benchmarks/run_study.py --preset f_eval --plant pendulum",
+        DeprecationWarning,
+        stacklevel=1,
+    )
+    raise SystemExit(main(["--preset", "f_eval", "--plant", "pendulum"]))
