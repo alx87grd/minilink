@@ -693,16 +693,18 @@ class MPCTickLatch:
         if solve_s is None:
             solve_s = self._planner.last_solve_time_s
         step_s = self._planner.last_step_time_s
+        solve_txt = "n/a" if solve_s is None else f"{float(solve_s):.3f}s"
+        step_txt = "n/a" if step_s is None else f"{float(step_s):.3f}s"
         if self._dt_mpc is not None:
             t_fire = self._t0 + k_int * self._dt_mpc
             print(
                 f"MPC @ t={t_fire:.2f}s  success={result.success}  "
-                f"solve={solve_s:.3f}s  step={step_s:.3f}s"
+                f"solve={solve_txt}  step={step_txt}"
             )
         else:
             print(
                 f"MPC @ k={k_int}  success={result.success}  "
-                f"solve={solve_s:.3f}s  step={step_s:.3f}s"
+                f"solve={solve_txt}  step={step_txt}"
             )
 
     def reset_latch(self) -> None:
