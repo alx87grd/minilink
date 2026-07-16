@@ -32,7 +32,7 @@ Unify **execution downstream** via `StaticSystem` controllers + `Simulator`, not
 
 ### Generalized parametric NLP (trajopt + MPC)
 
-Trajopt and MPC already share transcription math (`trajectory_cost`, collocation defects, grid options). The compile-once MPC bet — [`ParametricMathematicalProgram`](../../minilink/planning/mpc/parametric_program.py) + `bind(x0)` — is **directionally correct** but today only `x0` varies at runtime.
+Trajopt and MPC already share transcription math (`trajectory_cost`, collocation defects, grid options). The compile-once MPC bet — [`ParametricMathematicalProgram`](../../minilink/planning/trajectory_optimization/parametric_program.py) + `bind(x0)` — is **directionally correct** but today only `x0` varies at runtime.
 
 **Extend** the parametric tier so runtime arrays (especially scene/obstacle data) flow through `J(z, p)` without re-JIT, while keeping structure (max obstacle count `K`, probe layout, shaping) fixed at compile time.
 

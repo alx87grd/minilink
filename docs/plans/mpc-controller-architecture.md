@@ -24,7 +24,7 @@ Companion brainstorm: [planning-pipeline-architecture.md](planning-pipeline-arch
 closed-loop export / broadcast / deploy** requirements (R1–R12).
 
 PoC baseline (what exists today): [DESIGN.md](../../DESIGN.md) step/hybrid +
-Phase 6a–6b; code under [`minilink/planning/mpc/`](../../minilink/planning/mpc/).
+Phase 6a–6b; code under [`minilink/control/mpc/`](../../minilink/control/mpc/).
 
 ### Document map
 
@@ -1013,7 +1013,7 @@ typing along the lines of “given `x0`, return a drafted path plan” — name 
 (`horizon source`, `receding backend`, …). (Central to β.)
 
 **Idea — package placement:** adapters near `planning/` core; NLP-MPC + export
-bundle under `planning/mpc/`; avoid forcing `search/` / DP to import MPC
+bundle under `control/mpc/`; avoid forcing `search/` / DP to import MPC
 internals.
 
 ### 9.4 Open questions (Planner review)

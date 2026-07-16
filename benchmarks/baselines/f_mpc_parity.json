@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "suite": "f_mpc_parity",
+  "description": "Phase F MPC parity: hybrid ZOH, compute_command hand-loop, dual-rate.",
+  "regression_factor": 2.0,
+  "recorded_at": "2026-07-15",
+  "host_hint": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "metrics": [
+    {
+      "id": "f.hybrid_zoh.success",
+      "gate": "accuracy",
+      "direction": "higher_better",
+      "value": 1.0,
+      "unit": "flag",
+      "atol": 1e-12,
+      "notes": "1.0 means last/all NLP ticks reported success"
+    },
+    {
+      "id": "f.hybrid_zoh.wall_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.24549795901111793,
+      "unit": "s",
+      "notes": "mpc @ plant warm-start ZOH, short tf"
+    },
+    {
+      "id": "f.hybrid_zoh.nlp_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.004688792003435083,
+      "unit": "s",
+      "notes": "recorded NLP solve time (sum or last, see scenario)"
+    },
+    {
+      "id": "f.hybrid_zoh.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.3073535919925257,
+        1.4778483678452154,
+        -0.5885597782901242,
+        4.058719861898506,
+        -0.022476575529979868,
+        -0.13813294629263873,
+        13.551391485514362,
+        0.010470410239292845
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.hybrid_zoh.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        3.0,
+        0.0,
+        3.2,
+        0.0,
+        0.0,
+        10.666666666666668,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.hybrid_zoh.checkpoint_t0p5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        1.6429590258549376,
+        2.5772059868457395,
+        -0.2764767280552292,
+        3.69790871730884,
+        -0.8420075482284162,
+        -0.9880015281163307,
+        12.636538854170936,
+        -0.49531250288931733
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.hybrid_zoh.checkpoint_t1",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.3073535919925257,
+        1.4778483678452154,
+        -0.5885597782901242,
+        4.058719861898506,
+        -0.022476575529979868,
+        -0.13813294629263873,
+        13.551391485514362,
+        0.010470410239292845
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.hand_loop.success",
+      "gate": "accuracy",
+      "direction": "higher_better",
+      "value": 1.0,
+      "unit": "flag",
+      "atol": 1e-12,
+      "notes": "1.0 means last/all NLP ticks reported success"
+    },
+    {
+      "id": "f.hand_loop.wall_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.16140987499966286,
+      "unit": "s",
+      "notes": "compute_command hand loop, short tf"
+    },
+    {
+      "id": "f.hand_loop.nlp_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.030996042012702674,
+      "unit": "s",
+      "notes": "recorded NLP solve time (sum or last, see scenario)"
+    },
+    {
+      "id": "f.hand_loop.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.3073535919925257,
+        1.4778483678452148,
+        -0.5885597782901245,
+        4.058719861898509,
+        -0.02247657552998572,
+        -0.1381329462926442,
+        13.551391485514369,
+        0.010470410239288505
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.hand_loop.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        3.0,
+        0.0,
+        3.2,
+        0.0,
+        0.0,
+        10.666666666666668,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.hand_loop.checkpoint_t0p5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        1.6429590258549378,
+        2.5772059868457395,
+        -0.27647672805522927,
+        3.6979087173088403,
+        -0.842007548228416,
+        -0.9880015281163306,
+        12.63653885417094,
+        -0.495312502889317
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.hand_loop.checkpoint_t1",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.3073535919925248,
+        1.4778483678452152,
+        -0.5885597782901244,
+        4.058719861898509,
+        -0.022476575529986033,
+        -0.1381329462926446,
+        13.551391485514369,
+        0.01047041023928831
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.dual_rate.success",
+      "gate": "accuracy",
+      "direction": "higher_better",
+      "value": 1.0,
+      "unit": "flag",
+      "atol": 1e-12,
+      "notes": "1.0 means last/all NLP ticks reported success"
+    },
+    {
+      "id": "f.dual_rate.wall_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.23925920799956657,
+      "unit": "s",
+      "notes": "dual_rate_computer @ plant, short tf"
+    },
+    {
+      "id": "f.dual_rate.nlp_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.004529167010332458,
+      "unit": "s",
+      "notes": "recorded NLP solve time (sum or last, see scenario)"
+    },
+    {
+      "id": "f.dual_rate.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.3969945367566834,
+        1.5817382421605217,
+        -0.5417716220506352,
+        4.111019935652746,
+        -0.06836351849858038,
+        -0.18410127225687536,
+        13.732124298185127,
+        -0.019570713100160207
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.dual_rate.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        3.0,
+        0.0,
+        3.2,
+        0.0,
+        0.0,
+        10.666666666666668,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.dual_rate.checkpoint_t0p5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        1.6650129761024357,
+        2.599736871186436,
+        -0.25916877399930355,
+        3.7569491116899405,
+        -0.7218075895344649,
+        -0.8701058984758118,
+        12.773553945866471,
+        -0.4139941752048093
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "f.dual_rate.checkpoint_t1",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.3969945367566834,
+        1.5817382421605217,
+        -0.5417716220506352,
+        4.111019935652746,
+        -0.06836351849858038,
+        -0.18410127225687536,
+        13.732124298185127,
+        -0.019570713100160207
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    }
+  ]
+}

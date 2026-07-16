@@ -2,7 +2,7 @@
 
 Uses compile-once :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner` with
 :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs`
-and :class:`~minilink.planning.mpc.ModelPredictiveController` deploy ticks
+and :class:`~minilink.control.mpc.ModelPredictiveController` deploy ticks
 (``compute_command``). The plant integrates with RK4 at ``SIM_HZ`` between MPC
 ticks (ZOH on ``Command.u_ff``).
 
@@ -13,6 +13,9 @@ Run from repo root::
 
 import numpy as np
 
+from minilink.control.mpc import (
+    ModelPredictiveController,
+)
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
@@ -25,9 +28,6 @@ from minilink.graphical.animation.primitives import (
     TrajectoryPolyline,
 )
 from minilink.graphical.catalog import SceneHistory
-from minilink.planning.mpc import (
-    ModelPredictiveController,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,

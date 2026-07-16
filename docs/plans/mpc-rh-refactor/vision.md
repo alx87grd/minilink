@@ -227,7 +227,7 @@ wireable block** — not a non-System orchestrator that builds a separate leaf.
 Both share orchestration (mixin / private helpers):
 
 1. Tick → (optional) warm-start: if enabled, build a seed via
-   `warm_start.py` from latched plan / `warm_state`
+   `utilities.py` from latched plan / `warm_state`
 2. Call `planner.solve_trajectory_from(x0, params=…, initial_guess=seed)`
    and latch the returned `TrajectoryPlan`
 3. Ports (`u_ff`, `x_ff`, `z`, …) on the System
@@ -297,10 +297,10 @@ family; keep thin factory aliases until demos migrate (E3) / names retire (E5).
 | Concern | Home |
 | --- | --- |
 | Transcription / pack \(z\) / parametric NLP | Planner / trajopt (+ mpc until merge) |
-| Warm-start helpers (pure; seed from prior plan) | `planning/mpc/warm_start.py` (or shared) — used by the controller (and tests/demos), not planner API |
+| Warm-start / nominal helpers (pure) | `control/mpc/utilities.py` |
 | Tick latch / ports / `%` / `@` / warm-start orchestration | `ModelPredictiveController` (on the System) |
 | Flatten | `TrajectoryPlan` |
-| Overlays / plans_from_rollout | Free tools under `planning/mpc/` |
+| Overlays / plans_from_rollout | `control/mpc/viz.py` |
 
 ---
 
@@ -309,7 +309,7 @@ family; keep thin factory aliases until demos migrate (E3) / names retire (E5).
 | Piece | Home |
 | --- | --- |
 | `TrajectoryPlan`, `SolveMetadata` | `planning/results.py` |
-| `ModelPredictiveController`, `Command`, latch | `planning/mpc/` |
+| `ModelPredictiveController`, `Command`, latch | `control/mpc/` |
 | PoC leaves | Keep until demos migrate; retire later |
 
 Planners must not import hybrid/ROS. `ModelPredictiveController` may import

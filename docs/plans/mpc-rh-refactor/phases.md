@@ -37,7 +37,7 @@ time; JAX plants should pass `compile_backend="jax"` (see hybrid demos).
 | --- | --- |
 | MPC NLP | `tests/unittest/test_mpc_planner.py` |
 | Product controller | `test_model_predictive_controller.py` |
-| MPC blocks / hybrid | `test_mpc_stateless_controller.py`, `test_mpc_stateful_controller.py`, `test_mpc_export_computer.py`, `test_mpc_hybrid_*.py` |
+| MPC blocks / hybrid | `test_mpc_algebraic_controller.py`, `test_mpc_warm_start_controller.py`, `test_mpc_export_computer.py`, `test_mpc_hybrid_*.py` |
 | JAX collocation | `tests/unittest/test_jax_direct_collocation.py` |
 | Planning contracts | `tests/unittest/test_planning_architecture.py` |
 | RRT / DP | `test_rrt.py`, `test_dynamic_programming.py` |
@@ -74,8 +74,7 @@ dual-rate.
 (constructor ceremony). Pipeline B stays a wanted later feature outside this
 sequence.
 
-**Next:** expand [phase-F-cleanup.md](phase-F-cleanup.md), then land F; then
-[planning-ui-simplification.md](../planning-ui-simplification.md).
+**Next:** [planning-ui-simplification.md](../planning-ui-simplification.md).
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
 demos set finite `tf=` for trajopt/MPC); transcription options carry
@@ -94,7 +93,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | **E6** | Observability polish | [phase-E6.md](phase-E6.md) **(done)** |
 | **E7** | Online params façade (pipeline B deferred) | [phase-E7.md](phase-E7.md) **(done slim)** |
 | **E8** | Broadcast + dual-rate export | [phase-E8.md](phase-E8.md) **(done)** |
-| **F** | Post-refactor cleanup (expand next) | [phase-F-cleanup.md](phase-F-cleanup.md) **(stub)** |
+| **F** | Post-refactor cleanup (`control/mpc`) | [phase-F-cleanup.md](phase-F-cleanup.md) **(done)** |
 
 ## Suggested PR slicing
 
@@ -106,8 +105,8 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-D | E4 | MPC + trajopt + hybrid + controller | landed |
 | PR-E | E5 | after remaining demos/tests on controller | landed |
 | PR-F+ | E6–E8 | phase gates | E6–E8 landed |
-| PR-F-hygiene | Phase F — expand card, then land | F gate | next |
-| PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | UI-1+ gates | after F |
+| PR-F-hygiene | Phase F — expand card, then land | F gate | landed |
+| PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | UI-1+ gates | next |
 
 ## Start here
 
@@ -120,5 +119,5 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 7. **E6** — done ([phase-E6.md](phase-E6.md)).
 8. **E7** — done slim ([phase-E7.md](phase-E7.md)); pipeline B out of sequence.
 9. **E8** — done ([phase-E8.md](phase-E8.md)).
-10. **F** — expand + land [phase-F-cleanup.md](phase-F-cleanup.md) (`control/mpc`).
-11. **UI** — then [planning-ui-simplification.md](../planning-ui-simplification.md).
+10. **F** — done ([phase-F-cleanup.md](phase-F-cleanup.md)).
+11. **UI** — [planning-ui-simplification.md](../planning-ui-simplification.md).

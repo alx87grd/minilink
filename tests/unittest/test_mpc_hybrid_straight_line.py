@@ -7,15 +7,15 @@ import pytest
 
 pytest.importorskip("jax")
 
+from minilink.control.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
+    mpc_plans_from_rollout,
+)
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
     JaxDynamicBicycleRateInputsUY,
-)
-from minilink.planning.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-    mpc_plans_from_rollout,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (

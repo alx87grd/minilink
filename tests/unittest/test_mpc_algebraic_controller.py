@@ -10,10 +10,10 @@ pytest.importorskip("jax")
 
 import jax.numpy as jnp  # noqa: E402
 
+from minilink.control.mpc import ModelPredictiveController
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.system import DynamicSystem, System  # noqa: E402
-from minilink.planning.mpc import ModelPredictiveController
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,

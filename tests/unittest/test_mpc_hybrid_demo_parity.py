@@ -10,6 +10,13 @@ import pytest
 pytest.importorskip("jax")
 
 from minilink.blocks.routing import Demux  # noqa: E402
+from minilink.control.mpc import (
+    ModelPredictiveController,
+)
+from minilink.control.mpc.utilities import (  # noqa: E402
+    mpc_default_computer_x0,
+    warm_start_guess_from_prev_plan,
+)
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem  # noqa: E402
@@ -17,13 +24,6 @@ from minilink.core.hybrid_diagram import HybridDiagram  # noqa: E402
 from minilink.core.trajectory import Trajectory  # noqa: E402
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (  # noqa: E402
     JaxDynamicBicycleRateInputs,
-)
-from minilink.planning.mpc import (
-    ModelPredictiveController,
-)
-from minilink.planning.mpc.warm_start import (  # noqa: E402
-    mpc_default_computer_x0,
-    warm_start_guess_from_prev_plan,
 )
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (

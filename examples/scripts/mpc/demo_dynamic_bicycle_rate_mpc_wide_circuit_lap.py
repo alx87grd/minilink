@@ -2,7 +2,7 @@
 
 Wide asymmetric loop (bottom chicane, fast right sweeper, tight left hairpin).
 Uses compile-once :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
-with :class:`~minilink.planning.mpc.ModelPredictiveController` deploy ticks
+with :class:`~minilink.control.mpc.ModelPredictiveController` deploy ticks
 (``compute_command``).
 
 Run from repo root::
@@ -13,6 +13,7 @@ Run from repo root::
 import matplotlib.pyplot as plt
 import numpy as np
 
+from minilink.control.mpc import ModelPredictiveController
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
@@ -22,7 +23,6 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
 )
 from minilink.graphical.animation.primitives import HorizonPolyline, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
-from minilink.planning.mpc import ModelPredictiveController
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import pad_bounds, sample_field_costs

@@ -149,7 +149,7 @@ loss_and_grad = jax.jit(jax.value_and_grad(
 Discrete control laws (like digital MPC or sampled Sliding Mode Control) can close the loop on continuous plants without breaking the continuous-time core or solver guarantees. `StepSystem` defines discrete logic, and `Computer` schedules it. The `%` and `@` operators build a `HybridDiagram` with Zero-Order Hold (ZOH) and sampling:
 
 ```python
-from minilink.planning.mpc import ModelPredictiveController
+from minilink.control.mpc import ModelPredictiveController
 
 # controller is a discrete leaf; plant is a continuous DynamicSystem
 mpc = ModelPredictiveController(planner, dt_mpc=0.1, warm_start=True)

@@ -14,13 +14,12 @@ sequencing.
 | [vision.md](vision.md) | Locked end-goal contracts (Planner 2×2, `TrajectoryPlan`, `ModelPredictiveController`) |
 | [phases.md](phases.md) | E0–E8 order, gates, PR slices, start-here |
 | [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E8 done) |
-| [phase-F-cleanup.md](phase-F-cleanup.md) | Next: `control/mpc` move + hygiene → then [UI plan](../planning-ui-simplification.md) |
+| [phase-F-cleanup.md](phase-F-cleanup.md) | Done: `control/mpc` → next [UI plan](../planning-ui-simplification.md) |
 
-**Active phase:** [phase-F-cleanup.md](phase-F-cleanup.md) — expand before coding.
+**Active phase:** [planning-ui-simplification.md](../planning-ui-simplification.md)
 
-**Progress:** E0–E8 landed on `dev-mpc-v2`. Closing sequence: **F** (`control/mpc`)
-then **planning UI** (constructor ceremony). Pipeline B (online scene bind) is
-a wanted later feature — **not** in this closing sequence.
+**Progress:** E0–E8 + Phase F (`control/mpc`) landed on `dev-mpc-v2`. Next:
+planning UI (constructor ceremony). Pipeline B remains a later feature.
 
 ## Related requirements (background only)
 

@@ -18,7 +18,7 @@ Layering (vision):
 | --- | --- |
 | Planner `solve_trajectory_from` | \(x_0\), optional `params`, optional `initial_guess` |
 | `TrajectoryPlan.warm_state` | Result artifact (packed \(z\)) |
-| `ModelPredictiveController` + `warm_start.py` | Warm-start *orchestration* from last latch (E2) |
+| `ModelPredictiveController` + warm-start helpers | Warm-start *orchestration* from last latch (E2; now `control/mpc/utilities.py`) |
 
 No planner kwarg named `warm_start` on the from-API.
 
@@ -26,7 +26,7 @@ No planner kwarg named `warm_start` on the from-API.
 
 | Path | Change |
 | --- | --- |
-| `minilink/planning/mpc/planner.py` | Add `solve_trajectory_from`; route `solve` / `solve_trajectory` through it |
+| `minilink/planning/mpc/planner.py` (then; now trajopt) | Add `solve_trajectory_from`; route `solve` / `solve_trajectory` through it |
 | `tests/unittest/test_mpc_solve_trajectory_from.py` | New unit tests |
 | [vision.md](vision.md) | Kwargs / controller warm-start (E1 refinement) |
 

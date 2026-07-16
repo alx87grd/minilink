@@ -31,9 +31,9 @@ API — `warm_start=True` *is* the step block.
 
 | Path | Change |
 | --- | --- |
-| `minilink/planning/mpc/` | `ModelPredictiveController` family (+ `Command`); evolve PoC leaves |
-| `minilink/planning/mpc/tick_latch.py` | NLP entry → `solve_trajectory_from` |
-| `minilink/planning/mpc/__init__.py` | Export product name |
+| `minilink/planning/mpc/` (then; now `control/mpc`) | `ModelPredictiveController` family (+ `Command`); evolve PoC leaves |
+| `minilink/planning/mpc/tick_latch.py` (then; fused into `controller.py`) | NLP entry → `solve_trajectory_from` |
+| `minilink/planning/mpc/__init__.py` (then) | Export product name |
 | `tests/unittest/test_model_predictive_controller.py` | New |
 | PoC factories | Thin aliases until E5 |
 
@@ -44,7 +44,7 @@ API — `warm_start=True` *is* the step block.
 | E2.1 | Factory / dual subclasses: `ModelPredictiveController(planner, dt_mpc=…, warm_start=…)` |
 | E2.2 | Tick: optional warm-start helpers → `solve_trajectory_from(..., initial_guess=seed)` → latch |
 | E2.3 | `compute_command(y, …) -> Command` |
-| E2.4 | Warm-start via `mpc/warm_start.py` (orchestration on controller, not Planner) |
+| E2.4 | Warm-start via `mpc/warm_start.py` then (now `control/mpc/utilities.py`; orchestration on controller, not Planner) |
 | E2.5 | Ports + `export_to_computer` / `%` / `__matmul__` on the System instance |
 | E2.6 | Tests vs `solve_trajectory_from` + `@` smoke; PoC aliases keep existing tests green |
 

@@ -40,12 +40,12 @@ class TestAsComputer(unittest.TestCase):
         jax = pytest.importorskip("jax")
         del jax
 
+        from minilink.control.mpc import ModelPredictiveController
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
         from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
             JaxDynamicBicycleRateInputsUY,
         )
-        from minilink.planning.mpc import ModelPredictiveController
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
             DirectCollocationOptions,

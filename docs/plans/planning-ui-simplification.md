@@ -90,7 +90,7 @@ Three named building blocks, flat planner kwargs, zero options-dataclass imports
 ```python
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import TrajectoryOptimizationPlanner
-from minilink.planning.mpc import ModelPredictiveController
+from minilink.control.mpc import ModelPredictiveController
 
 problem = PlanningProblem(sys=sys, x_start=x0, cost=cost, tf=2.0)
 

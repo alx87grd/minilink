@@ -1,139 +1,75 @@
-# Phase F — Post-refactor cleanup
+# Phase F — `control/mpc` move + hygiene
 
-**Status:** stub — **ready to expand** ([E8](phase-E8.md) green)  
+**Status:** done  
 **Depends on:** E0–E8 complete  
 **Next after F:** [planning-ui-simplification.md](../planning-ui-simplification.md)
-(constructor ceremony). Pipeline B is out of this closing sequence.
 
 ## Goal
 
-One hygiene pass after the MPC/RH refactor is **functionally done**. Prune merge
-debt, sync docs with the landed product API, reduce demo duplication, and
-**land the package layout below** — **without** changing contracts in
-[vision.md](vision.md).
+Move the product MPC System family from `planning/mpc/` → `control/mpc/`,
+fuse internals, hard-cut old imports, and gate with before/after
+`ModelPredictiveController` smoke (trajectory + timing). No vision contract
+changes. Pipeline B and planning-UI ceremony are out of scope.
 
-**Constructor / planner API UX** is **not** Phase F — see
-[planning UI simplification](../planning-ui-simplification.md) (UI-1+).
-
----
-
-## Parked layout (expand into F.1…)
-
-Captured from product review (July 2026). Turn into numbered tasks when
-expanding this card; include E8 files (`nominal.py`, `broadcast_block.py`).
-
-### Package home
-
-Move the product MPC System family from `planning/mpc/` → **`control/mpc/`**.
-
-- DESIGN §3: diagram **control laws** live in `control/`; `planning/` owns
-  trajopt/search tools (`TrajectoryOptimizationPlanner`, parametric NLP stay
-  under `planning/trajectory_optimization/`).
-- Document a narrow DESIGN exception: `control/mpc` may import
-  `planning.trajectory_optimization` (RH controller wraps a traj-family planner).
-- Pre-1.0 hard cut: no lasting `planning.mpc` re-export; retarget all call sites
-  in the same change.
-
-### Target file structure (fewer files)
+## Layout (locked)
 
 ```text
 minilink/control/mpc/
-  __init__.py       # public API only
-  controller.py     # fused product module (see below)
-  warm_start.py     # guess / computer x0 helpers
-  viz.py            # mpc_plans_from_rollout + mpc_animation_overlays
+  __init__.py
+  controller.py      # fused runtime product
+  utilities.py       # warm-start + nominal (pure functions)
+  viz.py             # plans_from_rollout + animation_overlays
 ```
 
-**Fuse into `controller.py`** (today’s scatter under `planning/mpc/`):
+**Fuse into `controller.py`:** factory/mixin, algebraic + warm-start Systems,
+`Command`, latch, export helpers, broadcast leaf.
 
-- `model_predictive_controller.py` — factory, mixin, `compute_command`, `@`, debug
-- `controller.py` + `step_block.py` — algebraic / warm-start System backends
-- `tick_latch.py`, `command.py`, `_block_common.py` (incl. dual-rate export)
-- `broadcast_block.py` — dual-rate broadcast leaf (option A shared latch)
+**`utilities.py` public:** `mpc_warm_start_guess`, `mpc_default_computer_x0`;
+nominal build/eval as needed. Private: `_shift_plan_trajectory`, `_clamp_tau`.
+Demote `warm_start_guess_from_prev_plan` from public `__all__`.
 
-**Keep separate:** `warm_start.py` (demos + latch), `viz.py` (graphical /
-hybrid), `nominal.py` (cache / interp helpers — or fold if tiny).
+**Delete:** entire `planning/mpc/` (incl. parametric shims) — hard cut.
 
-**Delete:** `planning/mpc/parametric_*.py` shims; then remove `planning/mpc/` entirely.
+**DESIGN exception:** `control/mpc` may import `planning.trajectory_optimization`.
 
-### Public import after F
+## Checklist
 
-```python
-from minilink.control.mpc import ModelPredictiveController, Command, ...
-```
-
-### Also in F (hygiene categories)
-
-| Category | Note |
+| Step | Work |
 | --- | --- |
-| Test filenames | Rename `test_mpc_stateful/stateless_*.py` when retargeting imports |
-| Docs | DESIGN package map, README import paths, mark old brainstorm docs historical |
-| Demos | Dedup only when touching a file; preserve user-tuned constants (AGENTS.md) |
+| F.0 | Expand this card |
+| F.5a | Capture `f_mpc_parity` baseline (pre-move) |
+| F.1 | Create `control/mpc` (`controller` / `utilities` / `viz`) |
+| F.2 | Retarget imports; rename stateful/stateless tests |
+| F.3 | Delete `planning/mpc` |
+| F.4 | DESIGN / vision / ROADMAP / README / benchmarks README |
+| F.5b | Compare parity + full smoke |
 
----
-
-## When to expand this card
-
-1. Re-scan demos, tests, and plan docs against [vision.md](vision.md) (E8 done).
-2. Turn **Parked layout** into numbered tasks (F.1 package move, F.2 fuse,
-   F.3 retarget/delete, F.4 docs, F.5 gate) in a short expansion PR.
-
-Until expanded, treat the parked layout as **intent**, not an active work order.
-
----
-
-## Split of responsibility
-
-| Phase F (hygiene + layout) | [planning-ui-simplification.md](../planning-ui-simplification.md) |
-| --- | --- |
-| Move MPC → `control/mpc`, fuse files, delete shims | Flat planner constructor kwargs |
-| Doc and export alignment | Simulator-style defaults, tier-2 advanced path |
-| Optional demo dedup helpers | README / DESIGN constructor examples |
-| Test naming tidy-up | RRT / DP family alignment (UI-5 / UI-6) |
-
----
-
-## Sequencing
-
-```mermaid
-flowchart LR
-  E8[E8 done]
-  Fexpand[Expand phase-F card]
-  Fwork[Phase F control/mpc]
-  UI[Planning UI ceremony]
-
-  E8 --> Fexpand --> Fwork --> UI
-```
-
-**Order locked:** F before UI so teaching demos / README land on
-`minilink.control.mpc` once. Pipeline B is not in this graph.
-
----
-
-## Gate (phase exit)
+## Gate
 
 ```bash
+# Pre-move (once):
+MPLBACKEND=Agg python benchmarks/run_f_mpc_parity.py --capture
+
+# Post-move:
+MPLBACKEND=Agg python benchmarks/run_f_mpc_parity.py
 ruff check . && ruff format --check .
 pytest tests/unittest/test_model_predictive_controller.py \
-       tests/unittest/test_mpc_*.py tests/unittest/test_planning_architecture.py -q
-
-export MPLBACKEND=Agg SDL_VIDEODRIVER=dummy
-python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
-python examples/scripts/hybrid/demo_mpc_hybrid_dual_rate.py
-python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
+       tests/unittest/test_mpc_*.py \
+       tests/unittest/test_planning_architecture.py -q
+MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_minimal.py
+MPLBACKEND=Agg python examples/scripts/hybrid/demo_mpc_hybrid_dual_rate.py
+MPLBACKEND=Agg python examples/scripts/mpc/demo_dynamic_bicycle_rate_mpc_straight_line.py
 ```
 
----
+Compare: trajectory ~1e-4; timing factor 2.0.
 
 ## Non-goals
 
-- Vision or planner ABC contract changes
-- Pipeline B / online scene bind (later feature)
-- Physics-hiding presets or merging problem → planner → controller stages
-
----
+- Pipeline B / online scene bind
+- Planning UI constructor ceremony
+- Vision / planner ABC changes
 
 ## Exit
 
-F expanded and executed (including `control/mpc` layout); docs and exports
-match product API. Then schedule [planning-ui-simplification.md](../planning-ui-simplification.md).
+`control/mpc` landed; `planning/mpc` gone; parity baseline compares green;
+docs match. Next: UI plan.

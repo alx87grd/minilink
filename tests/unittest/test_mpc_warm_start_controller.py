@@ -10,15 +10,15 @@ pytest.importorskip("jax")
 
 import jax.numpy as jnp  # noqa: E402
 
+from minilink.control.mpc import ModelPredictiveController
+from minilink.control.mpc.utilities import (  # noqa: E402
+    _shift_plan_trajectory,
+    mpc_warm_start_guess,
+)
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.system import DynamicSystem, StepSystem  # noqa: E402
 from minilink.core.trajectory import Trajectory  # noqa: E402
-from minilink.planning.mpc import ModelPredictiveController
-from minilink.planning.mpc.warm_start import (  # noqa: E402
-    mpc_warm_start_guess,
-    shift_plan_trajectory,
-)
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -94,7 +94,7 @@ class TestMPCWarmStartController(unittest.TestCase):
             u=np.ones((1, t.size)),
         )
         x_meas = np.array([0.5, 0.25])
-        shifted = shift_plan_trajectory(
+        shifted = _shift_plan_trajectory(
             plan,
             x_meas,
             dt_shift=0.2,

@@ -11,17 +11,17 @@ Run from repo root::
 
 import numpy as np
 
+from minilink.control.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
+)
+from minilink.control.mpc.utilities import mpc_default_computer_x0
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputsUY,
 )
-from minilink.planning.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
-from minilink.planning.mpc.warm_start import mpc_default_computer_x0
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.paths import from_waypoints

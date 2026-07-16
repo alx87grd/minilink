@@ -171,8 +171,8 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] Trajectory optimization (direct collocation, shooting, multiple shooting)
 - [x] **MPC / trajopt compile-once** —
   `TrajectoryOptimizationPlanner.compile_parametric_program` +
-  `solve_trajectory_from` (parametric `x0`); controllers in `planning/mpc/`
-  (moving to `control/mpc` in Phase F); primary demos under
+  `solve_trajectory_from` (parametric `x0`); controllers in `control/mpc/`;
+  primary demos under
   `examples/scripts/mpc/` and `examples/scripts/hybrid/`;
   legacy per-step trajopt reference:
   `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`
@@ -183,12 +183,12 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] **Broadcast + dual-rate (E8)** —
   `generate_nominal_interpolator` + `get_nominal_u/x/u_dot/x_dot`;
   `dual_rate_computer(dt_broadcast)`; default `@` stays `u_ff` ZOH.
-- [ ] **Phase F — MPC package home** — move product System family
-  `planning/mpc/` → `control/mpc/`, fuse modules, retarget imports
-  (see `docs/plans/mpc-rh-refactor/phase-F-cleanup.md`).
+- [x] **Phase F — MPC package home** — product System family in
+  `control/mpc/` (`controller.py`, `utilities.py`, `viz.py`); hard-cut
+  former `planning/mpc` (see `docs/plans/mpc-rh-refactor/phase-F-cleanup.md`).
 - [ ] **Planning UI simplification** — Simulator-style planner constructors
-  (flat kwargs / defaults for trajopt, then RRT/DP); after Phase F so demos
-  teach `control.mpc` paths. See `docs/plans/planning-ui-simplification.md`.
+  (flat kwargs / defaults for trajopt, then RRT/DP); teach `control.mpc`
+  paths. See `docs/plans/planning-ui-simplification.md`.
 - [ ] **Scene params / online bind (pipeline B)** — *wanted later, not in the
   current RH closing sequence.* `ObstacleBank`, `J(z, p)` / `bind(p)`,
   indexed scene overrides (moving obstacles, scenario sweeps without NLP

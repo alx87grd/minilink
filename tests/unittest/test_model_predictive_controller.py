@@ -12,14 +12,14 @@ import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
 
+from minilink.control.mpc import (
+    Command,
+    ModelPredictiveController,
+)
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.costs import QuadraticCost  # noqa: E402
 from minilink.core.hybrid_diagram import HybridDiagram  # noqa: E402
 from minilink.core.system import DynamicSystem, StepSystem, System  # noqa: E402
-from minilink.planning.mpc import (
-    Command,
-    ModelPredictiveController,
-)
 from minilink.planning.problems import PlanningProblem  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -206,7 +206,7 @@ class TestModelPredictiveController(unittest.TestCase):
         """Latch + compile-once: no per-tick re-prepare / re-compile / multi-solve."""
         from unittest.mock import patch
 
-        from minilink.planning.mpc.warm_start import mpc_default_computer_x0
+        from minilink.control.mpc.utilities import mpc_default_computer_x0
         from minilink.simulation.computer import Computer
         from minilink.simulation.hybrid_simulator import HybridSimulator
 

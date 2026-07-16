@@ -56,7 +56,7 @@ or neural network alike):
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
-| `control/` | control laws and design factories (`linear.py`, `pid.py`, `lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`) |
+| `control/` | control laws and design factories (`linear.py`, `pid.py`, `lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -86,6 +86,8 @@ state-feedback block):
   never catalog content. (The abstraction modules are the shared mathematical
   bases of the library band: `blocks/` builds LTI wiring on them, `control/`
   computed torque, `estimation/` EKFs.)
+- **Exception:** `control/mpc` may import `planning.trajectory_optimization`
+  (receding-horizon controller wraps a traj-family planner).
 - Libraries may ship **factories for their own blocks** with array-in /
   block-out signatures (`control.lqr(A, B, Q, R) -> StateFeedback`,
   `estimation.kalman_design(A, C, Q, R) -> KalmanFilter`); the linearization
@@ -184,7 +186,7 @@ serial arms. Joint impedance / task impedance / computed torque use
   ``Computer @ plant`` and :func:`~minilink.core.hybrid_composition.hybrid_closed_loop`
   (same port auto-wiring as continuous ``ctl @ plant`` via
   :func:`~minilink.core.composition.resolve_standard_feedback`);
-  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.export_to_computer`
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.export_to_computer`
   for warm-start MPC (also via ``mpc % schedule``).
   Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
   exposes standard ``u`` / ``y`` ports for hybrid composition.
@@ -202,27 +204,27 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
-- **MPC hybrid block:** :func:`~minilink.planning.mpc.ModelPredictiveController`
+- **MPC hybrid block:** :func:`~minilink.control.mpc.ModelPredictiveController`
   returns a static ``System`` (``n=0``) or :class:`StepSystem` (``warm_start=True``)
   that holds a
   :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
   with :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.compile_parametric_program`
   so each Computer tick is bind + solve (memoized across ports ``u_ff``,
   ``x_ff``, ``z``). Warm-start via
-  :func:`~minilink.planning.mpc.warm_start.mpc_warm_start_guess` from
-  ``Computer.x``.   Deploy / hand loop:
-  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.compute_command`
-  → :class:`~minilink.planning.mpc.command.Command`; telemetry via
-  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.get_solve_metadata`
+  :func:`~minilink.control.mpc.utilities.mpc_warm_start_guess` from
+  ``Computer.x``. Deploy / hand loop:
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.compute_command`
+  → :class:`~minilink.control.mpc.controller.Command`; telemetry via
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.get_solve_metadata`
   and ``Command.metadata`` (alias of ``plan.metadata``); ``reset()`` clears
   deploy counter, last command, nominal cache, and tick latch. High-rate
   nominal (opt-in):
-  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.generate_nominal_interpolator`
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.generate_nominal_interpolator`
   then
-  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.get_nominal_u`
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.get_nominal_u`
   / ``get_nominal_x`` / ``get_nominal_u_dot`` / ``get_nominal_x_dot``.
   Default ``export_to_computer`` / ``mpc @ plant`` apply ``u_ff`` ZOH; advanced
-  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.dual_rate_computer`
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.dual_rate_computer`
   (``dt_broadcast``) builds a multi-rate Computer with ``u_nom`` broadcast.
   **Dual-rate packaging (option A):** ``replan`` and ``broadcast`` share the
   same MPC object — after each NLP the latch builds ``NominalCache`` via
@@ -233,9 +235,9 @@ serial arms. Joint impedance / task impedance / computed torque use
   plan (option B) would make the edge honest at the cost of one
   ``dt_broadcast`` lag under parallel tick semantics. External nodes wrap the
   same methods (no ROS2 package in-tree). Post-sim horizons:
-  :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
+  :func:`~minilink.control.mpc.viz.mpc_plans_from_rollout`;
   default animation overlays:
-  :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
+  :func:`~minilink.control.mpc.viz.mpc_animation_overlays`.
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
