@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "profile_id": "linux_cloud_vm",
+  "label": "Linux cloud / CI VM (typical Cursor agent host)",
+  "recorded_at": "2026-07-16",
+  "host_hint": "Linux-6.12.94+-x86_64-with-glibc2.39",
+  "workload": "tiny",
+  "notes": "Representative slow-VM timings; NLP solve often 3–10× slower than macOS reference. Use for context, not gates.",
+  "metrics": {
+    "pendulum_f.jax.speedup_vs_native": 4163.0,
+    "pendulum_f.numpy.speedup_vs_native": 381.2,
+    "f.hand_loop.nlp_s": 0.08,
+    "f.hand_loop.wall_s": 0.35,
+    "f.hybrid_zoh.nlp_s": 0.0066,
+    "f.dual_rate.nlp_s": 0.0057,
+    "trajopt.pendulum.numpy_slsqp.solve_s": 0.0317,
+    "e4.cartpole_rebuild.solve_s": 0.036
+  }
+}

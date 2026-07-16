@@ -113,6 +113,23 @@ speedup ratios). End-to-end `wall_s` / `total_s` are reported but not gated in C
 python benchmarks/run_regression_check.py --suite all
 ```
 
+### Host speed context (multi-machine reference)
+
+Speed gates still use **one committed baseline** per metric. Additionally,
+`benchmarks/host_profiles/*.json` stores timings from known machines (fast
+workstation, Linux cloud VM, …). After each suite, regression prints an
+**informational** table comparing the current run to those profiles — useful
+when a cloud agent sees an `nlp_s` failure that is normal on a slow host.
+
+Record your machine (does not change gates):
+
+```bash
+python benchmarks/run_regression_check.py --suite f_mpc --tiny \
+  --record-host-profile my_machine --host-profile-label "Description"
+```
+
+Skip context: `--no-host-context`.
+
 ```bash
 python benchmarks/run_regression_check.py
 python benchmarks/run_regression_check.py --suite integration

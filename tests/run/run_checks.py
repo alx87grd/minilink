@@ -51,14 +51,12 @@ def main() -> int:
             return _common.run_regression(ci_mode=True)
         case "l6":
             code = _common.run_smoke_script(
-                "examples/scripts/_smoke/run_catalog_smokes.py",
+                "tests/smoke/run_catalog_smokes.py",
                 ["--fast"],
             )
             if code != 0:
                 return code
-            return _common.run_smoke_script(
-                "examples/scripts/_smoke/run_flagship_demos.py"
-            )
+            return _common.run_smoke_script("tests/smoke/run_flagship_demos.py")
         case "l3_list":
             return _common.run_study_script(["--list"])
         case "l3_f_eval":

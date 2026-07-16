@@ -93,7 +93,7 @@ Demos: flat under `examples/scripts/`, runnable from repo root.
 
 ## Before push or PR (local CI gate)
 
-**Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points) — humans use **`scripts/checks/`** (IDE Run); agents and CI use the CLI table in that doc. Do not invent alternate test invocations.
+**Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points) — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
 
 GitHub **CI** (`.github/workflows/test.yml`) runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (L2). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
 

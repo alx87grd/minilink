@@ -5,8 +5,8 @@ graphics output channels so you can verify Meshcat, Matplotlib, and Plotly.
 
 Usage (from repo root)::
 
-    python examples/scripts/_smoke/run_graphics_visual_check.py
-    python examples/scripts/_smoke/run_graphics_visual_check.py --run-headless
+    python tests/smoke/run_graphics_visual_check.py
+    python tests/smoke/run_graphics_visual_check.py --run-headless
 """
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 CHECKS = (
     (
         "Matplotlib kinematic (catalog manifest PNGs)",
         [
             sys.executable,
-            "examples/scripts/_smoke/run_flagship_graphics.py",
+            "tests/smoke/run_flagship_graphics.py",
             "--out",
             "artifacts/gfx-smoke",
         ],
@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         cmd = _resolve_cmd(
             [
                 sys.executable,
-                "examples/scripts/_smoke/run_flagship_graphics.py",
+                "tests/smoke/run_flagship_graphics.py",
                 "--out",
                 "artifacts/gfx-smoke",
             ]
@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         cmd = _resolve_cmd(
             [
                 sys.executable,
-                "examples/scripts/_smoke/run_flagship_graphics.py",
+                "tests/smoke/run_flagship_graphics.py",
                 "--out",
                 "artifacts/gfx-smoke",
             ]

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "profile_id": "macos_arm_reference",
+  "label": "macOS ARM dev workstation (primary baseline host)",
+  "recorded_at": "2026-04-01",
+  "host_hint": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "workload": "default",
+  "notes": "Speed snapshots from committed baselines; gate reference machine.",
+  "metrics": {
+    "pendulum_f.jax.speedup_vs_native": 61.16,
+    "pendulum_f.numpy.speedup_vs_native": 2.765,
+    "diagram_dense_f.numpy.speedup_vs_native": 4.734,
+    "f.hand_loop.nlp_s": 0.031,
+    "f.hand_loop.wall_s": 0.161,
+    "f.hybrid_zoh.nlp_s": 0.00469,
+    "f.dual_rate.nlp_s": 0.00453,
+    "trajopt.pendulum.numpy_slsqp.solve_s": 0.0311,
+    "e4.cartpole_rebuild.solve_s": 0.0439
+  }
+}

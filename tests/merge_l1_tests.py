@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-UNITTEST = Path(__file__).resolve().parents[1] / "tests" / "unittest"
+UNITTEST = Path(__file__).resolve().parent / "unittest"
 
 MERGE_MAP: dict[str, list[str]] = {
     "test_core.py": [

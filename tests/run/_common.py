@@ -1,4 +1,4 @@
-"""Shared plumbing for IDE-click-run check scripts."""
+"""Shared plumbing for ``tests/run/`` IDE-click-run launchers."""
 
 from __future__ import annotations
 

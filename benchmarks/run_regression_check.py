@@ -34,6 +34,11 @@ from benchmarks.baseline import (
     print_comparison_report,
     save_baseline,
 )
+from benchmarks.host_profiles import (
+    PROFILES_DIR,
+    print_host_speed_context,
+    save_host_profile,
+)
 from benchmarks.scenarios.e4_trajopt_parity import (
     E4TrajoptParityConfig,
     run_e4_trajopt_parity_suite,
@@ -134,6 +139,25 @@ def main(argv: list[str] | None = None) -> int:
             "(e.g. solve_s,nlp_s,speedup). Other speed metrics are reported only."
         ),
     )
+    parser.add_argument(
+        "--no-host-context",
+        action="store_true",
+        help="Skip informational host speed context table after each suite",
+    )
+    parser.add_argument(
+        "--record-host-profile",
+        metavar="ID",
+        default=None,
+        help=(
+            "After running, save speed metrics to "
+            "benchmarks/host_profiles/ID.json (context only, not a gate)"
+        ),
+    )
+    parser.add_argument(
+        "--host-profile-label",
+        default=None,
+        help="Human label stored with --record-host-profile",
+    )
     args = parser.parse_args(argv)
 
     speed_suffixes = _parse_suffixes(args.speed_gate_suffixes)
@@ -204,6 +228,18 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print(f"=== Suite: {spec.name} (factor={factor:g}) ===")
         print_comparison_report(result)
+        if not args.no_host_context:
+            print_host_speed_context(
+                recorded=recorded,
+                baseline_host_hint=baseline.host_hint,
+            )
+        if args.record_host_profile and len(selected) == 1:
+            _record_host_profile_snapshot(
+                args.record_host_profile,
+                label=args.host_profile_label,
+                recorded=recorded,
+                workload="tiny" if args.tiny else "default",
+            )
         if result.failed:
             exit_code = 1
 
@@ -320,6 +356,25 @@ def _parse_suffixes(raw: str | None) -> tuple[str, ...]:
     if raw is None or not raw.strip():
         return ()
     return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _record_host_profile_snapshot(
+    profile_id: str,
+    *,
+    label: str | None,
+    recorded: list[MetricRecord],
+    workload: str,
+) -> None:
+    path = PROFILES_DIR / f"{profile_id}.json"
+    save_host_profile(
+        path,
+        profile_id=profile_id,
+        label=label or profile_id,
+        recorded=recorded,
+        workload=workload,
+        notes="Recorded from run_regression_check.py --record-host-profile",
+    )
+    print(f"Recorded host profile: {path}")
 
 
 if __name__ == "__main__":

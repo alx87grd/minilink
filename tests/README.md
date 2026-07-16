@@ -10,24 +10,42 @@ Six-layer vision (detail): [docs/plans/test-benchmark-consolidation.md](../docs/
 
 **Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (see [README.md#install](../README.md#install)).
 
-### Human (IDE — open script, click **Run**)
+### Folder layout (everything under `tests/` or `benchmarks/`)
 
-No terminal commands to remember. Scripts live in [`scripts/checks/`](../scripts/checks/).
+```
+tests/
+  README.md              ← this file (entry points)
+  run/                   ← human IDE launchers (click Run)
+  smoke/                 ← L6 catalog + demo smoke scripts
+  unittest/              ← L1 pytest contracts
+  fixtures/              ← graphics/regression fixtures
+  merge_l1_tests.py      ← dev tool to re-merge domain modules
+
+benchmarks/
+  run_regression_check.py   ← L2 gates (+ host speed context)
+  run_study.py              ← L3 backend exploration
+  host_profiles/*.json      ← recorded timings per machine (context only)
+  baselines/*.json          ← committed regression goldens
+```
+
+Demos stay in `examples/scripts/` for teaching; **smoke runners** that execute them live in `tests/smoke/`.
+
+### Human (IDE — open script, click **Run**)
 
 | When | Open and Run |
 | --- | --- |
-| **Daily** | [`scripts/checks/run_l1_tests.py`](../scripts/checks/run_l1_tests.py) |
-| **Before push** | [`scripts/checks/run_pre_push.py`](../scripts/checks/run_pre_push.py) |
-| **After sim/trajopt/MPC work** | [`scripts/checks/run_l2_regression.py`](../scripts/checks/run_l2_regression.py) |
-| **Demo/catalog sanity** | [`scripts/checks/run_l6_smokes.py`](../scripts/checks/run_l6_smokes.py) |
-| **Backend perf tables (local)** | [`scripts/checks/run_l3_benchmark_study.py`](../scripts/checks/run_l3_benchmark_study.py) |
-| **One file, pick check** | [`scripts/checks/run_checks.py`](../scripts/checks/run_checks.py) — set `CHECK = "l1"` at top |
+| **Daily** | [`tests/run/run_l1_tests.py`](run/run_l1_tests.py) |
+| **Before push** | [`tests/run/run_pre_push.py`](run/run_pre_push.py) |
+| **After sim/trajopt/MPC work** | [`tests/run/run_l2_regression.py`](run/run_l2_regression.py) |
+| **Demo/catalog sanity** | [`tests/run/run_l6_smokes.py`](run/run_l6_smokes.py) |
+| **Backend perf tables** | [`tests/run/run_l3_benchmark_study.py`](run/run_l3_benchmark_study.py) |
+| **Pick one check** | [`tests/run/run_checks.py`](run/run_checks.py) — set `CHECK = "l1"` at top |
 
-Optional toggles (constants at top of each script): `EXTRA_ARGS`, `MARKER`, `CI_MODE`, `PRESET`, etc.
+L5 visual checklist: [`tests/smoke/run_graphics_visual_check.py`](smoke/run_graphics_visual_check.py).
+
+Optional toggles: constants at the top of each `tests/run/*.py` file.
 
 ### Agent (terminal / CI — exact commands)
-
-Agents and GitHub Actions use **CLI only** (same underlying tools as the IDE scripts).
 
 | Situation | Command |
 | --- | --- |
@@ -36,60 +54,48 @@ Agents and GitHub Actions use **CLI only** (same underlying tools as the IDE scr
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or handoff | `pytest` |
 | Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
-| Backend perf exploration (no gate) | `python benchmarks/run_study.py --list` → [benchmarks/README.md](../benchmarks/README.md) |
-| User-facing demo/smoke change | `python examples/scripts/_smoke/run_catalog_smokes.py --fast` and/or `run_flagship_demos.py` |
+| Backend perf exploration | `python benchmarks/run_study.py --list` |
+| Demo smoke change | `python tests/smoke/run_catalog_smokes.py --fast` and/or `run_flagship_demos.py` |
 
-Rules: [AGENTS.md](../AGENTS.md). L1 path: `tests/unittest/` only. Demos: L6 smokes under `examples/scripts/`.
+Rules: [AGENTS.md](../AGENTS.md).
 
 ### CI (GitHub Actions)
 
 Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 
-| Job | Trigger | Exact steps |
-| --- | --- | --- |
-| **`test`** | Python 3.10–3.13 matrix | `pip install -e ".[dev]"` → `ruff check .` → `ruff format --check .` → `pytest` |
-| **`regression`** | After `test` passes; Python 3.12 + JAX | `pip install -e ".[dev,jax]"` → `PYTHONPATH=$PWD python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Job | Steps |
+| --- | --- |
+| **`test`** | ruff + `pytest` (py 3.10–3.13) |
+| **`regression`** | `run_regression_check.py --suite all --tiny …` (py 3.12 + JAX) |
 
-Pytest in CI: **L1** + **L4** + **L6 bridge** (`test_smoke_runners.py`). **L2** = `regression` job. **L3/L5** not in CI.
+### At a glance
 
-### Human (terminal — optional)
-
-Same tools as IDE scripts; use when you prefer the shell.
-
-```bash
-conda activate minilink
-pytest                                                    # L1 daily
-ruff check . && ruff format --check . && pytest           # pre-push
-PYTHONPATH=. python benchmarks/run_regression_check.py --suite all   # L2
-python examples/scripts/_smoke/run_catalog_smokes.py --fast          # L6
-python benchmarks/run_study.py --list                                 # L3
-```
-
-### At a glance (all audiences)
-
-| Layer | Human IDE | Agent / CI command | CI job |
+| Layer | Human IDE (`tests/run/`) | Agent / CI | CI job |
 | --- | --- | --- | --- |
-| **L1** Contracts | `run_l1_tests.py` | `pytest` | `test` |
-| **L2** Regression | `run_l2_regression.py` | `run_regression_check.py --suite all …` | `regression` |
-| **L3** Benchmark study | `run_l3_benchmark_study.py` | `run_study.py --preset …` | — |
-| **L4** Graphics auto | (in L1 pytest) | `test_flagship_graphics_contract.py` | `test` |
-| **L5** Graphics visual | `run_graphics_visual_check.py` | local only | — |
-| **L6** Demo smokes | `run_l6_smokes.py` | `run_catalog_smokes.py` / `run_flagship_demos.py` | `test` (subprocess) |
+| **L1** | `run_l1_tests.py` | `pytest` | `test` |
+| **L2** | `run_l2_regression.py` | `benchmarks/run_regression_check.py` | `regression` |
+| **L3** | `run_l3_benchmark_study.py` | `benchmarks/run_study.py` | — |
+| **L4** | (in L1 pytest) | `test_flagship_graphics_contract.py` | `test` |
+| **L5** | `tests/smoke/run_graphics_visual_check.py` | local | — |
+| **L6** | `run_l6_smokes.py` | `tests/smoke/run_*.py` | `test` |
 | **Pre-push** | `run_pre_push.py` | ruff + pytest | `test` |
 
-### Performance / backends — L2 vs L3
+### Performance — L2 gates vs L3 exploration vs host context
 
-| | **L2** `run_l2_regression.py` / `run_regression_check.py` | **L3** `run_l3_benchmark_study.py` / `run_study.py` |
-| --- | --- | --- |
-| **Purpose** | Pass/fail vs committed JSON baselines | Explore tables on *your* machine/GPU |
-| **Speed** | Gated: `speedup`, `solve_s`, `nlp_s` (CI: factor 6×) | Report only — compare runs yourself |
-| **Accuracy** | Gated: trajectory goldens, `rel_err_l2`, checkpoints | — |
-| **CI** | ✅ `regression` job | ❌ never |
-| **When** | After compile/sim/trajopt/MPC changes; before merge | New machine, backend tuning, perf investigation |
+| | **L2** regression | **L3** `run_study.py` | **Host profiles** |
+| --- | --- | --- | --- |
+| **Role** | Pass/fail vs `benchmarks/baselines/` | Backend tables on your machine | **Context only** — timings from other hosts |
+| **Location** | `benchmarks/` | `benchmarks/` | `benchmarks/host_profiles/*.json` |
+| **CI** | ✅ | ❌ | printed on L2 runs (informational) |
 
-L2 suites: `core_perf`, `integration`, `solve_speed`, `e4`, `f_mpc`. Detail: [benchmarks/README.md](../benchmarks/README.md).
+L2 prints a **host speed context** table after each suite (compare current run to recorded profiles). Gates unchanged. Record your machine:
 
-`test_benchmark_smoke.py` (in `pytest`) only checks benchmark **helpers import** — not performance gates.
+```bash
+python benchmarks/run_regression_check.py --suite f_mpc --tiny \
+  --record-host-profile my_laptop --host-profile-label "My workstation"
+```
+
+Detail: [benchmarks/README.md](../benchmarks/README.md).
 
 ---
 
@@ -126,7 +132,7 @@ many near-duplicate files.
 `test_graphics`, `test_geometry`, `test_engine_jax`, `test_jax_planning`,
 `test_symbolic`, `test_benchmark_smoke`, `test_smoke_runners`,
 `test_flagship_graphics_contract`. Re-merge helper:
-`scripts/merge_l1_tests.py`.
+[`merge_l1_tests.py`](merge_l1_tests.py).
 
 Kinematic render smoke (L4): ``run_flagship_graphics.py`` and manifest under
 ``tests/fixtures/kinematic_baseline/``.
@@ -139,16 +145,15 @@ Benchmark **Layer B** regression lives under repo-root `benchmarks/`; helper API
 drift guards in `test_benchmark_smoke.py`. See [Entry points](#entry-points) for
 L2 CI vs local commands and [benchmarks/README.md](../benchmarks/README.md).
 
-**Layer L6** scripts (also invoked from `test_smoke_runners.py` in pytest):
+**Layer L6** scripts in [`tests/smoke/`](smoke/) (also invoked from `test_smoke_runners.py`):
 
 ```bash
-python examples/scripts/_smoke/run_catalog_smokes.py --fast
-python examples/scripts/_smoke/run_flagship_demos.py
-python examples/scripts/_smoke/run_all_demos.py --flagship-only --continue-on-error
+python tests/smoke/run_catalog_smokes.py --fast
+python tests/smoke/run_flagship_demos.py
+python tests/smoke/run_all_demos.py --flagship-only --continue-on-error
 ```
 
-Nightly/manual full demo sweep: `run_all_demos.py`. L4 PNG smoke:
-`run_flagship_graphics.py`. L5 visual: `run_graphics_visual_check.py`.
+IDE launchers: [`tests/run/`](run/). L4 PNG smoke: `tests/smoke/run_flagship_graphics.py`.
 
 `tests/manual/` and `tests/bugs/` are removed — use `examples/scripts/` for
 smoke scripts and unittest for contracts.

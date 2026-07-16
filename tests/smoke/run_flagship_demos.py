@@ -2,7 +2,7 @@
 
 Usage (from repo root)::
 
-    python examples/scripts/_smoke/run_flagship_demos.py
+    python tests/smoke/run_flagship_demos.py
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 _SMOKE_DIR = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))

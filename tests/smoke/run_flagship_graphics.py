@@ -2,8 +2,8 @@
 
 Usage (from repo root)::
 
-    python examples/scripts/_smoke/run_flagship_graphics.py
-    python examples/scripts/_smoke/run_flagship_graphics.py --out /tmp/ml-gfx
+    python tests/smoke/run_flagship_graphics.py
+    python tests/smoke/run_flagship_graphics.py --out /tmp/ml-gfx
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ matplotlib.use("Agg")
 import matplotlib.image as mpimg  # noqa: E402
 import numpy as np  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 

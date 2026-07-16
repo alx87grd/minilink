@@ -26,7 +26,7 @@ class TestSmokeRunners(unittest.TestCase):
 
     def test_catalog_smokes_fast_exit_zero(self):
         proc = self._run(
-            "examples/scripts/_smoke/run_catalog_smokes.py",
+            "tests/smoke/run_catalog_smokes.py",
             "--fast",
         )
         if proc.returncode != 0:
@@ -36,7 +36,7 @@ class TestSmokeRunners(unittest.TestCase):
             )
 
     def test_flagship_demos_exit_zero(self):
-        proc = self._run("examples/scripts/_smoke/run_flagship_demos.py")
+        proc = self._run("tests/smoke/run_flagship_demos.py")
         if proc.returncode != 0:
             self.fail(
                 f"flagship demos failed (exit {proc.returncode})\n"
@@ -44,7 +44,7 @@ class TestSmokeRunners(unittest.TestCase):
             )
 
     def test_flagship_graphics_exit_zero(self):
-        proc = self._run("examples/scripts/_smoke/run_flagship_graphics.py")
+        proc = self._run("tests/smoke/run_flagship_graphics.py")
         if proc.returncode != 0:
             self.fail(
                 f"flagship graphics failed (exit {proc.returncode})\n"

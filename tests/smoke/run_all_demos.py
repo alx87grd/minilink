@@ -2,9 +2,9 @@
 
 Usage (from repo root)::
 
-    python examples/scripts/_smoke/run_all_demos.py --help
-    python examples/scripts/_smoke/run_all_demos.py --timeout 60 --continue-on-error
-    python examples/scripts/_smoke/run_all_demos.py --flagship-only
+    python tests/smoke/run_all_demos.py --help
+    python tests/smoke/run_all_demos.py --timeout 60 --continue-on-error
+    python tests/smoke/run_all_demos.py --flagship-only
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SMOKE_DIR = Path(__file__).resolve().parent
 SCRIPTS_ROOT = REPO_ROOT / "examples" / "scripts"
 FLAGSHIP_MANIFEST = SMOKE_DIR / "flagship_manifest.json"
@@ -33,7 +33,7 @@ class DemoRunRow:
 def _discover_scripts() -> list[Path]:
     paths: list[Path] = []
     for path in sorted(SCRIPTS_ROOT.rglob("*.py")):
-        if "_smoke" in path.parts:
+        if path.is_relative_to(SMOKE_DIR):
             continue
         paths.append(path)
     return paths

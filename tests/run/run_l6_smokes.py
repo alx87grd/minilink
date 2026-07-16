@@ -22,12 +22,12 @@ CATALOG_FAST = True  # False → full catalog sweep (slower)
 def main() -> int:
     catalog_args = ["--fast"] if CATALOG_FAST else []
     code = _common.run_smoke_script(
-        "examples/scripts/_smoke/run_catalog_smokes.py",
+        "tests/smoke/run_catalog_smokes.py",
         catalog_args,
     )
     if code != 0:
         return code
-    return _common.run_smoke_script("examples/scripts/_smoke/run_flagship_demos.py")
+    return _common.run_smoke_script("tests/smoke/run_flagship_demos.py")
 
 
 if __name__ == "__main__":

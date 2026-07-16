@@ -1,7 +1,7 @@
 """Catalog equation reference values and graphics primitive contracts (L1).
 
 Broad catalog plant smoke (instantiate, ``f`` finite, geometry) lives in L6:
-``examples/scripts/_smoke/run_catalog_smokes.py``.
+Broad catalog smoke: ``tests/smoke/run_catalog_smokes.py``.
 """
 
 import unittest
