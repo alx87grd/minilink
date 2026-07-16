@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from minilink.planning.mpc.command import Command
+from minilink.planning.results import SolveMetadata
 from minilink.planning.trajectory_optimization.planner import (
     reject_unknown_online_params,
 )
@@ -54,6 +55,28 @@ class ModelPredictiveControllerMixin:
     def last_command(self) -> Command | None:
         """Most recent :meth:`compute_command` result, if any."""
         return self._last_command
+
+    def get_solve_metadata(self) -> SolveMetadata | None:
+        """
+        Last NLP solve extras for deploy / logging (ROS-agnostic).
+
+        Prefers :attr:`last_command` metadata; otherwise the planner's
+        :attr:`~minilink.planning.planner.Planner.last_trajectory_plan`
+        (e.g. after a hybrid tick with no deploy call). ``None`` if nothing
+        has been solved yet.
+        """
+        if self._last_command is not None:
+            return self._last_command.metadata
+        plan = self._planner.last_trajectory_plan
+        if plan is not None:
+            return plan.metadata
+        return None
+
+    def reset(self) -> None:
+        """Clear deploy counter, last command, and tick latch memo."""
+        self._deploy_k = 0
+        self._last_command = None
+        self._latch.reset_latch()
 
     def _z_warm_for_command(self):
         """Override on StepSystem: previous packed ``z`` for warm-start."""

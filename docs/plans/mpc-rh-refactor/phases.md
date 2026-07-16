@@ -22,8 +22,8 @@ Branch: **`dev-mpc-v2`** (hybrid + MPC controllers present; same full stack as
 | Demo | Role |
 | --- | --- |
 | `demo_dynamic_bicycle_rate_mpc_straight_line.py` | **On** `compute_command` (product warm-start) |
-| `demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | Full closed-loop lap — migrate to `compute_command` in E5 |
-| Obstacle / stadium / wide / multi-obstacle | Migrate to `compute_command` in E5 |
+| `demo_dynamic_bicycle_rate_mpc_closed_loop_lap.py` | Full closed-loop lap — **on** `compute_command` (E5) |
+| Obstacle / stadium / wide / multi-obstacle | **on** `compute_command` (E5) |
 | `demo_mpc_spatial_scene_guide.py` | Teaching / scene API |
 | `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py` | Per-tick trajopt reference (keep as reference) |
 
@@ -64,12 +64,12 @@ flowchart LR
   E8 --> UI[Planning UI plan]
 ```
 
-E0–E4 done: foundation → online from-API → controller → flagships → TOP
-parametric merge. E5 retires PoC factories — see [phase-E5.md](phase-E5.md).
-E8 dual-rate contract is locked early; implementation stays last.
+E0–E6 done: foundation → online from-API → controller → flagships → TOP merge
+→ PoC retirement → observability polish. Next functional work is E7. E8
+dual-rate contract is locked early; implementation stays last.
 
-**After E8:** expand [phase-F-cleanup.md](phase-F-cleanup.md) with a concrete
-hygiene task list (generic guidelines until then). Constructor UX:
+**After E8:** expand [phase-F-cleanup.md](phase-F-cleanup.md) — parked intent
+includes moving MPC to `control/mpc` and fusing modules. Constructor UX:
 [planning-ui-simplification.md](../planning-ui-simplification.md).
 
 Continuous \(T\) lives only on `PlanningProblem.tf` (`None` / finite / `+inf`;
@@ -86,7 +86,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | **E3** | Migrate flagship demos to controller | [phase-E3.md](phase-E3.md) **(done)** |
 | **E4** | Merge parametric MPC into TOP | [phase-E4.md](phase-E4.md) **(done)** |
 | **E5** | Retire PoC controller leaves | [phase-E5.md](phase-E5.md) **(done)** |
-| **E6** | Observability polish | [phase-E6.md](phase-E6.md) |
+| **E6** | Observability polish | [phase-E6.md](phase-E6.md) **(done)** |
 | **E7** | Parametric scene (pipeline B) | [phase-E7.md](phase-E7.md) |
 | **E8** | Broadcast + dual-rate export | [phase-E8.md](phase-E8.md) **(contract locked)** |
 | **F** | Post-refactor cleanup (expand after E8) | [phase-F-cleanup.md](phase-F-cleanup.md) **(stub)** |
@@ -100,7 +100,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-C | E3 | hybrid parity + smoke demos | landed |
 | PR-D | E4 | MPC + trajopt + hybrid + controller | landed |
 | PR-E | E5 | after remaining demos/tests on controller | landed |
-| PR-F+ | E6–E8 | phase gates | later |
+| PR-F+ | E6–E8 | phase gates | E6 landed; E7–E8 later |
 | PR-F-hygiene | Phase F — expand card after E8, then land | F gate | after E8 |
 | PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | UI-1+ gates | after E8 (parallel with F) |
 
@@ -112,6 +112,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 4. **E3** — done ([phase-E3.md](phase-E3.md)).
 5. **E4** — done ([phase-E4.md](phase-E4.md)).
 6. **E5** — done ([phase-E5.md](phase-E5.md)).
-7. **E6** — expand [phase-E6.md](phase-E6.md) before coding (observability polish).
-8. **F** — after E8: expand [phase-F-cleanup.md](phase-F-cleanup.md), then hygiene
+7. **E6** — done ([phase-E6.md](phase-E6.md)).
+8. **E7** — expand [phase-E7.md](phase-E7.md) before coding (parametric scene).
+9. **F** — after E8: expand [phase-F-cleanup.md](phase-F-cleanup.md), then hygiene
    PRs; API UX per [planning-ui-simplification.md](../planning-ui-simplification.md).

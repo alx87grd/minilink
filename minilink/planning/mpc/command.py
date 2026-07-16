@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.planning.results import TrajectoryPlan
+from minilink.planning.results import SolveMetadata, TrajectoryPlan
 
 
 @dataclass(frozen=True)
@@ -30,3 +30,8 @@ class Command:
     def plan_flat(self) -> np.ndarray:
         """Flattened ``(t, x, u)`` from :meth:`TrajectoryPlan.to_flat`."""
         return self.plan.to_flat()
+
+    @property
+    def metadata(self) -> SolveMetadata:
+        """Solve extras for this tick (alias of ``plan.metadata``)."""
+        return self.plan.metadata

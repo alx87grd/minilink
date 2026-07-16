@@ -210,10 +210,17 @@ serial arms. Joint impedance / task impedance / computed torque use
   so each Computer tick is bind + solve (memoized across ports ``u_ff``,
   ``x_ff``, ``z``). Warm-start via
   :func:`~minilink.planning.mpc.warm_start.mpc_warm_start_guess` from
-  ``Computer.x``. Post-sim horizons:
+  ``Computer.x``. Deploy / hand loop:
+  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.compute_command`
+  → :class:`~minilink.planning.mpc.command.Command`; telemetry via
+  :meth:`~minilink.planning.mpc.model_predictive_controller.ModelPredictiveControllerMixin.get_solve_metadata`
+  and ``Command.metadata`` (alias of ``plan.metadata``); ``reset()`` clears
+  deploy counter, last command, and tick latch. External nodes wrap that loop
+  only (no ROS2 package in-tree). Post-sim horizons:
   :func:`~minilink.planning.mpc.plan_reconstruct.mpc_plans_from_rollout`;
   default animation overlays:
   :func:`~minilink.planning.mpc.animation_overlays.mpc_animation_overlays`.
+  High-rate ``get_nominal`` / dual-rate export are later (E8).
 - **Control naming:** `r` reference, `y` measurement, `u` control.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in

@@ -159,6 +159,16 @@ diagram.compute_trajectory(tf=10.0)  # solves the plant exactly between ticks
 diagram.animate()
 ```
 
+Hand-loop or external deploy node (ROS-agnostic — no ROS2 package in minilink):
+
+```python
+cmd = mpc.compute_command(y, t=t_wall)  # replan tick → Command
+u = cmd.u_ff
+meta = mpc.get_solve_metadata()         # success / cost / solve_time_s
+# or: cmd.metadata  (same SolveMetadata)
+mpc.reset()                             # clear deploy counter + latch
+```
+
 ### Analyze and design
 
 Characterize a plant and design a controller from the same `System`. `analysis`

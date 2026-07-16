@@ -88,14 +88,29 @@ class TestModelPredictiveController(unittest.TestCase):
     def test_compute_command_fields(self):
         planner = self._make_planner(0.1)
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
+        self.assertIsNone(mpc.get_solve_metadata())
         cmd = mpc.compute_command(np.array([0.1]), k=0)
         self.assertIsInstance(cmd, Command)
         self.assertEqual(cmd.k, 0)
         self.assertAlmostEqual(cmd.t_solve, 0.0)
         self.assertTrue(hasattr(cmd.plan.metadata, "success"))
+        self.assertIs(cmd.metadata, cmd.plan.metadata)
+        self.assertIs(mpc.get_solve_metadata(), cmd.metadata)
         self.assertIsNotNone(cmd.plan.warm_state)
         np.testing.assert_allclose(cmd.u_ff, cmd.plan.trajectory.u[:, 0])
         self.assertIs(mpc.last_command, cmd)
+
+    def test_reset_clears_deploy_state(self):
+        planner = self._make_planner(0.1)
+        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
+        cmd0 = mpc.compute_command(np.array([0.1]))
+        self.assertEqual(cmd0.k, 0)
+        self.assertIsNotNone(mpc.get_solve_metadata())
+        mpc.reset()
+        self.assertIsNone(mpc.last_command)
+        self.assertIsNotNone(mpc.get_solve_metadata())  # planner latch retained
+        cmd1 = mpc.compute_command(np.array([0.1]))
+        self.assertEqual(cmd1.k, 0)
 
     def test_compute_command_parity_with_ports(self):
         planner = self._make_planner(0.0)

@@ -13,13 +13,13 @@ sequencing.
 | --- | --- |
 | [vision.md](vision.md) | Locked end-goal contracts (Planner 2×2, `TrajectoryPlan`, `ModelPredictiveController`) |
 | [phases.md](phases.md) | E0–E8 order, gates, PR slices, start-here |
-| [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E5 done; others stubs) |
-| [phase-F-cleanup.md](phase-F-cleanup.md) | Post-refactor hygiene guidelines (expand task list after E8) → [UI plan](../planning-ui-simplification.md) |
+| [phase-E0.md](phase-E0.md) … [phase-E8.md](phase-E8.md) | Per-phase execution cards (E0–E6 done; E7–E8 stubs) |
+| [phase-F-cleanup.md](phase-F-cleanup.md) | Post-refactor hygiene + parked `control/mpc` layout (expand after E8) → [UI plan](../planning-ui-simplification.md) |
 
-**Active phase:** [phase-E6.md](phase-E6.md) — expand before coding; cite it in the PR.
+**Active phase:** [phase-E7.md](phase-E7.md) — expand before coding; cite it in the PR.
 
-**Progress:** E0–E5 landed on `dev-mpc-v2` (through PoC leaf retirement). Next
-is E6 (observability polish).
+**Progress:** E0–E6 landed on `dev-mpc-v2` (through observability polish). Next
+is E7 (parametric scene).
 
 ## Related requirements (background only)
 
