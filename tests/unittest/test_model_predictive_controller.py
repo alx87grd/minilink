@@ -120,11 +120,23 @@ class TestModelPredictiveController(unittest.TestCase):
         u_ff = mpc.outputs["u_ff"].compute(None, y, t=2)
         np.testing.assert_allclose(cmd.u_ff, u_ff)
 
-    def test_params_rejected(self):
+    def test_params_scene_not_implemented(self):
+        planner = self._make_planner()
+        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
+        with self.assertRaises(NotImplementedError):
+            mpc.compute_command(np.array([0.0]), params={"scene": {}})
+
+    def test_params_empty_ok(self):
+        planner = self._make_planner(0.0)
+        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
+        cmd = mpc.compute_command(np.array([0.0]), params={})
+        self.assertIsInstance(cmd, Command)
+
+    def test_params_unknown_rejected(self):
         planner = self._make_planner()
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
         with self.assertRaises(ValueError):
-            mpc.compute_command(np.array([0.0]), params={"scene": {}})
+            mpc.compute_command(np.array([0.0]), params={"foo": 1})
 
     def test_matmul_returns_hybrid(self):
         planner = self._make_planner()

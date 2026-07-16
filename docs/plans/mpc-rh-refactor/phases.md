@@ -64,9 +64,10 @@ flowchart LR
   E8 --> UI[Planning UI plan]
 ```
 
-E0–E6 done: foundation → online from-API → controller → flagships → TOP merge
-→ PoC retirement → observability polish. Next functional work is E7. E8
-dual-rate contract is locked early; implementation stays last.
+E0–E7 slim done: foundation → online from-API → controller → flagships → TOP
+merge → PoC retirement → observability → online `params` façade. Full pipeline
+B (`J(z, p)` / ObstacleBank) is deferred after E8. Next functional work is E8.
+E8 dual-rate contract is locked early; implementation stays last.
 
 **After E8:** expand [phase-F-cleanup.md](phase-F-cleanup.md) — parked intent
 includes moving MPC to `control/mpc` and fusing modules. Constructor UX:
@@ -87,7 +88,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | **E4** | Merge parametric MPC into TOP | [phase-E4.md](phase-E4.md) **(done)** |
 | **E5** | Retire PoC controller leaves | [phase-E5.md](phase-E5.md) **(done)** |
 | **E6** | Observability polish | [phase-E6.md](phase-E6.md) **(done)** |
-| **E7** | Parametric scene (pipeline B) | [phase-E7.md](phase-E7.md) |
+| **E7** | Online params façade (pipeline B deferred) | [phase-E7.md](phase-E7.md) **(done slim)** |
 | **E8** | Broadcast + dual-rate export | [phase-E8.md](phase-E8.md) **(contract locked)** |
 | **F** | Post-refactor cleanup (expand after E8) | [phase-F-cleanup.md](phase-F-cleanup.md) **(stub)** |
 
@@ -100,7 +101,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 | PR-C | E3 | hybrid parity + smoke demos | landed |
 | PR-D | E4 | MPC + trajopt + hybrid + controller | landed |
 | PR-E | E5 | after remaining demos/tests on controller | landed |
-| PR-F+ | E6–E8 | phase gates | E6 landed; E7–E8 later |
+| PR-F+ | E6–E8 | phase gates | E6–E7 slim landed; E8 later |
 | PR-F-hygiene | Phase F — expand card after E8, then land | F gate | after E8 |
 | PR-UI | [planning-ui-simplification.md](../planning-ui-simplification.md) | UI-1+ gates | after E8 (parallel with F) |
 
@@ -113,6 +114,7 @@ demos set finite `tf=` for trajopt/MPC); transcription options carry
 5. **E4** — done ([phase-E4.md](phase-E4.md)).
 6. **E5** — done ([phase-E5.md](phase-E5.md)).
 7. **E6** — done ([phase-E6.md](phase-E6.md)).
-8. **E7** — expand [phase-E7.md](phase-E7.md) before coding (parametric scene).
-9. **F** — after E8: expand [phase-F-cleanup.md](phase-F-cleanup.md), then hygiene
+8. **E7** — done slim ([phase-E7.md](phase-E7.md)); full pipeline B deferred.
+9. **E8** — expand [phase-E8.md](phase-E8.md) before coding (broadcast / dual-rate).
+10. **F** — after E8: expand [phase-F-cleanup.md](phase-F-cleanup.md), then hygiene
    PRs; API UX per [planning-ui-simplification.md](../planning-ui-simplification.md).

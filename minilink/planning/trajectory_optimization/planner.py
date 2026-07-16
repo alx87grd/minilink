@@ -627,8 +627,18 @@ class TrajectoryOptimizationPlanner(Planner):
         return type(value).__name__
 
 
+# Reserved online keys for pipeline B (ObstacleBank / J(z, p)); not bound yet.
+_DEFERRED_ONLINE_PARAM_KEYS = frozenset({"scene"})
+
+
 def reject_unknown_online_params(params) -> None:
-    """Reject non-empty online ``params`` until scene support lands (E7)."""
+    """
+    Validate online ``params`` for ``solve_trajectory_from`` / MPC.
+
+    ``None`` or ``{}`` → bind ``x0`` only. Known deferred keys (``scene``) raise
+    :class:`NotImplementedError` until pipeline B. Any other key raises
+    :class:`ValueError`.
+    """
     if params is None:
         return
     if not hasattr(params, "keys"):
@@ -636,8 +646,21 @@ def reject_unknown_online_params(params) -> None:
             f"params must be a mapping or None; got {type(params).__name__}."
         )
     keys = list(params.keys())
-    if keys:
+    if not keys:
+        return
+    unknown = sorted(k for k in keys if k not in _DEFERRED_ONLINE_PARAM_KEYS)
+    deferred = sorted(k for k in keys if k in _DEFERRED_ONLINE_PARAM_KEYS)
+    if unknown:
         raise ValueError(
-            "solve_trajectory_from does not accept params keys yet "
-            f"(got {keys!r}). Pass params=None or {{}} until scene support."
+            "solve_trajectory_from got unknown params keys "
+            f"{unknown!r}. Pass params=None or {{}} for x0-only bind, "
+            "or reserved key 'scene' (NotImplemented until pipeline B)."
+        )
+    if deferred:
+        raise NotImplementedError(
+            f"Online params key(s) {deferred} are reserved for pipeline B "
+            "(ObstacleBank / ParametricMathematicalProgram J(z, p) bind). "
+            "Pass params=None or {} for x0-only bind. See "
+            "docs/plans/planning-pipeline-architecture.md and "
+            "docs/plans/mpc-rh-refactor/phase-E7.md."
         )

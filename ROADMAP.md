@@ -175,9 +175,16 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
   primary demos under `examples/scripts/mpc/` and `examples/scripts/hybrid/`;
   legacy per-step trajopt reference:
   `demo_dynamic_bicycle_rate_mpc_straight_line_trajopt.py`
-- [ ] **Scene params** — `ProblemParameters.scene`, transcription merge helpers,
-  indexed overrides in `Scene` / `StateField` (moving obstacles, scenario sweeps,
-  MPC without scene rebuild).
+- [x] **Online `params` façade (E7 slim)** — `params=None`/`{}` for x0-only;
+  reserved `scene` key and `ProblemParameters.scene` placeholder;
+  `NotImplementedError` until full bind; latch forwards `params` on
+  `compute_command`.
+- [ ] **Scene params (pipeline B)** — `ObstacleBank`, `J(z, p)` /
+  `bind(p)` on `ParametricMathematicalProgram`, transcription merge helpers,
+  indexed overrides in `Scene` / `StateField` (moving obstacles, scenario
+  sweeps, MPC without scene rebuild). See
+  `docs/plans/mpc-rh-refactor/phase-E7.md` (deferred section) and
+  `docs/plans/planning-pipeline-architecture.md`.
 - [ ] **Parametric `core/` primitives** (promoted to P1) — call-time `params`
   overrides on `Shape.sdf`, `Set.margin`, and `CostFunction.g`/`h` (e.g. `BallSet`
   center/radius, `QuadraticCost` weights). Signatures exist; frozen attributes are the

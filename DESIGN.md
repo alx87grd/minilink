@@ -265,11 +265,17 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   (numeric leaves required): values vary without retracing, and
   `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
   (see `examples/scripts/identification/demo_params_gradient.py`).
-- **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets` today;
-  a future `scene` tier for spatial overrides is on the roadmap. **Deferred**
-  ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides on base
-  `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types declare
-  `(t, params)` but still read frozen attributes only until a follow-up pass.
+- **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets`
+  today; `scene` is reserved (`None`) for pipeline B spatial overrides.
+  Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
+  or `{}` binds `x0` only; `params={"scene": …}` raises `NotImplementedError`
+  until `ParametricMathematicalProgram` gains `J(z, p)` / `ObstacleBank`
+  ([phase-E7.md](docs/plans/mpc-rh-refactor/phase-E7.md),
+  [planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
+  **Deferred** ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides
+  on base `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types
+  declare `(t, params)` but still read frozen attributes only until a follow-up
+  pass.
 
 ### `DiagramSystem`
 
@@ -503,8 +509,11 @@ family).
 `TrajectoryPlan`. Offline `solve_trajectory` always rebuilds a fresh
 `MathematicalProgram`. Optional `compile_parametric_program()` builds a
 `ParametricMathematicalProgram` (``h(z, x0)``) once so
-`solve_trajectory_from(x0)` is bind + solve only (receding-horizon / MPC path);
-without compile, from-solves rebuild with a one-time speed warning. Knot count
+`solve_trajectory_from(x0, params=None)` is bind + solve only (receding-horizon /
+MPC path); without compile, from-solves rebuild with a one-time speed warning.
+Online ``params`` is an x0-only façade today (`None`/`{}`); reserved key
+``scene`` raises ``NotImplementedError`` until pipeline B extends the parametric
+tier to ``J(z, p)`` (see ROADMAP scene params). Knot count
 `n_steps` lives on transcription options; the time grid is
 `linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
@@ -548,7 +557,9 @@ geometry: :func:`~minilink.planning.spatial.collision.disc`,
 :func:`~minilink.planning.spatial.collision.car_outline`. Shape obstacles with
 `quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides (moving
-obstacles, MPC sweeps) are planned on the roadmap — rebuild `Scene` until then.
+obstacles, MPC sweeps) need pipeline B (`ObstacleBank` + `J(z, p)` bind) —
+online `params={"scene": …}` is reserved but raises `NotImplementedError`;
+rebuild `Scene` + re-`compile_parametric_program()` until then.
 
 **Reference track** (`planning/spatial/paths.py`, `track.py`): workspace centerlines
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in

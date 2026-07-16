@@ -98,9 +98,10 @@ class ModelPredictiveControllerMixin:
         y : array_like
             Measured plant state (diagram input ``y``).
         params : mapping, optional
-            Passed to
+            Forwarded to
             :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.solve_trajectory_from`
-            (rejected until E7 if non-empty keys).
+            via the tick latch (``None``/``{}`` = x0-only; ``scene`` reserved /
+            NotImplemented until pipeline B).
         k : int, optional
             Tick index. Default: increment internal deploy counter.
         t : float, optional
@@ -117,6 +118,7 @@ class ModelPredictiveControllerMixin:
         else:
             t_solve = float(t)
 
+        # Gate early for clear deploy errors; latch also forwards to the planner.
         reject_unknown_online_params(params)
         y_arr = np.asarray(y, dtype=float).reshape(-1)
         z_warm = self._z_warm_for_command()
@@ -125,6 +127,7 @@ class ModelPredictiveControllerMixin:
             y_arr,
             z_warm=z_warm,
             dt_mpc=self._dt_mpc if z_warm is not None else None,
+            params=params,
         )
         plan = self._planner.require_trajectory_plan()
         cmd = Command(

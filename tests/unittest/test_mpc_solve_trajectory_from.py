@@ -108,10 +108,15 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         np.testing.assert_allclose(plan_none.trajectory.x[:, 0], x0, atol=1e-5)
         np.testing.assert_allclose(plan_empty.trajectory.x[:, 0], x0, atol=1e-5)
 
+    def test_params_scene_not_implemented(self):
+        planner = self.make_planner(self.make_problem(0.0))
+        with self.assertRaises(NotImplementedError):
+            planner.solve_trajectory_from(np.array([0.0]), params={"scene": {}})
+
     def test_params_unknown_keys_rejected(self):
         planner = self.make_planner(self.make_problem(0.0))
         with self.assertRaises(ValueError):
-            planner.solve_trajectory_from(np.array([0.0]), params={"scene": {}})
+            planner.solve_trajectory_from(np.array([0.0]), params={"foo": 1})
 
     def test_solve_trajectory_rebuild_and_from_compiled(self):
         """Offline rebuild and compiled from-solve both honor ``x_start``."""

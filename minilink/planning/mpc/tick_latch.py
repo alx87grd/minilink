@@ -56,6 +56,7 @@ class MPCTickLatch:
         z_warm=None,
         dt_mpc=None,
         initial_guess=None,
+        params=None,
     ) -> MPCTickSolve:
         k_int = int(k)
         if self._latch_k == k_int and self._latch is not None:
@@ -74,7 +75,9 @@ class MPCTickLatch:
                 k=k_int,
             )
 
-        traj_plan = self._planner.solve_trajectory_from(y_arr, initial_guess=guess)
+        traj_plan = self._planner.solve_trajectory_from(
+            y_arr, params=params, initial_guess=guess
+        )
         traj = traj_plan.trajectory
         result = self._planner.last_optimization_result
         if result is None:

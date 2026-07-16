@@ -32,11 +32,16 @@ class ProblemParameters:
         Parameters passed to :class:`~minilink.core.costs.CostFunction`.
     sets : object, optional
         Parameters passed to allowable set objects.
+    scene : object, optional
+        Reserved for pipeline B spatial overrides (``ObstacleBank`` /
+        ``SceneParameters``). Always ``None`` until bind ``J(z, p)`` lands;
+        online ``params={"scene": …}`` raises ``NotImplementedError``.
     """
 
     system: object | None = None
     cost: object | None = None
     sets: object | None = None
+    scene: object | None = None
 
 
 @dataclass(frozen=True)
