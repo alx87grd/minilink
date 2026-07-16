@@ -1,8 +1,227 @@
 # Test & benchmark consolidation plan
 
-Status: **draft for review** — inventory and target layout; no file moves yet.
+Status: **vision agreed — L2 partially landed in PR #82**; L1 consolidation, L3–L6 still to build.
 
-## Problem statement
+---
+
+## Testing vision (authoritative)
+
+Six layers, bottom to top. **Unit tests belong to library modules (`minilink/`).**
+Demo and catalog scripts are **smoke-run only** (L6), not duplicated in pytest.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  L6  Smoke runners     catalog + demo scripts — must not throw         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L5  Graphics visual   you look: Meshcat, Matplotlib, Plotly live      │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L4  Graphics auto     agent/CI: runs, saves PNG, finite draw-lists    │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L3  Benchmark utility new machine / GPU — tables, not CI gates        │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L2  Regression        accuracy JSON goldens + guarded compute time      │
+├─────────────────────────────────────────────────────────────────────────┤
+│  L1  Contracts         pytest: API types, shapes, compile/sim behavior   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 1 — Contracts (pytest, `tests/unittest/`)
+
+**Purpose:** Core library correctness without running demos. “This function returns
+the right type/shape; this public API honors DESIGN.”
+
+| What | How | CI |
+| --- | --- | --- |
+| Types, shapes, params override, wiring | Parametrized pytest on `minilink/` | `pytest` every PR |
+| Compile / evaluator / sim / hybrid / MPC **behavior** | Domain test modules (~22 after consolidation) | `pytest` |
+| Foundational catalog **math** only | 2–3 plants with reference `H`, `g`, matrices (not 40-class loop) | `pytest` |
+
+**Not here:** demo scripts, wall-clock speed, pixel appearance, “every catalog class.”
+
+**Command:** `pytest` (optional: `pytest -m "not optional"` for minimal deps)
+
+**Target files:** see §Target layout — `test_core.py`, `test_compile.py`, `test_simulation.py`, …
+
+---
+
+### Layer 2 — Regression (accuracy + performance gates, `benchmarks/`)
+
+**Purpose:** Catch broken **simulation**, **trajectory optimization**, **NLP/MPC**
+paths — both **solution accuracy** and **compute time** on key scenarios.
+
+Two gate types (never mix them up):
+
+| Gate | Stored truth | Compare rule | Cross-machine safe? |
+| --- | --- | --- | --- |
+| **Accuracy** | Committed vectors in `benchmarks/baselines/*.json` (`x_tf`, `checkpoint_t*`, `eq_inf`, success flags) | Absolute tolerance / vector match | **Yes** — physics truth, not host-specific |
+| **Speed** | Baseline seconds recorded on a reference host | Current ≤ baseline × **factor** (4× default; 6× in CI for `solve_s`/`nlp_s`) | **Partially** — never hard-code “must finish in 0.05 s”; use factor + gate only solver wall time (`solve_s`, `nlp_s`, speedup ratios), not end-to-end `wall_s` in CI |
+
+**Accuracy truth pipeline:**
+
+1. Live “truth” where needed (e.g. `scipy_ultra` sim) → compare candidate vs truth (`rel_err_l2`).
+2. Truth vs **committed golden** (`truth.x_tf`) — catches broken sim even if candidate still matches truth.
+3. Checkpoints along trajectory vs JSON — catches drift mid-horizon.
+
+**Per-module coverage (where it makes sense):**
+
+| Module / path | L2 suite | Accuracy | Speed |
+| --- | --- | --- | --- |
+| Compile / `f()` | `core_perf` | diagram `dx` residual, sim final state | speedup vs native |
+| Simulator | `core_perf`, `integration` | checkpoint goldens, `rel_err_l2` | `solve_s` (sim wall) |
+| Optimizer / NLP | `solve_speed` | success flag | `optimizer.*.solve_s` |
+| Trajopt (NumPy) | `solve_speed` | success | `trajopt.pendulum.numpy_slsqp.solve_s` |
+| Trajopt (JAX) | `integration`, `e4` | traj + checkpoints | `solve_s` |
+| MPC product | `f_mpc` | hybrid/hand-loop/dual-rate states | `nlp_s` |
+
+**Command (local pre-handoff):**
+
+```bash
+python benchmarks/run_regression_check.py --suite all
+```
+
+**Command (CI — already wired):**
+
+```bash
+python benchmarks/run_regression_check.py --suite all --tiny --factor 6 \
+  --speed-gate-suffixes solve_s,nlp_s,speedup
+```
+
+**Refresh baselines (intentional change only):** `--update` + review JSON diff.
+
+**Status:** ✅ unified runner + 5 suites + CI job landed; ⬜ per-module consolidation into one scenario registry still todo.
+
+---
+
+### Layer 3 — Benchmark utilities (machine exploration, not testing)
+
+**Purpose:** “I have a new computer / GPU — how fast are backends here?”
+Utility scripts, **not** CI gates. Output human-readable tables for comparison
+across machines you own.
+
+| Script family | Question it answers |
+| --- | --- |
+| `run_pendulum_f_speed.py`, `run_diagram_f_speed.py`, … | Native vs NumPy vs JAX `f()` / `step()` |
+| `run_simulator_speed_matrix.py` | Solver × backend matrix vs ultra truth |
+| `run_trajopt_backends.py`, `run_optimizer_backends.py` | Which backend/solver wins **on this host** |
+| `run_dp_backends.py`, `run_rrt_nearest_backends.py` | DP / RRT backend sweep |
+| `run_pyro_minilink_parity.py` | External Pyro env comparison |
+
+**Planned:** single entry `run_study.py --preset sim_matrix|trajopt|…` (Phase 3).
+
+**Command today:**
+
+```bash
+python benchmarks/run_simulator_speed_matrix.py
+python benchmarks/run_trajopt_backends.py
+```
+
+**Rule:** Results are **for you on your machine** — do not commit as gates unless
+folding a representative scenario into L2 with factor tolerance.
+
+---
+
+### Layer 4 — Graphics automated (agent + headless CI)
+
+**Purpose:** Agent (or CI) verifies graphics **pipelines run** without you looking.
+
+| Check | Pass criterion |
+| --- | --- |
+| Draw-list contract | Finite transforms, expected primitive keys (`geometry_smoke`) |
+| Static render | Agg PNG written, finite pixels, non-empty variance |
+| Demo/flagship smoke | Script completes; figure saved to temp path |
+| Plotly (optional) | Figure object builds (`@pytest.mark.plotting`) |
+
+**Not here:** “does it look pretty” — that is L5.
+
+**Commands (planned):**
+
+```bash
+pytest tests/unittest/test_graphics.py tests/unittest/test_flagship_graphics_contract.py
+python examples/scripts/_smoke/run_flagship_graphics.py --headless --out /tmp/ml-gfx
+```
+
+**Status:** ⬜ partial today (`test_kinematic_regression`, `test_overlays`); flagship manifest + aggregator planned (Phase 6).
+
+---
+
+### Layer 5 — Graphics visual (you confirm on your machine)
+
+**Purpose:** One command opens **each major output channel** so **you** can confirm
+Meshcat, Matplotlib animation, Plotly live traj, etc. Agent prepares; you judge.
+
+| Pipeline | Script opens | You verify |
+| --- | --- | --- |
+| Matplotlib kinematic / animate | short flagship animate, `show=True` or saved + open | geometry, camera |
+| Meshcat 3D | engine / tire demo smoke | scene loads in browser |
+| Plotly live trajopt | cartpole live plot demo | interactive plot updates |
+| pygame (optional) | viz demo | window / headless dummy in CI only |
+
+**Command (planned):**
+
+```bash
+python examples/scripts/_smoke/run_graphics_visual_check.py
+# blocking prompts: "Press Enter after confirming Meshcat…"
+```
+
+**CI:** skip L5 entirely. **Agent workflow:** run L4, then tell user “run L5 locally.”
+
+**Status:** ⬜ not implemented — design in §Flagship graphics validation.
+
+---
+
+### Layer 6 — Smoke runners (catalog + demos, no per-script tests)
+
+**Purpose:** “At least these scripts **don't throw**.” No unittest per demo file.
+
+| Scope | Mechanism | Depth |
+| --- | --- | --- |
+| **Catalog** | `catalog/<pkg>/smoke.py` + `run_catalog_smokes.py` | instantiate, `f` finite, optional 3-step sim, `geometry_smoke` |
+| **Demos** | whitelist manifest + `run_smoke()` in each flagship demo | short `tf`, Agg, no `show` |
+| **All demos (optional)** | `run_all_demos.py --continue-on-error` | subprocess each script, report table — nightly only |
+
+**Pytest surface:** one subprocess test per aggregator, not 78 test files.
+
+```bash
+python examples/scripts/_smoke/run_catalog_smokes.py --fast
+python examples/scripts/_smoke/run_flagship_demos.py
+# optional nightly:
+python examples/scripts/_smoke/run_all_demos.py --timeout 120
+```
+
+**Status:** ⬜ planned Phase 5 — today catalog breadth still in `test_catalog_migration.py`.
+
+---
+
+## Quick reference — what runs where
+
+| Your requirement | Layer | Command | CI? |
+| --- | ---: | --- | ---: |
+| API / type / module contracts | L1 | `pytest` | ✅ |
+| Sim + trajopt accuracy goldens | L2 | `run_regression_check.py --suite all` | ✅ accuracy |
+| NLP/trajopt solve time regression | L2 | same + speed suffixes | ✅ partial |
+| New GPU / machine benchmarks | L3 | `run_*_speed.py`, `run_study.py` (planned) | ❌ |
+| Graphics pipelines run, PNG exists | L4 | pytest graphics + smoke scripts | ⬜ partial |
+| You eyeball Meshcat / Plotly / MPL | L5 | `run_graphics_visual_check.py` | ❌ |
+| Catalog + demos don't crash | L6 | `run_catalog_smokes.py`, demo aggregators | ⬜ planned |
+
+---
+
+## Implementation roadmap (order)
+
+| Phase | Layer | Deliverable | Status |
+| ---: | ---: | --- | --- |
+| 0 | — | This vision doc + inventory table | ✅ |
+| 1 | L2 | Unified `run_regression_check`, `solve_speed`, CI regression job | ✅ |
+| 2 | L1 | Merge 91 pytest files → ~22 domain modules | ⬜ |
+| 3 | L3 | `run_study.py` replaces scattered benchmark CLIs | ⬜ |
+| 4 | L6 | Catalog smokes + demo whitelist aggregators | ⬜ |
+| 5 | L4 | Flagship graphics headless manifest + pytest | ⬜ |
+| 6 | L5 | Interactive visual check script for local use | ⬜ |
+| 7 | L1 | Shrink catalog unittest to 3-plant contracts only | ⬜ (with Phase 4) |
+
+---
+
+## Problem statement (inventory)
 
 The repo has grown test and benchmark surface area without periodic cleanup:
 
@@ -10,21 +229,32 @@ The repo has grown test and benchmark surface area without periodic cleanup:
 | --- | ---: | --- |
 | `tests/unittest/test_*.py` | **91 files**, ~**780** `test_*` functions | `pytest` (all collected; optional deps skip at runtime) |
 | `benchmarks/run_*.py` | **15** CLI runners | **not** in CI |
-| Gated regression baselines | **4** JSON suites | manual / pre-handoff only |
+| Gated regression baselines | **5** JSON suites + CI job | ✅ L2 in CI |
 | `examples/scripts/` | **78** demos | not tests (out of scope for merge, noted for overlap) |
 | Catalog pytest surface | **4 files** (~60 tests): migration, plant contracts, manipulators, kinematic manifest | see §Catalog & demo smokes below |
 
-`tests/README.md` already states the philosophy (contracts over trivia, table-driven over duplicate files, benchmarks for perf not correctness). This plan turns that philosophy into a concrete shrink path while **retaining every independent check**.
+`tests/README.md` already states the philosophy (contracts over trivia, table-driven over duplicate files). The **six layers above** are the organizing principle; sections below retain the file-level inventory and migration tables from the first draft.
 
 ---
 
-## What we actually need to validate
+## Legacy section labels (mapped to L1–L6)
 
-Reframe requirements as **layers**, not as one file per feature landing.
+Older draft used Layer A–D. Mapping:
 
-### Layer A — Fast contract suite (pytest, always collected)
+| Old | New |
+| --- | --- |
+| Layer A (contracts) | **L1** + part of **L4** (draw-list) |
+| Layer B (regression JSON) | **L2** |
+| Layer C (manual perf sweeps) | **L3** |
+| Layer D (demos) | **L6** (+ L5 for visual) |
+| Phase 5 catalog smokes | **L6** |
+| Phase 6 flagship graphics | **L4** auto + **L5** visual |
 
-Stable public APIs that break user code or DESIGN contracts:
+---
+
+## What we actually need to validate (detail — L1 domains)
+
+Stable public APIs that break user code or DESIGN contracts (**L1**):
 
 1. **System model** — `System` / `DynamicSystem` / `StepSystem`, signals, params override, evolution maps, composition, feedback wiring.
 2. **Compile & evaluators** — diagram compile, algebraic loops, execution plan, NumPy/JAX evaluator tiers, parametric compile, math-program evaluators, static/step leaf dispatch.
@@ -39,22 +269,23 @@ Stable public APIs that break user code or DESIGN contracts:
 11. **MPC product path** — stateless block, warm-start controller, planner compile, hybrid closed-loop parity vs hand loops, NumPy rebuild mode, `export_to_computer`.
 12. **Graphics contract** — camera transform, implicit `world` frame, draw-list keys; **flagship demo pipeline smokes** (§Flagship graphics validation); catalog kinematic render via smoke registry (not a 40-class unittest loop).
 
-**Non-goals for Layer A:** wall-clock performance ratios, third-party print formatting, demo script pixel output.
+**Non-goals for L1:** wall-clock performance ratios, third-party print formatting, demo script execution, pixel appearance.
 
-### Layer B — Numerical regression (committed JSON, not default pytest)
+### Layer 2 detail — numerical regression (committed JSON)
 
 End-to-end trajectories, checkpoint goldens, and loose speed gates:
 
 | Suite | Baseline | Independent checks |
 | --- | --- | --- |
 | `core_perf` | `benchmarks/baselines/core_perf.json` | `f()` compile speed ratios; dense diagram `dx` residual; sim final-state vs truth; truth vector vs golden |
-| `integration_check` | `benchmarks/baselines/integration_check.json` | double-pendulum & showcase-pendulum checkpoints; cart-pole trajopt solve time + accuracy |
+| `integration_check` | `benchmarks/baselines/integration_check.json` | double-pendulum & showcase-pendulum checkpoints; cart-pole JAX trajopt accuracy + `solve_s` |
+| `solve_speed` | `benchmarks/baselines/solve_speed.json` | standalone NLP + NumPy pendulum trajopt `solve_s` |
 | `e4_trajopt_parity` | `benchmarks/baselines/e4_trajopt_parity.json` | TOP rebuild + MPC parametric on cartpole/pendulum/bicycle |
-| `f_mpc_parity` | `benchmarks/baselines/f_mpc_parity.json` | hybrid ZOH, hand-loop, dual-rate MPC product trajectories + timing |
+| `f_mpc_parity` | `benchmarks/baselines/f_mpc_parity.json` | hybrid ZOH, hand-loop, dual-rate MPC trajectories + `nlp_s` |
 
 Single entry point target: `python benchmarks/run_regression_check.py --suite all`.
 
-### Layer C — Performance studies (manual / dev only)
+### Layer 3 detail — performance studies (manual utilities)
 
 Backend and solver sweeps with human-readable tables — informative, not gated:
 
@@ -68,7 +299,7 @@ Backend and solver sweeps with human-readable tables — informative, not gated:
 
 Single entry point target: `python benchmarks/run_study.py --preset <name>` (new), replacing many `run_*_speed.py` / `run_*_backends.py` clones.
 
-### Layer D — Demos (unchanged role)
+### Layer 6 detail — demos (smoke only)
 
 `examples/scripts/` remain user-facing workflows; overlap with tests should **shrink** (MPC hybrid parity tests duplicating demo logic is a consolidation opportunity — extract shared scenario builders into `tests/` or `benchmarks/scenarios/` helpers, not delete checks).
 
