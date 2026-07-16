@@ -75,6 +75,10 @@ class JaxParametricProgramEvaluator:
         self._jit_h = jax.jit(h_raw)
         self._jit_g = jax.jit(g_raw)
         self._jit_grad_J = jax.jit(jax.grad(J_raw))
+        # TODO: Structural scale opportunity. Standard jacfwd dense allocation here is an O(N^2)
+        # bottleneck for long horizons. Since collocation defects are block-diagonal, consider 
+        # using jax.vmap(jacfwd) on a single step and populating a scipy.sparse.csc_matrix or 
+        # JAX BCOO to avoid massive dense zero-allocations.
         self._jit_jac_h = jax.jit(jax.jacfwd(h_raw, argnums=0))
         if program.g is not None:
             self._jit_jac_g = jax.jit(jax.jacfwd(g_raw))

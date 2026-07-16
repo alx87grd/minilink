@@ -290,6 +290,8 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   or `{}` binds `x0` only; `params={"scene": …}` raises `NotImplementedError`
   until `ParametricMathematicalProgram` gains `J(z, p)` / `ObstacleBank`
   ([planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
+  **TODO: Prioritize threading $p$ into JAX parametric programs.** This will allow 
+  moving obstacles online without rebuilding the NLP, unlocking real-time dynamic obstacle avoidance.
   **Deferred** ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides
   on base `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types
   declare `(t, params)` but still read frozen attributes only until a follow-up
@@ -464,6 +466,8 @@ Controllers with discontinuous laws (e.g. :class:`~minilink.control.modelbased.S
 ``sign(s)``) on a **continuous** :class:`DiagramSystem` closed loop are supported today,
 but several solver/logging behaviors are misleading until a dedicated hybrid or
 event-handling path lands ([ROADMAP.md](ROADMAP.md) §5.2).
+
+**TODO: Add a hard warning.** When a discontinuous controller is wired into a continuous `DiagramSystem`, we should warn the user and recommend wrapping it in a fast `Computer` inside a `HybridDiagram` to enforce physical digital-on-continuous reality.
 
 **Algebraic feedback during integration.** Nominal closed-loop runs integrate
 ``f_ivp(x, t)`` — the diagram evaluator re-solves feedback at **every** call to
