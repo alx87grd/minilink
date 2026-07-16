@@ -10,78 +10,24 @@ Six-layer vision (detail): [docs/plans/test-benchmark-consolidation.md](../docs/
 
 **Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (see [README.md#install](../README.md#install)).
 
-### At a glance
+### Human (IDE — open script, click **Run**)
 
-| Who | When | Run |
-| --- | --- | --- |
-| **Human** | Daily dev | `pytest` |
-| **Human** | Before push | `ruff check . && ruff format --check . && pytest` |
-| **Human** | Big sim/trajopt/MPC change | `python benchmarks/run_regression_check.py --suite all` |
-| **Human** | Backend/perf investigation (new machine, GPU) | `python benchmarks/run_study.py --list` |
-| **Human** | Demo/catalog sanity | `python examples/scripts/_smoke/run_catalog_smokes.py --fast` |
-| **Agent** | Pre-push / handoff | Same as human “Before push”; scope pytest per [AGENTS.md](../AGENTS.md) |
-| **Agent** | Compile/sim/trajopt edits | Add L2 regression (command below) |
-| **CI** | Every PR | [`.github/workflows/test.yml`](../.github/workflows/test.yml) — `test` + `regression` jobs |
+No terminal commands to remember. Scripts live in [`scripts/checks/`](../scripts/checks/).
 
-### Human — copy/paste
+| When | Open and Run |
+| --- | --- |
+| **Daily** | [`scripts/checks/run_l1_tests.py`](../scripts/checks/run_l1_tests.py) |
+| **Before push** | [`scripts/checks/run_pre_push.py`](../scripts/checks/run_pre_push.py) |
+| **After sim/trajopt/MPC work** | [`scripts/checks/run_l2_regression.py`](../scripts/checks/run_l2_regression.py) |
+| **Demo/catalog sanity** | [`scripts/checks/run_l6_smokes.py`](../scripts/checks/run_l6_smokes.py) |
+| **Backend perf tables (local)** | [`scripts/checks/run_l3_benchmark_study.py`](../scripts/checks/run_l3_benchmark_study.py) |
+| **One file, pick check** | [`scripts/checks/run_checks.py`](../scripts/checks/run_checks.py) — set `CHECK = "l1"` at top |
 
-```bash
-conda activate minilink
+Optional toggles (constants at top of each script): `EXTRA_ARGS`, `MARKER`, `CI_MODE`, `PRESET`, etc.
 
-# L1 — default (library contracts; includes L4 contract + L6 smoke bridge via pytest)
-pytest
+### Agent (terminal / CI — exact commands)
 
-# Minimal deps only (skips JAX, plotly, pygame, …)
-pytest -m "not optional"
-
-# Headless optional renderers (pygame, full optional set)
-SDL_VIDEODRIVER=dummy pytest
-
-# L2 — regression (pre-handoff on compile / Simulator / trajopt / MPC)
-PYTHONPATH=. python benchmarks/run_regression_check.py --suite all
-
-# L2 — same flags as CI
-PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny \
-  --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup
-
-# L6 — catalog + flagship demos (scripts; also run via test_smoke_runners.py in pytest)
-python examples/scripts/_smoke/run_catalog_smokes.py --fast
-python examples/scripts/_smoke/run_flagship_demos.py
-
-# L4 — graphics headless PNG (optional; also covered by pytest smoke runner)
-python examples/scripts/_smoke/run_flagship_graphics.py
-
-# L5 — visual checklist (local only; you confirm pixels)
-python examples/scripts/_smoke/run_graphics_visual_check.py
-
-# L3 — backend/computer performance exploration (local; prints tables, no CI gate)
-python benchmarks/run_study.py --list
-python benchmarks/run_study.py --preset f_eval --plant pendulum      # native vs NumPy vs JAX f()
-python benchmarks/run_study.py --preset sim --mode matrix            # solver × backend sweep
-python benchmarks/run_study.py --preset trajopt --mode backends       # trajopt backend sweep
-python benchmarks/run_study.py --preset dp                           # DP loop/numpy/jax
-python benchmarks/run_study.py --preset rrt_nearest                  # RRT nearest backends
-# Detail: benchmarks/README.md
-```
-
-### Performance / backends — L2 vs L3
-
-| | **L2** `run_regression_check.py` | **L3** `run_study.py` |
-| --- | --- | --- |
-| **Purpose** | Pass/fail vs committed JSON baselines | Explore tables on *your* machine/GPU |
-| **Speed** | Gated: `speedup`, `solve_s`, `nlp_s` (CI: factor 6×) | Report only — compare runs yourself |
-| **Accuracy** | Gated: trajectory goldens, `rel_err_l2`, checkpoints | — |
-| **CI** | ✅ `regression` job | ❌ never |
-| **When** | After compile/sim/trajopt/MPC changes; before merge | New machine, backend tuning, perf investigation |
-
-L2 suites: `core_perf` (compile/`f()` speed ratios + sim accuracy), `integration`, `solve_speed`, `e4`, `f_mpc`.
-Full catalog: [benchmarks/README.md](../benchmarks/README.md).
-
-`test_benchmark_smoke.py` (in `pytest`) only checks that benchmark **helpers import and return rows** — it does not measure or gate performance.
-
-### Agent — copy/paste
-
-Rules: [AGENTS.md](../AGENTS.md). **Do not invent commands** — use this table.
+Agents and GitHub Actions use **CLI only** (same underlying tools as the IDE scripts).
 
 | Situation | Command |
 | --- | --- |
@@ -89,13 +35,13 @@ Rules: [AGENTS.md](../AGENTS.md). **Do not invent commands** — use this table.
 | Docs/markdown only | skip pytest |
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or handoff | `pytest` |
-| Compile / `Simulator` / trajopt / MPC | L2: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
-| Backend perf exploration (no gate) | L3: `python benchmarks/run_study.py --list` → see [benchmarks/README.md](../benchmarks/README.md) |
+| Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Backend perf exploration (no gate) | `python benchmarks/run_study.py --list` → [benchmarks/README.md](../benchmarks/README.md) |
 | User-facing demo/smoke change | `python examples/scripts/_smoke/run_catalog_smokes.py --fast` and/or `run_flagship_demos.py` |
 
-L1 discovery path: `tests/unittest/` only. Demos live under `examples/scripts/` — **L6 smokes, not duplicated in L1**.
+Rules: [AGENTS.md](../AGENTS.md). L1 path: `tests/unittest/` only. Demos: L6 smokes under `examples/scripts/`.
 
-### CI — job → command
+### CI (GitHub Actions)
 
 Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 
@@ -104,7 +50,46 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 | **`test`** | Python 3.10–3.13 matrix | `pip install -e ".[dev]"` → `ruff check .` → `ruff format --check .` → `pytest` |
 | **`regression`** | After `test` passes; Python 3.12 + JAX | `pip install -e ".[dev,jax]"` → `PYTHONPATH=$PWD python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 
-What pytest covers in CI: **L1** (all `tests/unittest/`), **L4** (`test_flagship_graphics_contract.py`), **L6 bridge** (`test_smoke_runners.py` subprocesses catalog/flagship/graphics scripts). **L2** is the separate `regression` job. **L3/L5** are not CI.
+Pytest in CI: **L1** + **L4** + **L6 bridge** (`test_smoke_runners.py`). **L2** = `regression` job. **L3/L5** not in CI.
+
+### Human (terminal — optional)
+
+Same tools as IDE scripts; use when you prefer the shell.
+
+```bash
+conda activate minilink
+pytest                                                    # L1 daily
+ruff check . && ruff format --check . && pytest           # pre-push
+PYTHONPATH=. python benchmarks/run_regression_check.py --suite all   # L2
+python examples/scripts/_smoke/run_catalog_smokes.py --fast          # L6
+python benchmarks/run_study.py --list                                 # L3
+```
+
+### At a glance (all audiences)
+
+| Layer | Human IDE | Agent / CI command | CI job |
+| --- | --- | --- | --- |
+| **L1** Contracts | `run_l1_tests.py` | `pytest` | `test` |
+| **L2** Regression | `run_l2_regression.py` | `run_regression_check.py --suite all …` | `regression` |
+| **L3** Benchmark study | `run_l3_benchmark_study.py` | `run_study.py --preset …` | — |
+| **L4** Graphics auto | (in L1 pytest) | `test_flagship_graphics_contract.py` | `test` |
+| **L5** Graphics visual | `run_graphics_visual_check.py` | local only | — |
+| **L6** Demo smokes | `run_l6_smokes.py` | `run_catalog_smokes.py` / `run_flagship_demos.py` | `test` (subprocess) |
+| **Pre-push** | `run_pre_push.py` | ruff + pytest | `test` |
+
+### Performance / backends — L2 vs L3
+
+| | **L2** `run_l2_regression.py` / `run_regression_check.py` | **L3** `run_l3_benchmark_study.py` / `run_study.py` |
+| --- | --- | --- |
+| **Purpose** | Pass/fail vs committed JSON baselines | Explore tables on *your* machine/GPU |
+| **Speed** | Gated: `speedup`, `solve_s`, `nlp_s` (CI: factor 6×) | Report only — compare runs yourself |
+| **Accuracy** | Gated: trajectory goldens, `rel_err_l2`, checkpoints | — |
+| **CI** | ✅ `regression` job | ❌ never |
+| **When** | After compile/sim/trajopt/MPC changes; before merge | New machine, backend tuning, perf investigation |
+
+L2 suites: `core_perf`, `integration`, `solve_speed`, `e4`, `f_mpc`. Detail: [benchmarks/README.md](../benchmarks/README.md).
+
+`test_benchmark_smoke.py` (in `pytest`) only checks benchmark **helpers import** — not performance gates.
 
 ---
 

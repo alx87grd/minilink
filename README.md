@@ -350,15 +350,11 @@ required for writing model equations.
 
 ## Testing
 
-Use the **`minilink`** conda env above. **All entry points (human · agent · CI):**
-[tests/README.md#entry-points](tests/README.md#entry-points).
+Use the **`minilink`** conda env above. **Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points).
 
-Daily default from repo root:
+**Human (IDE):** open a script under [`scripts/checks/`](scripts/checks/) and click **Run** — start with [`run_l1_tests.py`](scripts/checks/run_l1_tests.py) for daily work.
 
-```bash
-conda activate minilink
-pytest
-```
+**Agent / CI:** terminal commands in [tests/README.md#entry-points](tests/README.md#entry-points) (CLI only).
 
 ## Call chains
 
