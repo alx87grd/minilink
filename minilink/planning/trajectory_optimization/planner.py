@@ -250,6 +250,8 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_program = program
         self.last_optimizer = optimizer
         self.last_optimization_result = optimization_result
+        self.last_solve_time_s = optimization_result.solve_time_s
+        self.last_step_time_s = total_s
         plan = self._store_trajectory_plan(
             TrajectoryPlan(
                 trajectory=trajectory,
@@ -453,8 +455,10 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
         if self.options.step_disp:
+            j_txt = "n/a" if result.cost is None else f"{float(result.cost):.6g}"
             print(
                 f"TOP step: success={result.success} "
+                f"J={j_txt} "
                 f"solve={self.last_solve_time_s:.6g}s "
                 f"step={self.last_step_time_s:.6g}s"
             )

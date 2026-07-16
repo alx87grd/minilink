@@ -4,6 +4,9 @@ Big ``=====`` boxes mark the ROS2 copy-paste surface: one ``__init__`` block
 (path → planning problem → planner → ``mpc``) and two timer callbacks.
 Everything else is offline sim / plotting only.
 
+Flip ``BACKEND`` below: ``"jax"`` parametric compile, ``"numpy"`` rebuild each
+replan tick (see ``demo_mpc_minimal_numpy.py``).
+
 Run from repo root::
 
     python examples/scripts/mpc/demo_mpc_path.py
@@ -38,9 +41,11 @@ from minilink.planning.trajectory_optimization.planner import (
 configure_jax(enable_x64=True)
 
 # Offline sim / viz params (not in the ROS2 node).
-TF_SIM = 20.0
+BACKEND = "jax"  # "jax" | "numpy"
+# BACKEND = "numpy"
+TF_SIM = 20.0  # 20.0
 SIM_DT = 0.01
-SHOW_COST_FIELD = True
+SHOW_COST_FIELD = False
 CAMERA_SCALE = 14.0
 
 # =============================================================================
@@ -97,7 +102,7 @@ planner = TrajectoryOptimizationPlanner(
     PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    compile_backend=BACKEND,
     record_solve_time=True,
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
@@ -136,7 +141,7 @@ sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
 sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = CAMERA_SCALE
 sys_sim.x0 = x0.copy()
-plant = sys_sim.compile(backend="jax", verbose=False)
+plant = sys_sim.compile(backend=BACKEND, verbose=False)
 
 t = 0.0
 x = x0.copy()  # in ROS2: measured / estimated plant state
