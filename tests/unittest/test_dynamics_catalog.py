@@ -488,9 +488,9 @@ class TestCarProfile(unittest.TestCase):
         self.assertEqual(profile.engine_power_peak, 48000.0)
         self.assertAlmostEqual(profile.limits.delta_max, np.pi / 4.0, places=2)
         self.assertEqual(profile.limits.delta_dot_max, 10.0)
-        self.assertEqual(profile.limits.w_rear_dot_prop_max, 6.0)
-        self.assertEqual(profile.limits.w_rear_dot_max, 29.0)
+        self.assertEqual(profile.limits.w_rear_dot_max, 6.0)
         self.assertEqual(profile.limits.tau_rear_max, 470.0)
+        self.assertEqual(profile.limits.tau_rear_min, -470.0)
 
     def test_propulsion_limits_from_power_at_nominal(self):
         from minilink.dynamics.catalog.vehicles.car_profile import (
@@ -501,24 +501,19 @@ class TestCarProfile(unittest.TestCase):
         for name in list_car_profiles():
             profile = get_car_profile(name)
             tau = profile.propulsion_torque_nominal()
-            wdot_prop = profile.propulsion_wheel_accel_nominal()
+            wdot = profile.propulsion_wheel_accel_nominal()
             if abs(tau) >= 100.0:
                 expected_tau = round(tau, -1)
             else:
                 expected_tau = round(tau, 1)
             self.assertEqual(profile.limits.tau_rear_max, expected_tau)
-            self.assertEqual(profile.limits.w_rear_dot_prop_max, round(wdot_prop))
+            self.assertEqual(profile.limits.tau_rear_min, -expected_tau)
+            self.assertEqual(profile.limits.w_rear_dot_max, round(wdot))
             self.assertAlmostEqual(
                 profile.limits.v_dot_max,
                 round(profile.propulsion_longitudinal_accel_nominal(), 1),
             )
-            self.assertEqual(
-                profile.limits.w_rear_dot_max,
-                max(
-                    profile.limits.w_rear_dot_prop_max,
-                    round(profile.limits.a_brake_max / profile.r_r),
-                ),
-            )
+            self.assertEqual(profile.limits.a_long_max, profile.limits.v_dot_max)
             self.assertEqual(profile.limits.delta_dot_max, profile.steer_rate_max)
 
     def test_udes_matches_kinematic_racecar_geometry(self):
