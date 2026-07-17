@@ -402,6 +402,8 @@ from minilink.core.backends import configure_jax
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycleRateInputs,
     JaxDynamicBicycleRateInputsUY,
+    JaxDynamicBicycleServoInputs,
+    JaxDynamicBicycleServoInputsUY,
 )
 
 
@@ -423,3 +425,41 @@ class TestDynamicBicycleUY(unittest.TestCase):
         dx_named = np.asarray(self.named.f(x, u))
         dx_uy = np.asarray(self.uy.f(x, u))
         np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
+
+    def test_inverse_propulsion_dynamics_inverts_wheel_spin(self):
+        rate = self.named
+        x = np.array([1.0, 2.0, 0.1, 3.0, 0.2, 0.05, 4.0, 0.1])
+        u_rate = np.array([0.5, -0.1])
+
+        tau = float(np.asarray(rate.inverse_propulsion_dynamics(x, u_rate)))
+        tau_ground = float(
+            np.asarray(rate.rear_wheel_ground_torque(x[3:6], x[6], x[7], rate.params))
+        )
+        w_dot = (tau - tau_ground) / rate.params["Jw_rear"]
+        self.assertAlmostEqual(w_dot, u_rate[0], places=9)
+
+
+class TestDynamicBicycleServoInputs(unittest.TestCase):
+    def setUp(self):
+        configure_jax(enable_x64=True)
+        self.named = JaxDynamicBicycleServoInputs()
+        self.uy = JaxDynamicBicycleServoInputsUY()
+
+    def test_standard_ports(self):
+        self.assertIn("u", self.uy.inputs)
+        self.assertEqual(self.uy.inputs["u"].dim, 2)
+        self.assertIn("y", self.uy.outputs)
+        self.assertEqual(self.uy.outputs["y"].dim, self.uy.n)
+
+    def test_f_matches_named_servo_inputs(self):
+        x = np.array([1.0, 2.0, 0.1, 3.0, 0.2, 0.05, 4.0, 0.1])
+        u = np.array([200.0, 0.05])
+        dx_named = np.asarray(self.named.f(x, u))
+        dx_uy = np.asarray(self.uy.f(x, u))
+        np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
+
+    def test_zero_torque_cruise_actuators_near_equilibrium(self):
+        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0 / 0.3, 0.0])
+        u = np.array([0.0, 0.0])
+        dx = np.asarray(self.named.f(x, u))
+        np.testing.assert_allclose(dx[6:8], np.zeros(2), atol=0.5)

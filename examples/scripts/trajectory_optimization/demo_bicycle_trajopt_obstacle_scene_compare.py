@@ -1,4 +1,4 @@
-"""Compare obstacle-scene TrajOpt across six JAX plants.
+"""Compare obstacle-scene TrajOpt across seven JAX plants.
 
 Run from repo root::
 
@@ -14,9 +14,10 @@ collocation on (simplest → most complex by state dimension):
 - :class:`~minilink.dynamics.catalog.vehicles.steering.JaxKinematicBicycleRateInputs` (n=5)
 - :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycle` (n=6)
 - :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs` (n=8)
+- :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleServoInputs` (n=8)
 
 Prints solve-time summary, shows side-by-side path and speed plots, then plays
-six animations (one per plant).
+seven animations (one per plant).
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     JaxDynamicBicycle,
     JaxDynamicBicycleRateInputs,
+    JaxDynamicBicycleServoInputs,
 )
 from minilink.dynamics.catalog.vehicles.steering import (
     JaxDynamicHolonomicMobileRobot,
@@ -62,6 +64,7 @@ SPEED_DOT_MAX = 3.0
 STEERING_DOT_MAX = 2.0
 W_REAR_DOT_MAX = 80.0
 DELTA_DOT_MAX = 2.0
+TAU_REAR_MAX = 5000.0
 
 OBSTACLE_CENTER = (12.0, 0.2)
 OBSTACLE_RADIUS = 0.4
@@ -77,6 +80,7 @@ PATH_COLORS = (
     "tab:red",
     "tab:purple",
     "tab:brown",
+    "tab:pink",
 )
 
 
@@ -105,6 +109,7 @@ MODEL_CASES = (
     ModelCase("kinematic_rate", "Kinematic rate", PATH_COLORS[3]),
     ModelCase("dynamic", "Dynamic", PATH_COLORS[4]),
     ModelCase("dynamic_rate", "Dynamic rate", PATH_COLORS[5]),
+    ModelCase("dynamic_servo", "Dynamic servo", PATH_COLORS[6]),
 )
 
 
@@ -241,6 +246,41 @@ def _build_dynamic_rate() -> tuple[
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
+def _build_dynamic_servo() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
+    sys = JaxDynamicBicycleServoInputs()
+    r_r = sys.params["r_r"]
+    w_rear_max = 1.2 * U_TARGET / r_r
+    sys.state.lower_bound[6] = 0.0
+    sys.state.upper_bound[6] = w_rear_max
+    sys.state.lower_bound[7] = -DELTA_MAX
+    sys.state.upper_bound[7] = DELTA_MAX
+    sys.inputs["tau_rear"].lower_bound[0] = -TAU_REAR_MAX
+    sys.inputs["tau_rear"].upper_bound[0] = TAU_REAR_MAX
+    sys.inputs["delta_sp"].lower_bound[0] = -DELTA_MAX
+    sys.inputs["delta_sp"].upper_bound[0] = DELTA_MAX
+
+    x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / r_r, 0.0])
+    x_ref = np.array(
+        [
+            _terminal_x(),
+            Y_GOAL,
+            HEADING_TARGET,
+            U_TARGET,
+            0.0,
+            0.0,
+            U_TARGET / r_r,
+            0.0,
+        ]
+    )
+    ubar = np.array([0.0, 0.0])
+    Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0])
+    R = np.diag([1e-4, 10.0])
+    S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0])
+    return sys, x_start, x_ref, ubar, Q, R, S
+
+
 BUILDERS = {
     "holonomic": _build_holonomic,
     "holonomic_dyn": _build_holonomic_dyn,
@@ -248,6 +288,7 @@ BUILDERS = {
     "kinematic": _build_kinematic,
     "kinematic_rate": _build_kinematic_rate,
     "dynamic_rate": _build_dynamic_rate,
+    "dynamic_servo": _build_dynamic_servo,
 }
 
 
@@ -316,7 +357,7 @@ def _print_summary(runs: list[SolveRun]) -> None:
 
 
 def _plot_paths(runs: list[SolveRun], scene: Scene) -> None:
-    fig, axes = plt.subplots(2, 3, figsize=(14.0, 9.0), sharex=True, sharey=True)
+    fig, axes = plt.subplots(3, 3, figsize=(14.0, 11.0), sharex=True, sharey=True)
     for ax, run in zip(axes.ravel(), runs, strict=True):
         scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title="")
         ax.plot(
@@ -329,6 +370,8 @@ def _plot_paths(runs: list[SolveRun], scene: Scene) -> None:
         solve_s = "—" if run.solve_s is None else f"{run.solve_s:.2f}s"
         ax.set_title(f"{run.case.title}  (solve {solve_s})")
         ax.legend(loc="upper left", fontsize=8)
+    for ax in axes.ravel()[len(runs) :]:
+        ax.set_visible(False)
     fig.suptitle("Planned paths (scene obstacle overlay)")
     fig.tight_layout()
     plt.show()
