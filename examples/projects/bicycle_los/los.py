@@ -1,4 +1,4 @@
-"""Line-of-sight heading guidance for Simon's bicycle path follower."""
+"""Line-of-sight (LOS) heading guidance along a polyline path."""
 
 import math
 
@@ -6,7 +6,7 @@ import numpy as np
 
 from minilink.core.kinematics import SE2
 from minilink.core.system import System
-from minilink.graphical.animation.primitives import Point
+from minilink.graphical.animation.primitives import CustomLine, Point
 
 _EPS = 1e-12
 
@@ -72,14 +72,14 @@ def project_on_path_with_t(path_xy, x, y, closed=True):
         d2 = (x - qx) ** 2 + (y - qy) ** 2
 
         if best is None or d2 < best[0]:
-            psi_path = math.atan2(ty, tx)
-            best = (d2, i, t, qx, qy, e_perp, psi_path)
+            path_heading = math.atan2(ty, tx)
+            best = (d2, i, t, qx, qy, e_perp, path_heading)
 
     if best is None:
         raise ValueError("invalid path for projection")
 
-    _, idx, t, qx, qy, e_perp, psi_path = best
-    return idx, t, qx, qy, e_perp, psi_path
+    _, idx, t, qx, qy, e_perp, path_heading = best
+    return idx, t, qx, qy, e_perp, path_heading
 
 
 def path_total_length(path_xy, closed=True):
@@ -157,8 +157,8 @@ def point_ahead_along_path(path_xy, idx, t, ds, closed=True):
 
     ax = cx + lam * dx
     ay = cy + lam * dy
-    psi_a = math.atan2(dy, dx)
-    return float(ax), float(ay), int(i), float(lam), float(psi_a)
+    heading_a = math.atan2(dy, dx)
+    return float(ax), float(ay), int(i), float(lam), float(heading_a)
 
 
 class LOSController:
@@ -167,25 +167,24 @@ class LOSController:
     def __init__(
         self,
         path_xy,
-        Delta=4.0,
-        i_lim=10.0,
+        lookahead=4.0,
         control_point_ahead=4.0,
         closed=False,
     ):
         self.path = np.asarray(path_xy, dtype=float)
-        self.Delta = float(Delta)
+        self.lookahead = float(lookahead)
         self.control_point_ahead = float(control_point_ahead)
         self.closed = bool(closed)
 
-    def compute(self, x, y, psi, u_body=None, v_body=None):
+    def compute(self, x, y, theta, vx=None, vy=None):
         if self.control_point_ahead != 0.0:
-            x_ctrl = x + self.control_point_ahead * math.cos(psi)
-            y_ctrl = y + self.control_point_ahead * math.sin(psi)
+            x_ctrl = x + self.control_point_ahead * math.cos(theta)
+            y_ctrl = y + self.control_point_ahead * math.sin(theta)
         else:
             x_ctrl = x
             y_ctrl = y
 
-        idx, t, qx, qy, e_perp, psi_path = project_on_path_with_t(
+        idx, t, qx, qy, e_perp, path_heading = project_on_path_with_t(
             self.path,
             x_ctrl,
             y_ctrl,
@@ -196,43 +195,47 @@ class LOSController:
             self.path,
             idx,
             t,
-            self.Delta,
+            self.lookahead,
             closed=self.closed,
         )
 
-        chi_d = math.atan2(ay - y_ctrl, ax - x_ctrl)
-        chi_meas = psi
+        # LOS course angle toward the lookahead point.
+        heading_ref = math.atan2(ay - y_ctrl, ax - x_ctrl)
+        heading_meas = theta
 
-        if u_body is not None and v_body is not None:
-            beta = math.atan2(v_body, max(1e-6, u_body))
-            chi_meas = wrap_pi(psi + beta)
+        if vx is not None and vy is not None:
+            beta = math.atan2(vy, max(1e-6, vx))
+            heading_meas = wrap_pi(theta + beta)
 
-        err_chi = wrap_pi(chi_d - chi_meas)
+        err_heading = wrap_pi(heading_ref - heading_meas)
 
         info = {
             "e_perp": e_perp,
-            "chi_d": chi_d,
+            "heading_ref": heading_ref,
             "idx": idx,
             "ax": ax,
             "ay": ay,
             "x_ctrl": x_ctrl,
             "y_ctrl": y_ctrl,
-            "err_chi": err_chi,
-            "psi_path": psi_path,
+            "err_heading": err_heading,
+            "path_heading": path_heading,
         }
 
-        return chi_d, info
+        return heading_ref, info
 
 
-class Los(System):
-    """Minilink wrapper around Simon's LOS controller."""
+class LOS(System):
+    """Line-of-sight heading reference from full plant output ``y``.
+
+    Input ``y`` is the plant boundary output
+    ``[X, Y, theta, vx, vy, yawrate, ...]``. Output ``heading_ref`` [rad].
+    Draws the reference path in the world frame for animation.
+    """
 
     def __init__(
         self,
         path_pts,
-        Delta=1.0,
-        zeta=0.7,
-        omega_n=1.2,
+        lookahead=1.0,
         control_point_ahead=0.5,
         closed=False,
     ):
@@ -240,52 +243,38 @@ class Los(System):
         self.name = "LOS"
 
         self.path_pts = np.asarray(path_pts, dtype=float)
-        if self.path_pts.shape[1] < 2:
-            raise ValueError("path_pts must contain at least x and y columns")
+        if self.path_pts.ndim != 2 or self.path_pts.shape[1] < 2:
+            raise ValueError("path_pts must be (N, >=2) with x and y columns")
         self.path_xy = self.path_pts[:, :2]
 
         self.controller = LOSController(
             path_xy=self.path_xy,
-            Delta=Delta,
+            lookahead=lookahead,
             control_point_ahead=control_point_ahead,
             closed=closed,
         )
 
-        self.add_input_port("x", nominal_value=np.array([0.0]))
-        self.add_input_port("y", nominal_value=np.array([0.0]))
-        self.add_input_port("psi", nominal_value=np.array([0.0]))
+        self.add_input_port("y", nominal_value=np.zeros(10))
         self.add_output_port(
-            "theta",
+            "heading_ref",
             dim=1,
-            function=self.los,
-            dependencies=("x", "y", "psi"),
-        )
-        self.add_output_port(
-            "logs",
-            dim=1,
-            function=self.logs,
-            dependencies=("x", "y", "psi"),
+            function=self.h_heading_ref,
+            dependencies=("y",),
         )
 
-    def los(self, x, u, t=0.0, params=None):
+    def h_heading_ref(self, x, u, t=0.0, params=None):
         px = float(u[0])
         py = float(u[1])
-        psi = float(u[2])
-
-        chi_ref, _ = self.controller.compute(px, py, psi)
-        return np.array([chi_ref], dtype=float)
-
-    def logs(self, x, u, t=0.0, params=None):
-        px = float(u[0])
-        py = float(u[1])
-        psi = float(u[2])
-
-        _, info = self.controller.compute(px, py, psi)
-        idx = info["idx"]
-        return np.array([idx], dtype=float)
+        theta = float(u[2])
+        heading_ref, _ = self.controller.compute(px, py, theta)
+        return np.array([heading_ref], dtype=float)
 
     def get_kinematic_geometry(self):
+        pts = np.column_stack(
+            [self.path_xy, np.zeros(self.path_xy.shape[0], dtype=float)]
+        )
         return {
+            "world": [CustomLine(pts, color="salmon", linewidth=2, style="-")],
             "control_point": [
                 Point(pt=[0.0, 0.0, 0.0], color="orange", marker="o", size=4)
             ],
@@ -295,10 +284,10 @@ class Los(System):
     def tf(self, x, u, t=0.0, params=None):
         px = float(u[0])
         py = float(u[1])
-        psi = float(u[2])
-
-        _, info = self.controller.compute(px, py, psi)
+        theta = float(u[2])
+        _, info = self.controller.compute(px, py, theta)
         return {
+            "world": np.eye(4),
             "control_point": SE2(info["x_ctrl"], info["y_ctrl"], 0.0),
             "lookahead": SE2(info["ax"], info["ay"], 0.0),
         }
