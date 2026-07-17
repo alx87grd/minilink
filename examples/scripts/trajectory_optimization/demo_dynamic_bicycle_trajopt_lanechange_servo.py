@@ -29,8 +29,8 @@ PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT
 SCIPY_DISP = False
 TF = 3.0
 N_STEPS = 30
-U_0 = 10.0
-U_TARGET = U_0 * 0.0
+U_0 = 5.0
+U_TARGET = U_0 * 2.0
 Y_GOAL = 2.5
 HEADING_TARGET = 0.0
 
@@ -50,9 +50,9 @@ x_ref = np.array(
     ]
 )
 
-Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0])
+Q = np.diag([0.0, 10.0, 1.0, 10.0, 0.1, 0.1, 0.01, 1.0])
 R = np.diag([1e-4, 10.0])
-S = np.diag([0.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0])
+S = np.diag([0.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.01, 1.0])
 
 ubar = np.array([0.0, 0.0])
 

@@ -358,7 +358,8 @@ def _print_summary(runs: list[SolveRun]) -> None:
 
 def _plot_paths(runs: list[SolveRun], scene: Scene) -> None:
     fig, axes = plt.subplots(3, 3, figsize=(14.0, 11.0), sharex=True, sharey=True)
-    for ax, run in zip(axes.ravel(), runs, strict=True):
+    flat = axes.ravel()
+    for ax, run in zip(flat, runs):
         scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title="")
         ax.plot(
             run.traj.x[0, :],
@@ -370,7 +371,7 @@ def _plot_paths(runs: list[SolveRun], scene: Scene) -> None:
         solve_s = "—" if run.solve_s is None else f"{run.solve_s:.2f}s"
         ax.set_title(f"{run.case.title}  (solve {solve_s})")
         ax.legend(loc="upper left", fontsize=8)
-    for ax in axes.ravel()[len(runs) :]:
+    for ax in flat[len(runs) :]:
         ax.set_visible(False)
     fig.suptitle("Planned paths (scene obstacle overlay)")
     fig.tight_layout()
