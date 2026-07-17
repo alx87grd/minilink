@@ -485,12 +485,12 @@ class TestCarProfile(unittest.TestCase):
         self.assertEqual(profile.a, 1.2)
         self.assertEqual(profile.b, 1.0)
         self.assertEqual(profile.r_r, 0.34)
-        self.assertEqual(profile.engine_power_peak, 48000.0)
+        self.assertEqual(profile.engine_power_peak, 200000.0)
         self.assertAlmostEqual(profile.limits.delta_max, np.pi / 4.0, places=2)
         self.assertEqual(profile.limits.delta_dot_max, 10.0)
-        self.assertEqual(profile.limits.w_rear_dot_max, 6.0)
-        self.assertEqual(profile.limits.tau_rear_max, 470.0)
-        self.assertEqual(profile.limits.tau_rear_min, -470.0)
+        self.assertEqual(profile.limits.w_rear_dot_max, 13.0)
+        self.assertEqual(profile.limits.tau_rear_max, 1060.0)
+        self.assertEqual(profile.limits.tau_rear_min, -1060.0)
 
     def test_propulsion_limits_from_power_at_nominal(self):
         from minilink.dynamics.catalog.vehicles.car_profile import (
