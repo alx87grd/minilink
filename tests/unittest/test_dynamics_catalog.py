@@ -426,6 +426,22 @@ class TestDynamicBicycleUY(unittest.TestCase):
         dx_uy = np.asarray(self.uy.f(x, u))
         np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
 
+    def test_rear_wheel_torque_inverts_servo_wheel_dynamics(self):
+        from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
+            JaxDynamicBicycleServoInputs,
+        )
+
+        rate = self.named
+        servo = JaxDynamicBicycleServoInputs()
+        x = np.array([1.0, 2.0, 0.1, 3.0, 0.2, 0.05, 4.0, 0.1])
+        u_rate = np.array([0.5, -0.1])
+
+        tau = float(np.asarray(rate.rear_wheel_torque(x, u_rate)))
+        w_dot_servo = float(
+            np.asarray(servo._wheel_spin_rate(x[3:6], x[6:8], tau, servo.params))
+        )
+        self.assertAlmostEqual(w_dot_servo, u_rate[0], places=9)
+
 
 class TestDynamicBicycleServoInputs(unittest.TestCase):
     def setUp(self):

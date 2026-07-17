@@ -606,6 +606,19 @@ class JaxDynamicBicycle(DynamicBicycle):
         w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
         return jnp.array([w_rear[0], delta[0]])
 
+    def _rear_wheel_ground_torque(self, v_body, w_rear, delta, params=None):
+        """Tire reaction plus viscous torque on the rear wheel [Nm].
+
+        Ground torque satisfies ``Jw * w_rear_dot = tau_motor - tau_ground``.
+        """
+        jnp = require_jax_numpy()
+        params = self.params if params is None else params
+        u_in = jnp.array([w_rear, delta])
+        _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params)
+        r_r = params["r_r"]
+        bw = params.get("bw_rear", 0.0)
+        return r_r * Fx_r + bw * w_rear
+
 
 class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
     """JAX-traceable :class:`DynamicBicycle` with rate inputs.
@@ -639,6 +652,9 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
             "delta",
         ]
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
+
+        self.params["Jw_rear"] = 1.6
+        self.params["bw_rear"] = 0.0
 
         self.inputs = {}
         self.add_input_port(
@@ -683,6 +699,43 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
     def _u_in(self, x, u):
         # Wheel rate and steer are integrated states here, not input ports.
         return x[6:8]
+
+    def rear_wheel_torque(self, x, u, t=0.0, params=None):
+        """Motor torque [Nm] that produces the commanded ``w_rear_dot = u[0]``.
+
+        Inverts the rear-wheel spin dynamics used by
+        :class:`JaxDynamicBicycleServoInputs`:
+
+        ``Jw_rear * w_rear_dot = tau_rear - tau_ground`` with
+        ``tau_ground = r_r * Fx_rear + bw_rear * w_rear``.
+
+        Parameters
+        ----------
+        x : array_like, shape (8,)
+            State ``[x, y, theta, vx, vy, yaw_rate, w_rear, delta]``.
+        u : array_like, shape (2,)
+            Rate input ``[w_rear_dot, delta_dot]``; only ``u[0]`` is used.
+        t : float
+            Time (unused; included for API symmetry with ``f``).
+        params : dict, optional
+            Plant parameters; defaults to ``self.params``.
+
+        Returns
+        -------
+        tau_rear : scalar or JAX array
+            Rear motor torque [Nm].
+        """
+        params = self.params if params is None else params
+        del t
+
+        v = x[3:6]
+        w_rear = x[6]
+        delta = x[7]
+        w_rear_dot = u[0]
+
+        Jw = params["Jw_rear"]
+        tau_ground = self._rear_wheel_ground_torque(v, w_rear, delta, params)
+        return Jw * w_rear_dot + tau_ground
 
 
 class JaxDynamicBicycleRateInputsUY(JaxDynamicBicycleRateInputs):
@@ -799,14 +852,8 @@ class JaxDynamicBicycleServoInputs(JaxDynamicBicycle):
 
     def _wheel_spin_rate(self, v_body, u_in, tau_rear, params):
         """Resolve ``w_rear_dot`` from motor torque and tire reaction torque."""
-        _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params)
-        r_r = params["r_r"]
-        Jw = params["Jw_rear"]
-        bw = params["bw_rear"]
-        w_rear = u_in[0]
-
-        tau_ground = r_r * Fx_r + bw * w_rear
-        return (tau_rear - tau_ground) / Jw
+        tau_ground = self._rear_wheel_ground_torque(v_body, u_in[0], u_in[1], params)
+        return (tau_rear - tau_ground) / params["Jw_rear"]
 
     def f(self, x, u, t=0.0, params=None):
         jnp = require_jax_numpy()
