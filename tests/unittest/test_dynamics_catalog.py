@@ -473,9 +473,7 @@ class TestCarProfile(unittest.TestCase):
             list_car_profiles,
         )
 
-        self.assertEqual(
-            list_car_profiles(), ("passenger_car", "racecar", "udes_1_5")
-        )
+        self.assertEqual(list_car_profiles(), ("passenger_car", "racecar", "udes_1_5"))
         for name in list_car_profiles():
             self.assertIs(get_car_profile(name), CAR_PROFILES[name])
 
@@ -483,11 +481,28 @@ class TestCarProfile(unittest.TestCase):
         from minilink.dynamics.catalog.vehicles.car_profile import racecar_profile
 
         profile = racecar_profile()
-        self.assertAlmostEqual(profile.mass, 698.8)
-        self.assertAlmostEqual(profile.a, 1.16)
-        self.assertAlmostEqual(profile.b, 0.95)
-        self.assertAlmostEqual(profile.r_r, 0.3429)
-        self.assertAlmostEqual(profile.engine_power_peak, 48470.5)
+        self.assertEqual(profile.mass, 700.0)
+        self.assertEqual(profile.a, 1.2)
+        self.assertEqual(profile.b, 1.0)
+        self.assertEqual(profile.r_r, 0.34)
+        self.assertEqual(profile.engine_power_peak, 48000.0)
+        self.assertAlmostEqual(profile.limits.delta_max, np.pi / 4.0, places=2)
+        self.assertEqual(profile.limits.delta_dot_max, 10.0)
+        self.assertEqual(profile.limits.w_rear_dot_max, 29.0)
+
+    def test_rate_input_limits_derived_from_longitudinal_and_steer_caps(self):
+        from minilink.dynamics.catalog.vehicles.car_profile import (
+            get_car_profile,
+            list_car_profiles,
+        )
+
+        for name in list_car_profiles():
+            profile = get_car_profile(name)
+            self.assertEqual(
+                profile.limits.w_rear_dot_max,
+                round(profile.limits.a_long_max / profile.r_r),
+            )
+            self.assertEqual(profile.limits.delta_dot_max, profile.steer_rate_max)
 
     def test_udes_matches_kinematic_racecar_geometry(self):
         from minilink.dynamics.catalog.vehicles.car_profile import udes_1_5_profile
@@ -533,6 +548,4 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(
             sys.inputs["u"].upper_bound[0], profile.limits.tau_rear_max
         )
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[1], profile.limits.delta_max
-        )
+        self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
