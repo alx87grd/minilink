@@ -725,6 +725,165 @@ class JaxDynamicBicycleRateInputsUY(JaxDynamicBicycleRateInputs):
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
 
 
+class JaxDynamicBicycleServoInputs(JaxDynamicBicycle):
+    """JAX bicycle with steering setpoint and rear-wheel torque inputs.
+
+    State ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta]`` matches
+    :class:`JaxDynamicBicycleRateInputs`. Inputs are ``tau_rear`` [Nm] and
+    ``delta_sp`` [rad]: a motor torque on the rear wheel and the setpoint of an
+    internal proportional steering servo.
+
+    The servo tracks ``delta_sp`` with rate limits; wheel spin follows
+    ``Jw_rear * w_rear_dot = tau_rear - r_r * Fx_rear - bw_rear * w_rear`` where
+    ``Fx_rear`` is the longitudinal tire force from the slip model.
+    """
+
+    def __init__(self):
+        from minilink.core.signals import VectorSignal
+
+        super().__init__()
+        self.name = "JAX Dynamic Bicycle (servo inputs)"
+
+        self.n = 8
+        self.state = VectorSignal("x", dim=self.n)
+        self.x0 = np.zeros(self.n)
+
+        self.state.labels = [
+            "x",
+            "y",
+            "theta",
+            "vx",
+            "vy",
+            "yaw_rate",
+            "w_rear",
+            "delta",
+        ]
+        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
+
+        self.params["Jw_rear"] = 1.6
+        self.params["bw_rear"] = 0.0
+        self.params["steer_Kp"] = 1.0 / 0.15
+        self.params["steer_rate_max"] = 10.0
+        self.params["delta_min"] = -np.pi / 4.0
+        self.params["delta_max"] = np.pi / 4.0
+
+        self.inputs = {}
+        self.add_input_port(
+            "tau_rear",
+            nominal_value=0.0,
+            labels=["tau_rear"],
+            units=["Nm"],
+        )
+        self.add_input_port(
+            "delta_sp",
+            nominal_value=0.0,
+            labels=["delta_sp"],
+            units=["rad"],
+        )
+        self.outputs = {}
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
+
+    def _steer_servo_rate(self, delta, delta_sp, params):
+        """Proportional steering servo with rate and angle limits."""
+        jnp = require_jax_numpy()
+        Kp = params["steer_Kp"]
+        rate_max = params["steer_rate_max"]
+        delta_min = params["delta_min"]
+        delta_max = params["delta_max"]
+
+        delta_dot = Kp * (delta_sp - delta)
+        delta_dot = jnp.clip(delta_dot, -rate_max, rate_max)
+        delta_dot = jnp.where((delta >= delta_max) & (delta_dot > 0.0), 0.0, delta_dot)
+        delta_dot = jnp.where((delta <= delta_min) & (delta_dot < 0.0), 0.0, delta_dot)
+        return delta_dot
+
+    def _wheel_spin_rate(self, v_body, u_in, tau_rear, params):
+        """Resolve ``w_rear_dot`` from motor torque and tire reaction torque."""
+        _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params)
+        r_r = params["r_r"]
+        Jw = params["Jw_rear"]
+        bw = params["bw_rear"]
+        w_rear = u_in[0]
+
+        tau_ground = r_r * Fx_r + bw * w_rear
+        return (tau_rear - tau_ground) / Jw
+
+    def f(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        params = self.params if params is None else params
+
+        q = x[0:3]
+        v = x[3:6]
+        u_in = x[6:8]
+        delta = u_in[1]
+
+        tau_rear = u[0]
+        delta_sp = u[1]
+
+        M = self.M(q, params)
+        C = self.C(q, v, params)
+        N = self.N(q, params)
+        d = self.generalized_d(q, v, u_in, params)
+
+        dv = jnp.linalg.solve(M, -C @ v - d)
+        dq = N @ v
+
+        w_rear_dot = self._wheel_spin_rate(v, u_in, tau_rear, params)
+        delta_dot = self._steer_servo_rate(delta, delta_sp, params)
+
+        return jnp.concatenate([dq, dv, jnp.array([w_rear_dot, delta_dot])])
+
+    def _u_in(self, x, u):
+        return x[6:8]
+
+
+class JaxDynamicBicycleServoInputsUY(JaxDynamicBicycleServoInputs):
+    """JAX servo-input bicycle with standard ``u`` / ``y`` ports.
+
+    Same dynamics as :class:`JaxDynamicBicycleServoInputs`; input ``u`` is
+    ``[tau_rear, delta_sp]`` and output ``y`` is the full state measurement.
+    """
+
+    def __init__(self):
+        from minilink.core.signals import VectorSignal
+
+        super(JaxDynamicBicycleServoInputs, self).__init__()
+        self.name = "JAX Dynamic Bicycle (servo inputs, u/y ports)"
+
+        self.n = 8
+        self.state = VectorSignal("x", dim=self.n)
+        self.x0 = np.zeros(self.n)
+        self.state.labels = [
+            "x",
+            "y",
+            "theta",
+            "vx",
+            "vy",
+            "yaw_rate",
+            "w_rear",
+            "delta",
+        ]
+        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
+
+        self.params["Jw_rear"] = 1.6
+        self.params["bw_rear"] = 0.0
+        self.params["steer_Kp"] = 1.0 / 0.15
+        self.params["steer_rate_max"] = 10.0
+        self.params["delta_min"] = -np.pi / 4.0
+        self.params["delta_max"] = np.pi / 4.0
+
+        self.inputs = {}
+        self.add_input_port(
+            "u",
+            dim=2,
+            nominal_value=np.zeros(2),
+            labels=["tau_rear", "delta_sp"],
+            units=["Nm", "rad"],
+        )
+        self.outputs = {}
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
+
+
 if __name__ == "__main__":
     sys = JaxDynamicBicycleRateInputs()
     # sys = DynamicBicycleCar3D()
