@@ -606,17 +606,18 @@ class JaxDynamicBicycle(DynamicBicycle):
         w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
         return jnp.array([w_rear[0], delta[0]])
 
-    def _rear_wheel_ground_torque(self, v_body, w_rear, delta, params=None):
+    def rear_wheel_ground_torque(self, v_body, w_rear, delta, params=None):
         """Tire reaction plus viscous torque on the rear wheel [Nm].
 
-        Ground torque satisfies ``Jw * w_rear_dot = tau_motor - tau_ground``.
+        Satisfies ``Jw * w_rear_dot = tau_motor - tau_ground``.
         """
         jnp = require_jax_numpy()
         params = self.params if params is None else params
-        u_in = jnp.array([w_rear, delta])
-        _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params)
         r_r = params["r_r"]
         bw = params.get("bw_rear", 0.0)
+
+        u_in = jnp.array([w_rear, delta])
+        _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params)
         return r_r * Fx_r + bw * w_rear
 
 
@@ -700,14 +701,13 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
         # Wheel rate and steer are integrated states here, not input ports.
         return x[6:8]
 
-    def rear_wheel_torque(self, x, u, t=0.0, params=None):
-        """Motor torque [Nm] that produces the commanded ``w_rear_dot = u[0]``.
+    def inverse_propulsion_dynamics(self, x, u, t=0.0, params=None):
+        """Rear motor torque [Nm] that produces the commanded ``w_rear_dot = u[0]``.
 
         Inverts the rear-wheel spin dynamics used by
         :class:`JaxDynamicBicycleServoInputs`:
 
-        ``Jw_rear * w_rear_dot = tau_rear - tau_ground`` with
-        ``tau_ground = r_r * Fx_rear + bw_rear * w_rear``.
+        ``Jw_rear * w_rear_dot = tau_rear - rear_wheel_ground_torque(...)``.
 
         Parameters
         ----------
@@ -722,19 +722,18 @@ class JaxDynamicBicycleRateInputs(JaxDynamicBicycle):
 
         Returns
         -------
-        tau_rear : scalar or JAX array
-            Rear motor torque [Nm].
+        tau_rear
+            Rear wheel motor torque [Nm].
         """
         params = self.params if params is None else params
-        del t
 
-        v = x[3:6]
+        v_body = x[3:6]
         w_rear = x[6]
         delta = x[7]
         w_rear_dot = u[0]
-
         Jw = params["Jw_rear"]
-        tau_ground = self._rear_wheel_ground_torque(v, w_rear, delta, params)
+
+        tau_ground = self.rear_wheel_ground_torque(v_body, w_rear, delta, params)
         return Jw * w_rear_dot + tau_ground
 
 
@@ -836,7 +835,7 @@ class JaxDynamicBicycleServoInputs(JaxDynamicBicycle):
         self.outputs = {}
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
 
-    def _steer_servo_rate(self, delta, delta_sp, params):
+    def steer_servo_rate(self, delta, delta_sp, params):
         """Proportional steering servo with rate and angle limits."""
         jnp = require_jax_numpy()
         Kp = params["steer_Kp"]
@@ -850,19 +849,15 @@ class JaxDynamicBicycleServoInputs(JaxDynamicBicycle):
         delta_dot = jnp.where((delta <= delta_min) & (delta_dot < 0.0), 0.0, delta_dot)
         return delta_dot
 
-    def _wheel_spin_rate(self, v_body, u_in, tau_rear, params):
-        """Resolve ``w_rear_dot`` from motor torque and tire reaction torque."""
-        tau_ground = self._rear_wheel_ground_torque(v_body, u_in[0], u_in[1], params)
-        return (tau_rear - tau_ground) / params["Jw_rear"]
-
     def f(self, x, u, t=0.0, params=None):
         jnp = require_jax_numpy()
         params = self.params if params is None else params
 
         q = x[0:3]
         v = x[3:6]
+        w_rear = x[6]
+        delta = x[7]
         u_in = x[6:8]
-        delta = u_in[1]
 
         tau_rear = u[0]
         delta_sp = u[1]
@@ -875,8 +870,9 @@ class JaxDynamicBicycleServoInputs(JaxDynamicBicycle):
         dv = jnp.linalg.solve(M, -C @ v - d)
         dq = N @ v
 
-        w_rear_dot = self._wheel_spin_rate(v, u_in, tau_rear, params)
-        delta_dot = self._steer_servo_rate(delta, delta_sp, params)
+        tau_ground = self.rear_wheel_ground_torque(v, w_rear, delta, params)
+        w_rear_dot = (tau_rear - tau_ground) / params["Jw_rear"]
+        delta_dot = self.steer_servo_rate(delta, delta_sp, params)
 
         return jnp.concatenate([dq, dv, jnp.array([w_rear_dot, delta_dot])])
 
