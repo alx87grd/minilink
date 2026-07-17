@@ -7,7 +7,8 @@ without editing individual demos.
 
 Propulsion limits (nominal speed, no slip)
 ------------------------------------------
-At nominal road speed ``v_nom`` the peak motor torque is power-limited:
+At nominal road speed ``v_nom`` (below top speed ``vx_max``, chosen as an
+acceleration rating point) the peak motor torque is power-limited:
 
 ``tau_prop = min(P_max / omega_nom, mu * Fz_r * r_r)``,
 ``omega_nom = v_nom / r_r``.
@@ -216,7 +217,7 @@ def _make_limits(
 def passenger_car_profile() -> CarProfile:
     """Full-size passenger sedan (~1500 kg, 2.7 m wheelbase).
 
-    ``P = 120 kW`` at ``v_nom = 27 m/s`` → ``tau ≈ 1470 Nm``, ``w_rear_dot ≈ 9 rad/s²``.
+    ``P = 120 kW`` at ``v_nom = 15 m/s`` → ``tau ≈ 2430 Nm``, ``w_rear_dot ≈ 15 rad/s²``.
     """
     mass = 1500.0
     a = 1.2
@@ -224,7 +225,7 @@ def passenger_car_profile() -> CarProfile:
     r_r = 0.33
     mu = 0.9
     vx_max = 27.0
-    v_nom = 27.0
+    v_nom = 15.0
     delta_max = 0.60
     steer_rate_max = 1.0
     return CarProfile(
@@ -271,7 +272,7 @@ def passenger_car_profile() -> CarProfile:
 def racecar_profile() -> CarProfile:
     """Bicycle LOS race vehicle (rounded from ``create_vehicle``).
 
-    ``P = 200 kW`` at ``v_nom = 35 m/s`` — traction-limited at nominal;
+    ``P = 200 kW`` at ``v_nom = 15 m/s`` — traction-limited at nominal;
     ``tau ≈ 1060 Nm``, ``w_rear_dot ≈ 13 rad/s²``.
     """
     mass = 700.0
@@ -280,7 +281,7 @@ def racecar_profile() -> CarProfile:
     r_r = 0.34
     mu = 1.0
     vx_max = 35.0
-    v_nom = 35.0
+    v_nom = 15.0
     delta_max = round(np.pi / 4.0, 2)
     steer_rate_max = 10.0
     engine_power_peak = 200000.0
@@ -328,7 +329,7 @@ def racecar_profile() -> CarProfile:
 def udes_1_5_profile() -> CarProfile:
     """1:5 UdeS racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar`).
 
-    ``P = 800 W`` at ``v_nom = 15 m/s`` — traction-limited; ``w_rear_dot ≈ 50 rad/s²``.
+    ``P = 800 W`` at ``v_nom = 8 m/s`` — traction-limited; ``w_rear_dot ≈ 50 rad/s²``.
     """
     mass = 10.0
     a = 0.17
@@ -336,7 +337,7 @@ def udes_1_5_profile() -> CarProfile:
     r_r = 0.07
     mu = 1.0
     vx_max = 15.0
-    v_nom = 15.0
+    v_nom = 8.0
     delta_max = 0.55
     steer_rate_max = 3.0
     engine_power_peak = 800.0
