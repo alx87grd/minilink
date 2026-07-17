@@ -1,4 +1,4 @@
-"""Unified Layer-C benchmark entry point (machine exploration, not CI gates).
+"""Unified benchmark-study entry point (machine exploration, not CI gates).
 
 Usage (from repo root)::
 
@@ -29,7 +29,7 @@ PRESET_HELP = {
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Layer-C benchmark studies (manual machine exploration)"
+        description="Benchmark studies (manual machine exploration, not CI gates)"
     )
     parser.add_argument(
         "--preset",
@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.list or args.preset is None:
-        print("Layer-C benchmark presets (not CI gates):\n")
+        print("Benchmark study presets (not CI gates):\n")
         for name in sorted(PRESET_HELP):
             print(f"  {name:12}  {PRESET_HELP[name]}")
         return 0

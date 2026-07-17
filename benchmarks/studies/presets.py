@@ -1,4 +1,4 @@
-"""Layer-C benchmark preset implementations (machine exploration, not CI gates)."""
+"""Benchmark-study preset implementations (machine exploration, not CI gates)."""
 
 from __future__ import annotations
 

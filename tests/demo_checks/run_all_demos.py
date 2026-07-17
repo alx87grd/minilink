@@ -1,10 +1,13 @@
-"""Run all example scripts as subprocess demo checks (nightly / local sweep).
+"""Run example scripts as subprocess demo checks (nightly / local sweep).
+
+Executes each script's ``__main__`` unchanged (no demo hooks required).
+For the smaller flagship whitelist, prefer ``run_flagship_demos.py``.
 
 Usage (from repo root)::
 
     python tests/demo_checks/run_all_demos.py --help
     python tests/demo_checks/run_all_demos.py --timeout 60 --continue-on-error
-    python tests/demo_checks/run_all_demos.py --flagship-only
+    python tests/demo_checks/run_all_demos.py --flagship-scripts --continue-on-error
 """
 
 from __future__ import annotations
@@ -31,12 +34,7 @@ class DemoRunRow:
 
 
 def _discover_scripts() -> list[Path]:
-    paths: list[Path] = []
-    for path in sorted(SCRIPTS_ROOT.rglob("*.py")):
-        if path.is_relative_to(CHECKS_DIR):
-            continue
-        paths.append(path)
-    return paths
+    return sorted(path for path in SCRIPTS_ROOT.rglob("*.py") if path.is_file())
 
 
 def _flagship_paths() -> list[Path]:
@@ -72,9 +70,9 @@ def run_all_demos(
     *,
     timeout: float,
     continue_on_error: bool,
-    flagship_only: bool,
+    flagship_scripts: bool,
 ) -> list[DemoRunRow]:
-    paths = _flagship_paths() if flagship_only else _discover_scripts()
+    paths = _flagship_paths() if flagship_scripts else _discover_scripts()
     rows: list[DemoRunRow] = []
     for path in paths:
         row = _run_script(path, timeout=timeout)
@@ -97,7 +95,11 @@ def _print_report(rows: list[DemoRunRow]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Subprocess demo checks for all example scripts"
+        description=(
+            "Subprocess demo checks: run example scripts via __main__ "
+            "(nightly / local). Prefer tests/demo_checks/run_flagship_demos.py "
+            "for the flagship whitelist."
+        )
     )
     parser.add_argument(
         "--timeout",
@@ -111,15 +113,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Keep running after a failure",
     )
     parser.add_argument(
+        "--flagship-scripts",
+        action="store_true",
+        help=(
+            "Only paths in flagship_manifest.json. "
+            "Prefer run_flagship_demos.py for the usual flagship gate."
+        ),
+    )
+    parser.add_argument(
         "--flagship-only",
         action="store_true",
-        help="Only run paths listed in flagship_manifest.json",
+        help=argparse.SUPPRESS,  # deprecated alias for --flagship-scripts
     )
     args = parser.parse_args(argv)
     rows = run_all_demos(
         timeout=args.timeout,
         continue_on_error=args.continue_on_error,
-        flagship_only=args.flagship_only,
+        flagship_scripts=args.flagship_scripts or args.flagship_only,
     )
     return _print_report(rows)
 

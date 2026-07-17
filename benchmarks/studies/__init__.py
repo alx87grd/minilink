@@ -1,4 +1,4 @@
-"""Layer-C benchmark study presets."""
+"""Benchmark study presets (machine exploration, not CI gates)."""
 
 from benchmarks.studies import presets
 

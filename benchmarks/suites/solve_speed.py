@@ -1,7 +1,7 @@
-"""Layer-B solve-speed gates: standalone NLP and trajopt solve wall times.
+"""Regression-gate solve-speed suite: standalone NLP and trajopt solve wall times.
 
 Catches Optimizer backend regressions and slow NLP/trajopt paths (including JAX
-compile + SciPy SLSQP) without running full tier-2 backend sweeps.
+compile + SciPy SLSQP) without running full benchmark-study backend sweeps.
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 Writes PNGs locally (gitignored) for optional visual review. Only the manifest
 is committed; CI uses ``run_flagship_graphics.py`` (graphics contract check), not pixels.
 
-Plant list: ``minilink.dynamics.catalog.catalog_check_registry.KINEMATIC_RENDER_PLANTS``.
+Plant list: ``tests.demo_checks.catalog_check_registry.KINEMATIC_RENDER_PLANTS``.
 
 Run from the repo root::
 
@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from minilink.dynamics.catalog.catalog_check_registry import (  # noqa: E402
+from tests.demo_checks.catalog_check_registry import (  # noqa: E402
     KINEMATIC_RENDER_PLANTS,
 )
 from tests.fixtures.kinematic_baseline.render import render_baseline_png  # noqa: E402

@@ -1,4 +1,10 @@
-"""Demo-check runner subprocess tests (catalog + flagship demos)."""
+"""Demo-check runner subprocess tests (catalog + flagship demos + graphics).
+
+Thin CI bridge: invokes ``tests/demo_checks/`` runners; does not duplicate their
+assertions. Without JAX, JAX-required flagships skip here — the CI
+``regression`` job (``.github/workflows/test.yml``) re-runs
+``run_flagship_demos.py`` with JAX installed.
+"""
 
 from __future__ import annotations
 

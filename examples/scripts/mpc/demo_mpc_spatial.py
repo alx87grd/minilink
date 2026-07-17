@@ -202,9 +202,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 150, "ftol": 0.1},
 )
 print(f"planner ready (not solved): horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
-print(
-    "Next: demo_mpc_circuit.ipynb (full stack) or demo_mpc_circuit.py (hybrid script)"
-)
+print("Next: demo_mpc_circuit.ipynb (full stack) or demo_mpc_circuit.py (hybrid script)")
 
 if SHOW_PLOTS:
     path_viz = track.distance_field(probe).as_cost(

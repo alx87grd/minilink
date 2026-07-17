@@ -71,23 +71,8 @@ step = Step()
 step.params["initial_value"] = np.array([0.0])
 step.params["final_value"] = np.array([1.0])
 step.params["step_time"] = 2.0
+run_demo(step, name="Signal blocks (parallel, step)", plot_diagram=True)
 
-
-def run_smoke(*, tf: float = 2.0, show: bool = False) -> None:
-    """Headless demo check: step-driven parallel signal block diagram."""
-    run_demo(step, name="Signal blocks (parallel, step)", tf=tf, plot_diagram=False)
-    t = np.linspace(0.0, tf, max(int(tf / 0.01) + 1, 3))
-    sine = TrajectorySource(t, np.sin(2.0 * np.pi * 0.5 * t))
-    run_demo(sine, name="Signal blocks (parallel, sine)", tf=tf)
-
-
-def main() -> None:
-    run_demo(step, name="Signal blocks (parallel, step)", plot_diagram=True)
-
-    t = np.linspace(0.0, 20.0, 2001)
-    sine = TrajectorySource(t, np.sin(2.0 * np.pi * 0.5 * t))
-    run_demo(sine, name="Signal blocks (parallel, sine)")
-
-
-if __name__ == "__main__":
-    main()
+t = np.linspace(0.0, 20.0, 2001)
+sine = TrajectorySource(t, np.sin(2.0 * np.pi * 0.5 * t))
+run_demo(sine, name="Signal blocks (parallel, sine)")

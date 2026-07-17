@@ -1,5 +1,5 @@
 # CI — entry points documented in tests/README.md#entry-points
-# Jobs: test (ruff + pytest, py3.10–3.13) → regression (regression gates, py3.12 + jax)
+# Jobs: test (ruff + pytest, py3.10–3.13) → regression (gates + flagship demos, py3.12 + jax)
 name: CI
 
 on:
@@ -56,10 +56,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e ".[dev,jax]"
 
-    - name: Layer-B regression (solve-speed gates)
+    - name: Regression gates
       env:
         PYTHONPATH: ${{ github.workspace }}
       run: |
         python benchmarks/run_regression_check.py --suite all --tiny \
           --factor 6 \
           --speed-gate-suffixes solve_s,nlp_s,speedup
+
+    # JAX flagships skip in the ``test`` job (no jax extra); gate them here.
+    - name: Flagship demo checks (incl. JAX)
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        MPLBACKEND: Agg
+      run: |
+        python tests/demo_checks/run_flagship_demos.py

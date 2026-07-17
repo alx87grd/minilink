@@ -26,7 +26,7 @@ import helpers as _helpers  # noqa: E402
 
 configure_headless = _helpers.configure_headless
 check_catalog_plant = _helpers.check_catalog_plant
-from minilink.dynamics.catalog.catalog_check_registry import (  # noqa: E402
+from catalog_check_registry import (  # noqa: E402
     CATALOG_CHECK_ENTRIES,
 )
 

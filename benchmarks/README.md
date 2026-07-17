@@ -20,9 +20,9 @@ scene for fast RRT contract tests.
 | Path | Role |
 | --- | --- |
 | [`run_regression_check.py`](run_regression_check.py) | Single entry point for all committed baselines |
-| [`run_study.py`](run_study.py) | **Layer C** unified machine-exploration presets (replaces tier-2 `run_*_speed.py` / backend sweeps) |
+| [`run_study.py`](run_study.py) | **Benchmark study** unified machine-exploration presets (replaces older `run_*_speed.py` / backend sweeps) |
 | [`studies/presets.py`](studies/presets.py) | Preset implementations invoked by `run_study.py` |
-| [`suites/core_perf.py`](suites/core_perf.py) | Fast compile/`f()`/sim final-state tier-1 gate |
+| [`suites/core_perf.py`](suites/core_perf.py) | Fast compile/`f()`/sim final-state regression gate |
 | [`suites/integration_check.py`](suites/integration_check.py) | Trajectory checkpoint goldens + JAX trajopt solve-time gates |
 | [`suites/solve_speed.py`](suites/solve_speed.py) | Standalone NLP + NumPy pendulum trajopt solve wall-time gates |
 | [`scenarios/`](scenarios/) | Frozen scenario configs (double pendulum, showcase pendulum, cart-pole trajopt, E4/F MPC parity) |
@@ -57,19 +57,19 @@ python benchmarks/run_trajopt_backends.py        # trajopt transcription x backe
 python benchmarks/run_trajopt_solver_presets.py  # direct-collocation solver presets
 python benchmarks/run_dp_backends.py             # value-iteration loop/numpy/jax backends
 python benchmarks/run_rrt_nearest_backends.py    # RRT nearest brute_force vs kd_tree
-python benchmarks/run_regression_check.py                  # tier-1 core_perf baseline
+python benchmarks/run_regression_check.py                  # core_perf baseline (default)
 python benchmarks/run_regression_check.py --suite integration  # trajectory + JAX trajopt gate
 python benchmarks/run_regression_check.py --suite solve_speed  # NLP + NumPy trajopt solve gates
 python benchmarks/run_regression_check.py --suite e4           # E4 trajopt/MPC parametric parity
 python benchmarks/run_regression_check.py --suite f_mpc        # F MPC hybrid/hand-loop/dual-rate
-python benchmarks/run_regression_check.py --suite all          # all Layer-B suites
+python benchmarks/run_regression_check.py --suite all          # all regression-gate suites
 python benchmarks/run_regression_check.py --suite all --tiny   # CI reduced workload
 python benchmarks/run_regression_check.py --update           # refresh committed JSON
 python benchmarks/run_e4_trajopt_parity.py --capture         # same as --suite e4 --update
 python benchmarks/run_f_mpc_parity.py --capture              # same as --suite f_mpc --update
 ```
 
-## Regression baselines (Layer B)
+## Regression baselines
 
 All gated suites run through [`run_regression_check.py`](run_regression_check.py).
 Pytest only guards benchmark helpers (`test_benchmark_helpers.py`); **GitHub CI** runs
@@ -101,11 +101,13 @@ slowdown on the next manual baseline refresh; CI uses **6×** on NLP solve gates
 python benchmarks/run_regression_check.py --suite all --tiny \
   --factor 6 \
   --speed-gate-suffixes solve_s,nlp_s,speedup
+python tests/demo_checks/run_flagship_demos.py   # incl. JAX flagships
 ```
 
 Enforces accuracy goldens plus **NLP/trajopt solve wall times** (`solve_s`, `nlp_s`,
 speedup ratios). End-to-end `wall_s` / `total_s` are reported but not gated in CI
-(cross-runner variance).
+(cross-runner variance). Flagship demos run here so JAX-required smokes are not
+skipped (the ``test`` job installs ``.[dev]`` only).
 
 **Local pre-handoff** (reference machine, per-suite factors from JSON):
 
@@ -137,6 +139,6 @@ python benchmarks/run_regression_check.py --suite all
 python benchmarks/run_regression_check.py --suite integration --update   # after intentional changes
 ```
 
-Review the JSON diff before committing an `--update`. Tier-2 runners are **deprecated
-shims** forwarding to [`run_study.py`](run_study.py); Pyro parity remains manual Layer-C
-only (external Pyro env).
+Review the JSON diff before committing an `--update`. Older speed/backend CLIs are
+**deprecated shims** forwarding to [`run_study.py`](run_study.py); Pyro parity remains
+manual benchmark-study only (external Pyro env).

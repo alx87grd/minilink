@@ -9,7 +9,12 @@ Status: **Complete** — six-layer vision landed; optional G1 perceptual PNG has
 ## Testing vision (authoritative)
 
 Six layers, bottom to top. **Unit tests belong to library modules (`minilink/`).**
-Demo and catalog scripts are **demo-check only** (not duplicated in pytest).
+Demo and catalog checks live in `tests/demo_checks/` (assertions and reports
+there — not re-implemented as pytest cases). Flagship demos are exercised by
+**subprocess of their unchanged `__main__`** — do not add test hooks to demo
+scripts. A thin pytest bridge (`test_demo_check_runners.py`) invokes those
+runners for the CI `test` job; JAX-required flagships are also gated in the
+`regression` job (JAX installed).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -180,19 +185,23 @@ python examples/scripts/_smoke/run_graphics_visual_check.py
 | Scope | Mechanism | Depth |
 | --- | --- | --- |
 | **Catalog** | `catalog/<pkg>/smoke.py` + `run_catalog_smokes.py` | instantiate, `f` finite, optional 3-step sim, `geometry_smoke` |
-| **Demos** | whitelist manifest + `run_smoke()` in each flagship demo | short `tf`, Agg, no `show` |
-| **All demos (optional)** | `run_all_demos.py --continue-on-error` | subprocess each script, report table — nightly only |
+| **Demos** | whitelist manifest + subprocess `__main__` | Agg + timeout; **no demo source changes** |
+| **All demos (optional)** | `run_all_demos.py --continue-on-error` | subprocess every script — nightly / local |
 
-**Pytest surface:** one subprocess test per aggregator, not 78 test files.
+**Pytest surface:** thin bridge (`test_demo_check_runners.py`) invokes aggregators;
+assertions stay in `tests/demo_checks/`. CI `regression` also runs
+`run_flagship_demos.py` with JAX so JAX flagships do not stay skipped.
+**Demos stay teaching scripts** — do not add `run_smoke()` or reshape for tests.
 
 ```bash
-python examples/scripts/_smoke/run_catalog_smokes.py --fast
-python examples/scripts/_smoke/run_flagship_demos.py
+python tests/demo_checks/run_catalog_checks.py --fast
+python tests/demo_checks/run_flagship_demos.py
 # optional nightly:
-python examples/scripts/_smoke/run_all_demos.py --timeout 120
+python tests/demo_checks/run_all_demos.py --timeout 120 --continue-on-error
 ```
 
-**Status:** ✅ catalog registry + aggregators; 11 flagship demos in manifest.
+**Status:** ✅ catalog registry + aggregators; 11 flagship demos in manifest
+(subprocess `__main__`, demos untouched).
 
 ---
 
@@ -234,7 +243,7 @@ The repo has grown test and benchmark surface area without periodic cleanup:
 | `tests/unittest/test_*.py` | **22 files**, ~**780** `test_*` functions | `pytest` (all collected; optional deps skip at runtime) |
 | `benchmarks/run_*.py` | **2** primary + shims | L2 in CI; L3 manual |
 | Gated regression baselines | **5** JSON suites + CI job | ✅ L2 in CI |
-| `examples/scripts/` | **78** demos | L6 smokes (11 flagship whitelist) |
+| `examples/scripts/` | **78** demos | L6 subprocess (11 flagship whitelist) |
 
 `tests/README.md` already states the philosophy (contracts over trivia, table-driven over duplicate files). The **six layers above** are the organizing principle; sections below retain the file-level inventory and migration tables from the first draft.
 
@@ -808,7 +817,7 @@ _(catalog/graphics questions above; prior decisions in §Decisions applied)_
 - [x] Update `benchmarks/README.md` with unified suites + CI flags.
 - [x] Update `AGENTS.md` verification table (CI regression job).
 - [x] Optional: `run_study.py` CLI unification (Phase 3).
-- [x] L6 flagship manifest expanded (11 demos).
+- [x] L6 flagship manifest expanded (11 demos; subprocess, no demo hooks).
 - [x] L4 `test_flagship_graphics_contract.py` + flagship graphics manifest.
 - [x] L5 `run_graphics_visual_check.py` checklist.
 - [x] `run_all_demos.py` for optional nightly sweep.

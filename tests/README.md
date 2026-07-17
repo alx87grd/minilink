@@ -65,8 +65,8 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 
 | Job | Steps |
 | --- | --- |
-| **`test`** | ruff + `pytest` (py 3.10–3.13) |
-| **`regression`** | `run_regression_check.py --suite all --tiny …` (py 3.12 + JAX) |
+| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX demos may skip) |
+| **`regression`** | regression gates `--suite all --tiny …` + **flagship demos** (py 3.12 + JAX) |
 
 ### At a glance
 
@@ -77,7 +77,7 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 | **Benchmark study** | `run_benchmark_study.py` | `benchmarks/run_study.py` | — |
 | **Graphics contract** | (in contract tests) | `test_flagship_graphics_contract.py` | `test` |
 | **Graphics visual** | `tests/demo_checks/run_graphics_visual_check.py` | local | — |
-| **Demo checks** | `run_demo_checks.py` | `tests/demo_checks/run_*.py` | `test` |
+| **Demo checks** | `run_demo_checks.py` | `tests/demo_checks/run_*.py` | `test` + `regression` |
 | **Pre-push** | `run_pre_push.py` | ruff + pytest | `test` |
 
 ### Performance — regression gates vs benchmark study vs host context
@@ -108,7 +108,7 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 | **Benchmark study** | Machine/GPU exploration tables | `run_study.py --list` | — |
 | **Graphics contract** | Draw-list + headless PNG checks | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
 | **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `run_graphics_visual_check.py` | — |
-| **Demo checks** | Catalog + flagship demos must not throw | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (via `test_demo_check_runners.py`) |
+| **Demo checks** | Catalog + flagship demos must not throw | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
 
 ## Local environment
 
@@ -145,12 +145,18 @@ Benchmark regression lives under repo-root `benchmarks/`; helper API
 drift guards in `test_benchmark_helpers.py`. See [Entry points](#entry-points) for
 regression CI vs local commands and [benchmarks/README.md](../benchmarks/README.md).
 
-**Demo checks** in [`tests/demo_checks/`](demo_checks/) (also invoked from `test_demo_check_runners.py`):
+**Demo checks** live in [`tests/demo_checks/`](demo_checks/) (assertions and reports
+there). A thin pytest bridge ([`test_demo_check_runners.py`](unittest/test_demo_check_runners.py))
+invokes those runners so the CI ``test`` job covers catalog / non-JAX flagships /
+graphics without re-implementing checks as pytest cases. The CI ``regression``
+job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated.
 
 ```bash
 python tests/demo_checks/run_catalog_checks.py --fast
+# Flagship whitelist: subprocess each demo's __main__ (no demo source changes):
 python tests/demo_checks/run_flagship_demos.py
-python tests/demo_checks/run_all_demos.py --flagship-only --continue-on-error
+# Nightly / local: every example script:
+python tests/demo_checks/run_all_demos.py --continue-on-error
 ```
 
 IDE launchers: [`tests/run/`](run/). Headless PNG check: `tests/demo_checks/run_flagship_graphics.py`.

@@ -1,5 +1,6 @@
 """Catalog plant registry for demo-check runners and kinematic render manifests.
 
+Repo-only (under ``tests/demo_checks/``) — not part of the shipped library.
 Single source of truth for which catalog classes get headless demo-check coverage.
 Import factories only — no matplotlib or simulator imports here.
 """
