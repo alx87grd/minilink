@@ -463,3 +463,76 @@ class TestDynamicBicycleServoInputs(unittest.TestCase):
         u = np.array([0.0, 0.0])
         dx = np.asarray(self.named.f(x, u))
         np.testing.assert_allclose(dx[6:8], np.zeros(2), atol=0.5)
+
+
+class TestCarProfile(unittest.TestCase):
+    def test_registered_profiles(self):
+        from minilink.dynamics.catalog.vehicles.car_profile import (
+            CAR_PROFILES,
+            get_car_profile,
+            list_car_profiles,
+        )
+
+        self.assertEqual(
+            list_car_profiles(), ("passenger_car", "racecar", "udes_1_5")
+        )
+        for name in list_car_profiles():
+            self.assertIs(get_car_profile(name), CAR_PROFILES[name])
+
+    def test_racecar_matches_demo_vehicle_geometry(self):
+        from minilink.dynamics.catalog.vehicles.car_profile import racecar_profile
+
+        profile = racecar_profile()
+        self.assertAlmostEqual(profile.mass, 698.8)
+        self.assertAlmostEqual(profile.a, 1.16)
+        self.assertAlmostEqual(profile.b, 0.95)
+        self.assertAlmostEqual(profile.r_r, 0.3429)
+        self.assertAlmostEqual(profile.engine_power_peak, 48470.5)
+
+    def test_udes_matches_kinematic_racecar_geometry(self):
+        from minilink.dynamics.catalog.vehicles.car_profile import udes_1_5_profile
+        from minilink.dynamics.catalog.vehicles.steering import UdeSRacecar
+
+        udes = UdeSRacecar()
+        profile = udes_1_5_profile()
+        self.assertAlmostEqual(profile.a, udes.params["a"])
+        self.assertAlmostEqual(profile.b, udes.params["b"])
+        self.assertAlmostEqual(profile.length, udes.params["length"])
+
+    def test_apply_car_profile_rate_plant(self):
+        from minilink.dynamics.catalog.vehicles.car_profile import (
+            apply_car_profile,
+            passenger_car_profile,
+        )
+        from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
+            JaxDynamicBicycleRateInputs,
+        )
+
+        sys = JaxDynamicBicycleRateInputs()
+        apply_car_profile(sys, passenger_car_profile())
+        profile = passenger_car_profile()
+        self.assertAlmostEqual(sys.params["mass"], profile.mass)
+        self.assertAlmostEqual(sys.state.upper_bound[6], profile.limits.w_rear_max)
+        self.assertAlmostEqual(
+            sys.inputs["w_rear_dot"].upper_bound[0], profile.limits.w_rear_dot_max
+        )
+
+    def test_apply_car_profile_servo_plant(self):
+        from minilink.dynamics.catalog.vehicles.car_profile import (
+            apply_car_profile,
+            racecar_profile,
+        )
+        from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
+            JaxDynamicBicycleServoInputsUY,
+        )
+
+        sys = JaxDynamicBicycleServoInputsUY()
+        apply_car_profile(sys, racecar_profile())
+        profile = racecar_profile()
+        self.assertAlmostEqual(sys.params["steer_Kp"], profile.steer_Kp)
+        self.assertAlmostEqual(
+            sys.inputs["u"].upper_bound[0], profile.limits.tau_rear_max
+        )
+        self.assertAlmostEqual(
+            sys.inputs["u"].upper_bound[1], profile.limits.delta_max
+        )

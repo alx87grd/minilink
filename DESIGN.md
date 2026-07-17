@@ -190,6 +190,10 @@ serial arms. Joint impedance / task impedance / computed torque use
   for warm-start MPC (also via ``mpc % schedule``).
   Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
   exposes standard ``u`` / ``y`` ports for hybrid composition.
+  Named vehicle envelopes (parameters + planning limits) live in
+  :mod:`~minilink.dynamics.catalog.vehicles.car_profile`
+  (``passenger_car``, ``racecar``, ``udes_1_5``); apply with
+  :func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_forced`, and
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_trajectory` /
