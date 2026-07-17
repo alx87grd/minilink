@@ -488,9 +488,11 @@ class TestCarProfile(unittest.TestCase):
         self.assertEqual(profile.engine_power_peak, 48000.0)
         self.assertAlmostEqual(profile.limits.delta_max, np.pi / 4.0, places=2)
         self.assertEqual(profile.limits.delta_dot_max, 10.0)
+        self.assertEqual(profile.limits.w_rear_dot_prop_max, 6.0)
         self.assertEqual(profile.limits.w_rear_dot_max, 29.0)
+        self.assertEqual(profile.limits.tau_rear_max, 470.0)
 
-    def test_rate_input_limits_derived_from_longitudinal_and_steer_caps(self):
+    def test_propulsion_limits_from_power_at_nominal(self):
         from minilink.dynamics.catalog.vehicles.car_profile import (
             get_car_profile,
             list_car_profiles,
@@ -498,9 +500,24 @@ class TestCarProfile(unittest.TestCase):
 
         for name in list_car_profiles():
             profile = get_car_profile(name)
+            tau = profile.propulsion_torque_nominal()
+            wdot_prop = profile.propulsion_wheel_accel_nominal()
+            if abs(tau) >= 100.0:
+                expected_tau = round(tau, -1)
+            else:
+                expected_tau = round(tau, 1)
+            self.assertEqual(profile.limits.tau_rear_max, expected_tau)
+            self.assertEqual(profile.limits.w_rear_dot_prop_max, round(wdot_prop))
+            self.assertAlmostEqual(
+                profile.limits.v_dot_max,
+                round(profile.propulsion_longitudinal_accel_nominal(), 1),
+            )
             self.assertEqual(
                 profile.limits.w_rear_dot_max,
-                round(profile.limits.a_long_max / profile.r_r),
+                max(
+                    profile.limits.w_rear_dot_prop_max,
+                    round(profile.limits.a_brake_max / profile.r_r),
+                ),
             )
             self.assertEqual(profile.limits.delta_dot_max, profile.steer_rate_max)
 

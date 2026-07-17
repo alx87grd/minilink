@@ -5,25 +5,25 @@ actuator time constants, and planning limits derived from the same physical
 envelope. Use :func:`apply_car_profile` to copy a profile onto a catalog plant
 without editing individual demos.
 
-Rate-input bounds (``JaxDynamicBicycleRateInputs``)
----------------------------------------------------
-Two inputs are tied to actuator physics:
+Propulsion limits (nominal speed, no slip)
+------------------------------------------
+At nominal road speed ``v_nom`` the peak motor torque is power-limited:
 
-**Wheel spin acceleration** ``w_rear_dot`` [rad/s²]
-    Derived from longitudinal grip at the contact patch:
+``tau_prop = min(P_max / omega_nom, mu * Fz_r * r_r)``,
+``omega_nom = v_nom / r_r``.
 
-    ``w_rear_dot_max = a_long_max / r_r``
+With no slip, wheel spin and vehicle longitudinal motion are coupled through
+``Jw * w_rear_dot + r_r * Fx = tau_motor`` and ``Fx = m * a_x = m * r_r * w_rear_dot``,
+so the effective rotational inertia is ``J_w + m * r_r^2`` and
 
-    where ``a_long_max`` [m/s²] is the larger of peak accel and peak brake
-    (typical passenger car: ~0.4 g accel, ~0.8 g brake). No-slip kinematics:
-    ``a_x ≈ r_r * w_rear_dot``.
+``w_rear_dot_prop_max = tau_prop / (J_w + m * r_r^2)``,
+``a_prop_max = r_r * w_rear_dot_prop_max``.
 
-**Steering rate** ``delta_dot`` [rad/s]
-    Maximum road-wheel slew rate (angle at the tire, not the steering wheel).
-    Set equal to ``steer_rate_max`` in the profile — the cap on the embedded
-    steering servo in :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleServoInputs`
-    and a first-order steer actuator with rate saturation. Typical passenger
-    values are ~1 rad/s; race / demo plants may allow more.
+These set ``tau_rear_max`` and the acceleration-side rate bound. Braking keeps
+a separate grip cap ``a_brake``; the symmetric rate-input box uses
+``max(w_rear_dot_prop_max, a_brake / r_r)``.
+
+Steering rate ``delta_dot_max`` equals ``steer_rate_max`` (road-wheel slew).
 
 Profiles
 --------
@@ -46,8 +46,9 @@ GRAVITY = 9.81
 class CarLimits:
     """State and input bounds shared across abstraction layers.
 
-    ``delta_dot_max`` and ``w_rear_dot_max`` are the rate-input planning limits
-    on :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs`.
+    ``tau_rear_max`` and ``w_rear_dot_prop_max`` are the nominal propulsion caps
+    from power at ``v_nom`` (no slip). ``w_rear_dot_max`` is the symmetric
+    rate-input box ``max(propulsion, braking)``.
     """
 
     vx_max: float
@@ -58,10 +59,12 @@ class CarLimits:
     delta_max: float
     delta_dot_max: float
     w_rear_max: float
+    w_rear_dot_prop_max: float
     w_rear_dot_max: float
     tau_rear_max: float
     tau_rear_min: float
     cascade_accel_max: float
+    a_brake_max: float
     a_long_max: float
 
 
@@ -89,6 +92,7 @@ class CarProfile:
     engine_power_peak: float
     engine_tau: float
     transmission_ratio: float
+    v_nom: float
     limits: CarLimits
 
     @property
@@ -106,6 +110,10 @@ class CarProfile:
     def rear_normal_load(self) -> float:
         return self.mass * self.gravity * self.b / self.length
 
+    def effective_wheel_inertia(self) -> float:
+        """``J_w + m r_r^2`` — no-slip wheel/vehicle inertia at the contact patch."""
+        return self.Jw_rear + self.mass * self.r_r**2
+
     def traction_torque_max(self) -> float:
         return self.mu * self.rear_normal_load() * self.r_r
 
@@ -113,6 +121,21 @@ class CarProfile:
         w_rear = max(abs(vx) / self.r_r, 1.0)
         w_engine = w_rear * self.transmission_ratio
         return self.engine_power_peak / w_engine
+
+    def propulsion_torque_nominal(self) -> float:
+        """Peak drive torque at ``v_nom`` [Nm]: min(power, traction)."""
+        return min(
+            self.traction_torque_max(),
+            self.power_torque_at_speed(self.v_nom),
+        )
+
+    def propulsion_wheel_accel_nominal(self) -> float:
+        """``w_rear_dot`` at ``v_nom`` from propulsion torque (no slip) [rad/s²]."""
+        return self.propulsion_torque_nominal() / self.effective_wheel_inertia()
+
+    def propulsion_longitudinal_accel_nominal(self) -> float:
+        """``a_x`` at ``v_nom`` from propulsion torque (no slip) [m/s²]."""
+        return self.r_r * self.propulsion_wheel_accel_nominal()
 
     def motor_torque_cap(self, vx: float) -> float:
         return min(self.traction_torque_max(), self.power_torque_at_speed(vx))
@@ -137,12 +160,17 @@ class CarProfile:
         }
 
 
+def _round_torque(tau: float) -> float:
+    if abs(tau) >= 100.0:
+        return float(round(tau, -1))
+    return float(round(tau, 1))
+
+
 def _make_limits(
     *,
     vx_max: float,
     vy_max: float,
     yaw_rate_max: float,
-    a_accel: float,
     a_brake: float,
     delta_max: float,
     steer_rate_max: float,
@@ -151,48 +179,52 @@ def _make_limits(
     mu: float,
     a: float,
     b: float,
+    Jw_rear: float,
     engine_power_peak: float,
     transmission_ratio: float,
+    v_nom: float,
 ) -> CarLimits:
-    """Build limits with round numbers from physical caps.
-
-    ``w_rear_dot_max`` comes from ``a_long_max / r_r`` (brake-limited wheel
-    spin acceleration). ``delta_dot_max`` follows ``steer_rate_max`` (road-wheel
-    steering slew).
-    """
+    """Build limits from power at ``v_nom`` (propulsion) and grip (braking)."""
     length = a + b
     Fz_r = mass * GRAVITY * b / length
     tau_traction = mu * Fz_r * r_r
-    w_cruise = vx_max / r_r
-    tau_power = engine_power_peak / max(w_cruise * transmission_ratio, 1.0)
-    tau_rear_max = min(tau_traction, tau_power)
+    w_rear_nom = v_nom / r_r
+    tau_power = engine_power_peak / max(w_rear_nom * transmission_ratio, 1.0)
+    tau_prop = min(tau_traction, tau_power)
 
-    a_long_max = max(a_accel, a_brake)
+    J_eff = Jw_rear + mass * r_r**2
+    w_rear_dot_prop = tau_prop / J_eff
+    a_prop = r_r * w_rear_dot_prop
+    w_rear_dot_brake = a_brake / r_r
+
+    w_rear_dot_prop_r = round(w_rear_dot_prop)
+    w_rear_dot_max = max(w_rear_dot_prop_r, round(w_rear_dot_brake))
     w_rear_max = round(vx_max / r_r)
-    w_rear_dot_max = round(a_long_max / r_r)
 
     return CarLimits(
         vx_max=vx_max,
         vy_max=vy_max,
         yaw_rate_max=yaw_rate_max,
         v_max=vx_max,
-        v_dot_max=a_accel,
+        v_dot_max=round(a_prop, 1),
         delta_max=delta_max,
         delta_dot_max=steer_rate_max,
         w_rear_max=w_rear_max,
+        w_rear_dot_prop_max=w_rear_dot_prop_r,
         w_rear_dot_max=w_rear_dot_max,
-        tau_rear_max=round(tau_rear_max, -1),
-        tau_rear_min=-round(tau_traction, -1),
-        cascade_accel_max=a_accel,
-        a_long_max=a_long_max,
+        tau_rear_max=_round_torque(tau_prop),
+        tau_rear_min=-_round_torque(tau_traction),
+        cascade_accel_max=round(a_prop, 1),
+        a_brake_max=a_brake,
+        a_long_max=max(round(a_prop, 1), a_brake),
     )
 
 
 def passenger_car_profile() -> CarProfile:
     """Full-size passenger sedan (~1500 kg, 2.7 m wheelbase).
 
-    ``a_long_max = 8 m/s²`` (~0.8 g brake) → ``w_rear_dot_max = 8 / 0.33 ≈ 24 rad/s²``.
-    ``steer_rate_max = 1 rad/s`` at the road wheel.
+    ``P = 120 kW`` at ``v_nom = 27 m/s`` → ``tau_prop ≈ 1470 Nm``,
+    ``w_rear_dot_prop ≈ 9 rad/s²``; brake grip ``a_brake = 8 m/s²``.
     """
     mass = 1500.0
     a = 1.2
@@ -200,7 +232,7 @@ def passenger_car_profile() -> CarProfile:
     r_r = 0.33
     mu = 0.9
     vx_max = 27.0
-    a_accel = 4.0
+    v_nom = 27.0
     a_brake = 8.0
     delta_max = 0.60
     steer_rate_max = 1.0
@@ -225,11 +257,11 @@ def passenger_car_profile() -> CarProfile:
         engine_power_peak=120000.0,
         engine_tau=0.25,
         transmission_ratio=1.0,
+        v_nom=v_nom,
         limits=_make_limits(
             vx_max=vx_max,
             vy_max=3.0,
             yaw_rate_max=1.5,
-            a_accel=a_accel,
             a_brake=a_brake,
             delta_max=delta_max,
             steer_rate_max=steer_rate_max,
@@ -238,8 +270,10 @@ def passenger_car_profile() -> CarProfile:
             mu=mu,
             a=a,
             b=b,
+            Jw_rear=2.0,
             engine_power_peak=120000.0,
             transmission_ratio=1.0,
+            v_nom=v_nom,
         ),
     )
 
@@ -247,8 +281,8 @@ def passenger_car_profile() -> CarProfile:
 def racecar_profile() -> CarProfile:
     """Bicycle LOS race vehicle (rounded from ``create_vehicle``).
 
-    ``a_long_max = 10 m/s²`` → ``w_rear_dot_max = 10 / 0.34 ≈ 29 rad/s²``.
-    ``steer_rate_max = 10 rad/s`` matches the demo plant steering saturation.
+    ``P = 48 kW`` at ``v_nom = 35 m/s`` → ``tau_prop ≈ 470 Nm``,
+    ``w_rear_dot_prop ≈ 6 rad/s²``; brake ``a_brake = 10 m/s²`` → box 29 rad/s².
     """
     mass = 700.0
     a = 1.2
@@ -256,7 +290,7 @@ def racecar_profile() -> CarProfile:
     r_r = 0.34
     mu = 1.0
     vx_max = 35.0
-    a_accel = 10.0
+    v_nom = 35.0
     a_brake = 10.0
     delta_max = round(np.pi / 4.0, 2)
     steer_rate_max = 10.0
@@ -282,11 +316,11 @@ def racecar_profile() -> CarProfile:
         engine_power_peak=engine_power_peak,
         engine_tau=0.25,
         transmission_ratio=1.0,
+        v_nom=v_nom,
         limits=_make_limits(
             vx_max=vx_max,
             vy_max=4.0,
             yaw_rate_max=2.0,
-            a_accel=a_accel,
             a_brake=a_brake,
             delta_max=delta_max,
             steer_rate_max=steer_rate_max,
@@ -295,8 +329,10 @@ def racecar_profile() -> CarProfile:
             mu=mu,
             a=a,
             b=b,
+            Jw_rear=1.6,
             engine_power_peak=engine_power_peak,
             transmission_ratio=1.0,
+            v_nom=v_nom,
         ),
     )
 
@@ -304,8 +340,8 @@ def racecar_profile() -> CarProfile:
 def udes_1_5_profile() -> CarProfile:
     """1:5 UdeS racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar`).
 
-    ``a_long_max = 12 m/s²`` (high-grip RC) → ``w_rear_dot_max = 12 / 0.07 ≈ 170 rad/s²``.
-    ``steer_rate_max = 3 rad/s`` at the road wheel.
+    ``P = 800 W`` at ``v_nom = 15 m/s`` — traction-limited at nominal;
+    ``w_rear_dot_prop ≈ 50 rad/s²``; brake ``a_brake = 12 m/s²``.
     """
     mass = 10.0
     a = 0.17
@@ -313,7 +349,7 @@ def udes_1_5_profile() -> CarProfile:
     r_r = 0.07
     mu = 1.0
     vx_max = 15.0
-    a_accel = 12.0
+    v_nom = 15.0
     a_brake = 12.0
     delta_max = 0.55
     steer_rate_max = 3.0
@@ -339,11 +375,11 @@ def udes_1_5_profile() -> CarProfile:
         engine_power_peak=engine_power_peak,
         engine_tau=0.10,
         transmission_ratio=1.0,
+        v_nom=v_nom,
         limits=_make_limits(
             vx_max=vx_max,
             vy_max=2.0,
             yaw_rate_max=4.0,
-            a_accel=a_accel,
             a_brake=a_brake,
             delta_max=delta_max,
             steer_rate_max=steer_rate_max,
@@ -352,8 +388,10 @@ def udes_1_5_profile() -> CarProfile:
             mu=mu,
             a=a,
             b=b,
+            Jw_rear=0.02,
             engine_power_peak=engine_power_peak,
             transmission_ratio=1.0,
+            v_nom=v_nom,
         ),
     )
 
