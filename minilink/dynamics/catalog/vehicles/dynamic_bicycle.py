@@ -13,8 +13,8 @@ JAX ladder (see :mod:`~minilink.dynamics.catalog.vehicles.car_profile` and
 ``DESIGN.md`` vehicle table): :class:`JaxDynamicBicycle` ($n=6$);
 :class:`JaxDynamicBicycleRateInputs` ($n=8$, rate inputs, ``inverse_propulsion_dynamics``);
 :class:`JaxDynamicBicycleServoInputs` ($n=8$, motor torque + steering setpoint);
-``*UY`` twins with standard ``u`` / ``y`` ports. Top rung with throttle + engine
-lag: ``EngineBicycle`` in ``examples/projects/bicycle_los*/vehicle.py``.
+``*UY`` twins with standard ``u`` / ``y`` ports. Planning limits and named
+vehicle envelopes: :mod:`~minilink.dynamics.catalog.vehicles.car_profile`.
 """
 
 from functools import partial

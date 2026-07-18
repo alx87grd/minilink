@@ -169,23 +169,20 @@ and
 | rigid body + tires | `JaxDynamicBicycle` | 6 | $[\omega_r, \delta]$ |
 | actuators | `JaxDynamicBicycleRateInputs` | 8 | $[\dot\omega_r, \dot\delta]$ |
 | | `JaxDynamicBicycleServoInputs` | 8 | $[\tau_r, \delta_{\mathrm{sp}}]$ |
-| power + engine lag | `EngineBicycle` (project demo) | 10 | $[\mathrm{throttle}, \delta_{\mathrm{cmd}}]$ |
 
-The compare demo solves tiers 1–7 on one mission. **Tier 8** —
-`EngineBicycle` in `examples/projects/bicycle_los*/vehicle.py` — adds a
-normalized **throttle** (power fraction), constant-power torque map
-$\tau_{\mathrm{avail}} = P_{\max}/\omega_{\mathrm{eng}}$, and first-order engine
-lag $\dot\tau_{\mathrm{engine}} = (\tau_{\mathrm{cmd}}-\tau_{\mathrm{engine}})/\tau_{\mathrm{engine}}$
-plus steering lag; used in LOS cascade MPC demos, not yet a catalog JAX plant.
+The compare demo solves all seven plants on one mission. **Engine power envelope**
+— constant-power torque rating and derived bounds — lives in
+:mod:`~minilink.dynamics.catalog.vehicles.car_profile` (``passenger_car``,
+``racecar``, ``udes_1_5``); apply with
+:func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
 
 `:class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs.inverse_propulsion_dynamics`
 maps rate input $\dot\omega_r$ to motor torque (bridge between rate and servo
 tiers). `*UY` variants share the same `f` with standard ``u`` / ``y`` ports
 (see hybrid bullet below).
 
-Named envelopes — :mod:`~minilink.dynamics.catalog.vehicles.car_profile`
-(``passenger_car``, ``racecar``, ``udes_1_5``): rigid-body and tire params,
-$P_{\max}$, $\tau_{\mathrm{engine}}$, steering time constants; symmetric
+Named envelopes — :mod:`~minilink.dynamics.catalog.vehicles.car_profile`:
+rigid-body and tire params, $P_{\max}$, steering time constants; symmetric
 planning limits from power at $v_{\mathrm{nom}}$ via
 :func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
 

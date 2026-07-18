@@ -265,7 +265,7 @@ labeled ports, and animation geometry:
 | --- | --- |
 | `pendulum` | `Pendulum`, `DoublePendulum`, `Acrobot`, `CartPole`, rotating cart-poles |
 | `manipulators` | one- to five-link arms, planar and 3D |
-| `vehicles` | JAX bicycle ladder (holonomic → kinematic → dynamic → rate/servo inputs), `CarProfile` envelopes (`passenger_car`, `racecar`, `udes_1_5`); `EngineBicycle` (throttle + engine lag) in `examples/projects/bicycle_los*`; longitudinal propulsion, suspension |
+| `vehicles` | JAX bicycle ladder (`steering.py` + `dynamic_bicycle.py`: holonomic → kinematic → dynamic → rate/servo inputs), `CarProfile` power envelopes and `apply_car_profile`; longitudinal propulsion, suspension |
 | `aerial` | planar drones, plane, rocket |
 | `marine` | planar boat, boat in current |
 | `mass_spring_damper` | one- to three-mass chains, floating variants |
@@ -451,7 +451,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
 | Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` |
-| Trajectory optimization | `examples/scripts/trajectory_optimization/` · [vehicle ladder compare (notebook)](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) — seven JAX plants + textbook EoM through engine tier · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) |
+| Trajectory optimization | `examples/scripts/trajectory_optimization/` · [JAX vehicle ladder compare (notebook)](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) — seven catalog plants + EoM · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |
 | C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/demo_c_export_proportional.py` · `demo_c_export.py` |
