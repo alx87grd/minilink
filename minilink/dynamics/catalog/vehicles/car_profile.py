@@ -21,6 +21,11 @@ wheel/vehicle couple,
 
 Both directions use the same symmetric cap (regen rated like forward drive).
 
+``v_nom`` is chosen per profile so actuator torque exceeds the traction
+reference (``mu * Fz_r * r_r``) by a comfortable margin — grip limits force
+at the tire, not at the planner input. Use
+:meth:`CarProfile.actuator_traction_headroom` to compare.
+
 Steering rate ``delta_dot_max`` equals ``steer_rate_max`` (road-wheel slew).
 
 Profiles
@@ -129,6 +134,14 @@ class CarProfile:
         """``a_x`` at ``v_nom`` from motor torque (no-slip couple) [m/s²]."""
         return self.r_r * self.propulsion_wheel_accel_nominal()
 
+    def traction_wheel_accel_reference(self) -> float:
+        """Grip-coupled ``w_rear_dot`` at full rear traction (reference, not a cap) [rad/s²]."""
+        return self.traction_torque_max() / self.effective_wheel_inertia()
+
+    def actuator_traction_headroom(self) -> float:
+        """Actuator torque limit divided by traction reference (values > 1 allow wheel spin)."""
+        return self.limits.tau_rear_max / self.traction_torque_max()
+
     def motor_torque_cap(self, vx: float) -> float:
         """Motor torque cap at road speed ``vx`` [Nm] from ``P_max`` only."""
         return self.power_torque_at_speed(vx)
@@ -206,7 +219,8 @@ def _make_limits(
 def passenger_car_profile() -> CarProfile:
     """Full-size passenger sedan (~1500 kg, 2.7 m wheelbase).
 
-    ``P = 120 kW`` at ``v_nom = 15 m/s`` → ``tau ≈ 2640 Nm``, ``w_rear_dot ≈ 16 rad/s²``.
+    ``P = 120 kW`` at ``v_nom = 6 m/s`` → ``tau ≈ 6600 Nm``, ``w_rear_dot ≈ 40 rad/s²``
+    (~2.7× rear traction reference — tire model handles slip).
     """
     mass = 1500.0
     a = 1.2
@@ -214,7 +228,7 @@ def passenger_car_profile() -> CarProfile:
     r_r = 0.33
     mu = 0.9
     vx_max = 27.0
-    v_nom = 15.0
+    v_nom = 6.0
     delta_max = 0.60
     steer_rate_max = 1.0
     return CarProfile(
@@ -258,7 +272,8 @@ def passenger_car_profile() -> CarProfile:
 def racecar_profile() -> CarProfile:
     """Bicycle LOS race vehicle (rounded from ``create_vehicle``).
 
-    ``P = 100 kW`` at ``v_nom = 10 m/s`` → ``tau ≈ 3400 Nm``, ``w_rear_dot ≈ 41 rad/s²``.
+    ``P = 100 kW`` at ``v_nom = 10 m/s`` → ``tau ≈ 3400 Nm``, ``w_rear_dot ≈ 41 rad/s²``
+    (~3× rear traction reference).
     """
     mass = 700.0
     a = 1.2
@@ -311,7 +326,8 @@ def racecar_profile() -> CarProfile:
 def udes_1_5_profile() -> CarProfile:
     """1:5 UdeS racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar`).
 
-    ``P = 800 W`` at ``v_nom = 8 m/s`` → ``tau ≈ 7 Nm``, ``w_rear_dot ≈ 101 rad/s²``.
+    ``P = 800 W`` at ``v_nom = 5 m/s`` → ``tau ≈ 11 Nm``, ``w_rear_dot ≈ 162 rad/s²``
+    (~3× rear traction reference).
     """
     mass = 10.0
     a = 0.17
@@ -319,7 +335,7 @@ def udes_1_5_profile() -> CarProfile:
     r_r = 0.07
     mu = 1.0
     vx_max = 15.0
-    v_nom = 8.0
+    v_nom = 5.0
     delta_max = 0.55
     steer_rate_max = 3.0
     engine_power_peak = 800.0

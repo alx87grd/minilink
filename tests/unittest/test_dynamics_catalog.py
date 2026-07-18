@@ -519,6 +519,26 @@ class TestCarProfile(unittest.TestCase):
             self.assertEqual(profile.limits.delta_dot_max, profile.steer_rate_max)
             self.assertLessEqual(profile.v_nom, profile.limits.vx_max)
 
+    def test_actuator_limits_exceed_traction_reference(self):
+        from minilink.dynamics.catalog.vehicles.car_profile import (
+            get_car_profile,
+            list_car_profiles,
+        )
+
+        for name in list_car_profiles():
+            profile = get_car_profile(name)
+            self.assertGreater(
+                profile.limits.tau_rear_max,
+                profile.traction_torque_max(),
+                msg=name,
+            )
+            self.assertGreater(
+                profile.limits.w_rear_dot_max,
+                round(profile.traction_wheel_accel_reference()),
+                msg=name,
+            )
+            self.assertGreaterEqual(profile.actuator_traction_headroom(), 2.0, msg=name)
+
     def test_udes_matches_kinematic_racecar_geometry(self):
         from minilink.dynamics.catalog.vehicles.car_profile import udes_1_5_profile
         from minilink.dynamics.catalog.vehicles.steering import UdeSRacecar
