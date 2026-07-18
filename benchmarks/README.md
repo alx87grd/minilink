@@ -99,7 +99,7 @@ slowdown on the next manual baseline refresh; CI uses **6×** on NLP solve gates
 
 ```bash
 python benchmarks/run_regression_check.py --suite all --tiny \
-  --factor 6 \
+  --factor 10 \
   --speed-gate-suffixes solve_s,nlp_s,speedup
 python tests/demo_checks/run_flagship_demos.py   # incl. JAX flagships
 ```
