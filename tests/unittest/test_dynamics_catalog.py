@@ -537,7 +537,7 @@ class TestCarProfile(unittest.TestCase):
                 round(profile.traction_wheel_accel_reference()),
                 msg=name,
             )
-            self.assertGreaterEqual(profile.actuator_traction_headroom(), 2.0, msg=name)
+            self.assertGreater(profile.actuator_traction_headroom(), 1.0, msg=name)
 
     def test_udes_matches_kinematic_racecar_geometry(self):
         from minilink.dynamics.catalog.vehicles.car_profile import udes_1_5_profile

@@ -21,10 +21,12 @@ wheel/vehicle couple,
 
 Both directions use the same symmetric cap (regen rated like forward drive).
 
-``v_nom`` is chosen per profile so actuator torque exceeds the traction
-reference (``mu * Fz_r * r_r``) by a comfortable margin — grip limits force
-at the tire, not at the planner input. Use
-:meth:`CarProfile.actuator_traction_headroom` to compare.
+Every profile uses the same pipeline (:func:`nominal_actuator_torque` →
+:func:`effective_wheel_inertia` → ``w_rear_dot``, ``a_long``) via
+:func:`_make_limits` and the :class:`CarProfile` propulsion helpers.
+``v_nom`` is profile-specific; a passenger sedan near traction at 10 m/s is
+normal, while race / RC profiles pick lower ``v_nom`` for more headroom.
+Compare actuator vs grip with :meth:`CarProfile.actuator_traction_headroom`.
 
 Steering rate ``delta_dot_max`` equals ``steer_rate_max`` (road-wheel slew).
 
@@ -112,23 +114,38 @@ class CarProfile:
 
     def effective_wheel_inertia(self) -> float:
         """``J_w + m r_r^2`` — no-slip wheel/vehicle inertia at the contact patch."""
-        return self.Jw_rear + self.mass * self.r_r**2
+        return effective_wheel_inertia(self.mass, self.r_r, self.Jw_rear)
 
     def traction_torque_max(self) -> float:
         return self.mu * self.rear_normal_load() * self.r_r
 
     def power_torque_at_speed(self, vx: float) -> float:
-        w_rear = max(abs(vx) / self.r_r, 1.0)
-        w_engine = w_rear * self.transmission_ratio
-        return self.engine_power_peak / w_engine
+        return power_torque_at_speed(
+            vx,
+            engine_power_peak=self.engine_power_peak,
+            transmission_ratio=self.transmission_ratio,
+            r_r=self.r_r,
+        )
 
     def propulsion_torque_nominal(self) -> float:
         """Peak motor torque at ``v_nom`` [Nm] from ``P_max`` only."""
-        return self.power_torque_at_speed(self.v_nom)
+        return nominal_actuator_torque(
+            engine_power_peak=self.engine_power_peak,
+            transmission_ratio=self.transmission_ratio,
+            r_r=self.r_r,
+            v_nom=self.v_nom,
+        )
 
     def propulsion_wheel_accel_nominal(self) -> float:
         """``w_rear_dot`` at ``v_nom`` from motor torque (no-slip couple) [rad/s²]."""
-        return self.propulsion_torque_nominal() / self.effective_wheel_inertia()
+        return nominal_actuator_wheel_accel(
+            mass=self.mass,
+            r_r=self.r_r,
+            Jw_rear=self.Jw_rear,
+            engine_power_peak=self.engine_power_peak,
+            transmission_ratio=self.transmission_ratio,
+            v_nom=self.v_nom,
+        )
 
     def propulsion_longitudinal_accel_nominal(self) -> float:
         """``a_x`` at ``v_nom`` from motor torque (no-slip couple) [m/s²]."""
@@ -166,6 +183,59 @@ class CarProfile:
         }
 
 
+def effective_wheel_inertia(mass: float, r_r: float, Jw_rear: float) -> float:
+    """``J_w + m r_r^2`` — no-slip wheel/vehicle inertia [kg·m²]."""
+    return Jw_rear + mass * r_r**2
+
+
+def power_torque_at_speed(
+    vx: float,
+    *,
+    engine_power_peak: float,
+    transmission_ratio: float,
+    r_r: float,
+) -> float:
+    """Motor torque [Nm] from ``P_max`` at road speed ``vx``."""
+    w_rear = max(abs(vx) / r_r, 1.0)
+    w_engine = w_rear * transmission_ratio
+    return engine_power_peak / w_engine
+
+
+def nominal_actuator_torque(
+    *,
+    engine_power_peak: float,
+    transmission_ratio: float,
+    r_r: float,
+    v_nom: float,
+) -> float:
+    """Peak motor torque [Nm] from ``P_max`` at nominal speed (planner rating)."""
+    return power_torque_at_speed(
+        v_nom,
+        engine_power_peak=engine_power_peak,
+        transmission_ratio=transmission_ratio,
+        r_r=r_r,
+    )
+
+
+def nominal_actuator_wheel_accel(
+    *,
+    mass: float,
+    r_r: float,
+    Jw_rear: float,
+    engine_power_peak: float,
+    transmission_ratio: float,
+    v_nom: float,
+) -> float:
+    """``w_rear_dot`` [rad/s²] from nominal motor torque and wheel/vehicle inertia."""
+    tau = nominal_actuator_torque(
+        engine_power_peak=engine_power_peak,
+        transmission_ratio=transmission_ratio,
+        r_r=r_r,
+        v_nom=v_nom,
+    )
+    return tau / effective_wheel_inertia(mass, r_r, Jw_rear)
+
+
 def _round_torque(tau: float) -> float:
     if abs(tau) >= 100.0:
         return float(round(tau, -1))
@@ -187,11 +257,20 @@ def _make_limits(
     v_nom: float,
 ) -> CarLimits:
     """Build symmetric actuator limits from ``P_max`` at ``v_nom``."""
-    w_rear_nom = v_nom / r_r
-    tau_max = engine_power_peak / max(w_rear_nom * transmission_ratio, 1.0)
-
-    J_eff = Jw_rear + mass * r_r**2
-    w_rear_dot = tau_max / J_eff
+    tau_max = nominal_actuator_torque(
+        engine_power_peak=engine_power_peak,
+        transmission_ratio=transmission_ratio,
+        r_r=r_r,
+        v_nom=v_nom,
+    )
+    w_rear_dot = nominal_actuator_wheel_accel(
+        mass=mass,
+        r_r=r_r,
+        Jw_rear=Jw_rear,
+        engine_power_peak=engine_power_peak,
+        transmission_ratio=transmission_ratio,
+        v_nom=v_nom,
+    )
     a_long = r_r * w_rear_dot
 
     w_rear_dot_r = round(w_rear_dot)
@@ -219,8 +298,8 @@ def _make_limits(
 def passenger_car_profile() -> CarProfile:
     """Full-size passenger sedan (~1500 kg, 2.7 m wheelbase).
 
-    ``P = 120 kW`` at ``v_nom = 6 m/s`` → ``tau ≈ 6600 Nm``, ``w_rear_dot ≈ 40 rad/s²``
-    (~2.7× rear traction reference — tire model handles slip).
+    ``P = 120 kW`` at ``v_nom = 10 m/s`` → ``tau ≈ 3960 Nm``, ``w_rear_dot ≈ 24 rad/s²``
+    (~1.6× rear traction — typical sedan, near grip at moderate speed).
     """
     mass = 1500.0
     a = 1.2
@@ -228,7 +307,7 @@ def passenger_car_profile() -> CarProfile:
     r_r = 0.33
     mu = 0.9
     vx_max = 27.0
-    v_nom = 6.0
+    v_nom = 10.0
     delta_max = 0.60
     steer_rate_max = 1.0
     return CarProfile(
