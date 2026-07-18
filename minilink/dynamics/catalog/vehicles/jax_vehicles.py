@@ -16,7 +16,7 @@ BicycleDyn                   6    ``[w_rear, delta]``   body + linear tires
 BicycleDynRate               8    ``[w_rear_dot, delta_dot]``
 BicycleDynTauRate            8    ``[tau_rear, delta_dot]``
 BicycleDynServo              9    ``[tau_cmd, delta_cmd]``  lag on τ and δ
-BicycleDynEngine             9    ``[P_cmd, delta_cmd]``    Phase 3 stub
+BicycleDynEngine             9    ``[P_cmd, delta_cmd]``    power lag + wheel
 =======  ==================  ===  =========================================
 
 EoM ``params`` carry only independent quantities that enter ``f``. Graphics axle
@@ -253,7 +253,15 @@ class BicycleAcc(BicycleKin):
     """No-slip bicycle with longitudinal accel and steer-rate inputs.
 
     State ``x = [x, y, theta, v, delta]``; input ``u = [a_x, delta_dot]``.
-    Same pose kinematics as :class:`BicycleKin`; was the kinematic-rate plant.
+
+    Equations of motion
+    -------------------
+    ``ẋ = v cos θ``, ``ẏ = v sin θ``, ``θ̇ = (v / L) tan δ``
+
+    ``v̇ = a_x``, ``δ̇ = δ̇_u``
+
+    EoM ``params``: ``length`` only (``L``). Axle offsets ``a`` / ``b`` are
+    graphics attributes (default ``length / 2``), not EoM params.
     """
 
     def __init__(self):
@@ -977,18 +985,33 @@ class BicycleDynServoPorts(BicycleDynServo):
 
 
 class BicycleDynEngine(BicycleDyn):
-    """Engine / power-command bicycle — **Phase 1 stub**, Phase 3 physics.
+    """Dynamic bicycle with lagged wheel power and steer commands.
 
-    Intended state ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta, P]``
-    (``n = 9``) with input ``u = [P_cmd, delta_cmd]``.
+    State ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta, P]``.
+    Input ``u = [P_cmd, delta_cmd]`` (wheel-frame watts; no gearbox).
 
-    Params stubs (for :func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`
-    and Phase 3): ``engine_power_peak``, ``engine_tau``, ``transmission_ratio``,
-    plus the Servo-style steer / wheel keys.
+    Actuator / propulsion
+    ---------------------
+    ``P_dot = (P_cmd - P) / engine_tau`` — first-order lag on commanded power.
+    ``P_cmd`` is not clipped in ``f`` (peaks live on ports / ``CarLimits``).
 
-    :meth:`f` raises :class:`NotImplementedError` until Phase 3 lands the
-    first-order power lag and power→torque map. Use :class:`BicycleDynServo`
-    meanwhile.
+    ``τ = clip(P / ω_r, ±τ_sat)`` — stall / low-speed torque limit. Under
+    saturation, delivered ``τ ω_r`` can be less than lagged ``|P|`` (``P`` is
+    filtered command power, not measured shaft power).
+
+    Engine / drivetrain brake (dry + viscous), separate from tire viscous
+    ``bw_rear`` inside :meth:`rear_wheel_ground_torque`::
+
+        τ_brake = bw_engine · ω_r + tau_fric · sign(ω_r)
+        Jw_rear · ω̇_r = τ − τ_ground − τ_brake
+
+    At constant ``P``, brake + body aero yield a terminal speed.
+
+    Steer (rate sat only; same idea as :class:`BicycleDynServo`)
+    -----------------------------------------------------------
+    ``delta_dot = clip((delta_cmd - delta) / steering_tau, ±steer_rate_max)``
+
+    No steer-angle hard-stop and no clip of ``delta_cmd`` in ``f``.
     """
 
     def __init__(self):
@@ -1026,10 +1049,10 @@ class BicycleDynEngine(BicycleDyn):
         self.params["bw_rear"] = 0.0
         self.params["steering_tau"] = 0.15
         self.params["steer_rate_max"] = 10.0
-        self.params["torque_tau"] = 0.05
-        self.params["engine_power_peak"] = 5e4
         self.params["engine_tau"] = 0.25
-        self.params["transmission_ratio"] = 1.0
+        self.params["tau_sat"] = 2500.0
+        self.params["bw_engine"] = 2.0
+        self.params["tau_fric"] = 20.0
 
         self.inputs = {}
         self.add_input_port(
@@ -1045,15 +1068,74 @@ class BicycleDynEngine(BicycleDyn):
         self.outputs["y"].units = list(self.state.units)
 
     def f(self, x, u, t=0.0, params=None):
-        raise NotImplementedError(
-            "BicycleDynEngine physics is Phase 3: first-order power lag "
-            "P_dot = (P_cmd - P) / engine_tau, then power→torque via "
-            "engine_power_peak / transmission_ratio, with steer lag as in "
-            "BicycleDynServo. Use BicycleDynServo until then."
-        )
+        jnp = require_jax_numpy()
+        params = self.params if params is None else params
+
+        q = x[0:3]
+        v = x[3:6]
+        w_rear = x[6]
+        delta = x[7]
+        P = x[8]
+        u_in = x[6:8]
+
+        P_cmd = u[0]
+        delta_cmd = u[1]
+
+        M = self.M(q, params)
+        C = self.C(q, v, params)
+        N = self.N(q, params)
+        d = self.generalized_d(q, v, u_in, params)
+
+        dv = jnp.linalg.solve(M, -C @ v - d)
+        dq = N @ v
+
+        tau_sat = params["tau_sat"]
+        # ω≈0 → τ = τ_sat · sign(P); else clip(P/ω, ±τ_sat). Safe denom avoids 0/0.
+        w_safe = jnp.where(jnp.abs(w_rear) < 1e-6, 1e-6, w_rear)
+        tau = jnp.clip(P / w_safe, -tau_sat, tau_sat)
+
+        tau_ground = self.rear_wheel_ground_torque(v, w_rear, delta, params)
+        tau_brake = params["bw_engine"] * w_rear + params["tau_fric"] * jnp.sign(w_rear)
+        w_rear_dot = (tau - tau_ground - tau_brake) / params["Jw_rear"]
+
+        engine_tau = params["engine_tau"]
+        steering_tau = params["steering_tau"]
+        rate_max = params["steer_rate_max"]
+
+        P_dot = (P_cmd - P) / engine_tau
+        delta_dot = (delta_cmd - delta) / steering_tau
+        delta_dot = jnp.clip(delta_dot, -rate_max, rate_max)
+
+        return jnp.concatenate([dq, dv, jnp.array([w_rear_dot, delta_dot, P_dot])])
 
     def _u_in(self, x, u):
         return x[6:8]
+
+
+class BicycleDynEnginePorts(BicycleDynEngine):
+    """:class:`BicycleDynEngine` with named inputs ``P_cmd`` and ``delta_cmd``."""
+
+    def __init__(self):
+        super().__init__()
+        self.name = "BicycleDynEngine (named ports)"
+        self.inputs = {}
+        self.add_input_port(
+            "P_cmd",
+            nominal_value=0.0,
+            labels=["P_cmd"],
+            units=["W"],
+        )
+        self.add_input_port(
+            "delta_cmd",
+            nominal_value=0.0,
+            labels=["delta_cmd"],
+            units=["rad"],
+        )
+
+    def f(self, x, u, t=0.0, params=None):
+        jnp = require_jax_numpy()
+        P_cmd, delta_cmd = self.get_port_values_from_u(u, "P_cmd", "delta_cmd")
+        return super().f(x, jnp.array([P_cmd[0], delta_cmd[0]]), t, params)
 
 
 if __name__ == "__main__":

@@ -190,6 +190,12 @@ serial arms. Joint impedance / task impedance / computed torque use
   for warm-start MPC (also via ``mpc % schedule``).
   Catalog plant :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynRate`
   exposes standard ``u`` / ``y`` ports for hybrid composition.
+  The JAX fidelity ladder in
+  :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles` runs through
+  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynServo`
+  (torque lag) and
+  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynEngine`
+  (wheel-frame power lag + stall torque + engine brake).
   Named vehicle envelopes (parameters + planning limits) live in
   :mod:`~minilink.dynamics.catalog.vehicles.car_profile`
   (``passenger_car``, ``racecar``, ``udes_1_5``); apply with

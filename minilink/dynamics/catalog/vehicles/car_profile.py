@@ -500,6 +500,7 @@ _JAX_VEHICLE_CLASSES = frozenset(
         "BicycleDynServo",
         "BicycleDynServoPorts",
         "BicycleDynEngine",
+        "BicycleDynEnginePorts",
     }
 )
 
@@ -524,9 +525,10 @@ def to_jax_plant_params(profile: CarProfile) -> dict[str, float]:
         "steering_tau": profile.steering_tau,
         "steer_rate_max": profile.steer_rate_max,
         "torque_tau": 0.05,
-        "engine_power_peak": profile.engine_power_peak,
         "engine_tau": profile.engine_tau,
-        "transmission_ratio": profile.transmission_ratio,
+        "tau_sat": 2500.0,
+        "bw_engine": 2.0,
+        "tau_fric": 20.0,
     }
 
 
@@ -631,13 +633,19 @@ def _apply_dynamic_nine(sys: Any, profile: CarProfile) -> None:
 
     tau_max = lim.tau_rear_max
     tau_min = lim.tau_rear_min
+    P_peak = profile.engine_power_peak
     if "tau_cmd" in sys.inputs:
         _set_port_bounds(sys.inputs["tau_cmd"], [tau_min], [tau_max])
+        _set_port_bounds(sys.inputs["delta_cmd"], [-delta], [delta])
+    elif "P_cmd" in sys.inputs:
+        _set_port_bounds(sys.inputs["P_cmd"], [-P_peak], [P_peak])
         _set_port_bounds(sys.inputs["delta_cmd"], [-delta], [delta])
     elif "u" in sys.inputs:
         labels = getattr(sys.inputs["u"], "labels", [])
         if labels and labels[0] == "tau_cmd":
             _set_port_bounds(sys.inputs["u"], [tau_min, -delta], [tau_max, delta])
+        elif labels and labels[0] == "P_cmd":
+            _set_port_bounds(sys.inputs["u"], [-P_peak, -delta], [P_peak, delta])
 
 
 _APPLY_BY_CLASS: dict[str, Any] = {
@@ -654,6 +662,8 @@ _APPLY_BY_CLASS: dict[str, Any] = {
     "BicycleDynTauRatePorts": _apply_dynamic_eight,
     "BicycleDynServo": _apply_dynamic_nine,
     "BicycleDynServoPorts": _apply_dynamic_nine,
+    "BicycleDynEngine": _apply_dynamic_nine,
+    "BicycleDynEnginePorts": _apply_dynamic_nine,
 }
 
 

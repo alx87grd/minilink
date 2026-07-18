@@ -401,6 +401,7 @@ pytest.importorskip("jax")
 from minilink.core.backends import configure_jax
 from minilink.dynamics.catalog.vehicles.jax_vehicles import (
     BicycleDynEngine,
+    BicycleDynEnginePorts,
     BicycleDynRate,
     BicycleDynRatePorts,
     BicycleDynServo,
@@ -486,11 +487,59 @@ class TestBicycleDynServo(unittest.TestCase):
 
 
 class TestBicycleDynEngine(unittest.TestCase):
-    def test_f_raises_not_implemented(self):
+    def setUp(self):
         configure_jax(enable_x64=True)
+        self.named = BicycleDynEnginePorts()
+        self.uy = BicycleDynEngine()
+
+    def test_standard_ports(self):
+        self.assertIn("u", self.uy.inputs)
+        self.assertEqual(self.uy.inputs["u"].dim, 2)
+        self.assertEqual(self.uy.n, 9)
+        self.assertEqual(self.uy.inputs["u"].labels, ["P_cmd", "delta_cmd"])
+        self.assertIn("y", self.uy.outputs)
+        self.assertEqual(self.uy.outputs["y"].dim, self.uy.n)
+        self.assertNotIn("torque_tau", self.uy.params)
+        self.assertNotIn("transmission_ratio", self.uy.params)
+        self.assertNotIn("engine_power_peak", self.uy.params)
+
+    def test_f_matches_named_engine_inputs(self):
+        x = np.array([1.0, 2.0, 0.1, 3.0, 0.2, 0.05, 10.0, 0.1, 5000.0])
+        u = np.array([8000.0, 0.05])
+        dx_named = np.asarray(self.named.f(x, u))
+        dx_uy = np.asarray(self.uy.f(x, u))
+        np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
+
+    def test_unsaturated_torque_is_power_over_omega(self):
         sys = BicycleDynEngine()
-        with self.assertRaises(NotImplementedError):
-            sys.f(np.zeros(9), np.zeros(2))
+        w = 50.0
+        P = 5000.0
+        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, w, 0.0, P])
+        u = np.array([P, 0.0])
+        # Mid-speed unsaturated: τ ≈ P/ω ≪ tau_sat
+        self.assertLess(abs(P / w), sys.params["tau_sat"])
+        dx = np.asarray(sys.f(x, u))
+        # P_dot ≈ 0 when P_cmd = P
+        np.testing.assert_allclose(dx[8], 0.0, atol=1e-09)
+
+    def test_stall_torque_saturates_near_zero_omega(self):
+        sys = BicycleDynEngine()
+        tau_sat = sys.params["tau_sat"]
+        P = 1e6
+        x = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, P])
+        u = np.array([P, 0.0])
+        dx = np.asarray(sys.f(x, u))
+        # ω=0, P>0 → τ = +τ_sat; brake≈0 → ω̇ = τ_sat / Jw
+        np.testing.assert_allclose(dx[6], tau_sat / sys.params["Jw_rear"], rtol=1e-06)
+
+    def test_params_override_engine_brake(self):
+        sys = BicycleDynEngine()
+        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0 / 0.3, 0.0, 0.0])
+        u = np.array([0.0, 0.0])
+        params = {**sys.params, "bw_engine": 10.0 * sys.params["bw_engine"]}
+        dx_nom = np.asarray(sys.f(x, u))
+        dx_heavy = np.asarray(sys.f(x, u, params=params))
+        self.assertFalse(np.allclose(dx_nom[6], dx_heavy[6]))
 
 
 class TestCarProfile(unittest.TestCase):
@@ -614,5 +663,26 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.params["torque_tau"], 0.05)
         self.assertAlmostEqual(
             sys.inputs["u"].upper_bound[0], profile.limits.tau_rear_max
+        )
+        self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
+
+    def test_apply_car_profile_engine_plant(self):
+        from minilink.dynamics.catalog.vehicles.car_profile import (
+            apply_car_profile,
+            racecar_profile,
+        )
+
+        sys = BicycleDynEngine()
+        apply_car_profile(sys, racecar_profile())
+        profile = racecar_profile()
+        self.assertAlmostEqual(sys.params["engine_tau"], profile.engine_tau)
+        self.assertAlmostEqual(sys.params["steering_tau"], profile.steering_tau)
+        self.assertNotIn("engine_power_peak", sys.params)
+        self.assertNotIn("transmission_ratio", sys.params)
+        self.assertAlmostEqual(
+            sys.inputs["u"].upper_bound[0], profile.engine_power_peak
+        )
+        self.assertAlmostEqual(
+            sys.inputs["u"].lower_bound[0], -profile.engine_power_peak
         )
         self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
