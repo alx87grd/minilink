@@ -66,7 +66,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Catalog | `pyro/dynamic/rocket.py` | Rocket | `minilink/dynamics/catalog/aerial/rocket.py` | Rocket | **Done** |  |
 | Catalog | `pyro/dynamic/suspension.py` | QuarterCarOnRoughTerrain | `minilink/dynamics/catalog/vehicles/suspension.py` | QuarterCarOnRoughTerrain | **Done** |  |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | — | **Partial** | Only LinearTire implemented |
-| Catalog | `pyro/dynamic/vehicle_dynamic.py` | LinearTire | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | LinearTire (+ JaxLinearTire) | **Done** |  |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | LinearTire | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | LinearTire (+ LinearTire) | **Done** |  |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | ROADMAP §5.8 review queue |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | DynamicBicycle | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | DynamicBicycle (+ JAX twins, rate inputs) | **Done** | Minilink adds rate-input variant |
 | Catalog | `pyro/dynamic/vehicle_propulsion.py` | LongitudinalFrontWheelDriveCarWithWheelSlipInput | `minilink/dynamics/catalog/vehicles/propulsion.py` | same | **Done** |  |

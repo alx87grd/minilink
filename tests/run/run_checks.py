@@ -11,6 +11,7 @@
 | ``regression_gates`` | Regression gates (full local) |
 | ``regression_gates_ci`` | Regression gates (CI flags) |
 | ``demo_checks`` | Catalog + flagship demo checks |
+| ``notebook_checks`` | Teaching notebook smoke (execute code cells) |
 | ``benchmark_study_list`` | Benchmark study preset list |
 | ``benchmark_study_f_eval`` | Benchmark study: native/NumPy/JAX f() on pendulum |
 """
@@ -58,6 +59,10 @@ def main() -> int:
                 return code
             return _common.run_demo_check_script(
                 "tests/demo_checks/run_flagship_demos.py"
+            )
+        case "notebook_checks":
+            return _common.run_demo_check_script(
+                "tests/demo_checks/run_notebook_checks.py"
             )
         case "benchmark_study_list":
             return _common.run_study_script(["--list"])

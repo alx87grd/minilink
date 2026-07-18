@@ -1,8 +1,8 @@
 """Lane-change trajectory optimization with servo + torque bicycle inputs.
 
 Same setup as ``demo_dynamic_bicycle_trajopt_lanechange.py``, but the plant is
-:class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleServoInputs`
-with ``u = [tau_rear, delta_sp]`` instead of wheel/steer rate commands.
+:class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynServo`
+with ``u = [tau_cmd, delta_cmd]`` instead of wheel/steer rate commands.
 
 Run from repo root::
 
@@ -13,9 +13,7 @@ import numpy as np
 
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleServoInputs,
-)
+from minilink.dynamics.catalog.vehicles.jax_vehicles import BicycleDynServo
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -29,14 +27,14 @@ PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT
 SCIPY_DISP = False
 TF = 3.0
 N_STEPS = 30
-U_0 = 10.0
-U_TARGET = U_0 * 0.0
+U_0 = 5.0
+U_TARGET = U_0 * 2.0
 Y_GOAL = 2.5
 HEADING_TARGET = 0.0
 
-sys = JaxDynamicBicycleServoInputs()
+sys = BicycleDynServo()
 
-x_start = np.array([0.0, 0.0, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0])
+x_start = np.array([0.0, 0.0, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0, 0.0])
 x_ref = np.array(
     [
         0.0,
@@ -47,12 +45,13 @@ x_ref = np.array(
         0.0,
         U_TARGET / sys.params["r_r"],
         0.0,
+        0.0,
     ]
 )
 
-Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0])
+Q = np.diag([0.0, 10.0, 1.0, 10.0, 0.1, 0.1, 0.01, 1.0, 0.0])
 R = np.diag([1e-4, 10.0])
-S = np.diag([0.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0])
+S = np.diag([0.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.01, 1.0, 0.0])
 
 ubar = np.array([0.0, 0.0])
 

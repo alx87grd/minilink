@@ -153,38 +153,27 @@ serial arms. Joint impedance / task impedance / computed torque use
 `control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
-**Vehicle JAX ladder** (`dynamics/catalog/vehicles/`) — bicycle-family plants
-ordered by modeling richness; all JAX twins trace `f` through `jax.numpy` for
-trajopt (`compile_backend="jax"`). Compare demo:
-`examples/scripts/trajectory_optimization/demo_bicycle_trajopt_obstacle_scene_compare.py`
-and
-[notebook](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb).
+**Vehicle JAX ladder** — :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles`
+(planning / trajopt plants; module-scoped names, no ``Jax`` prefix). Default
+``u`` / ``y = x``; named-port twins use the ``Ports`` suffix. Compare:
+``demo_car_trajopt_compare.py`` and
+[notebook](examples/notebooks/driving_model_trajopt_analysis.ipynb).
 
-| Tier | Plant | State $n$ | Input |
+| Class | $n$ | Input $\mathbf{u}$ | Role |
 | --- | --- | --- | --- |
-| kinematics | `JaxHolonomicMobileRobot` | 2 | $[v_x, v_y]$ |
-| | `JaxKinematicBicycle` | 3 | $[v, \delta]$ |
-| | `JaxDynamicHolonomicMobileRobot` | 4 | $[a_x, a_y]$ |
-| | `JaxKinematicBicycleRateInputs` | 5 | $[\dot v, \dot\delta]$ |
-| rigid body + tires | `JaxDynamicBicycle` | 6 | $[\omega_r, \delta]$ |
-| actuators | `JaxDynamicBicycleRateInputs` | 8 | $[\dot\omega_r, \dot\delta]$ |
-| | `JaxDynamicBicycleServoInputs` | 8 | $[\tau_r, \delta_{\mathrm{sp}}]$ |
+| `Holonomic` | 2 | $[v_x, v_y]$ | holonomic point |
+| `HolonomicAccel` | 4 | $[a_x, a_y]$ | holonomic double integrator |
+| `BicycleKin` | 3 | $[v, \delta]$ | kinematic bicycle |
+| `BicycleAcc` | 5 | $[a_x, \dot\delta]$ | no-slip accel / steer rate |
+| `BicycleDyn` | 6 | $[\omega_r, \delta]$ | rigid body + linear tires |
+| `BicycleDynRate` | 8 | $[\dot\omega_r, \dot\delta]$ | integrated wheel / steer |
+| `BicycleDynTauRate` | 8 | $[\tau_r, \dot\delta]$ | torque + steer rate |
+| `BicycleDynServo` | 9 | $[\tau_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged torque + steer |
+| `BicycleDynEngine` | 9 | $[P_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged **power** + steer |
 
-The compare demo solves all seven plants on one mission. **Engine power envelope**
-— constant-power torque rating and derived bounds — lives in
-:mod:`~minilink.dynamics.catalog.vehicles.car_profile` (``passenger_car``,
-``racecar``, ``udes_1_5``); apply with
-:func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
-
-`:class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs.inverse_propulsion_dynamics`
-maps rate input $\dot\omega_r$ to motor torque (bridge between rate and servo
-tiers). `*UY` variants share the same `f` with standard ``u`` / ``y`` ports
-(see hybrid bullet below).
-
-Named envelopes — :mod:`~minilink.dynamics.catalog.vehicles.car_profile`:
-rigid-body and tire params, $P_{\max}$, steering time constants; symmetric
-planning limits from power at $v_{\mathrm{nom}}$ via
-:func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
+NumPy bicycle plants remain in :mod:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle`
+and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
+:mod:`~minilink.dynamics.catalog.vehicles.car_profile` (`apply_car_profile`).
 
 ## 4. Core Object Contracts
 
@@ -221,8 +210,14 @@ planning limits from power at $v_{\mathrm{nom}}$ via
   :func:`~minilink.core.composition.resolve_standard_feedback`);
   :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.export_to_computer`
   for warm-start MPC (also via ``mpc % schedule``).
-  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
+  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynRate`
   exposes standard ``u`` / ``y`` ports for hybrid composition.
+  The JAX fidelity ladder in
+  :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles` runs through
+  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynServo`
+  (torque lag) and
+  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynEngine`
+  (wheel-frame power lag + stall torque + engine brake).
   Named vehicle envelopes (parameters + planning limits) live in
   :mod:`~minilink.dynamics.catalog.vehicles.car_profile`
   (``passenger_car``, ``racecar``, ``udes_1_5``); apply with

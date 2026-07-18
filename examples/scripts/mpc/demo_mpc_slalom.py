@@ -17,8 +17,8 @@ from minilink.control.mpc import (
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputsUY,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRate,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
@@ -54,7 +54,7 @@ OBSTACLE_REPULSION_EPS = 0.08
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 scene = Scene(obstacles=[Sphere(c, keepout_radius) for c in OBSTACLE_CENTERS])
 
-sys_mpc = JaxDynamicBicycleRateInputsUY()
+sys_mpc = BicycleDynRate()
 sys_mpc.state.lower_bound[6] = 0.0
 sys_mpc.state.upper_bound[6] = 90.0
 sys_mpc.state.lower_bound[7] = -0.55
@@ -89,7 +89,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True)
 
-sys_sim = JaxDynamicBicycleRateInputsUY()
+sys_sim = BicycleDynRate()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
 sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = 12.0

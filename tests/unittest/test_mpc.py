@@ -642,15 +642,15 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
 
 
 pytest.importorskip("jax")
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputsUY,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRate,
 )
 from minilink.simulation.computer import Computer
 
 
 def _planner():
     configure_jax(enable_x64=True)
-    sys = JaxDynamicBicycleRateInputsUY()
+    sys = BicycleDynRate()
     x0 = sys.x0.copy()
     return TrajectoryOptimizationPlanner(
         PlanningProblem(
@@ -859,8 +859,8 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
     u_target = 4.0
     mpc_horizon = 1.0
     mpc_steps = 8
-    sys_mpc = JaxDynamicBicycleRateInputsUY()
-    sys_sim = JaxDynamicBicycleRateInputsUY()
+    sys_mpc = BicycleDynRate()
+    sys_sim = BicycleDynRate()
     sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
     w_rear_max = 90.0
     delta_max = 0.55
@@ -963,8 +963,8 @@ pytest.importorskip("jax")
 from minilink.blocks.routing import Demux
 from minilink.control.mpc.utilities import mpc_default_computer_x0, mpc_warm_start_guess
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputs,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRatePorts,
 )
 from minilink.simulation.computer import Computer, StepSchedule
 
@@ -974,8 +974,8 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     u_target = 4.0
     mpc_horizon = 1.0
     mpc_steps = 8
-    sys_mpc = JaxDynamicBicycleRateInputs()
-    sys_sim = JaxDynamicBicycleRateInputs()
+    sys_mpc = BicycleDynRatePorts()
+    sys_sim = BicycleDynRatePorts()
     sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
     w_rear_max = 90.0
     delta_max = 0.55
@@ -1106,8 +1106,8 @@ DELTA_DOT_MAX = 2.0
 
 def _configure_bicycle_systems():
     configure_jax(enable_x64=True)
-    sys_mpc = JaxDynamicBicycleRateInputs()
-    sys_sim = JaxDynamicBicycleRateInputs()
+    sys_mpc = BicycleDynRatePorts()
+    sys_sim = BicycleDynRatePorts()
     sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
     sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
     for sys in (sys_mpc, sys_sim):

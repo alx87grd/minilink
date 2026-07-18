@@ -420,7 +420,7 @@ Library modules (`f_evaluators.py`, `simulation.py`, `suites/`, `scenarios/`, `s
 | `test_catalog_migration.py` | broad catalog import/instantiate smoke | `test_dynamics_catalog.py` | |
 | `test_catalog_plant_contracts.py` | deep dynamics + graphics on representative plants | `test_dynamics_catalog.py` | keep as parametrized deep block |
 | `test_manipulators.py` | all catalog manipulator classes cross-check | `test_dynamics_catalog.py` | |
-| `test_dynamic_bicycle_uy.py` | `JaxDynamicBicycleRateInputsUY` | `test_dynamics_catalog.py` | or `test_jax_planning.py` if only JAX |
+| `test_dynamic_bicycle_uy.py` | `BicycleDynRate` | `test_dynamics_catalog.py` | or `test_jax_planning.py` if only JAX |
 | `test_mechanical.py` | `MechanicalSystem` dimensions, `f`, ports | `test_mechanical_robotics.py` | |
 | `test_generalized_mechanical.py` | generalized coordinates variant | `test_mechanical_robotics.py` | |
 | `test_mechanical_jax.py` | JAX mechanical smoke | `test_mechanical_robotics.py` | `@pytest.mark.jax` section |

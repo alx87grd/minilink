@@ -33,6 +33,18 @@ no path hacks needed if the package is installed.
 
 On a normal local kernel, that cell is a no-op.
 
+## CI smoke
+
+The CI ``regression`` job executes every notebook's code cells (fail on error,
+outputs discarded). Locally:
+
+```bash
+MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
+```
+
+New notebooks under this folder must be added to
+[`tests/demo_checks/notebook_manifest.json`](../../tests/demo_checks/notebook_manifest.json).
+
 **Why only meshcat?** Colab already provides NumPy, SciPy, Matplotlib, and JAX-friendly stacks for these demos. Animation in the browser needs **meshcat**; the bootstrap installs that one extra dependency. Heavier local extras (`pip install -e ".[jax]"`, pygame, etc.) are for development on your machine, not required for the thin Colab path.
 
 ## Notebook list
@@ -46,5 +58,5 @@ On a normal local kernel, that cell is a no-op.
 | [demo_optimization.ipynb](demo_optimization.ipynb) | Small NLPs |
 | [demo_plots_animations_backends.ipynb](demo_plots_animations_backends.ipynb) | Plot / animate backends |
 | [demo_mpc_circuit.ipynb](demo_mpc_circuit.ipynb) | Spatial MPC full stack (scene → cost → plan → hybrid deploy) |
-| [demo_bicycle_trajopt_obstacle_scene_compare.ipynb](demo_bicycle_trajopt_obstacle_scene_compare.ipynb) | TrajOpt plant compare |
+| [driving_model_trajopt_analysis.ipynb](driving_model_trajopt_analysis.ipynb) | Car models + TrajOpt compare (obstacle + 90° corner) |
 | [simulation_benchmark.ipynb](simulation_benchmark.ipynb) | ODE solver benchmarks |

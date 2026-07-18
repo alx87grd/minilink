@@ -1,0 +1,56 @@
+[
+  {
+    "id": "demo_showcase",
+    "path": "examples/notebooks/demo_showcase.ipynb",
+    "requires": ["jax"],
+    "timeout": 300
+  },
+  {
+    "id": "demo_compile_evaluator",
+    "path": "examples/notebooks/demo_compile_evaluator.ipynb",
+    "requires": ["jax"],
+    "timeout": 180
+  },
+  {
+    "id": "demo_overview",
+    "path": "examples/notebooks/demo_overview.ipynb",
+    "requires": ["jax"],
+    "timeout": 300
+  },
+  {
+    "id": "demo_stateless_functional_jax",
+    "path": "examples/notebooks/demo_stateless_functional_jax.ipynb",
+    "requires": ["jax"],
+    "timeout": 300
+  },
+  {
+    "id": "demo_optimization",
+    "path": "examples/notebooks/demo_optimization.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "demo_plots_animations_backends",
+    "path": "examples/notebooks/demo_plots_animations_backends.ipynb",
+    "requires": ["meshcat", "plotly"],
+    "timeout": 180
+  },
+  {
+    "id": "demo_mpc_circuit",
+    "path": "examples/notebooks/demo_mpc_circuit.ipynb",
+    "requires": ["jax"],
+    "timeout": 600
+  },
+  {
+    "id": "driving_model_trajopt_analysis",
+    "path": "examples/notebooks/driving_model_trajopt_analysis.ipynb",
+    "requires": ["jax"],
+    "timeout": 600
+  },
+  {
+    "id": "simulation_benchmark",
+    "path": "examples/notebooks/simulation_benchmark.ipynb",
+    "requires": ["jax"],
+    "timeout": 300
+  }
+]

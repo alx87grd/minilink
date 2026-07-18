@@ -8,8 +8,8 @@ functions (no dataclasses) so a custom skin is just another ``(plant) -> dict``.
 
 Authored against the target frame vocabulary (vehicles: ``body`` and
 ``axle_front`` for the 2-D centerline; ``body`` plus steered ``wheel_fl`` /
-``wheel_fr`` for the 3-D four-wheel look). They read plant geometry from
-``plant.params`` and visual attributes with sensible fallbacks, so a bare plant
+``wheel_fr`` for the 3-D four-wheel look). They read axle offsets from
+``plant.a`` / ``plant.b`` when present, else ``plant.params``, so a bare plant
 still skins.
 """
 
@@ -34,6 +34,17 @@ def _wheel_rectangle(wl, ww, color="black", linewidth=1):
     return Line(pts, color=color, linewidth=linewidth)
 
 
+def _axle_offsets(plant):
+    """Front/rear CG→axle distances for skins (attrs preferred over params)."""
+    if hasattr(plant, "a") and hasattr(plant, "b"):
+        return float(plant.a), float(plant.b)
+    params = getattr(plant, "params", {}) or {}
+    if "a" in params and "b" in params:
+        return float(params["a"]), float(params["b"])
+    length = float(params.get("length", 2.0))
+    return 0.5 * length, 0.5 * length
+
+
 def car_skin_2d(plant, color="#1a1a1a"):
     """2-D centerline car look: chassis line + two axle wheels.
 
@@ -42,8 +53,7 @@ def car_skin_2d(plant, color="#1a1a1a"):
     ``axle_front`` (steered front wheel). The placing ``tf`` supplies world pose
     and the front steer angle.
     """
-    a = plant.params["a"]
-    b = plant.params["b"]
+    a, b = _axle_offsets(plant)
     wl = getattr(plant, "wheel_len", 0.6)
     ww = getattr(plant, "wheel_width", 0.2)
 
@@ -65,8 +75,7 @@ def car_skin_3d(plant, color="#151922"):
     rods; fixed hub offsets are baked into each rod ``local_transform``), and
     ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``).
     """
-    a = plant.params["a"]
-    b = plant.params["b"]
+    a, b = _axle_offsets(plant)
     r_f = plant.params["r_f"]
     r_r = plant.params["r_r"]
 

@@ -53,6 +53,12 @@ from minilink.dynamics.catalog.pendulum.pendulum import (
     Pendulum,
     TwoIndependentPendulums,
 )
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleAcc,
+    BicycleKin,
+    Holonomic,
+    HolonomicAccel,
+)
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalFrontWheelDriveCarWithTorqueInput,
@@ -63,10 +69,6 @@ from minilink.dynamics.catalog.vehicles.steering import (
     DynamicHolonomicMobileRobot,
     HolonomicMobileRobot,
     HolonomicMobileRobot3D,
-    JaxDynamicHolonomicMobileRobot,
-    JaxHolonomicMobileRobot,
-    JaxKinematicBicycle,
-    JaxKinematicBicycleRateInputs,
     KinematicBicycle,
     KinematicCar,
     UdeSRacecar,
@@ -118,22 +120,20 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("UnderactuatedRotatingCartPole", UnderactuatedRotatingCartPole),
     CatalogCheckEntry("CartPole", CartPole),
     CatalogCheckEntry("KinematicBicycle", KinematicBicycle),
-    CatalogCheckEntry("JaxKinematicBicycle", JaxKinematicBicycle, requires_jax=True),
+    CatalogCheckEntry("BicycleKin", BicycleKin, requires_jax=True),
     CatalogCheckEntry(
-        "JaxKinematicBicycleRateInputs",
-        JaxKinematicBicycleRateInputs,
+        "BicycleAcc",
+        BicycleAcc,
         requires_jax=True,
     ),
     CatalogCheckEntry("KinematicCar", KinematicCar),
     CatalogCheckEntry("ConstantSpeedKinematicCar", ConstantSpeedKinematicCar),
     CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),
     CatalogCheckEntry("DynamicHolonomicMobileRobot", DynamicHolonomicMobileRobot),
+    CatalogCheckEntry("Holonomic", Holonomic, requires_jax=True),
     CatalogCheckEntry(
-        "JaxHolonomicMobileRobot", JaxHolonomicMobileRobot, requires_jax=True
-    ),
-    CatalogCheckEntry(
-        "JaxDynamicHolonomicMobileRobot",
-        JaxDynamicHolonomicMobileRobot,
+        "HolonomicAccel",
+        HolonomicAccel,
         requires_jax=True,
     ),
     CatalogCheckEntry("HolonomicMobileRobot3D", HolonomicMobileRobot3D),
