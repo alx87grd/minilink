@@ -489,7 +489,7 @@ class TestCarProfile(unittest.TestCase):
         self.assertEqual(profile.v_nom, 10.0)
         self.assertLess(profile.v_nom, profile.limits.vx_max)
         self.assertAlmostEqual(profile.limits.delta_max, np.pi / 4.0, places=2)
-        self.assertEqual(profile.limits.delta_dot_max, 10.0)
+        self.assertEqual(profile.limits.delta_dot_max, 3.0)
         self.assertEqual(profile.limits.w_rear_dot_max, 41.0)
         self.assertEqual(profile.limits.tau_rear_max, 3400.0)
         self.assertEqual(profile.limits.tau_rear_min, -3400.0)

@@ -309,7 +309,7 @@ def passenger_car_profile() -> CarProfile:
     vx_max = 27.0
     v_nom = 15.0
     delta_max = 0.60
-    steer_rate_max = 1.0
+    steer_rate_max = 1.5
     return CarProfile(
         name="passenger_car",
         mass=mass,
@@ -362,7 +362,7 @@ def racecar_profile() -> CarProfile:
     vx_max = 35.0
     v_nom = 10.0
     delta_max = round(np.pi / 4.0, 2)
-    steer_rate_max = 10.0
+    steer_rate_max = 3.0
     engine_power_peak = 100000.0
     return CarProfile(
         name="racecar",
