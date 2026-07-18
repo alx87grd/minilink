@@ -459,8 +459,9 @@ class TestDynamicBicycleServoInputs(unittest.TestCase):
         np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
 
     def test_f_matches_named_servo_inputs_at_steering_limit(self):
-        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 33.0, 0.2])
-        u = np.array([0.0, 0.5])
+        delta_lim = np.pi / 4.0
+        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 33.0, delta_lim])
+        u = np.array([0.0, 1.0])
         dx_named = np.asarray(self.named.f(x, u))
         dx_uy = np.asarray(self.uy.f(x, u))
         np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)

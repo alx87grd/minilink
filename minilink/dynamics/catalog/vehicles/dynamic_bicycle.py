@@ -816,8 +816,8 @@ class JaxDynamicBicycleServoInputs(JaxDynamicBicycle):
         self.params["bw_rear"] = 0.0
         self.params["steer_Kp"] = 1.0 / 0.15
         self.params["steer_rate_max"] = 10.0
-        self.params["delta_min"] = -0.2
-        self.params["delta_max"] = 0.2
+        self.params["delta_min"] = -np.pi / 4.0
+        self.params["delta_max"] = np.pi / 4.0
 
         self.inputs = {}
         self.add_input_port(
@@ -825,16 +825,12 @@ class JaxDynamicBicycleServoInputs(JaxDynamicBicycle):
             nominal_value=0.0,
             labels=["tau_rear"],
             units=["Nm"],
-            lower_bound=-1000.0,
-            upper_bound=1000.0,
         )
         self.add_input_port(
             "delta_sp",
             nominal_value=0.0,
             labels=["delta_sp"],
             units=["rad"],
-            lower_bound=self.params["delta_min"],
-            upper_bound=self.params["delta_max"],
         )
         self.outputs = {}
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
@@ -916,8 +912,8 @@ class JaxDynamicBicycleServoInputsUY(JaxDynamicBicycleServoInputs):
         self.params["bw_rear"] = 0.0
         self.params["steer_Kp"] = 1.0 / 0.15
         self.params["steer_rate_max"] = 10.0
-        self.params["delta_min"] = -0.2
-        self.params["delta_max"] = 0.2
+        self.params["delta_min"] = -np.pi / 4.0
+        self.params["delta_max"] = np.pi / 4.0
 
         self.inputs = {}
         self.add_input_port(
@@ -926,8 +922,6 @@ class JaxDynamicBicycleServoInputsUY(JaxDynamicBicycleServoInputs):
             nominal_value=np.zeros(2),
             labels=["tau_rear", "delta_sp"],
             units=["Nm", "rad"],
-            lower_bound=np.array([-1000.0, self.params["delta_min"]]),
-            upper_bound=np.array([1000.0, self.params["delta_max"]]),
         )
         self.outputs = {}
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
