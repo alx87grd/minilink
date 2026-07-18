@@ -16,6 +16,13 @@ collocation on (simplest → most complex by state dimension):
 - :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs` (n=8)
 - :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleServoInputs` (n=8)
 
+The full vehicle ladder (including throttle + simple engine model
+``EngineBicycle``, n=10) and textbook EoM for each tier are documented in the
+companion
+`notebook <examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb>`_
+and ``DESIGN.md``; LOS cascade demos use the engine tier in
+``examples/projects/bicycle_los*``.
+
 Prints solve-time summary, shows side-by-side path and speed plots, then plays
 seven animations (one per plant).
 """

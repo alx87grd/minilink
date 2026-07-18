@@ -8,8 +8,13 @@ rate [rad/s]) and ``delta`` (steer angle [rad]) so diagrams can wire each
 command independently.
 
 :class:`DynamicBicycleCar3D` subclasses this model with identical dynamics and richer 3D graphics.
-:class:`JaxDynamicBicycle` is a JAX-traceable variant of the same dynamics, suitable for
-gradient-based trajectory optimization.
+
+JAX ladder (see :mod:`~minilink.dynamics.catalog.vehicles.car_profile` and
+``DESIGN.md`` vehicle table): :class:`JaxDynamicBicycle` ($n=6$);
+:class:`JaxDynamicBicycleRateInputs` ($n=8$, rate inputs, ``inverse_propulsion_dynamics``);
+:class:`JaxDynamicBicycleServoInputs` ($n=8$, motor torque + steering setpoint);
+``*UY`` twins with standard ``u`` / ``y`` ports. Top rung with throttle + engine
+lag: ``EngineBicycle`` in ``examples/projects/bicycle_los*/vehicle.py``.
 """
 
 from functools import partial

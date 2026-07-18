@@ -153,6 +153,42 @@ serial arms. Joint impedance / task impedance / computed torque use
 `control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
+**Vehicle JAX ladder** (`dynamics/catalog/vehicles/`) — bicycle-family plants
+ordered by modeling richness; all JAX twins trace `f` through `jax.numpy` for
+trajopt (`compile_backend="jax"`). Compare demo:
+`examples/scripts/trajectory_optimization/demo_bicycle_trajopt_obstacle_scene_compare.py`
+and
+[notebook](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb).
+
+| Tier | Plant | State $n$ | Input |
+| --- | --- | --- | --- |
+| kinematics | `JaxHolonomicMobileRobot` | 2 | $[v_x, v_y]$ |
+| | `JaxKinematicBicycle` | 3 | $[v, \delta]$ |
+| | `JaxDynamicHolonomicMobileRobot` | 4 | $[a_x, a_y]$ |
+| | `JaxKinematicBicycleRateInputs` | 5 | $[\dot v, \dot\delta]$ |
+| rigid body + tires | `JaxDynamicBicycle` | 6 | $[\omega_r, \delta]$ |
+| actuators | `JaxDynamicBicycleRateInputs` | 8 | $[\dot\omega_r, \dot\delta]$ |
+| | `JaxDynamicBicycleServoInputs` | 8 | $[\tau_r, \delta_{\mathrm{sp}}]$ |
+| power + engine lag | `EngineBicycle` (project demo) | 10 | $[\mathrm{throttle}, \delta_{\mathrm{cmd}}]$ |
+
+The compare demo solves tiers 1–7 on one mission. **Tier 8** —
+`EngineBicycle` in `examples/projects/bicycle_los*/vehicle.py` — adds a
+normalized **throttle** (power fraction), constant-power torque map
+$\tau_{\mathrm{avail}} = P_{\max}/\omega_{\mathrm{eng}}$, and first-order engine
+lag $\dot\tau_{\mathrm{engine}} = (\tau_{\mathrm{cmd}}-\tau_{\mathrm{engine}})/\tau_{\mathrm{engine}}$
+plus steering lag; used in LOS cascade MPC demos, not yet a catalog JAX plant.
+
+`:class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs.inverse_propulsion_dynamics`
+maps rate input $\dot\omega_r$ to motor torque (bridge between rate and servo
+tiers). `*UY` variants share the same `f` with standard ``u`` / ``y`` ports
+(see hybrid bullet below).
+
+Named envelopes — :mod:`~minilink.dynamics.catalog.vehicles.car_profile`
+(``passenger_car``, ``racecar``, ``udes_1_5``): rigid-body and tire params,
+$P_{\max}$, $\tau_{\mathrm{engine}}$, steering time constants; symmetric
+planning limits from power at $v_{\mathrm{nom}}$ via
+:func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
+
 ## 4. Core Object Contracts
 
 ### `System`
