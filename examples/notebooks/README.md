@@ -46,5 +46,5 @@ On a normal local kernel, that cell is a no-op.
 | [demo_optimization.ipynb](demo_optimization.ipynb) | Small NLPs |
 | [demo_plots_animations_backends.ipynb](demo_plots_animations_backends.ipynb) | Plot / animate backends |
 | [demo_mpc_circuit.ipynb](demo_mpc_circuit.ipynb) | Spatial MPC full stack (scene → cost → plan → hybrid deploy) |
-| [demo_bicycle_trajopt_obstacle_scene_compare.ipynb](demo_bicycle_trajopt_obstacle_scene_compare.ipynb) | `jax_vehicles` ladder intro + TrajOpt plant compare |
+| [demo_car_trajopt_compare.ipynb](demo_car_trajopt_compare.ipynb) | Car models + TrajOpt compare (obstacle + 90° corner) |
 | [simulation_benchmark.ipynb](simulation_benchmark.ipynb) | ODE solver benchmarks |
