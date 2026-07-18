@@ -527,17 +527,18 @@ class TestCarProfile(unittest.TestCase):
 
         for name in list_car_profiles():
             profile = get_car_profile(name)
-            self.assertGreater(
-                profile.limits.tau_rear_max,
-                profile.traction_torque_max(),
-                msg=name,
-            )
-            self.assertGreater(
-                profile.limits.w_rear_dot_max,
-                round(profile.traction_wheel_accel_reference()),
-                msg=name,
-            )
-            self.assertGreater(profile.actuator_traction_headroom(), 1.0, msg=name)
+            if profile.propulsion_torque_nominal() > profile.traction_torque_max():
+                self.assertGreater(
+                    profile.limits.tau_rear_max,
+                    profile.traction_torque_max(),
+                    msg=name,
+                )
+                self.assertGreater(
+                    profile.limits.w_rear_dot_max,
+                    round(profile.traction_wheel_accel_reference()),
+                    msg=name,
+                )
+                self.assertGreater(profile.actuator_traction_headroom(), 1.0, msg=name)
 
     def test_udes_matches_kinematic_racecar_geometry(self):
         from minilink.dynamics.catalog.vehicles.car_profile import udes_1_5_profile

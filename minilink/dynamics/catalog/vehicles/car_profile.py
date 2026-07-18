@@ -405,8 +405,7 @@ def racecar_profile() -> CarProfile:
 def udes_1_5_profile() -> CarProfile:
     """1:5 UdeS racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar`).
 
-    ``P = 800 W`` at ``v_nom = 5 m/s`` → ``tau ≈ 11 Nm``, ``w_rear_dot ≈ 162 rad/s²``
-    (~3× rear traction reference).
+    ``P = 200 W`` at ``v_nom = 5 m/s`` → ``tau ≈ 2.8 Nm``, ``w_rear_dot ≈ 41 rad/s²``.
     """
     mass = 10.0
     a = 0.17
@@ -417,7 +416,7 @@ def udes_1_5_profile() -> CarProfile:
     v_nom = 5.0
     delta_max = 0.55
     steer_rate_max = 3.0
-    engine_power_peak = 800.0
+    engine_power_peak = 200.0
     return CarProfile(
         name="udes_1_5",
         mass=mass,
