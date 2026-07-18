@@ -298,8 +298,8 @@ def _make_limits(
 def passenger_car_profile() -> CarProfile:
     """Full-size passenger sedan (~1500 kg, 2.7 m wheelbase).
 
-    ``P = 120 kW`` at ``v_nom = 10 m/s`` → ``tau ≈ 3960 Nm``, ``w_rear_dot ≈ 24 rad/s²``
-    (~1.6× rear traction — typical sedan, near grip at moderate speed).
+    ``P = 120 kW`` at ``v_nom = 15 m/s`` → ``tau ≈ 2640 Nm``, ``w_rear_dot ≈ 16 rad/s²``
+    (~1.1× rear traction — typical sedan near grip at moderate speed).
     """
     mass = 1500.0
     a = 1.2
@@ -307,7 +307,7 @@ def passenger_car_profile() -> CarProfile:
     r_r = 0.33
     mu = 0.9
     vx_max = 27.0
-    v_nom = 10.0
+    v_nom = 15.0
     delta_max = 0.60
     steer_rate_max = 1.0
     return CarProfile(
