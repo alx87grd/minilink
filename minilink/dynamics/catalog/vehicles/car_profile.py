@@ -24,7 +24,7 @@ Both directions use the same symmetric cap (regen rated like forward drive).
 Every profile uses the same pipeline (:func:`nominal_actuator_torque` →
 :func:`effective_wheel_inertia` → ``w_rear_dot``, ``a_long``) via
 :func:`_make_limits` and the :class:`CarProfile` propulsion helpers.
-``v_nom`` is profile-specific; a passenger sedan near traction at 10 m/s is
+``v_nom`` is profile-specific; a passenger sedan near traction at 15 m/s is
 normal, while race / RC profiles pick lower ``v_nom`` for more headroom.
 Compare actuator vs grip with :meth:`CarProfile.actuator_traction_headroom`.
 
