@@ -47,7 +47,7 @@
   {
     "id": "cartpole_trajopt_jax",
     "path": "examples/scripts/trajectory_optimization/demo_cartpole_direct_collocation_jax_ipopt.py",
-    "requires": ["jax"]
+    "requires": ["jax", "cyipopt"]
   },
   {
     "id": "mpc_minimal",

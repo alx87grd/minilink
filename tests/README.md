@@ -53,7 +53,7 @@ Optional toggles: constants at the top of each `tests/run/*.py` file.
 | Docs/markdown only | skip pytest |
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or handoff | `pytest` |
-| Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 6 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 | Backend perf exploration | `python benchmarks/run_study.py --list` |
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
 
