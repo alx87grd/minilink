@@ -272,7 +272,7 @@ def passenger_car_profile() -> CarProfile:
 def racecar_profile() -> CarProfile:
     """Bicycle LOS race vehicle (rounded from ``create_vehicle``).
 
-    ``P = 200 kW`` at ``v_nom = 15 m/s`` — traction-limited at nominal;
+    ``P = 200 kW`` at ``v_nom = 10 m/s`` — traction-limited at nominal;
     ``tau ≈ 1060 Nm``, ``w_rear_dot ≈ 13 rad/s²``.
     """
     mass = 700.0
@@ -281,7 +281,7 @@ def racecar_profile() -> CarProfile:
     r_r = 0.34
     mu = 1.0
     vx_max = 35.0
-    v_nom = 15.0
+    v_nom = 10.0
     delta_max = round(np.pi / 4.0, 2)
     steer_rate_max = 10.0
     engine_power_peak = 200000.0
