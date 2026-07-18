@@ -30,6 +30,10 @@ Compare actuator vs grip with :meth:`CarProfile.actuator_traction_headroom`.
 
 Steering rate ``delta_dot_max`` equals ``steer_rate_max`` (road-wheel slew).
 
+Engine plants (:class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynEngine`)
+also take ``tau_sat``, ``bw_engine``, and ``tau_fric`` from the profile; ``engine_power_peak``
+is a port / state bound only (not an EoM saturation).
+
 Profiles
 --------
 - :func:`passenger_car_profile` — full-size sedan-scale catalog defaults
@@ -94,6 +98,9 @@ class CarProfile:
     engine_power_peak: float
     engine_tau: float
     transmission_ratio: float
+    tau_sat: float
+    bw_engine: float
+    tau_fric: float
     v_nom: float
     limits: CarLimits
 
@@ -331,6 +338,9 @@ def passenger_car_profile() -> CarProfile:
         engine_power_peak=120000.0,
         engine_tau=0.25,
         transmission_ratio=1.0,
+        tau_sat=3000.0,
+        bw_engine=2.0,
+        tau_fric=20.0,
         v_nom=v_nom,
         limits=_make_limits(
             vx_max=vx_max,
@@ -385,6 +395,9 @@ def racecar_profile() -> CarProfile:
         engine_power_peak=engine_power_peak,
         engine_tau=0.25,
         transmission_ratio=1.0,
+        tau_sat=4000.0,
+        bw_engine=2.0,
+        tau_fric=20.0,
         v_nom=v_nom,
         limits=_make_limits(
             vx_max=vx_max,
@@ -438,6 +451,9 @@ def udes_1_5_profile() -> CarProfile:
         engine_power_peak=engine_power_peak,
         engine_tau=0.10,
         transmission_ratio=1.0,
+        tau_sat=5.0,
+        bw_engine=0.05,
+        tau_fric=0.2,
         v_nom=v_nom,
         limits=_make_limits(
             vx_max=vx_max,
@@ -526,9 +542,9 @@ def to_jax_plant_params(profile: CarProfile) -> dict[str, float]:
         "steer_rate_max": profile.steer_rate_max,
         "torque_tau": 0.05,
         "engine_tau": profile.engine_tau,
-        "tau_sat": 2500.0,
-        "bw_engine": 2.0,
-        "tau_fric": 20.0,
+        "tau_sat": profile.tau_sat,
+        "bw_engine": profile.bw_engine,
+        "tau_fric": profile.tau_fric,
     }
 
 
@@ -640,12 +656,16 @@ def _apply_dynamic_nine(sys: Any, profile: CarProfile) -> None:
     elif "P_cmd" in sys.inputs:
         _set_port_bounds(sys.inputs["P_cmd"], [-P_peak], [P_peak])
         _set_port_bounds(sys.inputs["delta_cmd"], [-delta], [delta])
+        sys.state.lower_bound[8] = -P_peak
+        sys.state.upper_bound[8] = P_peak
     elif "u" in sys.inputs:
         labels = getattr(sys.inputs["u"], "labels", [])
         if labels and labels[0] == "tau_cmd":
             _set_port_bounds(sys.inputs["u"], [tau_min, -delta], [tau_max, delta])
         elif labels and labels[0] == "P_cmd":
             _set_port_bounds(sys.inputs["u"], [-P_peak, -delta], [P_peak, delta])
+            sys.state.lower_bound[8] = -P_peak
+            sys.state.upper_bound[8] = P_peak
 
 
 _APPLY_BY_CLASS: dict[str, Any] = {

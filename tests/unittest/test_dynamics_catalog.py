@@ -677,6 +677,9 @@ class TestCarProfile(unittest.TestCase):
         profile = racecar_profile()
         self.assertAlmostEqual(sys.params["engine_tau"], profile.engine_tau)
         self.assertAlmostEqual(sys.params["steering_tau"], profile.steering_tau)
+        self.assertAlmostEqual(sys.params["tau_sat"], profile.tau_sat)
+        self.assertAlmostEqual(sys.params["bw_engine"], profile.bw_engine)
+        self.assertAlmostEqual(sys.params["tau_fric"], profile.tau_fric)
         self.assertNotIn("engine_power_peak", sys.params)
         self.assertNotIn("transmission_ratio", sys.params)
         self.assertAlmostEqual(
@@ -686,3 +689,5 @@ class TestCarProfile(unittest.TestCase):
             sys.inputs["u"].lower_bound[0], -profile.engine_power_peak
         )
         self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
+        self.assertAlmostEqual(sys.state.upper_bound[8], profile.engine_power_peak)
+        self.assertAlmostEqual(sys.state.lower_bound[8], -profile.engine_power_peak)

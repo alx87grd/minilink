@@ -1090,17 +1090,20 @@ class BicycleDynEngine(BicycleDyn):
         dq = N @ v
 
         tau_sat = params["tau_sat"]
+        bw_engine = params["bw_engine"]
+        tau_fric = params["tau_fric"]
+        Jw_rear = params["Jw_rear"]
+        engine_tau = params["engine_tau"]
+        steering_tau = params["steering_tau"]
+        rate_max = params["steer_rate_max"]
+
         # ω≈0 → τ = τ_sat · sign(P); else clip(P/ω, ±τ_sat). Safe denom avoids 0/0.
         w_safe = jnp.where(jnp.abs(w_rear) < 1e-6, 1e-6, w_rear)
         tau = jnp.clip(P / w_safe, -tau_sat, tau_sat)
 
         tau_ground = self.rear_wheel_ground_torque(v, w_rear, delta, params)
-        tau_brake = params["bw_engine"] * w_rear + params["tau_fric"] * jnp.sign(w_rear)
-        w_rear_dot = (tau - tau_ground - tau_brake) / params["Jw_rear"]
-
-        engine_tau = params["engine_tau"]
-        steering_tau = params["steering_tau"]
-        rate_max = params["steer_rate_max"]
+        tau_brake = bw_engine * w_rear + tau_fric * jnp.sign(w_rear)
+        w_rear_dot = (tau - tau_ground - tau_brake) / Jw_rear
 
         P_dot = (P_cmd - P) / engine_tau
         delta_dot = (delta_cmd - delta) / steering_tau

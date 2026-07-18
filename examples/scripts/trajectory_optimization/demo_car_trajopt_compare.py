@@ -11,7 +11,7 @@ Missions
    Bicycle plants use JAX + ``car_outline``; holonomic plants use NumPy + ``disc``
    (path-distance fields under JAX are unreliable for the n=2/4 point plants).
 
-Pedagogy twin: ``examples/notebooks/demo_car_trajopt_compare.ipynb``.
+Pedagogy twin: ``examples/notebooks/driving_model_trajopt_analysis.ipynb``.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.vehicles.jax_vehicles import (
     BicycleAcc,
     BicycleDyn,
+    BicycleDynEngine,
     BicycleDynRate,
     BicycleDynServo,
     BicycleDynTauRate,
@@ -64,6 +65,7 @@ PATH_COLORS = (
     "tab:brown",
     "tab:pink",
     "tab:gray",
+    "tab:olive",
 )
 
 
@@ -94,6 +96,7 @@ MODEL_CASES = (
     ModelCase("dynamic_rate", "BicycleDynRate", PATH_COLORS[5]),
     ModelCase("dynamic_taurate", "BicycleDynTauRate", PATH_COLORS[6]),
     ModelCase("dynamic_servo", "BicycleDynServo", PATH_COLORS[7]),
+    ModelCase("dynamic_engine", "BicycleDynEngine", PATH_COLORS[8]),
 )
 
 # ---------------------------------------------------------------------------
@@ -114,6 +117,7 @@ OBS_STEERING_DOT_MAX = 2.0
 OBS_W_REAR_DOT_MAX = 80.0
 OBS_DELTA_DOT_MAX = 2.0
 OBS_TAU_REAR_MAX = 5000.0
+OBS_P_CMD_MAX = 100000.0
 
 OBSTACLE_CENTER = (12.0, 0.2)
 OBSTACLE_RADIUS = 0.4
@@ -306,6 +310,41 @@ def _obs_build_dynamic_servo():
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
+def _obs_build_dynamic_engine():
+    sys = BicycleDynEngine()
+    r_r = sys.params["r_r"]
+    w_rear_max = 1.2 * OBS_U_TARGET / r_r
+    sys.state.lower_bound[6] = 0.0
+    sys.state.upper_bound[6] = w_rear_max
+    sys.state.lower_bound[7] = -OBS_DELTA_MAX
+    sys.state.upper_bound[7] = OBS_DELTA_MAX
+    sys.state.lower_bound[8] = -OBS_P_CMD_MAX
+    sys.state.upper_bound[8] = OBS_P_CMD_MAX
+    sys.inputs["u"].lower_bound = np.array([-OBS_P_CMD_MAX, -OBS_DELTA_MAX])
+    sys.inputs["u"].upper_bound = np.array([OBS_P_CMD_MAX, OBS_DELTA_MAX])
+    x_start = np.array(
+        [0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0, 0.0]
+    )
+    x_ref = np.array(
+        [
+            _obs_terminal_x(),
+            OBS_Y_GOAL,
+            OBS_HEADING_TARGET,
+            OBS_U_TARGET,
+            0.0,
+            0.0,
+            OBS_U_TARGET / r_r,
+            0.0,
+            0.0,
+        ]
+    )
+    ubar = np.array([0.0, 0.0])
+    Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0, 0.0])
+    R = np.diag([1e-10, 10.0])
+    S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0, 0.0])
+    return sys, x_start, x_ref, ubar, Q, R, S
+
+
 OBS_BUILDERS = {
     "holonomic": _obs_build_holonomic,
     "holonomic_dyn": _obs_build_holonomic_dyn,
@@ -315,6 +354,7 @@ OBS_BUILDERS = {
     "dynamic_rate": _obs_build_dynamic_rate,
     "dynamic_taurate": _obs_build_dynamic_taurate,
     "dynamic_servo": _obs_build_dynamic_servo,
+    "dynamic_engine": _obs_build_dynamic_engine,
 }
 
 # ---------------------------------------------------------------------------
@@ -541,6 +581,32 @@ def _corner_build_dynamic_servo(track: ReferenceTrack):
     return sys, x_start, x_ref, ubar, Q, R, S, "jax", geom
 
 
+def _corner_build_dynamic_engine(track: ReferenceTrack):
+    xy0, th0 = _pose_on_track(track, CORNER_S0)
+    sys = BicycleDynEngine()
+    r_r = sys.params["r_r"]
+    sys.state.lower_bound[6] = 0.0
+    sys.state.upper_bound[6] = 90.0
+    sys.state.lower_bound[7] = -CORNER_DELTA_MAX
+    sys.state.upper_bound[7] = CORNER_DELTA_MAX
+    sys.state.lower_bound[8] = -OBS_P_CMD_MAX
+    sys.state.upper_bound[8] = OBS_P_CMD_MAX
+    sys.inputs["u"].lower_bound = np.array([-OBS_P_CMD_MAX, -CORNER_DELTA_MAX])
+    sys.inputs["u"].upper_bound = np.array([OBS_P_CMD_MAX, CORNER_DELTA_MAX])
+    x_start = np.array(
+        [xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0, 0.0]
+    )
+    x_ref = np.array(
+        [0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0, 0.0, CORNER_U_TARGET / r_r, 0.0, 0.0]
+    )
+    ubar = np.zeros(2)
+    Q = np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0, 0.0])
+    R = np.diag([1e-10, 22.0])
+    S = np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0, 0.0])
+    geom = car_outline(CORNER_CAR_LENGTH, CORNER_CAR_WIDTH, margin=CORNER_CAR_MARGIN)
+    return sys, x_start, x_ref, ubar, Q, R, S, "jax", geom
+
+
 CORNER_BUILDERS = {
     "holonomic": _corner_build_holonomic,
     "holonomic_dyn": _corner_build_holonomic_dyn,
@@ -550,6 +616,7 @@ CORNER_BUILDERS = {
     "dynamic_rate": _corner_build_dynamic_rate,
     "dynamic_taurate": _corner_build_dynamic_taurate,
     "dynamic_servo": _corner_build_dynamic_servo,
+    "dynamic_engine": _corner_build_dynamic_engine,
 }
 
 
@@ -659,7 +726,7 @@ def _print_summary(title: str, runs: list[SolveRun], detail: str) -> None:
 
 
 def _plot_obstacle_paths(runs: list[SolveRun], scene: Scene) -> None:
-    fig, axes = plt.subplots(2, 4, figsize=(16.0, 8.0), sharex=True, sharey=True)
+    fig, axes = plt.subplots(3, 3, figsize=(12.0, 10.0), sharex=True, sharey=True)
     flat = axes.ravel()
     for ax, run in zip(flat, runs):
         scene.plot(
@@ -684,7 +751,7 @@ def _plot_obstacle_paths(runs: list[SolveRun], scene: Scene) -> None:
 
 def _plot_corner_paths(runs: list[SolveRun], track: ReferenceTrack) -> None:
     bounds = _corner_plot_bounds(track)
-    fig, axes = plt.subplots(2, 4, figsize=(16.0, 8.0), sharex=True, sharey=True)
+    fig, axes = plt.subplots(3, 3, figsize=(12.0, 10.0), sharex=True, sharey=True)
     flat = axes.ravel()
     for ax, run in zip(flat, runs):
         track.plot(show=False, ax=ax, bounds=bounds, title="")
