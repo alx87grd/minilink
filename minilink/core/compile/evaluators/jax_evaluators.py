@@ -572,7 +572,7 @@ register_jit_aliases(
 # =============================================================================
 
 
-class JaxDynamicEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin):
+class JaxDynamicEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin):
     """Compiled evaluator for a :class:`DynamicSystem` using JAX."""
 
     def __init__(self, system: DynamicSystem, verbose=False):
@@ -697,7 +697,7 @@ register_jit_aliases(JaxDynamicEvaluator, ("f", "outputs"))
 # =============================================================================
 
 
-class JaxDiagramEvaluator(DynamicsEvaluator, JaxIntegrationMixin, TraceTierMixin):
+class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin):
     """JAX-compatible evaluator for a compiled diagram."""
 
     def __init__(self, plan: ExecutionPlan, diagram, verbose=False):

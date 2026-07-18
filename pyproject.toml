@@ -52,6 +52,9 @@ dev = [
     "pre-commit",
     "pytest",
     "ruff",
+    "nbclient",
+    "nbformat",
+    "ipykernel",
 ]
 docs = [
     "sphinx>=7",
