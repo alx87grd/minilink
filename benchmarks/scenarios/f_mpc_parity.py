@@ -20,8 +20,8 @@ from minilink.control.mpc import ModelPredictiveController, mpc_default_computer
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputsUY,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRate,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -58,7 +58,7 @@ def _require_jax() -> None:
 
 def _bicycle_planner():
     configure_jax(enable_x64=True)
-    sys = JaxDynamicBicycleRateInputsUY()
+    sys = BicycleDynRate()
     r_r = sys.params["r_r"]
     x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
     x0 = np.array(
@@ -137,7 +137,7 @@ def run_hand_loop() -> list[MetricRecord]:
     """Deploy-shaped ``compute_command`` closed loop (few ticks)."""
     _require_jax()
     planner, sys, x0 = _bicycle_planner()
-    plant = JaxDynamicBicycleRateInputsUY()
+    plant = BicycleDynRate()
     plant.x0 = x0.copy()
     plant_eval = plant.compile(backend="jax")
     mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)

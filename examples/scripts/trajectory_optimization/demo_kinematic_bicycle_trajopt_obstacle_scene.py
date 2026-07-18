@@ -6,8 +6,8 @@ Run from repo root::
 
 Same obstacle-avoidance workflow as
 ``demo_dynamic_bicycle_trajopt_obstacle_scene.py``, but on
-:class:`~minilink.dynamics.catalog.vehicles.steering.JaxKinematicBicycleRateInputs`
-(state ``[x, y, theta, speed, steering]``, inputs ``[speed_dot, steering_dot]``).
+:class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleAcc`
+(state ``[x, y, theta, v, delta]``, inputs ``[a_x, delta_dot]``).
 """
 
 import matplotlib.pyplot as plt
@@ -16,7 +16,7 @@ import numpy as np
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.steering import JaxKinematicBicycleRateInputs
+from minilink.dynamics.catalog.vehicles.jax_vehicles import BicycleAcc
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
@@ -48,16 +48,14 @@ PLOT_BOUNDS = ((-2.0, U_TARGET * TF + 2.0), (-3.5, 2.0))
 
 configure_jax(enable_x64=True)
 
-sys = JaxKinematicBicycleRateInputs()
+sys = BicycleAcc()
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 sys.state.lower_bound[3] = 0.0
 sys.state.upper_bound[3] = V_MAX
 sys.state.lower_bound[4] = -DELTA_MAX
 sys.state.upper_bound[4] = DELTA_MAX
-sys.inputs["speed_dot"].lower_bound[0] = -SPEED_DOT_MAX
-sys.inputs["speed_dot"].upper_bound[0] = SPEED_DOT_MAX
-sys.inputs["steering_dot"].lower_bound[0] = -STEERING_DOT_MAX
-sys.inputs["steering_dot"].upper_bound[0] = STEERING_DOT_MAX
+sys.inputs["u"].lower_bound = np.array([-SPEED_DOT_MAX, -STEERING_DOT_MAX])
+sys.inputs["u"].upper_bound = np.array([SPEED_DOT_MAX, STEERING_DOT_MAX])
 
 x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0])
 x_ref = np.array([U_TARGET * TF, Y_GOAL, HEADING_TARGET, U_TARGET, 0.0])

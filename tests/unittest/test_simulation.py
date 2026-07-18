@@ -801,8 +801,8 @@ class TestAsComputer(unittest.TestCase):
         from minilink.control.mpc import ModelPredictiveController
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
-        from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-            JaxDynamicBicycleRateInputsUY,
+        from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+            BicycleDynRate,
         )
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -815,7 +815,7 @@ class TestAsComputer(unittest.TestCase):
         )
 
         configure_jax(enable_x64=True)
-        sys = JaxDynamicBicycleRateInputsUY()
+        sys = BicycleDynRate()
         x0 = sys.x0.copy()
         planner = TrajectoryOptimizationPlanner(
             PlanningProblem(

@@ -1,23 +1,25 @@
-"""Compare obstacle-scene TrajOpt across seven JAX plants.
+"""Compare obstacle-scene TrajOpt across the jax_vehicles fidelity ladder.
 
 Run from repo root::
 
     python examples/scripts/trajectory_optimization/demo_bicycle_trajopt_obstacle_scene_compare.py
 
-Same single-obstacle mission as
-``demo_kinematic_bicycle_trajopt_obstacle_scene.py``, solved with direct
-collocation on (simplest → most complex by state dimension):
+Pedagogy (state / inputs / params / physics per rung) lives in the twin notebook
+``examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb``.
+This script is the runnable TrajOpt bake-off on the same single-obstacle mission.
 
-- :class:`~minilink.dynamics.catalog.vehicles.steering.JaxHolonomicMobileRobot` (n=2)
-- :class:`~minilink.dynamics.catalog.vehicles.steering.JaxKinematicBicycle` (n=3)
-- :class:`~minilink.dynamics.catalog.vehicles.steering.JaxDynamicHolonomicMobileRobot` (n=4)
-- :class:`~minilink.dynamics.catalog.vehicles.steering.JaxKinematicBicycleRateInputs` (n=5)
-- :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycle` (n=6)
-- :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputs` (n=8)
-- :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleServoInputs` (n=8)
+Plants (fidelity / actuation order; Engine stub is notebook-only):
 
-Prints solve-time summary, shows side-by-side path and speed plots, then plays
-seven animations (one per plant).
+- :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.Holonomic` (n=2)
+- :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleKin` (n=3)
+- :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.HolonomicAccel` (n=4)
+- :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleAcc` (n=5)
+- :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDyn` (n=6)
+- :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynRate` (n=8)
+- :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynTauRate` (n=8)
+- :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynServo` (n=9)
+
+Prints solve-time summary, shows path and speed plots, then animates each plan.
 """
 
 from __future__ import annotations
@@ -32,16 +34,15 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycle,
-    JaxDynamicBicycleRateInputs,
-    JaxDynamicBicycleServoInputs,
-)
-from minilink.dynamics.catalog.vehicles.steering import (
-    JaxDynamicHolonomicMobileRobot,
-    JaxHolonomicMobileRobot,
-    JaxKinematicBicycle,
-    JaxKinematicBicycleRateInputs,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleAcc,
+    BicycleDyn,
+    BicycleDynRate,
+    BicycleDynServo,
+    BicycleDynTauRate,
+    BicycleKin,
+    Holonomic,
+    HolonomicAccel,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
@@ -81,6 +82,7 @@ PATH_COLORS = (
     "tab:purple",
     "tab:brown",
     "tab:pink",
+    "tab:gray",
 )
 
 
@@ -104,12 +106,13 @@ class SolveRun:
 
 MODEL_CASES = (
     ModelCase("holonomic", "Holonomic", PATH_COLORS[0]),
-    ModelCase("kinematic", "Kinematic", PATH_COLORS[1]),
-    ModelCase("holonomic_dyn", "Holonomic dyn", PATH_COLORS[2]),
-    ModelCase("kinematic_rate", "Kinematic rate", PATH_COLORS[3]),
-    ModelCase("dynamic", "Dynamic", PATH_COLORS[4]),
-    ModelCase("dynamic_rate", "Dynamic rate", PATH_COLORS[5]),
-    ModelCase("dynamic_servo", "Dynamic servo", PATH_COLORS[6]),
+    ModelCase("kinematic", "BicycleKin", PATH_COLORS[1]),
+    ModelCase("holonomic_dyn", "HolonomicAccel", PATH_COLORS[2]),
+    ModelCase("bicycle_acc", "BicycleAcc", PATH_COLORS[3]),
+    ModelCase("dynamic", "BicycleDyn", PATH_COLORS[4]),
+    ModelCase("dynamic_rate", "BicycleDynRate", PATH_COLORS[5]),
+    ModelCase("dynamic_taurate", "BicycleDynTauRate", PATH_COLORS[6]),
+    ModelCase("dynamic_servo", "BicycleDynServo", PATH_COLORS[7]),
 )
 
 
@@ -120,7 +123,7 @@ def _terminal_x() -> float:
 def _build_holonomic() -> tuple[
     object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
-    sys = JaxHolonomicMobileRobot()
+    sys = Holonomic()
     sys.inputs["u"].lower_bound = np.array([0.0, -V_MAX])
     sys.inputs["u"].upper_bound = np.array([V_MAX, V_MAX])
 
@@ -136,7 +139,7 @@ def _build_holonomic() -> tuple[
 def _build_holonomic_dyn() -> tuple[
     object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
-    sys = JaxDynamicHolonomicMobileRobot()
+    sys = HolonomicAccel()
     sys.state.lower_bound[2] = 0.0
     sys.state.upper_bound[2] = V_MAX
     sys.state.lower_bound[3] = -V_MAX
@@ -153,30 +156,10 @@ def _build_holonomic_dyn() -> tuple[
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
-def _build_dynamic() -> tuple[
-    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
-]:
-    sys = JaxDynamicBicycle()
-    r_r = sys.params["r_r"]
-    w_rear_max = 1.2 * U_TARGET / r_r
-    sys.inputs["w_rear"].lower_bound[0] = 0.0
-    sys.inputs["w_rear"].upper_bound[0] = w_rear_max
-    sys.inputs["delta"].lower_bound[0] = -DELTA_MAX
-    sys.inputs["delta"].upper_bound[0] = DELTA_MAX
-
-    x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0])
-    x_ref = np.array([_terminal_x(), Y_GOAL, HEADING_TARGET, U_TARGET, 0.0, 0.0])
-    ubar = np.array([U_TARGET / r_r, 0.0])
-    Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1])
-    R = np.diag([0.5, 10.0])
-    S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1])
-    return sys, x_start, x_ref, ubar, Q, R, S
-
-
 def _build_kinematic() -> tuple[
     object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
-    sys = JaxKinematicBicycle()
+    sys = BicycleKin()
     sys.inputs["u"].lower_bound = np.array([0.0, -DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([V_MAX, DELTA_MAX])
 
@@ -189,18 +172,16 @@ def _build_kinematic() -> tuple[
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
-def _build_kinematic_rate() -> tuple[
+def _build_bicycle_acc() -> tuple[
     object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
-    sys = JaxKinematicBicycleRateInputs()
+    sys = BicycleAcc()
     sys.state.lower_bound[3] = 0.0
     sys.state.upper_bound[3] = V_MAX
     sys.state.lower_bound[4] = -DELTA_MAX
     sys.state.upper_bound[4] = DELTA_MAX
-    sys.inputs["speed_dot"].lower_bound[0] = -SPEED_DOT_MAX
-    sys.inputs["speed_dot"].upper_bound[0] = SPEED_DOT_MAX
-    sys.inputs["steering_dot"].lower_bound[0] = -STEERING_DOT_MAX
-    sys.inputs["steering_dot"].upper_bound[0] = STEERING_DOT_MAX
+    sys.inputs["u"].lower_bound = np.array([-SPEED_DOT_MAX, -STEERING_DOT_MAX])
+    sys.inputs["u"].upper_bound = np.array([SPEED_DOT_MAX, STEERING_DOT_MAX])
 
     x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0])
     x_ref = np.array([_terminal_x(), Y_GOAL, HEADING_TARGET, U_TARGET, 0.0])
@@ -211,20 +192,36 @@ def _build_kinematic_rate() -> tuple[
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
+def _build_dynamic() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
+    sys = BicycleDyn()
+    r_r = sys.params["r_r"]
+    w_rear_max = 1.2 * U_TARGET / r_r
+    sys.inputs["u"].lower_bound = np.array([0.0, -DELTA_MAX])
+    sys.inputs["u"].upper_bound = np.array([w_rear_max, DELTA_MAX])
+
+    x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0])
+    x_ref = np.array([_terminal_x(), Y_GOAL, HEADING_TARGET, U_TARGET, 0.0, 0.0])
+    ubar = np.array([U_TARGET / r_r, 0.0])
+    Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1])
+    R = np.diag([0.5, 10.0])
+    S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1])
+    return sys, x_start, x_ref, ubar, Q, R, S
+
+
 def _build_dynamic_rate() -> tuple[
     object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
-    sys = JaxDynamicBicycleRateInputs()
+    sys = BicycleDynRate()
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * U_TARGET / r_r
     sys.state.lower_bound[6] = 0.0
     sys.state.upper_bound[6] = w_rear_max
     sys.state.lower_bound[7] = -DELTA_MAX
     sys.state.upper_bound[7] = DELTA_MAX
-    sys.inputs["w_rear_dot"].lower_bound[0] = -W_REAR_DOT_MAX
-    sys.inputs["w_rear_dot"].upper_bound[0] = W_REAR_DOT_MAX
-    sys.inputs["delta_dot"].lower_bound[0] = -DELTA_DOT_MAX
-    sys.inputs["delta_dot"].upper_bound[0] = DELTA_DOT_MAX
+    sys.inputs["u"].lower_bound = np.array([-W_REAR_DOT_MAX, -DELTA_DOT_MAX])
+    sys.inputs["u"].upper_bound = np.array([W_REAR_DOT_MAX, DELTA_DOT_MAX])
 
     x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / r_r, 0.0])
     x_ref = np.array(
@@ -246,20 +243,18 @@ def _build_dynamic_rate() -> tuple[
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
-def _build_dynamic_servo() -> tuple[
+def _build_dynamic_taurate() -> tuple[
     object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
-    sys = JaxDynamicBicycleServoInputs()
+    sys = BicycleDynTauRate()
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * U_TARGET / r_r
     sys.state.lower_bound[6] = 0.0
     sys.state.upper_bound[6] = w_rear_max
     sys.state.lower_bound[7] = -DELTA_MAX
     sys.state.upper_bound[7] = DELTA_MAX
-    sys.inputs["tau_rear"].lower_bound[0] = -TAU_REAR_MAX
-    sys.inputs["tau_rear"].upper_bound[0] = TAU_REAR_MAX
-    sys.inputs["delta_sp"].lower_bound[0] = -DELTA_MAX
-    sys.inputs["delta_sp"].upper_bound[0] = DELTA_MAX
+    sys.inputs["u"].lower_bound = np.array([-TAU_REAR_MAX, -DELTA_DOT_MAX])
+    sys.inputs["u"].upper_bound = np.array([TAU_REAR_MAX, DELTA_DOT_MAX])
 
     x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / r_r, 0.0])
     x_ref = np.array(
@@ -281,13 +276,48 @@ def _build_dynamic_servo() -> tuple[
     return sys, x_start, x_ref, ubar, Q, R, S
 
 
+def _build_dynamic_servo() -> tuple[
+    object, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
+    sys = BicycleDynServo()
+    r_r = sys.params["r_r"]
+    w_rear_max = 1.2 * U_TARGET / r_r
+    sys.state.lower_bound[6] = 0.0
+    sys.state.upper_bound[6] = w_rear_max
+    sys.state.lower_bound[7] = -DELTA_MAX
+    sys.state.upper_bound[7] = DELTA_MAX
+    sys.inputs["u"].lower_bound = np.array([-TAU_REAR_MAX, -DELTA_MAX])
+    sys.inputs["u"].upper_bound = np.array([TAU_REAR_MAX, DELTA_MAX])
+
+    x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / r_r, 0.0, 0.0])
+    x_ref = np.array(
+        [
+            _terminal_x(),
+            Y_GOAL,
+            HEADING_TARGET,
+            U_TARGET,
+            0.0,
+            0.0,
+            U_TARGET / r_r,
+            0.0,
+            0.0,
+        ]
+    )
+    ubar = np.array([0.0, 0.0])
+    Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0, 0.0])
+    R = np.diag([1e-4, 10.0])
+    S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0, 0.0])
+    return sys, x_start, x_ref, ubar, Q, R, S
+
+
 BUILDERS = {
     "holonomic": _build_holonomic,
     "holonomic_dyn": _build_holonomic_dyn,
-    "dynamic": _build_dynamic,
     "kinematic": _build_kinematic,
-    "kinematic_rate": _build_kinematic_rate,
+    "bicycle_acc": _build_bicycle_acc,
+    "dynamic": _build_dynamic,
     "dynamic_rate": _build_dynamic_rate,
+    "dynamic_taurate": _build_dynamic_taurate,
     "dynamic_servo": _build_dynamic_servo,
 }
 
@@ -299,7 +329,7 @@ def _speed_profile(case: ModelCase, traj: Trajectory) -> np.ndarray:
         return np.hypot(traj.x[2, :], traj.x[3, :])
     if case.key == "kinematic":
         return traj.u[0, :]
-    if case.key == "kinematic_rate":
+    if case.key == "bicycle_acc":
         return traj.x[3, :]
     return np.hypot(traj.x[3, :], traj.x[4, :])
 
@@ -357,7 +387,7 @@ def _print_summary(runs: list[SolveRun]) -> None:
 
 
 def _plot_paths(runs: list[SolveRun], scene: Scene) -> None:
-    fig, axes = plt.subplots(3, 3, figsize=(14.0, 11.0), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 4, figsize=(16.0, 8.0), sharex=True, sharey=True)
     flat = axes.ravel()
     for ax, run in zip(flat, runs):
         scene.plot(show=False, ax=ax, bounds=PLOT_BOUNDS, show_density=False, title="")

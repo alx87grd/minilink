@@ -1,6 +1,6 @@
 """MPC path tracking + EngineBicycle cascade (dual-rate broadcast).
 
-PathTracking is replaced by MPC on ``JaxDynamicBicycleRateInputsUY``; the cascade
+PathTracking is replaced by MPC on ``BicycleDynRate``; the cascade
 (Servos → Allocation) tracks broadcast ``x_nom`` refs on the real plant.
 
 Run from repo root::
@@ -29,8 +29,8 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
 from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputsUY,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRate,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline
@@ -62,7 +62,7 @@ track = ReferenceTrack(from_waypoints(path_xy), half_width=PATH_HALF_WIDTH)
 vehicle = create_vehicle(Y=0.0, vx=0.0, theta=np.pi, tire_slip_mode=None)
 x_mpc0 = plant_y_to_mpc_x(vehicle.x0)
 
-sys_mpc = JaxDynamicBicycleRateInputsUY()
+sys_mpc = BicycleDynRate()
 sys_mpc.state.lower_bound[6] = 0.0
 sys_mpc.state.upper_bound[6] = 90.0
 sys_mpc.state.lower_bound[7] = -0.55

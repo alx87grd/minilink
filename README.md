@@ -451,7 +451,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Animation | `examples/scripts/animation/` |
 | Optimization | `examples/scripts/optimization/` |
 | Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` |
-| Trajectory optimization | `examples/scripts/trajectory_optimization/` · [notebook](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) |
+| Trajectory optimization | `examples/scripts/trajectory_optimization/` · [ladder + TrajOpt compare notebook](examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/demo_bicycle_trajopt_obstacle_scene_compare.ipynb) |
 | Symbolic mechanics | `examples/scripts/symbolic/` |
 | Physics engine | `examples/scripts/engine/` |
 | C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/demo_c_export_proportional.py` · `demo_c_export.py` |

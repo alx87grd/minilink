@@ -21,8 +21,8 @@ from benchmarks.trajopt import jax_trajopt_available
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputs,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRatePorts,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -189,7 +189,7 @@ def run_bicycle_parametric(
     maxiter = BICYCLE_MAXITER
 
     configure_jax(enable_x64=True)
-    sys = JaxDynamicBicycleRateInputs()
+    sys = BicycleDynRatePorts()
     sys.state.lower_bound[6] = 0.0
     sys.state.upper_bound[6] = BICYCLE_W_REAR_MAX
     sys.state.lower_bound[7] = -BICYCLE_DELTA_MAX
@@ -279,7 +279,7 @@ def run_bicycle_parametric(
         prefix="e4.bicycle_parametric",
         result=result,
         notes=(
-            "JaxDynamicBicycleRateInputs TrajectoryOptimizationPlanner.solve_trajectory_from, "
+            "BicycleDynRatePorts TrajectoryOptimizationPlanner.solve_trajectory_from, "
             f"tf={BICYCLE_TF}, n_steps={n_steps}, jax+slsqp"
         ),
     )

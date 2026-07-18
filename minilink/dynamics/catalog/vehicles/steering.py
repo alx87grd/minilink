@@ -2,7 +2,7 @@ from functools import partial
 
 import numpy as np
 
-from minilink.core.backends import array_module, require_jax_numpy
+from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
@@ -18,8 +18,9 @@ from minilink.graphical.catalog.skins import car_skin_2d
 class KinematicBicycle(DynamicSystem):
     """Kinematic bicycle model with speed and steering-angle inputs.
 
-    See :class:`JaxKinematicBicycle` and :class:`JaxKinematicBicycleRateInputs`
-    for JAX-traceable variants.
+    See :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleKin` and
+    :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleAcc` for
+    JAX-traceable variants.
     """
 
     def __init__(self):
@@ -352,146 +353,6 @@ class UdeSRacecar(KinematicCar):
         self.tire_length = 0.04
         self.tire_width = 0.015
         self.camera_scale = 2.0 * self.params["length"]
-
-
-# Same equations as :class:`KinematicBicycle`, but written so the dynamics ``f``
-# trace through ``jax.numpy`` for gradient-based trajectory optimization.
-
-
-class JaxKinematicBicycle(KinematicBicycle):
-    """JAX-traceable :class:`KinematicBicycle`.
-
-    Inherits the geometry and visualization contract from
-    :class:`KinematicBicycle` and only overrides the equations of motion so that
-    ``f(x, u, t)`` traces through ``jax.numpy``.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.name = "JAX Kinematic Bicycle"
-
-    def f(self, x, u, t=0.0, params=None):
-        jnp = require_jax_numpy()
-        params = self.params if params is None else params
-        length = params["a"] + params["b"]
-        speed = u[0]
-        steering = u[1]
-        theta = x[2]
-
-        # kinematic bicycle: heading turns at speed * tan(steering) / wheelbase
-        return jnp.array(
-            [
-                speed * jnp.cos(theta),
-                speed * jnp.sin(theta),
-                speed * jnp.tan(steering) / length,
-            ]
-        )
-
-    def h(self, x, u, t=0.0, params=None):
-        jnp = require_jax_numpy()
-        return jnp.asarray(x)
-
-
-class JaxKinematicBicycleRateInputs(JaxKinematicBicycle):
-    """JAX-traceable :class:`KinematicBicycle` with rate inputs.
-
-    State ``x = [x, y, theta, speed, steering]``; inputs are ``speed_dot`` and
-    ``steering_dot``. Useful with trajectory optimization run with
-    ``compile_backend="jax"``.
-    """
-
-    def __init__(self):
-        from minilink.core.signals import VectorSignal
-
-        super().__init__()
-        self.name = "JAX Kinematic Bicycle (rate inputs)"
-
-        self.n = 5
-
-        self.state = VectorSignal("x", dim=self.n)
-        self.x0 = np.zeros(self.n)
-
-        self.state.labels = ["x", "y", "theta", "speed", "steering"]
-        self.state.units = ["m", "m", "rad", "m/s", "rad"]
-
-        self.inputs = {}
-        self.add_input_port(
-            "speed_dot",
-            nominal_value=0.0,
-            labels=["speed_dot"],
-            units=["m/s^2"],
-        )
-        self.add_input_port(
-            "steering_dot",
-            nominal_value=0.0,
-            labels=["steering_dot"],
-            units=["rad/s"],
-        )
-        self.outputs = {}
-        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
-
-    def f(self, x, u, t=0.0, params=None):
-        jnp = require_jax_numpy()
-        params = self.params if params is None else params
-        length = params["a"] + params["b"]
-        speed = x[3]
-        steering = x[4]
-        theta = x[2]
-
-        pose_dot = jnp.array(
-            [
-                speed * jnp.cos(theta),
-                speed * jnp.sin(theta),
-                speed * jnp.tan(steering) / length,
-            ]
-        )
-        return jnp.concatenate([pose_dot, u])
-
-    def tf(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-        a = params["a"]
-        steering = x[4]
-        T_wb = SE2(x[0], x[1], x[2])
-        return {
-            "body": T_wb,
-            "axle_front": T_wb @ SE2(a, 0.0, steering),
-        }
-
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return {}
-
-
-class JaxHolonomicMobileRobot(HolonomicMobileRobot):
-    """JAX-traceable :class:`HolonomicMobileRobot`."""
-
-    def __init__(self):
-        super().__init__()
-        self.name = "JAX Holonomic Mobile Robot"
-
-    def f(self, x, u, t=0.0, params=None):
-        jnp = require_jax_numpy()
-        return jnp.asarray(u)
-
-    def h(self, x, u, t=0.0, params=None):
-        jnp = require_jax_numpy()
-        return jnp.asarray(x)
-
-
-class JaxDynamicHolonomicMobileRobot(DynamicHolonomicMobileRobot):
-    """JAX-traceable :class:`DynamicHolonomicMobileRobot`."""
-
-    def __init__(self):
-        super().__init__()
-        self.name = "JAX Dynamic Holonomic Mobile Robot"
-
-    def f(self, x, u, t=0.0, params=None):
-        jnp = require_jax_numpy()
-        # double integrator in the plane: position integrates velocity, velocity integrates accel
-        return jnp.array([x[2], x[3], u[0], u[1]])
-
-    def h(self, x, u, t=0.0, params=None):
-        jnp = require_jax_numpy()
-        return jnp.asarray(x)
 
 
 if __name__ == "__main__":

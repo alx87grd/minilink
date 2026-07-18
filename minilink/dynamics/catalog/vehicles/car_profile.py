@@ -477,18 +477,74 @@ def list_car_profiles() -> tuple[str, ...]:
 
 
 def _set_tire_models(sys: Any, profile: CarProfile) -> None:
-    from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-        JaxLinearTire,
-        LinearTire,
-    )
+    from minilink.dynamics.catalog.vehicles.dynamic_bicycle import LinearTire
 
-    tire_cls = JaxLinearTire if "Jax" in type(sys).__name__ else LinearTire
-    tire = tire_cls(Ca=profile.Ca, Ck=profile.Ck, mu=profile.mu)
+    tire = LinearTire(Ca=profile.Ca, Ck=profile.Ck, mu=profile.mu)
     sys.tire_model_f = tire
     sys.tire_model_r = tire
 
 
+_JAX_VEHICLE_CLASSES = frozenset(
+    {
+        "Holonomic",
+        "HolonomicAccel",
+        "BicycleKin",
+        "BicycleAcc",
+        "BicycleAccPorts",
+        "BicycleDyn",
+        "BicycleDynPorts",
+        "BicycleDynRate",
+        "BicycleDynRatePorts",
+        "BicycleDynTauRate",
+        "BicycleDynTauRatePorts",
+        "BicycleDynServo",
+        "BicycleDynServoPorts",
+        "BicycleDynEngine",
+    }
+)
+
+
+def to_jax_plant_params(profile: CarProfile) -> dict[str, float]:
+    """Minimal EoM ``params`` for :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles`."""
+    return {
+        "length": profile.a + profile.b,
+        "mass": profile.mass,
+        "inertia": profile.inertia,
+        "r_f": profile.r_f,
+        "r_r": profile.r_r,
+        "gravity": profile.gravity,
+        "rho": profile.rho,
+        "CdA": profile.CdA,
+        "Ca": profile.Ca,
+        "Ck": profile.Ck,
+        "mu": profile.mu,
+        "v_min_epsilon": 0.1,
+        "Jw_rear": profile.Jw_rear,
+        "bw_rear": profile.bw_rear,
+        "steering_tau": profile.steering_tau,
+        "steer_rate_max": profile.steer_rate_max,
+        "torque_tau": 0.05,
+        "engine_power_peak": profile.engine_power_peak,
+        "engine_tau": profile.engine_tau,
+        "transmission_ratio": profile.transmission_ratio,
+    }
+
+
 def _apply_plant_params(sys: Any, profile: CarProfile) -> None:
+    if type(sys).__name__ in _JAX_VEHICLE_CLASSES or (
+        getattr(type(sys), "__module__", "").endswith(".jax_vehicles")
+    ):
+        # Only fill keys the plant already declares (Kin/Acc → length only).
+        for key, value in to_jax_plant_params(profile).items():
+            if key in sys.params:
+                sys.params[key] = value
+        # Graphics axle offsets stay on the object — not in EoM ``params``.
+        if hasattr(sys, "a"):
+            sys.a = profile.a
+        if hasattr(sys, "b"):
+            sys.b = profile.b
+        return
+
     for key, value in profile.to_plant_params().items():
         sys.params[key] = value
     if hasattr(sys, "tire_model_f"):
@@ -505,18 +561,22 @@ def _set_port_bounds(
 def _apply_kinematic(sys: Any, profile: CarProfile) -> None:
     lim = profile.limits
     delta = lim.delta_max
-    if "u" in sys.inputs:
-        _set_port_bounds(sys.inputs["u"], [0.0, -delta], [lim.v_max, delta])
     if sys.n >= 5:
         sys.state.lower_bound[3] = 0.0
         sys.state.upper_bound[3] = lim.v_max
         sys.state.lower_bound[4] = -delta
         sys.state.upper_bound[4] = delta
-        if "speed_dot" in sys.inputs:
-            sd = lim.v_dot_max
-            dd = lim.delta_dot_max
-            _set_port_bounds(sys.inputs["speed_dot"], [-sd], [sd])
-            _set_port_bounds(sys.inputs["steering_dot"], [-dd], [dd])
+        sd = lim.v_dot_max
+        dd = lim.delta_dot_max
+        if "a_x" in sys.inputs:
+            _set_port_bounds(sys.inputs["a_x"], [-sd], [sd])
+            _set_port_bounds(sys.inputs["delta_dot"], [-dd], [dd])
+        elif "u" in sys.inputs:
+            labels = getattr(sys.inputs["u"], "labels", [])
+            if labels and labels[0] == "a_x":
+                _set_port_bounds(sys.inputs["u"], [-sd, -dd], [sd, dd])
+    elif "u" in sys.inputs:
+        _set_port_bounds(sys.inputs["u"], [0.0, -delta], [lim.v_max, delta])
 
 
 def _apply_dynamic_six(sys: Any, profile: CarProfile) -> None:
@@ -551,26 +611,49 @@ def _apply_dynamic_eight(sys: Any, profile: CarProfile) -> None:
         _set_port_bounds(sys.inputs["delta_dot"], [-dd], [dd])
     elif "tau_rear" in sys.inputs:
         _set_port_bounds(sys.inputs["tau_rear"], [tau_min], [tau_max])
-        _set_port_bounds(sys.inputs["delta_sp"], [-delta], [delta])
+        _set_port_bounds(sys.inputs["delta_dot"], [-dd], [dd])
     elif "u" in sys.inputs:
         labels = getattr(sys.inputs["u"], "labels", [])
-        if labels and labels[0] in ("w_rear_dot", "tau_rear"):
-            if labels[0] == "w_rear_dot":
-                _set_port_bounds(sys.inputs["u"], [-wdot, -dd], [wdot, dd])
-            else:
-                _set_port_bounds(sys.inputs["u"], [tau_min, -delta], [tau_max, delta])
+        if labels and labels[0] == "w_rear_dot":
+            _set_port_bounds(sys.inputs["u"], [-wdot, -dd], [wdot, dd])
+        elif labels and labels[0] == "tau_rear":
+            _set_port_bounds(sys.inputs["u"], [tau_min, -dd], [tau_max, dd])
+
+
+def _apply_dynamic_nine(sys: Any, profile: CarProfile) -> None:
+    lim = profile.limits
+    delta = lim.delta_max
+    w_max = lim.w_rear_max
+    sys.state.lower_bound[6] = 0.0
+    sys.state.upper_bound[6] = w_max
+    sys.state.lower_bound[7] = -delta
+    sys.state.upper_bound[7] = delta
+
+    tau_max = lim.tau_rear_max
+    tau_min = lim.tau_rear_min
+    if "tau_cmd" in sys.inputs:
+        _set_port_bounds(sys.inputs["tau_cmd"], [tau_min], [tau_max])
+        _set_port_bounds(sys.inputs["delta_cmd"], [-delta], [delta])
+    elif "u" in sys.inputs:
+        labels = getattr(sys.inputs["u"], "labels", [])
+        if labels and labels[0] == "tau_cmd":
+            _set_port_bounds(sys.inputs["u"], [tau_min, -delta], [tau_max, delta])
 
 
 _APPLY_BY_CLASS: dict[str, Any] = {
-    "JaxKinematicBicycle": _apply_kinematic,
     "KinematicBicycle": _apply_kinematic,
-    "JaxKinematicBicycleRateInputs": _apply_kinematic,
-    "JaxDynamicBicycle": _apply_dynamic_six,
+    "BicycleKin": _apply_kinematic,
+    "BicycleAcc": _apply_kinematic,
+    "BicycleAccPorts": _apply_kinematic,
     "DynamicBicycle": _apply_dynamic_six,
-    "JaxDynamicBicycleRateInputs": _apply_dynamic_eight,
-    "JaxDynamicBicycleRateInputsUY": _apply_dynamic_eight,
-    "JaxDynamicBicycleServoInputs": _apply_dynamic_eight,
-    "JaxDynamicBicycleServoInputsUY": _apply_dynamic_eight,
+    "BicycleDyn": _apply_dynamic_six,
+    "BicycleDynPorts": _apply_dynamic_six,
+    "BicycleDynRate": _apply_dynamic_eight,
+    "BicycleDynRatePorts": _apply_dynamic_eight,
+    "BicycleDynTauRate": _apply_dynamic_eight,
+    "BicycleDynTauRatePorts": _apply_dynamic_eight,
+    "BicycleDynServo": _apply_dynamic_nine,
+    "BicycleDynServoPorts": _apply_dynamic_nine,
 }
 
 

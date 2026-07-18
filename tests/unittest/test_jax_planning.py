@@ -180,26 +180,28 @@ class TestJaxDirectCollocation(unittest.TestCase):
 
 pytest.importorskip("jax")
 from minilink.dynamics.catalog.vehicles.steering import (
-    JaxKinematicBicycle,
-    JaxKinematicBicycleRateInputs,
     KinematicBicycle,
+)
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleKin,
+    BicycleAcc,
 )
 
 
 @pytest.mark.optional
 @pytest.mark.jax
-class TestJaxKinematicBicycle(unittest.TestCase):
+class TestBicycleKin(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
 
     def test_regular_f_is_jaxpr_traceable(self):
-        sys = JaxKinematicBicycle()
+        sys = BicycleKin()
         x = jnp.zeros(3)
         u = jnp.zeros(2)
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
 
     def test_regular_f_matches_numpy_nominal(self):
-        sys_j = JaxKinematicBicycle()
+        sys_j = BicycleKin()
         sys_n = KinematicBicycle()
         x = jnp.zeros(3)
         u = jnp.array([2.0, 0.0])
@@ -208,7 +210,7 @@ class TestJaxKinematicBicycle(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(dx_j), dx_n, rtol=1e-05, atol=1e-05)
 
     def test_regular_f_matches_numpy_nontrivial(self):
-        sys_j = JaxKinematicBicycle()
+        sys_j = BicycleKin()
         sys_n = KinematicBicycle()
         x = jnp.array([1.0, -0.5, 0.4])
         u = jnp.array([3.0, 0.25])
@@ -217,13 +219,13 @@ class TestJaxKinematicBicycle(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(dx_j), dx_n, rtol=1e-05, atol=1e-05)
 
     def test_rate_f_is_jaxpr_traceable(self):
-        sys = JaxKinematicBicycleRateInputs()
+        sys = BicycleAcc()
         x = jnp.zeros(5)
         u = jnp.zeros(2)
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
 
     def test_rate_f_integrates_command_rates(self):
-        sys = JaxKinematicBicycleRateInputs()
+        sys = BicycleAcc()
         x = jnp.array([0.0, 0.0, 0.0, 2.0, 0.1])
         u = jnp.array([0.5, -0.2])
         dx = np.asarray(sys.f(x, u))
@@ -231,8 +233,8 @@ class TestJaxKinematicBicycle(unittest.TestCase):
         np.testing.assert_allclose(dx[3:], np.array([0.5, -0.2]))
 
     def test_rate_f_pose_derivative_matches_regular_model(self):
-        sys_rate = JaxKinematicBicycleRateInputs()
-        sys_reg = JaxKinematicBicycle()
+        sys_rate = BicycleAcc()
+        sys_reg = BicycleKin()
         x_rate = jnp.array([1.0, 2.0, 0.3, 4.0, -0.15])
         u_rate = jnp.zeros(2)
         dx_rate = np.asarray(sys_rate.f(x_rate, u_rate))

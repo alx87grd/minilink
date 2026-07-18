@@ -399,19 +399,20 @@ import pytest
 
 pytest.importorskip("jax")
 from minilink.core.backends import configure_jax
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputs,
-    JaxDynamicBicycleRateInputsUY,
-    JaxDynamicBicycleServoInputs,
-    JaxDynamicBicycleServoInputsUY,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynEngine,
+    BicycleDynRate,
+    BicycleDynRatePorts,
+    BicycleDynServo,
+    BicycleDynServoPorts,
 )
 
 
-class TestDynamicBicycleUY(unittest.TestCase):
+class TestBicycleDynRate(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
-        self.named = JaxDynamicBicycleRateInputs()
-        self.uy = JaxDynamicBicycleRateInputsUY()
+        self.named = BicycleDynRatePorts()
+        self.uy = BicycleDynRate()
 
     def test_standard_ports(self):
         self.assertIn("u", self.uy.inputs)
@@ -438,31 +439,58 @@ class TestDynamicBicycleUY(unittest.TestCase):
         w_dot = (tau - tau_ground) / rate.params["Jw_rear"]
         self.assertAlmostEqual(w_dot, u_rate[0], places=9)
 
+    def test_params_override_mass(self):
+        sys = BicycleDynRate()
+        x = np.array([0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 5.0 / 0.3, 0.0])
+        u = np.array([0.0, 0.0])
+        params = {**sys.params, "mass": 2.0 * sys.params["mass"]}
+        dx_nom = np.asarray(sys.f(x, u))
+        dx_heavy = np.asarray(sys.f(x, u, params=params))
+        self.assertFalse(np.allclose(dx_nom, dx_heavy))
 
-class TestDynamicBicycleServoInputs(unittest.TestCase):
+
+class TestBicycleDynServo(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
-        self.named = JaxDynamicBicycleServoInputs()
-        self.uy = JaxDynamicBicycleServoInputsUY()
+        self.named = BicycleDynServoPorts()
+        self.uy = BicycleDynServo()
 
     def test_standard_ports(self):
         self.assertIn("u", self.uy.inputs)
         self.assertEqual(self.uy.inputs["u"].dim, 2)
+        self.assertEqual(self.uy.n, 9)
         self.assertIn("y", self.uy.outputs)
         self.assertEqual(self.uy.outputs["y"].dim, self.uy.n)
 
     def test_f_matches_named_servo_inputs(self):
-        x = np.array([1.0, 2.0, 0.1, 3.0, 0.2, 0.05, 4.0, 0.1])
+        x = np.array([1.0, 2.0, 0.1, 3.0, 0.2, 0.05, 4.0, 0.1, 0.0])
         u = np.array([200.0, 0.05])
         dx_named = np.asarray(self.named.f(x, u))
         dx_uy = np.asarray(self.uy.f(x, u))
         np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
 
     def test_zero_torque_cruise_actuators_near_equilibrium(self):
-        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0 / 0.3, 0.0])
+        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0 / 0.3, 0.0, 0.0])
         u = np.array([0.0, 0.0])
         dx = np.asarray(self.named.f(x, u))
         np.testing.assert_allclose(dx[6:8], np.zeros(2), atol=0.5)
+
+    def test_params_override_Ca(self):
+        sys = BicycleDynServo()
+        x = np.array([0.0, 0.0, 0.0, 10.0, 0.5, 0.0, 10.0 / 0.3, 0.05, 0.0])
+        u = np.array([0.0, 0.0])
+        params = {**sys.params, "Ca": 0.5 * sys.params["Ca"]}
+        dx_nom = np.asarray(sys.f(x, u))
+        dx_soft = np.asarray(sys.f(x, u, params=params))
+        self.assertFalse(np.allclose(dx_nom, dx_soft))
+
+
+class TestBicycleDynEngine(unittest.TestCase):
+    def test_f_raises_not_implemented(self):
+        configure_jax(enable_x64=True)
+        sys = BicycleDynEngine()
+        with self.assertRaises(NotImplementedError):
+            sys.f(np.zeros(9), np.zeros(2))
 
 
 class TestCarProfile(unittest.TestCase):
@@ -555,17 +583,22 @@ class TestCarProfile(unittest.TestCase):
             apply_car_profile,
             passenger_car_profile,
         )
-        from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-            JaxDynamicBicycleRateInputs,
-        )
 
-        sys = JaxDynamicBicycleRateInputs()
+        sys = BicycleDynRate()
         apply_car_profile(sys, passenger_car_profile())
         profile = passenger_car_profile()
         self.assertAlmostEqual(sys.params["mass"], profile.mass)
+        self.assertAlmostEqual(sys.params["length"], profile.a + profile.b)
+        self.assertAlmostEqual(sys.params["Ca"], profile.Ca)
+        self.assertAlmostEqual(sys.a, profile.a)
+        self.assertAlmostEqual(sys.b, profile.b)
+        self.assertFalse(hasattr(sys, "tire_model_f"))
         self.assertAlmostEqual(sys.state.upper_bound[6], profile.limits.w_rear_max)
         self.assertAlmostEqual(
-            sys.inputs["w_rear_dot"].upper_bound[0], profile.limits.w_rear_dot_max
+            sys.inputs["u"].upper_bound[0], profile.limits.w_rear_dot_max
+        )
+        self.assertAlmostEqual(
+            sys.inputs["u"].upper_bound[1], profile.limits.delta_dot_max
         )
 
     def test_apply_car_profile_servo_plant(self):
@@ -573,14 +606,12 @@ class TestCarProfile(unittest.TestCase):
             apply_car_profile,
             racecar_profile,
         )
-        from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-            JaxDynamicBicycleServoInputsUY,
-        )
 
-        sys = JaxDynamicBicycleServoInputsUY()
+        sys = BicycleDynServo()
         apply_car_profile(sys, racecar_profile())
         profile = racecar_profile()
-        self.assertAlmostEqual(sys.params["steer_Kp"], profile.steer_Kp)
+        self.assertAlmostEqual(sys.params["steering_tau"], profile.steering_tau)
+        self.assertAlmostEqual(sys.params["torque_tau"], 0.05)
         self.assertAlmostEqual(
             sys.inputs["u"].upper_bound[0], profile.limits.tau_rear_max
         )
