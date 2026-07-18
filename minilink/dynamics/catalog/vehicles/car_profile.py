@@ -5,23 +5,21 @@ actuator time constants, and planning limits derived from the same physical
 envelope. Use :func:`apply_car_profile` to copy a profile onto a catalog plant
 without editing individual demos.
 
-Propulsion limits (nominal speed, no slip)
-------------------------------------------
-At nominal road speed ``v_nom`` (below top speed ``vx_max``, chosen as an
-acceleration rating point) the peak motor torque is power-limited:
+Propulsion limits (nominal speed, power only)
+---------------------------------------------
+At nominal road speed ``v_nom`` (below top speed ``vx_max``) the actuator cap
+is power-limited only:
 
-``tau_prop = min(P_max / omega_nom, mu * Fz_r * r_r)``,
-``omega_nom = v_nom / r_r``.
+``tau_max = P_max / omega_nom``, ``omega_nom = v_nom / r_r``.
 
-With no slip, wheel spin and vehicle longitudinal motion are coupled through
-``Jw * w_rear_dot + r_r * Fx = tau_motor`` and ``Fx = m * a_x = m * r_r * w_rear_dot``,
-so the effective rotational inertia is ``J_w + m * r_r^2`` and
+Grip is **not** applied here — tire slip and force saturation are handled by
+the plant tire model during simulation. With no-slip kinematics for the
+wheel/vehicle couple,
 
-``w_rear_dot_max = tau_prop / (J_w + m * r_r^2)``,
+``w_rear_dot_max = tau_max / (J_w + m * r_r^2)``,
 ``a_long_max = r_r * w_rear_dot_max``.
 
-Both directions use the same symmetric cap (regenerative braking / reverse
-drive rated like forward propulsion at ``v_nom``).
+Both directions use the same symmetric cap (regen rated like forward drive).
 
 Steering rate ``delta_dot_max`` equals ``steer_rate_max`` (road-wheel slew).
 
@@ -120,22 +118,20 @@ class CarProfile:
         return self.engine_power_peak / w_engine
 
     def propulsion_torque_nominal(self) -> float:
-        """Peak drive torque at ``v_nom`` [Nm]: min(power, traction)."""
-        return min(
-            self.traction_torque_max(),
-            self.power_torque_at_speed(self.v_nom),
-        )
+        """Peak motor torque at ``v_nom`` [Nm] from ``P_max`` only."""
+        return self.power_torque_at_speed(self.v_nom)
 
     def propulsion_wheel_accel_nominal(self) -> float:
-        """``w_rear_dot`` at ``v_nom`` from propulsion torque (no slip) [rad/s²]."""
+        """``w_rear_dot`` at ``v_nom`` from motor torque (no-slip couple) [rad/s²]."""
         return self.propulsion_torque_nominal() / self.effective_wheel_inertia()
 
     def propulsion_longitudinal_accel_nominal(self) -> float:
-        """``a_x`` at ``v_nom`` from propulsion torque (no slip) [m/s²]."""
+        """``a_x`` at ``v_nom`` from motor torque (no-slip couple) [m/s²]."""
         return self.r_r * self.propulsion_wheel_accel_nominal()
 
     def motor_torque_cap(self, vx: float) -> float:
-        return min(self.traction_torque_max(), self.power_torque_at_speed(vx))
+        """Motor torque cap at road speed ``vx`` [Nm] from ``P_max`` only."""
+        return self.power_torque_at_speed(vx)
 
     def to_plant_params(self) -> dict[str, float]:
         return {
@@ -172,29 +168,22 @@ def _make_limits(
     steer_rate_max: float,
     r_r: float,
     mass: float,
-    mu: float,
-    a: float,
-    b: float,
     Jw_rear: float,
     engine_power_peak: float,
     transmission_ratio: float,
     v_nom: float,
 ) -> CarLimits:
-    """Build symmetric limits from power at ``v_nom`` (no slip)."""
-    length = a + b
-    Fz_r = mass * GRAVITY * b / length
-    tau_traction = mu * Fz_r * r_r
+    """Build symmetric actuator limits from ``P_max`` at ``v_nom``."""
     w_rear_nom = v_nom / r_r
-    tau_power = engine_power_peak / max(w_rear_nom * transmission_ratio, 1.0)
-    tau_prop = min(tau_traction, tau_power)
+    tau_max = engine_power_peak / max(w_rear_nom * transmission_ratio, 1.0)
 
     J_eff = Jw_rear + mass * r_r**2
-    w_rear_dot = tau_prop / J_eff
+    w_rear_dot = tau_max / J_eff
     a_long = r_r * w_rear_dot
 
     w_rear_dot_r = round(w_rear_dot)
     w_rear_max = round(vx_max / r_r)
-    tau_r = _round_torque(tau_prop)
+    tau_r = _round_torque(tau_max)
     a_long_r = round(a_long, 1)
 
     return CarLimits(
@@ -217,7 +206,7 @@ def _make_limits(
 def passenger_car_profile() -> CarProfile:
     """Full-size passenger sedan (~1500 kg, 2.7 m wheelbase).
 
-    ``P = 120 kW`` at ``v_nom = 15 m/s`` → ``tau ≈ 2430 Nm``, ``w_rear_dot ≈ 15 rad/s²``.
+    ``P = 120 kW`` at ``v_nom = 15 m/s`` → ``tau ≈ 2640 Nm``, ``w_rear_dot ≈ 16 rad/s²``.
     """
     mass = 1500.0
     a = 1.2
@@ -258,9 +247,6 @@ def passenger_car_profile() -> CarProfile:
             steer_rate_max=steer_rate_max,
             r_r=r_r,
             mass=mass,
-            mu=mu,
-            a=a,
-            b=b,
             Jw_rear=2.0,
             engine_power_peak=120000.0,
             transmission_ratio=1.0,
@@ -272,8 +258,7 @@ def passenger_car_profile() -> CarProfile:
 def racecar_profile() -> CarProfile:
     """Bicycle LOS race vehicle (rounded from ``create_vehicle``).
 
-    ``P = 200 kW`` at ``v_nom = 10 m/s`` — traction-limited at nominal;
-    ``tau ≈ 1060 Nm``, ``w_rear_dot ≈ 13 rad/s²``.
+    ``P = 200 kW`` at ``v_nom = 10 m/s`` → ``tau ≈ 6800 Nm``, ``w_rear_dot ≈ 82 rad/s²``.
     """
     mass = 700.0
     a = 1.2
@@ -315,9 +300,6 @@ def racecar_profile() -> CarProfile:
             steer_rate_max=steer_rate_max,
             r_r=r_r,
             mass=mass,
-            mu=mu,
-            a=a,
-            b=b,
             Jw_rear=1.6,
             engine_power_peak=engine_power_peak,
             transmission_ratio=1.0,
@@ -329,7 +311,7 @@ def racecar_profile() -> CarProfile:
 def udes_1_5_profile() -> CarProfile:
     """1:5 UdeS racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar`).
 
-    ``P = 800 W`` at ``v_nom = 8 m/s`` — traction-limited; ``w_rear_dot ≈ 50 rad/s²``.
+    ``P = 800 W`` at ``v_nom = 8 m/s`` → ``tau ≈ 7 Nm``, ``w_rear_dot ≈ 101 rad/s²``.
     """
     mass = 10.0
     a = 0.17
@@ -371,9 +353,6 @@ def udes_1_5_profile() -> CarProfile:
             steer_rate_max=steer_rate_max,
             r_r=r_r,
             mass=mass,
-            mu=mu,
-            a=a,
-            b=b,
             Jw_rear=0.02,
             engine_power_peak=engine_power_peak,
             transmission_ratio=1.0,
