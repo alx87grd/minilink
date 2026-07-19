@@ -11,3 +11,4 @@ and [ROADMAP.md](../../ROADMAP.md) — do not keep finished implementation plans
 | [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Draft |
 | [neural-blocks-collection.md](neural-blocks-collection.md) | MLP / neural blocks roadmap | Future |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle model view ports | Draft |
+| [phase4-fidelity-maps.md](phase4-fidelity-maps.md) | Jax bicycle ladder lift/project maps + MPC Engine broadcast | Draft |
