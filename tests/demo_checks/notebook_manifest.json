@@ -1,56 +1,115 @@
 [
   {
-    "id": "demo_showcase",
-    "path": "examples/notebooks/demo_showcase.ipynb",
-    "requires": ["jax"],
+    "id": "showcase_minilink",
+    "path": "examples/notebooks/showcase/minilink.ipynb",
+    "requires": [
+      "jax"
+    ],
     "timeout": 300
   },
   {
-    "id": "demo_compile_evaluator",
-    "path": "examples/notebooks/demo_compile_evaluator.ipynb",
-    "requires": ["jax"],
-    "timeout": 180
-  },
-  {
-    "id": "demo_overview",
-    "path": "examples/notebooks/demo_overview.ipynb",
-    "requires": ["jax"],
+    "id": "showcase_jax",
+    "path": "examples/notebooks/showcase/jax.ipynb",
+    "requires": [
+      "jax"
+    ],
     "timeout": 300
   },
   {
-    "id": "demo_stateless_functional_jax",
-    "path": "examples/notebooks/demo_stateless_functional_jax.ipynb",
-    "requires": ["jax"],
-    "timeout": 300
-  },
-  {
-    "id": "demo_optimization",
-    "path": "examples/notebooks/demo_optimization.ipynb",
+    "id": "intro_00_core",
+    "path": "examples/notebooks/intro/00_core.ipynb",
     "requires": [],
     "timeout": 180
   },
   {
-    "id": "demo_plots_animations_backends",
-    "path": "examples/notebooks/demo_plots_animations_backends.ipynb",
-    "requires": ["meshcat", "plotly"],
+    "id": "intro_01_blocks",
+    "path": "examples/notebooks/intro/01_blocks.ipynb",
+    "requires": [],
     "timeout": 180
   },
   {
-    "id": "demo_mpc_circuit",
-    "path": "examples/notebooks/demo_mpc_circuit.ipynb",
-    "requires": ["jax"],
+    "id": "intro_02_dynamics",
+    "path": "examples/notebooks/intro/02_dynamics.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_03_control",
+    "path": "examples/notebooks/intro/03_control.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_04_analysis",
+    "path": "examples/notebooks/intro/04_analysis.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_05_simulation",
+    "path": "examples/notebooks/intro/05_simulation.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_06_hybrid",
+    "path": "examples/notebooks/intro/06_hybrid.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 300
+  },
+  {
+    "id": "intro_07_compile",
+    "path": "examples/notebooks/intro/07_compile.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 180
+  },
+  {
+    "id": "intro_08_optimization",
+    "path": "examples/notebooks/intro/08_optimization.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_09_planning",
+    "path": "examples/notebooks/intro/09_planning.ipynb",
+    "requires": [],
+    "timeout": 300
+  },
+  {
+    "id": "intro_10_graphical",
+    "path": "examples/notebooks/intro/10_graphical.ipynb",
+    "requires": [
+      "meshcat",
+      "plotly"
+    ],
+    "timeout": 180
+  },
+  {
+    "id": "applications_mpc",
+    "path": "examples/notebooks/applications/mpc.ipynb",
+    "requires": [
+      "jax"
+    ],
     "timeout": 600
   },
   {
-    "id": "driving_model_trajopt_analysis",
-    "path": "examples/notebooks/driving_model_trajopt_analysis.ipynb",
-    "requires": ["jax"],
+    "id": "applications_car_trajopt",
+    "path": "examples/notebooks/applications/car_trajopt.ipynb",
+    "requires": [
+      "jax"
+    ],
     "timeout": 600
   },
   {
-    "id": "simulation_benchmark",
-    "path": "examples/notebooks/simulation_benchmark.ipynb",
-    "requires": ["jax"],
+    "id": "tooling_benchmark",
+    "path": "examples/notebooks/tooling/benchmark.ipynb",
+    "requires": [
+      "jax"
+    ],
     "timeout": 300
   }
 ]

@@ -130,6 +130,27 @@ class TestPropagateAnimationCamera(unittest.TestCase):
         self.assertEqual(diagram.camera_follow_frame, "bike:body")
         self.assertEqual(diagram.camera_scale, 6.0)
 
+    def test_series_inherits_plant_camera_scale(self):
+        from minilink.blocks.sources import Step
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        diagram = Step(final_value=[1.0]) >> plant
+        self.assertEqual(diagram.camera_scale, plant.camera_scale)
+
+    def test_prefers_geometry_leaf_over_step(self):
+        from minilink.blocks.sources import Step
+
+        plant = DynamicSystem(2, input_dim=1, output_dim=1, expose_state=True)
+        plant.skin = lambda _self: {"body": []}
+        plant.camera_scale = 3.0
+        step = Step(final_value=[1.0])
+        diagram = DiagramSystem()
+        diagram.add_subsystem(step, "step")
+        diagram.add_subsystem(plant, "plant")
+        _propagate_animation_camera(diagram, *diagram.subsystems.values())
+        self.assertEqual(diagram.camera_scale, 3.0)
+
 
 class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
     def setUp(self):

@@ -438,13 +438,14 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 
 | Notebook |
 | --- |
-| `examples/notebooks/demo_mpc_circuit.ipynb` |
-| `examples/notebooks/demo_optimization.ipynb` |
-| `examples/notebooks/demo_overview.ipynb` |
-| `examples/notebooks/demo_plots_animations_backends.ipynb` |
-| `examples/notebooks/demo_showcase.ipynb` |
-| `examples/notebooks/demo_stateless_functional_jax.ipynb` |
-| `examples/notebooks/simulation_benchmark.ipynb` |
+| `examples/notebooks/applications/mpc.ipynb` |
+| `examples/notebooks/applications/car_trajopt.ipynb` |
+| `examples/notebooks/intro/08_optimization.ipynb` |
+| `examples/notebooks/intro/10_graphical.ipynb` |
+| `examples/notebooks/intro/07_compile.ipynb` |
+| `examples/notebooks/showcase/minilink.ipynb` |
+| `examples/notebooks/showcase/jax.ipynb` |
+| `examples/notebooks/tooling/benchmark.ipynb` |
 
 ---
 

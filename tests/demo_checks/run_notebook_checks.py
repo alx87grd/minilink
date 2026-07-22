@@ -1,16 +1,17 @@
 """Execute teaching notebooks via nbclient (demo-check layer).
 
-Runs every ``examples/notebooks/*.ipynb`` listed in ``notebook_manifest.json``.
-Code cells must not raise; outputs are discarded (notebooks are not rewritten).
-Uses ``MPLBACKEND=Agg`` so matplotlib stays headless.
+Runs every notebook listed in ``notebook_manifest.json`` under
+``examples/notebooks/`` (including subfolders). Code cells must not raise;
+outputs are discarded (notebooks are not rewritten). Uses ``MPLBACKEND=Agg``
+so matplotlib stays headless.
 
-Every on-disk notebook under ``examples/notebooks/`` must appear in the
+Every on-disk ``.ipynb`` under ``examples/notebooks/`` must appear in the
 manifest — new notebooks cannot be forgotten.
 
 Usage (from repo root)::
 
     python tests/demo_checks/run_notebook_checks.py
-    python tests/demo_checks/run_notebook_checks.py --notebook demo_showcase
+    python tests/demo_checks/run_notebook_checks.py --notebook showcase_minilink
 """
 
 from __future__ import annotations
@@ -40,11 +41,15 @@ def _load_manifest() -> list[dict]:
 
 
 def _disk_notebooks() -> set[str]:
-    return {p.name for p in NOTEBOOK_DIR.glob("*.ipynb")}
+    """Repo-relative paths of every ``.ipynb`` under ``examples/notebooks/``."""
+    return {
+        p.relative_to(REPO_ROOT).as_posix()
+        for p in NOTEBOOK_DIR.rglob("*.ipynb")
+    }
 
 
 def _unlisted_on_disk(manifest: list[dict]) -> list[str]:
-    listed = {Path(entry["path"]).name for entry in manifest}
+    listed = {entry["path"] for entry in manifest}
     return sorted(_disk_notebooks() - listed)
 
 

@@ -11,7 +11,7 @@ Missions
    Bicycle plants use JAX + ``car_outline``; holonomic plants use NumPy + ``disc``
    (path-distance fields under JAX are unreliable for the n=2/4 point plants).
 
-Pedagogy twin: ``examples/notebooks/driving_model_trajopt_analysis.ipynb``.
+Pedagogy twin: ``examples/notebooks/applications/car_trajopt.ipynb``.
 """
 
 from __future__ import annotations

@@ -67,24 +67,37 @@ def _namespaced_camera_follow_frame(
 
 
 def _propagate_animation_camera(diagram, *sources):
-    """Copy camera hints from a plant-like *source* onto *diagram*."""
+    """Copy camera hints from a plant-like *source* onto *diagram*.
+
+    Prefer a source (or nested leaf) that already carries kinematic geometry —
+    e.g. a catalog plant — over a bare ``Step`` / controller that would keep the
+    generic ``camera_scale=10`` default.
+    """
+    fallback = None
     for source in sources:
         animated = _animated_geometry_source(source)
+        if animated is not None:
+            _copy_animation_camera_hints(diagram, animated)
+            return
         if (
-            animated is None
+            fallback is None
             and isinstance(source, System)
             and not isinstance(source, DiagramSystem)
         ):
-            animated = source
-        if animated is not None:
-            diagram.camera_scale = animated.camera_scale
-            diagram.camera_target = np.array(animated.camera_target, dtype=float).copy()
-            diagram.camera_follow_frame = _namespaced_camera_follow_frame(
-                diagram,
-                animated,
-                getattr(animated, "camera_follow_frame", None),
-            )
-            return
+            fallback = source
+    if fallback is not None:
+        _copy_animation_camera_hints(diagram, fallback)
+
+
+def _copy_animation_camera_hints(diagram, animated):
+    diagram.camera_scale = animated.camera_scale
+    diagram.camera_target = np.array(animated.camera_target, dtype=float).copy()
+    diagram.camera_plot_axes = getattr(animated, "camera_plot_axes", (0, 1))
+    diagram.camera_follow_frame = _namespaced_camera_follow_frame(
+        diagram,
+        animated,
+        getattr(animated, "camera_follow_frame", None),
+    )
 
 
 def add_systems(*systems: System | DiagramSystem) -> DiagramSystem:
@@ -425,6 +438,7 @@ def _series_pair(diagram, right):
     output_port = _default_output_port(right)
     diagram.connect_new_output_port(right_id, output_port, "y")
     diagram._composition_output = (right_id, output_port)
+    _propagate_animation_camera(diagram, right)
     return diagram
 
 

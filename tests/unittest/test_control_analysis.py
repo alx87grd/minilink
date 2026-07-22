@@ -356,6 +356,11 @@ class TestFilteredController(unittest.TestCase):
 
 
 class TestImpedanceController(unittest.TestCase):
+    def test_gain_init_kwargs(self):
+        ctl = ImpedanceController(Kp=100.0, Kd=10.0)
+        np.testing.assert_allclose(ctl.params["Kp"], [100.0])
+        np.testing.assert_allclose(ctl.params["Kd"], [10.0])
+
     def test_vector_regulation(self):
         ctl = ImpedanceController(dof=2)
         ctl.params.update({"Kp": [2.0, 3.0], "Kd": [0.5, 0.5]})

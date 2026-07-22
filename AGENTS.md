@@ -19,9 +19,10 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 
 Do not add new markdown guides unless asked. Keep [README call chains](README.md#call-chains) minimal.
 
-**Intro-doc scope:** [README.md](README.md) and the showcase/overview notebooks
-([demo_showcase.ipynb](examples/notebooks/demo_showcase.ipynb),
-[demo_overview.ipynb](examples/notebooks/demo_overview.ipynb)) present the **main
+**Intro-doc scope:** [README.md](README.md), marketing showcases
+([showcase/minilink.ipynb](examples/notebooks/showcase/minilink.ipynb),
+[showcase/jax.ipynb](examples/notebooks/showcase/jax.ipynb)), and the
+[`intro/`](examples/notebooks/intro/) module API notebooks present the **main
 core tools and features** — `System` / diagrams / simulate / compile / analysis /
 planning trajopt / the hybrid step path (`StepSystem`, `StepDiagramSystem`,
 `Computer`, `HybridDiagram`) / MPC as the hybrid exemplar. Do **not** update those
