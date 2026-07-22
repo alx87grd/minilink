@@ -148,7 +148,8 @@ Pre-decided homes ([DESIGN.md §3](DESIGN.md)), build order adjusted for pyro 2.
 - [x] **Continuous SMC closed loop** — SMC `solver_info` flag, diagram aggregation, auto **Euler** + finer `dt`, forced-solver warnings (see also [DESIGN.md §5 — Discontinuous closed loops](DESIGN.md#discontinuous-closed-loops--known-issues))
 - [ ] `robotic.py` — joint/effector PD/PID wrappers (kinematic + nullspace landed)
 - [ ] `trajectory_lqr.py` — time-varying LQR along a reference
-- [ ] `mpc.py` (uses `optimization/`) — minilink extra, no pyro equivalent
+- [x] **MPC** — `control/mpc/` (`ModelPredictiveController`, warm-start, dual-rate);
+  see §5.5 for trajopt compile-once / NumPy rebuild
 - [ ] `neural.py` — policy wrappers ([neural-blocks-collection.md](docs/plans/neural-blocks-collection.md))
 
 ### 5.3 Blocks

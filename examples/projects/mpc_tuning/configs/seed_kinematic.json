@@ -1,0 +1,19 @@
+{
+  "CORRIDOR_COST_WEIGHT": 25.0,
+  "MPC_DT": 0.2,
+  "MPC_HORIZON": 2.0,
+  "MPC_STEPS": 10,
+  "PATH_COST_WEIGHT": 20.0,
+  "R_delta": 22.0,
+  "R_v": 0.5,
+  "TF_SIM_MAX": 90.0,
+  "U_TARGET": 10.0,
+  "compile_backend": "jax",
+  "ftol": 0.1,
+  "maxiter": 100,
+  "model": "kinematic",
+  "optimizer_method": "scipy_slsqp",
+  "plant_dt_inner": 0.01,
+  "transcription": "direct_collocation",
+  "warm_start": true
+}

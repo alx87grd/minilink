@@ -19,6 +19,17 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 
 Do not add new markdown guides unless asked. Keep [README call chains](README.md#call-chains) minimal.
 
+**Intro-doc scope:** [README.md](README.md) and the showcase/overview notebooks
+([demo_showcase.ipynb](examples/notebooks/demo_showcase.ipynb),
+[demo_overview.ipynb](examples/notebooks/demo_overview.ipynb)) present the **main
+core tools and features** — `System` / diagrams / simulate / compile / analysis /
+planning trajopt / the hybrid step path (`StepSystem`, `StepDiagramSystem`,
+`Computer`, `HybridDiagram`) / MPC as the hybrid exemplar. Do **not** update those
+intro surfaces to track every new demo, compare script, or `examples/projects/`
+experiment. New demos land under `examples/`; update DESIGN/ROADMAP when contracts
+or maturity change. Add a README examples-table row only when a demo is a
+**canonical** teaching entry for a core tool (e.g. `demo_mpc_minimal`).
+
 ## Core directives
 
 - **Math readability first**: equations read like textbook math, e.g. `dx = A @ x + B @ u`.

@@ -146,7 +146,15 @@ loss_and_grad = jax.jit(jax.value_and_grad(
 
 ### Hybrid and discrete control
 
-Discrete control laws (like digital MPC or sampled Sliding Mode Control) can close the loop on continuous plants without breaking the continuous-time core or solver guarantees. `StepSystem` defines discrete logic, and `Computer` schedules it. The `%` and `@` operators build a `HybridDiagram` with Zero-Order Hold (ZOH) and sampling:
+Discrete control laws (like digital MPC or sampled Sliding Mode Control) can close
+the loop on continuous plants without breaking the continuous-time core or solver
+guarantees. The hybrid stack has three pieces:
+
+1. **`StepSystem`** — discrete leaf (tick logic). Wire several into a
+   **`StepDiagramSystem`** when the discrete side needs its own diagram.
+2. **`Computer`** — schedules that step side (`block % dt` or `as_computer`).
+3. **`HybridDiagram`** — `Computer @ plant` (or `mpc @ plant`) with Zero-Order Hold
+   and sampling; the continuous plant is solved between ticks.
 
 ```python
 from minilink.control.mpc import ModelPredictiveController
@@ -373,7 +381,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | --- | --- |
 | `core` | `System`, façade mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
-| `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`) |
+| `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`, `mpc`) |
 | `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, `HybridSimulator`, `Computer`, solvers, time grids |
