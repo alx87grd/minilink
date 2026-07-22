@@ -17,7 +17,7 @@ rounded-rectangle track (path + corridor, **no obstacles**).
 | `kinematic` | `BicycleKin` | Drives OK |
 | `kinematic_rate` | `BicycleAcc` | Drives OK |
 | `dynamic_rate` | `BicycleDynRate` | Drives OK |
-| `dynamic_engine` | `BicycleDynEngine` | **Not valid** — path tracking fails |
+| `dynamic_engine` | `BicycleDynEngine` | **Deferred** — closed-loop path tracking not yet viable; skip Phases 1–4 for now |
 
 Tune **independently** (four separate configs). Do not share one hyperparameter
 vector across models.
@@ -52,9 +52,9 @@ examples/projects/mpc_tuning/
   results/                  # trial JSONL / summaries (gitignored bulk)
 ```
 
-Interactive compare remains
-[`examples/scripts/mpc/demo_mpc_circuit_model_compare.py`](../../examples/scripts/mpc/demo_mpc_circuit_model_compare.py);
-after Phase 4 it may load `configs/best_*.json`.
+Interactive compare:
+[`examples/projects/mpc_tuning/compare_demo.py`](../../examples/projects/mpc_tuning/compare_demo.py)
+(loads `configs/best_*.json` when present).
 
 ## Mission (shared harness)
 
