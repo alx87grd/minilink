@@ -105,6 +105,14 @@
     "timeout": 600
   },
   {
+    "id": "applications_cartpole_rollout_gradients",
+    "path": "examples/notebooks/applications/cartpole_rollout_gradients.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 300
+  },
+  {
     "id": "tooling_benchmark",
     "path": "examples/notebooks/tooling/benchmark.ipynb",
     "requires": [
