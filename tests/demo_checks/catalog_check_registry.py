@@ -130,9 +130,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("ConstantSpeedKinematicCar", ConstantSpeedKinematicCar),
     CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),
     CatalogCheckEntry("DynamicHolonomicMobileRobot", DynamicHolonomicMobileRobot),
-    CatalogCheckEntry(
-        "Holonomic", Holonomic, requires_jax=True
-    ),
+    CatalogCheckEntry("Holonomic", Holonomic, requires_jax=True),
     CatalogCheckEntry(
         "HolonomicAccel",
         HolonomicAccel,
