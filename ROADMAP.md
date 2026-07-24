@@ -386,3 +386,100 @@ Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) (June 
 
 Full per-module backlog:
 [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md).
+
+## 7. Suggested improvements (architecture review)
+
+Directional suggestions from a 2026-07 architecture / API review pass over core
+contracts, compile/evaluators, composition, optimization/planning, simulation
+facades, and graphics. **Not scheduled priorities** — does not displace P0–P5
+or §5 backlog items already tracked above. Use as a hardening backlog after
+maintainer triage; promote selected rows into §3 / §4 / §5 when accepted.
+
+### 7.1 Core contracts (`f` / ports / params)
+
+- [ ] Teach the three-layer output story in one place: model `h` (primary `"y"`)
+  → per-port `compute` → evaluator `outputs` dict (boundary only).
+- [ ] Document flat-`u` unpacking (`get_port_values_from_u`) as the multi-port
+  idiom; optional small unpack helper only if it stays out of equation lines.
+- [ ] Name params shapes explicitly: leaf flat dict vs diagram nested
+  `{sys_id: …}`; keep `params is None` → `self.params` semantics.
+- [ ] Keep arrays for signals and dict/pytree for params — do **not** homogenize
+  to all-array, all-dict, or Drake-style Context on the leaf equation path.
+
+### 7.2 Compile and evaluators
+
+- [ ] Publish a compact evaluator API matrix (user / simulator / trajopt–ID;
+  mark JAX-only trace methods).
+- [ ] Clarify or rename params freeze: leaf snapshot vs diagram live-default /
+  `bind_params`; one `compile(..., snapshot_params=…)` entry for leaves and
+  diagrams.
+- [ ] Shrink advertised public surface to `f`/`f_p`, `outputs`/`outputs_p`,
+  `step`/`step_p`, plus a short integrate list; treat full `_jit` / trace /
+  integrate grids as tool-author API.
+- [ ] Normalize JAX return types (device arrays in JAX methods; NumPy at
+  Trajectory / plot boundaries); complete or shrink `_jit` alias contract.
+- [ ] Make `auto` backend fallback visible under `verbose=` (and surface the
+  swallowed JAX exception when useful).
+- [ ] Table-driven NumPy↔JAX parity tests for leaf + diagram; prefer splitting
+  `jax_evaluators.py` by concern over redesigning typed evaluators.
+
+### 7.3 Diagram composition
+
+- [ ] Keep `add_subsystem` / `connect` as the documented canonical API; freeze
+  sugar grammar (`+`, `>>`, `@`, `autowire`, `feedback=`).
+- [ ] Add verbose / “explain wiring” mode for shortcuts (chosen ids, default
+  ports, feedback path, Mux insertion).
+- [ ] Contract tests for multi-output `>>`, nonstandard port names,
+  diagram–diagram flatten edges, hybrid multi-leaf cases — before more sugar.
+- [ ] Keep `autowire` conservative (no Mux); document Mux only via
+  `feedback="qdq"` / `closed_loop_qdq`.
+- [ ] Split `composition.py` by responsibility only after tests pin behavior.
+
+### 7.4 Optimization and planning
+
+- [ ] Unify optimizer wiring (`make_optimizer_backend`) so offline trajopt and
+  parametric MPC share SciPy / Ipopt methods.
+- [ ] Promote `ParametricMathematicalProgram` into `optimization/` when
+  `J(z, p)` / `h(z, p)` land; keep transcriptions in planning.
+- [ ] Finish scene / online param pipeline B (bind `p` without NLP rebuild)
+  before adding more planning features.
+- [ ] Sparse derivative story before climbing past TRL 5 on long-horizon trajopt.
+- [ ] Keep `PlanningProblem` declarative (no solver grid knobs on the problem);
+  keep MPC in `control/mpc` as a product wrapper, not a planning subtype.
+- [ ] Optional CasADi / acados as backends later — behind the same program /
+  planner façade, not a rewrite.
+
+### 7.5 Trajectory, simulation, facades
+
+- [ ] `SimulationOptions` ergonomic bag (solver, grid, backend, verbose,
+  warnings) — cleanup, not redesign.
+- [ ] Trajectory metadata (solver, backend, dt policy, discontinuous caveats);
+  optional readonly arrays / `readonly()` helper.
+- [ ] `reconstruct_internal_signals` reuse sim evaluator/backend (do not always
+  force NumPy recompile).
+- [ ] Hard warning when discontinuous controllers sit on continuous
+  `DiagramSystem`; recommend `Computer` / `HybridDiagram`.
+- [ ] Keep `self.traj` / `rollout` / `last_result` as convenience caches only;
+  document “latest result” semantics for scripts.
+
+### 7.6 Graphical rendering
+
+- [ ] Cache namespaced diagram kinematic geometry; keep shared `"world"` rule.
+- [ ] Lazy renderer registry (import backend only when selected).
+- [ ] Backend capability flags (`supports_3d`, `supports_dynamic_geometry_native`,
+  …) with early clear errors.
+- [ ] Primitive parity smoke tests across matplotlib / plotly / meshcat / pygame.
+- [ ] Decide optional `KinematicModel` delegate: adopt only if it cuts plant
+  boilerplate without moving math off `System`; otherwise drop from §4.
+- [ ] Keep overlays (`SceneHistory`, `Replay`, MPC viz) as the extension point —
+  do not special-case more viz inside `Animator`.
+
+### 7.7 Cross-cutting (docs / mental model)
+
+- [ ] Short “mental model” page or DESIGN subsection: System / ports / `f` vs
+  `step` / params tiers / compile tiers / when to drop from `@` to explicit
+  wiring.
+- [ ] Demo-gate the product vision with a few cross-pillar scripts (sim +
+  control + trajopt/MPC + params gradient) before broad API freeze.
+- [ ] Resolve stale wording (e.g. ROADMAP `h_p` vs DESIGN `outputs_p`; step /
+  hybrid parity notes vs older drop rows in pyro gap doc).
