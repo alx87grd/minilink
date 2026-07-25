@@ -42,10 +42,7 @@ def _load_manifest() -> list[dict]:
 
 def _disk_notebooks() -> set[str]:
     """Repo-relative paths of every ``.ipynb`` under ``examples/notebooks/``."""
-    return {
-        p.relative_to(REPO_ROOT).as_posix()
-        for p in NOTEBOOK_DIR.rglob("*.ipynb")
-    }
+    return {p.relative_to(REPO_ROOT).as_posix() for p in NOTEBOOK_DIR.rglob("*.ipynb")}
 
 
 def _unlisted_on_disk(manifest: list[dict]) -> list[str]:
