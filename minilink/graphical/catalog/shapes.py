@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from minilink.core.backends import array_module
+from minilink.core.kinematics import SE3
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
@@ -127,31 +129,33 @@ def segment_pose_2d(p0, p1):
 
 
 def link_pose_3d(p0, p1):
-    """Rigid pose for a unit ``Rod`` (length on primitive) from *p0* toward *p1*."""
-    p0 = np.asarray(p0, dtype=float).reshape(-1)
-    p1 = np.asarray(p1, dtype=float).reshape(-1)
-    if p0.size == 2:
-        p0 = np.array([p0[0], p0[1], 0.0])
-    if p1.size == 2:
-        p1 = np.array([p1[0], p1[1], 0.0])
-    delta = p1 - p0
-    length = np.linalg.norm(delta)
-    T = np.eye(4)
-    T[:3, 3] = p0
-    if length < 1e-12:
-        return T
+    """Rigid pose for a unit ``Rod`` (length on primitive) from *p0* toward *p1*.
 
-    y_axis = -delta / length
-    reference = np.array([0.0, 0.0, 1.0])
-    if abs(np.dot(y_axis, reference)) > 0.95:
-        reference = np.array([1.0, 0.0, 0.0])
-    x_axis = np.cross(reference, y_axis)
-    x_axis = x_axis / np.linalg.norm(x_axis)
-    z_axis = np.cross(x_axis, y_axis)
-    T[:3, 0] = x_axis
-    T[:3, 1] = y_axis
-    T[:3, 2] = z_axis
-    return T
+    Native-array: NumPy or JAX depending on the input backend. Near-zero span
+    collapses to a pure translation at *p0*.
+    """
+    xp = array_module(p0, p1)
+    p0 = xp.asarray(p0, dtype=float).reshape(-1)
+    p1 = xp.asarray(p1, dtype=float).reshape(-1)
+    if p0.shape[0] == 2:
+        p0 = xp.concatenate([p0, xp.asarray([0.0])])
+    if p1.shape[0] == 2:
+        p1 = xp.concatenate([p1, xp.asarray([0.0])])
+
+    delta = p1 - p0
+    length = xp.linalg.norm(delta)
+    safe = xp.maximum(length, 1e-12)
+    y_axis = -delta / safe
+    ref_z = xp.asarray([0.0, 0.0, 1.0])
+    ref_x = xp.asarray([1.0, 0.0, 0.0])
+    reference = xp.where(xp.abs(xp.dot(y_axis, ref_z)) > 0.95, ref_x, ref_z)
+    x_axis = xp.cross(reference, y_axis)
+    x_axis = x_axis / xp.linalg.norm(x_axis)
+    z_axis = xp.cross(x_axis, y_axis)
+    R = xp.stack([x_axis, y_axis, z_axis], axis=1)
+    posed = SE3(R, p0)
+    collapsed = SE3(xp.eye(3), p0)
+    return xp.where(length < 1e-12, collapsed, posed)
 
 
 def point_pose(p):

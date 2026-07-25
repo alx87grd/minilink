@@ -35,6 +35,6 @@ ctl.params["Kd"] = np.array([3.0, 25.0, 8.0, 0.2, 0.05, 0.003])
 
 diagram = ref >> closed_loop_qdq(ctl, arm)
 diagram.plot_diagram()
-diagram.compute_trajectory(tf=TF, n_steps=240)
+diagram.compute_trajectory(tf=TF, n_steps=240, compile_backend="jax")
 diagram.plot_trajectory()
 diagram.animate(renderer="meshcat", is_3d=True)

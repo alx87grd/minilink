@@ -5,14 +5,17 @@ The kinematic dimensions, masses, and centers of mass follow the public
 approximations, so this model is intended for controls teaching and simulation,
 not calibrated prediction of a particular robot.
 
-Dynamics are evaluated from link inertial wrenches instead of expanded symbolic
-expressions:
+Dynamics, kinematics, Jacobian, and ``tf`` are native-array paths: the same
+methods run under NumPy and trace under JAX via ``array_module``.
+
+Equation of motion::
 
     H(q) qdd + C(q, qd) qd + d(q, qd) + g(q) = tau
 """
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.dynamics.abstraction.manipulator import Manipulator
 from minilink.graphical.catalog.shapes import link_pose_3d
 from minilink.graphical.catalog.skins import ur5_skin
@@ -20,14 +23,16 @@ from minilink.graphical.catalog.skins import ur5_skin
 
 def _dh_transform(theta, d, a, alpha):
     """Standard DH transform from one link frame to the next."""
-    ct, st = np.cos(theta), np.sin(theta)
-    ca, sa = np.cos(alpha), np.sin(alpha)
+    xp = array_module(theta, d, a, alpha)
+    ct, st = xp.cos(theta), xp.sin(theta)
+    ca, sa = xp.cos(alpha), xp.sin(alpha)
+    one, zero = xp.ones_like(ct), xp.zeros_like(ct)
     # fmt: off
-    return np.array([
+    return xp.array([
         [ct, -st * ca,  st * sa, a * ct],
         [st,  ct * ca, -ct * sa, a * st],
-        [0.0,       sa,       ca,      d],
-        [0.0,      0.0,      0.0,    1.0],
+        [zero,      sa,       ca,      d],
+        [zero,    zero,     zero,    one],
     ])
     # fmt: on
 
@@ -42,31 +47,47 @@ def _cylinder_inertia(mass, length, radius, axis):
 
 
 def _skew(v):
+    xp = array_module(v)
+    v = xp.asarray(v)
+    zero = xp.zeros_like(v[0])
     # fmt: off
-    return np.array([
-        [0.0, -v[2], v[1]],
-        [v[2], 0.0, -v[0]],
-        [-v[1], v[0], 0.0],
+    return xp.array([
+        [ zero, -v[2],  v[1]],
+        [ v[2],  zero, -v[0]],
+        [-v[1],  v[0],  zero],
     ])
     # fmt: on
 
 
 def _motion_cross(v):
-    cross = np.zeros((6, 6))
-    cross[:3, :3] = _skew(v[:3])
-    cross[3:, :3] = _skew(v[3:])
-    cross[3:, 3:] = _skew(v[:3])
-    return cross
+    xp = array_module(v)
+    v = xp.asarray(v)
+    w = _skew(v[:3])
+    vlin = _skew(v[3:])
+    z = xp.zeros((3, 3))
+    top = xp.concatenate([w, z], axis=1)
+    bottom = xp.concatenate([vlin, w], axis=1)
+    return xp.concatenate([top, bottom], axis=0)
 
 
 def _spatial_inertia(mass, com, inertia):
+    xp = array_module(com, inertia, mass)
+    mass = xp.asarray(mass)
+    com = xp.asarray(com)
+    inertia = xp.asarray(inertia)
     c = _skew(com)
-    spatial = np.zeros((6, 6))
-    spatial[:3, :3] = inertia + mass * c.T @ c
-    spatial[:3, 3:] = mass * c
-    spatial[3:, :3] = mass * c.T
-    spatial[3:, 3:] = mass * np.eye(3)
-    return spatial
+    I_ang = inertia + mass * (c.T @ c)
+    m_c = mass * c
+    m_eye = mass * xp.eye(3)
+    top = xp.concatenate([I_ang, m_c], axis=1)
+    bottom = xp.concatenate([m_c.T, m_eye], axis=1)
+    return xp.concatenate([top, bottom], axis=0)
+
+
+def _as_params(params, *keys, like):
+    """Cast selected parameter values to the backend of *like*."""
+    xp = array_module(like)
+    return tuple(xp.asarray(params[key]) for key in keys)
 
 
 class UR5Manipulator(Manipulator):
@@ -76,6 +97,10 @@ class UR5Manipulator(Manipulator):
     UR5 masses and centers of mass are paired with simple cylinder inertias;
     consequently the model is suitable for controller examples but is not a
     factory-calibrated representation.
+
+    Equation paths (``H``/``C``/``g``/``d``, FK, ``J``, ``tf``) are NumPy/JAX
+    native-array: pass NumPy arrays for ordinary use, or JAX arrays for JIT,
+    gradients, and ``compile_backend="jax"`` simulation.
     """
 
     def __init__(self):
@@ -130,122 +155,143 @@ class UR5Manipulator(Manipulator):
 
     def _chain(self, q, params=None):
         params = self.params if params is None else params
-        a = np.asarray(params["a"], dtype=float)
-        d = np.asarray(params["d"], dtype=float)
-        alpha = np.asarray(params["alpha"], dtype=float)
+        xp = array_module(q)
+        q = xp.asarray(q)
+        a, d, alpha = _as_params(params, "a", "d", "alpha", like=q)
 
-        T = np.eye(4)
+        T = xp.eye(4)
         joint_frames = []
         joint_origins = []
         joint_axes = []
         link_frames = []
         for i in range(self.dof):
-            joint_frames.append(T.copy())
-            joint_origins.append(T[:3, 3].copy())
-            joint_axes.append(T[:3, 2].copy())
+            joint_frames.append(T)
+            joint_origins.append(T[:3, 3])
+            joint_axes.append(T[:3, 2])
             T = T @ _dh_transform(q[i], d[i], a[i], alpha[i])
-            link_frames.append(T.copy())
+            link_frames.append(T)
         return (
-            np.asarray(joint_frames),
-            np.asarray(joint_origins),
-            np.asarray(joint_axes),
-            np.asarray(link_frames),
+            xp.stack(joint_frames),
+            xp.stack(joint_origins),
+            xp.stack(joint_axes),
+            xp.stack(link_frames),
         )
 
     def _rnea(self, q, dq, acceleration, params=None, *, gravity=True):
         """Recursive Newton-Euler inverse dynamics in link coordinates."""
         params = self.params if params is None else params
-        q = np.asarray(q, dtype=float)
-        dq = np.asarray(dq, dtype=float)
-        acceleration = np.asarray(acceleration, dtype=float)
-        a = np.asarray(params["a"], dtype=float)
-        d = np.asarray(params["d"], dtype=float)
-        alpha = np.asarray(params["alpha"], dtype=float)
-        mass = np.asarray(params["mass"], dtype=float)
-        com = np.asarray(params["com"], dtype=float)
-        inertia = np.asarray(params["inertia"], dtype=float)
+        xp = array_module(q, dq, acceleration)
+        q = xp.asarray(q)
+        dq = xp.asarray(dq)
+        acceleration = xp.asarray(acceleration)
+        a, d, alpha, mass, com, inertia = _as_params(
+            params, "a", "d", "alpha", "mass", "com", "inertia", like=q
+        )
+        gravity_value = xp.asarray(params["gravity"])
 
-        Xup = np.zeros((self.dof, 6, 6))
-        motion = np.zeros((self.dof, 6))
-        spatial_acceleration = np.zeros((self.dof, 6))
-        force = np.zeros((self.dof, 6))
-        base_acceleration = np.zeros(6)
-        if gravity:
-            base_acceleration[5] = float(params["gravity"])
+        Xup = []
+        force = []
+        g_vec = xp.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0]) * gravity_value
+        base_acceleration = g_vec if gravity else xp.zeros(6)
 
-        parent_motion = np.zeros(6)
+        parent_motion = xp.zeros(6)
         parent_acceleration = base_acceleration
-        z = np.array([0.0, 0.0, 1.0])
+        z = xp.array([0.0, 0.0, 1.0])
         for i in range(self.dof):
             T = _dh_transform(q[i], d[i], a[i], alpha[i])
             R = T[:3, :3]
             r = T[:3, 3]
             Rt = R.T
 
-            Xup[i, :3, :3] = Rt
-            Xup[i, 3:, :3] = -Rt @ _skew(r)
-            Xup[i, 3:, 3:] = Rt
+            X = xp.concatenate(
+                [
+                    xp.concatenate([Rt, xp.zeros((3, 3))], axis=1),
+                    xp.concatenate([-Rt @ _skew(r), Rt], axis=1),
+                ],
+                axis=0,
+            )
+            Xup.append(X)
 
-            S = np.concatenate([Rt @ z, Rt @ np.cross(z, r)])
+            S = xp.concatenate([Rt @ z, Rt @ xp.cross(z, r)])
             joint_motion = S * dq[i]
-            motion[i] = Xup[i] @ parent_motion + joint_motion
-            spatial_acceleration[i] = (
-                Xup[i] @ parent_acceleration
+            vi = X @ parent_motion + joint_motion
+            ai = (
+                X @ parent_acceleration
                 + S * acceleration[i]
-                + _motion_cross(motion[i]) @ joint_motion
+                + _motion_cross(vi) @ joint_motion
             )
-
             I = _spatial_inertia(mass[i], com[i], inertia[i])
-            momentum = I @ motion[i]
-            force[i] = (
-                I @ spatial_acceleration[i] - _motion_cross(motion[i]).T @ momentum
-            )
-            parent_motion = motion[i]
-            parent_acceleration = spatial_acceleration[i]
+            fi = I @ ai - _motion_cross(vi).T @ (I @ vi)
 
-        tau = np.zeros(self.dof)
+            force.append(fi)
+            parent_motion = vi
+            parent_acceleration = ai
+
+        tau = []
         for i in reversed(range(self.dof)):
             T = _dh_transform(q[i], d[i], a[i], alpha[i])
             R = T[:3, :3]
             r = T[:3, 3]
-            S = np.concatenate([R.T @ z, R.T @ np.cross(z, r)])
-            tau[i] = S @ force[i]
+            S = xp.concatenate([R.T @ z, R.T @ xp.cross(z, r)])
+            tau.append(S @ force[i])
             if i > 0:
                 force[i - 1] = force[i - 1] + Xup[i].T @ force[i]
-        return tau
+        return xp.stack(tau[::-1])
 
     def H(self, q, params=None):
         """Joint-space inertia matrix."""
         params = self.params if params is None else params
-        zero = np.zeros(self.dof)
-        H = np.column_stack(
-            [
-                self._rnea(q, zero, direction, params, gravity=False)
-                for direction in np.eye(self.dof)
-            ]
-        )
+        xp = array_module(q)
+        q = xp.asarray(q)
+        zero = xp.zeros(self.dof)
+        columns = [
+            self._rnea(q, zero, direction, params, gravity=False)
+            for direction in xp.eye(self.dof)
+        ]
+        H = xp.stack(columns, axis=1)
         return 0.5 * (H + H.T)
 
     def C(self, q, dq, params=None):
         """Coriolis matrix chosen so ``C(q, dq) @ dq`` is the RNEA bias force."""
         params = self.params if params is None else params
-        dq = np.asarray(dq, dtype=float)
-        speed_squared = float(dq @ dq)
-        if speed_squared < 1e-16:
-            return np.zeros((self.dof, self.dof))
-        bias = self._rnea(q, dq, np.zeros(self.dof), params, gravity=False)
-        return np.outer(bias, dq) / speed_squared
+        xp = array_module(q, dq)
+        q = xp.asarray(q)
+        dq = xp.asarray(dq)
+        speed_squared = dq @ dq
+        # Near rest the rank-1 map is ill-conditioned; treat bias as zero.
+        denom = xp.maximum(speed_squared, 1e-12)
+        bias = self._rnea(q, dq, xp.zeros(self.dof), params, gravity=False)
+        C = xp.outer(bias, dq) / denom
+        return xp.where(speed_squared < 1e-12, xp.zeros((self.dof, self.dof)), C)
+
+    def forward_dynamics(self, q, v, u, t=0.0, params=None):
+        """Forward dynamics via RNEA bias ``C v + g`` (avoids ill-conditioned ``C``)."""
+        params = self.params if params is None else params
+        xp = array_module(q, v, u)
+        q = xp.asarray(q)
+        v = xp.asarray(v)
+        u = xp.asarray(u)
+        H = self.H(q, params)
+        bias = self._rnea(q, v, xp.zeros(self.dof), params, gravity=True)
+        d = self.d(q, v, u, t, params)
+        tau = self.generalized_force(q, v, u, t, params)
+        return xp.linalg.solve(H, tau - bias - d)
 
     def g(self, q, params=None):
         """Gravity generalized force."""
         params = self.params if params is None else params
-        zero = np.zeros(self.dof)
+        xp = array_module(q)
+        q = xp.asarray(q)
+        zero = xp.zeros(self.dof)
         return self._rnea(q, zero, zero, params, gravity=True)
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         """Linear viscous joint damping."""
         params = self.params if params is None else params
-        return np.asarray(params["damping"]) * dq
+        xp = array_module(q, dq)
+        dq = xp.asarray(dq)
+        damping = xp.asarray(params["damping"])
+        return damping * dq
 
     def forward_kinematics(self, q, params=None):
         """Tool-center position in the world frame."""
@@ -256,19 +302,21 @@ class UR5Manipulator(Manipulator):
     def J(self, q, params=None):
         """Translational tool Jacobian."""
         params = self.params if params is None else params
+        xp = array_module(q)
         _, origins, axes, links = self._chain(q, params)
         p = links[-1, :3, 3]
-        return np.column_stack(
-            [np.cross(axes[i], p - origins[i]) for i in range(self.dof)]
-        )
+        columns = [xp.cross(axes[i], p - origins[i]) for i in range(self.dof)]
+        return xp.stack(columns, axis=1)
 
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+        xp = array_module(x)
         q, _ = self.x2q(x)
         joint_frames, origins, _, links = self._chain(q, params)
-        points = np.vstack([origins, links[-1, :3, 3]])
+        tip = links[-1, :3, 3]
+        points = xp.concatenate([origins, tip.reshape(1, 3)], axis=0)
 
-        frames = {"base": np.eye(4), "tool": links[-1]}
+        frames = {"base": xp.eye(4), "tool": links[-1]}
         for i in range(self.dof):
             frames[f"link{i}"] = link_pose_3d(points[i], points[i + 1])
             frames[f"joint{i}"] = joint_frames[i]
@@ -280,5 +328,10 @@ if __name__ == "__main__":
     sys = UR5Manipulator()
     q0 = np.array([0.0, -np.pi / 2 + 0.2, 0.0, -np.pi / 2, 0.0, 0.0])
     sys.x0 = sys.q2x(q0, np.zeros(6))
-    sys.compute_forced(lambda t: np.zeros(6), tf=3.0, n_steps=120)
+    sys.compute_forced(
+        lambda t: np.zeros(6),
+        tf=3.0,
+        n_steps=120,
+        compile_backend="jax",
+    )
     sys.animate(renderer="meshcat", is_3d=True)
