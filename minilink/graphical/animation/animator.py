@@ -267,8 +267,8 @@ class Animator:
         Notes
         -----
         Meshcat native animation only keyframes rigid pose (position+quaternion).
-        Per-frame dynamic geometry (e.g. ``TorqueArrow`` sweep) is frozen at
-        ``t=0`` in the native path.
+        Per-frame dynamic geometry (e.g. ``Arrow`` length/direction,
+        ``TorqueArrow`` sweep) is frozen at ``t=0`` in the native path.
 
         Plotly does not support the per-frame Python loop (``native=False`` with
         ``html=False``): use ``native=True`` or ``html=True`` for inline/browser

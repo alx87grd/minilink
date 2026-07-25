@@ -462,6 +462,9 @@ from minilink.dynamics.catalog.manipulators.arms import (
     SpeedControlledManipulator,
     TwoLinkManipulator,
 )
+from minilink.dynamics.catalog.manipulators import UR5Manipulator
+from minilink.graphical.animation.primitives import Arrow
+from tests.unittest.graphics_contract_helpers import resolve_draw_frame
 
 
 class TestManipulatorPorts(unittest.TestCase):
@@ -542,6 +545,72 @@ class TestRoboticWrappers(unittest.TestCase):
         )
         self.assertIn("mux", diagram.subsystems)
         self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
+
+    def test_task_impedance_force_arrow_off_by_default(self):
+        arm = TwoLinkManipulator()
+        ctl = TaskImpedance(arm)
+        q = np.array([0.2, -0.1])
+        p_d = arm.forward_kinematics(np.zeros(2))
+        u = np.concatenate([p_d, q, np.zeros(2)])
+        self.assertEqual(ctl.tf(None, u), {})
+        self.assertEqual(ctl.get_dynamic_geometry(None, u), {})
+
+    def test_task_impedance_force_arrow_matches_task_wrench(self):
+        arm = TwoLinkManipulator()
+        ctl = TaskImpedance(
+            arm, gravity_comp=True, show_task_force=True, task_force_scale=0.02
+        )
+        q = np.array([0.4, -0.2])
+        dq = np.array([0.1, -0.05])
+        p_d = arm.forward_kinematics(np.zeros(2))
+        u = np.concatenate([p_d, q, dq])
+
+        p = arm.forward_kinematics(q)
+        J = arm.J(q)
+        pdot = J @ dq
+        f_task = ctl.params["Kp"] * (p_d - p) - ctl.params["Kd"] * pdot
+        tau = ctl.ctl(None, u)
+        np.testing.assert_allclose(tau, J.T @ f_task + arm.g(q))
+
+        frames = ctl.tf(None, u)
+        np.testing.assert_allclose(frames["task_force"][:2, 3], p)
+        np.testing.assert_allclose(frames["task_force"][2, 3], 0.0)
+        geom = ctl.get_dynamic_geometry(None, u)
+        arrow = geom["task_force"][0]
+        self.assertIsInstance(arrow, Arrow)
+        np.testing.assert_allclose(arrow.vector, f_task)
+        self.assertEqual(arrow.scale, 0.02)
+        # Gravity must not appear in the visualized task force.
+        self.assertFalse(np.allclose(arrow.vector, tau))
+
+    def test_task_impedance_force_arrow_in_diagram_and_ur5(self):
+        arm = TwoLinkManipulator()
+        ctl = TaskImpedance(arm, show_task_force=True)
+        diagram = closed_loop_qdq(ctl, arm)
+        q = np.array([0.3, -0.15])
+        p_d = arm.forward_kinematics(np.zeros(2))
+        x = arm.q2x(q, np.zeros(2))
+        # Diagram external input is controller reference ``r``.
+        frames = diagram.tf(x, p_d)
+        geom = diagram.get_dynamic_geometry(x, p_d)
+        self.assertIn("ctl:task_force", frames)
+        self.assertIn("ctl:task_force", geom)
+        np.testing.assert_allclose(
+            frames["ctl:task_force"][:2, 3], arm.forward_kinematics(q)
+        )
+        resolve_draw_frame(diagram, x, p_d)
+
+        ur5 = UR5Manipulator()
+        ctl3 = TaskImpedance(ur5, show_task_force=True, task_force_scale=0.005)
+        q3 = np.array([0.0, -1.0, 1.2, -1.4, 0.0, 0.0])
+        p_d3 = ur5.forward_kinematics(q3) + np.array([0.05, -0.02, 0.03])
+        u3 = np.concatenate([p_d3, q3, np.zeros(6)])
+        frames3 = ctl3.tf(None, u3)
+        geom3 = ctl3.get_dynamic_geometry(None, u3)
+        np.testing.assert_allclose(
+            frames3["task_force"][:3, 3], ur5.forward_kinematics(q3)
+        )
+        self.assertEqual(geom3["task_force"][0].vector.size, 3)
 
     def test_task_kinematic_law(self):
         arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())

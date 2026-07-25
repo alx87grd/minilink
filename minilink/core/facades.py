@@ -318,8 +318,9 @@ class SharedSystemFacades:
         engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
         Pass ``native=False`` to fall back to the per-frame Python-loop
         playback (useful for debugging or when the native path's limitations
-        matter — e.g. meshcat freezes per-frame dynamic geometry such as a
-        ``TorqueArrow`` sweep; see ``DESIGN.md`` §4.7). ``camera`` accepts an
+        matter — e.g. meshcat freezes per-frame dynamic geometry such as an
+        ``Arrow`` length/direction or ``TorqueArrow`` sweep; see ``DESIGN.md``
+        §4.7). ``camera`` accepts an
         optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
         callable). ``save=True`` with ``renderer="matplotlib"`` writes a GIF
         via ImageMagick (``{file_name}.gif``).

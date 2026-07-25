@@ -261,7 +261,11 @@ serial arms. Joint impedance / task impedance / computed torque use
   implicit** — the animator injects identity so world-fixed geometry can key to
   `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
   stays unprefixed (one shared root); articulated frames are namespaced
-  (``vehicle:body``).
+  (``vehicle:body``). Controllers may own their own visualization frames the
+  same way (e.g. optional `TaskImpedance` `task_force` → `ctl:task_force`); the
+  arrow shows the pre-gravity task wrench `f_task`, not `Jᵀ f_task` or `g(q)`.
+  Meshcat `native=True` freezes changing `Arrow` / `TorqueArrow` geometry at
+  `t=0` — use `native=False` for frame-accurate force playback.
 - **Facades:** user shortcuts only (lazy simulation/graphics); split across
   `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
   `compute_trajectory`, `plot_trajectory`, `animate`, …),
@@ -348,7 +352,7 @@ optional class attribute `feedback_profile`, not inheritance):
 | `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` |
 | `state` | `state.py` | full state `x` |
 | `siso` | `siso.py` | `y` dim `n` only (decoupled loops) |
-| `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)`` |
+| `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow |
 | `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants |
 | `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` |
 

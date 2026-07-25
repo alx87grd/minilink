@@ -16,7 +16,9 @@ from minilink.core.system import DynamicSystem
 from minilink.graphical.animation import Animator
 from minilink.graphical.animation.camera import resolve_camera_from_hints
 from minilink.graphical.animation.primitives import (
+    Arrow,
     Point,
+    arrow_pts,
     camera_matrix,
     world_to_camera,
 )
@@ -1150,3 +1152,37 @@ class TestPlotlySignalPlot(unittest.TestCase):
         self.assertEqual(h_sig, SIGNAL_PLOT_ROW_HEIGHT * n)
         _, h_sig_cap = signal_stack_figsize(n, allow_tall=False)
         self.assertEqual(h_sig_cap, SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP)
+
+
+class TestArrowGeometry(unittest.TestCase):
+    def test_planar_arrow_matches_historical_xy_geometry(self):
+        pts = arrow_pts((0.0, 0.0), (1.0, 0.0), scale=2.0, head_ratio=0.15)
+        self.assertEqual(pts.shape, (5, 3))
+        np.testing.assert_allclose(pts[0], [0.0, 0.0, 0.0])
+        np.testing.assert_allclose(pts[1], [2.0, 0.0, 0.0])
+        self.assertTrue(np.allclose(pts[:, 2], 0.0))
+
+    def test_spatial_axial_and_oblique_arrows(self):
+        axial = arrow_pts((0.0, 0.0, 0.0), (0.0, 0.0, 1.0), scale=1.5)
+        np.testing.assert_allclose(axial[0], [0.0, 0.0, 0.0])
+        np.testing.assert_allclose(axial[1], [0.0, 0.0, 1.5])
+        self.assertGreater(np.linalg.norm(axial[2] - axial[1]), 0.0)
+
+        oblique = arrow_pts((1.0, 2.0, 3.0), (1.0, 0.0, 1.0), scale=2.0)
+        tip = oblique[1]
+        expected_tip = np.array([1.0, 2.0, 3.0]) + 2.0 * np.array([1.0, 0.0, 1.0])
+        np.testing.assert_allclose(tip, expected_tip)
+        self.assertFalse(np.allclose(oblique[:, 2], oblique[0, 2]))
+
+    def test_near_zero_collapses_and_scale_is_honored(self):
+        collapsed = arrow_pts((0.1, -0.2, 0.3), (0.0, 0.0, 0.0))
+        self.assertEqual(collapsed.shape, (1, 3))
+        np.testing.assert_allclose(collapsed[0], [0.1, -0.2, 0.3])
+
+        arrow = Arrow(base=(0.0, 0.0, 0.0), vector=(0.0, 1.0, 0.0), scale=3.0)
+        np.testing.assert_allclose(arrow.pts[1], [0.0, 3.0, 0.0])
+        self.assertEqual(arrow.pts.shape[1], 3)
+
+    def test_mismatched_dimensions_raise(self):
+        with self.assertRaises(ValueError):
+            Arrow(base=(0.0, 0.0), vector=(1.0, 0.0, 0.0))

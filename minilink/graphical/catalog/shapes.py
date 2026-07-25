@@ -159,11 +159,18 @@ def link_pose_3d(p0, p1):
 
 
 def point_pose(p):
-    """Pure translation placing a primitive at *point*."""
-    p = _as3(p)
-    T = np.eye(4)
-    T[:3, 3] = p
-    return T
+    """Pure translation placing a primitive at *point*.
+
+    Native-array: NumPy or JAX depending on the input backend. Length-2 points
+    are lifted to the ``z = 0`` plane.
+    """
+    xp = array_module(p)
+    p = xp.asarray(p, dtype=float).reshape(-1)
+    if p.shape[0] == 2:
+        p = xp.concatenate([p, xp.asarray([0.0])])
+    else:
+        p = p[:3]
+    return SE3(xp.eye(3), p)
 
 
 __all__ = [

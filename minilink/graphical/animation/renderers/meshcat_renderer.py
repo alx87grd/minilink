@@ -499,21 +499,22 @@ class MeshcatRenderer(AnimationRenderer):
     def _build_meshcat_animation(self, primitives, frames, schedule):
         """
         Compile the frame list into a ``meshcat.animation.Animation`` keyframe
-        track per rigid primitive path. Dynamic primitives (``TorqueArrow``) are
-        left frozen at ``t=0`` and a one-line notice is printed if any are
-        present.
+        track per rigid primitive path. Dynamic polylines (``Arrow``,
+        ``TorqueArrow``) are left frozen at ``t=0`` and a one-line notice is
+        printed if any are present.
         """
         import meshcat.animation as mcanim
 
         self.canvas.ensure_objects(primitives)
 
-        # Draw t=0 once: this sets the (frozen) geometry of TorqueArrow and gives
-        # every rigid primitive a sane starting pose before keyframes kick in.
+        # Draw t=0 once: this sets the (frozen) geometry of dynamic polylines
+        # and gives every rigid primitive a sane starting pose before keyframes
+        # kick in.
         t0_transforms = frames[0]["transforms"]
         has_dynamic = False
         for i, (prim, T0) in enumerate(zip(primitives, t0_transforms)):
             self.canvas.update_primitive(i, prim, T0)
-            if isinstance(prim, TorqueArrow):
+            if isinstance(prim, (Arrow, TorqueArrow)):
                 has_dynamic = True
 
         animation_obj = mcanim.Animation(default_framerate=schedule.target_fps)
@@ -531,8 +532,9 @@ class MeshcatRenderer(AnimationRenderer):
         if has_dynamic:
             print(
                 "Note: meshcat native animation freezes per-frame dynamic "
-                "geometry (e.g. TorqueArrow sweep) at t=0; use native=False for "
-                "frame-accurate playback of those primitives."
+                "geometry (e.g. Arrow length/direction, TorqueArrow sweep) at "
+                "t=0; use native=False for frame-accurate playback of those "
+                "primitives."
             )
 
         return animation_obj
