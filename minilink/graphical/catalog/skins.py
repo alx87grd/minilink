@@ -16,7 +16,15 @@ still skins.
 import numpy as np
 
 from minilink.core.kinematics import translation
-from minilink.graphical.catalog.shapes import Box, Line, Plane, Point, Rod
+from minilink.graphical.catalog.shapes import (
+    Box,
+    Line,
+    Plane,
+    Point,
+    Rod,
+    Sphere,
+    link_pose_3d,
+)
 
 
 def _wheel_rectangle(wl, ww, color="black", linewidth=1):
@@ -128,6 +136,39 @@ def car_skin_3d(plant, color="#151922"):
         "wheel_fl": [wheel()],
         "wheel_fr": [wheel()],
     }
+
+
+def ur5_skin(plant):
+    """Schematic UR5 look made from link and joint cylinders.
+
+    Frame keys are ``base``, ``link0`` … ``link5``, ``joint0`` …
+    ``joint6``, and ``tool``. The plant's ``tf`` places every moving part.
+    """
+    a = np.asarray(plant.params["a"], dtype=float)
+    d = np.asarray(plant.params["d"], dtype=float)
+    lengths = np.hypot(a, d)
+
+    base = Rod(length=0.12, radius=0.09, color="#a6a8ab")
+    base.local_transform = link_pose_3d([0.0, 0.0, -0.12], [0.0, 0.0, 0.0])
+
+    geometry = {"base": [base]}
+    for i, length in enumerate(lengths):
+        radius = 0.055 if i < 3 else 0.04
+        geometry[f"link{i}"] = [
+            Rod(length=length, radius=radius, color="#c7c9cb", linewidth=3)
+        ]
+
+    for i in range(7):
+        radius = 0.075 if i < 4 else 0.055
+        housing = Rod(length=2.0 * radius, radius=0.8 * radius, color="#2b73b6")
+        housing.local_transform = link_pose_3d([0.0, 0.0, radius], [0.0, 0.0, -radius])
+        geometry[f"joint{i}"] = [
+            housing,
+            Sphere(radius=0.72 * radius, color="#d5d7d8", opacity=1.0),
+        ]
+
+    geometry["tool"] = [Sphere(radius=0.035, color="#3f4245", opacity=1.0)]
+    return geometry
 
 
 def merge_skins(*skins):

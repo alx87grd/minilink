@@ -33,6 +33,7 @@ from minilink.dynamics.catalog.manipulators.arms import (
     ThreeLinkManipulator3D,
     TwoLinkManipulator,
 )
+from minilink.dynamics.catalog.manipulators.ur5 import UR5Manipulator
 from minilink.dynamics.catalog.marine.boat import Boat2D, Boat2DWithCurrent
 from minilink.dynamics.catalog.mass_spring_damper.linear import (
     FloatingSingleMass,
@@ -130,9 +131,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("ConstantSpeedKinematicCar", ConstantSpeedKinematicCar),
     CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),
     CatalogCheckEntry("DynamicHolonomicMobileRobot", DynamicHolonomicMobileRobot),
-    CatalogCheckEntry(
-        "Holonomic", Holonomic, requires_jax=True
-    ),
+    CatalogCheckEntry("Holonomic", Holonomic, requires_jax=True),
     CatalogCheckEntry(
         "HolonomicAccel",
         HolonomicAccel,
@@ -166,6 +165,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("TwoLinkManipulator", TwoLinkManipulator),
     CatalogCheckEntry("ThreeLinkManipulator3D", ThreeLinkManipulator3D),
     CatalogCheckEntry("FiveLinkPlanarManipulator", FiveLinkPlanarManipulator),
+    CatalogCheckEntry("UR5Manipulator", UR5Manipulator),
 )
 
 _VEHICLES = "minilink.dynamics.catalog.vehicles"

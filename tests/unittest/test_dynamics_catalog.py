@@ -279,12 +279,14 @@ from minilink.dynamics.catalog.manipulators.arms import (
     TwoLinkManipulator,
     _planar_joint_positions,
 )
+from minilink.dynamics.catalog.manipulators.ur5 import UR5Manipulator
 
 _MANIPULATORS = (
     OneLinkManipulator,
     TwoLinkManipulator,
     ThreeLinkManipulator3D,
     FiveLinkPlanarManipulator,
+    UR5Manipulator,
 )
 
 
@@ -351,6 +353,38 @@ class TestManipulatorCatalog(unittest.TestCase):
         fk = arm.forward_kinematics(q)
         tip = arm.tf(x, np.zeros(3))["joint3"][:3, 3]
         np.testing.assert_allclose(fk, tip)
+
+    def test_ur5_zero_pose_matches_standard_dh_chain(self):
+        arm = UR5Manipulator()
+        expected = np.array([-0.81725, -0.19145, -0.005491])
+        np.testing.assert_allclose(arm.forward_kinematics(np.zeros(6)), expected)
+
+    def test_ur5_dynamics_are_well_conditioned_and_power_consistent(self):
+        arm = UR5Manipulator()
+        q = np.linspace(-0.5, 0.4, 6)
+        dq = np.linspace(0.2, -0.3, 6)
+        H = arm.H(q)
+
+        np.testing.assert_allclose(H, H.T, atol=1e-12)
+        self.assertTrue(np.all(np.linalg.eigvalsh(H) > 0.0))
+
+        eps = 1e-6
+        Hdot = (arm.H(q + eps * dq) - arm.H(q - eps * dq)) / (2.0 * eps)
+        coriolis_power = dq @ (arm.C(q, dq) @ dq)
+        inertia_rate_power = 0.5 * dq @ Hdot @ dq
+        np.testing.assert_allclose(coriolis_power, inertia_rate_power, atol=1e-8)
+
+    def test_ur5_params_override_and_skin(self):
+        arm = UR5Manipulator()
+        q = np.linspace(-0.4, 0.3, 6)
+        params = dict(arm.params)
+        params["gravity"] = 0.0
+        np.testing.assert_allclose(arm.g(q, params), np.zeros(6), atol=1e-12)
+
+        x = arm.q2x(q, np.zeros(6))
+        frames = arm.tf(x, np.zeros(6))
+        np.testing.assert_allclose(frames["joint6"][:3, 3], arm.forward_kinematics(q))
+        geometry_smoke(arm, x, np.zeros(6))
 
     def test_five_link_uses_placeholder_inertia(self):
         arm = FiveLinkPlanarManipulator()
