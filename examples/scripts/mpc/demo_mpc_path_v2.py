@@ -207,6 +207,7 @@ traj = Trajectory(t=np.asarray(t_hist), x=np.asarray(x_hist).T, u=np.asarray(u_h
 sys_sim.traj = traj
 sys_sim.animate(
     traj,
+    # renderer="meshcat",
     overlays=[
         TrackCorridorOverlay(track),
         SceneHistory(
