@@ -2,7 +2,7 @@
 
 Run from repo root::
 
-    python examples/scripts/robotic/demo_task_impedance_ur5.py
+    python examples/experimental/robotic/demo_task_impedance_ur5.py
 
 Task-space spring-damper on the tool position; feedback is joint space::
 

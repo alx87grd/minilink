@@ -2,7 +2,7 @@
 
 Run from repo root::
 
-    python examples/scripts/trajectory_optimization/demo_dynamic_bicycle_trajopt_obstacle_scene.py
+    python examples/experimental/trajectory_optimization/demo_dynamic_bicycle_trajopt_obstacle_scene.py
 
 Same open-loop direct-collocation workflow as
 ``demo_dynamic_bicycle_trajopt_lanechange.py``, with tracking cost composed as

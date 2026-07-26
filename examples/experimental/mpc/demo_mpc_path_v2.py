@@ -9,7 +9,7 @@ replan tick (see ``demo_mpc_minimal_numpy.py``).
 
 Run from repo root::
 
-    python examples/scripts/mpc/demo_mpc_path.py
+    python examples/experimental/mpc/demo_mpc_path_v2.py
 """
 
 import numpy as np
@@ -32,7 +32,7 @@ from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_3d
-from minilink.planning.spatial.shaping import quadratic_excess, quadratic_hinge
+from minilink.planning.spatial.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -69,7 +69,6 @@ MPC_HORIZON = 2.0
 MPC_STEPS = 10
 PATH_HALF_WIDTH = 5.0
 PATH_COST_WEIGHT = 40.0
-CORRIDOR_COST_WEIGHT = 25.0
 
 waypoints = np.asarray(WAYPOINTS, dtype=float)
 track = ReferenceTrack(from_waypoints(waypoints), half_width=PATH_HALF_WIDTH)
@@ -85,23 +84,15 @@ sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
-path_cost = track.distance_field(body).as_cost(
+cost = QuadraticCost.from_system(
+    sys_mpc,
+    Q=np.diag([0.0, 0.0, 0.0, 0.5, 4.0, 6.0, 0.1, 80.0]),
+    R=np.diag([1.0, 22.0]),
+    S=np.diag([0.0, 0.0, 0.0, 0.5, 4.0, 6.0, 0.1, 80.0]),
+    xbar=x_cruise,
+    ubar=np.zeros(2),
+) + track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
-)
-corridor_cost = track.corridor_field(body).as_cost(
-    weight=CORRIDOR_COST_WEIGHT, shaping=quadratic_hinge(threshold=0.0)
-)
-cost = (
-    QuadraticCost.from_system(
-        sys_mpc,
-        Q=np.diag([0.0, 0.0, 0.0, 0.5, 4.0, 6.0, 0.1, 80.0]),
-        R=np.diag([1.0, 22.0]),
-        S=np.diag([0.0, 0.0, 0.0, 0.5, 4.0, 6.0, 0.1, 80.0]),
-        xbar=x_cruise,
-        ubar=np.zeros(2),
-    )
-    + path_cost
-    + corridor_cost
 )
 
 # First state from sensors / localization (node start).
@@ -136,20 +127,13 @@ if SHOW_COST_FIELD:
         (waypoints[:, 0].min() - 4.0, waypoints[:, 0].max() + 4.0),
         (waypoints[:, 1].min() - 4.0, waypoints[:, 1].max() + 4.0),
     )
-    probe = bind(sys_mpc, point_probe())
-    path_viz = track.distance_field(probe).as_cost(
+    path_viz = track.distance_field(bind(sys_mpc, point_probe())).as_cost(
         weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
     )
-    corridor_viz = track.corridor_field(probe).as_cost(
-        weight=CORRIDOR_COST_WEIGHT, shaping=quadratic_hinge(threshold=0.0)
-    )
     grid = sample_field_costs(
-        [path_viz, corridor_viz],
-        bounds=bounds,
-        state_dim=sys_mpc.n,
-        grid=(80, 80),
+        [path_viz], bounds=bounds, state_dim=sys_mpc.n, grid=(80, 80)
     )
-    plot_cost_field_3d(grid, title="Path + corridor cost field", log_scale=True)
+    plot_cost_field_3d(grid, title="Path cost field", log_scale=True)
 
 # Offline: plant twin + demo clock (ROS2 uses the real vehicle / estimator).
 sys_sim = BicycleDynRate()
@@ -161,6 +145,17 @@ plant = sys_sim.compile(backend=BACKEND, verbose=False)
 
 t = 0.0
 x = x0.copy()  # in ROS2: measured / estimated plant state
+
+x[0] = 10.0
+x[1] = -50
+x[2] = 0.0
+x[3] = VX0
+x[4] = 0.0
+x[5] = 0.0
+x[6] = VX0 / r_r
+x[7] = 0.0
+
+
 u_nom = np.zeros(sys_sim.m)
 next_replan_t = 0.0
 next_broadcast_t = 0.0
@@ -212,6 +207,7 @@ traj = Trajectory(t=np.asarray(t_hist), x=np.asarray(x_hist).T, u=np.asarray(u_h
 sys_sim.traj = traj
 sys_sim.animate(
     traj,
+    # renderer="meshcat",
     overlays=[
         TrackCorridorOverlay(track),
         SceneHistory(

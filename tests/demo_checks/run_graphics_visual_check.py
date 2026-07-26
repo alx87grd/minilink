@@ -38,13 +38,13 @@ CHECKS = (
     ),
     (
         "Meshcat 3D (physics in diagram — optional meshcat extra)",
-        [sys.executable, "examples/scripts/engine/demo_physics_in_diagram.py"],
+        [sys.executable, "examples/experimental/engine/demo_physics_in_diagram.py"],
     ),
     (
         "Plotly live trajopt (optional plotting extra)",
         [
             sys.executable,
-            "examples/scripts/trajectory_optimization/demo_cartpole_direct_collocation_live_plot.py",
+            "examples/experimental/trajectory_optimization/demo_cartpole_direct_collocation_live_plot.py",
         ],
     ),
 )

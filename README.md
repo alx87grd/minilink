@@ -359,6 +359,10 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 
 ## Examples
 
+Index and placement rules: [examples/README.md](examples/README.md)
+(`scripts/` = canonical · `experimental/` = non-core / scenario WIP ·
+`projects/` = multi-file).
+
 | Interest | Start here |
 | --- | --- |
 | Feature tour (marketing) | [examples/notebooks/showcase/minilink.ipynb](examples/notebooks/showcase/minilink.ipynb) |
@@ -379,7 +383,6 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Optimization | `examples/scripts/optimization/` · [intro/optimization](examples/notebooks/intro/08_optimization.ipynb) |
 | Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` · [intro/planning](examples/notebooks/intro/09_planning.ipynb) |
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` · [car TrajOpt compare](examples/notebooks/applications/car_trajopt.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/applications/car_trajopt.ipynb) |
-| Physics engine | `examples/scripts/engine/` |
 | C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/demo_c_export_proportional.py` · `demo_c_export.py` |
 | Solver benchmarks | [examples/notebooks/tooling/benchmark.ipynb](examples/notebooks/tooling/benchmark.ipynb) (uses repo-root `benchmarks/`) |
 

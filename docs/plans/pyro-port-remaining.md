@@ -179,7 +179,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `courses/udes_gro860/dp_demo_swingup.py` | **Done** | demo_pendulum.py |
 | `courses/udes_gro860/dp_mass_min_time_optimal.py` | **Done** | demo_basics.py |
 | `courses/udes_gro860/dp_mass_min_time_policy_evaluation.py` | **Partial** | Core tool demos exist; course variant not ported |
-| `courses/udes_gro860/lqr_cartpole_stab.py` | **Done** | cartpole_lqr_stabilization.py |
+| `courses/udes_gro860/lqr_cartpole_stab.py` | **Done** | demo_cartpole_lqr_stabilization.py |
 | `courses/udes_gro860/lqr_cartpole_traj.py` | **Partial** | Core tool demos exist; course variant not ported |
 | `courses/udes_gro860/rl_drone_demo_learning2fly.py` | **Drop** | RL + Stable-Baselines3; interfaces/gymnasium TODO |
 | `courses/udes_gro860/rl_drone_demo_training.py` | **Drop** | RL + Stable-Baselines3; interfaces/gymnasium TODO |
@@ -203,15 +203,15 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/car_steering/bicycle_exploration_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
 | `demos_by_system/car_steering/bicycle_parallel_parking_with_rrt.py` | **Partial** | demo_car_parking.py |
 | `demos_by_system/car_steering/car.py` | **TODO** | Representative closed-loop for car_steering |
-| `demos_by_system/car_steering/car_trajectory_optimisation.py` | **Done** | examples/scripts/trajectory_optimization/demo_dynamic_bicycle_trajopt_*.py |
+| `demos_by_system/car_steering/car_trajectory_optimisation.py` | **Done** | examples/experimental/trajectory_optimization/demo_dynamic_bicycle_trajopt_*.py |
 | `demos_by_system/car_steering/car_trajectory_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
 | `demos_by_system/car_steering/car_with_custom_lateral_controller.py` | **TODO** | Representative closed-loop for car_steering |
 | `demos_by_system/car_steering/car_with_valueiteration_minimum_time.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/car_steering/car_with_valueiteration_quadratic_cost.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/cartpole/cartpole_LQG.py` | **TODO** | estimation/kalman.py |
 | `demos_by_system/cartpole/cartpole_demo.py` | **TODO** | Open-loop cartpole showcase |
-| `demos_by_system/cartpole/cartpole_stabilization.py` | **Partial** | cartpole_lqr_stabilization.py |
-| `demos_by_system/cartpole/cartpole_with_lqr.py` | **Done** | examples/scripts/statespace/cartpole_lqr_stabilization.py |
+| `demos_by_system/cartpole/cartpole_stabilization.py` | **Partial** | demo_cartpole_lqr_stabilization.py |
+| `demos_by_system/cartpole/cartpole_with_lqr.py` | **Done** | examples/scripts/statespace/demo_cartpole_lqr_stabilization.py |
 | `demos_by_system/cartpole/cartpole_with_trajectory_optimization.py` | **Partial** | trajopt framework; cartpole-specific demo TODO |
 | `demos_by_system/cartpole_rotating/cartpole_modes.py` | **Partial** | Use demo_modal.py + open-loop sim |
 | `demos_by_system/cartpole_rotating/cartpole_natural_behavior.py` | **TODO** | Representative closed-loop for cartpole_rotating |
@@ -398,16 +398,16 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | `examples/scripts/diagrams/demo_dynamic_bicycle_cascade_path_tracking.py` | diagrams |
 | `examples/scripts/diagrams/demo_nested_loop_diagram.py` | diagrams |
 | `examples/scripts/diagrams/demo_noise_ports.py` | diagrams |
-| `examples/scripts/engine/demo_ancf_tire_fall.py` | engine |
-| `examples/scripts/engine/demo_physics_in_diagram.py` | engine |
-| `examples/scripts/engine/demo_physics_many_spheres.py` | engine |
+| `examples/experimental/engine/demo_ancf_tire_fall.py` | engine |
+| `examples/experimental/engine/demo_physics_in_diagram.py` | engine |
+| `examples/experimental/engine/demo_physics_many_spheres.py` | engine |
 | `examples/scripts/identification/demo_params_gradient.py` | identification |
 | `examples/scripts/mpc/demo_mpc_minimal.py` | mpc |
 | `examples/scripts/mpc/demo_mpc_dual_rate.py` | mpc |
-| `examples/scripts/mpc/demo_mpc_path.py` | mpc |
-| `examples/scripts/mpc/demo_mpc_circuit.py` | mpc |
-| `examples/scripts/mpc/demo_mpc_slalom.py` | mpc |
-| `examples/scripts/mpc/demo_mpc_spatial.py` | mpc |
+| `examples/experimental/mpc/demo_mpc_path.py` | mpc |
+| `examples/experimental/mpc/demo_mpc_circuit.py` | mpc |
+| `examples/experimental/mpc/demo_mpc_slalom.py` | mpc |
+| `examples/experimental/mpc/demo_mpc_spatial.py` | mpc |
 | `examples/scripts/optimization/demo_basic_optim.py` | optimization |
 | `examples/scripts/optimization/demo_optim_plot.py` | optimization |
 | `examples/scripts/planning/rrt/demo_car_parking.py` | rrt |
@@ -428,12 +428,12 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | `examples/scripts/robotic/demo_kinematic_nullspace_five_link.py` | robotic |
 | `examples/scripts/robotic/demo_kinematic_two_link.py` | robotic |
 | `examples/scripts/robotic/demo_task_impedance_two_link.py` | robotic |
-| `examples/scripts/statespace/cartpole_lqr_stabilization.py` | statespace |
-| `examples/scripts/symbolic/demo_symbolic_quadruple_pendulum.py` | symbolic |
+| `examples/scripts/statespace/demo_cartpole_lqr_stabilization.py` | statespace |
+| `examples/experimental/symbolic/demo_symbolic_quadruple_pendulum.py` | symbolic |
 | `examples/scripts/trajectory_optimization/demo_cartpole_direct_collocation_jax_ipopt.py` | trajectory_optimization |
-| `examples/scripts/trajectory_optimization/demo_cartpole_direct_collocation_live_plot.py` | trajectory_optimization |
-| `examples/scripts/trajectory_optimization/demo_dynamic_bicycle_trajopt_lanechange.py` | trajectory_optimization |
-| `examples/scripts/trajectory_optimization/demo_dynamic_bicycle_trajopt_uturn.py` | trajectory_optimization |
+| `examples/experimental/trajectory_optimization/demo_cartpole_direct_collocation_live_plot.py` | trajectory_optimization |
+| `examples/experimental/trajectory_optimization/demo_dynamic_bicycle_trajopt_lanechange.py` | trajectory_optimization |
+| `examples/experimental/trajectory_optimization/demo_dynamic_bicycle_trajopt_uturn.py` | trajectory_optimization |
 | `examples/scripts/trajectory_optimization/demo_holonomic_corridor.py` | trajectory_optimization |
 
 | Notebook |

@@ -31,6 +31,16 @@ experiment. New demos land under `examples/`; update DESIGN/ROADMAP when contrac
 or maturity change. Add a README examples-table row only when a demo is a
 **canonical** teaching entry for a core tool (e.g. `demo_mpc_minimal`).
 
+**Examples buckets** (see [examples/README.md](examples/README.md)):
+`notebooks/` and `scripts/` stay as **separate format trees** (do not mix
+`.ipynb` and `.py` per module). Canonical single-file demos →
+`examples/scripts/<topic>/`. Non-core / scenario sprawl / versioned WIP →
+`examples/experimental/<topic>/`. Personal quick checks →
+`examples/experimental/scratch/` (not intro/README/CI). Multi-file experiments →
+`examples/projects/`. Pedagogical compares stay in `scripts/`; mission matrices
+go to `experimental/`. No `scripts/tooling/` — use `notebooks/tooling/`,
+`tests/demo_checks/`, `benchmarks/`.
+
 ## Core directives
 
 - **Math readability first**: equations read like textbook math, e.g. `dx = A @ x + B @ u`.
@@ -104,7 +114,8 @@ stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` (CI
 ``regression`` job runs the same).
 
-Demos: flat under `examples/scripts/`, runnable from repo root.
+Demos: under `examples/scripts/` (canonical) or `examples/experimental/`
+(non-core / WIP); runnable from repo root. Map: [examples/README.md](examples/README.md).
 
 ## Before push or PR (local CI gate)
 

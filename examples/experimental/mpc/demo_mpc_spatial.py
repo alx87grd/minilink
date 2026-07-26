@@ -4,13 +4,13 @@ Walks the ``planning/spatial`` pipeline: track + obstacles → fields → costs 
 ``PlanningProblem`` + ``TrajectoryOptimizationPlanner`` (not solved).
 
 Full NLP + hybrid MPC: ``examples/notebooks/applications/mpc.ipynb``.
-Closed-loop hybrid script: ``examples/scripts/mpc/demo_mpc_circuit.py``.
+Closed-loop hybrid script: ``examples/experimental/mpc/demo_mpc_circuit.py``.
 
 Set ``SHOW_PLOTS = False`` for a headless walkthrough.
 
 Run from repo root::
 
-    python examples/scripts/mpc/demo_mpc_spatial.py
+    python examples/experimental/mpc/demo_mpc_spatial.py
 """
 
 import matplotlib.pyplot as plt

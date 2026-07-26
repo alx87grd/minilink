@@ -2,7 +2,7 @@
 
 Run from repo root::
 
-    python examples/scripts/trajectory_optimization/demo_kinematic_bicycle_trajopt_obstacle_scene.py
+    python examples/experimental/trajectory_optimization/demo_kinematic_bicycle_trajopt_obstacle_scene.py
 
 Same obstacle-avoidance workflow as
 ``demo_dynamic_bicycle_trajopt_obstacle_scene.py``, but on

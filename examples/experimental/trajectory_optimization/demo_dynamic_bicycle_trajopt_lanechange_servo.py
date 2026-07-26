@@ -6,7 +6,7 @@ with ``u = [tau_cmd, delta_cmd]`` instead of wheel/steer rate commands.
 
 Run from repo root::
 
-    PYTHONPATH=. python examples/scripts/trajectory_optimization/demo_dynamic_bicycle_trajopt_lanechange_servo.py
+    PYTHONPATH=. python examples/experimental/trajectory_optimization/demo_dynamic_bicycle_trajopt_lanechange_servo.py
 """
 
 import numpy as np

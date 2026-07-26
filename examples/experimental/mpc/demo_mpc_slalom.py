@@ -5,7 +5,7 @@ obstacles. Closed loop via ``ModelPredictiveController`` and ``mpc @ plant``.
 
 Run from repo root::
 
-    python examples/scripts/mpc/demo_mpc_slalom.py
+    python examples/experimental/mpc/demo_mpc_slalom.py
 """
 
 import numpy as np

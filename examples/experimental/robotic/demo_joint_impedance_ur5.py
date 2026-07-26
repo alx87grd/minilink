@@ -2,7 +2,7 @@
 
 Run from repo root::
 
-    python examples/scripts/robotic/demo_joint_impedance_ur5.py
+    python examples/experimental/robotic/demo_joint_impedance_ur5.py
 
 Joint-space virtual spring-damper on ``[q, dq]`` via ``closed_loop_qdq``::
 

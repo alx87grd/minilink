@@ -53,7 +53,7 @@ flowchart LR
 ```
 
 Matches today’s dual-rate pattern in
-[`demo_mpc_path.py`](../../examples/scripts/mpc/demo_mpc_path.py) /
+[`demo_mpc_path.py`](../../examples/experimental/mpc/demo_mpc_path.py) /
 [`MPCBroadcastController`](../../minilink/control/mpc/controller.py):
 
 ```text
@@ -178,7 +178,7 @@ Implementation notes (match [AGENTS.md](../../AGENTS.md)):
 
 ## How this plugs into existing workflows
 
-1. **Flagship — dual-rate Engine broadcast:** MPC plant = Rate (or Acc); plant/allocator = Engine; after `compute_command`, lift latched traj → Engine `(x,u)`; fast timer samples `u_hi(t)=[P_cmd,δ_cmd]` like [`demo_mpc_path.py`](../../examples/scripts/mpc/demo_mpc_path.py) samples same-fid `u_nom`.
+1. **Flagship — dual-rate Engine broadcast:** MPC plant = Rate (or Acc); plant/allocator = Engine; after `compute_command`, lift latched traj → Engine `(x,u)`; fast timer samples `u_hi(t)=[P_cmd,δ_cmd]` like [`demo_mpc_path.py`](../../examples/experimental/mpc/demo_mpc_path.py) samples same-fid `u_nom`.
 2. **TrajOpt warm-start:** lift cheap plan → rich `Trajectory` → `pack_initial_guess` / `resample`.
 3. **MPC warm-start (same dims):** still `mpc_warm_start_guess`; cross-fid lift is for **broadcast / allocation**, planning stays low-fid unless the user remaps warm-start separately.
 4. **Notebook:** short cell — Rate/Acc traj → Engine `P_cmd(t)` strip.

@@ -5,7 +5,7 @@ Scene matches the former wide-circuit lap demo (asymmetric loop + sphere keepout
 
 Run from repo root::
 
-    python examples/scripts/mpc/demo_mpc_circuit.py
+    python examples/experimental/mpc/demo_mpc_circuit.py
 """
 
 import numpy as np
