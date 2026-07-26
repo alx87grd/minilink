@@ -239,8 +239,8 @@ serial arms. Joint impedance / task impedance / computed torque use
 **Vehicle JAX ladder** — :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles`
 (planning / trajopt plants; module-scoped names, no ``Jax`` prefix). Default
 ``u`` / ``y = x``; named-port twins use the ``Ports`` suffix. Compare:
-``demo_car_trajopt_compare.py`` and
-[notebook](examples/notebooks/driving_model_trajopt_analysis.ipynb).
+``examples/projects/car_trajopt/car_trajopt_compare.py`` and
+[notebook](examples/notebooks/applications/car_trajopt.ipynb).
 
 | Class | $n$ | Input $\mathbf{u}$ | Role |
 | --- | --- | --- | --- |
@@ -430,7 +430,7 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   backends and ignores `bound_params`. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
-  (see `examples/scripts/identification/demo_params_gradient.py`).
+  (see `examples/scripts/identification/params_gradient.py`).
 - **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets`
   today; `scene` is reserved (`None`) for pipeline B spatial overrides.
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
@@ -647,7 +647,7 @@ discontinuous mechanical SMC demos.
 **Hybrid contrast.** :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
 holds controller torque constant between computer ticks (ZOH) and samples plant outputs
 at tick boundaries — the intended semantics for digital SMC. See
-``examples/scripts/hybrid/demo_smc_pendulum_compare.py``.
+``examples/scripts/hybrid/smc_pendulum_rate.py``.
 
 **Diagnostics.** ``scratch/confirm_smc_solver_bug.py`` compares solvers, ``ddq_f`` vs
 numerical ``Δdq/Δt``, and RK4 k1–k4 cancellation on the pendulum SMC demo.

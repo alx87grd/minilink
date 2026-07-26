@@ -1,57 +1,57 @@
 [
   {
     "id": "signal_blocks",
-    "path": "examples/scripts/blocks/demo_signal_blocks.py",
+    "path": "examples/scripts/blocks/signal_blocks.py",
     "requires": []
   },
   {
     "id": "computed_torque_pendulum",
-    "path": "examples/scripts/control/demo_computed_torque_pendulum.py",
+    "path": "examples/scripts/control/computed_torque_pendulum.py",
     "requires": []
   },
   {
-    "id": "demo_closed_loop",
-    "path": "examples/scripts/diagrams/demo_closed_loop.py",
+    "id": "diagram_closed_loop",
+    "path": "examples/scripts/diagrams/diagram_closed_loop.py",
     "requires": []
   },
   {
-    "id": "demo_readme",
-    "path": "examples/scripts/plots/demo_readme.py",
+    "id": "plot_readme",
+    "path": "examples/scripts/plots/plot_readme.py",
     "requires": []
   },
   {
     "id": "diagram_compiling",
-    "path": "examples/scripts/diagrams/demo_diagram_compiling.py",
+    "path": "examples/scripts/diagrams/diagram_compiling.py",
     "requires": []
   },
   {
-    "id": "bicycle_cascade",
-    "path": "examples/scripts/diagrams/demo_dynamic_bicycle_cascade_path_tracking.py",
+    "id": "rrt_holonomic_obstacles",
+    "path": "examples/scripts/planning/rrt/rrt_holonomic_obstacles.py",
     "requires": []
   },
   {
-    "id": "holonomic_obstacles",
-    "path": "examples/scripts/planning/rrt/demo_holonomic_obstacles.py",
-    "requires": []
-  },
-  {
-    "id": "native_comparison",
-    "path": "examples/scripts/animation/demo_native_comparison.py",
+    "id": "animation_native_comparison",
+    "path": "examples/scripts/animation/animation_native_comparison.py",
     "requires": []
   },
   {
     "id": "mpc_minimal_numpy",
-    "path": "examples/scripts/mpc/demo_mpc_minimal_numpy.py",
+    "path": "examples/scripts/mpc/mpc_minimal_numpy.py",
     "requires": []
   },
   {
-    "id": "cartpole_trajopt_jax",
-    "path": "examples/scripts/trajectory_optimization/demo_cartpole_direct_collocation_jax_ipopt.py",
-    "requires": ["jax", "cyipopt"]
+    "id": "trajopt_cartpole_jax",
+    "path": "examples/scripts/trajopt/trajopt_cartpole_collocation_jax.py",
+    "requires": [
+      "jax",
+      "cyipopt"
+    ]
   },
   {
     "id": "mpc_minimal",
-    "path": "examples/scripts/mpc/demo_mpc_minimal.py",
-    "requires": ["jax"]
+    "path": "examples/scripts/mpc/mpc_minimal.py",
+    "requires": [
+      "jax"
+    ]
   }
 ]

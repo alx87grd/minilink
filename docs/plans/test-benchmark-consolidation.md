@@ -146,7 +146,7 @@ folding a representative scenario into L2 with factor tolerance.
 
 ```bash
 pytest tests/unittest/test_graphics.py tests/unittest/test_flagship_graphics_contract.py
-python examples/scripts/_smoke/run_flagship_graphics.py --headless --out /tmp/ml-gfx
+python tests/demo_checks/run_flagship_graphics.py --headless --out /tmp/ml-gfx
 ```
 
 **Status:** ✅ kinematic manifest smoke + **`test_flagship_graphics_contract.py`** (G0 draw-list); G1 perceptual hash still optional.
@@ -168,7 +168,7 @@ Meshcat, Matplotlib animation, Plotly live traj, etc. Agent prepares; you judge.
 **Command (planned):**
 
 ```bash
-python examples/scripts/_smoke/run_graphics_visual_check.py
+python tests/demo_checks/run_graphics_visual_check.py
 # blocking prompts: "Press Enter after confirming Meshcat…"
 ```
 
@@ -606,7 +606,7 @@ minilink/dynamics/catalog/
   vehicles/smoke.py
   manipulators/smoke.py
   ...
-examples/scripts/_smoke/
+tests/demo_checks/
   run_catalog_smokes.py        # runs all catalog smokes, structured exit code
   run_flagship_demos.py          # whitelist of flagship demos in --smoke mode (see below)
 ```
@@ -636,7 +636,7 @@ if __name__ == "__main__":
 
 ### Aggregator: one helper script
 
-**`examples/scripts/_smoke/run_catalog_smokes.py`** (or `python -m minilink.dynamics.catalog.run_smokes`):
+**`tests/demo_checks/run_catalog_smokes.py`** (or `python -m minilink.dynamics.catalog.run_smokes`):
 
 - Discovers smokes via registry (module path → smoke entrypoint).
 - Runs each subprocess with timeout; summarizes pass/fail table.
@@ -647,7 +647,7 @@ if __name__ == "__main__":
 ```python
 def test_catalog_smokes_exit_zero():
     subprocess.run(
-        [sys.executable, "examples/scripts/_smoke/run_catalog_smokes.py", "--fast"],
+        [sys.executable, "tests/demo_checks/run_catalog_smokes.py", "--fast"],
         check=True,
     )
 ```
@@ -668,7 +668,7 @@ Optional nightly job runs full smokes (with 3-step sim). Default CI uses `--fast
 Running all 78 demos headless in CI is brittle (user-tuned plots, JAX, meshcat, long MPC). Plan:
 
 1. **Do not** auto-discover every file under `examples/scripts/`.
-2. Maintain a **whitelist manifest** (`examples/scripts/_smoke/flagship_manifest.json`) of ~8–12 **README-tier** demos.
+2. Maintain a **whitelist manifest** (`tests/demo_checks/flagship_manifest.json`) of ~8–12 **README-tier** demos.
 3. Each whitelisted demo gains a **`run_smoke()`** function (new code at bottom — **does not change default `__main__` behavior** when user runs the demo normally):
    - Sets `MPLBACKEND=Agg`, `show=False`, short `tf`, minimal `maxiter` where applicable.
    - Runs the same call chain as the demo but skips `animate(show=True)` unless smoke tier requires one frame.
@@ -694,7 +694,7 @@ Goal: a **simple visual check** on core demos that exercises the main **graphics
 | --- | --- | --- |
 | Kinematic frame → Matplotlib Agg PNG | catalog plants, `Animator._resolve_frame` | `test_kinematic_regression` |
 | Diagram `plot_trajectory` / `plot_diagram` | most demos | none (implicit) |
-| `animate()` Matplotlib native | `demo_readme`, computed torque, bicycle cascade | none |
+| `animate()` Matplotlib native | `plot_readme`, computed torque, bicycle cascade | none |
 | Overlays (`mpc_animation_overlays`, etc.) | MPC demos | `test_overlays` (unit) |
 | Plotly renderer | trajopt live plot demos | `test_plotly_renderer` (optional) |
 | Meshcat / pygame | engine, interactive demos | optional markers only |
@@ -716,14 +716,14 @@ Extend kinematic fixture pattern to **flagship end-states**:
 
 | Flagship | Canonical capture | Renderer |
 | --- | --- | --- |
-| `demo_readme.py` (impedance @ pendulum) | `t=tf`, diagram plant state | Matplotlib Agg |
-| `demo_computed_torque_pendulum.py` | post-sim pendulum pose | Matplotlib Agg |
-| `demo_dynamic_bicycle_cascade_path_tracking.py` | mid-trajectory bicycle | Matplotlib Agg |
-| `demo_mpc_minimal.py` | terminal plant + MPC overlay frame | Matplotlib Agg + overlay keys |
-| `demo_diagram_compiling.py` or `demo_closed_loop.py` | diagram topology / signals plot | plot_diagram smoke (no PNG) |
-| `demo_cartpole_direct_collocation_jax_ipopt.py` | traj plot only | plot_trajectory finite axes |
-| `demo_holonomic_obstacles.py` | planning scene draw | scene bounds + path polyline |
-| `demo_animation/demo_native_comparison.py` | native vs non-native same frame | Matplotlib Agg (2 frames) |
+| `plot_readme.py` (impedance @ pendulum) | `t=tf`, diagram plant state | Matplotlib Agg |
+| `computed_torque_pendulum.py` | post-sim pendulum pose | Matplotlib Agg |
+| `projects/pathtracking/cascade_path_tracking.py` | mid-trajectory bicycle | Matplotlib Agg |
+| `mpc_minimal.py` | terminal plant + MPC overlay frame | Matplotlib Agg + overlay keys |
+| `diagram_compiling.py` or `diagram_closed_loop.py` | diagram topology / signals plot | plot_diagram smoke (no PNG) |
+| `trajopt_cartpole_collocation_jax.py` | traj plot only | plot_trajectory finite axes |
+| `rrt_holonomic_obstacles.py` | planning scene draw | scene bounds + path polyline |
+| `animation_native_comparison.py` | native vs non-native same frame | Matplotlib Agg (2 frames) |
 
 **Manifest:** `tests/fixtures/flagship_graphics/manifest.json`
 
@@ -732,7 +732,7 @@ Each entry:
 ```json
 {
   "id": "readme_impedance_pendulum",
-  "demo": "examples/scripts/plots/demo_readme.py",
+  "demo": "examples/scripts/plots/plot_readme.py",
   "smoke_fn": "run_smoke",
   "capture": "matplotlib_frame",
   "state": "from_smoke",

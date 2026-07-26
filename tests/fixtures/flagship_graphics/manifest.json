@@ -1,13 +1,21 @@
 [
   {
     "id": "closed_loop_pendulum",
-    "demo_id": "demo_closed_loop",
+    "demo_id": "diagram_closed_loop",
     "requires": [],
     "module": "minilink.dynamics.catalog.pendulum.pendulum",
     "class": "Pendulum",
-    "params": {"m": 1.0, "l": 5.0},
-    "x": [-2.0, 0.0],
-    "u": [0.0],
+    "params": {
+      "m": 1.0,
+      "l": 5.0
+    },
+    "x": [
+      -2.0,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
     "t": 0.0,
     "min_primitives": 1
   },
@@ -18,56 +26,99 @@
     "module": "minilink.dynamics.catalog.pendulum.pendulum",
     "class": "Pendulum",
     "params": {},
-    "x": [3.391592653589793, 0.0],
-    "u": [0.0],
+    "x": [
+      3.391592653589793,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
     "t": 0.0,
     "min_primitives": 1
   },
   {
     "id": "readme_impedance_pendulum",
-    "demo_id": "demo_readme",
+    "demo_id": "plot_readme",
     "requires": [],
     "module": "minilink.dynamics.catalog.pendulum.pendulum",
     "class": "Pendulum",
-    "params": {"m": 1.0, "l": 5.0},
-    "x": [2.0, 0.0],
-    "u": [0.0],
+    "params": {
+      "m": 1.0,
+      "l": 5.0
+    },
+    "x": [
+      2.0,
+      0.0
+    ],
+    "u": [
+      0.0
+    ],
     "t": 0.0,
     "min_primitives": 1
   },
   {
     "id": "bicycle_cascade_vehicle",
-    "demo_id": "bicycle_cascade",
+    "demo_id": "cascade_path_tracking",
     "requires": [],
     "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
     "class": "DynamicBicycleCar3D",
     "params": {},
-    "x": [-10.0, 0.4, 0.05, 0.0, 0.0, 0.0],
-    "u": [0.0, 0.0],
+    "x": [
+      -10.0,
+      0.4,
+      0.05,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
     "t": 0.0,
     "min_primitives": 1
   },
   {
     "id": "holonomic_robot",
-    "demo_id": "holonomic_obstacles",
+    "demo_id": "rrt_holonomic_obstacles",
     "requires": [],
     "module": "minilink.dynamics.catalog.vehicles.steering",
     "class": "HolonomicMobileRobot",
     "params": {},
-    "x": [-4.0, -4.0],
-    "u": [0.0, 0.0],
+    "x": [
+      -4.0,
+      -4.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
     "t": 0.0,
     "min_primitives": 1
   },
   {
     "id": "mpc_minimal_bicycle",
     "demo_id": "mpc_minimal",
-    "requires": ["jax"],
+    "requires": [
+      "jax"
+    ],
     "module": "minilink.dynamics.catalog.vehicles.jax_vehicles",
     "class": "BicycleDynRate",
     "params": {},
-    "x": [0.0, 3.0, 0.0, 3.2, 0.0, 0.0, 0.8, 0.0],
-    "u": [0.0, 0.0],
+    "x": [
+      0.0,
+      3.0,
+      0.0,
+      3.2,
+      0.0,
+      0.0,
+      0.8,
+      0.0
+    ],
+    "u": [
+      0.0,
+      0.0
+    ],
     "t": 0.0,
     "min_primitives": 1
   }

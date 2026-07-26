@@ -14,12 +14,12 @@ imported from that submodule — not re-exported on the package attribute.
 
 Implemented modules:
 
-- ``linearize.py`` — equilibrium linearization → matrices or ``LTISystem``
-- ``structural.py`` — controllability / observability
+- ``analysis_linearize.py`` — equilibrium linearization → matrices or ``LTISystem``
+- ``analysis_structural.py`` — controllability / observability
 - ``equilibria.py`` — trim points and root-finding on ``f``
-- ``modal.py`` — ``modal_analysis`` (poles, modes) and ``animate_modal``
+- ``analysis_modal.py`` — ``modal_analysis`` (poles, modes) and ``animate_modal``
 - ``frequency.py`` — selected-channel Bode / pole-zero response and plots
-- ``discretize.py`` — continuous→step plant wrappers
+- ``analysis_discretize.py`` — continuous→step plant wrappers
 
 Planned modules (see ROADMAP.md teaching-release priorities):
 

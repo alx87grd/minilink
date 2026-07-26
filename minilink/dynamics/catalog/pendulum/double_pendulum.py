@@ -1,13 +1,13 @@
 """
 Pyro-ported double pendulum (2 actuators, 2 links).
 
-This matches SherbyRobotics/pyro ``DoublePendulum`` in ``pyro/dynamic/pendulum.py``:
+This matches SherbyRobotics/pyro ``DoublePendulum`` in ``pyro/dynamic/vi_pendulum.py``:
 * ``q = [theta1, theta2]`` where ``theta1`` is the first joint and ``theta2`` is
   measured relative to the first link
 * the same ``H``, ``C``, ``B``, ``g``, and linear joint damping in ``d``
 
 Visualization maps Pyro's line-based torque arcs to :class:`TorqueArrow` using
-the same sweep scaling as the tutorial single pendulum in ``pendulum.py``.
+the same sweep scaling as the tutorial single pendulum in ``vi_pendulum.py``.
 """
 
 import numpy as np

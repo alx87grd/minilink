@@ -53,7 +53,7 @@ flowchart LR
 ```
 
 Matches today’s dual-rate pattern in
-[`demo_mpc_path.py`](../../examples/experimental/mpc/demo_mpc_path.py) /
+[`mpc_path.py`](../../examples/projects/mpc/mpc_path.py) /
 [`MPCBroadcastController`](../../minilink/control/mpc/controller.py):
 
 ```text
@@ -102,7 +102,7 @@ flowchart TB
 | **Trajectory + sample at `t`** | Dual-rate broadcast, warm-start whole horizon, Engine `P_cmd` from Rate plan | Flagship MPC case above |
 
 Teaching demos already pad by hand in
-[`demo_car_trajopt_compare.py`](../../examples/scripts/trajectory_optimization/demo_car_trajopt_compare.py).
+[`car_trajopt_compare.py`](../../examples/projects/car_trajopt/car_trajopt_compare.py).
 Phase 4 makes that shared and honest about when zeros are wrong.
 
 ## Ladder dimensions (reference)
@@ -178,7 +178,7 @@ Implementation notes (match [AGENTS.md](../../AGENTS.md)):
 
 ## How this plugs into existing workflows
 
-1. **Flagship — dual-rate Engine broadcast:** MPC plant = Rate (or Acc); plant/allocator = Engine; after `compute_command`, lift latched traj → Engine `(x,u)`; fast timer samples `u_hi(t)=[P_cmd,δ_cmd]` like [`demo_mpc_path.py`](../../examples/experimental/mpc/demo_mpc_path.py) samples same-fid `u_nom`.
+1. **Flagship — dual-rate Engine broadcast:** MPC plant = Rate (or Acc); plant/allocator = Engine; after `compute_command`, lift latched traj → Engine `(x,u)`; fast timer samples `u_hi(t)=[P_cmd,δ_cmd]` like [`mpc_path.py`](../../examples/projects/mpc/mpc_path.py) samples same-fid `u_nom`.
 2. **TrajOpt warm-start:** lift cheap plan → rich `Trajectory` → `pack_initial_guess` / `resample`.
 3. **MPC warm-start (same dims):** still `mpc_warm_start_guess`; cross-fid lift is for **broadcast / allocation**, planning stays low-fid unless the user remaps warm-start separately.
 4. **Notebook:** short cell — Rate/Acc traj → Engine `P_cmd(t)` strip.
@@ -189,7 +189,7 @@ Implementation notes (match [AGENTS.md](../../AGENTS.md)):
 - Rate↔TauRate: `inverse_propulsion_dynamics` consistency with existing unit tests.
 - Trajectory: coast → near-zero rates; ramp steer → nonzero `δ̇`.
 - **Use-case smoke:** Rate plan with nonzero `w_rear_dot` → Engine `P_cmd` ~ `τ·ω`; `lift_nominal_at` mid-horizon matches `lift_trajectory` column.
-- Optional thin dual-rate smoke with Engine plant (comment block mirroring `demo_mpc_path`).
+- Optional thin dual-rate smoke with Engine plant (comment block mirroring `mpc_path`).
 
 ## Docs
 

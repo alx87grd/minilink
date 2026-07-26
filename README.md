@@ -99,7 +99,7 @@ another diagram.
 
 Explicit wiring (`add_subsystem` / `connect`) is always available when the
 shortcuts are too implicit; see
-`examples/scripts/diagrams/demo_diagram_shortcuts.py` for both versions side by
+`examples/scripts/diagrams/diagram_shortcuts.py` for both versions side by
 side. Any internal signal can be plotted by `"subsystem_id:port_id"` name.
 
 ### One call to simulate, plot, animate
@@ -372,18 +372,22 @@ Index and placement rules: [examples/README.md](examples/README.md)
 | Diagrams | `examples/scripts/diagrams/` · [intro/core](examples/notebooks/intro/00_core.ipynb) |
 | Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` · [intro/blocks](examples/notebooks/intro/01_blocks.ipynb) |
 | Control | `examples/scripts/control/` · [intro/control](examples/notebooks/intro/03_control.ipynb) |
-| Pyro SMC continuous (pendulum) | `examples/scripts/control/demo_sliding_mode_pendulum.py` |
+| Pyro SMC continuous (pendulum) | `examples/scripts/control/sliding_mode_pendulum.py` |
+| Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/scripts/hybrid/` · `examples/scripts/step/` · [intro/hybrid](examples/notebooks/intro/06_hybrid.ipynb) |
+| MPC (minimal + dual-rate) | `examples/scripts/mpc/` · [applications/mpc](examples/notebooks/applications/mpc.ipynb) |
+| MPC scenarios (path / circuit / slalom) | `examples/projects/mpc/` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |
 | Analysis (linearize, trim, ctrb/obsv, modal) | `examples/scripts/analysis/` · [intro/analysis](examples/notebooks/intro/04_analysis.ipynb) |
 | State-space / LQR | `examples/scripts/statespace/` |
 | Identification (param gradients) | `examples/scripts/identification/` |
 | Plotting | `examples/scripts/plots/` · [intro/graphical](examples/notebooks/intro/10_graphical.ipynb) |
 | Animation | `examples/scripts/animation/` · [intro/graphical](examples/notebooks/intro/10_graphical.ipynb) |
-| Realtime game mode (keyboard → live plant → `Trajectory`) | `examples/scripts/realtime/demo_game_cartpole.py` |
+| Realtime game mode (keyboard → live plant → `Trajectory`) | `examples/scripts/realtime/game_cartpole.py` |
 | Optimization | `examples/scripts/optimization/` · [intro/optimization](examples/notebooks/intro/08_optimization.ipynb) |
-| Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` · [intro/planning](examples/notebooks/intro/09_planning.ipynb) |
-| Trajectory optimization | `examples/scripts/trajectory_optimization/` · [car TrajOpt compare](examples/notebooks/applications/car_trajopt.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/applications/car_trajopt.ipynb) |
-| C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/demo_c_export_proportional.py` · `demo_c_export.py` |
+| Planning (RRT, DP) | `examples/scripts/planning/` · [intro/planning](examples/notebooks/intro/09_planning.ipynb) |
+| Trajectory optimization | `examples/scripts/trajopt/` · [car TrajOpt compare](examples/notebooks/applications/car_trajopt.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/applications/car_trajopt.ipynb) |
+| Path tracking projects | `examples/projects/pathtracking/` · `examples/projects/car_trajopt/` |
+| C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/c_export_proportional.py` · `c_export.py` |
 | Solver benchmarks | [examples/notebooks/tooling/benchmark.ipynb](examples/notebooks/tooling/benchmark.ipynb) (uses repo-root `benchmarks/`) |
 
 Catalog plants: `from minilink.catalog import …` (math under `minilink.dynamics.catalog.*`).

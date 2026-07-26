@@ -30,8 +30,7 @@ FLAGSHIP_MANIFEST = CHECKS_DIR / "flagship_manifest.json"
 INTERACTIVE_DEMO_PREFIXES = ("examples/scripts/realtime/",)
 INTERACTIVE_DEMO_PATHS = frozenset(
     {
-        "examples/scripts/animation/demo_interactive.py",
-        "examples/scripts/animation/demo_dynamic_bicycle.py",
+        "examples/scripts/animation/game_bicycle.py",
     }
 )
 
