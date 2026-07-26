@@ -138,12 +138,17 @@ For autodiff inside an outer `jit`, use the **trace tier** (pre-JIT siblings:
 
 ```python
 evaluator = diagram.compile(backend="jax")
-dx = evaluator.f(x, u, 0.0)              # fast tier (JIT)
+dx = evaluator.f(x, u, 0.0)  # fast tier (JIT)
 
 import jax
-loss_and_grad = jax.jit(jax.value_and_grad(
-    lambda theta: jnp.mean((evaluator.f_trace_p(x, u, 0.0, {"plant": theta}) - dx_ref) ** 2)
-))
+
+loss_and_grad = jax.jit(
+    jax.value_and_grad(
+        lambda theta: jnp.mean(
+            (evaluator.f_trace_p(x, u, 0.0, {"plant": theta}) - dx_ref) ** 2
+        )
+    )
+)
 ```
 
 ### Hybrid and discrete control
@@ -177,9 +182,9 @@ Hand-loop or external deploy node (ROS-agnostic — no ROS2 package in minilink)
 ```python
 cmd = mpc.compute_command(y, t=t_wall)  # replan tick → Command
 u = cmd.u_ff
-meta = mpc.get_solve_metadata()         # success / cost / solve_time_s
+meta = mpc.get_solve_metadata()  # success / cost / solve_time_s
 # or: cmd.metadata  (same SolveMetadata)
-mpc.reset()                             # clear deploy counter + latch
+mpc.reset()  # clear deploy counter + latch
 ```
 
 ### Analyze and design
@@ -196,7 +201,7 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 plant = Pendulum()
 poles, modes = modal_analysis(plant, x_bar=[0.0, 0.0])
-plant.modal_analysis(x_bar=[0.0, 0.0], mode=0)      # one mode
+plant.modal_analysis(x_bar=[0.0, 0.0], mode=0)  # one mode
 plant.modal_analysis(x_bar=[0.0, 0.0], mode="all")  # every mode
 ```
 
@@ -211,12 +216,12 @@ from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
 
 plant = InvertedPendulum()
 A, B, C, D = linearize_matrices(plant, x_bar=[0.0, 0.0])  # raw arrays
-lti = linearize(plant, x_bar=[0.0, 0.0])             # → LTISystem at upright
+lti = linearize(plant, x_bar=[0.0, 0.0])  # → LTISystem at upright
 w, mag, phase = bode(plant, x_bar=[0.0, 0.0], input_port="u", output_index=0)
 plant.plot_bode(x_bar=[0.0, 0.0], input_port="u", output_index=0)
 controller = lqr(lti.A(), lti.B(), Q=np.diag([10.0, 1.0]), R=[[1.0]])
 
-diagram = DiagramSystem()                             # full-state feedback
+diagram = DiagramSystem()  # full-state feedback
 diagram.add_subsystem(controller, "lqr")
 diagram.add_subsystem(plant, "plant")
 diagram.connect("plant", "x", "lqr", "x")

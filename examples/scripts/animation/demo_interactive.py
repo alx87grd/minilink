@@ -1,4 +1,3 @@
-
 # Live loop: RealtimeSimulator + PygameInput behind the sys.game() facade;
 # keys command the input-port bounds and the session returns a Trajectory.
 

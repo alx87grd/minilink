@@ -625,7 +625,11 @@ Example contract (sketch):
 ```python
 # minilink/dynamics/catalog/pendulum/smoke.py
 """Headless catalog smoke for pendulum.py classes. Run: python -m ..."""
+
+
 def main() -> int: ...
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
 ```
@@ -642,7 +646,10 @@ if __name__ == "__main__":
 
 ```python
 def test_catalog_smokes_exit_zero():
-    subprocess.run([sys.executable, "examples/scripts/_smoke/run_catalog_smokes.py", "--fast"], check=True)
+    subprocess.run(
+        [sys.executable, "examples/scripts/_smoke/run_catalog_smokes.py", "--fast"],
+        check=True,
+    )
 ```
 
 Optional nightly job runs full smokes (with 3-step sim). Default CI uses `--fast`.
