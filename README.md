@@ -118,8 +118,10 @@ trajectories; `plot_diagram()` renders wiring topology (Graphviz/Mermaid).
 
 `animate()` plays a trajectory through swappable renderers: matplotlib
 (inline HTML in notebooks), plotly, meshcat (3D in the browser), or pygame.
-`game()` runs the model interactively with keyboard input — useful for
-building intuition about a plant before designing a controller.
+`game()` runs the model live in real time with keyboard input — useful for
+building intuition about a plant before designing a controller — and returns
+the recorded `Trajectory` when you quit, ready for `plot_trajectory()` or
+`animate()`.
 
 ### Compiled execution and JAX
 
@@ -412,7 +414,8 @@ Plot:      plot_trajectory*  →  graphical.signals  →  PlotResult
            plot_diagram      →  graphical.diagrams (DiagramSystem / StepDiagramSystem)
            HybridDiagram.plot_diagram  →  hybrid composite (Plant + Computer clusters)
 
-Animate:   animate* / render / game  →  Animator  →  renderer backend
+Animate:   animate* / render  →  Animator  →  renderer backend
+           game  →  simulation.realtime.RealtimeSimulator  →  live Animator frames
            HybridDiagram.animate  →  plant geometry + fine plant traj
            planner.plot_solution / animate_solution  →  problem.sys.*
 
@@ -458,6 +461,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 | Identification (param gradients) | `examples/scripts/identification/` |
 | Plotting | `examples/scripts/plots/` · [intro/graphical](examples/notebooks/intro/10_graphical.ipynb) |
 | Animation | `examples/scripts/animation/` · [intro/graphical](examples/notebooks/intro/10_graphical.ipynb) |
+| Realtime game mode (keyboard → live plant → `Trajectory`) | `examples/scripts/realtime/demo_game_cartpole.py` |
 | Optimization | `examples/scripts/optimization/` · [intro/optimization](examples/notebooks/intro/08_optimization.ipynb) |
 | Planning (RRT, DP, corridor trajopt) | `examples/scripts/planning/` · [intro/planning](examples/notebooks/intro/09_planning.ipynb) |
 | Trajectory optimization | `examples/scripts/trajectory_optimization/` · [car TrajOpt compare](examples/notebooks/applications/car_trajopt.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/applications/car_trajopt.ipynb) |

@@ -936,22 +936,12 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
         self.assertIsInstance(backend, PlotlyRenderer)
 
     def test_plotly_is_not_interactive_loop_backend(self):
+        from minilink.simulation.realtime import RealtimeSimulator
+
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
-        animator = Animator(sys)
-
-        def update_callback(x, u, t, step_idx, events):
-            return (x, u, True)
 
         with self.assertRaisesRegex(ValueError, "interactive loops"):
-            animator.run_interactive(
-                update_callback,
-                x0=np.array([0.0]),
-                renderer="plotly",
-                show=False,
-                max_steps=1,
-            )
-        with self.assertRaisesRegex(ValueError, "interactive loops"):
-            animator.game(renderer="plotly", max_steps=1)
+            RealtimeSimulator(sys, renderer="plotly", max_steps=1)
 
 
 @pytest.mark.plotting

@@ -125,7 +125,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Planning | `pyro/planning/trajectoryoptimisation.py` | DirectCollocationTrajectoryOptimisation | `minilink/planning/trajectory_optimization/` | DirectCollocation, Shooting, MS | **Done** | Ipopt/JAX backends |
 | Graphics | `pyro/kinematic/geometry.py` | transformation_matrix_2D | `minilink/core/kinematics.py` | frame tf helpers | **Done** |  |
 | Graphics | `pyro/kinematic/drawing.py` | transform_points_2D, arrows | `minilink/graphical/animation/` | primitives, drawables | **Done** |  |
-| Tools | `pyro/tools/sys2game.py` | InteractiveContinuousDynamicSystem | `minilink/graphical/animation/interactive.py` | partial keyboard loop | **Drop** | No sys2game framework |
+| Tools | `pyro/tools/sys2game.py` | InteractiveContinuousDynamicSystem | `minilink/simulation/realtime/` | superseded by `RealtimeSimulator` + `PygameInput` | **Drop** | Own realtime tool, not a port |
 | Tools | `pyro/tools/sys2gym.py` | Sys2Gym | `minilink/interfaces/` | — | **TODO** | interfaces/gymnasium.py |
 
 ---
@@ -351,10 +351,10 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `projects/asimov/asimov_endeffector_pid_controller.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/asimov/asimov_joint_pid_controller.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/asimov/asimov_kinematic_controller.py` | **Drop** | Research/course project; out of library demo scope |
-| `projects/pygame/boat_game.py` | **Drop** | sys2game; use animate(renderer=pygame) or skip |
-| `projects/pygame/double_pendulum_game.py` | **Drop** | sys2game; use animate(renderer=pygame) or skip |
-| `projects/pygame/test_double_pendulum_joy.py` | **Drop** | sys2game; use animate(renderer=pygame) or skip |
-| `projects/pygame/test_pendulum_joy.py` | **Drop** | sys2game; use animate(renderer=pygame) or skip |
+| `projects/pygame/boat_game.py` | **Drop** | sys2game; use `simulation/realtime/` or skip |
+| `projects/pygame/double_pendulum_game.py` | **Drop** | sys2game; use `simulation/realtime/` or skip |
+| `projects/pygame/test_double_pendulum_joy.py` | **Drop** | sys2game; use `simulation/realtime/` or skip |
+| `projects/pygame/test_pendulum_joy.py` | **Drop** | sys2game; use `simulation/realtime/` or skip |
 | `projects/tmotor_robot/tmotor_robot_controller_simulation_tests.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/ugv/ugv_backup.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/ugv/ugv_dubins.py` | **Drop** | Research/course project; out of library demo scope |
@@ -456,7 +456,7 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | Discrete-time / ZOH library | **Drop** | Continuous-time only (DESIGN §3) |
 | RNN / recurrent blocks | **Drop** | — |
 | Hybrid events / mixed-rate sim | **Drop** | — |
-| Pyro `sys2game` framework | **Drop** | `animate(..., renderer="pygame")` + interactive.py |
+| Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |
 | Stable-Baselines3 in-library RL | **Drop** | interfaces/gymnasium.py; train externally |
 | `*withObstacles` plant subclasses | **Drop** | planning/spatial/Scene + bind() |
 | DynamicProgramming2DRectBivariateSpline | **Drop** | Grid DP backends |

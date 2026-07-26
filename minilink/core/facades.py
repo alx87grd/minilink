@@ -10,8 +10,6 @@ contracts stay in :mod:`minilink.core.system`. Heavy dependencies
 (simulation, graphics) are imported lazily inside each method.
 """
 
-import numpy as np
-
 
 class SharedSystemFacades:
     """
@@ -685,34 +683,51 @@ class DynamicSystemFacades:
     def game(
         self,
         *,
-        dt=1 / 30.0,
-        dynamics_substeps=1,
+        frame_dt=1 / 30.0,
+        sim_dt=None,
         renderer="pygame",
         is_3d=False,
-        x0=None,
-        u0=None,
-        t0=0.0,
+        sync="locked",
+        compile_backend=None,
         max_steps=None,
+        tf=None,
+        x0=None,
+        t0=0.0,
     ):
         """
-        Convenience shortcut for the prototype interactive game loop.
+        Convenience shortcut for a live keyboard-driven real-time session.
 
-        See ``Animator.game`` and ``ROADMAP.md`` §7: integrator + live I/O are planned as
-        pluggable backends (today: pygame keyboard + Euler in the animator loop).
+        Façade over
+        :class:`~minilink.simulation.realtime.simulator.RealtimeSimulator`
+        with a :class:`~minilink.simulation.realtime.pygame_input.PygameInput`
+        keyboard source: held keys command the input-port bounds, the plant
+        advances in sync with the wall clock (``frame_dt`` per rendered frame,
+        integrated internally at ``sim_dt``), and the session returns a
+        :class:`~minilink.core.trajectory.Trajectory` when the user quits
+        (ESC or window close), also stored in :attr:`traj` for later
+        ``plot_trajectory`` / ``animate``.
+
+        ``compile_backend=None`` (default) tries JAX when available and
+        compatible, otherwise NumPy — preferred for live sessions where speed
+        matters.
         """
-        from minilink.graphical.animation import Animator
+        from minilink.simulation.realtime import PygameInput, RealtimeSimulator
 
-        animator = Animator(self)
-        return animator.game(
-            dt=dt,
-            dynamics_substeps=dynamics_substeps,
+        rt_sim = RealtimeSimulator(
+            self,
+            frame_dt=frame_dt,
+            sim_dt=sim_dt,
+            sync=sync,
             renderer=renderer,
             is_3d=is_3d,
-            x0=self.x0 if x0 is None else x0,
-            u0=np.zeros(self.m) if u0 is None else u0,
-            t0=t0,
+            input=PygameInput(),
+            compile_backend=compile_backend,
             max_steps=max_steps,
+            tf=tf,
         )
+        traj = rt_sim.run(x0=x0, t0=t0)
+        self.traj = traj
+        return traj
 
 
 class StepSystemFacades:

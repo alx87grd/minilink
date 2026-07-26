@@ -43,9 +43,9 @@ class AnimationRenderer(ABC):
     def poll_events(self):
         """Return backend events/state for interactive loops.
 
-        ROADMAP: live **external input** (beyond quit keys) and optional **live output push**
-        for cosimulation belong in dedicated I/O abstractions; renderers stay draw/present-only
-        where possible—see ``ROADMAP.md`` §7.
+        Live external input and output live in :mod:`minilink.simulation.realtime`
+        (``RealtimeInput`` / ``RealtimeOutput``); renderers stay draw/present-only
+        and report only view events such as ``{"quit": True}``.
         """
         return {}
 

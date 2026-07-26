@@ -25,12 +25,29 @@ CHECKS_DIR = Path(__file__).resolve().parent
 SCRIPTS_ROOT = REPO_ROOT / "examples" / "scripts"
 FLAGSHIP_MANIFEST = CHECKS_DIR / "flagship_manifest.json"
 
+# Live keyboard / wall-clock sessions hang until the user quits — not suitable
+# for an unattended subprocess sweep. Keep discoverable under examples/; skip here.
+INTERACTIVE_DEMO_PREFIXES = ("examples/scripts/realtime/",)
+INTERACTIVE_DEMO_PATHS = frozenset(
+    {
+        "examples/scripts/animation/demo_interactive.py",
+        "examples/scripts/animation/demo_dynamic_bicycle.py",
+    }
+)
+
 
 @dataclass(frozen=True)
 class DemoRunRow:
     path: str
     status: str
     message: str = ""
+
+
+def _is_interactive_demo(path: Path) -> bool:
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    if any(rel.startswith(prefix) for prefix in INTERACTIVE_DEMO_PREFIXES):
+        return True
+    return rel in INTERACTIVE_DEMO_PATHS
 
 
 def _discover_scripts() -> list[Path]:
@@ -44,6 +61,8 @@ def _flagship_paths() -> list[Path]:
 
 def _run_script(path: Path, *, timeout: float) -> DemoRunRow:
     rel = path.relative_to(REPO_ROOT)
+    if _is_interactive_demo(path):
+        return DemoRunRow(str(rel), "skip", "interactive realtime session")
     env = {**os.environ, "PYTHONPATH": str(REPO_ROOT), "MPLBACKEND": "Agg"}
     try:
         proc = subprocess.run(
@@ -89,7 +108,8 @@ def _print_report(rows: list[DemoRunRow]) -> int:
         print(f"  {row.path:<{width}}  {row.status}{note}")
     failed = sum(row.status == "fail" for row in rows)
     passed = sum(row.status == "pass" for row in rows)
-    print(f"\n{passed} passed, {failed} failed, {len(rows)} total")
+    skipped = sum(row.status == "skip" for row in rows)
+    print(f"\n{passed} passed, {failed} failed, {skipped} skipped, {len(rows)} total")
     return 1 if failed else 0
 
 

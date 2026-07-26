@@ -66,7 +66,7 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing |
+| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`) |
 | `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; `discretize` for continuous→step plant wrappers; more frequency tools planned |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
@@ -214,6 +214,34 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
+- **Realtime (live sessions):**
+  :class:`~minilink.simulation.realtime.simulator.RealtimeSimulator`
+  (`simulation/realtime/`) is the third simulation orchestrator, beside
+  :class:`~minilink.simulation.simulator.Simulator` and
+  :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`. Per frame it
+  polls a live :class:`~minilink.simulation.realtime.io.RealtimeInput`
+  (``u, should_stop``; nominal ``u`` when ``input=None``), advances the plant
+  with evaluator
+  :meth:`~minilink.core.compile.evaluators.numpy_evaluators.IntegrationMixin.integrate_zoh`,
+  draws live through ``Animator.open_live_scene`` / ``update_live_frame``, and
+  publishes to an optional
+  :class:`~minilink.simulation.realtime.io.RealtimeOutput` (cosimulation hook).
+  **Clocks:** ``frame_dt`` (wall period per rendered frame) is independent of
+  ``sim_dt`` (internal integration step, auto from ``solver_info`` like the
+  offline `Simulator`); ``sync="locked"`` (default) advances exactly
+  ``frame_dt`` of sim time per frame (reproducible, single JAX trace), while
+  ``sync="realtime"`` advances the measured wall elapsed quantized to the
+  ``sim_dt`` grid. ``compile_backend=None`` / ``"auto"`` tries JAX then
+  NumPy (preferring speed for live sessions); frames that miss the
+  ``frame_dt`` budget emit a throttled :class:`UserWarning`. JIT is warmed
+  before the clock starts. The run returns a
+  :class:`~minilink.core.trajectory.Trajectory` (one sample per frame) and the
+  ``sys.game()`` facade caches it on ``self.traj``.
+  :class:`~minilink.simulation.realtime.pygame_input.PygameInput` maps held
+  keys to input-port ``lower_bound``/``upper_bound`` (``mode="hold"``) or
+  slews a setpoint at ``rate`` (``mode="rate"``); rendering stays on the
+  :class:`~minilink.graphical.animation.renderers.renderer.AnimationRenderer`
+  pipeline and is not a ``RealtimeOutput``.
 - **MPC hybrid block:** :func:`~minilink.control.mpc.ModelPredictiveController`
   returns a static ``System`` (``n=0``) or :class:`StepSystem` (``warm_start=True``)
   that holds a

@@ -19,7 +19,8 @@ Maturity and priorities. Contracts: [DESIGN.md](DESIGN.md). Agent rules:
 | Planning/search | 4 | `RRTPlanner`, `RRTStarPlanner`, extenders, steering, KD-tree nearest; spatial `Scene` via `X`. | RRT-Connect; informed sampling. |
 | Geometry / spatial | 4 | Integrated architecture proposed for obstacle and terrain planning: `core/geometry.py` SDF primitives + cost algebra (`SumCost`/`ScaledCost`), and `planning/spatial/`: `Scene` (obstacles + `workspace_fields`), `WorkspaceField`/`StateField`, `RobotBody`/`TranslationBody`, export via `as_constraint`/`as_cost`. Tested incl. JAX twins. | User architecture validation; scene params (`ProblemParameters.scene`, future); RRT consumers; oriented/multi-sphere bodies and raster cost maps. |
 | Graphical | 4 | Frame-keyed ``tf`` / geometry / overlay contract integrated. | Renderer polish; optional ``KinematicModel`` delegate review. |
-| Animation | 4 | ``Animator`` + overlays (``SceneHistory``, ``Replay``); collision reuses ``tf``. | Interactive integrator backends; live I/O backends. |
+| Animation | 4 | ``Animator`` + overlays (``SceneHistory``, ``Replay``); collision reuses ``tf``; live sessions delegated to `simulation/realtime/`. | Renderer polish. |
+| Realtime simulation | 2 | `RealtimeSimulator` + `RealtimeInput`/`RealtimeOutput` contracts (`simulation/realtime/`): wall-clock loop on evaluator `integrate_zoh`, pygame keyboard + joystick input, live `Animator` draw, `Trajectory` return. | User architectural review; cosimulation adapters under `interfaces/`. |
 | Dynamics catalog | 6 | Pyro plants ported, QA'd term-by-term; catalog arms on `Manipulator`. | Optional `JaxManipulator`; `f_ext` port if approved. |
 | Dynamics abstraction | 6 | `MechanicalSystem` + `Manipulator` (`p`, `pdot`, FK/J); catalog arms rebased. | `JaxManipulator` if needed; external wrench port. |
 | Symbolic mechanics | 1 | One-shot AI-generated demos, not a validated subsystem. | Keep isolated until clear use cases justify review. |
@@ -116,7 +117,8 @@ gated on review-queue sign-off of the wording.
 - Trajopt transcription internal consolidation.
 - Dynamic bicycle module split.
 - Graphics/camera contract consolidation (`KinematicModel` delegate) — optional follow-up.
-- **Pyro game demos** — port via interactive animation or explicitly drop.
+- **Pyro game demos** — superseded by `simulation/realtime/` game demos
+  (`examples/scripts/realtime/`); port remaining ones there or explicitly drop.
 - **Product vision §5.11** — wording of vision, positioning table, and
   practices list
   ([§5.11](#511-product-vision--landscape-position)).
@@ -264,8 +266,9 @@ Full Simulink / arbitrary multi-clock hybrid parity, event-driven switching
 (guards, impacts) as a *framework* feature, RNN policy blocks, becoming a
 standalone batched RL physics engine — see [DESIGN.md §3](DESIGN.md). The
 **narrow** step/hybrid subset in §5.5a is in scope as a subsidiary program; it
-does not replace the continuous-time core. Pygame game framework (`sys2game`) —
-no first-class port unless reversed.
+does not replace the continuous-time core. Pyro's `sys2game` framework is not
+ported; live interaction is minilink's own `simulation/realtime/` tool
+(`RealtimeSimulator` + I/O contracts), not a pyro port.
 
 **In scope as leaves (not as core rewrite):** optional wrappers around external
 multibody/contact engines ([§5.7](#57-interfaces)) — *using* those engines for
