@@ -3,7 +3,7 @@
 Wrappers that let minilink systems talk to other frameworks, and external
 models enter minilink as plants.
 
-Planned modules (see ROADMAP.md §5):
+Planned modules (see ROADMAP.md Later):
 
 - ``gymnasium.py`` — expose a diagram as an RL environment (policies come
   back as ``control/`` blocks)

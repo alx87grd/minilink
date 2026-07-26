@@ -11,8 +11,8 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | Doc | When to update |
 | --- | --- |
 | [README.md](README.md) | User workflows, install, examples table |
-| [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior |
-| [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, priority checkboxes |
+| [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior, **product identity & scope** |
+| [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, teaching-release priorities |
 | [docs/plans/](docs/plans/) | Active design backlog only (delete finished plan docs) |
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy, **entry points (human · agent · CI)** |

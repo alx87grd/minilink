@@ -34,7 +34,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Framework | `pyro/dynamic/statespace.py` | StateObserver | `minilink/estimation/` | — | **TODO** | estimation/luenberger.py |
 | Framework | `pyro/dynamic/statespace.py` | ObservedSystem | `minilink/estimation/` | — | **TODO** | LQG blocked on observers |
 | Framework | `pyro/dynamic/stochastic.py` | NoiseSignal | `minilink/blocks/sources.py` | noise ports in diagrams | **Partial** | No StochasticSystemWrapper |
-| Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed (ROADMAP §5.8) |
+| Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed (ROADMAP Later) |
 | Framework | `pyro/dynamic/tranferfunction.py` | TransferFunction | `minilink/blocks/transfer_function.py` | TransferFunction | **Done** |  |
 | Framework | `pyro/dynamic/tranferfunction.py` | ss2tf() | `minilink/analysis/` | — | **TODO** | Frequency backlog |
 | Catalog | `pyro/dynamic/equation.py` | VanderPol | `minilink/dynamics/catalog/equations/oscillators.py` | VanderPol | **Done** |  |
@@ -67,7 +67,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Catalog | `pyro/dynamic/suspension.py` | QuarterCarOnRoughTerrain | `minilink/dynamics/catalog/vehicles/suspension.py` | QuarterCarOnRoughTerrain | **Done** |  |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | — | **Partial** | Only LinearTire implemented |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | LinearTire | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | LinearTire (+ LinearTire) | **Done** |  |
-| Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | ROADMAP §5.8 review queue |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | ROADMAP Later |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | DynamicBicycle | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | DynamicBicycle (+ JAX twins, rate inputs) | **Done** | Minilink adds rate-input variant |
 | Catalog | `pyro/dynamic/vehicle_propulsion.py` | LongitudinalFrontWheelDriveCarWithWheelSlipInput | `minilink/dynamics/catalog/vehicles/propulsion.py` | same | **Done** |  |
 | Catalog | `pyro/dynamic/vehicle_propulsion.py` | LongitudinalFrontWheelDriveCarWithTorqueInput | `minilink/dynamics/catalog/vehicles/propulsion.py` | same | **Done** |  |
@@ -464,7 +464,7 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | StochasticSystemWrapper | **Drop** | Noise ports only unless reversed |
 | University course folders | **Drop** | Port ideas via library demos, not 1:1 |
 | Research projects (asimov, ugv, wcrt, …) | **Drop** | Out of library scope |
-| Pacejka tire | **TODO/review** | ROADMAP §5.8 maintainer sign-off |
+| Pacejka tire | **TODO/review** | ROADMAP Later |
 
 ---
 

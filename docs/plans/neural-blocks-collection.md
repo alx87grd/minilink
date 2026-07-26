@@ -3,9 +3,9 @@
 Working notes for a long-term collection of neural-network blocks in minilink.
 Status: **proposal for architectural review** (`TODO: User Architectural Review`).
 
-Related maturity claims: [ROADMAP.md](../../ROADMAP.md) §5 (`blocks/neural.py` MLP
-done at TRL 2; `control/neural.py`, `identification/fitting.py`, and
-`interfaces/flax.py` planned).
+Related maturity claims: [ROADMAP.md](../../ROADMAP.md) Later (`blocks/` MLP,
+`control/neural.py`, `interfaces/flax.py`; `identification/fitting.py` is on the
+teaching-release priorities).
 
 ## Current state (June 2026)
 
@@ -198,7 +198,7 @@ Rewrite layers as Flax `nn.Module` subclasses, bridge to `StaticSystem`.
 | --- | --- |
 | Core stays lightweight and readable | Adapter maintenance when Flax API shifts |
 | Advanced users import Flax models without polluting core | Two paths to "a neural block" — needs docs |
-| Matches ROADMAP §5 placement (`interfaces/` for ecosystem bridges) | Flax adapter must map pytree → nested `params` dict |
+| Matches ROADMAP Later placement (`interfaces/` for ecosystem bridges) | Flax adapter must map pytree → nested `params` dict |
 | No forced Flax install for basic MLP control demos | |
 
 **Recommendation:** Option 3. The current `NeuralNetwork` is the right seed — extend

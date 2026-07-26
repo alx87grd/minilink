@@ -7,7 +7,7 @@ and neural-network weights alike — both ride the parametric evaluator tier
 ``examples/scripts/identification/demo_params_gradient.py`` for the equation-error
 prototype).
 
-Planned modules (see ROADMAP.md §5):
+Planned modules (see ROADMAP.md teaching-release priorities):
 
 - ``fitting.py`` — equation-error and prediction-error fits
 - experiment design helpers (PRBS/chirp inputs live in ``blocks/sources``)

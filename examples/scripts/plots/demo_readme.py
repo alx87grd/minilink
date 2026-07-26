@@ -1,6 +1,5 @@
 ########################################################
-from minilink.control.impedance import ImpedanceController
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink import ImpedanceController, Pendulum
 
 controller = ImpedanceController()  # u = Kp * (r - theta) - Kd * theta_dot
 plant = Pendulum()  # theta_ddot = -(g / l) * sin(theta) + tau / (m * l**2)
@@ -24,20 +23,22 @@ from minilink.core.system import DynamicSystem  # noqa: E402
 
 
 class MassSpringDamper(DynamicSystem):
+    """m * pddot + c * pdot + k * p = F"""
+
     def __init__(self):
         super().__init__(n=2, input_dim=1, expose_state=True)
-        self.params = {"m": 1.0, "k": 4.0, "c": 0.3}
 
     def f(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-        m, k, c = params["m"], params["k"], params["c"]
+        # m * pddot + c * pdot + k * p = F
+        m = 1.0
+        k = 4.0
+        c = 0.3
 
-        position, velocity = x
-        force = u[0]
+        p, pdot = x
+        F = u[0]
 
-        dx = np.zeros(2)
-        dx[0] = velocity
-        dx[1] = (force - c * velocity - k * position) / m
+        pddot = (F - c * pdot - k * p) / m
+        dx = np.array([pdot, pddot])
         return dx
 
 

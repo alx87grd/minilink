@@ -7,6 +7,9 @@ Architecture and public contracts. User guide and call chains: [README.md](READM
 1. **Math readability first**: e.g. `dx = A @ x + B @ u`.
 2. **Pure contracts, convenient boundaries**: equation paths stay functional;
    facades (`compute_trajectory`, `plot_*`, `animate`) live at API boundaries.
+   Models are **stateless** — a `System` holds equations, ports, params, and
+   `x0`; evolving state lives in the simulator / returned `Trajectory`, not as
+   hidden mutable block state.
 3. **Explicit data flow**: visible objects and direct calls; no global backend
    switches or hidden registries.
 4. **Backend-native math where simple**: one class for traceable NumPy/JAX algebra.
@@ -14,6 +17,58 @@ Architecture and public contracts. User guide and call chains: [README.md](READM
    would sacrifice readability.
 
 Contributing style (textbook rules, workflow): [AGENTS.md](AGENTS.md).
+
+### Product identity & scope
+
+Minilink is a **Python/JAX block-diagram toolbox** for **modeling, simulating,
+controlling, optimizing, and learning** with dynamical systems — equations that
+read like textbook math (`dx = f(x,u,t;p)`).
+
+**Distinct edge:** one object model for plants, controllers, diagrams, and
+NN/ID blocks. Compose (`@`, `>>`), simulate, analyze, optimize
+trajectories/policies, and differentiate / `jit` through the same `f` via
+compile backends — without splitting a “sim stack” from a “learning stack.”
+
+**Primary use cases**
+
+1. **Model & teach** — readable continuous plants and closed-loop diagrams.
+2. **Control** — classical, model-based, and hybrid digital loops (sampled
+   MPC/SMC) on those diagrams.
+3. **Optimize** — trajopt / MPC / planning (search, DP) on the same `System`
+   and costs/sets.
+4. **Learn** — identify parameters, residual dynamics, or NN policies with
+   gradients through compiled dynamics.
+5. **Scale out plants later** — optional external multibody engines as leaves
+   when needed; not the product center.
+
+**Not trying to be:** a Simulink GUI/DAE product, a Multibody/contact OS, an
+OCP modeling language, or a batched RL physics engine.
+
+| Toolbox | They own | Minilink vs them |
+| --- | --- | --- |
+| **Simulink** (+ Stateflow/Simscape) | Industrial diagrams, GUI, DAE, codegen | Same block-diagram idea; code-first, causal, open, differentiable — no GUI/DAE ambition |
+| **MATLAB** (CST etc.) | Classical LTI / frequency design | Neighbor for LTI; we center nonlinear systems + optimize/learn in one Python stack |
+| **Drake** | Multibody, contact, events, deep MathProg | Complement for teaching / reduced-order / JAX-learning loops; not a second MultibodyPlant |
+| **MuJoCo / MJX** | Fast multibody + contact physics | Physics backend we can wrap later; they don’t own control-diagram + optimize/learn UX |
+| **CasADi** | Symbolic AD → NLP/OCP | Opt is a *tool on Systems*; we own diagram/sim/control/learn surface around it |
+| **acados / Crocoddyl** | Fast deployed MPC/DDP | Solver peers; we stay the Systems lab that can call solvers |
+| **Pinocchio** | Fast RBD + derivatives | Algorithm/engine peer — not a diagram framework |
+| **Modelica** | Acausal physical networks | We stay causal ODE/blocks (better fit for AD and learning) |
+| **python-control** | Classical control in Python | Interop; they stop at LTI, we continue nonlinear + optimize/learn |
+| **Brax / similar** | Batched differentiable physics for RL | Neighbor in JAX; we are Systems+control+opt, not an RL physics engine |
+| **Pyro** | Teaching dynamics lineage | Successor: keep readability; add diagrams, compile/JAX, optimize, learn |
+
+**Claim:** *Systems-first lab for simulate → control → optimize → learn in
+Python/JAX — not a physics OS, not an OCP language, not a Simulink
+replacement.*
+
+**Scope practices** (with the principles above): freeze the composition
+grammar early; put hard physics behind optional leaves; expose structure
+(don’t black-box dynamics); demo-gate maturity; lock build vs run
+(wire/validate/compile freezes structure); be hard where the identity is
+(compile vs reference parity, JAX twins, discontinuous closed-loop solvers).
+
+Maturity and scheduling: [ROADMAP.md](ROADMAP.md).
 
 ### NumPy and JAX
 
@@ -30,15 +85,38 @@ package, no global mode. Explicit `compile_backend` and evaluator backend args.
 | 2 Orchestrators | Repeat runs, trajopt, NLP | `Simulator`, `TrajectoryOptimizationPlanner`, `Optimizer` |
 | 3 Contracts | Custom wiring, extension | `DiagramSystem.connect`, `compile()`, `MathematicalProgram` |
 
-Import from defining modules; `minilink/__init__.py` is a namespace marker until
-exports are frozen ([ROADMAP.md](ROADMAP.md) P1).
+### Public imports (teaching-first)
+
+Three public layers (shortest → deepest). Prefer the shortest that stays clear;
+deep defining-module paths stay valid but are not what README / intro show.
+
+| Layer | Example | Role |
+| --- | --- | --- |
+| **Root prelude** | `from minilink import Pendulum, ImpedanceController` | README / first-hour only (selective `__all__`) |
+| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis.linearize import linearize` | Canonical course / script API |
+| **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
+
+Rules:
+
+- `minilink.catalog` is a **teaching alias** of `dynamics/catalog/` (plants still
+  live under `dynamics/`; no math moves).
+- Band packages (`control/`, `analysis/`, `simulation/`, `control.mpc`, …)
+  re-export their teaching symbols via `__all__` / lazy `__getattr__`.
+  Exception: when a **module name matches a factory** (e.g. `control.lqr`,
+  `analysis.linearize`), import the factory from that module
+  (`from minilink.control.lqr import lqr`) — do not shadow the submodule on
+  the parent package.
+- Root `minilink/__init__.py` is a **small convenience prelude**, not the full
+  API — grow it slowly; prefer band imports in longer scripts.
+- Do **not** use `from minilink import *`. Do **not** re-export quarantine
+  (`symbolic/`, `dynamics/engines/`) from teaching surfaces.
 
 ## 3. Package Map
 
 Component maturity is tracked only in [ROADMAP.md](ROADMAP.md); this section
 describes package ownership. Every package belongs to one of four bands.
-Planned packages (homes pre-decided so future content lands without
-rearrangement) are listed in [ROADMAP.md §5](ROADMAP.md).
+Homes for planned content are pre-decided in the tables below; scheduling is
+in [ROADMAP.md](ROADMAP.md) (teaching-release priorities and Later).
 
 **Framework** — defines what a `System` is and how diagrams execute
 (NumPy-only; changes are design events):
@@ -56,7 +134,8 @@ or neural network alike):
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
-| `control/` | control laws and design factories (`linear.py`, `pid.py`, `lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
+| `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
+| `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -99,15 +178,19 @@ state-feedback block):
 ### Placement algorithm
 
 1. New `System` subclass → shelf by diagram role: wiring → `blocks/`, plant →
-   `dynamics/catalog/`, control law → `control/`, estimator → `estimation/`.
+   `dynamics/catalog/` (then re-export from domain `__init__` and
+   `minilink.catalog` if teaching-facing), control law → `control/`, estimator →
+   `estimation/`. Do **not** put plant math under top-level `catalog/` — that
+   package is a teaching alias only.
 2. New verb → tool: integrate time (`simulation`), characterize (`analysis`),
    find inputs/policies (`planning`), solve NLPs (`optimization`), fit to data
    (`identification`), render (`graphical`), talk to another ecosystem
    (`interfaces`).
 3. Neither, and unproven → quarantine at top level with a TRL tag.
 
-Student-facing taxonomy: wiring blocks come from `blocks/`, plants from
-`dynamics/`, controllers from `control/`, and everything is a `System`.
+Student-facing taxonomy: wiring from `blocks/`, plants from `minilink.catalog`
+(or `dynamics/catalog/…`), controllers from `control/`, analysis verbs from
+`analysis/` — everything is a `System`.
 `blocks/` holds plant-agnostic wiring primitives; `dynamics/catalog/equations/`
 holds canonical textbook ODEs (integrator chains, `VanderPol`) with graphics,
 labels, and bounds for teaching demos — the name overlap (`Integrator` vs
@@ -356,7 +439,7 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   ([planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
   **TODO: Prioritize threading $p$ into JAX parametric programs.** This will allow 
   moving obstacles online without rebuilding the NLP, unlocking real-time dynamic obstacle avoidance.
-  **Deferred** ([ROADMAP.md §5.5](ROADMAP.md#55-planning)): call-time overrides
+  **Deferred** ([ROADMAP.md](ROADMAP.md) Later): call-time overrides
   on base `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types
   declare `(t, params)` but still read frozen attributes only until a follow-up
   pass.
@@ -522,14 +605,15 @@ forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
 `euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
-([ROADMAP.md](ROADMAP.md) P1).
+([ROADMAP.md](ROADMAP.md) Later).
 
 ### Discontinuous closed loops — known issues
 
 Controllers with discontinuous laws (e.g. :class:`~minilink.control.modelbased.SlidingModeController`
 ``sign(s)``) on a **continuous** :class:`DiagramSystem` closed loop are supported today,
 but several solver/logging behaviors are misleading until a dedicated hybrid or
-event-handling path lands ([ROADMAP.md](ROADMAP.md) §5.2).
+event-handling path lands (hybrid path exists; see discontinuous guidance below and
+[ROADMAP.md](ROADMAP.md) teaching-release hardening).
 
 **TODO: Add a hard warning.** When a discontinuous controller is wired into a continuous `DiagramSystem`, we should warn the user and recommend wrapping it in a fast `Computer` inside a `HybridDiagram` to enforce physical digital-on-continuous reality.
 

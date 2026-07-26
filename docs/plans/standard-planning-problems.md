@@ -5,7 +5,7 @@ phase.
 
 Related: [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
 (algorithm / I/O stack), [DESIGN.md](../../DESIGN.md) §6,
-[ROADMAP.md](../../ROADMAP.md) §5.5.
+[ROADMAP.md](../../ROADMAP.md) Later.
 
 ---
 
