@@ -66,7 +66,7 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing |
+| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`) |
 | `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; `discretize` for continuous→step plant wrappers; more frequency tools planned |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
@@ -153,6 +153,28 @@ serial arms. Joint impedance / task impedance / computed torque use
 `control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
+**Vehicle JAX ladder** — :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles`
+(planning / trajopt plants; module-scoped names, no ``Jax`` prefix). Default
+``u`` / ``y = x``; named-port twins use the ``Ports`` suffix. Compare:
+``demo_car_trajopt_compare.py`` and
+[notebook](examples/notebooks/driving_model_trajopt_analysis.ipynb).
+
+| Class | $n$ | Input $\mathbf{u}$ | Role |
+| --- | --- | --- | --- |
+| `Holonomic` | 2 | $[v_x, v_y]$ | holonomic point |
+| `HolonomicAccel` | 4 | $[a_x, a_y]$ | holonomic double integrator |
+| `BicycleKin` | 3 | $[v, \delta]$ | kinematic bicycle |
+| `BicycleAcc` | 5 | $[a_x, \dot\delta]$ | no-slip accel / steer rate |
+| `BicycleDyn` | 6 | $[\omega_r, \delta]$ | rigid body + linear tires |
+| `BicycleDynRate` | 8 | $[\dot\omega_r, \dot\delta]$ | integrated wheel / steer |
+| `BicycleDynTauRate` | 8 | $[\tau_r, \dot\delta]$ | torque + steer rate |
+| `BicycleDynServo` | 9 | $[\tau_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged torque + steer |
+| `BicycleDynEngine` | 9 | $[P_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged **power** + steer |
+
+NumPy bicycle plants remain in :mod:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle`
+and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
+:mod:`~minilink.dynamics.catalog.vehicles.car_profile` (`apply_car_profile`).
+
 ## 4. Core Object Contracts
 
 ### `System`
@@ -188,8 +210,14 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.core.composition.resolve_standard_feedback`);
   :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.export_to_computer`
   for warm-start MPC (also via ``mpc % schedule``).
-  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.JaxDynamicBicycleRateInputsUY`
+  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynRate`
   exposes standard ``u`` / ``y`` ports for hybrid composition.
+  The JAX fidelity ladder in
+  :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles` runs through
+  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynServo`
+  (torque lag) and
+  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynEngine`
+  (wheel-frame power lag + stall torque + engine brake).
   Named vehicle envelopes (parameters + planning limits) live in
   :mod:`~minilink.dynamics.catalog.vehicles.car_profile`
   (``passenger_car``, ``racecar``, ``udes_1_5``); apply with
@@ -208,6 +236,34 @@ serial arms. Joint impedance / task impedance / computed torque use
   :func:`~minilink.graphical.diagrams.export_hybrid_topology` for Graphviz or Mermaid export.
   Default ``abstract_boundary=True`` collapses diagram external Inputs/Outputs routing nodes
   and anchors hybrid edges on wired subsystem ports.
+- **Realtime (live sessions):**
+  :class:`~minilink.simulation.realtime.simulator.RealtimeSimulator`
+  (`simulation/realtime/`) is the third simulation orchestrator, beside
+  :class:`~minilink.simulation.simulator.Simulator` and
+  :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`. Per frame it
+  polls a live :class:`~minilink.simulation.realtime.io.RealtimeInput`
+  (``u, should_stop``; nominal ``u`` when ``input=None``), advances the plant
+  with evaluator
+  :meth:`~minilink.core.compile.evaluators.numpy_evaluators.IntegrationMixin.integrate_zoh`,
+  draws live through ``Animator.open_live_scene`` / ``update_live_frame``, and
+  publishes to an optional
+  :class:`~minilink.simulation.realtime.io.RealtimeOutput` (cosimulation hook).
+  **Clocks:** ``frame_dt`` (wall period per rendered frame) is independent of
+  ``sim_dt`` (internal integration step, auto from ``solver_info`` like the
+  offline `Simulator`); ``sync="locked"`` (default) advances exactly
+  ``frame_dt`` of sim time per frame (reproducible, single JAX trace), while
+  ``sync="realtime"`` advances the measured wall elapsed quantized to the
+  ``sim_dt`` grid. ``compile_backend=None`` / ``"auto"`` tries JAX then
+  NumPy (preferring speed for live sessions); frames that miss the
+  ``frame_dt`` budget emit a throttled :class:`UserWarning`. JIT is warmed
+  before the clock starts. The run returns a
+  :class:`~minilink.core.trajectory.Trajectory` (one sample per frame) and the
+  ``sys.game()`` facade caches it on ``self.traj``.
+  :class:`~minilink.simulation.realtime.pygame_input.PygameInput` maps held
+  keys to input-port ``lower_bound``/``upper_bound`` (``mode="hold"``) or
+  slews a setpoint at ``rate`` (``mode="rate"``); rendering stays on the
+  :class:`~minilink.graphical.animation.renderers.renderer.AnimationRenderer`
+  pipeline and is not a ``RealtimeOutput``.
 - **MPC hybrid block:** :func:`~minilink.control.mpc.ModelPredictiveController`
   returns a static ``System`` (``n=0``) or :class:`StepSystem` (``warm_start=True``)
   that holds a
@@ -255,7 +311,11 @@ serial arms. Joint impedance / task impedance / computed torque use
   implicit** — the animator injects identity so world-fixed geometry can key to
   `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
   stays unprefixed (one shared root); articulated frames are namespaced
-  (``vehicle:body``).
+  (``vehicle:body``). Controllers may own their own visualization frames the
+  same way (e.g. optional `TaskImpedance` `task_force` → `ctl:task_force`); the
+  arrow shows the pre-gravity task wrench `f_task`, not `Jᵀ f_task` or `g(q)`.
+  Meshcat `native=True` freezes changing `Arrow` / `TorqueArrow` geometry at
+  `t=0` — use `native=False` for frame-accurate force playback.
 - **Facades:** user shortcuts only (lazy simulation/graphics); split across
   `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
   `compute_trajectory`, `plot_trajectory`, `animate`, …),
@@ -342,7 +402,7 @@ optional class attribute `feedback_profile`, not inheritance):
 | `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` |
 | `state` | `state.py` | full state `x` |
 | `siso` | `siso.py` | `y` dim `n` only (decoupled loops) |
-| `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)`` |
+| `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow |
 | `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants |
 | `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` |
 

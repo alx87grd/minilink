@@ -8,15 +8,23 @@ functions (no dataclasses) so a custom skin is just another ``(plant) -> dict``.
 
 Authored against the target frame vocabulary (vehicles: ``body`` and
 ``axle_front`` for the 2-D centerline; ``body`` plus steered ``wheel_fl`` /
-``wheel_fr`` for the 3-D four-wheel look). They read plant geometry from
-``plant.params`` and visual attributes with sensible fallbacks, so a bare plant
+``wheel_fr`` for the 3-D four-wheel look). They read axle offsets from
+``plant.a`` / ``plant.b`` when present, else ``plant.params``, so a bare plant
 still skins.
 """
 
 import numpy as np
 
 from minilink.core.kinematics import translation
-from minilink.graphical.catalog.shapes import Box, Line, Plane, Point, Rod
+from minilink.graphical.catalog.shapes import (
+    Box,
+    Line,
+    Plane,
+    Point,
+    Rod,
+    Sphere,
+    link_pose_3d,
+)
 
 
 def _wheel_rectangle(wl, ww, color="black", linewidth=1):
@@ -34,6 +42,17 @@ def _wheel_rectangle(wl, ww, color="black", linewidth=1):
     return Line(pts, color=color, linewidth=linewidth)
 
 
+def _axle_offsets(plant):
+    """Front/rear CG→axle distances for skins (attrs preferred over params)."""
+    if hasattr(plant, "a") and hasattr(plant, "b"):
+        return float(plant.a), float(plant.b)
+    params = getattr(plant, "params", {}) or {}
+    if "a" in params and "b" in params:
+        return float(params["a"]), float(params["b"])
+    length = float(params.get("length", 2.0))
+    return 0.5 * length, 0.5 * length
+
+
 def car_skin_2d(plant, color="#1a1a1a"):
     """2-D centerline car look: chassis line + two axle wheels.
 
@@ -42,8 +61,7 @@ def car_skin_2d(plant, color="#1a1a1a"):
     ``axle_front`` (steered front wheel). The placing ``tf`` supplies world pose
     and the front steer angle.
     """
-    a = plant.params["a"]
-    b = plant.params["b"]
+    a, b = _axle_offsets(plant)
     wl = getattr(plant, "wheel_len", 0.6)
     ww = getattr(plant, "wheel_width", 0.2)
 
@@ -65,8 +83,7 @@ def car_skin_3d(plant, color="#151922"):
     rods; fixed hub offsets are baked into each rod ``local_transform``), and
     ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``).
     """
-    a = plant.params["a"]
-    b = plant.params["b"]
+    a, b = _axle_offsets(plant)
     r_f = plant.params["r_f"]
     r_r = plant.params["r_r"]
 
@@ -119,6 +136,39 @@ def car_skin_3d(plant, color="#151922"):
         "wheel_fl": [wheel()],
         "wheel_fr": [wheel()],
     }
+
+
+def ur5_skin(plant):
+    """Schematic UR5 look made from link and joint cylinders.
+
+    Frame keys are ``base``, ``link0`` … ``link5``, ``joint0`` …
+    ``joint6``, and ``tool``. The plant's ``tf`` places every moving part.
+    """
+    a = np.asarray(plant.params["a"], dtype=float)
+    d = np.asarray(plant.params["d"], dtype=float)
+    lengths = np.hypot(a, d)
+
+    base = Rod(length=0.12, radius=0.09, color="#a6a8ab")
+    base.local_transform = link_pose_3d([0.0, 0.0, -0.12], [0.0, 0.0, 0.0])
+
+    geometry = {"base": [base]}
+    for i, length in enumerate(lengths):
+        radius = 0.055 if i < 3 else 0.04
+        geometry[f"link{i}"] = [
+            Rod(length=length, radius=radius, color="#c7c9cb", linewidth=3)
+        ]
+
+    for i in range(7):
+        radius = 0.075 if i < 4 else 0.055
+        housing = Rod(length=2.0 * radius, radius=0.8 * radius, color="#2b73b6")
+        housing.local_transform = link_pose_3d([0.0, 0.0, radius], [0.0, 0.0, -radius])
+        geometry[f"joint{i}"] = [
+            housing,
+            Sphere(radius=0.72 * radius, color="#d5d7d8", opacity=1.0),
+        ]
+
+    geometry["tool"] = [Sphere(radius=0.035, color="#3f4245", opacity=1.0)]
+    return geometry
 
 
 def merge_skins(*skins):

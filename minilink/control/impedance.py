@@ -29,6 +29,9 @@ class ImpedanceController(System):
         Number of axes.
     tracking_ref : bool
         If ``True``, ``r`` port dim is ``2·dof`` (tracking). Otherwise ``dof``.
+    Kp, Kd : float or array, optional
+        Proportional / derivative gains (scalar or length-``dof``). Stored in
+        ``self.params``; defaults ``Kp=10``, ``Kd=1``.
     y_labels, y_units, u_labels, u_units : sequence of str, optional
         Display metadata for ports.
     """
@@ -40,6 +43,8 @@ class ImpedanceController(System):
         dof: int = 1,
         *,
         tracking_ref: bool = False,
+        Kp=10.0,
+        Kd=1.0,
         y_labels=None,
         y_units=None,
         u_labels=None,
@@ -63,8 +68,8 @@ class ImpedanceController(System):
             u_units = [""] * n
 
         self.params = {
-            "Kp": np.full(n, 10.0),
-            "Kd": np.full(n, 1.0),
+            "Kp": _as_dof_vector(Kp, n),
+            "Kd": _as_dof_vector(Kd, n),
         }
 
         self.name = "Impedance Controller"

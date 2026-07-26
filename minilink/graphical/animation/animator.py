@@ -11,15 +11,10 @@ cached kinematic geometry and the per-frame dynamic geometry into the flat
 ``(primitive, world 4x4)`` list the renderers consume, and resolves the camera
 from the system's hints.
 
-Roadmap (not implemented here—see ``ROADMAP.md`` §7 and P2):
-
-- **Interactive integrator backends**: :meth:`Animator.game` /
-  :meth:`Animator.run_interactive` currently own a simple time loop (Euler +
-  substeps in ``game``). These should gain a ``Simulator``-style pluggable
-  **integration** layer instead of hard-coding one integrator in the animator.
-- **Live I/O backends**: ``game`` reads ``u`` only via **pygame** today; future
-  **input** backends (e.g. TCP for cosimulation) and optional **live output
-  push** should sit beside that as swappable sources/sinks.
+Live sessions (interactive ``game()`` mode) are orchestrated by
+:class:`~minilink.simulation.realtime.simulator.RealtimeSimulator`, which
+drives :meth:`Animator.open_live_scene` / :meth:`Animator.update_live_frame`
+per frame; this module stays playback and frame resolution only.
 """
 
 from __future__ import annotations
@@ -30,10 +25,6 @@ import numpy as np
 
 from minilink.graphical.animation.camera import resolve_camera_from_hints
 from minilink.graphical.animation.drawables import validate_overlay
-from minilink.graphical.animation.interactive import (
-    draw_keyboard_input_overlay,
-    u_from_keyboard,
-)
 from minilink.graphical.animation.renderers.matplotlib_renderer import (
     MatplotlibRenderer,
 )
@@ -82,15 +73,6 @@ def make_renderer(name: str, animator: "Animator") -> AnimationRenderer:
         "Unknown renderer "
         f"{name!r}. Expected 'matplotlib', 'meshcat', 'plotly', or 'pygame'."
     )
-
-
-def _require_interactive_renderer(name: str, renderer: AnimationRenderer) -> None:
-    if not renderer.supports_interactive:
-        raise ValueError(
-            f"renderer={name!r} does not support "
-            "interactive loops; use it with render() or animate() on a "
-            "precomputed trajectory."
-        )
 
 
 class Animator:
@@ -267,8 +249,8 @@ class Animator:
         Notes
         -----
         Meshcat native animation only keyframes rigid pose (position+quaternion).
-        Per-frame dynamic geometry (e.g. ``TorqueArrow`` sweep) is frozen at
-        ``t=0`` in the native path.
+        Per-frame dynamic geometry (e.g. ``Arrow`` length/direction,
+        ``TorqueArrow`` sweep) is frozen at ``t=0`` in the native path.
 
         Plotly does not support the per-frame Python loop (``native=False`` with
         ``html=False``): use ``native=True`` or ``html=True`` for inline/browser
@@ -361,198 +343,42 @@ class Animator:
         backend.close_scene()
         return None
 
-    def run_interactive(
-        self,
-        update_callback,
-        *,
-        x0,
-        u0=None,
-        t0=0.0,
-        dt=1 / 30.0,
-        renderer="pygame",
-        is_3d=False,
-        show=True,
-        max_steps=None,
+    # Live-session API (driven by RealtimeSimulator)
+
+    def open_live_scene(
+        self, backend, x, u, t, *, is_3d=False, kinematic=None, title=None
     ):
+        """Open *backend* and draw the initial live frame; return the frame dict.
+
+        Pacing (frame-rate sleep) belongs to the live orchestrator, so the
+        frame is presented non-blocking with no interval.
         """
-        Prototype callback-driven interactive loop.
-        callback signature:
-            new_x, new_u, should_stop = update_callback(x, u, t, step_idx, events)
-        """
-        backend = make_renderer(renderer, self)
-        _require_interactive_renderer(renderer, backend)
-        kinematic = self.sys.get_kinematic_geometry()
-
-        x = np.asarray(x0)
-        u = np.asarray([] if u0 is None else u0)
-        t = float(t0)
-        step_idx = 0
-
-        frame = self._resolve_frame(x, u, t, kinematic=kinematic)
-        backend.open_scene(
-            is_3d=is_3d,
-            show=show,
-            camera=frame["camera"],
-            title=f"Interactive: {self.sys.name}",
-        )
-
-        # Draw initial state once so the callback can just update controls.
-        backend.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
-        backend.present(block=False, interval_s=dt)
-
-        # ROADMAP: this loop is a minimal integrator+render tick; a future backend should
-        # own step integration (multiple schemes) like Simulator, not only this while-body.
-        while True:
-            events = backend.poll_events()
-            if events.get("quit", False):
-                break
-
-            new_x, new_u, should_stop = update_callback(x, u, t, step_idx, events)
-            x = np.asarray(new_x)
-            u = np.asarray(new_u)
-            t += dt
-            step_idx += 1
-
-            frame = self._resolve_frame(x, u, t, kinematic=kinematic)
-            backend.draw_frame(
-                frame["primitives"], frame["transforms"], t, frame["camera"]
-            )
-            backend.present(block=False, interval_s=dt)
-
-            if should_stop:
-                break
-            if max_steps is not None and step_idx >= max_steps:
-                break
-        backend.close_scene()
-
-    def game(
-        self,
-        *,
-        dt=1 / 100.0,
-        dynamics_substeps=1000,
-        renderer="pygame",
-        is_3d=False,
-        x0=None,
-        u0=None,
-        t0=0.0,
-        max_steps=None,
-    ):
-        """
-        Prototype real-time interactive mode.
-
-        - Poll keyboard using pygame (input only).
-        - Compute dynamics using Euler integration optionally with multiple
-          internal substeps per rendered frame.
-        - Update the visualization by redrawing each tick; dynamic geometry
-          (force/torque arrows) is rebuilt live from the frame-keyed hooks.
-
-        Roadmap: **input** should become pluggable backends (keyboard vs TCP
-        cosimulation, etc.); **integration** should be pluggable backends (not
-        Euler-only here); optional **live output push** is a later sibling—see
-        ``ROADMAP.md`` §7.
-        """
-        if dynamics_substeps < 1 or int(dynamics_substeps) != dynamics_substeps:
-            raise ValueError("dynamics_substeps must be a positive integer.")
-        dynamics_substeps = int(dynamics_substeps)
-        backend = make_renderer(renderer, self)
-        _require_interactive_renderer(renderer, backend)
-
-        # Lazy pygame import: game() should be optional.
-        try:
-            import pygame
-        except ImportError as e:
-            raise ImportError(
-                "pygame is required for renderer/input mode. Install with: "
-                "pip install 'minilink[visualization]'"
-            ) from e
-
-        pygame.init()
-        vis = renderer.strip().lower()
-        # When visualization is not pygame, use a visible window so SDL can
-        # deliver keyboard events (1x1 is not focusable on many platforms).
-        keyboard_input_screen = None
-        if vis != "pygame":
-            keyboard_input_screen = pygame.display.set_mode((640, 240))
-            pygame.display.set_caption(
-                f"minilink game — keyboard (focus here) — {self.sys.name}"
-            )
-
-        kinematic = self.sys.get_kinematic_geometry()
-
-        x = np.asarray(self.sys.x0 if x0 is None else x0, dtype=float).copy()
-        u = np.asarray(np.zeros(self.sys.m) if u0 is None else u0, dtype=float).copy()
-        t = float(t0)
-        step_idx = 0
-
+        if kinematic is None:
+            kinematic = self.sys.get_kinematic_geometry()
         frame = self._resolve_frame(x, u, t, kinematic=kinematic)
         backend.open_scene(
             is_3d=is_3d,
             show=True,
             camera=frame["camera"],
-            title=f"Interactive game — {self.sys.name}",
+            title=title or f"Live: {self.sys.name}",
         )
+        backend.draw_frame(
+            frame["primitives"], frame["transforms"], frame["t"], frame["camera"]
+        )
+        backend.present(block=False, interval_s=None)
+        return frame
 
-        # Initial input from keyboard (pygame display exists for renderer=pygame).
-        pygame.event.pump()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                backend.close_scene()
-                pygame.quit()
-                return
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                backend.close_scene()
-                pygame.quit()
-                return
+    def update_live_frame(self, backend, x, u, t, *, kinematic=None):
+        """Draw one live frame on an already-open *backend*; return backend events.
 
-        keys = pygame.key.get_pressed()
-        u = u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
-        draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
-
+        Dynamic geometry (force/torque arrows) is rebuilt from the frame-keyed
+        hooks each call, so live sessions render the same visuals as playback.
+        """
+        if kinematic is None:
+            kinematic = self.sys.get_kinematic_geometry()
         frame = self._resolve_frame(x, u, t, kinematic=kinematic)
-        backend.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])
-        backend.present(block=False, interval_s=dt)
-
-        while True:
-            should_quit = False
-
-            pygame.event.pump()
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    should_quit = True
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    should_quit = True
-
-            keys = pygame.key.get_pressed()
-            u = u_from_keyboard(keys, m=self.sys.m, pygame=pygame)
-            draw_keyboard_input_overlay(keyboard_input_screen, pygame, u)
-
-            # ROADMAP: Euler + substeps only—replace with interactive integrator
-            # backends; live u should come from an input backend (keys vs TCP).
-            # Euler steps for dynamic systems only (ZOH on u during frame).
-            if self.sys.n > 0:
-                dt_dyn = dt / dynamics_substeps
-                t_dyn = t
-                for _ in range(dynamics_substeps):
-                    dx = self.sys.f(x, u, t_dyn)
-                    x = x + np.asarray(dx, dtype=float) * dt_dyn
-                    t_dyn += dt_dyn
-
-            t = t + dt
-            step_idx += 1
-
-            frame = self._resolve_frame(x, u, t, kinematic=kinematic)
-            backend.draw_frame(
-                frame["primitives"], frame["transforms"], t, frame["camera"]
-            )
-            backend.present(block=False, interval_s=dt)
-
-            backend_events = backend.poll_events()
-            if backend_events.get("quit", False):
-                break
-            if should_quit:
-                break
-            if max_steps is not None and step_idx >= max_steps:
-                break
-
-        backend.close_scene()
-        pygame.quit()
+        backend.draw_frame(
+            frame["primitives"], frame["transforms"], frame["t"], frame["camera"]
+        )
+        backend.present(block=False, interval_s=None)
+        return backend.poll_events()

@@ -1,7 +1,7 @@
 # Notebooks
 
-Teaching and demo notebooks for minilink. Open any `.ipynb` from this folder on
-GitHub, or browse the whole set in Colab:
+Teaching and demo notebooks for minilink. Folders: `showcase/` (marketing),
+`intro/` (module API), `applications/`, `tooling/`.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/notebooks)
 
@@ -33,18 +33,16 @@ no path hacks needed if the package is installed.
 
 On a normal local kernel, that cell is a no-op.
 
+## CI smoke
+
+The CI ``regression`` job executes every notebook's code cells (fail on error,
+outputs discarded). Locally:
+
+```bash
+MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
+```
+
+New notebooks under this folder must be added to
+[`tests/demo_checks/notebook_manifest.json`](../../tests/demo_checks/notebook_manifest.json).
+
 **Why only meshcat?** Colab already provides NumPy, SciPy, Matplotlib, and JAX-friendly stacks for these demos. Animation in the browser needs **meshcat**; the bootstrap installs that one extra dependency. Heavier local extras (`pip install -e ".[jax]"`, pygame, etc.) are for development on your machine, not required for the thin Colab path.
-
-## Notebook list
-
-| Notebook | Topic |
-| --- | --- |
-| [demo_showcase.ipynb](demo_showcase.ipynb) | Feature tour |
-| [demo_compile_evaluator.ipynb](demo_compile_evaluator.ipynb) | Compile → evaluator |
-| [demo_overview.ipynb](demo_overview.ipynb) | Extended lab |
-| [demo_stateless_functional_jax.ipynb](demo_stateless_functional_jax.ipynb) | Stateless `f` and JAX tracing |
-| [demo_optimization.ipynb](demo_optimization.ipynb) | Small NLPs |
-| [demo_plots_animations_backends.ipynb](demo_plots_animations_backends.ipynb) | Plot / animate backends |
-| [demo_mpc_circuit.ipynb](demo_mpc_circuit.ipynb) | Spatial MPC full stack (scene → cost → plan → hybrid deploy) |
-| [demo_bicycle_trajopt_obstacle_scene_compare.ipynb](demo_bicycle_trajopt_obstacle_scene_compare.ipynb) | TrajOpt plant compare |
-| [simulation_benchmark.ipynb](simulation_benchmark.ipynb) | ODE solver benchmarks |

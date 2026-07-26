@@ -801,8 +801,8 @@ class TestAsComputer(unittest.TestCase):
         from minilink.control.mpc import ModelPredictiveController
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
-        from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-            JaxDynamicBicycleRateInputsUY,
+        from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+            BicycleDynRate,
         )
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -815,7 +815,7 @@ class TestAsComputer(unittest.TestCase):
         )
 
         configure_jax(enable_x64=True)
-        sys = JaxDynamicBicycleRateInputsUY()
+        sys = BicycleDynRate()
         x0 = sys.x0.copy()
         planner = TrajectoryOptimizationPlanner(
             PlanningProblem(
@@ -839,3 +839,106 @@ class TestAsComputer(unittest.TestCase):
         )
         self.assertIn("y", computer.diagram.inputs)
         self.assertIn("u_ff", computer.diagram.outputs)
+
+
+from minilink.simulation.realtime import (
+    CallbackInput,
+    CallbackOutput,
+    RealtimeSimulator,
+)
+
+
+class TestRealtimeSimulator(unittest.TestCase):
+    def test_headless_run_returns_trajectory(self):
+        sys = StableLinearSystem()
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            input=CallbackInput(lambda t, x: np.array([2.0])),
+            max_steps=5,
+        )
+        traj = rt_sim.run()
+
+        # Initial sample + one sample per frame; locked clock → uniform grid.
+        self.assertEqual(traj.t.size, 6)
+        self.assertEqual(traj.x.shape, (1, 6))
+        self.assertEqual(traj.u.shape, (1, 6))
+        np.testing.assert_allclose(np.diff(traj.t), 0.01)
+        np.testing.assert_allclose(traj.u[:, 1:], 2.0)
+        # dx = -x + u with u=2 pulls the state up from x0=1 toward 2.
+        self.assertGreater(traj.x[0, -1], traj.x[0, 0])
+        self.assertIs(rt_sim.last_traj, traj)
+
+    def test_nominal_input_and_output_publish(self):
+        sys = TwoPortLinearSystem()
+        published = []
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=0.01,
+            renderer=None,
+            output=CallbackOutput(
+                lambda t, x, u, outputs: published.append((t, u.copy(), outputs))
+            ),
+            max_steps=3,
+        )
+        traj = rt_sim.run()
+
+        # No input attached → nominal port values are held every frame.
+        np.testing.assert_allclose(traj.u[:, -1], [1.0, 2.0])
+        self.assertEqual(len(published), 3)
+        _, u_pub, outputs_pub = published[0]
+        np.testing.assert_allclose(u_pub, [1.0, 2.0])
+        self.assertIn("y", outputs_pub)
+
+    def test_tf_stops_the_run(self):
+        traj = RealtimeSimulator(
+            StableLinearSystem(),
+            frame_dt=0.01,
+            renderer=None,
+            tf=0.03,
+        ).run()
+        self.assertAlmostEqual(traj.t[-1], 0.03)
+
+    def test_auto_compile_backend_prefers_jax_when_available(self):
+        rt_sim = RealtimeSimulator(
+            StableLinearSystem(),
+            frame_dt=0.01,
+            renderer=None,
+            compile_backend=None,
+            max_steps=1,
+        )
+        if _have_jax():
+            self.assertEqual(rt_sim.compile_backend, "jax")
+        else:
+            self.assertEqual(rt_sim.compile_backend, "numpy")
+        self.assertEqual(rt_sim.evaluator.backend, rt_sim.compile_backend)
+
+    def test_realtime_overrun_emits_warning(self):
+        import time
+        import warnings
+
+        def slow_u(t, x):
+            time.sleep(0.03)
+            return np.array([0.0])
+
+        rt_sim = RealtimeSimulator(
+            StableLinearSystem(),
+            frame_dt=0.005,
+            renderer=None,
+            compile_backend="numpy",
+            input=CallbackInput(slow_u),
+            max_steps=2,
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            rt_sim.run()
+        messages = [
+            str(w.message) for w in caught if issubclass(w.category, UserWarning)
+        ]
+        self.assertTrue(
+            any("behind real time" in msg for msg in messages),
+            f"expected real-time overrun warning, got {messages!r}",
+        )
+        self.assertGreater(rt_sim.n_overruns, 0)

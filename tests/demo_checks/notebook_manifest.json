@@ -1,0 +1,123 @@
+[
+  {
+    "id": "showcase_minilink",
+    "path": "examples/notebooks/showcase/minilink.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 300
+  },
+  {
+    "id": "showcase_jax",
+    "path": "examples/notebooks/showcase/jax.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 300
+  },
+  {
+    "id": "intro_00_core",
+    "path": "examples/notebooks/intro/00_core.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_01_blocks",
+    "path": "examples/notebooks/intro/01_blocks.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_02_dynamics",
+    "path": "examples/notebooks/intro/02_dynamics.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_03_control",
+    "path": "examples/notebooks/intro/03_control.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_04_analysis",
+    "path": "examples/notebooks/intro/04_analysis.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_05_simulation",
+    "path": "examples/notebooks/intro/05_simulation.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_06_hybrid",
+    "path": "examples/notebooks/intro/06_hybrid.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 300
+  },
+  {
+    "id": "intro_07_compile",
+    "path": "examples/notebooks/intro/07_compile.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 180
+  },
+  {
+    "id": "intro_08_optimization",
+    "path": "examples/notebooks/intro/08_optimization.ipynb",
+    "requires": [],
+    "timeout": 180
+  },
+  {
+    "id": "intro_09_planning",
+    "path": "examples/notebooks/intro/09_planning.ipynb",
+    "requires": [],
+    "timeout": 300
+  },
+  {
+    "id": "intro_10_graphical",
+    "path": "examples/notebooks/intro/10_graphical.ipynb",
+    "requires": [
+      "meshcat",
+      "plotly"
+    ],
+    "timeout": 180
+  },
+  {
+    "id": "applications_mpc",
+    "path": "examples/notebooks/applications/mpc.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 600
+  },
+  {
+    "id": "applications_car_trajopt",
+    "path": "examples/notebooks/applications/car_trajopt.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 600
+  },
+  {
+    "id": "applications_cartpole_rollout_gradients",
+    "path": "examples/notebooks/applications/cartpole_rollout_gradients.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 300
+  },
+  {
+    "id": "tooling_benchmark",
+    "path": "examples/notebooks/tooling/benchmark.ipynb",
+    "requires": [
+      "jax"
+    ],
+    "timeout": 300
+  }
+]

@@ -19,8 +19,8 @@ import numpy as np
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputs,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRatePorts,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
@@ -49,7 +49,7 @@ PLOT_BOUNDS = ((-2.0, U_0 * TF + 2.0), (-2.0, 2.0))
 
 configure_jax(enable_x64=True)
 
-sys = JaxDynamicBicycleRateInputs()
+sys = BicycleDynRatePorts()
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 
 x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0])

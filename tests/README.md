@@ -2,7 +2,7 @@
 
 **Entry points (human · agent · CI):** see [Entry points](#entry-points) below — authoritative for all three audiences.
 
-Six-layer vision (historical plan detail): [docs/plans/test-benchmark-consolidation.md](../docs/plans/test-benchmark-consolidation.md).
+Six-layer vision (historical plan detail): [docs/plans/test-benchmark-consolidation.md](../docs/plans/test-benchmark-consolidation.md). Notebook smoke is an additional layer on top of that vision.
 
 ---
 
@@ -38,6 +38,7 @@ Demos stay in `examples/scripts/` for teaching; **demo-check runners** that exec
 | **Before push** | [`tests/run/run_pre_push.py`](run/run_pre_push.py) |
 | **After sim/trajopt/MPC work** | [`tests/run/run_regression_gates.py`](run/run_regression_gates.py) |
 | **Demo/catalog sanity** | [`tests/run/run_demo_checks.py`](run/run_demo_checks.py) |
+| **Notebook smoke** | [`tests/run/run_notebook_checks.py`](run/run_notebook_checks.py) |
 | **Backend perf tables** | [`tests/run/run_benchmark_study.py`](run/run_benchmark_study.py) |
 | **Pick one check** | [`tests/run/run_checks.py`](run/run_checks.py) — set `CHECK = "contract_tests"` at top |
 
@@ -56,6 +57,7 @@ Optional toggles: constants at the top of each `tests/run/*.py` file.
 | Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 | Backend perf exploration | `python benchmarks/run_study.py --list` |
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
+| Notebook change | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
 
 Rules: [AGENTS.md](../AGENTS.md).
 
@@ -66,7 +68,7 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 | Job | Steps |
 | --- | --- |
 | **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX demos may skip) |
-| **`regression`** | regression gates `--suite all --tiny …` + **flagship demos** (py 3.12 + JAX) |
+| **`regression`** | regression gates `--suite all --tiny …` + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
 
 ### At a glance
 
@@ -78,6 +80,7 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 | **Graphics contract** | (in contract tests) | `test_flagship_graphics_contract.py` | `test` |
 | **Graphics visual** | `tests/demo_checks/run_graphics_visual_check.py` | local | — |
 | **Demo checks** | `run_demo_checks.py` | `tests/demo_checks/run_*.py` | `test` + `regression` |
+| **Notebook smoke** | `run_notebook_checks.py` | `tests/demo_checks/run_notebook_checks.py` | `regression` |
 | **Pre-push** | `run_pre_push.py` | ruff + pytest | `test` |
 
 ### Performance — regression gates vs benchmark study vs host context
@@ -99,7 +102,7 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 
 ---
 
-## Six validation layers
+## Validation layers
 
 | Layer | Purpose | Entry command | CI job |
 | --- | --- | --- | --- |
@@ -109,6 +112,7 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 | **Graphics contract** | Draw-list + headless PNG checks | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
 | **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `run_graphics_visual_check.py` | — |
 | **Demo checks** | Catalog + flagship demos must not throw | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
+| **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `regression` |
 
 ## Local environment
 
@@ -149,15 +153,20 @@ regression CI vs local commands and [benchmarks/README.md](../benchmarks/README.
 there). A thin pytest bridge ([`test_demo_check_runners.py`](unittest/test_demo_check_runners.py))
 invokes those runners so the CI ``test`` job covers catalog / non-JAX flagships /
 graphics without re-implementing checks as pytest cases. The CI ``regression``
-job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated.
+job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated,
+and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not throw.
 
 ```bash
 python tests/demo_checks/run_catalog_checks.py --fast
 # Flagship whitelist: subprocess each demo's __main__ (no demo source changes):
 python tests/demo_checks/run_flagship_demos.py
+# Teaching notebooks: execute code cells (outputs discarded):
+MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
 # Nightly / local: every example script:
 python tests/demo_checks/run_all_demos.py --continue-on-error
 ```
+
+Opt-in pytest bridge for notebooks: `MINILINK_NOTEBOOK_CHECKS=1 pytest tests/unittest/test_demo_check_runners.py`.
 
 IDE launchers: [`tests/run/`](run/). Headless PNG check: `tests/demo_checks/run_flagship_graphics.py`.
 

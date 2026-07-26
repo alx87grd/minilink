@@ -2,7 +2,13 @@
 
 from minilink.simulation.computer import Computer, StepSchedule
 
-__all__ = ["Computer", "HybridSimResult", "HybridSimulator", "StepSchedule"]
+__all__ = [
+    "Computer",
+    "HybridSimResult",
+    "HybridSimulator",
+    "RealtimeSimulator",
+    "StepSchedule",
+]
 
 
 def __getattr__(name: str):
@@ -14,4 +20,8 @@ def __getattr__(name: str):
         from minilink.simulation.hybrid_simulator import HybridSimResult
 
         return HybridSimResult
+    if name == "RealtimeSimulator":
+        from minilink.simulation.realtime import RealtimeSimulator
+
+        return RealtimeSimulator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

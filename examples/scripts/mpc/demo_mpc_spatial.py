@@ -3,7 +3,7 @@
 Walks the ``planning/spatial`` pipeline: track + obstacles → fields → costs →
 ``PlanningProblem`` + ``TrajectoryOptimizationPlanner`` (not solved).
 
-Full NLP + hybrid MPC: ``examples/notebooks/demo_mpc_circuit.ipynb``.
+Full NLP + hybrid MPC: ``examples/notebooks/applications/mpc.ipynb``.
 Closed-loop hybrid script: ``examples/scripts/mpc/demo_mpc_circuit.py``.
 
 Set ``SHOW_PLOTS = False`` for a headless walkthrough.
@@ -20,8 +20,8 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.core.sets import BoxSet
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputs,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRatePorts,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
@@ -141,7 +141,7 @@ plot_bounds = (
 
 print(f"lap length = {track.path.total_length:.2f} m")
 
-sys_mpc = JaxDynamicBicycleRateInputs()
+sys_mpc = BicycleDynRatePorts()
 sys_mpc.state.lower_bound[6] = 0.0
 sys_mpc.state.upper_bound[6] = 90.0
 sys_mpc.state.lower_bound[7] = -0.55
@@ -203,7 +203,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 print(f"planner ready (not solved): horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
 print(
-    "Next: demo_mpc_circuit.ipynb (full stack) or demo_mpc_circuit.py (hybrid script)"
+    "Next: applications/mpc.ipynb (full stack) or demo_mpc_circuit.py (hybrid script)"
 )
 
 if SHOW_PLOTS:

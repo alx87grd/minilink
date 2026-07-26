@@ -19,6 +19,18 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 
 Do not add new markdown guides unless asked. Keep [README call chains](README.md#call-chains) minimal.
 
+**Intro-doc scope:** [README.md](README.md), marketing showcases
+([showcase/minilink.ipynb](examples/notebooks/showcase/minilink.ipynb),
+[showcase/jax.ipynb](examples/notebooks/showcase/jax.ipynb)), and the
+[`intro/`](examples/notebooks/intro/) module API notebooks present the **main
+core tools and features** — `System` / diagrams / simulate / compile / analysis /
+planning trajopt / the hybrid step path (`StepSystem`, `StepDiagramSystem`,
+`Computer`, `HybridDiagram`) / MPC as the hybrid exemplar. Do **not** update those
+intro surfaces to track every new demo, compare script, or `examples/projects/`
+experiment. New demos land under `examples/`; update DESIGN/ROADMAP when contracts
+or maturity change. Add a README examples-table row only when a demo is a
+**canonical** teaching entry for a core tool (e.g. `demo_mpc_minimal`).
+
 ## Core directives
 
 - **Math readability first**: equations read like textbook math, e.g. `dx = A @ x + B @ u`.
@@ -87,7 +99,10 @@ Details in [DESIGN.md](DESIGN.md).
 
 **Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file → ask before proceeding.
 
-**Notebooks:** skip review unless updating renamed imports or user asks; outputs stripped by pre-commit (`nbstripout`).
+**Notebooks:** skip review unless updating renamed imports or user asks; outputs
+stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
+`MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` (CI
+``regression`` job runs the same).
 
 Demos: flat under `examples/scripts/`, runnable from repo root.
 
@@ -95,7 +110,7 @@ Demos: flat under `examples/scripts/`, runnable from repo root.
 
 **Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points) — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
 
-GitHub **CI** (`.github/workflows/test.yml`) runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (regression gates + flagship demos with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+GitHub **CI** (`.github/workflows/test.yml`) runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
 
 **Always before push** (fast; mirrors CI `test` job):
 
@@ -115,6 +130,7 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Narrow module + tests already updated | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or before handoff/push | `pytest` |
 | Compile backend, simulator, or trajopt changes (big review pass) | Regression gates: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Teaching notebooks | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
 
 Regression gates full command and CI `regression` job flags: [tests/README.md#entry-points](tests/README.md#entry-points).
 

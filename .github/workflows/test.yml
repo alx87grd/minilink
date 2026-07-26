@@ -1,5 +1,5 @@
 # CI — entry points documented in tests/README.md#entry-points
-# Jobs: test (ruff + pytest, py3.10–3.13) → regression (gates + flagship demos, py3.12 + jax)
+# Jobs: test (ruff + pytest, py3.10–3.13) → regression (gates + flagships + notebooks, py3.12 + jax)
 name: CI
 
 on:
@@ -51,10 +51,13 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install dependencies (with JAX)
+    - name: Install system dependencies
+      run: sudo apt-get update && sudo apt-get install -y graphviz
+
+    - name: Install dependencies (with JAX + viz)
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev,jax]"
+        pip install -e ".[dev,jax,visualization,plotting]"
 
     - name: Regression gates
       env:
@@ -71,3 +74,12 @@ jobs:
         MPLBACKEND: Agg
       run: |
         python tests/demo_checks/run_flagship_demos.py
+
+    # Teaching notebooks: execute code cells; fail on error (once, with JAX).
+    - name: Notebook smoke checks
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        MPLBACKEND: Agg
+        SDL_VIDEODRIVER: dummy
+      run: |
+        python tests/demo_checks/run_notebook_checks.py

@@ -370,7 +370,10 @@ class HybridDiagram:
         graph = export_hybrid_graphviz(build_hybrid_topology(self))
         if graph is None:
             return None
-        return graph._repr_image_svg_xml()
+        try:
+            return graph._repr_image_svg_xml()
+        except Exception:
+            return None
 
 
 # Internal machinery

@@ -45,6 +45,7 @@ from minilink.graphical.catalog.skins import (
     car_skin_3d,
     debug_state_skin,
     merge_skins,
+    ur5_skin,
 )
 
 __all__ = [
@@ -78,6 +79,7 @@ __all__ = [
     "car_skin_3d",
     "debug_state_skin",
     "merge_skins",
+    "ur5_skin",
     # camera
     "camera_matrix",
     "fixed_camera",

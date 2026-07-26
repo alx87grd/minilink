@@ -191,7 +191,7 @@
       "direction": "lower_better",
       "value": 23.964517546186073,
       "unit": "cost",
-      "notes": "JaxDynamicBicycleRateInputs TrajectoryOptimizationPlanner.solve_trajectory_from, tf=1.0, n_steps=8, jax+slsqp"
+      "notes": "BicycleDynRatePorts TrajectoryOptimizationPlanner.solve_trajectory_from, tf=1.0, n_steps=8, jax+slsqp"
     },
     {
       "id": "e4.bicycle_parametric.solve_s",

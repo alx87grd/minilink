@@ -18,8 +18,8 @@ from minilink.control.mpc import ModelPredictiveController
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputsUY,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRate,
 )
 from minilink.graphical.animation.primitives import (
     HorizonPolyline,
@@ -73,7 +73,7 @@ PATH_COST_WEIGHT = 40.0
 waypoints = np.asarray(WAYPOINTS, dtype=float)
 track = ReferenceTrack(from_waypoints(waypoints), half_width=PATH_HALF_WIDTH)
 
-sys_mpc = JaxDynamicBicycleRateInputsUY()
+sys_mpc = BicycleDynRate()
 sys_mpc.state.lower_bound[6] = 0.0
 sys_mpc.state.upper_bound[6] = 90.0
 sys_mpc.state.lower_bound[7] = -0.55
@@ -136,7 +136,7 @@ if SHOW_COST_FIELD:
     plot_cost_field_3d(grid, title="Path cost field", log_scale=True)
 
 # Offline: plant twin + demo clock (ROS2 uses the real vehicle / estimator).
-sys_sim = JaxDynamicBicycleRateInputsUY()
+sys_sim = BicycleDynRate()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
 sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = CAMERA_SCALE
@@ -207,6 +207,7 @@ traj = Trajectory(t=np.asarray(t_hist), x=np.asarray(x_hist).T, u=np.asarray(u_h
 sys_sim.traj = traj
 sys_sim.animate(
     traj,
+    # renderer="meshcat",
     overlays=[
         TrackCorridorOverlay(track),
         SceneHistory(

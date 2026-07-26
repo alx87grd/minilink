@@ -33,7 +33,7 @@ SHOWCASE_TRAJOPT_FTOL = 1e-2
 
 
 def build_showcase_cartpole_problem() -> PlanningProblem:
-    """Cart-pole swing-up aligned with ``demo_showcase.ipynb`` section 9."""
+    """Cart-pole swing-up aligned with ``showcase/minilink.ipynb`` trajopt section."""
     configure_jax(enable_x64=True)
     sys = JaxCartPole()
     sys.inputs["u"].lower_bound[0] = -10.0

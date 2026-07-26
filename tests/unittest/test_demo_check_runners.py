@@ -4,6 +4,10 @@ Thin CI bridge: invokes ``tests/demo_checks/`` runners; does not duplicate their
 assertions. Without JAX, JAX-required flagships skip here — the CI
 ``regression`` job (``.github/workflows/test.yml``) re-runs
 ``run_flagship_demos.py`` with JAX installed.
+
+Notebook smoke checks run in the CI ``regression`` job (and via
+``tests/run/run_notebook_checks.py``). Opt in here with
+``MINILINK_NOTEBOOK_CHECKS=1`` so default ``pytest`` stays fast.
 """
 
 from __future__ import annotations
@@ -65,6 +69,16 @@ class TestDemoCheckRunners(unittest.TestCase):
                 f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
             )
         self.assertIn("f_eval", proc.stdout)
+
+    def test_notebook_checks_exit_zero(self):
+        if os.environ.get("MINILINK_NOTEBOOK_CHECKS") != "1":
+            self.skipTest("set MINILINK_NOTEBOOK_CHECKS=1 to run notebook smoke")
+        proc = self._run("tests/demo_checks/run_notebook_checks.py")
+        if proc.returncode != 0:
+            self.fail(
+                f"notebook checks failed (exit {proc.returncode})\n"
+                f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+            )
 
 
 if __name__ == "__main__":

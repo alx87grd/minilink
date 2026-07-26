@@ -66,7 +66,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Catalog | `pyro/dynamic/rocket.py` | Rocket | `minilink/dynamics/catalog/aerial/rocket.py` | Rocket | **Done** |  |
 | Catalog | `pyro/dynamic/suspension.py` | QuarterCarOnRoughTerrain | `minilink/dynamics/catalog/vehicles/suspension.py` | QuarterCarOnRoughTerrain | **Done** |  |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | — | **Partial** | Only LinearTire implemented |
-| Catalog | `pyro/dynamic/vehicle_dynamic.py` | LinearTire | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | LinearTire (+ JaxLinearTire) | **Done** |  |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | LinearTire | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | LinearTire (+ LinearTire) | **Done** |  |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | ROADMAP §5.8 review queue |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | DynamicBicycle | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | DynamicBicycle (+ JAX twins, rate inputs) | **Done** | Minilink adds rate-input variant |
 | Catalog | `pyro/dynamic/vehicle_propulsion.py` | LongitudinalFrontWheelDriveCarWithWheelSlipInput | `minilink/dynamics/catalog/vehicles/propulsion.py` | same | **Done** |  |
@@ -125,7 +125,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Planning | `pyro/planning/trajectoryoptimisation.py` | DirectCollocationTrajectoryOptimisation | `minilink/planning/trajectory_optimization/` | DirectCollocation, Shooting, MS | **Done** | Ipopt/JAX backends |
 | Graphics | `pyro/kinematic/geometry.py` | transformation_matrix_2D | `minilink/core/kinematics.py` | frame tf helpers | **Done** |  |
 | Graphics | `pyro/kinematic/drawing.py` | transform_points_2D, arrows | `minilink/graphical/animation/` | primitives, drawables | **Done** |  |
-| Tools | `pyro/tools/sys2game.py` | InteractiveContinuousDynamicSystem | `minilink/graphical/animation/interactive.py` | partial keyboard loop | **Drop** | No sys2game framework |
+| Tools | `pyro/tools/sys2game.py` | InteractiveContinuousDynamicSystem | `minilink/simulation/realtime/` | superseded by `RealtimeSimulator` + `PygameInput` | **Drop** | Own realtime tool, not a port |
 | Tools | `pyro/tools/sys2gym.py` | Sys2Gym | `minilink/interfaces/` | — | **TODO** | interfaces/gymnasium.py |
 
 ---
@@ -351,10 +351,10 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `projects/asimov/asimov_endeffector_pid_controller.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/asimov/asimov_joint_pid_controller.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/asimov/asimov_kinematic_controller.py` | **Drop** | Research/course project; out of library demo scope |
-| `projects/pygame/boat_game.py` | **Drop** | sys2game; use animate(renderer=pygame) or skip |
-| `projects/pygame/double_pendulum_game.py` | **Drop** | sys2game; use animate(renderer=pygame) or skip |
-| `projects/pygame/test_double_pendulum_joy.py` | **Drop** | sys2game; use animate(renderer=pygame) or skip |
-| `projects/pygame/test_pendulum_joy.py` | **Drop** | sys2game; use animate(renderer=pygame) or skip |
+| `projects/pygame/boat_game.py` | **Drop** | sys2game; use `simulation/realtime/` or skip |
+| `projects/pygame/double_pendulum_game.py` | **Drop** | sys2game; use `simulation/realtime/` or skip |
+| `projects/pygame/test_double_pendulum_joy.py` | **Drop** | sys2game; use `simulation/realtime/` or skip |
+| `projects/pygame/test_pendulum_joy.py` | **Drop** | sys2game; use `simulation/realtime/` or skip |
 | `projects/tmotor_robot/tmotor_robot_controller_simulation_tests.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/ugv/ugv_backup.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/ugv/ugv_dubins.py` | **Drop** | Research/course project; out of library demo scope |
@@ -438,13 +438,14 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 
 | Notebook |
 | --- |
-| `examples/notebooks/demo_mpc_circuit.ipynb` |
-| `examples/notebooks/demo_optimization.ipynb` |
-| `examples/notebooks/demo_overview.ipynb` |
-| `examples/notebooks/demo_plots_animations_backends.ipynb` |
-| `examples/notebooks/demo_showcase.ipynb` |
-| `examples/notebooks/demo_stateless_functional_jax.ipynb` |
-| `examples/notebooks/simulation_benchmark.ipynb` |
+| `examples/notebooks/applications/mpc.ipynb` |
+| `examples/notebooks/applications/car_trajopt.ipynb` |
+| `examples/notebooks/intro/08_optimization.ipynb` |
+| `examples/notebooks/intro/10_graphical.ipynb` |
+| `examples/notebooks/intro/07_compile.ipynb` |
+| `examples/notebooks/showcase/minilink.ipynb` |
+| `examples/notebooks/showcase/jax.ipynb` |
+| `examples/notebooks/tooling/benchmark.ipynb` |
 
 ---
 
@@ -455,7 +456,7 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | Discrete-time / ZOH library | **Drop** | Continuous-time only (DESIGN §3) |
 | RNN / recurrent blocks | **Drop** | — |
 | Hybrid events / mixed-rate sim | **Drop** | — |
-| Pyro `sys2game` framework | **Drop** | `animate(..., renderer="pygame")` + interactive.py |
+| Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |
 | Stable-Baselines3 in-library RL | **Drop** | interfaces/gymnasium.py; train externally |
 | `*withObstacles` plant subclasses | **Drop** | planning/spatial/Scene + bind() |
 | DynamicProgramming2DRectBivariateSpline | **Drop** | Grid DP backends |

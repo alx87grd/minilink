@@ -18,8 +18,8 @@ from minilink.control.mpc import (
 )
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
-    JaxDynamicBicycleRateInputsUY,
+from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+    BicycleDynRate,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import (
@@ -37,7 +37,7 @@ SIM_DT = 0.01
 STEP_DISP = True
 REF_X_PAD = 20.0
 
-sys = JaxDynamicBicycleRateInputsUY()
+sys = BicycleDynRate()
 r_r = sys.params["r_r"]
 x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 x0 = np.array([0.0, 3.0, 0.0, U_TARGET * 0.8, 0.0, 0.0, (U_TARGET * 0.8) / r_r, 0.0])
