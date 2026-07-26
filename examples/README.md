@@ -60,7 +60,7 @@ See also [notebooks/README.md](notebooks/README.md).
 | Hybrid / step | [intro/06_hybrid](notebooks/intro/06_hybrid.ipynb) | [`scripts/hybrid/`](scripts/hybrid/), [`scripts/step/`](scripts/step/), [`scripts/mpc/`](scripts/mpc/) | MPC minimal + dual-rate; scenarios: [`projects/mpc/`](projects/mpc/) |
 | Compile | [intro/07_compile](notebooks/intro/07_compile.ipynb) | [`scripts/diagrams/`](scripts/diagrams/) | |
 | Optimization | [intro/08_optimization](notebooks/intro/08_optimization.ipynb) | [`scripts/optimization/`](scripts/optimization/) | |
-| Planning / trajopt | [intro/09_planning](notebooks/intro/09_planning.ipynb) | [`scripts/planning/`](scripts/planning/), [`scripts/trajopt/`](scripts/trajopt/) | Car / LOS: [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
+| Planning / trajopt | [intro/09_planning](notebooks/intro/09_planning.ipynb) | [`scripts/planning/`](scripts/planning/), [`scripts/trajopt/`](scripts/trajopt/) | Car / LOS: [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/); UR5: `trajopt_ur5_collocation_jax.py` |
 | Graphical | [intro/10_graphical](notebooks/intro/10_graphical.ipynb) | [`scripts/plots/`](scripts/plots/), [`scripts/animation/`](scripts/animation/), [`scripts/realtime/`](scripts/realtime/) | |
 | Robotic | — | [`scripts/robotic/`](scripts/robotic/) | UR5 variants under `experimental/robotic/` |
 | State-space / LQR | — | [`scripts/statespace/`](scripts/statespace/) | |

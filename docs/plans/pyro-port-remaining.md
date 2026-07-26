@@ -446,6 +446,7 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | `examples/scripts/step/step_fibonacci.py` | step |
 | `examples/experimental/symbolic/symbolic_quadruple_pendulum.py` | symbolic |
 | `examples/scripts/trajopt/trajopt_cartpole_collocation_jax.py` | trajopt |
+| `examples/scripts/trajopt/trajopt_ur5_collocation_jax.py` | trajopt |
 | `examples/scripts/trajopt/trajopt_cartpole_rollout_gradients.py` | trajopt |
 | `examples/scripts/trajopt/trajopt_holonomic_corridor.py` | trajopt |
 | `examples/projects/car_trajopt/car_trajopt_compare.py` | trajopt |

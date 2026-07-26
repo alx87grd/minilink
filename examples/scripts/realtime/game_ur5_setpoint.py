@@ -25,6 +25,9 @@ from minilink.control.robotic import TaskImpedance
 from minilink.dynamics.catalog.manipulators import UR5Manipulator
 from minilink.simulation.realtime import PygameInput, RealtimeSimulator
 
+# GRAVITY_COMP = False
+GRAVITY = True
+
 p0 = np.array([-0.5, -0.0, 0.5])
 q_guess = np.array([0.0, -1.0, 1.2, -1.4, 0.0, 0.0])
 
@@ -35,7 +38,8 @@ arm = UR5Manipulator()
 q0 = arm.inverse_kinematics(p0, q_guess=q_guess)
 arm.x0 = arm.q2x(q0, np.zeros(6))
 
-ctl = TaskImpedance(arm, gravity_comp=True, show_task_force=True)
+
+ctl = TaskImpedance(arm, gravity_comp=GRAVITY_COMP, show_task_force=True)
 ctl.params["Kp"] = np.array([200.0, 200.0, 200.0])
 ctl.params["Kd"] = np.array([40.0, 40.0, 40.0])
 ctl.task_force_scale = 0.05

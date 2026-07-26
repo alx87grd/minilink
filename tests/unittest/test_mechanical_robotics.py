@@ -463,7 +463,7 @@ from minilink.dynamics.catalog.manipulators.arms import (
     TwoLinkManipulator,
 )
 from minilink.dynamics.catalog.manipulators import UR5Manipulator
-from minilink.graphical.animation.primitives import Arrow
+from minilink.graphical.animation.primitives import Arrow, Sphere
 from tests.unittest.graphics_contract_helpers import resolve_draw_frame
 
 
@@ -575,7 +575,10 @@ class TestRoboticWrappers(unittest.TestCase):
         frames = ctl.tf(None, u)
         np.testing.assert_allclose(frames["task_force"][:2, 3], p)
         np.testing.assert_allclose(frames["task_force"][2, 3], 0.0)
+        np.testing.assert_allclose(frames["task_target"][:2, 3], p_d)
         geom = ctl.get_dynamic_geometry(None, u)
+        self.assertIsInstance(geom["task_target"][0], Sphere)
+        self.assertEqual(geom["task_target"][0].radius, ctl.task_target_radius)
         arrow = geom["task_force"][0]
         self.assertIsInstance(arrow, Arrow)
         np.testing.assert_allclose(arrow.vector, f_task)
@@ -595,9 +598,12 @@ class TestRoboticWrappers(unittest.TestCase):
         geom = diagram.get_dynamic_geometry(x, p_d)
         self.assertIn("ctl:task_force", frames)
         self.assertIn("ctl:task_force", geom)
+        self.assertIn("ctl:task_target", frames)
+        self.assertIn("ctl:task_target", geom)
         np.testing.assert_allclose(
             frames["ctl:task_force"][:2, 3], arm.forward_kinematics(q)
         )
+        np.testing.assert_allclose(frames["ctl:task_target"][:2, 3], p_d)
         resolve_draw_frame(diagram, x, p_d)
 
         ur5 = UR5Manipulator()
@@ -610,7 +616,9 @@ class TestRoboticWrappers(unittest.TestCase):
         np.testing.assert_allclose(
             frames3["task_force"][:3, 3], ur5.forward_kinematics(q3)
         )
+        np.testing.assert_allclose(frames3["task_target"][:3, 3], p_d3)
         self.assertEqual(geom3["task_force"][0].vector.size, 3)
+        self.assertIsInstance(geom3["task_target"][0], Sphere)
 
     def test_task_kinematic_law(self):
         arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())

@@ -45,7 +45,7 @@ release process by themselves.
 | Geometry / spatial | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Architecture validation; scene bind later. |
 | Graphics / animation | 4 | Frame-keyed `tf` / geometry / overlays; `Animator`. | Renderer polish. |
 | Realtime simulation | 2 | `RealtimeSimulator` + pygame I/O; live draw. | Architectural review. |
-| Dynamics (abstraction + catalog) | 6 | Plants QA'd; `MechanicalSystem` / `Manipulator`; arms rebased. | Optional `f_ext`; `JaxManipulator` if needed. |
+| Dynamics (abstraction + catalog) | 6 | Plants QA'd; `MechanicalSystem` / `Manipulator`; arms rebased. UR5 `f` uses RNEA bias + \(H\) (not naive \(C,g\)). | Optional `f_ext`; shared RNEA serial stack + ABA (Later). |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Frequency completion (priority 1). |
 | Control | 6 | Linear, LQR, PID; model-based SMC; robotic impedance/kinematic. | Robotic PID wrappers; traj LQR; SMC demos. |
 | Blocks | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | MLP later. |
@@ -106,7 +106,10 @@ Decisions that block or shape the teaching release (maintainer sign-off):
 
 ## 6. Later / out of scope
 
-**Later** (post teaching release — do not displace §4):
+**Later** (post teaching release — do not displace §4). Lightweight **feature
+backlog**: one-line ideas land here; if a change needs architecture tradeoffs or
+a multi-step design, open a short doc under [`docs/plans/`](docs/plans/) and link
+it from [docs/plans/README.md](docs/plans/README.md).
 
 - Scene params / `J(z, p)` bind (moving obstacles, terrain SDFs without JIT rebuild)
 - `SolverFactory` — unify SciPy / Ipopt / CasADi wiring for trajopt and MPC
@@ -115,6 +118,15 @@ Decisions that block or shape the teaching release (maintainer sign-off):
 - Gymnasium / RL bridges; Pacejka; stochastic forcing; neural MLP
 - ROS2 / FMI; sparse long-horizon trajopt; parametric `core/` Shape/Set/Cost
   call-time overrides; trajectory post-filter; RRT-Connect / informed sampling
+- **Shared RNEA serial-chain stack** (not copy-paste per 6-DoF arm): extract
+  DH + spatial RNEA helpers (or a thin `SerialRneaManipulator` base) so catalog
+  plants only supply `a`/`d`/`alpha`, mass/COM/inertia; keep public `H`/`C`/`g`
+  on the mechanical API. Pair with ABA forward dynamics below when touching
+  this path.
+- **ABA forward dynamics** for RNEA plants (e.g. UR5): keep public `H` / `C` /
+  `g` for teaching and controllers; replace `forward_dynamics` / `f` assembly
+  (`H` via \(n\) RNEA columns + bias) with Articulated-Body Algorithm so
+  integration does not form \(H\) each step
 
 **Out of scope** (by decision — see [DESIGN.md](DESIGN.md)):
 

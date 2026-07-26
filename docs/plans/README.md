@@ -1,7 +1,16 @@
 # Plans index
 
-Active design backlog. Landed contracts live in [DESIGN.md](../../DESIGN.md)
-and [ROADMAP.md](../../ROADMAP.md) — do not keep finished implementation plans here.
+Two backlog homes (do not invent a third):
+
+| Home | Use for |
+| --- | --- |
+| [ROADMAP.md §4](../../ROADMAP.md) | Teaching-release priorities (active milestone) |
+| [ROADMAP.md §6 Later](../../ROADMAP.md) | Lightweight **feature backlog** (one-liners; post teaching release) |
+| **This folder** | Active **design** backlog — multi-step architecture / tradeoff docs |
+
+Landed contracts move into [DESIGN.md](../../DESIGN.md) and [ROADMAP.md](../../ROADMAP.md);
+delete finished plan docs here. Do not park one-line ideas only in this folder —
+add a Later bullet first; open a plan doc only when the design needs a writeup.
 
 | Doc | Scope | Status |
 | --- | --- | --- |
@@ -12,3 +21,5 @@ and [ROADMAP.md](../../ROADMAP.md) — do not keep finished implementation plans
 | [neural-blocks-collection.md](neural-blocks-collection.md) | MLP / neural blocks roadmap | Future |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle model view ports | Draft |
 | [phase4-fidelity-maps.md](phase4-fidelity-maps.md) | Jax bicycle ladder lift/project maps + MPC Engine broadcast | Draft |
+| [mpc-tuning.md](mpc-tuning.md) | MPC tuning project harness | Draft |
+| [test-benchmark-consolidation.md](test-benchmark-consolidation.md) | Demo/catalog check layout | Partial |
