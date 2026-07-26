@@ -504,6 +504,13 @@ class TestBicycleDynServo(unittest.TestCase):
         dx_uy = np.asarray(self.uy.f(x, u))
         np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
 
+    def test_f_matches_named_servo_inputs_with_large_steer_command(self):
+        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 33.0, 0.0, 0.0])
+        u = np.array([0.0, 1.0])
+        dx_named = np.asarray(self.named.f(x, u))
+        dx_uy = np.asarray(self.uy.f(x, u))
+        np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
+
     def test_zero_torque_cruise_actuators_near_equilibrium(self):
         x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0 / 0.3, 0.0, 0.0])
         u = np.array([0.0, 0.0])

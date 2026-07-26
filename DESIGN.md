@@ -153,6 +153,28 @@ serial arms. Joint impedance / task impedance / computed torque use
 `control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
+**Vehicle JAX ladder** — :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles`
+(planning / trajopt plants; module-scoped names, no ``Jax`` prefix). Default
+``u`` / ``y = x``; named-port twins use the ``Ports`` suffix. Compare:
+``demo_car_trajopt_compare.py`` and
+[notebook](examples/notebooks/driving_model_trajopt_analysis.ipynb).
+
+| Class | $n$ | Input $\mathbf{u}$ | Role |
+| --- | --- | --- | --- |
+| `Holonomic` | 2 | $[v_x, v_y]$ | holonomic point |
+| `HolonomicAccel` | 4 | $[a_x, a_y]$ | holonomic double integrator |
+| `BicycleKin` | 3 | $[v, \delta]$ | kinematic bicycle |
+| `BicycleAcc` | 5 | $[a_x, \dot\delta]$ | no-slip accel / steer rate |
+| `BicycleDyn` | 6 | $[\omega_r, \delta]$ | rigid body + linear tires |
+| `BicycleDynRate` | 8 | $[\dot\omega_r, \dot\delta]$ | integrated wheel / steer |
+| `BicycleDynTauRate` | 8 | $[\tau_r, \dot\delta]$ | torque + steer rate |
+| `BicycleDynServo` | 9 | $[\tau_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged torque + steer |
+| `BicycleDynEngine` | 9 | $[P_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged **power** + steer |
+
+NumPy bicycle plants remain in :mod:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle`
+and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
+:mod:`~minilink.dynamics.catalog.vehicles.car_profile` (`apply_car_profile`).
+
 ## 4. Core Object Contracts
 
 ### `System`

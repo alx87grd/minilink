@@ -85,7 +85,7 @@ Pytest only guards benchmark helpers (`test_benchmark_helpers.py`); **GitHub CI*
 
 **Speed** metrics use a multiplicative factor (default **4×** per baseline JSON, override
 with `--factor` or `MINILINK_BENCH_REGRESSION_FACTOR`). A **4×** ceiling catches a **10×**
-slowdown on the next manual baseline refresh; CI uses **6×** on NLP solve gates only
+slowdown on the next manual baseline refresh; CI uses **10×** on NLP solve gates only
 (see below). **Accuracy** metrics use absolute ceilings:
 
 - `rel_err_l2` — candidate final state vs live `scipy_ultra` truth (max **1%**)

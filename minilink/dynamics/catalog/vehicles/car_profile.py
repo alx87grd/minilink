@@ -37,8 +37,8 @@ is a port / state bound only (not an EoM saturation).
 Profiles
 --------
 - :func:`passenger_car_profile` — full-size sedan-scale catalog defaults
-- :func:`racecar_profile` — bicycle LOS ``EngineBicycle`` (rounded from demo)
-- :func:`udes_1_5_profile` — 1:5 UdeS racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar` geometry)
+- :func:`racecar_profile` — lightweight race vehicle envelope
+- :func:`udes_1_5_profile` — 1:5 RC racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar` geometry)
 """
 
 from __future__ import annotations
@@ -359,7 +359,7 @@ def passenger_car_profile() -> CarProfile:
 
 
 def racecar_profile() -> CarProfile:
-    """Bicycle LOS race vehicle (rounded from ``create_vehicle``).
+    """Lightweight race vehicle envelope.
 
     ``P = 100 kW`` at ``v_nom = 10 m/s`` → ``tau ≈ 3400 Nm``, ``w_rear_dot ≈ 41 rad/s²``
     (~3× rear traction reference).
