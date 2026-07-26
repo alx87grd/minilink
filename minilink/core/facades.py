@@ -237,7 +237,10 @@ class SharedSystemFacades:
         g = self.get_diagram()
         if g is None:
             return None
-        return g._repr_image_svg_xml()
+        try:
+            return g._repr_image_svg_xml()
+        except Exception:
+            return None
 
     def plot_diagram(self, filename=None, show_inline=None, show_pdf=None):
         """
