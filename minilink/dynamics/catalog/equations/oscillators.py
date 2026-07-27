@@ -31,6 +31,43 @@ class VanderPol(DynamicSystem):
         return x
 
 
+class Lorenz(DynamicSystem):
+    """Lorenz chaotic attractor."""
+
+    def __init__(self, sigma=10.0, rho=28.0, beta=8.0 / 3.0):
+        super().__init__(n=3, output_dim=3, expose_state=True)
+        self.name = "Lorenz Attractor"
+        self.params = {
+            "sigma": float(sigma),
+            "rho": float(rho),
+            "beta": float(beta),
+        }
+        self.state.labels = ["x", "y", "z"]
+        self.state.units = ["", "", ""]
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
+        self.solver_info = {
+            "smallest_time_constant": 0.01,
+            "discontinuous_behavior": False,
+        }
+
+    def f(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        sigma = params["sigma"]
+        rho = params["rho"]
+        beta = params["beta"]
+        x_val, y, z = x
+
+        # Lorenz equations
+        dx = sigma * (y - x_val)
+        dy = x_val * (rho - z) - y
+        dz = x_val * y - beta * z
+        return np.array([dx, dy, dz])
+
+    def h(self, x, u, t=0.0, params=None):
+        return x
+
+
 if __name__ == "__main__":
     sys = VanderPol()
     sys.x0 = np.array([0.0, 1.0])
