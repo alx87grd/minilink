@@ -13,7 +13,8 @@ Equation of motion::
     H(q) qdd + C(q, qd) qd + d(q, qd) + g(q) = tau
 
 Forward dynamics (``forward_dynamics`` / ``f``) uses the spatial **ABA**;
-``H``, ``C``, and ``g`` remain available via RNEA for analysis.
+``inverse_dynamics`` uses spatial **RNEA**. ``H``, ``C``, and ``g`` remain
+available via RNEA for analysis and matrix-form checks.
 """
 
 import numpy as np
@@ -102,8 +103,9 @@ class UR5Manipulator(Manipulator):
     factory-calibrated representation.
 
     Equation paths (``H``/``C``/``g``/``d``, FK, ``J``, ``tf``) are NumPy/JAX
-    native-array. Forward dynamics and ``f`` use the spatial ABA; ``H``/``C``/``g``
-    remain RNEA-based for analysis.
+    native-array. Forward dynamics and ``f`` use the spatial ABA;
+    ``inverse_dynamics`` uses spatial RNEA; ``H``/``C``/``g`` remain RNEA-based
+    for analysis and matrix-form checks.
     """
 
     def __init__(self):
@@ -348,6 +350,30 @@ class UR5Manipulator(Manipulator):
     def forward_dynamics_aba(self, q, v, u, t=0.0, params=None):
         """Alias of :meth:`forward_dynamics` (explicit ABA name for comparisons)."""
         return self.forward_dynamics(q, v, u, t, params)
+
+    def inverse_dynamics(self, q, v, acceleration, u=None, t=0.0, params=None):
+        """Inverse dynamics via spatial RNEA (default path)."""
+        params = self.params if params is None else params
+        return self._rnea(q, v, acceleration, params, gravity=True) + self.d(
+            q, v, u, t, params
+        )
+
+    def inverse_dynamics_matrix(self, q, v, acceleration, u=None, t=0.0, params=None):
+        """Inverse dynamics via explicit ``H``, ``C``, ``g`` (teaching / verification)."""
+        params = self.params if params is None else params
+        xp = array_module(q, v, acceleration)
+        q = xp.asarray(q)
+        v = xp.asarray(v)
+        acceleration = xp.asarray(acceleration)
+        H = self.H(q, params)
+        C = self.C(q, v, params)
+        g = self.g(q, params)
+        d = self.d(q, v, u, t, params)
+        return H @ acceleration + C @ v + g + d
+
+    def inverse_dynamics_rnea(self, q, v, acceleration, u=None, t=0.0, params=None):
+        """Alias of :meth:`inverse_dynamics` (explicit RNEA name for comparisons)."""
+        return self.inverse_dynamics(q, v, acceleration, u, t, params)
 
     def H(self, q, params=None):
         """Joint-space inertia matrix."""

@@ -405,6 +405,44 @@ class TestManipulatorCatalog(unittest.TestCase):
             qdd_aba = arm.forward_dynamics(q, v, u)
             np.testing.assert_allclose(qdd_aba, qdd_rnea, rtol=0.0, atol=1e-10)
 
+    def test_ur5_rnea_inverse_dynamics_matches_matrix(self):
+        arm = UR5Manipulator()
+        rng = np.random.default_rng(0)
+        for _ in range(8):
+            q = rng.uniform(-1.0, 1.0, 6)
+            v = rng.uniform(-1.0, 1.0, 6)
+            qdd = rng.uniform(-2.0, 2.0, 6)
+            u = rng.uniform(-5.0, 5.0, 6)
+            tau_rnea = arm.inverse_dynamics(q, v, qdd, u)
+            tau_matrix = arm.inverse_dynamics_matrix(q, v, qdd, u)
+            np.testing.assert_allclose(tau_rnea, tau_matrix, rtol=0.0, atol=1e-10)
+            np.testing.assert_allclose(
+                tau_rnea,
+                arm.inverse_dynamics_rnea(q, v, qdd, u),
+                rtol=0.0,
+                atol=1e-12,
+            )
+
+    def test_ur5_forward_inverse_dynamics_roundtrip(self):
+        arm = UR5Manipulator()
+        rng = np.random.default_rng(1)
+        for _ in range(8):
+            q = rng.uniform(-1.0, 1.0, 6)
+            v = rng.uniform(-1.0, 1.0, 6)
+            u = rng.uniform(-5.0, 5.0, 6)
+            qdd = arm.forward_dynamics(q, v, u)
+            tau = arm.inverse_dynamics(q, v, qdd, u)
+            np.testing.assert_allclose(
+                tau, arm.generalized_force(q, v, u), rtol=0.0, atol=1e-10
+            )
+            qdd_rnea_h = arm.forward_dynamics_rnea_h(q, v, u)
+            np.testing.assert_allclose(
+                arm.inverse_dynamics_matrix(q, v, qdd_rnea_h, u),
+                arm.generalized_force(q, v, u),
+                rtol=0.0,
+                atol=1e-10,
+            )
+
     def test_ur5_params_override_and_skin(self):
         arm = UR5Manipulator()
         q = np.linspace(-0.4, 0.3, 6)

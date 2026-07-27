@@ -45,7 +45,7 @@ release process by themselves.
 | Geometry / spatial | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Architecture validation; scene bind later. |
 | Graphics / animation | 4 | Frame-keyed `tf` / geometry / overlays; `Animator`. | Renderer polish. |
 | Realtime simulation | 2 | `RealtimeSimulator` + pygame I/O; live draw. | Architectural review. |
-| Dynamics (abstraction + catalog) | 6 | Plants QA'd; `MechanicalSystem` / `Manipulator`; arms rebased. UR5 `f` uses spatial **ABA**; `H`/`C`/`g` via RNEA. | Optional `f_ext`; shared RNEA serial stack (Later). |
+| Dynamics (abstraction + catalog) | 6 | Plants QA'd; `MechanicalSystem` / `Manipulator`; arms rebased. UR5 `f` uses spatial **ABA**; `inverse_dynamics` uses **RNEA**; `H`/`C`/`g` via RNEA. | Optional `f_ext`; shared RNEA serial stack (Later). |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Frequency completion (priority 1). |
 | Control | 6 | Linear, LQR, PID; model-based SMC; robotic impedance/kinematic. | Robotic PID wrappers; traj LQR; SMC demos. |
 | Blocks | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | MLP later. |
