@@ -13,7 +13,7 @@ import numpy as np
 
 from minilink.dynamics.catalog.manipulators.ur5 import UR5Manipulator
 
-_PLANT = None
+_PLANTS: dict[str, object] = {}
 
 
 def build_symbolic_ur5(*, backend: str = "numpy", verbose: bool = False):
@@ -32,9 +32,9 @@ def build_symbolic_ur5(*, backend: str = "numpy", verbose: bool = False):
     MechanicalSystem
         Numeric plant with ``H`` / ``C`` / ``g`` from Lagrange derivation.
     """
-    global _PLANT
-    if _PLANT is not None:
-        return _PLANT
+    global _PLANTS
+    if backend in _PLANTS:
+        return _PLANTS[backend]
 
     from minilink.symbolic.mechanics.model import MechanicalModel
 
@@ -91,7 +91,7 @@ def build_symbolic_ur5(*, backend: str = "numpy", verbose: bool = False):
     if verbose:
         print(f"  export: {time.perf_counter() - t0:.1f} s")
 
-    _PLANT = plant
+    _PLANTS[backend] = plant
     return plant
 
 

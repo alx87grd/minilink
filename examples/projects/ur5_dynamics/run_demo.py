@@ -1,10 +1,10 @@
 """UR5 EoM comparison — quick text smoke (teaching notebook is the main entry).
 
-Full textbook walkthrough with math, plots, and tables:
+Full textbook walkthrough with math, FD tables, rollout timing, and plots:
 
     examples/projects/ur5_dynamics/eom_comparison.ipynb
 
-Run this script for a fast reproducible summary without opening the notebook::
+Run this script for a fast reproducible summary::
 
     PYTHONPATH=. python examples/projects/ur5_dynamics/run_demo.py
 
@@ -21,6 +21,11 @@ from examples.projects.ur5_dynamics.compare_eom import (
     comprehensive_comparison,
     print_comprehensive_report,
 )
+from examples.projects.ur5_dynamics.rollout_compare import (
+    DEFAULT_ROLLOUT_BACKEND,
+    print_rollout_report,
+    rollout_comparison,
+)
 from examples.projects.ur5_dynamics.symbolic_ur5 import (
     build_symbolic_ur5,
     catalog_params_no_damping,
@@ -31,7 +36,6 @@ seed = int(os.environ.get("UR5_SEED", DEFAULT_SEED))
 n_samples = int(os.environ.get("UR5_N_SAMPLES", DEFAULT_N_SAMPLES))
 n_timing = int(os.environ.get("UR5_N_TIMING", DEFAULT_N_TIMING))
 
-arm = UR5Manipulator()
 params = catalog_params_no_damping()
 configs, labels = build_evaluation_batch(seed=seed, n_random=n_samples)
 
@@ -42,14 +46,16 @@ symbolic_plant = None
 if os.environ.get("UR5_SKIP_SYMBOLIC", "").strip().lower() not in {"1", "true", "yes"}:
     try:
         symbolic_plant = build_symbolic_ur5(
+            backend=DEFAULT_ROLLOUT_BACKEND,
             verbose=os.environ.get("UR5_SYMBOLIC_VERBOSE", "").strip().lower()
-            in {"1", "true", "yes"}
+            in {"1", "true", "yes"},
         )
     except ImportError:
-        print("SymPy not installed — ABA-only comparison.\n")
+        print("SymPy not installed — ABA-only FD and rollout comparison.\n")
 
+print("=== Forward dynamics (single-step) ===")
 result = comprehensive_comparison(
-    arm,
+    UR5Manipulator(),
     symbolic_plant,
     configs,
     params=params,
@@ -58,3 +64,11 @@ result = comprehensive_comparison(
     case_labels=labels,
 )
 print_comprehensive_report(result)
+
+print("\n=== Rollout simulation (JIT warm-up vs integration) ===")
+rollout_result, _ = rollout_comparison(
+    params,
+    symbolic_plant=symbolic_plant,
+    compile_backend=DEFAULT_ROLLOUT_BACKEND,
+)
+print_rollout_report(rollout_result)

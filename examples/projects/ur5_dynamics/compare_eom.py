@@ -278,9 +278,7 @@ def named_case_summary(result: ComparisonResult) -> list[dict[str, float | str]]
             "aba_max_abs_dqdd": result.methods["ABA"].per_sample_max[i],
         }
         if "Symbolic" in result.methods:
-            row["symbolic_max_abs_dqdd"] = result.methods[
-                "Symbolic"
-            ].per_sample_max[i]
+            row["symbolic_max_abs_dqdd"] = result.methods["Symbolic"].per_sample_max[i]
         rows.append(row)
     return rows
 
@@ -339,7 +337,9 @@ def plot_comparison(result: ComparisonResult, *, figsize=(10, 4)):
     fig, axes = plt.subplots(1, 2, figsize=figsize, constrained_layout=True)
 
     x = np.arange(n_random)
-    axes[0].semilogy(x, result.methods["ABA"].per_sample_max[random_start:], label="ABA")
+    axes[0].semilogy(
+        x, result.methods["ABA"].per_sample_max[random_start:], label="ABA"
+    )
     if "Symbolic" in result.methods:
         axes[0].semilogy(
             x,
