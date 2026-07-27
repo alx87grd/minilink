@@ -50,7 +50,7 @@ diagram.inputs["r"].set_nominal_value(p0)  # rate-mode setpoint starts at the to
 rt_sim = RealtimeSimulator(
     diagram,
     frame_dt=1 / 30,
-    sim_dt=0.05 / 30,
+    # sim_dt=0.05 / 30,
     renderer="meshcat",
     is_3d=True,
     verbose=True,

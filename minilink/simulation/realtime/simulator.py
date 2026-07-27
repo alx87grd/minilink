@@ -31,14 +31,25 @@ from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
+from minilink.simulation.simulator import (
+    DISCONTINUOUS_AUTO_DT_SCALE,
+    SMOOTH_AUTO_DT_SCALE,
+)
 
 # In ``sync="realtime"`` the measured wall elapsed is clamped to this many
 # frame periods so a stall (window drag, GC pause) cannot inject a huge step.
 MAX_DT_HOLD_FRAMES = 4
 
-# Default ZOH substeps per rendered frame when ``sim_dt`` is omitted
-# (speed vs accuracy compromise vs one-step-per-frame).
-DEFAULT_SIM_STEPS_PER_FRAME = 20
+# Live ceiling on ZOH substeps per rendered frame during auto ``sim_dt``
+# (prefer not lagging even when the offline auto-``dt`` is tiny).
+DEFAULT_SIM_STEPS_PER_FRAME = 10
+
+# Fraction of ``frame_dt`` reserved for integration during auto ``sim_dt``
+# calibration (leave most of the frame for draw / I/O — prefer not lagging).
+AUTO_SIM_DT_BUDGET_FRAC = 0.25
+
+# Timed probe frames after a discard warm-up when choosing auto ``sim_dt``.
+AUTO_SIM_DT_PROBE_REPEATS = 3
 
 # Minimum wall time between real-time overrun warnings (avoid per-frame spam).
 OVERRUN_WARN_INTERVAL_S = 2.0
@@ -59,10 +70,16 @@ class RealtimeSimulator:
     frame_dt : float
         Target wall time between frames in seconds (default ``1/30``).
     sim_dt : float, optional
-        Internal integration step for the ZOH hold. ``None`` (default) uses
-        ``frame_dt / 20`` — twenty integration substeps per rendered frame
-        (live-speed vs accuracy compromise). Pass a smaller value for finer
-        substeps, or ``frame_dt`` for one step per frame.
+        Internal integration step for the ZOH hold. ``None`` (default) picks
+        a live-friendly step at the start of :meth:`run`: time a short ZOH
+        probe, then choose as many substeps per ``frame_dt`` as fit in
+        ``AUTO_SIM_DT_BUDGET_FRAC`` of the frame budget (default 25%, so most
+        of the frame is left for draw / I/O). The fine-end cap is the coarser
+        of ``frame_dt / DEFAULT_SIM_STEPS_PER_FRAME`` and the offline
+        :class:`~minilink.simulation.simulator.Simulator` auto-``dt``
+        (``smallest_time_constant`` × scale) — never finer than offline would
+        use, and never more than the live substep ceiling. Pass an explicit
+        value to skip calibration.
     sync : str
         ``"locked"`` (default): advance exactly ``frame_dt`` of simulation
         time per frame — reproducible and JAX-friendly (constant ZOH shape).
@@ -88,9 +105,10 @@ class RealtimeSimulator:
     tf : float, optional
         Stop once the simulation time reaches ``tf``.
     verbose : bool
-        Print compact timing (default quiet): compile and warm-up durations,
-        then a live in-place per-frame line of compute time vs ``frame_dt``
-        budget (``ok`` / ``LATE``), and a short summary on stop.
+        Print framed setup / completion panels (default quiet), matching the
+        offline :class:`~minilink.simulation.simulator.Simulator` style, plus a
+        live in-place per-frame line of compute time vs ``frame_dt`` budget
+        (``ok`` / ``LATE``).
 
     Notes
     -----
@@ -135,6 +153,8 @@ class RealtimeSimulator:
 
         self.sys = sys
         self.frame_dt = float(frame_dt)
+        self._auto_sim_dt = sim_dt is None
+        # Provisional until :meth:`run` calibrates when ``sim_dt`` was omitted.
         self.sim_dt = self._resolve_sim_dt(sim_dt)
         self.sync = sync
         self.renderer = renderer
@@ -146,16 +166,13 @@ class RealtimeSimulator:
         self.verbose = bool(verbose)
         self.last_traj = None
         self.n_overruns = 0
+        self._compile_s = 0.0
 
         t_compile = time.perf_counter()
         self.compile_backend, self.evaluator = self._resolve_and_build_evaluator(
             compile_backend
         )
-        if self.verbose:
-            print(
-                f"RealtimeSimulator: compile backend={self.compile_backend!r}  "
-                f"{time.perf_counter() - t_compile:.3f}s"
-            )
+        self._compile_s = time.perf_counter() - t_compile
 
         # Build the live view up front so bad renderer names fail fast; the
         # window itself opens only inside run(). Lazy graphics import keeps
@@ -192,16 +209,38 @@ class RealtimeSimulator:
         sys = self.sys
         evaluator = self.evaluator
         frame_dt = self.frame_dt
-        sim_dt = self.sim_dt
 
         x = np.asarray(sys.x0 if x0 is None else x0, dtype=float).reshape(evaluator.n)
         t = float(t0)
         u = np.asarray(sys.get_u_from_input_ports(), dtype=float)
 
         t_warm = time.perf_counter()
+        if self._auto_sim_dt:
+            self.sim_dt = self._calibrate_sim_dt(x, u, t)
         self._warm_up(x, u, t)
+        warm_up_s = time.perf_counter() - t_warm
         if self.verbose:
-            print(f"RealtimeSimulator: warm-up  {time.perf_counter() - t_warm:.3f}s")
+            from minilink.simulation.sim_reporting import print_realtime_preamble
+
+            print_realtime_preamble(
+                system_name=sys.name,
+                n=evaluator.n,
+                m=evaluator.m,
+                x0=x,
+                t0=t,
+                frame_dt=frame_dt,
+                sim_dt=self.sim_dt,
+                sim_dt_auto=self._auto_sim_dt,
+                sync=self.sync,
+                compile_backend=self.compile_backend,
+                renderer=self.renderer,
+                compile_s=self._compile_s,
+                warm_up_s=warm_up_s,
+                tf=self.tf,
+                max_steps=self.max_steps,
+            )
+
+        sim_dt = self.sim_dt
 
         ts, xs, us = [t], [x.copy()], [u.copy()]
 
@@ -271,11 +310,10 @@ class RealtimeSimulator:
                 if self.verbose:
                     tag = "LATE" if wall_frame_s > frame_dt else "ok"
                     msg = (
-                        f"RealtimeSimulator: t={t:.2f}s  "
-                        f"compute={wall_frame_s * 1000:.1f}ms / "
+                        f"t={t:.2f}s  compute={wall_frame_s * 1000:.1f}ms / "
                         f"budget={frame_dt * 1000:.1f}ms  {tag}"
                     )
-                    print(f"\r{msg:<80}", end="", flush=True)
+                    print(f"\r{msg:<72}", end="", flush=True)
                     status_open = True
 
                 if should_stop:
@@ -299,10 +337,15 @@ class RealtimeSimulator:
                 self.output.close()
 
         if self.verbose:
+            from minilink.simulation.sim_reporting import print_realtime_report
+
             wall_s = time.perf_counter() - run_wall_start
-            print(
-                f"RealtimeSimulator: done  frames={step_idx}  "
-                f"overruns={self.n_overruns}  wall={wall_s:.3f}s"
+            print_realtime_report(
+                elapsed_s=wall_s,
+                n_frames=step_idx,
+                n_overruns=self.n_overruns,
+                t_final=t,
+                x_final=x,
             )
 
         traj = Trajectory(
@@ -333,14 +376,74 @@ class RealtimeSimulator:
                 return BACKEND_NUMPY, self.sys.compile(backend=BACKEND_NUMPY)
         return compile_backend, self.sys.compile(backend=compile_backend)
 
+    def _offline_auto_dt(self):
+        """Same automatic ``dt`` the offline :class:`Simulator` would pick."""
+        info = self.sys.solver_info
+        if info.get("discontinuous_behavior", False):
+            scale = DISCONTINUOUS_AUTO_DT_SCALE
+        else:
+            scale = SMOOTH_AUTO_DT_SCALE
+        return float(info["smallest_time_constant"]) * scale
+
+    def _auto_n_sub_max(self):
+        """Max ZOH substeps/frame: offline auto-``dt`` floor, live ceiling.
+
+        Never refine past the offline Simulator auto-``dt``, and never take
+        more than ``DEFAULT_SIM_STEPS_PER_FRAME`` substeps (prefer not lagging).
+        """
+        offline_dt = max(self._offline_auto_dt(), np.finfo(float).eps)
+        n_from_offline = max(1, int(self.frame_dt // offline_dt))
+        return max(1, min(DEFAULT_SIM_STEPS_PER_FRAME, n_from_offline))
+
     def _resolve_sim_dt(self, sim_dt):
-        """Explicit ``sim_dt``, or ``frame_dt / DEFAULT_SIM_STEPS_PER_FRAME``."""
+        """Explicit ``sim_dt``, or provisional finest auto grid until calibrate."""
         if sim_dt is not None:
             sim_dt = float(sim_dt)
             if sim_dt <= 0.0:
                 raise ValueError(f"sim_dt must be positive, got {sim_dt}")
             return sim_dt
-        return self.frame_dt / DEFAULT_SIM_STEPS_PER_FRAME
+        return self.frame_dt / self._auto_n_sub_max()
+
+    def _calibrate_sim_dt(self, x, u, t):
+        """Choose ``sim_dt`` so a frame of ZOH work fits under a real-time budget.
+
+        Probes the finest allowed grid (``_auto_n_sub_max`` substeps — offline
+        auto-``dt`` floor capped by the live substep ceiling), estimates cost
+        per substep, then picks the largest ``n_sub`` that fits in
+        ``AUTO_SIM_DT_BUDGET_FRAC * frame_dt``.
+        """
+        frame_dt = self.frame_dt
+        n_probe = self._auto_n_sub_max()
+        sim_dt_probe = frame_dt / n_probe
+        evaluator = self.evaluator
+
+        def _one_frame():
+            x_out = evaluator.integrate_zoh(x, u, t, frame_dt, dt_inner=sim_dt_probe)
+            if getattr(evaluator, "backend", "numpy") == "jax":
+                import jax
+
+                jax.block_until_ready(x_out)
+            return x_out
+
+        # Discard warm-up (JIT / cache) before timing.
+        _one_frame()
+
+        times = []
+        for _ in range(AUTO_SIM_DT_PROBE_REPEATS):
+            t0 = time.perf_counter()
+            _one_frame()
+            times.append(time.perf_counter() - t0)
+        times.sort()
+        probe_s = times[len(times) // 2]
+
+        cost_per_sub = probe_s / n_probe
+        budget_s = AUTO_SIM_DT_BUDGET_FRAC * frame_dt
+        if cost_per_sub <= 0.0:
+            n_sub = n_probe
+        else:
+            n_sub = int(budget_s // cost_per_sub)
+        n_sub = max(1, min(n_probe, n_sub))
+        return frame_dt / n_sub
 
     def _quantize_dt_hold(self, wall_elapsed):
         """Snap the measured elapsed to a multiple of ``sim_dt`` and clamp it.

@@ -945,15 +945,64 @@ class TestRealtimeSimulator(unittest.TestCase):
         )
         self.assertGreater(rt_sim.n_overruns, 0)
 
-    def test_auto_sim_dt_defaults_to_frame_dt_over_20(self):
+    def test_auto_sim_dt_calibrates_and_caps_at_live_ceiling(self):
         frame_dt = 1 / 30.0
         rt_sim = RealtimeSimulator(
             StableLinearSystem(),
             frame_dt=frame_dt,
             renderer=None,
+            compile_backend="numpy",
             max_steps=1,
         )
-        self.assertAlmostEqual(rt_sim.sim_dt, frame_dt / 20)
+        # Default plant offline_dt=1e-4 → many steps fit; live ceiling (10) binds.
+        self.assertAlmostEqual(rt_sim.sim_dt, frame_dt / 10)
+        rt_sim.run()
+        self.assertAlmostEqual(rt_sim.sim_dt, frame_dt / 10)
+        self.assertTrue(rt_sim._auto_sim_dt)
+
+    def test_auto_sim_dt_fine_cap_follows_offline_auto_dt(self):
+        frame_dt = 1 / 30.0
+        sys = StableLinearSystem()
+        # Offline auto dt = 0.1 * 0.1 = 0.01 → only ~3 offline steps per frame.
+        sys.solver_info["smallest_time_constant"] = 0.1
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=frame_dt,
+            renderer=None,
+            compile_backend="numpy",
+            max_steps=1,
+        )
+        n_max = rt_sim._auto_n_sub_max()
+        self.assertEqual(n_max, 3)
+        self.assertAlmostEqual(rt_sim.sim_dt, frame_dt / 3)
+        rt_sim.run()
+        self.assertAlmostEqual(rt_sim.sim_dt, frame_dt / 3)
+
+    def test_auto_sim_dt_coarsens_when_probe_is_expensive(self):
+        import time as time_mod
+
+        frame_dt = 0.05
+        rt_sim = RealtimeSimulator(
+            StableLinearSystem(),
+            frame_dt=frame_dt,
+            renderer=None,
+            compile_backend="numpy",
+            max_steps=1,
+        )
+        real_zoh = rt_sim.evaluator.integrate_zoh
+        n_cap = rt_sim._auto_n_sub_max()
+
+        def slow_zoh(x, u, t, dt_hold, dt_inner=None):
+            # ~3 ms per substep → probe exceeds the quarter-frame budget.
+            n_sub = max(1, int(round(float(dt_hold) / float(dt_inner))))
+            time_mod.sleep(0.003 * n_sub)
+            return real_zoh(x, u, t, dt_hold, dt_inner=dt_inner)
+
+        with patch.object(rt_sim.evaluator, "integrate_zoh", side_effect=slow_zoh):
+            rt_sim.run()
+        n_sub = int(round(frame_dt / rt_sim.sim_dt))
+        self.assertLess(n_sub, n_cap)
+        self.assertGreaterEqual(n_sub, 1)
 
     def test_verbose_prints_compile_warmup_and_frame_status(self):
         buf = io.StringIO()
@@ -967,8 +1016,11 @@ class TestRealtimeSimulator(unittest.TestCase):
                 verbose=True,
             ).run()
         out = buf.getvalue()
-        self.assertIn("compile", out)
-        self.assertIn("warm-up", out)
-        self.assertIn("compute", out)
-        self.assertIn("budget", out)
-        self.assertIn("done", out)
+        self.assertIn("Real-Time Simulation", out)
+        self.assertIn("compile:", out)
+        self.assertIn("warm-up:", out)
+        self.assertIn("Running live session", out)
+        self.assertIn("compute=", out)
+        self.assertIn("budget=", out)
+        self.assertIn("Completed in", out)
+        self.assertIn("n_frames:", out)

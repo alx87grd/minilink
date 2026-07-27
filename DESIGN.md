@@ -332,18 +332,21 @@ and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
   publishes to an optional
   :class:`~minilink.simulation.realtime.io.RealtimeOutput` (cosimulation hook).
   **Clocks:** ``frame_dt`` (wall period per rendered frame) is independent of
-  ``sim_dt`` (internal integration step; default ``frame_dt / 20`` — twenty
-  substeps per viz frame, live-speed vs accuracy compromise; pass a smaller
-  ``sim_dt`` for finer accuracy or ``frame_dt`` for one step per frame);
+  ``sim_dt`` (internal integration step; default auto-calibrates at
+  :meth:`~minilink.simulation.realtime.simulator.RealtimeSimulator.run` from a
+  short ZOH probe so integration stays under a quarter of the frame budget;
+  the fine-end cap is the coarser of the live substep ceiling (10/frame) and
+  the offline ``Simulator`` auto-``dt`` from ``smallest_time_constant``;
+  pass an explicit ``sim_dt`` to skip);
   ``sync="locked"`` (default) advances exactly
   ``frame_dt`` of sim time per frame (reproducible, single JAX trace), while
   ``sync="realtime"`` advances the measured wall elapsed quantized to the
   ``sim_dt`` grid. ``compile_backend=None`` / ``"auto"`` tries JAX then
   NumPy (preferring speed for live sessions); frames that miss the
   ``frame_dt`` budget emit a throttled :class:`UserWarning`. JIT is warmed
-  before the clock starts. ``verbose=True`` prints compact compile and
-  warm-up timings plus a live per-frame compute-vs-``frame_dt`` line.
-  The run returns a
+  before the clock starts. ``verbose=True`` prints framed setup / completion
+  panels (same style as offline ``Simulator``) plus a live per-frame
+  compute-vs-``frame_dt`` line. The run returns a
   :class:`~minilink.core.trajectory.Trajectory` (one sample per frame) and the
   ``sys.game()`` facade caches it on ``self.traj``.
   :class:`~minilink.simulation.realtime.pygame_input.PygameInput` maps held
