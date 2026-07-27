@@ -360,7 +360,6 @@ def plot_comparison(result: ComparisonResult, *, figsize=(10, 4)):
     axes[1].set_title("Forward dynamics timing")
     axes[1].grid(True, axis="y", alpha=0.3)
 
-    fig_time = fig_err
     return fig_err, axes
 
 
