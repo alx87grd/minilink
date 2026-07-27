@@ -394,6 +394,17 @@ class TestManipulatorCatalog(unittest.TestCase):
         inertia_rate_power = 0.5 * dq @ Hdot @ dq
         np.testing.assert_allclose(coriolis_power, inertia_rate_power, atol=1e-8)
 
+    def test_ur5_aba_matches_rnea_forward_dynamics(self):
+        arm = UR5Manipulator()
+        rng = np.random.default_rng(0)
+        for _ in range(8):
+            q = rng.uniform(-1.0, 1.0, 6)
+            v = rng.uniform(-1.0, 1.0, 6)
+            u = rng.uniform(-5.0, 5.0, 6)
+            qdd_rnea = arm.forward_dynamics(q, v, u)
+            qdd_aba = arm.forward_dynamics_aba(q, v, u)
+            np.testing.assert_allclose(qdd_aba, qdd_rnea, rtol=0.0, atol=1e-10)
+
     def test_ur5_params_override_and_skin(self):
         arm = UR5Manipulator()
         q = np.linspace(-0.4, 0.3, 6)

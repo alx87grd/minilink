@@ -238,6 +238,97 @@ class UR5Manipulator(Manipulator):
                 force[i - 1] = force[i - 1] + Xup[i].T @ force[i]
         return xp.stack(tau[::-1])
 
+    def _aba(self, q, dq, tau, params=None, *, gravity=True):
+        """Articulated-body forward dynamics — O(n) generalized accelerations."""
+        params = self.params if params is None else params
+        xp = array_module(q, dq, tau)
+        q = xp.asarray(q)
+        dq = xp.asarray(dq)
+        tau = xp.asarray(tau)
+        a, d, alpha, mass, com, inertia = _as_params(
+            params, "a", "d", "alpha", "mass", "com", "inertia", like=q
+        )
+        gravity_value = xp.asarray(params["gravity"])
+        a_grav = xp.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0]) * gravity_value
+        if not gravity:
+            a_grav = xp.zeros(6)
+        z = xp.array([0.0, 0.0, 1.0])
+
+        Xup = []
+        S_list = []
+        v = []
+        c = []
+        Ia = []
+        pa = []
+        parent_motion = xp.zeros(6)
+        for i in range(self.dof):
+            T = _dh_transform(q[i], d[i], a[i], alpha[i])
+            R = T[:3, :3]
+            r = T[:3, 3]
+            Rt = R.T
+            X = xp.concatenate(
+                [
+                    xp.concatenate([Rt, xp.zeros((3, 3))], axis=1),
+                    xp.concatenate([-Rt @ _skew(r), Rt], axis=1),
+                ],
+                axis=0,
+            )
+            S = xp.concatenate([Rt @ z, Rt @ xp.cross(z, r)])
+            Xup.append(X)
+            S_list.append(S)
+
+            joint_motion = S * dq[i]
+            vi = X @ parent_motion + joint_motion
+            ci = _motion_cross(vi) @ joint_motion
+            I = _spatial_inertia(mass[i], com[i], inertia[i])
+            v.append(vi)
+            c.append(ci)
+            Ia.append(I)
+            pa.append(-_motion_cross(vi).T @ (I @ vi))
+            parent_motion = vi
+
+        U = []
+        d_inv = []
+        u = []
+        for i in reversed(range(self.dof)):
+            Ui = Ia[i] @ S_list[i]
+            di = S_list[i] @ Ui
+            ui = tau[i] - S_list[i] @ pa[i]
+            U.append(Ui)
+            d_inv.append(xp.reciprocal(di))
+            u.append(ui)
+            if i > 0:
+                Ii = Ia[i] - xp.outer(Ui, Ui) * d_inv[-1]
+                pai = pa[i] + Ii @ c[i] + Ui * ui * d_inv[-1]
+                Ia[i - 1] = Ia[i - 1] + Xup[i].T @ Ii @ Xup[i]
+                pa[i - 1] = pa[i - 1] + Xup[i].T @ pai
+        U.reverse()
+        d_inv.reverse()
+        u.reverse()
+
+        qdd_parts = []
+        a = xp.zeros(6)
+        for i in range(self.dof):
+            if i == 0:
+                ai = Xup[i] @ a_grav + c[i]
+            else:
+                ai = Xup[i] @ a + c[i]
+            qdd_i = (u[i] - U[i] @ ai) * d_inv[i]
+            qdd_parts.append(qdd_i)
+            a = ai + S_list[i] * qdd_i
+        return xp.stack(qdd_parts)
+
+    def forward_dynamics_aba(self, q, v, u, t=0.0, params=None):
+        """Forward dynamics via articulated-body algorithm (no explicit ``H``)."""
+        params = self.params if params is None else params
+        xp = array_module(q, v, u)
+        q = xp.asarray(q)
+        v = xp.asarray(v)
+        u = xp.asarray(u)
+        tau = self.generalized_force(q, v, u, t, params)
+        d = self.d(q, v, u, t, params)
+        return self._aba(q, v, tau - d, params, gravity=True)
+
     def H(self, q, params=None):
         """Joint-space inertia matrix."""
         params = self.params if params is None else params
