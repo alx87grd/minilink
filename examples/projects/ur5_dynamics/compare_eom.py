@@ -1,4 +1,8 @@
-"""Compare UR5 forward-dynamics paths: RNEA–H, ABA, and symbolic Lagrange."""
+"""UR5 forward-dynamics comparison helpers (RNEA–H, ABA, symbolic Lagrange).
+
+Teaching walkthrough: ``eom_comparison.ipynb`` in this folder.
+Quick text smoke: ``run_demo.py``.
+"""
 
 from __future__ import annotations
 
@@ -13,11 +17,12 @@ DEFAULT_N_TIMING = 200
 DEFAULT_Q_RANGE = (-1.0, 1.0)
 DEFAULT_V_RANGE = (-1.0, 1.0)
 DEFAULT_U_RANGE = (-5.0, 5.0)
+N_NAMED_CASES = 3
 
 
 @dataclass
 class MethodStats:
-    """Aggregate acceleration error statistics vs RNEA–H."""
+    """Acceleration error statistics vs RNEA–H."""
 
     name: str
     per_sample_max: np.ndarray
@@ -51,6 +56,9 @@ class ComparisonResult:
     methods: dict[str, MethodStats] = field(default_factory=dict)
     timing_ms: dict[str, float] = field(default_factory=dict)
     timing_per_config_ms: dict[str, np.ndarray] = field(default_factory=dict)
+
+
+# Public API
 
 
 def sample_configurations(
@@ -129,50 +137,6 @@ def forward_dynamics_symbolic(plant, q, v, u):
     return plant.forward_dynamics(q, v, u)
 
 
-def max_acceleration_error(reference, candidate):
-    return float(np.max(np.abs(reference - candidate)))
-
-
-def per_joint_error(reference, candidate):
-    return np.abs(reference - candidate)
-
-
-def _warmup(arm, symbolic_plant, q, v, u, params):
-    forward_dynamics_rnea_h(arm, q, v, u, params)
-    forward_dynamics_aba(arm, q, v, u, params)
-    if symbolic_plant is not None:
-        forward_dynamics_symbolic(symbolic_plant, q, v, u)
-
-
-def benchmark_method(func, configs, n_repeat, *args):
-    """
-    Median wall time per call [s] cycling through *configs*.
-
-    Each repeat evaluates one configuration from the list.
-    """
-    n_cfg = len(configs)
-    times = []
-    for k in range(n_repeat):
-        q, v, u = configs[k % n_cfg]
-        t0 = time.perf_counter()
-        func(q, v, u, *args)
-        times.append(time.perf_counter() - t0)
-    return float(np.median(times))
-
-
-def benchmark_method_per_config(func, configs, n_repeat_per_config, *args):
-    """Median wall time [s] for each configuration."""
-    medians = []
-    for q, v, u in configs:
-        times = []
-        for _ in range(n_repeat_per_config):
-            t0 = time.perf_counter()
-            func(q, v, u, *args)
-            times.append(time.perf_counter() - t0)
-        medians.append(float(np.median(times)))
-    return np.asarray(medians)
-
-
 def comprehensive_comparison(
     arm,
     symbolic_plant,
@@ -191,24 +155,23 @@ def comprehensive_comparison(
     if case_labels is None:
         case_labels = [f"sample {i:03d}" for i in range(len(configs))]
 
-    method_errors = {}
+    method_errors = {"ABA": {"max": [], "per_joint": []}}
     if symbolic_plant is not None:
         method_errors["Symbolic"] = {"max": [], "per_joint": []}
-    method_errors["ABA"] = {"max": [], "per_joint": []}
 
     for q, v, u in configs:
         qdd_ref = forward_dynamics_rnea_h(arm, q, v, u, params)
         qdd_aba = forward_dynamics_aba(arm, q, v, u, params)
-        method_errors["ABA"]["max"].append(max_acceleration_error(qdd_ref, qdd_aba))
-        method_errors["ABA"]["per_joint"].append(per_joint_error(qdd_ref, qdd_aba))
+        method_errors["ABA"]["max"].append(_max_acceleration_error(qdd_ref, qdd_aba))
+        method_errors["ABA"]["per_joint"].append(_per_joint_error(qdd_ref, qdd_aba))
 
         if symbolic_plant is not None:
             qdd_sym = forward_dynamics_symbolic(symbolic_plant, q, v, u)
             method_errors["Symbolic"]["max"].append(
-                max_acceleration_error(qdd_ref, qdd_sym)
+                _max_acceleration_error(qdd_ref, qdd_sym)
             )
             method_errors["Symbolic"]["per_joint"].append(
-                per_joint_error(qdd_ref, qdd_sym)
+                _per_joint_error(qdd_ref, qdd_sym)
             )
 
     q0, v0, u0 = configs[0]
@@ -216,14 +179,14 @@ def comprehensive_comparison(
 
     timing_ms = {
         "RNEA-H": 1e3
-        * benchmark_method(
+        * _benchmark_method(
             lambda q, v, u, p: forward_dynamics_rnea_h(arm, q, v, u, p),
             configs,
             n_timing,
             params,
         ),
         "ABA": 1e3
-        * benchmark_method(
+        * _benchmark_method(
             lambda q, v, u, p: forward_dynamics_aba(arm, q, v, u, p),
             configs,
             n_timing,
@@ -231,7 +194,7 @@ def comprehensive_comparison(
         ),
     }
     if symbolic_plant is not None:
-        timing_ms["Symbolic"] = 1e3 * benchmark_method(
+        timing_ms["Symbolic"] = 1e3 * _benchmark_method(
             lambda q, v, u: forward_dynamics_symbolic(symbolic_plant, q, v, u),
             configs,
             n_timing,
@@ -239,14 +202,14 @@ def comprehensive_comparison(
 
     timing_per_config = {
         "RNEA-H": 1e3
-        * benchmark_method_per_config(
+        * _benchmark_method_per_config(
             lambda q, v, u, p: forward_dynamics_rnea_h(arm, q, v, u, p),
             configs,
             max(3, n_timing // len(configs)),
             params,
         ),
         "ABA": 1e3
-        * benchmark_method_per_config(
+        * _benchmark_method_per_config(
             lambda q, v, u, p: forward_dynamics_aba(arm, q, v, u, p),
             configs,
             max(3, n_timing // len(configs)),
@@ -254,7 +217,7 @@ def comprehensive_comparison(
         ),
     }
     if symbolic_plant is not None:
-        timing_per_config["Symbolic"] = 1e3 * benchmark_method_per_config(
+        timing_per_config["Symbolic"] = 1e3 * _benchmark_method_per_config(
             lambda q, v, u: forward_dynamics_symbolic(symbolic_plant, q, v, u),
             configs,
             max(3, n_timing // len(configs)),
@@ -280,16 +243,55 @@ def comprehensive_comparison(
     )
 
 
-def format_stats_row(stats: MethodStats, timing_ms: float, label_width=12) -> str:
-    return (
-        f"{stats.name:<{label_width}}  "
-        f"{stats.max:12.3e}  {stats.mean:12.3e}  {stats.rms:12.3e}  "
-        f"{stats.p95:12.3e}  {timing_ms:10.3f}"
-    )
+def accuracy_summary(result: ComparisonResult) -> list[dict[str, float | str]]:
+    """Rows for accuracy and timing tables (notebook or CLI)."""
+    rows = [
+        {
+            "method": "RNEA-H (ref)",
+            "max_abs_dqdd": 0.0,
+            "mean_abs_dqdd": 0.0,
+            "rms_abs_dqdd": 0.0,
+            "p95_abs_dqdd": 0.0,
+            "median_ms": result.timing_ms["RNEA-H"],
+        }
+    ]
+    for name, stats in result.methods.items():
+        rows.append(
+            {
+                "method": name,
+                "max_abs_dqdd": stats.max,
+                "mean_abs_dqdd": stats.mean,
+                "rms_abs_dqdd": stats.rms,
+                "p95_abs_dqdd": stats.p95,
+                "median_ms": result.timing_ms[name],
+            }
+        )
+    return rows
+
+
+def named_case_summary(result: ComparisonResult) -> list[dict[str, float | str]]:
+    """Per named pose max |Δqdd| vs RNEA–H."""
+    rows = []
+    for i in range(min(N_NAMED_CASES, result.n_samples)):
+        row = {
+            "case": result.case_labels[i],
+            "aba_max_abs_dqdd": result.methods["ABA"].per_sample_max[i],
+        }
+        if "Symbolic" in result.methods:
+            row["symbolic_max_abs_dqdd"] = result.methods[
+                "Symbolic"
+            ].per_sample_max[i]
+        rows.append(row)
+    return rows
+
+
+def aba_speedup(result: ComparisonResult) -> float:
+    """Median RNEA–H time divided by median ABA time."""
+    return result.timing_ms["RNEA-H"] / max(result.timing_ms["ABA"], 1e-12)
 
 
 def print_comprehensive_report(result: ComparisonResult, *, label_width=12):
-    """Human-readable accuracy and timing summary."""
+    """Human-readable accuracy and timing summary (CLI smoke)."""
     print(f"Seed = {result.seed}, samples = {result.n_samples}")
     print("Reference: RNEA–H (catalog forward_dynamics)\n")
     header = (
@@ -298,41 +300,43 @@ def print_comprehensive_report(result: ComparisonResult, *, label_width=12):
     )
     print(header)
     print("-" * len(header))
-    print(
-        f"{'RNEA-H (ref)':<{label_width}}  "
-        f"{'0':>12}  {'0':>12}  {'0':>12}  {'0':>12}  "
-        f"{result.timing_ms['RNEA-H']:10.3f}"
-    )
-    for name, stats in result.methods.items():
-        print(format_stats_row(stats, result.timing_ms[name], label_width))
+    for row in accuracy_summary(result):
+        if row["method"] == "RNEA-H (ref)":
+            print(
+                f"{row['method']:<{label_width}}  "
+                f"{'0':>12}  {'0':>12}  {'0':>12}  {'0':>12}  "
+                f"{row['median_ms']:10.3f}"
+            )
+        else:
+            print(
+                f"{row['method']:<{label_width}}  "
+                f"{row['max_abs_dqdd']:12.3e}  {row['mean_abs_dqdd']:12.3e}  "
+                f"{row['rms_abs_dqdd']:12.3e}  {row['p95_abs_dqdd']:12.3e}  "
+                f"{row['median_ms']:10.3f}"
+            )
 
     print("\nNamed case studies (max |Δqdd| vs RNEA–H):")
-    n_named = min(3, result.n_samples)
-    for i in range(n_named):
-        label = result.case_labels[i]
-        aba_err = result.methods["ABA"].per_sample_max[i]
-        line = f"  {label:<28}  ABA {aba_err:.3e}"
-        if "Symbolic" in result.methods:
-            sym_err = result.methods["Symbolic"].per_sample_max[i]
-            line += f"  Symbolic {sym_err:.3e}"
+    for row in named_case_summary(result):
+        line = f"  {row['case']:<28}  ABA {row['aba_max_abs_dqdd']:.3e}"
+        if "symbolic_max_abs_dqdd" in row:
+            line += f"  Symbolic {row['symbolic_max_abs_dqdd']:.3e}"
         print(line)
 
-    speedup = result.timing_ms["RNEA-H"] / max(result.timing_ms["ABA"], 1e-12)
-    print(f"\nABA median speedup vs RNEA–H: {speedup:.2f}×")
+    print(f"\nABA median speedup vs RNEA–H: {aba_speedup(result):.2f}×")
 
 
 def plot_comparison(result: ComparisonResult, *, figsize=(10, 4)):
     """
-    Matplotlib figures: per-sample errors and median timings.
+    Accuracy and timing figures for the random batch.
 
-    Returns ``(fig_err, fig_time)``.
+    Returns ``(fig, axes)``.
     """
     import matplotlib.pyplot as plt
 
-    n_random = result.n_samples - min(3, result.n_samples)
+    n_random = result.n_samples - min(N_NAMED_CASES, result.n_samples)
     random_start = result.n_samples - n_random
 
-    fig_err, axes = plt.subplots(1, 2, figsize=figsize, constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=figsize, constrained_layout=True)
 
     x = np.arange(n_random)
     axes[0].semilogy(x, result.methods["ABA"].per_sample_max[random_start:], label="ABA")
@@ -360,8 +364,70 @@ def plot_comparison(result: ComparisonResult, *, figsize=(10, 4)):
     axes[1].set_title("Forward dynamics timing")
     axes[1].grid(True, axis="y", alpha=0.3)
 
-    return fig_err, axes
+    return fig, axes
 
 
-# Backward-compatible alias used by early run_demo.
-run_parity_table = print_comprehensive_report
+def plot_per_joint_errors(result: ComparisonResult, *, figsize=(7, 3.5)):
+    """Bar chart of worst per-joint |Δqdd| over the full batch."""
+    import matplotlib.pyplot as plt
+
+    joints = np.arange(1, 7)
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    ax.bar(joints - 0.15, result.methods["ABA"].per_joint_max, width=0.3, label="ABA")
+    if "Symbolic" in result.methods:
+        ax.bar(
+            joints + 0.15,
+            result.methods["Symbolic"].per_joint_max,
+            width=0.3,
+            label="Symbolic",
+        )
+    ax.set_yscale("log")
+    ax.set_xlabel("Joint index")
+    ax.set_ylabel("max |Δqdd_j| vs RNEA–H")
+    ax.set_title("Worst per-joint error over all samples")
+    ax.legend()
+    ax.grid(True, axis="y", alpha=0.3)
+    return fig, ax
+
+
+# Internal machinery
+
+
+def _max_acceleration_error(reference, candidate):
+    return float(np.max(np.abs(reference - candidate)))
+
+
+def _per_joint_error(reference, candidate):
+    return np.abs(reference - candidate)
+
+
+def _warmup(arm, symbolic_plant, q, v, u, params):
+    forward_dynamics_rnea_h(arm, q, v, u, params)
+    forward_dynamics_aba(arm, q, v, u, params)
+    if symbolic_plant is not None:
+        forward_dynamics_symbolic(symbolic_plant, q, v, u)
+
+
+def _benchmark_method(func, configs, n_repeat, *args):
+    """Median wall time per call [s] cycling through *configs*."""
+    n_cfg = len(configs)
+    times = []
+    for k in range(n_repeat):
+        q, v, u = configs[k % n_cfg]
+        t0 = time.perf_counter()
+        func(q, v, u, *args)
+        times.append(time.perf_counter() - t0)
+    return float(np.median(times))
+
+
+def _benchmark_method_per_config(func, configs, n_repeat_per_config, *args):
+    """Median wall time [s] for each configuration."""
+    medians = []
+    for q, v, u in configs:
+        times = []
+        for _ in range(n_repeat_per_config):
+            t0 = time.perf_counter()
+            func(q, v, u, *args)
+            times.append(time.perf_counter() - t0)
+        medians.append(float(np.median(times)))
+    return np.asarray(medians)

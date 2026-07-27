@@ -1,18 +1,14 @@
-"""Compare UR5 equation-of-motion techniques: RNEA–H, ABA, symbolic Lagrange.
+"""UR5 EoM comparison — quick text smoke (teaching notebook is the main entry).
 
-Run from repo root::
+Full textbook walkthrough with math, plots, and tables:
+
+    examples/projects/ur5_dynamics/eom_comparison.ipynb
+
+Run this script for a fast reproducible summary without opening the notebook::
 
     PYTHONPATH=. python examples/projects/ur5_dynamics/run_demo.py
 
-Optional environment variables:
-
-* ``UR5_SKIP_SYMBOLIC=1`` — skip the slow SymPy derive/export step.
-* ``UR5_SYMBOLIC_VERBOSE=1`` — print symbolic build timings.
-* ``UR5_N_SAMPLES`` — random samples after named case studies (default 64).
-* ``UR5_SEED`` — RNG seed (default 0).
-* ``UR5_N_TIMING`` — timing repeats (default 200).
-
-Textbook walkthrough with plots: ``eom_comparison.ipynb`` in this folder.
+Set ``UR5_SKIP_SYMBOLIC=1`` to skip the slow SymPy build.
 """
 
 import os
@@ -39,27 +35,18 @@ arm = UR5Manipulator()
 params = catalog_params_no_damping()
 configs, labels = build_evaluation_batch(seed=seed, n_random=n_samples)
 
-print("UR5 forward dynamics — EoM technique comparison")
-print("Reference: RNEA bias + explicit H solve (catalog forward_dynamics)")
-print("Damping disabled so symbolic Lagrange plant matches spatial parameters.")
-print(f"Evaluation batch: {len(labels) - n_samples} named cases + {n_samples} random (seed={seed})")
+print("Teaching notebook: examples/projects/ur5_dynamics/eom_comparison.ipynb")
+print("Quick smoke below (same batch as the notebook, seed=%d)\n" % seed)
 
 symbolic_plant = None
-if os.environ.get("UR5_SKIP_SYMBOLIC", "").strip().lower() in {"1", "true", "yes"}:
-    print("\nSkipping symbolic path (UR5_SKIP_SYMBOLIC set).")
-else:
+if os.environ.get("UR5_SKIP_SYMBOLIC", "").strip().lower() not in {"1", "true", "yes"}:
     try:
-        verbose = os.environ.get("UR5_SYMBOLIC_VERBOSE", "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-        }
-        symbolic_plant = build_symbolic_ur5(verbose=verbose)
-    except ImportError:
-        print(
-            "\nSymPy not installed — skipping symbolic Lagrange path."
-            " Install with: pip install minilink[symbolic]"
+        symbolic_plant = build_symbolic_ur5(
+            verbose=os.environ.get("UR5_SYMBOLIC_VERBOSE", "").strip().lower()
+            in {"1", "true", "yes"}
         )
+    except ImportError:
+        print("SymPy not installed — ABA-only comparison.\n")
 
 result = comprehensive_comparison(
     arm,
