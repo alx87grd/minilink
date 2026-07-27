@@ -1,5 +1,7 @@
 import unittest
 import warnings
+import contextlib
+import io
 from types import SimpleNamespace
 from unittest.mock import patch
 import numpy as np
@@ -942,3 +944,31 @@ class TestRealtimeSimulator(unittest.TestCase):
             f"expected real-time overrun warning, got {messages!r}",
         )
         self.assertGreater(rt_sim.n_overruns, 0)
+
+    def test_auto_sim_dt_defaults_to_frame_dt_over_20(self):
+        frame_dt = 1 / 30.0
+        rt_sim = RealtimeSimulator(
+            StableLinearSystem(),
+            frame_dt=frame_dt,
+            renderer=None,
+            max_steps=1,
+        )
+        self.assertAlmostEqual(rt_sim.sim_dt, frame_dt / 20)
+
+    def test_verbose_prints_compile_warmup_and_frame_status(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            RealtimeSimulator(
+                StableLinearSystem(),
+                frame_dt=0.01,
+                renderer=None,
+                compile_backend="numpy",
+                max_steps=2,
+                verbose=True,
+            ).run()
+        out = buf.getvalue()
+        self.assertIn("compile", out)
+        self.assertIn("warm-up", out)
+        self.assertIn("compute", out)
+        self.assertIn("budget", out)
+        self.assertIn("done", out)

@@ -705,7 +705,8 @@ class DynamicSystemFacades:
         with a :class:`~minilink.simulation.realtime.pygame_input.PygameInput`
         keyboard source: held keys command the input-port bounds, the plant
         advances in sync with the wall clock (``frame_dt`` per rendered frame,
-        integrated internally at ``sim_dt``), and the session returns a
+        integrated internally at ``sim_dt``, defaulting to ``frame_dt / 20``),
+        and the session returns a
         :class:`~minilink.core.trajectory.Trajectory` when the user quits
         (ESC or window close), also stored in :attr:`traj` for later
         ``plot_trajectory`` / ``animate``.

@@ -39,7 +39,7 @@ q0 = arm.inverse_kinematics(p0, q_guess=q_guess)
 arm.x0 = arm.q2x(q0, np.zeros(6))
 
 
-ctl = TaskImpedance(arm, gravity_comp=GRAVITY_COMP, show_task_force=True)
+ctl = TaskImpedance(arm, gravity_comp=GRAVITY, show_task_force=True)
 ctl.params["Kp"] = np.array([200.0, 200.0, 200.0])
 ctl.params["Kd"] = np.array([40.0, 40.0, 40.0])
 ctl.task_force_scale = 0.05
@@ -50,8 +50,10 @@ diagram.inputs["r"].set_nominal_value(p0)  # rate-mode setpoint starts at the to
 rt_sim = RealtimeSimulator(
     diagram,
     frame_dt=1 / 30,
+    sim_dt=0.05 / 30,
     renderer="meshcat",
     is_3d=True,
+    verbose=True,
     input=PygameInput(
         mode="rate",
         rate=0.3,  # setpoint slew in m/s while a key is held

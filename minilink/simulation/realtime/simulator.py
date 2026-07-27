@@ -31,14 +31,14 @@ from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
-from minilink.simulation.simulator import (
-    DISCONTINUOUS_AUTO_DT_SCALE,
-    SMOOTH_AUTO_DT_SCALE,
-)
 
 # In ``sync="realtime"`` the measured wall elapsed is clamped to this many
 # frame periods so a stall (window drag, GC pause) cannot inject a huge step.
 MAX_DT_HOLD_FRAMES = 4
+
+# Default ZOH substeps per rendered frame when ``sim_dt`` is omitted
+# (speed vs accuracy compromise vs one-step-per-frame).
+DEFAULT_SIM_STEPS_PER_FRAME = 20
 
 # Minimum wall time between real-time overrun warnings (avoid per-frame spam).
 OVERRUN_WARN_INTERVAL_S = 2.0
@@ -59,10 +59,10 @@ class RealtimeSimulator:
     frame_dt : float
         Target wall time between frames in seconds (default ``1/30``).
     sim_dt : float, optional
-        Internal integration step for the ZOH hold. ``None`` derives it from
-        ``sys.solver_info`` with the same heuristic as the offline
-        :class:`~minilink.simulation.simulator.Simulator`, clamped to
-        ``frame_dt``.
+        Internal integration step for the ZOH hold. ``None`` (default) uses
+        ``frame_dt / 20`` — twenty integration substeps per rendered frame
+        (live-speed vs accuracy compromise). Pass a smaller value for finer
+        substeps, or ``frame_dt`` for one step per frame.
     sync : str
         ``"locked"`` (default): advance exactly ``frame_dt`` of simulation
         time per frame — reproducible and JAX-friendly (constant ZOH shape).
@@ -87,6 +87,10 @@ class RealtimeSimulator:
         Stop after this many frames (headless smoke / CI).
     tf : float, optional
         Stop once the simulation time reaches ``tf``.
+    verbose : bool
+        Print compact timing (default quiet): compile and warm-up durations,
+        then a live in-place per-frame line of compute time vs ``frame_dt``
+        budget (``ok`` / ``LATE``), and a short summary on stop.
 
     Notes
     -----
@@ -113,6 +117,7 @@ class RealtimeSimulator:
         compile_backend=None,
         max_steps=None,
         tf=None,
+        verbose=False,
     ):
         if not isinstance(sys, DynamicSystem):
             raise TypeError(
@@ -138,12 +143,19 @@ class RealtimeSimulator:
         self.output = output
         self.max_steps = max_steps
         self.tf = tf
+        self.verbose = bool(verbose)
         self.last_traj = None
         self.n_overruns = 0
 
+        t_compile = time.perf_counter()
         self.compile_backend, self.evaluator = self._resolve_and_build_evaluator(
             compile_backend
         )
+        if self.verbose:
+            print(
+                f"RealtimeSimulator: compile backend={self.compile_backend!r}  "
+                f"{time.perf_counter() - t_compile:.3f}s"
+            )
 
         # Build the live view up front so bad renderer names fail fast; the
         # window itself opens only inside run(). Lazy graphics import keeps
@@ -186,7 +198,10 @@ class RealtimeSimulator:
         t = float(t0)
         u = np.asarray(sys.get_u_from_input_ports(), dtype=float)
 
+        t_warm = time.perf_counter()
         self._warm_up(x, u, t)
+        if self.verbose:
+            print(f"RealtimeSimulator: warm-up  {time.perf_counter() - t_warm:.3f}s")
 
         ts, xs, us = [t], [x.copy()], [u.copy()]
 
@@ -212,6 +227,8 @@ class RealtimeSimulator:
         last_frame_start = time.perf_counter()
         last_overrun_warn_s = None
         self.n_overruns = 0
+        run_wall_start = time.perf_counter()
+        status_open = False
         try:
             while True:
                 frame_start = time.perf_counter()
@@ -251,6 +268,16 @@ class RealtimeSimulator:
                         wall_frame_s, last_overrun_warn_s
                     )
 
+                if self.verbose:
+                    tag = "LATE" if wall_frame_s > frame_dt else "ok"
+                    msg = (
+                        f"RealtimeSimulator: t={t:.2f}s  "
+                        f"compute={wall_frame_s * 1000:.1f}ms / "
+                        f"budget={frame_dt * 1000:.1f}ms  {tag}"
+                    )
+                    print(f"\r{msg:<80}", end="", flush=True)
+                    status_open = True
+
                 if should_stop:
                     break
                 if self.max_steps is not None and step_idx >= self.max_steps:
@@ -262,12 +289,21 @@ class RealtimeSimulator:
                 if sleep_s > 0.0:
                     time.sleep(sleep_s)
         finally:
+            if self.verbose and status_open:
+                print()
             if backend is not None:
                 backend.close_scene()
             if self.input is not None:
                 self.input.close()
             if self.output is not None:
                 self.output.close()
+
+        if self.verbose:
+            wall_s = time.perf_counter() - run_wall_start
+            print(
+                f"RealtimeSimulator: done  frames={step_idx}  "
+                f"overruns={self.n_overruns}  wall={wall_s:.3f}s"
+            )
 
         traj = Trajectory(
             t=np.asarray(ts), x=np.column_stack(xs), u=np.column_stack(us)
@@ -298,18 +334,13 @@ class RealtimeSimulator:
         return compile_backend, self.sys.compile(backend=compile_backend)
 
     def _resolve_sim_dt(self, sim_dt):
-        """Explicit ``sim_dt``, or the offline auto-``dt`` heuristic clamped to a frame."""
+        """Explicit ``sim_dt``, or ``frame_dt / DEFAULT_SIM_STEPS_PER_FRAME``."""
         if sim_dt is not None:
             sim_dt = float(sim_dt)
             if sim_dt <= 0.0:
                 raise ValueError(f"sim_dt must be positive, got {sim_dt}")
             return sim_dt
-        info = self.sys.solver_info
-        if info.get("discontinuous_behavior", False):
-            scale = DISCONTINUOUS_AUTO_DT_SCALE
-        else:
-            scale = SMOOTH_AUTO_DT_SCALE
-        return min(float(info["smallest_time_constant"]) * scale, self.frame_dt)
+        return self.frame_dt / DEFAULT_SIM_STEPS_PER_FRAME
 
     def _quantize_dt_hold(self, wall_elapsed):
         """Snap the measured elapsed to a multiple of ``sim_dt`` and clamp it.
