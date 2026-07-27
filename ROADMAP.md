@@ -45,7 +45,7 @@ release process by themselves.
 | Geometry / spatial | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Architecture validation; scene bind later. |
 | Graphics / animation | 4 | Frame-keyed `tf` / geometry / overlays; `Animator`. | Renderer polish. |
 | Realtime simulation | 2 | `RealtimeSimulator` + pygame I/O; live draw. | Architectural review. |
-| Dynamics (abstraction + catalog) | 6 | Plants QA'd; `MechanicalSystem` / `Manipulator`; arms rebased. UR5 `f` uses RNEA bias + \(H\) (not naive \(C,g\)). | Optional `f_ext`; shared RNEA serial stack + ABA (Later). |
+| Dynamics (abstraction + catalog) | 6 | Plants QA'd; `MechanicalSystem` / `Manipulator`; arms rebased. UR5 `f` uses spatial **ABA**; `H`/`C`/`g` via RNEA. | Optional `f_ext`; shared RNEA serial stack (Later). |
 | Analysis | 5 | Linearize, structural, equilibria, modal, selected-channel Bode. | Frequency completion (priority 1). |
 | Control | 6 | Linear, LQR, PID; model-based SMC; robotic impedance/kinematic. | Robotic PID wrappers; traj LQR; SMC demos. |
 | Blocks | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | MLP later. |
@@ -121,12 +121,11 @@ it from [docs/plans/README.md](docs/plans/README.md).
 - **Shared RNEA serial-chain stack** (not copy-paste per 6-DoF arm): extract
   DH + spatial RNEA helpers (or a thin `SerialRneaManipulator` base) so catalog
   plants only supply `a`/`d`/`alpha`, mass/COM/inertia; keep public `H`/`C`/`g`
-  on the mechanical API. Pair with ABA forward dynamics below when touching
-  this path.
-- **ABA forward dynamics** for RNEA plants (e.g. UR5): keep public `H` / `C` /
-  `g` for teaching and controllers; replace `forward_dynamics` / `f` assembly
-  (`H` via \(n\) RNEA columns + bias) with Articulated-Body Algorithm so
-  integration does not form \(H\) each step
+  on the mechanical API.
+- **ABA on other RNEA arms** (pattern from UR5): keep public `H` / `C` /
+  `g` for teaching; use Articulated-Body Algorithm for `forward_dynamics` /
+  `f` so integration does not form \(H\) each step. UR5 catalog plant done;
+  generalize when adding the next spatial manipulator.
 
 **Out of scope** (by decision — see [DESIGN.md](DESIGN.md)):
 

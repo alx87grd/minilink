@@ -123,13 +123,13 @@ def build_evaluation_batch(seed=DEFAULT_SEED, n_random=DEFAULT_N_SAMPLES):
 
 
 def forward_dynamics_rnea_h(arm, q, v, u, params):
-    """Explicit ``H`` assembly + linear solve (catalog default)."""
-    return arm.forward_dynamics(q, v, u, params=params)
+    """Explicit ``H`` assembly + linear solve (teaching / verification)."""
+    return arm.forward_dynamics_rnea_h(q, v, u, params=params)
 
 
 def forward_dynamics_aba(arm, q, v, u, params):
-    """Articulated-body algorithm (no explicit ``H``)."""
-    return arm.forward_dynamics_aba(q, v, u, params=params)
+    """Articulated-body algorithm (catalog default ``forward_dynamics``)."""
+    return arm.forward_dynamics(q, v, u, params=params)
 
 
 def forward_dynamics_symbolic(plant, q, v, u):

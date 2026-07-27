@@ -16,11 +16,11 @@ DEFAULT_ROLLOUT_SOLVER = "rk4_fixedsteps"
 DEFAULT_ROLLOUT_BACKEND = "jax"
 
 
-class UR5ManipulatorABA(UR5Manipulator):
-    """Catalog UR5 with :meth:`forward_dynamics` routed through ABA."""
+class UR5ManipulatorRNEA(UR5Manipulator):
+    """Catalog UR5 with :meth:`forward_dynamics` routed through RNEA–H."""
 
     def forward_dynamics(self, q, v, u, t=0.0, params=None):
-        return self.forward_dynamics_aba(q, v, u, t, params)
+        return self.forward_dynamics_rnea_h(q, v, u, t, params)
 
 
 @dataclass
@@ -136,8 +136,8 @@ def rollout_comparison(
     Reference trajectory: RNEA–H. Reports state errors and separate compile /
     JIT warm-up / rollout timings.
     """
-    rnea = configure_rollout_plant(UR5Manipulator(), params)
-    aba = configure_rollout_plant(UR5ManipulatorABA(), params)
+    rnea = configure_rollout_plant(UR5ManipulatorRNEA(), params)
+    aba = configure_rollout_plant(UR5Manipulator(), params)
 
     n_steps = int(round(tf / dt)) + 1
     result = RolloutComparisonResult(

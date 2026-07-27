@@ -401,8 +401,8 @@ class TestManipulatorCatalog(unittest.TestCase):
             q = rng.uniform(-1.0, 1.0, 6)
             v = rng.uniform(-1.0, 1.0, 6)
             u = rng.uniform(-5.0, 5.0, 6)
-            qdd_rnea = arm.forward_dynamics(q, v, u)
-            qdd_aba = arm.forward_dynamics_aba(q, v, u)
+            qdd_rnea = arm.forward_dynamics_rnea_h(q, v, u)
+            qdd_aba = arm.forward_dynamics(q, v, u)
             np.testing.assert_allclose(qdd_aba, qdd_rnea, rtol=0.0, atol=1e-10)
 
     def test_ur5_params_override_and_skin(self):

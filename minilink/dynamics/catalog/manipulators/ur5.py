@@ -11,6 +11,9 @@ methods run under NumPy and trace under JAX via ``array_module``.
 Equation of motion::
 
     H(q) qdd + C(q, qd) qd + d(q, qd) + g(q) = tau
+
+Forward dynamics (``forward_dynamics`` / ``f``) uses the spatial **ABA**;
+``H``, ``C``, and ``g`` remain available via RNEA for analysis.
 """
 
 import numpy as np
@@ -99,8 +102,8 @@ class UR5Manipulator(Manipulator):
     factory-calibrated representation.
 
     Equation paths (``H``/``C``/``g``/``d``, FK, ``J``, ``tf``) are NumPy/JAX
-    native-array: pass NumPy arrays for ordinary use, or JAX arrays for JIT,
-    gradients, and ``compile_backend="jax"`` simulation.
+    native-array. Forward dynamics and ``f`` use the spatial ABA; ``H``/``C``/``g``
+    remain RNEA-based for analysis.
     """
 
     def __init__(self):
@@ -318,8 +321,8 @@ class UR5Manipulator(Manipulator):
             a = ai + S_list[i] * qdd_i
         return xp.stack(qdd_parts)
 
-    def forward_dynamics_aba(self, q, v, u, t=0.0, params=None):
-        """Forward dynamics via articulated-body algorithm (no explicit ``H``)."""
+    def forward_dynamics(self, q, v, u, t=0.0, params=None):
+        """Forward dynamics via articulated-body algorithm (default simulation path)."""
         params = self.params if params is None else params
         xp = array_module(q, v, u)
         q = xp.asarray(q)
@@ -328,6 +331,23 @@ class UR5Manipulator(Manipulator):
         tau = self.generalized_force(q, v, u, t, params)
         d = self.d(q, v, u, t, params)
         return self._aba(q, v, tau - d, params, gravity=True)
+
+    def forward_dynamics_rnea_h(self, q, v, u, t=0.0, params=None):
+        """Forward dynamics via RNEA bias + explicit ``H`` (teaching / verification)."""
+        params = self.params if params is None else params
+        xp = array_module(q, v, u)
+        q = xp.asarray(q)
+        v = xp.asarray(v)
+        u = xp.asarray(u)
+        H = self.H(q, params)
+        bias = self._rnea(q, v, xp.zeros(self.dof), params, gravity=True)
+        d = self.d(q, v, u, t, params)
+        tau = self.generalized_force(q, v, u, t, params)
+        return xp.linalg.solve(H, tau - bias - d)
+
+    def forward_dynamics_aba(self, q, v, u, t=0.0, params=None):
+        """Alias of :meth:`forward_dynamics` (explicit ABA name for comparisons)."""
+        return self.forward_dynamics(q, v, u, t, params)
 
     def H(self, q, params=None):
         """Joint-space inertia matrix."""
@@ -354,19 +374,6 @@ class UR5Manipulator(Manipulator):
         bias = self._rnea(q, dq, xp.zeros(self.dof), params, gravity=False)
         C = xp.outer(bias, dq) / denom
         return xp.where(speed_squared < 1e-12, xp.zeros((self.dof, self.dof)), C)
-
-    def forward_dynamics(self, q, v, u, t=0.0, params=None):
-        """Forward dynamics via RNEA bias ``C v + g`` (avoids ill-conditioned ``C``)."""
-        params = self.params if params is None else params
-        xp = array_module(q, v, u)
-        q = xp.asarray(q)
-        v = xp.asarray(v)
-        u = xp.asarray(u)
-        H = self.H(q, params)
-        bias = self._rnea(q, v, xp.zeros(self.dof), params, gravity=True)
-        d = self.d(q, v, u, t, params)
-        tau = self.generalized_force(q, v, u, t, params)
-        return xp.linalg.solve(H, tau - bias - d)
 
     def g(self, q, params=None):
         """Gravity generalized force."""
