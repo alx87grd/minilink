@@ -73,7 +73,7 @@ class MassSpringDamper(DynamicSystem):
         k = 4.0
         c = 0.3
 
-        p =x[0]
+        p = x[0]
         pdot = x[1]
         F = u[0]
 
@@ -186,9 +186,13 @@ problem = PlanningProblem(
     cost=QuadraticCost.from_system(sys, Q=np.diag([1.0, 1.0, 0.0, 0.0]), xbar=x_goal),
     tf=5.0,
 )
-traj = TrajectoryOptimizationPlanner(
-    problem, n_steps=50, transcription="direct_collocation"
-).solve().trajectory
+traj = (
+    TrajectoryOptimizationPlanner(
+        problem, n_steps=50, transcription="direct_collocation"
+    )
+    .solve()
+    .trajectory
+)
 ```
 
 ### Plant catalog
