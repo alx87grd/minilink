@@ -20,6 +20,7 @@ from minilink.dynamics.catalog.equations.integrators import (
     TripleIntegrator,
 )
 from minilink.dynamics.catalog.equations.oscillators import VanderPol
+from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkPlanarManipulator,
     OneLinkManipulator,
@@ -72,6 +73,18 @@ class TestCatalogSmoke(unittest.TestCase):
         np.testing.assert_allclose(
             VanderPol(mu=0.5).f(np.array([1.0, 2.0]), np.array([0.0])), [2.0, -1.0]
         )
+
+    def test_three_body_energy_and_dynamics(self):
+        sys = ThreeBodyProblem(preset="figure_eight")
+        x0 = sys.x0
+        dx = sys.f(x0, np.array([]))
+        self.assertEqual(dx.shape, (18,))
+        np.testing.assert_allclose(dx[0:3], x0[3:6])
+        e0 = sys.total_energy(x0)
+        self.assertLess(e0, 0.0)
+        traj = sys.compute_trajectory(tf=1.0, n_steps=400, show=False, verbose=False)
+        e_drift = abs(sys.total_energy(traj.x[:, -1]) - e0) / abs(e0)
+        self.assertLess(e_drift, 1e-2)
 
     def test_mass_spring_damper_reference_matrices(self):
         single = SingleMass(mass=2.0, k=4.0, b=6.0)

@@ -20,6 +20,7 @@ from minilink.dynamics.catalog.aerial.drone import (
 )
 from minilink.dynamics.catalog.aerial.plane import Plane2D
 from minilink.dynamics.catalog.aerial.rocket import Rocket
+from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
 from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
     SimpleIntegrator,
@@ -103,6 +104,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("DoubleIntegrator", DoubleIntegrator),
     CatalogCheckEntry("TripleIntegrator", TripleIntegrator),
     CatalogCheckEntry("VanderPol", lambda: VanderPol(mu=0.5)),
+    CatalogCheckEntry("ThreeBodyProblem", ThreeBodyProblem),
     CatalogCheckEntry(
         "TransferFunction",
         lambda: TransferFunction([1.0], [1.0, 1.0]),
