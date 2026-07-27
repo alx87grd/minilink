@@ -5,10 +5,11 @@ from minilink.dynamics.catalog.equations.integrators import (
     SimpleIntegrator,
     TripleIntegrator,
 )
-from minilink.dynamics.catalog.equations.oscillators import VanderPol
+from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
 
 __all__ = [
     "DoubleIntegrator",
+    "Lorenz",
     "SimpleIntegrator",
     "TripleIntegrator",
     "VanderPol",

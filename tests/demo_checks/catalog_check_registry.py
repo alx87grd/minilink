@@ -25,7 +25,7 @@ from minilink.dynamics.catalog.equations.integrators import (
     SimpleIntegrator,
     TripleIntegrator,
 )
-from minilink.dynamics.catalog.equations.oscillators import VanderPol
+from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkPlanarManipulator,
     OneLinkManipulator,
@@ -103,6 +103,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("DoubleIntegrator", DoubleIntegrator),
     CatalogCheckEntry("TripleIntegrator", TripleIntegrator),
     CatalogCheckEntry("VanderPol", lambda: VanderPol(mu=0.5)),
+    CatalogCheckEntry("Lorenz", Lorenz),
     CatalogCheckEntry(
         "TransferFunction",
         lambda: TransferFunction([1.0], [1.0, 1.0]),

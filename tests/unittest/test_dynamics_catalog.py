@@ -19,7 +19,7 @@ from minilink.dynamics.catalog.equations.integrators import (
     SimpleIntegrator,
     TripleIntegrator,
 )
-from minilink.dynamics.catalog.equations.oscillators import VanderPol
+from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkPlanarManipulator,
     OneLinkManipulator,
@@ -71,6 +71,13 @@ class TestCatalogSmoke(unittest.TestCase):
         )
         np.testing.assert_allclose(
             VanderPol(mu=0.5).f(np.array([1.0, 2.0]), np.array([0.0])), [2.0, -1.0]
+        )
+        np.testing.assert_allclose(
+            Lorenz().f(np.array([0.0, 0.0, 0.0]), np.array([])), [0.0, 0.0, 0.0]
+        )
+        np.testing.assert_allclose(
+            Lorenz().f(np.array([1.0, 1.0, 1.0]), np.array([])),
+            [0.0, 26.0, -5.0 / 3.0],
         )
 
     def test_mass_spring_damper_reference_matrices(self):
