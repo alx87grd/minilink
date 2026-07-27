@@ -173,6 +173,95 @@ def point_pose(p):
     return SE3(xp.eye(3), p)
 
 
+def plane_airframe_3d(
+    length=2.0,
+    width=0.2,
+    l_cg=None,
+    span=2.0,
+    chord_w=0.35,
+    chord_t=0.2,
+    span_t=0.7,
+    fin_height=0.35,
+    l_w=0.0,
+    l_t=None,
+    color="#2f6fed",
+    wing_color="#4c8cff",
+    tail_color="#3a7af0",
+):
+    """Body-frame solid airframe for meshcat (c.g. at the origin).
+
+    Axes match a standard aircraft body frame: ``+x`` forward, ``+y`` right,
+    ``+z`` down. The fuselage is an :class:`ExtrudedPolygon` side silhouette
+    (local XY = body ``x``–up, extruded along body ``y``); wing / horizontal
+    tail / vertical fin are thin :class:`Box` solids.
+    """
+    from minilink.core.kinematics import Rx
+
+    length = float(length)
+    width = float(width)
+    l_cg = 0.6 * length if l_cg is None else float(l_cg)
+    l_t = 0.45 * length if l_t is None else float(l_t)
+    span = float(span)
+    chord_w = float(chord_w)
+    chord_t = float(chord_t)
+    span_t = float(span_t)
+    fin_height = float(fin_height)
+    l_w = float(l_w)
+    half_h = 0.55 * width
+
+    nose = length - l_cg
+    tail = -l_cg
+    # Side silhouette in ExtrudedPolygon XY: +X forward, +Y toward body -Z (up).
+    fuselage_pts = np.array(
+        [
+            [nose, 0.0],
+            [0.72 * nose, half_h],
+            [0.15 * nose, half_h],
+            [tail + 0.12 * length, 0.45 * half_h],
+            [tail, 0.2 * half_h],
+            [tail, -0.25 * half_h],
+            [0.15 * nose, -0.65 * half_h],
+            [0.72 * nose, -0.45 * half_h],
+        ]
+    )
+    fuselage = ExtrudedPolygon(fuselage_pts, height=width, color=color, opacity=1.0)
+    # Map ExtrudedPolygon (X, Y, Z_extrude) → body (X, Y_right, Z_down).
+    fuselage.local_transform = SE3(Rx(-0.5 * np.pi), 0.0)
+
+    wing = Box(
+        length_x=chord_w,
+        length_y=span,
+        length_z=max(0.06 * width, 0.03),
+        center=(0.0, 0.0, 0.0),
+        color=wing_color,
+        opacity=1.0,
+    )
+    wing.local_transform = SE3(np.eye(3), np.array([-l_w, 0.0, 0.0]))
+
+    h_tail = Box(
+        length_x=chord_t,
+        length_y=span_t,
+        length_z=max(0.05 * width, 0.025),
+        center=(0.0, 0.0, 0.0),
+        color=tail_color,
+        opacity=1.0,
+    )
+    h_tail.local_transform = SE3(np.eye(3), np.array([-l_t, 0.0, 0.0]))
+
+    v_fin = Box(
+        length_x=chord_t,
+        length_y=0.03 * width,
+        length_z=fin_height,
+        center=(0.0, 0.0, 0.0),
+        color=tail_color,
+        opacity=1.0,
+    )
+    # Fin sits above the boom (body -Z); box center at half height.
+    v_fin.local_transform = SE3(np.eye(3), np.array([-l_t, 0.0, -0.5 * fin_height]))
+
+    return [fuselage, wing, h_tail, v_fin]
+
+
 __all__ = [
     "Arrow",
     "Box",
@@ -193,6 +282,7 @@ __all__ = [
     "segment_pose_2d",
     "link_pose_3d",
     "point_pose",
+    "plane_airframe_3d",
     "vehicle_body",
     "wheel_box",
 ]

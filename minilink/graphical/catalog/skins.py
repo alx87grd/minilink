@@ -24,6 +24,7 @@ from minilink.graphical.catalog.shapes import (
     Rod,
     Sphere,
     link_pose_3d,
+    plane_airframe_3d,
 )
 
 
@@ -135,6 +136,58 @@ def car_skin_3d(plant, color="#151922"):
         "body": [body, wheel_rl, wheel_rr],
         "wheel_fl": [wheel()],
         "wheel_fr": [wheel()],
+    }
+
+
+def plane_skin_3d(plant, color="#2f6fed"):
+    """3-D aircraft look: ground plane plus solid fuselage / wing / tails.
+
+    Frame keys: ``world`` (ground) and ``body`` (airframe solids with the c.g.
+    at the body-frame origin). Reads length / span / lever arms from plant
+    graphic attrs and ``params`` when present.
+    """
+    params = getattr(plant, "params", {}) or {}
+    length = float(getattr(plant, "length", params.get("length", 2.0)))
+    width = float(getattr(plant, "width", length / 10.0))
+    l_cg = float(getattr(plant, "l_cg", 0.6 * length))
+    span = float(getattr(plant, "span", params.get("b_w", max(1.5 * length, 1.0))))
+    l_w = float(params.get("l_w", 0.0))
+    l_t = float(params.get("l_t", 0.45 * length))
+    s_w = float(params.get("S_w", 0.2))
+    s_t = float(params.get("S_t", 0.05))
+    ar = float(params.get("AR", 5.0))
+    chord_w = float(np.sqrt(max(s_w / max(ar, 1e-6), 1e-6)))
+    chord_t = float(np.sqrt(max(s_t / max(ar, 1e-6), 1e-6)))
+    # Visual chord a bit larger than aero chord so the wing reads clearly.
+    chord_w = max(chord_w, 0.12 * length)
+    chord_t = max(chord_t, 0.08 * length)
+    ground_size = float(getattr(plant, "ground_plane_size", 200.0))
+
+    ground = Plane(
+        normal=[0.0, 0.0, 1.0],
+        offset=0.0,
+        size=ground_size,
+        thickness=0.04,
+        color=[0.72, 0.74, 0.78],
+        opacity=0.5,
+    )
+    airframe = plane_airframe_3d(
+        length=length,
+        width=width,
+        l_cg=l_cg,
+        span=span,
+        chord_w=chord_w,
+        chord_t=chord_t,
+        span_t=0.35 * span,
+        fin_height=0.22 * length,
+        l_w=l_w,
+        l_t=l_t,
+        color=color,
+    )
+    center = Sphere(radius=0.04 * length, color="black", opacity=1.0)
+    return {
+        "world": [ground],
+        "body": airframe + [center],
     }
 
 

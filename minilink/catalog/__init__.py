@@ -68,6 +68,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "Drone2DWithSideThruster",
     ),
     "Plane2D": ("minilink.dynamics.catalog.aerial", "Plane2D"),
+    "Plane3D": ("minilink.dynamics.catalog.aerial", "Plane3D"),
     "Rocket": ("minilink.dynamics.catalog.aerial", "Rocket"),
     "SpeedControlledDrone2D": (
         "minilink.dynamics.catalog.aerial",

@@ -33,6 +33,7 @@ from minilink.graphical.catalog.shapes import (
     ground_line,
     line_segment,
     link_pose_3d,
+    plane_airframe_3d,
     point_pose,
     segment_pose_2d,
     spring_between,
@@ -45,6 +46,7 @@ from minilink.graphical.catalog.skins import (
     car_skin_3d,
     debug_state_skin,
     merge_skins,
+    plane_skin_3d,
     ur5_skin,
 )
 
@@ -68,6 +70,7 @@ __all__ = [
     "line_segment",
     "segment_pose_2d",
     "link_pose_3d",
+    "plane_airframe_3d",
     "point_pose",
     "vehicle_body",
     "wheel_box",
@@ -79,6 +82,7 @@ __all__ = [
     "car_skin_3d",
     "debug_state_skin",
     "merge_skins",
+    "plane_skin_3d",
     "ur5_skin",
     # camera
     "camera_matrix",
