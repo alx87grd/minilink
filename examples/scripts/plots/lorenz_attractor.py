@@ -16,8 +16,8 @@ N_STEPS = 4000
 sys = Lorenz()
 sys.x0 = np.array([1.0, 1.0, 1.0])
 
-traj = sys.compute_trajectory(tf=TF, n_steps=N_STEPS, show=False, verbose=False)
-sys.plot_trajectory(traj, show=False)
+traj = sys.compute_trajectory(tf=TF, n_steps=N_STEPS, verbose=False)
+sys.plot_trajectory(traj)
 
 x, y, z = traj.x[0], traj.x[1], traj.x[2]
 fig = plt.figure()
@@ -27,4 +27,4 @@ ax.set_xlabel("x")
 ax.set_ylabel("y")
 ax.set_zlabel("z")
 ax.set_title("Lorenz attractor")
-plt.close(fig)
+plt.show()

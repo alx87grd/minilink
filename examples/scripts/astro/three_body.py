@@ -7,12 +7,14 @@ Run from repo root::
 
 from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
 
-TF = 6.3
-N_STEPS = 2000
+TF = 30.0
+N_STEPS = 30000
 
 sys = ThreeBodyProblem(preset="figure_eight")
 
-traj = sys.compute_trajectory(tf=TF, n_steps=N_STEPS, show=False, verbose=False)
+sys.x0[0] = 0.9
 
-sys.plot_trajectory(traj)
-sys.animate(traj=traj, show=False)
+traj = sys.compute_trajectory(tf=TF, n_steps=N_STEPS)
+
+# sys.plot_trajectory()
+sys.animate(renderer="meshcat")
