@@ -38,7 +38,24 @@ class TestDiagrams(unittest.TestCase):
 
     def test_plot_diagram_no_display_returns_graph(self):
         pytest.importorskip("graphviz")
-        graph = plot_diagram(Integrator(), show_inline=False, show_pdf=False)
+        graph = plot_diagram(
+            Integrator(), show=False, show_inline=False, show_pdf=False
+        )
+        self.assertIsNotNone(graph)
+        self.assertIn("Integrator", graph.source)
+
+    def test_plot_diagram_matplotlib_path_with_agg(self):
+        pytest.importorskip("graphviz")
+        import matplotlib
+
+        matplotlib.use("Agg", force=True)
+        from minilink.graphical.common.environment import override_env
+
+        override_env("script")
+        try:
+            graph = plot_diagram(Integrator(), show=True, show_inline=False)
+        finally:
+            override_env(None)
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
 
