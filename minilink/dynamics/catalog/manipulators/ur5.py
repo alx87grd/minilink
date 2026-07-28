@@ -11,6 +11,10 @@ methods run under NumPy and trace under JAX via ``array_module``.
 Equation of motion::
 
     H(q) qdd + C(q, qd) qd + d(q, qd) + g(q) = tau
+
+Forward dynamics (``forward_dynamics`` / ``f``) uses the spatial **ABA**;
+``inverse_dynamics`` uses spatial **RNEA**. ``H``, ``C``, and ``g`` remain
+available via RNEA for analysis and matrix-form checks.
 """
 
 import numpy as np
@@ -99,8 +103,9 @@ class UR5Manipulator(Manipulator):
     factory-calibrated representation.
 
     Equation paths (``H``/``C``/``g``/``d``, FK, ``J``, ``tf``) are NumPy/JAX
-    native-array: pass NumPy arrays for ordinary use, or JAX arrays for JIT,
-    gradients, and ``compile_backend="jax"`` simulation.
+    native-array. Forward dynamics and ``f`` use the spatial ABA;
+    ``inverse_dynamics`` uses spatial RNEA; ``H``/``C``/``g`` remain RNEA-based
+    for analysis and matrix-form checks.
     """
 
     def __init__(self):
@@ -238,6 +243,138 @@ class UR5Manipulator(Manipulator):
                 force[i - 1] = force[i - 1] + Xup[i].T @ force[i]
         return xp.stack(tau[::-1])
 
+    def _aba(self, q, dq, tau, params=None, *, gravity=True):
+        """Articulated-body forward dynamics — O(n) generalized accelerations."""
+        params = self.params if params is None else params
+        xp = array_module(q, dq, tau)
+        q = xp.asarray(q)
+        dq = xp.asarray(dq)
+        tau = xp.asarray(tau)
+        a, d, alpha, mass, com, inertia = _as_params(
+            params, "a", "d", "alpha", "mass", "com", "inertia", like=q
+        )
+        gravity_value = xp.asarray(params["gravity"])
+        a_grav = xp.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0]) * gravity_value
+        if not gravity:
+            a_grav = xp.zeros(6)
+        z = xp.array([0.0, 0.0, 1.0])
+
+        Xup = []
+        S_list = []
+        v = []
+        c = []
+        Ia = []
+        pa = []
+        parent_motion = xp.zeros(6)
+        for i in range(self.dof):
+            T = _dh_transform(q[i], d[i], a[i], alpha[i])
+            R = T[:3, :3]
+            r = T[:3, 3]
+            Rt = R.T
+            X = xp.concatenate(
+                [
+                    xp.concatenate([Rt, xp.zeros((3, 3))], axis=1),
+                    xp.concatenate([-Rt @ _skew(r), Rt], axis=1),
+                ],
+                axis=0,
+            )
+            S = xp.concatenate([Rt @ z, Rt @ xp.cross(z, r)])
+            Xup.append(X)
+            S_list.append(S)
+
+            joint_motion = S * dq[i]
+            vi = X @ parent_motion + joint_motion
+            ci = _motion_cross(vi) @ joint_motion
+            I = _spatial_inertia(mass[i], com[i], inertia[i])
+            v.append(vi)
+            c.append(ci)
+            Ia.append(I)
+            pa.append(-_motion_cross(vi).T @ (I @ vi))
+            parent_motion = vi
+
+        U = []
+        d_inv = []
+        u = []
+        for i in reversed(range(self.dof)):
+            Ui = Ia[i] @ S_list[i]
+            di = S_list[i] @ Ui
+            ui = tau[i] - S_list[i] @ pa[i]
+            U.append(Ui)
+            d_inv.append(xp.reciprocal(di))
+            u.append(ui)
+            if i > 0:
+                Ii = Ia[i] - xp.outer(Ui, Ui) * d_inv[-1]
+                pai = pa[i] + Ii @ c[i] + Ui * ui * d_inv[-1]
+                Ia[i - 1] = Ia[i - 1] + Xup[i].T @ Ii @ Xup[i]
+                pa[i - 1] = pa[i - 1] + Xup[i].T @ pai
+        U.reverse()
+        d_inv.reverse()
+        u.reverse()
+
+        qdd_parts = []
+        a = xp.zeros(6)
+        for i in range(self.dof):
+            if i == 0:
+                ai = Xup[i] @ a_grav + c[i]
+            else:
+                ai = Xup[i] @ a + c[i]
+            qdd_i = (u[i] - U[i] @ ai) * d_inv[i]
+            qdd_parts.append(qdd_i)
+            a = ai + S_list[i] * qdd_i
+        return xp.stack(qdd_parts)
+
+    def forward_dynamics(self, q, v, u, t=0.0, params=None):
+        """Forward dynamics via articulated-body algorithm (default simulation path)."""
+        params = self.params if params is None else params
+        xp = array_module(q, v, u)
+        q = xp.asarray(q)
+        v = xp.asarray(v)
+        u = xp.asarray(u)
+        tau = self.generalized_force(q, v, u, t, params)
+        d = self.d(q, v, u, t, params)
+        return self._aba(q, v, tau - d, params, gravity=True)
+
+    def forward_dynamics_rnea_h(self, q, v, u, t=0.0, params=None):
+        """Forward dynamics via RNEA bias + explicit ``H`` (teaching / verification)."""
+        params = self.params if params is None else params
+        xp = array_module(q, v, u)
+        q = xp.asarray(q)
+        v = xp.asarray(v)
+        u = xp.asarray(u)
+        H = self.H(q, params)
+        bias = self._rnea(q, v, xp.zeros(self.dof), params, gravity=True)
+        d = self.d(q, v, u, t, params)
+        tau = self.generalized_force(q, v, u, t, params)
+        return xp.linalg.solve(H, tau - bias - d)
+
+    def forward_dynamics_aba(self, q, v, u, t=0.0, params=None):
+        """Alias of :meth:`forward_dynamics` (explicit ABA name for comparisons)."""
+        return self.forward_dynamics(q, v, u, t, params)
+
+    def inverse_dynamics(self, q, v, acceleration, u=None, t=0.0, params=None):
+        """Inverse dynamics via spatial RNEA (default path)."""
+        params = self.params if params is None else params
+        return self._rnea(q, v, acceleration, params, gravity=True) + self.d(
+            q, v, u, t, params
+        )
+
+    def inverse_dynamics_matrix(self, q, v, acceleration, u=None, t=0.0, params=None):
+        """Inverse dynamics via explicit ``H``, ``C``, ``g`` (teaching / verification)."""
+        params = self.params if params is None else params
+        xp = array_module(q, v, acceleration)
+        q = xp.asarray(q)
+        v = xp.asarray(v)
+        acceleration = xp.asarray(acceleration)
+        H = self.H(q, params)
+        C = self.C(q, v, params)
+        g = self.g(q, params)
+        d = self.d(q, v, u, t, params)
+        return H @ acceleration + C @ v + g + d
+
+    def inverse_dynamics_rnea(self, q, v, acceleration, u=None, t=0.0, params=None):
+        """Alias of :meth:`inverse_dynamics` (explicit RNEA name for comparisons)."""
+        return self.inverse_dynamics(q, v, acceleration, u, t, params)
+
     def H(self, q, params=None):
         """Joint-space inertia matrix."""
         params = self.params if params is None else params
@@ -263,19 +400,6 @@ class UR5Manipulator(Manipulator):
         bias = self._rnea(q, dq, xp.zeros(self.dof), params, gravity=False)
         C = xp.outer(bias, dq) / denom
         return xp.where(speed_squared < 1e-12, xp.zeros((self.dof, self.dof)), C)
-
-    def forward_dynamics(self, q, v, u, t=0.0, params=None):
-        """Forward dynamics via RNEA bias ``C v + g`` (avoids ill-conditioned ``C``)."""
-        params = self.params if params is None else params
-        xp = array_module(q, v, u)
-        q = xp.asarray(q)
-        v = xp.asarray(v)
-        u = xp.asarray(u)
-        H = self.H(q, params)
-        bias = self._rnea(q, v, xp.zeros(self.dof), params, gravity=True)
-        d = self.d(q, v, u, t, params)
-        tau = self.generalized_force(q, v, u, t, params)
-        return xp.linalg.solve(H, tau - bias - d)
 
     def g(self, q, params=None):
         """Gravity generalized force."""
