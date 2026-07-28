@@ -71,7 +71,6 @@ def _execute_notebook(path: Path, *, timeout: float) -> tuple[str, str]:
     os.environ.setdefault("PYTHONPATH", str(REPO_ROOT))
     os.environ["MPLBACKEND"] = "Agg"
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-    os.environ.setdefault("MINILINK_NOTEBOOK_SMOKE", "1")
 
     try:
         nb = nbformat.read(path, as_version=4)

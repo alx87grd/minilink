@@ -156,6 +156,11 @@ graphics without re-implementing checks as pytest cases. The CI ``regression``
 job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated,
 and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not throw.
 
+Demos and teaching notebooks must **not** branch on smoke/CI env vars — the runner
+only sets headless display knobs. A contract test scans ``examples/notebooks/`` and
+``examples/scripts/`` for forbidden harness names (see
+``test_examples_have_no_smoke_env_hooks``).
+
 ```bash
 python tests/demo_checks/run_catalog_checks.py --fast
 # Flagship whitelist: subprocess each demo's __main__ (no demo source changes):

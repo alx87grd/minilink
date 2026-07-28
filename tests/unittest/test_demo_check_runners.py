@@ -13,12 +13,22 @@ Notebook smoke checks run in the CI ``regression`` job (and via
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# Env / symbols that belong only in tests/demo_checks — never in teaching demos.
+_FORBIDDEN_DEMO_HARNESS = re.compile(
+    r"MINILINK_NOTEBOOK_SMOKE|_NOTEBOOK_SMOKE\b|MINILINK_.*_SMOKE"
+)
+_DEMO_ROOTS = (
+    REPO_ROOT / "examples" / "notebooks",
+    REPO_ROOT / "examples" / "scripts",
+)
 
 
 class TestDemoCheckRunners(unittest.TestCase):
@@ -33,6 +43,25 @@ class TestDemoCheckRunners(unittest.TestCase):
             text=True,
             check=False,
         )
+
+    def test_examples_have_no_smoke_env_hooks(self):
+        """Teaching demos must not branch on CI/smoke env vars."""
+        hits: list[str] = []
+        for root in _DEMO_ROOTS:
+            if not root.is_dir():
+                continue
+            for path in root.rglob("*"):
+                if path.suffix not in {".py", ".ipynb"} or not path.is_file():
+                    continue
+                text = path.read_text(encoding="utf-8")
+                if _FORBIDDEN_DEMO_HARNESS.search(text):
+                    hits.append(path.relative_to(REPO_ROOT).as_posix())
+        if hits:
+            self.fail(
+                "examples/notebooks and examples/scripts must not contain smoke/"
+                "CI harness hooks (adapt in tests/demo_checks instead):\n  "
+                + "\n  ".join(hits)
+            )
 
     def test_catalog_checks_fast_exit_zero(self):
         proc = self._run(
