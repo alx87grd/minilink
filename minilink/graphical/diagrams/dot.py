@@ -118,9 +118,26 @@ def _render_diagram_graph(
 
             import matplotlib.pyplot as plt
 
-            png = graph.pipe(format="png")
+            # Graphviz default DPI is ~96; bump for a sharper Matplotlib window.
+            prev_dpi = graph.graph_attr.get("dpi")
+            graph.graph_attr["dpi"] = "200"
+            try:
+                png = graph.pipe(format="png")
+            finally:
+                if prev_dpi is None:
+                    graph.graph_attr.pop("dpi", None)
+                else:
+                    graph.graph_attr["dpi"] = prev_dpi
+
             img = plt.imread(io.BytesIO(png), format="png")
-            fig, ax = plt.subplots()
+            height, width = img.shape[:2]
+            fig_dpi = 100.0
+            # High-res PNG; shrink the window a bit vs 1:1 pixel mapping.
+            scale = 0.65
+            fig, ax = plt.subplots(
+                figsize=(scale * width / fig_dpi, scale * height / fig_dpi),
+                dpi=fig_dpi,
+            )
             ax.imshow(img)
             ax.axis("off")
             fig.tight_layout(pad=0)
