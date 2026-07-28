@@ -142,7 +142,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | `minilink/blocks/neural.py` | MLP block (JAX) | Prototype; pyro RL is SB3-only |
 | `minilink/symbolic/` | Symbolic derivation | Quarantine; no pyro equivalent |
 | `minilink/dynamics/engines/` | Contact, ANCF tire (JAX) | Experimental physics engines |
-| `examples/scripts/mpc/` | Rate MPC closed-loop demos | Minilink extra; no pyro MPC module |
+| `examples/demos/mpc/` | Rate MPC closed-loop demos | Minilink extra; no pyro MPC module |
 
 ---
 
@@ -168,7 +168,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `courses/udes_gro501/mass-spring-dampers/one_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
 | `courses/udes_gro501/mass-spring-dampers/three_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
 | `courses/udes_gro501/mass-spring-dampers/two_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro501/phaseplane/demo.py` | **Done** | examples/scripts/plots/plot_phase_plane.py |
+| `courses/udes_gro501/phaseplane/demo.py` | **Done** | examples/demos/plots/plot_phase_plane.py |
 | `courses/udes_gro640/prob/abcd1234.py` | **TODO** | Robot control; blocked on control/robotic.py |
 | `courses/udes_gro640/prob/demo_crash_commande_en_position.py` | **TODO** | Robot control; blocked on control/robotic.py |
 | `courses/udes_gro640/prob/gro640_robots.py` | **TODO** | Robot control; blocked on control/robotic.py |
@@ -176,10 +176,10 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `courses/udes_gro640/prob/test_commande_en_position.py` | **TODO** | Robot control; blocked on control/robotic.py |
 | `courses/udes_gro640/prob/test_f.py` | **TODO** | Robot control; blocked on control/robotic.py |
 | `courses/udes_gro640/prob/test_trajectoire_3D.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro860/dp_demo_swingup.py` | **Done** | examples/scripts/planning/value_iteration/vi_pendulum.py |
-| `courses/udes_gro860/dp_mass_min_time_optimal.py` | **Done** | examples/scripts/planning/value_iteration/vi_basics.py |
+| `courses/udes_gro860/dp_demo_swingup.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py |
+| `courses/udes_gro860/dp_mass_min_time_optimal.py` | **Done** | examples/demos/planning/value_iteration/vi_basics.py |
 | `courses/udes_gro860/dp_mass_min_time_policy_evaluation.py` | **Partial** | Core tool demos exist; course variant not ported |
-| `courses/udes_gro860/lqr_cartpole_stab.py` | **Done** | examples/scripts/statespace/cartpole_lqr.py |
+| `courses/udes_gro860/lqr_cartpole_stab.py` | **Done** | examples/demos/statespace/cartpole_lqr.py |
 | `courses/udes_gro860/lqr_cartpole_traj.py` | **Partial** | Core tool demos exist; course variant not ported |
 | `courses/udes_gro860/rl_drone_demo_learning2fly.py` | **Drop** | RL + Stable-Baselines3; interfaces/gymnasium TODO |
 | `courses/udes_gro860/rl_drone_demo_training.py` | **Drop** | RL + Stable-Baselines3; interfaces/gymnasium TODO |
@@ -196,12 +196,12 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/boat/boat_with_ppo_demo.py` | **TODO** | Representative closed-loop for boat |
 | `demos_by_system/car_dynamic/demo_oversteer.py` | **TODO** | Representative closed-loop for car_dynamic |
 | `demos_by_system/car_dynamic/demo_understeer.py` | **TODO** | Representative closed-loop for car_dynamic |
-| `demos_by_system/car_dynamic/dynamic_bicycle.py` | **Done** | examples/scripts/animation/game_bicycle.py |
+| `demos_by_system/car_dynamic/dynamic_bicycle.py` | **Done** | examples/demos/animation/game_bicycle.py |
 | `demos_by_system/car_propulsion/longitudinal_car_braking_value_iteration.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/car_propulsion/longitudinal_car_with_torque_input.py` | **TODO** | Representative closed-loop for car_propulsion |
 | `demos_by_system/car_steering/bicycle.py` | **TODO** | Representative closed-loop for car_steering |
 | `demos_by_system/car_steering/bicycle_exploration_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
-| `demos_by_system/car_steering/bicycle_parallel_parking_with_rrt.py` | **Partial** | examples/scripts/planning/rrt/rrt_car_parking.py |
+| `demos_by_system/car_steering/bicycle_parallel_parking_with_rrt.py` | **Partial** | examples/demos/planning/rrt/rrt_car_parking.py |
 | `demos_by_system/car_steering/car.py` | **TODO** | Representative closed-loop for car_steering |
 | `demos_by_system/car_steering/car_trajectory_optimisation.py` | **Done** | examples/projects/car_trajopt/car_trajopt_*.py |
 | `demos_by_system/car_steering/car_trajectory_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
@@ -210,10 +210,10 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/car_steering/car_with_valueiteration_quadratic_cost.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/cartpole/cartpole_LQG.py` | **TODO** | estimation/kalman.py |
 | `demos_by_system/cartpole/cartpole_demo.py` | **TODO** | Open-loop cartpole showcase |
-| `demos_by_system/cartpole/cartpole_stabilization.py` | **Partial** | examples/scripts/statespace/cartpole_lqr.py |
-| `demos_by_system/cartpole/cartpole_with_lqr.py` | **Done** | examples/scripts/statespace/cartpole_lqr.py |
+| `demos_by_system/cartpole/cartpole_stabilization.py` | **Partial** | examples/demos/statespace/cartpole_lqr.py |
+| `demos_by_system/cartpole/cartpole_with_lqr.py` | **Done** | examples/demos/statespace/cartpole_lqr.py |
 | `demos_by_system/cartpole/cartpole_with_trajectory_optimization.py` | **Partial** | trajopt framework; cartpole-specific demo TODO |
-| `demos_by_system/cartpole_rotating/cartpole_modes.py` | **Partial** | Use examples/scripts/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/cartpole_rotating/cartpole_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
 | `demos_by_system/cartpole_rotating/cartpole_natural_behavior.py` | **TODO** | Representative closed-loop for cartpole_rotating |
 | `demos_by_system/cartpole_rotating/cartpole_swingup_trajectory_optimisation.py` | **Partial** | Trajopt done; plant-specific demo TODO |
 | `demos_by_system/cartpole_rotating/cartpole_with_computed_torque.py` | **TODO** | control/modelbased.py |
@@ -231,22 +231,22 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/equations/simple_integrator.py` | **TODO** | Representative closed-loop for equations |
 | `demos_by_system/equations/triple_integrator.py` | **TODO** | Representative closed-loop for equations |
 | `demos_by_system/equations/vanderpol.py` | **TODO** | Representative closed-loop for equations |
-| `demos_by_system/holonomic_mobile_robot/holonomic_mobile_robot_exploration_with_obstacles_with_rrt.py` | **Done** | examples/scripts/planning/rrt/rrt_holonomic_obstacles.py |
+| `demos_by_system/holonomic_mobile_robot/holonomic_mobile_robot_exploration_with_obstacles_with_rrt.py` | **Done** | examples/demos/planning/rrt/rrt_holonomic_obstacles.py |
 | `demos_by_system/holonomic_mobile_robot/holonomic_mobile_robot_exploration_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
 | `demos_by_system/holonomic_mobile_robot/holonomic_mobile_robot_with_valueiteration.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/mass_spring_damper/single_mass_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/mass_spring_damper/three_mass_dynamic.py` | **TODO** | Representative closed-loop for mass_spring_damper |
-| `demos_by_system/mass_spring_damper/three_mass_eigen_modes.py` | **Partial** | Use examples/scripts/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/mass_spring_damper/three_mass_eigen_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
 | `demos_by_system/mass_spring_damper/three_mass_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/mass_spring_damper/three_mass_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/mass_spring_damper/two_mass_dynamic.py` | **TODO** | Representative closed-loop for mass_spring_damper |
-| `demos_by_system/mass_spring_damper/two_mass_eigen_modes.py` | **Partial** | Use examples/scripts/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/mass_spring_damper/two_mass_eigen_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
 | `demos_by_system/mass_spring_damper/two_mass_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/mass_spring_damper/two_mass_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/mountain_car/mountain_car_with_valueiteration_quadratic.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/pendulum_double/double_pendulum.py` | **TODO** | Representative closed-loop for pendulum_double |
 | `demos_by_system/pendulum_double/double_pendulum_game.py` | **Drop** | sys2game interactive game |
-| `demos_by_system/pendulum_double/double_pendulum_modes.py` | **Partial** | Use examples/scripts/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/pendulum_double/double_pendulum_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
 | `demos_by_system/pendulum_double/double_pendulum_with_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_double/double_pendulum_with_computed_torque_and_sinus_ref.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_double/double_pendulum_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
@@ -261,27 +261,27 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/pendulum_simple/pendulum_game.py` | **Drop** | sys2game interactive game |
 | `demos_by_system/pendulum_simple/simple_pendulum.py` | **TODO** | Representative closed-loop for pendulum_simple |
 | `demos_by_system/pendulum_simple/simple_pendulum_custom_parameters.py` | **TODO** | Representative closed-loop for pendulum_simple |
-| `demos_by_system/pendulum_simple/simple_pendulum_modes.py` | **Partial** | Use examples/scripts/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/pendulum_simple/simple_pendulum_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
 | `demos_by_system/pendulum_simple/simple_pendulum_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_computed_torque.py` | **Done** | examples/scripts/control/computed_torque_pendulum.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_computed_torque.py` | **Done** | examples/demos/control/computed_torque_pendulum.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_open_loop_controller.py` | **TODO** | Representative closed-loop for pendulum_simple |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_rrt.py` | **Done** | examples/scripts/planning/rrt/rrt_pendulum_swingup.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_sliding_mode_controller.py` | **Done** | examples/scripts/control/sliding_mode_pendulum.py · hybrid: examples/scripts/hybrid/smc_pendulum_rate.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_rrt.py` | **Done** | examples/demos/planning/rrt/rrt_pendulum_swingup.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_sliding_mode_controller.py` | **Done** | examples/demos/control/sliding_mode_pendulum.py · hybrid: examples/demos/hybrid/smc_pendulum_rate.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/scripts/planning/value_iteration/vi_basics.py (mass) + examples/scripts/planning/value_iteration/vi_pendulum.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_quadratic.py` | **Done** | examples/scripts/planning/value_iteration/vi_pendulum.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/demos/planning/value_iteration/vi_basics.py (mass) + examples/demos/planning/value_iteration/vi_pendulum.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_quadratic.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py |
 | `demos_by_system/plane/plane_cobra.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/plane/plane_simple_controller.py` | **TODO** | Representative closed-loop for plane |
-| `demos_by_system/robot_arm_1dof/onelinkrobot_joint_impedance_controller.py` | **Done** | examples/scripts/robotic/joint_impedance_two_link.py (covers 1-dof pattern) |
-| `demos_by_system/robot_arm_2dof/twolinkrobot_computed_torque_controller.py` | **Done** | examples/scripts/robotic/computed_torque_two_link.py |
+| `demos_by_system/robot_arm_1dof/onelinkrobot_joint_impedance_controller.py` | **Done** | examples/demos/robotic/joint_impedance_two_link.py (covers 1-dof pattern) |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_computed_torque_controller.py` | **Done** | examples/demos/robotic/computed_torque_two_link.py |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_effector_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_effector_pid_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
-| `demos_by_system/robot_arm_2dof/twolinkrobot_joint_impedance_controller.py` | **Done** | examples/scripts/robotic/joint_impedance_two_link.py |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_joint_impedance_controller.py` | **Done** | examples/demos/robotic/joint_impedance_two_link.py |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_joint_pid_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
-| `demos_by_system/robot_arm_2dof/twolinkrobot_kinematic_controller.py` | **Done** | examples/scripts/robotic/kinematic_two_link.py |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_kinematic_controller.py` | **Done** | examples/demos/robotic/kinematic_two_link.py |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_kinematic_vs_dynamic_openloop.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_quasi_static_controllers.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
@@ -292,7 +292,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/robot_arm_3dof/threelinkrobot_joint_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_3dof/threelinkrobot_kinematic_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_5dof/fivelinkrobot_kinematic_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
-| `demos_by_system/robot_arm_5dof/fivelinkrobot_kinematic_nullspace_controller.py` | **Done** | examples/scripts/robotic/kinematic_nullspace_five_link.py |
+| `demos_by_system/robot_arm_5dof/fivelinkrobot_kinematic_nullspace_controller.py` | **Done** | examples/demos/robotic/kinematic_nullspace_five_link.py |
 | `demos_by_system/robot_arm_5dof/fivelinkrobot_with_obstacles_load_plan.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_5dof/fivelinkrobot_with_obstacles_path_planning.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/rocket/rocket_game.py` | **Drop** | sys2game interactive game |
@@ -311,17 +311,17 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/dynamicprogramming/active_suspension.py` | **TODO** | DP specialty demo not ported |
 | `demos_by_tool/dynamicprogramming/braking_reachability.py` | **TODO** | DP specialty demo not ported |
 | `demos_by_tool/dynamicprogramming/car_braking.py` | **TODO** | DP specialty demo not ported |
-| `demos_by_tool/dynamicprogramming/rrt_car_parking.py` | **Done** | examples/scripts/planning/rrt/rrt_car_parking.py |
-| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup.py` | **Done** | examples/scripts/planning/value_iteration/vi_double_pendulum_jax.py |
-| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/scripts/planning/value_iteration/vi_double_pendulum_jax.py |
-| `demos_by_tool/dynamicprogramming/float_mass_dp_optimal_controller.py` | **Done** | examples/scripts/planning/value_iteration/vi_basics.py |
+| `demos_by_tool/dynamicprogramming/rrt_car_parking.py` | **Done** | examples/demos/planning/rrt/rrt_car_parking.py |
+| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup.py` | **Done** | examples/demos/planning/value_iteration/vi_double_pendulum_jax.py |
+| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/demos/planning/value_iteration/vi_double_pendulum_jax.py |
+| `demos_by_tool/dynamicprogramming/float_mass_dp_optimal_controller.py` | **Done** | examples/demos/planning/value_iteration/vi_basics.py |
 | `demos_by_tool/dynamicprogramming/helicopter_tunnel.py` | **TODO** | DP specialty demo not ported |
-| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup.py` | **Done** | examples/scripts/planning/value_iteration/vi_pendulum.py |
-| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_demo.py` | **Done** | examples/scripts/planning/value_iteration/vi_pendulum.py |
-| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/scripts/planning/value_iteration/vi_pendulum.py (grid tuning differs) |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_demo.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/planning/value_iteration/vi_pendulum.py (grid tuning differs) |
 | `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | ReachabilityCost exists; demo TODO |
 | `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/modelbased.py |
-| `demos_by_tool/lqr_vs_valueiteration_for_a_simple_pendulum.py` | **Done** | examples/scripts/planning/value_iteration/vi_pendulum.py Part 2 |
+| `demos_by_tool/lqr_vs_valueiteration_for_a_simple_pendulum.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py Part 2 |
 | `demos_by_tool/optimal_control_demo.py` | **TODO** | Not yet audited |
 | `demos_by_tool/rl_with_stable_baseline3/double_pendulum_with_ppo.py` | **Drop** | External SB3 training |
 | `demos_by_tool/rl_with_stable_baseline3/drone_with_ppo.py` | **Drop** | External SB3 training |
@@ -335,8 +335,8 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/trajectory_stabilization/cartpole_swing_up_with_lqr_stabilization.py` | **TODO** | TrajectoryLQRController |
 | `demos_by_tool/trajectory_stabilization/double_pendulum_with_trajectory_following_lqr_controller.py` | **TODO** | TrajectoryLQRController |
 | `demos_by_tool/trajectory_stabilization/pendulum_swing_up_with_lqr_stabilization.py` | **TODO** | TrajectoryLQRController |
-| `demos_by_tool/transfer_functions/mass_with_pid.py` | **Partial** | examples/scripts/control/filtered_pid_anti_windup.py |
-| `demos_by_tool/transfer_functions/pendulum_frequency_response.py` | **Done** | examples/scripts/analysis/analysis_bode.py |
+| `demos_by_tool/transfer_functions/mass_with_pid.py` | **Partial** | examples/demos/control/filtered_pid_anti_windup.py |
+| `demos_by_tool/transfer_functions/pendulum_frequency_response.py` | **Done** | examples/demos/analysis/analysis_bode.py |
 
 ### 3.4 `projects/`
 
@@ -374,96 +374,96 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 
 | Script | Topic |
 | --- | --- |
-| `examples/scripts/analysis/analysis_bode.py` | analysis |
-| `examples/scripts/analysis/analysis_equilibrium.py` | analysis |
-| `examples/scripts/analysis/analysis_linearize.py` | analysis |
-| `examples/scripts/analysis/analysis_linearize_fd_vs_jax.py` | analysis |
-| `examples/scripts/analysis/analysis_modal.py` | analysis |
-| `examples/scripts/analysis/analysis_structural.py` | analysis |
-| `examples/scripts/analysis/analysis_discretize.py` | analysis |
-| `examples/scripts/animation/animation_backends.py` | animation |
-| `examples/notebooks/intro/10_graphical.ipynb` | animation |
-| `examples/scripts/animation/game_bicycle.py` | animation |
-| `examples/scripts/animation/animation_native_comparison.py` | animation |
-| `examples/scripts/blocks/signal_blocks.py` | blocks |
-| `examples/scripts/blocks/blocks_sources.py` | blocks |
-| `examples/scripts/control/computed_torque_pendulum.py` | control |
-| `examples/scripts/control/filtered_pid_anti_windup.py` | control |
-| `examples/scripts/control/neural_controller_jax.py` | control |
-| `examples/scripts/control/pid_autotuning_jax.py` | control |
-| `examples/scripts/control/sliding_mode_pendulum.py` | control |
-| `examples/scripts/diagrams/diagram_advanced_autowire.py` | diagrams |
-| `examples/scripts/diagrams/diagram_closed_loop.py` | diagrams |
-| `examples/scripts/diagrams/diagram_compiling.py` | diagrams |
-| `examples/scripts/diagrams/diagram_shortcuts.py` | diagrams |
-| `examples/scripts/diagrams/diagram_nested_loop.py` | diagrams |
-| `examples/scripts/diagrams/diagram_noise_ports.py` | diagrams |
-| `examples/experimental/engine/engine_ancf_tire_fall.py` | engine |
-| `examples/experimental/engine/engine_physics_in_diagram.py` | engine |
-| `examples/experimental/engine/engine_physics_many_spheres.py` | engine |
-| `examples/scripts/hybrid/hybrid_multi_rate.py` | hybrid |
-| `examples/scripts/hybrid/smc_pendulum_rate.py` | hybrid |
-| `examples/scripts/identification/params_gradient.py` | identification |
-| `examples/scripts/interfaces/c_export.py` | interfaces |
-| `examples/scripts/interfaces/c_export_proportional.py` | interfaces |
-| `examples/scripts/mpc/mpc_car_minimal.py` | mpc |
-| `examples/scripts/mpc/mpc_integrator_numpy.py` | mpc |
-| `examples/scripts/mpc/mpc_car_circuit.py` | mpc |
+| `examples/demos/analysis/analysis_bode.py` | analysis |
+| `examples/demos/analysis/analysis_equilibrium.py` | analysis |
+| `examples/demos/analysis/analysis_linearize.py` | analysis |
+| `examples/demos/analysis/analysis_linearize_fd_vs_jax.py` | analysis |
+| `examples/demos/analysis/analysis_modal.py` | analysis |
+| `examples/demos/analysis/analysis_structural.py` | analysis |
+| `examples/demos/analysis/analysis_discretize.py` | analysis |
+| `examples/demos/animation/animation_backends.py` | animation |
+| `examples/learn/intro/10_graphical.ipynb` | animation |
+| `examples/demos/animation/game_bicycle.py` | animation |
+| `examples/demos/animation/animation_native_comparison.py` | animation |
+| `examples/demos/blocks/signal_blocks.py` | blocks |
+| `examples/demos/blocks/blocks_sources.py` | blocks |
+| `examples/demos/control/computed_torque_pendulum.py` | control |
+| `examples/demos/control/filtered_pid_anti_windup.py` | control |
+| `examples/demos/control/neural_controller_jax.py` | control |
+| `examples/demos/control/pid_autotuning_jax.py` | control |
+| `examples/demos/control/sliding_mode_pendulum.py` | control |
+| `examples/demos/diagrams/diagram_advanced_autowire.py` | diagrams |
+| `examples/demos/diagrams/diagram_closed_loop.py` | diagrams |
+| `examples/demos/diagrams/diagram_compiling.py` | diagrams |
+| `examples/demos/diagrams/diagram_shortcuts.py` | diagrams |
+| `examples/demos/diagrams/diagram_nested_loop.py` | diagrams |
+| `examples/demos/diagrams/diagram_noise_ports.py` | diagrams |
+| `examples/sandbox/engine/engine_ancf_tire_fall.py` | engine |
+| `examples/sandbox/engine/engine_physics_in_diagram.py` | engine |
+| `examples/sandbox/engine/engine_physics_many_spheres.py` | engine |
+| `examples/demos/hybrid/hybrid_multi_rate.py` | hybrid |
+| `examples/demos/hybrid/smc_pendulum_rate.py` | hybrid |
+| `examples/demos/identification/params_gradient.py` | identification |
+| `examples/demos/interfaces/c_export.py` | interfaces |
+| `examples/demos/interfaces/c_export_proportional.py` | interfaces |
+| `examples/demos/mpc/mpc_car_minimal.py` | mpc |
+| `examples/demos/mpc/mpc_integrator_numpy.py` | mpc |
+| `examples/demos/mpc/mpc_car_circuit.py` | mpc |
 | `examples/projects/mpc/mpc_dual_rate.py` | mpc |
 | `examples/projects/mpc/mpc_path.py` | mpc |
 | `examples/projects/mpc/mpc_slalom.py` | mpc |
 | `examples/projects/mpc/mpc_spatial.py` | mpc |
-| `examples/scripts/optimization/optim_basic.py` | optimization |
-| `examples/scripts/optimization/optim_plot.py` | optimization |
+| `examples/demos/optimization/optim_basic.py` | optimization |
+| `examples/demos/optimization/optim_plot.py` | optimization |
 | `examples/projects/pathtracking/cascade_path_tracking.py` | pathtracking |
 | `examples/projects/pathtracking/bicycle_los/` | pathtracking |
 | `examples/projects/pathtracking/bicycle_los_v2/` | pathtracking |
 | `examples/projects/pathtracking/mpc_v1/` | pathtracking |
-| `examples/scripts/planning/rrt/rrt_car_parking.py` | rrt |
-| `examples/scripts/planning/rrt/rrt_holonomic_obstacles.py` | rrt |
-| `examples/scripts/planning/rrt/rrt_pendulum_swingup.py` | rrt |
-| `examples/scripts/planning/rrt/rrt_star_live.py` | rrt |
-| `examples/scripts/planning/value_iteration/vi_basics.py` | value_iteration |
-| `examples/scripts/planning/value_iteration/vi_double_pendulum_jax.py` | value_iteration |
-| `examples/scripts/planning/value_iteration/vi_pendulum.py` | value_iteration |
-| `examples/scripts/plots/plot_internal_signals.py` | plots |
-| `examples/scripts/plots/plot_phase_plane.py` | plots |
-| `examples/scripts/plots/plot_trajectory_options.py` | plots |
-| `examples/scripts/plots/plot_readme.py` | plots |
-| `examples/scripts/realtime/game_cartpole.py` | realtime |
-| `examples/scripts/realtime/game_ur5_setpoint.py` | realtime |
-| `examples/scripts/robotic/computed_torque_two_link.py` | robotic |
-| `examples/scripts/robotic/joint_impedance_two_link.py` | robotic |
-| `examples/scripts/robotic/kinematic_nullspace_five_link.py` | robotic |
-| `examples/scripts/robotic/kinematic_two_link.py` | robotic |
-| `examples/scripts/robotic/task_impedance_two_link.py` | robotic |
-| `examples/experimental/robotic/joint_impedance_ur5.py` | robotic |
-| `examples/experimental/robotic/task_impedance_ur5.py` | robotic |
-| `examples/scripts/statespace/cartpole_lqr.py` | statespace |
-| `examples/scripts/step/diagram_cascade_zoh.py` | step |
-| `examples/scripts/step/diagram_unity_feedback.py` | step |
-| `examples/scripts/step/step_accumulator.py` | step |
-| `examples/scripts/step/step_fibonacci.py` | step |
-| `examples/experimental/symbolic/symbolic_quadruple_pendulum.py` | symbolic |
-| `examples/scripts/trajopt/trajopt_cartpole_collocation_jax.py` | trajopt |
-| `examples/scripts/trajopt/trajopt_ur5_collocation_jax.py` | trajopt |
-| `examples/scripts/trajopt/trajopt_cartpole_rollout_gradients.py` | trajopt |
-| `examples/scripts/trajopt/trajopt_holonomic_corridor.py` | trajopt |
+| `examples/demos/planning/rrt/rrt_car_parking.py` | rrt |
+| `examples/demos/planning/rrt/rrt_holonomic_obstacles.py` | rrt |
+| `examples/demos/planning/rrt/rrt_pendulum_swingup.py` | rrt |
+| `examples/demos/planning/rrt/rrt_star_live.py` | rrt |
+| `examples/demos/planning/value_iteration/vi_basics.py` | value_iteration |
+| `examples/demos/planning/value_iteration/vi_double_pendulum_jax.py` | value_iteration |
+| `examples/demos/planning/value_iteration/vi_pendulum.py` | value_iteration |
+| `examples/demos/plots/plot_internal_signals.py` | plots |
+| `examples/demos/plots/plot_phase_plane.py` | plots |
+| `examples/demos/plots/plot_trajectory_options.py` | plots |
+| `examples/demos/plots/plot_readme.py` | plots |
+| `examples/demos/realtime/game_cartpole.py` | realtime |
+| `examples/demos/realtime/game_ur5_setpoint.py` | realtime |
+| `examples/demos/robotic/computed_torque_two_link.py` | robotic |
+| `examples/demos/robotic/joint_impedance_two_link.py` | robotic |
+| `examples/demos/robotic/kinematic_nullspace_five_link.py` | robotic |
+| `examples/demos/robotic/kinematic_two_link.py` | robotic |
+| `examples/demos/robotic/task_impedance_two_link.py` | robotic |
+| `examples/sandbox/robotic/joint_impedance_ur5.py` | robotic |
+| `examples/sandbox/robotic/task_impedance_ur5.py` | robotic |
+| `examples/demos/statespace/cartpole_lqr.py` | statespace |
+| `examples/demos/step/diagram_cascade_zoh.py` | step |
+| `examples/demos/step/diagram_unity_feedback.py` | step |
+| `examples/demos/step/step_accumulator.py` | step |
+| `examples/demos/step/step_fibonacci.py` | step |
+| `examples/sandbox/symbolic/symbolic_quadruple_pendulum.py` | symbolic |
+| `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py` | trajopt |
+| `examples/demos/trajopt/trajopt_ur5_collocation_jax.py` | trajopt |
+| `examples/demos/trajopt/trajopt_cartpole_rollout_gradients.py` | trajopt |
+| `examples/demos/trajopt/trajopt_holonomic_corridor.py` | trajopt |
 | `examples/projects/car_trajopt/car_trajopt_compare.py` | trajopt |
 | `examples/projects/car_trajopt/car_trajopt_lanechange.py` | trajopt |
 | `examples/projects/car_trajopt/car_trajopt_uturn.py` | trajopt |
 
 | Notebook |
 | --- |
-| `examples/notebooks/applications/mpc.ipynb` |
+| `examples/learn/teaching/topics/mpc.ipynb` |
 | `examples/projects/car_trajopt/car_trajopt.ipynb` |
-| `examples/experimental/scratch/cartpole_rollout_gradients.ipynb` |
-| `examples/notebooks/intro/08_optimization.ipynb` |
-| `examples/notebooks/intro/10_graphical.ipynb` |
-| `examples/notebooks/intro/07_compile.ipynb` |
-| `examples/notebooks/showcase/minilink.ipynb` |
-| `examples/notebooks/showcase/jax.ipynb` |
-| `examples/notebooks/tooling/benchmark.ipynb` |
+| `examples/sandbox/scratch/cartpole_rollout_gradients.ipynb` |
+| `examples/learn/intro/08_optimization.ipynb` |
+| `examples/learn/intro/10_graphical.ipynb` |
+| `examples/learn/intro/07_compile.ipynb` |
+| `examples/learn/intro/showcase_minilink.ipynb` |
+| `examples/learn/intro/showcase_jax.ipynb` |
+| `examples/tooling/notebooks/benchmark.ipynb` |
 
 ---
 

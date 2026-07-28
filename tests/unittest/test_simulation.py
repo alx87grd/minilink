@@ -434,7 +434,7 @@ DT_COARSE = 0.1
 
 
 def _build_smc_diagram():
-    """Match ``examples/scripts/control/sliding_mode_pendulum.py`` setup."""
+    """Match ``examples/demos/control/sliding_mode_pendulum.py`` setup."""
     plant = Pendulum(length=1.0, mass=1.0)
     model = Pendulum(length=1.0, mass=0.5)
     plant.x0 = np.array([1.0, 0.0])

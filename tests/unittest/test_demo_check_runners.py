@@ -26,8 +26,9 @@ _FORBIDDEN_DEMO_HARNESS = re.compile(
     r"MINILINK_NOTEBOOK_SMOKE|_NOTEBOOK_SMOKE\b|MINILINK_.*_SMOKE"
 )
 _DEMO_ROOTS = (
-    REPO_ROOT / "examples" / "notebooks",
-    REPO_ROOT / "examples" / "scripts",
+    REPO_ROOT / "examples" / "learn",
+    REPO_ROOT / "examples" / "demos",
+    REPO_ROOT / "examples" / "tooling",
 )
 
 
@@ -58,9 +59,9 @@ class TestDemoCheckRunners(unittest.TestCase):
                     hits.append(path.relative_to(REPO_ROOT).as_posix())
         if hits:
             self.fail(
-                "examples/notebooks and examples/scripts must not contain smoke/"
-                "CI harness hooks (adapt in tests/demo_checks instead):\n  "
-                + "\n  ".join(hits)
+                "examples/learn, examples/demos, and examples/tooling must not "
+                "contain smoke/CI harness hooks (adapt in tests/demo_checks "
+                "instead):\n  " + "\n  ".join(hits)
             )
 
     def test_catalog_checks_fast_exit_zero(self):

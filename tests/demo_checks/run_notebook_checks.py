@@ -1,12 +1,14 @@
 """Execute teaching notebooks via nbclient (demo-check layer).
 
-Auto-discovers every ``.ipynb`` under ``examples/notebooks/`` (including
-subfolders). Code cells must not raise; outputs are discarded (notebooks are
-not rewritten). Uses ``MPLBACKEND=Agg`` so matplotlib stays headless.
+Auto-discovers ``.ipynb`` under mature learn/tooling trees:
 
-Defaults: ``timeout=180``, ``requires=[]``. Non-default deps / timeouts live
-in ``notebook_overrides.json`` keyed by repo-relative path. Notebooks under
-``examples/projects/`` or ``examples/experimental/`` are not smoked here.
+* ``examples/learn/intro/``
+* ``examples/learn/teaching/topics/``
+* ``examples/tooling/notebooks/``
+
+Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
+Defaults: ``timeout=180``, ``requires=[]``. Overrides in
+``notebook_overrides.json``. Not smoked: ``courses/``, ``projects/``, ``sandbox/``.
 
 Usage (from repo root)::
 
@@ -26,7 +28,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _CHECKS_DIR = Path(__file__).resolve().parent
 OVERRIDES_PATH = _CHECKS_DIR / "notebook_overrides.json"
-NOTEBOOK_DIR = REPO_ROOT / "examples" / "notebooks"
+NOTEBOOK_ROOTS = (
+    REPO_ROOT / "examples" / "learn" / "intro",
+    REPO_ROOT / "examples" / "learn" / "teaching" / "topics",
+    REPO_ROOT / "examples" / "tooling" / "notebooks",
+)
 DEFAULT_TIMEOUT = 180.0
 
 
@@ -38,9 +44,17 @@ class NotebookRow:
 
 
 def _notebook_id(rel_path: str) -> str:
-    """``examples/notebooks/intro/00_core.ipynb`` → ``intro_00_core``."""
-    stem = Path(rel_path).relative_to("examples/notebooks").with_suffix("")
-    return "_".join(stem.parts)
+    """Stable short id for CLI ``--notebook`` filters."""
+    stem = Path(rel_path).stem
+    if "/learn/intro/" in rel_path:
+        if stem.startswith("showcase_"):
+            return stem
+        return f"intro_{stem}"
+    if "/teaching/topics/" in rel_path:
+        return f"topics_{stem}"
+    if "/tooling/notebooks/" in rel_path:
+        return f"tooling_{stem}"
+    return "_".join(Path(rel_path).with_suffix("").parts[-2:])
 
 
 def _load_overrides() -> dict[str, dict]:
@@ -53,10 +67,13 @@ def _load_overrides() -> dict[str, dict]:
 
 
 def _discover_notebooks() -> list[str]:
-    """Repo-relative paths of every ``.ipynb`` under ``examples/notebooks/``."""
-    return sorted(
-        p.relative_to(REPO_ROOT).as_posix() for p in NOTEBOOK_DIR.rglob("*.ipynb")
-    )
+    """Repo-relative paths of smoked teaching / tooling notebooks."""
+    found: list[str] = []
+    for root in NOTEBOOK_ROOTS:
+        if not root.is_dir():
+            continue
+        found.extend(p.relative_to(REPO_ROOT).as_posix() for p in root.rglob("*.ipynb"))
+    return sorted(found)
 
 
 def _execute_notebook(path: Path, *, timeout: float) -> tuple[str, str]:
@@ -84,7 +101,6 @@ def _execute_notebook(path: Path, *, timeout: float) -> tuple[str, str]:
     except CellTimeoutError:
         return "fail", f"timeout after {timeout:.0f}s"
     except CellExecutionError as exc:
-        # Last lines of the traceback are the useful bit.
         tail = str(exc).strip()[-500:]
         return "fail", tail
     except OSError as exc:

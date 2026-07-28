@@ -22,15 +22,15 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECKS_DIR = Path(__file__).resolve().parent
-SCRIPTS_ROOT = REPO_ROOT / "examples" / "scripts"
+SCRIPTS_ROOT = REPO_ROOT / "examples" / "demos"
 FLAGSHIP_MANIFEST = CHECKS_DIR / "flagship_manifest.json"
 
 # Live keyboard / wall-clock sessions hang until the user quits — not suitable
 # for an unattended subprocess sweep. Keep discoverable under examples/; skip here.
-INTERACTIVE_DEMO_PREFIXES = ("examples/scripts/realtime/",)
+INTERACTIVE_DEMO_PREFIXES = ("examples/demos/realtime/",)
 INTERACTIVE_DEMO_PATHS = frozenset(
     {
-        "examples/scripts/animation/game_bicycle.py",
+        "examples/demos/animation/game_bicycle.py",
     }
 )
 

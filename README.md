@@ -5,10 +5,10 @@ visualizing dynamical systems.
 
 ![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
 
-Start here: [showcase](examples/notebooks/showcase/minilink.ipynb) ·
-[JAX / autodiff showcase](examples/notebooks/showcase/jax.ipynb) ·
-[notebooks folder](examples/notebooks/README.md) ·
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/notebooks)
+Start here: [showcase](examples/learn/intro/showcase_minilink.ipynb) ·
+[JAX / autodiff showcase](examples/learn/intro/showcase_jax.ipynb) ·
+[notebooks folder](examples/learn/README.md) ·
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/learn)
 
 ## Why minilink
 
@@ -26,7 +26,7 @@ simulation state internally; state trajectories live in simulation results.
 
 Optional JAX compile and autodiff through the same dynamics unlocks fast
 trajopt, MPC, parameter fits, and learning — without a separate sim vs opt
-stack. See the [JAX showcase](examples/notebooks/showcase/jax.ipynb).
+stack. See the [JAX showcase](examples/learn/intro/showcase_jax.ipynb).
 
 ## Quick start
 
@@ -99,7 +99,7 @@ another diagram.
 
 Explicit wiring (`add_subsystem` / `connect`) is always available when the
 shortcuts are too implicit; see
-`examples/scripts/diagrams/diagram_shortcuts.py` for both versions side by
+`examples/demos/diagrams/diagram_shortcuts.py` for both versions side by
 side. Any internal signal can be plotted by `"subsystem_id:port_id"` name.
 
 ### One call to simulate, plot, animate
@@ -143,7 +143,7 @@ diagram.compute_trajectory(tf=10.0)
 ```
 
 Deploy ticks: `cmd = mpc.compute_command(y, t=t)`; `u = cmd.u_ff`. NumPy rebuild
-mode and demos: `examples/scripts/mpc/`.
+mode and demos: `examples/demos/mpc/`.
 
 ### Analyze and design
 
@@ -369,30 +369,30 @@ Index and placement rules: [examples/README.md](examples/README.md)
 
 | Interest | Start here |
 | --- | --- |
-| Feature tour (marketing) | [examples/notebooks/showcase/minilink.ipynb](examples/notebooks/showcase/minilink.ipynb) |
-| Stateless / JAX / autodiff (marketing) | [examples/notebooks/showcase/jax.ipynb](examples/notebooks/showcase/jax.ipynb) |
-| Module API intros | [examples/notebooks/intro/](examples/notebooks/intro/) (`00_core` … `10_graphical`) |
-| Compile → evaluator API | [examples/notebooks/intro/07_compile.ipynb](examples/notebooks/intro/07_compile.ipynb) |
-| Diagrams | `examples/scripts/diagrams/` · [intro/core](examples/notebooks/intro/00_core.ipynb) |
-| Blocks (routing, filters, nonlinear) | `examples/scripts/blocks/` · [intro/blocks](examples/notebooks/intro/01_blocks.ipynb) |
-| Control | `examples/scripts/control/` · [intro/control](examples/notebooks/intro/03_control.ipynb) |
-| Pyro SMC continuous (pendulum) | `examples/scripts/control/sliding_mode_pendulum.py` |
-| Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/scripts/hybrid/` · `examples/scripts/step/` · [intro/hybrid](examples/notebooks/intro/06_hybrid.ipynb) |
-| MPC (minimal + dual-rate) | `examples/scripts/mpc/` · [applications/mpc](examples/notebooks/applications/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
-| MPC scenarios (path / slalom / spatial) | `examples/projects/mpc/` · circuit: `examples/scripts/mpc/mpc_car_circuit.py` |
-| Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |
-| Analysis (linearize, trim, ctrb/obsv, modal) | `examples/scripts/analysis/` · [intro/analysis](examples/notebooks/intro/04_analysis.ipynb) |
-| State-space / LQR | `examples/scripts/statespace/` |
-| Identification (param gradients) | `examples/scripts/identification/` |
-| Plotting | `examples/scripts/plots/` · [intro/graphical](examples/notebooks/intro/10_graphical.ipynb) |
-| Animation | `examples/scripts/animation/` · [intro/graphical](examples/notebooks/intro/10_graphical.ipynb) |
-| Realtime game mode (keyboard → live plant → `Trajectory`) | `examples/scripts/realtime/game_cartpole.py` |
-| Optimization | `examples/scripts/optimization/` · [intro/optimization](examples/notebooks/intro/08_optimization.ipynb) |
-| Planning (RRT, DP) | `examples/scripts/planning/` · [intro/planning](examples/notebooks/intro/09_planning.ipynb) |
-| Trajectory optimization | `examples/scripts/trajopt/` · [car TrajOpt project](examples/projects/car_trajopt/) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/projects/car_trajopt/car_trajopt.ipynb) |
+| Feature tour (marketing) | [examples/learn/intro/showcase_minilink.ipynb](examples/learn/intro/showcase_minilink.ipynb) |
+| Stateless / JAX / autodiff (marketing) | [examples/learn/intro/showcase_jax.ipynb](examples/learn/intro/showcase_jax.ipynb) |
+| Module API intros | [examples/learn/intro/](examples/learn/intro/) (`00_core` … `10_graphical`) |
+| Compile → evaluator API | [examples/learn/intro/07_compile.ipynb](examples/learn/intro/07_compile.ipynb) |
+| Diagrams | `examples/demos/diagrams/` · [intro/core](examples/learn/intro/00_core.ipynb) |
+| Blocks (routing, filters, nonlinear) | `examples/demos/blocks/` · [intro/blocks](examples/learn/intro/01_blocks.ipynb) |
+| Control | `examples/demos/control/` · [intro/control](examples/learn/intro/03_control.ipynb) |
+| Pyro SMC continuous (pendulum) | `examples/demos/control/sliding_mode_pendulum.py` |
+| Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/demos/hybrid/` · `examples/demos/step/` · [intro/hybrid](examples/learn/intro/06_hybrid.ipynb) |
+| MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/topics/mpc](examples/learn/teaching/topics/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
+| MPC scenarios (path / slalom / spatial) | `examples/projects/mpc/` · circuit: `examples/demos/mpc/mpc_car_circuit.py` |
+| Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/demos/robotic/` |
+| Analysis (linearize, trim, ctrb/obsv, modal) | `examples/demos/analysis/` · [intro/analysis](examples/learn/intro/04_analysis.ipynb) |
+| State-space / LQR | `examples/demos/statespace/` |
+| Identification (param gradients) | `examples/demos/identification/` |
+| Plotting | `examples/demos/plots/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |
+| Animation | `examples/demos/animation/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |
+| Realtime game mode (keyboard → live plant → `Trajectory`) | `examples/demos/realtime/game_cartpole.py` |
+| Optimization | `examples/demos/optimization/` · [intro/optimization](examples/learn/intro/08_optimization.ipynb) |
+| Planning (RRT, DP) | `examples/demos/planning/` · [intro/planning](examples/learn/intro/09_planning.ipynb) |
+| Trajectory optimization | `examples/demos/trajopt/` · [car TrajOpt project](examples/projects/car_trajopt/) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/projects/car_trajopt/car_trajopt.ipynb) |
 | Path tracking projects | `examples/projects/pathtracking/` · `examples/projects/car_trajopt/` |
-| C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/c_export_proportional.py` · `c_export.py` |
-| Solver benchmarks | [examples/notebooks/tooling/benchmark.ipynb](examples/notebooks/tooling/benchmark.ipynb) (uses repo-root `benchmarks/`) |
+| C export (P controller round-trip; filtered PID leaf) | `examples/demos/interfaces/c_export_proportional.py` · `c_export.py` |
+| Solver benchmarks | [examples/tooling/notebooks/benchmark.ipynb](examples/tooling/notebooks/benchmark.ipynb) (uses repo-root `benchmarks/`) |
 
 Catalog plants: `from minilink.catalog import …` (math under `minilink.dynamics.catalog.*`).
 

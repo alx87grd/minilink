@@ -15,11 +15,11 @@ The latest NN work landed in commit `fd0d17d` with two artifacts:
 one hidden layer, `y = W2 tanh(W1 u + b1) + b2`, weights in `params`, and
 `xp = array_module(u)` for JAX traceability.
 
-**Demo** — `examples/scripts/control/neural_controller_jax.py`: wires
+**Demo** — `examples/demos/control/neural_controller_jax.py`: wires
 `NeuralNetwork` into a closed-loop diagram (`Mux` → `nn` → `Integrator`), compiles
 with `diagram.compile(backend="jax")`, and trains weights via batched RK4 rollouts
 and manual SGD through `f_p` and `jax.grad`. There is no dedicated
-`examples/scripts/blocks/neural*.py` yet.
+`examples/demos/blocks/neural*.py` yet.
 
 **Tests** — shape/equation correctness, params override, JAX `jit` traceability
 (`tests/unittest/test_neural_blocks.py`).

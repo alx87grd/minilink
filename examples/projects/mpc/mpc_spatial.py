@@ -3,8 +3,8 @@
 Walks the ``planning/spatial`` pipeline: track + obstacles → fields → costs →
 ``PlanningProblem`` + ``TrajectoryOptimizationPlanner`` (not solved).
 
-Full NLP + hybrid MPC: ``examples/notebooks/applications/mpc.ipynb``.
-Closed-loop hybrid script: ``examples/scripts/mpc/mpc_car_circuit.py``.
+Full NLP + hybrid MPC: ``examples/learn/teaching/topics/mpc.ipynb``.
+Closed-loop hybrid script: ``examples/demos/mpc/mpc_car_circuit.py``.
 
 Set ``SHOW_PLOTS = False`` for a headless walkthrough.
 
@@ -202,7 +202,9 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 150, "ftol": 0.1},
 )
 print(f"planner ready (not solved): horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
-print("Next: applications/mpc.ipynb (full stack) or circuit.py (hybrid script)")
+print(
+    "Next: learn/teaching/topics/mpc.ipynb (full stack) or demos/mpc/mpc_car_circuit.py"
+)
 
 if SHOW_PLOTS:
     path_viz = track.distance_field(probe).as_cost(

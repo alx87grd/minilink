@@ -437,7 +437,7 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   backends and ignores `bound_params`. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
-  (see `examples/scripts/identification/params_gradient.py`).
+  (see `examples/demos/identification/params_gradient.py`).
 - **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets`
   today; `scene` is reserved (`None`) for pipeline B spatial overrides.
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
@@ -654,7 +654,7 @@ discontinuous mechanical SMC demos.
 **Hybrid contrast.** :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
 holds controller torque constant between computer ticks (ZOH) and samples plant outputs
 at tick boundaries — the intended semantics for digital SMC. See
-``examples/scripts/hybrid/smc_pendulum_rate.py``.
+``examples/demos/hybrid/smc_pendulum_rate.py``.
 
 **Diagnostics.** ``scratch/confirm_smc_solver_bug.py`` compares solvers, ``ddq_f`` vs
 numerical ``Δdq/Δt``, and RK4 k1–k4 cancellation on the pendulum SMC demo.
