@@ -243,7 +243,7 @@ The repo has grown test and benchmark surface area without periodic cleanup:
 | `tests/unittest/test_*.py` | **22 files**, ~**780** `test_*` functions | `pytest` (all collected; optional deps skip at runtime) |
 | `benchmarks/run_*.py` | **2** primary + shims | L2 in CI; L3 manual |
 | Gated regression baselines | **5** JSON suites + CI job | ✅ L2 in CI |
-| `examples/scripts/` | **78** demos | L6 subprocess (11 flagship whitelist) |
+| `examples/demos/` | **78** demos | L6 subprocess (11 flagship whitelist) |
 
 `tests/README.md` already states the philosophy (contracts over trivia, table-driven over duplicate files). The **six layers above** are the organizing principle; sections below retain the file-level inventory and migration tables from the first draft.
 
@@ -313,7 +313,7 @@ Single entry point target: `python benchmarks/run_study.py --preset <name>` (new
 
 ### Layer 6 detail — demos (smoke only)
 
-`examples/scripts/` remain user-facing workflows; overlap with tests should **shrink** (MPC hybrid parity tests duplicating demo logic is a consolidation opportunity — extract shared scenario builders into `tests/` or `benchmarks/scenarios/` helpers, not delete checks).
+`examples/demos/` remain user-facing workflows; overlap with tests should **shrink** (MPC hybrid parity tests duplicating demo logic is a consolidation opportunity — extract shared scenario builders into `tests/` or `benchmarks/scenarios/` helpers, not delete checks).
 
 ---
 
@@ -667,7 +667,7 @@ Optional nightly job runs full smokes (with 3-step sim). Default CI uses `--fast
 
 Running all 78 demos headless in CI is brittle (user-tuned plots, JAX, meshcat, long MPC). Plan:
 
-1. **Do not** auto-discover every file under `examples/scripts/`.
+1. **Do not** auto-discover every file under `examples/demos/`.
 2. Maintain a **whitelist manifest** (`tests/demo_checks/flagship_manifest.json`) of ~8–12 **README-tier** demos.
 3. Each whitelisted demo gains a **`run_smoke()`** function (new code at bottom — **does not change default `__main__` behavior** when user runs the demo normally):
    - Sets `MPLBACKEND=Agg`, `show=False`, short `tf`, minimal `maxiter` where applicable.
@@ -732,7 +732,7 @@ Each entry:
 ```json
 {
   "id": "readme_impedance_pendulum",
-  "demo": "examples/scripts/plots/plot_readme.py",
+  "demo": "examples/demos/plots/plot_readme.py",
   "smoke_fn": "run_smoke",
   "capture": "matplotlib_frame",
   "state": "from_smoke",

@@ -53,7 +53,7 @@ transcribe or a parametric compile.
 
 | Path | Entry | Solver wiring | IPOPT (`cyipopt`) |
 | --- | --- | --- | --- |
-| Offline / rebuild | `solve()` / `solve_trajectory_from` without parametric compile | `Optimizer(program, method=…)` | **Yes** — see `examples/scripts/trajopt/trajopt_cartpole_collocation_jax.py` |
+| Offline / rebuild | `solve()` / `solve_trajectory_from` without parametric compile | `Optimizer(program, method=…)` | **Yes** — see `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py` |
 | NumPy MPC rebuild | `compile_backend='numpy'`, no parametric compile | Same `Optimizer` via `_make_optimizer` | **Yes** (if optional dep installed) |
 | JAX MPC fast path | `compile_parametric_program()` + `solve_trajectory_from` | **Custom** `_make_parametric_optimizer_backend` | **No** — SciPy only |
 

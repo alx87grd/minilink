@@ -28,7 +28,7 @@ benchmarks/
   baselines/*.json          ← committed regression goldens
 ```
 
-Demos stay in `examples/scripts/` for teaching; **demo-check runners** that execute them live in `tests/demo_checks/`.
+Demos stay in `examples/demos/` for teaching; **demo-check runners** that execute them live in `tests/demo_checks/`.
 
 ### Human (IDE — open script, click **Run**)
 
@@ -157,15 +157,15 @@ job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated
 and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not throw.
 
 Demos and teaching notebooks must **not** branch on smoke/CI env vars — the runner
-only sets headless display knobs. A contract test scans ``examples/notebooks/`` and
-``examples/scripts/`` for forbidden harness names (see
+only sets headless display knobs. A contract test scans ``examples/learn/`` and
+``examples/demos/`` for forbidden harness names (see
 ``test_examples_have_no_smoke_env_hooks``).
 
 ```bash
 python tests/demo_checks/run_catalog_checks.py --fast
 # Flagship whitelist: subprocess each demo's __main__ (no demo source changes):
 python tests/demo_checks/run_flagship_demos.py
-# Teaching notebooks under examples/notebooks/ (auto-discovered; overrides for deps/timeouts):
+# Teaching notebooks under examples/learn/ (auto-discovered; overrides for deps/timeouts):
 MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
 # Nightly / local: every example script:
 python tests/demo_checks/run_all_demos.py --continue-on-error
@@ -175,7 +175,7 @@ Opt-in pytest bridge for notebooks: `MINILINK_NOTEBOOK_CHECKS=1 pytest tests/uni
 
 IDE launchers: [`tests/run/`](run/). Headless PNG check: `tests/demo_checks/run_flagship_graphics.py`.
 
-`tests/manual/` and `tests/bugs/` are removed — use `examples/scripts/` for
+`tests/manual/` and `tests/bugs/` are removed — use `examples/demos/` for
 demos and unittest for contracts.
 
 ## Core behavior without optional extras

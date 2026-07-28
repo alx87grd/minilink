@@ -20,29 +20,28 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 Do not add new markdown guides unless asked. Keep [README call chains](README.md#call-chains) minimal.
 
 **Intro-doc scope:** [README.md](README.md), marketing showcases
-([showcase/minilink.ipynb](examples/notebooks/showcase/minilink.ipynb),
-[showcase/jax.ipynb](examples/notebooks/showcase/jax.ipynb)), and the
-[`intro/`](examples/notebooks/intro/) module API notebooks present the **main
+([showcase/minilink.ipynb](examples/learn/intro/showcase_minilink.ipynb),
+[showcase/jax.ipynb](examples/learn/intro/showcase_jax.ipynb)), and the
+[`intro/`](examples/learn/intro/) module API notebooks present the **main
 core tools and features** — `System` / diagrams / simulate / compile / analysis /
 planning trajopt / the hybrid step path (`StepSystem`, `StepDiagramSystem`,
 `Computer`, `HybridDiagram`) / MPC as the hybrid exemplar. Do **not** update those
 intro surfaces to track every new demo, compare script, or `examples/projects/`
 experiment. New demos land under `examples/`; update DESIGN/ROADMAP when contracts
 or maturity change. Add a README examples-table row only when a demo is a
-**canonical** teaching entry for a core tool (e.g. `examples/scripts/mpc/mpc_car_minimal.py`).
+**canonical** teaching entry for a core tool (e.g. `examples/demos/mpc/mpc_car_minimal.py`).
 
 **Examples buckets** (see [examples/README.md](examples/README.md)):
-`notebooks/` and `scripts/` stay as **separate format trees** (do not mix
-`.ipynb` and `.py` per module). Canonical single-file demos →
-`examples/scripts/<topic>/` with stems that keep the topic when needed
-(e.g. `mpc/mpc_car_minimal.py`, not bare `minimal.py`; no `demo_` prefix).
-Non-core / scenario sprawl / versioned WIP → `examples/experimental/<topic>/`.
-Personal quick checks → `examples/experimental/scratch/` (not intro/README/CI).
-Multi-file experiments → `examples/projects/`. Pedagogical compares stay in
-`scripts/`; mission matrices go to `experimental/` or `projects/`. Scripts are
+`learn/` (intro = library curriculum; teaching/topics = domain lessons;
+teaching/courses = class packs), `demos/<topic>/` (canonical single-file
+scripts), `projects/`, `tooling/` (notebooks and/or scripts), `sandbox/`
+(+ `scratch/`). Do not mix `.ipynb` and `.py` in the same leaf module folder
+(except inside one named project). Demo stems keep the topic when needed
+(e.g. `mpc/mpc_car_minimal.py`; no `demo_` prefix). Pedagogical compares stay
+in `demos/`; mission matrices go to `sandbox/` or `projects/`. Scripts are
 top-level open-and-run (no `main()`); do not add plant-only smokes — use catalog
-`__main__` instead. No `scripts/tooling/` — use `notebooks/tooling/`,
-`tests/demo_checks/`, `benchmarks/`.
+`__main__` instead. Tooling lives under `examples/tooling/`, plus
+`tests/demo_checks/` and `benchmarks/`.
 
 ## Core directives
 
@@ -53,7 +52,7 @@ top-level open-and-run (no `main()`); do not add plant-only smokes — use catal
 - **Prototype honestly**: unvalidated architecture gets `TODO: User Architectural Review`.
 - **Incremental refactoring**: no broad restructures unless the user asks.
 - **Preserve user edits**: never revert or "clean up" manual changes the user made in demos, notebooks, examples, or scratch code — commented-out plots, tuning constants (`TF`, gains, step times), disabled sections, exploratory variables — unless they explicitly ask you to change those lines. Commit/review passes must not overwrite user-tuned script state.
-- **No test harness in demos**: `examples/scripts/` and `examples/notebooks/` never read CI/smoke env vars or branch on “are we in a test?” (`MINILINK_NOTEBOOK_SMOKE`, etc.). Smoke runners adapt outside the demo (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Teaching code may fall back on missing optional packages (e.g. Ipopt → SciPy) — that is user UX, not a test hook.
+- **No test harness in demos**: `examples/demos/` and `examples/learn/` never read CI/smoke env vars or branch on “are we in a test?” (`MINILINK_NOTEBOOK_SMOKE`, etc.). Smoke runners adapt outside the demo (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Teaching code may fall back on missing optional packages (e.g. Ipopt → SciPy) — that is user UX, not a test hook.
 - **Docs are contract**: update DESIGN / ROADMAP / README when public behavior or maturity claims change.
 - **Familiar patterns first**: do not introduce programming concepts or advanced Python styles absent from the repo and the user's prior choices (e.g. `typing.Protocol`, metaclasses) unless there is a strong runtime or maintainability reason. Static-typing-only wins are not enough on their own — prefer patterns already in use (mixins, unions, duck typing). If the tradeoff is unclear, validate with the user before landing the pattern.
 
@@ -118,7 +117,7 @@ stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` (CI
 ``regression`` job runs the same).
 
-Demos: under `examples/scripts/` (canonical) or `examples/experimental/`
+Demos: under `examples/demos/` (canonical) or `examples/sandbox/`
 (non-core / WIP); runnable from repo root. Map: [examples/README.md](examples/README.md).
 
 ## Before push or PR (local CI gate)
