@@ -787,7 +787,8 @@ post-goal tree scans dominate.
 ## 7. Graphics And Benchmarks
 
 Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
-Phase plane: matplotlib default. Diagrams: Graphviz display, Mermaid export;
+Phase plane: matplotlib default. Diagrams: Graphviz layout (notebook SVG;
+script Matplotlib window), Mermaid export;
 Plotly under `plotting` extra.
 
 **Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix

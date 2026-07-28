@@ -242,21 +242,21 @@ class SharedSystemFacades:
         except Exception:
             return None
 
-    def plot_diagram(self, filename=None, show_inline=None, show_pdf=None):
+    def plot_diagram(self, filename=None, show=True, show_inline=None, show_pdf=None):
         """
         Convenience shortcut to render the system diagram.
 
-        ``show_inline`` and ``show_pdf`` default to ``None`` and auto-resolve
-        via :func:`minilink.graphical.common.environment.is_inline_capable`:
-        Jupyter / Colab get inline SVG only (no viewer pop-up, no disk write),
-        while bare scripts and IPython REPLs get the legacy render-to-temp-file
-        + open-in-OS-PDF-viewer behavior. Pass explicit booleans to override;
-        pass ``filename`` to force a specific on-disk output.
+        Jupyter / Colab get inline SVG by default. Bare scripts and IPython
+        REPLs open a Matplotlib window with the Graphviz PNG (same blocking
+        policy as trajectory plots). Pass ``show_pdf=True`` for the legacy
+        OS PDF viewer; pass ``filename`` to write Graphviz output to disk;
+        pass ``show=False`` to build the Digraph only.
         """
         from minilink.graphical.diagrams import plot_diagram
 
         return plot_diagram(
             self,
+            show=show,
             show_inline=show_inline,
             show_pdf=show_pdf,
             filename=filename,
