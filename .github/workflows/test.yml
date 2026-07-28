@@ -1,3 +1,5 @@
+# CI — entry points documented in tests/README.md#entry-points
+# Jobs: test (ruff + pytest, py3.10–3.13) → regression (gates + flagships + notebooks, py3.12 + jax)
 name: CI
 
 on:
@@ -36,3 +38,48 @@ jobs:
 
     - name: Test with pytest
       run: pytest
+
+  regression:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install system dependencies
+      run: sudo apt-get update && sudo apt-get install -y graphviz
+
+    - name: Install dependencies (with JAX + viz)
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,jax,visualization,plotting]"
+
+    - name: Regression gates
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python benchmarks/run_regression_check.py --suite all --tiny \
+          --factor 10 \
+          --speed-gate-suffixes solve_s,nlp_s,speedup
+
+    # JAX flagships skip in the ``test`` job (no jax extra); gate them here.
+    - name: Flagship demo checks (incl. JAX)
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        MPLBACKEND: Agg
+      run: |
+        python tests/demo_checks/run_flagship_demos.py
+
+    # Teaching notebooks: execute code cells; fail on error (once, with JAX).
+    - name: Notebook smoke checks
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        MPLBACKEND: Agg
+        SDL_VIDEODRIVER: dummy
+      run: |
+        python tests/demo_checks/run_notebook_checks.py

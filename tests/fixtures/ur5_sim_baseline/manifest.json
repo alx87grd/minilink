@@ -1,0 +1,33 @@
+{
+  "plant": "UR5Manipulator",
+  "module": "minilink.dynamics.catalog.manipulators.ur5",
+  "tf": 0.5,
+  "dt": 0.001,
+  "solver": "rk4_fixedsteps",
+  "compile_backend": "numpy",
+  "input_mode": "zero_torque",
+  "gravity": 0.0,
+  "x0": [
+    0.0,
+    -1.3707963267948966,
+    0.0,
+    -1.5707963267948966,
+    0.0,
+    0.0,
+    0.2,
+    -0.1,
+    0.15,
+    -0.05,
+    0.08,
+    -0.03
+  ],
+  "u": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "n_samples": 501
+}

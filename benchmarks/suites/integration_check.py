@@ -19,6 +19,9 @@ class IntegrationCheckSuiteConfig:
 
     sim_n_runs: int = 2
     trajopt_n_runs: int = 1
+    trajopt_n_steps: int | None = None
+    trajopt_maxiter: int | None = None
+    tiny: bool = False
     checkpoint_atol: float = 0.01
     checkpoint_rtol: float = 0.01
     truth_x_tf_atol: float = 0.05
@@ -65,7 +68,13 @@ def _showcase_trajopt_metrics(cfg: IntegrationCheckSuiteConfig) -> list[MetricRe
     if not jax_trajopt_available():
         return []
 
-    result = run_showcase_cartpole_trajopt(n_runs=cfg.trajopt_n_runs)
+    n_steps = cfg.trajopt_n_steps
+    maxiter = cfg.trajopt_maxiter
+    result = run_showcase_cartpole_trajopt(
+        n_runs=cfg.trajopt_n_runs,
+        n_steps=n_steps,
+        maxiter=maxiter,
+    )
     prefix = "trajopt.showcase_cartpole.jax_slsqp"
     metrics: list[MetricRecord] = [
         MetricRecord(

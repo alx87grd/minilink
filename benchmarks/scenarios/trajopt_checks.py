@@ -33,7 +33,7 @@ SHOWCASE_TRAJOPT_FTOL = 1e-2
 
 
 def build_showcase_cartpole_problem() -> PlanningProblem:
-    """Cart-pole swing-up aligned with ``demo_showcase.ipynb`` section 9."""
+    """Cart-pole swing-up aligned with ``showcase/minilink.ipynb`` trajopt section."""
     configure_jax(enable_x64=True)
     sys = JaxCartPole()
     sys.inputs["u"].lower_bound[0] = -10.0
@@ -48,33 +48,39 @@ def build_showcase_cartpole_problem() -> PlanningProblem:
     )
     return PlanningProblem(
         sys=sys,
+        tf=SHOWCASE_TRAJOPT_TF,
         x_start=x_start,
         x_goal=x_goal,
         cost=cost,
     )
 
 
-def run_showcase_cartpole_trajopt(*, n_runs: int = 1) -> TrajoptScenarioResult:
+def run_showcase_cartpole_trajopt(
+    *,
+    n_runs: int = 1,
+    n_steps: int | None = None,
+    maxiter: int | None = None,
+) -> TrajoptScenarioResult:
     """Showcase cart-pole swing-up with SciPy SLSQP on the JAX compile backend."""
     if not jax_trajopt_available():
         raise ModuleNotFoundError(
             "JAX is required for the showcase cart-pole trajopt check"
         )
 
+    n_steps = SHOWCASE_TRAJOPT_N_STEPS if n_steps is None else n_steps
+    maxiter = SHOWCASE_TRAJOPT_MAXITER if maxiter is None else maxiter
+
     problem = build_showcase_cartpole_problem()
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(
-                tf=SHOWCASE_TRAJOPT_TF,
-                n_steps=SHOWCASE_TRAJOPT_N_STEPS,
-            )
+            DirectCollocationOptions(n_steps=n_steps)
         ),
         options=TrajectoryOptimizationOptions(
             compile_backend="jax",
             optimizer_method="scipy_slsqp",
             optimizer_options={
-                "maxiter": SHOWCASE_TRAJOPT_MAXITER,
+                "maxiter": maxiter,
                 "ftol": SHOWCASE_TRAJOPT_FTOL,
                 "disp": False,
             },
@@ -91,7 +97,7 @@ def run_showcase_cartpole_trajopt(*, n_runs: int = 1) -> TrajoptScenarioResult:
 
     for _ in range(n_runs):
         t0 = time.perf_counter()
-        traj = planner.compute_solution()
+        traj = planner.solve().trajectory
         total_s = time.perf_counter() - t0
         total_times.append(total_s)
 

@@ -1,32 +1,16 @@
-"""Manual optimizer-backend benchmark runner.
-
-Run from the repository root::
-
-    python benchmarks/run_optimizer_backends.py
-    python benchmarks/run_optimizer_backends.py --maxiter 500 --runs 3
-"""
+"""Deprecated: use ``python benchmarks/run_study.py --preset optimizer``."""
 
 from __future__ import annotations
 
-from benchmarks.common import ipopt_available
-from benchmarks.optimization import (
-    STANDARD_OPTIMIZATION_CASES,
-    benchmark_optimizer_backends,
-    default_optimizer_variants,
-    print_optimizer_benchmark,
-)
+from benchmarks.run_study import main
 
-if not ipopt_available():
-    print("note: cyipopt is not installed; running SciPy variants only.")
+if __name__ == "__main__":
+    import warnings
 
-variants = default_optimizer_variants(
-    maxiter=200,
-    ftol=1e-2,
-    tol=1e-2,
-)
-result = benchmark_optimizer_backends(
-    STANDARD_OPTIMIZATION_CASES,
-    variants,
-    n_runs=1,
-)
-print_optimizer_benchmark(result)
+    warnings.warn(
+        "run_optimizer_backends.py is deprecated; use "
+        "python benchmarks/run_study.py --preset optimizer",
+        DeprecationWarning,
+        stacklevel=1,
+    )
+    raise SystemExit(main(["--preset", "optimizer"]))

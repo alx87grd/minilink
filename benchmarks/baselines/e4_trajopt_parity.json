@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "suite": "e4_trajopt_parity",
+  "description": "E4 trajopt parity: cartpole/pendulum TOP rebuild + bicycle TOP parametric from-solve.",
+  "regression_factor": 4.0,
+  "recorded_at": "2026-07-15",
+  "host_hint": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "metrics": [
+    {
+      "id": "e4.cartpole_rebuild.success",
+      "gate": "accuracy",
+      "direction": "higher_better",
+      "value": 1.0,
+      "unit": "flag",
+      "atol": 1e-12,
+      "notes": "1.0 means optimizer reported success"
+    },
+    {
+      "id": "e4.cartpole_rebuild.cost",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 66.71988306676982,
+      "unit": "cost",
+      "notes": "JaxCartPole TOP.solve, scipy_slsqp, compile_backend=jax"
+    },
+    {
+      "id": "e4.cartpole_rebuild.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.04394224999850849,
+      "unit": "s",
+      "notes": "optimizer / last_solve_time_s wall time"
+    },
+    {
+      "id": "e4.cartpole_rebuild.total_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.45926662500278326,
+      "unit": "s",
+      "notes": "end-to-end wall time including compile/bind as applicable"
+    },
+    {
+      "id": "e4.cartpole_rebuild.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        3.141592653589793,
+        0.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.cartpole_rebuild.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -2.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.cartpole_rebuild.checkpoint_t2",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        -0.6876614645562658,
+        2.5350767370031324,
+        0.365437886907926,
+        2.31633430674123
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.cartpole_rebuild.checkpoint_t4",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        3.141592653589793,
+        0.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.pendulum_rebuild.success",
+      "gate": "accuracy",
+      "direction": "higher_better",
+      "value": 1.0,
+      "unit": "flag",
+      "atol": 1e-12,
+      "notes": "1.0 means optimizer reported success"
+    },
+    {
+      "id": "e4.pendulum_rebuild.cost",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 8.797323017215827,
+      "unit": "cost",
+      "notes": "catalog Pendulum TOP.solve swing-up, tf=2.0, n_steps=16, jax+slsqp"
+    },
+    {
+      "id": "e4.pendulum_rebuild.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.001326917001279071,
+      "unit": "s",
+      "notes": "optimizer / last_solve_time_s wall time"
+    },
+    {
+      "id": "e4.pendulum_rebuild.total_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.15520487500180025,
+      "unit": "s",
+      "notes": "end-to-end wall time including compile/bind as applicable"
+    },
+    {
+      "id": "e4.pendulum_rebuild.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.141592653589793,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.pendulum_rebuild.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.pendulum_rebuild.checkpoint_t1",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        1.7674250710244142,
+        2.4924580774558684
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.pendulum_rebuild.checkpoint_t2",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.141592653589793,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.bicycle_parametric.success",
+      "gate": "accuracy",
+      "direction": "higher_better",
+      "value": 1.0,
+      "unit": "flag",
+      "atol": 1e-12,
+      "notes": "1.0 means optimizer reported success"
+    },
+    {
+      "id": "e4.bicycle_parametric.cost",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 23.964517546186073,
+      "unit": "cost",
+      "notes": "BicycleDynRatePorts TrajectoryOptimizationPlanner.solve_trajectory_from, tf=1.0, n_steps=8, jax+slsqp"
+    },
+    {
+      "id": "e4.bicycle_parametric.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.007585833998746239,
+      "unit": "s",
+      "notes": "optimizer / last_solve_time_s wall time"
+    },
+    {
+      "id": "e4.bicycle_parametric.total_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.05851741699734703,
+      "unit": "s",
+      "notes": "end-to-end wall time including compile/bind as applicable"
+    },
+    {
+      "id": "e4.bicycle_parametric.x_tf",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.625726346066425,
+        0.44042991018397426,
+        -0.22111202564577728,
+        3.7409270806800934,
+        -0.0782005413921549,
+        -0.12114437812887162,
+        12.473609010595805,
+        -0.04527122957243672
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.bicycle_parametric.checkpoint_t0",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        0.0,
+        1.0,
+        0.0,
+        3.6,
+        0.0,
+        0.0,
+        12.0,
+        0.0
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.bicycle_parametric.checkpoint_t0p5",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        1.8091442660161121,
+        0.8420785843130009,
+        -0.0972139773910693,
+        3.680271487186291,
+        -0.28024543088639864,
+        -0.33093186827929433,
+        12.308480934268633,
+        -0.17879615710125807
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    },
+    {
+      "id": "e4.bicycle_parametric.checkpoint_t1",
+      "gate": "accuracy",
+      "direction": "vector_match",
+      "value": [
+        3.625726346066425,
+        0.44042991018397426,
+        -0.22111202564577728,
+        3.7409270806800934,
+        -0.0782005413921549,
+        -0.12114437812887162,
+        12.473609010595805,
+        -0.04527122957243672
+      ],
+      "unit": "state",
+      "atol": 0.0001,
+      "rtol": 0.0001
+    }
+  ]
+}

@@ -221,46 +221,70 @@ class ExtrudedPolygon(GraphicPrimitive):
         return vertices, np.asarray(faces, dtype=np.uint32)
 
 
-def arrow_pts(base, vector, scale=1.0, head_ratio=0.15):
-    """Polyline (Nx3) of a straight arrow from *base* along *vector*, in local XY.
+def _arrow_perp(direction):
+    """Stable unit perpendicular for a 2-D or 3-D arrow shaft."""
+    direction = np.asarray(direction, dtype=float).reshape(-1)
+    if direction.size == 2:
+        return np.array([-direction[1], direction[0], 0.0])
+    # Prefer a world-up reference; fall back when the shaft is nearly vertical.
+    reference = np.array([0.0, 0.0, 1.0])
+    if abs(np.dot(direction, reference)) > 0.95:
+        reference = np.array([0.0, 1.0, 0.0])
+    perp = np.cross(reference, direction)
+    return perp / (np.linalg.norm(perp) + 1e-12)
 
-    The arrow is drawn at its **true length** ``scale * |vector|`` in the local
-    frame. A near-zero vector collapses to a single point (nothing visible).
+
+def arrow_pts(base, vector, scale=1.0, head_ratio=0.15):
+    """Polyline (Nx3) of a straight arrow from *base* along *vector*.
+
+    Accepts matching length-2 or length-3 *base* / *vector*. Planar arrows stay
+    in local XY (``z = 0``); spatial arrows build the chevron in a plane spanned
+    by the shaft and a deterministic perpendicular. Drawn length is
+    ``scale * |vector|``. A near-zero vector collapses to a single point.
 
     Parameters
     ----------
-    base : array-like, length 2
+    base : array-like, length 2 or 3
         Tail of the arrow in the local frame.
-    vector : array-like, length 2
+    vector : array-like, length 2 or 3
         Direction (and, with *scale*, length) of the shaft.
     scale : float
-        Multiplies *vector* to set the drawn length (e.g. a velocity gain).
+        Multiplies *vector* to set the drawn length (e.g. a force gain).
     head_ratio : float
         Chevron barb length as a fraction of the shaft length.
     """
-    base = np.asarray(base, dtype=float).reshape(2)
-    shaft = scale * np.asarray(vector, dtype=float).reshape(2)
-    length = float(np.hypot(shaft[0], shaft[1]))
-    if length < 1e-12:
-        return np.array([[base[0], base[1], 0.0]])
+    base = np.asarray(base, dtype=float).reshape(-1)
+    vector = np.asarray(vector, dtype=float).reshape(-1)
+    if base.size not in (2, 3) or vector.size not in (2, 3) or base.size != vector.size:
+        raise ValueError(
+            f"base and vector must both have length 2 or 3, got {base.size} and "
+            f"{vector.size}"
+        )
+    planar = base.size == 2
+    if planar:
+        base3 = np.array([base[0], base[1], 0.0])
+        shaft = scale * np.array([vector[0], vector[1], 0.0])
+    else:
+        base3 = base.copy()
+        shaft = scale * vector
 
-    tip = base + shaft
+    length = float(np.linalg.norm(shaft))
+    if length < 1e-12:
+        return base3.reshape(1, 3)
+
+    tip = base3 + shaft
     direction = shaft / length
     d = head_ratio * length
     back = direction * d
-    perp = np.array([-direction[1], direction[0]]) * d
+    if planar:
+        # Exact planar chevron (same points as the historical XY-only builder).
+        perp = np.array([-direction[1], direction[0], 0.0]) * d
+    else:
+        perp = _arrow_perp(direction) * d
 
     barb1 = tip - back + perp
     barb2 = tip - back - perp
-    return np.array(
-        [
-            [base[0], base[1], 0.0],
-            [tip[0], tip[1], 0.0],
-            [barb1[0], barb1[1], 0.0],
-            [tip[0], tip[1], 0.0],
-            [barb2[0], barb2[1], 0.0],
-        ]
-    )
+    return np.array([base3, tip, barb1, tip, barb2])
 
 
 def torque_arc_pts(sweep, radius=1.0, head_ratio=0.4, n_arc_pts=40):
@@ -300,12 +324,14 @@ def torque_arc_pts(sweep, radius=1.0, head_ratio=0.4, n_arc_pts=40):
 
 
 class Arrow(GraphicPrimitive):
-    """A 2-D arrow at honest world size — shaft from *base* along *vector*.
+    """A straight arrow at honest world size — shaft from *base* along *vector*.
 
-    The geometry is baked at its true length ``scale * |vector|``; the renderer
-    simply draws ``self.pts`` posed by the frame. Pass body-frame ``vector`` and
-    key the primitive to that body frame so its orientation comes from ``tf`` (no
-    manual ``cos``/``sin`` rotation).
+    Accepts planar (length-2) or spatial (length-3) *base* / *vector*. Geometry
+    is baked at true length ``scale * |vector|``; the renderer simply draws
+    ``self.pts`` posed by the frame. Pass body-frame ``vector`` and key the
+    primitive to that body frame so its orientation comes from ``tf`` (no
+    manual ``cos``/``sin`` rotation). For world-aligned task forces, key to a
+    translation-only frame and pass the force components directly as *vector*.
     """
 
     def __init__(
@@ -319,8 +345,19 @@ class Arrow(GraphicPrimitive):
         style="-",
     ):
         super().__init__(color, linewidth, style)
-        self.base = np.asarray(base, dtype=float).reshape(2)
-        self.vector = np.asarray(vector, dtype=float).reshape(2)
+        base = np.asarray(base, dtype=float).reshape(-1)
+        vector = np.asarray(vector, dtype=float).reshape(-1)
+        if (
+            base.size not in (2, 3)
+            or vector.size not in (2, 3)
+            or base.size != vector.size
+        ):
+            raise ValueError(
+                f"base and vector must both have length 2 or 3, got {base.size} and "
+                f"{vector.size}"
+            )
+        self.base = base
+        self.vector = vector
         self.scale = float(scale)
         self.head_ratio = head_ratio
         self.pts = arrow_pts(self.base, self.vector, self.scale, head_ratio)

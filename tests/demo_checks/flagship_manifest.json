@@ -1,0 +1,57 @@
+[
+  {
+    "id": "signal_blocks",
+    "path": "examples/scripts/blocks/signal_blocks.py",
+    "requires": []
+  },
+  {
+    "id": "computed_torque_pendulum",
+    "path": "examples/scripts/control/computed_torque_pendulum.py",
+    "requires": []
+  },
+  {
+    "id": "diagram_closed_loop",
+    "path": "examples/scripts/diagrams/diagram_closed_loop.py",
+    "requires": []
+  },
+  {
+    "id": "plot_readme",
+    "path": "examples/scripts/plots/plot_readme.py",
+    "requires": []
+  },
+  {
+    "id": "diagram_compiling",
+    "path": "examples/scripts/diagrams/diagram_compiling.py",
+    "requires": []
+  },
+  {
+    "id": "rrt_holonomic_obstacles",
+    "path": "examples/scripts/planning/rrt/rrt_holonomic_obstacles.py",
+    "requires": []
+  },
+  {
+    "id": "animation_native_comparison",
+    "path": "examples/scripts/animation/animation_native_comparison.py",
+    "requires": []
+  },
+  {
+    "id": "mpc_integrator_numpy",
+    "path": "examples/scripts/mpc/mpc_integrator_numpy.py",
+    "requires": []
+  },
+  {
+    "id": "trajopt_cartpole_jax",
+    "path": "examples/scripts/trajopt/trajopt_cartpole_collocation_jax.py",
+    "requires": [
+      "jax",
+      "cyipopt"
+    ]
+  },
+  {
+    "id": "mpc_car_minimal",
+    "path": "examples/scripts/mpc/mpc_car_minimal.py",
+    "requires": [
+      "jax"
+    ]
+  }
+]

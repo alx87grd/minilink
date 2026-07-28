@@ -52,6 +52,9 @@ dev = [
     "pre-commit",
     "pytest",
     "ruff",
+    "nbclient",
+    "nbformat",
+    "ipykernel",
 ]
 docs = [
     "sphinx>=7",
@@ -92,6 +95,26 @@ select = [
 ]
 # E741 flags one-letter names that resemble 1/I/O; disabled for textbook symbols (e.g. link length ``l``).
 ignore = ["E501", "E741"]
+
+[tool.ruff.lint.per-file-ignores]
+# L1 domain modules concatenate former per-topic files; section imports are intentional.
+"tests/unittest/test_backends.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_blocks.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_compile.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_control_analysis.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_core.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_costs_optimizer.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_diagrams.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_dynamics_catalog.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_engine_jax.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_graphics.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_hybrid.py" = ["E402", "F811", "I001", "F401"]
+"tests/unittest/test_jax_planning.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_mechanical_robotics.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_mpc.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_planning.py" = ["E402", "F811", "I001"]
+"tests/unittest/test_simulation.py" = ["E402", "F811", "I001", "F401"]
+"tests/unittest/test_step_discrete.py" = ["E402", "F811", "I001", "F401"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

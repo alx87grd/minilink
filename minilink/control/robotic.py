@@ -160,6 +160,16 @@ class TaskImpedance(System):
 
     Reference ``r`` has dim ``task_dim`` (regulation) or ``2·task_dim`` for
     stacked ``[p_d; pdot_d]`` tracking.
+
+    Optional visualization (``show_task_force=True``) draws:
+
+    * a ball at the desired task point ``p_d`` (frame ``task_target``);
+    * the commanded spring-damper task force ``f_task = Kp e + Kd ė`` at the
+      current end-effector (frame ``task_force``) — not gravity feedforward and
+      not the mapped joint torque.
+
+    In a diagram those frames namespace to ``ctl:task_target`` /
+    ``ctl:task_force``.
     """
 
     feedback_profile = "task"
@@ -173,12 +183,18 @@ class TaskImpedance(System):
         gravity: GravityHook | None = None,
         Kp=None,
         Kd=None,
+        show_task_force: bool = False,
+        task_force_scale: float = 0.01,
+        task_target_radius: float = 0.04,
     ):
         super().__init__()
         self.plant = plant
         self.gravity = gravity
         self.dof = plant.dof
         self.task_dim = plant.task_dim
+        self.show_task_force = bool(show_task_force)
+        self.task_force_scale = float(task_force_scale)
+        self.task_target_radius = float(task_target_radius)
         n = self.task_dim
         ref_dim = 2 * n if tracking_ref else n
 
@@ -200,7 +216,8 @@ class TaskImpedance(System):
             dependencies=("r", "y"),
         )
 
-    def ctl(self, x, u, t=0, params=None):
+    def _task_quantities(self, u, params=None):
+        """Return ``(q, p, p_d, J, f_task)`` for the current reference and measurement."""
         params = self.params if params is None else params
         xp = array_module(u)
 
@@ -220,18 +237,63 @@ class TaskImpedance(System):
         Kd = xp.asarray(params["Kd"])
 
         if ref_dim == task_dim:
-            e_p = r - p
-            u_task = Kp * e_p - Kd * pdot
+            p_d = r
+            f_task = Kp * (r - p) - Kd * pdot
         else:
             p_d = r[:task_dim]
             pdot_d = r[task_dim:]
-            u_task = Kp * (p_d - p) + Kd * (pdot_d - pdot)
+            f_task = Kp * (p_d - p) + Kd * (pdot_d - pdot)
 
-        tau = J.T @ u_task
+        return q, p, p_d, J, f_task
+
+    def ctl(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        q, _, _, J, f_task = self._task_quantities(u, params)
+
+        tau = J.T @ f_task
         if params.get("gravity_comp", False):
             tau = tau + _gravity_feedforward(self.plant, self.gravity, q)
 
         return tau.reshape(-1)
+
+    def tf(self, x, u, t=0, params=None):
+        if not self.show_task_force:
+            return {}
+        from minilink.graphical.catalog.shapes import point_pose
+
+        _, p, p_d, _, _ = self._task_quantities(u, params)
+        return {
+            "task_target": point_pose(p_d),
+            "task_force": point_pose(p),
+        }
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        if not self.show_task_force:
+            return {}
+        from minilink.graphical.animation.primitives import Arrow, Sphere
+
+        _, _, _, _, f_task = self._task_quantities(u, params)
+        f_task = np.asarray(f_task, dtype=float).reshape(-1)
+        base = np.zeros(f_task.size)
+        return {
+            "task_target": [
+                Sphere(
+                    radius=self.task_target_radius,
+                    center=(0.0, 0.0, 0.0),
+                    color="limegreen",
+                    opacity=0.85,
+                )
+            ],
+            "task_force": [
+                Arrow(
+                    base=base,
+                    vector=f_task,
+                    scale=self.task_force_scale,
+                    color="crimson",
+                    linewidth=2.5,
+                )
+            ],
+        }
 
 
 class TaskKinematic(System):

@@ -3,9 +3,9 @@
 Working notes for a long-term collection of neural-network blocks in minilink.
 Status: **proposal for architectural review** (`TODO: User Architectural Review`).
 
-Related maturity claims: [ROADMAP.md](../../ROADMAP.md) §5 (`blocks/neural.py` MLP
-done at TRL 2; `control/neural.py`, `identification/fitting.py`, and
-`interfaces/flax.py` planned).
+Related maturity claims: [ROADMAP.md](../../ROADMAP.md) Later (`blocks/` MLP,
+`control/neural.py`, `interfaces/flax.py`; `identification/fitting.py` is on the
+teaching-release priorities).
 
 ## Current state (June 2026)
 
@@ -15,11 +15,11 @@ The latest NN work landed in commit `fd0d17d` with two artifacts:
 one hidden layer, `y = W2 tanh(W1 u + b1) + b2`, weights in `params`, and
 `xp = array_module(u)` for JAX traceability.
 
-**Demo** — `examples/scripts/control/demo_neural_controller_jax.py`: wires
+**Demo** — `examples/scripts/control/neural_controller_jax.py`: wires
 `NeuralNetwork` into a closed-loop diagram (`Mux` → `nn` → `Integrator`), compiles
 with `diagram.compile(backend="jax")`, and trains weights via batched RK4 rollouts
 and manual SGD through `f_p` and `jax.grad`. There is no dedicated
-`examples/scripts/blocks/demo_neural*.py` yet.
+`examples/scripts/blocks/neural*.py` yet.
 
 **Tests** — shape/equation correctness, params override, JAX `jit` traceability
 (`tests/unittest/test_neural_blocks.py`).
@@ -71,7 +71,7 @@ u → Dense(2→8) → Tanh → Dense(8→1) → y
 - Topology is visible in `plot_diagram()` — ideal for controls/mechanical-engineering readers.
 - Mix NN layers with `Saturation`, `Gain`, `Sum`, filters in one architecture.
 - Each layer is independently replaceable and testable.
-- Matches how `demo_signal_blocks.py` fans out parallel paths.
+- Matches how `signal_blocks.py` fans out parallel paths.
 
 **Disadvantages**
 
@@ -198,7 +198,7 @@ Rewrite layers as Flax `nn.Module` subclasses, bridge to `StaticSystem`.
 | --- | --- |
 | Core stays lightweight and readable | Adapter maintenance when Flax API shifts |
 | Advanced users import Flax models without polluting core | Two paths to "a neural block" — needs docs |
-| Matches ROADMAP §5 placement (`interfaces/` for ecosystem bridges) | Flax adapter must map pytree → nested `params` dict |
+| Matches ROADMAP Later placement (`interfaces/` for ecosystem bridges) | Flax adapter must map pytree → nested `params` dict |
 | No forced Flax install for basic MLP control demos | |
 
 **Recommendation:** Option 3. The current `NeuralNetwork` is the right seed — extend

@@ -142,29 +142,40 @@ def rk4_step_between_knots(f, x, u0, u1, t, dt):
     return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
+def fixed_grid_t(tf: float, n_steps: int) -> np.ndarray:
+    """Uniform time knots: ``linspace(0, tf, n_steps)``."""
+    tf = float(tf)
+    if not np.isfinite(tf) or tf <= 0.0:
+        raise ValueError("fixed-grid tf must be positive and finite")
+    return np.linspace(0.0, tf, int(n_steps))
+
+
+def fixed_grid_dt(tf: float, n_steps: int) -> float:
+    """Uniform step: ``tf / (n_steps - 1)``."""
+    tf = float(tf)
+    if not np.isfinite(tf) or tf <= 0.0:
+        raise ValueError("fixed-grid tf must be positive and finite")
+    return tf / (int(n_steps) - 1)
+
+
 @dataclass
 class FixedGridOptions:
-    """Uniform fixed-time-grid options."""
+    """Uniform fixed-grid options — knot count only; horizon is ``problem.tf``."""
 
-    tf: float
     n_steps: int
 
     def __post_init__(self) -> None:
-        tf = float(self.tf)
-        if not np.isfinite(tf) or tf <= 0.0:
-            raise ValueError("tf must be positive and finite")
         if self.n_steps < 2:
             raise ValueError("n_steps must be at least 2")
-        self.tf = tf
         self.n_steps = int(self.n_steps)
 
-    @property
-    def t(self) -> np.ndarray:
-        return np.linspace(0.0, self.tf, self.n_steps)
+    def t(self, problem: PlanningProblem) -> np.ndarray:
+        """Time grid from finite ``problem.tf`` and ``n_steps``."""
+        return fixed_grid_t(problem.require_finite_tf(), self.n_steps)
 
-    @property
-    def dt(self) -> float:
-        return self.tf / (self.n_steps - 1)
+    def dt(self, problem: PlanningProblem) -> float:
+        """Step size from finite ``problem.tf`` and ``n_steps``."""
+        return fixed_grid_dt(problem.require_finite_tf(), self.n_steps)
 
 
 class Transcription(ABC):

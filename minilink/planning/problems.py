@@ -2,9 +2,9 @@
 Deterministic planning problem definitions.
 
 A :class:`PlanningProblem` describes the continuous mathematical task:
-the system, admissible sets, boundary sets, optional cost, and optional
-parameter bundle. Numerical grids, transcriptions, optimizers, and planner
-internals belong to solver packages rather than to the problem object.
+the system, admissible sets, boundary sets, continuous horizon ``tf``,
+optional cost, and optional parameter bundle. Knot count and other
+discretization choices belong to solver packages, not the problem object.
 """
 
 from collections.abc import Mapping
@@ -32,11 +32,16 @@ class ProblemParameters:
         Parameters passed to :class:`~minilink.core.costs.CostFunction`.
     sets : object, optional
         Parameters passed to allowable set objects.
+    scene : object, optional
+        Reserved for pipeline B spatial overrides (``ObstacleBank`` /
+        ``SceneParameters``). Always ``None`` until bind ``J(z, p)`` lands;
+        online ``params={"scene": …}`` raises ``NotImplementedError``.
     """
 
     system: object | None = None
     cost: object | None = None
     sets: object | None = None
+    scene: object | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +77,11 @@ class PlanningProblem:
         Initial and terminal boundary sets. These are the authoritative
         feasibility constraints; ``x_start`` and ``x_goal`` are shortcuts or
         representative points.
+    tf : float, optional
+        Continuous planning horizon length in seconds. ``None`` means unset
+        (RRT / some DP tasks). ``+inf`` means infinite-horizon. Finite trajopt /
+        MPC grids require a finite ``tf`` — demos should always set it
+        explicitly. Knot count ``N`` lives on transcription options.
     params : ProblemParameters, optional
         Explicit parameter bundle for system, cost, and set evaluation.
     """
@@ -84,11 +94,14 @@ class PlanningProblem:
     U: InputSet | None = None
     X0: Set | None = None
     Xf: Set | None = None
+    tf: float | None = None
     params: ProblemParameters | None = None
     metadata: Mapping[str, object] | None = None
 
     def __post_init__(self) -> None:
         n = int(self.sys.n)
+
+        tf = self._coerce_tf(self.tf)
 
         x_start = self._coerce_state(
             self._default_x_start(),
@@ -134,6 +147,7 @@ class PlanningProblem:
                 set_params=params.sets,
             )
 
+        object.__setattr__(self, "tf", tf)
         object.__setattr__(self, "x_start", x_start)
         object.__setattr__(self, "x_goal", x_goal)
         object.__setattr__(self, "X", X)
@@ -235,3 +249,29 @@ class PlanningProblem:
         if self.Xf is None:
             raise ValueError("This planner requires a terminal set or x_goal")
         return self.Xf
+
+    def require_finite_tf(self) -> float:
+        """Return a finite horizon or raise for solvers that need a time grid."""
+        if self.tf is None:
+            raise ValueError("This planner requires a finite problem.tf")
+        if not np.isfinite(self.tf):
+            raise ValueError(
+                "This planner requires a finite problem.tf "
+                "(got +inf for infinite-horizon)"
+            )
+        return float(self.tf)
+
+    @staticmethod
+    def _coerce_tf(tf: object) -> float | None:
+        if tf is None:
+            return None
+        value = float(tf)
+        if np.isnan(value) or value <= 0.0:
+            raise ValueError(
+                "tf must be positive, None (unset), or +inf (infinite-horizon)"
+            )
+        if not (np.isfinite(value) or np.isposinf(value)):
+            raise ValueError(
+                "tf must be positive, None (unset), or +inf (infinite-horizon)"
+            )
+        return value

@@ -44,7 +44,7 @@ DIAGRAM_DENSE_U = np.array([])
 def run_core_perf_suite(
     config: CorePerfSuiteConfig | None = None,
 ) -> list[MetricRecord]:
-    """Run the tier-1 core perf suite and return flat metric records."""
+    """Run the core-perf regression suite and return flat metric records."""
     cfg = config or CorePerfSuiteConfig()
     metrics: list[MetricRecord] = []
     metrics.extend(_f_evaluator_metrics(cfg))

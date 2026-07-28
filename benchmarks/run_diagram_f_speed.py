@@ -1,21 +1,16 @@
-"""Flat script: diagram ``f`` speed (same table as pendulum benchmark).
+"""Deprecated: use ``python benchmarks/run_study.py --preset f_eval --plant diagram_dense``."""
 
-Run:
-    python benchmarks/run_diagram_f_speed.py
-"""
+from __future__ import annotations
 
-import numpy as np
+from benchmarks.run_study import main
 
-from benchmarks.f_evaluators import benchmark_f_evaluators, print_f_benchmark
-from benchmarks.systems.network import make_dense_network
+if __name__ == "__main__":
+    import warnings
 
-diag = make_dense_network(num_nodes=50, connections_per_node=5)
-x_np = np.ones(diag.n)
-u_np = np.array([])
-
-# diag = build_deep_network(depth=50)
-# x_np = np.ones(diag.n)
-# u_np = np.array([])
-
-result = benchmark_f_evaluators(diag, x_np, u_np, t=0.0, n_calls=1000)
-print_f_benchmark(result)
+    warnings.warn(
+        "run_diagram_f_speed.py is deprecated; use "
+        "python benchmarks/run_study.py --preset f_eval --plant diagram_dense",
+        DeprecationWarning,
+        stacklevel=1,
+    )
+    raise SystemExit(main(["--preset", "f_eval", "--plant", "diagram_dense"]))

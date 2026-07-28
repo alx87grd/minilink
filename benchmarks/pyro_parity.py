@@ -204,9 +204,9 @@ def run_minilink_pendulum_dp(
     t_build = time.perf_counter()
     with _quiet():
         if fast_solve:
-            result = planner.solve_steps(min(n_steps, 50))
+            result = planner.solve_steps(min(n_steps, 50)).policy
         else:
-            result = planner.compute_solution()
+            result = planner.solve().policy
         planner.clean_infeasible_set()
     t_solve = time.perf_counter()
 
@@ -269,7 +269,7 @@ def run_minilink_double_pendulum_dp(
     )
     t_build = time.perf_counter()
     with _quiet():
-        result = planner.solve_steps(n_steps)
+        result = planner.solve_steps(n_steps).policy
         planner.clean_infeasible_set()
     t_solve = time.perf_counter()
 
@@ -328,7 +328,7 @@ def run_minilink_pendulum_rrt(*, seed=0, max_nodes=20000) -> ParityRow:
             nearest_backend="kd_tree",
         ),
     )
-    traj = planner.compute_solution()
+    traj = planner.solve().trajectory
     elapsed = time.perf_counter() - t0
     goal_err = _goal_error(traj.x[:, -1], x_goal)
 

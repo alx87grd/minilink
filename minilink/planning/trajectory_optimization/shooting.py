@@ -93,8 +93,8 @@ class ShootingTranscription(Transcription):
         import jax.numpy as jnp
 
         cost = problem.require_cost()
-        t = jnp.asarray(self.options.t)
-        dt = jnp.asarray(self.options.dt)
+        t = jnp.asarray(self.options.t(problem))
+        dt = jnp.asarray(self.options.dt(problem))
         n_steps = int(self.options.n_steps)
         m = int(problem.sys.m)
         x0 = jnp.asarray(self._initial_state(problem))
@@ -164,17 +164,17 @@ class ShootingTranscription(Transcription):
         u = self.unpack(result.z, problem)
         x = rollout(u)
         dx = np.zeros_like(x)
-        for k, t_k in enumerate(self.options.t):
+        for k, t_k in enumerate(self.options.t(problem)):
             dx[:, k] = dynamics(x[:, k], u[:, k], float(t_k))
 
-        traj = Trajectory(t=self.options.t, x=x, u=u, signals={"dx": dx})
+        traj = Trajectory(t=self.options.t(problem), x=x, u=u, signals={"dx": dx})
         if problem.cost is not None:
             traj = problem.cost.evaluate_trajectory(traj, params=problem.params.cost)
         return traj
 
     def initial_guess_time_grid(self, problem: PlanningProblem) -> np.ndarray:
         """Return the shooting input-knot grid."""
-        return self.options.t
+        return self.options.t(problem)
 
     def decision_dimension(self, problem: PlanningProblem) -> int:
         """Return the input-only decision-vector dimension."""
@@ -209,7 +209,7 @@ class ShootingTranscription(Transcription):
             raise ValueError("Shooting requires an initial input guess")
 
         if isinstance(guess, Trajectory):
-            resampled = guess.resample(t_new=self.options.t)
+            resampled = guess.resample(t_new=self.options.t(problem))
             return self.pack(resampled.u, problem)
 
         return guess.reshape(-1)
@@ -234,8 +234,8 @@ class ShootingTranscription(Transcription):
                 x_samples = evaluator.rk4_integrate_linear(
                     x0,
                     u.T,
-                    float(self.options.t[0]),
-                    self.options.dt,
+                    float(self.options.t(problem)[0]),
+                    self.options.dt(problem),
                 )
                 return x_samples.T
 
@@ -247,8 +247,8 @@ class ShootingTranscription(Transcription):
 
     def _rollout_loop(self, f, u, x0, problem: PlanningProblem) -> np.ndarray:
         n = int(problem.sys.n)
-        t = self.options.t
-        dt = self.options.dt
+        t = self.options.t(problem)
+        dt = self.options.dt(problem)
         xp = array_module(u)
 
         x = xp.asarray(x0).reshape(n)
@@ -268,7 +268,12 @@ class ShootingTranscription(Transcription):
         u = self.unpack(z, problem)
         x = rollout(u)
         return trajectory_cost(
-            cost, x, u, self.options.t, self.options.dt, problem.params.cost
+            cost,
+            x,
+            u,
+            self.options.t(problem),
+            self.options.dt(problem),
+            problem.params.cost,
         )
 
     def _add_terminal_constraints(
@@ -296,7 +301,7 @@ class ShootingTranscription(Transcription):
             x = rollout(self.unpack(z, problem))
             return boundary.margin(
                 x[:, -1],
-                t=float(self.options.t[-1]),
+                t=float(self.options.t(problem)[-1]),
                 params=problem.params.sets,
             )
 
@@ -314,7 +319,7 @@ class ShootingTranscription(Transcription):
             def state_margins(z):
                 x = rollout(self.unpack(z, problem))
                 margins = []
-                for k, t_k in enumerate(self.options.t):
+                for k, t_k in enumerate(self.options.t(problem)):
                     margin = problem.X.margin(
                         x[:, k],
                         t=float(t_k),
@@ -331,7 +336,7 @@ class ShootingTranscription(Transcription):
                 u = self.unpack(z, problem)
                 x = rollout(u)
                 margins = []
-                for k, t_k in enumerate(self.options.t):
+                for k, t_k in enumerate(self.options.t(problem)):
                     margin = problem.U.margin(
                         u[:, k],
                         x=x[:, k],
