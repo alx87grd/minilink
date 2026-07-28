@@ -1,7 +1,7 @@
 """Differentiate through a CartPole rollout: U-only vs U+params co-design.
 
 Teaching twin (math-first):
-``examples/notebooks/applications/cartpole_rollout_gradients.ipynb``.
+``examples/experimental/scratch/cartpole_rollout_gradients.ipynb``.
 Related: ``examples/notebooks/showcase/jax.ipynb`` §7.
 
 Full swing-up on catalog ``JaxCartPole`` (hanging → upright, θ★ = π):

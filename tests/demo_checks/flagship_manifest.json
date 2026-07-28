@@ -35,8 +35,8 @@
     "requires": []
   },
   {
-    "id": "mpc_minimal_numpy",
-    "path": "examples/scripts/mpc/mpc_minimal_numpy.py",
+    "id": "mpc_integrator_numpy",
+    "path": "examples/scripts/mpc/mpc_integrator_numpy.py",
     "requires": []
   },
   {
@@ -48,8 +48,8 @@
     ]
   },
   {
-    "id": "mpc_minimal",
-    "path": "examples/scripts/mpc/mpc_minimal.py",
+    "id": "mpc_car_minimal",
+    "path": "examples/scripts/mpc/mpc_car_minimal.py",
     "requires": [
       "jax"
     ]

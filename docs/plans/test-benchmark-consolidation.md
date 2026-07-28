@@ -719,7 +719,7 @@ Extend kinematic fixture pattern to **flagship end-states**:
 | `plot_readme.py` (impedance @ pendulum) | `t=tf`, diagram plant state | Matplotlib Agg |
 | `computed_torque_pendulum.py` | post-sim pendulum pose | Matplotlib Agg |
 | `projects/pathtracking/cascade_path_tracking.py` | mid-trajectory bicycle | Matplotlib Agg |
-| `mpc_minimal.py` | terminal plant + MPC overlay frame | Matplotlib Agg + overlay keys |
+| `mpc_car_minimal.py` | terminal plant + MPC overlay frame | Matplotlib Agg + overlay keys |
 | `diagram_compiling.py` or `diagram_closed_loop.py` | diagram topology / signals plot | plot_diagram smoke (no PNG) |
 | `trajopt_cartpole_collocation_jax.py` | traj plot only | plot_trajectory finite axes |
 | `rrt_holonomic_obstacles.py` | planning scene draw | scene bounds + path polyline |

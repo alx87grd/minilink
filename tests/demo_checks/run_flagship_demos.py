@@ -8,7 +8,7 @@ For a full sweep of every example script, use ``run_all_demos.py``.
 Usage (from repo root)::
 
     python tests/demo_checks/run_flagship_demos.py
-    python tests/demo_checks/run_flagship_demos.py --demo mpc_minimal
+    python tests/demo_checks/run_flagship_demos.py --demo mpc_car_minimal
 """
 
 from __future__ import annotations

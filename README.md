@@ -378,8 +378,8 @@ Index and placement rules: [examples/README.md](examples/README.md)
 | Control | `examples/scripts/control/` · [intro/control](examples/notebooks/intro/03_control.ipynb) |
 | Pyro SMC continuous (pendulum) | `examples/scripts/control/sliding_mode_pendulum.py` |
 | Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/scripts/hybrid/` · `examples/scripts/step/` · [intro/hybrid](examples/notebooks/intro/06_hybrid.ipynb) |
-| MPC (minimal + dual-rate) | `examples/scripts/mpc/` · [applications/mpc](examples/notebooks/applications/mpc.ipynb) |
-| MPC scenarios (path / circuit / slalom) | `examples/projects/mpc/` |
+| MPC (minimal + dual-rate) | `examples/scripts/mpc/` · [applications/mpc](examples/notebooks/applications/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
+| MPC scenarios (path / slalom / spatial) | `examples/projects/mpc/` · circuit: `examples/scripts/mpc/mpc_car_circuit.py` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/scripts/robotic/` |
 | Analysis (linearize, trim, ctrb/obsv, modal) | `examples/scripts/analysis/` · [intro/analysis](examples/notebooks/intro/04_analysis.ipynb) |
 | State-space / LQR | `examples/scripts/statespace/` |
@@ -389,7 +389,7 @@ Index and placement rules: [examples/README.md](examples/README.md)
 | Realtime game mode (keyboard → live plant → `Trajectory`) | `examples/scripts/realtime/game_cartpole.py` |
 | Optimization | `examples/scripts/optimization/` · [intro/optimization](examples/notebooks/intro/08_optimization.ipynb) |
 | Planning (RRT, DP) | `examples/scripts/planning/` · [intro/planning](examples/notebooks/intro/09_planning.ipynb) |
-| Trajectory optimization | `examples/scripts/trajopt/` · [car TrajOpt compare](examples/notebooks/applications/car_trajopt.ipynb) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/notebooks/applications/car_trajopt.ipynb) |
+| Trajectory optimization | `examples/scripts/trajopt/` · [car TrajOpt project](examples/projects/car_trajopt/) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/projects/car_trajopt/car_trajopt.ipynb) |
 | Path tracking projects | `examples/projects/pathtracking/` · `examples/projects/car_trajopt/` |
 | C export (P controller round-trip; filtered PID leaf) | `examples/scripts/interfaces/c_export_proportional.py` · `c_export.py` |
 | Solver benchmarks | [examples/notebooks/tooling/benchmark.ipynb](examples/notebooks/tooling/benchmark.ipynb) (uses repo-root `benchmarks/`) |

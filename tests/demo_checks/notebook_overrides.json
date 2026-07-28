@@ -1,0 +1,31 @@
+{
+  "examples/notebooks/showcase/minilink.ipynb": {
+    "requires": ["jax"],
+    "timeout": 300
+  },
+  "examples/notebooks/showcase/jax.ipynb": {
+    "requires": ["jax"],
+    "timeout": 300
+  },
+  "examples/notebooks/intro/06_hybrid.ipynb": {
+    "requires": ["jax"],
+    "timeout": 300
+  },
+  "examples/notebooks/intro/07_compile.ipynb": {
+    "requires": ["jax"]
+  },
+  "examples/notebooks/intro/09_planning.ipynb": {
+    "timeout": 300
+  },
+  "examples/notebooks/intro/10_graphical.ipynb": {
+    "requires": ["meshcat", "plotly"]
+  },
+  "examples/notebooks/applications/mpc.ipynb": {
+    "requires": ["jax"],
+    "timeout": 600
+  },
+  "examples/notebooks/tooling/benchmark.ipynb": {
+    "requires": ["jax"],
+    "timeout": 300
+  }
+}

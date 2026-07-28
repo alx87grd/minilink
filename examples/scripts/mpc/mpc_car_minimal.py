@@ -1,13 +1,10 @@
-"""Dual-rate hybrid MPC: replan at ``dt_mpc``, broadcast ``u_nom`` at ``dt_broadcast``.
+"""Minimal hybrid MPC: ``ModelPredictiveController`` then ``mpc @ plant``.
 
-Contrasts with default ``mpc @ plant`` (single-rate ``u_ff`` ZOH)::
-
-    computer = mpc.dual_rate_computer(dt_broadcast=0.01)
-    hybrid = computer @ plant
+Warm-start via ``warm_start=True`` (packed ``z`` on ``Computer.x``).
 
 Run from repo root::
 
-    python examples/scripts/mpc/mpc_dual_rate.py
+    python examples/scripts/mpc/mpc_car_minimal.py
 """
 
 import numpy as np
@@ -30,14 +27,14 @@ configure_jax(enable_x64=True)
 
 U_TARGET = 4.0
 TF_SIM = 5.0
-TF_MPC = 2.0
-MPC_DT = 0.5
-DT_BROADCAST = 0.01
+MPC_DT = 0.02
 SIM_DT = 0.01
 STEP_DISP = True
 REF_X_PAD = 20.0
 
 sys = BicycleDynRate()
+
+
 r_r = sys.params["r_r"]
 x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 x0 = np.array([0.0, 3.0, 0.0, U_TARGET * 0.8, 0.0, 0.0, (U_TARGET * 0.8) / r_r, 0.0])
@@ -46,7 +43,7 @@ sys.x0 = x0.copy()
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys,
-        tf=TF_MPC,
+        tf=2.0,
         x_start=x0,
         cost=QuadraticCost.from_system(
             sys,
@@ -57,19 +54,19 @@ planner = TrajectoryOptimizationPlanner(
             ubar=np.zeros(2),
         ),
     ),
-    n_steps=20,
+    n_steps=5,
     transcription="direct_collocation",
     compile_backend="jax",
     record_solve_time=True,
     optimizer_method="scipy_slsqp",
-    optimizer_options={"maxiter": 50, "ftol": 1.0},
+    optimizer_options={"maxiter": 10, "ftol": 1.0},
 )
 
 mpc = ModelPredictiveController(
     planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
 )
-computer = mpc.dual_rate_computer(dt_broadcast=DT_BROADCAST)
-hybrid = computer @ sys
+
+hybrid = mpc @ sys
 
 hybrid.plot_diagram()
 

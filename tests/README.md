@@ -160,7 +160,7 @@ and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not thr
 python tests/demo_checks/run_catalog_checks.py --fast
 # Flagship whitelist: subprocess each demo's __main__ (no demo source changes):
 python tests/demo_checks/run_flagship_demos.py
-# Teaching notebooks: execute code cells (outputs discarded):
+# Teaching notebooks under examples/notebooks/ (auto-discovered; overrides for deps/timeouts):
 MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
 # Nightly / local: every example script:
 python tests/demo_checks/run_all_demos.py --continue-on-error

@@ -31,7 +31,7 @@ applications notebook.
 `*_v2*` live under `experimental/<topic>/` or `projects/`.
 
 **Script naming:** no `demo_` prefix. Keep the topic in the stem when the
-name would otherwise be too generic — e.g. `mpc/mpc_minimal.py`,
+name would otherwise be too generic — e.g. `mpc/mpc_car_minimal.py`,
 `diagrams/diagram_shortcuts.py` (not bare `minimal.py` / `shortcuts.py`).
 Plant or scenario words stay when they discriminate (`sliding_mode_pendulum.py`).
 
@@ -57,7 +57,7 @@ See also [notebooks/README.md](notebooks/README.md).
 | Control | [intro/03_control](notebooks/intro/03_control.ipynb) | [`scripts/control/`](scripts/control/) | |
 | Analysis | [intro/04_analysis](notebooks/intro/04_analysis.ipynb) | [`scripts/analysis/`](scripts/analysis/) | |
 | Simulation | [intro/05_simulation](notebooks/intro/05_simulation.ipynb) | [`scripts/plots/`](scripts/plots/), [`scripts/animation/`](scripts/animation/) | |
-| Hybrid / step | [intro/06_hybrid](notebooks/intro/06_hybrid.ipynb) | [`scripts/hybrid/`](scripts/hybrid/), [`scripts/step/`](scripts/step/), [`scripts/mpc/`](scripts/mpc/) | MPC minimal + dual-rate; scenarios: [`projects/mpc/`](projects/mpc/) |
+| Hybrid / step | [intro/06_hybrid](notebooks/intro/06_hybrid.ipynb) | [`scripts/hybrid/`](scripts/hybrid/), [`scripts/step/`](scripts/step/), [`scripts/mpc/`](scripts/mpc/) | MPC minimal + circuit scripts; dual-rate / scenarios: [`projects/mpc/`](projects/mpc/) |
 | Compile | [intro/07_compile](notebooks/intro/07_compile.ipynb) | [`scripts/diagrams/`](scripts/diagrams/) | |
 | Optimization | [intro/08_optimization](notebooks/intro/08_optimization.ipynb) | [`scripts/optimization/`](scripts/optimization/) | |
 | Planning / trajopt | [intro/09_planning](notebooks/intro/09_planning.ipynb) | [`scripts/planning/`](scripts/planning/), [`scripts/trajopt/`](scripts/trajopt/) | Car / LOS: [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/); UR5: `trajopt_ur5_collocation_jax.py` |

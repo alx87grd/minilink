@@ -34,7 +34,7 @@ CHECKS = (
     ),
     (
         "Matplotlib hybrid MPC animate",
-        [sys.executable, "examples/scripts/mpc/mpc_minimal.py"],
+        [sys.executable, "examples/scripts/mpc/mpc_car_minimal.py"],
     ),
     (
         "Meshcat 3D (physics in diagram — optional meshcat extra)",

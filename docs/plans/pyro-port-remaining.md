@@ -406,11 +406,11 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | `examples/scripts/identification/params_gradient.py` | identification |
 | `examples/scripts/interfaces/c_export.py` | interfaces |
 | `examples/scripts/interfaces/c_export_proportional.py` | interfaces |
-| `examples/scripts/mpc/mpc_minimal.py` | mpc |
-| `examples/scripts/mpc/mpc_minimal_numpy.py` | mpc |
-| `examples/scripts/mpc/mpc_dual_rate.py` | mpc |
+| `examples/scripts/mpc/mpc_car_minimal.py` | mpc |
+| `examples/scripts/mpc/mpc_integrator_numpy.py` | mpc |
+| `examples/scripts/mpc/mpc_car_circuit.py` | mpc |
+| `examples/projects/mpc/mpc_dual_rate.py` | mpc |
 | `examples/projects/mpc/mpc_path.py` | mpc |
-| `examples/projects/mpc/mpc_circuit.py` | mpc |
 | `examples/projects/mpc/mpc_slalom.py` | mpc |
 | `examples/projects/mpc/mpc_spatial.py` | mpc |
 | `examples/scripts/optimization/optim_basic.py` | optimization |
@@ -456,8 +456,8 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | Notebook |
 | --- |
 | `examples/notebooks/applications/mpc.ipynb` |
-| `examples/notebooks/applications/car_trajopt.ipynb` |
-| `examples/notebooks/applications/cartpole_rollout_gradients.ipynb` |
+| `examples/projects/car_trajopt/car_trajopt.ipynb` |
+| `examples/experimental/scratch/cartpole_rollout_gradients.ipynb` |
 | `examples/notebooks/intro/08_optimization.ipynb` |
 | `examples/notebooks/intro/10_graphical.ipynb` |
 | `examples/notebooks/intro/07_compile.ipynb` |

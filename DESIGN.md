@@ -240,7 +240,7 @@ serial arms. Joint impedance / task impedance / computed torque use
 (planning / trajopt plants; module-scoped names, no ``Jax`` prefix). Default
 ``u`` / ``y = x``; named-port twins use the ``Ports`` suffix. Compare:
 ``examples/projects/car_trajopt/car_trajopt_compare.py`` and
-[notebook](examples/notebooks/applications/car_trajopt.ipynb).
+[notebook](examples/projects/car_trajopt/car_trajopt.ipynb).
 
 | Class | $n$ | Input $\mathbf{u}$ | Role |
 | --- | --- | --- | --- |

@@ -42,7 +42,9 @@ outputs discarded). Locally:
 MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
 ```
 
-New notebooks under this folder must be added to
-[`tests/demo_checks/notebook_manifest.json`](../../tests/demo_checks/notebook_manifest.json).
+New notebooks under this folder are auto-discovered. Optional deps and longer
+timeouts go in
+[`tests/demo_checks/notebook_overrides.json`](../../tests/demo_checks/notebook_overrides.json).
+Projects and experimental notebooks are not smoked here.
 
 **Why only meshcat?** Colab already provides NumPy, SciPy, Matplotlib, and JAX-friendly stacks for these demos. Animation in the browser needs **meshcat**; the bootstrap installs that one extra dependency. Heavier local extras (`pip install -e ".[jax]"`, pygame, etc.) are for development on your machine, not required for the thin Colab path.

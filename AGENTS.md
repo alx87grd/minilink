@@ -29,13 +29,13 @@ planning trajopt / the hybrid step path (`StepSystem`, `StepDiagramSystem`,
 intro surfaces to track every new demo, compare script, or `examples/projects/`
 experiment. New demos land under `examples/`; update DESIGN/ROADMAP when contracts
 or maturity change. Add a README examples-table row only when a demo is a
-**canonical** teaching entry for a core tool (e.g. `examples/scripts/mpc/mpc_minimal.py`).
+**canonical** teaching entry for a core tool (e.g. `examples/scripts/mpc/mpc_car_minimal.py`).
 
 **Examples buckets** (see [examples/README.md](examples/README.md)):
 `notebooks/` and `scripts/` stay as **separate format trees** (do not mix
 `.ipynb` and `.py` per module). Canonical single-file demos →
 `examples/scripts/<topic>/` with stems that keep the topic when needed
-(e.g. `mpc/mpc_minimal.py`, not bare `minimal.py`; no `demo_` prefix).
+(e.g. `mpc/mpc_car_minimal.py`, not bare `minimal.py`; no `demo_` prefix).
 Non-core / scenario sprawl / versioned WIP → `examples/experimental/<topic>/`.
 Personal quick checks → `examples/experimental/scratch/` (not intro/README/CI).
 Multi-file experiments → `examples/projects/`. Pedagogical compares stay in

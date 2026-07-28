@@ -1,12 +1,12 @@
 """Execute teaching notebooks via nbclient (demo-check layer).
 
-Runs every notebook listed in ``notebook_manifest.json`` under
-``examples/notebooks/`` (including subfolders). Code cells must not raise;
-outputs are discarded (notebooks are not rewritten). Uses ``MPLBACKEND=Agg``
-so matplotlib stays headless.
+Auto-discovers every ``.ipynb`` under ``examples/notebooks/`` (including
+subfolders). Code cells must not raise; outputs are discarded (notebooks are
+not rewritten). Uses ``MPLBACKEND=Agg`` so matplotlib stays headless.
 
-Every on-disk ``.ipynb`` under ``examples/notebooks/`` must appear in the
-manifest — new notebooks cannot be forgotten.
+Defaults: ``timeout=180``, ``requires=[]``. Non-default deps / timeouts live
+in ``notebook_overrides.json`` keyed by repo-relative path. Notebooks under
+``examples/projects/`` or ``examples/experimental/`` are not smoked here.
 
 Usage (from repo root)::
 
@@ -25,8 +25,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _CHECKS_DIR = Path(__file__).resolve().parent
-MANIFEST_PATH = _CHECKS_DIR / "notebook_manifest.json"
+OVERRIDES_PATH = _CHECKS_DIR / "notebook_overrides.json"
 NOTEBOOK_DIR = REPO_ROOT / "examples" / "notebooks"
+DEFAULT_TIMEOUT = 180.0
 
 
 @dataclass(frozen=True)
@@ -36,18 +37,26 @@ class NotebookRow:
     message: str = ""
 
 
-def _load_manifest() -> list[dict]:
-    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+def _notebook_id(rel_path: str) -> str:
+    """``examples/notebooks/intro/00_core.ipynb`` → ``intro_00_core``."""
+    stem = Path(rel_path).relative_to("examples/notebooks").with_suffix("")
+    return "_".join(stem.parts)
 
 
-def _disk_notebooks() -> set[str]:
+def _load_overrides() -> dict[str, dict]:
+    if not OVERRIDES_PATH.is_file():
+        return {}
+    raw = json.loads(OVERRIDES_PATH.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{OVERRIDES_PATH.name} must be a JSON object keyed by path")
+    return raw
+
+
+def _discover_notebooks() -> list[str]:
     """Repo-relative paths of every ``.ipynb`` under ``examples/notebooks/``."""
-    return {p.relative_to(REPO_ROOT).as_posix() for p in NOTEBOOK_DIR.rglob("*.ipynb")}
-
-
-def _unlisted_on_disk(manifest: list[dict]) -> list[str]:
-    listed = {entry["path"] for entry in manifest}
-    return sorted(_disk_notebooks() - listed)
+    return sorted(
+        p.relative_to(REPO_ROOT).as_posix() for p in NOTEBOOK_DIR.rglob("*.ipynb")
+    )
 
 
 def _execute_notebook(path: Path, *, timeout: float) -> tuple[str, str]:
@@ -92,24 +101,15 @@ def run_notebook_checks(
     notebook_filter: str | None = None,
     timeout_override: float | None = None,
 ) -> list[NotebookRow]:
-    manifest = _load_manifest()
+    overrides = _load_overrides()
     rows: list[NotebookRow] = []
 
-    unlisted = _unlisted_on_disk(manifest)
-    for name in unlisted:
-        rows.append(
-            NotebookRow(
-                name,
-                "fail",
-                f"on disk but missing from {MANIFEST_PATH.name}",
-            )
-        )
-
-    for entry in manifest:
-        notebook_id = entry["id"]
+    for rel in _discover_notebooks():
+        notebook_id = _notebook_id(rel)
         if notebook_filter is not None and notebook_id != notebook_filter:
             continue
 
+        entry = overrides.get(rel) or {}
         requires = tuple(entry.get("requires") or ())
         missing = False
         for extra in requires:
@@ -120,17 +120,15 @@ def run_notebook_checks(
         if missing:
             continue
 
-        path = REPO_ROOT / entry["path"]
+        path = REPO_ROOT / rel
         if not path.is_file():
-            rows.append(
-                NotebookRow(notebook_id, "fail", f"missing file {entry['path']}")
-            )
+            rows.append(NotebookRow(notebook_id, "fail", f"missing file {rel}"))
             continue
 
         timeout = (
             float(timeout_override)
             if timeout_override is not None
-            else float(entry.get("timeout", 180))
+            else float(entry.get("timeout", DEFAULT_TIMEOUT))
         )
         status, message = _execute_notebook(path, timeout=timeout)
         rows.append(NotebookRow(notebook_id, status, message))
@@ -159,13 +157,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--notebook",
         default=None,
-        help="Run one manifest id",
+        help="Run one notebook id (e.g. showcase_minilink, intro_00_core)",
     )
     parser.add_argument(
         "--timeout",
         type=float,
         default=None,
-        help="Override per-notebook timeout seconds (default: manifest value)",
+        help="Override per-notebook timeout seconds (default: override or 180)",
     )
     args = parser.parse_args(argv)
     rows = run_notebook_checks(

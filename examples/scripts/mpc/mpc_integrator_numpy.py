@@ -5,7 +5,7 @@ transcribes and solves a fresh NLP. Suitable for teaching and small plants.
 
 Run from repo root::
 
-    python examples/scripts/mpc/mpc_minimal_numpy.py
+    python examples/scripts/mpc/mpc_integrator_numpy.py
 """
 
 import numpy as np

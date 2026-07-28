@@ -5,7 +5,7 @@ Big ``=====`` boxes mark the ROS2 copy-paste surface: one ``__init__`` block
 Everything else is offline sim / plotting only.
 
 Flip ``BACKEND`` below: ``"jax"`` parametric compile, ``"numpy"`` rebuild each
-replan tick (see ``mpc_minimal_numpy.py``).
+replan tick (see ``mpc_integrator_numpy.py``).
 
 Run from repo root::
 
