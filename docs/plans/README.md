@@ -23,3 +23,4 @@ add a Later bullet first; open a plan doc only when the design needs a writeup.
 | [phase4-fidelity-maps.md](phase4-fidelity-maps.md) | Jax bicycle ladder lift/project maps + MPC Engine broadcast | Draft |
 | [mpc-tuning.md](mpc-tuning.md) | MPC tuning project harness | Draft |
 | [test-benchmark-consolidation.md](test-benchmark-consolidation.md) | Demo/catalog check layout | Partial |
+| [articulated-mechanism.md](articulated-mechanism.md) | Mechanism IR, sym/num dual, spatial RNEA/ABA, params vs URDF | Draft |
