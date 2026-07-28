@@ -24,6 +24,10 @@
     "requires": ["jax"],
     "timeout": 600
   },
+  "examples/learn/teaching/topics/articulated_robot_eom.ipynb": {
+    "requires": ["jax", "sympy", "meshcat"],
+    "timeout": 600
+  },
   "examples/tooling/notebooks/benchmark.ipynb": {
     "requires": ["jax"],
     "timeout": 300
