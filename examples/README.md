@@ -3,8 +3,9 @@
 Human-facing runnable learning and experiments. Automated contracts and
 runners live under [`tests/`](../tests/) and [`benchmarks/`](../benchmarks/).
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/learn)
-Browse curriculum notebooks in Colab · each notebook below also has its own badge.
+Start in Colab:
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)
+(Colab opens **notebook files** only — use the per-notebook badges below. Folder browsing is on GitHub.)
 
 ## Layout
 
@@ -48,12 +49,15 @@ leaf folder (except inside one named project). Tooling may use both
 
 ## Open in Colab
 
-| Folder | Colab |
-| --- | --- |
-| All curriculum (`learn/`) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/learn) |
-| Intro (library) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/learn/intro) |
-| Teaching topics | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/learn/teaching/topics) |
-| Tooling notebooks | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/tooling/notebooks) |
+Colab requires a `/blob/…/*.ipynb` path (not a GitHub `/tree/` folder). Browse
+folders on GitHub, then open a notebook badge.
+
+| Folder (GitHub) |
+| --- |
+| [`learn/`](https://github.com/alx87grd/minilink/tree/main/examples/learn) |
+| [`learn/intro/`](https://github.com/alx87grd/minilink/tree/main/examples/learn/intro) |
+| [`learn/teaching/topics/`](https://github.com/alx87grd/minilink/tree/main/examples/learn/teaching/topics) |
+| [`tooling/notebooks/`](https://github.com/alx87grd/minilink/tree/main/examples/tooling/notebooks) |
 
 ### Intro — learn minilink
 

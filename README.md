@@ -8,7 +8,7 @@ visualizing dynamical systems.
 Start here: [showcase](examples/learn/intro/showcase_minilink.ipynb) ·
 [JAX / autodiff showcase](examples/learn/intro/showcase_jax.ipynb) ·
 [examples](examples/README.md) ·
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/tree/main/examples/learn)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)
 
 ## Why minilink
 
