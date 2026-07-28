@@ -39,6 +39,7 @@ def export_hybrid_graphviz(topology, **kwargs):
 def plot_hybrid_diagram(
     hybrid,
     filename=None,
+    show=True,
     show_inline=None,
     show_pdf=None,
     *,
@@ -52,6 +53,7 @@ def plot_hybrid_diagram(
     )
     _render_diagram_graph(
         graph,
+        show=show,
         show_inline=show_inline,
         show_pdf=show_pdf,
         filename=filename,

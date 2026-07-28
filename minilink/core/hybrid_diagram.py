@@ -342,6 +342,7 @@ class HybridDiagram:
     def plot_diagram(
         self,
         filename=None,
+        show=True,
         show_inline=None,
         show_pdf=None,
         *,
@@ -349,14 +350,18 @@ class HybridDiagram:
     ):
         """Render Plant + Computer clusters with boundary ZOH/sample edges.
 
-        ``abstract_boundary=True`` (default) omits external Inputs/Outputs routing
-        nodes and anchors hybrid edges on the wired subsystem ports.
+        Display policy matches :meth:`minilink.core.facades.SharedSystemFacades.plot_diagram`
+        (notebook SVG; script Matplotlib window; ``show_pdf`` / ``filename`` /
+        ``show=False`` overrides). ``abstract_boundary=True`` (default) omits
+        external Inputs/Outputs routing nodes and anchors hybrid edges on the
+        wired subsystem ports.
         """
         from minilink.graphical.diagrams.hybrid_dot import plot_hybrid_diagram
 
         return plot_hybrid_diagram(
             self,
             filename=filename,
+            show=show,
             show_inline=show_inline,
             show_pdf=show_pdf,
             abstract_boundary=abstract_boundary,

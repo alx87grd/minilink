@@ -72,12 +72,17 @@ def block_html(node):
     return html
 
 
-def _render_diagram_graph(graph, show_inline=None, show_pdf=None, filename=None):
+def _render_diagram_graph(
+    graph, show=True, show_inline=None, show_pdf=None, filename=None
+):
     """
     Display a Graphviz object.
 
-    ``show_inline=None`` defaults to inline display in Jupyter / Colab.
-    ``show_pdf=None`` defaults to external PDF display in bare scripts.
+    ``show_inline=None`` defaults to inline SVG in Jupyter / Colab.
+    Outside notebooks, ``show=True`` opens a Matplotlib window with the
+    Graphviz PNG (same blocking policy as trajectory plots). Pass
+    ``show_pdf=True`` for the legacy OS PDF viewer; pass ``filename`` to
+    write Graphviz output to disk. ``show=False`` builds/returns only.
     """
     if graph is None:
         warnings.warn(
@@ -87,21 +92,46 @@ def _render_diagram_graph(graph, show_inline=None, show_pdf=None, filename=None)
         )
         return
 
-    from minilink.graphical.common.environment import is_inline_capable
+    from minilink.graphical.common.environment import (
+        is_blocking_needed,
+        is_inline_capable,
+    )
 
     inline_env = is_inline_capable()
     if show_inline is None:
         show_inline = inline_env
     if show_pdf is None:
-        show_pdf = not inline_env
+        show_pdf = False
 
-    if show_inline:
+    if show and show_inline:
         try:
             import IPython.display as display
 
             display.display(graph)
         except ImportError:
             warnings.warn("IPython is not available for inline display", stacklevel=2)
+
+    show_mpl = show and (not show_inline) and (not show_pdf)
+    if show_mpl:
+        try:
+            import io
+
+            import matplotlib.pyplot as plt
+
+            png = graph.pipe(format="png")
+            img = plt.imread(io.BytesIO(png), format="png")
+            fig, ax = plt.subplots()
+            ax.imshow(img)
+            ax.axis("off")
+            fig.tight_layout(pad=0)
+            if plt.get_backend().lower() != "agg":
+                plt.show(block=is_blocking_needed())
+        except Exception as exc:
+            warnings.warn(
+                f"Could not show diagram in Matplotlib. "
+                f"Is Graphviz installed? Error: {exc}",
+                stacklevel=2,
+            )
 
     need_disk = show_pdf or filename is not None
     if not need_disk:
@@ -117,7 +147,7 @@ def _render_diagram_graph(graph, show_inline=None, show_pdf=None, filename=None)
             filename = tmp.name
 
     try:
-        graph.render(filename=filename, view=show_pdf)
+        graph.render(filename=filename, view=bool(show and show_pdf))
     except Exception as exc:
         warnings.warn(
             f"Could not render graph. Is Graphviz installed? Error: {exc}",
@@ -147,11 +177,14 @@ def get_diagram(sys_or_diagram):
         return None
 
 
-def plot_diagram(sys_or_diagram, filename=None, show_inline=None, show_pdf=None):
+def plot_diagram(
+    sys_or_diagram, filename=None, show=True, show_inline=None, show_pdf=None
+):
     """Render a system or assembled diagram."""
     graph = get_diagram(sys_or_diagram)
     _render_diagram_graph(
         graph,
+        show=show,
         show_inline=show_inline,
         show_pdf=show_pdf,
         filename=filename,
