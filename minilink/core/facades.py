@@ -23,44 +23,11 @@ class SharedSystemFacades:
     On static ``System`` leaves (``n=0``), :meth:`compute_trajectory` and
     :meth:`compute_forced` use :class:`~minilink.simulation.static_simulator.StaticSimulator`.
     :class:`DynamicSystem` subclasses override those methods via
-    :class:`DynamicSystemFacades`.
+    :class:`DynamicSystemFacades`. :class:`StepSystem` overrides them to raise
+    and point at :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout`.
     """
 
     # User Shortcut / Facade API
-
-    def _facade_simulator_cls(self):
-        """Simulator class used by the facade shortcuts (MRO dispatch).
-
-        :class:`DynamicSystemFacades` overrides this to return
-        :class:`~minilink.simulation.simulator.Simulator`; imported lazily so
-        the core stays light.
-        """
-        from minilink.simulation.static_simulator import StaticSimulator
-
-        return StaticSimulator
-
-    def _facade_simulate(self, *, forced=None, show=False, **sim_kwargs):
-        """Shared body of :meth:`compute_trajectory` / :meth:`compute_forced`.
-
-        ``forced`` is ``None`` for a nominal solve, or ``(u, input_port_id)``
-        for a forced solve. Extra ``sim_kwargs`` go to the simulator
-        constructor. Caches the result on :attr:`traj`.
-        """
-        sim = self._facade_simulator_cls()(self, **sim_kwargs)
-
-        if forced is None:
-            traj = sim.solve()
-        else:
-            u, input_port_id = forced
-            traj = sim.solve_forced(u, input_port_id=input_port_id)
-
-        if show:
-            from minilink.graphical.signals import plot_time_signals
-
-            plot_time_signals(self, traj)
-
-        self.traj = traj
-        return traj
 
     def compile(self, backend="numpy", verbose=False):
         """
@@ -108,8 +75,10 @@ class SharedSystemFacades:
         Trajectory
             The sampled trajectory, also stored in :attr:`traj`.
         """
-        return self._facade_simulate(
-            show=show,
+        from minilink.simulation.static_simulator import StaticSimulator
+
+        sim = StaticSimulator(
+            self,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -119,6 +88,16 @@ class SharedSystemFacades:
             compile_backend=compile_backend,
             verbose=verbose,
         )
+        traj = sim.solve()
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+
+        return traj
 
     def compute_forced(
         self,
@@ -163,9 +142,10 @@ class SharedSystemFacades:
         Trajectory
             Sampled state-input trajectory.
         """
-        return self._facade_simulate(
-            forced=(u, input_port_id),
-            show=show,
+        from minilink.simulation.static_simulator import StaticSimulator
+
+        sim = StaticSimulator(
+            self,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -175,6 +155,17 @@ class SharedSystemFacades:
             compile_backend=compile_backend,
             verbose=verbose,
         )
+
+        traj = sim.solve_forced(u, input_port_id=input_port_id)
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+
+        return traj
 
     def plot_trajectory(
         self,
@@ -373,11 +364,6 @@ class DynamicSystemFacades:
     :class:`~minilink.core.diagram.DiagramSystem`.
     """
 
-    def _facade_simulator_cls(self):
-        from minilink.simulation.simulator import Simulator
-
-        return Simulator
-
     def compute_trajectory(
         self,
         t0=0,
@@ -416,8 +402,10 @@ class DynamicSystemFacades:
         Trajectory
             The simulated trajectory, also stored in :attr:`traj`.
         """
-        return self._facade_simulate(
-            show=show,
+        from minilink.simulation.simulator import Simulator
+
+        sim = Simulator(
+            self,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -428,6 +416,16 @@ class DynamicSystemFacades:
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
+        traj = sim.solve()
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+
+        return traj
 
     def compute_forced(
         self,
@@ -475,9 +473,10 @@ class DynamicSystemFacades:
         Trajectory
             Simulated state-input trajectory.
         """
-        return self._facade_simulate(
-            forced=(u, input_port_id),
-            show=show,
+        from minilink.simulation.simulator import Simulator
+
+        sim = Simulator(
+            self,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -488,6 +487,17 @@ class DynamicSystemFacades:
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
+
+        traj = sim.solve_forced(u, input_port_id=input_port_id)
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+
+        return traj
 
     def plot_phase_plane(
         self,
@@ -720,7 +730,30 @@ class DynamicSystemFacades:
 
 
 class StepSystemFacades:
-    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`."""
+    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`.
+
+    Step plants do **not** use :class:`~minilink.simulation.simulator.Simulator`
+    or :class:`~minilink.simulation.static_simulator.StaticSimulator` — those
+    belong to continuous / static leaves. Discrete evolution goes through
+    :meth:`compute_rollout` (compiled ``step`` / ``rollout``). Continuous-time
+    facades inherited from :class:`SharedSystemFacades`
+    (:meth:`compute_trajectory`, :meth:`compute_forced`) raise here with a
+    pointer to the rollout API.
+    """
+
+    def compute_trajectory(self, *args, **kwargs):
+        raise TypeError(
+            f"{type(self).__name__} is a StepSystem — use compute_rollout(...), "
+            "not compute_trajectory. Continuous-time simulation belongs on "
+            "DynamicSystem; hybrid closed loops use HybridSimulator."
+        )
+
+    def compute_forced(self, *args, **kwargs):
+        raise TypeError(
+            f"{type(self).__name__} is a StepSystem — use compute_rollout(...), "
+            "not compute_forced. Continuous-time simulation belongs on "
+            "DynamicSystem; hybrid closed loops use HybridSimulator."
+        )
 
     def compute_rollout(
         self,

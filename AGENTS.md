@@ -79,6 +79,10 @@ Reading minilink should feel like a controls/dynamics textbook.
 - Public APIs: type hints and NumPy docstrings — **except equation paths** (rule 5).
 - Lazy optional imports; explicit readable code with named temporaries in equation paths.
 - Low helper count in math tools; avoid single-use private methods (inline unless reused).
+- **No leading-underscore method names**: do not mark helpers “private” with a `_` prefix
+  on system / facade / simulator classes. Prefer a plain descriptive name even for
+  shared helpers — the file section (`# Public API` / `# Internal machinery`) is enough
+  to signal intent. Leading `_` is fine for module-level constants and truly local temps.
 - **Tests only when justified**: stable public APIs, TRL milestones, contracts, or user requests.
 - Validation in proportion; dataclasses for transparent records; `ABC` only when enforcement helps.
 
