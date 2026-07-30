@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.core.kinematics import translation
+from minilink.core.kinematics import SE2
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -102,19 +102,19 @@ class MountainCar(MechanicalSystem):
     def tf(self, x, u, t=0, params=None):
         q = x[:1]
         p = self.forward_kinematic_effector(q)
-        T = translation(p[0], p[1], 0.0)
-        return {"body": T}  # Bug here tangent tf is not correct
+
+        # body frame rides the curve, x-axis along the terrain tangent
+        slope = self.dz_dx(q[0], params)
+        theta = np.arctan(slope)
+        return {"body": SE2(p[0], p[1], theta)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        q = x[:1]
-        slope = self.dz_dx(q[0])
-        tangent = np.array([1.0, slope])
-        tangent = tangent / np.linalg.norm(tangent)
+        # throttle arrow along the body x-axis (the terrain tangent; see tf)
         return {
             "body": [
                 Arrow(
                     base=(0.0, 0.0),
-                    vector=(u[0] * tangent[0], u[0] * tangent[1]),
+                    vector=(u[0], 0.0),
                     scale=0.3,
                     color="red",
                     linewidth=2,

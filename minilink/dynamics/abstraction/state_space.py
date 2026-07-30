@@ -128,7 +128,10 @@ class LTISystem(StateSpaceSystem):
         )
 
         n, m, p = _check_dimensions(self._A, self._B, self._C, self._D)
-        super().__init__(n=n, m=m, p=p, feedthrough=D is not None, name=name)
+        # Structural feedthrough only when D has a nonzero entry — an explicit
+        # zero D must not create an algebraic y <- u dependency.
+        feedthrough = bool(np.any(np.asarray(self._D)))
+        super().__init__(n=n, m=m, p=p, feedthrough=feedthrough, name=name)
 
     def A(self, t=0.0, params=None):
         return self._A

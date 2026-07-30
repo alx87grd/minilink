@@ -30,7 +30,7 @@ PLOT_BACKEND = "matplotlib"  # use "plotly" if matplotlib live updates stall
 
 plant = Pendulum()
 ctl = ImpedanceIntegralController()
-ctl.params = {"kp": 1.0, "ki": 0.0, "kd": 1.0}
+ctl.params = {"Kp": 1.0, "Ki": 0.0, "Kd": 1.0}
 
 diagram = DiagramSystem()
 diagram.add_subsystem(plant, "plant")
@@ -58,9 +58,9 @@ plot_signals = resolve_plot_signals(diagram)
 def apply_pid_params(pid):
     diagram.params = {
         "ctl": {
-            "kp": float(pid[0]),
-            "ki": float(pid[1]),
-            "kd": float(pid[2]),
+            "Kp": float(pid[0]),
+            "Ki": float(pid[1]),
+            "Kd": float(pid[2]),
         }
     }
 
@@ -73,7 +73,7 @@ def simulate_traj(pid):
 
 def rollout_loss(pid):
     params = {
-        "ctl": {"kp": pid[0], "ki": pid[1], "kd": pid[2]},
+        "ctl": {"Kp": pid[0], "Ki": pid[1], "Kd": pid[2]},
         "plant": plant_params,
     }
 
@@ -93,7 +93,7 @@ plot_handle = None
 if PLOT_BACKEND == "matplotlib":
     plt.ion()
 
-print(f"{'iter':>5} {'loss':>12} {'kp':>8} {'ki':>8} {'kd':>8}")
+print(f"{'iter':>5} {'loss':>12} {'Kp':>8} {'Ki':>8} {'Kd':>8}")
 for i in range(N_LEARN_STEPS):
     loss, grad = loss_and_grad(pid_params)
     if i % 20 == 0:
@@ -106,8 +106,8 @@ for i in range(N_LEARN_STEPS):
         traj = simulate_traj(pid_params)
         title = (
             f"iteration {i}  cost {float(loss):.4g}  "
-            f"kp={float(pid_params[0]):.3f}  ki={float(pid_params[1]):.3f}  "
-            f"kd={float(pid_params[2]):.3f}"
+            f"Kp={float(pid_params[0]):.3f}  Ki={float(pid_params[1]):.3f}  "
+            f"Kd={float(pid_params[2]):.3f}"
         )
         if plot_handle is None:
             plot_handle = open_time_signal_plot(
@@ -125,8 +125,8 @@ for i in range(N_LEARN_STEPS):
     pid_params = pid_params - LR * grad
 
 print(
-    f"\nFinal PID: kp={float(pid_params[0]):.3f}, "
-    f"ki={float(pid_params[1]):.3f}, kd={float(pid_params[2]):.3f}, "
+    f"\nFinal PID: Kp={float(pid_params[0]):.3f}, "
+    f"Ki={float(pid_params[1]):.3f}, Kd={float(pid_params[2]):.3f}, "
     f"loss={float(loss):.4f}"
 )
 if PLOT_BACKEND == "matplotlib":

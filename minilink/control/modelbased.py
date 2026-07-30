@@ -19,6 +19,10 @@ class ComputedTorqueController(System):
     Wire ``y`` from ``[q; dq]`` (``closed_loop`` / ``closed_loop_qdq``); reference
     ``r`` is ``q_d`` (dim ``dof``) or stacked ``[q_d; dq_d]`` when
     ``tracking_ref=True``.
+
+    The embedded model (``inverse_dynamics``) reads the referenced plant's
+    **live** ``self.params``; the controller's own params carry gains only.
+    See DESIGN §4 (*Embedded-model params rule*).
     """
 
     feedback_profile = "modelbased"
@@ -73,6 +77,7 @@ class ComputedTorqueController(System):
         Kd = xp.asarray(params["Kd"])
 
         qdd_des = Kp * (q_d - q) - Kd * dq
+        # Embedded model: plant live self.params (DESIGN §4 embedded-model rule).
         tau = self.plant.inverse_dynamics(q, dq, qdd_des)
         return xp.asarray(tau).reshape(-1)
 
@@ -91,6 +96,7 @@ class ComputedTorqueController(System):
         Kd = xp.asarray(params["Kd"])
 
         qdd_des = Kp * (q_d - q) + Kd * (dq_d - dq)
+        # Embedded model: plant live self.params (DESIGN §4 embedded-model rule).
         tau = self.plant.inverse_dynamics(q, dq, qdd_des)
         return xp.asarray(tau).reshape(-1)
 
@@ -120,13 +126,7 @@ class SlidingModeController(ComputedTorqueController):
         lam=None,
         gain=None,
         nab=None,
-        Lambda=None,
-        eta=None,
     ):
-        if Lambda is not None and lam is None:
-            lam = Lambda
-        if eta is not None and gain is None:
-            gain = eta
         super().__init__(plant, tracking_ref=tracking_ref, Kp=0.0, Kd=0.0)
         n = plant.dof
         self.name = "Sliding Mode Controller"
@@ -177,6 +177,7 @@ class SlidingModeController(ComputedTorqueController):
         s = dq_e + lam * q_e
         ddq_r = ddq_d - lam * dq_e
 
+        # Embedded model: plant live self.params (DESIGN §4 embedded-model rule).
         H = self.plant.H(q)
         K = xp.diag(gain) + H @ xp.diag(nab)
         u_computed = self.plant.inverse_dynamics(q, dq, ddq_r)

@@ -492,14 +492,6 @@ def list_car_profiles() -> tuple[str, ...]:
     return tuple(sorted(CAR_PROFILES))
 
 
-def _set_tire_models(sys: Any, profile: CarProfile) -> None:
-    from minilink.dynamics.catalog.vehicles.dynamic_bicycle import LinearTire
-
-    tire = LinearTire(Ca=profile.Ca, Ck=profile.Ck, mu=profile.mu)
-    sys.tire_model_f = tire
-    sys.tire_model_r = tire
-
-
 _JAX_VEHICLE_CLASSES = frozenset(
     {
         "Holonomic",
@@ -565,8 +557,11 @@ def _apply_plant_params(sys: Any, profile: CarProfile) -> None:
 
     for key, value in profile.to_plant_params().items():
         sys.params[key] = value
-    if hasattr(sys, "tire_model_f"):
-        _set_tire_models(sys, profile)
+    # Linear-slip tire coefficients live in plant params (shared front/rear).
+    if "Ca" in sys.params:
+        sys.params["Ca"] = profile.Ca
+        sys.params["Ck"] = profile.Ck
+        sys.params["mu"] = profile.mu
 
 
 def _set_port_bounds(

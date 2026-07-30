@@ -351,13 +351,22 @@ class System(SharedSystemFacades):
     # Composition Operators
 
     def __add__(self, other: object) -> "DiagramSystem":
-        """Return a diagram containing ``self`` and ``other`` as subsystems."""
+        """Return a diagram containing ``self`` and ``other`` as subsystems.
+
+        If ``self`` is already a :class:`~minilink.core.diagram.DiagramSystem`,
+        it is extended **in place** and returned (subsystems are shared
+        references, never copied) — see DESIGN §4 operator mutation semantics.
+        """
         from minilink.core.composition import add_systems
 
         return add_systems(self, other)
 
     def __rshift__(self, other: object) -> "DiagramSystem":
-        """Return a diagram with ``self`` connected in series to ``other``."""
+        """Return a diagram with ``self`` connected in series to ``other``.
+
+        A diagram left operand is extended **in place** and returned — see
+        DESIGN §4 operator mutation semantics.
+        """
         from minilink.core.composition import series
 
         return series(self, other)

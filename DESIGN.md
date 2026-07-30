@@ -111,6 +111,21 @@ Rules:
 - Do **not** use `from minilink import *`. Do **not** re-export quarantine
   (`symbolic/`, `dynamics/engines/`) from teaching surfaces.
 
+### API stability tiers (v0.1)
+
+The v0.1 teaching release freezes a **stable tier**; the rest is
+**provisional** (see [README.md — API stability](README.md#api-stability-v01)
+for the user-facing table and [ROADMAP.md](ROADMAP.md) for TRL detail):
+
+- **Stable**: `core/` contracts (`System` family, diagrams, composition
+  operators, `Trajectory`, compile facade), `Simulator` / `StaticSimulator`,
+  `blocks/`, catalog teaching plants, basic `control/` and `analysis/`.
+  Public names and semantics change only with a deprecation note.
+- **Provisional**: planning, MPC, hybrid/step, realtime, optimization,
+  spatial, placeholders, and the evaluator integration-helper grid beyond the
+  frozen subset in §5. These may change between minor releases; hardening
+  items live in the ROADMAP pre-v0.2 backlog.
+
 ## 3. Package Map
 
 Component maturity is tracked only in [ROADMAP.md](ROADMAP.md); this section
@@ -470,6 +485,14 @@ Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
 `closed_loop_qdq` for explicit `Mux(q, dq)` wiring. Diagram operands are flattened,
 not nested. Explicit `add_subsystem` / `connect` remains canonical for general topology.
 
+**Operator mutation semantics (frozen v0.1 decision):** when the left operand of
+`+` or `>>` is already a `DiagramSystem`, the shortcut **extends that diagram in
+place and returns it** — `bigger = loop + estimator` mutates `loop`. This is
+deliberate: subsystem operands are always shared references (never copied), so a
+"fresh" diagram would only pretend to isolate state; in-place extension keeps
+`a >> b >> c` chains cheap and the object identity honest. Build a new
+`DiagramSystem` explicitly when you need an independent topology.
+
 **Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers),
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
 with ``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``.
@@ -495,6 +518,30 @@ optional class attribute `feedback_profile`, not inheritance):
 | `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow |
 | `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants |
 | `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` |
+
+**Controller naming conventions (v0.1).** PID-style gain params keys are
+uppercase (`Kp`, `Ki`, `Kd`, `K_null`) across `impedance`, `siso`, `robotic`,
+and `modelbased`; non-PID shaping constants keep their textbook lowercase
+names (`tau`, sliding-mode `lam` / `gain` / `nab`). `tracking_ref` defaults
+follow the law's nature and are deliberately **not** uniform: spring-damper
+and kinematic laws default to regulation (`tracking_ref=False`,
+``r = pos_d``); model-based trajectory laws (`ComputedTorqueController`,
+`SlidingModeController`) default to tracking (`tracking_ref=True`,
+``r = [q_d; dq_d]``).
+
+**Embedded-model params rule (frozen v0.1 decision).** Model-based controllers
+(`ModelJointImpedance`, `TaskImpedance`, `ComputedTorqueController`,
+`SlidingModeController`) hold a reference to a plant object and call its model
+hooks (`g(q)`, `H(q)`, `inverse_dynamics`) with ``params=None`` — the embedded
+model always reads that plant object's **live** ``self.params``. The
+controller's own params dict carries gains only and is never forwarded to the
+embedded model. Consequences: mutating ``plant.params`` updates both the real
+plant and the controller model (they are usually the same object — nominal
+model-based control); diagram-level ``params={"sys": {...}}`` overrides and the
+evaluator parametric tier reach the plant subsystem but **not** the
+controller's embedded copy (which is exactly the model-mismatch semantics —
+override the plant to study robustness). A forwarded model-params channel is
+deliberately not provided in v0.1.
 
 ### `Trajectory`, sets, costs, geometry
 
@@ -562,6 +609,15 @@ Same 2×2 for `outputs`, `step`, and integration helpers
 on JAX dynamics evaluators. Layout:
 `evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`,
 `step_rollout.py` (`gather_u`, `StepRolloutMixin`).
+
+**Frozen evaluator subset (v0.1).** The stable-tier evaluator API is:
+`f` / `f_p`, `outputs` / `outputs_p`, `step` / `step_p`, `rollout`,
+`rk4_step` / `rk4_step_p`, `integrate_zoh` / `integrate_zoh_rollout` /
+`integrate_zoh_p`, and the JAX trace-tier twins of those names
+(`f_trace`, `f_trace_p`, …). The rest of the integration-helper grid
+(`euler_*`, `*_ivp*`, `rk4_integrate_linear*`, `_jit` aliases) is
+**stable-internal**: used by simulators and transcriptions, kept working, but
+its names may still change before v1.0 — do not build external code on it.
 
 **Integration rename (pre-1.0).** Rollout methods use explicit integrator + input
 model tokens — no bare `integrate`:

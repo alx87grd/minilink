@@ -149,13 +149,14 @@ class MechanicalSystem(DynamicSystem):
     def forward_dynamics(self, q, v, u, t=0.0, params=None):
         """Forward dynamics: generalized acceleration given ``u``."""
         params = self.params if params is None else params
+        xp = array_module(q, v)
         H = self.H(q, params)
         C = self.C(q, v, params)
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
         tau = self.generalized_force(q, v, u, t, params)
+
         rhs = tau - C @ v - g - d
-        xp = array_module(rhs)
         return xp.linalg.solve(H, rhs)
 
     def f(self, x, u, t=0.0, params=None):
@@ -215,9 +216,6 @@ class JaxMechanicalSystem(MechanicalSystem):
         dt = getattr(q, "dtype", None) or jnp.float32
         return jnp.zeros(self.dof, dtype=dt)
 
-    def generalized_force(self, q, v, u, t=0.0, params=None):
-        return self.B(q, params) @ u
-
     def q2x(self, q, v):
         jnp = require_jax_numpy()
         dt = getattr(q, "dtype", None) or jnp.float32
@@ -244,7 +242,3 @@ class JaxMechanicalSystem(MechanicalSystem):
         q, v = self.x2q(x)
         acceleration = self.forward_dynamics(q, v, u, t, params)
         return self.q2x(v, acceleration)
-
-    def kinetic_energy(self, q, v, params=None):
-        params = self.params if params is None else params
-        return 0.5 * (v @ (self.H(q, params) @ v))

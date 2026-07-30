@@ -251,6 +251,18 @@ System                    # static IO shell (n defaults to 0)
       -> Pendulum
 ```
 
+## API stability (v0.1)
+
+Minilink v0.1 freezes a **stable tier** for teaching; everything else is
+**provisional**. Stable public names and semantics only change with a
+deprecation note in the release notes; provisional APIs may change between
+minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
+
+| Tier | Bands |
+| --- | --- |
+| **Stable** | `core/` (`System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, composition operators, `Trajectory`, compile facade), `simulation` (`Simulator`, `StaticSimulator`), `blocks/`, catalog teaching plants (`minilink.catalog`), basic `control/` (output, state, SISO, impedance, robotic, model-based, LQR), basic `analysis/` (linearize, modal, frequency, equilibria, discretize) |
+| **Provisional** | `planning/` (trajopt, RRT, DP, spatial), `control.mpc`, hybrid (`StepDiagramSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`), `simulation.realtime`, `optimization/`, evaluator integration-helper grid beyond the documented subset ([DESIGN.md §5](DESIGN.md#compilation-and-simulation)), `estimation/` / `identification/` / `interfaces/` placeholders, quarantine (`symbolic/`, `dynamics/engines/`) |
+
 ## Install
 
 Minilink requires Python 3.10+ (3.13 recommended for conda). Conda is recommended

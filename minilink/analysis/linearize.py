@@ -26,7 +26,7 @@ class LinearizationFallbackWarning(RuntimeWarning):
 
 def linearize_matrices(
     sys,
-    x_bar,
+    x_bar=None,
     u_bar=None,
     *,
     inputs=None,
@@ -43,8 +43,8 @@ def linearize_matrices(
     sys : DynamicSystem
         Continuous-time model whose ``f`` defines the dynamics (leaf subclass
         or wired diagram with stacked ``f``).
-    x_bar : array of shape (n,)
-        Operating-point state.
+    x_bar : array of shape (n,), optional
+        Operating-point state. Defaults to ``sys.x0``.
     u_bar : array of shape (m,), optional
         Full operating-point input. Defaults to the system's nominal port values.
     inputs : sequence of str, optional
@@ -69,6 +69,8 @@ def linearize_matrices(
     A, B, C, D : tuple of ndarray
         Linearized state, input, output, and feedthrough matrices.
     """
+    if x_bar is None:
+        x_bar = sys.x0
     xbar = np.asarray(x_bar, dtype=float).reshape(-1)
     if u_bar is None:
         u_bar = sys.get_u_from_input_ports()
@@ -125,7 +127,7 @@ def linearize_matrices(
 
 def linearize(
     sys,
-    x_bar,
+    x_bar=None,
     u_bar=None,
     *,
     inputs=None,
@@ -137,7 +139,8 @@ def linearize(
 ):
     """Linearize ``sys`` about ``(x_bar, u_bar)`` and return an ``LTISystem``.
 
-    This is a thin wrapper over :func:`linearize_matrices`.
+    This is a thin wrapper over :func:`linearize_matrices`; ``x_bar=None``
+    defaults to ``sys.x0`` (matching ``bode`` / ``pzmap`` / ``modal_analysis``).
     """
     A, B, C, D = linearize_matrices(
         sys,

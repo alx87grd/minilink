@@ -17,6 +17,10 @@ Shortcut-built diagrams remember a default *entry* input and *output* port
 know where to attach the next stage. Diagram operands are flattened, not
 nested. Explicit ``add_subsystem`` / ``connect`` remains the canonical way to
 build any topology.
+
+**Mutation semantics (frozen v0.1):** a ``DiagramSystem`` left operand of
+``+`` / ``>>`` is extended in place and returned — subsystem operands are
+always shared references, never copied. See DESIGN §4.
 """
 
 from __future__ import annotations

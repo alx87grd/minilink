@@ -123,6 +123,16 @@ class ImpedanceIntegralController(DynamicSystem):
     Measurement ``y = [pos; rate]`` (dim ``2·dof``). Integrator acts on
     ``pos_d - pos`` (regulation) or the position component of tracking error.
     No anti-windup in this version.
+
+    Parameters
+    ----------
+    dof : int
+        Number of axes.
+    tracking_ref : bool
+        If ``True``, ``r`` port dim is ``2·dof`` (tracking). Otherwise ``dof``.
+    Kp, Ki, Kd : float or array, optional
+        Proportional / integral / derivative gains (scalar or length-``dof``).
+        Stored in ``self.params``; defaults ``Kp=10``, ``Ki=1``, ``Kd=1``.
     """
 
     feedback_profile = "impedance"
@@ -132,6 +142,9 @@ class ImpedanceIntegralController(DynamicSystem):
         dof: int = 1,
         *,
         tracking_ref: bool = False,
+        Kp=10.0,
+        Ki=1.0,
+        Kd=1.0,
         y_labels=None,
         y_units=None,
         u_labels=None,
@@ -146,9 +159,9 @@ class ImpedanceIntegralController(DynamicSystem):
         self.dof = n
         self.name = "Impedance Integral Controller"
         self.params = {
-            "kp": np.full(n, 10.0),
-            "ki": np.full(n, 1.0),
-            "kd": np.full(n, 1.0),
+            "Kp": _as_dof_vector(Kp, n),
+            "Ki": _as_dof_vector(Ki, n),
+            "Kd": _as_dof_vector(Kd, n),
         }
         self.state.labels = [f"e_int{i}" for i in range(n)]
 
@@ -205,18 +218,18 @@ class ImpedanceIntegralController(DynamicSystem):
         params = self.params if params is None else params
 
         n = self.dof
-        kp = params["kp"]
-        ki = params["ki"]
-        kd = params["kd"]
+        Kp = params["Kp"]
+        Ki = params["Ki"]
+        Kd = params["Kd"]
 
         e_int = x
         ref_dim, r, pos, rate = self._split_measurement(u)
         e_pos = self._position_error(ref_dim, r, pos)
 
         if ref_dim == n:
-            u_cmd = kp * e_pos + ki * e_int - kd * rate
+            u_cmd = Kp * e_pos + Ki * e_int - Kd * rate
         else:
             vel_d = r[n:]
-            u_cmd = kp * e_pos + ki * e_int + kd * (vel_d - rate)
+            u_cmd = Kp * e_pos + Ki * e_int + Kd * (vel_d - rate)
 
         return u_cmd

@@ -23,33 +23,32 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
 
+# Tire model — pure functions; coefficients live in the plant ``params``.
 
-class LinearTire:
-    """Linear slip tire (same structure as pyro ``LinearTire``)."""
 
-    def __init__(self, Ca=60000.0, Ck=100000.0, mu=1.0):
-        self.v_min_epsilon = 0.1
-        self.Ca = Ca
-        self.Ck = Ck
-        self.mu = mu
+def tire_slip(vx, vy, w, R, v_min_epsilon):
+    """Slip angle ``alpha`` [rad] and slip ratio ``kappa`` [-] at one contact."""
+    vx_adj = abs(vx) + v_min_epsilon
+    alpha = -np.arctan(vy / vx_adj)
+    kappa = (w * R - vx) / vx_adj
+    return alpha, kappa
 
-    def vel2slip(self, vx, vy, w, R):
-        vx_adj = abs(vx) + self.v_min_epsilon
-        alpha = -np.arctan(vy / vx_adj)
-        kappa = (w * R - vx) / vx_adj
-        return alpha, kappa
 
-    def vel2forces(self, vx, vy, w, R, Fz):
-        alpha, kappa = self.vel2slip(vx, vy, w, R)
-        Fx = self.Ck * kappa
-        Fy = self.Ca * alpha
-        F_max = self.mu * Fz
-        F_total = np.sqrt(Fx**2 + Fy**2)
-        if F_total > F_max:
-            ratio = F_max / F_total
-            Fx *= ratio
-            Fy *= ratio
-        return Fx, Fy
+def linear_tire_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
+    """Linear-slip tire forces with friction-circle saturation (pyro ``LinearTire``).
+
+    ``Fx = Ck kappa`` and ``Fy = Ca alpha``, scaled back onto ``|F| <= mu Fz``.
+    """
+    alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
+    Fx = Ck * kappa
+    Fy = Ca * alpha
+    F_max = mu * Fz
+    F_total = np.sqrt(Fx**2 + Fy**2)
+    if F_total > F_max:
+        ratio = F_max / F_total
+        Fx *= ratio
+        Fy *= ratio
+    return Fx, Fy
 
 
 def _wheel_rectangle_pts(wl, ww):
@@ -93,7 +92,11 @@ class DynamicBicycle(DynamicSystem):
 
         # EoM parameters: CG-to-axle distances a/b [m], wheel radii r_f/r_r [m],
         # mass [kg], yaw inertia [kg m^2], gravity [m/s^2], air density rho
-        # [kg/m^3], and drag area CdA = Cd * A [m^2].
+        # [kg/m^3], drag area CdA = Cd * A [m^2], and linear-slip tire
+        # coefficients shared by both axles: cornering stiffness Ca [N/rad],
+        # longitudinal stiffness Ck [N], friction mu [-], and slip
+        # regularization speed v_min_epsilon [m/s] (same keys as the JAX
+        # vehicle ladder).
         self.params = {
             "a": 1.0,
             "b": 1.0,
@@ -104,10 +107,11 @@ class DynamicBicycle(DynamicSystem):
             "gravity": 9.81,
             "rho": 1.225,
             "CdA": 0.3 * 2.2,
+            "Ca": 60000.0,
+            "Ck": 100000.0,
+            "mu": 1.0,
+            "v_min_epsilon": 0.1,
         }
-
-        self.tire_model_f = LinearTire()
-        self.tire_model_r = LinearTire()
 
         # Graphics-only attributes (2-D centerline look)
         self.wheel_len = 0.76
@@ -201,6 +205,10 @@ class DynamicBicycle(DynamicSystem):
         r_r = params["r_r"]
         mass = params["mass"]
         gravity = params["gravity"]
+        Ca = params["Ca"]
+        Ck = params["Ck"]
+        mu = params["mu"]
+        v_min_epsilon = params["v_min_epsilon"]
         L = a + b
 
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
@@ -211,8 +219,12 @@ class DynamicBicycle(DynamicSystem):
         Fz_f = mass * gravity * (b / L)
         Fz_r = mass * gravity * (a / L)
 
-        Fx_f, Fy_f = self.tire_model_f.vel2forces(vx_f, vy_f, w_f, r_f, Fz_f)
-        Fx_r, Fy_r = self.tire_model_r.vel2forces(vx_r, vy_r, w_r, r_r, Fz_r)
+        Fx_f, Fy_f = linear_tire_forces(
+            vx_f, vy_f, w_f, r_f, Fz_f, Ca, Ck, mu, v_min_epsilon
+        )
+        Fx_r, Fy_r = linear_tire_forces(
+            vx_r, vy_r, w_r, r_r, Fz_r, Ca, Ck, mu, v_min_epsilon
+        )
         return Fx_f, Fy_f, Fx_r, Fy_r
 
     def generalized_d(self, q, v, u_in, params=None):

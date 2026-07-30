@@ -28,6 +28,40 @@ class SharedSystemFacades:
 
     # User Shortcut / Facade API
 
+    def _facade_simulator_cls(self):
+        """Simulator class used by the facade shortcuts (MRO dispatch).
+
+        :class:`DynamicSystemFacades` overrides this to return
+        :class:`~minilink.simulation.simulator.Simulator`; imported lazily so
+        the core stays light.
+        """
+        from minilink.simulation.static_simulator import StaticSimulator
+
+        return StaticSimulator
+
+    def _facade_simulate(self, *, forced=None, show=False, **sim_kwargs):
+        """Shared body of :meth:`compute_trajectory` / :meth:`compute_forced`.
+
+        ``forced`` is ``None`` for a nominal solve, or ``(u, input_port_id)``
+        for a forced solve. Extra ``sim_kwargs`` go to the simulator
+        constructor. Caches the result on :attr:`traj`.
+        """
+        sim = self._facade_simulator_cls()(self, **sim_kwargs)
+
+        if forced is None:
+            traj = sim.solve()
+        else:
+            u, input_port_id = forced
+            traj = sim.solve_forced(u, input_port_id=input_port_id)
+
+        if show:
+            from minilink.graphical.signals import plot_time_signals
+
+            plot_time_signals(self, traj)
+
+        self.traj = traj
+        return traj
+
     def compile(self, backend="numpy", verbose=False):
         """
         Convenience shortcut to compile the system into a backend evaluator.
@@ -74,10 +108,8 @@ class SharedSystemFacades:
         Trajectory
             The sampled trajectory, also stored in :attr:`traj`.
         """
-        from minilink.simulation.static_simulator import StaticSimulator
-
-        sim = StaticSimulator(
-            self,
+        return self._facade_simulate(
+            show=show,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -87,16 +119,6 @@ class SharedSystemFacades:
             compile_backend=compile_backend,
             verbose=verbose,
         )
-        traj = sim.solve()
-
-        if show:
-            from minilink.graphical.signals import plot_time_signals
-
-            plot_time_signals(self, traj)
-
-        self.traj = traj
-
-        return traj
 
     def compute_forced(
         self,
@@ -141,10 +163,9 @@ class SharedSystemFacades:
         Trajectory
             Sampled state-input trajectory.
         """
-        from minilink.simulation.static_simulator import StaticSimulator
-
-        sim = StaticSimulator(
-            self,
+        return self._facade_simulate(
+            forced=(u, input_port_id),
+            show=show,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -154,17 +175,6 @@ class SharedSystemFacades:
             compile_backend=compile_backend,
             verbose=verbose,
         )
-
-        traj = sim.solve_forced(u, input_port_id=input_port_id)
-
-        if show:
-            from minilink.graphical.signals import plot_time_signals
-
-            plot_time_signals(self, traj)
-
-        self.traj = traj
-
-        return traj
 
     def plot_trajectory(
         self,
@@ -203,17 +213,11 @@ class SharedSystemFacades:
         if signals is None:
             signals = resolve_plot_signals(self)
 
-        if traj is not None:
-            return plot_time_signals(
-                self, traj, signals=signals, backend=backend, show=show
-            )
+        if traj is None:
+            traj = self.traj
+        if traj is None:
+            traj = self.compute_trajectory(show=False, verbose=False)
 
-        if self.traj is not None:
-            return plot_time_signals(
-                self, self.traj, signals=signals, backend=backend, show=show
-            )
-
-        traj = self.compute_trajectory(show=False, verbose=False)
         return plot_time_signals(
             self,
             traj,
@@ -369,6 +373,11 @@ class DynamicSystemFacades:
     :class:`~minilink.core.diagram.DiagramSystem`.
     """
 
+    def _facade_simulator_cls(self):
+        from minilink.simulation.simulator import Simulator
+
+        return Simulator
+
     def compute_trajectory(
         self,
         t0=0,
@@ -407,10 +416,8 @@ class DynamicSystemFacades:
         Trajectory
             The simulated trajectory, also stored in :attr:`traj`.
         """
-        from minilink.simulation.simulator import Simulator
-
-        sim = Simulator(
-            self,
+        return self._facade_simulate(
+            show=show,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -421,16 +428,6 @@ class DynamicSystemFacades:
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
-        traj = sim.solve()
-
-        if show:
-            from minilink.graphical.signals import plot_time_signals
-
-            plot_time_signals(self, traj)
-
-        self.traj = traj
-
-        return traj
 
     def compute_forced(
         self,
@@ -478,10 +475,9 @@ class DynamicSystemFacades:
         Trajectory
             Simulated state-input trajectory.
         """
-        from minilink.simulation.simulator import Simulator
-
-        sim = Simulator(
-            self,
+        return self._facade_simulate(
+            forced=(u, input_port_id),
+            show=show,
             x0=x0,
             t0=t0,
             tf=tf,
@@ -492,17 +488,6 @@ class DynamicSystemFacades:
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
-
-        traj = sim.solve_forced(u, input_port_id=input_port_id)
-
-        if show:
-            from minilink.graphical.signals import plot_time_signals
-
-            plot_time_signals(self, traj)
-
-        self.traj = traj
-
-        return traj
 
     def plot_phase_plane(
         self,
@@ -802,26 +787,18 @@ class StepSystemFacades:
         if signals is None:
             signals = resolve_plot_signals(self)
 
-        if rollout is not None:
-            return plot_time_signals(
-                self,
-                rollout.as_trajectory(),
-                signals=signals,
-                abscissa_label=STEP_ABSCISSA_LABEL,
-                backend=backend,
-                show=show,
+        if rollout is None:
+            rollout = self.rollout
+        if rollout is None:
+            raise ValueError(
+                "No rollout available; pass rollout=... or call compute_rollout first."
             )
 
-        if self.rollout is not None:
-            return plot_time_signals(
-                self,
-                self.rollout.as_trajectory(),
-                signals=signals,
-                abscissa_label=STEP_ABSCISSA_LABEL,
-                backend=backend,
-                show=show,
-            )
-
-        raise ValueError(
-            "No rollout available; pass rollout=... or call compute_rollout first."
+        return plot_time_signals(
+            self,
+            rollout.as_trajectory(),
+            signals=signals,
+            abscissa_label=STEP_ABSCISSA_LABEL,
+            backend=backend,
+            show=show,
         )

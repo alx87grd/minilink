@@ -233,7 +233,7 @@ class TestNewSimulator(unittest.TestCase):
         self.assertIs(sb.last_solve_ivp_solution, failed_solution)
         self.assertFalse(sb.last_debug["success"])
         self.assertEqual(sb.last_debug["message"], "integration failed")
-        self.assertFalse(hasattr(sim, "last_traj"))
+        self.assertIsNone(sim.last_traj)
 
     def test_solve_populates_last_traj_and_last_debug(self):
         sim = Simulator(

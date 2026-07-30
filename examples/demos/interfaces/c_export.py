@@ -18,9 +18,9 @@ from minilink.interfaces.c_export import export_system_to_c
 # Dynamic SISO PID with filtered derivative and anti-windup (n=2, m=2 for [r, y]).
 controller = FilteredController(
     dof=1,
-    kp=10.0,
-    ki=1.0,
-    kd=2.0,
+    Kp=10.0,
+    Ki=1.0,
+    Kd=2.0,
     tau=0.05,
     u_min=-5.0,
     u_max=5.0,
