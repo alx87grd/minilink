@@ -124,14 +124,15 @@ for the user-facing table and [ROADMAP.md](ROADMAP.md) for TRL detail):
 - **Provisional**: planning, MPC, hybrid/step, realtime, optimization,
   spatial, placeholders, and the evaluator integration-helper grid beyond the
   frozen subset in §5. These may change between minor releases; hardening
-  items live in the ROADMAP pre-v0.2 backlog.
+  items live in the [docs/plans/TODO.md](docs/plans/TODO.md) pre-v0.2 backlog.
 
 ## 3. Package Map
 
 Component maturity is tracked only in [ROADMAP.md](ROADMAP.md); this section
 describes package ownership. Every package belongs to one of four bands.
 Homes for planned content are pre-decided in the tables below; scheduling is
-in [ROADMAP.md](ROADMAP.md) (teaching-release priorities and Later).
+in [ROADMAP.md](ROADMAP.md) (teaching-release priorities) and
+[docs/plans/TODO.md](docs/plans/TODO.md) (Later / operational backlog).
 
 **Framework** — defines what a `System` is and how diagrams execute
 (NumPy-only; changes are design events):
@@ -461,7 +462,7 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   ([planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
   **TODO: Prioritize threading $p$ into JAX parametric programs.** This will allow 
   moving obstacles online without rebuilding the NLP, unlocking real-time dynamic obstacle avoidance.
-  **Deferred** ([ROADMAP.md](ROADMAP.md) Later): call-time overrides
+  **Deferred** ([docs/plans/TODO.md](docs/plans/TODO.md) Later): call-time overrides
   on base `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types
   declare `(t, params)` but still read frozen attributes only until a follow-up
   pass.
@@ -550,7 +551,7 @@ deliberately not provided in v0.1.
   `&` → `IntersectionSet`. `margin(z, t, params)` is threaded by transcriptions via
   `problem.params.sets`; field-backed spatial sets forward that same parameter
   object to their scene queries. Base `Set` subclasses other than `FieldSet` /
-  `CallableSet` do not yet read `params` (deferred — see ROADMAP).
+  `CallableSet` do not yet read `params` (deferred — see [docs/plans/TODO.md](docs/plans/TODO.md)).
 - Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
   `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
   `ScaledCost` (e.g. `base + w * obstacle_cost`). `g`/`h` receive
@@ -668,7 +669,7 @@ forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
 `euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
-([ROADMAP.md](ROADMAP.md) Later).
+([docs/plans/TODO.md](docs/plans/TODO.md) Later).
 
 ### Discontinuous closed loops — known issues
 
@@ -676,7 +677,7 @@ Controllers with discontinuous laws (e.g. :class:`~minilink.control.modelbased.S
 ``sign(s)``) on a **continuous** :class:`DiagramSystem` closed loop are supported today,
 but several solver/logging behaviors are misleading until a dedicated hybrid or
 event-handling path lands (hybrid path exists; see discontinuous guidance below and
-[ROADMAP.md](ROADMAP.md) teaching-release hardening).
+[ROADMAP.md](ROADMAP.md) teaching-release hardening / [docs/plans/TODO.md](docs/plans/TODO.md)).
 
 **TODO: Add a hard warning.** When a discontinuous controller is wired into a continuous `DiagramSystem`, we should warn the user and recommend wrapping it in a fast `Computer` inside a `HybridDiagram` to enforce physical digital-on-continuous reality.
 
@@ -748,7 +749,7 @@ from-solve rebuilds the NLP (expected for no-JAX MPC). A one-time speed warning
 is emitted only when a JAX planner omits parametric compile.
 Online ``params`` is an x0-only façade today (`None`/`{}`); reserved key
 ``scene`` raises ``NotImplementedError`` until pipeline B extends the parametric
-tier to ``J(z, p)`` (see ROADMAP scene params). Knot count
+tier to ``J(z, p)`` (see [docs/plans/TODO.md](docs/plans/TODO.md) scene params). Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
 `linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native

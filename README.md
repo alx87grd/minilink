@@ -412,6 +412,7 @@ Catalog plants: `from minilink.catalog import …` (math under `minilink.dynamic
 
 - [DESIGN.md](DESIGN.md) — principles and contracts
 - [ROADMAP.md](ROADMAP.md) — TRL maturity and teaching-release priorities
+- [docs/plans/TODO.md](docs/plans/TODO.md) — operational backlog (fixes, demos, Later)
 - [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 parity audit (library + all 195 demos)
 - [docs/plans/](docs/plans/) — active design backlog
 - [AGENTS.md](AGENTS.md) — contributor / agent rules
