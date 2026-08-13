@@ -209,7 +209,6 @@ class LOSController:
         self,
         path_xy,
         Delta=4.0,
-        i_lim=10.0,
         control_point_ahead=4.0,
         closed=False,
     ):
@@ -289,8 +288,6 @@ class Los(System):
         self,
         path_pts,
         Delta=1.0,
-        zeta=0.7,
-        omega_n=1.2,
         control_point_ahead=0.5,
         closed=False,
     ):
@@ -445,8 +442,6 @@ def main():
     los_system = Los(
         path_pts=pts,
         Delta=1.0,
-        zeta=0.7,
-        omega_n=1.2,
         control_point_ahead=0.5,
         closed=False,
     )

@@ -345,7 +345,7 @@ class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
 
     Inputs
     ------
-    f_rear : rear wheel applied force [N]
+    t_rear : rear wheel applied torque [Nm]
     delta  : front steer angle [rad]
     """
 

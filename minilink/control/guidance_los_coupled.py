@@ -374,8 +374,6 @@ class Los(System):
         path_pts,
         vx_nom=1.0,
         Delta=1.0,
-        zeta=0.7,
-        omega_n=1.2,
         control_point_ahead=0.5,
         closed=False,
         dist_lut=None,  # LUT distance (m) pour pondération courbure
