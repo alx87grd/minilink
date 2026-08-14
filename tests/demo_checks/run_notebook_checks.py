@@ -37,6 +37,7 @@ DEFAULT_TIMEOUT = 180.0
 # Notebooks to skip in CI (timeout/performance reasons)
 SKIP_NOTEBOOKS = {"tooling_benchmark"}
 
+
 @dataclass(frozen=True)
 class NotebookRow:
     notebook_id: str
@@ -124,7 +125,7 @@ def run_notebook_checks(
         notebook_id = _notebook_id(rel)
         if notebook_filter is not None and notebook_id != notebook_filter:
             continue
-                # Skip notebooks in SKIP_NOTEBOOKS list
+            # Skip notebooks in SKIP_NOTEBOOKS list
         if notebook_id in SKIP_NOTEBOOKS:
             rows.append(NotebookRow(notebook_id, "skip", "skipped (CI timeout)"))
             continue
