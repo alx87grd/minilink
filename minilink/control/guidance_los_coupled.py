@@ -3,7 +3,7 @@ import math
 import numpy as np
 
 from minilink.core.system import System
-from minilink.graphical.animation.primitives import Point, pose2d_matrix
+from minilink.graphical.animation.primitives import Point
 
 _EPS = 1e-12
 
@@ -490,27 +490,27 @@ class Los(System):
             ),
         ]
 
-    def get_kinematic_transforms(self, x, u, t):
-        """
-        Position the two LOS points in the world frame.
-        """
+    # def get_kinematic_transforms(self, x, u, t):
+    #     """
+    #     Position the two LOS points in the world frame.
+    #     """
 
-        px = float(u[0])
-        py = float(u[1])
-        psi = float(u[2])
+    #     px = float(u[0])
+    #     py = float(u[1])
+    #     psi = float(u[2])
 
-        _, _, info = self.controller.compute(px, py, psi)
+    #     _, _, info = self.controller.compute(px, py, psi)
 
-        x_ctrl = info["x_ctrl"]
-        y_ctrl = info["y_ctrl"]
+    #     x_ctrl = info["x_ctrl"]
+    #     y_ctrl = info["y_ctrl"]
 
-        ax = info["ax"]
-        ay = info["ay"]
+    #     ax = info["ax"]
+    #     ay = info["ay"]
 
-        return [
-            pose2d_matrix(x=x_ctrl, y=y_ctrl, theta=0.0),
-            pose2d_matrix(x=ax, y=ay, theta=0.0),
-        ]
+    #     return [
+    #         pose2d_matrix(x=x_ctrl, y=y_ctrl, theta=0.0),
+    #         pose2d_matrix(x=ax, y=ay, theta=0.0),
+    #     ]
 
 
 def main():
