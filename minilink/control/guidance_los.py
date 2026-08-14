@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink.core.system import System
-from minilink.graphical.animation.primitives import Point  #, pose2d_matrix
+from minilink.graphical.animation.primitives import Point  # , pose2d_matrix
 
 # ============================================================
 # Utilitaires géométriques LOS

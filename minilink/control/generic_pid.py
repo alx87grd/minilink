@@ -145,6 +145,7 @@ class PID(DynamicSystem):
     def get_kinematic_transforms(self, x, u, t):
         return []
 
+
 class PIDMeas(DynamicSystem):
     """PID Generic"""
 
@@ -211,9 +212,7 @@ class PIDMeas(DynamicSystem):
         e = ref - meas
         return float(e)
 
-    def compute_cmd(
-        self, e: float, int_e: float, d_meas: float, p: dict
-    ) -> float:
+    def compute_cmd(self, e: float, int_e: float, d_meas: float, p: dict) -> float:
         cmd = p["Kp"] * e + p["Ki"] * int_e - p["Kd"] * d_meas
         return cmd
 
@@ -259,7 +258,6 @@ class PIDMeas(DynamicSystem):
         ref, meas, d_meas = float(u[0]), float(u[1]), float(u[2])
 
         e = self.calculate_error(ref, meas, u)
-
 
         cmd = self.compute_cmd(e, int_e, d_meas, p=p)
 
