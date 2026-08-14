@@ -153,9 +153,9 @@ def make_rounded_rectangle_path(
 
 
 def main():
-    path_original = make_rounded_rectangle_path(
-        Lx=40.0, Ly=20.0, R=5.0, nseg=4, narc=2, min_ds=0.10, closed=True
-    )
+    # path_original = make_rounded_rectangle_path(
+    #     Lx=40.0, Ly=20.0, R=5.0, nseg=4, narc=2, min_ds=0.10, closed=True
+    # )
 
     # Raw rectangle
     path_raw = make_rectangle_path(Lx=40.0, Ly=20.0)
