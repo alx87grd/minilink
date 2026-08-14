@@ -298,45 +298,45 @@ class DynamicBicycleMagicForces(DynamicSystem):
         return u
 
     # def get_kinematic_transforms(self, x: np.ndarray, u: np.ndarray, t: float):
-        X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
-        _, vb = self.x2q(x)
-        u_in = self.get_u_int(x, u)
-        delta = float(u_in[1])
+    #     X, Y, Theta = float(x[0]), float(x[1]), float(x[2])
+    #     _, vb = self.x2q(x)
+    #     u_in = self.get_u_int(x, u)
+    #     delta = float(u_in[1])
 
-        T_wb = pose2d_matrix(X, Y, Theta)
-        T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
-        T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
+    #     T_wb = pose2d_matrix(X, Y, Theta)
+    #     T_rear = T_wb @ pose2d_matrix(-self.b, 0.0, 0.0)
+    #     T_front = T_wb @ pose2d_matrix(self.a, 0.0, delta)
 
-        uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
-        v_f_loc = np.array([uu, vv + self.a * wr])
-        v_r_loc = np.array([uu, vv - self.b * wr])
+    #     uu, vv, wr = float(vb[0]), float(vb[1]), float(vb[2])
+    #     v_f_loc = np.array([uu, vv + self.a * wr])
+    #     v_r_loc = np.array([uu, vv - self.b * wr])
 
-        c, s = np.cos(Theta), np.sin(Theta)
-        rx = X + c * (-self.b) - s * 0.0
-        ry = Y + s * (-self.b) + c * 0.0
-        fx = X + c * self.a - s * 0.0
-        fy = Y + s * self.a + c * 0.0
+    #     c, s = np.cos(Theta), np.sin(Theta)
+    #     rx = X + c * (-self.b) - s * 0.0
+    #     ry = Y + s * (-self.b) + c * 0.0
+    #     fx = X + c * self.a - s * 0.0
+    #     fy = Y + s * self.a + c * 0.0
 
-        vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
-        vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
+    #     vfx, vfy = c * v_f_loc[0] - s * v_f_loc[1], s * v_f_loc[0] + c * v_f_loc[1]
+    #     vrx, vry = c * v_r_loc[0] - s * v_r_loc[1], s * v_r_loc[0] + c * v_r_loc[1]
 
-        Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(vb, u_in)
+    #     Fx_f_b, Fy_f_b, Fx_r_b, Fy_r_b = self.tire_forces_body_frame(vb, u_in)
 
-        Ffx_w = c * Fx_f_b - s * Fy_f_b
-        Ffy_w = s * Fx_f_b + c * Fy_f_b
+    #     Ffx_w = c * Fx_f_b - s * Fy_f_b
+    #     Ffy_w = s * Fx_f_b + c * Fy_f_b
 
-        Frx_w = c * Fx_r_b - s * Fy_r_b
-        Fry_w = s * Fx_r_b + c * Fy_r_b
+    #     Frx_w = c * Fx_r_b - s * Fy_r_b
+    #     Fry_w = s * Fx_r_b + c * Fy_r_b
 
-        return [
-            T_wb,
-            T_rear,
-            T_front,
-            self._world_arrow_pose(vrx, vry, rx, ry),
-            self._world_arrow_pose(vfx, vfy, fx, fy),
-            self._force_pose(Frx_w, Fry_w, rx, ry),
-            self._force_pose(Ffx_w, Ffy_w, fx, fy),
-        ]
+    #     return [
+    #         T_wb,
+    #         T_rear,
+    #         T_front,
+    #         self._world_arrow_pose(vrx, vry, rx, ry),
+    #         self._world_arrow_pose(vfx, vfy, fx, fy),
+    #         self._force_pose(Frx_w, Fry_w, rx, ry),
+    #         self._force_pose(Ffx_w, Ffy_w, fx, fy),
+    #     ]
 
 
 class DynamicBicycleRearWheelDrive(DynamicBicycleMagicForces):
