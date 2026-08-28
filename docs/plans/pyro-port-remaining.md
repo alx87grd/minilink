@@ -181,10 +181,10 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `courses/udes_gro860/dp_mass_min_time_policy_evaluation.py` | **Partial** | Core tool demos exist; course variant not ported |
 | `courses/udes_gro860/lqr_cartpole_stab.py` | **Done** | examples/demos/statespace/cartpole_lqr.py |
 | `courses/udes_gro860/lqr_cartpole_traj.py` | **Partial** | Core tool demos exist; course variant not ported |
-| `courses/udes_gro860/rl_drone_demo_learning2fly.py` | **Done** | examples/learn/teaching/courses/gro860/labs/drone_ppo_learn_to_fly.ipynb |
-| `courses/udes_gro860/rl_drone_demo_training.py` | **Done** | same GRO860 drone PPO notebook |
-| `courses/udes_gro860/rl_pendulum_swingup_basic_bangbang.py` | **Done** | examples/learn/teaching/courses/gro860/labs/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb |
-| `courses/udes_gro860/rl_pendulum_swingup_test.py` | **Done** | same GRO860 pendulum swing-up VI vs LQR vs PPO notebook |
+| `courses/udes_gro860/rl_drone_demo_learning2fly.py` | **Done** | examples/learn/teaching/drone_ppo_learn_to_fly.ipynb |
+| `courses/udes_gro860/rl_drone_demo_training.py` | **Done** | same drone PPO teaching notebook |
+| `courses/udes_gro860/rl_pendulum_swingup_basic_bangbang.py` | **Done** | examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb |
+| `courses/udes_gro860/rl_pendulum_swingup_test.py` | **Done** | same pendulum swing-up VI vs LQR vs PPO notebook |
 
 ### 3.2 `demos_by_system/`
 
@@ -455,7 +455,7 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 
 | Notebook |
 | --- |
-| `examples/learn/teaching/topics/mpc.ipynb` |
+| `examples/learn/teaching/mpc.ipynb` |
 | `examples/projects/car_trajopt/car_trajopt.ipynb` |
 | `examples/sandbox/scratch/cartpole_rollout_gradients.ipynb` |
 | `examples/learn/intro/08_optimization.ipynb` |

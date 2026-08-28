@@ -3,12 +3,14 @@
 Auto-discovers ``.ipynb`` under mature learn/tooling trees:
 
 * ``examples/learn/intro/``
-* ``examples/learn/teaching/topics/``
+* ``examples/learn/teaching/``
 * ``examples/tooling/notebooks/``
 
 Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
 Defaults: ``timeout=180``, ``requires=[]``. Overrides in
-``notebook_overrides.json``. Not smoked: ``courses/``, ``projects/``, ``sandbox/``.
+``notebook_overrides.json`` (``smoke: false`` drops a notebook from the
+default suite). Not smoked: ``projects/``, ``sandbox/``, and long topic
+notebooks (UR5 symbolic EoM, DP grids, PPO training).
 
 Usage (from repo root)::
 
@@ -30,7 +32,7 @@ _CHECKS_DIR = Path(__file__).resolve().parent
 OVERRIDES_PATH = _CHECKS_DIR / "notebook_overrides.json"
 NOTEBOOK_ROOTS = (
     REPO_ROOT / "examples" / "learn" / "intro",
-    REPO_ROOT / "examples" / "learn" / "teaching" / "topics",
+    REPO_ROOT / "examples" / "learn" / "teaching",
     REPO_ROOT / "examples" / "tooling" / "notebooks",
 )
 DEFAULT_TIMEOUT = 180.0
@@ -50,8 +52,8 @@ def _notebook_id(rel_path: str) -> str:
         if stem.startswith("showcase_"):
             return stem
         return f"intro_{stem}"
-    if "/teaching/topics/" in rel_path:
-        return f"topics_{stem}"
+    if "/learn/teaching/" in rel_path:
+        return f"teaching_{stem}"
     if "/tooling/notebooks/" in rel_path:
         return f"tooling_{stem}"
     return "_".join(Path(rel_path).with_suffix("").parts[-2:])
@@ -125,6 +127,8 @@ def run_notebook_checks(
             continue
 
         entry = overrides.get(rel) or {}
+        if entry.get("smoke") is False and notebook_filter is None:
+            continue
         requires = tuple(entry.get("requires") or ())
         missing = False
         for extra in requires:

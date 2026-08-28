@@ -390,7 +390,7 @@ Index and placement rules: [examples/README.md](examples/README.md)
 | Control | `examples/demos/control/` · [intro/control](examples/learn/intro/03_control.ipynb) |
 | Pyro SMC continuous (pendulum) | `examples/demos/control/sliding_mode_pendulum.py` |
 | Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/demos/hybrid/` · `examples/demos/step/` · [intro/hybrid](examples/learn/intro/06_hybrid.ipynb) |
-| MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/topics/mpc](examples/learn/teaching/topics/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
+| MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/mpc](examples/learn/teaching/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
 | MPC scenarios (path / slalom / spatial) | `examples/projects/mpc/` · circuit: `examples/demos/mpc/mpc_car_circuit.py` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/demos/robotic/` |
 | Analysis (linearize, trim, ctrb/obsv, modal) | `examples/demos/analysis/` · [intro/analysis](examples/learn/intro/04_analysis.ipynb) |

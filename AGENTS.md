@@ -33,8 +33,8 @@ or maturity change. Add a README examples-table row only when a demo is a
 **canonical** teaching entry for a core tool (e.g. `examples/demos/mpc/mpc_car_minimal.py`).
 
 **Examples buckets** (see [examples/README.md](examples/README.md)):
-`learn/` (intro = library curriculum; teaching/topics = domain lessons;
-teaching/courses = class packs), `demos/<topic>/` (canonical single-file
+`learn/` (intro = library curriculum; teaching/ = domain lessons),
+`demos/<topic>/` (canonical single-file
 scripts), `projects/`, `tooling/` (notebooks and/or scripts), `sandbox/`
 (+ `scratch/`). Do not mix `.ipynb` and `.py` in the same leaf module folder
 (except inside one named project). Demo stems keep the topic when needed
