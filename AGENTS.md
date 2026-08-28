@@ -12,8 +12,9 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | --- | --- |
 | [README.md](README.md) | User workflows, install, examples table |
 | [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior, **product identity & scope** |
-| [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, teaching-release priorities, **Later feature backlog** |
-| [docs/plans/](docs/plans/) | Active **design** backlog only (multi-step plans; delete finished plan docs) |
+| [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, teaching-release criteria & priorities, review queue, out-of-scope |
+| [docs/plans/TODO.md](docs/plans/TODO.md) | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
+| [docs/plans/](docs/plans/) | Active **design** writeups only (multi-step plans; delete finished plan docs) |
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy, **entry points (human · agent · CI)** |
 
@@ -32,8 +33,8 @@ or maturity change. Add a README examples-table row only when a demo is a
 **canonical** teaching entry for a core tool (e.g. `examples/demos/mpc/mpc_car_minimal.py`).
 
 **Examples buckets** (see [examples/README.md](examples/README.md)):
-`learn/` (intro = library curriculum; teaching/topics = domain lessons;
-teaching/courses = class packs), `demos/<topic>/` (canonical single-file
+`learn/` (intro = library curriculum; teaching/ = domain lessons),
+`demos/<topic>/` (canonical single-file
 scripts), `projects/`, `tooling/` (notebooks and/or scripts), `sandbox/`
 (+ `scratch/`). Do not mix `.ipynb` and `.py` in the same leaf module folder
 (except inside one named project). Demo stems keep the topic when needed
@@ -79,6 +80,10 @@ Reading minilink should feel like a controls/dynamics textbook.
 - Public APIs: type hints and NumPy docstrings — **except equation paths** (rule 5).
 - Lazy optional imports; explicit readable code with named temporaries in equation paths.
 - Low helper count in math tools; avoid single-use private methods (inline unless reused).
+- **No leading-underscore method names**: do not mark helpers “private” with a `_` prefix
+  on system / facade / simulator classes. Prefer a plain descriptive name even for
+  shared helpers — the file section (`# Public API` / `# Internal machinery`) is enough
+  to signal intent. Leading `_` is fine for module-level constants and truly local temps.
 - **Tests only when justified**: stable public APIs, TRL milestones, contracts, or user requests.
 - Validation in proportion; dataclasses for transparent records; `ABC` only when enforcement helps.
 

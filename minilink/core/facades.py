@@ -23,7 +23,8 @@ class SharedSystemFacades:
     On static ``System`` leaves (``n=0``), :meth:`compute_trajectory` and
     :meth:`compute_forced` use :class:`~minilink.simulation.static_simulator.StaticSimulator`.
     :class:`DynamicSystem` subclasses override those methods via
-    :class:`DynamicSystemFacades`.
+    :class:`DynamicSystemFacades`. :class:`StepSystem` overrides them to raise
+    and point at :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout`.
     """
 
     # User Shortcut / Facade API
@@ -203,17 +204,11 @@ class SharedSystemFacades:
         if signals is None:
             signals = resolve_plot_signals(self)
 
-        if traj is not None:
-            return plot_time_signals(
-                self, traj, signals=signals, backend=backend, show=show
-            )
+        if traj is None:
+            traj = self.traj
+        if traj is None:
+            traj = self.compute_trajectory(show=False, verbose=False)
 
-        if self.traj is not None:
-            return plot_time_signals(
-                self, self.traj, signals=signals, backend=backend, show=show
-            )
-
-        traj = self.compute_trajectory(show=False, verbose=False)
         return plot_time_signals(
             self,
             traj,
@@ -735,7 +730,30 @@ class DynamicSystemFacades:
 
 
 class StepSystemFacades:
-    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`."""
+    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`.
+
+    Step plants do **not** use :class:`~minilink.simulation.simulator.Simulator`
+    or :class:`~minilink.simulation.static_simulator.StaticSimulator` — those
+    belong to continuous / static leaves. Discrete evolution goes through
+    :meth:`compute_rollout` (compiled ``step`` / ``rollout``). Continuous-time
+    facades inherited from :class:`SharedSystemFacades`
+    (:meth:`compute_trajectory`, :meth:`compute_forced`) raise here with a
+    pointer to the rollout API.
+    """
+
+    def compute_trajectory(self, *args, **kwargs):
+        raise TypeError(
+            f"{type(self).__name__} is a StepSystem — use compute_rollout(...), "
+            "not compute_trajectory. Continuous-time simulation belongs on "
+            "DynamicSystem; hybrid closed loops use HybridSimulator."
+        )
+
+    def compute_forced(self, *args, **kwargs):
+        raise TypeError(
+            f"{type(self).__name__} is a StepSystem — use compute_rollout(...), "
+            "not compute_forced. Continuous-time simulation belongs on "
+            "DynamicSystem; hybrid closed loops use HybridSimulator."
+        )
 
     def compute_rollout(
         self,
@@ -802,26 +820,18 @@ class StepSystemFacades:
         if signals is None:
             signals = resolve_plot_signals(self)
 
-        if rollout is not None:
-            return plot_time_signals(
-                self,
-                rollout.as_trajectory(),
-                signals=signals,
-                abscissa_label=STEP_ABSCISSA_LABEL,
-                backend=backend,
-                show=show,
+        if rollout is None:
+            rollout = self.rollout
+        if rollout is None:
+            raise ValueError(
+                "No rollout available; pass rollout=... or call compute_rollout first."
             )
 
-        if self.rollout is not None:
-            return plot_time_signals(
-                self,
-                self.rollout.as_trajectory(),
-                signals=signals,
-                abscissa_label=STEP_ABSCISSA_LABEL,
-                backend=backend,
-                show=show,
-            )
-
-        raise ValueError(
-            "No rollout available; pass rollout=... or call compute_rollout first."
+        return plot_time_signals(
+            self,
+            rollout.as_trajectory(),
+            signals=signals,
+            abscissa_label=STEP_ABSCISSA_LABEL,
+            backend=backend,
+            show=show,
         )

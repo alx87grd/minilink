@@ -111,12 +111,28 @@ Rules:
 - Do **not** use `from minilink import *`. Do **not** re-export quarantine
   (`symbolic/`, `dynamics/engines/`) from teaching surfaces.
 
+### API stability tiers (v0.1)
+
+The v0.1 teaching release freezes a **stable tier**; the rest is
+**provisional** (see [README.md — API stability](README.md#api-stability-v01)
+for the user-facing table and [ROADMAP.md](ROADMAP.md) for TRL detail):
+
+- **Stable**: `core/` contracts (`System` family, diagrams, composition
+  operators, `Trajectory`, compile facade), `Simulator` / `StaticSimulator`,
+  `blocks/`, catalog teaching plants, basic `control/` and `analysis/`.
+  Public names and semantics change only with a deprecation note.
+- **Provisional**: planning, MPC, hybrid/step, realtime, optimization,
+  spatial, placeholders, and the evaluator integration-helper grid beyond the
+  frozen subset in §5. These may change between minor releases; hardening
+  items live in the [docs/plans/TODO.md](docs/plans/TODO.md) pre-v0.2 backlog.
+
 ## 3. Package Map
 
 Component maturity is tracked only in [ROADMAP.md](ROADMAP.md); this section
 describes package ownership. Every package belongs to one of four bands.
 Homes for planned content are pre-decided in the tables below; scheduling is
-in [ROADMAP.md](ROADMAP.md) (teaching-release priorities and Later).
+in [ROADMAP.md](ROADMAP.md) (teaching-release priorities) and
+[docs/plans/TODO.md](docs/plans/TODO.md) (Later / operational backlog).
 
 **Framework** — defines what a `System` is and how diagrams execute
 (NumPy-only; changes are design events):
@@ -151,7 +167,7 @@ state-feedback block):
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
-| `interfaces/` | gymnasium, cosimulation, external-model wrappers (planned) |
+| `interfaces/` | `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
 
 **Quarantine** — experimental (TRL < 3); nothing may import these:
 
@@ -446,7 +462,7 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   ([planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
   **TODO: Prioritize threading $p$ into JAX parametric programs.** This will allow 
   moving obstacles online without rebuilding the NLP, unlocking real-time dynamic obstacle avoidance.
-  **Deferred** ([ROADMAP.md](ROADMAP.md) Later): call-time overrides
+  **Deferred** ([docs/plans/TODO.md](docs/plans/TODO.md) Later): call-time overrides
   on base `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types
   declare `(t, params)` but still read frozen attributes only until a follow-up
   pass.
@@ -469,6 +485,14 @@ Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
 `autowire()` conservative fill — **never inserts Mux**; use `feedback="qdq"` or
 `closed_loop_qdq` for explicit `Mux(q, dq)` wiring. Diagram operands are flattened,
 not nested. Explicit `add_subsystem` / `connect` remains canonical for general topology.
+
+**Operator mutation semantics (frozen v0.1 decision):** when the left operand of
+`+` or `>>` is already a `DiagramSystem`, the shortcut **extends that diagram in
+place and returns it** — `bigger = loop + estimator` mutates `loop`. This is
+deliberate: subsystem operands are always shared references (never copied), so a
+"fresh" diagram would only pretend to isolate state; in-place extension keeps
+`a >> b >> c` chains cheap and the object identity honest. Build a new
+`DiagramSystem` explicitly when you need an independent topology.
 
 **Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers),
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
@@ -496,6 +520,30 @@ optional class attribute `feedback_profile`, not inheritance):
 | `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants |
 | `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` |
 
+**Controller naming conventions (v0.1).** PID-style gain params keys are
+uppercase (`Kp`, `Ki`, `Kd`, `K_null`) across `impedance`, `siso`, `robotic`,
+and `modelbased`; non-PID shaping constants keep their textbook lowercase
+names (`tau`, sliding-mode `lam` / `gain` / `nab`). `tracking_ref` defaults
+follow the law's nature and are deliberately **not** uniform: spring-damper
+and kinematic laws default to regulation (`tracking_ref=False`,
+``r = pos_d``); model-based trajectory laws (`ComputedTorqueController`,
+`SlidingModeController`) default to tracking (`tracking_ref=True`,
+``r = [q_d; dq_d]``).
+
+**Embedded-model params rule (frozen v0.1 decision).** Model-based controllers
+(`ModelJointImpedance`, `TaskImpedance`, `ComputedTorqueController`,
+`SlidingModeController`) hold a reference to a plant object and call its model
+hooks (`g(q)`, `H(q)`, `inverse_dynamics`) with ``params=None`` — the embedded
+model always reads that plant object's **live** ``self.params``. The
+controller's own params dict carries gains only and is never forwarded to the
+embedded model. Consequences: mutating ``plant.params`` updates both the real
+plant and the controller model (they are usually the same object — nominal
+model-based control); diagram-level ``params={"sys": {...}}`` overrides and the
+evaluator parametric tier reach the plant subsystem but **not** the
+controller's embedded copy (which is exactly the model-mismatch semantics —
+override the plant to study robustness). A forwarded model-params channel is
+deliberately not provided in v0.1.
+
 ### `Trajectory`, sets, costs, geometry
 
 - `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
@@ -503,7 +551,7 @@ optional class attribute `feedback_profile`, not inheritance):
   `&` → `IntersectionSet`. `margin(z, t, params)` is threaded by transcriptions via
   `problem.params.sets`; field-backed spatial sets forward that same parameter
   object to their scene queries. Base `Set` subclasses other than `FieldSet` /
-  `CallableSet` do not yet read `params` (deferred — see ROADMAP).
+  `CallableSet` do not yet read `params` (deferred — see [docs/plans/TODO.md](docs/plans/TODO.md)).
 - Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
   `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
   `ScaledCost` (e.g. `base + w * obstacle_cost`). `g`/`h` receive
@@ -563,6 +611,15 @@ on JAX dynamics evaluators. Layout:
 `evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`,
 `step_rollout.py` (`gather_u`, `StepRolloutMixin`).
 
+**Frozen evaluator subset (v0.1).** The stable-tier evaluator API is:
+`f` / `f_p`, `outputs` / `outputs_p`, `step` / `step_p`, `rollout`,
+`rk4_step` / `rk4_step_p`, `integrate_zoh` / `integrate_zoh_rollout` /
+`integrate_zoh_p`, and the JAX trace-tier twins of those names
+(`f_trace`, `f_trace_p`, …). The rest of the integration-helper grid
+(`euler_*`, `*_ivp*`, `rk4_integrate_linear*`, `_jit` aliases) is
+**stable-internal**: used by simulators and transcriptions, kept working, but
+its names may still change before v1.0 — do not build external code on it.
+
 **Integration rename (pre-1.0).** Rollout methods use explicit integrator + input
 model tokens — no bare `integrate`:
 
@@ -612,7 +669,7 @@ forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
 `euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
-([ROADMAP.md](ROADMAP.md) Later).
+([docs/plans/TODO.md](docs/plans/TODO.md) Later).
 
 ### Discontinuous closed loops — known issues
 
@@ -620,7 +677,7 @@ Controllers with discontinuous laws (e.g. :class:`~minilink.control.modelbased.S
 ``sign(s)``) on a **continuous** :class:`DiagramSystem` closed loop are supported today,
 but several solver/logging behaviors are misleading until a dedicated hybrid or
 event-handling path lands (hybrid path exists; see discontinuous guidance below and
-[ROADMAP.md](ROADMAP.md) teaching-release hardening).
+[ROADMAP.md](ROADMAP.md) teaching-release hardening / [docs/plans/TODO.md](docs/plans/TODO.md)).
 
 **TODO: Add a hard warning.** When a discontinuous controller is wired into a continuous `DiagramSystem`, we should warn the user and recommend wrapping it in a fast `Computer` inside a `HybridDiagram` to enforce physical digital-on-continuous reality.
 
@@ -692,7 +749,7 @@ from-solve rebuilds the NLP (expected for no-JAX MPC). A one-time speed warning
 is emitted only when a JAX planner omits parametric compile.
 Online ``params`` is an x0-only façade today (`None`/`{}`); reserved key
 ``scene`` raises ``NotImplementedError`` until pipeline B extends the parametric
-tier to ``J(z, p)`` (see ROADMAP scene params). Knot count
+tier to ``J(z, p)`` (see [docs/plans/TODO.md](docs/plans/TODO.md) scene params). Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
 `linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native

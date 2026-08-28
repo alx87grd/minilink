@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import Point
@@ -21,10 +22,12 @@ class SimpleIntegrator(DynamicSystem):
         self.outputs["y"].units = ["m"]
 
     def f(self, x, u, t=0.0, params=None):
-        return np.array([u[0]])
+        xp = array_module(x)
+        return xp.array([u[0]])
 
     def h(self, x, u, t=0.0, params=None):
-        return np.array([x[0]])
+        xp = array_module(x)
+        return xp.array([x[0]])
 
     def get_kinematic_geometry(self):
         return {}
@@ -54,14 +57,10 @@ class DoubleIntegrator(DynamicSystem):
         self.outputs["y"].units = ["m"]
 
     def f(self, x, u, t=0.0, params=None):
-        from minilink.core.backends import array_module
-
         xp = array_module(x)
         return xp.array([x[1], u[0]])
 
     def h(self, x, u, t=0.0, params=None):
-        from minilink.core.backends import array_module
-
         xp = array_module(x)
         return xp.array([x[0]])
 
@@ -95,10 +94,12 @@ class TripleIntegrator(DynamicSystem):
         self.outputs["y"].units = ["m"]
 
     def f(self, x, u, t=0.0, params=None):
-        return np.array([x[1], x[2], u[0]])
+        xp = array_module(x)
+        return xp.array([x[1], x[2], u[0]])
 
     def h(self, x, u, t=0.0, params=None):
-        return np.array([x[0]])
+        xp = array_module(x)
+        return xp.array([x[0]])
 
     def get_kinematic_geometry(self):
         return {}

@@ -2,6 +2,7 @@
 
 Maturity and priorities for the **teaching release**. Contracts and product
 identity: [DESIGN.md](DESIGN.md). Agent rules: [AGENTS.md](AGENTS.md).
+Operational backlog: [docs/plans/TODO.md](docs/plans/TODO.md).
 
 **Pyro parity audit:**
 [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md).
@@ -51,7 +52,7 @@ release process by themselves.
 | Blocks | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | MLP later. |
 | Estimation | 1 | Placeholder. | Luenberger, Kalman (priority 2). |
 | Identification | 2 | Parametric-tier prototype only. | `fitting.py` (priority 2). |
-| Interfaces | 1 | Placeholder. | Gymnasium later; MJX leaf later. |
+| Interfaces | 3 | `Sys2Gym` + `SB3Controller` (`minilink[rl]`). | MJX leaf later. |
 | Quarantine (symbolic, hand-rolled contact) | 1 | Experimental; not teaching path. | Keep isolated; prefer MJX leaf later. |
 | External multibody leaf (MJX) | 0 | Not started. | Spike later (`interfaces/mjx.py`). |
 | Pyro 2.0 overall | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Teaching release via §3–§4; detail in gap doc. |
@@ -104,30 +105,20 @@ Decisions that block or shape the teaching release (maintainer sign-off):
 - Optional `KinematicModel` delegate — adopt or drop.
 - Dynamic bicycle module split (if it blocks teaching demos).
 
-## 6. Later / out of scope
+## 6. Backlog homes
 
-**Later** (post teaching release — do not displace §4). Lightweight **feature
-backlog**: one-line ideas land here; if a change needs architecture tradeoffs or
-a multi-step design, open a short doc under [`docs/plans/`](docs/plans/) and link
-it from [docs/plans/README.md](docs/plans/README.md).
+Operational and detailed backlogs live outside this file (keep ROADMAP
+skimmable for maturity and milestone decisions):
 
-- Scene params / `J(z, p)` bind (moving obstacles, terrain SDFs without JIT rebuild)
-- `SolverFactory` — unify SciPy / Ipopt / CasADi wiring for trajopt and MPC
-- `MjxPlant` under `interfaces/mjx.py` (`minilink[mjx]`); prefer deprecate
-  hand-rolled contact in `dynamics/engines/`
-- Gymnasium / RL bridges; Pacejka; stochastic forcing; neural MLP
-- ROS2 / FMI; sparse long-horizon trajopt; parametric `core/` Shape/Set/Cost
-  call-time overrides; trajectory post-filter; RRT-Connect / informed sampling
-- **Shared RNEA serial-chain stack** (not copy-paste per 6-DoF arm): extract
-  DH + spatial RNEA helpers (or a thin `SerialRneaManipulator` base) so catalog
-  plants only supply `a`/`d`/`alpha`, mass/COM/inertia; keep public `H`/`C`/`g`
-  on the mechanical API.
-- **ABA on other RNEA arms** (pattern from UR5): keep public `H` / `C` /
-  `g` for teaching; use Articulated-Body Algorithm for `forward_dynamics` /
-  `f` so integration does not form \(H\) each step. UR5 catalog plant done;
-  generalize when adding the next spatial manipulator.
+| Doc | Job |
+| --- | --- |
+| [docs/plans/TODO.md](docs/plans/TODO.md) | Small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
+| [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Full pyro library / example parity audit |
+| [docs/plans/](docs/plans/) | Multi-step design writeups (see [plans README](docs/plans/README.md)) |
 
-**Out of scope** (by decision — see [DESIGN.md](DESIGN.md)):
+## 7. Out of scope
+
+By decision — see [DESIGN.md](DESIGN.md):
 
 Full Simulink / arbitrary multi-clock hybrid parity; event-driven switching as a
 framework feature; becoming a Multibody/contact OS or batched RL physics engine.

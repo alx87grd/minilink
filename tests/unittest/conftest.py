@@ -1,6 +1,6 @@
 import pytest
 
-OPTIONAL_MARKERS = ("jax", "symbolic", "visualization", "plotting", "ipopt")
+OPTIONAL_MARKERS = ("jax", "symbolic", "visualization", "plotting", "ipopt", "rl")
 
 
 def pytest_collection_modifyitems(items):

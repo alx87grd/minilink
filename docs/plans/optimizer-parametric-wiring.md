@@ -4,7 +4,7 @@ Status: **draft plan** (July 2026). Analysis + proposed fix for swapping
 `optimizer_method` (e.g. SciPy SLSQP → IPOPT) on the parametric MPC path.
 
 Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP),
-[ROADMAP.md](../../ROADMAP.md) Later (`SolverFactory` / optimizer wiring).
+[TODO.md](TODO.md) Later (`SolverFactory` / optimizer wiring).
 
 Related: [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
 (parametric `x0` bind; pipeline B extends to scene).

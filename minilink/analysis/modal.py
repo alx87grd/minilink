@@ -8,7 +8,7 @@ from minilink.core.trajectory import Trajectory
 
 def modal_analysis(
     sys,
-    x_bar,
+    x_bar=None,
     u_bar=None,
     *,
     t=0.0,
@@ -23,8 +23,8 @@ def modal_analysis(
     ----------
     sys : System
         Plant or other system with ``f`` (and ``h``).
-    x_bar : array of shape (n,)
-        Operating-point state.
+    x_bar : array of shape (n,), optional
+        Operating-point state. Defaults to ``sys.x0``.
     u_bar : array of shape (m,), optional
         Operating-point input. Defaults to port nominals.
     method : {"fd", "jax"}
@@ -38,6 +38,8 @@ def modal_analysis(
     modes : ndarray of shape (n, n)
         Eigenvectors (columns are mode shapes in perturbation coordinates).
     """
+    if x_bar is None:
+        x_bar = sys.x0
     x_bar = np.asarray(x_bar, dtype=float).reshape(-1)
     if u_bar is None:
         u_bar = sys.get_u_from_input_ports()
@@ -57,7 +59,7 @@ def modal_analysis(
 
 def animate_modal(
     plant,
-    x_bar,
+    x_bar=None,
     mode="all",
     u_bar=None,
     *,
@@ -86,8 +88,8 @@ def animate_modal(
     ----------
     plant : System
         System used for graphics (usually the nonlinear plant).
-    x_bar : array of shape (n,)
-        Linearization operating point.
+    x_bar : array of shape (n,), optional
+        Linearization operating point. Defaults to ``plant.x0``.
     mode : int or ``'all'``
         Mode index to animate, or every index ``0 … n-1``.
     u_bar : array of shape (m,), optional
@@ -98,6 +100,8 @@ def animate_modal(
     poles, modes
         Same as :func:`modal_analysis`.
     """
+    if x_bar is None:
+        x_bar = plant.x0
     x_bar = np.asarray(x_bar, dtype=float).reshape(-1)
     if u_bar is None:
         u_bar = plant.get_u_from_input_ports()

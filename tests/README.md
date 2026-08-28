@@ -198,7 +198,7 @@ SDL_VIDEODRIVER=dummy pytest
 Or install all pip extras in another Python 3.10+ environment:
 
 ```bash
-pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt]"
+pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt,rl]"
 SDL_VIDEODRIVER=dummy pytest
 ```
 
@@ -213,6 +213,7 @@ Cursor Cloud sessions.
 - `visualization`: tests requiring `meshcat` or `pygame`
 - `plotting`: tests requiring `plotly`
 - `ipopt`: tests requiring `cyipopt`
+- `rl`: tests requiring `gymnasium`
 
 When adding optional behavior, put the import inside a guarded block and add the
 appropriate marker(s). This keeps `pytest -m "not optional"` a dependable

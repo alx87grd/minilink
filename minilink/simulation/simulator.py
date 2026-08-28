@@ -15,7 +15,6 @@ control automatic compile backend selection and optional fixed-step RK4 on long
 uniform grids when using the JAX compiler.
 """
 
-import logging
 import time
 
 import numpy as np
@@ -26,6 +25,8 @@ from minilink.core.backends import (
     BACKEND_NUMPY,
 )
 from minilink.core.trajectory import Trajectory
+from minilink.simulation.compile_backend import resolve_auto_backend
+from minilink.simulation.input_coercion import coerce_forced_input
 from minilink.simulation.sim_reporting import (
     print_simulation_preamble,
     print_simulation_report,
@@ -35,6 +36,7 @@ from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
+from minilink.simulation.time_grid import build_time_grid
 
 # Internal: user-facing solver labels to backend keys and options
 # (solver backend key, options)
@@ -180,11 +182,12 @@ class Simulator:
         self.t0 = float(t0)
         self.tf = float(tf)
         self.last_solve_time_s = None
+        self.last_traj = None
+        self.last_debug = None
 
         # Select the time vector
         self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
-        self.times = self.t
-        self.n_pts = len(self.times)
+        self.n_pts = len(self.t)
         self.x0 = self._validate_x0(sys.x0 if x0 is None else x0, sys.n)
 
         # Compile the system
@@ -229,66 +232,22 @@ class Simulator:
                 notes=setup_notes or None,
             )
 
-        self.scipy_last_solution = None
-        self.last_debug = None
-
     def select_time_vector(self, t0, tf, n_steps, dt, sys):
         """
         Build time samples on [t0, tf] and return (time_vector, dt, len).
 
-        If n_steps is set, uses a uniform grid of that many points. If only dt is
-        set, uses that step with arange. If neither, picks dt from the system's
-        smallest time constant. If both n_steps and dt are set, n_steps wins (a
-        warning is logged).
+        Delegates to :func:`minilink.simulation.time_grid.build_time_grid`;
+        the automatic ``dt`` (neither ``n_steps`` nor ``dt`` given) comes from
+        the system's smallest time constant scaled by the smooth or
+        discontinuous auto-dt policy. If both ``n_steps`` and ``dt`` are set,
+        ``n_steps`` wins (a warning is logged).
         """
-
-        # Validate the time vector
-        try:
-            t0, tf = float(t0), float(tf)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("t0 and tf must be real scalars") from exc
-        if not (np.isfinite(t0) and np.isfinite(tf)):
-            raise ValueError("t0 and tf must be finite")
-        if tf <= t0:
-            raise ValueError("tf must be greater than t0")
-
-        # Automatically
-        if n_steps is None and dt is None:
-            if sys.solver_info.get("discontinuous_behavior", False):
-                scale = DISCONTINUOUS_AUTO_DT_SCALE
-            else:
-                scale = SMOOTH_AUTO_DT_SCALE
-            dt = self._validate_dt(
-                sys.solver_info["smallest_time_constant"] * scale,
-                label="automatic dt",
-            )
-            time_vector = np.arange(t0, tf + dt, dt)
-
-        # If only dt is set, use a uniform grid with that step size
-        elif dt is None:
-            self._validate_n_steps(n_steps)
-            time_vector = np.linspace(t0, tf, n_steps)
-
-        # If only n_steps is set, use a uniform grid with that many steps
-        elif n_steps is None:
-            dt = self._validate_dt(dt)
-            time_vector = np.arange(t0, tf + dt, dt)
-
-        # If both n_steps and dt are set, use a uniform grid with that many steps and step size
+        if sys.solver_info.get("discontinuous_behavior", False):
+            scale = DISCONTINUOUS_AUTO_DT_SCALE
         else:
-            self._validate_n_steps(n_steps)
-            logging.warning(
-                "You must choose between n_steps and dt: using the specified n_steps"
-            )
-            time_vector = np.linspace(t0, tf, n_steps)
-
-        if time_vector.size < 2:
-            raise ValueError("Time vector must contain at least two points")
-
-        # Return the time vector, step size, and number of steps
-        dt = time_vector[1] - time_vector[0]
-        n_steps = len(time_vector)
-        return time_vector, dt, n_steps
+            scale = SMOOTH_AUTO_DT_SCALE
+        default_dt = sys.solver_info["smallest_time_constant"] * scale
+        return build_time_grid(t0, tf, n_steps=n_steps, dt=dt, default_dt=default_dt)
 
     def select_solver(self, sys, user_solver=None):
         """
@@ -308,7 +267,7 @@ class Simulator:
         if (
             self.compile_backend == BACKEND_JAX
             and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
-            and _time_grid_is_uniform(self.times)
+            and _time_grid_is_uniform(self.t)
         ):
             return "rk4_fixedsteps"
         return "scipy"
@@ -318,7 +277,7 @@ class Simulator:
     def solve(self):
         """
         Run simulation with **nominal** input (constant :math:`\\bar{u}` from the
-        compiled evaluator) over ``self.times``.
+        compiled evaluator) over ``self.t``.
 
         Returns
         -------
@@ -332,7 +291,7 @@ class Simulator:
             t_start = time.perf_counter()
 
         x_traj = self.solver_backend.integrate(
-            self.evaluator, self.times, self.x0, args=self.solver_backend_options
+            self.evaluator, self.t, self.x0, args=self.solver_backend_options
         )
 
         if time_solve:
@@ -348,7 +307,7 @@ class Simulator:
 
         # Build the trajectory object
 
-        traj = Trajectory(t=self.times, x=x_traj, u=u_traj)
+        traj = Trajectory(t=self.t, x=x_traj, u=u_traj)
 
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
@@ -377,7 +336,7 @@ class Simulator:
         Trajectory
             State and input time series.
         """
-        u_traj = self._coerce_forced_input(u, input_port_id=input_port_id)
+        u_traj = coerce_forced_input(self.sys, self.t, u, input_port_id=input_port_id)
         if not self._supports_forced_mode():
             raise ValueError(
                 f"Solver '{self.solver_mode}' does not support forced simulations"
@@ -388,7 +347,7 @@ class Simulator:
 
         x_traj = self.solver_backend.integrate_forced(
             self.evaluator,
-            self.times,
+            self.t,
             u_traj,
             self.x0,
             args=self.solver_backend_options,
@@ -397,7 +356,7 @@ class Simulator:
         if time_solve:
             self.last_solve_time_s = time.perf_counter() - t_start
 
-        traj = Trajectory(t=self.times, x=x_traj, u=u_traj)
+        traj = Trajectory(t=self.t, x=x_traj, u=u_traj)
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
 
@@ -420,20 +379,9 @@ class Simulator:
         Compile with *compile_backend*, or if it is :data:`COMPILE_BACKEND_AUTO`, try JAX
         then NumPy.
         """
-        if compile_backend != BACKEND_AUTO:
-            return compile_backend, self._build_evaluator(sys, compile_backend)
-
-        try:
-            import jax  # noqa: F401
-        except ImportError:
-            return BACKEND_NUMPY, self._build_evaluator(sys, BACKEND_NUMPY)
-        try:
-            return BACKEND_JAX, self._build_evaluator(sys, BACKEND_JAX)
-        except Exception:
-            logging.getLogger(__name__).debug(
-                "JAX compile failed, falling back to numpy", exc_info=True
-            )
-            return BACKEND_NUMPY, self._build_evaluator(sys, BACKEND_NUMPY)
+        return resolve_auto_backend(
+            lambda backend: self._build_evaluator(sys, backend), compile_backend
+        )
 
     def _validate_x0(self, x0, n):
         x0_arr = np.asarray(x0, dtype=float)
@@ -444,92 +392,6 @@ class Simulator:
         if not np.all(np.isfinite(x0_arr)):
             raise ValueError("x0 must contain only finite values")
         return x0_arr
-
-    def _validate_n_steps(self, n_steps):
-        if isinstance(n_steps, bool) or not isinstance(n_steps, (int, np.integer)):
-            raise ValueError("n_steps must be an integer greater than or equal to 2")
-        if n_steps < 2:
-            raise ValueError("n_steps must be greater than or equal to 2")
-
-    def _validate_dt(self, dt, *, label="dt"):
-        if not np.isscalar(dt):
-            raise ValueError(f"{label} must be a positive finite scalar")
-        dt_value = float(dt)
-        if not np.isfinite(dt_value) or dt_value <= 0.0:
-            raise ValueError(f"{label} must be a positive finite scalar")
-        return dt_value
-
-    def _validate_forced_u_traj(self, u_traj):
-        u = np.asarray(u_traj, dtype=float)
-        m, n_pts = self.sys.m, self.n_pts
-        expected_shape = (m, n_pts)
-        if u.ndim != 2:
-            raise ValueError(f"u_traj must have shape {expected_shape}")
-        if u.shape != expected_shape:
-            raise ValueError(f"u_traj must have shape {expected_shape}")
-        if not np.all(np.isfinite(u)):
-            raise ValueError("u_traj must contain only finite values")
-        return u
-
-    def _coerce_forced_input(self, u, input_port_id=None):
-        if input_port_id is None:
-            return self._coerce_forced_signal(u, self.sys.m, "u")
-
-        port = self.sys.inputs[input_port_id]
-        port_slice = self.sys.get_input_port_slice(input_port_id)
-
-        u_nominal = self.sys.get_u_from_input_ports().reshape(self.sys.m, 1)
-        u_traj = np.repeat(u_nominal, self.n_pts, axis=1)
-        u_traj[port_slice, :] = self._coerce_forced_signal(
-            u,
-            port.dim,
-            f"u for input port '{input_port_id}'",
-        )
-        return self._validate_forced_u_traj(u_traj)
-
-    def _coerce_forced_signal(self, data, expected_dim, label):
-        if callable(data):
-            signal = self._sample_forced_callable(data, expected_dim)
-        else:
-            signal = self._coerce_forced_array(data, expected_dim, label)
-
-        if not np.all(np.isfinite(signal)):
-            raise ValueError(f"{label} must contain only finite values")
-        return signal
-
-    def _sample_forced_callable(self, fn, expected_dim):
-        samples = np.zeros((expected_dim, self.n_pts), dtype=float)
-
-        for i, ti in enumerate(self.times):
-            value = np.asarray(fn(float(ti)), dtype=float)
-            if expected_dim == 1 and value.ndim == 0:
-                samples[0, i] = float(value)
-                continue
-            samples[:, i] = value.reshape(expected_dim)
-
-        return samples
-
-    def _coerce_forced_array(self, data, expected_dim, label):
-        arr = np.asarray(data, dtype=float)
-        expected_shape = (expected_dim, self.n_pts)
-
-        if arr.ndim == 0:
-            if expected_dim != 1:
-                raise ValueError(f"{label} must have shape {expected_shape}")
-            return np.full((1, self.n_pts), float(arr), dtype=float)
-
-        if arr.ndim == 1:
-            if expected_dim == 1 and arr.shape[0] == self.n_pts:
-                return arr.reshape(1, self.n_pts)
-            if arr.shape[0] == expected_dim:
-                column = arr.reshape(expected_dim, 1)
-                return np.repeat(column, self.n_pts, axis=1)
-            raise ValueError(f"{label} must have shape {expected_shape}")
-
-        if arr.ndim == 2 and arr.shape == expected_shape:
-            return arr
-
-        raise ValueError(f"{label} must have shape {expected_shape}")
 
     def _supports_forced_mode(self):
         return True

@@ -16,9 +16,9 @@ sys = DoubleIntegrator()
 sys.name = "sys"
 
 pid = FilteredController()
-pid.params["kp"] = 5.0
-pid.params["ki"] = 1.0
-pid.params["kd"] = 3.0
+pid.params["Kp"] = 5.0
+pid.params["Ki"] = 1.0
+pid.params["Kd"] = 3.0
 pid.params["tau"] = 0.1
 pid.params["u_min"] = -5.0
 pid.params["u_max"] = 5.0
@@ -36,9 +36,9 @@ sat.params["upper"] = 0.5
 
 pid2 = FilteredController()
 pid2.name = "pid2"
-pid2.params["kp"] = pid.params["kp"]
-pid2.params["ki"] = pid.params["ki"]
-pid2.params["kd"] = pid.params["kd"]
+pid2.params["Kp"] = pid.params["Kp"]
+pid2.params["Ki"] = pid.params["Ki"]
+pid2.params["Kd"] = pid.params["Kd"]
 pid2.params["tau"] = pid.params["tau"]
 pid2.params["u_min"] = -np.inf
 pid2.params["u_max"] = np.inf

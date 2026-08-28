@@ -251,6 +251,18 @@ System                    # static IO shell (n defaults to 0)
       -> Pendulum
 ```
 
+## API stability (v0.1)
+
+Minilink v0.1 freezes a **stable tier** for teaching; everything else is
+**provisional**. Stable public names and semantics only change with a
+deprecation note in the release notes; provisional APIs may change between
+minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
+
+| Tier | Bands |
+| --- | --- |
+| **Stable** | `core/` (`System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, composition operators, `Trajectory`, compile facade), `simulation` (`Simulator`, `StaticSimulator`), `blocks/`, catalog teaching plants (`minilink.catalog`), basic `control/` (output, state, SISO, impedance, robotic, model-based, LQR), basic `analysis/` (linearize, modal, frequency, equilibria, discretize) |
+| **Provisional** | `planning/` (trajopt, RRT, DP, spatial), `control.mpc`, hybrid (`StepDiagramSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`), `simulation.realtime`, `optimization/`, evaluator integration-helper grid beyond the documented subset ([DESIGN.md §5](DESIGN.md#compilation-and-simulation)), `estimation/` / `identification/` / `interfaces/` placeholders, quarantine (`symbolic/`, `dynamics/engines/`) |
+
 ## Install
 
 Minilink requires Python 3.10+ (3.13 recommended for conda). Conda is recommended
@@ -278,12 +290,12 @@ conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activat
 Optional features (included in `environment.yml`; install separately for minimal envs):
 
 ```bash
-conda install -c conda-forge jax jaxlib meshcat-python pygame plotly sympy ipopt cyipopt
+conda install -c conda-forge jax jaxlib meshcat-python pygame plotly sympy ipopt cyipopt gymnasium
 ```
 
 Alternatively, a plain editable install works in any Python 3.10+ environment
 (`pip install -e ".[dev]"`, with extras `.[jax]`, `.[symbolic]`,
-`.[visualization]`, `.[plotting]`, `.[ipopt]`).
+`.[visualization]`, `.[plotting]`, `.[ipopt]`, `.[rl]`).
 
 Graphviz is used by `plot_diagram()` for diagram topology rendering; it is not
 required for writing model equations.
@@ -378,7 +390,7 @@ Index and placement rules: [examples/README.md](examples/README.md)
 | Control | `examples/demos/control/` · [intro/control](examples/learn/intro/03_control.ipynb) |
 | Pyro SMC continuous (pendulum) | `examples/demos/control/sliding_mode_pendulum.py` |
 | Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/demos/hybrid/` · `examples/demos/step/` · [intro/hybrid](examples/learn/intro/06_hybrid.ipynb) |
-| MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/topics/mpc](examples/learn/teaching/topics/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
+| MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/mpc](examples/learn/teaching/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
 | MPC scenarios (path / slalom / spatial) | `examples/projects/mpc/` · circuit: `examples/demos/mpc/mpc_car_circuit.py` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/demos/robotic/` |
 | Analysis (linearize, trim, ctrb/obsv, modal) | `examples/demos/analysis/` · [intro/analysis](examples/learn/intro/04_analysis.ipynb) |
@@ -400,6 +412,7 @@ Catalog plants: `from minilink.catalog import …` (math under `minilink.dynamic
 
 - [DESIGN.md](DESIGN.md) — principles and contracts
 - [ROADMAP.md](ROADMAP.md) — TRL maturity and teaching-release priorities
+- [docs/plans/TODO.md](docs/plans/TODO.md) — operational backlog (fixes, demos, Later)
 - [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 parity audit (library + all 195 demos)
 - [docs/plans/](docs/plans/) — active design backlog
 - [AGENTS.md](AGENTS.md) — contributor / agent rules

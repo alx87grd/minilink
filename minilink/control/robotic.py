@@ -15,17 +15,25 @@ from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 GravityHook = Callable[..., np.ndarray]
 
 
-def _gravity_feedforward(plant, gravity, q, params=None):
+def _gravity_feedforward(plant, gravity, q, model_params=None):
+    """Gravity feedforward ``g(q)`` from the controller's embedded model.
+
+    ``model_params=None`` (the default) means the embedded model reads the
+    referenced plant's **live** ``self.params`` — the controller's own params
+    dict (gains) is never forwarded. Diagram-level overrides of the plant
+    subsystem do not reach this embedded copy; see DESIGN §4
+    (*Embedded-model params rule*).
+    """
     xp = array_module(q)
     if gravity is not None:
         try:
-            g = gravity(q, params)
+            g = gravity(q, model_params)
         except TypeError:
             g = gravity(q)
     else:
         if plant is None:
             raise ValueError("gravity_comp requires plant or gravity hook")
-        g = plant.g(q, params)
+        g = plant.g(q, model_params)
     return xp.asarray(g, dtype=float).reshape(-1)
 
 

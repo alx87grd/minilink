@@ -22,6 +22,9 @@ class Sum(System):
 
     The default ``signs=(1.0, -1.0)`` is the classic tracking-error junction
     ``y = in0 - in1``. All input ports share the same dimension ``dim``.
+
+    ``signs`` is a structural attribute fixed at construction (it sets the
+    number of input ports), deliberately not a tunable ``params`` entry.
     """
 
     def __init__(self, signs=(1.0, -1.0), dim=1):

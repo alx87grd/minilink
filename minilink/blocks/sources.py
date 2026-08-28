@@ -4,6 +4,11 @@ Source blocks: systems that emit time signals.
 A source is a :class:`~minilink.core.system.System` with no states and no
 input ports; its single output port ``y`` is a function of time only,
 ``y = h(t; p)``.
+
+The cached interpolators of :class:`WhiteNoise` and :class:`TrajectorySource`
+are the sanctioned source-block exception to statelessness: they are
+deterministic precomputations rebuilt by ``refresh()``, not evolving
+simulation state.
 """
 
 import numpy as np

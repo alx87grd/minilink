@@ -11,7 +11,7 @@ Status legend: **Done** = equivalent landed · **Partial** = framework exists, g
 | Bucket | Pyro | Done | Partial | TODO | Drop |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Library symbols (table below) | 104 | 79 | 10 | 11 | 4 |
-| Example scripts | 195 | 21 | 45 | 90 | 39 |
+| Example scripts | 195 | 25 | 45 | 90 | 35 |
 | Minilink scripts | 60 | — | — | — | — |
 | Minilink notebooks | 7 | — | — | — | — |
 
@@ -34,7 +34,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Framework | `pyro/dynamic/statespace.py` | StateObserver | `minilink/estimation/` | — | **TODO** | estimation/luenberger.py |
 | Framework | `pyro/dynamic/statespace.py` | ObservedSystem | `minilink/estimation/` | — | **TODO** | LQG blocked on observers |
 | Framework | `pyro/dynamic/stochastic.py` | NoiseSignal | `minilink/blocks/sources.py` | noise ports in diagrams | **Partial** | No StochasticSystemWrapper |
-| Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed (ROADMAP Later) |
+| Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed ([TODO.md](TODO.md) Later) |
 | Framework | `pyro/dynamic/tranferfunction.py` | TransferFunction | `minilink/blocks/transfer_function.py` | TransferFunction | **Done** |  |
 | Framework | `pyro/dynamic/tranferfunction.py` | ss2tf() | `minilink/analysis/` | — | **TODO** | Frequency backlog |
 | Catalog | `pyro/dynamic/equation.py` | VanderPol | `minilink/dynamics/catalog/equations/oscillators.py` | VanderPol | **Done** |  |
@@ -65,9 +65,9 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Catalog | `pyro/dynamic/plane.py` | Plane2D | `minilink/dynamics/catalog/aerial/plane.py` | Plane2D | **Done** |  |
 | Catalog | `pyro/dynamic/rocket.py` | Rocket | `minilink/dynamics/catalog/aerial/rocket.py` | Rocket | **Done** |  |
 | Catalog | `pyro/dynamic/suspension.py` | QuarterCarOnRoughTerrain | `minilink/dynamics/catalog/vehicles/suspension.py` | QuarterCarOnRoughTerrain | **Done** |  |
-| Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | — | **Partial** | Only LinearTire implemented |
-| Catalog | `pyro/dynamic/vehicle_dynamic.py` | LinearTire | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | LinearTire (+ LinearTire) | **Done** |  |
-| Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | ROADMAP Later |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | — | **Partial** | Only the linear tire implemented (pure functions) |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | LinearTire | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | `tire_slip` / `linear_tire_forces` (coefficients in plant `params`) | **Done** |  |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | [TODO.md](TODO.md) Later |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | DynamicBicycle | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | DynamicBicycle (+ JAX twins, rate inputs) | **Done** | Minilink adds rate-input variant |
 | Catalog | `pyro/dynamic/vehicle_propulsion.py` | LongitudinalFrontWheelDriveCarWithWheelSlipInput | `minilink/dynamics/catalog/vehicles/propulsion.py` | same | **Done** |  |
 | Catalog | `pyro/dynamic/vehicle_propulsion.py` | LongitudinalFrontWheelDriveCarWithTorqueInput | `minilink/dynamics/catalog/vehicles/propulsion.py` | same | **Done** |  |
@@ -100,7 +100,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Control | `pyro/control/nonlinear.py` | ComputedTorqueController | `minilink/control/modelbased.py` | ComputedTorqueController | **Done** |  |
 | Control | `pyro/control/nonlinear.py` | SlidingModeController | `minilink/control/modelbased.py` | SlidingModeController | **Done** | Pyro `K(q) sign(s)` law; traj-following demos TODO |
 | Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/robotic.py` | JointImpedance, TaskImpedance, TaskKinematic, TaskKinematicNullspace | **Partial** | Dynamic joint/effector PID wrappers TODO |
-| Control | `pyro/control/reinforcementlearning.py` | stable_baseline3_controller | `minilink/interfaces/` | — | **TODO** | Train outside; gymnasium stub |
+| Control | `pyro/control/reinforcementlearning.py` | stable_baseline3_controller | `minilink/interfaces/gymnasium.py` | SB3Controller | **Done** | Duck-typed on `model.predict`; train outside |
 | Analysis | `pyro/analysis/simulation.py` | Trajectory | `minilink/core/trajectory.py` | Trajectory | **Done** |  |
 | Analysis | `pyro/analysis/simulation.py` | Simulator | `minilink/simulation/simulator.py` | Simulator | **Done** |  |
 | Analysis | `pyro/analysis/simulation.py` | CLosedLoopSimulator | `minilink/core/facades.py` | compute_trajectory() | **Done** |  |
@@ -126,7 +126,7 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Graphics | `pyro/kinematic/geometry.py` | transformation_matrix_2D | `minilink/core/kinematics.py` | frame tf helpers | **Done** |  |
 | Graphics | `pyro/kinematic/drawing.py` | transform_points_2D, arrows | `minilink/graphical/animation/` | primitives, drawables | **Done** |  |
 | Tools | `pyro/tools/sys2game.py` | InteractiveContinuousDynamicSystem | `minilink/simulation/realtime/` | superseded by `RealtimeSimulator` + `PygameInput` | **Drop** | Own realtime tool, not a port |
-| Tools | `pyro/tools/sys2gym.py` | Sys2Gym | `minilink/interfaces/` | — | **TODO** | interfaces/gymnasium.py |
+| Tools | `pyro/tools/sys2gym.py` | Sys2Gym | `minilink/interfaces/gymnasium.py` | Sys2Gym | **Done** | Cost passed explicitly; `rl` extra |
 
 ---
 
@@ -181,10 +181,10 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `courses/udes_gro860/dp_mass_min_time_policy_evaluation.py` | **Partial** | Core tool demos exist; course variant not ported |
 | `courses/udes_gro860/lqr_cartpole_stab.py` | **Done** | examples/demos/statespace/cartpole_lqr.py |
 | `courses/udes_gro860/lqr_cartpole_traj.py` | **Partial** | Core tool demos exist; course variant not ported |
-| `courses/udes_gro860/rl_drone_demo_learning2fly.py` | **Drop** | RL + Stable-Baselines3; interfaces/gymnasium TODO |
-| `courses/udes_gro860/rl_drone_demo_training.py` | **Drop** | RL + Stable-Baselines3; interfaces/gymnasium TODO |
-| `courses/udes_gro860/rl_pendulum_swingup_basic_bangbang.py` | **Drop** | RL + Stable-Baselines3; interfaces/gymnasium TODO |
-| `courses/udes_gro860/rl_pendulum_swingup_test.py` | **Drop** | RL + Stable-Baselines3; interfaces/gymnasium TODO |
+| `courses/udes_gro860/rl_drone_demo_learning2fly.py` | **Done** | examples/learn/teaching/drone_ppo_learn_to_fly.ipynb |
+| `courses/udes_gro860/rl_drone_demo_training.py` | **Done** | same drone PPO teaching notebook |
+| `courses/udes_gro860/rl_pendulum_swingup_basic_bangbang.py` | **Done** | examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb |
+| `courses/udes_gro860/rl_pendulum_swingup_test.py` | **Done** | same pendulum swing-up VI vs LQR vs PPO notebook |
 
 ### 3.2 `demos_by_system/`
 
@@ -455,7 +455,7 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 
 | Notebook |
 | --- |
-| `examples/learn/teaching/topics/mpc.ipynb` |
+| `examples/learn/teaching/mpc.ipynb` |
 | `examples/projects/car_trajopt/car_trajopt.ipynb` |
 | `examples/sandbox/scratch/cartpole_rollout_gradients.ipynb` |
 | `examples/learn/intro/08_optimization.ipynb` |
@@ -482,7 +482,7 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | StochasticSystemWrapper | **Drop** | Noise ports only unless reversed |
 | University course folders | **Drop** | Port ideas via library demos, not 1:1 |
 | Research projects (asimov, ugv, wcrt, …) | **Drop** | Out of library scope |
-| Pacejka tire | **TODO/review** | ROADMAP Later |
+| Pacejka tire | **TODO/review** | [TODO.md](TODO.md) Later |
 
 ---
 
@@ -497,7 +497,7 @@ Ordered by unblock count:
 | P3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
 | P3 | `estimation/luenberger.py`, `kalman.py` | LQG demos |
 | P3 | `identification/fitting.py` | params-gradient workflow |
-| P3 | `interfaces/gymnasium.py` | RL interface (train outside) |
+| P3 | ~~`interfaces/gymnasium.py`~~ (landed) | GRO860 course notebooks |
 | P3 | Frequency tools (pole-zero, Nyquist, margins, `ss2tf`) | transfer_functions/ completion |
 | P3 | `planning/filters.py` TrajectoryFilter | traj post-processing |
 | P4 | Representative closed-loop demo per `demos_by_system/*` plant band | ~93 TODO demos shrink to ~20 targets |

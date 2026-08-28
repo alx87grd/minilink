@@ -1,12 +1,18 @@
-"""Bridges to external ecosystems (placeholder — content planned, home decided).
+"""Bridges to external ecosystems.
 
 Wrappers that let minilink systems talk to other frameworks, and external
 models enter minilink as plants.
 
+Available modules:
+
+- ``gymnasium.py`` — :class:`~minilink.interfaces.gymnasium.Sys2Gym` exposes a
+  system + cost as an RL environment (``reward = -g * dt``); trained policies
+  come back as :class:`~minilink.interfaces.gymnasium.SB3Controller` feedback
+  blocks. Requires the optional ``gymnasium`` dependency (``pip install
+  minilink[rl]``); training itself stays external (e.g. stable-baselines3).
+
 Planned modules (see ROADMAP.md Later):
 
-- ``gymnasium.py`` — expose a diagram as an RL environment (policies come
-  back as ``control/`` blocks)
 - ``torch.py`` / ``flax.py`` — NN model wrappers
 - cosimulation / FMI, multibody-description import — live adapters implement
   the :mod:`minilink.simulation.realtime` contracts

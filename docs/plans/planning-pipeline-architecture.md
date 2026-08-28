@@ -5,7 +5,7 @@ parametric `x0` are landed. Open work is **pipeline B** — runtime scene /
 obstacle bind without re-JIT.
 
 Contracts in code: [DESIGN.md](../../DESIGN.md) §6,
-[ROADMAP.md](../../ROADMAP.md) Later (scene params / `J(z, p)` bind).
+[TODO.md](TODO.md) Later (scene params / `J(z, p)` bind).
 
 Related future taxonomy: [standard-planning-problems.md](standard-planning-problems.md).
 

@@ -292,7 +292,7 @@ class TestImpedanceIntegralController(unittest.TestCase):
     def test_closed_loop_removes_steady_state_error(self):
         plant = DoubleIntegrator()
         pid = ImpedanceIntegralController()
-        pid.params.update({"kp": 5.0, "ki": 1.0, "kd": 4.0})
+        pid.params.update({"Kp": 5.0, "Ki": 1.0, "Kd": 4.0})
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
@@ -310,7 +310,7 @@ class TestImpedanceIntegralController(unittest.TestCase):
 
 class TestFilteredController(unittest.TestCase):
     def test_equations(self):
-        pid = FilteredController(kp=10.0, ki=1.0, kd=1.0, tau=0.1)
+        pid = FilteredController(Kp=10.0, Ki=1.0, Kd=1.0, tau=0.1)
         np.testing.assert_allclose(
             pid.f(np.array([0.0, 0.2]), np.array([1.0, 0.2])), [0.8, 0.0]
         )
@@ -324,9 +324,9 @@ class TestFilteredController(unittest.TestCase):
         import jax.numpy as jnp
 
         pid = FilteredController(
-            kp=10.0,
-            ki=1.0,
-            kd=1.0,
+            Kp=10.0,
+            Ki=1.0,
+            Kd=1.0,
             u_min=-1.0,
             u_max=1.0,
             e_int_min=-0.5,
@@ -339,7 +339,7 @@ class TestFilteredController(unittest.TestCase):
     def test_closed_loop_removes_steady_state_error(self):
         plant = DoubleIntegrator()
         pid = FilteredController()
-        pid.params.update({"kp": 5.0, "ki": 1.0, "kd": 4.0})
+        pid.params.update({"Kp": 5.0, "Ki": 1.0, "Kd": 4.0})
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
@@ -382,7 +382,7 @@ class TestImpedanceController(unittest.TestCase):
 
 class TestFilteredControllerMIMO(unittest.TestCase):
     def test_dof_two_diagonal(self):
-        pid = FilteredController(dof=2, kp=2.0, ki=1.0, kd=0.5, tau=0.1)
+        pid = FilteredController(dof=2, Kp=2.0, Ki=1.0, Kd=0.5, tau=0.1)
         np.testing.assert_allclose(
             pid.f(np.zeros(4), np.array([1.0, 2.0, 0.0, 0.0])), [1.0, 2.0, 0.0, 0.0]
         )

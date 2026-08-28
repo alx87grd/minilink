@@ -20,13 +20,24 @@
   "examples/learn/intro/10_graphical.ipynb": {
     "requires": ["meshcat", "plotly"]
   },
-  "examples/learn/teaching/topics/mpc.ipynb": {
+  "examples/learn/teaching/mpc.ipynb": {
     "requires": ["jax"],
     "timeout": 600
   },
-  "examples/learn/teaching/topics/articulated_robot_eom.ipynb": {
-    "requires": ["jax", "sympy", "meshcat"],
-    "timeout": 600
+  "examples/learn/teaching/articulated_robot_eom.ipynb": {
+    "smoke": false
+  },
+  "examples/learn/teaching/pendulum_swing_up_cost_function_vi.ipynb": {
+    "smoke": false
+  },
+  "examples/learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb": {
+    "smoke": false
+  },
+  "examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb": {
+    "smoke": false
+  },
+  "examples/learn/teaching/drone_ppo_learn_to_fly.ipynb": {
+    "smoke": false
   },
   "examples/tooling/notebooks/benchmark.ipynb": {
     "requires": ["jax"],

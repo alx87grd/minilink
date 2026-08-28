@@ -7,6 +7,10 @@ Kinematics: the ground + cart are drawn in the X–Y plane; the pole is offset
 slightly in ``z`` for volumetric renderers (MeshCat) so the rod cylinder does
 not pass through the cart body while matplotlib's default XY projection stays
 visually the same.
+
+JAX-readiness: ``CartPole`` / ``RotatingCartPole`` are NumPy plants (``H`` /
+``C`` / ``g`` build ``np`` arrays); use the explicit :class:`JaxCartPole`
+twin for ``jit`` / ``grad`` / ``vmap`` workflows.
 """
 
 import numpy as np

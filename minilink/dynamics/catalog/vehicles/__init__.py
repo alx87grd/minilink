@@ -1,9 +1,10 @@
 """Vehicle dynamics (kinematic and dynamic)."""
 
+# Tire math (pure functions ``tire_slip`` / ``linear_tire_forces``) stays in
+# minilink.dynamics.catalog.vehicles.dynamic_bicycle — plants only in __all__.
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     DynamicBicycle,
     DynamicBicycleCar3D,
-    LinearTire,
 )
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
@@ -30,7 +31,6 @@ __all__ = [
     "HolonomicMobileRobot3D",
     "KinematicBicycle",
     "KinematicCar",
-    "LinearTire",
     "LongitudinalFrontWheelDriveCarWithTorqueInput",
     "LongitudinalFrontWheelDriveCarWithWheelSlipInput",
     "MountainCar",

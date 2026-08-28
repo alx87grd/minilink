@@ -13,13 +13,13 @@ class FilteredController(DynamicSystem):
     Each axis has its own integrator and filtered-measurement state. The
     derivative acts on the filtered measurement:
 
-        u_i = kp_i e_i + ki_i e_int_i - kd_i dy_filt_i,   e_i = r_i - y_i
+        u_i = Kp_i e_i + Ki_i e_int_i - Kd_i dy_filt_i,   e_i = r_i - y_i
 
     Parameters
     ----------
     dof : int
         Number of independent scalar loops (default 1).
-    kp, ki, kd : float or vector
+    Kp, Ki, Kd : float or vector
         Per-axis gains (scalar broadcasts to all axes).
     tau : float or vector
         Filter time constant per axis [s].
@@ -34,9 +34,9 @@ class FilteredController(DynamicSystem):
     def __init__(
         self,
         dof: int = 1,
-        kp: float = 1.0,
-        ki: float = 0.0,
-        kd: float = 0.0,
+        Kp: float = 1.0,
+        Ki: float = 0.0,
+        Kd: float = 0.0,
         tau: float = 0.1,
         y_filt0=0.0,
         u_min: float = -np.inf,
@@ -53,9 +53,9 @@ class FilteredController(DynamicSystem):
         self.name = "Filtered Controller"
 
         self.params = {
-            "kp": _as_dof_vector(kp, n),
-            "ki": _as_dof_vector(ki, n),
-            "kd": _as_dof_vector(kd, n),
+            "Kp": _as_dof_vector(Kp, n),
+            "Ki": _as_dof_vector(Ki, n),
+            "Kd": _as_dof_vector(Kd, n),
             "tau": _as_dof_vector(tau, n),
             "u_min": _as_dof_vector(u_min, n),
             "u_max": _as_dof_vector(u_max, n),
@@ -81,9 +81,9 @@ class FilteredController(DynamicSystem):
         xp = array_module(x)
         n = self.dof
 
-        kp = xp.asarray(params["kp"])
-        ki = xp.asarray(params["ki"])
-        kd = xp.asarray(params["kd"])
+        Kp = xp.asarray(params["Kp"])
+        Ki = xp.asarray(params["Ki"])
+        Kd = xp.asarray(params["Kd"])
         tau = xp.asarray(params["tau"])
         u_min = xp.asarray(params["u_min"])
         u_max = xp.asarray(params["u_max"])
@@ -97,7 +97,7 @@ class FilteredController(DynamicSystem):
         e = r - y
         dy_filt = (y - y_filt) / tau
 
-        u_unsat = kp * e + ki * e_int - kd * dy_filt
+        u_unsat = Kp * e + Ki * e_int - Kd * dy_filt
 
         stop_hi = xp.logical_and(u_unsat >= u_max, e > 0.0)
         stop_lo = xp.logical_and(u_unsat <= u_min, e < 0.0)
@@ -116,9 +116,9 @@ class FilteredController(DynamicSystem):
         xp = array_module(x)
         n = self.dof
 
-        kp = xp.asarray(params["kp"])
-        ki = xp.asarray(params["ki"])
-        kd = xp.asarray(params["kd"])
+        Kp = xp.asarray(params["Kp"])
+        Ki = xp.asarray(params["Ki"])
+        Kd = xp.asarray(params["Kd"])
         tau = xp.maximum(xp.asarray(params["tau"]), 1e-3)
         u_min = xp.asarray(params["u_min"])
         u_max = xp.asarray(params["u_max"])
@@ -129,5 +129,5 @@ class FilteredController(DynamicSystem):
 
         e = r - y
         dy_filt = (y - y_filt) / tau
-        u_cmd = kp * e + ki * e_int - kd * dy_filt
+        u_cmd = Kp * e + Ki * e_int - Kd * dy_filt
         return xp.clip(u_cmd, u_min, u_max)
