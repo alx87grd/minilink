@@ -183,8 +183,8 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `courses/udes_gro860/lqr_cartpole_traj.py` | **Partial** | Core tool demos exist; course variant not ported |
 | `courses/udes_gro860/rl_drone_demo_learning2fly.py` | **Done** | examples/learn/teaching/courses/gro860/labs/drone_ppo_learn_to_fly.ipynb |
 | `courses/udes_gro860/rl_drone_demo_training.py` | **Done** | same GRO860 drone PPO notebook |
-| `courses/udes_gro860/rl_pendulum_swingup_basic_bangbang.py` | **Done** | examples/learn/teaching/courses/gro860/labs/pendulum_dp_vs_ppo.ipynb |
-| `courses/udes_gro860/rl_pendulum_swingup_test.py` | **Done** | same GRO860 DP vs PPO notebook |
+| `courses/udes_gro860/rl_pendulum_swingup_basic_bangbang.py` | **Done** | examples/learn/teaching/courses/gro860/labs/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb |
+| `courses/udes_gro860/rl_pendulum_swingup_test.py` | **Done** | same GRO860 pendulum swing-up VI vs LQR vs PPO notebook |
 
 ### 3.2 `demos_by_system/`
 

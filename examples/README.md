@@ -90,10 +90,10 @@ Syllabus labs (not smoked by CI — DP grids and PPO training are too long). Det
 
 | Notebook | Colab |
 | --- | --- |
-| [cost_function_pendulum](learn/teaching/courses/gro860/labs/cost_function_pendulum.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/cost_function_pendulum.ipynb) |
-| [lqr_vs_vi_pendulum](learn/teaching/courses/gro860/labs/lqr_vs_vi_pendulum.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/lqr_vs_vi_pendulum.ipynb) |
+| [pendulum_swing_up_cost_function_vi](learn/teaching/courses/gro860/labs/pendulum_swing_up_cost_function_vi.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/pendulum_swing_up_cost_function_vi.ipynb) |
+| [pendulum_swing_up_vi_vs_lqr](learn/teaching/courses/gro860/labs/pendulum_swing_up_vi_vs_lqr.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/pendulum_swing_up_vi_vs_lqr.ipynb) |
+| [pendulum_swing_up_vi_vs_lqr_vs_ppo](learn/teaching/courses/gro860/labs/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) |
 | [drone_ppo_learn_to_fly](learn/teaching/courses/gro860/labs/drone_ppo_learn_to_fly.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/drone_ppo_learn_to_fly.ipynb) |
-| [pendulum_dp_vs_ppo](learn/teaching/courses/gro860/labs/pendulum_dp_vs_ppo.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/pendulum_dp_vs_ppo.ipynb) |
 
 ### Tooling
 
