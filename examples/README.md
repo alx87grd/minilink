@@ -84,6 +84,17 @@ folders on GitHub, then open a notebook badge.
 | [mpc](learn/teaching/topics/mpc.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/topics/mpc.ipynb) |
 | [articulated_robot_eom](learn/teaching/topics/articulated_robot_eom.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/topics/articulated_robot_eom.ipynb) |
 
+### Courses — GRO860
+
+Syllabus labs (not smoked by CI — DP grids and PPO training are too long). Details: [`learn/teaching/courses/gro860/`](learn/teaching/courses/gro860/).
+
+| Notebook | Colab |
+| --- | --- |
+| [cost_function_pendulum](learn/teaching/courses/gro860/labs/cost_function_pendulum.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/cost_function_pendulum.ipynb) |
+| [lqr_vs_vi_pendulum](learn/teaching/courses/gro860/labs/lqr_vs_vi_pendulum.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/lqr_vs_vi_pendulum.ipynb) |
+| [drone_ppo_learn_to_fly](learn/teaching/courses/gro860/labs/drone_ppo_learn_to_fly.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/drone_ppo_learn_to_fly.ipynb) |
+| [pendulum_dp_vs_ppo](learn/teaching/courses/gro860/labs/pendulum_dp_vs_ppo.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/courses/gro860/labs/pendulum_dp_vs_ppo.ipynb) |
+
 ### Tooling
 
 | Notebook | Colab |

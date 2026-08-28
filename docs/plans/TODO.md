@@ -95,7 +95,7 @@ One-line ideas land here; multi-step designs get their own plan doc and a link b
 - [ ] Scene params / `J(z, p)` bind (moving obstacles, terrain SDFs without JIT rebuild) — [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
 - [ ] `SolverFactory` — unify SciPy / Ipopt / CasADi wiring for trajopt and MPC — [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md)
 - [ ] `MjxPlant` under `interfaces/mjx.py` (`minilink[mjx]`); prefer deprecate hand-rolled contact in `dynamics/engines/`
-- [ ] Gymnasium / RL bridges; Pacejka; stochastic forcing; neural MLP
+- [ ] Pacejka; stochastic forcing; neural MLP
 - [ ] ROS2 / FMI; sparse long-horizon trajopt; parametric `core/` Shape/Set/Cost call-time overrides; trajectory post-filter; RRT-Connect / informed sampling
 - [ ] **Shared RNEA serial-chain stack** (not copy-paste per 6-DoF arm): extract DH + spatial RNEA helpers (or a thin `SerialRneaManipulator` base) so catalog plants only supply `a`/`d`/`alpha`, mass/COM/inertia; keep public `H`/`C`/`g` on the mechanical API
 - [ ] **ABA on other RNEA arms** (pattern from UR5): keep public `H` / `C` / `g` for teaching; use Articulated-Body Algorithm for `forward_dynamics` / `f` so integration does not form \(H\) each step. UR5 catalog plant done; generalize when adding the next spatial manipulator

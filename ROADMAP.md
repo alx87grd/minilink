@@ -52,7 +52,7 @@ release process by themselves.
 | Blocks | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | MLP later. |
 | Estimation | 1 | Placeholder. | Luenberger, Kalman (priority 2). |
 | Identification | 2 | Parametric-tier prototype only. | `fitting.py` (priority 2). |
-| Interfaces | 1 | Placeholder. | Gymnasium later; MJX leaf later. |
+| Interfaces | 3 | `Sys2Gym` + `SB3Controller` (`minilink[rl]`). | MJX leaf later. |
 | Quarantine (symbolic, hand-rolled contact) | 1 | Experimental; not teaching path. | Keep isolated; prefer MJX leaf later. |
 | External multibody leaf (MJX) | 0 | Not started. | Spike later (`interfaces/mjx.py`). |
 | Pyro 2.0 overall | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Teaching release via §3–§4; detail in gap doc. |

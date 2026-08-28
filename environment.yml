@@ -45,6 +45,9 @@ dependencies:
   - ipopt             # native solver library
   - cyipopt           # `from cyipopt import minimize_ipopt`
 
+  # --- optional: rl ([rl]) ---
+  - gymnasium
+
   # --- dev ([dev] + docs) ---
   - pytest
   - ruff

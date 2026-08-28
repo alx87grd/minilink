@@ -167,7 +167,7 @@ state-feedback block):
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
-| `interfaces/` | gymnasium, cosimulation, external-model wrappers (planned) |
+| `interfaces/` | `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
 
 **Quarantine** — experimental (TRL < 3); nothing may import these:
 

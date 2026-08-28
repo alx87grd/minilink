@@ -290,12 +290,12 @@ conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activat
 Optional features (included in `environment.yml`; install separately for minimal envs):
 
 ```bash
-conda install -c conda-forge jax jaxlib meshcat-python pygame plotly sympy ipopt cyipopt
+conda install -c conda-forge jax jaxlib meshcat-python pygame plotly sympy ipopt cyipopt gymnasium
 ```
 
 Alternatively, a plain editable install works in any Python 3.10+ environment
 (`pip install -e ".[dev]"`, with extras `.[jax]`, `.[symbolic]`,
-`.[visualization]`, `.[plotting]`, `.[ipopt]`).
+`.[visualization]`, `.[plotting]`, `.[ipopt]`, `.[rl]`).
 
 Graphviz is used by `plot_diagram()` for diagram topology rendering; it is not
 required for writing model equations.
