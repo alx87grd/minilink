@@ -5,11 +5,9 @@ declares its feedback pattern (measurement / ref / control ports) as class
 metadata usable by any `System`; memoryless laws additionally subclass
 `StaticController` and implement the pure-array `control_law(y, r, t, params)`.
 `@` composition reads the declaration instead of guessing. Static-map plotting
-gets one engine and two facades: generic `plot_input_output_map` (any static
-block sweeps its own input port) and `plot_control_law()` (controller teaching
-shortcut — regulation slices over the controller's own measurement/reference
-ports, **no plant argument**). Overlaying a control map on a plant phase plane
-is a separate optional tool for later, not part of the controller API.
+gets one engine and two facades: generic `plot_input_output_map` (sweep a
+block's own input port) and `ctl.plot_control_law()` (sweep the plant state
+space) — analogous to phase-plane plots for `f`.
 
 Status: **Draft — awaiting architectural review** (DESIGN §4 contract change).
 
@@ -52,7 +50,7 @@ def control_law(self, y, r, t=0, params=None):
   class are deliberately decoupled.
 - **NN / RL policies** (`SB3Controller`, future learned laws): declare
   `measurement_port="y"`, wrap `predict` in `control_law` →
-  `plot_control_law` over the policy input port, no plant.
+  `plot_control_law` free.
 - **JAX**: `(y, r, t, params)` with `xp = array_module(y)` traces like `f` —
   no object state in the hot path.
 - **Regulation shortcut** (Pyro `cbar`): `regulation_action(y, t=0)` =
@@ -109,7 +107,7 @@ class StaticController(System):
     def regulation_action(self, y, t=0, params=None):
         return self.control_law(y, self.rbar, t, params)
 
-    def plot_control_law(self, **kwargs):   # lazy graphical import; no sys=
+    def plot_control_law(self, sys=None, **kwargs):   # lazy graphical import
 ```
 
 Port-bundle order `(r, y)` is **internal** — diagrams wire by port name, so
@@ -188,149 +186,95 @@ behavior-preserving, gated by full `pytest` in Phase C (matmul tests in
 `test_core.py`, SMC loop in `test_simulation.py`, lookup matmul in
 `test_planning.py`).
 
-## 3. Static-map plotting: one engine, two facades (controller-local)
+## 3. Static-map plotting: one engine, two facades
 
-**Design rule:** a controller plots **its own input–output map**. It never
-takes a plant (`sys=`). The plant appears only when wiring a closed loop
-(`ctl @ plant`); plotting stays in the coordinates the law actually sees.
+Two standard plots that differ in **what space you sweep**, sharing one
+evaluation/render engine:
 
-Build order:
+- **`plot_input_output_map`** — sweep the **block's own input port**. Generic,
+  no feedback semantics: `Saturation` curve, `Relay` step, `Gain`,
+  `NeuralNetwork` response surface, a PID's `e → u` slice.
+- **`plot_control_law`** — sweep the **plant's state space**. The measurement
+  is *derived* at each mesh node from the declared contract (`x` directly,
+  `h(x)`, or `[q; dq]` stacking), `r` pinned at `rbar`; axes labeled with plant
+  state labels. The pedagogically meaningful view next to a cost-to-go plot.
 
-1. **Core** — `plot_input_output_map` on any static `System` (generic IO slice).
-2. **Teaching shortcut** — `plot_control_law` on controller blocks (regulation
-   defaults, feedback vocabulary, same engine).
-3. **Later (optional)** — standalone helper to overlay a control map on a
-   plant phase plane (needs `h(x)` / plant labels); not a controller method.
+A controller *can* use the generic tool (sweep its `y` port, pin `r`) — that
+plots the law in measurement coordinates; only `plot_control_law` gives the
+law over the plant phase plane. Two names, one implementation — the axis
+semantics flip and the argument sets barely overlap, and a `Saturation` block
+should never see feedback vocabulary in its plotting API (selector-orchestrator
+style).
 
 ```mermaid
 flowchart TB
   subgraph engine [Shared engine — graphical/port_map.py]
-    mesh["mesh: pick 1–2 axes, pin the rest at nominal"]
-    eval["evaluate output port / control_law per node"]
-    render["1D curve / 2D heatmap → PlotResult"]
+    mesh["mesh over 1 or 2 swept dims, others pinned at nominal"]
+    eval["evaluate block output port per node"]
+    render["render: 1D curve / 2D heatmap, PlotResult"]
   end
-  subgraph facades [Facades — build in this order]
-    iomap["System.plot_input_output_map — generic static block"]
-    ctllaw["plot_control_law — controller teaching shortcut"]
-  end
-  subgraph later [Later — not Phase D]
-    overlay["optional: control map over plant phase plane"]
+  subgraph facades [Two thin facades]
+    iomap["System.plot_input_output_map(u_port, y_port, ...) — sweep block input"]
+    ctllaw["StaticController.plot_control_law(sys, ...) — sweep plant state, build y from declaration"]
   end
   iomap --> engine
   ctllaw --> engine
-  overlay -.-> engine
 ```
 
-### 3.1 Engine — `graphical/port_map.py`
+**Engine** — new `minilink/graphical/port_map.py` mirroring
+[phase_plane](../../minilink/graphical/phase_plane/phase_plane.py)
+(spec dataclass → `evaluate_port_map` builder → matplotlib render →
+`PlotResult`). Handles 1-D swept input → line plot, 2-D → heatmap,
+higher-dim → pick `x_axis`/`y_axis`, pin the rest at the port's
+`nominal_value`.
 
-Mirror [phase_plane](../../minilink/graphical/phase_plane/phase_plane.py):
-spec dataclass → mesh builder → evaluate → matplotlib render →
-[PlotResult](../../minilink/graphical/common/plot_result.py).
-
-- 1-D swept axis → line plot; 2-D → heatmap; higher-D → pick `x_axis` /
-  `y_axis`, pin remaining coordinates.
-- Bounds from explicit `bounds=` or port `nominal_value` ± range /
-  `lower_bound` / `upper_bound`.
-- Labels from port `labels` / `units`.
-- Reject blocks with internal state (`DynamicSystem` with `n > 0`) for the
-  static IO path unless a future dynamic slice API pins controller state
-  (§5).
-
-Implementation lives in `graphical/port_map.py` as module functions; facades
-delegate lazily (repo rule: no `graphical/` import at controller import time).
+**Generic facade** on `System` (any block whose output port is static — no
+state dependency; error otherwise):
 
 ```python
-# graphical/port_map.py (module-level — usable without control/ import)
-def plot_input_output_map(block, *, in_port=None, out_port=None, ...)
-def plot_control_law(block, *, x_axis=0, y_axis=None, ...)
-```
-
-### 3.2 Core facade — `System.plot_input_output_map`
-
-Generic static IO map. No feedback semantics.
-
-```python
-def plot_input_output_map(self, in_port=None, out_port=None, *, x_axis=0,
+def plot_input_output_map(self, u_port=None, y_port=None, *, x_axis=0,
                           y_axis=None, out_axis=0, bounds=None,
                           grid_shape=(101, 101), show=True) -> PlotResult
 ```
 
-Defaults: first input port → first output port. Sweeps components of the
-**input port vector**; pins other input components at `nominal_value`.
+Defaults: first input port → first output port; bounds from `bounds=` or the
+port nominal ± range.
 
-Examples: `Saturation` curve, `Relay` step, `Gain` line,
-`NeuralNetwork` response surface.
-
-Eligibility: static `System` only (no diagram state in the output compute path).
-`DynamicSystem` raises with a clear message pointing to §5 for dynamic slices.
-
-### 3.3 Teaching shortcut — `plot_control_law`
-
-Controller-specific wrapper over the **same engine**. Sweeps the controller's
-**measurement port** (name from `measurement_port`, usually `y` or `x`); pins
-**reference** at `rbar` (`ref_port.nominal_value`) unless `r=` is passed.
+**Feedback facade** on `StaticController` (Level 2; requires the declaration;
+duck-typed module call for lookup/NN blocks):
 
 ```python
-def plot_control_law(self, *, x_axis=0, y_axis=None, u_axis=0,
-                     r=None, t=0.0, bounds=None,
+def plot_control_law(self, sys=None, *, x_axis=0, y_axis=1, u_axis=0,
+                     x_ref=None, r=None, t=0.0, bounds=None,
                      grid_shape=(101, 101), show=True) -> PlotResult
 ```
 
-**No `sys` argument.** Axis indices refer to the measurement port vector. When
-`ref_port is None` (lookup, RL), sweep the sole input port (`x`).
+- Mesh over **plant state axes**; other states pinned to `x_ref` (default plant
+  nominal — Pyro's `xbar`).
+- Measurement built from the declaration: `x` → mesh state; `y` →
+  `sys.h(x, u_nom, t)`; `y` dim `2n` → `[q; dq]`; `q` → position slice.
+- Each node: `regulation_action(y, t)` (or `control_law(y, r, t)` when `r=`
+  given), extract `u[u_axis]`; color limits from plant input bounds.
+- `sys=None` degrades gracefully into the generic measurement-coordinate sweep
+  (Pyro fallback bounds).
 
-At each mesh node:
-
-1. Build measurement vector `y` (or `x`) from swept/pinned coordinates.
-2. `u = regulation_action(y, t)` if `r is None`, else `control_law(y, r, t)`.
-3. Plot `u[u_axis]` (scalar heatmap/curve).
-
-Available on:
-
-- `StaticController` subclasses (method delegates to `port_map.plot_control_law`).
-- Duck-typed blocks with `control_law` + Level-1 attrs (`LookupTableController`
-  in `planning/` — thin method, no `control/` import).
-
-**Why a separate name from `plot_input_output_map`?** Same engine, but
-controllers merit a one-liner teaching API: regulation default, measurement-port
-semantics, `u` output, no need to name ports. A `Saturation` block should never
-see `plot_control_law` (selector-orchestrator split).
-
-### 3.4 Demo payoff — [vi_pendulum_lqr.py](../../examples/demos/planning/value_iteration/vi_pendulum_lqr.py)
-
-The manual `lqr_law` array already sweeps LQR's **`x` port** with `r` fixed at
-`UPRIGHT` — no plant object involved.
+Demo payoff in
+[vi_pendulum_lqr.py](../../examples/demos/planning/value_iteration/vi_pendulum_lqr.py):
 
 ```python
 # before: manual array bypassing the block
 K = lqr.params["K"][0]; ubar = lqr.params["ubar"][0]
 lqr_law = ubar - (grid.states - UPRIGHT) @ K
-plotting.plot_value(grid, lqr_law, title="LQR control law", ...)
+plotting.plot_value(grid, lqr_law, ...)
 
-# after — controller-local, same slice
-lqr.plot_control_law(x_axis=0, y_axis=1)   # r pinned at rbar = UPRIGHT
-planner.get_controller().plot_control_law(x_axis=0, y_axis=1)   # VI lookup, same API
+# after
+lqr.plot_control_law(sys=plant, x_axis=0, y_axis=1)
+planner.get_controller().plot_control_law(sys=plant)   # dense VI law, same API
 ```
 
 `PolicyEvaluator` cost-to-go stays on `plotting.plot_value` (that's `J`, not
-the law). Replaces the hand-rolled `lqr_policy` def:
+the law). Also replaces the hand-rolled `lqr_policy` def:
 `PolicyEvaluator(..., policy=lqr.regulation_action)`.
-
-Side-by-side in the demo: `planner.plot_cost2go()` (value) +
-`lqr.plot_control_law()` (law) — parallel teaching views, no shared `sys=`.
-
-### 3.5 Later — plant phase-plane overlay (out of Phase D scope)
-
-Optional standalone utility (not on the controller), e.g. in `graphical/port_map.py`:
-
-```python
-def plot_control_on_plant_phase_plane(controller, plant, *, ...)
-```
-
-Would mesh plant state, build `y` via `h(x)` when needed, evaluate the law,
-and optionally underlay `plant.plot_phase_plane` vector field. Nice for
-teaching when measurement ≠ state, but **not required** for the core contract.
-Ship only if a demo clearly needs it after Phase D.
 
 ## 4. Phases + gates (each behavior-preserving)
 
@@ -339,9 +283,8 @@ Ship only if a demo clearly needs it after Phase D.
 | A | Base class + migrate `output.py`, `state.py`, `impedance.py` | new equivalence tests (`ctl` bundle == `control_law` direct); `pytest tests/unittest/test_core.py test_simulation.py` |
 | B | `robotic.py`, `modelbased.py`; Level-1 attrs on lookup + MPC | `pytest tests/unittest/test_planning.py` + robotic demos smoke |
 | C | Composition reads declaration (fallback kept) | **full `pytest`** — zero behavior change allowed |
-| D | `graphical/port_map.py` engine + `plot_input_output_map` (core) + `plot_control_law` (controller shortcut); facades on `System` / `StaticController` | Agg smoke: LQR, lookup, impedance, `Saturation`, `NeuralNetwork`; run `vi_pendulum_lqr.py`, `vi_pendulum_swingup.py` |
+| D | `graphical/port_map.py` engine + both facades (`plot_input_output_map`, `plot_control_law`) | Agg smoke: LQR, lookup, impedance, `Saturation`, `NeuralNetwork`; run `vi_pendulum_lqr.py`, `vi_pendulum_swingup.py` |
 | E | Demo migration + DESIGN §feedback-profiles rewrite + pyro-port row (`StaticController.plot_control_law` → Done) | `ruff check .`, `ruff format --check .` |
-| F | `DynamicController` + dynamic `plot_control_law` slices (`x_ctrl` axes); optional `plot_control_on_plant_phase_plane` | extend `FilteredController` smoke; dynamic axis pin tests |
 
 **Risk inventory**
 
@@ -357,38 +300,184 @@ Ship only if a demo clearly needs it after Phase D.
 - DESIGN §4 contract change → `TODO: User Architectural Review` marker until
   maintainer sign-off on the migrated files.
 
-## 5. Dynamic controllers (Phase F — after static plotting lands)
+---
 
-Same Level-1 port metadata. New base sibling:
+## Appendix: architectural review discussion (Aug 2026)
+
+Synthesis of a review pass on this plan against the current library (pre-
+implementation on `dev-alex`). **The sections above are the original Fable
+design and are unchanged.** This appendix records agreed refinements, open
+issues, and implementation priorities from discussion — treat it as addendum
+for sign-off, not a rewrite of §0–§4.
+
+### A.1 Review verdict on the original plan
+
+The core contract is sound and matches the codebase:
+
+- **`(y, r) → u`** is the right minimal signature (covers P, LQR/state feedback,
+  impedance, model-based laws; error is computed inside the law).
+- **Two-level split** (Level-1 port metadata on any controller; Level-2
+  `StaticController` + `control_law` for memoryless laws) respects the
+  dependency law (`planning/` must not import `control/`).
+- **`@` composition** declaration-first with heuristic fallback is the right
+  migration (Phase C full-`pytest` gate).
+- **Phased rollout** A–E is behavior-preserving and proportionate.
+
+At review time nothing in §1–§2 was implemented yet (`control/controller.py`,
+`graphical/port_map.py`, and `measurement_port` attrs still absent). The
+pendulum demo [vi_pendulum_lqr.py](../../examples/demos/planning/value_iteration/vi_pendulum_lqr.py)
+already hand-rolls the law slice the plan targets.
+
+**Terminology:** “control law” plotting (\(u = c(\cdot)\)) is distinct from
+cost-to-go \(J(x)\) (`plotting.plot_value`) and from training rollout loss
+(demo-local `rollout_loss` in autotuning / neural demos — out of scope here).
+
+### A.2 Issues and gaps in the original draft (for implementers)
+
+| Topic | Original plan | Review note |
+| --- | --- | --- |
+| `plot_control_law(sys=plant, …)` | §3 sweeps **plant state**, builds `y` via `h(x)` | See **A.3** — revised priority: controller-local first |
+| `StateFeedbackController` bundle order | Standardize `(r, y)` in base `ctl` | Today `dependencies=("x", "r")` — order flips on migration; wiring by port name unchanged; full pytest must catch leaks |
+| `LookupTableController` plotting | Duck-typed on `StaticController` | Needs **module-level** `port_map.plot_control_law(block, …)` so `planning/` need not import `control/` |
+| Dynamic controllers | Mentioned in §0 future-proofing only | See **A.4** — needs explicit Phase F |
+| `FilteredController` / integral impedance | Level-1 attrs only | Specify attrs: `measurement_port="y"`, `ref_port="r"`, `control_port="u"` |
+| Multi-ref (`TaskKinematicNullspace` `r_null`) | Not covered | **Out of scope** for single `ref_port`; custom wiring unchanged |
+| Embedded-model plot + `sys=` | Controller calls plant `h(x)` | Avoid on controller API — embedded model stays in `control_law` math, not plot coordinates |
+| Hybrid path | §2 mentions `default_computer_boundary_ports` | Include in Phase C file list with `hybrid_composition.py` |
+| `feedback_profile` vs ports | Both kept | Guard against drift (profile should match declaration) |
+
+### A.3 Plotting — agreed refinement (amends §3 intent for Phase D)
+
+**Design rule:** a controller plots **its own input–output map**. It should
+**not** take a plant (`sys=`). The plant appears only when wiring (`ctl @
+plant`); plotting stays in coordinates the law actually sees.
+
+**Build order for Phase D:**
+
+1. **Core tool** — `plot_input_output_map` on any static `System` (generic IO
+   slice: sweep input port components, pin at nominal, plot output port).
+   Examples: `Saturation`, `Gain`, `NeuralNetwork`.
+2. **Teaching shortcut** — `plot_control_law` on controller blocks (same
+   engine): sweep **measurement port** (`x` or `y` from declaration), pin `r`
+   at `rbar` by default, evaluate `regulation_action(y)` → plot `u`. One-liner
+   for regulation slices without naming ports.
+3. **Later (optional)** — standalone
+   `plot_control_on_plant_phase_plane(controller, plant, …)` to overlay a
+   control map on a plant phase plane (needs `h(x)`, plant labels). **Not** a
+   controller method; ship only if a demo clearly needs it after Phase D.
+
+**Revised API sketch (supersedes §3 `sys=` facade for implementation):**
+
+```python
+# Core — any static block
+System.plot_input_output_map(in_port=None, out_port=None, x_axis=0, y_axis=None, ...)
+
+# Controller teaching shortcut — no sys=
+StaticController.plot_control_law(x_axis=0, y_axis=None, u_axis=0, r=None, ...)
+
+# Module-level (for LookupTableController in planning/)
+graphical.port_map.plot_control_law(block, ...)
+```
+
+**Demo payoff (same picture as manual `lqr_law`, no plant):**
+
+```python
+lqr.plot_control_law(x_axis=0, y_axis=1)   # r pinned at rbar = UPRIGHT
+planner.get_controller().plot_control_law(x_axis=0, y_axis=1)
+```
+
+The original §3 `sys=plant` path remains a valid **optional overlay tool** (item
+3 above), not the primary controller API.
+
+**Why two names?** Same engine; selector-orchestrator split — generic blocks
+must not see feedback vocabulary; controllers merit regulation defaults.
+
+### A.4 Dynamic controllers — agreed extension (new Phase F)
+
+Original §0 sketches `DynamicController.c(z, y, r, t)` with state prepended;
+Phase 1 correctly excludes migration of `FilteredController` and
+`ImpedanceIntegralController`.
+
+**Law contract (Phase F):**
 
 ```python
 class DynamicController(DynamicSystem):
     def control_law(self, x, y, r, t=0, params=None):
         """u = c(x, y, r, t).   x: (n_ctrl,) internal state."""
-
-    def ctl(self, x, u, t=0, params=None):
-        r, y = ...   # same bundle unpack as StaticController
-        return self.control_law(x, y, r, t, params)
 ```
 
 `f(x, u, t)` stays explicit (anti-windup, filter dynamics — not derived from
 `control_law` alone).
 
-**Plotting — same API, wider workspace, still no plant:**
+**Plotting dynamic laws — still no plant:**
 
-Plot workspace `z = [x_ctrl ; measurement]` (reference pinned at `rbar` by
-default, same as static). `x_axis` / `y_axis` index into `z`:
+Instantaneous map is \(u = c(x_{\text{ctrl}}, y, r)\). Plot workspace:
 
-- Default regulation slice: sweep measurement port, pin `x_ctrl = x0` (often
-  zeros → “no integral / filter memory”).
-- Teaching slices: e.g. measurement vs `e_int` for PID windup.
-
-Examples:
-
-```python
-pid.plot_control_law(x_axis=0, y_axis=1)              # sweep y, ctrl pinned at x0
-pid.plot_control_law(x_axis=0, y_axis=pid.n + 0)      # y[0] vs e_int (axis into x_ctrl)
+```text
+z = [ x_ctrl ; measurement ]     (r pinned at rbar by default)
 ```
 
-Migrate: `FilteredController`, `ImpedanceIntegralController`. Still no `sys=`.
-Optional plant phase-plane overlay (§3.5) remains a separate tool if added.
+- **Default regulation slice:** sweep measurement port, pin `x_ctrl = x0`
+  (often zeros → “no integral / filter memory”) — PD-like view of a PID.
+- **Teaching slices:** pick any two components of `z`, e.g. measurement vs
+  `e_int` for windup (`FilteredController`), or `[pos, rate]` vs `e_int`
+  (`ImpedanceIntegralController`).
+
+```python
+pid.plot_control_law(x_axis=0, y_axis=1)           # sweep y, ctrl pinned at x0
+pid.plot_control_law(x_axis=0, y_axis=pid.n + 0)   # y[0] vs e_int
+```
+
+Do **not** append internal state to “measurement” as a separate concept — both
+live in one pin-able workspace `z`; measurement is a named segment, not merged
+into the `y` vector.
+
+**PID mapping:**
+
+| Block | Static / dynamic | Phase |
+| --- | --- | --- |
+| `ProportionalController` | Static → `StaticController` | A |
+| `ImpedanceController` (PD) | Static → `StaticController` | A |
+| `FilteredController` (full PID) | Dynamic → Level-1 attrs now, `DynamicController` in F | B attrs / F migrate |
+| `ImpedanceIntegralController` | Dynamic → same | B attrs / F migrate |
+| MPC | Level-1 only; no `control_law` or static plot | B |
+
+### A.5 Suggested phase table addendum
+
+| Phase | Addendum content |
+| --- | --- |
+| D | Implement **controller-local** facades (A.3 items 1–2); defer plant overlay (item 3) |
+| F | `DynamicController` + dynamic `plot_control_law` over `z = [x_ctrl; measurement]` |
+| F (optional) | `plot_control_on_plant_phase_plane` if teaching demo requires it |
+
+### A.6 Big-picture pattern (discussion summary)
+
+```mermaid
+flowchart TB
+  subgraph L1 [Level 1 — any controller]
+    meta["measurement_port / ref_port / control_port"]
+  end
+  subgraph L2 [Level 2 — StaticController]
+    staticLaw["control_law(y, r, t)"]
+  end
+  subgraph L3 [Level 3 — DynamicController Phase F]
+    dynLaw["control_law(x, y, r, t)"]
+  end
+  subgraph tools [Plotting — no plant on controller]
+    iomap["plot_input_output_map — generic static IO"]
+    ctllaw["plot_control_law — controller shortcut"]
+    overlay["optional plant phase-plane overlay"]
+  end
+  meta --> matmul["@ composition"]
+  staticLaw --> ctllaw
+  dynLaw --> ctllaw
+  iomap --> engine["graphical/port_map.py"]
+  ctllaw --> engine
+  overlay -.-> engine
+```
+
+**One sentence:** declare feedback ports for wiring; put static math in
+`control_law(y, r, t)` and dynamic math in `control_law(x, y, r, t)`; plot
+slices of the controller's own IO map — plant coupling is composition, not
+plotting.
+
