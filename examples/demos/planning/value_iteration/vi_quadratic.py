@@ -1,13 +1,3 @@
-"""Double integrator — quadratic regulator by value iteration.
-
-Run from the repo root::
-
-    python examples/demos/planning/value_iteration/vi_quadratic.py
-
-Mirrors pyro's float-mass DP demo: discretize, solve the Bellman equation,
-close the loop with a lookup-table controller.
-"""
-
 import numpy as np
 
 from minilink.core.costs import QuadraticCost
@@ -41,6 +31,7 @@ planner = DynamicProgrammingPlanner(
 )
 planner.solve()
 planner.clean_infeasible_set()
+planner.plot_cost2go(jmax=INF, show_3d=True)
 
 controller = planner.get_controller()
 diagram = controller @ plant
@@ -51,8 +42,8 @@ diagram.plot_diagram()
 trajectory = diagram.compute_trajectory(tf=20.0)
 diagram.plot_trajectory(trajectory)
 
-planner.plot_cost2go(jmax=INF, show_3d=True)
+
 planner.plot_policy(trajectory=trajectory)
-# diagram.animate()
+diagram.animate()
 
 print("final state:", np.round(trajectory.x[:, -1], 3))
