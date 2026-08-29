@@ -9,6 +9,7 @@ from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
 )
+from minilink.planning.policy_synthesis.policy_eval import PolicyEvaluator
 from minilink.planning.problems import PlanningProblem
 
 INF = 500.0
@@ -43,9 +44,23 @@ lqr_plant.state.upper_bound = np.array([HI, HI])
 lqr_plant.inputs["u"].lower_bound = np.array([-TORQUE])
 lqr_plant.inputs["u"].upper_bound = np.array([TORQUE])
 lqr = lqr_at_operating_point(lqr_plant, UPRIGHT, Q, R)
+r_nom = lqr.inputs["r"].nominal_value
+
+
+def lqr_policy(x):
+    x = np.asarray(x, dtype=float).reshape(-1)
+    return lqr.params["ubar"] - lqr.params["K"] @ (x - r_nom)
+
+
+J_lqr = PolicyEvaluator(
+    problem, grid=grid, policy=lqr_policy, options=planner.options
+).solve()
 K = lqr.params["K"][0]
 ubar = lqr.params["ubar"][0]
 lqr_law = ubar - (grid.states - UPRIGHT) @ K
+
+planner.plot_cost2go(jmax=INF, show_3d=True)
+plotting.plot_value(grid, J_lqr, vmax=INF, title="LQR cost-to-go")
 
 planner.plot_policy()
 plotting.plot_value(
@@ -77,5 +92,7 @@ lqr_traj = lqr_diagram.compute_trajectory(tf=10.0)
 vi_diagram.plot_trajectory(vi_traj)
 lqr_diagram.plot_trajectory(lqr_traj)
 
+# print("VI  cost-to-go at x0:", round(planner.value_at(X0), 2))
+# print("LQR cost-to-go at x0:", round(float(grid.interpolate(J_lqr, X0.reshape(1, -1))[0]), 2))
 # print("VI  | final angle error:", round(abs(vi_traj.x[0, -1] - UPRIGHT[0]), 3), "rad")
 # print("LQR | final angle error:", round(abs(lqr_traj.x[0, -1] - UPRIGHT[0]), 3), "rad")
