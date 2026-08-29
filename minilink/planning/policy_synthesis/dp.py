@@ -150,14 +150,6 @@ class DynamicProgrammingResult:
     delta: float
     history: list | None = None
 
-    def controller(self, *, interpolation: str = "linear"):
-        """Return a :class:`LookupTableController` from the greedy policy."""
-        from minilink.planning.policy_synthesis.lookup_policy import (
-            LookupTableController,
-        )
-
-        return LookupTableController(self.grid, self.pi, interpolation=interpolation)
-
     def value_at(self, x) -> float:
         """Interpolate the cost-to-go at an arbitrary state ``x``."""
         return float(self.grid.interpolate(self.J, np.atleast_2d(x))[0])
@@ -246,6 +238,11 @@ class DynamicProgrammingPlanner(Planner):
         """Run exactly ``n`` backward sweeps (finite-horizon / time-varying)."""
         return self._solve(max_iterations=int(n), stop_on_tol=False)
 
+    @property
+    def result(self) -> DynamicProgrammingResult:
+        """Cost-to-go field and greedy policy from the latest solve."""
+        return self.require_policy_plan().policy
+
     def clean_infeasible_set(self, tol: float = 1.0) -> DynamicProgrammingResult:
         """
         Flag states whose cost-to-go has saturated at ``out_of_bound_cost``.
@@ -253,7 +250,7 @@ class DynamicProgrammingPlanner(Planner):
         Their value is pinned to the penalty and their policy to the action
         nearest the system's nominal input, mirroring pyro's cleanup pass.
         """
-        result = self.require_policy_plan().policy
+        result = self.result
         default_action = self.grid.nearest_action(
             self.problem.sys.get_u_from_input_ports()
         )
@@ -261,6 +258,35 @@ class DynamicProgrammingPlanner(Planner):
         result.J[infeasible] = self.options.out_of_bound_cost
         result.pi[infeasible] = default_action
         return result
+
+    def plot_cost2go(self, **kwargs):
+        from minilink.planning.policy_synthesis import plotting
+
+        return plotting.plot_cost2go(self.result, **kwargs)
+
+    def plot_policy(self, **kwargs):
+        from minilink.planning.policy_synthesis import plotting
+
+        return plotting.plot_policy(self.result, **kwargs)
+
+    def animate_cost2go(self, **kwargs):
+        from minilink.planning.policy_synthesis import plotting
+
+        return plotting.animate_cost2go(self.result, **kwargs)
+
+    def animate_policy(self, **kwargs):
+        from minilink.planning.policy_synthesis import plotting
+
+        return plotting.animate_policy(self.result, **kwargs)
+
+    def get_controller(self, **kwargs):
+        from minilink.planning.policy_synthesis import plotting
+
+        return plotting.get_controller(self.result, **kwargs)
+
+    def value_at(self, x) -> float:
+        """Interpolate the cost-to-go at the latest solve."""
+        return self.result.value_at(x)
 
     # Internal machinery
 

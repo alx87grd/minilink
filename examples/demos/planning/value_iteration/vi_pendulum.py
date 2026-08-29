@@ -72,14 +72,13 @@ def run_swingup():
             alpha=1.0, tol=0.1, max_iterations=2000, out_of_bound_cost=INF, verbose=True
         ),
     )
-    result = planner.solve().policy
+    planner.solve()
     planner.clean_infeasible_set()
 
-    plotting.plot_value(grid, result.J, vmax=INF)
-    plotting.plot_value_3d(grid, np.clip(result.J, 0.0, INF))
-    plotting.plot_policy(grid, result.pi)
+    planner.plot_cost2go(jmax=INF, show_3d=True)
+    planner.plot_policy()
 
-    controller = result.controller()
+    controller = planner.get_controller()
     diagram = DiagramSystem()
     diagram.add_subsystem(controller, "controller")
     diagram.add_subsystem(pendulum, "plant")
@@ -108,7 +107,7 @@ def run_lqr_comparison():
         grid=grid,
         options=DynamicProgrammingOptions(alpha=1.0, tol=0.1, max_iterations=2000),
     )
-    result = planner.solve().policy
+    planner.solve()
     planner.clean_infeasible_set()
 
     lqr = lqr_at_operating_point(
@@ -118,7 +117,7 @@ def run_lqr_comparison():
     ubar = lqr.params["ubar"][0]
     lqr_law = ubar - (grid.states - UPRIGHT) @ K
 
-    plotting.plot_policy(grid, result.pi)
+    planner.plot_policy()
     plotting.plot_value(
         grid, lqr_law, vmin=-TORQUE, vmax=TORQUE, cmap="bwr", title="LQR control law"
     )
@@ -133,7 +132,7 @@ def run_lqr_comparison():
         diagram.connect("controller", "u", "plant", "u")
         return diagram, diagram.compute_trajectory(tf=10.0)
 
-    vi_diagram, vi_traj = closed_loop(result.controller(), [-0.1, 0.0])
+    vi_diagram, vi_traj = closed_loop(planner.get_controller(), [-0.1, 0.0])
     lqr_diagram, lqr_traj = closed_loop(lqr, [-0.1, 0.0])
     vi_diagram.plot_trajectory(vi_traj)
     lqr_diagram.plot_trajectory(lqr_traj)

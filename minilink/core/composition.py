@@ -245,7 +245,6 @@ def closed_loop(
     control_port = wiring.control_out
     plant_input_port = wiring.plant_in
 
-    _require_input(controller, ref_port, f"controller reference port {ref_port!r}")
     _require_input(
         controller,
         measurement_port,
@@ -273,10 +272,11 @@ def closed_loop(
             f"{controller_id}:{measurement_port}",
         )
 
-    ref = controller.inputs[ref_port]
-    _add_input_port_like(diagram, ref_port, ref)
+    if ref_port in controller.inputs:
+        ref = controller.inputs[ref_port]
+        _add_input_port_like(diagram, ref_port, ref)
+        diagram.connect("input", ref_port, controller_id, ref_port)
 
-    diagram.connect("input", ref_port, controller_id, ref_port)
     if wiring.mux_id is not None:
         diagram.connect(plant_id, "q", wiring.mux_id, "in0")
         diagram.connect(plant_id, "dq", wiring.mux_id, "in1")
@@ -287,7 +287,10 @@ def closed_loop(
     diagram.connect_new_output_port(plant_id, plant_output_port, output_port)
 
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
-    diagram._composition_entry = (controller_id, ref_port)
+    if ref_port in controller.inputs:
+        diagram._composition_entry = (controller_id, ref_port)
+    else:
+        diagram._composition_entry = (controller_id, measurement_port)
     diagram._composition_output = (plant_id, plant_output_port)
 
     _propagate_animation_camera(diagram, plant)

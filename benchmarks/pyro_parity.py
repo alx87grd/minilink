@@ -22,6 +22,7 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.sets import BallSet
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.planning.policy_synthesis import plotting
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
 from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingOptions,
@@ -204,13 +205,14 @@ def run_minilink_pendulum_dp(
     t_build = time.perf_counter()
     with _quiet():
         if fast_solve:
-            result = planner.solve_steps(min(n_steps, 50)).policy
+            planner.solve_steps(min(n_steps, 50))
         else:
-            result = planner.solve().policy
+            planner.solve()
+        result = planner.result
         planner.clean_infeasible_set()
     t_solve = time.perf_counter()
 
-    controller = result.controller()
+    controller = plotting.get_controller(result)
     t_sim0 = time.perf_counter()
     traj = _minilink_closed_loop(
         problem.sys, controller, x0, tf=10.0, n_steps=10001, solver="euler"
@@ -269,11 +271,12 @@ def run_minilink_double_pendulum_dp(
     )
     t_build = time.perf_counter()
     with _quiet():
-        result = planner.solve_steps(n_steps).policy
+        planner.solve_steps(n_steps)
+        result = planner.result
         planner.clean_infeasible_set()
     t_solve = time.perf_counter()
 
-    controller = result.controller()
+    controller = plotting.get_controller(result)
     t_sim0 = time.perf_counter()
     traj = _minilink_closed_loop(
         problem.sys, controller, x0, tf=8.0, n_steps=4001, solver="euler"
