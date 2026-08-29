@@ -4,8 +4,10 @@ Design writeup for a foundational control-block contract: every controller
 declares its feedback pattern (measurement / ref / control ports) as class
 metadata usable by any `System`; memoryless laws additionally subclass
 `StaticController` and implement the pure-array `control_law(y, r, t, params)`.
-`@` composition reads the declaration instead of guessing; `ctl.plot_control_law()`
-densely samples the continuous law (analogous to phase-plane plots for `f`).
+`@` composition reads the declaration instead of guessing. Static-map plotting
+gets one engine and two facades: generic `plot_input_output_map` (sweep a
+block's own input port) and `ctl.plot_control_law()` (sweep the plant state
+space) — analogous to phase-plane plots for `f`.
 
 Status: **Draft — awaiting architectural review** (DESIGN §4 contract change).
 
@@ -69,7 +71,7 @@ flowchart TB
   end
   subgraph consumers [Consumers]
     matmul["@ composition (reads Level 1)"]
-    plotter["graphical/control_law (uses Level 2, duck-typed)"]
+    plotter["graphical/port_map (uses Level 2, duck-typed)"]
     mpc["MPC, DynamicController later (Level 1 only)"]
   end
   attrs --> static
@@ -184,25 +186,77 @@ behavior-preserving, gated by full `pytest` in Phase C (matmul tests in
 `test_core.py`, SMC loop in `test_simulation.py`, lookup matmul in
 `test_planning.py`).
 
-## 3. `ctl.plot_control_law()` — dense continuous law (not DP grid)
+## 3. Static-map plotting: one engine, two facades
 
-New `minilink/graphical/control_law.py` mirroring
+Two standard plots that differ in **what space you sweep**, sharing one
+evaluation/render engine:
+
+- **`plot_input_output_map`** — sweep the **block's own input port**. Generic,
+  no feedback semantics: `Saturation` curve, `Relay` step, `Gain`,
+  `NeuralNetwork` response surface, a PID's `e → u` slice.
+- **`plot_control_law`** — sweep the **plant's state space**. The measurement
+  is *derived* at each mesh node from the declared contract (`x` directly,
+  `h(x)`, or `[q; dq]` stacking), `r` pinned at `rbar`; axes labeled with plant
+  state labels. The pedagogically meaningful view next to a cost-to-go plot.
+
+A controller *can* use the generic tool (sweep its `y` port, pin `r`) — that
+plots the law in measurement coordinates; only `plot_control_law` gives the
+law over the plant phase plane. Two names, one implementation — the axis
+semantics flip and the argument sets barely overlap, and a `Saturation` block
+should never see feedback vocabulary in its plotting API (selector-orchestrator
+style).
+
+```mermaid
+flowchart TB
+  subgraph engine [Shared engine — graphical/port_map.py]
+    mesh["mesh over 1 or 2 swept dims, others pinned at nominal"]
+    eval["evaluate block output port per node"]
+    render["render: 1D curve / 2D heatmap, PlotResult"]
+  end
+  subgraph facades [Two thin facades]
+    iomap["System.plot_input_output_map(u_port, y_port, ...) — sweep block input"]
+    ctllaw["StaticController.plot_control_law(sys, ...) — sweep plant state, build y from declaration"]
+  end
+  iomap --> engine
+  ctllaw --> engine
+```
+
+**Engine** — new `minilink/graphical/port_map.py` mirroring
 [phase_plane](../../minilink/graphical/phase_plane/phase_plane.py)
-(spec dataclass → builder → matplotlib render → `PlotResult`):
+(spec dataclass → `evaluate_port_map` builder → matplotlib render →
+`PlotResult`). Handles 1-D swept input → line plot, 2-D → heatmap,
+higher-dim → pick `x_axis`/`y_axis`, pin the rest at the port's
+`nominal_value`.
+
+**Generic facade** on `System` (any block whose output port is static — no
+state dependency; error otherwise):
 
 ```python
-def plot_control_law(controller, sys=None, *, x_axis=0, y_axis=1, u_axis=0,
+def plot_input_output_map(self, u_port=None, y_port=None, *, x_axis=0,
+                          y_axis=None, out_axis=0, bounds=None,
+                          grid_shape=(101, 101), show=True) -> PlotResult
+```
+
+Defaults: first input port → first output port; bounds from `bounds=` or the
+port nominal ± range.
+
+**Feedback facade** on `StaticController` (Level 2; requires the declaration;
+duck-typed module call for lookup/NN blocks):
+
+```python
+def plot_control_law(self, sys=None, *, x_axis=0, y_axis=1, u_axis=0,
                      x_ref=None, r=None, t=0.0, bounds=None,
                      grid_shape=(101, 101), show=True) -> PlotResult
 ```
 
 - Mesh over **plant state axes**; other states pinned to `x_ref` (default plant
-  nominal — Pyro's `xbar`); without `sys`, Pyro fallback bounds.
+  nominal — Pyro's `xbar`).
 - Measurement built from the declaration: `x` → mesh state; `y` →
   `sys.h(x, u_nom, t)`; `y` dim `2n` → `[q; dq]`; `q` → position slice.
 - Each node: `regulation_action(y, t)` (or `control_law(y, r, t)` when `r=`
   given), extract `u[u_axis]`; color limits from plant input bounds.
-- Facade on `StaticController` (and duck-typed module call for lookup/NN blocks).
+- `sys=None` degrades gracefully into the generic measurement-coordinate sweep
+  (Pyro fallback bounds).
 
 Demo payoff in
 [vi_pendulum_lqr.py](../../examples/demos/planning/value_iteration/vi_pendulum_lqr.py):
@@ -229,7 +283,7 @@ the law). Also replaces the hand-rolled `lqr_policy` def:
 | A | Base class + migrate `output.py`, `state.py`, `impedance.py` | new equivalence tests (`ctl` bundle == `control_law` direct); `pytest tests/unittest/test_core.py test_simulation.py` |
 | B | `robotic.py`, `modelbased.py`; Level-1 attrs on lookup + MPC | `pytest tests/unittest/test_planning.py` + robotic demos smoke |
 | C | Composition reads declaration (fallback kept) | **full `pytest`** — zero behavior change allowed |
-| D | `graphical/control_law.py` + facade | Agg smoke: LQR, lookup, impedance; run `vi_pendulum_lqr.py`, `vi_pendulum_swingup.py` |
+| D | `graphical/port_map.py` engine + both facades (`plot_input_output_map`, `plot_control_law`) | Agg smoke: LQR, lookup, impedance, `Saturation`, `NeuralNetwork`; run `vi_pendulum_lqr.py`, `vi_pendulum_swingup.py` |
 | E | Demo migration + DESIGN §feedback-profiles rewrite + pyro-port row (`StaticController.plot_control_law` → Done) | `ruff check .`, `ruff format --check .` |
 
 **Risk inventory**
