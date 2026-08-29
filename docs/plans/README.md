@@ -21,6 +21,7 @@ design needs a writeup.
 | --- | --- | --- |
 | [TODO.md](TODO.md) | Operational workboard (all kinds) | Ongoing |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro 2.0 demo/tool backlog | Ongoing |
+| [control-block-contract.md](control-block-contract.md) | `StaticController` base, declared feedback ports, `@` resolution, `plot_control_law` | Draft — awaiting review |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Result families + parametric scene bind (pipeline B) | Partial — A largely landed; B open |
 | [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | Unify solver backend factory for offline + parametric MPC (IPOPT, etc.) | Draft — P1–P5 |
 | [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Draft |
