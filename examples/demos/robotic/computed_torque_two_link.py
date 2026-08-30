@@ -36,6 +36,7 @@ ref = Step(initial_value=q0, final_value=q1, step_time=STEP_TIME)
 ctl = ComputedTorqueController(arm, tracking_ref=False)
 ctl.params["Kp"] = np.array([20.0, 20.0])
 ctl.params["Kd"] = np.array([10.0, 10.0])
+ctl.plot_control_law()  # τ1 over (q0, dq0)
 
 diagram = ref >> ctl @ arm
 

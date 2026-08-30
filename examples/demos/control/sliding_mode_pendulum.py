@@ -34,6 +34,7 @@ ref = Step(
 )
 
 smc = SlidingModeController(model, lam=20.0, gain=8.0, nab=0.15)
+smc.plot_control_law()  # switching surface over (q, dq)
 
 diagram = ref >> closed_loop_qdq(smc, plant)
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.core.system import DynamicSystem, System
+from minilink.core.feedback import Controller, DynamicController
 
 
 def _as_dof_vector(value, dof: int):
@@ -16,7 +16,7 @@ def _as_dof_vector(value, dof: int):
     return arr
 
 
-class ImpedanceController(System):
+class ImpedanceController(Controller):
     """Virtual spring-damper on ``[position; rate]``.
 
     The measurement port ``y`` carries ``[pos; rate]`` (dim ``2·dof``). Reference
@@ -117,7 +117,7 @@ class ImpedanceController(System):
         return u_cmd
 
 
-class ImpedanceIntegralController(DynamicSystem):
+class ImpedanceIntegralController(DynamicController):
     """Impedance control with integral action on position error.
 
     Measurement ``y = [pos; rate]`` (dim ``2·dof``). Integrator acts on

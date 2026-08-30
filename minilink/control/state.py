@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from minilink.core.system import System
+from minilink.core.feedback import Controller
 
 
-class StateFeedbackController(System):
+class StateFeedbackController(Controller):
     """Full-state feedback ``u = ubar - K (x - r)``.
 
     Ports: the plant state ``x`` (dimension ``n``) and a reference ``r`` (also

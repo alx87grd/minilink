@@ -35,6 +35,7 @@ planner.plot_cost2go(jmax=INF, show_3d=True)
 planner.plot_policy()
 
 controller = planner.get_controller()
+controller.plot_control_law()  # interpolated law next to the discrete policy table
 diagram = controller @ plant
 diagram.name = "Minimum-time double integrator (value iteration)"
 

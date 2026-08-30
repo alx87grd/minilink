@@ -21,9 +21,15 @@ component selection for high-dim signals).
 real demos; §4 composition; §5 engine; §6 dynamic laws; §7 phases; §8
 decision record.
 
-Status: **Draft v4.2 — metadata + marker architecture, dynamic-controller
-ready** (supersedes the `StaticController` base-class drafts; see §8).
-Awaiting maintainer sign-off.
+Status: **Implemented (v4.2, Aug 2026)** — all phases (§7 A–E) landed:
+`core/feedback.py` (registry + `feedback_ports` + `Controller` /
+`DynamicController` markers), declaration-first `@`,
+`graphical/port_map.py` engine with `plot_input_output_map` /
+`plot_control_law`, `PolicyEvaluator(policy=block)`, demo + notebook
+migrations, and DESIGN §feedback-profiles rewrite. This doc is kept as the
+design record until the DESIGN section passes maintainer review
+(`TODO: User Architectural Review` marker in DESIGN.md), then it can be
+deleted per the docs/plans policy.
 
 ## 1. The declaration: metadata only, no behavior changes
 

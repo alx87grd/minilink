@@ -312,6 +312,59 @@ class TestStandardFeedback(unittest.TestCase):
         self.assertEqual(wiring.control_out, "u_ff")
 
 
+from minilink.control.state import StateFeedbackController
+from minilink.core.feedback import Controller, feedback_ports
+
+
+class TestFeedbackDeclaration(unittest.TestCase):
+    def test_profile_registry_resolves_roles(self):
+        roles = feedback_ports(ProportionalController(0.5))
+        self.assertEqual((roles.measurement, roles.ref, roles.control), ("y", "r", "u"))
+        self.assertEqual(roles.plot_space, "error")
+
+    def test_state_profile_resolves_x_measurement(self):
+        roles = feedback_ports(StateFeedbackController(np.array([[1.0, 1.0]])))
+        self.assertEqual(roles.measurement, "x")
+        self.assertEqual(roles.plot_space, "state")
+
+    def test_explicit_attrs_override_profile(self):
+        class Custom(Controller):
+            feedback_profile = "error"
+            measurement_port = "meas"
+            ref_port = None
+
+            def __init__(self):
+                super().__init__()
+                self.add_input_port("meas", dim=1)
+                self.add_output_port(
+                    "u",
+                    dim=1,
+                    function=lambda x, u, t, params=None: -u,
+                    dependencies=("meas",),
+                )
+
+        roles = feedback_ports(Custom())
+        self.assertEqual(roles.measurement, "meas")
+        self.assertIsNone(roles.ref)
+
+    def test_undeclared_or_missing_ports_return_none(self):
+        self.assertIsNone(feedback_ports(Integrator()))
+
+        class BadDeclaration(Controller):
+            feedback_profile = "error"  # but no y/u ports exist
+
+        self.assertIsNone(feedback_ports(BadDeclaration()))
+
+    def test_declared_state_feedback_wires_x(self):
+        lqr = StateFeedbackController(np.array([[1.0, 1.0]]))
+        diagram = lqr @ Pendulum()
+        self.assertEqual(diagram.connections["ctl"]["x"], ("sys", "x"))
+
+    def test_declared_mismatch_error_names_declaration(self):
+        with self.assertRaisesRegex(ValueError, "declares measurement"):
+            closed_loop(ImpedanceController(dof=3), Pendulum())
+
+
 from minilink.blocks.routing import Gain
 from minilink.core.system import System
 

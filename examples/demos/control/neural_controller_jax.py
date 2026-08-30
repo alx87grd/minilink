@@ -16,7 +16,7 @@ from minilink.blocks.routing import Mux
 from minilink.core.backends import configure_jax
 from minilink.core.diagram import DiagramSystem
 from minilink.graphical.common.environment import is_blocking_needed
-from minilink.graphical.common.matplotlib_style import DPI_FIGURE, FONT_SIZE
+from minilink.graphical.common.matplotlib_style import DPI_FIGURE
 
 configure_jax(enable_x64=True)
 
@@ -133,71 +133,50 @@ print("=" * 70)
 
 R_MIN, R_MAX = -0.5, 1.0
 Y_MIN, Y_MAX = -3.0, 3.0
-N_GRID = 100
-r_vals = jnp.linspace(R_MIN, R_MAX, N_GRID)
-y_vals = jnp.linspace(Y_MIN, Y_MAX, N_GRID)
+
+# The generic port-map tool replaces the hand-rolled jit/vmap surface sweep:
+# params= evaluates alternative weights, ax= draws side by side.
+controller.inputs["u"].labels = [r"$r$ (reference)", r"$y$ (plant output)"]
 
 
-@jax.jit
-def control_surface(r_grid, y_grid, nn_params):
-    def row(y_val):
-        def cell(r_val):
-            return controller.compute([], jnp.array([r_val, y_val]), params=nn_params)[
-                0
-            ]
-
-        return jax.vmap(cell)(r_grid)
-
-    return jax.vmap(row)(y_grid)
-
-
-def plot_control_law_heatmaps(before_params, after_params):
-    u_before = np.asarray(control_surface(r_vals, y_vals, before_params))
-    u_after = np.asarray(control_surface(r_vals, y_vals, after_params))
-    u_lim = max(
-        float(np.max(np.abs(u_before))),
-        float(np.max(np.abs(u_after))),
-        1e-6,
+def surface_max(nn_p):
+    return max(
+        abs(float(controller.compute([], np.array([r, y]), params=nn_p)[0]))
+        for r in np.linspace(R_MIN, R_MAX, 15)
+        for y in np.linspace(Y_MIN, Y_MAX, 15)
     )
 
-    fig, axes = plt.subplots(
-        1,
-        2,
-        figsize=(10.0, 4.2),
-        dpi=DPI_FIGURE,
-        sharey=True,
-        constrained_layout=True,
+
+u_lim = max(surface_max(jax.device_get(initial_params)), surface_max(learned_params))
+
+fig, axes = plt.subplots(
+    1,
+    2,
+    figsize=(10.0, 4.2),
+    dpi=DPI_FIGURE,
+    sharey=True,
+    constrained_layout=True,
+)
+for ax, nn_p, title in zip(
+    axes,
+    (jax.device_get(initial_params), learned_params),
+    ("Before training", "After training"),
+):
+    controller.plot_input_output_map(
+        x_axis=0,
+        y_axis=1,
+        bounds=((R_MIN, R_MAX), (Y_MIN, Y_MAX)),
+        params=nn_p,
+        cmap="RdBu_r",
+        vmin=-u_lim,
+        vmax=u_lim,
+        title=title,
+        ax=ax,
+        show=False,
     )
-    manager = getattr(fig.canvas, "manager", None)
-    set_window_title = getattr(manager, "set_window_title", None)
-    if callable(set_window_title):
-        set_window_title("Neural controller: u = f(r, y)")
-
-    for ax, u_map, title in zip(
-        axes,
-        (u_before, u_after),
-        ("Before training", "After training"),
-    ):
-        mesh = ax.pcolormesh(
-            np.asarray(r_vals),
-            np.asarray(y_vals),
-            u_map,
-            shading="auto",
-            cmap="RdBu_r",
-            vmin=-u_lim,
-            vmax=u_lim,
-        )
-        for r_train in np.unique(np.asarray(r_batch)):
-            ax.axvline(float(r_train), color="k", ls="--", lw=0.8, alpha=0.7)
-        ax.set_xlabel(r"$r$ (reference)", fontsize=FONT_SIZE)
-        ax.set_title(title, fontsize=FONT_SIZE)
-        fig.colorbar(mesh, ax=ax, label=r"$u$")
-
-    axes[0].set_ylabel(r"$y$ (plant output)", fontsize=FONT_SIZE)
-    plt.show(block=is_blocking_needed())
-
-
-plot_control_law_heatmaps(initial_params, nn_params)
+    for r_train in np.unique(np.asarray(r_batch)):
+        ax.axvline(float(r_train), color="k", ls="--", lw=0.8, alpha=0.7)
+plt.show(block=is_blocking_needed())
 
 
 print("\n" + "=" * 70)

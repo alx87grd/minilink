@@ -217,6 +217,19 @@ class SharedSystemFacades:
             show=show,
         )
 
+    def plot_input_output_map(self, **kwargs):
+        """
+        Convenience shortcut plotting one output component over swept inputs.
+
+        Sweeps components of one input port (line, heatmap, or
+        ``show_3d=True`` surface) with every other input pinned at its
+        nominal value. See
+        :func:`minilink.graphical.port_map.plot_input_output_map`.
+        """
+        from minilink.graphical.port_map import plot_input_output_map
+
+        return plot_input_output_map(self, **kwargs)
+
     def get_diagram(self):
         """
         Convenience shortcut returning a renderable diagram representation.

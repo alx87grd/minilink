@@ -1176,3 +1176,190 @@ class TestArrowGeometry(unittest.TestCase):
     def test_mismatched_dimensions_raise(self):
         with self.assertRaises(ValueError):
             Arrow(base=(0.0, 0.0), vector=(1.0, 0.0, 0.0))
+
+
+# Port-map plotting: plot_input_output_map + plot_control_law
+#
+# Slice-value tests: evaluate a known law through the plotting engine and
+# assert the drawn surface matches the textbook expression — the guard for
+# error-space sign conventions (e = r − y, de = vel_d − rate).
+
+from minilink.blocks.nonlinear import Saturation  # noqa: E402
+from minilink.control.impedance import ImpedanceController  # noqa: E402
+from minilink.control.modelbased import ComputedTorqueController  # noqa: E402
+from minilink.control.output import ProportionalController  # noqa: E402
+from minilink.control.siso import FilteredController  # noqa: E402
+from minilink.control.state import StateFeedbackController  # noqa: E402
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum  # noqa: E402
+from minilink.graphical import port_map  # noqa: E402
+
+
+class TestPlotInputOutputMap(unittest.TestCase):
+    def test_saturation_line_values(self):
+        sat = Saturation(-1.0, 1.0)
+        res = sat.plot_input_output_map(bounds=(-2.0, 2.0), show=False)
+        line = res.axes.lines[0]
+        np.testing.assert_allclose(
+            line.get_ydata(), np.clip(line.get_xdata(), -1.0, 1.0)
+        )
+        plt.close(res.figure)
+
+    def test_params_override_and_existing_ax(self):
+        sat = Saturation(-1.0, 1.0)
+        fig, ax = plt.subplots()
+        res = sat.plot_input_output_map(
+            bounds=(-2.0, 2.0),
+            params={"lower": -0.5, "upper": 0.5},
+            ax=ax,
+            show=False,
+        )
+        self.assertIs(res.axes, ax)
+        line = ax.lines[0]
+        np.testing.assert_allclose(
+            line.get_ydata(), np.clip(line.get_xdata(), -0.5, 0.5)
+        )
+        plt.close(fig)
+
+    def test_two_axes_heatmap(self):
+        from minilink.blocks.routing import Mux
+
+        mux = Mux(dims=(1, 1))
+        res = mux.plot_input_output_map(
+            in_port="in0", bounds=(-1.0, 1.0), grid_shape=(5, 5), show=False
+        )
+        self.assertIsNotNone(res.figure)
+        plt.close(res.figure)
+
+
+class TestPlotControlLaw(unittest.TestCase):
+    def test_error_profile_line_values(self):
+        prop = ProportionalController(K=2.0)
+        res = prop.plot_control_law(bounds=(-1.0, 1.0), show=False)
+        line = res.axes.lines[0]
+        e = line.get_xdata()
+        np.testing.assert_allclose(line.get_ydata(), 2.0 * e)
+        self.assertEqual(res.axes.get_xlabel(), "e")
+        plt.close(res.figure)
+
+    def test_state_profile_surface_values(self):
+        K = np.array([[3.0, 1.0]])
+        xbar = np.array([np.pi, 0.0])
+        ubar = np.array([0.5])
+        lqr = StateFeedbackController(K, xbar=xbar, ubar=ubar)
+        spec_bounds = ((0.0, 2 * np.pi), (-4.0, 4.0))
+        res = lqr.plot_control_law(bounds=spec_bounds, grid_shape=(5, 5), show=False)
+        mesh = res.axes.collections[0]
+        U = mesh.get_array().reshape(5, 5)
+        x0_vals = np.linspace(0.0, 2 * np.pi, 5)
+        x1_vals = np.linspace(-4.0, 4.0, 5)
+        for row, x1 in enumerate(x1_vals):
+            for col, x0 in enumerate(x0_vals):
+                x = np.array([x0, x1])
+                expected = ubar - K @ (x - xbar)
+                self.assertAlmostEqual(U[row, col], expected[0])
+        plt.close(res.figure)
+
+    def test_impedance_error_plane_values(self):
+        pd = ImpedanceController(dof=1, Kp=10.0, Kd=1.0)
+        res = pd.plot_control_law(
+            bounds=((-1.0, 1.0), (-2.0, 2.0)), grid_shape=(5, 5), show=False
+        )
+        self.assertEqual(res.axes.get_xlabel(), "e")
+        self.assertEqual(res.axes.get_ylabel(), "de")
+        U = res.axes.collections[0].get_array().reshape(5, 5)
+        e_vals = np.linspace(-1.0, 1.0, 5)
+        de_vals = np.linspace(-2.0, 2.0, 5)
+        # regulation at r = 0: pos = -e, rate = -de → u = Kp e + Kd de
+        for row, de in enumerate(de_vals):
+            for col, e in enumerate(e_vals):
+                self.assertAlmostEqual(U[row, col], 10.0 * e + 1.0 * de)
+        plt.close(res.figure)
+
+    def test_modelbased_default_axes_are_qdq(self):
+        ct = ComputedTorqueController(Pendulum())
+        res = ct.plot_control_law(grid_shape=(5, 5), show=False)
+        self.assertEqual(res.axes.get_xlabel(), "q0")
+        self.assertEqual(res.axes.get_ylabel(), "dq0")
+        plt.close(res.figure)
+
+    def test_dynamic_law_pins_internal_state_at_x0(self):
+        Kp, Ki, Kd, tau = 4.0, 1.0, 0.5, 0.1
+        pid = FilteredController(Kp=Kp, Ki=Ki, Kd=Kd, tau=tau)
+        res = pid.plot_control_law(bounds=(-1.0, 1.0), show=False)
+        line = res.axes.lines[0]
+        e = line.get_xdata()
+        # x0 = 0: e_int = 0, y_filt = 0, y = -e → dy_filt = -e / tau
+        expected = Kp * e - Kd * (-e / tau)
+        np.testing.assert_allclose(line.get_ydata(), expected)
+        plt.close(res.figure)
+
+    def test_dynamic_law_windup_slice(self):
+        Kp, Ki = 4.0, 1.0
+        pid = FilteredController(Kp=Kp, Ki=Ki, Kd=0.0)
+        res = pid.plot_control_law(
+            x_axis=0,
+            y_axis=1,
+            bounds=((-1.0, 1.0), (-2.0, 2.0)),
+            grid_shape=(5, 5),
+            show=False,
+        )
+        self.assertEqual(res.axes.get_xlabel(), "e")
+        self.assertEqual(res.axes.get_ylabel(), "e_int0")
+        U = res.axes.collections[0].get_array().reshape(5, 5)
+        e_vals = np.linspace(-1.0, 1.0, 5)
+        e_int_vals = np.linspace(-2.0, 2.0, 5)
+        for row, e_int in enumerate(e_int_vals):
+            for col, e in enumerate(e_vals):
+                self.assertAlmostEqual(U[row, col], Kp * e + Ki * e_int)
+        plt.close(res.figure)
+
+    def test_reference_pin_and_3d(self):
+        prop = ProportionalController(K=2.0)
+        res = prop.plot_control_law(r=np.array([0.5]), bounds=(-1.0, 1.0), show=False)
+        line = res.axes.lines[0]
+        np.testing.assert_allclose(line.get_ydata(), 2.0 * line.get_xdata())
+        plt.close(res.figure)
+
+        lqr = StateFeedbackController(np.array([[1.0, 1.0]]))
+        res = lqr.plot_control_law(
+            bounds=((-1.0, 1.0), (-1.0, 1.0)),
+            grid_shape=(5, 5),
+            show_3d=True,
+            show=False,
+        )
+        self.assertEqual(res.axes.name, "3d")
+        plt.close(res.figure)
+
+    def test_undeclared_block_raises_with_hint(self):
+        class Bare(System):
+            def __init__(self):
+                super().__init__()
+                self.add_input_port("v", dim=1)
+                self.add_output_port(
+                    "w",
+                    dim=1,
+                    function=lambda x, u, t, params=None: u,
+                    dependencies=("v",),
+                )
+
+        with self.assertRaisesRegex(ValueError, "feedback_profile"):
+            port_map.plot_control_law(Bare(), show=False)
+
+    def test_solver_block_without_plot_space_refuses(self):
+        class SolverLike(System):
+            measurement_port = "y"
+            ref_port = None
+            control_port = "u_ff"
+
+            def __init__(self):
+                super().__init__()
+                self.add_input_port("y", dim=1)
+                self.add_output_port(
+                    "u_ff",
+                    dim=1,
+                    function=lambda x, u, t, params=None: u,
+                    dependencies=("y",),
+                )
+
+        with self.assertRaisesRegex(ValueError, "not a static map"):
+            port_map.plot_control_law(SolverLike(), show=False)

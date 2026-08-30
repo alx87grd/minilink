@@ -332,9 +332,7 @@ def plot_value_3d(
 # Internal machinery
 
 
-def _plot_policy_field(
-    grid, pi, *, axis, axes, anchor, cmap, ax, show
-):
+def _plot_policy_field(grid, pi, *, axis, axes, anchor, cmap, ax, show):
     u_axis = grid.input_from_policy(pi)[:, axis]
     return _plot_field(
         grid,

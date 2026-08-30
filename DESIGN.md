@@ -507,18 +507,52 @@ Visualization: subsystem `"world"` geometry merges into one shared diagram
 
 ### Control feedback profiles
 
-Controllers in `control/` are grouped by **feedback profile** (module layout +
-optional class attribute `feedback_profile`, not inheritance):
+<!-- TODO: User Architectural Review — feedback-port declaration contract (v0.2 draft) -->
 
-| Profile | Module | Measurement |
-| --- | --- | --- |
-| `output` | `output.py` | `y` (static output error) |
-| `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` |
-| `state` | `state.py` | full state `x` |
-| `siso` | `siso.py` | `y` dim `n` only (decoupled loops) |
-| `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow |
-| `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants |
-| `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` |
+A controller is an ordinary `System`: explicit ports, and `ctl` as the port
+compute — `ctl` *is* the control law. The **feedback-port declaration** is
+read-only context for tools, never behavior: the class attribute
+`feedback_profile` names the law family, and
+`minilink/core/feedback.py` maps it to standard port roles
+(`PROFILE_PORTS` registry + `feedback_ports(block)` resolver). Explicit
+attrs `measurement_port` / `ref_port` / `control_port` / `plot_space`
+override the registry for nonstandard blocks (`LookupTableController`
+declares `measurement_port="x"`, `ref_port=None`; MPC declares
+`control_port="u_ff"`, no `plot_space`). Resolution is duck-typed
+(`getattr`), never `isinstance`.
+
+The declaration drives three tools:
+
+- **`@` composition** resolves the controller side from the declaration
+  first (`resolve_standard_feedback` and the hybrid
+  `default_computer_boundary_ports`); the name/dimension heuristics
+  (`y↔y`, `Mux(q, dq)`, `x↔x`) remain as fallback for undeclared blocks.
+- **`plot_control_law()`** on the `Controller` / `DynamicController`
+  marker facades (also in `core/feedback.py` — no ports, no state, no
+  behavior; static blocks subclass `Controller`, stateful ones
+  `DynamicController`). The zero-argument call sweeps the textbook slice
+  per profile (error space for error-driven laws, absolute measurement or
+  state otherwise), pinning the reference, unswept components, and any
+  internal state (`x0`) at nominal; engine in
+  `graphical/port_map.py` (module twin for third-party blocks). The
+  generic `plot_input_output_map()` lives on every `System` and needs no
+  declaration.
+- **`PolicyEvaluator(policy=block)`** adapts a declared block into
+  `u = policy(x)` (grid state on the measurement port, reference pinned).
+
+An undeclared block still simulates, compiles, and wires manually — the
+declaration only unlocks the smart tools.
+
+| Profile | Module | Measurement | `plot_control_law` sweep |
+| --- | --- | --- | --- |
+| `error` | `output.py` | `y` (error-driven, `u = c(r - y)`) | error `e = r − y` |
+| `output` | (reserved) | `y` used absolutely, `u = c(y, r)` (learned policies) | measurement, `r` pinned |
+| `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane |
+| `state` | `state.py` | full state `x` | `(x0, x1)` |
+| `siso` | `siso.py` | `y` dim `n` only (decoupled loops) | error per axis |
+| `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute |
+| `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement |
+| `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` | `(q0, dq0)` absolute |
 
 **Controller naming conventions (v0.1).** PID-style gain params keys are
 uppercase (`Kp`, `Ki`, `Kd`, `K_null`) across `impedance`, `siso`, `robotic`,

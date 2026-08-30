@@ -44,28 +44,21 @@ lqr_plant.state.upper_bound = np.array([HI, HI])
 lqr_plant.inputs["u"].lower_bound = np.array([-TORQUE])
 lqr_plant.inputs["u"].upper_bound = np.array([TORQUE])
 lqr = lqr_at_operating_point(lqr_plant, UPRIGHT, Q, R)
-r_nom = lqr.inputs["r"].nominal_value
 
-
-def lqr_policy(x):
-    x = np.asarray(x, dtype=float).reshape(-1)
-    return lqr.params["ubar"] - lqr.params["K"] @ (x - r_nom)
-
-
-J_lqr = PolicyEvaluator(
-    problem, grid=grid, policy=lqr_policy, options=planner.options
-).solve()
-K = lqr.params["K"][0]
-ubar = lqr.params["ubar"][0]
-lqr_law = ubar - (grid.states - UPRIGHT) @ K
+# The LQR block is the policy and the law: no params unpacking needed.
+J_lqr = PolicyEvaluator(problem, grid=grid, policy=lqr, options=planner.options).solve()
 
 planner.plot_cost2go(jmax=INF, show_3d=True)
 plotting.plot_value(grid, J_lqr, vmax=INF, title="LQR cost-to-go")
 
 planner.plot_policy()
-plotting.plot_value(
-    grid, lqr_law, vmin=-TORQUE, vmax=TORQUE, cmap="bwr", title="LQR control law"
+lqr.plot_control_law(
+    bounds=((LO, HI), (LO, HI)),
+    vmin=-TORQUE,
+    vmax=TORQUE,
+    title="LQR control law",
 )
+planner.get_controller().plot_control_law(title="VI control law (interpolated)")
 
 sim_vi = Pendulum()
 sim_vi.state.lower_bound = np.array([LO, LO])

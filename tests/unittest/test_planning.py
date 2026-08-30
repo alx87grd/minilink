@@ -2236,3 +2236,34 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         self.assertEqual(diagram.connections["ctl"]["x"], ("sys", "x"))
         self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
         self.assertNotIn("r", diagram.inputs)
+
+    def test_lookup_controller_plot_control_law_smoke(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        problem = make_problem()
+        planner, _ = solve(problem)
+        controller = planner.get_controller()
+        res = controller.plot_control_law(grid_shape=(9, 9), show=False)
+        self.assertIsNotNone(res.figure)
+
+    def test_policy_evaluator_accepts_declared_block(self):
+        problem = make_problem()
+        planner, result = solve(problem)
+        controller = planner.get_controller()
+        options = planner.options
+        J_callable = PolicyEvaluator(
+            problem, grid=result.grid, policy=controller.action, options=options
+        ).solve()
+        J_block = PolicyEvaluator(
+            problem, grid=result.grid, policy=controller, options=options
+        ).solve()
+        np.testing.assert_allclose(J_block, J_callable)
+
+    def test_policy_evaluator_rejects_undeclared_block(self):
+        from minilink.blocks.basic import Integrator
+
+        problem = make_problem()
+        _, result = solve(problem)
+        with self.assertRaisesRegex(ValueError, "feedback declaration"):
+            PolicyEvaluator(problem, grid=result.grid, policy=Integrator())

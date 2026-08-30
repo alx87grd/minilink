@@ -89,8 +89,9 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Catalog | `pyro/dynamic/manipulator.py` | TwoLinkManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Catalog | `pyro/dynamic/manipulator.py` | FiveLinkPlanarManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Control | `pyro/control/controller.py` | StaticController | `minilink/core/diagram.py` | DiagramSystem wiring | **Done** |  |
+| Control | `pyro/control/controller.py` | StaticController.plot_control_law | `minilink/graphical/port_map.py` | plot_control_law(), plot_input_output_map() | **Done** | Declaration-driven (`core/feedback.py`); `Controller` marker facade |
 | Control | `pyro/control/controller.py` | ClosedLoopSystem | `minilink/core/diagram.py` | `@`, `>>`, `+` composition | **Done** |  |
-| Control | `pyro/control/controller.py` | DynamicController | `minilink/core/diagram.py` | DiagramSystem | **Partial** | No separate wrapper class |
+| Control | `pyro/control/controller.py` | DynamicController | `minilink/core/feedback.py` | DynamicController marker (FilteredController, ImpedanceIntegralController) | **Done** | Marker + facade; stateful controllers stay DynamicSystem |
 | Control | `pyro/control/controller.py` | DynamicClosedLoopSystem | `minilink/core/diagram.py` | DiagramSystem | **Partial** |  |
 | Control | `pyro/control/linear.py` | ProportionalController | `minilink/control/linear.py` | PDController, ProportionalGain | **Done** |  |
 | Control | `pyro/control/linear.py` | PIDController | `minilink/control/pid.py` | PIDController | **Done** |  |

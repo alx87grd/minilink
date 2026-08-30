@@ -6,11 +6,11 @@ import numpy as np
 
 from minilink.control.impedance import _as_dof_vector
 from minilink.core.backends import array_module
-from minilink.core.system import System
+from minilink.core.feedback import Controller
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
-class ComputedTorqueController(System):
+class ComputedTorqueController(Controller):
     """Computed torque with built-in outer PD on joint space.
 
     Desired acceleration ``qdd = Kp (q_d - q) + Kd (dq_d - dq)`` (regulation
@@ -51,7 +51,12 @@ class ComputedTorqueController(System):
         }
 
         self.add_input_port("r", dim=ref_dim, nominal_value=np.zeros(ref_dim))
-        self.add_input_port("y", dim=2 * n, nominal_value=np.zeros(2 * n))
+        self.add_input_port(
+            "y",
+            dim=2 * n,
+            nominal_value=np.zeros(2 * n),
+            labels=[f"q{i}" for i in range(n)] + [f"dq{i}" for i in range(n)],
+        )
         ctl_fn = self._ctl_tracking if tracking_ref else self._ctl_regulation
         self.add_output_port(
             "u",
