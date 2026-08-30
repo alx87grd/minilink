@@ -11,7 +11,6 @@ except ImportError:
     GYMNASIUM_AVAILABLE = False
 
 from minilink.core.costs import QuadraticCost
-from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
@@ -114,15 +113,26 @@ class TestSB3Controller(unittest.TestCase):
         plant = make_bounded_pendulum()
         ctl = SB3Controller(_ConstantPolicy(n=2, m=1, value=0.2))
 
-        diagram = DiagramSystem()
-        diagram.add_subsystem(ctl, "ctl")
-        diagram.add_subsystem(plant, "plant")
-        diagram.connect("plant", "y", "ctl", "x")
-        diagram.connect("ctl", "u", "plant", "u")
+        diagram = ctl @ plant
+        self.assertEqual(diagram.connections["ctl"]["x"], ("sys", "x"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
 
         traj = diagram.compute_trajectory(tf=0.5, n_steps=51, verbose=False)
         self.assertEqual(traj.x.shape[0], 2)
         np.testing.assert_allclose(ctl.action(np.zeros(2)), [0.2])
+
+    def test_plot_control_law(self):
+        import matplotlib.pyplot as plt
+
+        from minilink.interfaces.gymnasium import SB3Controller
+
+        plant = make_bounded_pendulum()
+        ctl = SB3Controller(_ConstantPolicy(n=2, m=1, value=0.2), sys=plant)
+        res = ctl.plot_control_law(grid_shape=(5, 5), show=False)
+        mesh = res.axes.collections[0]
+        np.testing.assert_allclose(mesh.get_array(), 0.2)
+        self.assertIn(plant.state.labels[0], res.axes.get_xlabel())
+        plt.close(res.figure)
 
 
 if __name__ == "__main__":

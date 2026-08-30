@@ -19,7 +19,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from minilink.core.system import System
+from minilink.core.feedback import Controller
 
 # Public API
 
@@ -215,34 +215,68 @@ class Sys2Gym(gym.Env):
         self._animator.open_live_scene(self._render_backend, self.x, self.u, self.t)
 
 
-class SB3Controller(System):
+class SB3Controller(Controller):
     """
     State-feedback controller wrapping a trained RL policy.
 
     Wraps any model exposing ``predict(obs, deterministic=True)`` (the
     stable-baselines3 API) as a static feedback block ``u = pi(x)``, so a
     learned policy composes with a plant exactly like the other minilink
-    controllers::
+    controllers. It is a :class:`~minilink.core.feedback.Controller`, so
+    ``plot_control_law()`` draws the same textbook slice as LQR / VI::
 
-        diagram = DiagramSystem()
-        diagram.add_subsystem(ctl, "ctl")
-        diagram.add_subsystem(plant, "plant")
-        diagram.connect("plant", "y", "ctl", "x")
-        diagram.connect("ctl", "u", "plant", "u")
+        ctl = SB3Controller(model, sys=plant)
+        ctl.plot_control_law(x_axis=2, y_axis=5)
 
     The model itself is duck-typed: stable-baselines3 is not imported.
+    Pass ``sys`` to copy state/input labels, units, and bounds onto the
+    ports (sweep domain and axis names for ``plot_control_law``).
     """
 
-    def __init__(self, model, name="RL Policy Controller"):
+    # Explicit port roles: state measurement, no boundary reference.
+    measurement_port = "x"
+    ref_port = None
+    control_port = "u"
+    plot_space = "state"
+
+    def __init__(self, model, sys=None, name="RL Policy Controller"):
         super().__init__()
         self.name = name
         self.model = model
 
         n = int(model.observation_space.shape[0])
         m = int(model.action_space.shape[0])
+        x_lb, x_ub = _box_bounds(model.observation_space)
+        u_lb, u_ub = _box_bounds(model.action_space)
+        x_labels = x_units = u_labels = u_units = None
+        if sys is not None:
+            x_labels = list(sys.state.labels)
+            x_units = list(sys.state.units)
+            x_lb, x_ub = sys.state.lower_bound, sys.state.upper_bound
+            if "u" in sys.inputs:
+                u_labels = list(sys.inputs["u"].labels)
+                u_units = list(sys.inputs["u"].units)
+                u_lb = sys.inputs["u"].lower_bound
+                u_ub = sys.inputs["u"].upper_bound
 
-        self.add_input_port("x", dim=n)
-        self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x",))
+        self.add_input_port(
+            "x",
+            dim=n,
+            labels=x_labels,
+            units=x_units,
+            lower_bound=x_lb,
+            upper_bound=x_ub,
+        )
+        self.add_output_port(
+            "u",
+            dim=m,
+            function=self.ctl,
+            dependencies=("x",),
+            labels=u_labels,
+            units=u_units,
+            lower_bound=u_lb,
+            upper_bound=u_ub,
+        )
 
     def action(self, x) -> np.ndarray:
         """Return the deterministic policy action ``u`` at a single state ``x``."""
@@ -260,6 +294,15 @@ def to_gymnasium(sys, cost, **kwargs) -> Sys2Gym:
 
 
 # Internal machinery
+
+
+def _box_bounds(space):
+    """Return ``(low, high)`` from a gym ``Box``, or ``(None, None)``."""
+    low = getattr(space, "low", None)
+    high = getattr(space, "high", None)
+    if low is None or high is None:
+        return None, None
+    return np.asarray(low, dtype=float), np.asarray(high, dtype=float)
 
 
 def _state_bounds(sys):

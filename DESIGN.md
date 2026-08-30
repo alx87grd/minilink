@@ -517,8 +517,8 @@ read-only context for tools, never behavior: the class attribute
 (`PROFILE_PORTS` registry + `feedback_ports(block)` resolver). Explicit
 attrs `measurement_port` / `ref_port` / `control_port` / `plot_space`
 override the registry for nonstandard blocks (`LookupTableController`
-declares `measurement_port="x"`, `ref_port=None`; MPC declares
-`control_port="u_ff"`, no `plot_space`). Resolution is duck-typed
+and `SB3Controller` declare `measurement_port="x"`, `ref_port=None`;
+MPC declares `control_port="u_ff"`, no `plot_space`). Resolution is duck-typed
 (`getattr`), never `isinstance`.
 
 The declaration drives three tools:
