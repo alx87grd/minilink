@@ -54,4 +54,4 @@ diagram.plot_trajectory(trajectory)
 
 planner.plot_policy(trajectory=trajectory)
 diagram.camera_scale = 2.0
-# diagram.animate()
+diagram.animate()

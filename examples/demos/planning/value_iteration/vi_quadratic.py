@@ -42,8 +42,4 @@ diagram.plot_diagram()
 trajectory = diagram.compute_trajectory(tf=20.0)
 diagram.plot_trajectory(trajectory)
 
-
 planner.plot_policy(trajectory=trajectory)
-diagram.animate()
-
-print("final state:", np.round(trajectory.x[:, -1], 3))
