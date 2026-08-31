@@ -20,14 +20,20 @@ GRO860 students → **GRO860**. JAX/showcase notebooks → **Full**. Otherwise �
 
 ## Conda (recommended)
 
+**Full** (recommended — same as [README § Install](README.md#install)):
+
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda env create -f environment.yml
+conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+```
 
-# Pick one:
-conda env create -f environment-gro860.yml   # GRO860
-conda env create -f environment.yml          # Full
+**GRO860** course toolkit:
 
-conda activate minilink-gro860               # or: minilink
+```bash
+conda env create -f environment-gro860.yml
+conda activate minilink-gro860
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink-gro860
 ```
 
@@ -81,10 +87,8 @@ Expected: `OK: 2`
 - **Missing `stable_baselines3` / `torch`** — you need the **GRO860** tier for PPO notebooks.
 - **`cyipopt` / Ipopt errors** — optional; Basic/GRO860 pip omit it. Use default SciPy solvers, or `conda install -c conda-forge ipopt cyipopt` / Full conda env if you need Ipopt.
 
-Contributors: editable pip install in a Python 3.10+ env:
+Contributors — editable pip install:
 
 ```bash
 pip install -e ".[dev]"    # extras: .[jax], .[symbolic], .[visualization], .[plotting], .[ipopt], .[rl], .[docs]
 ```
-
-Dev conda env: [environment.yml](environment.yml) (see [README.md § Install](README.md#install)).

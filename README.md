@@ -10,6 +10,19 @@ Start here: [showcase](examples/learn/intro/showcase_minilink.ipynb) ·
 [examples](examples/README.md) ·
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)
 
+## Install
+
+Python 3.10+. **Recommended** — full conda environment from [`environment.yml`](environment.yml)
+(notebooks, JAX, teaching extras):
+
+```bash
+git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda env create -f environment.yml && conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+```
+
+Other tiers (Basic, GRO860), pip, and no-Graphviz options: [install.md](install.md).
+
 ## Why minilink
 
 Minilink is designed for dynamical-system models where the code reads as close
@@ -263,23 +276,9 @@ minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
 | **Stable** | `core/` (`System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, composition operators, `Trajectory`, compile facade), `simulation` (`Simulator`, `StaticSimulator`), `blocks/`, catalog teaching plants (`minilink.catalog`), basic `control/` (output, state, SISO, impedance, robotic, model-based, LQR), basic `analysis/` (linearize, modal, frequency, equilibria, discretize) |
 | **Provisional** | `planning/` (trajopt, RRT, DP, spatial), `control.mpc`, hybrid (`StepDiagramSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`), `simulation.realtime`, `optimization/`, evaluator integration-helper grid beyond the documented subset ([DESIGN.md §5](DESIGN.md#compilation-and-simulation)), `estimation/` / `identification/` / `interfaces/` placeholders, quarantine (`symbolic/`, `dynamics/engines/`) |
 
-## Install
-
-Python 3.10+. **Students and pip/conda tiers:** [install.md](install.md) (**Basic**, **Full**, **GRO860**).
-
-**Contributors:** conda dev env, then `PYTHONPATH` to the repo root:
-
-```bash
-git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda env create -f environment.yml && conda activate minilink
-conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
-```
-
-Pip editable install and optional extras: [install.md](install.md) (contributors section).
-
 ## Testing
 
-Use the **`minilink`** conda env above.
+Use the **`minilink`** conda env from [Install](#install).
 **Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points)
 (IDE: [`tests/run/run_contract_tests.py`](tests/run/run_contract_tests.py)).
 
