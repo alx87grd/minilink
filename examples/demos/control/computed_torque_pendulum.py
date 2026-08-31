@@ -29,6 +29,7 @@ ref = Step(
 ct = ComputedTorqueController(plant)
 ct.params["Kp"] = np.array([25.0])
 ct.params["Kd"] = np.array([8.0])
+ct.plot_control_law()  # τ over (q, dq)
 
 diagram = ref >> ct @ plant
 

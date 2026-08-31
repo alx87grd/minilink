@@ -32,6 +32,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
+from minilink.core.feedback import feedback_ports
 from minilink.core.system import System
 
 _VALID_FEEDBACK = frozenset({"auto", "y", "qdq"})
@@ -245,7 +246,6 @@ def closed_loop(
     control_port = wiring.control_out
     plant_input_port = wiring.plant_in
 
-    _require_input(controller, ref_port, f"controller reference port {ref_port!r}")
     _require_input(
         controller,
         measurement_port,
@@ -273,10 +273,11 @@ def closed_loop(
             f"{controller_id}:{measurement_port}",
         )
 
-    ref = controller.inputs[ref_port]
-    _add_input_port_like(diagram, ref_port, ref)
+    if ref_port in controller.inputs:
+        ref = controller.inputs[ref_port]
+        _add_input_port_like(diagram, ref_port, ref)
+        diagram.connect("input", ref_port, controller_id, ref_port)
 
-    diagram.connect("input", ref_port, controller_id, ref_port)
     if wiring.mux_id is not None:
         diagram.connect(plant_id, "q", wiring.mux_id, "in0")
         diagram.connect(plant_id, "dq", wiring.mux_id, "in1")
@@ -287,7 +288,10 @@ def closed_loop(
     diagram.connect_new_output_port(plant_id, plant_output_port, output_port)
 
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
-    diagram._composition_entry = (controller_id, ref_port)
+    if ref_port in controller.inputs:
+        diagram._composition_entry = (controller_id, ref_port)
+    else:
+        diagram._composition_entry = (controller_id, measurement_port)
     diagram._composition_output = (plant_id, plant_output_port)
 
     _propagate_animation_camera(diagram, plant)
@@ -789,6 +793,10 @@ def resolve_standard_feedback(
     """
     Choose standard feedback port names shared by ``closed_loop`` and hybrid wiring.
 
+    The controller's feedback-port declaration
+    (:func:`minilink.core.feedback.feedback_ports`) is consulted first; the
+    name/dimension heuristics below remain as fallback for undeclared blocks.
+
     Unset ``control_out`` / ``plant_in`` resolve to ``u`` (or ``u_ff`` / single port).
     Unset ``measurement_in`` / ``plant_out`` use ``feedback`` auto rules (``y``, ``qdq``, ``x``).
     """
@@ -797,7 +805,11 @@ def resolve_standard_feedback(
             f"feedback must be one of {sorted(_VALID_FEEDBACK)!r}, got {feedback!r}"
         )
 
-    resolved_control = control_out or _default_control_out(controller)
+    roles = feedback_ports(controller)
+    declared_control = roles.control if roles is not None else None
+    resolved_control = (
+        control_out or declared_control or _default_control_out(controller)
+    )
     resolved_plant_in = plant_in or _default_plant_in(plant)
 
     if measurement_in is not None and plant_out is not None:
@@ -861,6 +873,20 @@ def _resolve_feedback_path(
             )
         return _FeedbackPath("y", "y")
 
+    # auto: the controller's declaration resolves the measurement side first;
+    # the name/dimension heuristics below remain for undeclared blocks.
+    roles = feedback_ports(controller)
+    if roles is not None:
+        return _feedback_path_from_declaration(
+            controller,
+            plant,
+            diagram,
+            measurement=roles.measurement,
+            plant_output_port=plant_output_port,
+            controller_id=controller_id,
+            plant_id=plant_id,
+        )
+
     if _y_feedback_available(controller, plant):
         return _FeedbackPath("y", "y")
 
@@ -885,6 +911,56 @@ def _resolve_feedback_path(
             plant_id,
             attempted="auto",
         )
+    )
+
+
+def _feedback_path_from_declaration(
+    controller,
+    plant,
+    diagram,
+    *,
+    measurement: str,
+    plant_output_port: str,
+    controller_id: str,
+    plant_id: str,
+) -> _FeedbackPath:
+    """Wire the declared measurement port to the matching plant output.
+
+    ``measurement == "x"`` reads the plant state output; ``"y"`` (or any other
+    declared name) reads the plant ``y``, inserting a ``Mux(q, dq)`` when the
+    declared dimension is twice the plant dof.
+    """
+    dim = controller.inputs[measurement].dim
+
+    if measurement == "x":
+        if "x" in plant.outputs and plant.outputs["x"].dim == dim:
+            return _FeedbackPath("x", "x")
+        plant_x = plant.outputs["x"].dim if "x" in plant.outputs else None
+        raise ValueError(
+            f"Cannot wire closed-loop feedback: {controller_id} declares "
+            f"measurement 'x' dim {dim}, but {plant_id} 'x' output has dim "
+            f"{plant_x}"
+        )
+
+    if "y" in plant.outputs and plant.outputs["y"].dim == dim:
+        return _FeedbackPath(measurement, "y")
+
+    qdq_n = _plant_qdq_dof(plant)
+    if diagram is not None and qdq_n is not None and dim == 2 * qdq_n:
+        mux_id = _add_qdq_mux(diagram, qdq_n)
+        return _FeedbackPath(measurement, plant_output_port, mux_id)
+
+    plant_y = plant.outputs["y"].dim if "y" in plant.outputs else None
+    hint = ""
+    if qdq_n is not None:
+        hint = (
+            f"; plant exposes q/dq dof {qdq_n} — the measurement must be "
+            f"dim {2 * qdq_n} for Mux(q, dq) wiring (or pass feedback='qdq')"
+        )
+    raise ValueError(
+        f"Cannot wire closed-loop feedback: {controller_id} declares "
+        f"measurement {measurement!r} dim {dim}, but {plant_id} 'y' output "
+        f"has dim {plant_y}{hint}"
     )
 
 
@@ -924,6 +1000,9 @@ def _default_plant_in(sys) -> str:
 
 def default_computer_boundary_ports(controller) -> tuple[str, str]:
     """Return ``(measurement_in, control_out)`` for step-diagram boundary expose."""
+    roles = feedback_ports(controller)
+    if roles is not None:
+        return roles.measurement, roles.control
     if "y" in controller.inputs:
         measurement_in = "y"
     elif "x" in controller.inputs:
@@ -981,6 +1060,11 @@ def _feedback_mismatch_message(
         hint = "; try feedback='qdq'"
     elif profile == "impedance" and qdq_n is not None:
         hint = "; impedance controller may need feedback='qdq'"
+    elif profile is None:
+        hint = (
+            "; declare feedback_profile (or measurement_port / control_port) "
+            "on the controller for declaration-driven wiring"
+        )
     return (
         f"Cannot wire closed-loop feedback ({attempted!r}): "
         f"{controller_id}.y dim {ctl_y}, {plant_id}.y dim {plant_y}"

@@ -512,6 +512,7 @@ class TestPlanningArchitecture(unittest.TestCase):
 
 
 import pytest
+from minilink.planning.policy_synthesis import plotting
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
 from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingOptions,
@@ -1868,6 +1869,7 @@ from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingPlanner,
     DynamicProgrammingResult,
 )
+from minilink.planning.policy_synthesis import plotting
 from minilink.planning.policy_synthesis.policy_eval import PolicyEvaluator
 
 
@@ -1910,7 +1912,8 @@ def solve(problem, *, precompute=True, **opt_kwargs):
         alpha=0.95, tol=0.001, max_iterations=400, **opt_kwargs
     )
     planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
-    return (planner, planner.solve().policy)
+    planner.solve()
+    return (planner, planner.result)
 
 
 class TestStateSpaceGrid(unittest.TestCase):
@@ -2018,7 +2021,8 @@ class TestValueIteration(unittest.TestCase):
         problem = make_problem()
         grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(5,), dt=0.1)
         planner = DynamicProgrammingPlanner(problem, grid=grid)
-        result = planner.solve_steps(5).policy
+        planner.solve_steps(5)
+        result = planner.result
         self.assertEqual(result.iterations, 5)
 
     def test_out_of_bound_penalty_and_cleanup(self):
@@ -2052,7 +2056,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         problem = make_problem()
         planner, result = solve(problem)
         planner.clean_infeasible_set()
-        controller = result.controller()
+        controller = plotting.get_controller(result)
         plant = problem.sys
         plant.x0 = np.array([2.0, 0.0])
         diagram = DiagramSystem()
@@ -2066,7 +2070,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
     def test_policy_evaluator_matches_optimal_value(self):
         problem = make_problem()
         planner, result = solve(problem)
-        controller = result.controller()
+        controller = plotting.get_controller(result)
         evaluator = PolicyEvaluator(
             problem, grid=result.grid, policy=controller.action, options=planner.options
         )
@@ -2173,3 +2177,93 @@ class TestBackends(unittest.TestCase):
         gap = np.max(np.abs(jax_result.J[feasible] - vectorized.J[feasible]))
         self.assertLess(gap, 0.0001)
         self.assertGreater(np.mean(jax_result.pi == vectorized.pi), 0.98)
+
+
+class TestDynamicProgrammingPlotting(unittest.TestCase):
+    def test_plot_cost2go_smoke(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        _, result = solve(make_problem())
+        fig, ax = plotting.plot_cost2go(result, show=False)
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+    def test_plot_policy_smoke(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        _, result = solve(make_problem())
+        fig, ax = plotting.plot_policy(result, show=False)
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+    def test_planner_plot_delegates(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        problem = make_problem()
+        planner, _ = solve(problem)
+        fig, ax = planner.plot_cost2go(show=False)
+        self.assertIsNotNone(fig)
+        controller = planner.get_controller()
+        self.assertTrue(hasattr(controller, "action"))
+
+    def test_get_controller_smoke(self):
+        _, result = solve(make_problem())
+        controller = plotting.get_controller(result)
+        u = controller.action(result.grid.states[0])
+        self.assertEqual(u.shape, (1,))
+
+    def test_plot_policy_trajectory_overlay(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        problem = make_problem()
+        planner, result = solve(problem)
+        planner.clean_infeasible_set()
+        plant = problem.sys
+        plant.x0 = np.array([2.0, 0.0])
+        diagram = plotting.get_controller(result) @ plant
+        trajectory = diagram.compute_trajectory(tf=8.0, verbose=False)
+        _, ax = plotting.plot_policy(result, trajectory=trajectory, show=False)
+        self.assertGreaterEqual(len(ax.lines), 1)
+
+    def test_lookup_controller_matmul_wires_state_feedback(self):
+        problem = make_problem()
+        planner, _ = solve(problem)
+        diagram = planner.get_controller() @ problem.sys
+        self.assertEqual(diagram.connections["ctl"]["x"], ("sys", "x"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
+        self.assertNotIn("r", diagram.inputs)
+
+    def test_lookup_controller_plot_control_law_smoke(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        problem = make_problem()
+        planner, _ = solve(problem)
+        controller = planner.get_controller()
+        res = controller.plot_control_law(grid_shape=(9, 9), show=False)
+        self.assertIsNotNone(res.figure)
+
+    def test_policy_evaluator_accepts_declared_block(self):
+        problem = make_problem()
+        planner, result = solve(problem)
+        controller = planner.get_controller()
+        options = planner.options
+        J_callable = PolicyEvaluator(
+            problem, grid=result.grid, policy=controller.action, options=options
+        ).solve()
+        J_block = PolicyEvaluator(
+            problem, grid=result.grid, policy=controller, options=options
+        ).solve()
+        np.testing.assert_allclose(J_block, J_callable)
+
+    def test_policy_evaluator_rejects_undeclared_block(self):
+        from minilink.blocks.basic import Integrator
+
+        problem = make_problem()
+        _, result = solve(problem)
+        with self.assertRaisesRegex(ValueError, "feedback declaration"):
+            PolicyEvaluator(problem, grid=result.grid, policy=Integrator())

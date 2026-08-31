@@ -26,7 +26,6 @@ import numpy as np
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
-from minilink.planning.policy_synthesis import plotting
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
 from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingOptions,
@@ -109,7 +108,7 @@ planner = DynamicProgrammingPlanner(
     ),
 )
 t_xnext = time.perf_counter()
-result = planner.solve_steps(n_steps).policy
+planner.solve_steps(n_steps)
 planner.clean_infeasible_set()
 t_done = time.perf_counter()
 
@@ -119,34 +118,14 @@ print(f"  x_next table:     {t_xnext - t_mesh:5.2f} s  (planner init)")
 print(f"  G, J0, Bellman:   {t_done - t_xnext:5.2f} s  (each step timed above)")
 print(f"  total pipeline:   {t_done - t_plan:5.2f} s")
 
-plotting.plot_value(
-    grid,
-    result.J,
-    axes=(0, 1),
+planner.plot_cost2go(
+    jmax=INF,
+    axes=[(0, 1), (0, 2), (1, 3)],
     anchor=GOAL,
-    vmax=INF,
-    title="Cost-to-go (θ1, θ2) at goal velocities",
 )
-plotting.plot_value(
-    grid,
-    result.J,
-    axes=(0, 2),
-    anchor=GOAL,
-    vmax=INF,
-    title="Cost-to-go (θ1, dθ1) at goal θ2, dθ2",
-)
-plotting.plot_value(
-    grid,
-    result.J,
-    axes=(1, 3),
-    anchor=GOAL,
-    vmax=INF,
-    title="Cost-to-go (θ2, dθ2) at goal θ1, dθ1",
-)
-plotting.plot_policy(grid, result.pi, axis=0, axes=(0, 1), anchor=GOAL)
-plotting.plot_policy(grid, result.pi, axis=1, axes=(0, 1), anchor=GOAL)
+planner.plot_policy(axis=[0, 1], axes=[(0, 1), (0, 1)], anchor=GOAL)
 
-controller = result.controller()
+controller = planner.get_controller()
 diagram = DiagramSystem()
 diagram.add_subsystem(controller, "controller")
 diagram.add_subsystem(plant, "plant")
@@ -157,7 +136,7 @@ diagram.name = "Double pendulum swing-up (value iteration, JAX)"
 for x0 in CLOSED_LOOP_X0:
     plant.x0 = x0.copy()
     print(f"\nclosed loop from x0 = {np.round(x0, 3)}")
-    print("predicted cost-to-go:", round(result.value_at(x0), 2))
+    print("predicted cost-to-go:", round(planner.value_at(x0), 2))
     trajectory = diagram.compute_trajectory(tf=8.0, n_steps=4001, solver="euler")
     diagram.plot_trajectory(trajectory, signals=("x", "u"))
     diagram.plot_phase_plane(trajectory, x_axis=0, y_axis=2, title="(θ1, dθ1)")

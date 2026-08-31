@@ -1,11 +1,11 @@
-"""Feedback profile: output — static output-error proportional control."""
+"""Feedback profile: error — static output-error proportional control."""
 
 import numpy as np
 
-from minilink.core.system import System
+from minilink.core.feedback import Controller
 
 
-class ProportionalController(System):
+class ProportionalController(Controller):
     """Output-error proportional control ``u = K (r - y)`` (SISO or MIMO).
 
     ``K`` is a scalar (SISO, a ``1×1`` gain) or an ``(m, p)`` matrix mapping a
@@ -13,12 +13,12 @@ class ProportionalController(System):
     measurement ``y`` share dimension ``p``. The gain lives in ``params["K"]``
     (always stored as a matrix) so it can be tuned or differentiated.
 
-    This is *output* feedback on the measured ``y`` port (it composes with the
-    ``@`` operator). For *state* feedback with a feedforward offset — the form
-    LQR produces — use :class:`~minilink.control.state.StateFeedbackController`.
+    This is error-driven feedback on the measured ``y`` port (it composes with
+    the ``@`` operator). For *state* feedback with a feedforward offset — the
+    form LQR produces — use :class:`~minilink.control.state.StateFeedbackController`.
     """
 
-    feedback_profile = "output"
+    feedback_profile = "error"
 
     def __init__(self, K=1.0):
         super().__init__()

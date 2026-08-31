@@ -89,8 +89,9 @@ Release criteria (unchanged): every **in-scope** pyro library module has a minil
 | Catalog | `pyro/dynamic/manipulator.py` | TwoLinkManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Catalog | `pyro/dynamic/manipulator.py` | FiveLinkPlanarManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Control | `pyro/control/controller.py` | StaticController | `minilink/core/diagram.py` | DiagramSystem wiring | **Done** |  |
+| Control | `pyro/control/controller.py` | StaticController.plot_control_law | `minilink/graphical/port_map.py` | plot_control_law(), plot_input_output_map() | **Done** | Declaration-driven (`core/feedback.py`); `Controller` marker facade |
 | Control | `pyro/control/controller.py` | ClosedLoopSystem | `minilink/core/diagram.py` | `@`, `>>`, `+` composition | **Done** |  |
-| Control | `pyro/control/controller.py` | DynamicController | `minilink/core/diagram.py` | DiagramSystem | **Partial** | No separate wrapper class |
+| Control | `pyro/control/controller.py` | DynamicController | `minilink/core/feedback.py` | DynamicController marker (FilteredController, ImpedanceIntegralController) | **Done** | Marker + facade; stateful controllers stay DynamicSystem |
 | Control | `pyro/control/controller.py` | DynamicClosedLoopSystem | `minilink/core/diagram.py` | DiagramSystem | **Partial** |  |
 | Control | `pyro/control/linear.py` | ProportionalController | `minilink/control/linear.py` | PDController, ProportionalGain | **Done** |  |
 | Control | `pyro/control/linear.py` | PIDController | `minilink/control/pid.py` | PIDController | **Done** |  |
@@ -176,8 +177,8 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `courses/udes_gro640/prob/test_commande_en_position.py` | **TODO** | Robot control; blocked on control/robotic.py |
 | `courses/udes_gro640/prob/test_f.py` | **TODO** | Robot control; blocked on control/robotic.py |
 | `courses/udes_gro640/prob/test_trajectoire_3D.py` | **TODO** | Robot control; blocked on control/robotic.py |
-| `courses/udes_gro860/dp_demo_swingup.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py |
-| `courses/udes_gro860/dp_mass_min_time_optimal.py` | **Done** | examples/demos/planning/value_iteration/vi_basics.py |
+| `courses/udes_gro860/dp_demo_swingup.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum_swingup.py |
+| `courses/udes_gro860/dp_mass_min_time_optimal.py` | **Done** | examples/demos/planning/value_iteration/vi_minimum_time.py |
 | `courses/udes_gro860/dp_mass_min_time_policy_evaluation.py` | **Partial** | Core tool demos exist; course variant not ported |
 | `courses/udes_gro860/lqr_cartpole_stab.py` | **Done** | examples/demos/statespace/cartpole_lqr.py |
 | `courses/udes_gro860/lqr_cartpole_traj.py` | **Partial** | Core tool demos exist; course variant not ported |
@@ -271,8 +272,8 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/pendulum_simple/simple_pendulum_with_sliding_mode_controller.py` | **Done** | examples/demos/control/sliding_mode_pendulum.py · hybrid: examples/demos/hybrid/smc_pendulum_rate.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/demos/planning/value_iteration/vi_basics.py (mass) + examples/demos/planning/value_iteration/vi_pendulum.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_quadratic.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/demos/planning/value_iteration/vi_minimum_time.py (mass) + examples/demos/planning/value_iteration/vi_pendulum_swingup.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_quadratic.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum_swingup.py |
 | `demos_by_system/plane/plane_cobra.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/plane/plane_simple_controller.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/robot_arm_1dof/onelinkrobot_joint_impedance_controller.py` | **Done** | examples/demos/robotic/joint_impedance_two_link.py (covers 1-dof pattern) |
@@ -314,14 +315,14 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/dynamicprogramming/rrt_car_parking.py` | **Done** | examples/demos/planning/rrt/rrt_car_parking.py |
 | `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup.py` | **Done** | examples/demos/planning/value_iteration/vi_double_pendulum_jax.py |
 | `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/demos/planning/value_iteration/vi_double_pendulum_jax.py |
-| `demos_by_tool/dynamicprogramming/float_mass_dp_optimal_controller.py` | **Done** | examples/demos/planning/value_iteration/vi_basics.py |
+| `demos_by_tool/dynamicprogramming/float_mass_dp_optimal_controller.py` | **Done** | examples/demos/planning/value_iteration/vi_quadratic.py |
 | `demos_by_tool/dynamicprogramming/helicopter_tunnel.py` | **TODO** | DP specialty demo not ported |
-| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py |
-| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_demo.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py |
-| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/planning/value_iteration/vi_pendulum.py (grid tuning differs) |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum_swingup.py |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_demo.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum_swingup.py |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/planning/value_iteration/vi_pendulum_swingup.py (grid tuning differs) |
 | `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | ReachabilityCost exists; demo TODO |
 | `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/modelbased.py |
-| `demos_by_tool/lqr_vs_valueiteration_for_a_simple_pendulum.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum.py Part 2 |
+| `demos_by_tool/lqr_vs_valueiteration_for_a_simple_pendulum.py` | **Done** | examples/demos/planning/value_iteration/vi_pendulum_lqr.py |
 | `demos_by_tool/optimal_control_demo.py` | **TODO** | Not yet audited |
 | `demos_by_tool/rl_with_stable_baseline3/double_pendulum_with_ppo.py` | **Drop** | External SB3 training |
 | `demos_by_tool/rl_with_stable_baseline3/drone_with_ppo.py` | **Drop** | External SB3 training |
@@ -423,9 +424,11 @@ These are minilink-native; they may cover pyro workflows without 1:1 filename pa
 | `examples/demos/planning/rrt/rrt_holonomic_obstacles.py` | rrt |
 | `examples/demos/planning/rrt/rrt_pendulum_swingup.py` | rrt |
 | `examples/demos/planning/rrt/rrt_star_live.py` | rrt |
-| `examples/demos/planning/value_iteration/vi_basics.py` | value_iteration |
+| `examples/demos/planning/value_iteration/vi_quadratic.py` | value_iteration |
+| `examples/demos/planning/value_iteration/vi_minimum_time.py` | value_iteration |
 | `examples/demos/planning/value_iteration/vi_double_pendulum_jax.py` | value_iteration |
-| `examples/demos/planning/value_iteration/vi_pendulum.py` | value_iteration |
+| `examples/demos/planning/value_iteration/vi_pendulum_swingup.py` | value_iteration |
+| `examples/demos/planning/value_iteration/vi_pendulum_lqr.py` | value_iteration |
 | `examples/demos/plots/plot_internal_signals.py` | plots |
 | `examples/demos/plots/plot_phase_plane.py` | plots |
 | `examples/demos/plots/plot_trajectory_options.py` | plots |

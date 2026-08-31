@@ -38,6 +38,7 @@ ref = Step(initial_value=q0, final_value=q1, step_time=STEP_TIME)
 ctl = JointImpedance(arm, gravity_comp=False)
 ctl.params["Kp"] = np.array([20.0, 20.0])
 ctl.params["Kd"] = np.array([5.0, 5.0])
+ctl.plot_control_law()  # Kp·e + Kd·de plane (first joint)
 
 diagram = ref >> closed_loop_qdq(ctl, arm)
 

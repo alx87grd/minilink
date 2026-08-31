@@ -7,7 +7,7 @@ This matches SherbyRobotics/pyro ``DoublePendulum`` in ``pyro/dynamic/vi_pendulu
 * the same ``H``, ``C``, ``B``, ``g``, and linear joint damping in ``d``
 
 Visualization maps Pyro's line-based torque arcs to :class:`TorqueArrow` using
-the same sweep scaling as the tutorial single pendulum in ``vi_pendulum.py``.
+the same sweep scaling as the tutorial single pendulum in ``vi_pendulum_swingup.py``.
 """
 
 import numpy as np

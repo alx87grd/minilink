@@ -4,10 +4,10 @@ import numpy as np
 
 from minilink.control.impedance import _as_dof_vector
 from minilink.core.backends import array_module
-from minilink.core.system import DynamicSystem
+from minilink.core.feedback import DynamicController
 
 
-class FilteredController(DynamicSystem):
+class FilteredController(DynamicController):
     """Decoupled SISO PID with filtered derivative and anti-windup.
 
     Each axis has its own integrator and filtered-measurement state. The

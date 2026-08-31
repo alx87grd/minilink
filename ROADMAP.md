@@ -100,6 +100,12 @@ Decisions that block or shape the teaching release (maintainer sign-off):
 - ~~Public export policy for `minilink/__init__.py`~~ — done (teaching-first
   root prelude + `catalog` / `control` / `analysis` band facades;
   [DESIGN.md §2](DESIGN.md#public-imports-teaching-first)).
+- ~~Control-block contract (implementation)~~ — landed: feedback-port
+  declaration (`core/feedback.py`), `Controller` / `DynamicController`
+  markers, declaration-first `@`, `plot_control_law` /
+  `plot_input_output_map`. DESIGN §feedback-profiles still carries
+  `TODO: User Architectural Review`
+  ([docs/plans/control-block-contract.md](docs/plans/control-block-contract.md)).
 - Diagram validation as separate `validate()` vs inline wiring.
 - Pyro game demos — port remaining to `simulation/realtime/` or explicitly drop.
 - Optional `KinematicModel` delegate — adopt or drop.

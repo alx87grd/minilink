@@ -8,7 +8,7 @@ import numpy as np
 
 from minilink.control.impedance import ImpedanceController, _as_dof_vector
 from minilink.core.backends import array_module
-from minilink.core.system import System
+from minilink.core.feedback import Controller
 from minilink.dynamics.abstraction.manipulator import Manipulator
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
@@ -45,7 +45,7 @@ def _impedance_joint_torque(ref_dim, n, r, q, dq, Kp, Kd, xp):
     return Kp * (pos_d - q) + Kd * (vel_d - dq)
 
 
-class ModelJointImpedance(System):
+class ModelJointImpedance(Controller):
     """Joint-space impedance on a mechanical plant with optional gravity feedforward.
 
     Law: ``τ = Kp e + Kd ė + g(q)`` when ``gravity_comp`` is enabled.
@@ -82,7 +82,12 @@ class ModelJointImpedance(System):
         self.name = "Joint Impedance"
 
         self.add_input_port("r", dim=ref_dim, nominal_value=np.zeros(ref_dim))
-        self.add_input_port("y", dim=2 * n, nominal_value=np.zeros(2 * n))
+        self.add_input_port(
+            "y",
+            dim=2 * n,
+            nominal_value=np.zeros(2 * n),
+            labels=[f"q{i}" for i in range(n)] + [f"dq{i}" for i in range(n)],
+        )
         self.add_output_port(
             "u",
             dim=n,
@@ -157,7 +162,7 @@ def JointImpedance(
     )
 
 
-class TaskImpedance(System):
+class TaskImpedance(Controller):
     """Task-space impedance using an internal kinematic model.
 
     Joint measurements ``y = [q; dq]`` are mapped to task space via the
@@ -216,7 +221,13 @@ class TaskImpedance(System):
         self.name = "Task Impedance"
 
         self.add_input_port("r", dim=ref_dim, nominal_value=np.zeros(ref_dim))
-        self.add_input_port("y", dim=2 * self.dof, nominal_value=np.zeros(2 * self.dof))
+        self.add_input_port(
+            "y",
+            dim=2 * self.dof,
+            nominal_value=np.zeros(2 * self.dof),
+            labels=[f"q{i}" for i in range(self.dof)]
+            + [f"dq{i}" for i in range(self.dof)],
+        )
         self.add_output_port(
             "u",
             dim=self.dof,
@@ -304,7 +315,7 @@ class TaskImpedance(System):
         }
 
 
-class TaskKinematic(System):
+class TaskKinematic(Controller):
     """Task-space kinematic controller for velocity-controlled manipulators.
 
     Joint measurements ``y = q``; output ``u = dq`` drives a
