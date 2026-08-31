@@ -1,25 +1,41 @@
 # Install minilink (class quick start)
 
-Minilink needs **Python 3.10+** (3.13 works well with conda). Pick **one** path below.
+Minilink needs **Python 3.10+** (3.13 works well with conda). First pick a **toolkit tier**, then follow the conda or pip steps below.
 
-After any path, jump to [Verify](#verify-it-works).
-
----
-
-## Which option should I use?
-
-| You have… | Use |
-| --- | --- |
-| Anaconda or Miniconda | **Option 1** (recommended) |
-| Plain Python + `pip` only | **Option 2** |
-| Limited disk / slow network | **Option 3** (minimal) |
-| No local install | **Option 4** (Colab) |
+After any install, jump to [Verify](#verify-it-works).
 
 ---
 
-## Option 1 — Conda full environment (recommended)
+## Toolkit tiers — which one do I need?
 
-One file installs core deps, JAX, notebooks, and optional teaching extras.
+| Tier | Install file(s) | You can run… |
+| --- | --- | --- |
+| **Basic** | [requirements.txt](requirements.txt) | Core sim/plot scripts, LQR, value iteration (`examples/demos/statespace/`, `examples/demos/planning/value_iteration/`) |
+| **Full** | [requirements-full.txt](requirements-full.txt) or [environment.yml](environment.yml) | Everything in Basic **plus** intro/showcase notebooks, JAX trajopt/MPC, symbolic EOM, meshcat/plotly/pygame animators |
+| **GRO860** | [requirements-gro860.txt](requirements-gro860.txt) or [environment-gro860.yml](environment-gro860.yml) | **UdeS GRO860 course** — Basic labs **plus** Jupyter and PPO RL notebooks (`examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb`, `drone_ppo_learn_to_fly.ipynb`, …) |
+
+**Not sure?** GRO860 students → **GRO860 tier**. General minilink class with JAX notebooks → **Full**. Scripts only, no notebooks → **Basic**.
+
+Upgrade path: Basic → `pip install -r requirements-gro860.txt` or `pip install -r requirements-full.txt` (both include Basic via `-r requirements.txt`).
+
+---
+
+## Conda install (recommended)
+
+Conda is recommended because diagram rendering (`plot_diagram`) needs the Graphviz `dot` binary, bundled reliably via conda-forge.
+
+### GRO860 toolkit
+
+```bash
+git clone https://github.com/alx87grd/minilink.git
+cd minilink
+conda env create -f environment-gro860.yml
+conda activate minilink-gro860
+conda env config vars set PYTHONPATH="$PWD"
+conda deactivate && conda activate minilink-gro860
+```
+
+### Full toolkit
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git
@@ -30,15 +46,41 @@ conda env config vars set PYTHONPATH="$PWD"
 conda deactivate && conda activate minilink
 ```
 
-**Why conda?** Diagram rendering (`plot_diagram`) and some solvers need native libraries; conda-forge bundles them reliably on Windows, macOS, and Linux.
+### Basic toolkit (minimal conda)
+
+```bash
+git clone https://github.com/alx87grd/minilink.git
+cd minilink
+conda create -n minilink-basic -c conda-forge python=3.13 numpy scipy matplotlib graphviz python-graphviz
+conda activate minilink-basic
+conda env config vars set PYTHONPATH="$PWD"
+conda deactivate && conda activate minilink-basic
+```
+
+Add extras later:
+
+```bash
+# → GRO860
+conda env create -f environment-gro860.yml   # or new env from the yml
+
+# → Full
+conda install -c conda-forge jax jaxlib jupyterlab ipykernel plotly sympy meshcat-python pygame gymnasium
+pip install stable-baselines3 torch   # if you need PPO notebooks too
+```
 
 ---
 
-## Option 2 — Pip + virtual environment
+## Pip install
 
-Works on any Python 3.10+ install. Good if you already use `venv` or `uv`.
+Works on any Python 3.10+ install (`venv`, `uv`, etc.).
 
-### 2a. Full classroom stack (notebooks + JAX + extras)
+**Graphviz:** pip installs the Python wrapper only — you also need the system `dot` binary:
+
+- **Ubuntu / Debian:** `sudo apt install graphviz`
+- **macOS (Homebrew):** `brew install graphviz`
+- **Windows:** [Graphviz installer](https://graphviz.org/download/) — add `dot` to your PATH
+
+Shared setup (replace `TIER` with `basic`, `full`, or `gro860`):
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git
@@ -48,95 +90,69 @@ python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
 pip install --upgrade pip
-pip install -r requirements-class.txt
+pip install -r requirements-TIER.txt
 
 export PYTHONPATH="$PWD"           # Windows (cmd): set PYTHONPATH=%CD%
                                    # Windows (PowerShell): $env:PYTHONPATH = (Get-Location)
 ```
 
-### 2b. Core only (lighter)
+Concrete commands:
 
 ```bash
-git clone https://github.com/alx87grd/minilink.git
-cd minilink
-
-python -m venv .venv
-source .venv/bin/activate
-
-pip install --upgrade pip
+# Basic
 pip install -r requirements.txt
 
-export PYTHONPATH="$PWD"
+# Full (notebooks + JAX + teaching extras)
+pip install -r requirements-full.txt
+
+# GRO860 (notebooks + Gymnasium + Stable-Baselines3 + PyTorch)
+pip install -r requirements-gro860.txt
 ```
 
-Add extras anytime:
+**Editable install alternative** (same repo checkout):
 
 ```bash
-pip install jax jaxlib plotly sympy meshcat pygame jupyterlab
+pip install -e ".[jax,visualization,plotting,symbolic,rl]"   # Full-ish via pyproject extras
+pip install jupyterlab ipykernel stable-baselines3 torch      # + GRO860 PPO stack
 ```
 
-### 2c. Editable install from `pyproject.toml`
-
-Same repo checkout; installs minilink as a package plus chosen extras:
-
-```bash
-pip install -e ".[jax,visualization,plotting,symbolic]"
-pip install jupyterlab ipykernel
-```
-
-Available extras: `jax`, `symbolic`, `visualization`, `plotly`, `plotting`, `ipopt`, `rl`, `dev`, `docs`.
-
-**Graphviz on pip:** install the system `dot` binary too, or diagrams that call Graphviz will fail:
-
-- **Ubuntu / Debian:** `sudo apt install graphviz`
-- **macOS (Homebrew):** `brew install graphviz`
-- **Windows:** [Graphviz installer](https://graphviz.org/download/) — add `dot` to your PATH
+Pyproject extras: `jax`, `symbolic`, `visualization`, `plotting`, `ipopt`, `rl`, `dev`, `docs`.
 
 ---
 
-## Option 3 — Conda minimal (smallest useful env)
-
-Core simulation and plotting only; add extras later if a notebook needs them.
-
-```bash
-git clone https://github.com/alx87grd/minilink.git
-cd minilink
-
-conda create -n minilink -c conda-forge python=3.13 numpy scipy matplotlib graphviz python-graphviz
-conda activate minilink
-conda env config vars set PYTHONPATH="$PWD"
-conda deactivate && conda activate minilink
-```
-
-Add teaching extras when needed:
-
-```bash
-conda install -c conda-forge jax jaxlib jupyterlab ipykernel plotly sympy meshcat-python pygame
-```
-
----
-
-## Option 4 — Google Colab (no local install)
-
-Open the showcase notebook in Colab (runs in the browser):
+## Google Colab (no local install)
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)
 
-Colab already has NumPy, SciPy, and Matplotlib. For JAX demos, use the [JAX showcase](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_jax.ipynb).
+JAX demos: [JAX showcase](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_jax.ipynb).
+
+GRO860 PPO notebooks install `gymnasium` and `stable-baselines3` automatically on first run in Colab.
 
 ---
 
 ## Verify it works
 
-From the repo root, with your env active and `PYTHONPATH` set to the repo (Options 1–3):
+From the repo root, with your env active and `PYTHONPATH` set:
 
 ```bash
 python -c "from minilink import Pendulum; p = Pendulum(); print('OK:', p.n)"
 ```
 
-Expected output: `OK: 2`
+Expected: `OK: 2`
 
-Optional — run a short simulation:
+**GRO860 tier** — check RL stack:
+
+```bash
+python -c "import gymnasium, stable_baselines3, torch; print('GRO860 RL OK')"
+```
+
+**Full tier** — check JAX:
+
+```bash
+python -c "import jax; print('JAX', jax.__version__)"
+```
+
+Optional simulation smoke test:
 
 ```bash
 python -c "
@@ -146,10 +162,11 @@ print('Simulation OK')
 "
 ```
 
-Open the intro notebook (if Jupyter is installed):
+Open a notebook (Full or GRO860 tiers):
 
 ```bash
-jupyter lab examples/learn/intro/showcase_minilink.ipynb
+jupyter lab examples/learn/intro/showcase_minilink.ipynb          # Full
+jupyter lab examples/learn/teaching/drone_ppo_learn_to_fly.ipynb  # GRO860
 ```
 
 ---
@@ -158,30 +175,35 @@ jupyter lab examples/learn/intro/showcase_minilink.ipynb
 
 **`ModuleNotFoundError: No module named 'minilink'`**
 
-- You are not in the repo root, or `PYTHONPATH` is not set to it.
-- Fix: `cd minilink` then `export PYTHONPATH="$PWD"` (see your option above).
+- Not in the repo root, or `PYTHONPATH` is unset. Fix: `cd minilink` then `export PYTHONPATH="$PWD"`.
 
 **`ExecutableNotFound: failed to execute 'dot'` (Graphviz)**
 
-- Install Graphviz binaries (Option 1/3 conda usually fixes this; pip users see Option 2 Graphviz note).
+- Install Graphviz binaries (conda tiers usually include them; pip users see Graphviz note above).
 
-**JAX / CUDA errors**
+**`ModuleNotFoundError: stable_baselines3` / `torch`**
 
-- Class demos use CPU JAX by default. If you installed a GPU build by mistake, reinstall CPU JAX: `pip install -U "jax[cpu]"`.
+- You installed **Basic** or **Full** but opened a **GRO860** PPO notebook. Run: `pip install -r requirements-gro860.txt`.
 
-**Ipopt / `cyipopt` (optional NLP solver)**
+**JAX / CUDA errors (Full tier)**
 
-- Not in the default class lists. Conda: `conda install -c conda-forge ipopt cyipopt`. Pip needs a working Ipopt library on your system — prefer conda for this extra.
+- Class demos use CPU JAX. Reinstall: `pip install -U "jax[cpu]"`.
+
+**Ipopt / `cyipopt` (optional NLP solver, Full tier advanced labs)**
+
+- Conda: `conda install -c conda-forge ipopt cyipopt`. Prefer conda over pip for this extra.
 
 ---
 
 ## Files in this repo
 
-| File | Purpose |
+| File | Tier |
 | --- | --- |
-| [environment.yml](environment.yml) | Full conda dev + class environment |
-| [requirements.txt](requirements.txt) | Pip core deps |
-| [requirements-class.txt](requirements-class.txt) | Pip classroom stack |
+| [requirements.txt](requirements.txt) | Basic |
+| [requirements-full.txt](requirements-full.txt) | Full (pip) |
+| [requirements-gro860.txt](requirements-gro860.txt) | GRO860 (pip) |
+| [environment.yml](environment.yml) | Full (conda) |
+| [environment-gro860.yml](environment-gro860.yml) | GRO860 (conda) |
 | [pyproject.toml](pyproject.toml) | Package metadata and optional `[extras]` |
 
-More detail for contributors: [README.md § Install](README.md#install).
+Contributors: [README.md § Install](README.md#install).

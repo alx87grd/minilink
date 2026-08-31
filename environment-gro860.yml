@@ -1,0 +1,36 @@
+# Conda environment for the GRO860 course toolkit (UdeS).
+#
+# Value iteration, LQR, and PPO notebooks — lighter than environment.yml
+# (no JAX, meshcat, plotly, or dev tools).
+#
+# Create:
+#   conda env create -f environment-gro860.yml
+#   conda activate minilink-gro860
+#   conda env config vars set PYTHONPATH="$PWD"
+#   conda deactivate && conda activate minilink-gro860
+
+name: minilink-gro860
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pip
+
+  # --- core ---
+  - numpy
+  - scipy
+  - matplotlib
+  - graphviz
+  - python-graphviz
+
+  # --- notebooks ---
+  - ipython
+  - ipykernel
+  - jupyterlab
+  - notebook
+
+  # --- RL (GRO860 PPO labs) ---
+  - gymnasium
+  - pytorch
+  - pip:
+      - stable-baselines3

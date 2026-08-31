@@ -1,10 +1,13 @@
 # Minilink dependencies (Python 3.10+)
 #
+# Basic tier — core simulation and plotting only.
+#
 # Install (from repo root, after activating your env):
 #   pip install -r requirements.txt
 #
-# For the full classroom stack (notebooks + JAX + extras), use:
-#   pip install -r requirements-class.txt
+# Other tiers (see install.md):
+#   pip install -r requirements-full.txt    # notebooks + JAX + teaching extras
+#   pip install -r requirements-gro860.txt    # UdeS GRO860 course (VI, LQR, PPO)
 #
 # Native note: `graphviz` needs the Graphviz `dot` binary on your PATH.
 # Conda users: `conda install -c conda-forge graphviz python-graphviz`

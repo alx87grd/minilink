@@ -265,8 +265,7 @@ minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
 
 ## Install
 
-**Class quick start:** [install.md](install.md) — conda (recommended), pip, minimal, and Colab
-options with copy-paste commands.
+**Class quick start:** [install.md](install.md) — **Basic**, **Full**, and **GRO860** toolkit tiers (conda + pip).
 
 Minilink requires Python 3.10+ (3.13 recommended for conda). Conda is recommended
 because diagram rendering and some optimization backends depend on native libraries.
