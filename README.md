@@ -265,9 +265,9 @@ minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
 
 ## Install
 
-Python 3.10+ (3.13 recommended). **Students:** [install.md](install.md) — **Basic**, **Full**, or **GRO860** tier (conda or pip, copy-paste commands).
+Python 3.10+. **Students and pip/conda tiers:** [install.md](install.md) (**Basic**, **Full**, **GRO860**).
 
-**Contributors / dev:** full conda env from [environment.yml](environment.yml), then `PYTHONPATH` to the repo root:
+**Contributors:** conda dev env, then `PYTHONPATH` to the repo root:
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -275,7 +275,7 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Editable pip install: `pip install -e ".[dev]"` (extras: `.[jax]`, `.[symbolic]`, `.[visualization]`, `.[plotting]`, `.[ipopt]`, `.[rl]`). Graphviz is optional for equations; needed for `plot_diagram()`.
+Pip editable install and optional extras: [install.md](install.md) (contributors section).
 
 ## Testing
 

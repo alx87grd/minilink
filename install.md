@@ -81,4 +81,10 @@ Expected: `OK: 2`
 - **Missing `stable_baselines3` / `torch`** — you need the **GRO860** tier for PPO notebooks.
 - **`cyipopt` / Ipopt errors** — optional; Basic/GRO860 pip omit it. Use default SciPy solvers, or `conda install -c conda-forge ipopt cyipopt` / Full conda env if you need Ipopt.
 
-Contributors: editable install and dev extras in [README.md § Install](README.md#install).
+Contributors: editable pip install in a Python 3.10+ env:
+
+```bash
+pip install -e ".[dev]"    # extras: .[jax], .[symbolic], .[visualization], .[plotting], .[ipopt], .[rl], .[docs]
+```
+
+Dev conda env: [environment.yml](environment.yml) (see [README.md § Install](README.md#install)).
