@@ -1,0 +1,23 @@
+# GRO860 toolkit — UdeS optimal control & reinforcement learning course.
+#
+# Covers value iteration / DP scripts, LQR demos, and PPO notebooks under
+# examples/learn/teaching/ (pendulum swing-up, drone learn-to-fly).
+#
+# Install (from repo root, after activating your env):
+#   pip install -r requirements-gro860.txt
+#
+# CPU-only PyTorch (smaller download; fine for course PPO labs):
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+-r requirements.txt
+
+# --- Notebooks ---
+ipykernel
+ipython
+jupyterlab
+notebook
+
+# --- Reinforcement learning (Gymnasium + Stable-Baselines3) ---
+gymnasium
+stable-baselines3
+torch

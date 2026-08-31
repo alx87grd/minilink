@@ -1,0 +1,20 @@
+# Minilink dependencies (Python 3.10+)
+#
+# Basic tier — core simulation and plotting (+ diagram topology via Graphviz).
+#
+# Install:
+#   pip install -r requirements.txt
+#
+# No Graphviz (skip plot_diagram(); see install.md):
+#   pip install -r requirements-nographviz.txt
+#
+# Other tiers: requirements-full.txt, requirements-gro860.txt
+# No-Graphviz variants: requirements-full-nographviz.txt, requirements-gro860-nographviz.txt
+#
+# Ipopt/cyipopt is optional (not listed here); trajopt defaults to SciPy.
+
+# --- Core (required) ---
+numpy
+scipy
+matplotlib
+graphviz

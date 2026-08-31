@@ -1,0 +1,26 @@
+# Full teaching stack — basic + notebooks + JAX + visualization + RL API.
+# Closest pip equivalent to environment.yml (minus dev tools and Ipopt).
+#
+# Install (from repo root, after activating your env):
+#   pip install -r requirements-full.txt
+
+-r requirements.txt
+
+# --- Notebooks ---
+ipykernel
+ipython
+jupyterlab
+notebook
+
+# --- JAX / autodiff / trajopt teaching ---
+jax>=0.4.28
+jaxlib>=0.4.28
+
+# --- Symbolic, plotting, animation backends ---
+sympy>=1.12
+plotly
+meshcat
+pygame
+
+# --- RL environment API (general teaching; SB3 in GRO860 toolkit) ---
+gymnasium

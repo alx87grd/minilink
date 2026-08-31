@@ -265,40 +265,17 @@ minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
 
 ## Install
 
-Minilink requires Python 3.10+ (3.13 recommended for conda). Conda is recommended
-because diagram rendering and some optimization backends depend on native libraries.
+Python 3.10+. **Students and pip/conda tiers:** [install.md](install.md) (**Basic**, **Full**, **GRO860**).
 
-Full dev environment from [environment.yml](environment.yml) (core deps, optional
-extras, pytest/ruff/sphinx, Jupyter):
+**Contributors:** conda dev env, then `PYTHONPATH` to the repo root:
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda env create -f environment.yml
-conda activate minilink
+conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Minimal manual setup:
-
-```bash
-git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda create -n minilink -c conda-forge python=3.13 numpy scipy matplotlib graphviz python-graphviz
-conda activate minilink
-conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
-```
-
-Optional features (included in `environment.yml`; install separately for minimal envs):
-
-```bash
-conda install -c conda-forge jax jaxlib meshcat-python pygame plotly sympy ipopt cyipopt gymnasium
-```
-
-Alternatively, a plain editable install works in any Python 3.10+ environment
-(`pip install -e ".[dev]"`, with extras `.[jax]`, `.[symbolic]`,
-`.[visualization]`, `.[plotting]`, `.[ipopt]`, `.[rl]`).
-
-Graphviz is used by `plot_diagram()` for diagram topology rendering; it is not
-required for writing model equations.
+Pip editable install and optional extras: [install.md](install.md) (contributors section).
 
 ## Testing
 
