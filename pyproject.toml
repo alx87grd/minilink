@@ -87,6 +87,7 @@ target-version = "py310"
 exclude = [
     "minilink/_version.py",
     "**/*.ipynb",
+    "**/*.md",  # ruff 0.16+ formats fenced Python; plan docs keep aligned comments
 ]
 
 [tool.ruff.lint]
