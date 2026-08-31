@@ -1,0 +1,18 @@
+# Minilink dependencies (Python 3.10+)
+#
+# Install (from repo root, after activating your env):
+#   pip install -r requirements.txt
+#
+# For the full classroom stack (notebooks + JAX + extras), use:
+#   pip install -r requirements-class.txt
+#
+# Native note: `graphviz` needs the Graphviz `dot` binary on your PATH.
+# Conda users: `conda install -c conda-forge graphviz python-graphviz`
+# Ubuntu/Debian: `sudo apt install graphviz`
+# macOS (Homebrew): `brew install graphviz`
+
+# --- Core (required) ---
+numpy
+scipy
+matplotlib
+graphviz

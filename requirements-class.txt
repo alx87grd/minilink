@@ -1,0 +1,23 @@
+# Recommended classroom stack — core + notebooks + common teaching extras.
+# Matches most of environment.yml (minus dev tools and native-only Ipopt).
+#
+# Install (from repo root, after activating your env):
+#   pip install -r requirements-class.txt
+#
+# Then clone minilink and point Python at the repo (see install.md).
+
+-r requirements.txt
+
+# --- Notebooks ---
+ipykernel
+ipython
+jupyterlab
+notebook
+
+# --- Teaching extras (showcases, plots, symbolic, 3D/game animators) ---
+jax>=0.4.28
+jaxlib>=0.4.28
+sympy>=1.12
+plotly
+meshcat
+pygame
