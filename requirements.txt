@@ -11,7 +11,7 @@
 # Other tiers: requirements-full.txt, requirements-gro860.txt
 # No-Graphviz variants: requirements-full-nographviz.txt, requirements-gro860-nographviz.txt
 #
-# graphviz also needs the system `dot` binary on PATH (conda bundles it).
+# Ipopt/cyipopt is optional (not listed here); trajopt defaults to SciPy.
 
 # --- Core (required) ---
 numpy

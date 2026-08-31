@@ -4,6 +4,8 @@ Python **3.10+**. Conda recommended (bundles Graphviz for `plot_diagram()`).
 
 **Graphviz is not core.** Simulation, trajectory plots, phase planes, and animation work without it. Only **`plot_diagram()`** (block-diagram topology) needs Graphviz — skip it if you use the no-Graphviz pip files below.
 
+**Ipopt / `cyipopt` is not in Basic pip** (or GRO860). Trajopt and NLP default to **SciPy** (`scipy_slsqp`) — you will not fail without it. Only install Ipopt if you explicitly set `method="ipopt"` (Full conda [`environment.yml`](environment.yml) includes it).
+
 ## Pick a tier
 
 | Tier | For | Conda | Pip | Pip (no Graphviz) |
@@ -77,5 +79,6 @@ Expected: `OK: 2`
 - **`No module named 'minilink'`** — set `PYTHONPATH` to the repo root (`export PYTHONPATH="$PWD"`).
 - **`failed to execute 'dot'`** — install Graphviz, or reinstall with a `*-nographviz.txt` file and skip `plot_diagram()`.
 - **Missing `stable_baselines3` / `torch`** — you need the **GRO860** tier for PPO notebooks.
+- **`cyipopt` / Ipopt errors** — optional; Basic/GRO860 pip omit it. Use default SciPy solvers, or `conda install -c conda-forge ipopt cyipopt` / Full conda env if you need Ipopt.
 
 Contributors: editable install and dev extras in [README.md § Install](README.md#install).

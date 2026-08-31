@@ -7,6 +7,8 @@
 # Other no-Graphviz tiers (see install.md):
 #   pip install -r requirements-full-nographviz.txt
 #   pip install -r requirements-gro860-nographviz.txt
+#
+# Ipopt/cyipopt is optional (not listed here); trajopt defaults to SciPy.
 
 numpy
 scipy
