@@ -21,7 +21,7 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Other tiers (Basic, GRO860), pip, and no-Graphviz options: [install.md](install.md).
+Other tiers (Basic, GRO860), pip, Colab setup cell, and no-Graphviz options: [install.md](install.md).
 
 ## Why minilink
 
