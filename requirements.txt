@@ -1,18 +1,17 @@
 # Minilink dependencies (Python 3.10+)
 #
-# Basic tier — core simulation and plotting only.
+# Basic tier — core simulation and plotting (+ diagram topology via Graphviz).
 #
-# Install (from repo root, after activating your env):
+# Install:
 #   pip install -r requirements.txt
 #
-# Other tiers (see install.md):
-#   pip install -r requirements-full.txt    # notebooks + JAX + teaching extras
-#   pip install -r requirements-gro860.txt    # UdeS GRO860 course (VI, LQR, PPO)
+# No Graphviz (skip plot_diagram(); see install.md):
+#   pip install -r requirements-nographviz.txt
 #
-# Native note: `graphviz` needs the Graphviz `dot` binary on your PATH.
-# Conda users: `conda install -c conda-forge graphviz python-graphviz`
-# Ubuntu/Debian: `sudo apt install graphviz`
-# macOS (Homebrew): `brew install graphviz`
+# Other tiers: requirements-full.txt, requirements-gro860.txt
+# No-Graphviz variants: requirements-full-nographviz.txt, requirements-gro860-nographviz.txt
+#
+# graphviz also needs the system `dot` binary on PATH (conda bundles it).
 
 # --- Core (required) ---
 numpy

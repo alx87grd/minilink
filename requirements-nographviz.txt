@@ -1,0 +1,13 @@
+# Basic tier without Graphviz — sim, traj plots, animate, LQR, VI, RL all work.
+# Skip `plot_diagram()` (block-diagram topology only; not core).
+#
+# Install:
+#   pip install -r requirements-nographviz.txt
+#
+# Other no-Graphviz tiers (see install.md):
+#   pip install -r requirements-full-nographviz.txt
+#   pip install -r requirements-gro860-nographviz.txt
+
+numpy
+scipy
+matplotlib

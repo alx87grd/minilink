@@ -5,6 +5,9 @@
 #
 # Install (from repo root, after activating your env):
 #   pip install -r requirements-gro860.txt
+#
+# CPU-only PyTorch (smaller download; fine for course PPO labs):
+--extra-index-url https://download.pytorch.org/whl/cpu
 
 -r requirements.txt
 

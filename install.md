@@ -2,13 +2,15 @@
 
 Python **3.10+**. Conda recommended (bundles Graphviz for `plot_diagram()`).
 
+**Graphviz is not core.** Simulation, trajectory plots, phase planes, and animation work without it. Only **`plot_diagram()`** (block-diagram topology) needs Graphviz — skip it if you use the no-Graphviz pip files below.
+
 ## Pick a tier
 
-| Tier | For | Conda | Pip |
-| --- | --- | --- | --- |
-| **Basic** | Scripts only (sim, LQR, value iteration) | see below | `requirements.txt` |
-| **Full** | Notebooks + JAX + animators | `environment.yml` | `requirements-full.txt` |
-| **GRO860** | UdeS course (VI, LQR, PPO) | `environment-gro860.yml` | `requirements-gro860.txt` |
+| Tier | For | Conda | Pip | Pip (no Graphviz) |
+| --- | --- | --- | --- | --- |
+| **Basic** | Scripts (sim, LQR, value iteration) | see below | `requirements.txt` | `requirements-nographviz.txt` |
+| **Full** | Notebooks + JAX + animators | `environment.yml` | `requirements-full.txt` | `requirements-full-nographviz.txt` |
+| **GRO860** | UdeS course (VI, LQR, PPO) | `environment-gro860.yml` | `requirements-gro860.txt` | `requirements-gro860-nographviz.txt` |
 
 GRO860 students → **GRO860**. JAX/showcase notebooks → **Full**. Otherwise → **Basic**.
 
@@ -35,17 +37,25 @@ conda activate minilink-basic
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink-basic
 ```
 
+Omit `graphviz python-graphviz` from the line above if you will not call `plot_diagram()`.
+
 ---
 
 ## Pip
 
-Pip needs the system Graphviz `dot` binary (`apt install graphviz`, `brew install graphviz`, or [Windows installer](https://graphviz.org/download/)).
+**With Graphviz** — pip installs the Python wrapper; you also need the system `dot` binary (`apt install graphviz`, `brew install graphviz`, or [Windows installer](https://graphviz.org/download/)).
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements-gro860.txt              # or requirements-full.txt / requirements.txt
 export PYTHONPATH="$PWD"                            # Windows PS: $env:PYTHONPATH = (Get-Location)
+```
+
+**Without Graphviz** — same tiers, no `graphviz` package or `dot` binary needed; avoid `plot_diagram()`:
+
+```bash
+pip install -r requirements-gro860-nographviz.txt   # or requirements-full-nographviz.txt / requirements-nographviz.txt
 ```
 
 **Colab:** [showcase notebook](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb) — no local install.
@@ -65,7 +75,7 @@ Expected: `OK: 2`
 ## Troubleshooting
 
 - **`No module named 'minilink'`** — set `PYTHONPATH` to the repo root (`export PYTHONPATH="$PWD"`).
-- **`failed to execute 'dot'`** — install Graphviz binaries (conda envs include them).
+- **`failed to execute 'dot'`** — install Graphviz, or reinstall with a `*-nographviz.txt` file and skip `plot_diagram()`.
 - **Missing `stable_baselines3` / `torch`** — you need the **GRO860** tier for PPO notebooks.
 
 Contributors: editable install and dev extras in [README.md § Install](README.md#install).

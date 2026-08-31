@@ -1,0 +1,21 @@
+# Full tier without Graphviz (see requirements-nographviz.txt).
+#
+# Install:
+#   pip install -r requirements-full-nographviz.txt
+
+-r requirements-nographviz.txt
+
+ipykernel
+ipython
+jupyterlab
+notebook
+
+jax>=0.4.28
+jaxlib>=0.4.28
+
+sympy>=1.12
+plotly
+meshcat
+pygame
+
+gymnasium
