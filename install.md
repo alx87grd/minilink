@@ -20,14 +20,20 @@ GRO860 students → **GRO860**. JAX/showcase notebooks → **Full**. Otherwise �
 
 ## Conda (recommended)
 
+**Full** (recommended — same as [README § Install](README.md#install)):
+
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda env create -f environment.yml
+conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+```
 
-# Pick one:
-conda env create -f environment-gro860.yml   # GRO860
-conda env create -f environment.yml          # Full
+**GRO860** course toolkit:
 
-conda activate minilink-gro860               # or: minilink
+```bash
+conda env create -f environment-gro860.yml
+conda activate minilink-gro860
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink-gro860
 ```
 
@@ -60,7 +66,34 @@ export PYTHONPATH="$PWD"                            # Windows PS: $env:PYTHONPAT
 pip install -r requirements-gro860-nographviz.txt   # or requirements-full-nographviz.txt / requirements-nographviz.txt
 ```
 
-**Colab:** [showcase notebook](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb) — no local install.
+---
+
+## Google Colab
+
+No local install. Open a notebook with **Open in Colab** (e.g.
+[showcase](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb),
+[JAX showcase](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_jax.ipynb)).
+
+Most notebooks start with a setup cell like this — paste it as the **first code cell** if you build your own notebook:
+
+```python
+# Local conda: minilink already installed. Colab: clone + path + extras.
+import sys
+
+if "google.colab" in sys.modules:
+    get_ipython().run_line_magic("matplotlib", "inline")
+    get_ipython().system("git clone https://github.com/alx87grd/minilink")
+    sys.path.insert(0, "/content/minilink")
+    get_ipython().system("pip install -q meshcat")  # 3D animation; omit if unused
+```
+
+**GRO860** PPO notebooks — swap the last line for:
+
+```python
+    get_ipython().system("pip install -q gymnasium stable-baselines3")
+```
+
+Colab already ships NumPy, SciPy, and Matplotlib. Trajopt uses SciPy by default (`cyipopt` is optional). Skip `plot_diagram()` unless you install Graphviz on the runtime.
 
 ---
 
@@ -81,10 +114,8 @@ Expected: `OK: 2`
 - **Missing `stable_baselines3` / `torch`** — you need the **GRO860** tier for PPO notebooks.
 - **`cyipopt` / Ipopt errors** — optional; Basic/GRO860 pip omit it. Use default SciPy solvers, or `conda install -c conda-forge ipopt cyipopt` / Full conda env if you need Ipopt.
 
-Contributors: editable pip install in a Python 3.10+ env:
+Contributors — editable pip install:
 
 ```bash
 pip install -e ".[dev]"    # extras: .[jax], .[symbolic], .[visualization], .[plotting], .[ipopt], .[rl], .[docs]
 ```
-
-Dev conda env: [environment.yml](environment.yml) (see [README.md § Install](README.md#install)).

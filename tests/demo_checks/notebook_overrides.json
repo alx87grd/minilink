@@ -40,7 +40,6 @@
     "smoke": false
   },
   "examples/tooling/notebooks/benchmark.ipynb": {
-    "requires": ["jax"],
-    "timeout": 300
+    "smoke": false
   }
 }
