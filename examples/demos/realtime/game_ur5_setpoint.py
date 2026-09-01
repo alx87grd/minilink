@@ -45,6 +45,7 @@ ctl.params["Kd"] = np.array([40.0, 40.0, 40.0])
 ctl.task_force_scale = 0.05
 
 diagram = ctl @ arm  # boundary input r = desired tool position
+diagram.plot_diagram()
 diagram.inputs["r"].set_nominal_value(p0)  # rate-mode setpoint starts at the tool
 
 rt_sim = RealtimeSimulator(

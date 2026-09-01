@@ -28,6 +28,7 @@ diagram = DiagramSystem()
 diagram.add_subsystem(step, "step")
 diagram.add_subsystem(ctl, "controller")
 diagram.add_subsystem(sys, "plant")
+diagram.plot_diagram()
 
 
 # Unconnected controller -> plant
