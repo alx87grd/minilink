@@ -12,8 +12,7 @@ Start here: [showcase](examples/learn/intro/showcase_minilink.ipynb) ·
 
 ## Install
 
-Python 3.10+. **Recommended** — full conda environment from [`environment.yml`](environment.yml)
-(notebooks, JAX, teaching extras):
+Python 3.10+. **Recommended** — full conda environment from [`environment.yml`](environment.yml):
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -21,7 +20,7 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Other tiers (Basic, GRO860), pip, Colab setup cell, and no-Graphviz options: [install.md](install.md).
+Other tiers, pip, Colab setup cell, and options: [install.md](install.md).
 
 ## Why minilink
 
