@@ -195,12 +195,14 @@ conda activate minilink
 SDL_VIDEODRIVER=dummy pytest
 ```
 
-Or install all pip extras in another Python 3.10+ environment:
+Or install library extras in another Python 3.10+ environment (this is not the
+Full teaching stack — no Jupyter / SB3; see [install.md](../install.md)):
 
 ```bash
 pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt,rl]"
 SDL_VIDEODRIVER=dummy pytest
 ```
+
 
 `SDL_VIDEODRIVER=dummy` lets pygame tests initialize in headless CI or
 Cursor Cloud sessions.

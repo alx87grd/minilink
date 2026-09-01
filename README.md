@@ -10,6 +10,18 @@ Start here: [showcase](examples/learn/intro/showcase_minilink.ipynb) ·
 [examples](examples/README.md) ·
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)
 
+## Install
+
+Python 3.10+. **Recommended** — full conda environment from [`environment.yml`](environment.yml):
+
+```bash
+git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda env create -f environment.yml && conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+```
+
+Basic tier, pip, Colab setup cell, and options: [install.md](install.md).
+
 ## Why minilink
 
 Minilink is designed for dynamical-system models where the code reads as close
@@ -263,46 +275,9 @@ minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
 | **Stable** | `core/` (`System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, composition operators, `Trajectory`, compile facade), `simulation` (`Simulator`, `StaticSimulator`), `blocks/`, catalog teaching plants (`minilink.catalog`), basic `control/` (output, state, SISO, impedance, robotic, model-based, LQR), basic `analysis/` (linearize, modal, frequency, equilibria, discretize) |
 | **Provisional** | `planning/` (trajopt, RRT, DP, spatial), `control.mpc`, hybrid (`StepDiagramSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`), `simulation.realtime`, `optimization/`, evaluator integration-helper grid beyond the documented subset ([DESIGN.md §5](DESIGN.md#compilation-and-simulation)), `estimation/` / `identification/` / `interfaces/` placeholders, quarantine (`symbolic/`, `dynamics/engines/`) |
 
-## Install
-
-Minilink requires Python 3.10+ (3.13 recommended for conda). Conda is recommended
-because diagram rendering and some optimization backends depend on native libraries.
-
-Full dev environment from [environment.yml](environment.yml) (core deps, optional
-extras, pytest/ruff/sphinx, Jupyter):
-
-```bash
-git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda env create -f environment.yml
-conda activate minilink
-conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
-```
-
-Minimal manual setup:
-
-```bash
-git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda create -n minilink -c conda-forge python=3.13 numpy scipy matplotlib graphviz python-graphviz
-conda activate minilink
-conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
-```
-
-Optional features (included in `environment.yml`; install separately for minimal envs):
-
-```bash
-conda install -c conda-forge jax jaxlib meshcat-python pygame plotly sympy ipopt cyipopt gymnasium
-```
-
-Alternatively, a plain editable install works in any Python 3.10+ environment
-(`pip install -e ".[dev]"`, with extras `.[jax]`, `.[symbolic]`,
-`.[visualization]`, `.[plotting]`, `.[ipopt]`, `.[rl]`).
-
-Graphviz is used by `plot_diagram()` for diagram topology rendering; it is not
-required for writing model equations.
-
 ## Testing
 
-Use the **`minilink`** conda env above.
+Use the **`minilink`** conda env from [Install](#install).
 **Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points)
 (IDE: [`tests/run/run_contract_tests.py`](tests/run/run_contract_tests.py)).
 

@@ -1,0 +1,22 @@
+# Basic tier — core simulation and plotting (+ Graphviz for plot_diagram()).
+# Pip mirror: requirements.txt (or requirements-nographviz.txt without Graphviz).
+# Colab already ships this stack (numpy, scipy, matplotlib).
+#
+# Create:
+#   conda env create -f environment-basic.yml
+#   conda activate minilink-basic
+#   conda env config vars set PYTHONPATH="$PWD"
+#   conda deactivate && conda activate minilink-basic
+#
+# Full stack: environment.yml. Tiers: install.md.
+
+name: minilink-basic
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - numpy
+  - scipy
+  - matplotlib
+  - graphviz          # Graphviz binaries (dot)
+  - python-graphviz   # `import graphviz` in graphical/diagrams/dot.py

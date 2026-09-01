@@ -1,0 +1,15 @@
+# Basic tier without Graphviz — sim, trajectory plots, matplotlib animate, LQR, VI.
+# Skip `plot_diagram()` (block-diagram topology only; not core).
+# Conda Basic includes Graphviz; this file is the pip escape hatch (see install.md).
+#
+# Install:
+#   pip install -r requirements-nographviz.txt
+#
+# Full without Graphviz:
+#   pip install -r requirements-full-nographviz.txt
+#
+# Ipopt/cyipopt is optional (not listed here); trajopt defaults to SciPy.
+
+numpy
+scipy
+matplotlib

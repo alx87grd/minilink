@@ -1,13 +1,15 @@
-# Conda environment for minilink development.
+# Full tier — notebooks, JAX, animators, symbolic, PPO, plus dev tools and Ipopt.
+# Pip mirror: requirements-full.txt (minus dev tools and Ipopt).
+# Basic tier: environment-basic.yml. Tiers: install.md.
 #
-# Covers every third-party import under minilink/ (core, optional features, dev tools).
 # Conda-forge package names differ from PyPI where noted in comments.
 #
 # Create:
 #   conda env create -f environment.yml
 #   conda activate minilink
 #
-# Repo-root import (matches README; alternative: pip install -e ".[dev]" inside the env):
+# Repo-root import (matches README). Inside this env, `pip install -e ".[dev]"`
+# is an alternative to PYTHONPATH (dev tools are already in the yml):
 #   conda env config vars set PYTHONPATH="$PWD"
 #   conda deactivate && conda activate minilink
 #
@@ -45,8 +47,10 @@ dependencies:
   - ipopt             # native solver library
   - cyipopt           # `from cyipopt import minimize_ipopt`
 
-  # --- optional: rl ([rl]) ---
+  # --- optional: rl ([rl] = gymnasium; SB3/torch for PPO teaching notebooks) ---
   - gymnasium
+  - pytorch
+  - stable-baselines3
 
   # --- dev ([dev] + docs) ---
   - pytest
