@@ -20,6 +20,10 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
+Core is NumPy, SciPy, and Matplotlib. Optional: JAX, Ipopt (high-performance
+backend), Meshcat / Plotly and other graphical outputs, and Gymnasium /
+Stable-Baselines3 bridges.
+
 Basic tier, pip, Colab setup cell, and options: [install.md](install.md).
 
 ## Why minilink
