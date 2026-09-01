@@ -20,7 +20,7 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Other tiers, pip, Colab setup cell, and options: [install.md](install.md).
+Basic tier, pip, Colab setup cell, and options: [install.md](install.md).
 
 ## Why minilink
 

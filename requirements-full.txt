@@ -1,8 +1,11 @@
-# Full teaching stack — basic + notebooks + JAX + visualization + RL API.
-# Closest pip equivalent to environment.yml (minus dev tools and Ipopt).
+# Full tier — basic + notebooks + JAX + visualization + RL/PPO.
+# Conda mirror: environment.yml (minus dev tools and Ipopt).
 #
 # Install (from repo root, after activating your env):
 #   pip install -r requirements-full.txt
+#
+# No Graphviz (skip plot_diagram()):
+#   pip install -r requirements-full-nographviz.txt
 
 -r requirements.txt
 
@@ -22,5 +25,6 @@ plotly
 meshcat
 pygame
 
-# --- RL environment API (general teaching; SB3 in GRO860 toolkit) ---
+# --- RL / PPO teaching (Gymnasium + Stable-Baselines3; torch via SB3) ---
 gymnasium
+stable-baselines3

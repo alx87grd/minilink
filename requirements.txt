@@ -1,6 +1,5 @@
-# Minilink dependencies (Python 3.10+)
-#
 # Basic tier — core simulation and plotting (+ diagram topology via Graphviz).
+# Conda mirror: environment-basic.yml. Colab already ships numpy/scipy/matplotlib.
 #
 # Install:
 #   pip install -r requirements.txt
@@ -8,8 +7,7 @@
 # No Graphviz (skip plot_diagram(); see install.md):
 #   pip install -r requirements-nographviz.txt
 #
-# Other tiers: requirements-full.txt, requirements-gro860.txt
-# No-Graphviz variants: requirements-full-nographviz.txt, requirements-gro860-nographviz.txt
+# Full tier: requirements-full.txt / requirements-full-nographviz.txt
 #
 # Ipopt/cyipopt is optional (not listed here); trajopt defaults to SciPy.
 

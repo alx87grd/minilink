@@ -1,4 +1,5 @@
-# Full tier without Graphviz (see requirements-nographviz.txt).
+# Full tier without Graphviz — same extras as requirements-full.txt.
+# Conda Full includes Graphviz; this file is the pip escape hatch (see install.md).
 #
 # Install:
 #   pip install -r requirements-full-nographviz.txt
@@ -19,3 +20,4 @@ meshcat
 pygame
 
 gymnasium
+stable-baselines3
