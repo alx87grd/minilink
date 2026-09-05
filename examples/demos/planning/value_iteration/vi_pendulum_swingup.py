@@ -1,11 +1,6 @@
 import numpy as np
 
-from minilink import (
-    DynamicProgrammingPlanner,
-    Pendulum,
-    PlanningProblem,
-    QuadraticCost,
-)
+from minilink import DynamicProgrammingPlanner, Pendulum, PlanningProblem, QuadraticCost
 
 INF = 500.0
 UPRIGHT = np.array([-np.pi, 0.0])

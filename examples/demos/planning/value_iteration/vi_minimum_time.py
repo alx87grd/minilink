@@ -1,10 +1,6 @@
 import numpy as np
 
-from minilink import (
-    DoubleIntegrator,
-    DynamicProgrammingPlanner,
-    PlanningProblem,
-)
+from minilink import DoubleIntegrator, DynamicProgrammingPlanner, PlanningProblem
 from minilink.core import TimeCost
 
 INF = 10.0
