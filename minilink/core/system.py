@@ -422,7 +422,8 @@ class DynamicSystem(DynamicSystemFacades, System):
         input_dim : int, optional
             If provided, create a standard input port named ``u``.
         output_dim : int, optional
-            If provided, create a standard primary output port named ``y``.
+            If provided, create a standard primary output port named ``y``
+            (``y = x`` by default when ``output_dim == n``; override :meth:`h`).
         expose_state : bool, optional
             If True, create an auxiliary state output port named ``x``.
         y_dependencies : tuple or "all", optional
@@ -462,6 +463,30 @@ class DynamicSystem(DynamicSystemFacades, System):
         """
         dx = np.zeros(self.n)
         return dx
+
+    def h(self, x, u, t=0, params=None):
+        """
+        Output ``y = h(x, u, t; p)``.
+
+        Default: the full state, ``y = x``, when the ``y`` port has the state
+        dimension (``p == n``); zeros otherwise. Override for any other
+        measurement.
+
+        Parameters
+        ----------
+        x : array of shape (n,)
+        u : array of shape (m,)
+        t : float
+        params : dict, optional
+
+        Returns
+        -------
+        y : array of shape (p,)
+        """
+        if self.p == self.n:
+            return x
+        y = np.zeros(self.p)
+        return y
 
 
 class StepSystem(StepSystemFacades, System):
@@ -539,6 +564,8 @@ class StepSystem(StepSystemFacades, System):
         """
         Output ``y_k = h(x, u, k; p)``.
 
+        Default: ``y = x`` when ``p == n``; zeros otherwise.
+
         Parameters
         ----------
         x : array of shape (n,)
@@ -550,6 +577,8 @@ class StepSystem(StepSystemFacades, System):
         -------
         y : array of shape (p,)
         """
+        if self.p == self.n:
+            return x
         y = np.zeros(self.p)
         return y
 

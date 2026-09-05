@@ -285,7 +285,11 @@ and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
 
 - **Math:** `h(x,u,t,params)` on the model and port `compute` functions; continuous
   evolution `f(x,u,t,params)` is on :class:`DynamicSystem` only (and stacked on
-  :class:`DiagramSystem`).
+  :class:`DiagramSystem`). **Default output:** on :class:`DynamicSystem` and
+  :class:`StepSystem`, `h` returns the full state `y = x` when the `y` port has
+  the state dimension (`p == n`) and zeros otherwise — the pyro convention, so a
+  plant declared with `output_dim=n` composes with `controller @ plant` without
+  overriding `h`.
 - **Dims:** `n` defaults to 0 (static IO shell); `m` from input ports; `p` from primary output
   `"y"` only (aux `"x"` does not change `p`; no `"y"` ⇒ `p==0`).
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
