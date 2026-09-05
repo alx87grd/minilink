@@ -53,5 +53,19 @@
     "requires": [
       "jax"
     ]
+  },
+  {
+    "id": "c_export",
+    "path": "examples/demos/interfaces/c_export.py",
+    "requires": [
+      "jax"
+    ]
+  },
+  {
+    "id": "c_export_proportional",
+    "path": "examples/demos/interfaces/c_export_proportional.py",
+    "requires": [
+      "jax"
+    ]
   }
 ]
