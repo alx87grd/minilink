@@ -2,15 +2,12 @@
 
 import numpy as np
 
+from minilink.catalog import JaxCartPole
+from minilink.core import QuadraticCost
 from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
-from minilink.planning.problems import PlanningProblem
+from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
 from minilink.planning.trajectory_optimization.live_plot import (
     LiveTrajectoryPlotCallback,
-)
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationPlanner,
 )
 
 # Demo controls.

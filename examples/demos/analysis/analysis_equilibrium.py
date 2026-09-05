@@ -7,8 +7,8 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.analysis.equilibria import find_equilibrium
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.analysis import find_equilibrium
+from minilink.catalog import Pendulum
 
 plant = Pendulum()
 x_guess = np.array([0.3, 0.0])  # near upright, zero rate

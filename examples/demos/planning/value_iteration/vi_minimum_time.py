@@ -1,10 +1,8 @@
 import numpy as np
 
-from minilink.core.costs import TimeCost
-from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
-from minilink.planning.problems import PlanningProblem
+from minilink.catalog import DoubleIntegrator
+from minilink.core import TimeCost
+from minilink.planning import DynamicProgrammingPlanner, PlanningProblem, StateSpaceGrid
 
 INF = 10.0
 X0 = np.array([1.2, 0.0])

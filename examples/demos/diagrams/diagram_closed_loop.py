@@ -1,9 +1,9 @@
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.control.impedance import ImpedanceController
-from minilink.core.diagram import DiagramSystem
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.blocks import Step
+from minilink.catalog import Pendulum
+from minilink.control import ImpedanceController
+from minilink.core import DiagramSystem
 
 # Plant system
 sys = Pendulum()

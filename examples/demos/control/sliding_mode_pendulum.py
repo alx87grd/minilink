@@ -18,10 +18,10 @@ closed loops — known issues*. Solver comparisons live in
 
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.control.modelbased import SlidingModeController
+from minilink.blocks import Step
+from minilink.catalog import Pendulum
+from minilink.control import SlidingModeController
 from minilink.core.composition import closed_loop_qdq
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 plant = Pendulum(length=1.0, mass=1.0)
 model = Pendulum(length=1.0, mass=0.5)

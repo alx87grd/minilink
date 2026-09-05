@@ -8,7 +8,7 @@ Run from the repo root::
 import numpy as np
 
 from minilink.analysis.discretize import discretize
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.catalog import Pendulum
 
 plant = Pendulum()
 plant.x0 = np.array([0.5, 0.0])

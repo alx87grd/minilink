@@ -13,15 +13,12 @@ from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
 )
+from minilink.core import QuadraticCost
 from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.vehicles.jax_vehicles import (
     BicycleDynRate,
 )
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationPlanner,
-)
+from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
 
 configure_jax(enable_x64=True)
 

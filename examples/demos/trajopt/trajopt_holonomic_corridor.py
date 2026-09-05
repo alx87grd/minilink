@@ -14,22 +14,17 @@ that stays in the tube and reaches the terminal goal.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.core.costs import QuadraticCost
+from minilink.catalog import HolonomicMobileRobot
+from minilink.core import BoxSet, QuadraticCost, SingletonSet, Trajectory
 from minilink.core.geometry import Sphere
-from minilink.core.sets import BoxSet, SingletonSet
-from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
-from minilink.planning.problems import PlanningProblem
+from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
 from minilink.planning.spatial.collision import bind, disc
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationPlanner,
-)
 
 TF = 14.0
 N_STEPS = 50

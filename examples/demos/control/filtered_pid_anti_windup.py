@@ -2,10 +2,9 @@
 
 import numpy as np
 
-from minilink.blocks.nonlinear import Saturation
-from minilink.blocks.sources import Step
-from minilink.control.siso import FilteredController
-from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
+from minilink.blocks import Saturation, Step
+from minilink.catalog import DoubleIntegrator
+from minilink.control import FilteredController
 
 step = Step()
 step.params["initial_value"] = np.array([0.0])

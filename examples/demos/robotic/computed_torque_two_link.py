@@ -16,9 +16,9 @@ with joint references from inverse kinematics.
 
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.control.modelbased import ComputedTorqueController
-from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
+from minilink.blocks import Step
+from minilink.catalog import TwoLinkManipulator
+from minilink.control import ComputedTorqueController
 
 p0 = np.array([0.5, 0.5])
 p1 = np.array([-0.5, 0.5])

@@ -18,12 +18,12 @@ import time
 
 import numpy as np
 
+from minilink.catalog import HolonomicMobileRobot
+from minilink.core import BoxSet
 from minilink.core.geometry import Sphere
-from minilink.core.sets import BoxSet
-from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
-from minilink.planning.problems import PlanningProblem
+from minilink.planning import PlanningProblem, RRTStarPlanner
 from minilink.planning.search.extenders import SteeringExtender
-from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
+from minilink.planning.search.rrt_star import RRTStarOptions
 from minilink.planning.search.steering import StraightLineSteering
 from minilink.planning.spatial.collision import bind, disc
 from minilink.planning.spatial.scene import Scene

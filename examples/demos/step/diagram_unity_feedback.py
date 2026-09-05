@@ -9,10 +9,9 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.control.output import ProportionalController
+from minilink.control import ProportionalController
+from minilink.core import StepDiagramSystem, StepSystem
 from minilink.core.backends import array_module
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem
 
 
 class DiscreteAccumulator(StepSystem):

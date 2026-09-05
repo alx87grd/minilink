@@ -5,8 +5,8 @@ Run from the repo root:
     python examples/demos/diagrams/diagram_advanced_autowire.py
 """
 
-from minilink.core.system import System
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
+from minilink.catalog import DynamicBicycle
+from minilink.core import System
 
 
 class DemoPathPlanner(System):

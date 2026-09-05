@@ -10,13 +10,12 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
+from minilink.blocks import Integrator
+from minilink.control import ProportionalController
+from minilink.core import StepDiagramSystem, StepSystem
 from minilink.core.backends import array_module
-from minilink.core.diagram import StepDiagramSystem
 from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.core.system import StepSystem
-from minilink.simulation.computer import StepSchedule
+from minilink.simulation import StepSchedule
 
 DT_BASE = 0.01
 TF = 2.0

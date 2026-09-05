@@ -27,13 +27,13 @@ import time
 
 import numpy as np
 
+from minilink.catalog import KinematicCar
+from minilink.core import BallSet, BoxSet
 from minilink.core.geometry import Box
-from minilink.core.sets import BallSet, BoxSet
-from minilink.dynamics.catalog.vehicles.steering import KinematicCar
-from minilink.planning.problems import PlanningProblem
+from minilink.planning import PlanningProblem, RRTPlanner
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.metric import weighted
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
+from minilink.planning.search.rrt import RRTOptions
 from minilink.planning.search.steering import DubinsSteering
 from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.scene import Scene

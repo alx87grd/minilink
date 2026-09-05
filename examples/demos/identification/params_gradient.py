@@ -19,9 +19,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from minilink.core import DiagramSystem, DynamicSystem, System
 from minilink.core.backends import array_module, configure_jax
-from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem, System
 
 configure_jax(enable_x64=True)
 

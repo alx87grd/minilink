@@ -12,8 +12,9 @@ simulation — ready for plotting or replay.
 
 import numpy as np
 
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole
-from minilink.simulation.realtime import PygameInput, RealtimeSimulator
+from minilink.catalog import CartPole
+from minilink.simulation import RealtimeSimulator
+from minilink.simulation.realtime import PygameInput
 
 sys = CartPole()
 sys.x0 = np.array([0.0, 0.2, 0.0, 0.0])  # small pole tilt to balance away

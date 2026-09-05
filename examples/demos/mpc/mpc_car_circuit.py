@@ -14,13 +14,13 @@ from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
 )
+from minilink.core import QuadraticCost
 from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.dynamics.catalog.vehicles.jax_vehicles import (
     BicycleDynRate,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.paths import from_waypoints
@@ -32,9 +32,6 @@ from minilink.planning.spatial.shaping import (
     quadratic_hinge,
 )
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationPlanner,
-)
 
 configure_jax(enable_x64=True)
 

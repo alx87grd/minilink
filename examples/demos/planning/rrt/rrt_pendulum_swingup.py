@@ -14,11 +14,11 @@ obstacles — this is pure state-space planning with the dynamics.
 
 import numpy as np
 
-from minilink.core.sets import BallSet
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.planning.problems import PlanningProblem
+from minilink.catalog import Pendulum
+from minilink.core import BallSet
+from minilink.planning import PlanningProblem, RRTPlanner
 from minilink.planning.search.extenders import KinodynamicExtender
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
+from minilink.planning.search.rrt import RRTOptions
 
 sys = Pendulum()  # state [theta, dtheta]; theta=0 hangs down, theta=pi inverted
 sys.state.lower_bound = np.array([-2.0 * np.pi, -12.0])

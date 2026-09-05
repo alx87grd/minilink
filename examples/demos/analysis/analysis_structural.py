@@ -7,9 +7,9 @@ Run from the repo root::
 
 import numpy as np
 
+from minilink.analysis import controllability, observability
 from minilink.analysis.linearize import linearize
-from minilink.analysis.structural import controllability, observability
-from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
+from minilink.catalog import InvertedPendulum
 
 plant = InvertedPendulum()
 lti = linearize(plant, x_bar=[0.0, 0.0])

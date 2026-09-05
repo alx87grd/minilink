@@ -13,9 +13,9 @@ Built-in outer PD + inverse dynamics in one block::
 
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.control.modelbased import ComputedTorqueController
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.blocks import Step
+from minilink.catalog import Pendulum
+from minilink.control import ComputedTorqueController
 
 plant = Pendulum()
 plant.x0 = np.array([np.pi + 0.25, 0.0])

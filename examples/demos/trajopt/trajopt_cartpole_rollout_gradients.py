@@ -21,9 +21,9 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
+from minilink.catalog import JaxCartPole
+from minilink.core import Trajectory
 from minilink.core.backends import configure_jax
-from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
 
 # Demo controls.
 ANIMATE = True

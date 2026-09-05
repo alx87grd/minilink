@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.catalog import Pendulum
 
 pendulum = Pendulum()
 pendulum.state.lower_bound = np.array([-2.0 * np.pi, -6.0])

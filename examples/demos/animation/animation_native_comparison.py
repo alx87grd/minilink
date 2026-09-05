@@ -3,8 +3,8 @@
 Matplotlib runs with ``show=False``. Meshcat is skipped when not installed.
 """
 
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.simulation.simulator import Simulator
+from minilink.catalog import Pendulum
+from minilink.simulation import Simulator
 
 sys = Pendulum()
 sys.x0[0] = 2.0

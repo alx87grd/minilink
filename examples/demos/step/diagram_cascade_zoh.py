@@ -10,8 +10,8 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.blocks.step import ZOHHold
-from minilink.core.diagram import StepDiagramSystem
+from minilink.blocks import ZOHHold
+from minilink.core import StepDiagramSystem
 
 
 def pulse_input(k):

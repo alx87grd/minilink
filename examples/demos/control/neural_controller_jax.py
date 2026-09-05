@@ -10,11 +10,9 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.blocks.basic import Integrator
-from minilink.blocks.neural import NeuralNetwork
-from minilink.blocks.routing import Mux
+from minilink.blocks import Integrator, Mux, NeuralNetwork
+from minilink.core import DiagramSystem
 from minilink.core.backends import configure_jax
-from minilink.core.diagram import DiagramSystem
 from minilink.graphical.common.environment import is_blocking_needed
 from minilink.graphical.common.matplotlib_style import DPI_FIGURE
 

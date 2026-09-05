@@ -1,16 +1,16 @@
 import numpy as np
 
+from minilink.catalog import Pendulum
 from minilink.control.lqr import lqr_at_operating_point
-from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.planning.policy_synthesis import plotting
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
+from minilink.core import QuadraticCost
+from minilink.planning import (
     DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
+    PlanningProblem,
+    PolicyEvaluator,
+    StateSpaceGrid,
 )
-from minilink.planning.policy_synthesis.policy_eval import PolicyEvaluator
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.policy_synthesis import plotting
 
 INF = 500.0
 UPRIGHT = np.array([-np.pi, 0.0])

@@ -2,9 +2,8 @@ import time
 
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.core.diagram import DiagramSystem
-from minilink.core.system import DynamicSystem, System
+from minilink.blocks import Step
+from minilink.core import DiagramSystem, DynamicSystem, System
 
 # Demo controls.
 PRINT_COMPILE_REPORT = True  # Print compile timing diagnostics.

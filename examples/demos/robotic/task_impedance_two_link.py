@@ -16,9 +16,9 @@ End-effector step from ``p0 = (0.5, 0.5)`` to ``p1 = (-0.5, 0.5)`` at ``t = 4`` 
 
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.control.robotic import TaskImpedance
-from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
+from minilink.blocks import Step
+from minilink.catalog import TwoLinkManipulator
+from minilink.control import TaskImpedance
 
 p0 = np.array([0.5, 0.5])
 p1 = np.array([-0.5, 0.5])

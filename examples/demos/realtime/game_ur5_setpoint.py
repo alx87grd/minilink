@@ -21,9 +21,10 @@ returns the recorded ``Trajectory``.
 
 import numpy as np
 
-from minilink.control.robotic import TaskImpedance
-from minilink.dynamics.catalog.manipulators import UR5Manipulator
-from minilink.simulation.realtime import PygameInput, RealtimeSimulator
+from minilink.catalog import UR5Manipulator
+from minilink.control import TaskImpedance
+from minilink.simulation import RealtimeSimulator
+from minilink.simulation.realtime import PygameInput
 
 # GRAVITY_COMP = False
 GRAVITY = True

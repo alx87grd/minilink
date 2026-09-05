@@ -21,12 +21,9 @@ Wiring::
 
 import numpy as np
 
-from minilink.blocks.sources import Source, Step
-from minilink.control.robotic import TaskKinematicNullspace
-from minilink.dynamics.catalog.manipulators.arms import (
-    FiveLinkPlanarManipulator,
-    SpeedControlledManipulator,
-)
+from minilink.blocks import Source, Step
+from minilink.catalog import FiveLinkPlanarManipulator, SpeedControlledManipulator
+from minilink.control import TaskKinematicNullspace
 
 TF = 8.0
 NULLSPACE_STEP_TIME = 1.0
