@@ -1,9 +1,7 @@
 # file  module — deep imports that predate the teaching-surface rule (S12).
 # This list only shrinks; see test_teaching_imports.py.
-examples/demos/control/neural_controller_jax.py minilink.core.backends
 examples/demos/control/neural_controller_jax.py minilink.graphical.common.environment
 examples/demos/control/neural_controller_jax.py minilink.graphical.common.matplotlib_style
-examples/demos/control/pid_autotuning_jax.py minilink.core.backends
 examples/demos/control/pid_autotuning_jax.py minilink.graphical.signals
 examples/demos/control/sliding_mode_pendulum.py minilink.core.composition
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
@@ -12,7 +10,6 @@ examples/demos/hybrid/smc_pendulum_rate.py minilink.core.hybrid_composition
 examples/demos/identification/params_gradient.py minilink.core.backends
 examples/demos/interfaces/c_export.py minilink.interfaces.c_export
 examples/demos/interfaces/c_export_proportional.py minilink.interfaces.c_export
-examples/demos/mpc/mpc_car_circuit.py minilink.core.backends
 examples/demos/mpc/mpc_car_circuit.py minilink.core.geometry
 examples/demos/mpc/mpc_car_circuit.py minilink.dynamics.catalog.vehicles.jax_vehicles
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.collision
@@ -22,7 +19,6 @@ examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.plotting
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.scene
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.shaping
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.track
-examples/demos/mpc/mpc_car_minimal.py minilink.core.backends
 examples/demos/mpc/mpc_car_minimal.py minilink.dynamics.catalog.vehicles.jax_vehicles
 examples/demos/optimization/optim_plot.py minilink.graphical.common.environment
 examples/demos/optimization/optim_plot.py minilink.graphical.common.matplotlib_style
@@ -54,9 +50,7 @@ examples/demos/robotic/joint_impedance_two_link.py minilink.core.composition
 examples/demos/step/diagram_unity_feedback.py minilink.core.backends
 examples/demos/step/step_accumulator.py minilink.core.backends
 examples/demos/step/step_fibonacci.py minilink.core.backends
-examples/demos/trajopt/trajopt_cartpole_collocation_jax.py minilink.core.backends
 examples/demos/trajopt/trajopt_cartpole_collocation_jax.py minilink.planning.trajectory_optimization.live_plot
-examples/demos/trajopt/trajopt_cartpole_rollout_gradients.py minilink.core.backends
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.core.geometry
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.graphical.animation.primitives
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.graphical.catalog
