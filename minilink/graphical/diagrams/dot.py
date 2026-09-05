@@ -110,6 +110,17 @@ def _render_diagram_graph(
             display.display(graph)
         except ImportError:
             warnings.warn("IPython is not available for inline display", stacklevel=2)
+        except Exception as exc:
+            # graphviz raises ExecutableNotFound when the ``dot`` binary is
+            # missing (a bare Colab runtime, or a pip install without the
+            # system package). The notebook keeps running; the diagram is
+            # simply not drawn.
+            warnings.warn(
+                "Could not render the diagram inline. Is the Graphviz binary "
+                "installed? (conda install graphviz / apt install graphviz / "
+                f"brew install graphviz). Error: {exc}",
+                stacklevel=2,
+            )
 
     show_mpl = show and (not show_inline) and (not show_pdf)
     if show_mpl:

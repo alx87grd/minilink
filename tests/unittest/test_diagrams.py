@@ -360,3 +360,33 @@ class TestFeedbackMissingPortMessage(unittest.TestCase):
         self.assertIn("has no 'y' output port", message)
         self.assertIn("output_dim=", message)
         self.assertNotIn("dim None", message)
+
+
+class TestDiagramRenderWithoutDot(unittest.TestCase):
+    """plot_diagram() in a notebook without the Graphviz binary warns, never raises."""
+
+    def test_inline_render_warns_when_dot_is_missing(self):
+        import warnings
+        from unittest import mock
+
+        from minilink.control.impedance import ImpedanceController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+        from minilink.graphical.diagrams import dot as dot_module
+
+        try:
+            import IPython.display  # noqa: F401
+        except ImportError:
+            self.skipTest("IPython not installed")
+
+        graph = (ImpedanceController() @ Pendulum()).get_diagram()
+        if graph is None:
+            self.skipTest("graphviz Python package not installed")
+
+        with mock.patch(
+            "IPython.display.display",
+            side_effect=RuntimeError("failed to execute PosixPath('dot')"),
+        ):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                dot_module._render_diagram_graph(graph, show=True, show_inline=True)
+        self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
