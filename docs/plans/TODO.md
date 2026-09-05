@@ -27,18 +27,18 @@ updates only where a public contract changes.
 ## 1. Phase D — docs as plan of record
 
 - [x] **D1** `ROADMAP.md` rewritten (milestones, two lanes, TRL ledger with lane column, GRO860 checklist, phases, review queue, consolidation principle).
-- [ ] **D2** `README.md` **[ask]** — custom-plant example composes with `@` (depends on step S40 below); band-facade imports in every code block where a facade exists today; "API stability" table → the two-lane table; install section unchanged (conda recommended).
+- [x] **D2** `README.md` **[ask]** — custom-plant example composes with `@` (depends on step S40 below); band-facade imports in every code block where a facade exists today; "API stability" table → the two-lane table; install section unchanged (conda recommended).
 - [x] **D3** `DESIGN.md` — two-lane section, wheel scope, float64 policy, unconnected-input contract, control-block decision record, duplicated line removed.
 - [x] **D4** `AGENTS.md` — student-facing import rule, demo-header rule, consolidate-never-strip, two lanes, delegation split, float64 / unconnected / verbose reminders.
 - [x] **D5** this file.
-- [ ] **D6** `docs/plans/` — delete `control-block-contract.md` (Implemented) and `test-benchmark-consolidation.md` (Complete); shrink `pyro-port-remaining.md` to open rows plus a compact pyro→minilink name map, converting the two `*WithPositionInputs` "Done" rows (classes do not exist; DESIGN rejects the branch) to Drop and fixing the three stale paths; relabel the five draft plans "research lane — Later"; update `README.md` index.
-- [ ] **D7** `examples/README.md` — `projects/` and `sandbox/` labelled research lane (outside the release contract, not CI-checked). `install.md` unchanged.
+- [x] **D6** `docs/plans/` — delete `control-block-contract.md` (Implemented) and `test-benchmark-consolidation.md` (Complete); shrink `pyro-port-remaining.md` to open rows plus a compact pyro→minilink name map, converting the two `*WithPositionInputs` "Done" rows (classes do not exist; DESIGN rejects the branch) to Drop and fixing the three stale paths; relabel the five draft plans "research lane — Later"; update `README.md` index.
+- [x] **D7** `examples/README.md` — `projects/` and `sandbox/` labelled research lane (outside the release contract, not CI-checked). `install.md` unchanged.
 
 ---
 
 ## 2. Phase 0 — first-hour safety
 
-- [ ] **S01 Default output grid** **[ask — Simulator API]** (direction approved 2026-09-05: fixed count).
+- [x] **S01 Default output grid** **[ask — Simulator API]** (direction approved 2026-09-05: fixed count).
   Touch `simulation/simulator.py` (`select_time_vector`, `select_solver`), `simulation/time_grid.py`, `simulation/static_simulator.py`, tests asserting `100001`.
   When neither `n_steps` nor `dt` is given: `n_steps = 1001` for adaptive solvers; `dt` from `smallest_time_constant` only for `euler` / `euler_fixedsteps` / `rk4_fixedsteps`; auto-RK4 under JAX keyed on the requested solver or `discontinuous_behavior`, never on `n_pts`.
   Done when `Pendulum().compute_trajectory(tf=10)` returns 1 001 samples on both backends, the JAX default still picks `scipy` (`nfev ≈ 200`), suite green.
@@ -46,14 +46,14 @@ updates only where a public contract changes.
   Touch `core/compile/compiler.py` (leaf + diagram entry), `numpy_evaluators.py` constructors, `jax_evaluators.py` (probe *before* `check_jax_compatible`).
   Probe `f(x0, u_nom, 0, params)` and every `port.compute(...)`; raise `ValueError("f() of 'Name' returned shape (1,); expected (2,) for n=2")` and the port analogue; skip `f` for `n == 0`.
   Done when a wrong-shape `f` / `h` raises the message from `compute_trajectory`, `compile("numpy")`, and `compile("jax")`; test in `test_compile.py`.
-- [ ] **S40 `DynamicSystem` default output** **[ask — core API]**. Today `output_dim=n` with no `h` override yields `y ≡ 0` (the `00_core` custom-plant form). Decide: default `h` returns `x` when `output_dim == n` (pyro semantics), or require an explicit `h`, or keep zeros and make the README/notebook example define `h`. D2 depends on this.
+- [x] **S40 `DynamicSystem` default output** **[ask — core API]**. Today `output_dim=n` with no `h` override yields `y ≡ 0` (the `00_core` custom-plant form). Decide: default `h` returns `x` when `output_dim == n` (pyro semantics), or require an explicit `h`, or keep zeros and make the README/notebook example define `h`. D2 depends on this.
 - [ ] **S04 README example + `@` message** **[ask — README]**. `composition.py` `_feedback_mismatch_message`: when the plant lacks the expected output port, say *"plant 'X' has no 'y' output port; pass `output_dim=…` or wire ports explicitly"* instead of "dim None". Test in `test_diagrams.py`.
-- [ ] **S05 Float64 policy** (approved).
+- [x] **S05 Float64 policy** (approved).
   Touch `core/backends.py` (`ensure_jax_x64()` or inside `require_jax_numpy`), all JAX evaluator constructors in `core/compile/evaluators/jax_evaluators.py`, `optimization/evaluators/jax_evaluator.py`, `planning/trajectory_optimization/parametric_evaluator.py`; DP's existing `configure_jax(enable_x64=True)` calls become no-ops.
   Done when the canonical pendulum / cart-pole trajopt problems report `success=True` on `compile_backend="jax"` without the caller touching `configure_jax`; `MINILINK_JAX_X64=0` restores float32; test in `test_jax_planning.py`.
 - [ ] **S06 `super().__init__()` guard** **[ask — core]**. In the facade entry points (`compile`, `compute_trajectory`, `plot_*`, `animate`) one helper: if `not hasattr(self, "inputs")` raise `TypeError(f"{type(self).__name__}.__init__ must call super().__init__(n=…) before use")`. Test in `test_core.py`.
-- [ ] **S07 Unify verbose flag names** (approved; panel stays). `verbose` / `disp` → `verbose` on planners, optimizer, MPC; framed panel unchanged. Update call sites and docs in the same change (no aliases).
-- [ ] **S08 nbstripout hook**. `.pre-commit-config.yaml` → `files: ^examples/.*\.ipynb$`; strip stored outputs. Done when `pre-commit run nbstripout --all-files` is clean.
+- [x] **S07 Unify verbose flag names** (approved; panel stays). `verbose` / `disp` → `verbose` on planners, optimizer, MPC; framed panel unchanged. Update call sites and docs in the same change (no aliases).
+- [x] **S08 nbstripout hook**. `.pre-commit-config.yaml` → `files: ^examples/.*\.ipynb$`; strip stored outputs. Done when `pre-commit run nbstripout --all-files` is clean.
 - [ ] **S09 Trajopt `success` = defects satisfied** **[ask — planner API]**. `SolveMetadata` gains `max_defect` / `max_violation`; transcriptions expose `defects(z)` / `constraint_violation(z)`; `success = solver_ok or (defects ≤ tol and violation ≤ tol)`; both numbers in the solve summary. Tests in `test_planning.py`.
 
 ---
@@ -70,9 +70,9 @@ updates only where a public contract changes.
 - [ ] **S38 DP metadata honesty** **[ask — planner API]**. `DynamicProgrammingOptions.final_time` reads `problem.tf` when set; `SolveMetadata.success` reports convergence, not always `True`; VI notebooks wire with `vi_ctl @ plant` (notebook edits **[ask]**).
 - [ ] **S16 Delete the `_jit` aliases** **[ask — evaluator names]**. `register_jit_aliases`, `_TRACE_TIER_SUFFIXES`, six call sites, `test_f_jit_alias_identity`, DESIGN §5 sentence. 24 alias methods, zero call sites.
 - [ ] **S17 Delete the 28 unreferenced evaluator methods** **[ask — evaluator names]**: `euler_integrate_ivp_p`, `euler_integrate_ivp_trace`, `euler_integrate_ivp_trace_p`, `euler_integrate_zoh_p`, `euler_integrate_zoh_trace_p`, `euler_step_ivp_p`, `euler_step_ivp_trace`, `euler_step_ivp_trace_p`, `euler_step_trace`, `euler_step_trace_p`, `f_ivp_scipy`, `f_scipy`, `integrate_zoh_p`, `outputs_trace_p`, `rk4_integrate_ivp_p`, `rk4_integrate_ivp_trace`, `rk4_integrate_ivp_trace_p`, `rk4_integrate_linear_trace`, `rk4_integrate_linear_trace_p`, `rk4_integrate_zoh_trace_p`, `rk4_step_ivp`, `rk4_step_ivp_p`, `rk4_step_ivp_trace`, `rk4_step_ivp_trace_p`, `rk4_step_trace_p`, `rollout_p`, `step_block`, `step_trace_p`. Keep the frozen subset DESIGN §5 names.
-- [ ] **S18 Wheel excludes the research lane** (approved). `pyproject.toml` `[tool.hatch.build.targets.wheel]` excludes `minilink/symbolic/**`, `minilink/dynamics/engines/**`, `minilink/interfaces/c_export.py`; `examples/` were never shipped. Done when `python -m build` produces a wheel without those paths and the suite (run from the repo) stays green.
-- [ ] **S19 `c_export` in the nightly sweep**. Add both `examples/demos/interfaces/` scripts to the nightly manifest with `requires: ["jax"]` (TRL row already in ROADMAP).
-- [ ] **S20 Nightly full demo sweep**. `.github/workflows/nightly.yml` running `run_all_demos.py --timeout 120 --continue-on-error` and `run_notebook_checks.py` on a schedule + `workflow_dispatch`.
+- [x] **S18 Wheel excludes the research lane** (approved). `pyproject.toml` `[tool.hatch.build.targets.wheel]` excludes `minilink/symbolic/**`, `minilink/dynamics/engines/**`, `minilink/interfaces/c_export.py`; `examples/` were never shipped. Done when `python -m build` produces a wheel without those paths and the suite (run from the repo) stays green.
+- [x] **S19 `c_export` in the nightly sweep**. Add both `examples/demos/interfaces/` scripts to the nightly manifest with `requires: ["jax"]` (TRL row already in ROADMAP).
+- [x] **S20 Nightly full demo sweep**. `.github/workflows/nightly.yml` running `run_all_demos.py --timeout 120 --continue-on-error` and `run_notebook_checks.py` on a schedule + `workflow_dispatch`.
 - [ ] **S21 Branch hygiene** **[ask — you run the script]**. List the 31 local branches merged into `main` and the 42 `cursor/*` remotes with dates; produce the delete script.
 - [ ] **S41 Consolidation inventory** (report only). Ranked table of maintenance-cost items — text edited twice, dead API, boilerplate classes, twin plants, plotting homes, research code in the teaching tree — each with lines, blast radius, and what it does *not* remove. Maintainer picks; picked items become steps in §4/§5.
 - [ ] **S42 Multiple-shooting parametric guard** (carried over; cheap). `MultipleShootingTranscription` inherits collocation `transcribe_parametric` and silently builds wrong defects; override to `NotImplementedError` and replace the planner's `hasattr` check with an explicit capability flag.
