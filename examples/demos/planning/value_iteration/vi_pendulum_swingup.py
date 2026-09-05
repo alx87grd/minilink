@@ -5,9 +5,7 @@ from minilink import (
     Pendulum,
     PlanningProblem,
     QuadraticCost,
-    StateSpaceGrid,
 )
-from minilink.planning import DynamicProgrammingOptions
 
 INF = 500.0
 UPRIGHT = np.array([-np.pi, 0.0])
@@ -29,13 +27,15 @@ cost = QuadraticCost.from_system(
 )
 problem = PlanningProblem(plant, x_goal=UPRIGHT, cost=cost)
 
-grid = StateSpaceGrid(problem, x_grid_shape=(201, 201), u_grid_shape=(21,), dt=0.05)
 planner = DynamicProgrammingPlanner(
     problem,
-    grid=grid,
-    options=DynamicProgrammingOptions(
-        alpha=1.0, tol=0.1, max_iterations=2000, out_of_bound_cost=INF, verbose=True
-    ),
+    x_grid=(201, 201),
+    u_grid=(21,),
+    dt=0.05,
+    tol=0.1,
+    max_iterations=2000,
+    out_of_bound_cost=INF,
+    verbose=True,
 )
 planner.solve()
 planner.clean_infeasible_set()

@@ -15,7 +15,6 @@ from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
 )
-from minilink.core.backends import configure_jax
 from minilink.core.geometry import Sphere
 from minilink.dynamics.catalog.vehicles.jax_vehicles import (
     BicycleDynRate,
@@ -31,8 +30,6 @@ from minilink.planning.spatial.shaping import (
     quadratic_hinge,
 )
 from minilink.planning.spatial.track import ReferenceTrack
-
-configure_jax(enable_x64=True)
 
 # --- knobs ---
 U_TARGET = 20.0

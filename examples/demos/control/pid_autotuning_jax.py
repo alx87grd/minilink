@@ -7,10 +7,7 @@ import numpy as np
 
 from minilink import DiagramSystem, Pendulum, Trajectory
 from minilink.control import ImpedanceIntegralController
-from minilink.core.backends import configure_jax
 from minilink.graphical.signals import open_time_signal_plot, resolve_plot_signals
-
-configure_jax(enable_x64=True)
 
 # Rollout horizon (JAX loss and NumPy plot share dt and tf).
 TF = 10.0

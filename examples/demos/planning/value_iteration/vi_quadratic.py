@@ -5,7 +5,6 @@ from minilink import (
     DynamicProgrammingPlanner,
     PlanningProblem,
     QuadraticCost,
-    StateSpaceGrid,
 )
 
 INF = 300.0
@@ -21,10 +20,11 @@ cost = QuadraticCost.from_system(
 )
 problem = PlanningProblem(plant, x_goal=np.zeros(2), cost=cost)
 
-grid = StateSpaceGrid(problem, x_grid_shape=(101, 101), u_grid_shape=(41,), dt=0.05)
 planner = DynamicProgrammingPlanner(
     problem,
-    grid=grid,
+    x_grid=(101, 101),
+    u_grid=(41,),
+    dt=0.05,
     alpha=1.0,
     tol=0.5,
     max_iterations=1000,

@@ -12,12 +12,8 @@ import numpy as np
 
 from minilink import DiagramSystem, Integrator, Mux
 from minilink.blocks import NeuralNetwork
-from minilink.core.backends import configure_jax
 from minilink.graphical.common.environment import is_blocking_needed
 from minilink.graphical.common.matplotlib_style import DPI_FIGURE
-
-configure_jax(enable_x64=True)
-
 
 print("=" * 70)
 print("Part 1 - Build a neural closed-loop controller")

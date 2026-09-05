@@ -4,7 +4,6 @@ from minilink import (
     DoubleIntegrator,
     DynamicProgrammingPlanner,
     PlanningProblem,
-    StateSpaceGrid,
 )
 from minilink.core import TimeCost
 
@@ -20,10 +19,11 @@ plant.inputs["u"].upper_bound = np.array([1.0])
 cost = TimeCost.from_system(plant, eps=1e-3)
 problem = PlanningProblem(plant, x_goal=np.zeros(2), cost=cost)
 
-grid = StateSpaceGrid(problem, x_grid_shape=(201, 201), u_grid_shape=(3,), dt=0.05)
 planner = DynamicProgrammingPlanner(
     problem,
-    grid=grid,
+    x_grid=(201, 201),
+    u_grid=(3,),
+    dt=0.05,
     alpha=1.0,
     tol=1e-3,
     max_iterations=800,

@@ -22,12 +22,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink import JaxCartPole, Trajectory
-from minilink.core.backends import configure_jax
 
 # Demo controls.
 ANIMATE = True
-
-configure_jax(enable_x64=True)
 
 plant = JaxCartPole()
 evaluator = plant.compile(backend="jax")

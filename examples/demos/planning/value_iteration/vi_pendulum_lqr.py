@@ -6,10 +6,8 @@ from minilink import (
     PlanningProblem,
     PolicyEvaluator,
     QuadraticCost,
-    StateSpaceGrid,
     lqr_at_operating_point,
 )
-from minilink.planning import DynamicProgrammingOptions
 from minilink.planning.policy_synthesis import plotting
 
 INF = 500.0
@@ -29,12 +27,10 @@ plant.inputs["u"].upper_bound = np.array([TORQUE])
 cost = QuadraticCost.from_system(plant, xbar=UPRIGHT, Q=Q, R=R)
 problem = PlanningProblem(plant, x_goal=UPRIGHT, cost=cost)
 
-grid = StateSpaceGrid(problem, x_grid_shape=(101, 101), u_grid_shape=(11,), dt=0.05)
 planner = DynamicProgrammingPlanner(
-    problem,
-    grid=grid,
-    options=DynamicProgrammingOptions(alpha=1.0, tol=0.1, max_iterations=2000),
+    problem, x_grid=(101, 101), u_grid=(11,), dt=0.05, tol=0.1, max_iterations=2000
 )
+grid = planner.grid  # shared with the LQR policy evaluation below
 planner.solve()
 planner.clean_infeasible_set()
 

@@ -14,12 +14,9 @@ from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
 )
-from minilink.core.backends import configure_jax
 from minilink.dynamics.catalog.vehicles.jax_vehicles import (
     BicycleDynRate,
 )
-
-configure_jax(enable_x64=True)
 
 U_TARGET = 4.0
 TF_SIM = 5.0

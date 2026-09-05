@@ -8,18 +8,12 @@ from minilink import (
     QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
-from minilink.core.backends import configure_jax
 from minilink.planning.trajectory_optimization.live_plot import (
     LiveTrajectoryPlotCallback,
 )
 
-# Demo controls.
-PRINT_SOLVE_REPORT = True  # Print the Minilink TrajOpt pre/post solve report.
-PRINT_RESULT_SUMMARY = not PRINT_SOLVE_REPORT  # Print compact success/cost fallback.
-SCIPY_DISP = False  # Keep SciPy's own backend text off; use PRINT_SOLVE_REPORT.
-LIVE_PLOT = False  # Set True for Plotly live iterate updates during solve.
-
-configure_jax(enable_x64=True)
+PRINT_SOLVE_REPORT = True  # Minilink's pre/post solve report
+LIVE_PLOT = False  # Plotly live iterate updates during the solve
 
 sys = JaxCartPole()
 sys.inputs["u"].lower_bound[0] = -10.0
@@ -66,10 +60,9 @@ planner = TrajectoryOptimizationPlanner(
     callback=callback,
 )
 
-traj = planner.solve().trajectory
-planner.plot_solution(signals=("x", "u"))
-
-planner.problem.sys.animate(traj)
+planner.solve()
+planner.plot_solution()
+planner.animate_solution()
 
 # traj2 = traj.resample(n_samples=200)
 # planner.problem.sys.animate(traj2)
