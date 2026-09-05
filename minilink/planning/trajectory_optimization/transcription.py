@@ -179,6 +179,11 @@ class FixedGridOptions:
 
 
 class Transcription(ABC):
+    #: True when :meth:`transcribe_parametric` builds a correct parametric
+    #: program (the receding-horizon / MPC path). Checked by the planner
+    #: instead of ``hasattr`` so a subclass cannot inherit a wrong one.
+    supports_parametric = False
+
     """
     Base class for finite-dimensional trajectory transcriptions.
     """

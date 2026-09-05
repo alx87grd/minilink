@@ -2267,3 +2267,40 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         _, result = solve(problem)
         with self.assertRaisesRegex(ValueError, "feedback declaration"):
             PolicyEvaluator(problem, grid=result.grid, policy=Integrator())
+
+
+class TestParametricCapabilityFlag(unittest.TestCase):
+    """S42: multiple shooting no longer inherits collocation's parametric build."""
+
+    def test_multiple_shooting_declares_no_parametric_support(self):
+        from minilink.planning.trajectory_optimization.direct_collocation import (
+            DirectCollocationTranscription,
+        )
+        from minilink.planning.trajectory_optimization.multiple_shooting import (
+            MultipleShootingTranscription,
+        )
+
+        self.assertTrue(DirectCollocationTranscription.supports_parametric)
+        self.assertFalse(MultipleShootingTranscription.supports_parametric)
+
+    def test_planner_refuses_parametric_compile_for_multiple_shooting(self):
+        pytest.importorskip("jax")
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        problem = PlanningProblem(
+            plant,
+            x_start=np.zeros(2),
+            x_goal=goal,
+            tf=2.0,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            n_steps=10,
+            transcription="multiple_shooting",
+            compile_backend="jax",
+        )
+        with self.assertRaises(TypeError):
+            planner.compile_parametric_program()

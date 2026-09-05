@@ -158,6 +158,8 @@ class DirectCollocationTranscription(Transcription):
             },
         )
 
+    supports_parametric = True
+
     def transcribe_parametric(
         self,
         problem: PlanningProblem,

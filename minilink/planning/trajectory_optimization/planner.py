@@ -293,10 +293,10 @@ class TrajectoryOptimizationPlanner(Planner):
                 "compile_parametric_program requires compile_backend='jax' "
                 f"(got {self.options.compile_backend!r})."
             )
-        if not hasattr(self.transcription, "transcribe_parametric"):
+        if not getattr(self.transcription, "supports_parametric", False):
             raise TypeError(
-                f"{type(self.transcription).__name__} does not support "
-                "transcribe_parametric; use DirectCollocationTranscription."
+                f"{type(self.transcription).__name__} does not support a "
+                "parametric program; use transcription='direct_collocation'."
             )
 
         from minilink.planning.trajectory_optimization.parametric_evaluator import (
