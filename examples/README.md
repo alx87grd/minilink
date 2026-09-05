@@ -25,9 +25,9 @@ examples/
 | [`learn/intro/`](learn/intro/) | Learn **minilink** — numbered API notebooks + showcase |
 | [`learn/teaching/`](learn/teaching/) | Learn a **subject** (reusable domain notebooks) |
 | [`demos/<topic>/`](demos/) | Canonical single-file feature demo (incl. pedagogical compares) |
-| [`projects/<name>/`](projects/) | Multi-file experiment (`run_demo.py` + helpers ± notebook) |
+| [`projects/<name>/`](projects/) | Multi-file experiment (`run_demo.py` + helpers ± notebook) — **research lane**: outside the release contract, not CI-checked |
 | [`tooling/`](tooling/) | Dev matrices / benches — `notebooks/` and/or `scripts/` |
-| [`sandbox/<topic>/`](sandbox/) | Non-core, scenario sprawl, versioned WIP |
+| [`sandbox/<topic>/`](sandbox/) | Non-core, scenario sprawl, versioned WIP — **research lane** |
 | [`sandbox/scratch/`](sandbox/scratch/) | Personal quick checks; not README/CI |
 
 **Promotion:** `sandbox/scratch/` → `sandbox/<topic>/` → `demos/<topic>/` (if
@@ -116,9 +116,9 @@ use the `minilink` conda env (see root [README](../README.md#install)).
 | RL | [pendulum_swing_up_vi_vs_lqr_vs_ppo](learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) | — | [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) |
 | State-space / LQR | — | [`demos/statespace/`](demos/statespace/) | |
 | Identification | — | [`demos/identification/`](demos/identification/) | |
-| C export | — | [`demos/interfaces/`](demos/interfaces/) | |
-| Physics engine | — | [`sandbox/engine/`](sandbox/engine/) | Non-core |
-| Symbolic | — | [`sandbox/symbolic/`](sandbox/symbolic/) | Non-core |
+| C export | — | [`demos/interfaces/`](demos/interfaces/) | Research lane (repo-only, nightly sweep) |
+| Physics engine | — | [`sandbox/engine/`](sandbox/engine/) | Research lane (quarantine) |
+| Symbolic | — | [`sandbox/symbolic/`](sandbox/symbolic/) | Research lane (quarantine) |
 | Solver benchmarks | — | [benchmark](tooling/notebooks/benchmark.ipynb) | Uses repo-root `benchmarks/` |
 
 Run demos from the repo root, e.g.
