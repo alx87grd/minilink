@@ -114,6 +114,12 @@ Step-level specs, files, and "done when" criteria live in
 [docs/plans/TODO.md](docs/plans/TODO.md); the audit trail is in
 [docs/reviews/](docs/reviews/).
 
+**Status 2026-09-05 (evening session, `dev-fable`):** Phase D complete; Phase 0
+complete (S03 dropped by decision); Phase 1 landed S11–S15, S18–S21, S41, S42 —
+open: S16/S17 (evaluator names, your pick), S33 (`Sys2Gym` compiled step), S38
+(DP metadata), S39 (demo headers — needs a joint editorial pass). Phase 2 not
+started. Session log: [docs/reviews/2026-09-05-evening-session.md](docs/reviews/2026-09-05-evening-session.md).
+
 | Phase | Scope | When |
 | --- | --- | --- |
 | **D — docs as plan of record** | ROADMAP, README, DESIGN, AGENTS, TODO, plans index, install/examples READMEs aligned to §1–§4. No Python changes. | now, 1–2 days |
