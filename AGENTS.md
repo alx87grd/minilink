@@ -12,11 +12,12 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | --- | --- |
 | [README.md](README.md) | User workflows, install, examples table |
 | [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior, **product identity & scope** |
-| [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, teaching-release criteria & priorities, review queue, out-of-scope |
+| [ROADMAP.md](ROADMAP.md) | **Plan of record**: releases and milestones, two-lane rule, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
 | [docs/plans/TODO.md](docs/plans/TODO.md) | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
 | [docs/plans/](docs/plans/) | Active **design** writeups only (multi-step plans; delete finished plan docs) |
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy, **entry points (human · agent · CI)** |
+| [docs/reviews/](docs/reviews/) | Dated architecture audits and the interview decision records; read-only history, never a backlog |
 
 Do not add new markdown guides unless asked. Keep [README call chains](README.md#call-chains) minimal.
 
@@ -44,6 +45,24 @@ top-level open-and-run (no `main()`); do not add plant-only smokes — use catal
 `__main__` instead. Tooling lives under `examples/tooling/`, plus
 `tests/demo_checks/` and `benchmarks/`.
 
+**Student-facing imports.** Code in `README.md`, `examples/learn/`, and
+`examples/demos/` imports through the **teaching surface** — the root prelude
+(`from minilink import Pendulum`) or a band facade (`from minilink.catalog
+import …`, `minilink.control`, `minilink.analysis`, `minilink.blocks`,
+`minilink.simulation`, `minilink.planning`). Deep defining-module imports are
+for library code, tests, and the research lane (`examples/projects/`,
+`examples/sandbox/`). Where a band facade does not exist yet, use the shortest
+import that works and leave the facade to the planned step — never invent a
+name. Exception kept: a factory whose name matches its module is imported from
+the module (`from minilink.control.lqr import lqr`).
+
+**Demo-script headers.** One-line title docstring; everything else lives
+inline next to the code it describes. No run instructions, section maps, or
+flag explanations in the header — `examples/README.md` says how to run
+demos, and the code with its inline comments must tell the whole story
+(textbook rule). Notebooks are course material: do not trim their markdown
+unless asked.
+
 ## Core directives
 
 - **Math readability first**: equations read like textbook math, e.g. `dx = A @ x + B @ u`.
@@ -52,6 +71,16 @@ top-level open-and-run (no `main()`); do not add plant-only smokes — use catal
 - **Minimalist UX**: beginner-friendly main workflow; complexity in orchestrators and backends.
 - **Prototype honestly**: unvalidated architecture gets `TODO: User Architectural Review`.
 - **Incremental refactoring**: no broad restructures unless the user asks.
+- **Consolidate, never strip**: simplification targets *maintenance cost* —
+  text edited twice when code changes, dead API, boilerplate a flag would
+  replace, NumPy/JAX twins one `xp` body covers. Clean, well-placed code is
+  not a liability; a deliberate ladder of implementations (e.g. the DP
+  planner's `loop` / `numpy` / `jax` backends) is not duplication. Never
+  remove a feature or a user-importable name without asking.
+- **Two lanes** ([ROADMAP.md §2](ROADMAP.md#2-two-lanes)): the teaching
+  surface is a contract (soft entry rule: demo or notebook, both-backends
+  test where it defines dynamics, docstring); the research lane is free and
+  repo-only. Keep the wheel scope honest.
 - **Preserve user edits**: never revert or "clean up" manual changes the user made in demos, notebooks, examples, or scratch code — commented-out plots, tuning constants (`TF`, gains, step times), disabled sections, exploratory variables — unless they explicitly ask you to change those lines. Commit/review passes must not overwrite user-tuned script state.
 - **No test harness in demos**: `examples/demos/` and `examples/learn/` never read CI/smoke env vars or branch on “are we in a test?” (`MINILINK_NOTEBOOK_SMOKE`, etc.). Smoke runners adapt outside the demo (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Teaching code may fall back on missing optional packages (e.g. Ipopt → SciPy) — that is user UX, not a test hook.
 - **Docs are contract**: update DESIGN / ROADMAP / README when public behavior or maturity claims change.
@@ -101,6 +130,9 @@ Details in [DESIGN.md](DESIGN.md).
 
 - **Continuous-time core is the priority** — `DynamicSystem`, flow diagrams, `Simulator`, and analysis on `f` are the main framework. `StepSystem` / hybrid are subsidiary utilities for discrete control in the loop (MPC, SMC). On trade-offs, keep the continuous path clean; step/hybrid add-ons use sibling types and separate compile/sim paths — do not complicate flow `compile()`, `DiagramSystem`, or `Simulator`.
 - Equation paths stay **native-array**; conversions at boundaries only.
+- **JAX is float64 by default** (`MINILINK_JAX_X64=0` opts out); tools never require the caller to call `configure_jax`.
+- **Unconnected input ports read their nominal value, silently, by design** — never add a warning or error for it.
+- `verbose=True` keeps the framed simulation panel; unify flag *names* (`verbose`), not the format.
 - `params is None` → object defaults; any other `params` overrides — never `params or self.params`.
 - **Inheritance** for core system types; **composition** for diagrams and optional behaviors.
 - **`outputs()` / `outputs_p()` are boundary outputs only**; no `compute_outputs(..., ports=...)`.
@@ -113,7 +145,17 @@ Details in [DESIGN.md](DESIGN.md).
 
 **Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals).
 
-**Ask first:** delete/rename files; architecture refactors; new dependencies; evaluator/optimizer contract changes; removing user scratch code.
+**Ask first (maintainer-owned):** anything student-facing (`README.md`,
+`examples/`, notebooks, ROADMAP §1–§4, public names); **core architecture and
+the API of the main tools** (`System` family, diagrams, compile, `Simulator`,
+planners, `Optimizer`, controllers); any feature or user-importable-name
+removal; delete/rename files; new dependencies; removing user scratch code.
+
+**Agent-managed (decide, then report):** plotting interfaces, external
+interfaces (`interfaces/`), docs housekeeping, the TRL ledger, `TODO.md`,
+plan-doc housekeeping, tests, and internal code structure that does not
+change a public contract. When you spot an opportunity outside your lane,
+ask — do not act.
 
 **Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file → ask before proceeding.
 
