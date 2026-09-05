@@ -1,6 +1,7 @@
 # Phase 4 — Cross-fidelity maps (design)
 
 Status: draft plan (July 2026). Active backlog — not implemented yet.
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 Locked defaults: **bicycle ladder only** (Kin → Acc → Dyn → Rate → TauRate →
 Servo → Engine); Holonomic deferred. Maps live in

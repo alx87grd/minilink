@@ -1,6 +1,7 @@
 # Planning pipeline architecture
 
 Status: **partial** (July 2026). Result / metadata wrappers and compile-once
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 parametric `x0` are landed. Open work is **pipeline B** — runtime scene /
 obstacle bind without re-JIT.
 

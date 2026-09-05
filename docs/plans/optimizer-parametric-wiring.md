@@ -1,6 +1,7 @@
 # Optimizer wiring for parametric trajopt / MPC
 
 Status: **draft plan** (July 2026). Analysis + proposed fix for swapping
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 `optimizer_method` (e.g. SciPy SLSQP → IPOPT) on the parametric MPC path.
 
 Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP),

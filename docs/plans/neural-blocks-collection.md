@@ -2,6 +2,7 @@
 
 Working notes for a long-term collection of neural-network blocks in minilink.
 Status: **proposal for architectural review** (`TODO: User Architectural Review`).
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 Related maturity claims: [TODO.md](TODO.md) Later (`blocks/` MLP,
 `control/neural.py`, `interfaces/flax.py`; `identification/fitting.py` is on the

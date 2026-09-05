@@ -1,6 +1,7 @@
 # Vehicle abstraction (design only)
 
 Status: draft plan (June 2026). No implementation in this phase.
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 ## Scope
 

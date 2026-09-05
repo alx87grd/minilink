@@ -1,6 +1,7 @@
 # Articulated mechanism layer (design)
 
 Status: draft plan (July 2026). No implementation in this phase.
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 ## Problem
 
