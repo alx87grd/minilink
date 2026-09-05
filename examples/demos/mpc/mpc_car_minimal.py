@@ -9,16 +9,15 @@ Run from repo root::
 
 import numpy as np
 
+from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
 )
-from minilink.core import QuadraticCost
 from minilink.core.backends import configure_jax
 from minilink.dynamics.catalog.vehicles.jax_vehicles import (
     BicycleDynRate,
 )
-from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
 
 configure_jax(enable_x64=True)
 

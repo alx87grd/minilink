@@ -1,5 +1,5 @@
 ########################################################
-from minilink import ImpedanceController, Pendulum
+from minilink import DynamicSystem, ImpedanceController, Pendulum, Step
 
 controller = ImpedanceController()  # u = Kp * (r - theta) - Kd * theta_dot
 plant = Pendulum()  # theta_ddot = -(g / l) * sin(theta) + tau / (m * l**2)
@@ -17,9 +17,6 @@ diagram.animate()
 
 ########################################################
 import numpy as np  # noqa: E402
-
-from minilink.blocks import Step  # noqa: E402
-from minilink.core import DynamicSystem  # noqa: E402
 
 
 class MassSpringDamper(DynamicSystem):

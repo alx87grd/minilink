@@ -17,8 +17,7 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.catalog import Pendulum
-from minilink.control import SlidingModeController
+from minilink import Pendulum, SlidingModeController
 from minilink.core.hybrid_composition import hybrid_closed_loop
 
 TF = 5.0

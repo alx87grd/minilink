@@ -10,9 +10,13 @@ Run from repo root::
 
 import numpy as np
 
+from minilink import (
+    DynamicSystem,
+    PlanningProblem,
+    QuadraticCost,
+    TrajectoryOptimizationPlanner,
+)
 from minilink.control.mpc import ModelPredictiveController
-from minilink.core import DynamicSystem, QuadraticCost
-from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
 
 
 class SingleIntegrator(DynamicSystem):

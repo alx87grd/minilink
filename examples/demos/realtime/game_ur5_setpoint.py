@@ -21,8 +21,7 @@ returns the recorded ``Trajectory``.
 
 import numpy as np
 
-from minilink.catalog import UR5Manipulator
-from minilink.control import TaskImpedance
+from minilink import TaskImpedance, UR5Manipulator
 from minilink.simulation import RealtimeSimulator
 from minilink.simulation.realtime import PygameInput
 

@@ -8,7 +8,7 @@ UP/DOWN  -> rear wheel speed ``w_rear`` (port bounds)
 LEFT/RIGHT -> steer ``delta``
 """
 
-from minilink.catalog import DynamicBicycleCar3D
+from minilink import DynamicBicycleCar3D
 
 sys = DynamicBicycleCar3D()
 

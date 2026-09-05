@@ -16,7 +16,7 @@ Run from repo root::
 
 import numpy as np
 
-from minilink.control import ProportionalController
+from minilink import ProportionalController
 from minilink.interfaces.c_export import export_system_to_c, load_exported_c
 
 # Static controller: n=0, stacked input u_in = [r, y], output port "u".

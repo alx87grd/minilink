@@ -1,13 +1,13 @@
 import numpy as np
 
-from minilink.catalog import Pendulum
-from minilink.core import QuadraticCost
-from minilink.planning import (
-    DynamicProgrammingOptions,
+from minilink import (
     DynamicProgrammingPlanner,
+    Pendulum,
     PlanningProblem,
+    QuadraticCost,
     StateSpaceGrid,
 )
+from minilink.planning import DynamicProgrammingOptions
 
 INF = 500.0
 UPRIGHT = np.array([-np.pi, 0.0])

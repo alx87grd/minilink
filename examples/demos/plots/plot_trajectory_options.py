@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.catalog import Pendulum
+from minilink import Pendulum
 
 sys = Pendulum()
 sys.params["m"] = 1.0

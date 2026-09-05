@@ -11,21 +11,19 @@ together. Two inputs are exercised: a step and a sinusoid.
 
 import numpy as np
 
-from minilink.blocks import (
+from minilink import (
     DeadZone,
+    DiagramSystem,
     Gain,
     LowPassFilter,
     Mux,
-    NotchFilter,
     Relay,
     Saturation,
-    Source,
     Step,
     Sum,
     TrajectorySource,
-    Washout,
 )
-from minilink.core import DiagramSystem
+from minilink.blocks import NotchFilter, Source, Washout
 
 OUTPUT_SIGNALS = (
     "src:y",

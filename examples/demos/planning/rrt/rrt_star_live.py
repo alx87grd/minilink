@@ -18,10 +18,9 @@ import time
 
 import numpy as np
 
-from minilink.catalog import HolonomicMobileRobot
-from minilink.core import BoxSet
+from minilink import BoxSet, HolonomicMobileRobot, PlanningProblem
 from minilink.core.geometry import Sphere
-from minilink.planning import PlanningProblem, RRTStarPlanner
+from minilink.planning import RRTStarPlanner
 from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.rrt_star import RRTStarOptions
 from minilink.planning.search.steering import StraightLineSteering

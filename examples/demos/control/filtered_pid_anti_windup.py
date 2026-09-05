@@ -2,9 +2,7 @@
 
 import numpy as np
 
-from minilink.blocks import Saturation, Step
-from minilink.catalog import DoubleIntegrator
-from minilink.control import FilteredController
+from minilink import DoubleIntegrator, FilteredController, Saturation, Step
 
 step = Step()
 step.params["initial_value"] = np.array([0.0])

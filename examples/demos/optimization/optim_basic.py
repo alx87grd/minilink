@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.optimization import MathematicalProgram, Optimizer
+from minilink import MathematicalProgram, Optimizer
 
 z_bar = np.array([1.0, -0.5, 2.0])
 

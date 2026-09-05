@@ -14,9 +14,8 @@ obstacles — this is pure state-space planning with the dynamics.
 
 import numpy as np
 
-from minilink.catalog import Pendulum
+from minilink import Pendulum, PlanningProblem, RRTPlanner
 from minilink.core import BallSet
-from minilink.planning import PlanningProblem, RRTPlanner
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTOptions
 

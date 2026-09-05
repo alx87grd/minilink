@@ -7,7 +7,7 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.core import StepSystem
+from minilink import StepSystem
 from minilink.core.backends import array_module
 
 

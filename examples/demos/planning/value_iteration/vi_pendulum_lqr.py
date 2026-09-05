@@ -1,15 +1,15 @@
 import numpy as np
 
-from minilink.catalog import Pendulum
-from minilink.control.lqr import lqr_at_operating_point
-from minilink.core import QuadraticCost
-from minilink.planning import (
-    DynamicProgrammingOptions,
+from minilink import (
     DynamicProgrammingPlanner,
+    Pendulum,
     PlanningProblem,
     PolicyEvaluator,
+    QuadraticCost,
     StateSpaceGrid,
+    lqr_at_operating_point,
 )
+from minilink.planning import DynamicProgrammingOptions
 from minilink.planning.policy_synthesis import plotting
 
 INF = 500.0

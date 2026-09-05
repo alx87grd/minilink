@@ -21,8 +21,8 @@ Wiring::
 
 import numpy as np
 
-from minilink.blocks import Source, Step
-from minilink.catalog import FiveLinkPlanarManipulator, SpeedControlledManipulator
+from minilink import FiveLinkPlanarManipulator, SpeedControlledManipulator, Step
+from minilink.blocks import Source
 from minilink.control import TaskKinematicNullspace
 
 TF = 8.0

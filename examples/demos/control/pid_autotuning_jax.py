@@ -5,9 +5,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.catalog import Pendulum
+from minilink import DiagramSystem, Pendulum, Trajectory
 from minilink.control import ImpedanceIntegralController
-from minilink.core import DiagramSystem, Trajectory
 from minilink.core.backends import configure_jax
 from minilink.graphical.signals import open_time_signal_plot, resolve_plot_signals
 

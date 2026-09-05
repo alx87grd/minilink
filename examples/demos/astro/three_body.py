@@ -5,7 +5,7 @@ Run from repo root::
     PYTHONPATH=. MPLBACKEND=Agg python examples/demos/astro/three_body.py
 """
 
-from minilink.catalog import ThreeBodyProblem
+from minilink import ThreeBodyProblem
 
 TF = 30.0
 N_STEPS = 30000

@@ -1,6 +1,6 @@
 import numpy as np
 
-from minilink.optimization import MathematicalProgram, Optimizer
+from minilink import MathematicalProgram, Optimizer
 
 # Demo controls.
 Z0 = 2.0

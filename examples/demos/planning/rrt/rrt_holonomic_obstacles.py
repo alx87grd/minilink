@@ -18,10 +18,9 @@ Set ``RUN_EXTENDER_COMPARISON = True`` to also run section B.
 
 import numpy as np
 
-from minilink.catalog import HolonomicMobileRobot
-from minilink.core import BoxSet
+from minilink import BoxSet, HolonomicMobileRobot, PlanningProblem, RRTPlanner
 from minilink.core.geometry import Sphere
-from minilink.planning import PlanningProblem, RRTPlanner, RRTStarPlanner
+from minilink.planning import RRTStarPlanner
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.steering import StraightLineSteering
 from minilink.planning.spatial.collision import bind, disc, point_probe

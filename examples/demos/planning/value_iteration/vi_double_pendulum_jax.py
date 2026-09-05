@@ -23,14 +23,15 @@ import time
 
 import numpy as np
 
-from minilink.catalog import DoublePendulum
-from minilink.core import DiagramSystem, QuadraticCost
-from minilink.planning import (
-    DynamicProgrammingOptions,
+from minilink import (
+    DiagramSystem,
+    DoublePendulum,
     DynamicProgrammingPlanner,
     PlanningProblem,
+    QuadraticCost,
     StateSpaceGrid,
 )
+from minilink.planning import DynamicProgrammingOptions
 
 # RESOLUTION = "high"  # "fast" | "pyro" | "high"
 # RESOLUTION = "fast"  # "fast" | "pyro" | "high"

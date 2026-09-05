@@ -7,8 +7,7 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.analysis.linearize import linearize
-from minilink.catalog import InvertedPendulum
+from minilink import InvertedPendulum, linearize
 
 plant = InvertedPendulum()
 

@@ -9,8 +9,8 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.control import ProportionalController
-from minilink.core import StepDiagramSystem, StepSystem
+from minilink import ProportionalController, StepSystem
+from minilink.core import StepDiagramSystem
 from minilink.core.backends import array_module
 
 

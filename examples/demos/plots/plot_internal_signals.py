@@ -1,9 +1,12 @@
 import numpy as np
 
-from minilink.blocks import Step, WhiteNoise
-from minilink.catalog import PendulumWithNoisePort
-from minilink.control import ImpedanceController
-from minilink.core import DiagramSystem
+from minilink import (
+    DiagramSystem,
+    ImpedanceController,
+    PendulumWithNoisePort,
+    Step,
+    WhiteNoise,
+)
 
 # Plant system
 sys = PendulumWithNoisePort()

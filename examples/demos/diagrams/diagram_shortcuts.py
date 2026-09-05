@@ -5,9 +5,14 @@ Run from the repo root:
     python examples/demos/diagrams/diagram_shortcuts.py
 """
 
-from minilink.blocks import Integrator, Step, WhiteNoise
-from minilink.catalog import Pendulum, PendulumWithNoisePort
-from minilink.control import ImpedanceController
+from minilink import (
+    ImpedanceController,
+    Integrator,
+    Pendulum,
+    PendulumWithNoisePort,
+    Step,
+    WhiteNoise,
+)
 
 
 def show(diagram, name, operation):

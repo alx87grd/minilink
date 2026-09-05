@@ -1,7 +1,6 @@
 import numpy as np
 
-from minilink.analysis import bode, pzmap
-from minilink.catalog import Pendulum
+from minilink import Pendulum, bode, pzmap
 
 plant = Pendulum()
 

@@ -12,7 +12,7 @@ simulation — ready for plotting or replay.
 
 import numpy as np
 
-from minilink.catalog import CartPole
+from minilink import CartPole
 from minilink.simulation import RealtimeSimulator
 from minilink.simulation.realtime import PygameInput
 

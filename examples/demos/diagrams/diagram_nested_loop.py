@@ -1,7 +1,6 @@
 import numpy as np
 
-from minilink.blocks import Step
-from minilink.core import DiagramSystem, DynamicSystem, System
+from minilink import DiagramSystem, DynamicSystem, Step, System
 
 # Custom blocks
 

@@ -12,7 +12,7 @@ Run from repo root::
     PYTHONPATH=. python examples/demos/interfaces/c_export.py
 """
 
-from minilink.control import FilteredController
+from minilink import FilteredController
 from minilink.interfaces.c_export import export_system_to_c
 
 # Dynamic SISO PID with filtered derivative and anti-windup (n=2, m=2 for [r, y]).

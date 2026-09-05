@@ -7,7 +7,7 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink.catalog import DoublePendulum
+from minilink import DoublePendulum
 
 cartpole = DoublePendulum()
 cartpole.modal_analysis(x_bar=[np.pi, 0.0, 0.0, 0.0], mode="all")

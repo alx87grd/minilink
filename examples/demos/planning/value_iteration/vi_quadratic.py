@@ -1,8 +1,12 @@
 import numpy as np
 
-from minilink.catalog import DoubleIntegrator
-from minilink.core import QuadraticCost
-from minilink.planning import DynamicProgrammingPlanner, PlanningProblem, StateSpaceGrid
+from minilink import (
+    DoubleIntegrator,
+    DynamicProgrammingPlanner,
+    PlanningProblem,
+    QuadraticCost,
+    StateSpaceGrid,
+)
 
 INF = 300.0
 

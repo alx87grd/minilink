@@ -8,7 +8,7 @@ Run from repo root::
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.catalog import Lorenz
+from minilink import Lorenz
 
 TF = 40.0
 N_STEPS = 4000
