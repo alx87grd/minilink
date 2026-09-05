@@ -425,3 +425,27 @@ class TestDefaultOutput(unittest.TestCase):
         )
         # r defaults to 0, so u = K (r - y) = -K x = -1.0
         self.assertAlmostEqual(float(u_ctl[0]), -1.0)
+
+
+class TestForgottenSuperInit(unittest.TestCase):
+    """S06: a subclass that skips super().__init__() gets a named error."""
+
+    def test_message_names_the_class_and_the_fix(self):
+        class NoSuper(DynamicSystem):
+            def __init__(self):
+                self.params = {}
+
+            def f(self, x, u, t=0, params=None):
+                return np.zeros(2)
+
+        with self.assertRaises(AttributeError) as ctx:
+            NoSuper().compile()
+        self.assertIn(
+            "NoSuper.__init__() must call super().__init__", str(ctx.exception)
+        )
+
+    def test_unknown_attribute_is_still_a_plain_attribute_error(self):
+        sys = DynamicSystem(n=1)
+        with self.assertRaises(AttributeError):
+            sys.no_such_attribute
+        self.assertFalse(hasattr(sys, "no_such_attribute"))

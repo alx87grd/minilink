@@ -26,6 +26,21 @@ if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
 
+# Attributes every System owns after ``System.__init__``; a failed lookup of one
+# of these almost always means a subclass skipped ``super().__init__(...)``.
+_CORE_ATTRIBUTES = (
+    "n",
+    "name",
+    "state",
+    "inputs",
+    "outputs",
+    "x0",
+    "params",
+    "solver_info",
+    "traj",
+)
+
+
 class System(SharedSystemFacades):
     """
       Static input-output shell: ports, parameters, metadata, and facades.
@@ -347,6 +362,21 @@ class System(SharedSystemFacades):
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """Per-frame geometry as ``dict[str, list[primitive]]`` (rebuilt each frame)."""
         return {}
+
+    # Contract guard
+
+    def __getattr__(self, name):
+        # Reached only when normal lookup fails. On a System the usual cause
+        # is a subclass whose __init__ never called super().__init__(...).
+        if name in _CORE_ATTRIBUTES:
+            raise AttributeError(
+                f"{type(self).__name__}.__init__() must call "
+                f"super().__init__(n=...) before the system is used "
+                f"(missing attribute {name!r})"
+            )
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
 
     # Composition Operators
 
