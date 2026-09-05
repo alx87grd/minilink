@@ -77,6 +77,11 @@ NumPy required; JAX optional (`minilink[jax]`), imported lazily via
 package, no global mode. Explicit `compile_backend` and evaluator backend args.
 `array_module()` only for small hybrid helpers.
 
+**Precision policy (adopted 2026-09, lands in Phase 0 of [ROADMAP.md](ROADMAP.md)):**
+JAX evaluators enable 64-bit floats on construction; `MINILINK_JAX_X64=0`
+opts out for GPU/RL workloads. Tools built on JAX evaluators (trajopt,
+`Optimizer`, DP) never require the caller to call `configure_jax` first.
+
 ## 2. Interface Layers
 
 | Layer | Use | Examples |
@@ -111,20 +116,16 @@ Rules:
 - Do **not** use `from minilink import *`. Do **not** re-export quarantine
   (`symbolic/`, `dynamics/engines/`) from teaching surfaces.
 
-### API stability tiers (v0.1)
+### Two lanes (teaching surface vs research lane)
 
-The v0.1 teaching release freezes a **stable tier**; the rest is
-**provisional** (see [README.md — API stability](README.md#api-stability-v01)
-for the user-facing table and [ROADMAP.md](ROADMAP.md) for TRL detail):
-
-- **Stable**: `core/` contracts (`System` family, diagrams, composition
-  operators, `Trajectory`, compile facade), `Simulator` / `StaticSimulator`,
-  `blocks/`, catalog teaching plants, basic `control/` and `analysis/`.
-  Public names and semantics change only with a deprecation note.
-- **Provisional**: planning, MPC, hybrid/step, realtime, optimization,
-  spatial, placeholders, and the evaluator integration-helper grid beyond the
-  frozen subset in §5. These may change between minor releases; hardening
-  items live in the [docs/plans/TODO.md](docs/plans/TODO.md) pre-v0.2 backlog.
+Stability is a **contract between two lanes**, defined in
+[ROADMAP.md §2](ROADMAP.md#2-two-lanes). The **teaching surface** — root
+prelude plus the band facades — is registered in one place and tested as a
+set; names and semantics change only with a deprecation note; student-facing
+examples and notebooks import only through it. Everything else is the
+**research lane**: no stability promise, importable from a git checkout,
+outside the published wheel. Deep defining-module imports stay valid in both
+lanes.
 
 ## 3. Package Map
 
@@ -175,6 +176,11 @@ state-feedback block):
 | --- | --- |
 | `symbolic/` | experimental symbolic mechanics (SymPy EoM derivation) |
 
+**Wheel scope.** The published package ships the teaching surface and the
+provisional planning / MPC / hybrid bands. Quarantine (`symbolic/`,
+`dynamics/engines/`), `interfaces/c_export.py`, `examples/projects/`, and
+`examples/sandbox/` are repo-only (research lane).
+
 ### Dependency law
 
 - Libraries import only `core`, plus `dynamics/abstraction` interfaces —
@@ -220,8 +226,7 @@ Minilink's **primary framework** is continuous-time: `DynamicSystem`, flow
 
 **Step and hybrid** are a **narrow parallel add-on** — not a second framework of
 equal weight. They exist so discrete control laws (MPC, SMC, sampled regulators)
-can close the loop on a continuous plant without hand-rolled outer `while` loops.
-can close the loop on a continuous plant without hand-rolled outer `while` loops.
+can close the loop on a continuous plant without hand-rolled outer `while` loops
 (subset only — not full Simulink / discrete-dynamics parity).
 
 **Design trade-off rule:** when step or hybrid work conflicts with continuous-time
@@ -507,7 +512,18 @@ Visualization: subsystem `"world"` geometry merges into one shared diagram
 
 ### Control feedback profiles
 
-<!-- TODO: User Architectural Review — feedback-port declaration contract (v0.2 draft) -->
+**Decision record (landed Aug 2026, reviewed Sep 2026).** A controller is
+an ordinary `System` whose port compute `ctl` *is* the control law; the
+feedback declaration is read-only context for tools and never changes how a
+block computes. Rejected on the way: a `StaticController` base owning a
+`control_law(y, r, t)` method with a base-class `ctl` unbundling ports
+(hid the block's real behaviour behind two methods and changed how students
+author controllers); per-family law bases (premature while families have
+1–3 members — revisit when an observer family lands); `plot_control_law` on
+`System` (a plant must not carry feedback vocabulary — it lives on the thin
+`Controller` / `DynamicController` markers). `error` and `output` profiles
+are split so error-driven laws and learned policies plot differently while
+wiring identically. Undeclared blocks keep working everywhere.
 
 A controller is an ordinary `System`: explicit ports, and `ctl` as the port
 compute — `ctl` *is* the control law. The **feedback-port declaration** is
@@ -697,8 +713,11 @@ Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous di
 *diagram* (`n=0` stacked state) still subclasses `DynamicSystem` and uses
 `Simulator` with the diagram evaluator (signal-flow on a time grid).
 
-Unconnected inputs use port nominals; time-varying sources belong in the diagram;
-forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
+**Unconnected inputs read their port nominal value — by design, and silently.**
+An input left unwired is a constant at its declared `nominal_value` (the
+Simulink "ground" semantics), never an error or a warning; `plot_diagram()`
+shows it as unconnected. Time-varying sources belong in the diagram; forcing
+via `compute_forced`. Facades default `compile_backend="numpy"`.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
