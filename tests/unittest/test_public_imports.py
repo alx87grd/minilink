@@ -50,6 +50,35 @@ class TestPublicImports(unittest.TestCase):
         self.assertIs(Simulator, SimulatorDef)
         self.assertIs(StaticSimulator, StaticSimulatorDef)
 
+    def test_planning_and_core_band_exports(self):
+        from minilink.core import (
+            DiagramSystem,
+            DynamicSystem,
+            QuadraticCost,
+            Trajectory,
+        )
+        from minilink.core.costs import QuadraticCost as QuadraticCostDef
+        from minilink.core.system import DynamicSystem as DynamicSystemDef
+        from minilink.planning import (
+            DynamicProgrammingPlanner,
+            PlanningProblem,
+            StateSpaceGrid,
+            TrajectoryOptimizationPlanner,
+        )
+        from minilink.planning.problems import PlanningProblem as PlanningProblemDef
+
+        self.assertIs(DynamicSystem, DynamicSystemDef)
+        self.assertIs(QuadraticCost, QuadraticCostDef)
+        self.assertIs(PlanningProblem, PlanningProblemDef)
+        for value in (
+            DiagramSystem,
+            Trajectory,
+            TrajectoryOptimizationPlanner,
+            DynamicProgrammingPlanner,
+            StateSpaceGrid,
+        ):
+            self.assertTrue(callable(value))
+
     def test_blocks_band_exports(self):
         from minilink.blocks import Integrator, Step, Sum
         from minilink.blocks.basic import Integrator as IntegratorDef
@@ -62,7 +91,13 @@ class TestPublicImports(unittest.TestCase):
         """Every `_EXPORTS` name on a stable band facade resolves lazily."""
         import importlib
 
-        for band in ("minilink", "minilink.blocks", "minilink.simulation"):
+        for band in (
+            "minilink",
+            "minilink.blocks",
+            "minilink.simulation",
+            "minilink.planning",
+            "minilink.core",
+        ):
             module = importlib.import_module(band)
             for name in module.__all__:
                 self.assertIsNotNone(getattr(module, name), f"{band}.{name}")
