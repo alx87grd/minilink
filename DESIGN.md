@@ -723,9 +723,16 @@ Simulink "ground" semantics), never an error or a warning; `plot_diagram()`
 shows it as unconnected. Time-varying sources belong in the diagram; forcing
 via `compute_forced`. Facades default `compile_backend="numpy"`.
 
+**Automatic grid.** With neither `n_steps` nor `dt`, the solver is chosen first
+(user choice, else `euler` for discontinuous plants, else `scipy`) and the grid
+is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 1001` points (a
+plotting resolution — the integrator picks its own steps); fixed-step solvers
+take `dt` from `solver_info["smallest_time_constant"]` × 0.1. `StaticSimulator`
+shares the 1001-point default.
+
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
-`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
+`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked on JAX only for an explicit uniform grid of ≥ 10 000 points). Planned: `SimulationOptions`
 ([docs/plans/TODO.md](docs/plans/TODO.md) Later).
 
 ### Discontinuous closed loops — known issues

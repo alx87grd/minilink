@@ -4,6 +4,11 @@ import logging
 
 import numpy as np
 
+# Automatic output grid (points on [t0, tf]) when neither ``n_steps`` nor ``dt``
+# is given and the solver picks its own steps: a reporting resolution, not an
+# integration step. Fixed-step solvers derive ``dt`` from the plant instead.
+DEFAULT_N_STEPS = 1001
+
 
 def build_time_grid(
     t0,
