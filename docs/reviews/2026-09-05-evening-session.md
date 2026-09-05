@@ -72,3 +72,23 @@ after S01 (the `Simulator` change).
 `dot` needs the env's `bin` on `PATH` (the one "failing" notebook was that);
 zsh needs `${=var}` splitting and `set -o pipefail` for gated chains; the
 project's `addopts` already carries `-q`.
+
+## Addendum — textbook pass on the student-facing API (same day, with the maintainer)
+
+Measured first: 63 demos, 3 504 code lines, of which 293 import lines,
+193 `np.array([...])`, 56 bound assignments, 101 `.params[...] =`. Four API
+proposals were put to the maintainer; **A** (scalar/list bounds and `x0`) and
+**B** (scalar `Q`/`R`/`S` in `QuadraticCost.from_system`) were **declined** —
+bounds and cost matrices stay explicit arrays. **C** and **D** landed:
+
+| Commit | Change |
+| --- | --- |
+| `3c3ce90` | `DynamicProgrammingPlanner(problem, x_grid=, u_grid=, dt=, ...)` builds its own grid (one object); `grid=` stays for custom grids |
+| `7296cb6` | the root prelude **is the teaching surface** — one `from minilink import ...` line; catalog delegated to `minilink.catalog`; tested as a set |
+| `7f13f79` | 80 student-facing files rewritten to one root import statement |
+| `6defb17` | no-op `configure_jax` lines out of the `.py` demos; trajopt demo uses `plot_solution()` / `animate_solution()` and loses two unused flags; VI demos and the three VI notebooks use the one-object DP setup; the VI-vs-LQR(-vs-PPO) notebooks wire their loops with `controller @ plant` |
+| follow-ups | allowlist regenerated (93 rows, all research-lane); merged root imports collapsed to one physical line where they fit |
+
+Corpus effect: import lines **329 → 228**, `configure_jax` calls **7 → 0**.
+Verification after the pass: `pytest` 919 passed / 2 skipped, demo sweep
+60/60, notebook smoke 15/15.

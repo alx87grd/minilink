@@ -91,6 +91,9 @@ updates only where a public contract changes.
 
 ## 5. Phase 3 and Later
 
+- **Declined 2026-09-05 (do not re-propose):** scalar/list signal bounds and a coercing `x0`; scalar `Q`/`R`/`S` in `QuadraticCost.from_system`. Bounds and cost matrices stay explicit arrays in student-facing code.
+- [x] **Textbook pass** — root prelude = teaching surface (one import line); `DynamicProgrammingPlanner` one-object setup; demo cleanups (see the session-log addendum).
+
 After the term, in the order the cohort's questions suggest:
 
 - [ ] **S29** `DiagramSystem.x0` / `n` / `state` as derived properties (mirror the live `params` view); `Simulator` drops its pre-read `refresh()`. **[ask — core]**
