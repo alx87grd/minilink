@@ -72,7 +72,6 @@ examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.t
 examples/learn/intro/06_hybrid.ipynb minilink.core.backends
 examples/learn/intro/06_hybrid.ipynb minilink.dynamics.catalog.vehicles.jax_vehicles
 examples/learn/intro/07_compile.ipynb minilink.core.backends
-examples/learn/intro/08_optimization.ipynb minilink.optimization
 examples/learn/intro/08_optimization.ipynb minilink.optimization.mathematical_program
 examples/learn/intro/08_optimization.ipynb minilink.optimization.optimizer
 examples/learn/intro/showcase_jax.ipynb minilink.core.backends

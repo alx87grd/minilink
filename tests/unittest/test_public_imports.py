@@ -96,6 +96,7 @@ class TestPublicImports(unittest.TestCase):
             "minilink.blocks",
             "minilink.simulation",
             "minilink.planning",
+            "minilink.optimization",
             "minilink.core",
         ):
             module = importlib.import_module(band)

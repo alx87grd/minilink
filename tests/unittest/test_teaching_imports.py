@@ -32,6 +32,7 @@ TEACHING_MODULES = {
     "minilink.analysis.discretize",
     "minilink.simulation",
     "minilink.planning",
+    "minilink.optimization",
     "minilink.interfaces.gymnasium",
 }
 

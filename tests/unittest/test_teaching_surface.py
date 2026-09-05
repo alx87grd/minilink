@@ -77,6 +77,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "find_equilibrium",
     ),
     "minilink.simulation": ("Simulator", "StaticSimulator"),
+    "minilink.optimization": ("MathematicalProgram", "Optimizer"),
     "minilink.planning": (
         "PlanningProblem",
         "TrajectoryPlan",
@@ -107,6 +108,7 @@ TEACHING_LANE_PREFIXES = (
     "minilink.simulation.simulator",
     "minilink.simulation.static_simulator",
     "minilink.planning.",
+    "minilink.optimization.",
 )
 RESEARCH_LANE_PREFIXES = (
     "minilink.control.mpc",
