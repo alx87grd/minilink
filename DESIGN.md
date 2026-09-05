@@ -97,7 +97,7 @@ deep defining-module paths stay valid but are not what README / intro show.
 
 | Layer | Example | Role |
 | --- | --- | --- |
-| **Root prelude** | `from minilink import Pendulum, ImpedanceController` | README / first-hour only (selective `__all__`) |
+| **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
 | **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis.linearize import linearize` | Canonical course / script API |
 | **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
 
@@ -111,8 +111,9 @@ Rules:
   `analysis.linearize`), import the factory from that module
   (`from minilink.control.lqr import lqr`) — do not shadow the submodule on
   the parent package.
-- Root `minilink/__init__.py` is a **small convenience prelude**, not the full
-  API — grow it slowly; prefer band imports in longer scripts.
+- Root `minilink/__init__.py` exports the **whole teaching surface** (lazily) so
+  student-facing code needs one import line; band facades organise the same
+  names by role. Research-lane names never appear at the root.
 - Do **not** use `from minilink import *`. Do **not** re-export quarantine
   (`symbolic/`, `dynamics/engines/`) from teaching surfaces.
 

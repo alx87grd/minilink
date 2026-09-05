@@ -210,3 +210,32 @@ class TestBasicTier(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRootPrelude(unittest.TestCase):
+    """The root package exports exactly the teaching surface (one import line)."""
+
+    def test_every_surface_name_is_the_same_object_at_the_root(self):
+        import minilink
+
+        for band, names in TEACHING_SURFACE.items():
+            module = importlib.import_module(band)
+            for name in names:
+                self.assertIn(
+                    name, minilink.__all__, f"{name} missing from the root prelude"
+                )
+                self.assertIs(getattr(minilink, name), getattr(module, name), name)
+        for module_path, name in TEACHING_MODULE_FUNCTIONS:
+            self.assertIs(
+                getattr(minilink, name),
+                getattr(importlib.import_module(module_path), name),
+            )
+
+    def test_every_root_export_is_teaching_lane(self):
+        import minilink
+
+        for name in minilink.__all__:
+            value = getattr(minilink, name)
+            home = getattr(value, "__module__", "")
+            self.assertTrue(home.startswith(TEACHING_LANE_PREFIXES), f"{name}: {home}")
+            self.assertFalse(home.startswith(RESEARCH_LANE_PREFIXES), f"{name}: {home}")

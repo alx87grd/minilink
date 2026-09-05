@@ -33,12 +33,13 @@ class TestPublicImports(unittest.TestCase):
         self.assertTrue(callable(modal_analysis))
         self.assertTrue(callable(ImpedanceController))
 
-    def test_root_all_is_selective(self):
+    def test_root_prelude_is_the_teaching_surface(self):
         import minilink
 
         self.assertIn("Pendulum", minilink.__all__)
-        self.assertNotIn("Boat2D", minilink.__all__)
-        self.assertNotIn("ModelPredictiveController", minilink.__all__)
+        self.assertIn("Boat2D", minilink.__all__)  # the catalog is teaching surface
+        self.assertNotIn("ModelPredictiveController", minilink.__all__)  # research lane
+        self.assertNotIn("HybridDiagram", minilink.__all__)
 
     def test_simulation_band_exports_simulators(self):
         from minilink.simulation import Simulator, StaticSimulator

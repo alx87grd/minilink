@@ -63,9 +63,11 @@ diagram.plot_trajectory()
 diagram.animate()
 ```
 
-Longer scripts prefer band imports (`from minilink.catalog import …`,
-`from minilink.control import …`, `from minilink.analysis import …`). See
-[DESIGN.md §2](DESIGN.md#public-imports-teaching-first).
+One import line covers the teaching surface — every plant, block, controller,
+analysis tool, and planner a course uses:
+`from minilink import CartPole, lqr, QuadraticCost, PlanningProblem, DynamicProgrammingPlanner`.
+Band facades (`minilink.catalog`, `minilink.control`, `minilink.planning`, …)
+organise the same names by role. See [DESIGN.md §2](DESIGN.md#public-imports-teaching-first).
 
 ## Features
 
