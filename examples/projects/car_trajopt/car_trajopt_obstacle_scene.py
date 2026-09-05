@@ -92,7 +92,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=N_STEPS,
     transcription="direct_collocation",
     compile_backend="jax",
-    solve_disp=True,
+    verbose=True,
     optimizer_options={
         "maxiter": 500,
         "ftol": 1e-1,

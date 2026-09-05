@@ -66,7 +66,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
+    planner, dt_mpc=MPC_DT, warm_start=True, verbose=STEP_DISP
 )
 computer = mpc.dual_rate_computer(dt_broadcast=DT_BROADCAST)
 hybrid = computer @ sys

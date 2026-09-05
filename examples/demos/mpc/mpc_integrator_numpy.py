@@ -65,7 +65,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
+    planner, dt_mpc=MPC_DT, warm_start=True, verbose=STEP_DISP
 )
 hybrid = mpc @ sys
 

@@ -88,7 +88,7 @@ def record_iterate(z: np.ndarray, J: float, t: float) -> None:
 
 out = opt.solve(
     callback=record_iterate if TRACE_ITERATES else None,
-    disp=PRINT_SOLVE_REPORT,
+    verbose=PRINT_SOLVE_REPORT,
 )
 
 if SHOW_FIGURE:

@@ -329,7 +329,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             options=TrajectoryOptimizationOptions(
                 compile_backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
-                solve_disp=True,
+                verbose=True,
             ),
         )
         stdout = io.StringIO()

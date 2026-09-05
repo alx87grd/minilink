@@ -116,7 +116,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True)
+mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
 # =============================================================================
 # end ROS2 NODE __init__
 # =============================================================================

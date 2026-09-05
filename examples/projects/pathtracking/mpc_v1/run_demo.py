@@ -101,7 +101,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True)
+mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
 computer = dual_rate_computer_ahead(
     mpc, dt_broadcast=DT_BROADCAST, dt_project=DT_PROJECT
 )

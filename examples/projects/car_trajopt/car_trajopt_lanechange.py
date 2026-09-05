@@ -70,7 +70,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     compile_backend="jax",
     # optimizer_method="ipopt",
-    solve_disp=PRINT_SOLVE_REPORT,
+    verbose=PRINT_SOLVE_REPORT,
     optimizer_options={
         "disp": SCIPY_DISP,
         "maxiter": 500,

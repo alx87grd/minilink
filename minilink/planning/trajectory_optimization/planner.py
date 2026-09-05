@@ -46,8 +46,7 @@ _TRAJOPT_OPTION_KEYS = (
     "record_history",
     "callback",
     "record_solve_time",
-    "solve_disp",
-    "step_disp",
+    "verbose",
 )
 
 _TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
@@ -69,10 +68,10 @@ class TrajectoryOptimizationIteration:
 class TrajectoryOptimizationOptions:
     """Generic trajectory-optimization workflow options.
 
-    ``solve_disp`` prints a Minilink trajectory-optimization preamble and
-    report. It is separate from SciPy's ``options['disp']``.
-
-    ``step_disp`` prints per-tick timing on the parametric / from-solve path.
+    ``verbose`` prints the Minilink trajectory-optimization preamble and report
+    on :meth:`TrajectoryOptimizationPlanner.solve`, and one timing line per tick
+    on the online :meth:`TrajectoryOptimizationPlanner.solve_trajectory_from`
+    path. It is separate from SciPy's per-iteration ``options['disp']``.
 
     ``record_history=True`` reconstructs a full :class:`Trajectory` per
     optimizer iterate — convenient for live plots and teaching, but it adds
@@ -91,8 +90,7 @@ class TrajectoryOptimizationOptions:
     record_history: bool = False
     callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
     record_solve_time: bool = False
-    solve_disp: bool = False
-    step_disp: bool = False
+    verbose: bool = False
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -133,8 +131,7 @@ class TrajectoryOptimizationPlanner(Planner):
         record_history=_UNSET,
         callback=_UNSET,
         record_solve_time=_UNSET,
-        solve_disp=_UNSET,
-        step_disp=_UNSET,
+        verbose=_UNSET,
     ) -> None:
         """
         Parameters
@@ -153,7 +150,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
         compile_backend, initial_guess, warm_start, optimizer_method,
         optimizer_options, use_hessian, record_history, callback,
-        record_solve_time, solve_disp, step_disp
+        record_solve_time, verbose
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
         """
         super().__init__(problem)
@@ -170,8 +167,7 @@ class TrajectoryOptimizationPlanner(Planner):
             record_history=record_history,
             callback=callback,
             record_solve_time=record_solve_time,
-            solve_disp=solve_disp,
-            step_disp=step_disp,
+            verbose=verbose,
         )
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
@@ -223,7 +219,7 @@ class TrajectoryOptimizationPlanner(Planner):
         optimizer = self._make_optimizer(program, z0)
         compile_s = time.perf_counter() - compile_t0
 
-        if self.options.solve_disp:
+        if self.options.verbose:
             self._print_solve_preamble(
                 program=program,
                 optimizer=optimizer,
@@ -235,8 +231,8 @@ class TrajectoryOptimizationPlanner(Planner):
         self.iteration_history = []
         optimization_result = optimizer.solve(
             callback=self._make_callback(optimizer, compile_backend),
-            record_solve_time=self.options.record_solve_time or self.options.solve_disp,
-            disp=False,
+            record_solve_time=self.options.record_solve_time or self.options.verbose,
+            verbose=False,
         )
         reconstruct_t0 = time.perf_counter()
         trajectory = self.transcription.reconstruct_result(
@@ -266,7 +262,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         )
 
-        if self.options.solve_disp:
+        if self.options.verbose:
             self._print_solve_report(
                 optimizer=optimizer,
                 result=optimization_result,
@@ -411,7 +407,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         z0 = self.transcription.pack_initial_guess(problem_k, initial_guess)
 
-        record_solve_time = self.options.record_solve_time or self.options.step_disp
+        record_solve_time = self.options.record_solve_time or self.options.verbose
         if record_solve_time:
             solve_t0 = time.perf_counter()
 
@@ -454,7 +450,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         )
 
-        if self.options.step_disp:
+        if self.options.verbose:
             j_txt = "n/a" if result.cost is None else f"{float(result.cost):.6g}"
             print(
                 f"TOP step: success={result.success} "

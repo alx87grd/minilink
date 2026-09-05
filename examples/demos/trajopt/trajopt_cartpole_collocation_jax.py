@@ -62,7 +62,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_method="ipopt",
     # optimizer_method="scipy_slsqp",
     # optimizer_options={"maxiter": 500, "ftol": 1e-2},
-    solve_disp=PRINT_SOLVE_REPORT,
+    verbose=PRINT_SOLVE_REPORT,
     callback=callback,
 )
 

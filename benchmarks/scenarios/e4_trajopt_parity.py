@@ -132,7 +132,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
                 "disp": False,
             },
             record_solve_time=True,
-            solve_disp=False,
+            verbose=False,
         ),
     )
 

@@ -198,7 +198,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     compile_backend="jax",
     optimizer_method="scipy_slsqp",
-    solve_disp=False,
+    verbose=False,
     optimizer_options={"maxiter": 150, "ftol": 0.1},
 )
 print(f"planner ready (not solved): horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
