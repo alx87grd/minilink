@@ -42,19 +42,19 @@ updates only where a public contract changes.
   Touch `simulation/simulator.py` (`select_time_vector`, `select_solver`), `simulation/time_grid.py`, `simulation/static_simulator.py`, tests asserting `100001`.
   When neither `n_steps` nor `dt` is given: `n_steps = 1001` for adaptive solvers; `dt` from `smallest_time_constant` only for `euler` / `euler_fixedsteps` / `rk4_fixedsteps`; auto-RK4 under JAX keyed on the requested solver or `discontinuous_behavior`, never on `n_pts`.
   Done when `Pendulum().compute_trajectory(tf=10)` returns 1 001 samples on both backends, the JAX default still picks `scipy` (`nfev ≈ 200`), suite green.
-- [ ] **S02 Shape validation at compile** **[ask — core]**.
+- [x] **S02 Shape validation at compile** **[ask — core]**.
   Touch `core/compile/compiler.py` (leaf + diagram entry), `numpy_evaluators.py` constructors, `jax_evaluators.py` (probe *before* `check_jax_compatible`).
   Probe `f(x0, u_nom, 0, params)` and every `port.compute(...)`; raise `ValueError("f() of 'Name' returned shape (1,); expected (2,) for n=2")` and the port analogue; skip `f` for `n == 0`.
   Done when a wrong-shape `f` / `h` raises the message from `compute_trajectory`, `compile("numpy")`, and `compile("jax")`; test in `test_compile.py`.
 - [x] **S40 `DynamicSystem` default output** **[ask — core API]**. Today `output_dim=n` with no `h` override yields `y ≡ 0` (the `00_core` custom-plant form). Decide: default `h` returns `x` when `output_dim == n` (pyro semantics), or require an explicit `h`, or keep zeros and make the README/notebook example define `h`. D2 depends on this.
-- [ ] **S04 README example + `@` message** **[ask — README]**. `composition.py` `_feedback_mismatch_message`: when the plant lacks the expected output port, say *"plant 'X' has no 'y' output port; pass `output_dim=…` or wire ports explicitly"* instead of "dim None". Test in `test_diagrams.py`.
+- [x] **S04 README example + `@` message** **[ask — README]**. `composition.py` `_feedback_mismatch_message`: when the plant lacks the expected output port, say *"plant 'X' has no 'y' output port; pass `output_dim=…` or wire ports explicitly"* instead of "dim None". Test in `test_diagrams.py`.
 - [x] **S05 Float64 policy** (approved).
   Touch `core/backends.py` (`ensure_jax_x64()` or inside `require_jax_numpy`), all JAX evaluator constructors in `core/compile/evaluators/jax_evaluators.py`, `optimization/evaluators/jax_evaluator.py`, `planning/trajectory_optimization/parametric_evaluator.py`; DP's existing `configure_jax(enable_x64=True)` calls become no-ops.
   Done when the canonical pendulum / cart-pole trajopt problems report `success=True` on `compile_backend="jax"` without the caller touching `configure_jax`; `MINILINK_JAX_X64=0` restores float32; test in `test_jax_planning.py`.
-- [ ] **S06 `super().__init__()` guard** **[ask — core]**. In the facade entry points (`compile`, `compute_trajectory`, `plot_*`, `animate`) one helper: if `not hasattr(self, "inputs")` raise `TypeError(f"{type(self).__name__}.__init__ must call super().__init__(n=…) before use")`. Test in `test_core.py`.
+- [x] **S06 `super().__init__()` guard** **[ask — core]**. In the facade entry points (`compile`, `compute_trajectory`, `plot_*`, `animate`) one helper: if `not hasattr(self, "inputs")` raise `TypeError(f"{type(self).__name__}.__init__ must call super().__init__(n=…) before use")`. Test in `test_core.py`.
 - [x] **S07 Unify verbose flag names** (approved; panel stays). `verbose` / `disp` → `verbose` on planners, optimizer, MPC; framed panel unchanged. Update call sites and docs in the same change (no aliases).
 - [x] **S08 nbstripout hook**. `.pre-commit-config.yaml` → `files: ^examples/.*\.ipynb$`; strip stored outputs. Done when `pre-commit run nbstripout --all-files` is clean.
-- [ ] **S09 Trajopt `success` = defects satisfied** **[ask — planner API]**. `SolveMetadata` gains `max_defect` / `max_violation`; transcriptions expose `defects(z)` / `constraint_violation(z)`; `success = solver_ok or (defects ≤ tol and violation ≤ tol)`; both numbers in the solve summary. Tests in `test_planning.py`.
+- [x] **S09 Trajopt `success` = defects satisfied** **[ask — planner API]**. `SolveMetadata` gains `max_defect` / `max_violation`; transcriptions expose `defects(z)` / `constraint_violation(z)`; `success = solver_ok or (defects ≤ tol and violation ≤ tol)`; both numbers in the solve summary. Tests in `test_planning.py`.
 
 ---
 
@@ -73,9 +73,9 @@ updates only where a public contract changes.
 - [x] **S18 Wheel excludes the research lane** (approved). `pyproject.toml` `[tool.hatch.build.targets.wheel]` excludes `minilink/symbolic/**`, `minilink/dynamics/engines/**`, `minilink/interfaces/c_export.py`; `examples/` were never shipped. Done when `python -m build` produces a wheel without those paths and the suite (run from the repo) stays green.
 - [x] **S19 `c_export` in the nightly sweep**. Add both `examples/demos/interfaces/` scripts to the nightly manifest with `requires: ["jax"]` (TRL row already in ROADMAP).
 - [x] **S20 Nightly full demo sweep**. `.github/workflows/nightly.yml` running `run_all_demos.py --timeout 120 --continue-on-error` and `run_notebook_checks.py` on a schedule + `workflow_dispatch`.
-- [ ] **S21 Branch hygiene** **[ask — you run the script]**. List the 31 local branches merged into `main` and the 42 `cursor/*` remotes with dates; produce the delete script.
-- [ ] **S41 Consolidation inventory** (report only). Ranked table of maintenance-cost items — text edited twice, dead API, boilerplate classes, twin plants, plotting homes, research code in the teaching tree — each with lines, blast radius, and what it does *not* remove. Maintainer picks; picked items become steps in §4/§5.
-- [ ] **S42 Multiple-shooting parametric guard** (carried over; cheap). `MultipleShootingTranscription` inherits collocation `transcribe_parametric` and silently builds wrong defects; override to `NotImplementedError` and replace the planner's `hasattr` check with an explicit capability flag.
+- [x] **S21 Branch hygiene** **[ask — you run the script]** — script generated: [../reviews/2026-09-05-branch-cleanup.md](../reviews/2026-09-05-branch-cleanup.md). List the 31 local branches merged into `main` and the 42 `cursor/*` remotes with dates; produce the delete script.
+- [x] **S41 Consolidation inventory** (report only) — [../reviews/2026-09-05-consolidation-inventory.md](../reviews/2026-09-05-consolidation-inventory.md). Ranked table of maintenance-cost items — text edited twice, dead API, boilerplate classes, twin plants, plotting homes, research code in the teaching tree — each with lines, blast radius, and what it does *not* remove. Maintainer picks; picked items become steps in §4/§5.
+- [x] **S42 Multiple-shooting parametric guard** (carried over; cheap). `MultipleShootingTranscription` inherits collocation `transcribe_parametric` and silently builds wrong defects; override to `NotImplementedError` and replace the planner's `hasattr` check with an explicit capability flag.
 
 ---
 
