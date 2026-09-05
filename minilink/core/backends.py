@@ -11,6 +11,10 @@ that policy:
   :func:`normalize_backend`.
 - **Runtime helpers** — :func:`array_module` for hybrid equation paths and
   :func:`require_jax_numpy` / :func:`configure_jax` for JAX-only code paths.
+- **Precision policy** — JAX runs with 64-bit floats by default
+  (:func:`jax_x64_policy`, applied by :func:`ensure_jax_x64` from every
+  JAX evaluator and from :func:`require_jax_numpy`); set ``MINILINK_JAX_X64=0``
+  to keep JAX's float32 default for GPU / RL workloads.
 
 Backend strings
 ---------------
@@ -34,6 +38,7 @@ low-level :func:`minilink.core.compile.compiler.compile` only accepts
 from __future__ import annotations
 
 import functools
+import os
 import types
 
 import numpy as np
@@ -104,7 +109,27 @@ def require_jax_numpy() -> types.ModuleType:
             "This code path requires JAX. "
             "Install with `pip install minilink[jax]` (or `pip install jax jaxlib`)."
         ) from e
+    ensure_jax_x64()
     return jnp
+
+
+def jax_x64_policy() -> bool:
+    """Library policy: 64-bit floats in JAX unless ``MINILINK_JAX_X64=0``."""
+    flag = os.environ.get("MINILINK_JAX_X64", "1").strip().lower()
+    return flag not in ("0", "false", "no", "off")
+
+
+def ensure_jax_x64() -> types.ModuleType:
+    """Apply :func:`jax_x64_policy` to the JAX config (idempotent; JAX required).
+
+    Called by every JAX evaluator constructor and by :func:`require_jax_numpy`,
+    so tools built on JAX evaluators never need the caller to enable x64.
+    """
+    import jax
+
+    if jax_x64_policy():
+        jax.config.update("jax_enable_x64", True)
+    return jax
 
 
 def configure_jax(*, enable_x64: bool | None = None) -> types.ModuleType:

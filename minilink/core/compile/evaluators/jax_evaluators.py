@@ -11,6 +11,7 @@ import time
 
 import numpy as np
 
+from minilink.core.backends import ensure_jax_x64
 from minilink.core.compile.evaluators.evaluators import (
     DynamicsEvaluator,
     StaticEvaluator,
@@ -582,6 +583,8 @@ class JaxDynamicEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
         import jax
         import jax.numpy as jnp
 
+        ensure_jax_x64()
+
         self.jax = jax
         self.jnp = jnp
         self.n = system.n
@@ -704,6 +707,8 @@ class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
         try:
             import jax
             import jax.numpy as jnp
+
+            ensure_jax_x64()
         except ImportError as e:
             raise ImportError(
                 "JAX is required for the 'jax' backend. "
@@ -949,6 +954,8 @@ class JaxStaticEvaluator(StaticEvaluator, TraceTierMixin):
         import jax
         import jax.numpy as jnp
 
+        ensure_jax_x64()
+
         self.jax = jax
         self.jnp = jnp
         self.n = 0
@@ -1033,6 +1040,8 @@ class JaxStepEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
         import jax
         import jax.numpy as jnp
+
+        ensure_jax_x64()
 
         self.jax = jax
         self.jnp = jnp
@@ -1148,6 +1157,8 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
     def __init__(self, plan: StepExecutionPlan, diagram, verbose=False):
         import jax
         import jax.numpy as jnp
+
+        ensure_jax_x64()
 
         self.jax = jax
         self.jnp = jnp

@@ -162,3 +162,85 @@ def test_quadratic_cost_is_jax_jittable():
         return cost.g(x, u) + cost.h(x)
 
     assert np.isclose(float(jax.jit(J)(x, u)), 16.0)
+
+
+# JAX 64-bit precision policy (S05)
+
+
+def test_jax_x64_policy_env_var(monkeypatch):
+    from minilink.core.backends import jax_x64_policy
+
+    monkeypatch.delenv("MINILINK_JAX_X64", raising=False)
+    assert jax_x64_policy()
+    for off in ("0", "false", "No", "off"):
+        monkeypatch.setenv("MINILINK_JAX_X64", off)
+        assert not jax_x64_policy()
+    monkeypatch.setenv("MINILINK_JAX_X64", "1")
+    assert jax_x64_policy()
+
+
+def _run_fresh_python(code, env_overrides):
+    """Run ``code`` in a fresh interpreter so module-level JAX config cannot leak in."""
+    import os
+    import subprocess
+    import sys
+
+    env = dict(os.environ)
+    env.pop("MINILINK_JAX_X64", None)
+    env.update(env_overrides)
+    env["PYTHONPATH"] = os.getcwd()
+    env["MPLBACKEND"] = "Agg"
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    return result.stdout.strip().splitlines()[-1]
+
+
+_X64_PROBE = """
+import warnings; warnings.filterwarnings("ignore")
+import jax, numpy as np
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+ev = Pendulum().compile(backend="jax")
+dx = ev.f(np.zeros(2), np.zeros(1), 0.0)
+print(jax.config.jax_enable_x64, dx.dtype)
+"""
+
+_TRAJOPT_PROBE = """
+import warnings; warnings.filterwarnings("ignore")
+import numpy as np
+from minilink.core.costs import QuadraticCost
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.planning.problems import PlanningProblem
+from minilink.planning.trajectory_optimization.planner import TrajectoryOptimizationPlanner
+p = Pendulum()
+p.inputs["u"].lower_bound = np.array([-20.0]); p.inputs["u"].upper_bound = np.array([20.0])
+goal = np.array([np.pi, 0.0])
+problem = PlanningProblem(p, x_start=np.zeros(2), x_goal=goal, tf=3.0,
+    cost=QuadraticCost.from_system(p, Q=np.eye(2), R=np.eye(1), xbar=goal))
+plan = TrajectoryOptimizationPlanner(problem, n_steps=30, transcription="direct_collocation",
+    compile_backend="jax").solve()
+print(plan.metadata.success)
+"""
+
+
+@pytest.mark.jax
+def test_jax_evaluator_is_float64_by_default_in_a_fresh_process():
+    pytest.importorskip("jax")
+    assert _run_fresh_python(_X64_PROBE, {}) == "True float64"
+
+
+@pytest.mark.jax
+def test_jax_x64_opt_out_env_var_keeps_float32():
+    pytest.importorskip("jax")
+    assert _run_fresh_python(_X64_PROBE, {"MINILINK_JAX_X64": "0"}) == "False float32"
+
+
+@pytest.mark.jax
+def test_trajopt_succeeds_on_jax_without_caller_enabling_x64():
+    pytest.importorskip("jax")
+    assert _run_fresh_python(_TRAJOPT_PROBE, {}) == "True"
