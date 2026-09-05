@@ -72,7 +72,9 @@ Longer scripts prefer band imports (`from minilink.catalog import …`,
 ### Models that read like the textbook
 
 Custom dynamics subclass `DynamicSystem` and implement `f`; equation code stays
-close to forms like `dx = A @ x + B @ u`.
+close to forms like `dx = A @ x + B @ u`. `output_dim` creates the standard
+`y` port — the full state by default (`y = x`), or override `h` for any
+other measurement — so the plant composes with `controller @ plant`.
 
 ```python
 import numpy as np
@@ -81,7 +83,7 @@ from minilink import DynamicSystem
 
 class MassSpringDamper(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, input_dim=1, expose_state=True)
+        super().__init__(n=2, input_dim=1, output_dim=2)
 
     def f(self, x, u, t=0, params=None):
 
@@ -267,17 +269,15 @@ System                    # static IO shell (n defaults to 0)
       -> Pendulum
 ```
 
-## API stability (v0.1)
+## Two lanes
 
-Minilink v0.1 freezes a **stable tier** for teaching; everything else is
-**provisional**. Stable public names and semantics only change with a
-deprecation note in the release notes; provisional APIs may change between
-minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
+Minilink serves students and researchers from one codebase; the boundary is a
+contract, defined in [ROADMAP.md §2](ROADMAP.md#2-two-lanes).
 
-| Tier | Bands |
-| --- | --- |
-| **Stable** | `core/` (`System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, composition operators, `Trajectory`, compile facade), `simulation` (`Simulator`, `StaticSimulator`), `blocks/`, catalog teaching plants (`minilink.catalog`), basic `control/` (output, state, SISO, impedance, robotic, model-based, LQR), basic `analysis/` (linearize, modal, frequency, equilibria, discretize) |
-| **Provisional** | `planning/` (trajopt, RRT, DP, spatial), `control.mpc`, hybrid (`StepDiagramSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`), `simulation.realtime`, `optimization/`, evaluator integration-helper grid beyond the documented subset ([DESIGN.md §5](DESIGN.md#compilation-and-simulation)), `estimation/` / `identification/` / `interfaces/` placeholders, quarantine (`symbolic/`, `dynamics/engines/`) |
+| Lane | What | Promise |
+| --- | --- | --- |
+| **Teaching surface** | Root prelude (`from minilink import …`) and the band facades (`minilink.catalog`, `.blocks`, `.control`, `.analysis`, `.simulation`, `.planning`): `System` family, diagrams and operators, `Trajectory`, `Simulator`, catalog plants, basic control and analysis, planning for the courses (value iteration, LQR, trajectory optimization, the `Sys2Gym` RL bridge) | Names and semantics change only with a deprecation note; every example and notebook imports through it |
+| **Research lane** | Everything else — hybrid / MPC, realtime, spatial scenes, quarantine (`symbolic/`, `dynamics/engines/`), C export, `examples/projects/`, `examples/sandbox/` | No stability promise; importable from a git checkout; outside the published wheel |
 
 ## Testing
 
@@ -390,9 +390,10 @@ Catalog plants: `from minilink.catalog import …` (math under `minilink.dynamic
 ## Docs
 
 - [DESIGN.md](DESIGN.md) — principles and contracts
-- [ROADMAP.md](ROADMAP.md) — TRL maturity and teaching-release priorities
-- [docs/plans/TODO.md](docs/plans/TODO.md) — operational backlog (fixes, demos, Later)
-- [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 parity audit (library + all 195 demos)
+- [ROADMAP.md](ROADMAP.md) — plan of record: milestones, two lanes, TRL ledger, phases
+- [docs/plans/TODO.md](docs/plans/TODO.md) — step-level workboard for the phases
+- [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro parity (v0.2): open rows + landed name map
+- [docs/reviews/](docs/reviews/) — dated architecture audits and decision records
 - [docs/plans/](docs/plans/) — active design backlog
 - [AGENTS.md](AGENTS.md) — contributor / agent rules
 - API reference (Sphinx): [alx87grd.github.io/minilink](https://alx87grd.github.io/minilink/) (built from `main` via [.github/workflows/docs.yml](.github/workflows/docs.yml)); local build: `pip install -e ".[docs]" && sphinx-build -b html docs docs/_build/html`
