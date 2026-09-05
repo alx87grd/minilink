@@ -950,7 +950,14 @@ def _feedback_path_from_declaration(
         mux_id = _add_qdq_mux(diagram, qdq_n)
         return _FeedbackPath(measurement, plant_output_port, mux_id)
 
-    plant_y = plant.outputs["y"].dim if "y" in plant.outputs else None
+    if "y" not in plant.outputs:
+        raise ValueError(
+            f"Cannot wire closed-loop feedback: plant '{plant.name}' ({plant_id}) "
+            "has no 'y' output port; declare it with output_dim=... (the standard "
+            "port, y = x by default) or wire ports explicitly with "
+            "add_subsystem/connect"
+        )
+    plant_y = plant.outputs["y"].dim
     hint = ""
     if qdq_n is not None:
         hint = (
