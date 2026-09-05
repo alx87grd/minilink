@@ -969,3 +969,59 @@ def test_jax_evaluator_autodiff_when_available():
     np.testing.assert_allclose(program_evaluator.jacobian_h([1.0, 2.0]), [[1.0, 1.0]])
     np.testing.assert_allclose(program_evaluator.jacobian_g([1.0, 2.0]), np.eye(2))
     assert jax is not None
+
+
+class TestEquationShapeValidation(unittest.TestCase):
+    """S02: wrong-shape f / h fail loudly at compile on both backends."""
+
+    def _bad_f(self):
+        class BadF(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, output_dim=2)
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([x[1]])  # (1,) instead of (2,)
+
+        return BadF()
+
+    def _bad_h(self):
+        class BadH(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, output_dim=2)
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([x[1], -x[0]])
+
+            def h(self, x, u, t=0, params=None):
+                return np.array([x[0]])  # (1,) instead of (2,)
+
+        return BadH()
+
+    def test_wrong_f_shape_raises_on_numpy(self):
+        with self.assertRaises(ValueError) as ctx:
+            self._bad_f().compile(backend="numpy")
+        self.assertIn("f() of", str(ctx.exception))
+        self.assertIn("returned shape (1,); expected (2,)", str(ctx.exception))
+
+    def test_wrong_f_shape_raises_from_compute_trajectory(self):
+        with self.assertRaises(ValueError):
+            self._bad_f().compute_trajectory(tf=1.0, verbose=False)
+
+    def test_wrong_h_shape_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            self._bad_h().compile(backend="numpy")
+        self.assertIn("h() of", str(ctx.exception))
+        self.assertIn("output port 'y'", str(ctx.exception))
+
+    def test_wrong_f_shape_inside_a_diagram(self):
+        from minilink.blocks.sources import Step
+
+        with self.assertRaises(ValueError):
+            (Step() >> self._bad_f()).compile(backend="numpy")
+
+    @pytest.mark.optional
+    @pytest.mark.jax
+    def test_wrong_f_shape_raises_on_jax(self):
+        pytest.importorskip("jax")
+        with self.assertRaises(ValueError):
+            self._bad_f().compile(backend="jax")
