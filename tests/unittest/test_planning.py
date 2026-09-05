@@ -2349,3 +2349,41 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
         self.assertFalse(md.feasible)
         self.assertFalse(md.success)
         self.assertGreater(md.max_equality_violation, 1e-3)
+
+
+class TestDpOneObjectSetup(unittest.TestCase):
+    """DynamicProgrammingPlanner builds its grid from x_grid / u_grid / dt."""
+
+    def _problem(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        return PlanningProblem(
+            plant,
+            x_goal=goal,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+
+    def test_shapes_and_dt_build_the_grid(self):
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        planner = DynamicProgrammingPlanner(
+            self._problem(), x_grid=(11, 11), u_grid=(3,), dt=0.05
+        )
+        self.assertEqual(planner.grid.x_grid_shape, (11, 11))
+        self.assertEqual(planner.grid.u_grid_shape, (3,))
+        self.assertAlmostEqual(planner.grid.dt, 0.05)
+
+    def test_grid_and_shapes_are_exclusive(self):
+        from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        problem = self._problem()
+        grid = StateSpaceGrid(
+            problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.05
+        )
+        with self.assertRaises(ValueError):
+            DynamicProgrammingPlanner(problem, grid=grid, dt=0.05)
+        with self.assertRaises(ValueError):
+            DynamicProgrammingPlanner(problem, x_grid=(11, 11))

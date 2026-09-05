@@ -175,6 +175,13 @@ class DynamicProgrammingPlanner(Planner):
     """
     Value-iteration planner over a discretized state space.
 
+    The common setup is one object::
+
+        DynamicProgrammingPlanner(problem, x_grid=(201, 201), u_grid=(21,), dt=0.05)
+
+    which builds the :class:`~minilink.planning.policy_synthesis.discretizer.StateSpaceGrid`
+    itself; pass ``grid=`` for custom grids (``precompute``, ``verbose``, ...).
+
     Parameters
     ----------
     problem : PlanningProblem
@@ -192,7 +199,10 @@ class DynamicProgrammingPlanner(Planner):
         self,
         problem: PlanningProblem,
         *,
-        grid: StateSpaceGrid,
+        grid: StateSpaceGrid | None = None,
+        x_grid=None,
+        u_grid=None,
+        dt=None,
         options: DynamicProgrammingOptions | None = None,
         backend=_UNSET,
         alpha=_UNSET,
@@ -206,6 +216,18 @@ class DynamicProgrammingPlanner(Planner):
     ) -> None:
         super().__init__(problem)
         self.require_cost()
+        # Common case: shapes + dt build the grid here; custom grids come in
+        # through grid= (precompute / verbose options live on StateSpaceGrid).
+        if grid is None:
+            if x_grid is None or u_grid is None or dt is None:
+                raise ValueError(
+                    "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
+                )
+            grid = StateSpaceGrid(
+                problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt
+            )
+        elif x_grid is not None or u_grid is not None or dt is not None:
+            raise ValueError("pass either grid= or x_grid/u_grid/dt, not both")
         self.grid = grid
         self.options = _merge_dp_options(
             options,
