@@ -338,3 +338,25 @@ class TestCompileTypes(unittest.TestCase):
     def test_compile_diagram_diagram_evaluator(self):
         diagram = _unity_feedback_diagram()
         self.assertIsInstance(diagram.compile(), NumpyDiagramEvaluator)
+
+
+class TestFeedbackMissingPortMessage(unittest.TestCase):
+    """S04: a plant without a 'y' port gets a message that names the fix."""
+
+    def test_missing_plant_output_port_message(self):
+        from minilink.control.output import ProportionalController
+        from minilink.core.system import DynamicSystem
+
+        class NoOutput(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, expose_state=True)
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([x[1], u[0] - x[0]])
+
+        with self.assertRaises(ValueError) as ctx:
+            ProportionalController() @ NoOutput()
+        message = str(ctx.exception)
+        self.assertIn("has no 'y' output port", message)
+        self.assertIn("output_dim=", message)
+        self.assertNotIn("dim None", message)

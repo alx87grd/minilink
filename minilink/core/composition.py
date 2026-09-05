@@ -1051,6 +1051,13 @@ def _feedback_mismatch_message(
     *,
     attempted: str,
 ) -> str:
+    if "y" not in plant.outputs and "y" in controller.inputs:
+        return (
+            f"Cannot wire closed-loop feedback: plant '{plant.name}' ({plant_id}) "
+            "has no 'y' output port; declare it with output_dim=... (the standard "
+            "port, y = x by default) or wire ports explicitly with "
+            "add_subsystem/connect"
+        )
     ctl_y = controller.inputs["y"].dim if "y" in controller.inputs else None
     plant_y = plant.outputs["y"].dim if "y" in plant.outputs else None
     qdq_n = _plant_qdq_dof(plant)
