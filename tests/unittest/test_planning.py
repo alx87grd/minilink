@@ -2304,3 +2304,48 @@ class TestParametricCapabilityFlag(unittest.TestCase):
         )
         with self.assertRaises(TypeError):
             planner.compile_parametric_program()
+
+
+class TestTrajoptSuccessSemantics(unittest.TestCase):
+    """S09: success means the plan satisfies the constraints, not the solver's mood."""
+
+    def _pendulum_problem(self, u_max, tf=3.0):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        plant.inputs["u"].lower_bound = np.array([-u_max])
+        plant.inputs["u"].upper_bound = np.array([u_max])
+        goal = np.array([np.pi, 0.0])
+        return PlanningProblem(
+            plant,
+            x_start=np.zeros(2),
+            x_goal=goal,
+            tf=tf,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+
+    def test_feasible_plan_records_violations_and_succeeds(self):
+        plan = TrajectoryOptimizationPlanner(
+            self._pendulum_problem(20.0),
+            n_steps=20,
+            transcription="direct_collocation",
+            compile_backend="numpy",
+        ).solve()
+        md = plan.metadata
+        self.assertTrue(md.success)
+        self.assertTrue(md.feasible)
+        self.assertIsNotNone(md.max_equality_violation)
+        self.assertLessEqual(md.max_equality_violation, 1e-5)
+        self.assertLessEqual(md.max_bound_violation, 1e-5)
+
+    def test_unactuated_swing_up_is_reported_infeasible(self):
+        plan = TrajectoryOptimizationPlanner(
+            self._pendulum_problem(0.0, tf=1.0),
+            n_steps=10,
+            transcription="direct_collocation",
+            compile_backend="numpy",
+        ).solve()
+        md = plan.metadata
+        self.assertFalse(md.feasible)
+        self.assertFalse(md.success)
+        self.assertGreater(md.max_equality_violation, 1e-3)

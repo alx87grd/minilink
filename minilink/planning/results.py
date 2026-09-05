@@ -23,6 +23,13 @@ class SolveMetadata:
     cost: float | None = None
     solve_time_s: float | None = None
     stats: dict[str, object] = field(default_factory=dict)
+    #: Constraint check of the returned plan (trajopt offline solves): worst
+    #: equality residual, worst inequality margin (negative = violated), worst
+    #: bound violation, and whether all three are within ``feasibility_tol``.
+    max_equality_violation: float | None = None
+    min_inequality_margin: float | None = None
+    max_bound_violation: float | None = None
+    feasible: bool | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "stats", dict(self.stats))

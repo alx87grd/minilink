@@ -799,7 +799,11 @@ require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 family).
 
 **Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
-`TrajectoryPlan`. **I-level constructors** take flat kwargs
+`TrajectoryPlan`. `SolveMetadata.success` means *the returned plan satisfies the
+program constraints to `feasibility_tol`* (or the solver converged): an
+iteration-limit stop on a feasible plan is not a failure, and the worst
+equality residual / inequality margin / bound violation are recorded on the
+metadata. **I-level constructors** take flat kwargs
 (`n_steps=…`, `transcription="direct_collocation"`, `compile_backend=…`,
 `optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
 `transcription=` explicitly. Tier-2 still accepts a `Transcription` instance

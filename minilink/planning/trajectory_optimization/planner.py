@@ -47,6 +47,7 @@ _TRAJOPT_OPTION_KEYS = (
     "callback",
     "record_solve_time",
     "verbose",
+    "feasibility_tol",
 )
 
 _TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
@@ -91,6 +92,10 @@ class TrajectoryOptimizationOptions:
     callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
     record_solve_time: bool = False
     verbose: bool = False
+    #: ``success`` is granted when the returned plan satisfies the program
+    #: constraints (equality residuals, inequality margins, bounds) to this
+    #: tolerance, even if the solver stopped on an iteration limit.
+    feasibility_tol: float = 1e-6
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -132,6 +137,7 @@ class TrajectoryOptimizationPlanner(Planner):
         callback=_UNSET,
         record_solve_time=_UNSET,
         verbose=_UNSET,
+        feasibility_tol=_UNSET,
     ) -> None:
         """
         Parameters
@@ -150,7 +156,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
         compile_backend, initial_guess, warm_start, optimizer_method,
         optimizer_options, use_hessian, record_history, callback,
-        record_solve_time, verbose
+        record_solve_time, verbose, feasibility_tol
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
         """
         super().__init__(problem)
@@ -168,6 +174,7 @@ class TrajectoryOptimizationPlanner(Planner):
             callback=callback,
             record_solve_time=record_solve_time,
             verbose=verbose,
+            feasibility_tol=feasibility_tol,
         )
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
@@ -248,15 +255,33 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimization_result = optimization_result
         self.last_solve_time_s = optimization_result.solve_time_s
         self.last_step_time_s = total_s
+        # success = the solver converged OR the returned plan satisfies the
+        # constraints to feasibility_tol (iteration-limit stops on a feasible
+        # plan are not failures; a converged-looking infeasible plan is).
+        max_eq, min_ineq, max_bound = optimizer.program_evaluator.constraint_violations(
+            optimization_result.z
+        )
+        tol = float(self.options.feasibility_tol)
+        feasible = bool(
+            max_eq <= tol
+            and (min_ineq is None or min_ineq >= -tol)
+            and max_bound <= tol
+        )
         plan = self._store_trajectory_plan(
             TrajectoryPlan(
                 trajectory=trajectory,
                 metadata=SolveMetadata(
-                    success=bool(optimization_result.success),
+                    success=bool(optimization_result.success) or feasible,
                     message=str(optimization_result.message),
                     cost=optimization_result.cost,
                     solve_time_s=optimization_result.solve_time_s,
                     stats=dict(optimization_result.stats),
+                    max_equality_violation=float(max_eq),
+                    min_inequality_margin=(
+                        None if min_ineq is None else float(min_ineq)
+                    ),
+                    max_bound_violation=float(max_bound),
+                    feasible=feasible,
                 ),
                 warm_state=optimization_result.z,
             )
@@ -655,7 +680,16 @@ class TrajectoryOptimizationPlanner(Planner):
 
         print("Completed in", result.solve_time_s, "seconds")
         print(DISP_RULE_DIV)
-        print("success:", result.success)
+        print("success:", result.success, "(solver)")
+        print(
+            "feasible:",
+            bool(
+                max_eq <= self.options.feasibility_tol
+                and (min_ineq is None or min_ineq >= -self.options.feasibility_tol)
+                and max_bound <= self.options.feasibility_tol
+            ),
+            f"(tol={self.options.feasibility_tol:g})",
+        )
         print("message:", result.message)
         print("J*:", result.cost)
         print("stats:", result.stats)
