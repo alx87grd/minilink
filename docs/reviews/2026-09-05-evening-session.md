@@ -154,3 +154,17 @@ Verification: demo sweep 57 passed / 3 interactive skips (60 scripts under
 `demos/`), notebook smoke 15/15 (incl. the new `06_hybrid` and the promoted
 `cartpole_rollout_gradients`), the three `projects/pathtracking` runs from
 `common/`, `pytest` and catalog checks green.
+
+## S33 — compiled `Sys2Gym` step (2026-09-06)
+
+Ruled: keep the evaluator methods (S16/S17 closed as keep); land S33.
+`Sys2Gym(sys, cost, ..., integrator="rk4", compile_backend=None)` compiles the
+plant once and steps it with one call per env step — `jax.jit` of the
+evaluator's RK4 step when JAX is installed and the plant traces, the NumPy
+evaluator otherwise (`Drone2D` and the other NumPy-only catalog plants fall
+back silently; `compile_backend` records the choice). `integrator="euler"`
+reproduces the historical `x + f dt`. Per step on this machine: pendulum
+9.6 µs (jitted RK4) vs 7 µs (Python Euler); UR5 56 µs vs 263 µs. Parity tests
+cover RK4 vs the explicit formula, RK4 vs Euler at small `dt`, JAX vs NumPy,
+and the fallback. The two PPO notebooks were not re-trained here:
+stable-baselines3 is not in the dev env.

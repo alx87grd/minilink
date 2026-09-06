@@ -62,7 +62,7 @@ a release process by themselves.
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`. | Honest `final_time` / `success` metadata; `vi_ctl @ plant` in notebooks. |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot. **`success` echoes solver status; float32 by default on JAX.** | float64 policy; `success` = defects satisfied; multiple-shooting parametric guard. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
-| Interfaces / RL bridge | teaching (GRO860) | 3 | `Sys2Gym` + `SB3Controller`; step is a Python forward-Euler loop. | Compiled `step` on `integrate_zoh` (optional JAX) for training speed. |
+| Interfaces / RL bridge | teaching (GRO860) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call (jitted under JAX when the plant traces, NumPy otherwise; Euler kept as an option). | Vectorized envs; re-train the PPO notebooks on the RK4 step. |
 | Planning / search (RRT) | provisional | 4 | RRT/RRT*; spatial `Scene`. | RRT-Connect later. |
 | Geometry / spatial | provisional | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Glyph/solid naming split (v1.0). |
 | Graphics / animation | teaching | 4 | Frame-keyed `tf` / geometry / overlays; four renderers. | Renderer polish; matplotlib renderer coverage. |
@@ -114,7 +114,7 @@ Step-level specs, files, and "done when" criteria live in
 [docs/plans/TODO.md](docs/plans/TODO.md); the audit trail is in
 [docs/reviews/](docs/reviews/).
 
-**Status 2026-09-06 (`dev-fable`):** Phase D and Phase 0 complete; Phase 1 landed S11–S15, S18–S21, S39, S41, S42 plus the 2026-09-06 review pass (trajopt `success` = feasible, x64 policy at every JAX entry, shape probe on step diagrams) and the organisation pass (`minilink/experimental/`, one `lazy_facade` helper, root prelude with the demo names, demo folders keyed to the intro chapters, `examples/experimental/`). Open: S16/S17 (evaluator names, your pick), S33 (`Sys2Gym` compiled step), S38 (DP metadata). Phase 2 not started.
+**Status 2026-09-06 (`dev-fable`):** Phase D and Phase 0 complete; Phase 1 landed S11–S15, S18–S21, S39, S41, S42 plus the 2026-09-06 review pass (trajopt `success` = feasible, x64 policy at every JAX entry, shape probe on step diagrams) and the organisation pass (`minilink/experimental/`, one `lazy_facade` helper, root prelude with the demo names, demo folders keyed to the intro chapters, `examples/experimental/`). S33 landed (compiled RK4 env step, JAX when the plant traces); S16/S17 closed as keep. Open: S38 (DP metadata). Phase 2 not started.
 
 | Phase | Scope | When |
 | --- | --- | --- |
