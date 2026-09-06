@@ -64,6 +64,20 @@ def test_plant_compiles_on_both_backends_and_agrees(name):
             )
 
 
+def test_catalog_check_registry_covers_every_catalog_plant():
+    from tests.demo_checks import catalog_check_registry as registry
+
+    entries = [
+        value
+        for value in vars(registry).values()
+        if isinstance(value, (list, tuple))
+        and value
+        and isinstance(value[0], registry.CatalogCheckEntry)
+    ][0]
+    missing = sorted(set(catalog.__all__) - {entry.id for entry in entries})
+    assert missing == [], f"catalog plants without a catalog-check entry: {missing}"
+
+
 def test_numpy_only_list_names_catalog_plants():
     unknown = sorted(NUMPY_ONLY - set(catalog.__all__))
     assert unknown == [], f"not catalog names: {unknown}"

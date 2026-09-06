@@ -185,3 +185,22 @@ Verification after each step: full `pytest`, catalog checks (fast + full),
 `test_catalog_backends` (51 cases), demo sweep, notebook smoke, regression
 gates; a parity probe of the new ladder against the retired `jax_vehicles`
 module reported differences of 1e-13 or below on random points.
+
+### Review pass on Phase 2 (2026-09-06, inline — the finder agents hit the session limit)
+
+Twelve findings; four fixed: `rollout_batch` caches one `jit(vmap)` per input
+/ family layout (repeat calls 65 ms → 4 ms on the seven-length pendulum
+sweep); `Sys2Gym` falls back to NumPy only on the "not JAX-traceable" verdict
+and re-raises any other JAX compile error; the catalog-check registry gains
+the five plants it never covered (`DoublePendulum`, `Plane3D`,
+`PendulumWithNoisePort`, `DynamicBicycle`, `DynamicBicycleCar3D`) plus a test
+that it covers every `minilink.catalog` name; the 3-D collision tests use a
+three-line test plant instead of importing the research-lane `extras`.
+Recorded, not changed: NumPy `f` of the swept `DynamicBicycle` costs 15 µs
+(was 10) from the `xp.array` / `where` forms; `named_ports` exists in three
+shapes (two inline, one project mixin); `BicycleDynRate` rebuilds its state
+and ports after the base constructor; the family-axis heuristic for params
+leaves without a compiled twin; `test_dynamics_catalog` still imports the
+research rungs it tests. Note: the S22 / S23 / S24 / S26 changes landed inside
+the S25 commit `9554a48` (their own gated chains stopped on a test failure at
+the time).

@@ -12,6 +12,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from minilink.blocks.transfer_function import TransferFunction
+from minilink.catalog import (
+    DoublePendulum,
+    DynamicBicycle,
+    DynamicBicycleCar3D,
+    PendulumWithNoisePort,
+    Plane3D,
+)
 from minilink.dynamics.catalog.aerial.drone import (
     ConstantSpeedHelicopterTunnel,
     Drone2D,
@@ -134,6 +141,11 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("ConstantSpeedHelicopterTunnel", ConstantSpeedHelicopterTunnel),
     CatalogCheckEntry("Rocket", Rocket),
     CatalogCheckEntry("Plane2D", Plane2D),
+    CatalogCheckEntry("Plane3D", Plane3D),
+    CatalogCheckEntry("DoublePendulum", DoublePendulum),
+    CatalogCheckEntry("PendulumWithNoisePort", PendulumWithNoisePort),
+    CatalogCheckEntry("DynamicBicycle", DynamicBicycle),
+    CatalogCheckEntry("DynamicBicycleCar3D", DynamicBicycleCar3D),
     CatalogCheckEntry("Boat2D", Boat2D),
     CatalogCheckEntry("Boat2DWithCurrent", Boat2DWithCurrent),
     CatalogCheckEntry(

@@ -1341,8 +1341,7 @@ def test_record_history_for_animation():
 from dataclasses import dataclass
 from minilink.core.backends import array_module
 from minilink.core.geometry import Sphere
-from minilink.core.kinematics import apply
-from examples.projects.car_trajopt.vehicles.extras import HolonomicMobileRobot3D
+from minilink.core.kinematics import apply, translation
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
     KinematicCar,
@@ -1407,8 +1406,21 @@ def test_bind_disc_body_pose():
     assert apply(T, np.zeros(2)) == pytest.approx([1.5, -2.0])
 
 
+class _Point3D(DynamicSystem):
+    """Velocity-controlled point in 3-D whose ``body`` frame sits at its position."""
+
+    def __init__(self):
+        super().__init__(n=3, input_dim=3, output_dim=3)
+
+    def f(self, x, u, t=0, params=None):
+        return np.asarray(u)
+
+    def tf(self, x, u, t=0, params=None):
+        return {"body": translation(x[0], x[1], x[2])}
+
+
 def test_bind_disc_in_3d():
-    body = bind(HolonomicMobileRobot3D(), Sphere(np.zeros(3), 0.5))
+    body = bind(_Point3D(), Sphere(np.zeros(3), 0.5))
     (T,) = body.body_poses(np.array([1.0, 2.0, 3.0]))
     assert T.shape == (4, 4)
     assert apply(T, np.zeros(3)) == pytest.approx([1.0, 2.0, 3.0])
@@ -1482,7 +1494,7 @@ def test_bound_jax_twin_margin_matches_and_differentiates():
 
 def test_clearance_pipeline_in_3d():
     scene = Scene(obstacles=(Sphere([0.0, 0.0, 0.0], 1.0),))
-    body = bind(HolonomicMobileRobot3D(), Sphere(np.zeros(3), 0.5))
+    body = bind(_Point3D(), Sphere(np.zeros(3), 0.5))
     field = scene.clearance_field(body)
     assert field.value(np.array([3.0, 0.0, 0.0])) == pytest.approx(3.0 - 1.0 - 0.5)
     free = field.as_constraint()

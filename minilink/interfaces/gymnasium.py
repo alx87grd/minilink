@@ -328,8 +328,10 @@ def _compiled_step(sys, integrator, compile_backend):
     backend = ("jax" if _jax_installed() else "numpy") if auto else compile_backend
     try:
         evaluator = sys.compile(backend=backend, verbose=False)
-    except RuntimeError:
-        if not (auto and backend == "jax"):
+    except RuntimeError as exc:
+        # Only the "not JAX-traceable" verdict falls back; any other error
+        # from the JAX compile is a real problem and must surface.
+        if not (auto and backend == "jax" and "JAX-traceable" in str(exc)):
             raise
         backend = "numpy"  # the plant does not trace: NumPy evaluator instead
         evaluator = sys.compile(backend=backend, verbose=False)

@@ -396,15 +396,33 @@ class JaxIntegrationMixin:
         t0 = jnp.asarray(t0, dtype=float)
         dt = jnp.asarray(dt, dtype=float)
 
+        # One jitted vmap per (input layout, family layout): repeated sweeps
+        # with the same shapes reuse the compiled rollout instead of re-tracing.
+        cache = self.__dict__.setdefault("_rollout_batch_cache", {})
         if params is None:
-            fn = jax.vmap(
-                self._rk4_integrate_zoh_trace_fn, in_axes=(0, u_axis, None, None)
-            )
+            key = (u_axis, None)
+            fn = cache.get(key)
+            if fn is None:
+                fn = jax.jit(
+                    jax.vmap(
+                        self._rk4_integrate_zoh_trace_fn,
+                        in_axes=(0, u_axis, None, None),
+                    )
+                )
+                cache[key] = fn
             return fn(x0s, u_seq, t0, dt)
         axes = self._params_batch_axes(params, batch)
-        fn = jax.vmap(
-            self._rk4_integrate_zoh_trace_p_fn, in_axes=(0, u_axis, None, None, axes)
-        )
+        leaves, treedef = jax.tree_util.tree_flatten(axes, is_leaf=lambda a: a is None)
+        key = (u_axis, str(treedef), tuple(leaves))
+        fn = cache.get(key)
+        if fn is None:
+            fn = jax.jit(
+                jax.vmap(
+                    self._rk4_integrate_zoh_trace_p_fn,
+                    in_axes=(0, u_axis, None, None, axes),
+                )
+            )
+            cache[key] = fn
         return fn(x0s, u_seq, t0, dt, params)
 
     def _params_batch_axes(self, params, batch):
