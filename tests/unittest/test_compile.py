@@ -1003,6 +1003,45 @@ class TestEquationShapeValidation(unittest.TestCase):
         self.assertIn("f() of", str(ctx.exception))
         self.assertIn("returned shape (1,); expected (2,)", str(ctx.exception))
 
+    def test_scalar_f_is_accepted_for_a_first_order_plant(self):
+        class FirstOrder(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+
+            def f(self, x, u, t=0, params=None):
+                return -x[0] + u[0]  # a bare scalar, as students write it
+
+        traj = FirstOrder().compute_trajectory(tf=1.0, show=False, verbose=False)
+        self.assertEqual(traj.x.shape[0], 1)
+
+    def test_wrong_x0_shape_is_reported_at_compile(self):
+        sys = DynamicSystem(n=2, input_dim=1, output_dim=2)
+        sys.x0 = np.array([0.1])
+        with self.assertRaises(ValueError) as ctx:
+            sys.compile(backend="numpy")
+        self.assertIn("x0 of", str(ctx.exception))
+        self.assertIn("expected (2,)", str(ctx.exception))
+
+    def test_wrong_step_shape_inside_a_step_diagram_raises(self):
+        from minilink.core.diagram import StepDiagramSystem
+        from minilink.core.system import StepSystem
+
+        class BadStep(StepSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, output_dim=2)
+
+            def step(self, x, u, k=0, params=None):
+                return np.array([x[1]])  # (1,) instead of (2,)
+
+        diagram = StepDiagramSystem()
+        diagram.add_subsystem(BadStep(), "plant")
+        diagram.add_input_port("u")
+        diagram.connect("input", "u", "plant", "u")
+        with self.assertRaises(ValueError) as ctx:
+            diagram.compile()
+        self.assertIn("step() of", str(ctx.exception))
+        self.assertIn("(plant)", str(ctx.exception))
+
     def test_wrong_f_shape_raises_from_compute_trajectory(self):
         with self.assertRaises(ValueError):
             self._bad_f().compute_trajectory(tf=1.0, verbose=False)

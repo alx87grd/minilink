@@ -27,7 +27,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, configure_jax
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
 from minilink.planning.planner import Planner
 from minilink.planning.policy_synthesis.discretizer import (
     PAIR_CHUNK_SIZE,
@@ -498,7 +498,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def _terminal_cost_jax(self, t):
         """Terminal cost-to-go at every grid node (JAX vmap over N nodes)."""
-        jax = configure_jax(enable_x64=True)
+        jax = ensure_jax_x64()
         jnp = jax.numpy
         grid = self.grid
         N = grid.nodes_n
@@ -583,7 +583,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def _running_cost_jax(self, action_ok, x_next_ok, t):
         """Running-cost lookup table G[s,a] = g(x,u,t)*dt (JAX vmap over N×A pairs)."""
-        jax = configure_jax(enable_x64=True)
+        jax = ensure_jax_x64()
         jnp = jax.numpy
         grid = self.grid
         g = self.problem.cost.g
@@ -656,7 +656,7 @@ class DynamicProgrammingPlanner(Planner):
         jitted ``lax.while_loop`` with ``map_coordinates`` interpolation. The
         compiled runner is cached so repeated solves pay compilation only once.
         """
-        jax = configure_jax(enable_x64=True)  # match NumPy float64 precision
+        jax = ensure_jax_x64()  # library float64 policy (MINILINK_JAX_X64)
         jnp = jax.numpy
         grid = self.grid
         opt = self.options

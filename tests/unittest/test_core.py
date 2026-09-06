@@ -449,3 +449,26 @@ class TestForgottenSuperInit(unittest.TestCase):
         with self.assertRaises(AttributeError):
             sys.no_such_attribute
         self.assertFalse(hasattr(sys, "no_such_attribute"))
+
+    def test_message_also_reaches_the_property_paths(self):
+        class NoSuper(DynamicSystem):
+            def __init__(self):
+                pass
+
+        for attr in ("p", "m", "n", "camera_scale"):
+            with self.assertRaises(AttributeError) as ctx:
+                getattr(NoSuper(), attr)
+            self.assertIn("must call super().__init__", str(ctx.exception))
+
+    def test_property_errors_name_the_real_missing_attribute(self):
+        class Typo(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+
+            @property
+            def gain(self):
+                return self.missing_thing
+
+        with self.assertRaises(AttributeError) as ctx:
+            Typo().gain
+        self.assertIn("missing_thing", str(ctx.exception))

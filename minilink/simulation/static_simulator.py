@@ -10,7 +10,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO
-from minilink.simulation.time_grid import DEFAULT_N_STEPS, build_time_grid
+from minilink.simulation.time_grid import build_time_grid
 
 
 class StaticSimulator:
@@ -52,8 +52,8 @@ class StaticSimulator:
         self.sys = sys
         self.sys.refresh()
 
-        if n_steps is None and dt is None:
-            n_steps = DEFAULT_N_STEPS  # outputs are sampled, not integrated
+        # Outputs are sampled, not integrated: no dt policy, so the automatic
+        # grid is the DEFAULT_N_STEPS reporting grid.
         self.t, self.dt, self.n_pts = build_time_grid(
             t0,
             tf,

@@ -208,10 +208,6 @@ class TestBasicTier(unittest.TestCase):
         self.assertIn("BASIC-TIER-OK", result.stdout)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestRootPrelude(unittest.TestCase):
     """The root package exports exactly the teaching surface (one import line)."""
 
@@ -239,3 +235,7 @@ class TestRootPrelude(unittest.TestCase):
             home = getattr(value, "__module__", "")
             self.assertTrue(home.startswith(TEACHING_LANE_PREFIXES), f"{name}: {home}")
             self.assertFalse(home.startswith(RESEARCH_LANE_PREFIXES), f"{name}: {home}")
+
+
+if __name__ == "__main__":
+    unittest.main()

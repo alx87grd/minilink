@@ -26,21 +26,6 @@ if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
 
-# Attributes every System owns after ``System.__init__``; a failed lookup of one
-# of these almost always means a subclass skipped ``super().__init__(...)``.
-_CORE_ATTRIBUTES = (
-    "n",
-    "name",
-    "state",
-    "inputs",
-    "outputs",
-    "x0",
-    "params",
-    "solver_info",
-    "traj",
-)
-
-
 class System(SharedSystemFacades):
     """
       Static input-output shell: ports, parameters, metadata, and facades.
@@ -368,12 +353,17 @@ class System(SharedSystemFacades):
     def __getattr__(self, name):
         # Reached only when normal lookup fails. On a System the usual cause
         # is a subclass whose __init__ never called super().__init__(...).
-        if name in _CORE_ATTRIBUTES:
+        if "inputs" not in vars(self):
             raise AttributeError(
                 f"{type(self).__name__}.__init__() must call "
                 f"super().__init__(n=...) before the system is used "
                 f"(missing attribute {name!r})"
             )
+        descriptor = getattr(type(self), name, None)
+        if isinstance(descriptor, property):
+            # The getter raised AttributeError and Python discarded it; run it
+            # again so the real missing name reaches the user.
+            return descriptor.__get__(self, type(self))
         raise AttributeError(
             f"{type(self).__name__!r} object has no attribute {name!r}"
         )

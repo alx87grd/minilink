@@ -106,17 +106,17 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Optimizer": ("minilink.optimization.optimizer", "Optimizer"),
 }
 
-__all__ = sorted(set(_EXPORTS) | set(_CATALOG_NAMES))
+_EXPORTS.update({name: ("minilink.catalog", name) for name in _CATALOG_NAMES})
+
+__all__ = sorted(_EXPORTS)
 
 
 def __getattr__(name: str) -> Any:
-    if name in _EXPORTS:
+    try:
         module_path, attr = _EXPORTS[name]
-        value = getattr(import_module(module_path), attr)
-    elif name in _CATALOG_NAMES:
-        value = getattr(import_module("minilink.catalog"), name)
-    else:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    except KeyError:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+    value = getattr(import_module(module_path), attr)
     globals()[name] = value
     return value
 

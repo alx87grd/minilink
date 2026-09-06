@@ -2,7 +2,12 @@
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
+from minilink.core.backends import (
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+    ensure_jax_x64,
+    normalize_backend,
+)
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -92,8 +97,8 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         compile_backend: str,
     ) -> MathematicalProgram:
         """Build a JAX-vectorized multiple-shooting program."""
-        import jax
-        import jax.numpy as jnp
+        jax = ensure_jax_x64()
+        jnp = jax.numpy
 
         cost = problem.require_cost()
         t = jnp.asarray(self.options.t(problem))

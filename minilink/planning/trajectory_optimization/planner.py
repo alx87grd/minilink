@@ -32,6 +32,7 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import SolveMetadata, TrajectoryPlan
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
+    dynamics_function,
 )
 
 _UNSET = object()
@@ -100,6 +101,14 @@ class TrajectoryOptimizationOptions:
     #: Redraw the iterate trajectory during the solve (matplotlib); a
     #: custom ``callback`` takes precedence.
     live_plot: bool = False
+
+
+def _within_tolerance(max_eq, min_ineq, max_bound, tol) -> bool:
+    """True when the worst residual, margin, and bound violation are within tol."""
+    tol = float(tol)
+    return bool(
+        max_eq <= tol and (min_ineq is None or min_ineq >= -tol) and max_bound <= tol
+    )
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -261,23 +270,21 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimization_result = optimization_result
         self.last_solve_time_s = optimization_result.solve_time_s
         self.last_step_time_s = total_s
-        # success = the solver converged OR the returned plan satisfies the
-        # constraints to feasibility_tol (iteration-limit stops on a feasible
-        # plan are not failures; a converged-looking infeasible plan is).
+        # success = the returned plan satisfies the constraints to
+        # feasibility_tol. The solver's own flag stays in `message` / `stats`:
+        # an iteration-limit stop on a feasible plan is not a failure, and a
+        # solver that reports convergence on an infeasible plan is.
         max_eq, min_ineq, max_bound = optimizer.program_evaluator.constraint_violations(
             optimization_result.z
         )
-        tol = float(self.options.feasibility_tol)
-        feasible = bool(
-            max_eq <= tol
-            and (min_ineq is None or min_ineq >= -tol)
-            and max_bound <= tol
+        feasible = _within_tolerance(
+            max_eq, min_ineq, max_bound, self.options.feasibility_tol
         )
         plan = self._store_trajectory_plan(
             TrajectoryPlan(
                 trajectory=trajectory,
                 metadata=SolveMetadata(
-                    success=bool(optimization_result.success) or feasible,
+                    success=feasible,
                     message=str(optimization_result.message),
                     cost=optimization_result.cost,
                     solve_time_s=optimization_result.solve_time_s,
@@ -295,7 +302,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
         if self.options.verbose:
             self._print_solve_report(
-                optimizer=optimizer,
+                metadata=plan.metadata,
                 result=optimization_result,
                 trajectory=plan.trajectory,
                 transcribe_s=transcribe_s,
@@ -578,15 +585,27 @@ class TrajectoryOptimizationPlanner(Planner):
         compile_backend: str,
     ) -> OptimizationProgressCallback | None:
         callback = self.options.callback
-        if callback is None and self.options.live_plot:
+        if self.options.live_plot:
             from minilink.planning.trajectory_optimization.live_plot import (
                 LiveTrajectoryPlotCallback,
             )
 
-            callback = LiveTrajectoryPlotCallback(self.problem.sys)
+            live_callback = LiveTrajectoryPlotCallback(self.problem.sys)
+            if callback is None:
+                callback = live_callback
+            else:
+                user_callback = callback
+
+                def callback(iteration):  # both the live figure and the user's hook
+                    live_callback(iteration)
+                    user_callback(iteration)
+
         if not self.options.record_history and callback is None:
             return None
 
+        # One dynamics callable for every iterate (reconstruct_result would
+        # otherwise compile the plant again on each optimizer step).
+        dynamics = dynamics_function(self.problem, compile_backend)
         iteration_index = 0
 
         def planner_progress(z: np.ndarray, J: float, _t: float) -> None:
@@ -598,6 +617,7 @@ class TrajectoryOptimizationPlanner(Planner):
                 compile_backend,
                 iteration_index,
                 cost=J,
+                dynamics=dynamics,
             )
             if self.options.record_history:
                 self.iteration_history.append(iteration)
@@ -615,6 +635,7 @@ class TrajectoryOptimizationPlanner(Planner):
         iteration_index: int,
         *,
         cost: float | None = None,
+        dynamics=None,
     ) -> TrajectoryOptimizationIteration:
         """Build one planning-aware optimizer iteration payload."""
         if cost is None:
@@ -623,6 +644,7 @@ class TrajectoryOptimizationPlanner(Planner):
             OptimizationResult(z=z, success=False, cost=cost),
             problem=self.problem,
             compile_backend=compile_backend,
+            dynamics=dynamics,
         )
         max_eq, min_ineq, _ = optimizer.program_evaluator.constraint_violations(z)
         return TrajectoryOptimizationIteration(
@@ -679,7 +701,7 @@ class TrajectoryOptimizationPlanner(Planner):
     def _print_solve_report(
         self,
         *,
-        optimizer: Optimizer,
+        metadata: SolveMetadata,
         result: OptimizationResult,
         trajectory: Trajectory,
         transcribe_s: float,
@@ -687,28 +709,20 @@ class TrajectoryOptimizationPlanner(Planner):
         reconstruct_s: float,
         total_s: float,
     ) -> None:
-        max_eq, min_ineq, max_bound = optimizer.program_evaluator.constraint_violations(
-            result.z
-        )
-
         print("Completed in", result.solve_time_s, "seconds")
         print(DISP_RULE_DIV)
-        print("success:", result.success, "(solver)")
         print(
-            "feasible:",
-            bool(
-                max_eq <= self.options.feasibility_tol
-                and (min_ineq is None or min_ineq >= -self.options.feasibility_tol)
-                and max_bound <= self.options.feasibility_tol
-            ),
-            f"(tol={self.options.feasibility_tol:g})",
+            "success:",
+            metadata.success,
+            f"(plan feasible to tol={self.options.feasibility_tol:g})",
         )
+        print("solver success:", result.success)
         print("message:", result.message)
         print("J*:", result.cost)
         print("stats:", result.stats)
-        print("max_eq:", max_eq)
-        print("min_ineq:", min_ineq)
-        print("max_bound:", max_bound)
+        print("max_eq:", metadata.max_equality_violation)
+        print("min_ineq:", metadata.min_inequality_margin)
+        print("max_bound:", metadata.max_bound_violation)
         print("x(0):", preview_vector(trajectory.x[:, 0]))
         print("x(tf):", preview_vector(trajectory.x[:, -1]))
         if self.problem.x_goal is not None:

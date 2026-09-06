@@ -228,18 +228,21 @@ print(plan.metadata.success)
 """
 
 
+@pytest.mark.optional
 @pytest.mark.jax
 def test_jax_evaluator_is_float64_by_default_in_a_fresh_process():
     pytest.importorskip("jax")
     assert _run_fresh_python(_X64_PROBE, {}) == "True float64"
 
 
+@pytest.mark.optional
 @pytest.mark.jax
 def test_jax_x64_opt_out_env_var_keeps_float32():
     pytest.importorskip("jax")
     assert _run_fresh_python(_X64_PROBE, {"MINILINK_JAX_X64": "0"}) == "False float32"
 
 
+@pytest.mark.optional
 @pytest.mark.jax
 def test_trajopt_succeeds_on_jax_without_caller_enabling_x64():
     pytest.importorskip("jax")

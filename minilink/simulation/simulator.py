@@ -38,7 +38,7 @@ from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
-from minilink.simulation.time_grid import DEFAULT_N_STEPS, build_time_grid
+from minilink.simulation.time_grid import build_time_grid
 
 # Internal: user-facing solver labels to backend keys and options
 # (solver backend key, options)
@@ -93,9 +93,12 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
 # triggers this rule.
 RK4_AUTO_MIN_TIME_POINTS = 10_000
 
-# Solvers that integrate on the output grid itself: their automatic dt comes
-# from the plant time constant instead of DEFAULT_N_STEPS.
-FIXED_STEP_SOLVERS = ("euler", "euler_fixedsteps", "rk4_fixedsteps")
+# Solvers that integrate on the output grid itself (every non-SciPy backend):
+# their automatic dt comes from the plant time constant instead of
+# DEFAULT_N_STEPS.
+FIXED_STEP_SOLVERS = tuple(
+    label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
+)
 
 # Default automatic dt scale relative to ``solver_info["smallest_time_constant"]``
 SMOOTH_AUTO_DT_SCALE = 0.1
@@ -259,13 +262,13 @@ class Simulator:
         their own steps, so the grid is only a reporting resolution with
         :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.
         """
-        if n_steps is None and dt is None and solver_mode not in FIXED_STEP_SOLVERS:
-            n_steps = DEFAULT_N_STEPS
-        if sys.solver_info.get("discontinuous_behavior", False):
-            scale = DISCONTINUOUS_AUTO_DT_SCALE
-        else:
-            scale = SMOOTH_AUTO_DT_SCALE
-        default_dt = sys.solver_info["smallest_time_constant"] * scale
+        default_dt = None  # -> DEFAULT_N_STEPS reporting grid
+        if solver_mode in FIXED_STEP_SOLVERS:
+            if sys.solver_info.get("discontinuous_behavior", False):
+                scale = DISCONTINUOUS_AUTO_DT_SCALE
+            else:
+                scale = SMOOTH_AUTO_DT_SCALE
+            default_dt = sys.solver_info["smallest_time_constant"] * scale
         return build_time_grid(t0, tf, n_steps=n_steps, dt=dt, default_dt=default_dt)
 
     def select_solver(self, sys, user_solver=None):

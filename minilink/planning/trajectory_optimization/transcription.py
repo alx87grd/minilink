@@ -22,6 +22,7 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
     array_module,
+    ensure_jax_x64,
     normalize_backend,
 )
 from minilink.core.trajectory import Trajectory
@@ -106,7 +107,7 @@ def running_cost_samples(cost, x, u, t, params):
             ]
         )
 
-    import jax
+    jax = ensure_jax_x64()
 
     return jax.vmap(
         lambda x_k, u_k, t_k: cost.g(x_k, u_k, t_k, params=params),
@@ -179,14 +180,14 @@ class FixedGridOptions:
 
 
 class Transcription(ABC):
+    """
+    Base class for finite-dimensional trajectory transcriptions.
+    """
+
     #: True when :meth:`transcribe_parametric` builds a correct parametric
     #: program (the receding-horizon / MPC path). Checked by the planner
     #: instead of ``hasattr`` so a subclass cannot inherit a wrong one.
     supports_parametric = False
-
-    """
-    Base class for finite-dimensional trajectory transcriptions.
-    """
 
     @abstractmethod
     def transcribe(

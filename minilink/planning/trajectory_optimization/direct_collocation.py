@@ -2,7 +2,12 @@
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
+from minilink.core.backends import (
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+    ensure_jax_x64,
+    normalize_backend,
+)
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -97,8 +102,8 @@ class DirectCollocationTranscription(Transcription):
         vectorized knot evaluation instead of nesting precompiled dynamics
         evaluators inside the program.
         """
-        import jax
-        import jax.numpy as jnp
+        jax = ensure_jax_x64()
+        jnp = jax.numpy
 
         cost = problem.require_cost()
         t = jnp.asarray(self.options.t(problem))
@@ -186,8 +191,8 @@ class DirectCollocationTranscription(Transcription):
                 "boundary X0."
             )
 
-        import jax
-        import jax.numpy as jnp
+        jax = ensure_jax_x64()
+        jnp = jax.numpy
 
         cost = problem.require_cost()
         t = jnp.asarray(self.options.t(problem))

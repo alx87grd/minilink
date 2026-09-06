@@ -319,7 +319,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(traj.has_signal("dx"))
         self.assertTrue(traj.has_signal("cost"))
 
-    def test_trajopt_solve_disp_prints_planning_report(self):
+    def test_trajopt_solve_verbose_prints_planning_report(self):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
@@ -2283,6 +2283,8 @@ class TestParametricCapabilityFlag(unittest.TestCase):
         self.assertTrue(DirectCollocationTranscription.supports_parametric)
         self.assertFalse(MultipleShootingTranscription.supports_parametric)
 
+    @pytest.mark.optional
+    @pytest.mark.jax
     def test_planner_refuses_parametric_compile_for_multiple_shooting(self):
         pytest.importorskip("jax")
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
@@ -2350,6 +2352,29 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
         self.assertFalse(md.success)
         self.assertGreater(md.max_equality_violation, 1e-3)
 
+    def test_solver_success_on_an_infeasible_plan_is_not_success(self):
+        from dataclasses import replace
+        from unittest import mock
+
+        from minilink.optimization.optimizer import Optimizer
+
+        original_solve = Optimizer.solve
+
+        def lying_solve(optimizer, *args, **kwargs):
+            result = original_solve(optimizer, *args, **kwargs)
+            return replace(result, success=True, message="solver claims success")
+
+        with mock.patch.object(Optimizer, "solve", lying_solve):
+            plan = TrajectoryOptimizationPlanner(
+                self._pendulum_problem(0.0, tf=1.0),
+                n_steps=10,
+                transcription="direct_collocation",
+                compile_backend="numpy",
+            ).solve()
+        self.assertEqual(plan.metadata.message, "solver claims success")
+        self.assertFalse(plan.metadata.feasible)
+        self.assertFalse(plan.metadata.success)
+
 
 class TestDpOneObjectSetup(unittest.TestCase):
     """DynamicProgrammingPlanner builds its grid from x_grid / u_grid / dt."""
@@ -2413,6 +2438,19 @@ class TestTextbookOptions(unittest.TestCase):
             verbose=False,
         )
         self.assertFalse(planner.options.clean_infeasible)
+        from unittest import mock
+
+        with mock.patch.object(
+            DynamicProgrammingPlanner, "clean_infeasible_set"
+        ) as cleanup:
+            planner.solve()
+        cleanup.assert_not_called()
+        planner.options.clean_infeasible = True
+        with mock.patch.object(
+            DynamicProgrammingPlanner, "clean_infeasible_set"
+        ) as cleanup:
+            planner.solve()
+        cleanup.assert_called_once()
 
     def test_trajopt_live_plot_builds_a_callback(self):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
@@ -2437,3 +2475,37 @@ class TestTextbookOptions(unittest.TestCase):
         planner.options.live_plot = False
         self.assertIsNone(planner._make_callback(None, "numpy"))
         self.assertTrue(callable(LiveTrajectoryPlotCallback))
+
+    def test_trajopt_live_plot_composes_with_a_user_callback(self):
+        from unittest import mock
+
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        problem = PlanningProblem(
+            plant,
+            x_start=np.zeros(2),
+            x_goal=goal,
+            tf=1.0,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+        seen = []
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            n_steps=5,
+            transcription="direct_collocation",
+            live_plot=True,
+            callback=seen.append,
+        )
+        live = mock.MagicMock()
+        with mock.patch(
+            "minilink.planning.trajectory_optimization.live_plot."
+            "LiveTrajectoryPlotCallback",
+            return_value=live,
+        ):
+            progress = planner._make_callback(mock.MagicMock(), "numpy")
+            planner._iteration_from_z = lambda *a, **k: "iteration"
+            progress(np.zeros(3), 0.0, 0.0)
+        self.assertEqual(seen, ["iteration"])
+        live.assert_called_once_with("iteration")

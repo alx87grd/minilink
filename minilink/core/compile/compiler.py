@@ -64,7 +64,9 @@ def validate_equation_shapes(system, label=None):
     n = int(system.n)
     x0 = np.asarray(system.x0, dtype=float).reshape(-1)
     if x0.shape != (n,):
-        x0 = np.zeros(n)
+        raise ValueError(
+            f"x0 of '{name}' has shape {x0.shape}; expected ({n},) for n={n}"
+        )
     u0 = np.asarray(system.get_u_from_input_ports(), dtype=float).reshape(-1)
 
     if isinstance(system, DynamicSystem) and n > 0:
@@ -89,10 +91,9 @@ def validate_equation_shapes(system, label=None):
 
 def _check_shape(value, expected, what, context):
     shape = np.shape(value)
-    if shape != expected:
-        raise ValueError(
-            f"{what} returned shape {shape}; expected {expected} {context}"
-        )
+    if shape == expected or (shape == () and expected == (1,)):
+        return  # a bare scalar is fine for a one-dimensional equation
+    raise ValueError(f"{what} returned shape {shape}; expected {expected} {context}")
 
 
 def compile(system, backend=BACKEND_NUMPY, verbose=False):
