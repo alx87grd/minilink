@@ -19,6 +19,7 @@ the design needs a writeup.
 | --- | --- | --- |
 | [TODO.md](TODO.md) | Operational workboard (phases D–3, v0.2 pulls) | Ongoing |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.2 |
+| [derivatives-facade.md](derivatives-facade.md) | `df_dx` / `df_du` / `dh_dx` / `df_dp` … on every `System` (JAX exact, finite-difference backup) | Teaching surface — draft, awaiting rulings |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Result families + parametric scene bind (pipeline B) | Research lane — partial, Later |
 | [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | Solver backend factory for offline + parametric MPC | Research lane — draft, Later |
 | [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Research lane — draft, Later |
