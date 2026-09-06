@@ -13,7 +13,7 @@ Run from repo root::
 """
 
 from minilink import FilteredController
-from minilink.interfaces.c_export import export_system_to_c
+from minilink.experimental.c_export import export_system_to_c
 
 # Dynamic SISO PID with filtered derivative and anti-windup (n=2, m=2 for [r, y]).
 controller = FilteredController(

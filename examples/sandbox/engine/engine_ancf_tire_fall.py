@@ -6,7 +6,7 @@ and slopes, elastic forces come from JAX-differentiated energy, and contact is
 a smooth penalty force against a fixed ground plane.
 """
 
-from minilink.dynamics.engines.ancf_tire_jax import (
+from minilink.experimental.engines.ancf_tire_jax import (
     ANCFTireSystem,
     make_ancf_tire_model,
 )

@@ -8,8 +8,8 @@ examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.hybrid_composition
 examples/demos/hybrid/smc_pendulum_rate.py minilink.core.hybrid_composition
 examples/demos/identification/params_gradient.py minilink.core.backends
-examples/demos/interfaces/c_export.py minilink.interfaces.c_export
-examples/demos/interfaces/c_export_proportional.py minilink.interfaces.c_export
+examples/demos/interfaces/c_export.py minilink.experimental.c_export
+examples/demos/interfaces/c_export_proportional.py minilink.experimental.c_export
 examples/demos/mpc/mpc_car_circuit.py minilink.core.geometry
 examples/demos/mpc/mpc_car_circuit.py minilink.dynamics.catalog.vehicles.jax_vehicles
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.collision
@@ -68,7 +68,7 @@ examples/learn/intro/showcase_minilink.ipynb minilink.dynamics.catalog.vehicles.
 examples/learn/intro/showcase_minilink.ipynb minilink.graphical.animation.primitives
 examples/learn/intro/showcase_minilink.ipynb minilink.graphical.catalog.shapes
 examples/learn/teaching/articulated_robot_eom.ipynb minilink.core.backends
-examples/learn/teaching/articulated_robot_eom.ipynb minilink.symbolic.mechanics.model
+examples/learn/teaching/articulated_robot_eom.ipynb minilink.experimental.symbolic.mechanics.model
 examples/learn/teaching/mpc.ipynb minilink.core.backends
 examples/learn/teaching/mpc.ipynb minilink.core.costs
 examples/learn/teaching/mpc.ipynb minilink.core.geometry

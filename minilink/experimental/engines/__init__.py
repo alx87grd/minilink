@@ -4,7 +4,7 @@ Distinct from the other two children of ``dynamics/``: ``abstraction/``
 holds mathematical bases you subclass, ``catalog/`` holds named plants you
 pick, and ``engines/`` holds kernels that *build* a
 :class:`~minilink.core.system.System` from a description
-(``make_world_model(...)`` -> :class:`~minilink.dynamics.engines.world.PhysicsWorldSystem`).
+(``make_world_model(...)`` -> :class:`~minilink.experimental.engines.world.PhysicsWorldSystem`).
 
 The boundary test: engine code **executes inside ``f`` during
 simulation** (``world_ode`` runs every step). Offline authoring that derives

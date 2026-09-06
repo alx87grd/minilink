@@ -116,9 +116,7 @@ RESEARCH_LANE_PREFIXES = (
     "minilink.simulation.computer",
     "minilink.simulation.hybrid_simulator",
     "minilink.core.hybrid",
-    "minilink.symbolic",
-    "minilink.dynamics.engines",
-    "minilink.interfaces.c_export",
+    "minilink.experimental",
 )
 
 

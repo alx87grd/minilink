@@ -3,7 +3,7 @@ Symbolic mechanical system in manipulator form (SymPy).
 
     H(q) q̈ + C(q, q̇) q̇ + d(q, q̇) + g(q) = B(q) u
 
-This class lives in ``minilink.symbolic.mechanics`` only. For a numeric block, call
+This class lives in ``minilink.experimental.symbolic.mechanics`` only. For a numeric block, call
 :meth:`to_minilink` (NumPy :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`
 or, with ``backend="jax"``, :class:`~minilink.dynamics.abstraction.mechanical.JaxMechanicalSystem`).
 """

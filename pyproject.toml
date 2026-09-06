@@ -147,13 +147,11 @@ git_describe_command = "git describe --dirty --tags --long --match '0.*'"
 
 [tool.hatch.build.targets.wheel]
 # Only the library ships; tests/ and benchmarks/ stay repo-only. The research
-# lane (ROADMAP §2) is repo-only too: quarantine packages and the experimental
-# C export are excluded from the published wheel.
+# lane (ROADMAP §2) is repo-only too: the experimental tier is excluded from
+# the published wheel.
 packages = ["minilink"]
 exclude = [
-    "minilink/symbolic/**",
-    "minilink/dynamics/engines/**",
-    "minilink/interfaces/c_export.py",
+    "minilink/experimental/**",
 ]
 
 [tool.hatch.build.hooks.vcs]

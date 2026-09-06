@@ -27,10 +27,10 @@ a **contract**, not a documentation convention.
 | Lane | What it is | Rules |
 | --- | --- | --- |
 | **Teaching surface** | The names students meet: root prelude (`from minilink import …`) and the band facades (`minilink.catalog`, `.blocks`, `.control`, `.analysis`, `.simulation`, `.planning`). Registered in one place, tested as a set. | *Soft rule:* nothing enters without a demo or notebook, a both-backends test where it defines dynamics, and a docstring. Names and semantics change only with a deprecation note. Student-facing examples and notebooks import **only** through it (CI-checked). |
-| **Research lane** | Everything else: provisional bands (hybrid, MPC, realtime, spatial), quarantine (`symbolic/`, `dynamics/engines/`), `interfaces/c_export`, `examples/projects/`, `examples/sandbox/`. | No stability promise, no entry requirements, importable from a git checkout. Stays **out of the wheel** and out of the release contract. Deep imports always remain valid. |
+| **Research lane** | Everything else: provisional bands (hybrid, MPC, realtime, spatial), the `minilink/experimental/` tier (symbolic mechanics, contact engines, C export), `examples/projects/`, `examples/sandbox/`. | No stability promise, no entry requirements, importable from a git checkout. Stays **out of the wheel** and out of the release contract. Deep imports always remain valid. |
 
 **Wheel scope:** the published package ships the teaching surface plus the
-provisional planning/MPC/hybrid bands. Quarantine, `c_export`, projects, and
+provisional planning/MPC/hybrid bands. `experimental/`, projects, and
 sandbox are repo-only.
 
 ## 3. Maturity (TRL)
@@ -70,8 +70,8 @@ a release process by themselves.
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review. |
 | Estimation | planned | 1 | Placeholder. | Luenberger, Kalman (v0.2). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2); batched `rollout_batch` facade first. |
-| C export (`interfaces/c_export`) | research | 2 | Experimental JAX→C transpiler; two demos pass locally; not in CI. | Repo-only; add to the nightly sweep. |
-| Quarantine (symbolic, hand-rolled contact) | research | 1 | Experimental; not teaching path. | Keep isolated; repo-only. |
+| C export (`experimental/c_export`) | research | 2 | Experimental JAX→C transpiler; two demos pass locally; not in CI. | Repo-only; add to the nightly sweep. |
+| Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Experimental; not teaching path. | Keep isolated; repo-only. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later (`interfaces/mjx.py`). |
 | Pyro 2.0 overall | v0.2 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 

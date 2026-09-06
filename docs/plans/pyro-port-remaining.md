@@ -60,8 +60,8 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | `minilink/planning/spatial/` | Scene, WorkspaceField, RobotBody | Obstacle/clearance layer replaces *withObstacles plants |
 | `minilink/planning/search/dubins.py` | Dubins steering | Extra beyond pyro RRT |
 | `minilink/blocks/neural.py` | MLP block (JAX) | Prototype; pyro RL is SB3-only |
-| `minilink/symbolic/` | Symbolic derivation | Quarantine; no pyro equivalent |
-| `minilink/dynamics/engines/` | Contact, ANCF tire (JAX) | Experimental physics engines |
+| `minilink/experimental/symbolic/` | Symbolic derivation | Quarantine; no pyro equivalent |
+| `minilink/experimental/engines/` | Contact, ANCF tire (JAX) | Experimental physics engines |
 | `examples/demos/mpc/` | Rate MPC closed-loop demos | Minilink extra; no pyro MPC module |
 
 ---

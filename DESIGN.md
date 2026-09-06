@@ -114,8 +114,8 @@ Rules:
 - Root `minilink/__init__.py` exports the **whole teaching surface** (lazily) so
   student-facing code needs one import line; band facades organise the same
   names by role. Research-lane names never appear at the root.
-- Do **not** use `from minilink import *`. Do **not** re-export quarantine
-  (`symbolic/`, `dynamics/engines/`) from teaching surfaces.
+- Do **not** use `from minilink import *`. Do **not** re-export the
+  `experimental/` tier from teaching surfaces.
 
 ### Two lanes (teaching surface vs research lane)
 
@@ -151,7 +151,7 @@ or neural network alike):
 | Package | Role |
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
-| `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
+| `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
 | `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | online state and parameter estimators (planned) |
@@ -171,15 +171,18 @@ state-feedback block):
 | `graphical/` | signals, phase plane, diagrams, animation |
 | `interfaces/` | `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
 
-**Quarantine** — experimental (TRL < 3); nothing may import these:
+**Experimental tier** — `experimental/` (TRL < 3, research lane, repo-only);
+nothing in the library imports it, and the path itself states the maturity:
 
-| Package | Role |
+| Module | Role |
 | --- | --- |
-| `symbolic/` | experimental symbolic mechanics (SymPy EoM derivation) |
+| `experimental/symbolic/` | symbolic mechanics (SymPy EoM derivation, Lagrange / Kane) and export |
+| `experimental/engines/` | hand-rolled JAX contact worlds, ANCF tire |
+| `experimental/c_export.py` | JAX → C transpiler for controller leaves |
 
 **Wheel scope.** The published package ships the teaching surface and the
-provisional planning / MPC / hybrid bands. Quarantine (`symbolic/`,
-`dynamics/engines/`), `interfaces/c_export.py`, `examples/projects/`, and
+provisional planning / MPC / hybrid bands. The `experimental/` tier,
+`examples/projects/`, and
 `examples/sandbox/` are repo-only (research lane).
 
 ### Dependency law
@@ -196,7 +199,7 @@ provisional planning / MPC / hybrid bands. Quarantine (`symbolic/`,
   producing those arrays lives in `analysis/`.
 - Tools import `core`; they may consume libraries in demos and benchmarks.
 - `graphical/` is imported lazily from anywhere; rendering stays optional.
-- Quarantined packages are imported by nothing.
+- The `experimental/` tier is imported by nothing.
 
 ### Placement algorithm
 
@@ -209,7 +212,7 @@ provisional planning / MPC / hybrid bands. Quarantine (`symbolic/`,
    find inputs/policies (`planning`), solve NLPs (`optimization`), fit to data
    (`identification`), render (`graphical`), talk to another ecosystem
    (`interfaces`).
-3. Neither, and unproven → quarantine at top level with a TRL tag.
+3. Neither, and unproven → `experimental/` with a TRL tag.
 
 Student-facing taxonomy: wiring from `blocks/`, plants from `minilink.catalog`
 (or `dynamics/catalog/…`), controllers from `control/`, analysis verbs from

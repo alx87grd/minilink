@@ -4,7 +4,11 @@ import numpy as np
 
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
-from minilink.dynamics.engines.contact_jax import WorldModel, unpack_state, world_ode
+from minilink.experimental.engines.contact_jax import (
+    WorldModel,
+    unpack_state,
+    world_ode,
+)
 from minilink.graphical.animation.primitives import Plane, Sphere
 
 

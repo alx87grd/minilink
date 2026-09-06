@@ -1,7 +1,7 @@
 """
 Mechanical model before equations of motion — frames, bodies, DH chains, loads.
 
-Call :meth:`derive` to obtain a symbolic :class:`~minilink.symbolic.mechanics.symbolic_system.MechanicalSystem`.
+Call :meth:`derive` to obtain a symbolic :class:`~minilink.experimental.symbolic.mechanics.symbolic_system.MechanicalSystem`.
 """
 
 import sympy as sp
@@ -28,7 +28,7 @@ class MechanicalModel:
     2. Add bodies (DH chains and/or manual frames).
     3. Add gravity, springs, dampers, etc.
     4. Call ``derive()`` to obtain a symbolic ``MechanicalSystem`` (SymPy).
-    5. Call ``sys.to_minilink(params)`` for a numeric plant (NumPy or JAX; see :meth:`~minilink.symbolic.mechanics.symbolic_system.MechanicalSystem.to_minilink`).
+    5. Call ``sys.to_minilink(params)`` for a numeric plant (NumPy or JAX; see :meth:`~minilink.experimental.symbolic.mechanics.symbolic_system.MechanicalSystem.to_minilink`).
     """
 
     def __init__(self, name="System"):

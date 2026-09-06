@@ -228,7 +228,7 @@ animation geometry:
 
 ### Symbolic mechanics (experimental)
 
-`minilink.symbolic.mechanics` derives EoM symbolically (SymPy, Lagrange or Kane)
+`minilink.experimental.symbolic.mechanics` derives EoM symbolically (SymPy, Lagrange or Kane)
 from a DH-chain and exports a regular minilink mechanical system (including a
 JAX-traceable variant).
 
@@ -274,7 +274,7 @@ contract, defined in [ROADMAP.md §2](ROADMAP.md#2-two-lanes).
 | Lane | What | Promise |
 | --- | --- | --- |
 | **Teaching surface** | Root prelude (`from minilink import …`) and the band facades (`minilink.catalog`, `.blocks`, `.control`, `.analysis`, `.simulation`, `.planning`): `System` family, diagrams and operators, `Trajectory`, `Simulator`, catalog plants, basic control and analysis, planning for the courses (value iteration, LQR, trajectory optimization, the `Sys2Gym` RL bridge) | Names and semantics change only with a deprecation note; every example and notebook imports through it |
-| **Research lane** | Everything else — hybrid / MPC, realtime, spatial scenes, quarantine (`symbolic/`, `dynamics/engines/`), C export, `examples/projects/`, `examples/sandbox/` | No stability promise; importable from a git checkout; outside the published wheel |
+| **Research lane** | Everything else — hybrid / MPC, realtime, spatial scenes, the `experimental/` tier (symbolic mechanics, contact engines, C export), `examples/projects/`, `examples/sandbox/` | No stability promise; importable from a git checkout; outside the published wheel |
 
 ## Testing
 

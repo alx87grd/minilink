@@ -73,7 +73,7 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
     Parameters
     ----------
     sym_sys
-        Symbolic system from ``minilink.symbolic.mechanics``.
+        Symbolic system from ``minilink.experimental.symbolic.mechanics``.
     parameters : dict, optional
         ``{symbol: value}`` substitution before lambdify.
     backend : {"numpy", "jax"}
