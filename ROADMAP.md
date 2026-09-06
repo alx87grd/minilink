@@ -27,7 +27,7 @@ a **contract**, not a documentation convention.
 | Lane | What it is | Rules |
 | --- | --- | --- |
 | **Teaching surface** | The names students meet: root prelude (`from minilink import …`) and the band facades (`minilink.catalog`, `.blocks`, `.control`, `.analysis`, `.simulation`, `.planning`). Registered in one place, tested as a set. | *Soft rule:* nothing enters without a demo or notebook, a both-backends test where it defines dynamics, and a docstring. Names and semantics change only with a deprecation note. Student-facing examples and notebooks import **only** through it (CI-checked). |
-| **Research lane** | Everything else: provisional bands (hybrid, MPC, realtime, spatial), the `minilink/experimental/` tier (symbolic mechanics, contact engines, C export), `examples/projects/`, `examples/sandbox/`. | No stability promise, no entry requirements, importable from a git checkout. Stays **out of the wheel** and out of the release contract. Deep imports always remain valid. |
+| **Research lane** | Everything else: provisional bands (hybrid, MPC, realtime, spatial), the `minilink/experimental/` tier (symbolic mechanics, contact engines, C export), `examples/projects/`, `examples/experimental/`. | No stability promise, no entry requirements, importable from a git checkout. Stays **out of the wheel** and out of the release contract. Deep imports always remain valid. |
 
 **Wheel scope:** the published package ships the teaching surface plus the
 provisional planning/MPC/hybrid bands. `experimental/`, projects, and
@@ -114,11 +114,7 @@ Step-level specs, files, and "done when" criteria live in
 [docs/plans/TODO.md](docs/plans/TODO.md); the audit trail is in
 [docs/reviews/](docs/reviews/).
 
-**Status 2026-09-05 (evening session, `dev-fable`):** Phase D complete; Phase 0
-complete (S03 dropped by decision); Phase 1 landed S11–S15, S18–S21, S41, S42 —
-open: S16/S17 (evaluator names, your pick), S33 (`Sys2Gym` compiled step), S38
-(DP metadata), S39 (demo headers — needs a joint editorial pass). Phase 2 not
-started. Session log: [docs/reviews/2026-09-05-evening-session.md](docs/reviews/2026-09-05-evening-session.md).
+**Status 2026-09-06 (`dev-fable`):** Phase D and Phase 0 complete; Phase 1 landed S11–S15, S18–S21, S39, S41, S42 plus the 2026-09-06 review pass (trajopt `success` = feasible, x64 policy at every JAX entry, shape probe on step diagrams) and the organisation pass (`minilink/experimental/`, one `lazy_facade` helper, root prelude with the demo names, demo folders keyed to the intro chapters, `examples/experimental/`). Open: S16/S17 (evaluator names, your pick), S33 (`Sys2Gym` compiled step), S38 (DP metadata). Phase 2 not started.
 
 | Phase | Scope | When |
 | --- | --- | --- |

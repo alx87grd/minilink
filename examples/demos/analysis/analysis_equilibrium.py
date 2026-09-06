@@ -1,9 +1,4 @@
-"""Find a trim point where the dynamics vanish.
-
-Run from the repo root::
-
-    python examples/demos/analysis/analysis_equilibrium.py
-"""
+"""Find a trim point where the dynamics vanish."""
 
 import numpy as np
 

@@ -1,3 +1,5 @@
+"""Minimize a quadratic with MathematicalProgram and Optimizer."""
+
 import numpy as np
 
 from minilink import MathematicalProgram, Optimizer

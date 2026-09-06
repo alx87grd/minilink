@@ -1,12 +1,4 @@
-"""Multi-rate filter + controller with a continuous integrator plant.
-
-Fast discrete filter + slow P controller on a continuous integrator plant via
-:class:`~minilink.simulation.hybrid_simulator.HybridSimulator`.
-
-Run from the repo root::
-
-    python examples/demos/hybrid/hybrid_multi_rate.py
-"""
+"""Multi-rate filter + controller with a continuous integrator plant."""
 
 import numpy as np
 

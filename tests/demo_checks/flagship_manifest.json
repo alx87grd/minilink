@@ -11,17 +11,17 @@
   },
   {
     "id": "diagram_closed_loop",
-    "path": "examples/demos/diagrams/diagram_closed_loop.py",
+    "path": "examples/demos/core/diagram_closed_loop.py",
     "requires": []
   },
   {
     "id": "plot_readme",
-    "path": "examples/demos/plots/plot_readme.py",
+    "path": "examples/demos/core/readme_examples.py",
     "requires": []
   },
   {
     "id": "diagram_compiling",
-    "path": "examples/demos/diagrams/diagram_compiling.py",
+    "path": "examples/demos/compile/diagram_compiling.py",
     "requires": []
   },
   {
@@ -30,8 +30,8 @@
     "requires": []
   },
   {
-    "id": "animation_native_comparison",
-    "path": "examples/demos/animation/animation_native_comparison.py",
+    "id": "animation_renderers",
+    "path": "examples/demos/graphical/animation_renderers.py",
     "requires": []
   },
   {
@@ -41,7 +41,7 @@
   },
   {
     "id": "trajopt_cartpole_jax",
-    "path": "examples/demos/trajopt/trajopt_cartpole_collocation_jax.py",
+    "path": "examples/demos/planning/trajopt/trajopt_cartpole_collocation_jax.py",
     "requires": [
       "jax",
       "cyipopt"
@@ -56,14 +56,14 @@
   },
   {
     "id": "c_export",
-    "path": "examples/demos/interfaces/c_export.py",
+    "path": "examples/experimental/c_export/c_export.py",
     "requires": [
       "jax"
     ]
   },
   {
     "id": "c_export_proportional",
-    "path": "examples/demos/interfaces/c_export_proportional.py",
+    "path": "examples/experimental/c_export/c_export_proportional.py",
     "requires": [
       "jax"
     ]

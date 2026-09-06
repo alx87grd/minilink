@@ -1,18 +1,4 @@
-"""Two-link end-effector impedance — Pyro ``twolinkrobot_effector_impedance_controller``.
-
-Run from repo root::
-
-    python examples/demos/robotic/task_impedance_two_link.py
-
-Task-space law uses the internal FK/Jacobian model; feedback is joint space::
-
-    ref.r ─────────────► ctl.r          (desired p)
-    sys.q  ──┐
-    sys.dq ──┴─ Mux ─► ctl.y         ([q; dq])
-    ctl.u ──► sys.u                    (τ)
-
-End-effector step from ``p0 = (0.5, 0.5)`` to ``p1 = (-0.5, 0.5)`` at ``t = 4`` s.
-"""
+"""Two-link end-effector impedance — Pyro ``twolinkrobot_effector_impedance_controller``."""
 
 import numpy as np
 

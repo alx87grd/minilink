@@ -1,12 +1,4 @@
-"""Hybrid MPC on the wide technical circuit (track + corridor + obstacles).
-
-``ModelPredictiveController`` with ``warm_start=True`` and ``mpc @ plant``.
-Scene matches the former wide-circuit lap demo (asymmetric loop + sphere keepouts).
-
-Run from repo root::
-
-    python examples/demos/mpc/mpc_car_circuit.py
-"""
+"""Hybrid MPC on the wide technical circuit (track + corridor + obstacles)."""
 
 import numpy as np
 

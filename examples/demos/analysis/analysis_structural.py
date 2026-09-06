@@ -1,9 +1,4 @@
-"""Controllability and observability of a linearized plant.
-
-Run from the repo root::
-
-    python examples/demos/analysis/analysis_structural.py
-"""
+"""Controllability and observability of a linearized plant."""
 
 import numpy as np
 

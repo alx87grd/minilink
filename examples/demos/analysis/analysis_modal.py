@@ -1,9 +1,4 @@
-"""Modal analysis demo.
-
-Run from the repo root::
-
-    python examples/demos/analysis/analysis_modal.py
-"""
+"""Modal analysis demo."""
 
 import numpy as np
 

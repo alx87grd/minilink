@@ -10,16 +10,16 @@ Run from repo root::
 
 import numpy as np
 
-from examples.projects.pathtracking.mpc_v1.allocation import Allocation
+from examples.projects.pathtracking.common.allocation import Allocation
+from examples.projects.pathtracking.common.path_generator import rounded_rectangle_path
+from examples.projects.pathtracking.common.vehicle import create_vehicle
 from examples.projects.pathtracking.mpc_v1.mpc_dual_rate import dual_rate_computer_ahead
 from examples.projects.pathtracking.mpc_v1.nominal_refs import NominalRefs
-from examples.projects.pathtracking.mpc_v1.path_generator import rounded_rectangle_path
 from examples.projects.pathtracking.mpc_v1.plant_to_mpc import (
     PlantToMpcState,
     plant_y_to_mpc_x,
 )
 from examples.projects.pathtracking.mpc_v1.servos import Servos
-from examples.projects.pathtracking.mpc_v1.vehicle import create_vehicle
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,

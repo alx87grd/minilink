@@ -1,13 +1,4 @@
-"""Parallel signal-processing blocks driven by one source.
-
-Run from the repo root::
-
-    python examples/demos/blocks/signal_blocks.py
-
-A source fans out to routing (Gain, Sum, Mux), nonlinear (Saturation, DeadZone,
-Relay), and filter (LowPass, Notch, Washout) blocks; all outputs are plotted
-together. Two inputs are exercised: a step and a sinusoid.
-"""
+"""Parallel signal-processing blocks driven by one source."""
 
 import numpy as np
 

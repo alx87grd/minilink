@@ -1,15 +1,4 @@
-"""Pendulum regulation with computed torque — Pyro ``simple_pendulum_with_computed_torque``.
-
-Run from repo root::
-
-    python examples/demos/control/computed_torque_pendulum.py
-
-Built-in outer PD + inverse dynamics in one block::
-
-    ref.r ─────────────► ct.r              ([q_d; dq_d])
-    plant.y ───────────► ct.y              ([q; dq])
-    ct.u ──────────────► plant.u           (τ)
-"""
+"""Pendulum regulation with computed torque — Pyro ``simple_pendulum_with_computed_torque``."""
 
 import numpy as np
 

@@ -7,10 +7,6 @@
     "requires": ["jax"],
     "timeout": 300
   },
-  "examples/learn/intro/06_hybrid.ipynb": {
-    "requires": ["jax"],
-    "timeout": 300
-  },
   "examples/learn/intro/07_compile.ipynb": {
     "requires": ["jax"]
   },
@@ -20,9 +16,9 @@
   "examples/learn/intro/10_graphical.ipynb": {
     "requires": ["meshcat", "plotly"]
   },
-  "examples/learn/teaching/mpc.ipynb": {
+  "examples/learn/teaching/cartpole_rollout_gradients.ipynb": {
     "requires": ["jax"],
-    "timeout": 600
+    "timeout": 300
   },
   "examples/learn/teaching/articulated_robot_eom.ipynb": {
     "smoke": false

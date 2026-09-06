@@ -1,19 +1,4 @@
-"""Two-link arm joint impedance — Pyro ``twolinkrobot_joint_impedance_controller``.
-
-Run from repo root::
-
-    python examples/demos/robotic/joint_impedance_two_link.py
-
-Joint-space virtual spring-damper on ``[q, dq]`` via ``closed_loop_qdq``::
-
-    ref.r ─────────────► ctl.r
-    sys.q  ──┐
-    sys.dq ──┴─ Mux ─► ctl.y
-    ctl.u ──► sys.u          (τ = PD + optional g(q))
-
-Same end-effector step task as ``task_impedance_two_link.py`` (``p0`` → ``p1``),
-with joint references from inverse kinematics.
-"""
+"""Two-link arm joint impedance — Pyro ``twolinkrobot_joint_impedance_controller``."""
 
 import numpy as np
 

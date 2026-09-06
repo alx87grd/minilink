@@ -1,3 +1,5 @@
+"""Step and white-noise sources, shown as signals."""
+
 import numpy as np
 
 from minilink import Step, WhiteNoise

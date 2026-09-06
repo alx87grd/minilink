@@ -1,14 +1,6 @@
-"""Drive a cart-pole with the arrow keys — real-time game mode.
+"""Drive a cart-pole with the arrow keys — real-time game mode."""
 
-Run from repo root::
-
-    python examples/demos/realtime/game_cartpole.py
-
-RIGHT/LEFT push the cart; the force saturates at the ``u`` input-port bounds.
-Try to keep the pole balanced. ESC or closing the window stops the session,
-which returns the recorded ``Trajectory`` — the same artifact as an offline
-simulation — ready for plotting or replay.
-"""
+# RIGHT/LEFT push the cart; the force saturates at the ``u`` input-port bounds.
 
 import numpy as np
 

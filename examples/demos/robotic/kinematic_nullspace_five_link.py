@@ -1,23 +1,4 @@
-"""Five-link nullspace kinematic control — Pyro ``fivelinkrobot_kinematic_nullspace_controller``.
-
-Run from repo root::
-
-    python examples/demos/robotic/kinematic_nullspace_five_link.py
-
-Two reference signals on a redundant arm (5 DOF, 2D task):
-
-1. **End-effector ref** — constant ``p_d`` on ``ctl.r``.
-2. **Nullspace joint ref** — ``ctl.r_null`` held at ``q0`` initially, then steps
-   to ``q_null`` at ``NULLSPACE_STEP_TIME`` so the arm reconfigures in the
-   nullspace while tracking ``p``.
-
-Wiring::
-
-    ref_p.y ───────────► ctl.r              (p_d)
-    ref_q.y ───────────► ctl.r_null        (q_null, stepped late)
-    plant.y ───────────► ctl.y              (q)
-    ctl.u ─────────────► plant.u            (dq)
-"""
+"""Five-link nullspace kinematic control — Pyro ``fivelinkrobot_kinematic_nullspace_controller``."""
 
 import numpy as np
 

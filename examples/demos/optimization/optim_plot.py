@@ -1,3 +1,5 @@
+"""Optimizer iterates traced on a bounded two-variable cost."""
+
 import numpy as np
 
 from minilink import MathematicalProgram, Optimizer

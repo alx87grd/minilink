@@ -35,15 +35,16 @@ or maturity change. Add a README examples-table row only when a demo is a
 
 **Examples buckets** (see [examples/README.md](examples/README.md)):
 `learn/` (intro = library curriculum; teaching/ = domain lessons),
-`demos/<topic>/` (canonical single-file
-scripts), `projects/`, `tooling/` (notebooks and/or scripts), `sandbox/`
-(+ `scratch/`). Do not mix `.ipynb` and `.py` in the same leaf module folder
-(except inside one named project). Demo stems keep the topic when needed
-(e.g. `mpc/mpc_car_minimal.py`; no `demo_` prefix). Pedagogical compares stay
-in `demos/`; mission matrices go to `sandbox/` or `projects/`. Scripts are
-top-level open-and-run (no `main()`); do not add plant-only smokes — use catalog
-`__main__` instead. Tooling lives under `examples/tooling/`, plus
-`tests/demo_checks/` and `benchmarks/`.
+`demos/<chapter>/` (canonical single-file scripts, one folder per intro
+chapter), `projects/` (multi-file, research lane), `tooling/` (benches),
+`experimental/` (research-lane single files; `scratch/` for personal checks).
+Do not mix `.ipynb` and `.py` in the same leaf folder (except inside one named
+project). Demo stems keep the topic when needed (e.g. `mpc/mpc_car_minimal.py`;
+no `demo_` prefix). Pedagogical compares stay in `demos/`; mission matrices go
+to `experimental/` or `projects/`. Scripts are top-level open-and-run (no
+`main()`); do not add plant-only smokes — use catalog `__main__` instead.
+Tooling lives under `examples/tooling/`, plus `tests/demo_checks/` and
+`benchmarks/`.
 
 **Student-facing imports.** Code in `README.md`, `examples/learn/`, and
 `examples/demos/` imports through the **teaching surface** — the root prelude
@@ -51,7 +52,7 @@ top-level open-and-run (no `main()`); do not add plant-only smokes — use catal
 import …`, `minilink.control`, `minilink.analysis`, `minilink.blocks`,
 `minilink.simulation`, `minilink.planning`). Deep defining-module imports are
 for library code, tests, and the research lane (`examples/projects/`,
-`examples/sandbox/`). Where a band facade does not exist yet, use the shortest
+`examples/experimental/`). Where a band facade does not exist yet, use the shortest
 import that works and leave the facade to the planned step — never invent a
 name. Exception kept: a factory whose name matches its module is imported from
 the module (`from minilink.control.lqr import lqr`).
@@ -164,7 +165,7 @@ stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` (CI
 ``regression`` job runs the same).
 
-Demos: under `examples/demos/` (canonical) or `examples/sandbox/`
+Demos: under `examples/demos/` (canonical) or `examples/experimental/`
 (non-core / WIP); runnable from repo root. Map: [examples/README.md](examples/README.md).
 
 ## Before push or PR (local CI gate)

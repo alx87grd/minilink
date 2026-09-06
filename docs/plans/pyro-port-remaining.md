@@ -119,7 +119,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/car_steering/car_with_valueiteration_quadratic_cost.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/cartpole/cartpole_LQG.py` | **TODO** | estimation/kalman.py |
 | `demos_by_system/cartpole/cartpole_demo.py` | **TODO** | Open-loop cartpole showcase |
-| `demos_by_system/cartpole/cartpole_stabilization.py` | **Partial** | examples/demos/statespace/cartpole_lqr.py |
+| `demos_by_system/cartpole/cartpole_stabilization.py` | **Partial** | examples/demos/control/cartpole_lqr.py |
 | `demos_by_system/cartpole/cartpole_with_trajectory_optimization.py` | **Partial** | trajopt framework; cartpole-specific demo TODO |
 | `demos_by_system/cartpole_rotating/cartpole_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
 | `demos_by_system/cartpole_rotating/cartpole_natural_behavior.py` | **TODO** | Representative closed-loop for cartpole_rotating |

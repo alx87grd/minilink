@@ -1,23 +1,4 @@
-"""Double pendulum swing-up by value iteration — 4-D state, JAX backend.
-
-Run from the repo root::
-
-    python examples/demos/planning/value_iteration/vi_double_pendulum_jax.py
-
-Mirrors pyro ``double_pendulum_optimal_swingup.py``: asymmetric state bounds,
-``(51, 41, 51, 41)`` state grid with ``(5, 5)`` torques, quadratic cost to
-the upright ``[0, 0, 0, 0]``, and swing-up from the hanging configuration
-``[-π, 1, 0, 0]``. At full scale this is ~4.4M nodes and ~109M state–action
-pairs — a stress test for the JAX lookup-table pipeline (grid transition, ``G``,
-and jitted Bellman sweeps).
-
-Set ``RESOLUTION = "fast"`` for a smaller grid when iterating locally (~15M
-pairs), or ``"high"`` for a finer state/control mesh and more Bellman sweeps.
-
-After planning, three closed-loop simulations mirror pyro (hanging and two
-additional starts): state/input time plots, ``(θ1, dθ1)`` and ``(θ2, dθ2)``
-phase planes, and animation.
-"""
+"""Double pendulum swing-up by value iteration — 4-D state, JAX backend."""
 
 import time
 
@@ -34,7 +15,7 @@ from minilink import (
 
 # RESOLUTION = "high"  # "fast" | "pyro" | "high"
 # RESOLUTION = "fast"  # "fast" | "pyro" | "high"
-RESOLUTION = "pyro"  # "fast" | "pyro" | "high"
+RESOLUTION = "pyro"  # "fast" (local iteration) | "pyro" (4.4M nodes) | "high"
 
 INF = 1000.0
 GOAL = np.zeros(4)

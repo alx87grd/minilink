@@ -10,13 +10,13 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from examples.projects.pathtracking.bicycle_los_v2.allocation import Allocation
-from examples.projects.pathtracking.bicycle_los_v2.path_generator import (
-    rounded_rectangle_path,
-)
 from examples.projects.pathtracking.bicycle_los_v2.path_tracking import PathTracking
 from examples.projects.pathtracking.bicycle_los_v2.servos import Servos
-from examples.projects.pathtracking.bicycle_los_v2.vehicle import create_vehicle
+from examples.projects.pathtracking.common.allocation import Allocation
+from examples.projects.pathtracking.common.path_generator import (
+    rounded_rectangle_path,
+)
+from examples.projects.pathtracking.common.vehicle import create_vehicle
 from minilink.core.diagram import DiagramSystem
 
 path = rounded_rectangle_path(Lx=40.0, Ly=20.0, R=7.0, nseg=2, narc=4, closed=True)

@@ -1,11 +1,4 @@
-"""Minimal hybrid MPC: ``ModelPredictiveController`` then ``mpc @ plant``.
-
-Warm-start via ``warm_start=True`` (packed ``z`` on ``Computer.x``).
-
-Run from repo root::
-
-    python examples/demos/mpc/mpc_car_minimal.py
-"""
+"""Minimal hybrid MPC: ``ModelPredictiveController`` then ``mpc @ plant``."""
 
 import numpy as np
 

@@ -1,3 +1,5 @@
+"""Pendulum swing-up by value iteration."""
+
 import numpy as np
 
 from minilink import DynamicProgrammingPlanner, Pendulum, PlanningProblem, QuadraticCost

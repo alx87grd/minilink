@@ -1,3 +1,5 @@
+"""Minimum-time double integrator by value iteration."""
+
 import numpy as np
 
 from minilink import (

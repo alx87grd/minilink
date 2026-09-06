@@ -1,3 +1,5 @@
+"""Double integrator with a quadratic cost by value iteration."""
+
 import numpy as np
 
 from minilink import (

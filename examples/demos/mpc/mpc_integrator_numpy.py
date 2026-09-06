@@ -1,12 +1,4 @@
-"""Minimal hybrid MPC without JAX — NumPy rebuild each replan tick.
-
-``compile_backend='numpy'`` skips parametric compile; each MPC tick
-transcribes and solves a fresh NLP. Suitable for teaching and small plants.
-
-Run from repo root::
-
-    python examples/demos/mpc/mpc_integrator_numpy.py
-"""
+"""Minimal hybrid MPC without JAX — NumPy rebuild each replan tick."""
 
 import numpy as np
 

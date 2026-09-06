@@ -1,9 +1,4 @@
-"""Compare finite-difference and JAX linearization on a tiny plant.
-
-Run from the repo root::
-
-    python examples/demos/analysis/analysis_linearize_fd_vs_jax.py
-"""
+"""Compare finite-difference and JAX linearization on a tiny plant."""
 
 import numpy as np
 

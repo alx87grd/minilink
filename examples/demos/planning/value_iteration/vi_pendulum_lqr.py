@@ -1,3 +1,5 @@
+"""Pendulum swing-up: value iteration vs LQR."""
+
 import numpy as np
 
 from minilink import (

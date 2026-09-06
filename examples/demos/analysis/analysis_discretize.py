@@ -1,9 +1,4 @@
-"""Discretize a continuous plant to a StepSystem (Euler / RK4).
-
-Run from the repo root::
-
-    python examples/demos/analysis/analysis_discretize.py
-"""
+"""Discretize a continuous plant to a StepSystem (Euler / RK4)."""
 
 import numpy as np
 

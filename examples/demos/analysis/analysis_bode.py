@@ -1,3 +1,5 @@
+"""Bode plot and pole-zero map of a linearized pendulum."""
+
 import numpy as np
 
 from minilink import Pendulum, bode, pzmap

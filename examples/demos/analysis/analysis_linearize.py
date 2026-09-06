@@ -1,9 +1,4 @@
-"""Linearize a nonlinear plant about an operating point.
-
-Run from the repo root::
-
-    python examples/demos/analysis/analysis_linearize.py
-"""
+"""Linearize a nonlinear plant about an operating point."""
 
 import numpy as np
 

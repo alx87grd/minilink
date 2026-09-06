@@ -1,20 +1,4 @@
-"""Holonomic obstacle avoidance — scene, RRT vs RRT*, and extenders.
-
-Run from repo root::
-
-    python examples/demos/planning/rrt/rrt_holonomic_obstacles.py
-
-Intro: one hard obstacle plus a soft Gaussian workspace field — clearance and
-cost fields for ``point_probe`` vs ``disc`` robot bodies (via :func:`bind`).
-
-Section A (default): RRT stops at the first goal; RRT* keeps searching with
-``optimize_after_goal=True`` until path cost stops improving.
-
-Section B: steering vs kinodynamic extenders on the same 18-sphere scene.
-
-Set ``RUN_SCENE_INTRO = False`` to skip the intro plot.
-Set ``RUN_EXTENDER_COMPARISON = True`` to also run section B.
-"""
+"""Holonomic obstacle avoidance — scene, RRT vs RRT*, and extenders."""
 
 import numpy as np
 
@@ -32,8 +16,8 @@ from minilink.planning.spatial.collision import bind, disc, point_probe
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.workspace_fields import GaussianField
 
-RUN_SCENE_INTRO = True
-RUN_EXTENDER_COMPARISON = False
+RUN_SCENE_INTRO = True  # clearance / cost fields for point_probe vs disc bodies
+RUN_EXTENDER_COMPARISON = False  # section B: steering vs kinodynamic extenders
 
 SEED = 0
 GOAL_TOLERANCE = 0.1

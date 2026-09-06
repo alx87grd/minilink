@@ -119,7 +119,7 @@ another diagram.
 
 Explicit wiring (`add_subsystem` / `connect`) is always available when the
 shortcuts are too implicit; see
-`examples/demos/diagrams/diagram_shortcuts.py` for both versions side by
+`examples/demos/core/diagram_shortcuts.py` for both versions side by
 side. Any internal signal can be plotted by `"subsystem_id:port_id"` name.
 
 ### One call to simulate, plot, animate
@@ -274,7 +274,7 @@ contract, defined in [ROADMAP.md §2](ROADMAP.md#2-two-lanes).
 | Lane | What | Promise |
 | --- | --- | --- |
 | **Teaching surface** | Root prelude (`from minilink import …`) and the band facades (`minilink.catalog`, `.blocks`, `.control`, `.analysis`, `.simulation`, `.planning`): `System` family, diagrams and operators, `Trajectory`, `Simulator`, catalog plants, basic control and analysis, planning for the courses (value iteration, LQR, trajectory optimization, the `Sys2Gym` RL bridge) | Names and semantics change only with a deprecation note; every example and notebook imports through it |
-| **Research lane** | Everything else — hybrid / MPC, realtime, spatial scenes, the `experimental/` tier (symbolic mechanics, contact engines, C export), `examples/projects/`, `examples/sandbox/` | No stability promise; importable from a git checkout; outside the published wheel |
+| **Research lane** | Everything else — hybrid / MPC, realtime, spatial scenes, the `experimental/` tier (symbolic mechanics, contact engines, C export), `examples/projects/`, `examples/experimental/` | No stability promise; importable from a git checkout; outside the published wheel |
 
 ## Testing
 
@@ -352,7 +352,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 ## Examples
 
 Index and placement rules: [examples/README.md](examples/README.md)
-(`demos/` = canonical single-file · `sandbox/` = non-core / scenario WIP ·
+(`demos/` = canonical single-file · `experimental/` = research-lane single files ·
 `projects/` = multi-file).
 
 | Interest | Start here |
@@ -361,25 +361,25 @@ Index and placement rules: [examples/README.md](examples/README.md)
 | Stateless / JAX / autodiff (marketing) | [examples/learn/intro/showcase_jax.ipynb](examples/learn/intro/showcase_jax.ipynb) |
 | Module API intros | [examples/learn/intro/](examples/learn/intro/) (`00_core` … `10_graphical`) |
 | Compile → evaluator API | [examples/learn/intro/07_compile.ipynb](examples/learn/intro/07_compile.ipynb) |
-| Diagrams | `examples/demos/diagrams/` · [intro/core](examples/learn/intro/00_core.ipynb) |
+| Diagrams | `examples/demos/core/` · [intro/core](examples/learn/intro/00_core.ipynb) |
 | Blocks (routing, filters, nonlinear) | `examples/demos/blocks/` · [intro/blocks](examples/learn/intro/01_blocks.ipynb) |
 | Control | `examples/demos/control/` · [intro/control](examples/learn/intro/03_control.ipynb) |
 | Pyro SMC continuous (pendulum) | `examples/demos/control/sliding_mode_pendulum.py` |
-| Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/demos/hybrid/` · `examples/demos/step/` · [intro/hybrid](examples/learn/intro/06_hybrid.ipynb) |
-| MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/mpc](examples/learn/teaching/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
+| Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/demos/hybrid/` · `examples/demos/hybrid/` · [intro/hybrid](examples/learn/intro/06_hybrid.ipynb) |
+| MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/mpc](examples/projects/mpc/mpc_spatial_stack.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
 | MPC scenarios (path / slalom / spatial) | `examples/projects/mpc/` · circuit: `examples/demos/mpc/mpc_car_circuit.py` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/demos/robotic/` |
 | Analysis (linearize, trim, ctrb/obsv, modal) | `examples/demos/analysis/` · [intro/analysis](examples/learn/intro/04_analysis.ipynb) |
-| State-space / LQR | `examples/demos/statespace/` |
-| Identification (param gradients) | `examples/demos/identification/` |
-| Plotting | `examples/demos/plots/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |
-| Animation | `examples/demos/animation/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |
+| State-space / LQR | `examples/demos/control/` |
+| Identification (param gradients) | `examples/demos/compile/` |
+| Plotting | `examples/demos/graphical/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |
+| Animation | `examples/demos/graphical/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |
 | Realtime game mode (keyboard → live plant → `Trajectory`) | `examples/demos/realtime/game_cartpole.py` |
 | Optimization | `examples/demos/optimization/` · [intro/optimization](examples/learn/intro/08_optimization.ipynb) |
 | Planning (RRT, DP) | `examples/demos/planning/` · [intro/planning](examples/learn/intro/09_planning.ipynb) |
-| Trajectory optimization | `examples/demos/trajopt/` · [car TrajOpt project](examples/projects/car_trajopt/) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/projects/car_trajopt/car_trajopt.ipynb) |
+| Trajectory optimization | `examples/demos/planning/trajopt/` · [car TrajOpt project](examples/projects/car_trajopt/) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/projects/car_trajopt/car_trajopt.ipynb) |
 | Path tracking projects | `examples/projects/pathtracking/` · `examples/projects/car_trajopt/` |
-| C export (P controller round-trip; filtered PID leaf) | `examples/demos/interfaces/c_export_proportional.py` · `c_export.py` |
+| C export (P controller round-trip; filtered PID leaf) | `examples/experimental/c_export/c_export_proportional.py` · `c_export.py` |
 | Solver benchmarks | [examples/tooling/notebooks/benchmark.ipynb](examples/tooling/notebooks/benchmark.ipynb) (uses repo-root `benchmarks/`) |
 
 Catalog plants: `from minilink.catalog import …` (math under `minilink.dynamics.catalog.*`).
