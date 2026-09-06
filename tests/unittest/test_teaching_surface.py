@@ -41,6 +41,10 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "QuadraticCost",
         "BoxSet",
         "BoxInputSet",
+        "BallSet",
+        "TimeCost",
+        "StepDiagramSystem",
+        "closed_loop_qdq",
     ),
     "minilink.blocks": (
         "Integrator",
@@ -56,6 +60,8 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Relay",
         "LowPassFilter",
         "TransferFunction",
+        "Source",
+        "ZOHHold",
     ),
     "minilink.control": (
         "ProportionalController",
@@ -66,6 +72,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "TaskImpedance",
         "ComputedTorqueController",
         "SlidingModeController",
+        "ImpedanceIntegralController",
     ),
     "minilink.analysis": (
         "bode",
@@ -87,6 +94,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "LookupTableController",
         "PolicyEvaluator",
         "RRTPlanner",
+        "RRTStarPlanner",
     ),
 }
 
@@ -95,6 +103,7 @@ TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.lqr", "lqr"),
     ("minilink.control.lqr", "lqr_at_operating_point"),
     ("minilink.analysis.linearize", "linearize"),
+    ("minilink.analysis.discretize", "discretize"),
 )
 
 # Module prefixes that belong to the teaching lane.

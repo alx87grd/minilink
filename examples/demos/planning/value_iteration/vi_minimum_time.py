@@ -1,7 +1,11 @@
 import numpy as np
 
-from minilink import DoubleIntegrator, DynamicProgrammingPlanner, PlanningProblem
-from minilink.core import TimeCost
+from minilink import (
+    DoubleIntegrator,
+    DynamicProgrammingPlanner,
+    PlanningProblem,
+    TimeCost,
+)
 
 INF = 10.0
 X0 = np.array([1.2, 0.0])

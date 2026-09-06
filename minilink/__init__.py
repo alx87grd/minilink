@@ -16,10 +16,8 @@ appear here.
 
 from __future__ import annotations
 
-from importlib import import_module
-from typing import Any
-
 from minilink.catalog import __all__ as _CATALOG_NAMES
+from minilink.core.facade import lazy_facade
 
 # name -> (module path, attribute); catalog plants resolve through minilink.catalog
 _EXPORTS: dict[str, tuple[str, str]] = {
@@ -103,23 +101,22 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.optimization.mathematical_program",
         "MathematicalProgram",
     ),
+    # band names the teaching demos use
+    "TimeCost": ("minilink.core.costs", "TimeCost"),
+    "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
+    "BallSet": ("minilink.core.sets", "BallSet"),
+    "closed_loop_qdq": ("minilink.core.composition", "closed_loop_qdq"),
+    "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
+    "Source": ("minilink.blocks.sources", "Source"),
+    "ImpedanceIntegralController": (
+        "minilink.control.impedance",
+        "ImpedanceIntegralController",
+    ),
+    "discretize": ("minilink.analysis.discretize", "discretize"),
+    "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),
     "Optimizer": ("minilink.optimization.optimizer", "Optimizer"),
 }
 
 _EXPORTS.update({name: ("minilink.catalog", name) for name in _CATALOG_NAMES})
 
-__all__ = sorted(_EXPORTS)
-
-
-def __getattr__(name: str) -> Any:
-    try:
-        module_path, attr = _EXPORTS[name]
-    except KeyError:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
-    value = getattr(import_module(module_path), attr)
-    globals()[name] = value
-    return value
-
-
-def __dir__() -> list[str]:
-    return sorted(set(globals()) | set(__all__))
+__all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

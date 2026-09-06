@@ -13,8 +13,7 @@ Velocity-controlled plant with task-space kinematic law::
 
 import numpy as np
 
-from minilink import SpeedControlledManipulator, TwoLinkManipulator
-from minilink.blocks import Source
+from minilink import Source, SpeedControlledManipulator, TwoLinkManipulator
 from minilink.control import TaskKinematic
 
 p_d = np.array([0.5, 0.5])

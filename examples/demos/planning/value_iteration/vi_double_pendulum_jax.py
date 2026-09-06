@@ -31,7 +31,6 @@ from minilink import (
     QuadraticCost,
     StateSpaceGrid,
 )
-from minilink.planning import DynamicProgrammingOptions
 
 # RESOLUTION = "high"  # "fast" | "pyro" | "high"
 # RESOLUTION = "fast"  # "fast" | "pyro" | "high"
@@ -99,13 +98,11 @@ t_mesh = time.perf_counter()
 planner = DynamicProgrammingPlanner(
     problem,
     grid=grid,
-    options=DynamicProgrammingOptions(
-        backend="jax",
-        alpha=1.0,
-        max_iterations=n_steps,
-        out_of_bound_cost=INF,
-        verbose=True,
-    ),
+    backend="jax",
+    alpha=1.0,
+    max_iterations=n_steps,
+    out_of_bound_cost=INF,
+    verbose=True,
 )
 t_xnext = time.perf_counter()
 planner.solve_steps(n_steps)

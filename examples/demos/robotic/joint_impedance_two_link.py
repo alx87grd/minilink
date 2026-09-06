@@ -17,8 +17,7 @@ with joint references from inverse kinematics.
 
 import numpy as np
 
-from minilink import JointImpedance, Step, TwoLinkManipulator
-from minilink.core.composition import closed_loop_qdq
+from minilink import JointImpedance, Step, TwoLinkManipulator, closed_loop_qdq
 
 p0 = np.array([0.5, 0.5])
 p1 = np.array([-0.5, 0.5])

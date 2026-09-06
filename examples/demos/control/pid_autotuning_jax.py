@@ -5,8 +5,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import DiagramSystem, Pendulum, Trajectory
-from minilink.control import ImpedanceIntegralController
+from minilink import DiagramSystem, ImpedanceIntegralController, Pendulum, Trajectory
 from minilink.graphical.signals import open_time_signal_plot, resolve_plot_signals
 
 # Rollout horizon (JAX loss and NumPy plot share dt and tf).

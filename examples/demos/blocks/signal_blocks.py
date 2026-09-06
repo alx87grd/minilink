@@ -19,11 +19,12 @@ from minilink import (
     Mux,
     Relay,
     Saturation,
+    Source,
     Step,
     Sum,
     TrajectorySource,
 )
-from minilink.blocks import NotchFilter, Source, Washout
+from minilink.blocks import NotchFilter, Washout
 
 OUTPUT_SIGNALS = (
     "src:y",

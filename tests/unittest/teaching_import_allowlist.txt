@@ -3,7 +3,6 @@
 examples/demos/control/neural_controller_jax.py minilink.graphical.common.environment
 examples/demos/control/neural_controller_jax.py minilink.graphical.common.matplotlib_style
 examples/demos/control/pid_autotuning_jax.py minilink.graphical.signals
-examples/demos/control/sliding_mode_pendulum.py minilink.core.composition
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.hybrid_composition
 examples/demos/hybrid/smc_pendulum_rate.py minilink.core.hybrid_composition
@@ -46,7 +45,6 @@ examples/demos/planning/rrt/rrt_star_live.py minilink.planning.spatial.scene
 examples/demos/planning/value_iteration/vi_pendulum_lqr.py minilink.planning.policy_synthesis
 examples/demos/realtime/game_cartpole.py minilink.simulation.realtime
 examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime
-examples/demos/robotic/joint_impedance_two_link.py minilink.core.composition
 examples/demos/step/diagram_unity_feedback.py minilink.core.backends
 examples/demos/step/step_accumulator.py minilink.core.backends
 examples/demos/step/step_fibonacci.py minilink.core.backends

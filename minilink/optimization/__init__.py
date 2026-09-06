@@ -9,8 +9,7 @@ Defining modules stay importable (``minilink.optimization.optimizer``, ...).
 
 from __future__ import annotations
 
-from importlib import import_module
-from typing import Any
+from minilink.core.facade import lazy_facade
 
 # name -> (module path, attribute)
 _EXPORTS: dict[str, tuple[str, str]] = {
@@ -25,18 +24,4 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Optimizer": ("minilink.optimization.optimizer", "Optimizer"),
 }
 
-__all__ = sorted(_EXPORTS)
-
-
-def __getattr__(name: str) -> Any:
-    try:
-        module_path, attr = _EXPORTS[name]
-    except KeyError as exc:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
-    value = getattr(import_module(module_path), attr)
-    globals()[name] = value
-    return value
-
-
-def __dir__() -> list[str]:
-    return sorted(set(globals()) | set(__all__))
+__all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

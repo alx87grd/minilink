@@ -10,8 +10,7 @@ Run from the repo root::
 
 import numpy as np
 
-from minilink import Integrator, ProportionalController, StepSystem
-from minilink.core import StepDiagramSystem
+from minilink import Integrator, ProportionalController, StepDiagramSystem, StepSystem
 from minilink.core.backends import array_module
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.simulation import StepSchedule
