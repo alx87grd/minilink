@@ -92,7 +92,7 @@ updates only where a public contract changes.
 ## 5. Phase 3 and Later
 
 - **Declined 2026-09-05 (do not re-propose):** scalar/list signal bounds and a coercing `x0`; scalar `Q`/`R`/`S` in `QuadraticCost.from_system`. Bounds and cost matrices stay explicit arrays in student-facing code.
-- [x] **Textbook pass** — root prelude = teaching surface (one import line); `DynamicProgrammingPlanner` one-object setup; demo cleanups (see the session-log addendum).
+- [x] **Textbook pass** — root prelude = teaching surface (one import line); `DynamicProgrammingPlanner` one-object setup + automatic infeasible-set cleanup; trajopt `live_plot=`; pendulum camera default; demo/notebook ceremony removed (see the session-log addendum).
 
 After the term, in the order the cohort's questions suggest:
 

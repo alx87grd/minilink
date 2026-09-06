@@ -92,3 +92,15 @@ bounds and cost matrices stay explicit arrays. **C** and **D** landed:
 Corpus effect: import lines **329 → 228**, `configure_jax` calls **7 → 0**.
 Verification after the pass: `pytest` 919 passed / 2 skipped, demo sweep
 60/60, notebook smoke 15/15.
+
+### Textbook pass 2 (the five follow-ups, approved together)
+
+| Commit | Change |
+| --- | --- |
+| `c623a87` | `DynamicProgrammingOptions.clean_infeasible` (default on) runs the cleanup after every solve; `TrajectoryOptimizationPlanner(live_plot=True)` builds the matplotlib live callback itself; `Pendulum.camera_scale` defaults to `2 × length` |
+| `ab383f3` | demos/notebooks: explicit `S=zeros` / `ubar=zeros` (the `from_system` defaults) removed; `live_plot=LIVE_PLOT` replaces eight lines of callback setup; `clean_infeasible_set()` lines, `x0.copy()`, redundant `diagram.name` and camera hints gone from the VI material; `applied_u()` replaced by `reconstruct_internal_signals` (`ctl:u`) |
+| follow-up | allowlist shrunk again (the live-plot deep import is gone) |
+
+Result on the two GRO860 demos: `vi_pendulum_swingup.py` 48 → 40 non-comment
+lines, `trajopt_cartpole_collocation_jax.py` 58 → 40 — with the bounds and
+cost matrices deliberately left explicit (A/B declined).
