@@ -55,7 +55,7 @@ a release process by themselves.
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested. | Shape validation at compile; derived `x0` (v1.0). |
 | Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; ~30 unreferenced integration helpers and `_jit` aliases still on the surface. | Delete the unused grid; float64 policy; re-layering deferred to v1.0. |
 | Simulation | teaching | 7 | Mature workflow; stable solvers/forcing. | Fixed output count by default; unify `verbose` flag names. |
-| Dynamics (abstraction + catalog) | teaching | 6 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA. **30 of 49 catalog plants are NumPy-only.** | `xp` sweep to dual-backend; both-backends contract test; four-rung vehicle teaching ladder, research rungs → projects. |
+| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA. **Every catalog plant compiles on both backends** (`xp` sweep 2026-09-06, contract test `test_catalog_backends.py`); `JaxCartPole` retired. | Four-rung vehicle teaching ladder, research rungs → projects. |
 | Control | teaching | 6 | Linear, LQR, PID; model-based SMC; robotic impedance/kinematic. | Robotic PID wrappers; traj LQR (v0.2). |
 | Analysis | teaching | 5 | Linearize, structural, equilibria, modal, SISO Bode. | Frequency completion — `pole_zero_map()`, `nyquist()`, `margin()`, `ss2tf()` as minimal NumPy tools, or a python-control bridge; decision postponed to v0.2 (§6). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine`/`Ramp`/`Chirp`/`Delay`/`Switch` (v0.2). |
@@ -114,7 +114,7 @@ Step-level specs, files, and "done when" criteria live in
 [docs/plans/TODO.md](docs/plans/TODO.md); the audit trail is in
 [docs/reviews/](docs/reviews/).
 
-**Status 2026-09-06 (`dev-fable`):** Phase D and Phase 0 complete; Phase 1 landed S11–S15, S18–S21, S39, S41, S42 plus the 2026-09-06 review pass (trajopt `success` = feasible, x64 policy at every JAX entry, shape probe on step diagrams) and the organisation pass (`minilink/experimental/`, one `lazy_facade` helper, root prelude with the demo names, demo folders keyed to the intro chapters, `examples/experimental/`). S33 landed (compiled RK4 env step, JAX when the plant traces); S16/S17 closed as keep; S38 landed (DP `success` = converged, `final_time` from `problem.tf`). Phase 2 in progress.
+**Status 2026-09-06 (`dev-fable`):** Phases D, 0, 1 and 2 complete — the review pass, the organisation pass (`minilink/experimental/`, `lazy_facade`, demo folders keyed to the intro chapters), S33 (compiled `Sys2Gym` step), S38 (DP metadata), and Phase 2 in full: the `xp` sweep (every catalog plant on both backends, contract test with an empty NumPy-only list), `JaxCartPole` retired, the four-rung vehicle ladder with research rungs in `examples/projects/car_trajopt/vehicles/`, and `rollout_batch`. S16/S17 closed as keep. Next: Phase 3 (after the term).
 
 | Phase | Scope | When |
 | --- | --- | --- |

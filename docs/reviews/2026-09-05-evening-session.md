@@ -168,3 +168,20 @@ reproduces the historical `x + f dt`. Per step on this machine: pendulum
 cover RK4 vs the explicit formula, RK4 vs Euler at small `dt`, JAX vs NumPy,
 and the fallback. The two PPO notebooks were not re-trained here:
 stable-baselines3 is not in the dev env.
+
+## Phase 2 — the JAX claim (2026-09-06, ruled "full phase 2")
+
+| Step | Change |
+| --- | --- |
+| S38 | DP `success` = converged to `tol` (`solve_steps` always completes); sweep count and last delta in `message` / `stats`; `final_time` reads `problem.tf` |
+| S23 | `tests/unittest/test_catalog_backends.py`: every `minilink.catalog` plant compiles on NumPy and JAX and agrees on random points; strict-xfail `NUMPY_ONLY` list, now empty |
+| S22 | thirteen modules swept to `xp = array_module(...)` (oscillators, mountain car, suspension, rocket, three-body, steering, drone, propulsion, noise-port pendulum, cart-poles, boat, arms, dynamic bicycle); in-place writes became `concatenate` / `column_stack` / `where` |
+| S24 | `JaxCartPole` retired — `CartPole` traces; every user says `CartPole` |
+| S26 | `rollout_batch(x0s, u_sequences=None, *, t0, dt, n_steps, params)` on the JAX evaluator: one `vmap` of the RK4/ZOH rollout over families of initial states, inputs, and params (a leaf with one extra dimension is swept); demo `demos/compile/rollout_param_family.py` (pendulum lengths, Buckingham-π collapse) |
+| S25 | catalog ladder `HolonomicMobileRobot` → `KinematicBicycle` / `KinematicCar` → `DynamicBicycle` → `BicycleDynRate` (now in `dynamic_bicycle.py`, numerically the JAX rate variant to 1e-15, dual-backend, on the root prelude); `named_ports=` replaces the six `*Ports` twins; `Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`, the torque / servo / engine rungs, the four extra variants and `CarProfile` live in `examples/projects/car_trajopt/vehicles/`; `jax_vehicles.py` is gone |
+| — | `Sys2Gym` steps on the compiled plant (S33, earlier the same day); S16/S17 closed as keep |
+
+Verification after each step: full `pytest`, catalog checks (fast + full),
+`test_catalog_backends` (51 cases), demo sweep, notebook smoke, regression
+gates; a parity probe of the new ladder against the retired `jax_vehicles`
+module reported differences of 1e-13 or below on random points.
