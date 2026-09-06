@@ -803,9 +803,7 @@ class TestAsComputer(unittest.TestCase):
         from minilink.control.mpc import ModelPredictiveController
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
-        from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-            BicycleDynRate,
-        )
+        from minilink import BicycleDynRate
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
             DirectCollocationOptions,

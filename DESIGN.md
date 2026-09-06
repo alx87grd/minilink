@@ -261,27 +261,25 @@ serial arms. Joint impedance / task impedance / computed torque use
 `control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
-**Vehicle JAX ladder** — :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles`
-(planning / trajopt plants; module-scoped names, no ``Jax`` prefix). Default
-``u`` / ``y = x``; named-port twins use the ``Ports`` suffix. Compare:
-``examples/projects/car_trajopt/car_trajopt_compare.py`` and
-[notebook](examples/projects/car_trajopt/car_trajopt.ipynb).
+**Vehicle ladder** — four teaching rungs in
+:mod:`~minilink.dynamics.catalog.vehicles`, all dual-backend:
 
 | Class | $n$ | Input $\mathbf{u}$ | Role |
 | --- | --- | --- | --- |
-| `Holonomic` | 2 | $[v_x, v_y]$ | holonomic point |
-| `HolonomicAccel` | 4 | $[a_x, a_y]$ | holonomic double integrator |
-| `BicycleKin` | 3 | $[v, \delta]$ | kinematic bicycle |
-| `BicycleAcc` | 5 | $[a_x, \dot\delta]$ | no-slip accel / steer rate |
-| `BicycleDyn` | 6 | $[\omega_r, \delta]$ | rigid body + linear tires |
-| `BicycleDynRate` | 8 | $[\dot\omega_r, \dot\delta]$ | integrated wheel / steer |
-| `BicycleDynTauRate` | 8 | $[\tau_r, \dot\delta]$ | torque + steer rate |
-| `BicycleDynServo` | 9 | $[\tau_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged torque + steer |
-| `BicycleDynEngine` | 9 | $[P_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged **power** + steer |
+| `HolonomicMobileRobot` | 2 | $[v_x, v_y]$ | holonomic point |
+| `KinematicBicycle` / `KinematicCar` | 3 | $[v, \delta]$ | kinematic bicycle (car skin) |
+| `DynamicBicycle` | 6 | `w_rear`, `delta` ports (`named_ports=False` stacks them) | rigid body + linear tires |
+| `BicycleDynRate` | 8 | $[\dot\omega_r, \dot\delta]$ (`named_ports=True` splits them) | integrated wheel / steer — the MPC plant |
 
-NumPy bicycle plants remain in :mod:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle`
-and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
-:mod:`~minilink.dynamics.catalog.vehicles.car_profile` (`apply_car_profile`).
+The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
+`BicycleDynTauRate`, `BicycleDynServo`, `BicycleDynEngine`), the extra variants
+(`ConstantSpeedKinematicCar`, `DynamicHolonomicMobileRobot`,
+`HolonomicMobileRobot3D`, `UdeSRacecar`) and the named envelopes
+(`CarProfile`, `apply_car_profile`) live with their scenarios in
+`examples/projects/car_trajopt/vehicles/`; every command plant takes
+`named_ports=True` instead of a `*Ports` twin. Compare:
+``examples/projects/car_trajopt/car_trajopt_compare.py`` and
+[notebook](examples/projects/car_trajopt/car_trajopt.ipynb).
 
 ## 4. Core Object Contracts
 
@@ -322,16 +320,12 @@ and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
   :func:`~minilink.core.composition.resolve_standard_feedback`);
   :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.export_to_computer`
   for warm-start MPC (also via ``mpc % schedule``).
-  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynRate`
-  exposes standard ``u`` / ``y`` ports for hybrid composition.
-  The JAX fidelity ladder in
-  :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles` runs through
-  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynServo`
-  (torque lag) and
-  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynEngine`
-  (wheel-frame power lag + stall torque + engine brake).
-  Named vehicle envelopes (parameters + planning limits) live in
-  :mod:`~minilink.dynamics.catalog.vehicles.car_profile`
+  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.BicycleDynRate`
+  exposes standard ``u`` / ``y`` ports for hybrid composition; the research
+  ladder (``examples/projects/car_trajopt/vehicles/ladder.py``) runs through
+  ``BicycleDynServo`` (torque lag) and ``BicycleDynEngine`` (wheel-frame power
+  lag + stall torque + engine brake). Named vehicle envelopes (parameters +
+  planning limits) live in ``examples/projects/car_trajopt/vehicles/car_profile.py``
   (``passenger_car``, ``racecar``, ``udes_1_5``); apply with
   :func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
@@ -640,6 +634,12 @@ naming the block, the hook, and both shapes; a bare scalar is accepted for
 compiles all run this check.
 
 `compile(system, backend)` returns a typed evaluator:
+
+On JAX the evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0, dt,
+n_steps, params=None)` — one `vmap` of the RK4 / ZOH rollout over a family of
+initial states, input sequences, and params (a params leaf with one more
+dimension than the compiled value is swept); the research facade for
+parameter-family experiments.
 
 - :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.DynamicsEvaluator`
   (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)

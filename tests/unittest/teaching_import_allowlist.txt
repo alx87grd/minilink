@@ -11,7 +11,6 @@ examples/demos/hybrid/step_accumulator.py minilink.core.backends
 examples/demos/hybrid/step_fibonacci.py minilink.core.backends
 examples/demos/hybrid/step_unity_feedback.py minilink.core.backends
 examples/demos/mpc/mpc_car_circuit.py minilink.core.geometry
-examples/demos/mpc/mpc_car_circuit.py minilink.dynamics.catalog.vehicles.jax_vehicles
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.collision
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.grid
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.paths
@@ -19,7 +18,6 @@ examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.plotting
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.scene
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.shaping
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.track
-examples/demos/mpc/mpc_car_minimal.py minilink.dynamics.catalog.vehicles.jax_vehicles
 examples/demos/optimization/optim_plot.py minilink.graphical.common.environment
 examples/demos/optimization/optim_plot.py minilink.graphical.common.matplotlib_style
 examples/demos/planning/rrt/rrt_car_parking.py minilink.core.geometry
@@ -56,7 +54,6 @@ examples/demos/realtime/game_cartpole.py minilink.simulation.realtime
 examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime
 examples/learn/intro/showcase_jax.ipynb minilink.core.backends
 examples/learn/intro/showcase_minilink.ipynb minilink.core.kinematics
-examples/learn/intro/showcase_minilink.ipynb minilink.dynamics.catalog.vehicles.jax_vehicles
 examples/learn/intro/showcase_minilink.ipynb minilink.graphical.animation.primitives
 examples/learn/intro/showcase_minilink.ipynb minilink.graphical.catalog.shapes
 examples/learn/teaching/articulated_robot_eom.ipynb minilink.experimental.symbolic.mechanics.model

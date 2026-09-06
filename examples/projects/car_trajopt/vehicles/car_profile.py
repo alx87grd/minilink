@@ -30,7 +30,7 @@ Compare actuator vs grip with :meth:`CarProfile.actuator_traction_headroom`.
 
 Steering rate ``delta_dot_max`` equals ``steer_rate_max`` (road-wheel slew).
 
-Engine plants (:class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynEngine`)
+Engine plants (``BicycleDynEngine`` (``ladder.py``))
 also take ``tau_sat``, ``bw_engine``, and ``tau_fric`` from the profile; ``engine_power_peak``
 is a port / state bound only (not an EoM saturation).
 
@@ -38,7 +38,7 @@ Profiles
 --------
 - :func:`passenger_car_profile` — full-size sedan-scale catalog defaults
 - :func:`racecar_profile` — lightweight race vehicle envelope
-- :func:`udes_1_5_profile` — 1:5 RC racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar` geometry)
+- :func:`udes_1_5_profile` — 1:5 RC racecar scale (``UdeSRacecar`` (``extras.py``) geometry)
 """
 
 from __future__ import annotations
@@ -416,7 +416,7 @@ def racecar_profile() -> CarProfile:
 
 
 def udes_1_5_profile() -> CarProfile:
-    """1:5 UdeS racecar scale (:class:`~minilink.dynamics.catalog.vehicles.steering.UdeSRacecar`).
+    """1:5 UdeS racecar scale (``UdeSRacecar`` (``extras.py``)).
 
     ``P = 200 W`` at ``v_nom = 5 m/s`` → ``tau ≈ 2.8 Nm``, ``w_rear_dot ≈ 41 rad/s²``.
     """
@@ -492,29 +492,8 @@ def list_car_profiles() -> tuple[str, ...]:
     return tuple(sorted(CAR_PROFILES))
 
 
-_JAX_VEHICLE_CLASSES = frozenset(
-    {
-        "Holonomic",
-        "HolonomicAccel",
-        "BicycleKin",
-        "BicycleAcc",
-        "BicycleAccPorts",
-        "BicycleDyn",
-        "BicycleDynPorts",
-        "BicycleDynRate",
-        "BicycleDynRatePorts",
-        "BicycleDynTauRate",
-        "BicycleDynTauRatePorts",
-        "BicycleDynServo",
-        "BicycleDynServoPorts",
-        "BicycleDynEngine",
-        "BicycleDynEnginePorts",
-    }
-)
-
-
 def to_jax_plant_params(profile: CarProfile) -> dict[str, float]:
-    """Minimal EoM ``params`` for :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles`."""
+    """Minimal EoM ``params`` for the JAX ladder rungs (``length``-based plants)."""
     return {
         "length": profile.a + profile.b,
         "mass": profile.mass,
@@ -541,22 +520,15 @@ def to_jax_plant_params(profile: CarProfile) -> dict[str, float]:
 
 
 def _apply_plant_params(sys: Any, profile: CarProfile) -> None:
-    if type(sys).__name__ in _JAX_VEHICLE_CLASSES or (
-        getattr(type(sys), "__module__", "").endswith(".jax_vehicles")
-    ):
-        # Only fill keys the plant already declares (Kin/Acc → length only).
-        for key, value in to_jax_plant_params(profile).items():
-            if key in sys.params:
-                sys.params[key] = value
-        # Graphics axle offsets stay on the object — not in EoM ``params``.
-        if hasattr(sys, "a"):
-            sys.a = profile.a
-        if hasattr(sys, "b"):
-            sys.b = profile.b
-        return
-
-    for key, value in profile.to_plant_params().items():
-        sys.params[key] = value
+    """Copy the profile onto the keys the plant declares (``length`` or ``a`` / ``b``)."""
+    values = {**profile.to_plant_params(), **to_jax_plant_params(profile)}
+    for key, value in values.items():
+        if key in sys.params:
+            sys.params[key] = value
+    # Graphics axle offsets kept as object attributes by the kinematic rungs.
+    for key in ("a", "b"):
+        if key not in sys.params and hasattr(sys, key):
+            setattr(sys, key, getattr(profile, key))
     # Linear-slip tire coefficients live in plant params (shared front/rear).
     if "Ca" in sys.params:
         sys.params["Ca"] = profile.Ca
@@ -667,18 +639,11 @@ _APPLY_BY_CLASS: dict[str, Any] = {
     "KinematicBicycle": _apply_kinematic,
     "BicycleKin": _apply_kinematic,
     "BicycleAcc": _apply_kinematic,
-    "BicycleAccPorts": _apply_kinematic,
     "DynamicBicycle": _apply_dynamic_six,
-    "BicycleDyn": _apply_dynamic_six,
-    "BicycleDynPorts": _apply_dynamic_six,
     "BicycleDynRate": _apply_dynamic_eight,
-    "BicycleDynRatePorts": _apply_dynamic_eight,
     "BicycleDynTauRate": _apply_dynamic_eight,
-    "BicycleDynTauRatePorts": _apply_dynamic_eight,
     "BicycleDynServo": _apply_dynamic_nine,
-    "BicycleDynServoPorts": _apply_dynamic_nine,
     "BicycleDynEngine": _apply_dynamic_nine,
-    "BicycleDynEnginePorts": _apply_dynamic_nine,
 }
 
 
@@ -688,7 +653,7 @@ def apply_car_profile(sys: Any, profile: CarProfile | str) -> Any:
     Parameters
     ----------
     sys
-        A kinematic or dynamic bicycle plant from ``minilink.dynamics.catalog.vehicles``.
+        A kinematic or dynamic bicycle plant (catalog rung or ladder rung).
     profile
         :class:`CarProfile` instance or registered profile name.
 

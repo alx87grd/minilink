@@ -1,5 +1,4 @@
-import numpy as np
-
+from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
@@ -49,21 +48,23 @@ class Drone2D(MechanicalSystem):
         params = self.params if params is None else params
         mass = params["mass"]
         inertia = params["inertia"]
+        xp = array_module(q)
 
         # diagonal translational and rotational inertia
-        return np.diag([mass, mass, inertia])
+        return xp.diag(xp.array([mass, mass, inertia]))
 
     def C(self, q, dq, params=None):
-        return np.zeros((3, 3))
+        return array_module(q).zeros((3, 3))
 
     def B(self, q, params=None):
         params = self.params if params is None else params
         offset = params["thruster_offset"]
-        s, c = np.sin(q[2]), np.cos(q[2])
+        xp = array_module(q)
+        s, c = xp.sin(q[2]), xp.cos(q[2])
 
         # both thrusters push along the body vertical; their difference yaws
         # fmt: off
-        return np.array([
+        return xp.array([
             [    -s,     -s],
             [     c,      c],
             [-offset, offset],
@@ -76,17 +77,18 @@ class Drone2D(MechanicalSystem):
         gravity = params["gravity"]
 
         # weight pulls down along +y in screen coordinates
-        return np.array([0.0, mass * gravity, 0.0])
+        return array_module(q).array([0.0, mass * gravity, 0.0])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         cda = params["cda"]
+        xp = array_module(dq)
 
         # quadratic aero drag on translation plus light linear damping on all DOF
-        return np.array(
+        return xp.array(
             [
-                cda * dq[0] * abs(dq[0]) + 0.01 * dq[0],
-                cda * dq[1] * abs(dq[1]) + 0.01 * dq[1],
+                cda * dq[0] * xp.abs(dq[0]) + 0.01 * dq[0],
+                cda * dq[1] * xp.abs(dq[1]) + 0.01 * dq[1],
                 0.01 * dq[2],
             ]
         )
@@ -144,13 +146,11 @@ class Drone2DWithSideThruster(Drone2D):
 
     def B(self, q, params=None):
         theta = q[2]
+        xp = array_module(q)
 
         # extend the two-thruster matrix with a body-lateral thruster column
-        B = np.zeros((3, 3))
-        B[:, :2] = super().B(q, params)
-        B[0, 2] = np.cos(theta)
-        B[1, 2] = np.sin(theta)
-        return B
+        lateral = xp.array([xp.cos(theta), xp.sin(theta), 0.0])
+        return xp.column_stack([super().B(q, params), lateral])
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         dynamic = super().get_dynamic_geometry(x, u[:2], t)
@@ -183,7 +183,7 @@ class SpeedControlledDrone2D(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         # the commanded velocity is the position rate directly
-        return np.asarray(u)
+        return array_module(u).asarray(u)
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -235,7 +235,7 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
         vx = params["vx"]
 
         # vertical force drives altitude; horizontal cruise speed stays constant
-        return np.array([u[0] / mass, x[0], vx])
+        return array_module(x, u).array([u[0] / mass, x[0], vx])
 
     def h(self, x, u, t=0.0, params=None):
         return x

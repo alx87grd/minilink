@@ -126,8 +126,9 @@ class PendulumWithNoisePort(Pendulum):
 
     def h(self, x, u, t=0.0, params=None):
         v_noise = self.get_port_values_from_u(u, "v")
-        y = x.copy()
-        y[self.dof] = x[self.dof] + v_noise[0]
+        xp = array_module(x, u)
+        k = self.dof
+        y = xp.concatenate([x[:k], x[k : k + 1] + v_noise[0], x[k + 1 :]])
         return y
 
 

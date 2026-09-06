@@ -10,6 +10,7 @@ Run from repo root::
 
 import numpy as np
 
+from minilink import BicycleDynRate
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
@@ -17,9 +18,6 @@ from minilink.control.mpc import (
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRate,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.scene import Scene

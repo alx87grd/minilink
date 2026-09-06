@@ -183,11 +183,24 @@ class TestSys2GymJax(unittest.TestCase):
         self.assertEqual(env_jax.x.dtype, np.float64)
 
     def test_untraceable_plant_falls_back_to_numpy(self):
-        from minilink import Drone2D
+        from minilink.core.system import DynamicSystem
         from minilink.interfaces.gymnasium import Sys2Gym
 
-        plant = Drone2D()
-        plant.x0 = np.zeros(plant.n)
+        class Branching(DynamicSystem):
+            """A Python branch on the state value: NumPy only."""
+
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+                self.state.lower_bound = np.array([-5.0])
+                self.state.upper_bound = np.array([5.0])
+                self.inputs["u"].lower_bound = np.array([-1.0])
+                self.inputs["u"].upper_bound = np.array([1.0])
+
+            def f(self, x, u, t=0, params=None):
+                gain = 2.0 if x[0] > 0.0 else 1.0
+                return np.array([-gain * x[0] + u[0]])
+
+        plant = Branching()
         cost = QuadraticCost.from_system(plant, xbar=np.zeros(plant.n))
         env = Sys2Gym(plant, cost, dt=0.05, tf=1.0)
         self.assertEqual(env.compile_backend, "numpy")

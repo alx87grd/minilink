@@ -16,13 +16,11 @@ Run from repo root::
 import matplotlib.pyplot as plt
 import numpy as np
 
+from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.core.sets import BoxSet
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRatePorts,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
@@ -141,7 +139,7 @@ plot_bounds = (
 
 print(f"lap length = {track.path.total_length:.2f} m")
 
-sys_mpc = BicycleDynRatePorts()
+sys_mpc = BicycleDynRate(named_ports=True)
 sys_mpc.state.lower_bound[6] = 0.0
 sys_mpc.state.upper_bound[6] = 90.0
 sys_mpc.state.lower_bound[7] = -0.55

@@ -220,7 +220,7 @@ animation geometry:
 | --- | --- |
 | `pendulum` | `Pendulum`, `DoublePendulum`, `Acrobot`, `CartPole`, rotating cart-poles |
 | `manipulators` | one- to five-link arms, planar and 3D |
-| `vehicles` | NumPy bicycles (`dynamic_bicycle`, `steering`); JAX ladder in `jax_vehicles`; `CarProfile`; propulsion, suspension |
+| `vehicles` | the four-rung ladder: `HolonomicMobileRobot`, `KinematicBicycle` / `KinematicCar`, `DynamicBicycle`, `BicycleDynRate`; propulsion, suspension, mountain car |
 | `aerial` | planar drones, plane, rocket |
 | `marine` | planar boat, boat in current |
 | `mass_spring_damper` | one- to three-mass chains, floating variants |

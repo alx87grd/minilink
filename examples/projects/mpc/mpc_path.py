@@ -14,13 +14,11 @@ Run from repo root::
 
 import numpy as np
 
+from minilink import BicycleDynRate
 from minilink.control.mpc import ModelPredictiveController
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRate,
-)
 from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,

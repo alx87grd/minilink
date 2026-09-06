@@ -2,10 +2,14 @@
 
 import numpy as np
 
-from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
+from minilink import (
+    BicycleDynRate,
+    PlanningProblem,
+    QuadraticCost,
+    TrajectoryOptimizationPlanner,
+)
 from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
 from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.jax_vehicles import BicycleDynRate
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.paths import from_waypoints

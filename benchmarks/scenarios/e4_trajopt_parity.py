@@ -18,12 +18,10 @@ from benchmarks.scenarios.common import (
 )
 from benchmarks.scenarios.trajopt_checks import run_showcase_cartpole_trajopt
 from benchmarks.trajopt import jax_trajopt_available
+from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRatePorts,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -82,7 +80,7 @@ def run_cartpole_rebuild(
     return _metrics_from_result(
         prefix="e4.cartpole_rebuild",
         result=result,
-        notes="JaxCartPole TOP.solve, scipy_slsqp, compile_backend=jax",
+        notes="CartPole TOP.solve, scipy_slsqp, compile_backend=jax",
     )
 
 
@@ -189,7 +187,7 @@ def run_bicycle_parametric(
     maxiter = BICYCLE_MAXITER
 
     configure_jax(enable_x64=True)
-    sys = BicycleDynRatePorts()
+    sys = BicycleDynRate(named_ports=True)
     sys.state.lower_bound[6] = 0.0
     sys.state.upper_bound[6] = BICYCLE_W_REAR_MAX
     sys.state.lower_bound[7] = -BICYCLE_DELTA_MAX
@@ -279,7 +277,7 @@ def run_bicycle_parametric(
         prefix="e4.bicycle_parametric",
         result=result,
         notes=(
-            "BicycleDynRatePorts TrajectoryOptimizationPlanner.solve_trajectory_from, "
+            "BicycleDynRate(named_ports=True) TrajectoryOptimizationPlanner.solve_trajectory_from, "
             f"tf={BICYCLE_TF}, n_steps={n_steps}, jax+slsqp"
         ),
     )

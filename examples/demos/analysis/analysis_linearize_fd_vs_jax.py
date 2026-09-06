@@ -2,22 +2,22 @@
 
 import numpy as np
 
-from minilink import DoublePendulum, JaxCartPole
+from minilink import CartPole, DoublePendulum
 from minilink.analysis.linearize import linearize_matrices
 
 np.set_printoptions(precision=4, suppress=True)
 
-plant = JaxCartPole()
+plant = CartPole()
 xbar = np.array([0.0, 0.0, 0.0, 0.0])
 ubar = np.array([0.0])
 
 
 A, B, C, D = linearize_matrices(plant, xbar, ubar, method="fd")
-print("JaxCartPole (fd):")
+print("CartPole (fd):")
 print("A =\n", A)
 
 A, B, C, D = linearize_matrices(plant, xbar, ubar, method="jax")
-print("JaxCartPole (jax):")
+print("CartPole (jax):")
 print("A =\n", A)
 
 plant = DoublePendulum()

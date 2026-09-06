@@ -1064,3 +1064,69 @@ class TestEquationShapeValidation(unittest.TestCase):
         pytest.importorskip("jax")
         with self.assertRaises(ValueError):
             self._bad_f().compile(backend="jax")
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+@unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
+class TestRolloutBatch(unittest.TestCase):
+    """rollout_batch equals a loop of single rollouts for x0, input, and params families."""
+
+    def setUp(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        self.sys = Pendulum()
+        self.ev = self.sys.compile(backend="jax")
+        self.rng = np.random.default_rng(0)
+        self.x0s = self.rng.standard_normal((4, 2))
+        self.dt = 0.02
+        self.n_steps = 15
+        self.u_nominal = np.tile(self.sys.get_u_from_input_ports(), (self.n_steps, 1))
+
+    def test_family_of_initial_states_under_the_nominal_input(self):
+        xs = np.asarray(
+            self.ev.rollout_batch(self.x0s, n_steps=self.n_steps, dt=self.dt)
+        )
+        self.assertEqual(xs.shape, (4, self.n_steps + 1, 2))
+        for i in range(4):
+            single = self.ev.rk4_integrate_zoh(
+                self.x0s[i], self.u_nominal, 0.0, self.dt
+            )
+            np.testing.assert_allclose(
+                xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
+            )
+
+    def test_one_input_sequence_per_member(self):
+        u_seqs = 0.5 * self.rng.standard_normal((4, self.n_steps, 1))
+        xs = np.asarray(self.ev.rollout_batch(self.x0s, u_seqs, dt=self.dt))
+        for i in range(4):
+            single = self.ev.rk4_integrate_zoh(self.x0s[i], u_seqs[i], 0.0, self.dt)
+            np.testing.assert_allclose(
+                xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
+            )
+
+    def test_params_family_sweeps_one_leaf(self):
+        lengths = np.linspace(0.5, 2.0, 4)
+        params = dict(self.sys.params, l=lengths)
+        xs = np.asarray(
+            self.ev.rollout_batch(
+                self.x0s, n_steps=self.n_steps, dt=self.dt, params=params
+            )
+        )
+        for i in range(4):
+            p_i = dict(self.sys.params, l=float(lengths[i]))
+            single = self.ev.rk4_integrate_zoh_p(
+                self.x0s[i], self.u_nominal, 0.0, self.dt, p_i
+            )
+            np.testing.assert_allclose(
+                xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
+            )
+        self.assertGreater(np.abs(xs[0] - xs[-1]).max(), 1e-3)
+
+    def test_shape_errors(self):
+        with self.assertRaises(ValueError):
+            self.ev.rollout_batch(self.x0s, dt=self.dt)
+        with self.assertRaises(ValueError):
+            self.ev.rollout_batch(self.x0s[:, :1], n_steps=3, dt=self.dt)
+        with self.assertRaises(ValueError):
+            self.ev.rollout_batch(self.x0s, np.zeros((3, 5, 1)), dt=self.dt)

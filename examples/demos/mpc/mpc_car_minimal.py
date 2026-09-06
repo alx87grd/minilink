@@ -2,9 +2,13 @@
 
 import numpy as np
 
-from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
+from minilink import (
+    BicycleDynRate,
+    PlanningProblem,
+    QuadraticCost,
+    TrajectoryOptimizationPlanner,
+)
 from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
-from minilink.dynamics.catalog.vehicles.jax_vehicles import BicycleDynRate
 
 U_TARGET = 4.0
 TF_SIM = 5.0

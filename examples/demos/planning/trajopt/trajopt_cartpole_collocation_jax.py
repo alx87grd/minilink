@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink import (
-    JaxCartPole,
+    CartPole,
     PlanningProblem,
     QuadraticCost,
     TrajectoryOptimizationPlanner,
@@ -12,7 +12,7 @@ from minilink import (
 PRINT_SOLVE_REPORT = True  # Minilink's pre/post solve report
 LIVE_PLOT = False  # redraw the iterate trajectory during the solve
 
-sys = JaxCartPole()
+sys = CartPole()
 sys.inputs["u"].lower_bound[0] = -10.0
 sys.inputs["u"].upper_bound[0] = 10.0
 

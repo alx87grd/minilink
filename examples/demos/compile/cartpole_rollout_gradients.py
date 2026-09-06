@@ -7,12 +7,12 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import JaxCartPole, Trajectory
+from minilink import CartPole, Trajectory
 
 # Demo controls.
 ANIMATE = True
 
-plant = JaxCartPole()
+plant = CartPole()
 evaluator = plant.compile(backend="jax")
 rk4_step_p = evaluator.rk4_step_p
 
@@ -96,7 +96,7 @@ def make_trajectory(x0_vec, states, u_seq, dt_step):
 
 def plant_from_params(p_vec, name):
     """Catalog plant with EoM params applied (ready to animate a traj)."""
-    sys = JaxCartPole()
+    sys = CartPole()
     sys.name = name
     for key, val in params_dict(p_vec).items():
         sys.params[key] = float(val)

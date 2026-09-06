@@ -316,7 +316,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | DoublePendulum | DoublePendulum | `minilink/dynamics/catalog/pendulum/double_pendulum.py` |
 | Acrobot | Acrobot | `minilink/dynamics/catalog/pendulum/double_pendulum.py` |
 | TwoIndependentSinglePendulum | TwoIndependentPendulums | `minilink/dynamics/catalog/pendulum/pendulum.py` |
-| CartPole | CartPole (+ JaxCartPole) | `minilink/dynamics/catalog/pendulum/cartpole.py` |
+| CartPole | CartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
 | RotatingCartPole | RotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
 | UnderActuatedRotatingCartPole | UnderActuatedRotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
 | SingleMass | SingleMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |

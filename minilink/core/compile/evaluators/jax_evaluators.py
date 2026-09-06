@@ -342,6 +342,95 @@ class JaxIntegrationMixin:
             params,
         )
 
+    # --- Batched rollouts (research facade) ---
+
+    def rollout_batch(
+        self, x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None
+    ):
+        """Roll out a family of RK4 / ZOH trajectories in one ``jax.vmap`` call.
+
+        Parameters
+        ----------
+        x0s : array, shape ``(B, n)``
+            One initial state per family member.
+        u_sequences : None, ``(N, m)``, or ``(B, N, m)``
+            Held inputs per step: the compiled nominal input (``n_steps``
+            required), one sequence shared by the batch, or one per member.
+        t0, dt : float
+            Start time and step, shared by the batch.
+        params : None or pytree
+            ``None`` uses the compiled values. Otherwise a params pytree whose
+            leaves are either shared by the batch or carry a leading axis of
+            size ``B`` — a leaf with one more dimension than the compiled value
+            is a family (``{"l": jnp.linspace(0.5, 2.0, B)}`` sweeps a length).
+
+        Returns
+        -------
+        jax.Array, shape ``(B, N + 1, n)``
+            Sampled states, ``x0`` first, for every member of the family.
+        """
+        jax, jnp = self.jax, self.jnp
+        x0s = jnp.asarray(x0s, dtype=float)
+        if x0s.ndim != 2 or x0s.shape[1] != self.n:
+            raise ValueError(f"x0s must have shape (B, {self.n}); got {x0s.shape}")
+        batch = int(x0s.shape[0])
+
+        if u_sequences is None:
+            if n_steps is None:
+                raise ValueError("n_steps is required when u_sequences is None")
+            u_seq = jnp.broadcast_to(self._u_nominal, (int(n_steps), self.m))
+            u_axis = None
+        else:
+            u_seq = jnp.asarray(u_sequences, dtype=float)
+            if u_seq.ndim == 2:
+                u_axis = None
+            elif u_seq.ndim == 3 and u_seq.shape[0] == batch:
+                u_axis = 0
+            else:
+                raise ValueError(
+                    f"u_sequences must have shape (N, {self.m}) or "
+                    f"({batch}, N, {self.m}); got {u_seq.shape}"
+                )
+            if n_steps is not None and u_seq.shape[-2] != int(n_steps):
+                raise ValueError("n_steps disagrees with u_sequences")
+        t0 = jnp.asarray(t0, dtype=float)
+        dt = jnp.asarray(dt, dtype=float)
+
+        if params is None:
+            fn = jax.vmap(
+                self._rk4_integrate_zoh_trace_fn, in_axes=(0, u_axis, None, None)
+            )
+            return fn(x0s, u_seq, t0, dt)
+        axes = self._params_batch_axes(params, batch)
+        fn = jax.vmap(
+            self._rk4_integrate_zoh_trace_p_fn, in_axes=(0, u_axis, None, None, axes)
+        )
+        return fn(x0s, u_seq, t0, dt, params)
+
+    def _params_batch_axes(self, params, batch):
+        """``in_axes`` for ``params``: 0 on family leaves, ``None`` on shared ones.
+
+        A leaf is a family when it has one more dimension than the compiled
+        value at the same path; leaves without a compiled twin (partial nested
+        params) count as a family when their leading axis has size ``batch``.
+        """
+        from jax.tree_util import keystr, tree_leaves_with_path, tree_map_with_path
+
+        reference = {}
+        frozen = getattr(self, "_frozen_params", None)
+        if frozen is not None:
+            for path, leaf in tree_leaves_with_path(frozen):
+                reference[keystr(path)] = np.ndim(leaf)
+
+        def axis(path, leaf):
+            ndim = np.ndim(leaf)
+            ref_ndim = reference.get(keystr(path))
+            if ref_ndim is not None:
+                return 0 if ndim == ref_ndim + 1 else None
+            return 0 if (ndim >= 1 and np.shape(leaf)[0] == batch) else None
+
+        return tree_map_with_path(axis, params)
+
     # --- RK4 integrate linear ---
 
     def rk4_integrate_linear(self, x0, u_knots, t0, dt):

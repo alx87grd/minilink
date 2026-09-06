@@ -1342,9 +1342,9 @@ from dataclasses import dataclass
 from minilink.core.backends import array_module
 from minilink.core.geometry import Sphere
 from minilink.core.kinematics import apply
+from examples.projects.car_trajopt.vehicles.extras import HolonomicMobileRobot3D
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
-    HolonomicMobileRobot3D,
     KinematicCar,
 )
 from minilink.planning.spatial.collision import (

@@ -20,6 +20,7 @@ from examples.projects.pathtracking.mpc_v1.plant_to_mpc import (
     plant_y_to_mpc_x,
 )
 from examples.projects.pathtracking.mpc_v1.servos import Servos
+from minilink import BicycleDynRate
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
@@ -29,9 +30,6 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
 from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRate,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.paths import from_waypoints
