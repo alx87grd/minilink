@@ -50,7 +50,6 @@ examples/demos/robotic/joint_impedance_two_link.py minilink.core.composition
 examples/demos/step/diagram_unity_feedback.py minilink.core.backends
 examples/demos/step/step_accumulator.py minilink.core.backends
 examples/demos/step/step_fibonacci.py minilink.core.backends
-examples/demos/trajopt/trajopt_cartpole_collocation_jax.py minilink.planning.trajectory_optimization.live_plot
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.core.geometry
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.graphical.animation.primitives
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.graphical.catalog
