@@ -629,6 +629,13 @@ deliberately not provided in v0.1.
 
 ## 5. Compilation And Simulation
 
+Before lowering, every leaf's textbook hooks are probed once at
+`(x0, u_nominal, t=0)` — `f` / `step` and the constructor-made `y` / `x`
+ports — and a wrong-length result (or a wrong-length `x0`) raises `ValueError`
+naming the block, the hook, and both shapes; a bare scalar is accepted for
+`n = 1`, custom port computes are not probed. Leaf, diagram, and step-diagram
+compiles all run this check.
+
 `compile(system, backend)` returns a typed evaluator:
 
 - :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.DynamicsEvaluator`
@@ -801,10 +808,12 @@ family).
 
 **Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
 `TrajectoryPlan`. `SolveMetadata.success` means *the returned plan satisfies the
-program constraints to `feasibility_tol`* (or the solver converged): an
-iteration-limit stop on a feasible plan is not a failure, and the worst
-equality residual / inequality margin / bound violation are recorded on the
-metadata. **I-level constructors** take flat kwargs
+program constraints to `feasibility_tol`* — nothing else: an iteration-limit
+stop on a feasible plan is not a failure, a solver that reports convergence on
+an infeasible plan is, and the solver's own flag stays in `message` / `stats`.
+The worst equality residual / inequality margin / bound violation are recorded
+on the metadata. Online ticks (`solve_trajectory_from`, the MPC path) report
+the solver flag without a residual check. **I-level constructors** take flat kwargs
 (`n_steps=…`, `transcription="direct_collocation"`, `compile_backend=…`,
 `optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
 `transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
@@ -833,7 +842,11 @@ default.
 **RRT / DP:** same two-tier idea — flat routine knobs on
 `RRTPlanner` / `RRTStarPlanner` / `DynamicProgrammingPlanner`, with
 `options=` as the advanced escape. Keep fundamental seams explicit
-(`extender`, `StateSpaceGrid`).
+(`extender`, `StateSpaceGrid`). The textbook DP setup
+`DynamicProgrammingPlanner(problem, x_grid=, u_grid=, dt=)` builds that grid
+itself (`grid=` for a custom one), and `solve()` then pins saturated
+cost-to-go cells to `out_of_bound_cost` (`clean_infeasible=False` keeps the raw
+table; `clean_infeasible_set(tol)` reruns the pass with another tolerance).
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*

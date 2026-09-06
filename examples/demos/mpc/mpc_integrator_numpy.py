@@ -37,7 +37,7 @@ class SingleIntegrator(DynamicSystem):
 TF_SIM = 2.0
 MPC_DT = 0.2
 SIM_DT = 0.01
-STEP_DISP = True
+VERBOSE = True
 
 sys = SingleIntegrator()
 x0 = np.array([0.5])
@@ -64,7 +64,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, verbose=STEP_DISP
+    planner, dt_mpc=MPC_DT, warm_start=True, verbose=VERBOSE
 )
 hybrid = mpc @ sys
 

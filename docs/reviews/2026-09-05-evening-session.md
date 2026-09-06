@@ -104,3 +104,27 @@ Verification after the pass: `pytest` 919 passed / 2 skipped, demo sweep
 Result on the two GRO860 demos: `vi_pendulum_swingup.py` 48 → 40 non-comment
 lines, `trajopt_cartpole_collocation_jax.py` 58 → 40 — with the bounds and
 cost matrices deliberately left explicit (A/B declined).
+
+## Review pass — 2026-09-06 (branch review + pre-merge punch list)
+
+Ten-angle review of `dev-alex..dev-fable` (seven finder passes ran; the
+line-by-line, removed-behaviour, and cross-file angles were redone inline after
+a rate-limit stop), merged with the maintainer's punch list
+([2026-09-06-dev-fable-pre-merge.md](2026-09-06-dev-fable-pre-merge.md)).
+Fifteen findings reported; all fixed in one pass:
+
+| Fix | Where |
+| --- | --- |
+| trajopt `success` **is** feasibility (solver flag stays in `message`/`stats`); report reads the stored metadata; `live_plot` composes with a user callback; iterates reuse one dynamics callable | `planner.py` |
+| `Transcription` docstring restored (was displaced by `supports_parametric`) | `transcription.py` |
+| every JAX entry point gets `jax` through `ensure_jax_x64()` — DP / discretizer no longer force x64 (`MINILINK_JAX_X64=0` honoured), collocation / shooting knot grids are float64 in a fresh process | `dp.py`, `discretizer.py`, `direct_collocation.py`, `multiple_shooting.py`, `shooting.py`, `transcription.py` |
+| shape probe: wrong-length `x0` raises instead of zeros; a bare scalar is accepted for `n = 1` (dev-alex ran it); step diagrams are probed too | `compiler.py`, `step_compiler.py` |
+| `System.__getattr__`: sentinel (`inputs` missing ⇒ `super().__init__` message for any name, incl. `p`/`m`/`h`), and a failing property is re-run so the real missing name shows | `system.py` |
+| `FIXED_STEP_SOLVERS` derived from the solver table; the automatic-grid fallback lives once in `build_time_grid` | `simulator.py`, `time_grid.py`, `static_simulator.py` |
+| root prelude: one `_EXPORTS` table (catalog names merged in) | `minilink/__init__.py` |
+| nightly installs `coinor-libipopt-dev` + the `ipopt` extra (trajopt flagship uses Ipopt) | `nightly.yml` |
+| stale `disp=True` docstring, test name, `optional` markers, `__main__` guard, DP opt-out test exercises the wiring; catalog full-mode helper called `Simulator.run()` (dead since the `solve()` rename — pre-existing) | tests |
+| DESIGN: success wording, DP one-object setup + `clean_infeasible`, compile-time probe contract; README trajopt block on the one-line import; examples README lists `grid_world_exact_dp`; tests README stale link; `STEP_DISP` → `VERBOSE` in the two MPC demos | docs, demos |
+
+Verification: `pytest` 929 passed / 2 skipped, catalog 49/49 (fast **and**
+full mode), demo sweep 60/60, notebook smoke 15/15.

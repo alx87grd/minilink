@@ -190,12 +190,7 @@ and spatial geometry. The same problem feeds trajopt, RRT/RRT*, and DP:
 
 ```python
 import numpy as np
-from minilink import CartPole
-from minilink.core.costs import QuadraticCost
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationPlanner,
-)
+from minilink import CartPole, PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
 
 sys = CartPole()
 x_goal = np.array([0.0, np.pi, 0.0, 0.0])
@@ -357,7 +352,7 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 ## Examples
 
 Index and placement rules: [examples/README.md](examples/README.md)
-(`scripts/` = canonical · `experimental/` = non-core / scenario WIP ·
+(`demos/` = canonical single-file · `sandbox/` = non-core / scenario WIP ·
 `projects/` = multi-file).
 
 | Interest | Start here |

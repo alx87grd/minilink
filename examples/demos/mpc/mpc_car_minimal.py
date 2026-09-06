@@ -17,7 +17,7 @@ U_TARGET = 4.0
 TF_SIM = 5.0
 MPC_DT = 0.02
 SIM_DT = 0.01
-STEP_DISP = True
+VERBOSE = True
 REF_X_PAD = 20.0
 
 sys = BicycleDynRate()
@@ -50,7 +50,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, verbose=STEP_DISP
+    planner, dt_mpc=MPC_DT, warm_start=True, verbose=VERBOSE
 )
 
 hybrid = mpc @ sys

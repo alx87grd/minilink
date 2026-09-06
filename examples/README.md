@@ -86,6 +86,7 @@ Long notebooks (UR5 EoM, DP grids, PPO training) are not smoked by CI.
 | [pendulum_swing_up_vi_vs_lqr](learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb) |
 | [pendulum_swing_up_vi_vs_lqr_vs_ppo](learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) |
 | [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/drone_ppo_learn_to_fly.ipynb) |
+| [grid_world_exact_dp](learn/teaching/grid_world_exact_dp.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/grid_world_exact_dp.ipynb) |
 
 ### Tooling
 
