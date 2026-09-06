@@ -128,3 +128,29 @@ Fifteen findings reported; all fixed in one pass:
 
 Verification: `pytest` 929 passed / 2 skipped, catalog 49/49 (fast **and**
 full mode), demo sweep 60/60, notebook smoke 15/15.
+
+## Organisation pass — 2026-09-06 (rulings applied)
+
+Rulings: online MPC ticks keep the solver flag; band names the demos use are
+promoted to the root, option objects stay off the root and out of demos;
+`configure_jax` stripped from the notebooks; DP history frames left as they
+are; one facade helper; `minilink/experimental/`; the demo regroup; every
+dedupe item; one-line headers ("super minimalist"). Proposal:
+[2026-09-06-examples-organisation-proposal.md](2026-09-06-examples-organisation-proposal.md).
+
+| Commit | Change |
+| --- | --- |
+| `experimental:` | `minilink/experimental/{symbolic,engines,c_export}` — the import path states the maturity; wheel exclude is one glob; duplicated UR5 EoM project notebook removed |
+| `facades:` | `minilink/core/facade.py` (`lazy_facade`) replaces nine copies; root gains `TimeCost`, `StepDiagramSystem`, `BallSet`, `closed_loop_qdq`, `ZOHHold`, `Source`, `ImpedanceIntegralController`, `discretize`, `RRTStarPlanner` (`discretize` stays off the analysis band: it shadows its own module); 15 demos on the root line; `DynamicProgrammingOptions` out of the student path |
+| `examples: regroup` | demo folders 19 → 13 keyed to the intro chapters (`core`, `blocks`, `dynamics`, `control`, `analysis`, `hybrid`, `compile`, `optimization`, `planning/{rrt,value_iteration,trajopt}`, `graphical`, `realtime`, `robotic`, `mpc`); `sandbox/` → `experimental/` (+ `c_export/`); two animation demos merged; internal-signals demo on the shortcut loop; sampled-SMC demo without its dead block; `readme_examples.py`; `projects/pathtracking/common/` (three identical `vehicle.py` → one); scratch rollout-gradients notebook → `learn/teaching/` (smoked); spatial-MPC notebook → `projects/mpc/`; empty `tooling/scripts/` gone; the `run_all_demos` special case for `game_bicycle` gone |
+| `notebooks:` | `configure_jax` out of every `learn/` notebook (and the moved MPC one); `06_hybrid` rewritten as a real chapter (`StepSystem` → `StepDiagramSystem` → `block % dt` → `computer @ plant`); rollout-gradients twin on root imports |
+| `headers:` | S39 — one-line docstrings on all 68 demo / experimental scripts; key maps kept as comments in the games; flag explanations next to the constants |
+
+Kept as two lessons: `pendulum_swing_up_vi_vs_lqr` and `…_vs_lqr_vs_ppo` share
+4 of 25 cells — not duplicates. Kept in `experimental/robotic/`: the two UR5
+impedance scripts (JAX + meshcat, not headless).
+
+Verification: demo sweep 57 passed / 3 interactive skips (60 scripts under
+`demos/`), notebook smoke 15/15 (incl. the new `06_hybrid` and the promoted
+`cartpole_rollout_gradients`), the three `projects/pathtracking` runs from
+`common/`, `pytest` and catalog checks green.

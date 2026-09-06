@@ -1,8 +1,11 @@
 # Examples and lane organisation — proposal (2026-09-06)
 
 Survey of `examples/` (63 scripts, 21 notebooks, 19 demo folders) and the
-research-lane placement in `minilink/`, with one recommended layout. Nothing
-here is applied; each numbered item is a ruling for the maintainer.
+research-lane placement in `minilink/`, with one recommended layout.
+
+**Applied 2026-09-06** after the maintainer's rulings (§1 `experimental/`: yes;
+§2 regroup: yes; all dedupe items: fix; VI-vs-LQR pair kept — 4 of 25 cells
+shared, two lessons). Record in `2026-09-05-evening-session.md`.
 
 ## 1. Stable vs experimental in the package
 
