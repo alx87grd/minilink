@@ -1,7 +1,10 @@
 # Partial derivatives on every `System` — plan (draft, 2026-09-06)
 
-Status: **draft for the maintainer's rulings** (naming and defaults below).
+Status: **draft v2 for the maintainer's rulings** (naming and defaults below).
 Lane: teaching surface (core facade + `analysis/`). Nothing implemented yet.
+v2 (same day) answers the maintainer's questions: arguments mirror `f`, the
+surface is one general `jacobian(of, wrt)` plus four textbook shortcuts,
+output ports are addressed by id, and the demo impact is listed.
 
 ## 1. What a student writes
 
@@ -21,6 +24,9 @@ plant.df_dt(x_bar, u_bar, t=2.0)     # ∂f/∂t, time-varying plants only
 
 loop = controller @ plant
 A_cl = loop.df_dx()                  # closed loop: same call, poles of the loop
+
+K = controller.jacobian("u", "y")   # any output port w.r.t. any input port
+J = arm.jacobian("p", "x")          # task-space Jacobian of a manipulator
 ```
 
 Every call returns a NumPy array (or a dict of arrays for `_dp`), whatever
@@ -81,19 +87,51 @@ def jacobian(sys, of, wrt, x=None, u=None, t=0.0, *, params=None,
   use) but calls this engine for the arithmetic — one implementation of FD and
   of the JAX Jacobian instead of two.
 
-**Facade methods, `minilink/core/facades.py`** — each a two-line delegation,
-the pattern `modal_analysis` and `plot_bode` already follow:
+**Surface: one general verb plus four textbook shortcuts.** Every `System`
+gets `jacobian(of, wrt, x, u, t, params, *, method, eps)`, where `of` is
+`"f"`, `"step"`, or an output-port id and `wrt` is `"x"`, `"t"`, `"params"`,
+or an input-port id (`"u"` = every input stacked, the default). The four
+shortcuts are the textbook names for the `y` / `u` convention that DESIGN §4
+already makes the default output contract:
 
-| Mixin | Methods |
-| --- | --- |
-| `SharedSystemFacades` (every `System`, static blocks included) | `dh_dx`, `dh_du`, `dh_dt`, `dh_dp`, `linearize` |
-| `DynamicSystemFacades` (continuous leaves and diagrams) | `df_dx`, `df_du`, `df_dt`, `df_dp` |
-| `StepSystemFacades` (discrete leaves and step diagrams) | `dstep_dx`, `dstep_du`, `dstep_dp` — the Jacobians of `x_{k+1} = step(x_k, u_k)` |
+| Shortcut | Equals | Shape |
+| --- | --- | --- |
+| `df_dx(...)` | `jacobian("f", "x", ...)` | `(n, n)` |
+| `df_du(...)` | `jacobian("f", "u", ...)` | `(n, m)` |
+| `dh_dx(...)` | `jacobian("y", "x", ...)` | `(p, n)` |
+| `dh_du(...)` | `jacobian("y", "u", ...)` | `(p, m)` |
+| `df_dp(...)` | `jacobian("f", "params", ...)` | dict, `(n, *shape)` per leaf |
+| `linearize(...)` | the four matrices as an `LTISystem` | — |
 
-A static block asked for `df_dx` gets `AttributeError` with the sentence
-"static system: no f; use dh_dx / dh_du" (the method is simply not on the
-static mixin). A diagram's `df_dx` is the stacked closed-loop Jacobian; internal
-ports stay with `linearize_matrices(outputs=(sys_id, port))`.
+That is six methods on every system (today a `Pendulum` shows 59 public
+attributes, about 40 of them callable); `df_dt`, `dh_dp`, `dstep_dx` and
+any other pair stay reachable through `jacobian` without a name of their own.
+
+**Arguments mirror `f`.** Positional order `(x, u, t, params)`, all optional:
+`plant.df_dx()` is the nominal point, `plant.df_dx(x_bar, u_bar)` reads like
+"at $(\bar x, \bar u)$", and a student who already writes
+`f(self, x, u, t=0, params=None)` never learns a second order. `method` and
+`eps` are keyword-only.
+
+**Outputs are ports, not `h`.** `y = h(x, u, t)` is only the primary port;
+controllers output `u`, manipulators add `p`, and 34 blocks declare custom
+ports. So the general verb takes the port id — `ctl.jacobian("u", "y")` is the
+controller gain matrix, `arm.jacobian("p", "x")` the task-space Jacobian —
+and the `dh_*` shortcuts require a `y` port (the error names
+`jacobian(port, wrt)` otherwise). Methods on the port objects
+(`sys.outputs["p"].dy_dx()`) were considered and dropped: ports are data
+(`OutputPort` holds a `compute` callable and no owner), diagram boundary ports
+only exist through the compiled plan, and one verb with a `port` argument
+covers the same ground without teaching a second calling surface.
+
+**Where the methods live** (`minilink/core/facades.py`, two-line delegations
+like `modal_analysis`): `jacobian`, `dh_dx`, `dh_du`, `linearize` on
+`SharedSystemFacades` (static blocks included; `df_*` are not on the static
+mixin, so a static block asked for `df_dx` gets the usual `AttributeError`);
+`df_dx`, `df_du`, `df_dp` on `DynamicSystemFacades` (leaves and diagrams —
+a diagram's `df_dx` is the closed-loop Jacobian; internal ports stay with
+`linearize_matrices(outputs=(sys_id, port))`); on `StepSystemFacades` the
+same four shortcuts read `step` instead of `f`.
 
 **Optional: evaluator cache on the system.** A JAX `df_dx()` inside a loop
 would re-jit on every call (0.3–1 s). Keep the compiled evaluator on the
@@ -128,19 +166,30 @@ cost), Jacobians along a whole `Trajectory` (a `Trajectory.linearize()` for
 time-varying LQR), sensitivities of a simulation with respect to params
 (`rollout_batch` + `jax.grad` remain the research spelling).
 
-## 5. Rulings needed
+## 5. What it does to the student material
 
-1. **Names.** `df_dx / df_du / df_dt / df_dp` and `dh_dx / dh_du / dh_dt / dh_dp`
-   (recommended: they mirror the `def f` / `def h` a student writes), or
-   `dy_dx / dy_du …` for the output map. `df_dp` vs `df_dparams`.
-2. **`_dp` result.** Dict keyed by parameter name (recommended, same layout as
-   `params`) or one stacked matrix with a label list.
-3. **Defaults.** Nominal point `(x0, ū, 0)` when no arguments are given
-   (recommended) or required `x`, `u`.
+| File | Today | With the facade |
+| --- | --- | --- |
+| `demos/analysis/analysis_linearize_fd_vs_jax.py` | 30 lines of `linearize_matrices(plant, xbar, ubar, method=...)` unpacking four matrices to print one | `A_fd = plant.df_dx(xbar, ubar, method="fd")`, `A_jax = plant.df_dx(xbar, ubar, method="jax")` — about ten lines |
+| `demos/compile/params_gradient.py` part 1 | a 30-line `TraceablePendulum` class, `compile("jax")`, `jnp` arrays, `evaluator.jacobian_f_params`, a hand-written FD loop | catalog `Pendulum` (it traces now), `S = plant.df_dp(x, u)`, `S_fd = plant.df_dp(x, u, method="fd")`, one print loop |
+| `demos/compile/params_gradient.py` part 2 | equation-error identification: `f_p` under `jax.vmap`, a loss, `jax.value_and_grad` | unchanged — a loss over data is the research spelling, and rightly so |
+| `demos/compile/pid_autotuning_jax.py`, `neural_controller_jax.py`, `cartpole_rollout_gradients.py` | gradients through rollouts | unchanged (same reason) |
+| `learn/intro/showcase_jax.ipynb` §3–4 | two `jax.jacfwd(lambda x: evaluator.f(x, u, t))` cells, a `linearize_matrices` compare, a `jacobian_f_params` table | `plant.df_dx()`, `df_du()`, `df_dp()`; one `jacfwd` cell kept as "what runs underneath" |
+| `learn/intro/04_analysis.ipynb` | `linearize(plant, x_bar)` + `linearize_matrices(plant, x_bar, method="fd")` | `plant.linearize(x_bar)` + `plant.df_dx(x_bar, method="fd")` |
+| `learn/intro/03_control.ipynb` (optional) | `lqr_at_operating_point(plant, x_bar, Q, R)` | can also show the chain `A, B = plant.df_dx(x_bar), plant.df_du(x_bar); K = lqr(A, B, Q, R)` |
+
+VI / DP, trajectory optimization, and MPC material is untouched.
+
+## 6. Rulings needed
+
+1. **Names.** `df_dx / df_du / dh_dx / dh_du / df_dp` (recommended: they mirror
+   the `def f` / `def h` a student writes) or `dy_dx / dy_du` for the output
+   map; `df_dp` vs `df_dparams`.
+2. **Surface size.** The six methods above (recommended) or only `jacobian` +
+   `linearize`.
+3. **`_dp` result.** Dict keyed by parameter name, nested like `params` for
+   diagrams (recommended) or one stacked matrix with a label list.
 4. **Fallback noise.** `method="auto"` silent (recommended) or a warning when
-   JAX is asked for and FD is used (what `linearize_matrices` does today).
-5. **`sys.linearize()` as a method** alongside the functional `linearize(sys)`
-   (recommended).
-6. **Step systems.** `dstep_dx` (recommended) or `dx_next_dx`.
-7. **Evaluator cache** on the system with `refresh()` invalidation: go or
+   JAX was asked for and finite differences ran (`linearize_matrices` today).
+5. **Evaluator cache** on the system with `refresh()` invalidation: go, or
    compile per call.
