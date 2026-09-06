@@ -87,7 +87,8 @@ class DynamicProgrammingOptions:
         Finite penalty charged to inadmissible inputs or out-of-domain
         successors.
     final_time : float
-        Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``.
+        Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``. Left
+        at ``0.0``, the planner reads ``problem.tf`` when the problem sets one.
     record_history : bool
         Keep ``(t, J, pi)`` per sweep for animation.
     verbose : bool
@@ -247,6 +248,10 @@ class DynamicProgrammingPlanner(Planner):
             verbose=verbose,
             clean_infeasible=clean_infeasible,
         )
+        if final_time is _UNSET and self.options.final_time == 0.0:
+            tf = getattr(problem, "tf", None)
+            if tf is not None and np.isfinite(tf):
+                self.options = replace(self.options, final_time=float(tf))
         if self.options.backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
             raise ValueError(f"Unknown backend {self.options.backend!r}")
         self._G = None  # running-cost table, cached when the grid is precomputed
@@ -375,13 +380,33 @@ class DynamicProgrammingPlanner(Planner):
         result = DynamicProgrammingResult(
             grid=grid, J=J, pi=pi, iterations=k, delta=delta, history=history
         )
-        return self._finish_policy(result)
+        return self._finish_policy(result, stop_on_tol=stop_on_tol)
 
-    def _finish_policy(self, result: DynamicProgrammingResult) -> PolicyPlan:
+    def _finish_policy(
+        self, result: DynamicProgrammingResult, *, stop_on_tol: bool
+    ) -> PolicyPlan:
+        # success = the Bellman sweeps converged to `tol` (a fixed-horizon
+        # solve_steps() always completes its sweeps); the metadata says which.
+        converged = (not stop_on_tol) or result.delta <= float(self.options.tol)
+        if not stop_on_tol:
+            message = f"{result.iterations} backward sweeps (fixed horizon)"
+        elif converged:
+            message = (
+                f"converged in {result.iterations} sweeps (delta={result.delta:.3g})"
+            )
+        else:
+            message = (
+                f"max_iterations={result.iterations} reached before tol="
+                f"{self.options.tol:g} (delta={result.delta:.3g})"
+            )
         plan = self._store_policy_plan(
             PolicyPlan(
                 policy=result,
-                metadata=SolveMetadata(success=True),
+                metadata=SolveMetadata(
+                    success=converged,
+                    message=message,
+                    stats={"iterations": result.iterations, "delta": result.delta},
+                ),
             )
         )
         if self.options.clean_infeasible:
@@ -697,7 +722,7 @@ class DynamicProgrammingPlanner(Planner):
             delta=float(delta),
             history=None,
         )
-        return self._finish_policy(result)
+        return self._finish_policy(result, stop_on_tol=stop_on_tol)
 
     def _jax_step(self, jax, jnp):
         """Return (and cache) the jitted single Bellman backup."""
@@ -828,4 +853,4 @@ class DynamicProgrammingPlanner(Planner):
             delta=delta,
             history=history,
         )
-        return self._finish_policy(result)
+        return self._finish_policy(result, stop_on_tol=stop_on_tol)

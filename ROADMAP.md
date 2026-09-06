@@ -114,7 +114,7 @@ Step-level specs, files, and "done when" criteria live in
 [docs/plans/TODO.md](docs/plans/TODO.md); the audit trail is in
 [docs/reviews/](docs/reviews/).
 
-**Status 2026-09-06 (`dev-fable`):** Phase D and Phase 0 complete; Phase 1 landed S11–S15, S18–S21, S39, S41, S42 plus the 2026-09-06 review pass (trajopt `success` = feasible, x64 policy at every JAX entry, shape probe on step diagrams) and the organisation pass (`minilink/experimental/`, one `lazy_facade` helper, root prelude with the demo names, demo folders keyed to the intro chapters, `examples/experimental/`). S33 landed (compiled RK4 env step, JAX when the plant traces); S16/S17 closed as keep. Open: S38 (DP metadata). Phase 2 not started.
+**Status 2026-09-06 (`dev-fable`):** Phase D and Phase 0 complete; Phase 1 landed S11–S15, S18–S21, S39, S41, S42 plus the 2026-09-06 review pass (trajopt `success` = feasible, x64 policy at every JAX entry, shape probe on step diagrams) and the organisation pass (`minilink/experimental/`, one `lazy_facade` helper, root prelude with the demo names, demo folders keyed to the intro chapters, `examples/experimental/`). S33 landed (compiled RK4 env step, JAX when the plant traces); S16/S17 closed as keep; S38 landed (DP `success` = converged, `final_time` from `problem.tf`). Phase 2 in progress.
 
 | Phase | Scope | When |
 | --- | --- | --- |

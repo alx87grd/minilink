@@ -850,6 +850,10 @@ default.
 itself (`grid=` for a custom one), and `solve()` then pins saturated
 cost-to-go cells to `out_of_bound_cost` (`clean_infeasible=False` keeps the raw
 table; `clean_infeasible_set(tol)` reruns the pass with another tolerance).
+`PolicyPlan.metadata.success` means the sweeps converged to `tol` (a
+fixed-horizon `solve_steps` always succeeds); `message` and `stats` carry the
+sweep count and the last cost-to-go change. `final_time` reads `problem.tf`
+when the problem sets one.
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*

@@ -2400,6 +2400,47 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertEqual(planner.grid.u_grid_shape, (3,))
         self.assertAlmostEqual(planner.grid.dt, 0.05)
 
+    def test_success_reports_convergence(self):
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        problem = make_problem()
+        capped = DynamicProgrammingPlanner(
+            problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, max_iterations=2
+        ).solve()
+        self.assertFalse(capped.metadata.success)
+        self.assertIn("max_iterations", capped.metadata.message)
+        self.assertEqual(capped.metadata.stats["iterations"], 2)
+
+        converged = DynamicProgrammingPlanner(
+            problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, tol=1.0, max_iterations=500
+        ).solve()
+        self.assertTrue(converged.metadata.success)
+        self.assertIn("converged", converged.metadata.message)
+        self.assertLessEqual(converged.policy.delta, 1.0)
+
+        fixed = DynamicProgrammingPlanner(
+            problem, x_grid=(11, 11), u_grid=(3,), dt=0.05
+        ).solve_steps(3)
+        self.assertTrue(fixed.metadata.success)
+        self.assertEqual(fixed.policy.iterations, 3)
+
+    def test_final_time_reads_the_problem_horizon(self):
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        sys = DoubleIntegrator()
+        cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+        timed = PlanningProblem(sys, x_goal=np.zeros(2), cost=cost, tf=2.0)
+        planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
+        self.assertEqual(planner.options.final_time, 2.0)
+        explicit = DynamicProgrammingPlanner(
+            timed, x_grid=(5, 5), u_grid=(3,), dt=0.1, final_time=0.5
+        )
+        self.assertEqual(explicit.options.final_time, 0.5)
+        untimed = DynamicProgrammingPlanner(
+            make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1
+        )
+        self.assertEqual(untimed.options.final_time, 0.0)
+
     def test_grid_and_shapes_are_exclusive(self):
         from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
         from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
