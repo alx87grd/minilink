@@ -48,6 +48,7 @@ _TRAJOPT_OPTION_KEYS = (
     "record_solve_time",
     "verbose",
     "feasibility_tol",
+    "live_plot",
 )
 
 _TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
@@ -96,6 +97,9 @@ class TrajectoryOptimizationOptions:
     #: constraints (equality residuals, inequality margins, bounds) to this
     #: tolerance, even if the solver stopped on an iteration limit.
     feasibility_tol: float = 1e-6
+    #: Redraw the iterate trajectory during the solve (matplotlib); a
+    #: custom ``callback`` takes precedence.
+    live_plot: bool = False
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -138,6 +142,7 @@ class TrajectoryOptimizationPlanner(Planner):
         record_solve_time=_UNSET,
         verbose=_UNSET,
         feasibility_tol=_UNSET,
+        live_plot=_UNSET,
     ) -> None:
         """
         Parameters
@@ -156,7 +161,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
         compile_backend, initial_guess, warm_start, optimizer_method,
         optimizer_options, use_hessian, record_history, callback,
-        record_solve_time, verbose, feasibility_tol
+        record_solve_time, verbose, feasibility_tol, live_plot
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
         """
         super().__init__(problem)
@@ -175,6 +180,7 @@ class TrajectoryOptimizationPlanner(Planner):
             record_solve_time=record_solve_time,
             verbose=verbose,
             feasibility_tol=feasibility_tol,
+            live_plot=live_plot,
         )
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
@@ -571,7 +577,14 @@ class TrajectoryOptimizationPlanner(Planner):
         optimizer: Optimizer,
         compile_backend: str,
     ) -> OptimizationProgressCallback | None:
-        if not self.options.record_history and self.options.callback is None:
+        callback = self.options.callback
+        if callback is None and self.options.live_plot:
+            from minilink.planning.trajectory_optimization.live_plot import (
+                LiveTrajectoryPlotCallback,
+            )
+
+            callback = LiveTrajectoryPlotCallback(self.problem.sys)
+        if not self.options.record_history and callback is None:
             return None
 
         iteration_index = 0
@@ -588,8 +601,8 @@ class TrajectoryOptimizationPlanner(Planner):
             )
             if self.options.record_history:
                 self.iteration_history.append(iteration)
-            if self.options.callback is not None:
-                self.options.callback(iteration)
+            if callback is not None:
+                callback(iteration)
             iteration_index += 1
 
         return planner_progress

@@ -57,6 +57,7 @@ _DP_OPTION_KEYS = (
     "final_time",
     "record_history",
     "verbose",
+    "clean_infeasible",
 )
 
 
@@ -106,6 +107,9 @@ class DynamicProgrammingOptions:
     final_time: float = 0.0
     record_history: bool = False
     verbose: bool = False
+    #: After each solve, pin saturated cost-to-go cells to ``out_of_bound_cost``
+    #: and their policy to the nominal action (:meth:`clean_infeasible_set`).
+    clean_infeasible: bool = True
 
 
 def _merge_dp_options(
@@ -213,6 +217,7 @@ class DynamicProgrammingPlanner(Planner):
         final_time=_UNSET,
         record_history=_UNSET,
         verbose=_UNSET,
+        clean_infeasible=_UNSET,
     ) -> None:
         super().__init__(problem)
         self.require_cost()
@@ -240,6 +245,7 @@ class DynamicProgrammingPlanner(Planner):
             final_time=final_time,
             record_history=record_history,
             verbose=verbose,
+            clean_infeasible=clean_infeasible,
         )
         if self.options.backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
             raise ValueError(f"Unknown backend {self.options.backend!r}")
@@ -372,12 +378,15 @@ class DynamicProgrammingPlanner(Planner):
         return self._finish_policy(result)
 
     def _finish_policy(self, result: DynamicProgrammingResult) -> PolicyPlan:
-        return self._store_policy_plan(
+        plan = self._store_policy_plan(
             PolicyPlan(
                 policy=result,
                 metadata=SolveMetadata(success=True),
             )
         )
+        if self.options.clean_infeasible:
+            self.clean_infeasible_set()  # pins saturated cells in place on `result`
+        return plan
 
     def _vectorized_step(self, J, t):
         """Vectorized Bellman backup over the precomputed lookup table (NumPy)."""

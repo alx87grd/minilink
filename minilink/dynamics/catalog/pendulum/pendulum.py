@@ -33,7 +33,7 @@ class Pendulum(MechanicalSystem):
         # Graphic parameters
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
-        self.camera_scale = length * 1.5
+        self.camera_scale = length * 2.0
 
     def H(self, q, params=None):
         params = self.params if params is None else params

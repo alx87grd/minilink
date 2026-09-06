@@ -2387,3 +2387,53 @@ class TestDpOneObjectSetup(unittest.TestCase):
             DynamicProgrammingPlanner(problem, grid=grid, dt=0.05)
         with self.assertRaises(ValueError):
             DynamicProgrammingPlanner(problem, x_grid=(11, 11))
+
+
+class TestTextbookOptions(unittest.TestCase):
+    """clean_infeasible runs after each DP solve; live_plot builds the callback."""
+
+    def test_dp_solve_cleans_infeasible_by_default(self):
+        planner, result = solve(make_problem())
+        penalty = planner.options.out_of_bound_cost
+        self.assertTrue(planner.options.clean_infeasible)
+        saturated = result.J > penalty - 1.0
+        self.assertTrue(np.all(result.J[saturated] == penalty))
+
+    def test_dp_clean_infeasible_can_be_disabled(self):
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        problem = make_problem()
+        planner = DynamicProgrammingPlanner(
+            problem,
+            x_grid=(11, 11),
+            u_grid=(3,),
+            dt=0.05,
+            max_iterations=5,
+            clean_infeasible=False,
+            verbose=False,
+        )
+        self.assertFalse(planner.options.clean_infeasible)
+
+    def test_trajopt_live_plot_builds_a_callback(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+        from minilink.planning.trajectory_optimization.live_plot import (
+            LiveTrajectoryPlotCallback,
+        )
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        problem = PlanningProblem(
+            plant,
+            x_start=np.zeros(2),
+            x_goal=goal,
+            tf=1.0,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+        planner = TrajectoryOptimizationPlanner(
+            problem, n_steps=5, transcription="direct_collocation", live_plot=True
+        )
+        self.assertTrue(planner.options.live_plot)
+        self.assertIsNotNone(planner._make_callback(None, "numpy"))
+        planner.options.live_plot = False
+        self.assertIsNone(planner._make_callback(None, "numpy"))
+        self.assertTrue(callable(LiveTrajectoryPlotCallback))
