@@ -32,7 +32,6 @@ planner = DynamicProgrammingPlanner(
 )
 grid = planner.grid  # shared with the LQR policy evaluation below
 planner.solve()
-planner.clean_infeasible_set()
 
 lqr_plant = Pendulum()
 lqr_plant.state.lower_bound = np.array([LO, LO])
@@ -72,8 +71,8 @@ lqr_diagram = lqr @ sim_lqr
 vi_diagram.name = "Pendulum swing-up (value iteration)"
 lqr_diagram.name = "Pendulum swing-up (LQR)"
 
-sim_vi.x0 = X0.copy()
-sim_lqr.x0 = X0.copy()
+sim_vi.x0 = X0
+sim_lqr.x0 = X0
 vi_diagram.plot_diagram()
 lqr_diagram.plot_diagram()
 vi_traj = vi_diagram.compute_trajectory(tf=10.0)

@@ -54,7 +54,6 @@ planner = TrajectoryOptimizationPlanner(
             sys,
             Q=np.eye(1),
             R=0.1 * np.eye(1),
-            S=np.zeros((1, 1)),
             xbar=x_goal,
         ),
     ),

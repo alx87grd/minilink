@@ -72,7 +72,7 @@ plant.state.lower_bound = np.array([-5.0, -1.5, -4.0, -4.0])
 plant.state.upper_bound = np.array([0.5, 4.0, 5.5, 7.0])
 plant.inputs["u"].lower_bound = np.array([-12.0, -12.0])
 plant.inputs["u"].upper_bound = np.array([12.0, 12.0])
-plant.x0 = HANGING.copy()
+plant.x0 = HANGING
 
 Q = np.diag([1.0, 0.5, 0.1, 0.05])
 R = np.diag([0.05, 0.05])
@@ -109,7 +109,6 @@ planner = DynamicProgrammingPlanner(
 )
 t_xnext = time.perf_counter()
 planner.solve_steps(n_steps)
-planner.clean_infeasible_set()
 t_done = time.perf_counter()
 
 print("\ntiming summary:")
@@ -131,7 +130,6 @@ diagram.add_subsystem(controller, "controller")
 diagram.add_subsystem(plant, "plant")
 diagram.connect("plant", "y", "controller", "x")
 diagram.connect("controller", "u", "plant", "u")
-diagram.name = "Double pendulum swing-up (value iteration, JAX)"
 
 for x0 in CLOSED_LOOP_X0:
     plant.x0 = x0.copy()

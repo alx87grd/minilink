@@ -32,13 +32,11 @@ planner = DynamicProgrammingPlanner(
     verbose=True,
 )
 planner.solve()
-planner.clean_infeasible_set()
 planner.plot_cost2go(jmax=INF, show_3d=True)
 
 controller = planner.get_controller()
 controller.plot_control_law()  # interpolated law the closed loop actually feels
 diagram = controller @ plant
-diagram.name = "Double integrator (value iteration)"
 
 plant.x0 = np.array([5.0, 3.0])
 diagram.plot_diagram()

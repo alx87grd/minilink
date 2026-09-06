@@ -8,12 +8,9 @@ from minilink import (
     QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
-from minilink.planning.trajectory_optimization.live_plot import (
-    LiveTrajectoryPlotCallback,
-)
 
 PRINT_SOLVE_REPORT = True  # Minilink's pre/post solve report
-LIVE_PLOT = False  # Plotly live iterate updates during the solve
+LIVE_PLOT = False  # redraw the iterate trajectory during the solve
 
 sys = JaxCartPole()
 sys.inputs["u"].lower_bound[0] = -10.0
@@ -26,9 +23,7 @@ cost = QuadraticCost.from_system(
     sys,
     Q=np.diag([1.0, 1.0, 0.0, 0.0]),
     R=np.diag([0.01]),
-    S=np.zeros((sys.n, sys.n)),
     xbar=x_goal,
-    ubar=np.zeros(sys.m),
 )
 problem = PlanningProblem(
     sys=sys,
@@ -37,16 +32,6 @@ problem = PlanningProblem(
     x_goal=x_goal,
     cost=cost,
 )
-
-callback = None
-if LIVE_PLOT:
-    callback = LiveTrajectoryPlotCallback(
-        sys,
-        signals=("x", "u"),
-        every=1,
-        pause=0.001,
-        backend="plotly",
-    )
 
 planner = TrajectoryOptimizationPlanner(
     problem,
@@ -57,7 +42,7 @@ planner = TrajectoryOptimizationPlanner(
     # optimizer_method="scipy_slsqp",
     # optimizer_options={"maxiter": 500, "ftol": 1e-2},
     verbose=PRINT_SOLVE_REPORT,
-    callback=callback,
+    live_plot=LIVE_PLOT,
 )
 
 planner.solve()

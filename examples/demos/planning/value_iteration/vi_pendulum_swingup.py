@@ -33,20 +33,17 @@ planner = DynamicProgrammingPlanner(
     verbose=True,
 )
 planner.solve()
-planner.clean_infeasible_set()
 
 planner.plot_cost2go(jmax=INF, show_3d=True)
 planner.plot_policy()
 
 controller = planner.get_controller()
 diagram = controller @ plant
-diagram.name = "Pendulum swing-up (value iteration)"
 
-plant.x0 = X0.copy()
+plant.x0 = X0
 diagram.plot_diagram()
 trajectory = diagram.compute_trajectory(tf=10.0)
 diagram.plot_trajectory(trajectory)
 
 planner.plot_policy(trajectory=trajectory)
-diagram.camera_scale = 2.0
 diagram.animate()
