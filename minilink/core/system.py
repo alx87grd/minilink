@@ -392,7 +392,15 @@ class System(SharedSystemFacades):
         return series(self, other)
 
     def __matmul__(self, other: object) -> "DiagramSystem":
-        """Return a closed-loop diagram ``self @ other``."""
+        """Return a closed-loop diagram ``self @ other``.
+
+        ``controller @ plant`` wires the standard feedback ports; an
+        error-driven left operand (a compensator, a transfer function, a
+        series diagram ``C >> G``) gets a summing junction ``e = r - y``
+        inserted; ``sys @ 1`` closes ``sys`` on itself with unity feedback.
+        See :func:`~minilink.core.composition.closed_loop` and
+        :func:`~minilink.core.composition.feedback`.
+        """
         from minilink.core.composition import closed_loop
 
         return closed_loop(self, other)

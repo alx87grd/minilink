@@ -36,4 +36,4 @@ without renaming dynamics shelves.
 ## Follow-on
 
 When implementing: add view ports on `DynamicBicycle` behind this contract, reuse
-`ImpedanceController` / `FilteredController` with vehicle-specific labels.
+`ImpedanceController` / `PID` with vehicle-specific labels.

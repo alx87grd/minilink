@@ -825,12 +825,12 @@ class TestAdvancedPlotting(unittest.TestCase):
 
     def test_resolve_plot_signals_dynamic_controller(self):
         from minilink.blocks.sources import Step
-        from minilink.control.siso import FilteredController
+        from minilink.control.siso import PID
         from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
         diagram = (
             Step(final_value=[1.0], step_time=0.0)
-            >> FilteredController() @ DoubleIntegrator()
+            >> PID(ports="reference") @ DoubleIntegrator()
         )
         self.assertEqual(resolve_plot_signals(diagram), ("x", "ref:y", "ctl:u"))
 
@@ -1188,7 +1188,7 @@ from minilink.blocks.nonlinear import Saturation  # noqa: E402
 from minilink.control.impedance import ImpedanceController  # noqa: E402
 from minilink.control.modelbased import ComputedTorqueController  # noqa: E402
 from minilink.control.output import ProportionalController  # noqa: E402
-from minilink.control.siso import FilteredController  # noqa: E402
+from minilink.control.siso import PID  # noqa: E402
 from minilink.control.state import StateFeedbackController  # noqa: E402
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum  # noqa: E402
 from minilink.graphical import port_map  # noqa: E402
@@ -1284,7 +1284,7 @@ class TestPlotControlLaw(unittest.TestCase):
 
     def test_dynamic_law_pins_internal_state_at_x0(self):
         Kp, Ki, Kd, tau = 4.0, 1.0, 0.5, 0.1
-        pid = FilteredController(Kp=Kp, Ki=Ki, Kd=Kd, tau=tau)
+        pid = PID(Kp=Kp, Ki=Ki, Kd=Kd, tau=tau, ports="reference")
         res = pid.plot_control_law(bounds=(-1.0, 1.0), show=False)
         line = res.axes.lines[0]
         e = line.get_xdata()
@@ -1295,7 +1295,7 @@ class TestPlotControlLaw(unittest.TestCase):
 
     def test_dynamic_law_windup_slice(self):
         Kp, Ki = 4.0, 1.0
-        pid = FilteredController(Kp=Kp, Ki=Ki, Kd=0.0)
+        pid = PID(Kp=Kp, Ki=Ki, Kd=0.0, ports="reference")
         res = pid.plot_control_law(
             x_axis=0,
             y_axis=1,
@@ -1335,11 +1335,12 @@ class TestPlotControlLaw(unittest.TestCase):
             def __init__(self):
                 super().__init__()
                 self.add_input_port("v", dim=1)
+                self.add_input_port("w_in", dim=1)
                 self.add_output_port(
                     "w",
                     dim=1,
-                    function=lambda x, u, t, params=None: u,
-                    dependencies=("v",),
+                    function=lambda x, u, t, params=None: u[:1],
+                    dependencies=("v", "w_in"),
                 )
 
         with self.assertRaisesRegex(ValueError, "feedback_profile"):

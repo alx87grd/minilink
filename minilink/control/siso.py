@@ -1,30 +1,38 @@
-"""Feedback profile: siso — decoupled dynamic loops on scalar measurements."""
+"""Feedback profile: siso — decoupled PID loops, compensator or controller form."""
 
 import numpy as np
 
 from minilink.control.impedance import _as_dof_vector
 from minilink.core.backends import array_module
-from minilink.core.feedback import DynamicController
+from minilink.core.feedback import DynamicController, ErrorDriven
 
 
-class FilteredController(DynamicController):
-    """Decoupled SISO PID with filtered derivative and anti-windup.
+class PID(ErrorDriven, DynamicController):
+    """Decoupled PID with filtered derivative and anti-windup.
 
-    Each axis has its own integrator and filtered-measurement state. The
-    derivative acts on the filtered measurement:
+    ``ports="error"`` (default) is the compensator form: one input ``e``, so
+    ``PID(...) @ plant`` inserts the summing junction ``e = r - y`` and
+    ``PID(...) >> plant`` is the loop gain. ``ports="reference"`` is the
+    controller form with inputs ``r`` and ``y``. Per axis,
 
-        u_i = Kp_i e_i + Ki_i e_int_i - Kd_i dy_filt_i,   e_i = r_i - y_i
+        u_i = Kp_i e_i + Ki_i e_int_i + Kd_i d_i,
+
+    where ``d_i`` is the filtered derivative of ``e_i`` (error form) or of
+    ``-y_i`` (reference form: no derivative kick on reference steps); the
+    integrator stops while the command saturates.
 
     Parameters
     ----------
+    Kp, Ki, Kd : float or vector
+        Per-axis gains (a scalar broadcasts to all axes).
+    tau : float or vector
+        Derivative filter time constant per axis [s].
     dof : int
         Number of independent scalar loops (default 1).
-    Kp, Ki, Kd : float or vector
-        Per-axis gains (scalar broadcasts to all axes).
-    tau : float or vector
-        Filter time constant per axis [s].
+    ports : {"error", "reference"}
+        Input layout, see above.
     y_filt0 : float or vector
-        Initial filtered measurement state(s).
+        Initial filtered state per axis (the filtered ``y``, or ``-e``).
     u_min, u_max, e_int_min, e_int_max : float or vector
         Saturation limits per axis.
     """
@@ -33,11 +41,13 @@ class FilteredController(DynamicController):
 
     def __init__(
         self,
-        dof: int = 1,
         Kp: float = 1.0,
         Ki: float = 0.0,
         Kd: float = 0.0,
         tau: float = 0.1,
+        *,
+        dof: int = 1,
+        ports: str = "error",
         y_filt0=0.0,
         u_min: float = -np.inf,
         u_max: float = np.inf,
@@ -50,7 +60,7 @@ class FilteredController(DynamicController):
 
         super().__init__(n=2 * n)
         self.dof = n
-        self.name = "Filtered Controller"
+        self.name = "PID"
 
         self.params = {
             "Kp": _as_dof_vector(Kp, n),
@@ -63,18 +73,20 @@ class FilteredController(DynamicController):
             "e_int_max": _as_dof_vector(e_int_max, n),
         }
         self.state.labels = [f"e_int{i}" for i in range(n)] + [
-            f"y_filt{i}" for i in range(n)
+            f"d_filt{i}" for i in range(n)
         ]
-        y0 = _as_dof_vector(y_filt0, n)
-        self.x0 = np.concatenate([np.zeros(n), y0])
+        self.x0 = np.concatenate([np.zeros(n), _as_dof_vector(y_filt0, n)])
 
-        self.add_input_port("r", dim=n, nominal_value=np.zeros(n))
-        self.add_input_port("y", dim=n, nominal_value=np.zeros(n))
-        self.add_output_port("u", dim=n, function=self.ctl, dependencies=("r", "y"))
+        self.add_error_ports(ports, n)
+        self.add_output_port(
+            "u", dim=n, function=self.ctl, dependencies=self.error_dependencies
+        )
 
-    def _split_state(self, x):
-        n = self.dof
-        return x[:n], x[n:]
+    def derivative_signal(self, u):
+        """The signal the filtered derivative acts on: ``y`` (reference form) or ``-e``."""
+        if self.port_layout == "error":
+            return -self.error(u)
+        return u[self.dof :]
 
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -90,15 +102,14 @@ class FilteredController(DynamicController):
         e_int_min = xp.asarray(params["e_int_min"])
         e_int_max = xp.asarray(params["e_int_max"])
 
-        e_int, y_filt = self._split_state(x)
-        r = u[:n]
-        y = u[n:]
+        e_int, m_filt = x[:n], x[n:]
+        e = self.error(u)
+        m = self.derivative_signal(u)
+        dm_filt = (m - m_filt) / tau
 
-        e = r - y
-        dy_filt = (y - y_filt) / tau
+        u_unsat = Kp * e + Ki * e_int - Kd * dm_filt
 
-        u_unsat = Kp * e + Ki * e_int - Kd * dy_filt
-
+        # anti-windup: the integrator stops while the command is saturated
         stop_hi = xp.logical_and(u_unsat >= u_max, e > 0.0)
         stop_lo = xp.logical_and(u_unsat <= u_min, e < 0.0)
         stop_sat = xp.logical_or(stop_hi, stop_lo)
@@ -109,7 +120,7 @@ class FilteredController(DynamicController):
         stop_int = xp.logical_or(stop_int_hi, stop_int_lo)
         de_int = xp.where(stop_int, 0.0, de_int)
 
-        return xp.concatenate([de_int, dy_filt])
+        return xp.concatenate([de_int, dm_filt])
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -123,11 +134,9 @@ class FilteredController(DynamicController):
         u_min = xp.asarray(params["u_min"])
         u_max = xp.asarray(params["u_max"])
 
-        e_int, y_filt = self._split_state(x)
-        r = u[:n]
-        y = u[n:]
+        e_int, m_filt = x[:n], x[n:]
+        e = self.error(u)
+        dm_filt = (self.derivative_signal(u) - m_filt) / tau
 
-        e = r - y
-        dy_filt = (y - y_filt) / tau
-        u_cmd = Kp * e + Ki * e_int - Kd * dy_filt
+        u_cmd = Kp * e + Ki * e_int - Kd * dm_filt
         return xp.clip(u_cmd, u_min, u_max)

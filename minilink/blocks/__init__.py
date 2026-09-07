@@ -31,6 +31,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "LowPassFilter": ("minilink.blocks.filters", "LowPassFilter"),
     "NotchFilter": ("minilink.blocks.filters", "NotchFilter"),
     "TransferFunction": ("minilink.blocks.transfer_function", "TransferFunction"),
+    "Lead": ("minilink.blocks.transfer_function", "Lead"),
+    "Lag": ("minilink.blocks.transfer_function", "Lag"),
     "Washout": ("minilink.blocks.filters", "Washout"),
     # neural
     "NeuralNetwork": ("minilink.blocks.neural", "NeuralNetwork"),

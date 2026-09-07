@@ -19,7 +19,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.control.modelbased",
         "ComputedTorqueController",
     ),
-    "FilteredController": ("minilink.control.siso", "FilteredController"),
+    "PID": ("minilink.control.siso", "PID"),
     "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
     "ImpedanceIntegralController": (
         "minilink.control.impedance",

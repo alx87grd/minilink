@@ -92,7 +92,7 @@ opts out for GPU/RL workloads. Tools built on JAX evaluators (trajopt,
 
 | Layer | Use | Examples |
 | --- | --- | --- |
-| 1 Facades | Teaching, quick looks | `compute_trajectory`, `plot_trajectory`, `jacobian`, `linearize`, `+`/`>>`/`@` |
+| 1 Facades | Teaching, quick looks | `compute_trajectory`, `plot_trajectory`, `jacobian`, `linearize`, `+`/`>>`/`@` (`C >> G` is the loop gain, `C @ G` or `L @ 1` the loop closed through a summing junction) |
 | 2 Tools and orchestrators | Scripts, projects, repeat runs, trajopt, NLP | `Simulator`, `analysis.jacobian`, `analysis.bode`, `TrajectoryOptimizationPlanner`, `Optimizer` |
 | 3 Contracts | Custom wiring, extension | `DiagramSystem.connect`, `compile()`, `MathematicalProgram` |
 
@@ -159,7 +159,7 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
+| `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -530,6 +530,23 @@ Visualization: subsystem `"world"` geometry merges into one shared diagram
 `"world"` frame; only articulated frames get `{sys_id}:` prefixes.
 
 ### Control feedback profiles
+
+**Compensators and the summing junction (Sep 2026).** Classical laws are
+written once on the tracking error and take a port-layout switch:
+`ports="error"` declares one input `e` (the compensator form, `PID`,
+`TransferFunction`, `Lead`, `Lag`, `ProportionalController(ports="error")`),
+`ports="reference"` declares `r` and `y` (the controller form the generic
+framework uses). `@` keeps one rule — the left operand drives the right
+one and the output returns to the left — with two layouts: a declared
+measurement port is wired directly; an error-driven block
+(`core.feedback.error_input`: a declared `error_port`, or a single input
+with no roles — a compensator, a transfer function, a plant, a series
+diagram `C >> G`) gets a `Sum` junction `e = r - y` inserted by
+`core.composition.feedback`, and `sys @ 1` closes any such system on itself
+(`sys @ K` through a `Gain`). A scalar error against a vector output takes
+component 0 through a visible `Demux`; equal dimensions close a vector loop;
+anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`
+block, no new operator.
 
 **Decision record (landed Aug 2026, reviewed Sep 2026).** A controller is
 an ordinary `System` whose port compute `ctl` *is* the control law; the

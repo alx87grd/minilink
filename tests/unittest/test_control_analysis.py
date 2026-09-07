@@ -245,7 +245,7 @@ class TestLQR(unittest.TestCase):
 
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
 from minilink.control.output import ProportionalController
-from minilink.control.siso import FilteredController
+from minilink.control.siso import PID
 from minilink.control.state import StateFeedbackController
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
@@ -300,9 +300,9 @@ class TestImpedanceIntegralController(unittest.TestCase):
         self.assertAlmostEqual(speed, 0.0, places=2)
 
 
-class TestFilteredController(unittest.TestCase):
+class TestPID(unittest.TestCase):
     def test_equations(self):
-        pid = FilteredController(Kp=10.0, Ki=1.0, Kd=1.0, tau=0.1)
+        pid = PID(Kp=10.0, Ki=1.0, Kd=1.0, tau=0.1, ports="reference")
         np.testing.assert_allclose(
             pid.f(np.array([0.0, 0.2]), np.array([1.0, 0.2])), [0.8, 0.0]
         )
@@ -315,7 +315,8 @@ class TestFilteredController(unittest.TestCase):
         jax = pytest.importorskip("jax")
         import jax.numpy as jnp
 
-        pid = FilteredController(
+        pid = PID(
+            ports="reference",
             Kp=10.0,
             Ki=1.0,
             Kd=1.0,
@@ -330,7 +331,7 @@ class TestFilteredController(unittest.TestCase):
 
     def test_closed_loop_removes_steady_state_error(self):
         plant = DoubleIntegrator()
-        pid = FilteredController()
+        pid = PID(ports="reference")
         pid.params.update({"Kp": 5.0, "Ki": 1.0, "Kd": 4.0})
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
@@ -372,9 +373,9 @@ class TestImpedanceController(unittest.TestCase):
         )
 
 
-class TestFilteredControllerMIMO(unittest.TestCase):
+class TestPIDMIMO(unittest.TestCase):
     def test_dof_two_diagonal(self):
-        pid = FilteredController(dof=2, Kp=2.0, Ki=1.0, Kd=0.5, tau=0.1)
+        pid = PID(dof=2, Kp=2.0, Ki=1.0, Kd=0.5, tau=0.1, ports="reference")
         np.testing.assert_allclose(
             pid.f(np.zeros(4), np.array([1.0, 2.0, 0.0, 0.0])), [1.0, 2.0, 0.0, 0.0]
         )

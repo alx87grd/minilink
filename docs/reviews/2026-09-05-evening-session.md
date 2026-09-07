@@ -304,3 +304,29 @@ which set the automatic reporting grid for adaptive solvers to 1001 points
 reporting resolution only, the SciPy solver still picks its own steps and
 fixed-step solvers still derive `dt` from the plant time constant. A default
 pendulum simulation takes 0.2 s; demo sweep 59/59, suite green.
+
+Classical loop (2026-09-07): compensators and the summing junction. `PID`
+(was `FilteredController`) defaults to the compensator layout
+`ports="error"`, one input `e`; `ports="reference"` keeps the two-port
+controller form `r, y`. Both layouts run one law through the `ErrorDriven`
+mixin in `core/feedback.py` (`add_error_ports`, `error(u)`), shared with
+`ProportionalController` and `TransferFunction`; `Lead(K, z, p)` and
+`Lag(K, z, p)` are `TransferFunction` subclasses. `L = C >> plant` is the
+loop gain as an ordinary diagram and `T = C @ plant` closes it: `closed_loop`
+sees that the controller input is an error (`error_input`: a declared
+`error_port`, else the single input of a block without feedback roles) and
+calls `feedback(series(C, plant))`, which inserts `Sum(signs=(1, sign))` as
+`sum`, exposes the boundary input `r`, adds a `Demux` as `demux` picking
+component 0 when the error is scalar and the plant output a vector
+(`of=("y", i)` selects another component; a vector error against a vector
+output uses a vector `Sum`; other mismatches raise with guidance), and puts
+a `Gain` (`L @ K`) or a sensor block (`through=block`) on the return path.
+Two-port controllers wire exactly as before; `plot_control_law` falls back
+to the error-driven roles. `feedback` is a root export only, since
+`minilink.core.feedback` is a submodule and the core band cannot carry the
+name. Demos `analysis_frequency.py`, `analysis_root_locus.py`,
+`pid_anti_windup.py` (renamed) and the frequency-domain notebook are
+rewritten on `C >> plant` / `C @ plant`; the notebook checks the closed-loop
+eigenvalues against the roots of `1 + L(s)` read off the wired diagram.
+Tests: `test_feedback_composition.py` (12); suite 1047 passed, demo sweep
+59/59, three notebooks re-smoked.

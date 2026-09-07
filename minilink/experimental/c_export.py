@@ -386,7 +386,7 @@ def export_system_to_c(
             return evaluator.outputs(x, u, t_jax)
 
     # Trace tier avoids evaluator-level JIT; disable_jit still needed when
-    # subsystem f()/compute() embed jax.jit (e.g. FilteredController).
+    # subsystem f()/compute() embed jax.jit (e.g. PID).
     with jax.disable_jit():
         closed_jaxpr = jax.make_jaxpr(func)(x_jax, u_jax)
 

@@ -1,10 +1,11 @@
-"""C export: FilteredController alone (anti-windup / richer C)."""
+"""C export: a PID block alone (anti-windup / richer C)."""
 
-from minilink import FilteredController
+from minilink import PID
 from minilink.experimental.c_export import export_system_to_c
 
 # Dynamic SISO PID with filtered derivative and anti-windup (n=2, m=2 for [r, y]).
-controller = FilteredController(
+controller = PID(
+    ports="reference",
     dof=1,
     Kp=10.0,
     Ki=1.0,

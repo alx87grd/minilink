@@ -46,10 +46,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Relay": ("minilink.blocks.nonlinear", "Relay"),
     "LowPassFilter": ("minilink.blocks.filters", "LowPassFilter"),
     "TransferFunction": ("minilink.blocks.transfer_function", "TransferFunction"),
+    "Lead": ("minilink.blocks.transfer_function", "Lead"),
+    "Lag": ("minilink.blocks.transfer_function", "Lag"),
     # control
     "ProportionalController": ("minilink.control.output", "ProportionalController"),
     "StateFeedbackController": ("minilink.control.state", "StateFeedbackController"),
-    "FilteredController": ("minilink.control.siso", "FilteredController"),
+    "PID": ("minilink.control.siso", "PID"),
     "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
     "JointImpedance": ("minilink.control.robotic", "JointImpedance"),
     "TaskImpedance": ("minilink.control.robotic", "TaskImpedance"),
@@ -116,6 +118,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
     "closed_loop_qdq": ("minilink.core.composition", "closed_loop_qdq"),
+    "feedback": ("minilink.core.composition", "feedback"),
     "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
     "Source": ("minilink.blocks.sources", "Source"),
     "ImpedanceIntegralController": (

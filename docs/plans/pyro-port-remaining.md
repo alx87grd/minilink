@@ -40,7 +40,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Catalog | `pyro/dynamic/manipulator.py` | TwoLinkManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Catalog | `pyro/dynamic/manipulator.py` | FiveLinkPlanarManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Control | `pyro/control/controller.py` | DynamicClosedLoopSystem | `minilink/core/diagram.py` | DiagramSystem | **Partial** |  |
-| Control | `pyro/control/linear.py` | PIDController | `minilink/control/siso.py` | FilteredController (filtered PID) | **Partial** | Dedicated PID wrapper pending (v0.2 robotic PID wrappers) |
+| Control | `pyro/control/linear.py` | PIDController | `minilink/control/siso.py` | PID (filtered PID) | **Partial** | Dedicated PID wrapper pending (v0.2 robotic PID wrappers) |
 | Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/lqr.py` | — | **TODO** | Trajectory stabilization demos |
 | Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/robotic.py` | JointImpedance, TaskImpedance, TaskKinematic, TaskKinematicNullspace | **Partial** | Dynamic joint/effector PID wrappers TODO |
 | Planning | `pyro/planning/dynamicprogramming.py` | DynamicProgramming2DRectBivariateSpline | `minilink/planning/policy_synthesis/dp.py` | — | **Drop** | Not needed; grid backends cover use cases |
@@ -227,7 +227,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/trajectory_stabilization/cartpole_swing_up_with_lqr_stabilization.py` | **TODO** | TrajectoryLQRController |
 | `demos_by_tool/trajectory_stabilization/double_pendulum_with_trajectory_following_lqr_controller.py` | **TODO** | TrajectoryLQRController |
 | `demos_by_tool/trajectory_stabilization/pendulum_swing_up_with_lqr_stabilization.py` | **TODO** | TrajectoryLQRController |
-| `demos_by_tool/transfer_functions/mass_with_pid.py` | **Partial** | examples/demos/control/filtered_pid_anti_windup.py |
+| `demos_by_tool/transfer_functions/mass_with_pid.py` | **Partial** | examples/demos/control/pid_anti_windup.py |
 
 ### 3.4 `projects/`
 
@@ -354,7 +354,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | StaticController | DiagramSystem wiring | `minilink/core/diagram.py` |
 | StaticController.plot_control_law | plot_control_law(), plot_input_output_map() | `minilink/graphical/port_map.py` |
 | ClosedLoopSystem | `@`, `>>`, `+` composition | `minilink/core/diagram.py` |
-| DynamicController | DynamicController marker (FilteredController, ImpedanceIntegralController) | `minilink/core/feedback.py` |
+| DynamicController | DynamicController marker (PID, ImpedanceIntegralController) | `minilink/core/feedback.py` |
 | ProportionalController | ProportionalController | `minilink/control/output.py` |
 | synthesize_lqr_controller | synthesize_lqr | `minilink/control/lqr.py` |
 | linearize_and_synthesize_lqr_controller | linearize + synthesize_lqr | `minilink/control/lqr.py` |

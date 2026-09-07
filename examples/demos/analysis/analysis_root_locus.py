@@ -1,22 +1,20 @@
-"""Root locus of the inverted pendulum: angle feedback alone against a PD compensator."""
+"""Root locus of the inverted pendulum: angle feedback alone against a lead compensator."""
 
 import numpy as np
 
-from minilink import InvertedPendulum, TransferFunction
+from minilink import InvertedPendulum, Lead
 
 plant = InvertedPendulum()
-x_bar = np.array([0.0, 0.0])  # upright
+plant.x0 = np.array([0.0, 0.0])  # upright: the operating point every tool defaults to
 
 # u = -K theta: the two real poles meet at the origin and leave along the
 # imaginary axis, so no gain on the angle alone stabilizes the upright pole.
-plant.plot_pzmap(x_bar)
-plant.plot_root_locus(x_bar)
+plant.plot_pzmap()
+plant.plot_root_locus()
 
-# Add rate feedback, u = -K (theta + dtheta / 2): the zero at s = -2 pulls both
-# branches into the left half-plane above a critical gain.
-G = plant.transfer_function(x_bar)
-L = TransferFunction(np.polymul([0.5, 1.0], G.numerator), G.denominator)
-L.name = "PD-compensated inverted pendulum"
+# A lead compensator (s + 2) / (s + 20) adds rate feedback: its zero pulls
+# both branches into the left half-plane above a critical gain.
+L = Lead(K=1.0, z=2.0, p=20.0) >> plant
 L.plot_root_locus()
 
 gains, roots = L.root_locus()

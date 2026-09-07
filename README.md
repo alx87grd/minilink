@@ -115,6 +115,7 @@ another diagram.
 | `a + b + c` | Add subsystems without wiring |
 | `source >> plant` | Chain output to input |
 | `controller @ plant` | Build a simple feedback diagram |
+| `C @ plant`, `L @ 1` | Classical loop: a compensator or series diagram closed through a summing junction `e = r - y` |
 | `.autowire(strict=True)` | Connect matching named ports |
 
 Explicit wiring (`add_subsystem` / `connect`) is always available when the
@@ -314,7 +315,7 @@ control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 | --- | --- |
 | `core` | `System`, façade mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem`, ports, `Trajectory`, sets, costs |
 | `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
-| `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`, `mpc`) |
+| `control` | control laws and design factories (`PID`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`, `mpc`) |
 | `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
 | `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
 | `simulation` | `Simulator`, `HybridSimulator`, `Computer`, solvers, time grids |

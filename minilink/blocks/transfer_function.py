@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import signal
 
+from minilink.core.feedback import ErrorDriven
 from minilink.core.kinematics import translation
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.animation.primitives import (
@@ -10,19 +11,52 @@ from minilink.graphical.animation.primitives import (
 )
 
 
-class TransferFunction(LTISystem):
-    """Continuous-time SISO transfer function in state-space realization."""
+class TransferFunction(ErrorDriven, LTISystem):
+    """Continuous-time SISO transfer function in state-space realization.
 
-    def __init__(self, numerator, denominator, *, name="Transfer Function"):
+    ``ports="error"`` (default) is a plain ``u -> y`` block: a plant, or a
+    compensator whose input is the error, so ``C @ plant`` inserts the
+    summing junction and ``C >> plant`` is the loop gain. ``ports="reference"``
+    declares ``r`` and ``y`` and drives the same dynamics with ``r - y``, the
+    controller form ``@`` wires directly; its command port is ``u``.
+    """
+
+    def __init__(
+        self, numerator, denominator, *, ports="error", name="Transfer Function"
+    ):
         self.numerator = np.asarray(numerator, dtype=float)
         self.denominator = np.asarray(denominator, dtype=float)
         A, B, C, D = signal.tf2ss(self.numerator, self.denominator)
         super().__init__(A, B, C, D, name=name)
-        self.inputs["u"].labels = ["u"]
-        self.outputs["y"].labels = ["y"]
         tf = signal.TransferFunction(self.numerator, self.denominator)
         self.poles = tf.poles
         self.zeros = tf.zeros
+
+        if ports == "reference":
+            feedthrough = tuple(self.outputs["y"].dependencies)
+            self.inputs = {}
+            self.outputs = {}
+            self.add_error_ports("reference", 1)
+            self.add_output_port(
+                "u",
+                dim=1,
+                function=self.h,
+                dependencies=self.error_dependencies if feedthrough else (),
+            )
+            self.measurement_port, self.ref_port, self.control_port = "y", "r", "u"
+            self.plot_space = "error"
+        else:
+            if ports != "error":
+                raise ValueError(f"ports must be 'error' or 'reference', got {ports!r}")
+            self.port_layout = "error"
+            self.inputs["u"].labels = ["u"]
+            self.outputs["y"].labels = ["y"]
+
+    def f(self, x, u, t=0, params=None):
+        return super().f(x, self.error(u), t, params)
+
+    def h(self, x, u, t=0, params=None):
+        return super().h(x, self.error(u), t, params)
 
     def get_kinematic_geometry(self):
         return {
@@ -38,7 +72,7 @@ class TransferFunction(LTISystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        input_value = float(np.asarray(u).reshape(-1)[0])
+        input_value = float(np.asarray(self.error(u)).reshape(-1)[0])
         return {
             "force": [
                 Arrow(
@@ -59,3 +93,25 @@ if __name__ == "__main__":
     sys.compute_trajectory(tf=5.0)
     sys.plot_trajectory()
     sys.animate()
+
+
+class Lead(TransferFunction):
+    """Lead compensator ``C(s) = K (s + z) / (s + p)`` with ``z < p``: phase lead between ``z`` and ``p``."""
+
+    def __init__(self, K=1.0, z=1.0, p=10.0, *, ports="error"):
+        if not 0.0 < z < p:
+            raise ValueError(f"a lead compensator has 0 < z < p, got z={z}, p={p}")
+        super().__init__(
+            [K, K * z], [1.0, p], ports=ports, name=f"Lead K={K}, z={z}, p={p}"
+        )
+
+
+class Lag(TransferFunction):
+    """Lag compensator ``C(s) = K (s + z) / (s + p)`` with ``p < z``: gain at low frequency."""
+
+    def __init__(self, K=1.0, z=1.0, p=0.1, *, ports="error"):
+        if not 0.0 < p < z:
+            raise ValueError(f"a lag compensator has 0 < p < z, got z={z}, p={p}")
+        super().__init__(
+            [K, K * z], [1.0, p], ports=ports, name=f"Lag K={K}, z={z}, p={p}"
+        )

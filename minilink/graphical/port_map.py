@@ -216,6 +216,8 @@ def plot_control_law(
     """
     roles = feedback_ports(block)
     if roles is None:
+        roles = _error_driven_roles(block)
+    if roles is None:
         raise ValueError(
             f"{block.name} has no resolvable feedback declaration — declare "
             "feedback_profile (or measurement_port / control_port) to use "
@@ -266,6 +268,18 @@ def plot_control_law(
     return render_port_map_matplotlib(
         spec, show_3d=show_3d, cmap=cmap, ax=ax, show=show
     )
+
+
+def _error_driven_roles(block):
+    """Roles for a compensator (one input ``e``): sweep the error port itself."""
+    from minilink.core.feedback import FeedbackRoles, error_input
+
+    port = error_input(block)
+    outputs = list(getattr(block, "outputs", {}))
+    if port is None or not outputs:
+        return None
+    control = "u" if "u" in outputs else outputs[0]
+    return FeedbackRoles(port, None, control, "measurement")
 
 
 def render_port_map_matplotlib(
