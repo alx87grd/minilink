@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from minilink.core.system import DynamicSystem, StepSystem
 
-_VALID_METHODS = frozenset({"rk4", "euler"})
+_INTEGRATORS = frozenset({"rk4", "euler"})
 
 
 class DiscretizedDynamicSystem(StepSystem):
     """Discrete-time wrapper over a continuous :class:`DynamicSystem`."""
 
-    def __init__(self, source: DynamicSystem, params: dict, *, method: str):
+    def __init__(self, source: DynamicSystem, params: dict, *, integrator: str):
         y_deps = ()
         if "y" in source.outputs:
             y_deps = tuple(source.outputs["y"].dependencies)
@@ -23,7 +23,7 @@ class DiscretizedDynamicSystem(StepSystem):
         )
         self.name = f"Discretized({source.name})"
         self.params = dict(params)
-        self.method = method
+        self.integrator = integrator
         self._source = source
 
     def h(self, x, u, k=0, params=None):
@@ -38,7 +38,7 @@ class DiscretizedEulerDynamicSystem(DiscretizedDynamicSystem):
     """``x_{k+1} = x_k + dt f(x_k, u_k, t_k; p)``."""
 
     def __init__(self, source: DynamicSystem, params: dict):
-        super().__init__(source, params, method="euler")
+        super().__init__(source, params, integrator="euler")
 
     def step(self, x, u, k=0, params=None):
         f = self._source.f
@@ -52,7 +52,7 @@ class DiscretizedRK4DynamicSystem(DiscretizedDynamicSystem):
     """One RK4 step of ``f`` over ``[t_k, t_k + dt]`` with ZOH on ``u``."""
 
     def __init__(self, source: DynamicSystem, params: dict):
-        super().__init__(source, params, method="rk4")
+        super().__init__(source, params, integrator="rk4")
 
     def step(self, x, u, k=0, params=None):
         f = self._source.f
@@ -73,29 +73,29 @@ def discretize(
     system: DynamicSystem,
     dt: float | None = None,
     *,
-    method: str = "rk4",
+    integrator: str = "rk4",
     params: dict | None = None,
 ) -> StepSystem:
     """
     Wrap a :class:`DynamicSystem` as a :class:`StepSystem` with sample time in ``params``.
 
     ``params["dt"]`` is the hold interval (set via ``dt=`` and/or ``params``).
-    ``x_{k+1} = step(x, u, k; p)`` integrates ``f`` with ``method`` ``"rk4"`` or
-    ``"euler"``; ``p`` defaults to the wrapper's :attr:`params`.
+    ``x_{k+1} = step(x, u, k; p)`` integrates ``f`` with ``integrator``
+    ``"rk4"`` or ``"euler"`` (the same word as ``Sys2Gym``); ``p`` defaults to
+    the wrapper's :attr:`params`.
     """
     if not isinstance(system, DynamicSystem):
         raise TypeError(
             f"discretize requires DynamicSystem, got {type(system).__name__}"
         )
-    if method not in _VALID_METHODS:
+    if integrator not in _INTEGRATORS:
         raise ValueError(
-            f"Unknown discretization method {method!r}; "
-            f"expected one of {sorted(_VALID_METHODS)!r}."
+            f"Unknown integrator {integrator!r}; expected one of {sorted(_INTEGRATORS)!r}."
         )
 
     merged = _merge_discretize_params(system, dt, params)
 
-    if method == "euler":
+    if integrator == "euler":
         return DiscretizedEulerDynamicSystem(system, merged)
     return DiscretizedRK4DynamicSystem(system, merged)
 

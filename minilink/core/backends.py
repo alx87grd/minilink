@@ -100,6 +100,13 @@ def normalize_backend(
 
 
 @functools.lru_cache(maxsize=1)
+def jax_installed() -> bool:
+    """Return True when the ``jax`` package is importable (without importing it)."""
+    import importlib.util
+
+    return importlib.util.find_spec("jax") is not None
+
+
 def require_jax_numpy() -> types.ModuleType:
     """Return ``jax.numpy`` (lazy, cached). Raises if JAX is not installed."""
     try:

@@ -150,9 +150,11 @@ class System(SharedSystemFacades):
         """
         Recompute derived internals from current parameters/topology.
 
-        Base implementation is a no-op and can be overridden by subclasses.
+        Base implementation only drops the cached compiled evaluators
+        (:meth:`~minilink.core.facades.SharedSystemFacades._compiled_evaluator`);
+        subclasses may override it.
         """
-        return
+        self._invalidate_compiled()
 
     # Structural Model API
 
@@ -200,6 +202,7 @@ class System(SharedSystemFacades):
             lower_bound=lower_bound,
             upper_bound=upper_bound,
         )
+        self._invalidate_compiled()
 
     def add_output_port(
         self,
@@ -243,6 +246,7 @@ class System(SharedSystemFacades):
             lower_bound=lower_bound,
             upper_bound=upper_bound,
         )
+        self._invalidate_compiled()
 
     def get_u_from_input_ports(self):
         """

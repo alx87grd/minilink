@@ -1,8 +1,8 @@
-"""Modal analysis demo."""
+"""Modal analysis: poles and mode shapes of a double pendulum hanging down."""
 
 import numpy as np
 
 from minilink import DoublePendulum
 
-cartpole = DoublePendulum()
-cartpole.modal_analysis(x_bar=[np.pi, 0.0, 0.0, 0.0], mode="all")
+plant = DoublePendulum()
+plant.modal_analysis([np.pi, 0.0, 0.0, 0.0], mode="all")

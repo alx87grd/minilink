@@ -152,6 +152,7 @@ class WiredDiagramMixin:
 
         self.compute_state_properties()
         self._refresh_solver_info()
+        self._invalidate_compiled()
 
     def _refresh_solver_info(self):
         """Bubble subsystem solver hints to the diagram root."""
@@ -254,6 +255,7 @@ class WiredDiagramMixin:
             source_sys_id,
             source_port_id,
         )
+        self._invalidate_compiled()
 
         if self.connection_verbose:
             print(
@@ -334,6 +336,7 @@ class WiredDiagramMixin:
         for subsystem in self.subsystems.values():
             subsystem.refresh()
         self.compute_state_properties()
+        self._invalidate_compiled()
 
     def autowire(
         self,

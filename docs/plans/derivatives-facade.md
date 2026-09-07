@@ -1,6 +1,12 @@
 # Partial derivatives and the analysis family on every `System` — plan (draft, 2026-09-06)
 
-Status: **draft v4 for the maintainer's rulings** (§6). Nothing implemented.
+Status: **implemented on `dev-fable` (2026-09-06)** with the recommended
+rulings of §6; one deviation: the JAX Jacobian runs `jacfwd` eagerly instead
+of under `jax.jit`, so catalog blocks that build constant matrices from
+`params` (`np.array` in an `A(t, params)`) still differentiate exactly with
+respect to `x`, `u`, `t` and wires, and `method="auto"` falls back to finite
+differences for `wrt="params"` on those blocks. The rest of this document is
+the plan as ruled.
 Lane: teaching surface (core facade) over the evaluators. v3 stepped back to
 two methods on `System` (`jacobian`, `linearize`), values at the student tier
 and the function form on the evaluator. v4 extends the same calling pattern to

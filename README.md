@@ -172,16 +172,21 @@ Characterize a plant and design a controller from the same `System`:
 ```python
 import numpy as np
 from minilink import InvertedPendulum
-from minilink.analysis.linearize import linearize
 from minilink.control.lqr import lqr
 
 plant = InvertedPendulum()
-lti = linearize(plant, x_bar=[0.0, 0.0])
-ctl = lqr(lti.A(), lti.B(), Q=np.diag([10.0, 1.0]), R=[[1.0]])
+A = plant.jacobian("f", "x", [0.0, 0.0])   # ∂f/∂x at the upright point
+B = plant.jacobian("f", "u", [0.0, 0.0])
+ctl = lqr(A, B, Q=np.diag([10.0, 1.0]), R=[[1.0]])
 diagram = ctl @ plant
+
+lin = plant.linearize([0.0, 0.0])           # LTISystem: lin.A(), lin.B(), ...
+G = plant.transfer_function([0.0, 0.0])    # one channel as a TransferFunction
 ```
 
-Also: `bode` / `plot_bode`, `modal_analysis`, ctrb/obsv, equilibria.
+Every analysis verb reads the same way — `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)` —
+and is exact under JAX when the plant traces, finite differences otherwise. Also:
+`bode` / `plot_bode`, `pzmap`, `modal_analysis`, ctrb/obsv, `find_equilibrium`, `discretize`.
 
 ### Planning, search, and optimization
 

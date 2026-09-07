@@ -75,9 +75,12 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "ImpedanceIntegralController",
     ),
     "minilink.analysis": (
+        "jacobian",
+        "transfer_function",
         "bode",
         "plot_bode",
         "pzmap",
+        "plot_pzmap",
         "modal_analysis",
         "controllability",
         "observability",

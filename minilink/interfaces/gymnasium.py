@@ -324,16 +324,12 @@ def _compiled_step(sys, integrator, compile_backend):
     """
     if integrator not in ("rk4", "euler"):
         raise ValueError(f"integrator must be 'rk4' or 'euler', got {integrator!r}")
-    auto = compile_backend is None
-    backend = ("jax" if _jax_installed() else "numpy") if auto else compile_backend
-    try:
-        evaluator = sys.compile(backend=backend, verbose=False)
-    except RuntimeError as exc:
-        # Only the "not JAX-traceable" verdict falls back; any other error
-        # from the JAX compile is a real problem and must surface.
-        if not (auto and backend == "jax" and "JAX-traceable" in str(exc)):
-            raise
-        backend = "numpy"  # the plant does not trace: NumPy evaluator instead
+    if compile_backend is None:
+        from minilink.core.compile.compiler import compile_auto
+
+        backend, evaluator = compile_auto(sys)
+    else:
+        backend = compile_backend
         evaluator = sys.compile(backend=backend, verbose=False)
 
     if backend == "jax":
@@ -348,12 +344,6 @@ def _compiled_step(sys, integrator, compile_backend):
     else:
         step = evaluator.rk4_step if integrator == "rk4" else evaluator.euler_step
     return backend, evaluator, step
-
-
-def _jax_installed() -> bool:
-    import importlib.util
-
-    return importlib.util.find_spec("jax") is not None
 
 
 def _box_bounds(space):

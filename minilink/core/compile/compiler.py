@@ -180,6 +180,26 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
     return evaluator
 
 
+def compile_auto(system, verbose=False):
+    """Compile with JAX when it is installed and ``system`` traces, else with NumPy.
+
+    Returns ``(backend, evaluator)``. Only two verdicts fall back to NumPy:
+    JAX cannot be imported, or the system is "not JAX-traceable"; any other
+    error from the JAX compile surfaces.
+    """
+    from minilink.core.backends import BACKEND_JAX, jax_installed
+
+    if jax_installed():
+        try:
+            return BACKEND_JAX, compile(system, backend=BACKEND_JAX, verbose=verbose)
+        except ImportError:
+            pass  # present on disk but not importable (e.g. blocked, broken install)
+        except RuntimeError as exc:
+            if "JAX-traceable" not in str(exc):
+                raise
+    return BACKEND_NUMPY, compile(system, backend=BACKEND_NUMPY, verbose=verbose)
+
+
 def compile_diagram(
     diagram: DiagramSystem,
     backend: str = BACKEND_NUMPY,

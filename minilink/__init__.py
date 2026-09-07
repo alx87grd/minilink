@@ -61,10 +61,13 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "lqr": ("minilink.control.lqr", "lqr"),
     "lqr_at_operating_point": ("minilink.control.lqr", "lqr_at_operating_point"),
     # analysis
+    "jacobian": ("minilink.analysis.derivatives", "jacobian"),
     "linearize": ("minilink.analysis.linearize", "linearize"),
+    "transfer_function": ("minilink.analysis.frequency", "transfer_function"),
     "bode": ("minilink.analysis.frequency", "bode"),
     "plot_bode": ("minilink.analysis.frequency", "plot_bode"),
     "pzmap": ("minilink.analysis.frequency", "pzmap"),
+    "plot_pzmap": ("minilink.analysis.frequency", "plot_pzmap"),
     "modal_analysis": ("minilink.analysis.modal", "modal_analysis"),
     "controllability": ("minilink.analysis.structural", "controllability"),
     "observability": ("minilink.analysis.structural", "observability"),

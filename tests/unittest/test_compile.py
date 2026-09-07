@@ -539,9 +539,9 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         for key in out_n:
             np.testing.assert_allclose(np.asarray(out_j[key]), out_n[key], atol=1e-05)
 
-    def test_jacobian_f_params_analytic(self):
+    def test_jacobian_wrt_params_analytic(self):
         params = {"ctl": {"Kp": 2.5}, "plant": {"k": 1.0}}
-        jac = self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, params)
+        jac = self.ev.jacobian("f", "params")(self.x_j, self.u_j, 0.0, params)
         np.testing.assert_allclose(
             np.asarray(jac["plant"]["k"]), [2.5 * 1.5], atol=1e-05
         )
@@ -556,9 +556,9 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         g = jax.grad(dx0)({"plant": {"k": 1.0}})
         self.assertAlmostEqual(float(g["plant"]["k"]), 2.5 * 1.5, places=4)
 
-    def test_jacobian_f_params_requires_params(self):
+    def test_jacobian_wrt_params_requires_params(self):
         with self.assertRaises(ValueError):
-            self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, None)
+            self.ev.jacobian("f", "params")(self.x_j, self.u_j, 0.0, None)
 
 
 from minilink.blocks.routing import Gain

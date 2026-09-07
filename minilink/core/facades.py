@@ -10,6 +10,13 @@ contracts stay in :mod:`minilink.core.system`. Heavy dependencies
 (simulation, graphics) are imported lazily inside each method.
 """
 
+import weakref
+
+# Compiled evaluators behind the derivative tools, keyed by system (weakly) then
+# by backend. Kept outside the instance dict so copies and pickles never carry
+# jitted closures; structural mutators call ``_invalidate_compiled``.
+_COMPILED_EVALUATORS: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+
 
 class SharedSystemFacades:
     """
@@ -38,6 +45,61 @@ class SharedSystemFacades:
         from minilink.core.compile.compiler import compile as compile_system
 
         return compile_system(self, backend=backend, verbose=verbose)
+
+    def _compiled_evaluator(self, method="auto"):
+        """Cached compiled evaluator behind the derivative tools.
+
+        ``"auto"`` prefers JAX when it is installed and the system traces,
+        ``"fd"`` compiles with NumPy, ``"jax"`` compiles with JAX and raises
+        when the system does not trace. Cleared by :meth:`refresh` and by the
+        structural mutators (ports, subsystems, connections); parameter edits
+        need no recompile because every call passes the live ``params``.
+        """
+        from minilink.core.compile.compiler import compile as compile_system
+        from minilink.core.compile.compiler import compile_auto
+
+        key = str(method).strip().lower()
+        if key not in ("auto", "fd", "jax"):
+            raise ValueError(f"method must be 'auto', 'fd' or 'jax'; got {method!r}")
+        cache = _COMPILED_EVALUATORS.setdefault(self, {})
+        if key == "auto":
+            if "auto" not in cache:
+                backend, evaluator = compile_auto(self)
+                cache["auto"] = backend
+                cache[backend] = evaluator
+            return cache[cache["auto"]]
+        backend = "numpy" if key == "fd" else "jax"
+        if backend not in cache:
+            cache[backend] = compile_system(self, backend=backend)
+        return cache[backend]
+
+    def _invalidate_compiled(self):
+        """Drop the cached evaluators (called after structural changes)."""
+        _COMPILED_EVALUATORS.pop(self, None)
+
+    def jacobian(
+        self,
+        of,
+        wrt,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Return ``d(of)/d(wrt)`` at an operating point, as a NumPy array.
+
+        ``plant.jacobian("f", "x")`` is ∂f/∂x at the nominal point;
+        ``plant.jacobian("f", "u", x_bar, u_bar)`` at ``(x̄, ū)``. ``of`` is
+        ``"f"``, an output port id, or a diagram wire ``"block:port"``; ``wrt``
+        is ``"x"``, ``"u"``, an input port id, ``"t"``, ``"params"`` (dict
+        result), or a wire. See :func:`minilink.analysis.derivatives.jacobian`.
+        """
+        from minilink.analysis.derivatives import jacobian
+
+        return jacobian(self, of, wrt, x_bar, u_bar, t, params, method=method, eps=eps)
 
     def compute_trajectory(
         self,
@@ -543,50 +605,141 @@ class DynamicSystemFacades:
             **kwargs,
         )
 
+    def linearize(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Linearize about ``(x_bar, u_bar)`` and return an ``LTISystem``.
+
+        ``lin = plant.linearize(x_bar)`` gives ``lin.A()``, ``lin.B()``,
+        ``lin.C()``, ``lin.D()``. See :func:`minilink.analysis.linearize.linearize`.
+        """
+        from minilink.analysis.linearize import linearize
+
+        return linearize(
+            self, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        )
+
+    def transfer_function(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Return one SISO channel of the linearization as a ``TransferFunction``.
+
+        See :func:`minilink.analysis.frequency.transfer_function`.
+        """
+        from minilink.analysis.frequency import transfer_function
+
+        return transfer_function(
+            self, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        )
+
+    def bode(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        w=None,
+        n=200,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Return ``(w, magnitude_db, phase_deg)`` of one SISO channel.
+
+        See :func:`minilink.analysis.frequency.bode`.
+        """
+        from minilink.analysis.frequency import bode
+
+        return bode(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            w=w,
+            n=n,
+            method=method,
+            eps=eps,
+        )
+
+    def pzmap(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Return ``(zeros, poles, gain)`` of one SISO channel.
+
+        See :func:`minilink.analysis.frequency.pzmap`.
+        """
+        from minilink.analysis.frequency import pzmap
+
+        return pzmap(
+            self, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        )
+
     def plot_bode(
         self,
         x_bar=None,
         u_bar=None,
-        *,
-        input_port=None,
-        input_index=0,
-        output_port=None,
-        output_index=0,
-        w=None,
-        n=200,
-        method="fd",
         t=0.0,
         params=None,
-        epsilon=1e-6,
+        *,
+        of=None,
+        wrt=None,
+        w=None,
+        n=200,
+        method="auto",
+        eps=1e-6,
         backend="matplotlib",
         show=True,
     ):
-        """
-        Convenience shortcut to plot a selected SISO Bode response.
+        """Plot the Bode response of one SISO channel.
 
-        ``input_port`` selects a boundary input port and ``input_index`` selects
-        one component inside it. ``output_port`` selects a boundary output port,
-        or an internal diagram output ``(sys_id, port_id)``; ``output_index``
-        selects one component inside that output.
+        See :func:`minilink.analysis.frequency.plot_bode`.
         """
         from minilink.analysis.frequency import plot_bode
 
-        if x_bar is None:
-            x_bar = self.x0
         return plot_bode(
             self,
             x_bar,
             u_bar,
-            input_port=input_port,
-            input_index=input_index,
-            output_port=output_port,
-            output_index=output_index,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
             w=w,
             n=n,
             method=method,
-            t=t,
-            params=params,
-            epsilon=epsilon,
+            eps=eps,
             backend=backend,
             show=show,
         )
@@ -595,37 +748,32 @@ class DynamicSystemFacades:
         self,
         x_bar=None,
         u_bar=None,
-        *,
-        input_port=None,
-        input_index=0,
-        output_port=None,
-        output_index=0,
-        method="fd",
         t=0.0,
         params=None,
-        epsilon=1e-6,
+        *,
+        of=None,
+        wrt=None,
+        method="auto",
+        eps=1e-6,
         backend="matplotlib",
         show=True,
     ):
-        """
-        Convenience shortcut to plot poles and zeros for a selected SISO channel.
+        """Plot poles and zeros of one SISO channel.
+
+        See :func:`minilink.analysis.frequency.plot_pzmap`.
         """
         from minilink.analysis.frequency import plot_pzmap
 
-        if x_bar is None:
-            x_bar = self.x0
         return plot_pzmap(
             self,
             x_bar,
             u_bar,
-            input_port=input_port,
-            input_index=input_index,
-            output_port=output_port,
-            output_index=output_index,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
             method=method,
-            t=t,
-            params=params,
-            epsilon=epsilon,
+            eps=eps,
             backend=backend,
             show=show,
         )
@@ -634,9 +782,12 @@ class DynamicSystemFacades:
         self,
         x_bar=None,
         u_bar=None,
+        t=0.0,
+        params=None,
         *,
         mode=None,
-        method="fd",
+        method="auto",
+        eps=1e-6,
         amplitude=1.0,
         tf=None,
         n_steps=2001,
@@ -646,31 +797,25 @@ class DynamicSystemFacades:
         show=True,
         html=None,
         native=True,
-        t=0.0,
-        params=None,
-        epsilon=1e-6,
     ):
-        """
-        Linearize and eigendecompose ``A``.
+        """Linearize and eigendecompose ``A``; returns ``(poles, modes)``.
 
-        Returns ``(poles, modes)``. With ``mode=None``, analyze only.
-        With ``mode=0`` or ``mode='all'``, delegates to
+        With ``mode=None`` analyze only. With ``mode=0`` or ``mode="all"``,
+        also animate the mode shapes through
         :func:`~minilink.analysis.modal.animate_modal`.
         """
         from minilink.analysis.modal import animate_modal, modal_analysis
 
-        if x_bar is None:
-            x_bar = self.x0
         if mode is not None:
             return animate_modal(
                 self,
                 x_bar,
-                mode,
                 u_bar,
-                t=t,
-                params=params,
+                t,
+                params,
+                mode=mode,
                 method=method,
-                epsilon=epsilon,
+                eps=eps,
                 amplitude=amplitude,
                 tf=tf,
                 n_steps=n_steps,
@@ -681,15 +826,16 @@ class DynamicSystemFacades:
                 html=html,
                 native=native,
             )
-        return modal_analysis(
-            self,
-            x_bar,
-            u_bar,
-            t=t,
-            params=params,
-            method=method,
-            epsilon=epsilon,
-        )
+        return modal_analysis(self, x_bar, u_bar, t, params, method=method, eps=eps)
+
+    def find_equilibrium(self, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
+        """Return a state near ``x_guess`` where ``f`` vanishes.
+
+        See :func:`minilink.analysis.equilibria.find_equilibrium`.
+        """
+        from minilink.analysis.equilibria import find_equilibrium
+
+        return find_equilibrium(self, x_guess, u_bar, t, params, tol=tol)
 
     def game(
         self,
@@ -753,6 +899,26 @@ class StepSystemFacades:
     (:meth:`compute_trajectory`, :meth:`compute_forced`) raise here with a
     pointer to the rollout API.
     """
+
+    def jacobian(
+        self,
+        of,
+        wrt,
+        x_bar=None,
+        u_bar=None,
+        k=0,
+        params=None,
+        *,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Return ``d(of)/d(wrt)`` at ``(x_bar, u_bar, k)``; ``of="step"`` is the update map.
+
+        See :func:`minilink.analysis.derivatives.jacobian`.
+        """
+        from minilink.analysis.derivatives import jacobian
+
+        return jacobian(self, of, wrt, x_bar, u_bar, k, params, method=method, eps=eps)
 
     def compute_trajectory(self, *args, **kwargs):
         raise TypeError(

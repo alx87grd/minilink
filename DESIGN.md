@@ -164,7 +164,7 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`) |
-| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; `discretize` for continuous→step plant wrappers; more frequency tools planned |
+| `analysis/` | one calling pattern `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)`: `jacobian(sys, "f", "x")` (∂f/∂x; `of` / `wrt` name `f`, ports, `t`, `params`, or diagram wires `"block:port"`), `linearize` (→ `LTISystem`), one-channel `bode` / `pzmap` / `transfer_function` (`of=` / `wrt=`), controllability/observability (matrices or an `LTISystem`), equilibria, `modal`; `discretize(integrator=)` for continuous→step wrappers. `method="auto"` is exact under JAX when the system traces, finite differences otherwise; the same verbs are methods on every `System` over a cached compiled evaluator |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
@@ -433,8 +433,14 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
   `compute_trajectory`, `plot_trajectory`, `animate`, …),
   `DynamicSystemFacades` on `DynamicSystem` (continuous `compute_trajectory`,
-  analysis plots, `game`), `StepSystemFacades` on `StepSystem`
-  (`compute_rollout`). **MRO** picks `compute_trajectory` implementation; no
+  the analysis family — `linearize`, `transfer_function`, `bode`, `pzmap`,
+  `plot_bode`, `plot_pzmap`, `modal_analysis`, `find_equilibrium` — and
+  `game`), `StepSystemFacades` on `StepSystem` (`compute_rollout`, `jacobian`
+  with `k`). `jacobian(of, wrt, x_bar, u_bar, t, params, *, method, eps)` sits
+  on `SharedSystemFacades` over `_compiled_evaluator(method)`, a per-system
+  cache (weak, outside the instance dict) cleared by `refresh()` and the
+  structural mutators; parameter edits need no recompile because every call
+  passes the live `params`. **MRO** picks `compute_trajectory` implementation; no
   façade-layer `isinstance` routers. `self.traj` is a convenience cache of
   the latest facade rollout; library code never reads it as an input.
 
@@ -459,8 +465,13 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   The parametric tier (`f_p`/`h_p`/`outputs_p`) takes the nested dict on both
   backends and ignores `bound_params`. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
-  `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
-  (see `examples/demos/compile/params_gradient.py`).
+  `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
+  w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
+  `evaluator.jacobian(of, wrt)` returns a callable `(x, u, t, params)` on every
+  evaluator (`jax.jacfwd` eagerly on JAX, central differences on NumPy); the
+  callable is jit-compatible for blocks written with `array_module` all the
+  way through, and diagrams address internal wires as `"block:port"`, as
+  output or as an additive perturbation.
 - **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets`
   today; `scene` is reserved (`None`) for pipeline B spatial overrides.
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`

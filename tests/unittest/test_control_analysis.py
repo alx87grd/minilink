@@ -4,11 +4,7 @@ import unittest
 import numpy as np
 import pytest
 from minilink.analysis.equilibria import find_equilibrium
-from minilink.analysis.linearize import (
-    LinearizationFallbackWarning,
-    linearize,
-    linearize_matrices,
-)
+from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.analysis.structural import controllability, observability
 from minilink.control.lqr import lqr, lqr_at_operating_point, lqr_gain
 from minilink.core.backends import array_module
@@ -92,7 +88,7 @@ class TestLinearize(unittest.TestCase):
 
     def test_selected_input_ports_reduce_b_and_d_columns(self):
         A, B, C, D = linearize_matrices(
-            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], inputs=["bias"]
+            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], wrt="bias"
         )
         self.assertEqual(B.shape, (2, 1))
         self.assertEqual(D.shape, (1, 1))
@@ -103,7 +99,7 @@ class TestLinearize(unittest.TestCase):
 
     def test_selected_leaf_output_ports_reduce_c_and_d_rows(self):
         _, B, C, D = linearize_matrices(
-            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"]
+            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], of="speed"
         )
         self.assertEqual(C.shape, (1, 2))
         self.assertEqual(D.shape, (1, 2))
@@ -114,33 +110,31 @@ class TestLinearize(unittest.TestCase):
     def test_diagram_boundary_output_ports(self):
         diagram = _build_port_diagram()
         A, B, C, D = linearize_matrices(
-            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"]
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="y_meas"
         )
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[0.0, 1.0]], atol=1e-06)
         np.testing.assert_allclose(D, [[0.0]], atol=1e-06)
 
-    def test_diagram_internal_output_ports_fd(self):
+    def test_diagram_internal_wire_as_output(self):
         diagram = _build_port_diagram()
         A, B, C, D = linearize_matrices(
-            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=[("plant", "y")]
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="plant:y", method="fd"
         )
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(D, [[0.0]], atol=1e-06)
 
-    def test_jax_internal_output_falls_back_to_fd_with_warning(self):
+    @pytest.mark.optional
+    @pytest.mark.jax
+    def test_jax_internal_wire_is_exact(self):
+        pytest.importorskip("jax")
         diagram = _build_port_diagram()
-        with pytest.warns(LinearizationFallbackWarning):
-            A, B, C, D = linearize_matrices(
-                diagram,
-                x_bar=[1.0, 2.0],
-                u_bar=[3.0],
-                outputs=[("plant", "y")],
-                method="jax",
-            )
+        A, B, C, D = linearize_matrices(
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="plant:y", method="jax"
+        )
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
@@ -152,10 +146,10 @@ class TestLinearize(unittest.TestCase):
         pytest.importorskip("jax")
         plant = _PortLinearSystem()
         fd = linearize_matrices(
-            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"], method="fd"
+            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], of="speed", method="fd"
         )
         exact = linearize_matrices(
-            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"], method="jax"
+            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], of="speed", method="jax"
         )
         for fd_matrix, exact_matrix in zip(fd, exact):
             np.testing.assert_allclose(fd_matrix, exact_matrix, atol=1e-06)
@@ -166,26 +160,23 @@ class TestLinearize(unittest.TestCase):
         pytest.importorskip("jax")
         diagram = _build_port_diagram()
         fd = linearize_matrices(
-            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"], method="fd"
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="y_meas", method="fd"
         )
         exact = linearize_matrices(
-            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"], method="jax"
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="y_meas", method="jax"
         )
         for fd_matrix, exact_matrix in zip(fd, exact):
             np.testing.assert_allclose(fd_matrix, exact_matrix, atol=1e-06)
 
     @pytest.mark.optional
     @pytest.mark.jax
-    def test_incompatible_jax_output_falls_back_with_warning(self):
+    def test_untraceable_output_auto_uses_finite_differences_jax_strict_raises(self):
         pytest.importorskip("jax")
-        with pytest.warns(LinearizationFallbackWarning):
-            A, B, C, D = linearize_matrices(
-                _JaxIncompatibleOutputSystem(),
-                x_bar=[1.0, 2.0],
-                u_bar=[3.0, 4.0],
-                outputs=["bad"],
-                method="jax",
-            )
+        plant = _JaxIncompatibleOutputSystem()
+        with self.assertRaises(RuntimeError):
+            linearize_matrices(plant, [1.0, 2.0], [3.0, 4.0], of="bad", method="jax")
+        A, B, C, D = linearize_matrices(plant, [1.0, 2.0], [3.0, 4.0], of="bad")
+        self.assertEqual(plant._compiled_evaluator("auto").backend, "numpy")
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
@@ -441,13 +432,13 @@ class TestAnimateModal(unittest.TestCase):
     @pytest.mark.optional
     def test_animate_one_mode_headless(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], 0, show=False)
+        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], mode=0, show=False)
         self.assertEqual(len(poles), 2)
 
     @pytest.mark.optional
     def test_animate_all_modes(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], "all", show=False)
+        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], mode="all", show=False)
         self.assertEqual(len(poles), 2)
 
 
@@ -554,10 +545,8 @@ def test_bode_selects_named_port_and_component():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         w=[1.0],
     )
     G = 13.0 + 10.0 / (2.0 + 1j)
@@ -572,8 +561,8 @@ def test_bode_selects_nonprimary_output_port():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="bias",
-        output_port="sensor",
+        wrt="bias",
+        of="sensor",
         w=[1.0],
     )
     G = 17.0 + 28.0 / (2.0 + 1j)
@@ -587,8 +576,8 @@ def test_bode_selects_internal_diagram_output_port():
         diagram,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="bias",
-        output_port=("plant", "sensor"),
+        wrt="bias",
+        of="plant:sensor",
         w=[1.0],
     )
     G = 17.0 + 28.0 / (2.0 + 1j)
@@ -602,10 +591,8 @@ def test_pzmap_returns_zeros_poles_and_gain_for_selected_channel():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
     )
     np.testing.assert_allclose(zeros, [-36.0 / 13.0], atol=1e-06)
     np.testing.assert_allclose(poles, [-2.0], atol=1e-06)
@@ -621,10 +608,8 @@ def test_bode_jax_matches_fd_for_selected_channel():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         w=[1.0, 10.0],
         method="fd",
     )
@@ -632,10 +617,8 @@ def test_bode_jax_matches_fd_for_selected_channel():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         w=[1.0, 10.0],
         method="jax",
     )
@@ -652,20 +635,16 @@ def test_pzmap_jax_matches_fd_for_selected_channel():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         method="fd",
     )
     exact = pzmap(
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         method="jax",
     )
     for fd_value, exact_value in zip(fd, exact):
@@ -679,10 +658,8 @@ def test_plot_bode_facade_returns_plot_result():
     result = plant.plot_bode(
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         w=[1.0, 10.0],
         show=False,
     )
@@ -699,10 +676,8 @@ def test_plot_pzmap_facade_returns_plot_result():
     result = plant.plot_pzmap(
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         show=False,
     )
     assert isinstance(result, PlotResult)
@@ -884,14 +859,14 @@ class TestDiscretize(unittest.TestCase):
     def test_discretize_euler_matches_source_step(self):
         plant = DoubleIntegrator()
         dt = 0.05
-        step_leaf = discretize(plant, dt, method="euler")
+        step_leaf = discretize(plant, dt, integrator="euler")
         p = step_leaf.params
         x0 = np.array([0.2, -0.1])
         u = np.array([0.4])
         x1_ref = x0 + dt * plant.f(x0, u, 0.0, p)
         x1 = step_leaf.step(x0, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-        self.assertEqual(step_leaf.method, "euler")
+        self.assertEqual(step_leaf.integrator, "euler")
 
     def test_discretize_accepts_dt_in_params_only(self):
         step_leaf = discretize(_GainIntegrator(), params={"dt": 0.02})
@@ -918,10 +893,10 @@ class TestDiscretize(unittest.TestCase):
         x_long = step_leaf.step(x0, u, k=0, params=p_long)
         self.assertLess(x_short[0], x_long[0])
 
-    def test_discretize_rejects_unknown_method(self):
+    def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()
         with self.assertRaises(ValueError):
-            discretize(plant, 0.01, method="bdf")
+            discretize(plant, 0.01, integrator="bdf")
 
     def test_discretize_rejects_missing_dt(self):
         plant = DoubleIntegrator()

@@ -25,12 +25,15 @@ class StructuralResult:
         return self.rank == self.n
 
 
-def controllability(A, B):
+def controllability(A, B=None):
     """Return the controllability test for ``dx = A x + B u``.
 
     The Kalman matrix is ``[B, AB, A²B, …, Aⁿ⁻¹B]``; the pair is controllable
-    when it has full row rank ``n``.
+    when it has full row rank ``n``. Pass the two matrices or one
+    ``LTISystem`` (``controllability(plant.linearize(x_bar))``).
     """
+    if B is None:
+        A, B = A.A(), A.B()
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     n = A.shape[0]
@@ -43,12 +46,15 @@ def controllability(A, B):
     return StructuralResult(matrix=ctrb, rank=int(np.linalg.matrix_rank(ctrb)), n=n)
 
 
-def observability(A, C):
+def observability(A, C=None):
     """Return the observability test for ``dx = A x``, ``y = C x``.
 
     The Kalman matrix is ``[C; CA; CA²; …; CAⁿ⁻¹]``; the pair is observable
-    when it has full column rank ``n``.
+    when it has full column rank ``n``. Pass the two matrices or one
+    ``LTISystem``.
     """
+    if C is None:
+        A, C = A.A(), A.C()
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
     n = A.shape[0]

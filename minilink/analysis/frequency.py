@@ -1,10 +1,19 @@
-"""Frequency-response tools for linearized systems."""
+"""Frequency-domain analysis of one input–output channel of a linearized model.
+
+``bode``, ``pzmap`` and ``transfer_function`` linearize ``sys`` about
+``(x_bar, u_bar)`` with the same arguments as
+:func:`~minilink.analysis.linearize.linearize` and then look at one SISO
+channel: ``of`` names the output (a port id, a diagram wire ``"block:port"``,
+or ``(selector, index)`` for one component; a bare id means component 0) and
+``wrt`` the input the same way. The defaults are component 0 of the primary
+output and of the first input port.
+"""
 
 from __future__ import annotations
 
 import numpy as np
 
-from minilink.analysis.linearize import linearize_matrices
+from minilink.analysis.linearize import linearize_matrices, output_selectors
 from minilink.graphical.common import PlotResult
 
 
@@ -12,17 +21,15 @@ def bode(
     sys,
     x_bar=None,
     u_bar=None,
+    t=0.0,
+    params=None,
     *,
-    input_port=None,
-    input_index: int = 0,
-    output_port=None,
-    output_index: int = 0,
+    of=None,
+    wrt=None,
     w=None,
     n: int = 200,
-    method: str = "fd",
-    t: float = 0.0,
-    params=None,
-    epsilon: float = 1e-6,
+    method: str = "auto",
+    eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return the SISO Bode response ``(w, magnitude_db, phase_deg)``.
 
@@ -30,73 +37,37 @@ def bode(
     ----------
     sys : System
         System or diagram to linearize before computing the frequency response.
-    x_bar : array of shape (n,), optional
-        Operating-point state. Defaults to ``sys.x0``.
-    u_bar : array of shape (m,), optional
-        Full operating-point input. Defaults to the system's nominal port values.
-    input_port : str, optional
-        Boundary input port selected for the SISO channel. Defaults to the first
-        boundary input port.
-    input_index : int, optional
-        Component inside ``input_port``.
-    output_port : str or (str, str), optional
-        Boundary output port, or internal diagram ``(sys_id, port_id)`` output.
-        Defaults to the standard linearization output.
-    output_index : int, optional
-        Component inside the selected output.
+    x_bar, u_bar : array-like, optional
+        Operating point; default ``sys.x0`` and the nominal port values.
+    t : float, optional
+        Time at which the Jacobians are evaluated.
+    params : dict, optional
+        Parameter set; default the live ``sys.params``.
+    of : str or (str, int), optional
+        Output of the channel: a port id, a diagram wire ``"block:port"``, or
+        ``(selector, index)`` for one component (a bare id means component 0).
+        Default: component 0 of the primary output.
+    wrt : str or (str, int), optional
+        Input of the channel, same forms. Default: component 0 of the first
+        input port.
     w : array, optional
         Frequencies in rad/s. When omitted, a logarithmic grid is chosen from
         the linearized poles.
     n : int, optional
         Number of frequencies for the automatic grid.
-    method : {"fd", "jax"}, optional
-        Linearization method passed to ``linearize_matrices``.
+    method : {"auto", "fd", "jax"}, optional
+        Differentiation backend, see :func:`~minilink.analysis.derivatives.jacobian`.
+    eps : float, optional
+        Central-difference step.
 
     Returns
     -------
     w, magnitude_db, phase_deg : tuple of ndarray
         Frequency grid, magnitude in dB, and unwrapped phase in degrees.
     """
-    # --- operating point ---
-    if x_bar is None:
-        x_bar = sys.x0
-
-    # --- SISO channel: one input port/component, one output port/component ---
-    if input_port is None:
-        if not sys.inputs:
-            raise ValueError("Bode analysis requires at least one input port.")
-        input_port = next(iter(sys.inputs))
-
-    # Linearize about (x_bar, u_bar):
-    #   dDelta x = A Delta x + B Delta u
-    #   Delta y  = C Delta x + D Delta u
-    A, B, C, D = linearize_matrices(
-        sys,
-        x_bar,
-        u_bar,
-        inputs=[input_port],
-        outputs=None if output_port is None else [output_port],
-        method=method,
-        t=t,
-        params=params,
-        epsilon=epsilon,
+    A, B, C, D = siso_matrices(
+        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
-
-    input_index = int(input_index)
-    output_index = int(output_index)
-    if input_index < 0 or input_index >= B.shape[1]:
-        raise ValueError(
-            f"input_index must be in [0, {B.shape[1] - 1}] for port {input_port!r}."
-        )
-    if output_index < 0 or output_index >= C.shape[0]:
-        raise ValueError(
-            f"output_index must be in [0, {C.shape[0] - 1}] for selected output."
-        )
-
-    # Keep matrix shapes: B is (n, 1), C is (1, n), D is (1, 1).
-    B = B[:, [input_index]]
-    C = C[[output_index], :]
-    D = D[[output_index], [input_index]]
 
     # --- frequency grid omega [rad/s] ---
     if w is None:
@@ -135,121 +106,90 @@ def pzmap(
     sys,
     x_bar=None,
     u_bar=None,
-    *,
-    input_port=None,
-    input_index: int = 0,
-    output_port=None,
-    output_index: int = 0,
-    method: str = "fd",
-    t: float = 0.0,
+    t=0.0,
     params=None,
-    epsilon: float = 1e-6,
+    *,
+    of=None,
+    wrt=None,
+    method: str = "auto",
+    eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """Return the selected SISO channel as ``(zeros, poles, gain)``."""
-    # --- operating point ---
-    if x_bar is None:
-        x_bar = sys.x0
+    """Return the selected SISO channel as ``(zeros, poles, gain)``.
 
-    # --- SISO channel: one input port/component, one output port/component ---
-    if input_port is None:
-        if not sys.inputs:
-            raise ValueError("Pole-zero analysis requires at least one input port.")
-        input_port = next(iter(sys.inputs))
-
-    # Linearize about (x_bar, u_bar):
-    #   dDelta x = A Delta x + B Delta u
-    #   Delta y  = C Delta x + D Delta u
-    A, B, C, D = linearize_matrices(
-        sys,
-        x_bar,
-        u_bar,
-        inputs=[input_port],
-        outputs=None if output_port is None else [output_port],
-        method=method,
-        t=t,
-        params=params,
-        epsilon=epsilon,
+    Same arguments as :func:`bode` without the frequency grid.
+    """
+    num, den = siso_numden(
+        *siso_matrices(
+            sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        )
     )
+    tol = np.finfo(float).eps * max(num.size, den.size)
+    tol *= max(np.max(np.abs(num)), np.max(np.abs(den)), 1.0)
+    if den.size == 1:  # static channel: pure gain
+        return np.array([], dtype=complex), np.array([], dtype=complex), num[0] / den[0]
+    if np.all(np.abs(num) <= tol):
+        return np.array([], dtype=complex), np.roots(den), 0.0
 
-    input_index = int(input_index)
-    output_index = int(output_index)
-    if input_index < 0 or input_index >= B.shape[1]:
-        raise ValueError(
-            f"input_index must be in [0, {B.shape[1] - 1}] for port {input_port!r}."
-        )
-    if output_index < 0 or output_index >= C.shape[0]:
-        raise ValueError(
-            f"output_index must be in [0, {C.shape[0] - 1}] for selected output."
-        )
+    from scipy import signal
 
-    # Keep matrix shapes: B is (n, 1), C is (1, n), D is (1, 1).
-    B = B[:, [input_index]]
-    C = C[[output_index], :]
-    D = D[[output_index], [input_index]]
-
-    if A.size:
-        from scipy import signal
-
-        num, den = signal.ss2tf(A, B, C, D)
-        num = np.asarray(num[0], dtype=float)
-        den = np.asarray(den, dtype=float)
-
-        tol = np.finfo(float).eps * max(num.size, den.size)
-        tol *= max(np.max(np.abs(num)), np.max(np.abs(den)), 1.0)
-        while num.size > 1 and abs(num[0]) <= tol:
-            num = num[1:]
-
-        if np.all(np.abs(num) <= tol):
-            zeros = np.array([], dtype=complex)
-            poles = np.roots(den)
-            gain = 0.0
-        else:
-            zeros, poles, gain = signal.tf2zpk(num, den)
-    else:
-        zeros = np.array([], dtype=complex)
-        poles = np.array([], dtype=complex)
-        gain = D[0, 0]
-
+    zeros, poles, gain = signal.tf2zpk(num, den)
     return np.asarray(zeros), np.asarray(poles), float(np.real_if_close(gain))
+
+
+def transfer_function(
+    sys,
+    x_bar=None,
+    u_bar=None,
+    t=0.0,
+    params=None,
+    *,
+    of=None,
+    wrt=None,
+    method: str = "auto",
+    eps: float = 1e-6,
+):
+    """Return the selected SISO channel as a ``TransferFunction`` block.
+
+    Same arguments as :func:`bode` without the frequency grid. The block is
+    the state-space realization of ``num(s) / den(s)`` and carries
+    ``numerator``, ``denominator``, ``poles`` and ``zeros``; it can be plotted,
+    simulated, or wired like any other block.
+    """
+    from minilink.blocks.transfer_function import TransferFunction
+
+    num, den = siso_numden(
+        *siso_matrices(
+            sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        )
+    )
+    label = channel_label(sys, of, wrt)
+    return TransferFunction(num, den, name=f"{sys.name} {label}")
 
 
 def plot_bode(
     sys,
     x_bar=None,
     u_bar=None,
+    t=0.0,
+    params=None,
     *,
-    input_port=None,
-    input_index: int = 0,
-    output_port=None,
-    output_index: int = 0,
+    of=None,
+    wrt=None,
     w=None,
     n: int = 200,
-    method: str = "fd",
-    t: float = 0.0,
-    params=None,
-    epsilon: float = 1e-6,
+    method: str = "auto",
+    eps: float = 1e-6,
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Plot the selected SISO Bode response."""
+    """Plot the selected SISO Bode response (arguments as :func:`bode`)."""
     if not isinstance(backend, str) or backend.strip().lower() != "matplotlib":
         raise ValueError("Bode plotting currently supports backend='matplotlib'.")
 
     w, magnitude_db, phase_deg = bode(
-        sys,
-        x_bar,
-        u_bar,
-        input_port=input_port,
-        input_index=input_index,
-        output_port=output_port,
-        output_index=output_index,
-        w=w,
-        n=n,
-        method=method,
-        t=t,
-        params=params,
-        epsilon=epsilon,
+        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
+    channel = channel_label(sys, of, wrt)
 
     import matplotlib
     import matplotlib.pyplot as plt
@@ -264,21 +204,6 @@ def plot_bode(
 
     matplotlib.rcParams["pdf.fonttype"] = 42
     matplotlib.rcParams["ps.fonttype"] = 42
-
-    output_name = output_port
-    if output_name is None:
-        if "y" in sys.outputs:
-            output_name = "y"
-        elif sys.outputs:
-            output_name = next(iter(sys.outputs))
-        else:
-            output_name = "x"
-    if isinstance(output_name, tuple):
-        output_name = f"{output_name[0]}:{output_name[1]}"
-    input_name = input_port
-    if input_name is None:
-        input_name = next(iter(sys.inputs), "input")
-    channel = f"{output_name}[{output_index}] / {input_name}[{input_index}]"
 
     fig, axes = plt.subplots(
         2,
@@ -319,35 +244,24 @@ def plot_pzmap(
     sys,
     x_bar=None,
     u_bar=None,
-    *,
-    input_port=None,
-    input_index: int = 0,
-    output_port=None,
-    output_index: int = 0,
-    method: str = "fd",
-    t: float = 0.0,
+    t=0.0,
     params=None,
-    epsilon: float = 1e-6,
+    *,
+    of=None,
+    wrt=None,
+    method: str = "auto",
+    eps: float = 1e-6,
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Plot poles and zeros for the selected SISO channel."""
+    """Plot poles and zeros of the selected SISO channel (arguments as :func:`pzmap`)."""
     if not isinstance(backend, str) or backend.strip().lower() != "matplotlib":
         raise ValueError("Pole-zero plotting currently supports backend='matplotlib'.")
 
     zeros, poles, gain = pzmap(
-        sys,
-        x_bar,
-        u_bar,
-        input_port=input_port,
-        input_index=input_index,
-        output_port=output_port,
-        output_index=output_index,
-        method=method,
-        t=t,
-        params=params,
-        epsilon=epsilon,
+        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+    channel = channel_label(sys, of, wrt)
 
     import matplotlib
     import matplotlib.pyplot as plt
@@ -369,21 +283,6 @@ def plot_pzmap(
     if callable(set_window_title):
         set_window_title(f"Pole-zero map of {sys.name}")
 
-    output_name = output_port
-    if output_name is None:
-        if "y" in sys.outputs:
-            output_name = "y"
-        elif sys.outputs:
-            output_name = next(iter(sys.outputs))
-        else:
-            output_name = "x"
-    if isinstance(output_name, tuple):
-        output_name = f"{output_name[0]}:{output_name[1]}"
-    input_name = input_port
-    if input_name is None:
-        input_name = next(iter(sys.inputs), "input")
-    channel = f"{output_name}[{output_index}] / {input_name}[{input_index}]"
-
     if zeros.size:
         ax.plot(
             zeros.real,
@@ -401,22 +300,87 @@ def plot_pzmap(
             linestyle="none",
             label="poles",
         )
-    ax.axhline(0.0, color="black", linewidth=0.8, alpha=0.4)
-    ax.axvline(0.0, color="black", linewidth=0.8, alpha=0.4)
+    ax.axhline(0.0, color="0.7", linewidth=0.8)
+    ax.axvline(0.0, color="0.7", linewidth=0.8)
     ax.set_xlabel("Real", fontsize=FONT_SIZE)
     ax.set_ylabel("Imaginary", fontsize=FONT_SIZE)
-    ax.set_title(f"{channel}\ngain = {gain:.4g}", fontsize=FONT_SIZE)
-    style_trajectory_subplot(ax)
+    ax.set_title(f"{channel}   gain = {gain:.4g}", fontsize=FONT_SIZE)
     if zeros.size or poles.size:
-        ax.legend(loc="best")
+        ax.legend(fontsize=FONT_SIZE)
+    style_trajectory_subplot(ax)
     fig.tight_layout()
 
     if show and plt.get_backend().lower() != "agg":
         plt.show(block=is_blocking_needed())
 
-    return PlotResult(
-        backend="matplotlib",
-        payload=(fig, ax),
-        figure=fig,
-        axes=ax,
+    return PlotResult(backend="matplotlib", payload=(fig, ax), figure=fig, axes=ax)
+
+
+# Channel helpers
+
+
+def siso_channel(sys, of, wrt):
+    """Normalize the channel to ``((of_name, index), (wrt_name, index))``.
+
+    ``of_name`` is ``None`` when the output is the state itself (no ``y``
+    port): the row is then taken from ``C = I``.
+    """
+    if wrt is None:
+        if not sys.inputs:
+            raise ValueError("Frequency analysis requires at least one input port.")
+        wrt = (next(iter(sys.inputs)), 0)
+    elif isinstance(wrt, str):
+        wrt = (wrt, 0)
+    if of is None:
+        default = output_selectors(sys, None)
+        of = (None, 0) if default is None else (default[0][0], 0)
+    elif isinstance(of, str):
+        of = (of, 0)
+    return (of[0], int(of[1])), (wrt[0], int(wrt[1]))
+
+
+def channel_label(sys, of, wrt):
+    """``"y[1] / u[0]"`` for the selected channel."""
+    (of_name, i), (wrt_name, j) = siso_channel(sys, of, wrt)
+    return f"{'x' if of_name is None else of_name}[{i}] / {wrt_name}[{j}]"
+
+
+def siso_matrices(sys, x_bar, u_bar, t, params, *, of, wrt, method, eps):
+    """``A, b, c, d`` of the selected channel (``b`` a column, ``c`` a row)."""
+    (of_name, i), channel_in = siso_channel(sys, of, wrt)
+    A, B, C, D = linearize_matrices(
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=None if of_name is None else [(of_name, i)],
+        wrt=[channel_in],
+        method=method,
+        eps=eps,
     )
+    if of_name is None:  # state output: pick the component of C = I
+        if i < 0 or i >= C.shape[0]:
+            raise ValueError(
+                f"of index must be in [0, {C.shape[0] - 1}] for the state."
+            )
+        C, D = C[[i], :], D[[i], :]
+    return A, B, C, D
+
+
+def siso_numden(A, B, C, D):
+    """Polynomial numerator and denominator of the SISO channel ``(A, b, c, d)``."""
+    if not A.size:
+        return np.array([float(D[0, 0])]), np.array([1.0])
+
+    from scipy import signal
+
+    num, den = signal.ss2tf(A, B, C, D)
+    num = np.asarray(num[0], dtype=float)
+    den = np.asarray(den, dtype=float)
+
+    tol = np.finfo(float).eps * max(num.size, den.size)
+    tol *= max(np.max(np.abs(num)), np.max(np.abs(den)), 1.0)
+    while num.size > 1 and abs(num[0]) <= tol:
+        num = num[1:]
+    return num, den

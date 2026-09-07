@@ -61,32 +61,22 @@ class TraceableImpedanceController(System):
         return xp.array([tau])
 
 
-# Part 1: leaf sensitivity ∂f/∂θ vs finite differences
+# Part 1: leaf sensitivity ∂f/∂params, exact vs finite differences
 print("=" * 70)
-print("Part 1 — leaf pendulum: jacobian_f_params vs finite differences")
+print("Part 1 — leaf pendulum: jacobian('f', 'params') exact vs finite differences")
 print("=" * 70)
 
 plant = TraceablePendulum()
-evaluator = plant.compile(backend="jax")
+x = np.array([0.8, -0.3])
+u = np.array([0.5])
 
-x = jnp.array([0.8, -0.3])
-u = jnp.array([0.5])
-t = 0.0
-params = dict(plant.params)
+exact = plant.jacobian("f", "params", x, u)  # JAX autodiff (the plant traces)
+fd = plant.jacobian("f", "params", x, u, method="fd")
 
-jac = evaluator.jacobian_f_params(x, u, t, params)
-
-eps = 1e-6
 print(f"{'param':>10} {'autodiff d(ddq)/dθ':>22} {'finite diff':>22}")
-for key in params:
-    hi = dict(params)
-    lo = dict(params)
-    hi[key] = params[key] + eps
-    lo[key] = params[key] - eps
-    fd = (evaluator.f_p(x, u, t, hi) - evaluator.f_p(x, u, t, lo)) / (2 * eps)
-    ad = np.asarray(jac[key])
-    np.testing.assert_allclose(ad, np.asarray(fd), rtol=1e-5, atol=1e-7)
-    print(f"{key:>10} {float(ad[1]):>22.6f} {float(fd[1]):>22.6f}")
+for key in plant.params:
+    np.testing.assert_allclose(exact[key], fd[key], rtol=1e-5, atol=1e-7)
+    print(f"{key:>10} {exact[key][1]:>22.6f} {fd[key][1]:>22.6f}")
 print("Finite-difference check passed.")
 
 # Part 2: closed-loop diagram, identify plant params from data

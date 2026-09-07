@@ -16,6 +16,7 @@ from minilink.core.compile.evaluators.evaluators import (
     StepEvaluator,
     outputs_from_ports,
 )
+from minilink.core.compile.evaluators.jacobian import NumpyJacobianMixin
 from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin, gather_u
 from minilink.core.compile.evaluators.tiers import NoTraceTierMixin
 from minilink.core.compile.execution_plan import ExecutionPlan
@@ -296,7 +297,9 @@ class IntegrationMixin:
 # =============================================================================
 
 
-class NumpyDynamicEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixin):
+class NumpyDynamicEvaluator(
+    NoTraceTierMixin, NumpyJacobianMixin, DynamicsEvaluator, IntegrationMixin
+):
     """Compiled evaluator for a :class:`DynamicSystem` using NumPy."""
 
     def __init__(self, system: DynamicSystem):
@@ -309,6 +312,7 @@ class NumpyDynamicEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
         self._u_nominal = np.copy(system.get_u_from_input_ports())
+        self._jac_setup(system, "dynamic", state_fn=self.f_p, outputs_fn=self.outputs_p)
 
     def f(self, x, u, t=0.0):
         return self._system.f(x, u, t, self._frozen_params)
@@ -328,7 +332,9 @@ class NumpyDynamicEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
 # =============================================================================
 
 
-class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixin):
+class NumpyDiagramEvaluator(
+    NoTraceTierMixin, NumpyJacobianMixin, DynamicsEvaluator, IntegrationMixin
+):
     """Stateless NumPy evaluator for a compiled diagram."""
 
     def __init__(self, plan: ExecutionPlan, diagram):
@@ -344,6 +350,7 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
         self._frozen_params = None
         self._u_nominal = np.copy(diagram.get_u_from_input_ports())
         self._subsystem_ids = tuple(diagram.subsystems)
+        self._jac_setup(diagram, "dynamic", state_fn=None, outputs_fn=None, plan=plan)
 
     def f(self, x: np.ndarray, u: np.ndarray, t: float = 0.0) -> np.ndarray:
         signals = self._compute_port_signals(x, u, t)
@@ -357,6 +364,9 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
     def f_p(self, x, u, t, params):
         validate_diagram_params(params, self._subsystem_ids)
         signals = self._compute_port_signals_p(x, u, t, params)
+        return self._dx_from_signals_p(x, u, t, params, signals)
+
+    def _dx_from_signals_p(self, x, u, t, params, signals):
         dx = np.zeros(self.plan.state_dim)
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
@@ -364,6 +374,29 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
             op_params = None if params is None else params.get(op.sys_id)
             dx[op.local_x_slice] = op.f_func(local_x, local_u, t, op_params)
         return dx
+
+    def _jac_validate_params(self, params):
+        validate_diagram_params(params, self._subsystem_ids)
+
+    def _jac_probe(self, target, wire=None):
+        kind, key = target
+        signals_of = self._compute_port_signals_p
+
+        if kind == "state":
+            dx_of = self._dx_from_signals_p
+
+            def probe(x, u, t, params, delta):
+                signals = signals_of(x, u, t, params, inject=(wire, delta))
+                return dx_of(x, u, t, params, signals)
+
+            return probe
+
+        sl = self.plan.external_output_slices[key] if kind == "port" else key
+
+        def probe(x, u, t, params, delta):
+            return signals_of(x, u, t, params, inject=(wire, delta))[sl]
+
+        return probe
 
     def outputs(self, x, u, t=0.0):
         signals = self._compute_port_signals(x, u, t)
@@ -405,14 +438,17 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
         return signals
 
     def _compute_port_signals_p(
-        self, x: np.ndarray, u: np.ndarray, t: float, params
+        self, x: np.ndarray, u: np.ndarray, t: float, params, inject=None
     ) -> np.ndarray:
+        """Fill the signal buffer; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire."""
         signals = np.zeros(self.plan.signal_dim)
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             op_params = None if params is None else params.get(op.sys_id)
             signals[op.out_slice] = op.compute_func(local_x, local_u, t, op_params)
+            if inject is not None and op.out_slice == inject[0]:
+                signals[op.out_slice] += inject[1]
         return signals
 
 
@@ -421,7 +457,7 @@ class NumpyDiagramEvaluator(NoTraceTierMixin, DynamicsEvaluator, IntegrationMixi
 # =============================================================================
 
 
-class NumpyStaticEvaluator(NoTraceTierMixin, StaticEvaluator):
+class NumpyStaticEvaluator(NoTraceTierMixin, NumpyJacobianMixin, StaticEvaluator):
     """NumPy evaluator for a static ``System`` leaf (``n == 0``)."""
 
     def __init__(self, system: System):
@@ -436,6 +472,7 @@ class NumpyStaticEvaluator(NoTraceTierMixin, StaticEvaluator):
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
         self._u_nominal = np.copy(system.get_u_from_input_ports())
+        self._jac_setup(system, "static", state_fn=None, outputs_fn=self.outputs_p)
 
     def outputs(self, x, u, t=0.0):
         return outputs_from_ports(self._system, x, u, t, self._frozen_params)
@@ -449,7 +486,9 @@ class NumpyStaticEvaluator(NoTraceTierMixin, StaticEvaluator):
 # =============================================================================
 
 
-class NumpyStepEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixin):
+class NumpyStepEvaluator(
+    NoTraceTierMixin, NumpyJacobianMixin, StepEvaluator, StepRolloutMixin
+):
     """Compiled evaluator for a :class:`StepSystem` using NumPy."""
 
     def __init__(self, system: StepSystem):
@@ -462,6 +501,7 @@ class NumpyStepEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixin):
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
         self._u_nominal = np.copy(system.get_u_from_input_ports())
+        self._jac_setup(system, "step", state_fn=self.step_p, outputs_fn=self.outputs_p)
 
     def step(self, x, u, k=0):
         return self._system.step(x, u, k, self._frozen_params)
@@ -481,7 +521,9 @@ class NumpyStepEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixin):
 # =============================================================================
 
 
-class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixin):
+class NumpyStepDiagramEvaluator(
+    NoTraceTierMixin, NumpyJacobianMixin, StepEvaluator, StepRolloutMixin
+):
     """Stateless NumPy evaluator for a compiled step diagram."""
 
     def __init__(self, plan: StepExecutionPlan, diagram):
@@ -497,6 +539,7 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
         self._frozen_params = None
         self._u_nominal = np.copy(diagram.get_u_from_input_ports())
         self._subsystem_ids = tuple(diagram.subsystems)
+        self._jac_setup(diagram, "step", state_fn=None, outputs_fn=None, plan=plan)
 
     def step(self, x, u, k=0):
         signals = self._compute_port_signals(x, u, k)
@@ -510,6 +553,9 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
     def step_p(self, x, u, k, params):
         validate_diagram_params(params, self._subsystem_ids)
         signals = self._compute_port_signals_p(x, u, k, params)
+        return self._x_next_from_signals_p(x, u, k, params, signals)
+
+    def _x_next_from_signals_p(self, x, u, k, params, signals):
         x_new = np.asarray(x, dtype=float).reshape(self.n).copy()
         for op in self.plan.step_ops:
             local_x = x_new[op.local_x_slice]
@@ -517,6 +563,29 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
             op_params = None if params is None else params.get(op.sys_id)
             x_new[op.local_x_slice] = op.step_func(local_x, local_u, k, op_params)
         return x_new
+
+    def _jac_validate_params(self, params):
+        validate_diagram_params(params, self._subsystem_ids)
+
+    def _jac_probe(self, target, wire=None):
+        kind, key = target
+        signals_of = self._compute_port_signals_p
+
+        if kind == "state":
+            next_of = self._x_next_from_signals_p
+
+            def probe(x, u, k, params, delta):
+                signals = signals_of(x, u, k, params, inject=(wire, delta))
+                return next_of(x, u, k, params, signals)
+
+            return probe
+
+        sl = self.plan.external_output_slices[key] if kind == "port" else key
+
+        def probe(x, u, k, params, delta):
+            return signals_of(x, u, k, params, inject=(wire, delta))[sl]
+
+        return probe
 
     def outputs(self, x, u, k=0):
         signals = self._compute_port_signals(x, u, k)
@@ -563,7 +632,8 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
             )
         return signals
 
-    def _compute_port_signals_p(self, x, u, k, params) -> np.ndarray:
+    def _compute_port_signals_p(self, x, u, k, params, inject=None) -> np.ndarray:
+        """Fill the signal buffer; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire."""
         signals = np.zeros(self.plan.signal_dim)
         x_arr = np.asarray(x, dtype=float).reshape(self.n)
         for op in self.plan.port_ops:
@@ -571,4 +641,6 @@ class NumpyStepDiagramEvaluator(NoTraceTierMixin, StepEvaluator, StepRolloutMixi
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u)
             op_params = None if params is None else params.get(op.sys_id)
             signals[op.out_slice] = op.compute_func(local_x, local_u, k, op_params)
+            if inject is not None and op.out_slice == inject[0]:
+                signals[op.out_slice] += inject[1]
         return signals

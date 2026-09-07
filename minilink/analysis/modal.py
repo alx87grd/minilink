@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.analysis.linearize import linearize_matrices
+from minilink.analysis.derivatives import jacobian
 from minilink.core.trajectory import Trajectory
 
 
@@ -10,11 +10,11 @@ def modal_analysis(
     sys,
     x_bar=None,
     u_bar=None,
-    *,
     t=0.0,
     params=None,
-    method="fd",
-    epsilon=1e-6,
+    *,
+    method="auto",
+    eps=1e-6,
 ):
     """
     Linearize about ``(x_bar, u_bar)`` and eigendecompose ``A``.
@@ -27,9 +27,14 @@ def modal_analysis(
         Operating-point state. Defaults to ``sys.x0``.
     u_bar : array of shape (m,), optional
         Operating-point input. Defaults to port nominals.
-    method : {"fd", "jax"}
-        Linearization method passed to
-        :func:`~minilink.analysis.linearize.linearize_matrices`.
+    t : float, optional
+        Time at which the Jacobian is evaluated.
+    params : dict, optional
+        Parameter set; default the live ``sys.params``.
+    method : {"auto", "fd", "jax"}
+        Differentiation backend, see :func:`~minilink.analysis.derivatives.jacobian`.
+    eps : float, optional
+        Central-difference step.
 
     Returns
     -------
@@ -38,35 +43,20 @@ def modal_analysis(
     modes : ndarray of shape (n, n)
         Eigenvectors (columns are mode shapes in perturbation coordinates).
     """
-    if x_bar is None:
-        x_bar = sys.x0
-    x_bar = np.asarray(x_bar, dtype=float).reshape(-1)
-    if u_bar is None:
-        u_bar = sys.get_u_from_input_ports()
-    u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
-
-    A, _, _, _ = linearize_matrices(
-        sys,
-        x_bar,
-        u_bar,
-        t=t,
-        params=params,
-        epsilon=epsilon,
-        method=method,
-    )
+    A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, method=method, eps=eps)
     return np.linalg.eig(A)
 
 
 def animate_modal(
     plant,
     x_bar=None,
-    mode="all",
     u_bar=None,
-    *,
     t=0.0,
     params=None,
-    method="fd",
-    epsilon=1e-6,
+    *,
+    mode="all",
+    method="auto",
+    eps=1e-6,
     amplitude=1.0,
     tf=None,
     n_steps=2001,
@@ -90,10 +80,10 @@ def animate_modal(
         System used for graphics (usually the nonlinear plant).
     x_bar : array of shape (n,), optional
         Linearization operating point. Defaults to ``plant.x0``.
-    mode : int or ``'all'``
-        Mode index to animate, or every index ``0 … n-1``.
     u_bar : array of shape (m,), optional
         Operating-point input during the animation.
+    mode : int or ``'all'``
+        Mode index to animate, or every index ``0 … n-1``.
 
     Returns
     -------
@@ -108,13 +98,7 @@ def animate_modal(
     u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
 
     poles, modes = modal_analysis(
-        plant,
-        x_bar,
-        u_bar,
-        t=t,
-        params=params,
-        method=method,
-        epsilon=epsilon,
+        plant, x_bar, u_bar, t, params, method=method, eps=eps
     )
 
     indices = range(len(poles)) if mode == "all" else [int(mode)]
