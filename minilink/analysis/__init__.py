@@ -24,13 +24,16 @@ Implemented modules:
 - ``structural.py`` — controllability / observability
 - ``equilibria.py`` — trim points and root-finding on ``f``
 - ``modal.py`` — ``modal_analysis`` (poles, modes) and ``animate_modal``
-- ``frequency.py`` — one-channel Bode / pole-zero / transfer function and plots
+- ``linear.py`` — the linear-algebra core on one channel ``(A, b, c, d)``:
+  poles, zeros, frequency response, margins, root locus, step response
+- ``frequency.py`` — one-channel Bode, pole-zero, Nyquist, margins, root
+  locus, transfer function and their plots (matplotlib or plotly)
+- ``time_response.py`` — step response and ``StepInfo``
 - ``discretize.py`` — continuous→step plant wrappers
 
 Planned additions (see ROADMAP.md teaching-release priorities):
 
-- ``frequency.py`` — Nyquist, gain/phase margins (pole-zero / Bode landed)
-- ``time_response.py`` — step/impulse sugar over the simulator
+- Nichols chart; multi-system overlays in one figure
 
 Placement rule: if it *characterizes* an existing system, it belongs here;
 if it *is* a block you wire into a diagram, it belongs in a library package.
@@ -47,12 +50,21 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "bode": ("minilink.analysis.frequency", "bode"),
     "controllability": ("minilink.analysis.structural", "controllability"),
     "find_equilibrium": ("minilink.analysis.equilibria", "find_equilibrium"),
+    "frequency_response": ("minilink.analysis.frequency", "frequency_response"),
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
+    "margins": ("minilink.analysis.frequency", "margins"),
     "modal_analysis": ("minilink.analysis.modal", "modal_analysis"),
+    "nyquist": ("minilink.analysis.frequency", "nyquist"),
     "observability": ("minilink.analysis.structural", "observability"),
     "plot_bode": ("minilink.analysis.frequency", "plot_bode"),
+    "plot_nyquist": ("minilink.analysis.frequency", "plot_nyquist"),
     "plot_pzmap": ("minilink.analysis.frequency", "plot_pzmap"),
+    "plot_root_locus": ("minilink.analysis.frequency", "plot_root_locus"),
+    "plot_step_response": ("minilink.analysis.time_response", "plot_step_response"),
     "pzmap": ("minilink.analysis.frequency", "pzmap"),
+    "root_locus": ("minilink.analysis.frequency", "root_locus"),
+    "step_info": ("minilink.analysis.time_response", "step_info"),
+    "step_response": ("minilink.analysis.time_response", "step_response"),
     "transfer_function": ("minilink.analysis.frequency", "transfer_function"),
 }
 

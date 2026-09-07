@@ -144,10 +144,9 @@ def plot_phase_plane(
         subclass or wired diagram with stacked ``f``).
     """
     backend_key = _normalize_backend(backend)
-    if backend_key != "matplotlib":
+    if backend_key not in ("matplotlib", "plotly"):
         raise ValueError(
-            f"backend={backend!r} is not implemented for phase-plane plots yet; "
-            "use backend='matplotlib'."
+            f"Unknown plot backend {backend!r}. Expected 'matplotlib' or 'plotly'."
         )
 
     spec = build_phase_plane_spec(
@@ -163,6 +162,8 @@ def plot_phase_plane(
         params=params,
         title=title,
     )
+    if backend_key == "plotly":
+        return render_phase_plane_plotly(spec, streamplot=streamplot, show=show)
     return render_phase_plane_matplotlib(
         spec,
         streamplot=streamplot,
@@ -295,6 +296,103 @@ def render_phase_plane_matplotlib(
         figure=fig,
         axes=ax,
     )
+
+
+def render_phase_plane_plotly(
+    spec: PhasePlaneSpec,
+    *,
+    streamplot: bool = False,
+    show: bool = True,
+) -> PlotResult:
+    """Render a phase-plane specification with Plotly (quiver or streamlines)."""
+    try:
+        import plotly.figure_factory as ff
+        import plotly.graph_objects as go
+    except ImportError as exc:
+        raise ImportError(
+            "Plotly phase-plane plots require Plotly. Install with: "
+            "pip install 'minilink[plotting]'"
+        ) from exc
+
+    from minilink.graphical.common.plotly_style import (
+        PLOTLY_2D_MARGIN,
+        PLOTLY_FIG_WIDTH,
+        PLOTLY_TEMPLATE,
+    )
+
+    x_values, y_values = spec.X[0, :], spec.Y[:, 0]
+    if streamplot:
+        fig = ff.create_streamline(
+            x_values,
+            y_values,
+            spec.V,
+            spec.W,
+            density=1.2,
+            line={"color": "#1f77b4", "width": 1},
+        )
+    else:
+        cell = min(np.diff(x_values).min(), np.diff(y_values).min())
+        longest = max(float(np.hypot(spec.V, spec.W).max()), 1e-12)
+        fig = ff.create_quiver(
+            spec.X,
+            spec.Y,
+            spec.V,
+            spec.W,
+            scale=0.9 * cell / longest,
+            arrow_scale=0.3,
+            line={"color": "#1f77b4", "width": 1},
+        )
+    fig.data[0].name = "vector field"
+
+    if spec.trajectory is not None:
+        path = spec.trajectory
+        fig.add_trace(
+            go.Scatter(
+                x=path.x,
+                y=path.y,
+                mode="lines",
+                name="trajectory",
+                line={"color": "#ff7f0e", "width": 2},
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[path.x[0]],
+                y=[path.y[0]],
+                mode="markers",
+                name="start",
+                marker={"color": "black", "size": 9},
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[path.x[-1]],
+                y=[path.y[-1]],
+                mode="markers",
+                name="end",
+                marker={"color": "red", "symbol": "x", "size": 9},
+            )
+        )
+
+    fig.update_layout(
+        title=spec.title,
+        xaxis={
+            "title_text": _format_axis_label(spec.x_label, spec.x_unit),
+            "range": list(spec.x_bounds),
+        },
+        yaxis={
+            "title_text": _format_axis_label(spec.y_label, spec.y_unit),
+            "range": list(spec.y_bounds),
+        },
+        width=PLOTLY_FIG_WIDTH,
+        height=480,
+        showlegend=spec.trajectory is not None,
+        margin=dict(PLOTLY_2D_MARGIN),
+        template=PLOTLY_TEMPLATE,
+    )
+    if show:
+        fig.show()
+    return PlotResult(backend="plotly", payload=fig, figure=fig)
 
 
 def _normalize_backend(backend: str) -> str:

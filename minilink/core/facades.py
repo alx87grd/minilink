@@ -679,12 +679,13 @@ class DynamicSystemFacades:
         wrt=None,
         w=None,
         n=200,
+        margins=True,
         method="auto",
         eps=1e-6,
         backend="matplotlib",
         show=True,
     ):
-        """Plot the Bode response of one SISO channel.
+        """Bode diagram of one SISO channel, gain and phase margins marked.
 
         See :func:`minilink.analysis.frequency.plot_bode`.
         """
@@ -699,6 +700,253 @@ class DynamicSystemFacades:
             of=of,
             wrt=wrt,
             w=w,
+            n=n,
+            margins=margins,
+            method=method,
+            eps=eps,
+            backend=backend,
+            show=show,
+        )
+
+    def margins(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        w=None,
+        n=2000,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Gain and phase margins of one SISO channel taken as a loop gain.
+
+        See :func:`minilink.analysis.frequency.margins`.
+        """
+        from minilink.analysis.frequency import margins
+
+        return margins(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            w=w,
+            n=n,
+            method=method,
+            eps=eps,
+        )
+
+    def nyquist(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        w=None,
+        n=500,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Return ``(w, G)`` of one SISO channel for the Nyquist contour.
+
+        See :func:`minilink.analysis.frequency.nyquist`.
+        """
+        from minilink.analysis.frequency import nyquist
+
+        return nyquist(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            w=w,
+            n=n,
+            method=method,
+            eps=eps,
+        )
+
+    def root_locus(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        gains=None,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Return ``(gains, roots)`` of one SISO channel closed with ``u = -K y``.
+
+        See :func:`minilink.analysis.frequency.root_locus`.
+        """
+        from minilink.analysis.frequency import root_locus
+
+        return root_locus(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            gains=gains,
+            method=method,
+            eps=eps,
+        )
+
+    def step_response(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        tf=None,
+        n=500,
+        method="auto",
+        eps=1e-6,
+    ):
+        """Return ``(time, y)``, the unit-step response of one SISO channel.
+
+        See :func:`minilink.analysis.time_response.step_response`.
+        """
+        from minilink.analysis.time_response import step_response
+
+        return step_response(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            tf=tf,
+            n=n,
+            method=method,
+            eps=eps,
+        )
+
+    def plot_root_locus(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        gains=None,
+        method="auto",
+        eps=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """Root locus of one SISO channel closed with ``u = -K y``.
+
+        See :func:`minilink.analysis.frequency.plot_root_locus`.
+        """
+        from minilink.analysis.frequency import plot_root_locus
+
+        return plot_root_locus(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            gains=gains,
+            method=method,
+            eps=eps,
+            backend=backend,
+            show=show,
+        )
+
+    def plot_nyquist(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        w=None,
+        n=500,
+        method="auto",
+        eps=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """Nyquist diagram of one SISO channel with the critical point.
+
+        See :func:`minilink.analysis.frequency.plot_nyquist`.
+        """
+        from minilink.analysis.frequency import plot_nyquist
+
+        return plot_nyquist(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            w=w,
+            n=n,
+            method=method,
+            eps=eps,
+            backend=backend,
+            show=show,
+        )
+
+    def plot_step_response(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        tf=None,
+        n=500,
+        method="auto",
+        eps=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """Step response of one SISO channel with rise time, settling time and overshoot.
+
+        See :func:`minilink.analysis.time_response.plot_step_response`.
+        """
+        from minilink.analysis.time_response import plot_step_response
+
+        return plot_step_response(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            tf=tf,
             n=n,
             method=method,
             eps=eps,

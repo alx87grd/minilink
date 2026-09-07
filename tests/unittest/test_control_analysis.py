@@ -666,7 +666,7 @@ def test_plot_bode_facade_returns_plot_result():
     )
     assert isinstance(result, PlotResult)
     assert len(result.axes) == 2
-    assert "y[1] / force[1]" in result.axes[0].get_ylabel()
+    assert "From: force[1]  To: y[1]" in result.axes[0].get_title()
     plt.close(result.figure)
 
 
@@ -683,7 +683,7 @@ def test_plot_pzmap_facade_returns_plot_result():
     )
     assert isinstance(result, PlotResult)
     assert result.axes is not None
-    assert "y[1] / force[1]" in result.axes.get_title()
+    assert "From: force[1]  To: y[1]" in result.axes.get_title()
     plt.close(result.figure)
 
 
@@ -804,8 +804,8 @@ class TestPhasePlane(unittest.TestCase):
 
     def test_unsupported_backend_reports_clear_error(self):
         sys = PhasePlaneTestSystem()
-        with self.assertRaisesRegex(ValueError, "backend='plotly'.*not implemented"):
-            plot_phase_plane(sys, backend="plotly", show=False)
+        with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
+            plot_phase_plane(sys, backend="bokeh", show=False)
 
 
 from minilink.analysis.discretize import discretize

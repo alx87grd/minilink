@@ -100,7 +100,7 @@ After the term, in the order the cohort's questions suggest:
 - [ ] **S30** Rename the graphical `Sphere` / `Box` glyphs so no two importable public types share a name with `core.geometry`. **[ask — public names]**
 - [ ] **S31** `HybridDiagram` → `HybridLoop`, `%` → `on_schedule()` — or promotion to a `System` (ROADMAP §6, v1.0). **[ask — core]**
 - [ ] **S32** Unify `MechanicalSystem` / `GeneralizedMechanicalSystem` (`N = I` special case); `Boat2D` / `Plane3D` gain `q` / `dq` ports. **[ask — core]**
-- [ ] Frequency analysis — minimal NumPy `pole_zero_map` / `nyquist` / `margin` / `ss2tf` **or** a python-control bridge; decision postponed (ROADMAP §6). **[ask]**
+- [x] Frequency analysis — NumPy-only on the state-space channel: `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response` and their plots (2026-09-07).
 - [ ] PyPI publication as a third install option (conda stays recommended). **[ask]**
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
 - [ ] **S27** Diffrax as an optional JAX solver backend (later; not short-term).

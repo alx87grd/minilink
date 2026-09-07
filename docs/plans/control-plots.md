@@ -1,6 +1,13 @@
 # Control-analysis plots — Bode, pole-zero, root locus, Nyquist (draft, 2026-09-07)
 
-Status: **draft v1 for the maintainer's rulings** (§7). Nothing implemented.
+Status: **implemented on `dev-fable` (2026-09-07)** with the recommended
+rulings of §7 and one sharpening from the maintainer: every tool reduces to
+the state-space channel ``(A, b, c, d)`` and computes with linear algebra on
+it (`analysis/linear.py`: eigenvalues, the Rosenbrock pencil for zeros,
+``C (jwI - A)^-1 B + D``, ``eig(A - B K C)`` for the root locus, one matrix
+exponential for the step response); no polynomial arithmetic and no
+python-control. The damping grid is not drawn. The rest of this document is
+the plan as ruled.
 Lane: teaching surface (`analysis/frequency.py` + a small plotting layer in
 `graphical/`). Closes the ROADMAP §6 "frequency analysis" question with the
 NumPy-only route: minilink already carries `bode`, `pzmap` and

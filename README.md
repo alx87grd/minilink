@@ -188,8 +188,13 @@ G = plant.transfer_function([0.0, 0.0])    # one channel as a TransferFunction
 ```
 
 Every analysis verb reads the same way — `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)` —
-and is exact under JAX when the plant traces, finite differences otherwise. Also:
-`bode` / `plot_bode`, `pzmap`, `modal_analysis`, ctrb/obsv, `find_equilibrium`, `discretize`.
+and is exact under JAX when the plant traces, finite differences otherwise. The
+control plots (`plot_bode` with margins, `plot_pzmap`, `plot_root_locus`,
+`plot_nyquist`, `plot_step_response`) look like the MATLAB ones and render with
+`backend="matplotlib"` or `backend="plotly"`; each has a data twin (`bode`, `pzmap`,
+`root_locus`, `nyquist`, `margins`, `step_response`), all computed from the
+state-space channel `(A, b, c, d)`. Also: `modal_analysis`, ctrb/obsv,
+`find_equilibrium`, `discretize`.
 
 ### Planning, search, and optimization
 

@@ -273,3 +273,26 @@ defensive `getattr` probes (`05_simulation`, `08_optimization`,
 `09_planning`). Hybrid / step, compile, planning and mpc demos untouched by
 request. Demo sweep 58/58, five notebooks re-smoked, teaching-import test
 green after two stale allowlist rows were removed.
+
+Control-analysis plots (2026-09-07): plan
+[docs/plans/control-plots.md](../plans/control-plots.md) implemented with the
+maintainer's sharpening — every tool reduces to the state-space channel
+`(A, b, c, d)` and computes with linear algebra on it, no polynomial
+arithmetic, no python-control. New `analysis/linear.py` (poles, transmission
+zeros from the Rosenbrock pencil, `C (jwI - A)^-1 B + D`, margins by
+interpolated crossings, root locus as `eig(A - B K C)` over an adaptive gain
+sweep with branch matching, exact ZOH step response by one `expm`),
+`analysis/time_response.py` (`step_response`, `StepInfo`), `frequency.py`
+rebuilt on the core (`frequency_response`, `nyquist`, `margins`,
+`root_locus`; `pzmap` and `transfer_function` from the pencil and the leading
+Markov parameter). Plots: one `ControlFigure` spec under
+`graphical/control/` rendered by matplotlib or plotly in the MATLAB look
+(titles, From/To subtitle, axis labels, blue `x` / `o`, log grids, margin
+lines and text, `-1` on Nyquist, hover text on plotly); phase plane gained a
+plotly renderer. Facades: `margins`, `nyquist`, `root_locus`,
+`step_response`, `plot_root_locus`, `plot_nyquist`, `plot_step_response`;
+`plot_bode(margins=True)`. Demos `analysis_frequency.py` (was
+`analysis_bode.py`) and `analysis_root_locus.py`; analysis notebook updated;
+ROADMAP §6 question closed. Tests: `test_control_plots.py` (15) with
+analytic checks (margins of `1/(s(s+1)(s+2))`, second-order overshoot,
+exact first-order step). Suite 1035 passed, demo sweep 59/59.

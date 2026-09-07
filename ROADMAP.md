@@ -57,7 +57,7 @@ a release process by themselves.
 | Simulation | teaching | 7 | Mature workflow; stable solvers/forcing. | Fixed output count by default; unify `verbose` flag names. |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA. **Every catalog plant compiles on both backends** (`xp` sweep 2026-09-06, contract test `test_catalog_backends.py`); `JaxCartPole` retired. | Four-rung vehicle teaching ladder, research rungs → projects. |
 | Control | teaching | 6 | Linear, LQR, PID; model-based SMC; robotic impedance/kinematic. | Robotic PID wrappers; traj LQR (v0.2). |
-| Analysis | teaching | 5 | Linearize, structural, equilibria, modal, SISO Bode. | Frequency completion — `pole_zero_map()`, `nyquist()`, `margin()`, `ss2tf()` as minimal NumPy tools, or a python-control bridge; decision postponed to v0.2 (§6). |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response — matplotlib and plotly. | Nichols chart, multi-system overlays, discrete-time plots. |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine`/`Ramp`/`Chirp`/`Delay`/`Switch` (v0.2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`. | Honest `final_time` / `success` metadata; `vi_ctl @ plant` in notebooks. |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot. **`success` echoes solver status; float32 by default on JAX.** | float64 policy; `success` = defects satisfied; multiple-shooting parametric guard. |
@@ -150,7 +150,7 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - **Open (v0.2):** optional `KinematicModel` delegate — adopt or drop.
 - ~~Dynamic bicycle module split / vehicle ladder~~ — four teaching rungs in `catalog/`, research rungs to `examples/projects/`.
 - **Open (v0.2):** pyro game demos — port the rest to `simulation/realtime/` or explicitly drop.
-- **Open (v0.2):** frequency analysis — minimal NumPy-only `pole_zero_map`/`nyquist`/`margin`/`ss2tf` in minilink (original intent) vs a python-control bridge. Postponed; not part of the v0.1 consolidation.
+- ~~Frequency analysis — NumPy-only vs a python-control bridge~~ — NumPy-only, landed 2026-09-07: `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response` on the state-space channel (`analysis/linear.py`), plots on matplotlib and plotly.
 - **Open (v0.2):** PyPI publication — wanted eventually as a third install option; conda stays recommended.
 - **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename.
 - **Open (v1.0):** evaluator/solver layering — evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; Diffrax as an optional JAX solve (later).
