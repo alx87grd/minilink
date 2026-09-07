@@ -127,7 +127,10 @@ side. Any internal signal can be plotted by `"subsystem_id:port_id"` name.
 Common facades: `compute_trajectory(...)` → `Trajectory`;
 `plot_trajectory(...)` / `plot_phase_plane(...)` / `plot_diagram()`;
 `animate()` (matplotlib, plotly, meshcat, pygame); `game()` for live keyboard
-sessions. Continuous plants and diagrams use `Simulator`; static leaves use
+sessions. Facades are shortcuts for teaching and quick looks; each one
+delegates to a tool in its own module (`Simulator`, `minilink.analysis`), which
+is what scripts and projects import. A `System` stays a description of the
+model and keeps no run state, apart from `.traj`, the last trajectory. Continuous plants and diagrams use `Simulator`; static leaves use
 `StaticSimulator`. Hybrid diagrams render plant + scheduled computer views.
 
 ### Compiled execution and JAX
@@ -294,7 +297,9 @@ Minimal paths for debugging and extending workflows. Contracts:
 
 Facade methods for common workflows: `compute_trajectory(...)` (static leaves and
 continuous/diagram systems via MRO), `plot_trajectory(...)`,
-`plot_diagram(...)`, `animate(...)`. Use lower-level APIs when you need explicit
+`plot_diagram(...)`, `animate(...)`, `jacobian(...)`, `linearize(...)`. They are
+shortcuts over the tools' own modules — `Simulator`, `minilink.analysis` — which
+scripts and projects import directly. Use lower-level APIs when you need explicit
 control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
 `compile()` / `DynamicsEvaluator`.
 

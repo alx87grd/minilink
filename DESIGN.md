@@ -6,10 +6,16 @@ Architecture and public contracts. User guide and call chains: [README.md](READM
 
 1. **Math readability first**: e.g. `dx = A @ x + B @ u`.
 2. **Pure contracts, convenient boundaries**: equation paths stay functional;
-   facades (`compute_trajectory`, `plot_*`, `animate`) live at API boundaries.
-   Models are **stateless** — a `System` holds equations, ports, params, and
-   `x0`; evolving state lives in the simulator / returned `Trajectory`, not as
-   hidden mutable block state.
+   facades (`compute_trajectory`, `plot_*`, `animate`, `jacobian`) live at API
+   boundaries. A `System` is a **description** — equations, ports, params,
+   `x0` — plus thin shortcut methods, nothing else. Each shortcut delegates to
+   a tool that lives in its own module (`Simulator`, `analysis.jacobian`,
+   `analysis.linearize`); the shortcut is the teaching and quick-look
+   spelling, the module is the spelling scripts and projects use. No
+   input/output data, caches or run state on the object: evolving state lives
+   in the simulator and the returned `Trajectory`. `self.traj` is the one
+   exception, kept because it is used daily; a new exception needs a reason of
+   that weight.
 3. **Explicit data flow**: visible objects and direct calls; no global backend
    switches or hidden registries.
 4. **Backend-native math where simple**: one class for traceable NumPy/JAX algebra.
@@ -86,8 +92,8 @@ opts out for GPU/RL workloads. Tools built on JAX evaluators (trajopt,
 
 | Layer | Use | Examples |
 | --- | --- | --- |
-| 1 Facades | Default | `compute_trajectory`, `plot_trajectory`, `+`/`>>`/`@` |
-| 2 Orchestrators | Repeat runs, trajopt, NLP | `Simulator`, `TrajectoryOptimizationPlanner`, `Optimizer` |
+| 1 Facades | Teaching, quick looks | `compute_trajectory`, `plot_trajectory`, `jacobian`, `linearize`, `+`/`>>`/`@` |
+| 2 Tools and orchestrators | Scripts, projects, repeat runs, trajopt, NLP | `Simulator`, `analysis.jacobian`, `analysis.bode`, `TrajectoryOptimizationPlanner`, `Optimizer` |
 | 3 Contracts | Custom wiring, extension | `DiagramSystem.connect`, `compile()`, `MathematicalProgram` |
 
 ### Public imports (teaching-first)
@@ -436,11 +442,11 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   the analysis family — `linearize`, `transfer_function`, `bode`, `pzmap`,
   `plot_bode`, `plot_pzmap`, `modal_analysis`, `find_equilibrium` — and
   `game`), `StepSystemFacades` on `StepSystem` (`compute_rollout`, `jacobian`
-  with `k`). `jacobian(of, wrt, x_bar, u_bar, t, params, *, method, eps)` sits
-  on `SharedSystemFacades`; each call compiles its own evaluator (about a
-  millisecond, the JAX derivative path is eager) and stores nothing on the
-  system — loops keep the callable from `evaluator.jacobian(of, wrt)`
-  instead. **MRO** picks `compute_trajectory` implementation; no
+  with `k`). Every facade is a two-line delegation to the tool's module and
+  stores nothing on the system (§1 principle 2): `jacobian` compiles its
+  evaluator per call, about a millisecond on the eager JAX path, and loops
+  keep the callable from `evaluator.jacobian(of, wrt)` instead. **MRO**
+  picks `compute_trajectory` implementation; no
   façade-layer `isinstance` routers. `self.traj` is a convenience cache of
   the latest facade rollout; library code never reads it as an input.
 

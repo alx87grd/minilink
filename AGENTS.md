@@ -99,10 +99,17 @@ Reading minilink should feel like a controls/dynamics textbook.
 6. **The `xp` idiom**: `xp = array_module(x)` right after params unpacking — hybrid NumPy/JAX in one line.
 7. **Derived, not cached**: computable quantities are read-only properties, never stale cached attrs.
 8. **No shadow state**: initialize in `__init__`, never `hasattr`-or-create at use sites.
-9. **Libraries are silent**: no `print` except explicit `verbose=`; delete debug scaffolding.
-10. **Pre-1.0 no-alias rule**: rename cleanly; fix call sites in the same change.
-11. **Backend imports from `core/backends.py`**: never import from `core/compile/` in system libraries.
-12. **`__main__` hello-worlds**: ~10 lines max in core modules; bigger examples in `examples/`.
+9. **Systems are descriptions, facades are shortcuts**: a `System` holds ports,
+   params, equations and `x0`, plus thin shortcut methods (`compute_trajectory`,
+   `jacobian`, `linearize`) that delegate to the tool's own module — the module
+   (`Simulator`, `minilink.analysis.jacobian`) is what scripts and projects
+   import; the shortcut is for teaching and quick looks. No input/output data,
+   caches or run state on the object; `self.traj` is the one exception,
+   justified by daily use, and a new one needs a reason of that weight.
+10. **Libraries are silent**: no `print` except explicit `verbose=`; delete debug scaffolding.
+11. **Pre-1.0 no-alias rule**: rename cleanly; fix call sites in the same change.
+12. **Backend imports from `core/backends.py`**: never import from `core/compile/` in system libraries.
+13. **`__main__` hello-worlds**: ~10 lines max in core modules; bigger examples in `examples/`.
 
 ### General coding
 
