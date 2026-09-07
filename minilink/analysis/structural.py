@@ -38,6 +38,7 @@ def controllability(A, B=None):
     B = np.atleast_2d(np.asarray(B, dtype=float))
     n = A.shape[0]
 
+    # 𝒞 = [B, AB, …, A^{n-1} B]
     blocks = [B]
     for _ in range(1, n):
         blocks.append(A @ blocks[-1])
@@ -59,6 +60,7 @@ def observability(A, C=None):
     C = np.atleast_2d(np.asarray(C, dtype=float))
     n = A.shape[0]
 
+    # 𝒪 = [C; CA; …; CA^{n-1}]
     blocks = [C]
     for _ in range(1, n):
         blocks.append(blocks[-1] @ A)

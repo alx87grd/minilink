@@ -43,7 +43,10 @@ def modal_analysis(
     modes : ndarray of shape (n, n)
         Eigenvectors (columns are mode shapes in perturbation coordinates).
     """
+    # A = ∂f/∂x at (x_bar, u_bar)
     A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, method=method, eps=eps)
+
+    # λ, V  with  A V = V Λ
     return np.linalg.eig(A)
 
 
@@ -116,6 +119,8 @@ def animate_modal(
             )
 
         time = np.linspace(0.0, horizon, n_steps)
+
+        # Δx(t) = amp · Re{ v e^{λ t} },   x(t) = x_bar + Δx(t)
         delta_x = amplitude * np.real(vector[:, None] * np.exp(pole * time))
         traj = Trajectory(
             t=time,

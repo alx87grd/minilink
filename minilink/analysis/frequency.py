@@ -1,12 +1,14 @@
 """Frequency-domain analysis of one input–output channel of a linearized model.
 
+Every number comes from :mod:`minilink.analysis.linear`. This module picks
+one SISO channel ``(A, b, c, d)`` and plots the result.
+
 ``bode``, ``pzmap``, ``nyquist``, ``margins``, ``root_locus`` and
 ``transfer_function`` linearize ``sys`` about ``(x_bar, u_bar)`` with the
-same arguments as :func:`~minilink.analysis.linearize.linearize`, keep one
-SISO channel ``(A, b, c, d)`` — ``of`` names the output and ``wrt`` the input
-(a port id means component 0, ``(port, index)`` one component, a diagram wire
-``"block:port"`` an internal signal) — and compute with the linear algebra of
-:mod:`minilink.analysis.linear`. The ``plot_`` tools build one
+same arguments as :func:`~minilink.analysis.linearize.linearize`. ``of``
+names the output and ``wrt`` the input (a port id means component 0,
+``(port, index)`` one component, a diagram wire ``"block:port"`` an internal
+signal). The ``plot_`` tools build one
 :class:`~minilink.graphical.control.ControlFigure` and render it with
 matplotlib or plotly.
 """
@@ -77,6 +79,7 @@ def frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     w = frequency_grid(A, B, C, D, w, n)
+
     return w, linear.frequency_response(A, B, C, D, w)
 
 
@@ -101,6 +104,7 @@ def bode(
     w, G = frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
+
     magnitude_db, phase_deg = _bode_coordinates(G)
     return w, magnitude_db, phase_deg
 
@@ -128,6 +132,7 @@ def margins(
     w, G = frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
+
     return linear.margins(w, G)
 
 
@@ -178,6 +183,7 @@ def pzmap(
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+
     return linear.zeros(A, B, C, D), linear.poles(A), linear.gain(A, B, C, D)
 
 
@@ -204,6 +210,7 @@ def root_locus(
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+
     return linear.root_locus(A, B, C, D, gains)
 
 
@@ -232,6 +239,8 @@ def transfer_function(
     z, p, k = pzmap(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+
+    # num(s) = k ∏(s − z),   den(s) = ∏(s − p)
     num = np.real_if_close(k * np.poly(z)).astype(float)
     den = np.real_if_close(np.poly(p)).astype(float)
     return TransferFunction(num, den, name=f"{sys.name} {channel_label(sys, of, wrt)}")
@@ -263,47 +272,10 @@ def plot_bode(
     w, G = frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
-    magnitude_db, phase_deg = _bode_coordinates(G)
-    hover = tuple(
-        f"ω = {wk:.3g} rad/s<br>|G| = {mk:.1f} dB<br>∠G = {pk:.1f}°"
-        for wk, mk, pk in zip(w, magnitude_db, phase_deg)
+
+    return render_control_figure(
+        _bode_figure(w, G, sys, of, wrt, margins), backend=backend, show=show
     )
-    crossovers, notes, references = (), (), ()
-    if margins:
-        m = linear.margins(w, G)
-        crossovers = tuple(
-            RefLine("x", w_c)
-            for w_c in (m.w_gain_crossover, m.w_phase_crossover)
-            if np.isfinite(w_c)
-        )
-        notes = (Note(_margins_text(m)),)
-        references = (RefLine("y", 0.0),), (RefLine("y", -180.0),)
-    else:
-        references = (), ()
-    figure = ControlFigure(
-        title=style.BODE_TITLE,
-        subtitle=channel_subtitle(sys, of, wrt),
-        share_x=True,
-        panels=(
-            Panel(
-                traces=(Trace(w, magnitude_db, style.SYSTEM_COLOR, hover=hover),),
-                lines=crossovers + references[0],
-                notes=notes,
-                x_label="",
-                y_label=style.MAGNITUDE_LABEL,
-                x_log=True,
-            ),
-            Panel(
-                traces=(Trace(w, phase_deg, style.SYSTEM_COLOR, hover=hover),),
-                lines=crossovers + references[1],
-                x_label=style.FREQUENCY_LABEL,
-                y_label=style.PHASE_LABEL,
-                x_log=True,
-                y_ticks=style.phase_ticks(phase_deg),
-            ),
-        ),
-    )
-    return render_control_figure(figure, backend=backend, show=show)
 
 
 def plot_pzmap(
@@ -324,22 +296,10 @@ def plot_pzmap(
     z, p, gain = pzmap(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
-    points = np.concatenate([z, p])
-    figure = ControlFigure(
-        title=style.PZMAP_TITLE,
-        subtitle=channel_subtitle(sys, of, wrt),
-        panels=(
-            Panel(
-                traces=_root_markers(p, z),
-                x_label=style.REAL_LABEL,
-                y_label=style.IMAG_LABEL,
-                zero_lines=True,
-                x_lim=style.padded_limits(np.concatenate([points.real, [0.0]])),
-                y_lim=style.padded_limits(np.concatenate([points.imag, -points.imag])),
-            ),
-        ),
+
+    return render_control_figure(
+        _pzmap_figure(z, p, sys, of, wrt), backend=backend, show=show
     )
-    return render_control_figure(figure, backend=backend, show=show)
 
 
 def plot_root_locus(
@@ -362,43 +322,12 @@ def plot_root_locus(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     K, roots = linear.root_locus(A, B, C, D, gains)
-    # The view keeps the poles, zeros and the branches near them; the far tails
-    # of the asymptotes leave the frame as they do in MATLAB.
-    reach = 3.0 * max(
-        np.max(
-            np.abs(np.concatenate([linear.poles(A), linear.zeros(A, B, C, D)])),
-            initial=0.0,
-        ),
-        1.0,
+
+    return render_control_figure(
+        _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt),
+        backend=backend,
+        show=show,
     )
-    near = roots[np.abs(roots) <= reach]
-    branches = tuple(
-        Trace(
-            roots[:, j].real,
-            roots[:, j].imag,
-            style.SYSTEM_COLOR,
-            hover=tuple(
-                f"K = {k:.3g}<br>" + _root_text(s) for k, s in zip(K, roots[:, j])
-            ),
-        )
-        for j in range(roots.shape[1])
-    )
-    figure = ControlFigure(
-        title=style.ROOT_LOCUS_TITLE,
-        subtitle=channel_subtitle(sys, of, wrt),
-        panels=(
-            Panel(
-                traces=branches
-                + _root_markers(linear.poles(A), linear.zeros(A, B, C, D)),
-                x_label=style.REAL_LABEL,
-                y_label=style.IMAG_LABEL,
-                zero_lines=True,
-                x_lim=style.padded_limits(np.concatenate([near.real, [0.0]])),
-                y_lim=style.padded_limits(np.concatenate([near.imag, -near.imag])),
-            ),
-        ),
-    )
-    return render_control_figure(figure, backend=backend, show=show)
 
 
 def plot_nyquist(
@@ -421,40 +350,10 @@ def plot_nyquist(
     w, G = nyquist(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
-    hover = tuple(
-        f"ω = {wk:.3g} rad/s<br>G = {g.real:.3g} {g.imag:+.3g}j" for wk, g in zip(w, G)
+
+    return render_control_figure(
+        _nyquist_figure(w, G, sys, of, wrt), backend=backend, show=show
     )
-    # Zoom on the part of the contour that matters: poles at the origin send
-    # |G| to infinity at low frequency, so the limits ignore the far points.
-    visible = G[np.abs(G) <= 10.0 * np.median(np.abs(G))]
-    points = np.concatenate([visible, np.conj(visible), [-1.0 + 0j]])
-    critical = Trace(
-        np.array([-1.0]),
-        np.array([0.0]),
-        style.CRITICAL_COLOR,
-        mode="markers",
-        marker="+",
-        size=10.0,
-    )
-    figure = ControlFigure(
-        title=style.NYQUIST_TITLE,
-        subtitle=channel_subtitle(sys, of, wrt),
-        panels=(
-            Panel(
-                traces=(
-                    Trace(G.real, G.imag, style.SYSTEM_COLOR, hover=hover, arrows=True),
-                    Trace(G.real, -G.imag, style.SYSTEM_COLOR, dash="dash"),
-                    critical,
-                ),
-                x_label="Real Axis",
-                y_label="Imaginary Axis",
-                zero_lines=True,
-                x_lim=style.padded_limits(points.real),
-                y_lim=style.padded_limits(points.imag),
-            ),
-        ),
-    )
-    return render_control_figure(figure, backend=backend, show=show)
 
 
 # =============================================================================
@@ -524,6 +423,11 @@ def frequency_grid(A, B, C, D, w, n):
     return w
 
 
+# =============================================================================
+# Internal machinery
+# =============================================================================
+
+
 def _bode_coordinates(G):
     with np.errstate(divide="ignore"):
         magnitude_db = 20.0 * np.log10(np.abs(G))
@@ -587,5 +491,141 @@ def _root_markers(p, z):
             mode="markers",
             marker="o",
             hover=tuple(_root_text(s) for s in z),
+        ),
+    )
+
+
+def _bode_figure(w, G, sys, of, wrt, margins):
+    magnitude_db, phase_deg = _bode_coordinates(G)
+    hover = tuple(
+        f"ω = {wk:.3g} rad/s<br>|G| = {mk:.1f} dB<br>∠G = {pk:.1f}°"
+        for wk, mk, pk in zip(w, magnitude_db, phase_deg)
+    )
+    crossovers, notes, references = (), (), ()
+    if margins:
+        m = linear.margins(w, G)
+        crossovers = tuple(
+            RefLine("x", w_c)
+            for w_c in (m.w_gain_crossover, m.w_phase_crossover)
+            if np.isfinite(w_c)
+        )
+        notes = (Note(_margins_text(m)),)
+        references = (RefLine("y", 0.0),), (RefLine("y", -180.0),)
+    else:
+        references = (), ()
+    return ControlFigure(
+        title=style.BODE_TITLE,
+        subtitle=channel_subtitle(sys, of, wrt),
+        share_x=True,
+        panels=(
+            Panel(
+                traces=(Trace(w, magnitude_db, style.SYSTEM_COLOR, hover=hover),),
+                lines=crossovers + references[0],
+                notes=notes,
+                x_label="",
+                y_label=style.MAGNITUDE_LABEL,
+                x_log=True,
+            ),
+            Panel(
+                traces=(Trace(w, phase_deg, style.SYSTEM_COLOR, hover=hover),),
+                lines=crossovers + references[1],
+                x_label=style.FREQUENCY_LABEL,
+                y_label=style.PHASE_LABEL,
+                x_log=True,
+                y_ticks=style.phase_ticks(phase_deg),
+            ),
+        ),
+    )
+
+
+def _pzmap_figure(z, p, sys, of, wrt):
+    points = np.concatenate([z, p])
+    return ControlFigure(
+        title=style.PZMAP_TITLE,
+        subtitle=channel_subtitle(sys, of, wrt),
+        panels=(
+            Panel(
+                traces=_root_markers(p, z),
+                x_label=style.REAL_LABEL,
+                y_label=style.IMAG_LABEL,
+                zero_lines=True,
+                x_lim=style.padded_limits(np.concatenate([points.real, [0.0]])),
+                y_lim=style.padded_limits(np.concatenate([points.imag, -points.imag])),
+            ),
+        ),
+    )
+
+
+def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
+    # The view keeps the poles, zeros and the branches near them; the far tails
+    # of the asymptotes leave the frame as they do in MATLAB.
+    reach = 3.0 * max(
+        np.max(
+            np.abs(np.concatenate([linear.poles(A), linear.zeros(A, B, C, D)])),
+            initial=0.0,
+        ),
+        1.0,
+    )
+    near = roots[np.abs(roots) <= reach]
+    branches = tuple(
+        Trace(
+            roots[:, j].real,
+            roots[:, j].imag,
+            style.SYSTEM_COLOR,
+            hover=tuple(
+                f"K = {k:.3g}<br>" + _root_text(s) for k, s in zip(K, roots[:, j])
+            ),
+        )
+        for j in range(roots.shape[1])
+    )
+    return ControlFigure(
+        title=style.ROOT_LOCUS_TITLE,
+        subtitle=channel_subtitle(sys, of, wrt),
+        panels=(
+            Panel(
+                traces=branches
+                + _root_markers(linear.poles(A), linear.zeros(A, B, C, D)),
+                x_label=style.REAL_LABEL,
+                y_label=style.IMAG_LABEL,
+                zero_lines=True,
+                x_lim=style.padded_limits(np.concatenate([near.real, [0.0]])),
+                y_lim=style.padded_limits(np.concatenate([near.imag, -near.imag])),
+            ),
+        ),
+    )
+
+
+def _nyquist_figure(w, G, sys, of, wrt):
+    hover = tuple(
+        f"ω = {wk:.3g} rad/s<br>G = {g.real:.3g} {g.imag:+.3g}j" for wk, g in zip(w, G)
+    )
+    # Zoom on the part of the contour that matters: poles at the origin send
+    # |G| to infinity at low frequency, so the limits ignore the far points.
+    visible = G[np.abs(G) <= 10.0 * np.median(np.abs(G))]
+    points = np.concatenate([visible, np.conj(visible), [-1.0 + 0j]])
+    critical = Trace(
+        np.array([-1.0]),
+        np.array([0.0]),
+        style.CRITICAL_COLOR,
+        mode="markers",
+        marker="+",
+        size=10.0,
+    )
+    return ControlFigure(
+        title=style.NYQUIST_TITLE,
+        subtitle=channel_subtitle(sys, of, wrt),
+        panels=(
+            Panel(
+                traces=(
+                    Trace(G.real, G.imag, style.SYSTEM_COLOR, hover=hover, arrows=True),
+                    Trace(G.real, -G.imag, style.SYSTEM_COLOR, dash="dash"),
+                    critical,
+                ),
+                x_label="Real Axis",
+                y_label="Imaginary Axis",
+                zero_lines=True,
+                x_lim=style.padded_limits(points.real),
+                y_lim=style.padded_limits(points.imag),
+            ),
         ),
     )
