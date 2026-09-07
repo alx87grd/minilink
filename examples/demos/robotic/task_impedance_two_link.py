@@ -14,10 +14,14 @@ arm.x0 = np.zeros(4)
 
 ref = Step(initial_value=p0, final_value=p1, step_time=STEP_TIME)
 
-ctl = TaskImpedance(arm, gravity_comp=False, show_task_force=True)
-ctl.params["Kp"] = np.array([120.0, 120.0])
-ctl.params["Kd"] = np.array([12.0, 12.0])
-ctl.task_force_scale = 0.005
+ctl = TaskImpedance(
+    arm,
+    gravity_comp=False,
+    Kp=[120.0, 120.0],
+    Kd=[12.0, 12.0],
+    show_task_force=True,
+    task_force_scale=0.005,
+)
 
 diagram = ref >> ctl @ arm
 

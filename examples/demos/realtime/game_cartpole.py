@@ -25,6 +25,4 @@ rt_sim = RealtimeSimulator(
     input=PygameInput(key_axes=[("right", "left")]),  # RIGHT/LEFT -> cart force
 )
 traj = rt_sim.run()
-
-sys.traj = traj
-sys.plot_trajectory()
+sys.plot_trajectory(traj)

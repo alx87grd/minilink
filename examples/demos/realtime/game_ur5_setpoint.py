@@ -25,10 +25,14 @@ q0 = arm.inverse_kinematics(p0, q_guess=q_guess)
 arm.x0 = arm.q2x(q0, np.zeros(6))
 
 
-ctl = TaskImpedance(arm, gravity_comp=GRAVITY, show_task_force=True)
-ctl.params["Kp"] = np.array([200.0, 200.0, 200.0])
-ctl.params["Kd"] = np.array([40.0, 40.0, 40.0])
-ctl.task_force_scale = 0.05
+ctl = TaskImpedance(
+    arm,
+    gravity_comp=GRAVITY,
+    Kp=[200.0, 200.0, 200.0],
+    Kd=[40.0, 40.0, 40.0],
+    show_task_force=True,
+    task_force_scale=0.05,
+)
 
 diagram = ctl @ arm  # boundary input r = desired tool position
 diagram.plot_diagram()
@@ -48,6 +52,4 @@ rt_sim = RealtimeSimulator(
     ),
 )
 traj = rt_sim.run()
-
-diagram.traj = traj
-diagram.plot_trajectory()
+diagram.plot_trajectory(traj)

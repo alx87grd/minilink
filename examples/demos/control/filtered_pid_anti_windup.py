@@ -1,48 +1,24 @@
 """Filtered PID step tracking with and without anti-windup."""
 
-import numpy as np
-
 from minilink import DoubleIntegrator, FilteredController, Saturation, Step
 
-step = Step()
-step.params["initial_value"] = np.array([0.0])
-step.params["final_value"] = np.array([4.0])
-step.params["step_time"] = 3.0
-
+step = Step(final_value=4.0, step_time=3.0)
 sys = DoubleIntegrator()
-sys.name = "sys"
 
-pid = FilteredController()
-pid.params["Kp"] = 5.0
-pid.params["Ki"] = 1.0
-pid.params["Kd"] = 3.0
-pid.params["tau"] = 0.1
-pid.params["u_min"] = -5.0
-pid.params["u_max"] = 5.0
+# With anti-windup: the controller clips its own command at +-5 and stops integrating.
+pid = FilteredController(Kp=5.0, Ki=1.0, Kd=3.0, tau=0.1, u_min=-5.0, u_max=5.0)
 
 diagram = step >> pid @ sys
-
 diagram.plot_diagram()
 diagram.compute_trajectory(tf=20)
 diagram.plot_trajectory()
 
-# Without anti-windup: external saturation clips u; the integrator keeps growing.
-sat = Saturation()
-sat.params["lower"] = -0.5
-sat.params["upper"] = 0.5
-
-pid2 = FilteredController()
-pid2.name = "pid2"
-pid2.params["Kp"] = pid.params["Kp"]
-pid2.params["Ki"] = pid.params["Ki"]
-pid2.params["Kd"] = pid.params["Kd"]
-pid2.params["tau"] = pid.params["tau"]
-pid2.params["u_min"] = -np.inf
-pid2.params["u_max"] = np.inf
+# Without anti-windup: an external saturation clips u; the integrator keeps growing.
+pid2 = FilteredController(Kp=5.0, Ki=1.0, Kd=3.0, tau=0.1)
+sat = Saturation(-0.5, 0.5)
 
 diagram2 = step >> pid2 >> sat >> sys
 diagram2.connect("sys", "y", "ctl", "y")
 diagram2.plot_diagram()
-
 diagram2.compute_trajectory(tf=20)
 diagram2.plot_trajectory()

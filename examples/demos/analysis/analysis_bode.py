@@ -5,7 +5,7 @@ import numpy as np
 from minilink import Pendulum
 
 plant = Pendulum()
-plant.params.update({"m": 1.0, "l": 1.0, "I": 1.0, "gravity": 9.81, "d": 1.0})
+plant.params["d"] = 1.0  # add damping to the default pendulum
 
 x_bar = np.array([0.0, 0.0])  # upright equilibrium (unstable for this model)
 channel = dict(of=("y", 1), wrt="u")  # velocity dtheta from the torque

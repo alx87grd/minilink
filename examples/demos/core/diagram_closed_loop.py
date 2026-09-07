@@ -1,7 +1,5 @@
 """Wire a pendulum loop by hand: unconnected, open loop, closed loop."""
 
-import numpy as np
-
 from minilink import DiagramSystem, ImpedanceController, Pendulum, Step
 
 # Plant system
@@ -11,15 +9,10 @@ sys.params["l"] = 5.0
 sys.x0[0] = -2.0
 
 # Source input
-step = Step()
-step.params["initial_value"] = np.array([0.0])
-step.params["final_value"] = np.array([1.0])
-step.params["step_time"] = 10.0
+step = Step(final_value=1.0, step_time=10.0)
 
 # Closed loop system
-ctl = ImpedanceController()
-ctl.params["Kp"] = 1000.0
-ctl.params["Kd"] = 100.0
+ctl = ImpedanceController(Kp=1000.0, Kd=100.0)
 
 # Diagram
 diagram = DiagramSystem()

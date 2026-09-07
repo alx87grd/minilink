@@ -260,3 +260,16 @@ structural-signature heuristic and a pickling hook on every `System`. Removed:
 `__getstate__`; `analysis.derivatives.compiled(sys, method)` compiles per
 call and the value tier stores nothing on the system. Suite 1020 passed / 2
 skipped, analysis demos 8/8, two notebooks re-smoked.
+
+Streamlining pass on the continuous-time teaching material (2026-09-07):
+demos no longer redefine blocks the prelude ships (`diagram_nested_loop.py`
+uses `Integrator` / `ProportionalController`), the flat scripts lost their
+helper functions (`signal_blocks.py`, `optim_plot.py`) and demo-control flags,
+`try`/`except` around optional renderers is gone (`animation_renderers.py`),
+sources and controllers are built with their constructor kwargs instead of
+three `params[...]` lines where the parameters are not the lesson, redundant
+`show=False` / unused variables are dropped, and the notebooks lost their
+defensive `getattr` probes (`05_simulation`, `08_optimization`,
+`09_planning`). Hybrid / step, compile, planning and mpc demos untouched by
+request. Demo sweep 58/58, five notebooks re-smoked, teaching-import test
+green after two stale allowlist rows were removed.

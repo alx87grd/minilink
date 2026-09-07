@@ -1,14 +1,8 @@
 """Step and white-noise sources, shown as signals."""
 
-import numpy as np
-
 from minilink import Step, WhiteNoise
 
-step = Step()
-step.params["initial_value"] = np.array([0.0])
-step.params["final_value"] = np.array([1.0])
-step.params["step_time"] = 10.0
-
+step = Step(final_value=1.0, step_time=10.0)
 step.show_signal(t0=-2.0, tf=12.0)
 
 noise = WhiteNoise(1)
