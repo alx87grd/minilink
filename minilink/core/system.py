@@ -109,6 +109,11 @@ class System(SharedSystemFacades):
         # ``compute_trajectory``.
         self.traj = None
 
+        # Compiled evaluators behind the derivative tools, keyed by backend and
+        # tagged with the structural signature they were built for
+        # (``compiled_evaluator``); never copied or pickled.
+        self.compiled_evaluators = {}
+
         # Standard camera hints (resolved by ``Animator`` via ``camera.py``).
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
@@ -150,11 +155,9 @@ class System(SharedSystemFacades):
         """
         Recompute derived internals from current parameters/topology.
 
-        Base implementation only drops the cached compiled evaluators
-        (:meth:`~minilink.core.facades.SharedSystemFacades._compiled_evaluator`);
-        subclasses may override it.
+        Base implementation is a no-op and can be overridden by subclasses.
         """
-        self._invalidate_compiled()
+        return
 
     # Structural Model API
 
@@ -202,7 +205,6 @@ class System(SharedSystemFacades):
             lower_bound=lower_bound,
             upper_bound=upper_bound,
         )
-        self._invalidate_compiled()
 
     def add_output_port(
         self,
@@ -246,7 +248,6 @@ class System(SharedSystemFacades):
             lower_bound=lower_bound,
             upper_bound=upper_bound,
         )
-        self._invalidate_compiled()
 
     def get_u_from_input_ports(self):
         """

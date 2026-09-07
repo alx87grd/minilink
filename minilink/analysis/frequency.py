@@ -329,14 +329,28 @@ def siso_channel(sys, of, wrt):
         if not sys.inputs:
             raise ValueError("Frequency analysis requires at least one input port.")
         wrt = (next(iter(sys.inputs)), 0)
-    elif isinstance(wrt, str):
-        wrt = (wrt, 0)
     if of is None:
         default = output_selectors(sys, None)
         of = (None, 0) if default is None else (default[0][0], 0)
-    elif isinstance(of, str):
-        of = (of, 0)
-    return (of[0], int(of[1])), (wrt[0], int(wrt[1]))
+    return _component(of, "of"), _component(wrt, "wrt")
+
+
+def _component(selector, name):
+    """One component ``(name, index)`` from a port id or a ``(port, index)`` pair."""
+    if isinstance(selector, str):
+        return (selector, 0)
+    if (
+        isinstance(selector, tuple)
+        and len(selector) == 2
+        and (selector[0] is None or isinstance(selector[0], str))
+        and isinstance(selector[1], (int, np.integer))
+        and not isinstance(selector[1], bool)
+    ):
+        return (selector[0], int(selector[1]))
+    raise TypeError(
+        f"{name} names one channel: a port id, a diagram wire 'block:port', or "
+        f"(selector, index); got {selector!r}"
+    )
 
 
 def channel_label(sys, of, wrt):

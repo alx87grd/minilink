@@ -56,10 +56,12 @@ def jacobian(
     ndarray or dict
         Shape ``(dim(of), dim(wrt))``; ``(dim(of),)`` for ``wrt="t"``; for
         ``wrt="params"`` a dict shaped like ``params`` with leaves
-        ``(dim(of), *leaf.shape)`` (float leaves only).
+        ``(dim(of), *leaf.shape)`` (float leaves only). A block whose ``f``
+        reads instance attributes instead of its ``params`` argument reports
+        zero sensitivity, like every parametric tier.
     """
     x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
-    evaluator = sys._compiled_evaluator(method)
+    evaluator = sys.compiled_evaluator(method)
     try:
         J = evaluator.jacobian(of, wrt, eps=eps)(x_bar, u_bar, t, params)
     except Exception as exc:
@@ -68,7 +70,7 @@ def jacobian(
         # from params, wrt="params") falls back to finite differences.
         if method != "auto" or evaluator.backend != "jax" or not _is_tracing_error(exc):
             raise
-        J = sys._compiled_evaluator("fd").jacobian(of, wrt, eps=eps)(
+        J = sys.compiled_evaluator("fd").jacobian(of, wrt, eps=eps)(
             x_bar, u_bar, t, params
         )
     return as_numpy(J)
@@ -100,3 +102,11 @@ def as_numpy(value):
     if isinstance(value, dict):
         return {key: as_numpy(leaf) for key, leaf in value.items()}
     return np.asarray(value, dtype=float)
+
+
+if __name__ == "__main__":
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+    pendulum = Pendulum()
+    print("df/dx =\n", np.round(jacobian(pendulum, "f", "x", [0.3, 0.0]), 4))
+    print("df/du =\n", np.round(jacobian(pendulum, "f", "u", [0.3, 0.0]), 4))

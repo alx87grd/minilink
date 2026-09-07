@@ -62,6 +62,8 @@ def linearize_matrices(
     n = sys.n
     inputs = input_selectors(sys, wrt)
     outputs = output_selectors(sys, of)
+    if n == 0 and outputs is None:
+        raise ValueError(f"{sys.name!r} has neither a state nor an output port")
 
     if n > 0:
         A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, **at)
@@ -82,7 +84,6 @@ def linearize_matrices(
         )
     else:  # static block: no state, the channel is the feedthrough D
         A = np.zeros((0, 0))
-        C = np.zeros((sum(_rows_of(sys, name, index) for name, index in outputs), 0))
 
     D = np.vstack(
         [
@@ -106,6 +107,7 @@ def linearize_matrices(
     )
     if n == 0:
         B = np.zeros((0, D.shape[1]))
+        C = np.zeros((D.shape[0], 0))
     return A, B, C, D
 
 
@@ -164,11 +166,17 @@ def output_selectors(sys, of):
 def _selector(item, name):
     if isinstance(item, str):
         return (item, None)
-    if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], str):
+    if (
+        isinstance(item, tuple)
+        and len(item) == 2
+        and isinstance(item[0], str)
+        and isinstance(item[1], (int, np.integer))
+        and not isinstance(item[1], bool)
+    ):
         return (item[0], int(item[1]))
     raise TypeError(
         f"{name} selectors are port ids, diagram wires 'block:port', or "
-        f"(selector, index) tuples; got {item!r}"
+        f"(selector, index) tuples with an integer index; got {item!r}"
     )
 
 
@@ -198,3 +206,11 @@ def _rows_of(sys, name, index):
         return sys.outputs[name].dim
     block, port = name.split(":", 1)
     return sys.subsystems[block].outputs[port].dim
+
+
+if __name__ == "__main__":
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+    lti = linearize(Pendulum(), x_bar=[0.0, 0.0])
+    print("A =\n", np.round(lti.A(), 4))
+    print("open-loop poles:", np.round(np.linalg.eigvals(lti.A()), 4))

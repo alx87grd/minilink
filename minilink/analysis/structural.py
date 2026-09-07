@@ -33,7 +33,7 @@ def controllability(A, B=None):
     ``LTISystem`` (``controllability(plant.linearize(x_bar))``).
     """
     if B is None:
-        A, B = A.A(), A.B()
+        A, B = _lti_matrices(A, "B")
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     n = A.shape[0]
@@ -54,7 +54,7 @@ def observability(A, C=None):
     ``LTISystem``.
     """
     if C is None:
-        A, C = A.A(), A.C()
+        A, C = _lti_matrices(A, "C")
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
     n = A.shape[0]
@@ -65,6 +65,15 @@ def observability(A, C=None):
     obsv = np.vstack(blocks)
 
     return StructuralResult(matrix=obsv, rank=int(np.linalg.matrix_rank(obsv)), n=n)
+
+
+def _lti_matrices(lti, second):
+    """``(A, B)`` or ``(A, C)`` of an ``LTISystem`` passed as the only argument."""
+    if not all(callable(getattr(lti, name, None)) for name in ("A", second)):
+        raise TypeError(
+            f"pass the two matrices (A, {second}) or one LTISystem; got {type(lti).__name__}"
+        )
+    return lti.A(), getattr(lti, second)()
 
 
 if __name__ == "__main__":

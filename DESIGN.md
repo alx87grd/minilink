@@ -437,10 +437,11 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   `plot_bode`, `plot_pzmap`, `modal_analysis`, `find_equilibrium` — and
   `game`), `StepSystemFacades` on `StepSystem` (`compute_rollout`, `jacobian`
   with `k`). `jacobian(of, wrt, x_bar, u_bar, t, params, *, method, eps)` sits
-  on `SharedSystemFacades` over `_compiled_evaluator(method)`, a per-system
-  cache (weak, outside the instance dict) cleared by `refresh()` and the
-  structural mutators; parameter edits need no recompile because every call
-  passes the live `params`. **MRO** picks `compute_trajectory` implementation; no
+  on `SharedSystemFacades` over `compiled_evaluator(method)`, a per-system
+  cache (`compiled_evaluators`) tagged with the structural signature (ports,
+  dimensions, subsystems, connections) so structural edits recompile on the
+  next call, parameter edits never do (every call passes the live `params`),
+  and copies or pickles drop it (`__getstate__`). **MRO** picks `compute_trajectory` implementation; no
   façade-layer `isinstance` routers. `self.traj` is a convenience cache of
   the latest facade rollout; library code never reads it as an input.
 

@@ -107,6 +107,7 @@ def jax_installed() -> bool:
     return importlib.util.find_spec("jax") is not None
 
 
+@functools.lru_cache(maxsize=1)
 def require_jax_numpy() -> types.ModuleType:
     """Return ``jax.numpy`` (lazy, cached). Raises if JAX is not installed."""
     try:

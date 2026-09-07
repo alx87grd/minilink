@@ -176,7 +176,7 @@ class TestLinearize(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             linearize_matrices(plant, [1.0, 2.0], [3.0, 4.0], of="bad", method="jax")
         A, B, C, D = linearize_matrices(plant, [1.0, 2.0], [3.0, 4.0], of="bad")
-        self.assertEqual(plant._compiled_evaluator("auto").backend, "numpy")
+        self.assertEqual(plant.compiled_evaluator("auto").backend, "numpy")
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)

@@ -204,3 +204,49 @@ leaves without a compiled twin; `test_dynamics_catalog` still imports the
 research rungs it tests. Note: the S22 / S23 / S24 / S26 changes landed inside
 the S25 commit `9554a48` (their own gated chains stopped on a test failure at
 the time).
+
+## Derivatives facade and analysis family (2026-09-06, `c9372a5` + review fixes)
+
+Plan [docs/plans/derivatives-facade.md](../plans/derivatives-facade.md) v4
+implemented with its recommended rulings: `evaluator.jacobian(of, wrt)` on
+all ten evaluators (eager `jax.jacfwd` on JAX, central differences on NumPy;
+`f` / `step` / output ports / diagram wires `"block:port"` against `x` / `u` /
+input ports / `t` / `params` / wires), `System.jacobian(...)` returning NumPy
+values over a cached compiled evaluator, and one calling pattern
+`tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)` for
+`linearize`, `bode`, `pzmap`, `plot_*`, `modal_analysis`, `find_equilibrium`,
+`lqr_at_operating_point`, the new `transfer_function`, `discretize(integrator=)`
+and `controllability(lti)`; all of them methods on `DynamicSystem`.
+`jacobian_f_params` removed; demos, five intro notebooks, README and DESIGN
+updated. Verification: unit suite 1022 passed / 2 skipped, demo sweep 58/58,
+notebook smoke 5/5 edited notebooks.
+
+Inline review of the commit (diff scan, removed behaviour, callers, pitfalls,
+wrapper, cleanup, altitude, AGENTS conventions, sweep) found and fixed:
+
+1. `backends.py`: the `lru_cache` decorator had slid from `require_jax_numpy`
+   onto the new `jax_installed` — both now cached.
+2. Evaluator cache in a `WeakKeyDictionary` leaked every leaf system (the
+   evaluator holds the system, so the weak key never dies); replaced by
+   `sys.compiled_evaluators`, initialised in `System.__init__`, tagged with a
+   structural signature (ports, dims, subsystems by identity, connections) and
+   reset by `__getstate__` so copies and pickles never carry jitted closures.
+3. `refresh()` invalidation dropped the cache on every `Simulator` solve, and a
+   port added to a block already inside a diagram never invalidated the
+   diagram — both covered by the signature; the mutator hooks are gone.
+4. `_jac_resolve_of(None)` on static evaluators selected the missing
+   evolution; static-block `linearize_matrices` could raise `AttributeError`
+   on a wire selector and iterate `None` when a static block had no outputs;
+   the old `(sys_id, port_id)` tuple and a list passed as a channel produced
+   `int()` errors; `controllability(array)` raised `AttributeError` — all now
+   clear `TypeError` / `ValueError` messages.
+5. `central_difference` evaluated `g(z)` once more than needed; stale
+   "under `jax.jit`" docstring; AGENTS rules: no leading-underscore facade
+   methods (`compiled_evaluator`), no hasattr-or-create state, `__main__`
+   hello-worlds restored in `linearize.py` / `derivatives.py`.
+
+Left as is, for the maintainer: `transfer_function` imports the
+`TransferFunction` block lazily from `blocks/` (a tool returning a library
+block, like `lqr_at_operating_point` returns `StateFeedbackController`);
+`analysis.linearize` keeps six small selector helpers; eager `jacfwd` costs
+0.5–5 ms per Jacobian against 0.03–0.08 ms for finite differences.

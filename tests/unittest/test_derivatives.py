@@ -123,7 +123,7 @@ class TestJacobianValues(unittest.TestCase):
     @jax_only
     def test_jax(self):
         self.check("jax")
-        self.assertEqual(self.plant._compiled_evaluator("jax").backend, "jax")
+        self.assertEqual(self.plant.compiled_evaluator("jax").backend, "jax")
 
     def test_defaults_are_the_nominal_point(self):
         plant = self.plant
@@ -274,7 +274,7 @@ class TestMethodAndCache(unittest.TestCase):
     def test_auto_falls_back_to_finite_differences_and_jax_is_strict(self):
         plant = _Untraceable()
         A = plant.jacobian("f", "x")
-        self.assertEqual(plant._compiled_evaluator("auto").backend, "numpy")
+        self.assertEqual(plant.compiled_evaluator("auto").backend, "numpy")
         np.testing.assert_allclose(
             A, Pendulum().jacobian("f", "x", method="fd"), atol=1e-8
         )
@@ -288,26 +288,44 @@ class TestMethodAndCache(unittest.TestCase):
 
     def test_evaluator_is_cached_and_parameters_stay_live(self):
         plant = Pendulum()
-        first = plant._compiled_evaluator("auto")
-        self.assertIs(plant._compiled_evaluator("auto"), first)
+        first = plant.compiled_evaluator("auto")
+        self.assertIs(plant.compiled_evaluator("auto"), first)
         a_before = plant.jacobian("f", "x")[1, 0]
         plant.params["gravity"] = 2.0 * plant.params["gravity"]
         a_after = plant.jacobian("f", "x")[1, 0]
-        self.assertIs(plant._compiled_evaluator("auto"), first)
+        self.assertIs(plant.compiled_evaluator("auto"), first)
         np.testing.assert_allclose(a_after, 2.0 * a_before, rtol=1e-6)
 
     def test_structural_changes_recompile(self):
         plant = Pendulum()
-        first = plant._compiled_evaluator("auto")
+        first = plant.compiled_evaluator("auto")
         plant.add_output_port("angle", dim=1, function=lambda x, u, t, p=None: x[:1])
-        self.assertIsNot(plant._compiled_evaluator("auto"), first)
+        self.assertIsNot(plant.compiled_evaluator("auto"), first)
         np.testing.assert_allclose(
             plant.jacobian("angle", "x"), [[1.0, 0.0]], atol=1e-8
         )
+        # a port added to a block already inside a diagram is seen by the diagram
         loop = _closed_loop()
-        first = loop._compiled_evaluator("auto")
-        loop.refresh()
-        self.assertIsNot(loop._compiled_evaluator("auto"), first)
+        first = loop.compiled_evaluator("auto")
+        ctl = loop.subsystems["ctl"]
+        ctl.add_output_port(
+            "twice",
+            dim=1,
+            function=lambda x, u, t, p=None: 2.0 * ctl.ctl(x, u, t, p),
+            dependencies="all",
+        )
+        self.assertIsNot(loop.compiled_evaluator("auto"), first)
+        np.testing.assert_allclose(
+            loop.jacobian("ctl:twice", "r")[0, 0],
+            2.0 * loop.jacobian("ctl:u", "r")[0, 0],
+        )
+
+    def test_simulation_and_refresh_keep_the_cache(self):
+        plant = Pendulum()
+        first = plant.compiled_evaluator("auto")
+        plant.refresh()
+        plant.compute_trajectory(tf=0.1, n_steps=11, verbose=False)
+        self.assertIs(plant.compiled_evaluator("auto"), first)
 
     def test_cache_survives_copies_without_carrying_evaluators(self):
         import copy
@@ -316,7 +334,8 @@ class TestMethodAndCache(unittest.TestCase):
         plant = Pendulum()
         plant.jacobian("f", "x")
         twin = copy.deepcopy(plant)
-        pickle.dumps(twin)
+        self.assertEqual(twin.compiled_evaluators, {})
+        pickle.loads(pickle.dumps(twin))
         np.testing.assert_allclose(twin.jacobian("f", "x"), plant.jacobian("f", "x"))
 
     @jax_only
@@ -324,7 +343,7 @@ class TestMethodAndCache(unittest.TestCase):
         from minilink.dynamics.catalog.mass_spring_damper.linear import TwoMass
 
         plant = TwoMass()  # A(t, params) is a NumPy matrix built from params
-        self.assertEqual(plant._compiled_evaluator("auto").backend, "jax")
+        self.assertEqual(plant.compiled_evaluator("auto").backend, "jax")
         S = plant.jacobian("f", "params")
         S_fd = plant.jacobian("f", "params", method="fd")
         for key in S_fd:
@@ -467,6 +486,13 @@ class TestFamilyPattern(unittest.TestCase):
             linearize_matrices(Pendulum(), inputs=["u"])
         with self.assertRaises(TypeError):
             linearize_matrices(Pendulum(), epsilon=1e-6)
+        loop = _closed_loop()
+        with self.assertRaisesRegex(TypeError, "integer index"):
+            linearize_matrices(loop, of=("ctl", "u"))  # the old (sys_id, port_id) form
+        with self.assertRaisesRegex(TypeError, "one channel"):
+            bode(loop, of=["y", "y"])
+        with self.assertRaisesRegex(TypeError, "LTISystem"):
+            controllability(np.eye(2))
 
 
 if __name__ == "__main__":

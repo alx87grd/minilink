@@ -12,8 +12,8 @@ The mixin resolves the two names once and hands a *probe*
 ``(x, u, t, params, delta) -> vector`` to the backend, which returns the
 Jacobian as a callable with the signature of the parametric tier:
 ``(x, u, t, params)`` on continuous and static evaluators, ``(x, u, k, params)``
-on step evaluators. JAX evaluators use ``jax.jacfwd`` under ``jax.jit``; NumPy
-evaluators use central finite differences.
+on step evaluators. JAX evaluators run ``jax.jacfwd`` eagerly on the trace
+tier; NumPy evaluators use central finite differences.
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ class JacobianMixin:
     def _jac_resolve_of(self, of):
         kind = self._jac_kind
         evolution = {"dynamic": "f", "step": "step"}.get(kind)
-        if of == evolution:
+        if evolution is not None and of == evolution:
             if of in self._jac_output_ids:
                 raise ValueError(
                     f"of={of!r} is ambiguous: an output port is also named {of!r}; "
@@ -300,15 +300,16 @@ def central_difference(g, z, eps):
     """Central-difference Jacobian of ``g`` at ``z``: column ``i`` is ``dg/dz_i``."""
     z = np.asarray(z, dtype=float).reshape(-1)
     n = z.size
-    p = np.asarray(g(z), dtype=float).reshape(-1).size
-    J = np.zeros((p, n))
+    columns = []
     for i in range(n):
         dz = np.zeros(n)
         dz[i] = eps
         plus = np.asarray(g(z + dz), dtype=float).reshape(-1)
         minus = np.asarray(g(z - dz), dtype=float).reshape(-1)
-        J[:, i] = (plus - minus) / (2.0 * eps)
-    return J
+        columns.append((plus - minus) / (2.0 * eps))
+    if not columns:  # nothing to perturb: only the row count is needed
+        return np.zeros((np.asarray(g(z), dtype=float).reshape(-1).size, 0))
+    return np.column_stack(columns)
 
 
 def flatten_params(params, prefix=()):
