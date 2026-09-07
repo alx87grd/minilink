@@ -14,16 +14,13 @@ from minilink.graphical.animation.primitives import (
 class TransferFunction(ErrorDriven, LTISystem):
     """Continuous-time SISO transfer function in state-space realization.
 
-    ``ports="error"`` (default) is a plain ``u -> y`` block: a plant, or a
-    compensator whose input is the error, so ``C @ plant`` inserts the
-    summing junction and ``C >> plant`` is the loop gain. ``ports="reference"``
-    declares ``r`` and ``y`` and drives the same dynamics with ``r - y``, the
-    controller form ``@`` wires directly; its command port is ``u``.
+    The default is a plant: input ``u``, outputs ``y`` and ``x``. Compensator
+    layouts match the other classical blocks: ``ports="error"`` is ``e -> u``
+    (``C @ plant`` inserts the Error block; ``C >> plant`` is the loop gain);
+    ``ports="reference"`` is ``r, y -> u``.
     """
 
-    def __init__(
-        self, numerator, denominator, *, ports="error", name="Transfer Function"
-    ):
+    def __init__(self, numerator, denominator, *, ports=None, name="Transfer Function"):
         self.numerator = np.asarray(numerator, dtype=float)
         self.denominator = np.asarray(denominator, dtype=float)
         A, B, C, D = signal.tf2ss(self.numerator, self.denominator)
@@ -32,25 +29,27 @@ class TransferFunction(ErrorDriven, LTISystem):
         self.poles = tf.poles
         self.zeros = tf.zeros
 
-        if ports == "reference":
+        if ports in ("error", "reference"):
             feedthrough = tuple(self.outputs["y"].dependencies)
             self.inputs = {}
             self.outputs = {}
-            self.add_error_ports("reference", 1)
+            self.add_error_ports(ports, 1)
             self.add_output_port(
                 "u",
                 dim=1,
                 function=self.h,
                 dependencies=self.error_dependencies if feedthrough else (),
             )
-            self.measurement_port, self.ref_port, self.control_port = "y", "r", "u"
-            self.plot_space = "error"
+            if ports == "reference":
+                self.measurement_port, self.ref_port, self.control_port = "y", "r", "u"
+                self.plot_space = "error"
+        elif ports not in (None, "plant"):
+            raise ValueError(
+                f"ports must be None, 'plant', 'error', or 'reference', got {ports!r}"
+            )
         else:
-            if ports != "error":
-                raise ValueError(f"ports must be 'error' or 'reference', got {ports!r}")
+            # plant: ``error()`` is the identity so ``f`` / ``h`` stay ``u -> y``
             self.port_layout = "error"
-            self.inputs["u"].labels = ["u"]
-            self.outputs["y"].labels = ["y"]
 
     def f(self, x, u, t=0, params=None):
         return super().f(x, self.error(u), t, params)
@@ -101,9 +100,7 @@ class Lead(TransferFunction):
     def __init__(self, K=1.0, z=1.0, p=10.0, *, ports="error"):
         if not 0.0 < z < p:
             raise ValueError(f"a lead compensator has 0 < z < p, got z={z}, p={p}")
-        super().__init__(
-            [K, K * z], [1.0, p], ports=ports, name=f"Lead K={K}, z={z}, p={p}"
-        )
+        super().__init__([K, K * z], [1.0, p], ports=ports, name="Lead")
 
 
 class Lag(TransferFunction):
@@ -112,6 +109,4 @@ class Lag(TransferFunction):
     def __init__(self, K=1.0, z=1.0, p=0.1, *, ports="error"):
         if not 0.0 < p < z:
             raise ValueError(f"a lag compensator has 0 < p < z, got z={z}, p={p}")
-        super().__init__(
-            [K, K * z], [1.0, p], ports=ports, name=f"Lag K={K}, z={z}, p={p}"
-        )
+        super().__init__([K, K * z], [1.0, p], ports=ports, name="Lag")

@@ -37,6 +37,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Step": ("minilink.blocks.sources", "Step"),
     "WhiteNoise": ("minilink.blocks.sources", "WhiteNoise"),
     "TrajectorySource": ("minilink.blocks.sources", "TrajectorySource"),
+    "Error": ("minilink.blocks.routing", "Error"),
     "Sum": ("minilink.blocks.routing", "Sum"),
     "Gain": ("minilink.blocks.routing", "Gain"),
     "Mux": ("minilink.blocks.routing", "Mux"),

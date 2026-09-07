@@ -19,6 +19,29 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn('PORT="r"', html)
         self.assertIn('PORT="u"', html)
 
+    def test_error_block_html_shows_plus_minus_e(self):
+        from minilink.blocks.routing import Error
+
+        html = get_system_block_html(Error(), "error")
+        self.assertIn("Error::error", html)
+        self.assertIn(">+<", html)
+        self.assertIn(">-<", html)
+        self.assertIn(">e<", html)
+        self.assertIn('PORT="plus"', html)
+        self.assertIn('PORT="minus"', html)
+        self.assertIn('PORT="e"', html)
+
+    def test_demux_block_html_shows_numpy_slices(self):
+        from minilink.blocks.routing import Demux
+
+        html = get_system_block_html(Demux(dims=(1, 1), port="y"), "demux")
+        self.assertIn("Demux::demux", html)
+        self.assertIn(">y[0]<", html)
+        self.assertIn(">y[1]<", html)
+        self.assertIn('PORT="y"', html)
+        self.assertIn('PORT="y_0"', html)
+        self.assertIn('PORT="y_1"', html)
+
     def test_system_diagram_contains_block_label(self):
         pytest.importorskip("graphviz")
         graph = get_diagram(Integrator())

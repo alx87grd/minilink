@@ -53,6 +53,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "WhiteNoise",
         "TrajectorySource",
         "Sum",
+        "Error",
         "Gain",
         "Mux",
         "Demux",

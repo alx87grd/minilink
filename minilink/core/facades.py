@@ -684,6 +684,7 @@ class DynamicSystemFacades:
         eps=1e-6,
         backend="matplotlib",
         show=True,
+        title=None,
     ):
         """Bode diagram of one SISO channel, gain and phase margins marked.
 
@@ -706,6 +707,7 @@ class DynamicSystemFacades:
             eps=eps,
             backend=backend,
             show=show,
+            title=title,
         )
 
     def margins(

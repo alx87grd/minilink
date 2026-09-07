@@ -396,7 +396,7 @@ class System(SharedSystemFacades):
 
         ``controller @ plant`` wires the standard feedback ports; an
         error-driven left operand (a compensator, a transfer function, a
-        series diagram ``C >> G``) gets a summing junction ``e = r - y``
+        series diagram ``C >> G``) gets an Error block ``e = r - y``
         inserted; ``sys @ 1`` closes ``sys`` on itself with unity feedback.
         See :func:`~minilink.core.composition.closed_loop` and
         :func:`~minilink.core.composition.feedback`.

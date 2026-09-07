@@ -2,10 +2,30 @@
 
 from __future__ import annotations
 
+import re
 import warnings
 
 from minilink.graphical.diagrams.export import TopologyExporter
 from minilink.graphical.diagrams.topology import build_diagram_topology
+
+
+def graphviz_port_id(port_id):
+    """Return a Graphviz HTML ``PORT`` identifier for a minilink port id.
+
+    Graphviz port names must be identifiers; ``+`` / ``-`` become ``plus`` /
+    ``minus``, and ``y[0]``-style Demux ids drop the brackets. The cell
+    still displays the original port id.
+    """
+    if port_id == "+":
+        return "plus"
+    if port_id == "-":
+        return "minus"
+    text = re.sub(r"[^0-9A-Za-z_]", "_", port_id).strip("_")
+    if not text:
+        text = "port"
+    if text[0].isdigit():
+        text = "p_" + text
+    return text
 
 
 class GraphvizTopologyExporter(TopologyExporter):
@@ -33,8 +53,8 @@ class GraphvizTopologyExporter(TopologyExporter):
 
         for edge in topology.edges:
             graph.edge(
-                f"{edge.source_node}:{edge.source_port}:e",
-                f"{edge.target_node}:{edge.target_port}:w",
+                f"{edge.source_node}:{graphviz_port_id(edge.source_port)}:e",
+                f"{edge.target_node}:{graphviz_port_id(edge.target_port)}:w",
             )
 
         return graph
@@ -57,13 +77,18 @@ def block_html(node):
         html += "<TR>\n"
         if j < len(node.inputs):
             port_id = node.inputs[j].id
-            html += f'<TD PORT="{port_id}" align="left" BORDER="1">{port_id}</TD>\n'
+            html += (
+                f'<TD PORT="{graphviz_port_id(port_id)}" align="left" '
+                f'BORDER="1">{port_id}</TD>\n'
+            )
         else:
             html += '<TD BORDER="1"> </TD>\n'
 
         if j < len(node.outputs):
             port_id = node.outputs[j].id
-            html += f'<TD PORT="{port_id}" BORDER="1">{port_id}</TD>\n'
+            html += (
+                f'<TD PORT="{graphviz_port_id(port_id)}" BORDER="1">{port_id}</TD>\n'
+            )
         else:
             html += '<TD BORDER="1"> </TD>\n'
         html += "</TR>\n"

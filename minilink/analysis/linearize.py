@@ -150,13 +150,16 @@ def output_selectors(sys, of):
     """Normalize ``of`` to a list of ``(name, index)``; ``None`` means the state.
 
     Default: every boundary output of a diagram, the ``y`` port of a leaf,
-    every output port of a static block, or the state when nothing applies.
+    the command ``u`` of a compensator, every output of a static block, or
+    the state when nothing applies.
     """
     if of is None:
         if isinstance(sys, DiagramSystem) and sys.outputs:
             return [(port_id, None) for port_id in sys.outputs]
         if "y" in sys.outputs:
             return [("y", None)]
+        if "u" in sys.outputs:
+            return [("u", None)]
         if sys.n == 0 and sys.outputs:
             return [(port_id, None) for port_id in sys.outputs]
         return None

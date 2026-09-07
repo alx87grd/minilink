@@ -92,7 +92,7 @@ opts out for GPU/RL workloads. Tools built on JAX evaluators (trajopt,
 
 | Layer | Use | Examples |
 | --- | --- | --- |
-| 1 Facades | Teaching, quick looks | `compute_trajectory`, `plot_trajectory`, `jacobian`, `linearize`, `+`/`>>`/`@` (`C >> G` is the loop gain, `C @ G` or `L @ 1` the loop closed through a summing junction) |
+| 1 Facades | Teaching, quick looks | `compute_trajectory`, `plot_trajectory`, `jacobian`, `linearize`, `+`/`>>`/`@` (`C >> G` is the loop gain, `C @ G` or `L @ 1` the loop closed through an Error block) |
 | 2 Tools and orchestrators | Scripts, projects, repeat runs, trajopt, NLP | `Simulator`, `analysis.jacobian`, `analysis.bode`, `TrajectoryOptimizationPlanner`, `Optimizer` |
 | 3 Contracts | Custom wiring, extension | `DiagramSystem.connect`, `compile()`, `MathematicalProgram` |
 
@@ -531,19 +531,21 @@ Visualization: subsystem `"world"` geometry merges into one shared diagram
 
 ### Control feedback profiles
 
-**Compensators and the summing junction (Sep 2026).** Classical laws are
+**Compensators and the Error block (Sep 2026).** Classical laws are
 written once on the tracking error and take a port-layout switch:
-`ports="error"` declares one input `e` (the compensator form, `PID`,
-`TransferFunction`, `Lead`, `Lag`, `ProportionalController(ports="error")`),
+`ports="error"` declares one input `e` and command `u` (the compensator
+form, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`,
+`ProportionalController(ports="error")`),
 `ports="reference"` declares `r` and `y` (the controller form the generic
-framework uses). `@` keeps one rule — the left operand drives the right
+framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). `@` keeps one rule — the left operand drives the right
 one and the output returns to the left — with two layouts: a declared
 measurement port is wired directly; an error-driven block
 (`core.feedback.error_input`: a declared `error_port`, or a single input
 with no roles — a compensator, a transfer function, a plant, a series
-diagram `C >> G`) gets a `Sum` junction `e = r - y` inserted by
-`core.composition.feedback`, and `sys @ 1` closes any such system on itself
-(`sys @ K` through a `Gain`). A scalar error against a vector output takes
+diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`, `e`)
+inserted by `core.composition.feedback`, and `sys @ 1` closes any such
+system on itself (`sys @ K` through a `Gain`). Positive feedback still
+uses a signed `Sum`. A scalar error against a vector output takes
 component 0 through a visible `Demux`; equal dimensions close a vector loop;
 anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`
 block, no new operator.

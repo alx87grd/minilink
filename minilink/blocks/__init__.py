@@ -2,7 +2,7 @@
 
 Band facade for short teaching imports::
 
-    from minilink.blocks import Step, Integrator, Sum, Saturation
+    from minilink.blocks import Step, Integrator, Error, Sum, Saturation
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "WhiteNoise": ("minilink.blocks.sources", "WhiteNoise"),
     # routing
     "Demux": ("minilink.blocks.routing", "Demux"),
+    "Error": ("minilink.blocks.routing", "Error"),
     "Gain": ("minilink.blocks.routing", "Gain"),
     "Mux": ("minilink.blocks.routing", "Mux"),
     "Sum": ("minilink.blocks.routing", "Sum"),

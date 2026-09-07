@@ -172,14 +172,17 @@ def series(
 
 
 def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSystem:
-    """Close ``sys`` on itself with a summing junction: ``r -> Σ -> sys -> y``.
+    """Close ``sys`` on itself with an :class:`~minilink.blocks.routing.Error`
+    block: ``r -> e = r - y -> sys -> y``.
 
-    The junction computes ``e = r + sign * y`` (negative feedback by default)
-    and drives the one free input of ``sys`` — a plant, a transfer function,
-    a compensator, or a series diagram such as ``C >> G``. ``sys`` is not
-    modified: the result is a new diagram sharing its blocks, with boundary
-    input ``r`` and the output of ``sys`` as boundary output ``y``. The
-    operator form is ``sys @ 1`` (and ``sys @ K`` for ``through=K``).
+    Negative feedback (the default) inserts ``Error``, so the diagram shows
+    ports ``+``, ``-``, and ``e``. Positive feedback still uses a signed
+    :class:`~minilink.blocks.routing.Sum`. The junction drives the one free
+    input of ``sys`` — a plant, a transfer function, a compensator, or a
+    series diagram such as ``C >> G``. ``sys`` is not modified: the result
+    is a new diagram sharing its blocks, with boundary input ``r`` and the
+    output of ``sys`` as boundary output ``y``. The operator form is
+    ``sys @ 1`` (and ``sys @ K`` for ``through=K``).
 
     Parameters
     ----------
@@ -197,7 +200,7 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
     validate : bool
         Run algebraic-loop detection before returning.
     """
-    from minilink.blocks.routing import Demux, Gain, Sum
+    from minilink.blocks.routing import Demux, Error, Gain, Sum
 
     diagram = DiagramSystem()
     if isinstance(sys, DiagramSystem):
@@ -235,14 +238,21 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
         diagram.connect(signal_sys, signal_port, gain_id, "u")
         signal_sys, signal_port = gain_id, "y"
 
-    sum_id = _add_system_to_diagram(
-        diagram, Sum(signs=(1.0, float(sign)), dim=entry_dim), role="sum"
-    )
+    if float(sign) == -1.0:
+        junction_id = _add_system_to_diagram(
+            diagram, Error(dim=entry_dim), role="error"
+        )
+        plus_port, minus_port, out_port = "+", "-", "e"
+    else:
+        junction_id = _add_system_to_diagram(
+            diagram, Sum(signs=(1.0, float(sign)), dim=entry_dim), role="sum"
+        )
+        plus_port, minus_port, out_port = "in0", "in1", "y"
     diagram.add_input_port("r", dim=entry_dim)
-    diagram.connect("input", "r", sum_id, "in0")
-    diagram.connect(signal_sys, signal_port, sum_id, "in1")
-    diagram.connect(sum_id, "y", entry_sys, entry_port)
-    diagram._composition_entry = (sum_id, "in0")
+    diagram.connect("input", "r", junction_id, plus_port)
+    diagram.connect(signal_sys, signal_port, junction_id, minus_port)
+    diagram.connect(junction_id, out_port, entry_sys, entry_port)
+    diagram._composition_entry = (junction_id, plus_port)
     diagram._composition_output = (output_sys, output_port)
     diagram.name = f"Closed loop of {sys.name}"
     if validate:
@@ -278,9 +288,11 @@ def _return_signal(diagram, of, entry_dim, Demux):
     if entry_dim != 1:
         raise ValueError("of=(port, index) selects one component; the input takes more")
     parts = [d for d in (index, 1, dim - index - 1) if d > 0]
-    demux_id = _add_system_to_diagram(diagram, Demux(dims=parts), role="demux")
-    diagram.connect(out_sys, out_port, demux_id, "u")
-    return demux_id, f"out{1 if index > 0 else 0}"
+    demux_id = _add_system_to_diagram(
+        diagram, Demux(dims=parts, port=out_port), role="demux"
+    )
+    diagram.connect(out_sys, out_port, demux_id, out_port)
+    return demux_id, f"{out_port}[{index}]"
 
 
 _close_with_junction = feedback
@@ -306,8 +318,9 @@ def closed_loop(
     - a controller with a measurement port (``r``, ``y`` → ``u``) is wired
       the standard way, the measurement returning to ``y``;
     - an error-driven block (:func:`~minilink.core.feedback.error_input`: a
-      compensator, a transfer function, a plant, a series diagram) gets a
-      summing junction ``e = r - y`` inserted by :func:`feedback`; a scalar
+      compensator, a transfer function, a plant, a series diagram) gets an
+      :class:`~minilink.blocks.routing.Error` block ``e = r - y`` inserted by
+      :func:`feedback`; a scalar
       or matrix ``plant`` is the return-path gain (``L @ 1`` is unity
       feedback, ``L @ K`` is ``feedback(L, K)``).
 
@@ -1291,7 +1304,7 @@ def _is_controller_like(sys) -> bool:
         return True
     outputs = sys.outputs
     inputs = sys.inputs
-    return "u" in outputs and ("r" in inputs or "y" in inputs)
+    return "u" in outputs and ("r" in inputs or "y" in inputs or "e" in inputs)
 
 
 def _default_subsystem_id(sys, *, role=None) -> str:

@@ -267,14 +267,20 @@ def plot_bode(
     eps: float = 1e-6,
     backend="matplotlib",
     show: bool = True,
+    title: str | None = None,
 ) -> PlotResult:
-    """Bode diagram of the selected channel; ``margins=True`` marks the crossovers."""
+    """Bode diagram of the selected channel; ``margins=True`` marks the crossovers.
+
+    ``title`` overrides the figure heading (default ``"Bode Diagram"``).
+    """
     w, G = frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
 
     return render_control_figure(
-        _bode_figure(w, G, sys, of, wrt, margins), backend=backend, show=show
+        _bode_figure(w, G, sys, of, wrt, margins, title=title),
+        backend=backend,
+        show=show,
     )
 
 
@@ -495,7 +501,7 @@ def _root_markers(p, z):
     )
 
 
-def _bode_figure(w, G, sys, of, wrt, margins):
+def _bode_figure(w, G, sys, of, wrt, margins, title=None):
     magnitude_db, phase_deg = _bode_coordinates(G)
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>|G| = {mk:.1f} dB<br>∠G = {pk:.1f}°"
@@ -514,7 +520,7 @@ def _bode_figure(w, G, sys, of, wrt, margins):
     else:
         references = (), ()
     return ControlFigure(
-        title=style.BODE_TITLE,
+        title=style.BODE_TITLE if title is None else title,
         subtitle=channel_subtitle(sys, of, wrt),
         share_x=True,
         panels=(

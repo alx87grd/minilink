@@ -1,4 +1,4 @@
-"""The summing-junction side of ``@``: compensators, ``feedback``, port layouts."""
+"""The Error-block side of ``@``: compensators, ``feedback``, port layouts."""
 
 from __future__ import annotations
 
@@ -56,15 +56,15 @@ class TestJunction(unittest.TestCase):
         T = PID(Kp=20.0, Kd=2.0, tau=0.05) @ _damped_pendulum()
         self.assertEqual(list(T.inputs), ["r"])
         self.assertEqual(list(T.outputs), ["y"])
-        self.assertEqual(list(T.subsystems), ["ctl", "sys", "demux", "sum"])
+        self.assertEqual(list(T.subsystems), ["ctl", "sys", "demux", "error"])
         self.assertEqual(
             T.subsystems["demux"].dims, [1, 1]
         )  # theta, the first component
         self.assertEqual(
-            T.connections["sum"], {"in0": ("input", "r"), "in1": ("demux", "out0")}
+            T.connections["error"], {"+": ("input", "r"), "-": ("demux", "y[0]")}
         )
-        self.assertEqual(T.connections["ctl"]["e"], ("sum", "y"))
-        self.assertEqual(T.connections["demux"]["u"], ("sys", "y"))
+        self.assertEqual(T.connections["ctl"]["e"], ("error", "e"))
+        self.assertEqual(T.connections["demux"]["y"], ("sys", "y"))
 
     def test_series_then_unity_equals_compensator_at_plant_and_leaves_the_loop_gain_alone(
         self,
@@ -87,8 +87,8 @@ class TestJunction(unittest.TestCase):
 
     def test_vector_loop_uses_a_vector_junction(self):
         T = PID(Kp=[3.0, 5.0], dof=2) @ _TwoInTwoOut()
-        self.assertEqual(list(T.subsystems), ["ctl", "sys", "sum"])
-        self.assertEqual(T.subsystems["sum"].dim, 2)
+        self.assertEqual(list(T.subsystems), ["ctl", "sys", "error"])
+        self.assertEqual(T.subsystems["error"].dim, 2)
         self.assertEqual(T.inputs["r"].dim, 2)
         self.assertEqual(T.jacobian("f", "x").shape, (6, 6))
 
@@ -96,19 +96,19 @@ class TestJunction(unittest.TestCase):
         L = PID(Kp=20.0, Kd=2.0) >> _damped_pendulum()
         T = feedback(L, of=("y", 1))
         self.assertEqual(T.subsystems["demux"].dims, [1, 1])
-        self.assertEqual(T.connections["sum"]["in1"], ("demux", "out1"))
+        self.assertEqual(T.connections["error"]["-"], ("demux", "y[1]"))
         T = L @ 0.5
-        self.assertEqual(list(T.subsystems), ["ctl", "sys", "demux", "gain", "sum"])
+        self.assertEqual(list(T.subsystems), ["ctl", "sys", "demux", "gain", "error"])
         np.testing.assert_allclose(T.subsystems["gain"].params["K"], [[0.5]])
         T = feedback(L, through=TransferFunction([1.0], [0.1, 1.0]))
         self.assertIn("sensor", T.subsystems)
-        self.assertEqual(T.connections["sum"]["in1"], ("sensor", "y"))
+        self.assertEqual(T.connections["error"]["-"], ("sensor", "y"))
 
     def test_sign_and_plant_alone(self):
         T = feedback(_damped_pendulum(), sign=+1.0)
         np.testing.assert_allclose(T.subsystems["sum"].signs, [1.0, 1.0])
         T = _damped_pendulum() @ 1
-        self.assertEqual(list(T.subsystems), ["sys", "demux", "sum"])
+        self.assertEqual(list(T.subsystems), ["sys", "demux", "error"])
 
     def test_mismatches_are_refused_with_guidance(self):
         with self.assertRaisesRegex(ValueError, "Cannot close the loop"):
@@ -126,6 +126,7 @@ class TestJunction(unittest.TestCase):
         self.assertIsNone(error_input(PID(ports="reference")))
         self.assertEqual(error_input(PID()), "e")
         self.assertEqual(error_input(TransferFunction([1.0], [1.0, 1.0])), "u")
+        self.assertEqual(error_input(Lead()), "e")
 
     def test_step_reference_drives_the_classical_loop(self):
         plant = _damped_pendulum()
@@ -133,7 +134,7 @@ class TestJunction(unittest.TestCase):
             Step(final_value=0.3, step_time=1.0)
             >> PID(Kp=20.0, Kd=2.0, tau=0.05) @ plant
         )
-        self.assertEqual(list(loop.subsystems), ["ref", "ctl", "sys", "demux", "sum"])
+        self.assertEqual(list(loop.subsystems), ["ref", "ctl", "sys", "demux", "error"])
         traj = loop.compute_trajectory(tf=8.0, verbose=False)
         static_gain = 20.0 / (20.0 + 4.905 / 0.5)  # Kp / (Kp + wn^2 / k)
         self.assertAlmostEqual(traj.x[-2, -1], 0.3 * static_gain, delta=0.01)
@@ -182,12 +183,17 @@ class TestPortLayouts(unittest.TestCase):
         lead = Lead(K=2.0, z=1.0, p=10.0)
         np.testing.assert_allclose(lead.numerator, [2.0, 2.0])
         np.testing.assert_allclose(lead.denominator, [1.0, 10.0])
+        self.assertEqual(lead.name, "Lead")
+        self.assertEqual(list(lead.inputs), ["e"])
+        self.assertEqual(list(lead.outputs), ["u"])
         np.testing.assert_allclose(Lag(K=1.0, z=1.0, p=0.1).poles, [-0.1])
         with self.assertRaises(ValueError):
             Lead(z=10.0, p=1.0)
         with self.assertRaises(ValueError):
             Lag(z=0.1, p=1.0)
-        self.assertEqual(list((Lead() >> DoubleIntegrator()).inputs), ["u"])
+        L = Lead() >> DoubleIntegrator()
+        self.assertEqual(list(L.inputs), ["e"])
+        self.assertEqual(list(L.subsystems), ["ctl", "sys"])
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ class ProportionalController(ErrorDriven, Controller):
 
     ``ports="reference"`` (default) declares ``r`` and ``y`` and computes
     ``e = r - y`` inside; ``ports="error"`` declares one input ``e`` — the
-    compensator form, where ``@`` inserts the summing junction. For *state*
+    compensator form, where ``@`` inserts the Error block. For *state*
     feedback with a feedforward offset — the form LQR produces — use
     :class:`~minilink.control.state.StateFeedbackController`.
     """

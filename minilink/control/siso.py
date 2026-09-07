@@ -11,7 +11,7 @@ class PID(ErrorDriven, DynamicController):
     """Decoupled PID with filtered derivative and anti-windup.
 
     ``ports="error"`` (default) is the compensator form: one input ``e``, so
-    ``PID(...) @ plant`` inserts the summing junction ``e = r - y`` and
+    ``PID(...) @ plant`` inserts the Error block ``e = r - y`` and
     ``PID(...) >> plant`` is the loop gain. ``ports="reference"`` is the
     controller form with inputs ``r`` and ``y``. Per axis,
 

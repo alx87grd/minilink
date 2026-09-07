@@ -115,7 +115,7 @@ another diagram.
 | `a + b + c` | Add subsystems without wiring |
 | `source >> plant` | Chain output to input |
 | `controller @ plant` | Build a simple feedback diagram |
-| `C @ plant`, `L @ 1` | Classical loop: a compensator or series diagram closed through a summing junction `e = r - y` |
+| `C @ plant`, `L @ 1` | Classical loop: a compensator or series diagram closed through an Error block `e = r - y` |
 | `.autowire(strict=True)` | Connect matching named ports |
 
 Explicit wiring (`add_subsystem` / `connect`) is always available when the

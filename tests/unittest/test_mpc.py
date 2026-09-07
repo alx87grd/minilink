@@ -1029,8 +1029,8 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     plant_diagram.add_subsystem(Demux(dims=(1, 1)), "split")
     plant_diagram.add_input_port("u", dim=2)
     plant_diagram.connect("input", "u", "split", "u")
-    plant_diagram.connect("split", "out0", "bike", "w_rear_dot")
-    plant_diagram.connect("split", "out1", "bike", "delta_dot")
+    plant_diagram.connect("split", "u[0]", "bike", "w_rear_dot")
+    plant_diagram.connect("split", "u[1]", "bike", "delta_dot")
     plant_diagram.connect_new_output_port("bike", "y", "y")
     hybrid = HybridDiagram(
         computer=Computer(step_diagram, StepSchedule(dt_base=mpc_dt)),
@@ -1216,8 +1216,8 @@ def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
     plant_diagram.add_subsystem(Demux(dims=(1, 1)), "split")
     plant_diagram.add_input_port("u", dim=2)
     plant_diagram.connect("input", "u", "split", "u")
-    plant_diagram.connect("split", "out0", "bike", "w_rear_dot")
-    plant_diagram.connect("split", "out1", "bike", "delta_dot")
+    plant_diagram.connect("split", "u[0]", "bike", "w_rear_dot")
+    plant_diagram.connect("split", "u[1]", "bike", "delta_dot")
     plant_diagram.connect_new_output_port("bike", "y", "y")
     hybrid = HybridDiagram(
         computer=Computer(step_diagram, StepSchedule(dt_base=MPC_DT)),

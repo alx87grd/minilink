@@ -146,7 +146,7 @@ class DynamicController(Controller, DynamicSystem):
 
 
 def error_input(block):
-    """Input port a summing junction drives when ``block`` is closed on itself, or ``None``.
+    """Input port an Error block drives when ``block`` is closed on itself, or ``None``.
 
     An explicit ``error_port`` attribute wins (:class:`ErrorDriven` sets it).
     Otherwise a block with exactly one input port and no declared feedback
@@ -167,7 +167,7 @@ class ErrorDriven:
     """Port-layout switch for laws written on the tracking error ``e = r - y``.
 
     ``ports="error"`` declares one input ``e`` — the compensator form, where
-    ``block @ plant`` inserts the summing junction and ``block >> plant`` is
+    ``block @ plant`` inserts the Error block and ``block >> plant`` is
     the loop gain. ``ports="reference"`` declares ``r`` and ``y`` — the
     controller form, where ``@`` wires them to the plant. The law reads
     ``e = self.error(u)`` either way, so it is written once.

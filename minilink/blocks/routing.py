@@ -5,10 +5,11 @@ Plant-agnostic plumbing for multi-signal diagrams. Each block is a
 dimensions are fixed at construction, so diagram wiring is validated at connect
 time.
 
+- :class:`Error` — tracking-error comparison ``e = r - y`` on ports ``+``, ``-``, ``e``.
 - :class:`Sum` — signed junction ``y = Σ sign_i · in_i``.
 - :class:`Gain` — constant gain ``y = K · u``.
 - :class:`Mux` — stack several input signals into one vector output.
-- :class:`Demux` — split one vector input into several outputs.
+- :class:`Demux` — split one vector into NumPy-style slices (``y[0]``, ``y[1]``, …).
 """
 
 import numpy as np
@@ -17,11 +18,37 @@ from minilink.core.backends import array_module
 from minilink.core.system import System
 
 
+class Error(System):
+    """Tracking-error comparison ``e = r - y`` on ports ``+``, ``-``, ``e``.
+
+    The automatic feedback pattern (``C @ plant``, ``sys @ 1``) inserts this
+    block so the diagram reads as a comparison, not a generic summer. All
+    three ports share the same dimension ``dim``.
+    """
+
+    def __init__(self, dim=1):
+        super().__init__()
+        self.name = "Error"
+        self.dim = int(dim)
+
+        self.add_input_port("+", dim=self.dim)
+        self.add_input_port("-", dim=self.dim)
+        self.add_output_port(
+            "e", dim=self.dim, function=self.compute, dependencies="all"
+        )
+
+    def compute(self, x, u, t=0, params=None):
+        r, y = u.reshape(2, self.dim)
+        return r - y
+
+
 class Sum(System):
     """Signed summing junction ``y = Σ sign_i · in_i`` on ports ``in0, in1, …``.
 
-    The default ``signs=(1.0, -1.0)`` is the classic tracking-error junction
-    ``y = in0 - in1``. All input ports share the same dimension ``dim``.
+    The default ``signs=(1.0, -1.0)`` is a two-input difference
+    ``y = in0 - in1``. Use :class:`Error` for the named tracking-error
+    comparison that ``@`` inserts. All input ports share the same dimension
+    ``dim``.
 
     ``signs`` is a structural attribute fixed at construction (it sets the
     number of input ports), deliberately not a tunable ``params`` entry.
@@ -106,25 +133,34 @@ class Mux(System):
 
 
 class Demux(System):
-    """Split one vector input ``u`` into outputs ``out0, out1, …``.
+    """Split one vector into NumPy-style slices of a named signal.
 
-    ``dims`` lists each output-port dimension; the input dimension is their sum.
-    Each output slices its contiguous block out of the input vector.
+    ``dims`` lists each output-port dimension; the input dimension is their
+    sum. The input port is ``port`` (default ``u``); each output is the
+    corresponding slice, ``u[0]``, ``u[1]``, or ``u[0:2]`` for a wider
+    block. Auto-wired feedback passes the plant port name so a ``y``
+    measurement becomes ``y`` in and ``y[0]``, ``y[1]``, … out.
     """
 
-    def __init__(self, dims=(1, 1)):
+    def __init__(self, dims=(1, 1), *, port="u"):
         super().__init__()
         self.name = "Demux"
         self.dims = [int(d) for d in dims]
+        self.port = str(port)
 
-        self.add_input_port("u", dim=sum(self.dims))
+        self.add_input_port(self.port, dim=sum(self.dims))
         start = 0
-        for i, d in enumerate(self.dims):
+        for d in self.dims:
+            port_id = (
+                f"{self.port}[{start}]"
+                if d == 1
+                else f"{self.port}[{start}:{start + d}]"
+            )
             self.add_output_port(
-                f"out{i}",
+                port_id,
                 dim=d,
                 function=self._slice(slice(start, start + d)),
-                dependencies=("u",),
+                dependencies=(self.port,),
             )
             start += d
 
@@ -138,12 +174,12 @@ class Demux(System):
 
 
 if __name__ == "__main__":
-    # Hello world: difference junction, gain, and a Mux/Demux round trip.
-    error = Sum(signs=(1.0, -1.0))
-    print("Sum:", error.compute(None, np.array([5.0, 2.0])))  # 3.0
+    # Hello world: error comparison, gain, and a Mux/Demux round trip.
+    error = Error()
+    print("Error:", error.compute(None, np.array([5.0, 2.0])))  # 3.0
 
     gain = Gain([2.0, 3.0])
     print("Gain:", gain.compute(None, np.array([1.0, 1.0])))  # [2, 3]
 
     split = Demux(dims=(2, 1))
-    print("Demux out1:", split.outputs["out1"].compute(None, np.array([1.0, 2.0, 9.0])))
+    print("Demux u[2]:", split.outputs["u[2]"].compute(None, np.array([1.0, 2.0, 9.0])))
