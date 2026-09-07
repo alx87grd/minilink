@@ -384,7 +384,7 @@ Index and placement rules: [examples/README.md](examples/README.md)
 | MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/mpc](examples/projects/mpc/mpc_spatial_stack.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
 | MPC scenarios (path / slalom / spatial) | `examples/projects/mpc/` · circuit: `examples/demos/mpc/mpc_car_circuit.py` |
 | Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/demos/robotic/` |
-| Analysis (linearize, trim, ctrb/obsv, modal) | `examples/demos/analysis/` · [intro/analysis](examples/learn/intro/04_analysis.ipynb) |
+| Analysis (linearize, trim, ctrb/obsv, modal, Bode, root locus) | `examples/demos/analysis/` · [intro/analysis](examples/learn/intro/04_analysis.ipynb) · [teaching/frequency_domain_tools](examples/learn/teaching/frequency_domain_tools.ipynb) |
 | State-space / LQR | `examples/demos/control/` |
 | Identification (param gradients) | `examples/demos/compile/` |
 | Plotting | `examples/demos/graphical/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |

@@ -78,6 +78,7 @@ Long notebooks (UR5 EoM, DP grids, PPO training) are not smoked by CI.
 
 | Notebook | Colab |
 | --- | --- |
+| [frequency_domain_tools](learn/teaching/frequency_domain_tools.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/frequency_domain_tools.ipynb) |
 | [pendulum_swing_up_cost_function_vi](learn/teaching/pendulum_swing_up_cost_function_vi.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/pendulum_swing_up_cost_function_vi.ipynb) |
 | [pendulum_swing_up_vi_vs_lqr](learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb) |
 | [pendulum_swing_up_vi_vs_lqr_vs_ppo](learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) |
@@ -106,7 +107,7 @@ One demo folder per intro chapter; the research lane sits apart.
 | Blocks | [01_blocks](learn/intro/01_blocks.ipynb) | [`demos/blocks/`](demos/blocks/) | |
 | Dynamics catalog | [02_dynamics](learn/intro/02_dynamics.ipynb) | [`demos/dynamics/`](demos/dynamics/) | `from minilink import Pendulum, CartPole, …` |
 | Control | [03_control](learn/intro/03_control.ipynb) | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [articulated_robot_eom](learn/teaching/articulated_robot_eom.ipynb) |
-| Analysis | [04_analysis](learn/intro/04_analysis.ipynb) | [`demos/analysis/`](demos/analysis/) | |
+| Analysis | [04_analysis](learn/intro/04_analysis.ipynb) | [`demos/analysis/`](demos/analysis/) | [frequency_domain_tools](learn/teaching/frequency_domain_tools.ipynb) (Bode, margins, Nyquist, root locus, step response) |
 | Simulation | [05_simulation](learn/intro/05_simulation.ipynb) | [`demos/graphical/`](demos/graphical/) | |
 | Hybrid / step | [06_hybrid](learn/intro/06_hybrid.ipynb) | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack) |
 | Compile / autodiff | [07_compile](learn/intro/07_compile.ipynb), [showcase_jax](learn/intro/showcase_jax.ipynb) | [`demos/compile/`](demos/compile/) | [cartpole_rollout_gradients](learn/teaching/cartpole_rollout_gradients.ipynb) |

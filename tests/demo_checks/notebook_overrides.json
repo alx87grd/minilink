@@ -1,23 +1,34 @@
 {
   "examples/learn/intro/showcase_minilink.ipynb": {
-    "requires": ["jax"],
+    "requires": [
+      "jax"
+    ],
     "timeout": 300
   },
   "examples/learn/intro/showcase_jax.ipynb": {
-    "requires": ["jax"],
+    "requires": [
+      "jax"
+    ],
     "timeout": 300
   },
   "examples/learn/intro/07_compile.ipynb": {
-    "requires": ["jax"]
+    "requires": [
+      "jax"
+    ]
   },
   "examples/learn/intro/09_planning.ipynb": {
     "timeout": 300
   },
   "examples/learn/intro/10_graphical.ipynb": {
-    "requires": ["meshcat", "plotly"]
+    "requires": [
+      "meshcat",
+      "plotly"
+    ]
   },
   "examples/learn/teaching/cartpole_rollout_gradients.ipynb": {
-    "requires": ["jax"],
+    "requires": [
+      "jax"
+    ],
     "timeout": 300
   },
   "examples/learn/teaching/articulated_robot_eom.ipynb": {
@@ -37,5 +48,15 @@
   },
   "examples/tooling/notebooks/benchmark.ipynb": {
     "smoke": false
+  },
+  "examples/learn/teaching/frequency_domain_tools.ipynb": {
+    "requires": [
+      "plotly"
+    ]
+  },
+  "examples/learn/intro/04_analysis.ipynb": {
+    "requires": [
+      "plotly"
+    ]
   }
 }
