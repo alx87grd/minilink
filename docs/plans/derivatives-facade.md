@@ -5,13 +5,12 @@ rulings of §6; two deviations. The JAX Jacobian runs `jacfwd` eagerly instead
 of under `jax.jit`, so catalog blocks that build constant matrices from
 `params` (`np.array` in an `A(t, params)`) still differentiate exactly with
 respect to `x`, `u`, `t` and wires, and `method="auto"` falls back to finite
-differences for `wrt="params"` on those blocks. The evaluator cache
-(`sys.compiled_evaluator(method)`, stored in `sys.compiled_evaluators`) is
-tagged with a structural signature (ports, dimensions, subsystems,
-connections) instead of being cleared by `refresh()` and the mutators:
-`Simulator` calls `refresh()` on every solve, and a port added to a block
-already inside a diagram must invalidate the diagram too. The rest of this
-document is the plan as ruled.
+differences for `wrt="params"` on those blocks. There is no evaluator cache
+on the system: with the eager path a JAX compile costs about 1.5 ms, less
+than one Jacobian evaluation, so each call of the value tier compiles its own
+evaluator and the `System` object stays stateless; loops keep the callable
+from `evaluator.jacobian(of, wrt)`. The rest of this document is the plan as
+ruled.
 Lane: teaching surface (core facade) over the evaluators. v3 stepped back to
 two methods on `System` (`jacobian`, `linearize`), values at the student tier
 and the function form on the evaluator. v4 extends the same calling pattern to

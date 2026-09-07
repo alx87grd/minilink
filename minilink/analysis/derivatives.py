@@ -4,9 +4,10 @@
 differentiated (``"f"``, ``"step"``, an output port, or a diagram wire
 ``"block:port"``), the second the variable (``"x"``, ``"u"``, an input port,
 ``"t"``, ``"params"``, or a wire). The point follows in the order of
-``f(x, u, t, params)`` with the textbook defaults, and the arithmetic runs on
-the cached compiled evaluator: exact under JAX when the system traces, central
-finite differences otherwise.
+``f(x, u, t, params)`` with the textbook defaults, and each call compiles its
+own evaluator (about a millisecond): exact under JAX when the system traces,
+central finite differences otherwise. Nothing is stored on the system; keep
+``evaluator.jacobian(of, wrt)`` when a loop needs the callable.
 """
 
 from __future__ import annotations
@@ -61,7 +62,7 @@ def jacobian(
         zero sensitivity, like every parametric tier.
     """
     x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
-    evaluator = sys.compiled_evaluator(method)
+    evaluator = compiled(sys, method)
     try:
         J = evaluator.jacobian(of, wrt, eps=eps)(x_bar, u_bar, t, params)
     except Exception as exc:
@@ -70,10 +71,26 @@ def jacobian(
         # from params, wrt="params") falls back to finite differences.
         if method != "auto" or evaluator.backend != "jax" or not _is_tracing_error(exc):
             raise
-        J = sys.compiled_evaluator("fd").jacobian(of, wrt, eps=eps)(
-            x_bar, u_bar, t, params
-        )
+        J = compiled(sys, "fd").jacobian(of, wrt, eps=eps)(x_bar, u_bar, t, params)
     return as_numpy(J)
+
+
+def compiled(sys, method="auto"):
+    """The evaluator behind one derivative call.
+
+    ``"auto"`` prefers JAX when it is installed and the system traces,
+    ``"fd"`` compiles with NumPy, ``"jax"`` compiles with JAX and raises when
+    the system does not trace.
+    """
+    from minilink.core.compile.compiler import compile as compile_system
+    from minilink.core.compile.compiler import compile_auto
+
+    key = str(method).strip().lower()
+    if key == "auto":
+        return compile_auto(sys)[1]
+    if key in ("fd", "jax"):
+        return compile_system(sys, backend="numpy" if key == "fd" else "jax")
+    raise ValueError(f"method must be 'auto', 'fd' or 'jax'; got {method!r}")
 
 
 def _is_tracing_error(exc):

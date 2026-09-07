@@ -250,3 +250,13 @@ Left as is, for the maintainer: `transfer_function` imports the
 block, like `lqr_at_operating_point` returns `StateFeedbackController`);
 `analysis.linearize` keeps six small selector helpers; eager `jacfwd` costs
 0.5–5 ms per Jacobian against 0.03–0.08 ms for finite differences.
+
+Follow-up (2026-09-07): the maintainer questioned the evaluator cache on the
+system. Measured with the eager JAX path, a JAX compile costs 1.3–1.6 ms
+(NumPy 0.02 ms) against 1.8–5.4 ms for one Jacobian evaluation, so the cache
+saved about 1.5 ms per call at the price of an attribute, a method, a
+structural-signature heuristic and a pickling hook on every `System`. Removed:
+`compiled_evaluators`, `compiled_evaluator`, `structure_signature`,
+`__getstate__`; `analysis.derivatives.compiled(sys, method)` compiles per
+call and the value tier stores nothing on the system. Suite 1020 passed / 2
+skipped, analysis demos 8/8, two notebooks re-smoked.

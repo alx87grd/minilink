@@ -164,7 +164,7 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`) |
-| `analysis/` | one calling pattern `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)`: `jacobian(sys, "f", "x")` (∂f/∂x; `of` / `wrt` name `f`, ports, `t`, `params`, or diagram wires `"block:port"`), `linearize` (→ `LTISystem`), one-channel `bode` / `pzmap` / `transfer_function` (`of=` / `wrt=`), controllability/observability (matrices or an `LTISystem`), equilibria, `modal`; `discretize(integrator=)` for continuous→step wrappers. `method="auto"` is exact under JAX when the system traces, finite differences otherwise; the same verbs are methods on every `System` over a cached compiled evaluator |
+| `analysis/` | one calling pattern `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)`: `jacobian(sys, "f", "x")` (∂f/∂x; `of` / `wrt` name `f`, ports, `t`, `params`, or diagram wires `"block:port"`), `linearize` (→ `LTISystem`), one-channel `bode` / `pzmap` / `transfer_function` (`of=` / `wrt=`), controllability/observability (matrices or an `LTISystem`), equilibria, `modal`; `discretize(integrator=)` for continuous→step wrappers. `method="auto"` is exact under JAX when the system traces, finite differences otherwise; the same verbs are methods on every `System`, stateless (each call compiles its evaluator) |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
@@ -437,11 +437,10 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   `plot_bode`, `plot_pzmap`, `modal_analysis`, `find_equilibrium` — and
   `game`), `StepSystemFacades` on `StepSystem` (`compute_rollout`, `jacobian`
   with `k`). `jacobian(of, wrt, x_bar, u_bar, t, params, *, method, eps)` sits
-  on `SharedSystemFacades` over `compiled_evaluator(method)`, a per-system
-  cache (`compiled_evaluators`) tagged with the structural signature (ports,
-  dimensions, subsystems, connections) so structural edits recompile on the
-  next call, parameter edits never do (every call passes the live `params`),
-  and copies or pickles drop it (`__getstate__`). **MRO** picks `compute_trajectory` implementation; no
+  on `SharedSystemFacades`; each call compiles its own evaluator (about a
+  millisecond, the JAX derivative path is eager) and stores nothing on the
+  system — loops keep the callable from `evaluator.jacobian(of, wrt)`
+  instead. **MRO** picks `compute_trajectory` implementation; no
   façade-layer `isinstance` routers. `self.traj` is a convenience cache of
   the latest facade rollout; library code never reads it as an input.
 

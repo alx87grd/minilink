@@ -23,6 +23,7 @@ from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.blocks.transfer_function import TransferFunction
 from minilink.control.state import StateFeedbackController
 from minilink.core.backends import array_module, jax_installed
+from minilink.core.compile.compiler import compile_auto
 from minilink.core.system import DynamicSystem, StepSystem
 
 JAX = jax_installed()
@@ -123,7 +124,6 @@ class TestJacobianValues(unittest.TestCase):
     @jax_only
     def test_jax(self):
         self.check("jax")
-        self.assertEqual(self.plant.compiled_evaluator("jax").backend, "jax")
 
     def test_defaults_are_the_nominal_point(self):
         plant = self.plant
@@ -270,11 +270,11 @@ class TestCatalogAgreement(unittest.TestCase):
                 )
 
 
-class TestMethodAndCache(unittest.TestCase):
+class TestMethod(unittest.TestCase):
     def test_auto_falls_back_to_finite_differences_and_jax_is_strict(self):
         plant = _Untraceable()
         A = plant.jacobian("f", "x")
-        self.assertEqual(plant.compiled_evaluator("auto").backend, "numpy")
+        self.assertEqual(compile_auto(plant)[0], "numpy")
         np.testing.assert_allclose(
             A, Pendulum().jacobian("f", "x", method="fd"), atol=1e-8
         )
@@ -286,27 +286,20 @@ class TestMethodAndCache(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "method must be"):
             Pendulum().jacobian("f", "x", method="ad")
 
-    def test_evaluator_is_cached_and_parameters_stay_live(self):
+    def test_parameter_and_structure_edits_are_seen_by_the_next_call(self):
         plant = Pendulum()
-        first = plant.compiled_evaluator("auto")
-        self.assertIs(plant.compiled_evaluator("auto"), first)
         a_before = plant.jacobian("f", "x")[1, 0]
         plant.params["gravity"] = 2.0 * plant.params["gravity"]
-        a_after = plant.jacobian("f", "x")[1, 0]
-        self.assertIs(plant.compiled_evaluator("auto"), first)
-        np.testing.assert_allclose(a_after, 2.0 * a_before, rtol=1e-6)
-
-    def test_structural_changes_recompile(self):
-        plant = Pendulum()
-        first = plant.compiled_evaluator("auto")
+        np.testing.assert_allclose(
+            plant.jacobian("f", "x")[1, 0], 2.0 * a_before, rtol=1e-6
+        )
         plant.add_output_port("angle", dim=1, function=lambda x, u, t, p=None: x[:1])
-        self.assertIsNot(plant.compiled_evaluator("auto"), first)
         np.testing.assert_allclose(
             plant.jacobian("angle", "x"), [[1.0, 0.0]], atol=1e-8
         )
         # a port added to a block already inside a diagram is seen by the diagram
         loop = _closed_loop()
-        first = loop.compiled_evaluator("auto")
+        loop.jacobian("f", "x")
         ctl = loop.subsystems["ctl"]
         ctl.add_output_port(
             "twice",
@@ -314,28 +307,21 @@ class TestMethodAndCache(unittest.TestCase):
             function=lambda x, u, t, p=None: 2.0 * ctl.ctl(x, u, t, p),
             dependencies="all",
         )
-        self.assertIsNot(loop.compiled_evaluator("auto"), first)
         np.testing.assert_allclose(
             loop.jacobian("ctl:twice", "r")[0, 0],
             2.0 * loop.jacobian("ctl:u", "r")[0, 0],
         )
 
-    def test_simulation_and_refresh_keep_the_cache(self):
-        plant = Pendulum()
-        first = plant.compiled_evaluator("auto")
-        plant.refresh()
-        plant.compute_trajectory(tf=0.1, n_steps=11, verbose=False)
-        self.assertIs(plant.compiled_evaluator("auto"), first)
-
-    def test_cache_survives_copies_without_carrying_evaluators(self):
+    def test_nothing_is_stored_on_the_system(self):
         import copy
         import pickle
 
         plant = Pendulum()
+        before = set(vars(plant))
         plant.jacobian("f", "x")
-        twin = copy.deepcopy(plant)
-        self.assertEqual(twin.compiled_evaluators, {})
-        pickle.loads(pickle.dumps(twin))
+        plant.linearize()
+        self.assertEqual(set(vars(plant)), before)
+        twin = pickle.loads(pickle.dumps(copy.deepcopy(plant)))
         np.testing.assert_allclose(twin.jacobian("f", "x"), plant.jacobian("f", "x"))
 
     @jax_only
@@ -343,7 +329,7 @@ class TestMethodAndCache(unittest.TestCase):
         from minilink.dynamics.catalog.mass_spring_damper.linear import TwoMass
 
         plant = TwoMass()  # A(t, params) is a NumPy matrix built from params
-        self.assertEqual(plant.compiled_evaluator("auto").backend, "jax")
+        self.assertEqual(compile_auto(plant)[0], "jax")
         S = plant.jacobian("f", "params")
         S_fd = plant.jacobian("f", "params", method="fd")
         for key in S_fd:

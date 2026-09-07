@@ -11,36 +11,6 @@ contracts stay in :mod:`minilink.core.system`. Heavy dependencies
 """
 
 
-def structure_signature(system):
-    """Hashable summary of what a compiled evaluator depends on.
-
-    Port ids and dimensions, the state dimension, and for diagrams the
-    subsystems (by id and identity, recursively) and the connections. Nominal
-    values, labels and ``params`` are not part of it: the derivative tools
-    pass them at call time.
-    """
-    ports = (
-        int(system.n),
-        tuple((port_id, port.dim) for port_id, port in system.inputs.items()),
-        tuple((port_id, port.dim) for port_id, port in system.outputs.items()),
-    )
-    subsystems = getattr(system, "subsystems", None)
-    if subsystems is None:
-        return ports
-    return (
-        ports,
-        tuple(
-            (sys_id, id(sub), structure_signature(sub))
-            for sys_id, sub in subsystems.items()
-        ),
-        tuple(
-            (target, port_id, source)
-            for target, targets in system.connections.items()
-            for port_id, source in targets.items()
-        ),
-    )
-
-
 class SharedSystemFacades:
     """
     Mixin providing shortcuts shared by all :class:`~minilink.core.system.System` kinds.
@@ -68,44 +38,6 @@ class SharedSystemFacades:
         from minilink.core.compile.compiler import compile as compile_system
 
         return compile_system(self, backend=backend, verbose=verbose)
-
-    def compiled_evaluator(self, method="auto"):
-        """Cached compiled evaluator behind the derivative tools.
-
-        ``"auto"`` prefers JAX when it is installed and the system traces,
-        ``"fd"`` compiles with NumPy, ``"jax"`` compiles with JAX and raises
-        when the system does not trace. The cache is keyed by the structural
-        signature (ports, dimensions, subsystems, connections), so any
-        structural change recompiles on the next call while parameter edits
-        need no recompile: every call passes the live ``params``. Copies and
-        pickles do not carry the cache (:meth:`__getstate__`).
-        """
-        from minilink.core.compile.compiler import compile as compile_system
-        from minilink.core.compile.compiler import compile_auto
-
-        key = str(method).strip().lower()
-        if key not in ("auto", "fd", "jax"):
-            raise ValueError(f"method must be 'auto', 'fd' or 'jax'; got {method!r}")
-        signature = structure_signature(self)
-        cache = self.compiled_evaluators
-        if cache.get("signature") != signature:
-            cache.clear()
-            cache["signature"] = signature
-        if key == "auto":
-            if "auto" not in cache:
-                backend, evaluator = compile_auto(self)
-                cache["auto"] = backend
-                cache[backend] = evaluator
-            return cache[cache["auto"]]
-        backend = "numpy" if key == "fd" else "jax"
-        if backend not in cache:
-            cache[backend] = compile_system(self, backend=backend)
-        return cache[backend]
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        state["compiled_evaluators"] = {}  # jitted closures never travel
-        return state
 
     def jacobian(
         self,

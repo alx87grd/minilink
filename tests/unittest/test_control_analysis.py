@@ -8,6 +8,7 @@ from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.analysis.structural import controllability, observability
 from minilink.control.lqr import lqr, lqr_at_operating_point, lqr_gain
 from minilink.core.backends import array_module
+from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
@@ -176,7 +177,7 @@ class TestLinearize(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             linearize_matrices(plant, [1.0, 2.0], [3.0, 4.0], of="bad", method="jax")
         A, B, C, D = linearize_matrices(plant, [1.0, 2.0], [3.0, 4.0], of="bad")
-        self.assertEqual(plant.compiled_evaluator("auto").backend, "numpy")
+        self.assertEqual(compile_auto(plant)[0], "numpy")
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
