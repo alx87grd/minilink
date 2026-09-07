@@ -296,3 +296,11 @@ plotly renderer. Facades: `margins`, `nyquist`, `root_locus`,
 ROADMAP §6 question closed. Tests: `test_control_plots.py` (15) with
 analytic checks (margins of `1/(s(s+1)(s+2))`, second-order overshoot,
 exact first-order step). Suite 1035 passed, demo sweep 59/59.
+
+Default output grid (2026-09-07): the maintainer found the pendulum
+velocity plot jagged; the cause was commit `08080e5` (2026-09-05, S01)
+which set the automatic reporting grid for adaptive solvers to 1001 points
+(10 ms over 10 s). `DEFAULT_N_STEPS` is now 10001 (1 ms over 10 s): a
+reporting resolution only, the SciPy solver still picks its own steps and
+fixed-step solvers still derive `dt` from the plant time constant. A default
+pendulum simulation takes 0.2 s; demo sweep 59/59, suite green.

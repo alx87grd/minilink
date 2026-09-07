@@ -40,7 +40,7 @@ updates only where a public contract changes.
 
 - [x] **S01 Default output grid** **[ask — Simulator API]** (direction approved 2026-09-05: fixed count).
   Touch `simulation/simulator.py` (`select_time_vector`, `select_solver`), `simulation/time_grid.py`, `simulation/static_simulator.py`, tests asserting `100001`.
-  When neither `n_steps` nor `dt` is given: `n_steps = 1001` for adaptive solvers; `dt` from `smallest_time_constant` only for `euler` / `euler_fixedsteps` / `rk4_fixedsteps`; auto-RK4 under JAX keyed on the requested solver or `discontinuous_behavior`, never on `n_pts`.
+  When neither `n_steps` nor `dt` is given: `n_steps = 10001` for adaptive solvers; `dt` from `smallest_time_constant` only for `euler` / `euler_fixedsteps` / `rk4_fixedsteps`; auto-RK4 under JAX keyed on the requested solver or `discontinuous_behavior`, never on `n_pts`.
   Done when `Pendulum().compute_trajectory(tf=10)` returns 1 001 samples on both backends, the JAX default still picks `scipy` (`nfev ≈ 200`), suite green.
 - [x] **S02 Shape validation at compile** **[ask — core]**.
   Touch `core/compile/compiler.py` (leaf + diagram entry), `numpy_evaluators.py` constructors, `jax_evaluators.py` (probe *before* `check_jax_compatible`).

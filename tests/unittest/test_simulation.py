@@ -1027,13 +1027,13 @@ class TestRealtimeSimulator(unittest.TestCase):
 class TestAutomaticTimeGrid(unittest.TestCase):
     """S01: solver first, then a grid sized to it."""
 
-    def test_adaptive_default_is_1001_points_with_scipy(self):
+    def test_adaptive_default_is_a_fine_reporting_grid_with_scipy(self):
         from minilink.simulation.time_grid import DEFAULT_N_STEPS
 
         sim = Simulator(StableLinearSystem(), tf=10.0, verbose=False)
         self.assertEqual(sim.solver_mode, "scipy")
         self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
-        self.assertAlmostEqual(sim.dt, 0.01)
+        self.assertAlmostEqual(sim.dt, 10.0 / (DEFAULT_N_STEPS - 1))
         self.assertTrue(sim.auto_time_grid)
 
     def test_fixed_step_solver_takes_dt_from_time_constant(self):
@@ -1072,8 +1072,10 @@ class TestAutomaticTimeGrid(unittest.TestCase):
     @pytest.mark.jax
     @unittest.skipUnless(_have_jax(), "jax not installed")
     def test_jax_automatic_grid_never_selects_rk4(self):
+        from minilink.simulation.time_grid import DEFAULT_N_STEPS
+
         sim = Simulator(
             StableLinearSystem(), tf=10.0, compile_backend="jax", verbose=False
         )
         self.assertEqual(sim.solver_mode, "scipy")
-        self.assertEqual(sim.n_pts, 1001)
+        self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)

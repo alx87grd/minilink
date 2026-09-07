@@ -753,10 +753,10 @@ via `compute_forced`. Facades default `compile_backend="numpy"`.
 
 **Automatic grid.** With neither `n_steps` nor `dt`, the solver is chosen first
 (user choice, else `euler` for discontinuous plants, else `scipy`) and the grid
-is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 1001` points (a
+is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 10001` points (a
 plotting resolution — the integrator picks its own steps); fixed-step solvers
 take `dt` from `solver_info["smallest_time_constant"]` × 0.1. `StaticSimulator`
-shares the 1001-point default.
+shares the 10001-point default.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
