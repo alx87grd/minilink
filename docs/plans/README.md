@@ -19,6 +19,7 @@ the design needs a writeup.
 | --- | --- | --- |
 | [TODO.md](TODO.md) | Operational workboard (phases D–3, v0.2 pulls) | Ongoing |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.2 |
+| [gro501-classical-control.md](gro501-classical-control.md) | Fix plan for the GRO501 objective — phantom `PID` modes, `minreal`, `place`, observers, sensitivity verbs, the z-domain question | Teaching surface — draft, awaiting rulings (v0.2) |
 | [control-plots.md](control-plots.md) | Root locus, Nyquist, margins, step response; MATLAB look; one figure spec rendered on matplotlib and plotly | Teaching surface — implemented 2026-09-07 |
 | [derivatives-facade.md](derivatives-facade.md) | `sys.jacobian("f", "x")`, `sys.linearize(...)` and one calling pattern for the analysis family (`bode`, `pzmap`, `transfer_function`, …) | Teaching surface — implemented 2026-09-06 |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Result families + parametric scene bind (pipeline B) | Research lane — partial, Later |

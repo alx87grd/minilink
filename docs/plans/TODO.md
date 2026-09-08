@@ -115,7 +115,22 @@ After the term, in the order the cohort's questions suggest:
 
 - [ ] Pyro parity open rows — [pyro-port-remaining.md](pyro-port-remaining.md).
 - [ ] GMC714 modelling ladder: manipulators + the four-rung vehicle ladder as a `02_dynamics` lesson; robotic PID wrappers; trajectory LQR.
-- [ ] Estimation — Luenberger, Kalman. Identification — `fitting.py` (after S26).
+- [ ] **GRO501 objective** ([ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end)) — steps P1–P11 in [gro501-classical-control.md](gro501-classical-control.md). Wave 1 first, it is the correctness wave:
+  - [x] **P1** `PI` and `PD` classes carrying only the states their terms need (`ProportionalController` already covered P); `PID` unchanged so its gains stay tunable from zero. Landed 2026-09-07.
+  - [x] **F1** `frequency_range` widens until it brackets `|G| = 1` — `margins()` reported `inf` for every PI/I loop and every high-static-gain loop. Landed 2026-09-07.
+  - [x] **F2** `PID.f` and `PID.ctl` use the same `tau`; positivity validated at construction. Landed 2026-09-07.
+  - [x] **F4** `closed_loop_poles` returns infinite poles at `K = -1/d` instead of raising. Landed 2026-09-07.
+  - [ ] **P2** `minreal` on the matrices tier + `sys.minreal()`; order reduction as a separate verb.
+  - [ ] **P3** `place()` / `place_gain()` / `place_at_operating_point()` mirroring `lqr`.
+  - [ ] **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`, `kalman()`; how the observer and state feedback compose. **[held 2026-09-07]**
+  - [ ] **P5** Named `S` / `T` / `PS` / `CS`; disturbance and noise injection points on `feedback()`.
+  - [ ] **P6** Discrete (z) tier — teach with `discretize` only, or build the z analysis family. **[held 2026-09-07]**
+  - [ ] **P7** Generate the 13 analysis facades instead of hand-copying signatures.
+  - [ ] **P8** ζ / ω_n from poles; the `N` reference-scaling matrix; `settling_horizon` docstring fix.
+  - [ ] **P9** `TransferFunction` builds its ports once (no clear-and-re-add).
+  - [ ] **P10** Document the three `@` dispatch paths in DESIGN; pin the `e`-input autowire heuristic with a test.
+  - [ ] **P11** `gro501_app2_propulsion` and `gro501_app4_autopilot` notebooks. **[maintainer — student-facing]**
+- [ ] Estimation — Luenberger, Kalman (P4, held). Identification — `fitting.py` (after S26).
 - [ ] `trajectory_generation/` port.
 - [ ] Blocks: `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch`.
 - [ ] SMC trajectory-following demo; remaining pyro game demos → `simulation/realtime/` or explicit drop.

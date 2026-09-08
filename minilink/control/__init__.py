@@ -20,6 +20,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "ComputedTorqueController",
     ),
     "PID": ("minilink.control.siso", "PID"),
+    "PI": ("minilink.control.siso", "PI"),
+    "PD": ("minilink.control.siso", "PD"),
     "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
     "ImpedanceIntegralController": (
         "minilink.control.impedance",

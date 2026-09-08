@@ -53,6 +53,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "ProportionalController": ("minilink.control.output", "ProportionalController"),
     "StateFeedbackController": ("minilink.control.state", "StateFeedbackController"),
     "PID": ("minilink.control.siso", "PID"),
+    "PI": ("minilink.control.siso", "PI"),
+    "PD": ("minilink.control.siso", "PD"),
     "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
     "JointImpedance": ("minilink.control.robotic", "JointImpedance"),
     "TaskImpedance": ("minilink.control.robotic", "TaskImpedance"),

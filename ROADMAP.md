@@ -15,8 +15,8 @@ substrate of the maintainer's group. Full identity and landscape position:
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via `Sys2Gym` + SB3. See §4. | Fall 2026 — term in progress; hardening lands during the term without breaking names the course notebooks already use |
-| **v0.2** | **Pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), the deferred v0.1 items in §5 Phase 2, frequency-analysis completion (decision in §6), and a `pip install minilink` option (conda stays the recommended local install). | Winter 2027 |
+| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via `Sys2Gym` + SB3. See §4.1. | Fall 2026 — term in progress; hardening lands during the term without breaking names the course notebooks already use |
+| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), the deferred v0.1 items in §5 Phase 2, and a `pip install minilink` option (conda stays the recommended local install). | Winter 2027 |
 | **v1.0** | The foundation questions deferred in §6 (hybrid as a `System`, evaluator/solver layering, geometry unification), after two cohorts. | 2027 |
 
 ## 2. Two lanes
@@ -56,8 +56,8 @@ a release process by themselves.
 | Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; ~30 unreferenced integration helpers and `_jit` aliases still on the surface. | Delete the unused grid; float64 policy; re-layering deferred to v1.0. |
 | Simulation | teaching | 7 | Mature workflow; stable solvers/forcing. | Fixed output count by default; unify `verbose` flag names. |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA. **Every catalog plant compiles on both backends** (`xp` sweep 2026-09-06, contract test `test_catalog_backends.py`); `JaxCartPole` retired. | Four-rung vehicle teaching ladder, research rungs → projects. |
-| Control | teaching | 6 | Linear, LQR, PID; model-based SMC; robotic impedance/kinematic. | Robotic PID wrappers; traj LQR (v0.2). |
-| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response — matplotlib and plotly. | Nichols chart, multi-system overlays, discrete-time plots. |
+| Control | teaching | 6 | Linear, LQR, `P` / `PI` / `PD` / `PID`; model-based SMC; robotic impedance/kinematic. **Each compensator form carries only the states its terms need** (landed 2026-09-07), so pole and zero counts match the hand calculation. | `place()` for GRO501 (v0.2); robotic PID wrappers; traj LQR (v0.2). |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response — matplotlib and plotly. **The automatic frequency band brackets the 0 dB crossing** (landed 2026-09-07), so integrator and high-gain loops no longer report infinite margins. | `minreal`; named `S`/`T`/`PS`/`CS`; Nichols chart; multi-system overlays. Discrete-time (z) plots held. |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine`/`Ramp`/`Chirp`/`Delay`/`Switch` (v0.2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`. | Honest `final_time` / `success` metadata; `vi_ctl @ plant` in notebooks. |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot. **`success` echoes solver status; float32 by default on JAX.** | float64 policy; `success` = defects satisfied; multiple-shooting parametric guard. |
@@ -68,17 +68,21 @@ a release process by themselves.
 | Graphics / animation | teaching | 4 | Frame-keyed `tf` / geometry / overlays; four renderers. | Renderer polish; matplotlib renderer coverage. |
 | Hybrid / step / MPC | provisional | 5 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. Not a `System`; not a GRO860 topic. | Keep names through the term; `HybridLoop` / promotion question at v1.0. |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review. |
-| Estimation | planned | 1 | Placeholder. | Luenberger, Kalman (v0.2). |
+| Estimation | planned (GRO501) | 1 | Placeholder. **The largest single GRO501 gap** (§4.2). | Luenberger, then Kalman, as diagram blocks (v0.2). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2); batched `rollout_batch` facade first. |
 | C export (`experimental/c_export`) | research | 2 | Experimental JAX→C transpiler; two demos pass locally; not in CI. | Repo-only; add to the nightly sweep. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Experimental; not teaching path. | Keep isolated; repo-only. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later (`interfaces/mjx.py`). |
 | Pyro 2.0 overall | v0.2 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
-## 4. v0.1 — GRO860 end to end
+## 4. Course objectives
 
-Ready when every row is green on the teaching surface — in Colab (git-clone
-cell) and in the conda env — and the cross-cutting gates hold.
+Two courses drive the release contract: GRO860 (§4.1, v0.1, running now) and
+GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
+"end to end" when every topic row is green on the teaching surface — in Colab
+(git-clone cell) and in the conda env — and the cross-cutting gates hold.
+
+### 4.1 v0.1 — GRO860 end to end
 
 | Topic | Surface | Material | Gate |
 | --- | --- | --- | --- |
@@ -105,8 +109,52 @@ cell) and in the conda env — and the cross-cutting gates hold.
 7. No name a GRO860 notebook imports today changes during the term.
 
 Out of the v0.1 checklist by decision: MPC/hybrid (provisional, lesson keeps
-shipping), estimation, identification, frequency-domain tools (decision
-postponed to v0.2), PyPI publication (later; conda remains the local path).
+shipping), estimation, identification, frequency-domain tools (landed
+2026-09-07 but gated by §4.2, not by v0.1), PyPI publication (later; conda
+remains the local path).
+
+### 4.2 v0.2 — GRO501 end to end
+
+The classical-control course (*Systèmes asservis*, BSc Génie Robotique):
+an APP problem on the UdeS-Racecar. APP2 is multi-physics modelling of the
+DC-motor propulsion plus SISO speed and position loops designed to time- and
+frequency-domain specifications and implemented as difference equations on an
+Arduino; APP4 is the bicycle-model MIMO plant with LQR, nested loops, pole
+placement and a Kalman observer. Student guide: `GRO501_Guide.pdf`
+(maintainer's copy); references Dorf & Bishop and Åström & Murray.
+
+Baseline audit 2026-09-07 on `dev-fable`:
+[docs/reviews/2026-09-07-gro501-coverage.md](docs/reviews/2026-09-07-gro501-coverage.md).
+Roughly four-fifths of the course runs today; the gaps below are the release
+contract. Step-level work:
+[docs/plans/gro501-classical-control.md](docs/plans/gro501-classical-control.md).
+
+| Topic | Surface | Status | Gate |
+| --- | --- | --- | --- |
+| Multi-physics modelling — nonlinear `f`/`h`, block diagram, linearize, `H(s)` | custom `DynamicSystem`, `plot_diagram`, `linearize`, `transfer_function` | green | a DC-motor + longitudinal-vehicle plant in the catalog; order reduction (`minreal`) available |
+| Closed-loop analysis — poles, root locus, Bode, margins, step specs | `pzmap`, `root_locus`, `bode`, `margins`, `step_info`, `P` / `PI` / `PD` / `PID` | green | met 2026-09-07: every compensator form reports the poles and zeros of the hand calculation, and margins are found wherever the crossover sits |
+| Design to specification — rise time, overshoot, final error, phase margin | `PI`, `PD`, `PID`, `Lead`, `Lag`, `step_info`, `margins` | green | the Table 2 specs of the guide are checkable in one notebook |
+| Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | reachable today via `of="block:port"` | needs a named verb | `S` / `T` / `PS` / `CS` are one call on a closed-loop diagram |
+| Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | continuous only, **z tier held** | the sampled loop is validated by simulation; a z tier stays out of v0.2 unless the sommatif examines z-plane analysis (§6) |
+| State-space MIMO — bicycle model, controllability at every nominal speed | `KinematicBicycle`, `controllability`, `observability` | green | — |
+| Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr_at_operating_point`, `StateFeedbackController` | green | — |
+| Pole placement — `K_sta` for a prescribed pole set | — | missing | `place(A, B, poles)` returning a `StateFeedbackController` |
+| Nested loops — inner speed loop, outer position loop | `@` composition | green (verified) | stays green with the observer in the loop |
+| State estimation — Luenberger observer and Kalman filter | `minilink/estimation/` placeholder | missing, **held** | an observer block that closes the loop on a diagram and simulates with measurement noise; not scheduled — the release contract will need revisiting if it stays out |
+| Reference scaling — the `N` matrix giving `y = r` at steady state | — | missing | a helper or a documented recipe |
+
+**Cross-cutting gates**
+
+1. Every topic row above is green, with a demo or a notebook.
+2. One `examples/learn/teaching/` notebook per APP, Colab-first, Basic tier
+   (NumPy + SciPy + Matplotlib) — no JAX on the GRO501 path.
+3. Every tool agrees with the hand calculation for the guide's §9 exercises;
+   the closed-loop analysis exercises (§9.6, §9.7) are the acceptance test.
+4. Student-facing GRO501 material imports only through the teaching surface.
+
+Out of the GRO501 checklist by decision: hardware, ROS, and the Arduino
+firmware itself (the course owns those); system identification from logged
+runs beyond what `identification/` already offers.
 
 ## 5. Phases
 
@@ -151,6 +199,9 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - ~~Dynamic bicycle module split / vehicle ladder~~ — four teaching rungs in `catalog/`, research rungs to `examples/projects/`.
 - **Open (v0.2):** pyro game demos — port the rest to `simulation/realtime/` or explicitly drop.
 - ~~Frequency analysis — NumPy-only vs a python-control bridge~~ — NumPy-only, landed 2026-09-07: `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response` on the state-space channel (`analysis/linear.py`), plots on matplotlib and plotly.
+- ~~`PID` spurious modes~~ — settled 2026-09-07: dedicated `PI` and `PD` classes carry only the states their terms need (`ProportionalController` already covered P); `PID` keeps its fixed `2n` layout so its gains stay tunable from zero. `minreal` still wanted for the general case (P2).
+- **Held (v0.2):** discrete-domain scope for GRO501 — a z-domain tier in `analysis/` (ZOH/Tustin, z-plane `pzmap`, discrete Bode) vs teaching the Arduino law with `discretize` + simulation only. Maintainer paused this 2026-09-07; default is simulation only.
+- **Held (v0.2):** the `estimation/` band (Luenberger, Kalman). Paused 2026-09-07; it is the last unmet §4.2 row.
 - **Open (v0.2):** PyPI publication — wanted eventually as a third install option; conda stays recommended.
 - **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename.
 - **Open (v1.0):** evaluator/solver layering — evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; Diffrax as an optional JAX solve (later).

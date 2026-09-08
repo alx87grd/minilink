@@ -245,7 +245,7 @@ class TestLQR(unittest.TestCase):
 
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
 from minilink.control.output import ProportionalController
-from minilink.control.siso import PID
+from minilink.control.siso import PD, PI, PID
 from minilink.control.state import StateFeedbackController
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
@@ -1007,3 +1007,129 @@ class TestStateSpaceSystem(unittest.TestCase):
         np.testing.assert_allclose(
             sys.f(x, u, params={"a": 0.0, "b": 1.0}), np.array([5.0])
         )
+
+
+class TestCompensatorStateLayout(unittest.TestCase):
+    """P / PI / PD carry only the states their terms need.
+
+    A gain is tunable, so ``PID`` cannot drop a state when ``Ki`` or ``Kd`` is
+    zero — the dead state would still show as an unobservable pole. The
+    dedicated forms make the absence structural, so pole and zero counts match
+    the hand calculation.
+    """
+
+    def setUp(self):
+        self.plant = Pendulum()
+        self.plant.params["d"] = 0.5
+        self.plant.x0 = np.zeros(2)
+
+    def test_state_dimensions(self):
+        self.assertEqual(ProportionalController(2.0, ports="error").n, 0)
+        self.assertEqual(PI(Kp=2.0, Ki=1.0).n, 1)
+        self.assertEqual(PD(Kp=2.0, Kd=1.0).n, 1)
+        self.assertEqual(PID(Kp=2.0, Ki=1.0, Kd=1.0).n, 2)
+        self.assertEqual(PI(Kp=2.0, Ki=1.0, dof=3).n, 3)
+        self.assertEqual(PD(Kp=2.0, Kd=1.0, dof=3).n, 3)
+
+    def test_loop_gain_pole_and_zero_counts(self):
+        plant_poles = 2
+        for controller, extra_poles, n_zeros in (
+            (ProportionalController(20.0, ports="error"), 0, 0),
+            (PI(Kp=20.0, Ki=10.0), 1, 1),
+            (PD(Kp=20.0, Kd=2.0, tau=0.05), 1, 1),
+            (PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05), 2, 2),
+        ):
+            with self.subTest(controller=type(controller).__name__):
+                zeros, poles, _ = (controller >> self.plant).pzmap()
+                self.assertEqual(len(poles), plant_poles + extra_poles)
+                self.assertEqual(len(zeros), n_zeros)
+
+    def test_pi_has_the_integrator_pole_and_pd_the_filter_pole(self):
+        _, pi_poles, _ = (PI(Kp=20.0, Ki=10.0) >> self.plant).pzmap()
+        self.assertEqual(np.sum(np.abs(pi_poles) < 1e-9), 1)
+
+        _, pd_poles, _ = (PD(Kp=20.0, Kd=2.0, tau=0.05) >> self.plant).pzmap()
+        self.assertEqual(np.sum(np.abs(pd_poles) < 1e-9), 0)
+        self.assertTrue(np.any(np.abs(pd_poles + 20.0) < 1e-9))  # -1/tau
+
+    def test_integral_action_removes_the_static_error(self):
+        from minilink.analysis import step_info
+
+        pd_final = step_info(
+            *(PD(Kp=20.0, Kd=2.0, tau=0.05) @ self.plant).step_response()
+        )
+        pid_final = step_info(
+            *(PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05) @ self.plant).step_response()
+        )
+        self.assertLess(pd_final.steady_state, 0.9)  # static offset without Ki
+        self.assertAlmostEqual(pid_final.steady_state, 1.0, places=2)
+
+    def test_pid_law_is_unchanged_by_the_split(self):
+        """The full form still computes what it did: u = Kp e + Ki e_int - Kd dm."""
+        ctl = PID(Kp=2.0, Ki=3.0, Kd=0.5, tau=0.1)
+        x, u = np.array([1.5, -0.25]), np.array([0.4])
+        dm = (-0.4 - (-0.25)) / 0.1
+        np.testing.assert_allclose(ctl.ctl(x, u), [2.0 * 0.4 + 3.0 * 1.5 - 0.5 * dm])
+        np.testing.assert_allclose(ctl.f(x, u), [0.4, dm])
+
+    def test_filter_time_constant_must_be_positive(self):
+        with self.assertRaises(ValueError):
+            PID(tau=0.0)
+        with self.assertRaises(ValueError):
+            PD(Kp=1.0, Kd=1.0, tau=-0.1)
+        PI(Kp=1.0, Ki=1.0)  # no filter, no tau to validate
+
+    def test_f_and_ctl_agree_on_tau(self):
+        """A tiny tau must drive the state rate and the command identically."""
+        ctl = PD(Kp=1.0, Kd=1.0, tau=1e-6)
+        x, u = np.zeros(1), np.array([1.0])
+        dm_filt = ctl.f(x, u)[0]
+        np.testing.assert_allclose(ctl.ctl(x, u), [1.0 * 1.0 - 1.0 * dm_filt])
+
+
+class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
+    """The automatic grid must contain the 0 dB crossing.
+
+    Roots at the origin carry no rate and a large static gain pushes the
+    crossover past the fastest root, so a band read from the poles and zeros
+    alone silently reports an infinite margin — the most dangerous wrong
+    answer a margin tool can give.
+    """
+
+    @staticmethod
+    def _tf(num, den):
+        from minilink.blocks.transfer_function import TransferFunction
+
+        return TransferFunction(num, den)
+
+    def test_integrator_loop(self):
+        loop = self._tf([10.0], [1.0, 10.0, 0.0])  # 10 / (s (s + 10))
+        self.assertAlmostEqual(loop.margins().phase_margin_deg, 84.3173, places=3)
+
+    def test_large_static_gain(self):
+        loop = self._tf([1000.0], [1.0, 1.0])  # crossover three decades up
+        self.assertAlmostEqual(loop.margins().phase_margin_deg, 90.0573, places=3)
+
+    def test_marginal_loop_is_exact(self):
+        loop = self._tf([1.0], [1.0, 1.0, 1.0, 0.0])  # L(j1) = -1 exactly
+        margins = loop.margins()
+        self.assertAlmostEqual(margins.phase_margin_deg, 0.0, places=3)
+        self.assertAlmostEqual(margins.gain_margin_db, 0.0, places=3)
+
+    def test_flat_low_frequency_gain_keeps_a_tidy_band(self):
+        from minilink.analysis import linear
+
+        loop = self._tf(
+            [1.0], np.polymul(np.polymul([1.0, 1.0], [1.0, 2.0]), [1.0, 3.0])
+        )
+        w_min, w_max = linear.frequency_range(loop.A(), loop.B(), loop.C(), loop.D())
+        self.assertAlmostEqual(w_min, 0.1)  # no walk down a DC plateau
+        self.assertAlmostEqual(w_max, 100.0)
+        self.assertTrue(np.isinf(loop.margins().phase_margin_deg))
+
+    def test_singular_feedback_gain_is_not_a_crash(self):
+        from minilink.analysis import linear
+
+        tf = self._tf([1.0, 2.0], [1.0, 1.0])  # d = 1, so K = -1 is singular
+        poles = linear.closed_loop_poles(tf.A(), tf.B(), tf.C(), tf.D(), -1.0)
+        self.assertTrue(np.all(np.isinf(poles)))

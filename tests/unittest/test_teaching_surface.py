@@ -71,6 +71,8 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "ProportionalController",
         "StateFeedbackController",
         "PID",
+        "PI",
+        "PD",
         "ImpedanceController",
         "JointImpedance",
         "TaskImpedance",

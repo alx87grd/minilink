@@ -89,16 +89,24 @@ def frequency_response(A, B, C, D, w):
 
 
 def frequency_range(A, B, C, D):
-    """``(w_min, w_max)`` one decade beyond the slowest and fastest pole or zero."""
+    """``(w_min, w_max)`` covering the dynamics *and* any 0 dB crossing.
+
+    One decade beyond the slowest and fastest nonzero pole or zero, then
+    widened until the band brackets ``|G| = 1``. The widening matters: roots
+    at the origin carry no rate, so an integrator's crossover sits below the
+    pole-derived band, and a large static gain pushes it above — in both
+    cases a band read from the roots alone misses the crossover and
+    :func:`margins` would report an infinite margin.
+    """
     rates = np.abs(np.concatenate([poles(A), zeros(A, B, C, D)]))
     rates = rates[rates > 1e-9]
     if rates.size == 0:
-        return 1e-2, 1e2
-
-    # one decade past min |λ| and max |λ|
-    return 10.0 ** np.floor(np.log10(rates.min()) - 1.0), 10.0 ** np.ceil(
-        np.log10(rates.max()) + 1.0
-    )
+        w_min, w_max = 1e-2, 1e2
+    else:
+        # one decade past min |λ| and max |λ|
+        w_min = 10.0 ** np.floor(np.log10(rates.min()) - 1.0)
+        w_max = 10.0 ** np.ceil(np.log10(rates.max()) + 1.0)
+    return _bracket_unit_gain(A, B, C, D, w_min, w_max)
 
 
 # =============================================================================
@@ -140,8 +148,10 @@ def closed_loop_poles(A, B, C, D, K):
     A, B, C, D = _matrices(A, B, C, D)
 
     # λ = eig(A − B K (1 + K d)^{-1} C)
-    feedback = K / (1.0 + K * D[0, 0])
-    return np.linalg.eigvals(A - feedback * (B @ C))
+    loop = 1.0 + K * D[0, 0]
+    if loop == 0.0:  # K = -1/d: the algebraic loop is singular, no finite poles
+        return np.full(A.shape[0], np.inf, dtype=complex)
+    return np.linalg.eigvals(A - (K / loop) * (B @ C))
 
 
 def root_locus(A, B, C, D, gains=None, *, n=400):
@@ -214,6 +224,33 @@ def settling_horizon(A):
 # =============================================================================
 # Internal machinery
 # =============================================================================
+
+
+def _bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
+    """Widen ``(w_min, w_max)`` until the band brackets ``|G| = 1``.
+
+    Downward while the magnitude is below one *and still climbing steeply*
+    (an integrator gains a decade per decade; a static gain approaches its
+    plateau and stops the walk), upward while it is above one. At most
+    ``decades`` steps each way.
+    """
+    magnitude = lambda w: abs(frequency_response(A, B, C, D, [w])[0])  # noqa: E731
+
+    low = magnitude(w_min)
+    for _ in range(decades):
+        if low >= 1.0:
+            break
+        lower = magnitude(0.1 * w_min)
+        if lower <= 2.0 * low:  # approaching the DC plateau, not integrating
+            break
+        w_min, low = 0.1 * w_min, lower
+
+    for _ in range(decades):
+        if magnitude(w_max) <= 1.0:
+            break
+        w_max = 10.0 * w_max
+
+    return w_min, w_max
 
 
 def _matrices(A, B, C, D):
