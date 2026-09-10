@@ -6,6 +6,21 @@ this folder (September 2026). Every number below was measured on a laptop CPU
 backend, the rollout a `lax.scan` over the RK4 step with the policy sampled
 inside, and the whole PPO update one jitted call.
 
+## Where this stands now (2026-09-10)
+
+The prototype (`minilink/experimental/ppo_jax.py`) became a planner:
+`minilink.planning.ReinforcementLearningPlanner` on a
+`StochasticPlanningProblem`, with `algorithm="ppo"` or `"sac"`, the law as a
+`minilink.control.NeuralPolicyController`, and `MonteCarloEvaluator` to score
+any controller on the same task. `pendulum_rl_planner.py` in this folder is
+the planner-API version of the pendulum demo (PPO and SAC side by side), and
+`examples/demos/rl/` holds the official versions of every demo below on the
+full pipeline. The scripts in this folder stay on the prototype until the
+maintainer retires it (vision plan step R7). Every lesson below carries over: the exit rule is
+now a problem field (`on_exit`, `exit_cost`), normalization and the
+squash are inside the policy block, and the discount can be declared on the
+cost (`discount_rate`).
+
 ## The demos and what they took
 
 | demo | plant | budget | training | what the policy learns |

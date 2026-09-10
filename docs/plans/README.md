@@ -26,6 +26,7 @@ the design needs a writeup.
 | [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | Solver backend factory for offline + parametric MPC | Research lane — draft, Later |
 | [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Research lane — draft, Later |
 | [neural-blocks-collection.md](neural-blocks-collection.md) | MLP / neural blocks | Research lane — proposal, Later |
+| [rl-planner-vision.md](rl-planner-vision.md) | RL as a policy-family planner on the stochastic problem: exit rule and horizon semantics, feature/policy block, bare JAX vs Flax, Monte Carlo evaluation | Research lane — in progress: R1–R5b landed 2026-09-10, R6–R7 open |
 | [vehicle-abstraction.md](vehicle-abstraction.md) | Vehicle model view ports | Research lane — draft; the teaching ladder itself is settled (TODO S25) |
 | [phase4-fidelity-maps.md](phase4-fidelity-maps.md) | Jax bicycle ladder lift/project maps + MPC broadcast | Research lane — draft, Later |
 | [mpc-tuning.md](mpc-tuning.md) | MPC tuning project harness | Research lane — project notes |

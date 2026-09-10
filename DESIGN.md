@@ -850,6 +850,62 @@ require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 `Planner.solve()` → `TrajectoryPlan` (traj family) or `PolicyPlan` (policy
 family).
 
+**Cost horizon and exit rule (landed 2026-09-10, research lane → planning
+band):** a `CostFunction` states its `horizon` (`"finite"` with `h` at `tf`,
+`"infinite"` with no terminal cost, or `None` to follow `problem.tf`) and a
+continuous `discount_rate` `rho`; planners convert it with
+`cost.discount_factor(dt)` (DP `alpha`, RL `gamma`). What leaving `X` costs
+is the **problem's** business, not the cost's: `PlanningProblem.on_exit`
+(`"infeasible"`, the hard-constraint default, or `"terminate"`) and
+`exit_cost` (scalar or `exit_cost(x, t)`). Trajopt keeps `X` hard; DP reads
+`exit_cost` as its default `out_of_bound_cost`; RL ends the episode there and
+charges it, with no bootstrap. `h` keeps its one job: the end of a finite
+horizon.
+
+**Stochastic problem:** `StochasticPlanningProblem(PlanningProblem)` adds
+`x0_distribution` (its mean is `x_start`, its support `X0`),
+`params_distribution` (`{name: Distribution}` over `sys.params`),
+`disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
+port) and `criterion` (`"expectation"` default, `"worst_case"`). Distributions
+(`planning/distributions.py`: `Gaussian`, `Uniform`, `Particles`, `Sampler`)
+are a duck type — `dim`, `mean()`, `sample(key)` on a NumPy generator or a
+JAX key (traceable). `nominal()` is the certainty-equivalent
+`PlanningProblem`. Every planner that takes a `PlanningProblem` takes the
+stochastic one.
+
+**Monte Carlo evaluation (the second verb):** `MonteCarloEvaluator(problem,
+dt=, n_trials=, backend=)` scores any state-feedback block on the draws —
+`MonteCarloReport` with per-trial `J`, mean / std / worst / failure rate
+(trials that left the box). `backend="jax"` vmaps the compiled rollout for
+static laws; `backend="numpy"` runs the closed-loop `Simulator` per trial for
+any controller. Same numbers for LQR, DP, MPC and RL laws.
+
+**Reinforcement learning (`planning/reinforcement_learning/`):**
+`ReinforcementLearningPlanner(problem, dt=, hidden=, features=, algorithm=)`
+is a policy-family planner beside DP: `solve(timesteps=)` → `PolicyPlan`
+(controller, weights, history), `get_controller()` →
+`control.neural.NeuralPolicyController` (`u = u_mid + u_half · squash(MLP(z(x)))`,
+weights in `params["mlp"]`, features normalized by the state box or a user
+map), `solve_trajectory_from(x0)` → `TrajectoryPlan` of the learned law.
+Shared machinery — `RolloutEnvironment` (the problem's semantics as pure
+JAX step functions), heads (`GaussianHead`, `SquashedGaussianHead`), critics
+(`ValueFunction`, `QFunction`), collectors (`rollout` scan + GAE,
+`collect_transitions` + `ReplayBuffer`), `Adam` — and one file per algorithm
+under `algorithms/` (`PPO` on-policy, `SAC` off-policy) holding only its
+update rule and train state; `Algorithm.on_policy` picks the planner's loop.
+Bare JAX, no Flax/Optax dependency; an Optax-style optimizer can be passed.
+`control.angle_features(angles, scales)` builds the periodic feature map
+(`cos, sin` per listed angle, scaled rates). The learned law is a `System`:
+`ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
+through the network, and the parametric tier (`rk4_step_trace_p` with
+`params={"ctl": ..., "sys": ...}`) gives gradients of a rollout with respect
+to the policy weights. Official demos: `examples/demos/rl/`; the intro
+chapter is `examples/learn/intro/11_reinforcement_learning.ipynb`. The
+spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `bind`,
+`car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
+`plot_track`) are exported on the `minilink.planning` facade so track demos
+import through the teaching surface.
+
 **Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
 `TrajectoryPlan`. `SolveMetadata.success` means *the returned plan satisfies the
 program constraints to `feasibility_tol`* — nothing else: an iteration-limit

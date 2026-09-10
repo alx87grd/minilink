@@ -16,6 +16,7 @@ import numpy as np
 from minilink.core.costs import CostFunction
 from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
 from minilink.core.system import System
+from minilink.planning.distributions import Distribution
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,18 @@ class PlanningProblem:
         explicitly. Knot count ``N`` lives on transcription options.
     params : ProblemParameters, optional
         Explicit parameter bundle for system, cost, and set evaluation.
+    on_exit : {"infeasible", "terminate"}
+        What a trajectory leaving ``X`` means. ``"infeasible"`` (default): a
+        hard constraint — trajectory optimization rejects it, value iteration
+        charges its out-of-bound cost. ``"terminate"``: the trajectory ends
+        there and ``exit_cost`` is charged — the rule reinforcement learning
+        trains with, so that trajopt, DP and RL score the same trajectory the
+        same way.
+    exit_cost : float or callable, optional
+        Price of leaving ``X``: a scalar, or ``exit_cost(x, t)`` evaluated at
+        the exit state. Read by value iteration as its default
+        ``out_of_bound_cost`` and by RL as the terminal penalty. Should exceed
+        the cost-to-go of finishing the task from a typical start.
     """
 
     sys: System
@@ -97,11 +110,21 @@ class PlanningProblem:
     tf: float | None = None
     params: ProblemParameters | None = None
     metadata: Mapping[str, object] | None = None
+    on_exit: str = "infeasible"
+    exit_cost: object = None
+
+    EXIT_RULES = ("infeasible", "terminate")
 
     def __post_init__(self) -> None:
         n = int(self.sys.n)
 
         tf = self._coerce_tf(self.tf)
+        if self.on_exit not in self.EXIT_RULES:
+            raise ValueError(
+                f"on_exit must be one of {self.EXIT_RULES}, got {self.on_exit!r}"
+            )
+        if self.exit_cost is not None and not callable(self.exit_cost):
+            object.__setattr__(self, "exit_cost", float(self.exit_cost))
 
         x_start = self._coerce_state(
             self._default_x_start(),
@@ -233,6 +256,22 @@ class PlanningProblem:
         """Return ``True`` when a terminal goal or boundary set is available."""
         return self.Xf is not None
 
+    def exit_penalty(self, x, t=0.0):
+        """Cost charged at an exit state (scalar or ``exit_cost(x, t)``); ``None`` if unset."""
+        if self.exit_cost is None:
+            return None
+        if callable(self.exit_cost):
+            return self.exit_cost(x, t)
+        return self.exit_cost
+
+    def horizon_kind(self) -> str:
+        """``"finite"`` or ``"infinite"``: the cost's declaration, else from ``tf``."""
+        if self.cost is None:
+            return (
+                "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"
+            )
+        return self.cost.horizon_kind(self.tf)
+
     @property
     def has_cost(self) -> bool:
         """Return ``True`` when the problem has a cost function."""
@@ -275,3 +314,121 @@ class PlanningProblem:
                 "tf must be positive, None (unset), or +inf (infinite-horizon)"
             )
         return value
+
+
+@dataclass(frozen=True)
+class StochasticPlanningProblem(PlanningProblem):
+    """
+    Planning problem with probabilistic uncertainty (the stochastic class).
+
+    Same spine as :class:`PlanningProblem` — the deterministic problem is its
+    base class, so every planner that accepts one accepts this — plus the
+    uncertainty channels and the criterion:
+
+    Parameters
+    ----------
+    x0_distribution : Distribution
+        Law of the initial state ``x(0) ~ p(x0)``. Its mean is the default
+        ``x_start`` and its support (when it has one) the default ``X0``.
+    params_distribution : mapping, optional
+        ``{name: Distribution}`` over entries of ``sys.params`` (domain
+        randomization, robustness sweeps); each sample overrides those entries.
+    disturbances : mapping, optional
+        ``{port_id: Distribution}`` over input ports of ``sys``: a fresh draw
+        per step held on that port (a seeded disturbance signal).
+    criterion : {"expectation", "worst_case"}
+        What "optimal" means over the draws. Reinforcement learning optimizes
+        the expectation; Monte Carlo evaluation reports both.
+
+    Solve verbs (RL, gain search) and the evaluate verb (Monte Carlo) both
+    read this description; :meth:`nominal` returns the certainty-equivalent
+    :class:`PlanningProblem` for trajectory optimization and LQR.
+    """
+
+    x0_distribution: Distribution | None = None
+    params_distribution: Mapping[str, Distribution] | None = None
+    disturbances: Mapping[str, Distribution] | None = None
+    criterion: str = "expectation"
+
+    CRITERIA = ("expectation", "worst_case")
+
+    def __post_init__(self) -> None:
+        if self.x0_distribution is None:
+            raise ValueError("StochasticPlanningProblem requires x0_distribution")
+        if self.x_start is None:
+            object.__setattr__(self, "x_start", self.x0_distribution.mean())
+        if self.X0 is None and self.x0_distribution.support is not None:
+            object.__setattr__(self, "X0", self.x0_distribution.support)
+        super().__post_init__()
+        if self.criterion not in self.CRITERIA:
+            raise ValueError(
+                f"criterion must be one of {self.CRITERIA}, got {self.criterion!r}"
+            )
+        if int(self.x0_distribution.dim) != int(self.sys.n):
+            raise ValueError("x0_distribution.dim must equal sys.n")
+        for name in self.params_distribution or {}:
+            if name not in self.sys.params:
+                raise ValueError(
+                    f"params_distribution key {name!r} is not in sys.params"
+                )
+        for port in self.disturbances or {}:
+            if port not in self.sys.inputs:
+                raise ValueError(
+                    f"disturbances key {port!r} is not an input port of sys"
+                )
+        object.__setattr__(
+            self, "params_distribution", dict(self.params_distribution or {})
+        )
+        object.__setattr__(self, "disturbances", dict(self.disturbances or {}))
+
+    def sample_x0(self, key, n=None):
+        """Draw initial states: ``(n,)`` for one, ``(n_samples, n)`` with ``n``."""
+        return self.x0_distribution.sample(key, n)
+
+    def sample_params(self, key):
+        """Draw one ``{name: value}`` override of ``sys.params`` (empty if none)."""
+        names = list(self.params_distribution)
+        keys = split_keys(key, len(names))
+        return {
+            name: self.params_distribution[name].sample(k)
+            for name, k in zip(names, keys)
+        }
+
+    def sample_disturbances(self, key):
+        """Draw one ``{port_id: value}`` of held disturbance inputs (empty if none)."""
+        ports = list(self.disturbances)
+        keys = split_keys(key, len(ports))
+        return {port: self.disturbances[port].sample(k) for port, k in zip(ports, keys)}
+
+    @property
+    def is_stochastic(self) -> bool:
+        return True
+
+    def nominal(self) -> PlanningProblem:
+        """Certainty-equivalent deterministic problem: mean start, no draws."""
+        return PlanningProblem(
+            sys=self.sys,
+            x_start=self.x0_distribution.mean(),
+            x_goal=self.x_goal,
+            cost=self.cost,
+            X=self.X,
+            U=self.U,
+            Xf=self.Xf,
+            tf=self.tf,
+            params=self.params,
+            metadata=self.metadata,
+            on_exit=self.on_exit,
+            exit_cost=self.exit_cost,
+        )
+
+
+def split_keys(key, n):
+    """``n`` independent keys from a JAX key, or the same NumPy generator ``n`` times."""
+    if n == 0:
+        return []
+    if type(key).__module__.startswith("jax"):
+        import jax
+
+        return list(jax.random.split(key, n))
+    rng = key if isinstance(key, np.random.Generator) else np.random.default_rng(key)
+    return [rng] * n

@@ -248,6 +248,9 @@ class DynamicProgrammingPlanner(Planner):
             verbose=verbose,
             clean_infeasible=clean_infeasible,
         )
+        # The problem's exit rule is the default price of leaving the grid
+        if out_of_bound_cost is _UNSET and isinstance(problem.exit_cost, float):
+            self.options = replace(self.options, out_of_bound_cost=problem.exit_cost)
         if final_time is _UNSET and self.options.final_time == 0.0:
             tf = getattr(problem, "tf", None)
             if tf is not None and np.isfinite(tf):
