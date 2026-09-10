@@ -75,6 +75,8 @@ class DynamicProgrammingOptions:
     alpha : float
         Discount (exponential forgetting) factor; use ``alpha < 1`` for
         guaranteed contraction in infinite-horizon value iteration.
+        When omitted, the cost's ``discount_factor(dt)`` is used if the
+        cost declares a positive ``discount_rate``; otherwise ``1`` (undiscounted).
     tol : float
         Stopping tolerance on the largest cost-to-go change per sweep.
     max_iterations : int
@@ -251,6 +253,15 @@ class DynamicProgrammingPlanner(Planner):
         # The problem's exit rule is the default price of leaving the grid
         if out_of_bound_cost is _UNSET and isinstance(problem.exit_cost, float):
             self.options = replace(self.options, out_of_bound_cost=problem.exit_cost)
+        # The cost's continuous rate becomes the per-step factor unless alpha is set
+        if (
+            alpha is _UNSET
+            and problem.cost is not None
+            and float(problem.cost.discount_rate) > 0.0
+        ):
+            self.options = replace(
+                self.options, alpha=problem.cost.discount_factor(self.grid.dt)
+            )
         if final_time is _UNSET and self.options.final_time == 0.0:
             tf = getattr(problem, "tf", None)
             if tf is not None and np.isfinite(tf):

@@ -14,7 +14,10 @@ import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
 from minilink.control.neural import NeuralPolicyController  # noqa: E402
-from minilink.planning.evaluation import MonteCarloEvaluator  # noqa: E402
+from minilink.planning.evaluation import (  # noqa: E402
+    MonteCarloEvaluator,
+    score_trajectory,
+)
 from minilink.planning.reinforcement_learning import (  # noqa: E402
     PPO,
     ReinforcementLearningPlanner,
@@ -135,6 +138,8 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     np.testing.assert_allclose(ctl.params["mlp"]["W0"], np.asarray(actor["W0"]))
     tp = planner.solve_trajectory_from(np.zeros(2), tf=0.5)
     assert isinstance(tp, TrajectoryPlan) and tp.trajectory.n_samples == 6
+    J, _ = score_trajectory(prob, tp.trajectory)
+    np.testing.assert_allclose(tp.metadata.cost, J)
     u, _ = planner.predict(np.zeros((3, 2)))
     assert u.shape == (3, 1)
 
@@ -151,6 +156,14 @@ def test_planner_reads_the_cost_discount_and_rejects_bad_batches():
         prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32, verbose=0
     )
     np.testing.assert_allclose(planner.gamma, np.exp(-0.1))
+    # the step reward is −g dt; gamma carries the discount (not exp(−ρ t) in r)
+    x = jnp.array([1.0, 0.0])
+    u = jnp.zeros(1)
+    g0 = float(Discounted().g(np.array([1.0, 0.0]), np.array([0.0])))
+    _, _, r0, _, _ = planner.env.step(x, 0.0, u, jax.random.PRNGKey(0))
+    _, _, r_later, _, _ = planner.env.step(x, 5.0, u, jax.random.PRNGKey(0))
+    np.testing.assert_allclose(float(r0), -g0 * 0.1, atol=1e-6)
+    np.testing.assert_allclose(float(r_later), float(r0), atol=1e-6)
     with pytest.raises(ValueError):
         ReinforcementLearningPlanner(prob, dt=0.1, algorithm="sac?", verbose=0)
 

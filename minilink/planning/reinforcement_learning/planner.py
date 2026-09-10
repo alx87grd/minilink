@@ -403,18 +403,21 @@ class ReinforcementLearningPlanner(Planner):
         def body(carry, key):
             x, t = carry
             u = self.action_jit(params, x)
-            x_next, t_next, reward, _, _ = env.step(x, t, u, key)  # nominal params
-            return (x_next, t_next), (x, u, reward)
+            x_next, t_next, _, _, _ = env.step(x, t, u, key)  # nominal params
+            return (x_next, t_next), (x, u)
 
         keys = jax.random.split(key, n_steps)
-        (x_end, t_end), (xs, us, rewards) = jax.lax.scan(
+        (x_end, _), (xs, us) = jax.lax.scan(
             body, (jnp.asarray(x0, dtype=float), 0.0), keys
         )
         xs = np.concatenate([np.asarray(xs), np.asarray(x_end)[None]])
         us = np.concatenate([np.asarray(us), np.asarray(us)[-1:]])
         t = env.dt * np.arange(n_steps + 1)
         trajectory = Trajectory(t=t, x=xs.T, u=us.T)
-        metadata = SolveMetadata(success=True, cost=-float(np.sum(np.asarray(rewards))))
+        from minilink.planning.evaluation import score_trajectory
+
+        J, failed = score_trajectory(self.problem, trajectory)
+        metadata = SolveMetadata(success=True, cost=J, stats={"failed": bool(failed)})
         return self._store_trajectory_plan(TrajectoryPlan(trajectory, metadata))
 
     # --- plots ---

@@ -186,7 +186,7 @@ class MonteCarloEvaluator:
         law = static_law(controller, backend="jax")
         charged = env.charge_exit
         finite = env.finite_horizon
-        rho, dt = env.discount_rate, env.dt
+        dt = env.dt
         x_lb, x_ub = env.x_lb, env.x_ub
 
         def trial(key):
@@ -198,11 +198,11 @@ class MonteCarloEvaluator:
                 x, t, J, alive, failed = carry
                 u = law(x)
                 u_full = env.input_vector(u, key)
-                g = jnp.exp(-rho * t) * env.cost.g(x, u_full[env.port_slices["u"]], t)
+                g = env.running_cost(x, u_full[env.port_slices["u"]], t)
                 x_next = env.step_plant_p(x, u_full, t, dt, theta)
                 t_next = t + dt
                 u_next = jnp.clip(law(x_next), env.u_lb, env.u_ub)
-                g_next = jnp.exp(-rho * t_next) * env.cost.g(x_next, u_next, t_next)
+                g_next = env.running_cost(x_next, u_next, t_next)
                 # trapezoid on this interval while alive; an exit sample is the last one counted
                 J = J + alive * 0.5 * (g + g_next) * dt
                 out = jnp.any(x_next < x_lb) | jnp.any(x_next > x_ub)

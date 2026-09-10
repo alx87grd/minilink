@@ -172,7 +172,9 @@ class RolloutEnvironment:
         else:
             x_next = self.step_plant_p(x, u_full, t, dt, params)
         t_next = t + dt
-        reward = -self.running_cost(x, u_full[self.port_slices["u"]], t) * dt
+        # Undiscounted −g dt: GAE / gamma = exp(−ρ dt) is the discrete discount.
+        # exp(−ρ t) belongs only in score_trajectory / Monte Carlo reporting.
+        reward = -self.cost.g(x, u_full[self.port_slices["u"]], t) * dt
 
         out = jnp.any(x_next < self.x_lb) | jnp.any(x_next > self.x_ub)
         horizon_reached = t_next >= self.tf - 0.5 * dt

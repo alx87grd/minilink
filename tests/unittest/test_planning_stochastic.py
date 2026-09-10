@@ -78,6 +78,26 @@ def test_dp_reads_the_problem_exit_cost():
     assert explicit.options.out_of_bound_cost == 7.0
 
 
+def test_dp_reads_the_cost_discount_rate():
+    class Discounted(CostFunction):
+        discount_rate = 1.0
+
+        def g(self, x, u, t=0.0, params=None):
+            return 0.0
+
+        def h(self, x, t=0.0, params=None):
+            return 0.0
+
+    plant = pendulum()
+    problem = PlanningProblem(plant, cost=Discounted())
+    planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
+    np.testing.assert_allclose(planner.options.alpha, np.exp(-0.05))
+    explicit = DynamicProgrammingPlanner(
+        problem, x_grid=(5, 5), u_grid=(3,), dt=0.05, alpha=0.9
+    )
+    assert explicit.options.alpha == 0.9
+
+
 # --- R2: distributions and the stochastic problem ---
 
 

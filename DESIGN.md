@@ -871,8 +871,9 @@ the discounted running cost by the trapezoidal rule
 (`CostFunction.evaluate_trajectory`, which applies `discount_rate`), cut at
 the first sample outside `X` (a failure, charged when priced), plus `h` at a
 reached finite horizon. RL *trains* on the left-Riemann discretization of
-the same running cost (`r_k = -g dt`); its plans report the trapezoidal
-Monte Carlo score.
+the same running cost (`r_k = -g dt`) with per-step factor
+`gamma = exp(-rho dt)`; `exp(-rho t)` is not folded into the reward (that
+would discount twice). Its plans report the trapezoidal Monte Carlo score.
 
 **Stochastic problem:** `StochasticPlanningProblem(PlanningProblem)` adds
 `x0_distribution` (its mean is `x_start`, its support `X0`),
