@@ -12,11 +12,16 @@ The problem is the one :class:`~minilink.interfaces.gymnasium.Sys2Gym` poses:
 - ``x_{k+1} = rk4(x_k, u_k, t_k, dt)`` with the input held (ZOH);
 - ``r_k = -g(x_k, u_k, t_k) * dt``, so maximizing the return minimizes the
   cost ``J = int g dt``;
-- an episode truncates after ``tf`` seconds or when the state leaves its
-  bounds; the next state's value bootstraps the truncated reward.
+- an episode truncates after ``tf`` seconds (the next state's value
+  bootstraps the truncated reward) and, by default, when the state leaves
+  its bounds; ``domain_exit="terminate"`` instead ends such an episode with
+  the terminal cost ``h(x)`` and no bootstrap, which removes the incentive
+  to escape the box for an extrapolated value.
 
-The policy is a diagonal Gaussian ``u ~ N(mu_theta(x), sigma)`` with an MLP
-mean and a state-independent log-std; the critic is a second MLP. Sizes,
+The policy is a diagonal Gaussian ``a ~ N(mu_theta(x), sigma)`` on the
+normalized action ``a in [-1, 1]`` (``u = u_mid + u_half * a`` spans the
+input-port bounds), with an MLP mean and a state-independent log-std; the
+critic is a second MLP. Sizes,
 initialisation, and hyperparameters follow the usual PPO defaults (two
 hidden layers of 64 tanh units, orthogonal init, 2048-step rollouts,
 minibatches of 64, 10 epochs, lr 3e-4, gamma 0.99, lambda 0.95, clip 0.2),
@@ -57,6 +62,10 @@ class PPO:
         Control period (zero-order hold, one RK4 step per period).
     tf : float
         Episode duration (truncation).
+    domain_exit : {"truncate", "terminate"}
+        What leaving the state bounds does: ``"truncate"`` bootstraps with the
+        critic (the Gymnasium bridge behaviour); ``"terminate"`` ends the
+        episode with reward ``-h(x_next)`` and no bootstrap.
     reset_mode : {"gaussian", "uniform", "determinist"}
         Initial-state distribution around ``sys.x0``.
     x0_std : array, optional
@@ -68,11 +77,18 @@ class PPO:
         Rollouts simulated in parallel (vmapped); ``n_steps`` is per env.
     seed : int
         Seed of the policy initialisation, exploration, and resets.
+    features : callable, optional
+        Observation map ``z = features(x)`` fed to both networks (default:
+        the state itself). Use it to make angles periodic, e.g.
+        ``lambda x: xp.array([x[0], cos(x[1]), sin(x[1]), x[2], x[3]])``;
+        it must trace under JAX. The learned law stays ``u = pi(x)``.
 
     The remaining keyword arguments are the PPO hyperparameters, named as in
     the common implementations: ``hidden``, ``n_steps``, ``batch_size``,
     ``n_epochs``, ``learning_rate``, ``gamma``, ``gae_lambda``,
-    ``clip_range``, ``ent_coef``, ``vf_coef``, ``max_grad_norm``.
+    ``clip_range``, ``ent_coef``, ``vf_coef``, ``max_grad_norm``, plus
+    ``log_std_init`` (initial exploration log-std on the normalized action;
+    ``0`` explores the full input range, lower values start gentler).
 
     Attributes
     ----------
@@ -109,11 +125,21 @@ class PPO:
         ent_coef=0.0,
         vf_coef=0.5,
         max_grad_norm=0.5,
+        log_std_init=0.0,
         integrator="rk4",
+        domain_exit="truncate",
+        features=None,
         verbose=1,
     ):
         jnp = require_jax_numpy()
         import jax
+
+        if domain_exit not in ("truncate", "terminate"):
+            raise ValueError(
+                f"domain_exit must be 'truncate' or 'terminate', got {domain_exit!r}"
+            )
+        self.domain_exit = domain_exit
+        self.features = (lambda x: x) if features is None else features
 
         self.sys = sys
         self.cost = cost
@@ -154,6 +180,8 @@ class PPO:
         self.u_ub = jnp.asarray(sys.inputs["u"].upper_bound, dtype=float)
         self.n = int(sys.n)
         self.m = int(self.u_lb.shape[0])
+        self.u_mid = 0.5 * (self.u_ub + self.u_lb)  # normalized action a in [-1, 1]
+        self.u_half = 0.5 * (self.u_ub - self.u_lb)
 
         # Initial-state distribution
         self.x0 = jnp.asarray(sys.x0, dtype=float)
@@ -166,12 +194,13 @@ class PPO:
         self.x0_ub = self.x0 + 0.1 * self.x_ub if x0_ub is None else jnp.asarray(x0_ub)
 
         # Networks: actor mean, critic value, state-independent log-std
+        n_features = int(jnp.asarray(self.features(self.x0)).shape[0])
         self.key = jax.random.PRNGKey(seed)
         self.key, k_actor, k_critic = jax.random.split(self.key, 3)
         self.weights = {
-            "actor": mlp_init(k_actor, self.n, hidden, self.m, out_gain=0.01),
-            "critic": mlp_init(k_critic, self.n, hidden, 1, out_gain=1.0),
-            "log_std": jnp.zeros(self.m),
+            "actor": mlp_init(k_actor, n_features, hidden, self.m, out_gain=0.01),
+            "critic": mlp_init(k_critic, n_features, hidden, 1, out_gain=1.0),
+            "log_std": jnp.full(self.m, float(log_std_init)),
         }
         self.opt_state = adam_init(self.weights)
 
@@ -191,19 +220,24 @@ class PPO:
     # --- policy ---
 
     def mean_action(self, weights, x):
-        """Deterministic policy ``u = mu_theta(x)`` (unclipped)."""
-        return mlp_apply(weights["actor"], x)
+        """Deterministic normalized action ``a = mu_theta(x)`` (unclipped)."""
+        return mlp_apply(weights["actor"], self.features(x))
+
+    def to_input(self, a):
+        """Map a normalized action to the plant input, clipped to the bounds."""
+        jnp = require_jax_numpy()
+        return self.u_mid + self.u_half * jnp.clip(a, -1.0, 1.0)
 
     def value(self, weights, x):
         """Critic ``V_phi(x)``."""
-        return mlp_apply(weights["critic"], x)[0]
+        return mlp_apply(weights["critic"], self.features(x))[0]
 
-    def log_prob(self, weights, x, u):
-        """Log-density of ``u`` under the diagonal Gaussian policy at ``x``."""
+    def log_prob(self, weights, x, a):
+        """Log-density of the normalized action ``a`` under the policy at ``x``."""
         jnp = require_jax_numpy()
         mu = self.mean_action(weights, x)
         log_std = weights["log_std"]
-        z = (u - mu) / jnp.exp(log_std)
+        z = (a - mu) / jnp.exp(log_std)
         return jnp.sum(-0.5 * z**2 - log_std - 0.5 * math.log(2.0 * math.pi))
 
     def entropy(self, weights):
@@ -222,9 +256,8 @@ class PPO:
         return np.asarray(u), None
 
     def action(self, weights, x):
-        """Clipped deterministic action ``u = clip(mu_theta(x))``."""
-        jnp = require_jax_numpy()
-        return jnp.clip(self.mean_action(weights, x), self.u_lb, self.u_ub)
+        """Deterministic plant input ``u = u_mid + u_half * clip(mu_theta(x))``."""
+        return self.to_input(self.mean_action(weights, x))
 
     # --- environment (one step, one env) ---
 
@@ -252,9 +285,9 @@ class PPO:
 
         # Explore: Gaussian sample stored unclipped, the plant sees the clipped input
         mu = self.mean_action(weights, x)
-        u = mu + jnp.exp(weights["log_std"]) * jax.random.normal(k_sample, (self.m,))
-        u_plant = jnp.clip(u, self.u_lb, self.u_ub)
-        logp = self.log_prob(weights, x, u)
+        a = mu + jnp.exp(weights["log_std"]) * jax.random.normal(k_sample, (self.m,))
+        u_plant = self.to_input(a)
+        logp = self.log_prob(weights, x, a)
         v = self.value(weights, x)
 
         # Plant and reward
@@ -262,28 +295,28 @@ class PPO:
         t_next = t + dt
         r = -self.cost.g(x, u_plant, t) * dt
 
-        # Truncation: horizon or domain exit -> bootstrap, then reset
-        truncated = (
-            (t_next > self.tf)
-            | jnp.any(x_next < self.x_lb)
-            | jnp.any(x_next > self.x_ub)
-        )
+        # Episode end: horizon (bootstrap) or domain exit (bootstrap or h)
+        out_of_bounds = jnp.any(x_next < self.x_lb) | jnp.any(x_next > self.x_ub)
+        terminated = out_of_bounds & (self.domain_exit == "terminate")
+        truncated = (t_next > self.tf) | (out_of_bounds & ~terminated)
+        done = terminated | truncated
+        r = r - terminated * self.cost.h(x_next, t_next)
         ep_return_next = ep_return + r  # logged return: raw rewards only
         r = r + truncated * self.gamma * self.value(weights, x_next)
         x_reset = self.reset(k_reset)
-        x_next = jnp.where(truncated, x_reset, x_next)
-        t_next = jnp.where(truncated, 0.0, t_next)
+        x_next = jnp.where(done, x_reset, x_next)
+        t_next = jnp.where(done, 0.0, t_next)
 
         sample = {
             "x": x,
-            "u": u,
+            "u": a,
             "logp": logp,
             "value": v,
             "reward": r,
-            "done": truncated.astype(float),
-            "ep_return": jnp.where(truncated, ep_return_next, jnp.nan),
+            "done": done.astype(float),
+            "ep_return": jnp.where(done, ep_return_next, jnp.nan),
         }
-        ep_return_next = jnp.where(truncated, 0.0, ep_return_next)
+        ep_return_next = jnp.where(done, 0.0, ep_return_next)
         return (x_next, t_next, ep_return_next), sample
 
     # --- rollout and advantage estimation ---
