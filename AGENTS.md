@@ -19,7 +19,7 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy, **entry points (human · agent · CI)** |
 | [docs/reviews/](docs/reviews/) | Dated architecture audits and the interview decision records; read-only history, never a backlog |
 
-Do not add new markdown guides unless asked. Keep [README call chains](README.md#call-chains) minimal.
+Do not add new markdown guides unless asked. Keep [DESIGN.md call chains](DESIGN.md#8-call-chains) minimal.
 
 **Intro-doc scope:** [README.md](README.md), marketing showcases
 ([showcase/minilink.ipynb](examples/learn/intro/showcase_minilink.ipynb),

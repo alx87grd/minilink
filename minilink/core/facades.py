@@ -356,7 +356,7 @@ class SharedSystemFacades:
         §4.7). ``camera`` accepts an
         optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
         callable). ``save=True`` with ``renderer="matplotlib"`` writes a GIF
-        via ImageMagick (``{file_name}.gif``).
+        with the Pillow writer (``{file_name}.gif``).
         """
         from minilink.graphical.animation import Animator
         from minilink.graphical.common.environment import prefers_inline_animation

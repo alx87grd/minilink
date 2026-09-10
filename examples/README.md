@@ -109,13 +109,13 @@ One demo folder per intro chapter; the research lane sits apart.
 | Control | [03_control](learn/intro/03_control.ipynb) | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [articulated_robot_eom](learn/teaching/articulated_robot_eom.ipynb) |
 | Analysis | [04_analysis](learn/intro/04_analysis.ipynb) | [`demos/analysis/`](demos/analysis/) | [frequency_domain_tools](learn/teaching/frequency_domain_tools.ipynb) (Bode, margins, Nyquist, root locus, step response) |
 | Simulation | [05_simulation](learn/intro/05_simulation.ipynb) | [`demos/graphical/`](demos/graphical/) | |
-| Hybrid / step | [06_hybrid](learn/intro/06_hybrid.ipynb) | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack) |
+| Hybrid / step | [06_hybrid](learn/intro/06_hybrid.ipynb) | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack, dual-rate `mpc_dual_rate.py`), [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
 | Compile / autodiff | [07_compile](learn/intro/07_compile.ipynb), [showcase_jax](learn/intro/showcase_jax.ipynb) | [`demos/compile/`](demos/compile/) | [cartpole_rollout_gradients](learn/teaching/cartpole_rollout_gradients.ipynb) |
 | Optimization | [08_optimization](learn/intro/08_optimization.ipynb) | [`demos/optimization/`](demos/optimization/) | |
 | Planning | [09_planning](learn/intro/09_planning.ipynb) | [`demos/planning/`](demos/planning/) (`trajopt/`, `rrt/`, `value_iteration/`) | [cost+VI](learn/teaching/pendulum_swing_up_cost_function_vi.ipynb), [VI vs LQR](learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb), [grid world DP](learn/teaching/grid_world_exact_dp.ipynb); [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
-| Graphical | [10_graphical](learn/intro/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) | |
+| Graphical | [10_graphical](learn/intro/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`) | |
 | RL | — | — | [VI vs LQR vs PPO](learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb), [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) |
-| Research lane | — | [`experimental/`](experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5) | not swept; `c_export` runs in the JAX regression job |
+| Research lane | — | [`experimental/`](experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5) | not swept; `c_export` runs in the JAX regression job; C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` |
 | Solver benchmarks | — | [benchmark](tooling/notebooks/benchmark.ipynb) | Uses repo-root `benchmarks/` |
 
 Run demos from the repo root, e.g.

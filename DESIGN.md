@@ -1,6 +1,6 @@
 # Minilink Technical Design
 
-Architecture and public contracts. User guide and call chains: [README.md](README.md).
+Architecture and public contracts. User guide: [README.md](README.md). Call chains: [§8](#8-call-chains).
 
 ## 1. Design Principles
 
@@ -989,3 +989,71 @@ which keep bare signatures per [AGENTS.md](AGENTS.md) Textbook Style); lazy opti
 namespace `__init__.py` files; plot subpackages may re-export small facades.
 Agents and maintainers run tests in the **`minilink`** conda env from
 [environment.yml](environment.yml) ([README.md#install](README.md#install)).
+
+## 8. Call Chains
+
+Minimal paths for debugging and extending workflows (moved here from the README, 2026-09).
+
+Facade methods for common workflows: `compute_trajectory(...)` (static leaves and
+continuous/diagram systems via MRO), `plot_trajectory(...)`,
+`plot_diagram(...)`, `animate(...)`, `jacobian(...)`, `linearize(...)`. They are
+shortcuts over the tools' own modules — `Simulator`, `minilink.analysis` — which
+scripts and projects import directly. Use lower-level APIs when you need explicit
+control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
+`compile()` / `DynamicsEvaluator`.
+
+### Package roles
+
+| Package | Owns |
+| --- | --- |
+| `core` | `System`, façade mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem`, ports, `Trajectory`, sets, costs |
+| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
+| `control` | control laws and design factories (`PID`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`, `mpc`) |
+| `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
+| `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
+| `simulation` | `Simulator`, `HybridSimulator`, `Computer`, solvers, time grids |
+| `graphical` | plots, diagrams, animation (`Animator` + renderers) |
+| `planning` | `PlanningProblem`, planners, transcriptions |
+| `optimization` | `MathematicalProgram`, `Optimizer` |
+
+### Main chains
+
+```text
+Model:     subclass System → f/h (+ ports or DynamicSystem options)
+
+Compose:   + / >> / @ / autowire  →  DiagramSystem
+           hybrid: block % dt  →  Computer; Computer @ plant  →  HybridDiagram
+           or add_subsystem + connect (+ connect_new_output_port)
+
+Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
+           →  compile  →  solve  →  Trajectory
+           StepSystem: compute_rollout  →  StepEvaluator.rollout (state-only k/x/u)
+           StepDiagram + schedule: Computer.tick  →  signal histories (not evaluator rollout)
+           HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
+           cache: self.traj (plant Trajectory), self.last_result (full result), self.rollout (computer)
+
+Compile:   sys.compile(backend)  →  DynamicsEvaluator
+
+Plot:      plot_trajectory*  →  graphical.signals  →  PlotResult
+           plot_phase_plane* →  graphical.phase_plane
+           plot_diagram      →  graphical.diagrams (DiagramSystem / StepDiagramSystem)
+           HybridDiagram.plot_diagram  →  hybrid composite (Plant + Computer clusters)
+
+Animate:   animate* / render  →  Animator  →  renderer backend
+           game  →  simulation.realtime.RealtimeSimulator  →  live Animator frames
+           HybridDiagram.animate  →  plant geometry + fine plant traj
+           planner.plot_solution / animate_solution  →  problem.sys.*
+
+Trajopt:   PlanningProblem + TrajectoryOptimizationPlanner
+           (flat ``n_steps`` / ``transcription="…"``; optional Transcription)
+           → transcribe → MathematicalProgram → Optimizer → TrajectoryPlan
+
+NLP:       MathematicalProgram → Optimizer → OptimizationResult
+```
+
+- `Trajectory` is numeric only (`t`, `x`, `u`, optional `signals`); labels stay on `System`.
+- Diagram internal signals in plots: `"sys_id:port_id"`, or ``(subsystem, "port")``
+  tuples; shortcut-built diagrams default to ``ref`` / ``ctl`` / ``sys``.
+- `DiagramSystem.connection_verbose` defaults to `False`; set `True` to print one line per connection.
+- Shortcuts flatten diagram operands instead of nesting them; `+` does not infer cross-wiring.
+- `compute_*` returns `Trajectory`; `plot_*` returns `PlotResult`; `show=False` skips display.

@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 540" width="1000" height="540" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+  </defs>
+  <style>
+    .canvas { fill: #f8fafc; stroke: #e2e8f0; }
+    .card { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.4; }
+    .row { fill: #f1f5f9; stroke: #e2e8f0; stroke-width: 1; }
+    .box { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1.2; }
+    .pill { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.2; }
+    .bar { fill: #2563eb; }
+    .port { fill: #2563eb; stroke: #ffffff; stroke-width: 2; }
+    .wire { stroke: #475569; stroke-width: 1.6; fill: none; marker-end: url(#ah); }
+    .h1 { fill: #0f172a; font-size: 22px; font-weight: 700; }
+    .h2 { fill: #0f172a; font-size: 16px; font-weight: 700; }
+    .h3 { fill: #0f172a; font-size: 14px; font-weight: 700; }
+    .t  { fill: #0f172a; font-size: 15px; }
+    .g  { fill: #64748b; font-size: 13px; }
+    .gs { fill: #64748b; font-size: 12px; }
+    .lab { fill: #334155; font-size: 14px; font-style: italic; font-family: 'Times New Roman', Times, serif; }
+    .math { fill: #0f172a; font-size: 19px; font-style: italic; font-family: 'Times New Roman', Times, serif; }
+    .code { fill: #1e40af; font-size: 12px; font-family: Menlo, Consolas, 'Courier New', monospace; }
+  </style>
+
+  <rect class="canvas" x="0.5" y="0.5" width="999" height="539" rx="18"/>
+
+  <!-- ================= the System card ================= -->
+  <rect class="card" x="70" y="36" width="500" height="276" rx="14"/>
+  <text class="h1" x="320" y="72" text-anchor="middle">System</text>
+  <text class="g" x="320" y="93" text-anchor="middle">ports · parameters p · initial state x0 · labels and units</text>
+
+  <rect class="row" x="96" y="112" width="448" height="48" rx="8"/>
+  <text class="math" x="112" y="143">ẋ = f(x, u, t; p)</text>
+  <text class="g" x="528" y="142" text-anchor="end">dynamics</text>
+
+  <rect class="row" x="96" y="172" width="448" height="48" rx="8"/>
+  <text class="math" x="112" y="203">y = h(x, u, t; p)</text>
+  <text class="g" x="528" y="202" text-anchor="end">outputs · default y = x</text>
+
+  <rect class="row" x="96" y="232" width="448" height="48" rx="8"/>
+  <text class="math" x="112" y="263">T = tf(x, u, t; p)</text>
+  <text class="g" x="528" y="262" text-anchor="end">body poses · skin geometry</text>
+
+  <!-- ports and boundary signals -->
+  <line class="wire" x1="12" y1="196" x2="58" y2="196"/>
+  <text class="lab" x="34" y="186" text-anchor="middle">u</text>
+  <circle class="port" cx="70" cy="196" r="8"/>
+  <circle class="port" cx="570" cy="196" r="8"/>
+  <line class="wire" x1="582" y1="196" x2="628" y2="196"/>
+  <text class="lab" x="606" y="186" text-anchor="middle">y</text>
+
+  <!-- ================= what you get ================= -->
+  <text class="g" x="680" y="60">what f and tf give you</text>
+
+  <rect class="pill" x="680" y="72" width="300" height="60" rx="10"/>
+  <rect class="bar" x="680" y="80" width="4" height="44" rx="2"/>
+  <text class="h3" x="700" y="94">simulate, plot, analyze</text>
+  <text class="code" x="700" y="112">compute_trajectory() · plot_trajectory()</text>
+  <text class="code" x="700" y="126">linearize() · jacobian() · plot_bode()</text>
+
+  <rect class="pill" x="680" y="146" width="300" height="60" rx="10"/>
+  <rect class="bar" x="680" y="154" width="4" height="44" rx="2"/>
+  <text class="h3" x="700" y="168">animate, on any renderer</text>
+  <text class="code" x="700" y="188">animate(renderer=…)</text>
+  <text class="gs" x="700" y="200">matplotlib · plotly · meshcat 3D · pygame</text>
+
+  <rect class="pill" x="680" y="220" width="300" height="60" rx="10"/>
+  <rect class="bar" x="680" y="228" width="4" height="44" rx="2"/>
+  <text class="h3" x="700" y="242">play it</text>
+  <text class="code" x="700" y="262">game()</text>
+  <text class="gs" x="700" y="274">the keyboard drives u, in real time</text>
+
+  <!-- ================= a diagram is a System ================= -->
+  <text class="h2" x="70" y="358">A diagram is a System too</text>
+  <text class="g" x="70" y="378">ctl @ plant · source &gt;&gt; plant · a + b + c · ctl % dt</text>
+
+  <rect class="card" x="70" y="392" width="500" height="112" rx="14"/>
+  <rect class="box" x="140" y="424" width="120" height="48" rx="8"/>
+  <text class="t" x="200" y="453" text-anchor="middle">controller</text>
+  <rect class="box" x="330" y="424" width="120" height="48" rx="8"/>
+  <text class="t" x="390" y="453" text-anchor="middle">plant</text>
+
+  <line class="wire" x1="12" y1="448" x2="58" y2="448"/>
+  <text class="lab" x="34" y="438" text-anchor="middle">r</text>
+  <circle class="port" cx="70" cy="448" r="8"/>
+  <line class="wire" x1="80" y1="448" x2="136" y2="448"/>
+  <line class="wire" x1="260" y1="448" x2="326" y2="448"/>
+  <text class="lab" x="293" y="440" text-anchor="middle">u</text>
+  <line class="wire" x1="450" y1="448" x2="558" y2="448"/>
+  <text class="lab" x="504" y="440" text-anchor="middle">y</text>
+  <path class="wire" d="M500,448 L500,490 L200,490 L200,476"/>
+  <circle class="port" cx="570" cy="448" r="8"/>
+  <line class="wire" x1="582" y1="448" x2="628" y2="448"/>
+  <text class="lab" x="606" y="438" text-anchor="middle">y</text>
+
+  <text class="h3" x="680" y="420">same ports, same tools</text>
+  <text class="code" x="680" y="442">diagram.linearize()</text>
+  <text class="code" x="680" y="460">diagram.animate()</text>
+  <text class="code" x="680" y="478">outer = mpc @ diagram</text>
+  <text class="gs" x="680" y="496">and it nests again</text>
+</svg>

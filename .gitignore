@@ -89,3 +89,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# README / landing-page assets built by docs/make_assets.py (kept in git so GitHub renders them)
+!docs/_static/*.gif
+!docs/_static/*.png
+!docs/_static/pitch.html
