@@ -8,7 +8,8 @@ the compiled plant one control period and scores it — with the problem's own
 semantics:
 
 - reward ``r = -g(x, u, t) dt`` (the running cost over the step, the
-  left-Riemann discretization of ``int g dt`` on the control grid);
+  left-Riemann discretization of ``int g dt`` on the control grid; the
+  discount is the planner's ``gamma``, applied once in the return);
 - a finite horizon ends the episode at ``tf`` with the terminal cost ``h``;
   an infinite horizon uses ``episode_length`` and *truncates* (the value of
   the next state bootstraps the return);
@@ -25,6 +26,7 @@ over time. There is no Python per step.
 
 import numpy as np
 
+from minilink.control.neural import action_port_of
 from minilink.core.backends import require_jax_numpy
 from minilink.core.sets import BoxSet
 
@@ -80,9 +82,6 @@ class RolloutEnvironment:
             getattr(problem, "params_distribution", {}) or {}
         )
         self.randomizes_params = bool(self.params_distribution)
-        self.nominal_params = {
-            k: jnp.asarray(v, dtype=float) for k, v in self.sys.params.items()
-        }
 
         # The allowed box: problem.X when it is a box, else the state bounds
         X = problem.X
@@ -99,16 +98,18 @@ class RolloutEnvironment:
             problem.exit_cost is not None or problem.on_exit == "terminate"
         )
 
-        # Stacked input vector: the action fills port "u", disturbances their ports
+        # Stacked input vector: the action fills its port, disturbances theirs
+        self.action_port = action_port_of(self.sys)
         self.u_nominal = jnp.asarray(self.sys.get_u_from_input_ports(), dtype=float)
         self.port_slices = {}
         i = 0
         for port_id, port in self.sys.inputs.items():
             self.port_slices[port_id] = slice(i, i + port.dim)
             i += port.dim
-        self.m = int(self.sys.inputs["u"].dim)
-        self.u_lb = jnp.asarray(self.sys.inputs["u"].lower_bound, dtype=float)
-        self.u_ub = jnp.asarray(self.sys.inputs["u"].upper_bound, dtype=float)
+        action = self.sys.inputs[self.action_port]
+        self.m = int(action.dim)
+        self.u_lb = jnp.asarray(action.lower_bound, dtype=float)
+        self.u_ub = jnp.asarray(action.upper_bound, dtype=float)
         self.u_mid = 0.5 * (self.u_ub + self.u_lb)  # normalized action a in [-1, 1]
         self.u_half = 0.5 * (self.u_ub - self.u_lb)
 
@@ -122,20 +123,32 @@ class RolloutEnvironment:
         return jnp.asarray(self.problem.x_start, dtype=float)
 
     def sample_params(self, key):
-        """Plant parameters of one episode: the nominal dict with the problem's draws."""
+        """The episode's parameter draws ``{name: array}`` (empty when nothing is randomized)."""
         jnp = require_jax_numpy()
-        params = dict(self.nominal_params)
-        if self.randomizes_params:
-            for name, value in self.problem.sample_params(key).items():
-                params[name] = jnp.asarray(value, dtype=float).reshape(
-                    self.nominal_params[name].shape
-                )
-        return params
+        if not self.randomizes_params:
+            return {}
+        import jax
+
+        return jax.tree_util.tree_map(
+            lambda v: jnp.asarray(v, dtype=float), self.problem.sample_params(key)
+        )
+
+    def full_params(self, theta):
+        """The plant's params with the episode's draws merged in (other entries untouched)."""
+        from minilink.planning.problems import merge_params
+
+        return merge_params(self.sys.params, theta)
+
+    def plant_step(self, x, u_full, t, theta=None):
+        """One integration step of the plant, on the nominal or the episode's parameters."""
+        if not theta:
+            return self.step_plant(x, u_full, t, self.dt)
+        return self.step_plant_p(x, u_full, t, self.dt, self.full_params(theta))
 
     def input_vector(self, u, key):
         """Full plant input: action on port ``u``, fresh disturbance draws elsewhere."""
         jnp = require_jax_numpy()
-        full = self.u_nominal.at[self.port_slices["u"]].set(
+        full = self.u_nominal.at[self.port_slices[self.action_port]].set(
             jnp.clip(u, self.u_lb, self.u_ub)
         )
         draws = (
@@ -150,15 +163,19 @@ class RolloutEnvironment:
         return full
 
     def running_cost(self, x, u, t):
-        """Discounted running cost ``exp(-rho t) g(x, u, t)`` of the applied input."""
-        jnp = require_jax_numpy()
-        return jnp.exp(-self.discount_rate * t) * self.cost.g(x, u, t)
+        """Running cost ``g(x, u, t)`` of the applied input.
+
+        Undiscounted on purpose: the discount enters the return once, through
+        the planner's ``gamma`` (``cost.discount_factor(dt)`` by default), not
+        through the per-step reward.
+        """
+        return self.cost.g(x, u, t)
 
     def step(self, x, t, u, key, params=None):
         """
         One control period: ``(x_next, t_next, reward, terminated, truncated)``.
 
-        ``params`` is the episode's plant-parameter dict (``None``: nominal).
+        ``params`` is the episode's parameter draws (``None`` or empty: nominal).
         ``terminated`` ends the episode with its cost fully accounted (finite
         horizon reached, or a charged exit); ``truncated`` ends it with the
         value of ``x_next`` still to come (episode length, or an uncharged
@@ -167,16 +184,17 @@ class RolloutEnvironment:
         jnp = require_jax_numpy()
         dt = self.dt
         u_full = self.input_vector(u, key)
-        if params is None:
-            x_next = self.step_plant(x, u_full, t, dt)
-        else:
-            x_next = self.step_plant_p(x, u_full, t, dt, params)
+        x_next = self.plant_step(x, u_full, t, params)
         t_next = t + dt
-        # Undiscounted −g dt: GAE / gamma = exp(−ρ dt) is the discrete discount.
-        # exp(−ρ t) belongs only in score_trajectory / Monte Carlo reporting.
-        reward = -self.cost.g(x, u_full[self.port_slices["u"]], t) * dt
+        reward = (
+            -self.running_cost(x, u_full[self.port_slices[self.action_port]], t) * dt
+        )
 
-        out = jnp.any(x_next < self.x_lb) | jnp.any(x_next > self.x_ub)
+        # A step that blew up ends the episode; the last finite state stands in
+        # for the next one so rewards, values and the reset stay finite
+        finite = jnp.all(jnp.isfinite(x_next))
+        x_next = jnp.where(finite, x_next, x)
+        out = jnp.any(x_next < self.x_lb) | jnp.any(x_next > self.x_ub) | ~finite
         horizon_reached = t_next >= self.tf - 0.5 * dt
 
         if self.charge_exit:

@@ -138,6 +138,7 @@ class ReinforcementLearningPlanner(Planner):
         self.verbose = verbose
         self.num_timesteps = 0
         self.train_time = 0.0
+        self.last_ep_return_mean = np.nan
         self.history = []
 
         self.env = RolloutEnvironment(
@@ -304,11 +305,13 @@ class ReinforcementLearningPlanner(Planner):
 
             ep_returns = np.asarray(batch["ep_return"])
             ep_returns = ep_returns[np.isfinite(ep_returns)]
+            if (
+                ep_returns.size
+            ):  # else keep the last mean: no episode ended in this collection
+                self.last_ep_return_mean = float(ep_returns.mean())
             record = {
                 "timesteps": self.num_timesteps,
-                "ep_return_mean": float(ep_returns.mean())
-                if ep_returns.size
-                else np.nan,
+                "ep_return_mean": self.last_ep_return_mean,
                 "n_episodes": int(ep_returns.size),
                 "fps": per_iteration / max(time.time() - t0, 1e-9),
                 "elapsed": self.train_time,

@@ -877,7 +877,8 @@ would discount twice). Its plans report the trapezoidal Monte Carlo score.
 
 **Stochastic problem:** `StochasticPlanningProblem(PlanningProblem)` adds
 `x0_distribution` (its mean is `x_start`, its support `X0`),
-`params_distribution` (`{name: Distribution}` over `sys.params`, one draw per
+`params_distribution` (`{name: Distribution}` over `sys.params`, dotted names
+reaching a diagram's subsystem params such as `"sys.mass"`, one draw per
 episode carried through the parametric step `rk4_step_trace_p`),
 `disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
 port) and `criterion` (`"expectation"` default; `"worst_case"` is reported by
@@ -917,7 +918,10 @@ under `algorithms/` (`PPO` on-policy, `SAC` off-policy) holding only its
 update rule and train state; `Algorithm.on_policy` picks the planner's loop.
 Bare JAX, no Flax/Optax dependency; an Optax-style optimizer can be passed.
 `control.angle_features(angles, scales)` builds the periodic feature map
-(`cos, sin` per listed angle, scaled rates). The learned law is a `System`:
+(`cos, sin` per listed angle, scaled rates). The action port is `u` when the
+plant has one, else its single input port — so an inner loop `impedance @
+arm` (input `r`) is a plant for an outer learned law; a step that leaves the
+box or blows up (non-finite state) ends the episode. The learned law is a `System`:
 `ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
 through the network, and the parametric tier (`rk4_step_trace_p` with
 `params={"ctl": ..., "sys": ...}`) gives gradients of a rollout with respect

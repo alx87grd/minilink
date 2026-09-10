@@ -333,6 +333,8 @@ class StochasticPlanningProblem(PlanningProblem):
     params_distribution : mapping, optional
         ``{name: Distribution}`` over entries of ``sys.params`` (domain
         randomization, robustness sweeps); each sample overrides those entries.
+        A dotted name reaches into a diagram's subsystem params
+        (``"sys.mass"`` for the plant inside a closed loop).
     disturbances : mapping, optional
         ``{port_id: Distribution}`` over input ports of ``sys``: a fresh draw
         per step held on that port (a seeded disturbance signal).
@@ -367,9 +369,16 @@ class StochasticPlanningProblem(PlanningProblem):
         if int(self.x0_distribution.dim) != int(self.sys.n):
             raise ValueError("x0_distribution.dim must equal sys.n")
         for name in self.params_distribution or {}:
-            if name not in self.sys.params:
+            try:
+                leaf = lookup_param(self.sys.params, name)
+            except KeyError:
                 raise ValueError(
                     f"params_distribution key {name!r} is not in sys.params"
+                ) from None
+            if isinstance(leaf, dict):
+                raise ValueError(
+                    f"params_distribution over {name!r}: distributions apply to "
+                    "array-valued parameters, not to a whole subsystem dict"
                 )
         for port in self.disturbances or {}:
             if port not in self.sys.inputs:
@@ -392,7 +401,12 @@ class StochasticPlanningProblem(PlanningProblem):
         draws = {}
         for name, k in zip(names, keys):
             value = self.params_distribution[name].sample(k)
-            draws[name] = value.reshape(np.shape(self.sys.params[name]))
+            value = value.reshape(np.shape(lookup_param(self.sys.params, name)))
+            node = draws
+            *path, last = name.split(".")
+            for part in path:
+                node = node.setdefault(part, {})
+            node[last] = value
         return draws
 
     def sample_disturbances(self, key):
@@ -433,3 +447,22 @@ def split_keys(key, n):
         return list(jax.random.split(key, n))
     rng = key if isinstance(key, np.random.Generator) else np.random.default_rng(key)
     return [rng] * n
+
+
+def lookup_param(params, name):
+    """Entry of a (nested) params dict by dotted name; raises ``KeyError``."""
+    node = params
+    for part in name.split("."):
+        node = node[part]
+    return node
+
+
+def merge_params(params, draws):
+    """``params`` with the (nested) ``draws`` overriding matching entries, untouched elsewhere."""
+    merged = dict(params)
+    for name, value in draws.items():
+        if isinstance(value, dict) and isinstance(merged.get(name), dict):
+            merged[name] = merge_params(merged[name], value)
+        else:
+            merged[name] = value
+    return merged

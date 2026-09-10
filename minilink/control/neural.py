@@ -18,6 +18,18 @@ from minilink.core.feedback import Controller
 # Public API
 
 
+def action_port_of(sys) -> str:
+    """The input port a learned law drives: ``"u"`` when it exists, else the plant's single input."""
+    if "u" in sys.inputs:
+        return "u"
+    if len(sys.inputs) == 1:
+        return next(iter(sys.inputs))
+    raise ValueError(
+        "the plant needs an input port named 'u' or a single input port; "
+        f"got {list(sys.inputs)}"
+    )
+
+
 class NeuralPolicyController(Controller):
     """
     State feedback ``u = u_mid + u_half * clip(MLP(z(x)), -1, 1)``.
@@ -25,8 +37,9 @@ class NeuralPolicyController(Controller):
     Parameters
     ----------
     sys : System
-        Plant whose state bounds and ``u`` port bounds define the feature
-        normalization and the action range.
+        Plant whose state bounds and action-port bounds (``"u"``, or its
+        single input port, e.g. the reference ``r`` of an inner loop) define
+        the feature normalization and the action range.
     features : callable, optional
         Observation map ``z = features(x)`` (must trace under JAX). Use it to
         make angles periodic or to give the policy task-relative sensing.
@@ -71,14 +84,15 @@ class NeuralPolicyController(Controller):
         if squash not in ("clip", "tanh"):
             raise ValueError(f"squash must be 'clip' or 'tanh', got {squash!r}")
         self.squash = squash
-        n, m = int(sys.n), int(sys.inputs["u"].dim)
+        port = sys.inputs[action_port_of(sys)]
+        n, m = int(sys.n), int(port.dim)
         x_lb = np.asarray(sys.state.lower_bound, dtype=float)
         x_ub = np.asarray(sys.state.upper_bound, dtype=float)
-        u_lb = np.asarray(sys.inputs["u"].lower_bound, dtype=float)
-        u_ub = np.asarray(sys.inputs["u"].upper_bound, dtype=float)
+        u_lb = np.asarray(port.lower_bound, dtype=float)
+        u_ub = np.asarray(port.upper_bound, dtype=float)
         if not (np.all(np.isfinite(u_lb)) and np.all(np.isfinite(u_ub))):
             raise ValueError(
-                "NeuralPolicyController needs finite bounds on sys.inputs['u']"
+                "NeuralPolicyController needs finite bounds on the plant's action port"
             )
 
         # Features: user map, or the state scaled to the box [-1, 1]
@@ -112,8 +126,8 @@ class NeuralPolicyController(Controller):
             dim=m,
             function=self.ctl,
             dependencies=("x",),
-            labels=list(sys.inputs["u"].labels),
-            units=list(sys.inputs["u"].units),
+            labels=list(port.labels),
+            units=list(port.units),
             lower_bound=u_lb,
             upper_bound=u_ub,
         )

@@ -40,6 +40,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.trajectory import Trajectory
+from minilink.planning.problems import merge_params
 
 # Public API
 
@@ -187,6 +188,7 @@ class MonteCarloEvaluator:
         charged = env.charge_exit
         finite = env.finite_horizon
         dt = env.dt
+        rho = env.discount_rate
         x_lb, x_ub = env.x_lb, env.x_ub
 
         def trial(key):
@@ -198,14 +200,22 @@ class MonteCarloEvaluator:
                 x, t, J, alive, failed = carry
                 u = law(x)
                 u_full = env.input_vector(u, key)
-                g = env.running_cost(x, u_full[env.port_slices["u"]], t)
-                x_next = env.step_plant_p(x, u_full, t, dt, theta)
+                g = jnp.exp(-rho * t) * env.running_cost(
+                    x, u_full[env.port_slices[env.action_port]], t
+                )
+                x_next = env.plant_step(x, u_full, t, theta)
                 t_next = t + dt
                 u_next = jnp.clip(law(x_next), env.u_lb, env.u_ub)
-                g_next = env.running_cost(x_next, u_next, t_next)
+                g_next = jnp.exp(-rho * t_next) * env.running_cost(
+                    x_next, u_next, t_next
+                )
                 # trapezoid on this interval while alive; an exit sample is the last one counted
                 J = J + alive * 0.5 * (g + g_next) * dt
-                out = jnp.any(x_next < x_lb) | jnp.any(x_next > x_ub)
+                out = (
+                    jnp.any(x_next < x_lb)
+                    | jnp.any(x_next > x_ub)
+                    | ~jnp.all(jnp.isfinite(x_next))
+                )
                 exits = alive & out
                 if charged:
                     penalty = env.problem.exit_penalty(x_next, t_next)
@@ -239,8 +249,9 @@ class MonteCarloEvaluator:
         for port_id, port in sys.inputs.items():
             slices[port_id] = slice(i, i + port.dim)
             i += port.dim
-        u_lb = np.asarray(sys.inputs["u"].lower_bound, dtype=float)
-        u_ub = np.asarray(sys.inputs["u"].upper_bound, dtype=float)
+        action_port = env_action_port(sys)
+        u_lb = np.asarray(sys.inputs[action_port].lower_bound, dtype=float)
+        u_ub = np.asarray(sys.inputs[action_port].upper_bound, dtype=float)
         randomizes = bool(getattr(problem, "params_distribution", None))
 
         J = np.zeros(self.n_trials)
@@ -249,18 +260,20 @@ class MonteCarloEvaluator:
         trajectories = [] if self.record else None
         for i, x0 in enumerate(x0s):
             params = (
-                {**sys.params, **problem.sample_params(rng)} if randomizes else None
+                merge_params(sys.params, problem.sample_params(rng))
+                if randomizes
+                else None
             )
             t = dt * np.arange(n_steps + 1)
             xs = np.zeros((sys.n, n_steps + 1))
-            us = np.zeros((sys.inputs["u"].dim, n_steps + 1))
+            us = np.zeros((sys.inputs[action_port].dim, n_steps + 1))
             xs[:, 0] = x0
             for k in range(n_steps + 1):
                 us[:, k] = np.clip(law(xs[:, k]), u_lb, u_ub)
                 if k == n_steps:
                     break
                 u_full = u_nominal.copy()
-                u_full[slices["u"]] = us[:, k]
+                u_full[slices[action_port]] = us[:, k]
                 for port_id, value in problem.sample_disturbances(rng).items():
                     u_full[slices[port_id]] = value
                 if params is None:
@@ -292,8 +305,9 @@ class MonteCarloEvaluator:
         x0s = np.asarray(problem.sample_x0(rng, n=self.n_trials), dtype=float)
         trajectories = [] if self.record else None
         x0_saved = np.asarray(sys.x0, dtype=float).copy()
-        u_lb = np.asarray(sys.inputs["u"].lower_bound, dtype=float)
-        u_ub = np.asarray(sys.inputs["u"].upper_bound, dtype=float)
+        action_port = env_action_port(sys)
+        u_lb = np.asarray(sys.inputs[action_port].lower_bound, dtype=float)
+        u_ub = np.asarray(sys.inputs[action_port].upper_bound, dtype=float)
         saturation_warned = False
         try:
             for i, x0 in enumerate(x0s):
@@ -318,6 +332,12 @@ class MonteCarloEvaluator:
         finally:
             sys.x0 = x0_saved
         return MonteCarloReport(J, failed, x0s, trajectories)
+
+
+def env_action_port(sys) -> str:
+    from minilink.control.neural import action_port_of
+
+    return action_port_of(sys)
 
 
 def static_law(controller, backend="jax"):

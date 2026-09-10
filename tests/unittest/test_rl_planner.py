@@ -298,3 +298,85 @@ def test_planner_trains_with_randomized_parameters():
     assert set(np.unique(np.asarray(theta["m"]))) <= {0.5, 2.0}
     planner.learn(64)
     assert np.all(np.isfinite(np.asarray(planner.carry[0])))
+
+
+# --- an inner loop as the plant: the action port is its reference, params are nested ---
+
+
+def test_outer_loop_on_an_inner_loop_with_nested_params():
+    from minilink.control import StateFeedbackController
+    from minilink.planning.distributions import Particles
+    from minilink.planning.evaluation import MonteCarloEvaluator
+    from minilink.planning.problems import lookup_param, merge_params
+
+    plant = bounded_pendulum()
+    inner = StateFeedbackController(K=[[20.0, 4.0]], xbar=[0.0, 0.0]) @ plant
+    inner.inputs["r"].lower_bound = np.array([-1.0, -2.0])
+    inner.inputs["r"].upper_bound = np.array([1.0, 2.0])
+    inner.state.lower_bound = plant.state.lower_bound
+    inner.state.upper_bound = plant.state.upper_bound
+    assert "u" not in inner.inputs and list(inner.inputs) == ["r"]
+
+    prob = StochasticPlanningProblem(
+        inner,
+        cost=HangCost(),
+        x0_distribution=Uniform([-0.3, -0.3], [0.3, 0.3]),
+        params_distribution={"sys.m": Particles([[0.5], [2.0]])},  # the plant inside
+    )
+    assert lookup_param(inner.params, "sys.m") == 1.0
+    draw = prob.sample_params(0)
+    assert set(draw) == {"sys"} and float(draw["sys"]["m"]) in (0.5, 2.0)
+    merged = merge_params(inner.params, draw)
+    assert merged["ctl"] is not None and merged["sys"]["m"] == float(draw["sys"]["m"])
+    assert inner.params["sys"]["m"] == 1.0  # untouched
+
+    planner = ReinforcementLearningPlanner(
+        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
+    )
+    assert planner.env.action_port == "r" and planner.env.m == 2
+    planner.learn(64)
+    ctl = planner.get_controller()
+    u = ctl.action(np.zeros(2))
+    assert u.shape == (2,) and -1.0 <= u[0] <= 1.0 and -2.0 <= u[1] <= 2.0
+    report = MonteCarloEvaluator(prob, dt=0.1, n_trials=3, episode_length=0.5).evaluate(
+        ctl
+    )
+    assert np.all(np.isfinite(report.J))
+
+
+def test_a_step_that_blows_up_ends_the_episode_finitely():
+    from minilink.core.system import DynamicSystem
+
+    class Explosive(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=1, output_dim=1)
+            self.inputs["u"].lower_bound = np.array([-1.0])
+            self.inputs["u"].upper_bound = np.array([1.0])
+            self.state.lower_bound = np.array([-10.0])
+            self.state.upper_bound = np.array([10.0])
+
+        def f(self, x, u, t=0.0, params=None):
+            return 1e6 * x  # stiff enough to overflow an RK4 step of 1 s
+
+        def h(self, x, u, t=0.0, params=None):
+            return x
+
+    class Zero(CostFunction):
+        def g(self, x, u, t=0.0, params=None):
+            return 1.0
+
+        def h(self, x, t=0.0, params=None):
+            return 0.0
+
+    prob = StochasticPlanningProblem(
+        Explosive(), cost=Zero(), tf=np.inf, x0_distribution=Uniform([1.0], [2.0])
+    )
+    env = RolloutEnvironment(prob, dt=1.0, episode_length=5.0)
+    x_next, t, r, terminated, truncated = env.step(
+        jnp.array([1.0]), 0.0, jnp.zeros(1), jax.random.PRNGKey(0)
+    )
+    assert (
+        bool(jnp.all(jnp.isfinite(x_next)))
+        and bool(truncated)
+        and np.isfinite(float(r))
+    )
