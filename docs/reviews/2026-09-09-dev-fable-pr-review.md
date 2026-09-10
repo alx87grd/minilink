@@ -15,7 +15,8 @@ is fully landed; this file is the new action list.
 | DP notebooks CI skips (`smoke: false`), run explicitly | `pendulum_swing_up_cost_function_vi` pass, `pendulum_swing_up_vi_vs_lqr` pass |
 | Demo sweep (`run_all_demos.py --timeout 120 --continue-on-error`) | 59 passed, 0 failed, 3 skipped of 62 (skips: the realtime game demos, which need a window) |
 | Regression gates (`run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup`) | pass; every speed metric within 0.8–1.1× of the macOS reference baseline |
-| PPO notebooks (`pendulum_swing_up_vi_vs_lqr_vs_ppo`, 200k–1M steps; `drone_ppo_learn_to_fly`), `articulated_robot_eom` | NOT RUN (long; see §4) |
+| PPO notebooks (`pendulum_swing_up_vi_vs_lqr_vs_ppo`, `drone_ppo_learn_to_fly`) | not runnable here: this conda env lacks `torch` / `stable_baselines3` (both fail at import; `environment.yml` lists them under the rl section, the env is behind it). Colab installs them in the setup cell. |
+| `articulated_robot_eom` (SymPy UR5 derivation) | **timed out after 3600 s**; per-cell timing in §4: the symbolic derive + export is 103 s, the symbolic speed-comparison cell 21 is 8 417 s. |
 | README examples (`examples/demos/core/readme_examples.py`) | runs (19 s) |
 | Punch list 2026-09-06, "fix before merge" 1–4 | all in the code: `success=feasible` (`planner.py:287`), `Transcription` docstring first, nightly installs `ipopt`, `compile_step_diagram` validates shapes |
 
@@ -84,12 +85,23 @@ pathtracking `mpc_v1` / `bicycle_los_v2` helper duplicates folded into
 
 ## 4. Not verified, and why
 
-- The two PPO notebooks train for 200 000 and 1 000 000 timesteps and the
-  drone one similar; each is tens of minutes on CPU. They are `smoke: false`
-  by design. Run them once locally (or on the nightly) before the term's RL
-  week; not a merge blocker.
-- `articulated_robot_eom` (SymPy derivation) is `smoke: false` for length;
-  same treatment.
+- The two PPO notebooks could not run here (no `torch` / `stable_baselines3`
+  in this env). They train for 200 000 and 1 000 000 timesteps, tens of
+  minutes on CPU, and are `smoke: false` by design. Run them once in an env
+  with the rl extras (or on Colab) before the term's RL week; not a merge
+  blocker.
+- `articulated_robot_eom` did not finish in an hour on an Apple M4 Max.
+  Measured cell by cell (2026-09-10): the symbolic derive + export (cell 17)
+  takes 103 s, as its markdown promises, and the complexity cell 6 s; **cell 21,
+  the speed comparison that adds the symbolic plant to the JIT timing batch,
+  took 8 417 s** (2.3 h), while every other cell is under 7 s. The
+  lambdified closed-form UR5 model is enormous, and compiling it under XLA
+  plus timing it over the batch is where the time goes. A student on Colab
+  would never see the end of the notebook. Candidates, student-facing so the
+  maintainer's call: leave the symbolic plant out of the timing batch by
+  default (time it on one call, print that), or default `SKIP_SYMBOLIC = True`
+  so the whole symbolic path is opt-in. Not a merge blocker, but fix before
+  the notebook is assigned.
 - `examples/projects/` scripts are research lane and were not run.
 
 ## 5. Cleanup plan before the PR
