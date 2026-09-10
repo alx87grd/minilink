@@ -242,3 +242,46 @@ def test_neural_closed_loop_compiles_and_differentiates_under_jax():
 
     grads = jax.grad(J)({"ctl": ctl.params, "sys": plant.params})
     assert all(bool(jnp.all(jnp.isfinite(g))) for g in jax.tree_util.tree_leaves(grads))
+
+
+def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
+    prob = problem(tf=np.inf)
+    planner = ReinforcementLearningPlanner(
+        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
+    )
+    plan = planner.solve(timesteps=64, n_trials=4)
+    assert np.isfinite(plan.metadata.cost) and plan.metadata.success
+    assert 0.0 <= plan.metadata.stats["failure_rate"] <= 1.0
+    assert "truncates" in planner.env.describe()
+
+    worst = StochasticPlanningProblem(
+        bounded_pendulum(),
+        cost=HangCost(),
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        criterion="worst_case",
+    )
+    with pytest.raises(NotImplementedError):
+        ReinforcementLearningPlanner(worst, dt=0.1, verbose=0)
+
+
+def test_planner_trains_with_randomized_parameters():
+    from minilink.planning.distributions import Particles
+
+    plant = bounded_pendulum()
+    prob = StochasticPlanningProblem(
+        plant,
+        cost=HangCost(),
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        params_distribution={"m": Particles([[0.5], [2.0]])},
+    )
+    planner = ReinforcementLearningPlanner(
+        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
+    )
+    assert (
+        planner.env.randomizes_params
+        and "randomized params ['m']" in planner.env.describe()
+    )
+    theta = planner.carry[3]
+    assert set(np.unique(np.asarray(theta["m"]))) <= {0.5, 2.0}
+    planner.learn(64)
+    assert np.all(np.isfinite(np.asarray(planner.carry[0])))

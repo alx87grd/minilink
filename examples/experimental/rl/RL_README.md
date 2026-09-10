@@ -17,9 +17,11 @@ the planner-API version of the pendulum demo (PPO and SAC side by side), and
 `examples/demos/rl/` holds the official versions of every demo below on the
 full pipeline. The scripts in this folder stay on the prototype until the
 maintainer retires it (vision plan step R7). Every lesson below carries over: the exit rule is
-now a problem field (`on_exit`, `exit_cost`), normalization and the
-squash are inside the policy block, and the discount can be declared on the
-cost (`discount_rate`).
+now a problem field (`on_exit`, `exit_cost`; the unpriced default still
+truncates and bootstraps, and the planner prints which rule is in force),
+normalization and the squash are inside the policy block, the discount can
+be declared on the cost (`discount_rate`), and plant parameters can be
+randomized per episode (`params_distribution`).
 
 ## The demos and what they took
 

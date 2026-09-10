@@ -859,14 +859,31 @@ is the **problem's** business, not the cost's: `PlanningProblem.on_exit`
 (`"infeasible"`, the hard-constraint default, or `"terminate"`) and
 `exit_cost` (scalar or `exit_cost(x, t)`). Trajopt keeps `X` hard; DP reads
 `exit_cost` as its default `out_of_bound_cost`; RL ends the episode there and
-charges it, with no bootstrap. `h` keeps its one job: the end of a finite
-horizon.
+charges it with no bootstrap **when the exit is priced** (`exit_cost` set or
+`on_exit="terminate"`); an unpriced exit is *truncated* and the critic's value
+at the exit state bootstraps the return — the Gymnasium convention, an
+approximation the training environment states in `describe()`. `h` keeps its
+one job: the end of a finite horizon.
+
+**One scoring contract:** `planning.evaluation.score_trajectory(problem, traj)`
+is the cost of a sampled closed-loop trajectory for every tool's reporting —
+the discounted running cost by the trapezoidal rule
+(`CostFunction.evaluate_trajectory`, which applies `discount_rate`), cut at
+the first sample outside `X` (a failure, charged when priced), plus `h` at a
+reached finite horizon. RL *trains* on the left-Riemann discretization of
+the same running cost (`r_k = -g dt`); its plans report the trapezoidal
+Monte Carlo score.
 
 **Stochastic problem:** `StochasticPlanningProblem(PlanningProblem)` adds
 `x0_distribution` (its mean is `x_start`, its support `X0`),
-`params_distribution` (`{name: Distribution}` over `sys.params`),
+`params_distribution` (`{name: Distribution}` over `sys.params`, one draw per
+episode carried through the parametric step `rk4_step_trace_p`),
 `disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
-port) and `criterion` (`"expectation"` default, `"worst_case"`). Distributions
+port) and `criterion` (`"expectation"` default; `"worst_case"` is reported by
+the Monte Carlo evaluator and refused by the RL planner, which optimizes the
+expectation). A deterministic planner given a stochastic problem plans from
+the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the
+Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions
 (`planning/distributions.py`: `Gaussian`, `Uniform`, `Particles`, `Sampler`)
 are a duck type — `dim`, `mean()`, `sample(key)` on a NumPy generator or a
 JAX key (traceable). `nominal()` is the certainty-equivalent
@@ -876,9 +893,13 @@ stochastic one.
 **Monte Carlo evaluation (the second verb):** `MonteCarloEvaluator(problem,
 dt=, n_trials=, backend=)` scores any state-feedback block on the draws —
 `MonteCarloReport` with per-trial `J`, mean / std / worst / failure rate
-(trials that left the box). `backend="jax"` vmaps the compiled rollout for
-static laws; `backend="numpy"` runs the closed-loop `Simulator` per trial for
-any controller. Same numbers for LQR, DP, MPC and RL laws.
+(trials that left the box), `value(criterion)`. `backend="jax"` vmaps the
+compiled held-input rollout (static laws; parameter and disturbance draws
+applied); `backend="numpy"` produces the same samples one trial at a time on
+the NumPy evaluator (identical numbers, tested); `backend="simulator"` runs the
+continuous-time closed loop for any controller, dynamic ones included, without
+draws and without clipping the law (it warns when the law exceeds the port
+bounds). Same contract for LQR, DP, MPC and RL laws.
 
 **Reinforcement learning (`planning/reinforcement_learning/`):**
 `ReinforcementLearningPlanner(problem, dt=, hidden=, features=, algorithm=)`

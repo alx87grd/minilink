@@ -2,17 +2,22 @@
 The rollout environment: a stochastic planning problem as pure JAX step functions.
 
 ``RolloutEnvironment`` turns a :class:`~minilink.planning.problems.StochasticPlanningProblem`
-into what a learning loop needs — ``reset(key)`` draws a start, ``step`` moves
+into what a learning loop needs — ``reset(key)`` draws a start (and, when the
+problem randomizes them, the plant parameters of the episode), ``step`` moves
 the compiled plant one control period and scores it — with the problem's own
 semantics:
 
-- reward ``r = -g(x, u, t) dt`` (the running cost over the step);
+- reward ``r = -g(x, u, t) dt`` (the running cost over the step, the
+  left-Riemann discretization of ``int g dt`` on the control grid);
 - a finite horizon ends the episode at ``tf`` with the terminal cost ``h``;
   an infinite horizon uses ``episode_length`` and *truncates* (the value of
   the next state bootstraps the return);
-- leaving the allowed box ends the episode: with an ``exit_cost`` it is
-  *terminated* and charged; without one and ``on_exit="infeasible"`` it is
-  truncated (bootstrap), the Gymnasium bridge's historical behaviour.
+- leaving the allowed box ends the episode: with an ``exit_cost`` (or
+  ``on_exit="terminate"``) it is *terminated* and charged, otherwise it is
+  *truncated* and the critic's value at the exit state bootstraps the
+  return — the Gymnasium bridge's historical behaviour, and an approximation
+  a policy can exploit (see ``examples/experimental/rl/RL_README.md`` §1).
+  :meth:`describe` states which rule is in force.
 
 Every function is traceable, so collectors ``vmap`` over plants and ``scan``
 over time. There is no Python per step.
@@ -33,7 +38,10 @@ class RolloutEnvironment:
     Parameters
     ----------
     problem : StochasticPlanningProblem
-        The task: plant, cost, box, exit rule, horizon, start distribution.
+        The task: plant, cost, box, exit rule, horizon, start distribution,
+        optional parameter and disturbance distributions. A deterministic
+        :class:`~minilink.planning.problems.PlanningProblem` restarts at its
+        ``x_start``.
     dt : float
         Control period (one RK4 step, input held).
     episode_length : float, optional
@@ -55,14 +63,26 @@ class RolloutEnvironment:
         else:
             self.tf = 10.0 if episode_length is None else float(episode_length)
         self.n_steps_per_episode = int(round(self.tf / self.dt))
+        self.discount_rate = float(self.cost.discount_rate)
 
         self.evaluator = self.sys.compile(backend="jax", verbose=False)
         if integrator == "rk4":
             self.step_plant = self.evaluator.rk4_step_trace
+            self.step_plant_p = self.evaluator.rk4_step_trace_p
         elif integrator == "euler":
             self.step_plant = self.evaluator.euler_step_trace
+            self.step_plant_p = self.evaluator.euler_step_trace_p
         else:
             raise ValueError(f"integrator must be 'rk4' or 'euler', got {integrator!r}")
+
+        # Randomized plant parameters: the episode carries its own draw
+        self.params_distribution = dict(
+            getattr(problem, "params_distribution", {}) or {}
+        )
+        self.randomizes_params = bool(self.params_distribution)
+        self.nominal_params = {
+            k: jnp.asarray(v, dtype=float) for k, v in self.sys.params.items()
+        }
 
         # The allowed box: problem.X when it is a box, else the state bounds
         X = problem.X
@@ -95,11 +115,22 @@ class RolloutEnvironment:
     # --- pure functions (traceable) ---
 
     def reset(self, key):
-        """Draw an initial state from the problem (a deterministic problem restarts at ``x_start``)."""
+        """Draw an initial state (a deterministic problem restarts at ``x_start``)."""
         jnp = require_jax_numpy()
         if hasattr(self.problem, "sample_x0"):
             return jnp.asarray(self.problem.sample_x0(key), dtype=float)
         return jnp.asarray(self.problem.x_start, dtype=float)
+
+    def sample_params(self, key):
+        """Plant parameters of one episode: the nominal dict with the problem's draws."""
+        jnp = require_jax_numpy()
+        params = dict(self.nominal_params)
+        if self.randomizes_params:
+            for name, value in self.problem.sample_params(key).items():
+                params[name] = jnp.asarray(value, dtype=float).reshape(
+                    self.nominal_params[name].shape
+                )
+        return params
 
     def input_vector(self, u, key):
         """Full plant input: action on port ``u``, fresh disturbance draws elsewhere."""
@@ -118,10 +149,16 @@ class RolloutEnvironment:
             )
         return full
 
-    def step(self, x, t, u, key):
+    def running_cost(self, x, u, t):
+        """Discounted running cost ``exp(-rho t) g(x, u, t)`` of the applied input."""
+        jnp = require_jax_numpy()
+        return jnp.exp(-self.discount_rate * t) * self.cost.g(x, u, t)
+
+    def step(self, x, t, u, key, params=None):
         """
         One control period: ``(x_next, t_next, reward, terminated, truncated)``.
 
+        ``params`` is the episode's plant-parameter dict (``None``: nominal).
         ``terminated`` ends the episode with its cost fully accounted (finite
         horizon reached, or a charged exit); ``truncated`` ends it with the
         value of ``x_next`` still to come (episode length, or an uncharged
@@ -130,9 +167,12 @@ class RolloutEnvironment:
         jnp = require_jax_numpy()
         dt = self.dt
         u_full = self.input_vector(u, key)
-        x_next = self.step_plant(x, u_full, t, dt)
+        if params is None:
+            x_next = self.step_plant(x, u_full, t, dt)
+        else:
+            x_next = self.step_plant_p(x, u_full, t, dt, params)
         t_next = t + dt
-        reward = -self.cost.g(x, u_full[self.port_slices["u"]], t) * dt
+        reward = -self.running_cost(x, u_full[self.port_slices["u"]], t) * dt
 
         out = jnp.any(x_next < self.x_lb) | jnp.any(x_next > self.x_ub)
         horizon_reached = t_next >= self.tf - 0.5 * dt
@@ -157,8 +197,19 @@ class RolloutEnvironment:
 
     def describe(self) -> str:
         kind = "finite horizon" if self.finite_horizon else "infinite horizon"
-        exit_rule = "charged exit" if self.charge_exit else "truncated exit (bootstrap)"
-        return f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}, {exit_rule}"
+        if self.charge_exit:
+            exit_rule = "leaving the box terminates and is charged"
+        else:
+            exit_rule = "leaving the box truncates (value bootstrapped, no charge)"
+        randomized = (
+            f", randomized params {sorted(self.params_distribution)}"
+            if self.randomizes_params
+            else ""
+        )
+        return (
+            f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; "
+            f"{exit_rule}{randomized}"
+        )
 
     def bounds_numpy(self):
         return np.asarray(self.x_lb), np.asarray(self.x_ub)

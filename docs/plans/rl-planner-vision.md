@@ -385,8 +385,8 @@ type, never the reverse.
 | Step | Deliverable | Done when |
 | --- | --- | --- |
 | **R0** | This draft reviewed; decisions D1–D6 below ruled | review queue cleared |
-| **R1** (done) | `CostFunction.horizon` / `rho`; `PlanningProblem.on_exit` / `exit_cost`; DP reads `exit_cost`; DESIGN §6 states the shared `J` | DP and trajopt demos unchanged in output; contract test that the three tools agree on `J` of one trajectory |
-| **R2** (done) | `StochasticPlanningProblem` + distributions + `nominal()` | the drone notebook's setup expressed as a problem; `Sys2Gym(problem)` passes the existing gym tests |
+| **R1** (done; the shared-`J` contract test landed 2026-09-10 after review: `score_trajectory`, jax == numpy backends, discount applied in `evaluate_trajectory`) | `CostFunction.horizon` / `rho`; `PlanningProblem.on_exit` / `exit_cost`; DP reads `exit_cost`; DESIGN §6 states the shared `J` | DP and trajopt demos unchanged in output; contract test that the three tools agree on `J` of one trajectory |
+| **R2** (done, `Sys2Gym.from_problem` added 2026-09-10 after review) | `StochasticPlanningProblem` + distributions + `nominal()` | the drone notebook's setup expressed as a problem; `Sys2Gym(problem)` passes the existing gym tests |
 | **R3** (done) | `MonteCarloEvaluator` on JAX (`vmap`) and NumPy | report for LQR vs DP vs PPO on the pendulum over 100 starts |
 | **R4** (done) | `blocks/`: `Normalize`, `AngleFeatures`; `control/neural.py`: `NeuralPolicyController` composite | `ctl @ plant`, `plot_diagram`, `plot_control_law`, both backends |
 | **R5a** (done) | `ReinforcementLearningPlanner` + the shared machinery of §3.5 with PPO as the first algorithm; `PolicyPlan`, `get_controller`, `solve_trajectory_from` | the experimental demos re-expressed through the planner with the same outcomes and times |

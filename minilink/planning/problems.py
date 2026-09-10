@@ -386,13 +386,14 @@ class StochasticPlanningProblem(PlanningProblem):
         return self.x0_distribution.sample(key, n)
 
     def sample_params(self, key):
-        """Draw one ``{name: value}`` override of ``sys.params`` (empty if none)."""
+        """Draw one ``{name: value}`` override of ``sys.params`` (empty if none), nominal shapes."""
         names = list(self.params_distribution)
         keys = split_keys(key, len(names))
-        return {
-            name: self.params_distribution[name].sample(k)
-            for name, k in zip(names, keys)
-        }
+        draws = {}
+        for name, k in zip(names, keys):
+            value = self.params_distribution[name].sample(k)
+            draws[name] = value.reshape(np.shape(self.sys.params[name]))
+        return draws
 
     def sample_disturbances(self, key):
         """Draw one ``{port_id: value}`` of held disturbance inputs (empty if none)."""

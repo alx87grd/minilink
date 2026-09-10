@@ -47,9 +47,20 @@ ALGORITHMS = {"ppo": PPO, "sac": SAC}
 # Public API
 
 
+def jax_leaves(tree):
+    import jax
+
+    return jax.tree_util.tree_leaves(tree)
+
+
 class ReinforcementLearningPlanner(Planner):
     """
     Policy-family planner that learns ``u = pi(x)`` by reinforcement learning.
+
+    The training objective is the expected discounted return on the control
+    grid, ``E[-sum_k gamma^k g(x_k, u_k) dt]`` under the problem's exit rule;
+    the reported ``cost`` of a plan is the problem's Monte Carlo score of the
+    deterministic law (:class:`~minilink.planning.evaluation.MonteCarloEvaluator`).
 
     Parameters
     ----------
@@ -88,6 +99,8 @@ class ReinforcementLearningPlanner(Planner):
         The compiled environment (its ``describe()`` states the semantics).
     """
 
+    accepts_stochastic = True
+
     def __init__(
         self,
         problem,
@@ -113,6 +126,12 @@ class ReinforcementLearningPlanner(Planner):
         jnp = require_jax_numpy()
         import jax
 
+        if getattr(problem, "criterion", "expectation") != "expectation":
+            raise NotImplementedError(
+                "reinforcement learning optimizes the expectation; "
+                f"criterion={problem.criterion!r} is only reported by MonteCarloEvaluator"
+            )
+
         self.dt = float(dt)
         self.n_envs = int(n_envs)
         self.n_steps = int(n_steps)
@@ -124,6 +143,8 @@ class ReinforcementLearningPlanner(Planner):
         self.env = RolloutEnvironment(
             problem, dt=dt, episode_length=episode_length, integrator=integrator
         )
+        if verbose:
+            print(f"ReinforcementLearningPlanner: {self.env.describe()}")
         sys = problem.sys
         self.controller = policy or NeuralPolicyController(
             sys,
@@ -313,17 +334,37 @@ class ReinforcementLearningPlanner(Planner):
     def solve(self, timesteps=100_000, **kwargs) -> PolicyPlan:
         return self.solve_policy(timesteps=timesteps, **kwargs)
 
-    def solve_policy(self, timesteps=100_000, **kwargs) -> PolicyPlan:
-        """Train, then wrap the law in a :class:`PolicyPlan`."""
+    def solve_policy(self, timesteps=100_000, n_trials=50, **kwargs) -> PolicyPlan:
+        """
+        Train, score the deterministic law by Monte Carlo, wrap it in a :class:`PolicyPlan`.
+
+        ``metadata.cost`` is the mean problem cost over ``n_trials`` draws,
+        ``stats["failure_rate"]`` the fraction of trials that left the box, and
+        ``success`` means the training finished with finite weights and a
+        finite score.
+        """
+        from minilink.planning.evaluation import MonteCarloEvaluator
+
         t0 = time.time()
         self.learn(timesteps)
-        last = self.history[-1] if self.history else {}
+        report = MonteCarloEvaluator(
+            self.problem, dt=self.dt, n_trials=n_trials, episode_length=self.env.tf
+        ).evaluate(self.controller)
+        weights_finite = all(
+            bool(np.all(np.isfinite(np.asarray(w))))
+            for w in jax_leaves(self.algorithm.params(self.train_state))
+        )
         metadata = SolveMetadata(
-            success=True,
-            message=f"{self.num_timesteps} steps, {type(self.algorithm).__name__}",
-            cost=-last.get("ep_return_mean", np.nan),
+            success=bool(weights_finite and np.isfinite(report.mean)),
+            message=f"{self.num_timesteps} steps, {type(self.algorithm).__name__}; {report}",
+            cost=report.mean,
             solve_time_s=time.time() - t0,
-            stats={"timesteps": self.num_timesteps, "history": list(self.history)},
+            stats={
+                "timesteps": self.num_timesteps,
+                "failure_rate": report.failure_rate,
+                "worst": report.worst,
+                "history": list(self.history),
+            },
         )
         payload = {
             "controller": self.controller,
@@ -362,7 +403,7 @@ class ReinforcementLearningPlanner(Planner):
         def body(carry, key):
             x, t = carry
             u = self.action_jit(params, x)
-            x_next, t_next, reward, _, _ = env.step(x, t, u, key)
+            x_next, t_next, reward, _, _ = env.step(x, t, u, key)  # nominal params
             return (x_next, t_next), (x, u, reward)
 
         keys = jax.random.split(key, n_steps)

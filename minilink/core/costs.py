@@ -90,13 +90,16 @@ class CostFunction(ABC):
         Return ``traj`` with sampled running and cumulative costs.
 
         The added signals are ``"cost_rate"`` and ``"cost"`` with shape
-        ``(1, N)``. The cumulative integral uses the trapezoidal rule and
-        excludes the terminal cost; callers can add ``h(x(tf), tf)`` when
-        they need the full objective scalar.
+        ``(1, N)``. ``cost_rate`` is the discounted integrand
+        ``exp(-rho t) g(x, u, t)``; the cumulative integral uses the
+        trapezoidal rule and excludes the terminal cost; callers can add
+        ``h(x(tf), tf)`` when they need the full objective scalar.
         """
         dJ = np.zeros(traj.n_samples, dtype=float)
+        rho = float(self.discount_rate)
         for i, t in enumerate(traj.t):
-            dJ[i] = float(self.g(traj.x[:, i], traj.u[:, i], float(t), params=params))
+            g = float(self.g(traj.x[:, i], traj.u[:, i], float(t), params=params))
+            dJ[i] = np.exp(-rho * float(t)) * g
 
         J = np.zeros(traj.n_samples, dtype=float)
         if traj.n_samples > 1:

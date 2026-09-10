@@ -9,7 +9,10 @@ Adam steps on
 
 with ``rho = pi(a|x) / pi_old(a|x)``. Defaults follow the common PPO
 configuration (2048-sample rollouts, minibatches of 64, 10 epochs, lr 3e-4,
-gamma 0.99, lambda 0.95, clip 0.2).
+gamma 0.99, lambda 0.95, clip 0.2). As in the reference implementations the
+Gaussian sample is stored unclipped and its density is the unclipped one,
+while the plant receives ``clip(a, -1, 1)``; the squashed head of the SAC
+family is the alternative when that mismatch matters.
 """
 
 from minilink.core.backends import require_jax_numpy
