@@ -30,10 +30,9 @@ class Pendulum(MechanicalSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphic parameters
+        # Graphic parameters: no camera_scale, so the view follows params["l"]
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
-        self.camera_scale = length * 2.0
 
     def H(self, q, params=None):
         params = self.params if params is None else params

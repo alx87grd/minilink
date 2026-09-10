@@ -2562,3 +2562,19 @@ class TestTextbookOptions(unittest.TestCase):
             progress(np.zeros(3), 0.0, 0.0)
         self.assertEqual(seen, ["iteration"])
         live.assert_called_once_with("iteration")
+
+
+def test_rrt_default_extender_is_bang_bang_from_input_bounds():
+    """``RRTPlanner(problem)`` needs no extender: corners of ``problem.U`` plus its centre."""
+    from minilink.planning.search.extenders import bang_bang_controls
+
+    problem, X = make_holonomic_obstacle_problem()
+    planner = RRTPlanner(problem, options=RRTOptions(seed=0, max_nodes=50))
+    assert isinstance(planner.extender, KinodynamicExtender)
+    controls = planner.extender._controls(problem, np.random.default_rng(0))
+    lower, upper = problem.U.box.lower, problem.U.box.upper
+    assert len(controls) == 1 + 2**lower.size
+    assert any(np.allclose(u, 0.5 * (lower + upper)) for u in controls)
+    assert any(np.allclose(u, lower) for u in controls)
+    assert any(np.allclose(u, upper) for u in controls)
+    assert bang_bang_controls(problem.U)[0].shape == lower.shape

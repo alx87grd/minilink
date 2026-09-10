@@ -76,7 +76,7 @@ def _propagate_animation_camera(diagram, *sources):
 
     Prefer a source (or nested leaf) that already carries kinematic geometry —
     e.g. a catalog plant — over a bare ``Step`` / controller that would keep the
-    generic ``camera_scale=10`` default.
+    generic auto-fit default (``camera_scale=None``).
     """
     fallback = None
     for source in sources:

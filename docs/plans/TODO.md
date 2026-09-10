@@ -102,6 +102,12 @@ After the term, in the order the cohort's questions suggest:
 - [ ] **S32** Unify `MechanicalSystem` / `GeneralizedMechanicalSystem` (`N = I` special case); `Boat2D` / `Plane3D` gain `q` / `dq` ports. **[ask — core]**
 - [x] Frequency analysis — NumPy-only on the state-space channel: `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response` and their plots (2026-09-07).
 - [ ] PyPI publication as a third install option (conda stays recommended). **[ask]**
+- [x] **Pitch-driven (2026-09-09)** — auto-fit camera (`camera_scale=None` default, `bounding_points`, `camera_fit` flag; pendulum follows `params["l"]`, cart-pole ground via `ground_line`); `RRTPlanner(problem)` default bang-bang `KinodynamicExtender` (0.3 s edges) and `RRTOptions` / extenders on the planning band and root prelude; DESIGN §5 speed note; ROADMAP §1 north star = the pitch.
+- [ ] **S41** Profile `rollout_batch` with a `params` family: 278 ms vs 27 ms for the plain batch (pendulum, 1000 × 1000 RK4 steps, 2026-09-09). Done when the family path is within 2× of the plain batch.
+- [ ] **S42** `plot_cost2go` colour scale clipped at `out_of_bound_cost` by default (the showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default.
+- [ ] **S43** Constructor-derived `camera_scale` hints (boat, steering, propulsion, plane, arms, rotating cart-poles) → auto-fit or params-derived; convert raw ground `CustomLine`s in catalog skins to `ground_line()` so the `camera_fit` flag applies.
+- [ ] **S44** A single posed-geometry hook so "two functions" (`f` + drawing) is literal; today `tf` + skin. **[ask — core]**
+- [ ] **S45** `c_export` in the nightly sweep (on the pitch deck as experimental).
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
 - [ ] **S27** Diffrax as an optional JAX solver backend (later; not short-term).
 - [ ] **S37** Evaluator / solver re-layering (v1.0; after S27).

@@ -126,7 +126,7 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 | Robot control | `ComputedTorqueController(arm)`, `JointImpedance(arm)` |
 | 3D robots | `UR5Manipulator()`, then `animate(renderer="meshcat", is_3d=True)` |
 | Value iteration | `DynamicProgrammingPlanner(problem, x_grid=(101, 101))` |
-| Sampling search | `RRTPlanner(problem, extender)` |
+| Sampling search | `RRTPlanner(problem)` |
 | Trajectory optimization | `TrajectoryOptimizationPlanner(problem, transcription="direct_collocation")` |
 | Model predictive control | `ModelPredictiveController(planner, dt_mpc=0.1) @ plant` |
 | Reinforcement learning | `Sys2Gym(plant, cost)`, then any Gymnasium agent |
@@ -141,7 +141,6 @@ from minilink import (
     BallSet, DynamicProgrammingPlanner, Pendulum, PlanningProblem,
     QuadraticCost, RRTPlanner, TrajectoryOptimizationPlanner,
 )
-from minilink.planning.search.extenders import KinodynamicExtender
 
 plant = Pendulum()
 x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
@@ -154,9 +153,8 @@ vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05
 vi.solve()                                   # value iteration on a grid
 loop = vi.get_controller() @ plant           # the policy is a controller
 
-torques = [np.array([tau]) for tau in (-5.0, 0.0, 5.0)]
-rrt = RRTPlanner(problem, KinodynamicExtender(torques, horizon=0.3))
-tree_traj = rrt.solve().trajectory           # kinodynamic tree search
+rrt = RRTPlanner(problem, seed=0)
+tree_traj = rrt.solve().trajectory           # kinodynamic tree search, bang-bang inputs
 
 opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")
 opt_traj = opt.solve().trajectory            # direct collocation

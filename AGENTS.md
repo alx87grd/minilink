@@ -16,6 +16,7 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | [docs/plans/TODO.md](docs/plans/TODO.md) | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
 | [docs/plans/](docs/plans/) | Active **design** writeups only (multi-step plans; delete finished plan docs) |
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
+| [docs/pitch/](docs/pitch/) | The five-slide pitch (`slides.html` + `pitch.css`): single source for the docs landing page (`docs/index.rst`) and the standalone deck `docs/_static/pitch.html` built by `docs/make_assets.py` (also the README GIFs and diagram PNG; `ur5_meshcat.gif` is a screen recording, not rebuilt) |
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy, **entry points (human · agent · CI)** |
 | [docs/reviews/](docs/reviews/) | Dated architecture audits and the interview decision records; read-only history, never a backlog |
 
@@ -56,6 +57,19 @@ for library code, tests, and the research lane (`examples/projects/`,
 import that works and leave the facade to the planned step — never invent a
 name. Exception kept: a factory whose name matches its module is imported from
 the module (`from minilink.control.lqr import lqr`).
+
+**Public-facing text** (README, the two showcases, `docs/pitch/`, the docs
+landing page). Always positive about minilink; never name or compare against
+other tools — the allowed framing is that minilink *bridges* capabilities that
+usually live in separate tools. Foundational, not marketing: no superlatives,
+every number measured by a notebook cell (quote batches, never a per-call
+speedup: a jitted `f` call is no faster than NumPy), main line readable by an
+undergraduate, expert depth in short "under the hood" asides. The README does
+not link the deck for now. Verification grep before push:
+`grep -n -i "simulink|matlab|drake|casadi|mujoco"` over README, slides and
+notebook markdown must be empty. GIF assets stay under 1 MB and use the
+plants' catalog framing (the only camera override is the MPC clip following
+the car).
 
 **Demo-script headers.** One-line title docstring; everything else lives
 inline next to the code it describes. No run instructions, section maps, or

@@ -8,9 +8,26 @@ Point-in-time audits: [docs/reviews/](docs/reviews/).
 ## 1. North star
 
 Minilink is the pyro successor for teaching dynamics, control, and optimal
-control — readable equations, arbitrary diagrams, one `f` that simulates,
-linearizes, optimizes, and differentiates on NumPy or JAX — and the research
-substrate of the maintainer's group. Full identity and landscape position:
+control, and the research substrate of the maintainer's group. The promise:
+**write the equations once, then simulate, analyze, control, plan, optimize
+and learn on the same model.** A model is three functions of `(x, u, t; p)`:
+`f` (dynamics), `h` (outputs, default `y = x`) and `tf` (body poses). Three
+claims follow, each containing the previous:
+
+1. **Block diagrams as readable Python, with graphics for free** — `+`, `>>`,
+   `@`; from `f` and `tf` come simulation, plots, the same animation on four
+   renderers and a keyboard game mode; the core is NumPy, SciPy, Matplotlib.
+2. **One interface, every tool, textbook objects in between** — everything is
+   a `System`; `PlanningProblem = sys + cost + boundaries` feeds every planner,
+   `MathematicalProgram` → `Optimizer` is the one NLP shape, `Trajectory` is
+   what every tool returns.
+3. **The same `f` is differentiable and compiled** — exact Jacobians,
+   sensitivity to the physics, gradients through a rollout, batches over
+   parameter families, on NumPy or JAX.
+
+The material that carries this pitch (README, `docs/pitch/`, the two showcase
+notebooks) is a spec: wherever the code needs a workaround to make a slide
+true, that is a priority. Full identity and landscape position:
 [DESIGN.md — Product identity & scope](DESIGN.md#product-identity--scope).
 
 | Release | Milestone | When |
@@ -53,24 +70,24 @@ a release process by themselves.
 | Area | Lane | TRL | Rationale | Next |
 | --- | --- | --- | --- | --- |
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested. | Shape validation at compile; derived `x0` (v1.0). |
-| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; ~30 unreferenced integration helpers and `_jit` aliases still on the surface. | Delete the unused grid; float64 policy; re-layering deferred to v1.0. |
+| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; ~30 unreferenced integration helpers and `_jit` aliases still on the surface. Speed lives in batches: 1000 rollouts × 1000 RK4 steps in 27 ms; a single jitted `f` call is no faster than NumPy. | Delete the unused grid; float64 policy; profile `rollout_batch` with a `params` family (10× slower than the plain batch, 2026-09-09); re-layering deferred to v1.0. |
 | Simulation | teaching | 7 | Mature workflow; stable solvers/forcing. | Fixed output count by default; unify `verbose` flag names. |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA. **Every catalog plant compiles on both backends** (`xp` sweep 2026-09-06, contract test `test_catalog_backends.py`); `JaxCartPole` retired. | Four-rung vehicle teaching ladder, research rungs → projects. |
 | Control | teaching | 6 | Linear, LQR, `P` / `PI` / `PD` / `PID`; model-based SMC; robotic impedance/kinematic. **Each compensator form carries only the states its terms need** (landed 2026-09-07), so pole and zero counts match the hand calculation. | `place()` for GRO501 (v0.2); robotic PID wrappers; traj LQR (v0.2). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response — matplotlib and plotly. **The automatic frequency band brackets the 0 dB crossing** (landed 2026-09-07), so integrator and high-gain loops no longer report infinite margins. | `minreal`; named `S`/`T`/`PS`/`CS`; Nichols chart; multi-system overlays. Discrete-time (z) plots held. |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine`/`Ramp`/`Chirp`/`Delay`/`Switch` (v0.2). |
-| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`. | Honest `final_time` / `success` metadata; `vi_ctl @ plant` in notebooks. |
+| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`. | Honest `final_time` / `success` metadata; `vi_ctl @ plant` in notebooks; `plot_cost2go` colour scale clipped at the out-of-bound cost by default. |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot. **`success` echoes solver status; float32 by default on JAX.** | float64 policy; `success` = defects satisfied; multiple-shooting parametric guard. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
 | Interfaces / RL bridge | teaching (GRO860) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call (jitted under JAX when the plant traces, NumPy otherwise; Euler kept as an option). | Vectorized envs; re-train the PPO notebooks on the RK4 step. |
-| Planning / search (RRT) | provisional | 4 | RRT/RRT*; spatial `Scene`. | RRT-Connect later. |
+| Planning / search (RRT) | provisional | 5 | RRT/RRT*; spatial `Scene`. **`RRTPlanner(problem)` works from the input bounds alone** (bang-bang `KinodynamicExtender` default, 0.3 s edges; extenders and `RRTOptions` on the planning band, landed 2026-09-09). | RRT-Connect later. |
 | Geometry / spatial | provisional | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Glyph/solid naming split (v1.0). |
-| Graphics / animation | teaching | 4 | Frame-keyed `tf` / geometry / overlays; four renderers. | Renderer polish; matplotlib renderer coverage. |
-| Hybrid / step / MPC | provisional | 5 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. Not a `System`; not a GRO860 topic. | Keep names through the term; `HybridLoop` / promotion question at v1.0. |
+| Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers. **Auto-fit camera** (`camera_scale=None`, the `System` default, landed 2026-09-09): hint-less plants frame the drawn geometry over the whole animation; backdrops (`ground_line`, `Plane`) and force glyphs excluded. | Renderer polish; matplotlib renderer coverage; constructor-derived `camera_scale` hints → auto or params-derived so `params` changes keep the framing. |
+| Hybrid / step / MPC | provisional | 5 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. Not a `System`; not a GRO860 topic. Pitch-visible seam: the sampled loop is the one thing that is not a `System` (no `linearize`, no nesting). | Keep names through the term; `HybridLoop` / promotion question at v1.0. |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review. |
 | Estimation | planned (GRO501) | 1 | Placeholder. **The largest single GRO501 gap** (§4.2). | Luenberger, then Kalman, as diagram blocks (v0.2). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2); batched `rollout_batch` facade first. |
-| C export (`experimental/c_export`) | research | 2 | Experimental JAX→C transpiler; two demos pass locally; not in CI. | Repo-only; add to the nightly sweep. |
+| C export (`experimental/c_export`) | research | 2 | Experimental JAX→C transpiler; two demos pass locally; not in CI. On the pitch deck as *experimental* since 2026-09-09. | Repo-only; add to the nightly sweep (pitch-visible). |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Experimental; not teaching path. | Keep isolated; repo-only. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later (`interfaces/mjx.py`). |
 | Pyro 2.0 overall | v0.2 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
@@ -164,6 +181,10 @@ Step-level specs, files, and "done when" criteria live in
 
 **Status 2026-09-06 (`dev-fable`):** Phases D, 0, 1 and 2 complete — the review pass, the organisation pass (`minilink/experimental/`, `lazy_facade`, demo folders keyed to the intro chapters), S33 (compiled `Sys2Gym` step), S38 (DP metadata), and Phase 2 in full: the `xp` sweep (every catalog plant on both backends, contract test with an empty NumPy-only list), `JaxCartPole` retired, the four-rung vehicle ladder with research rungs in `examples/projects/car_trajopt/vehicles/`, and `rollout_batch`. S16/S17 closed as keep. Next: Phase 3 (after the term).
 
+**Status 2026-09-09:** pitch material landed (README, five-slide deck as the
+docs landing page, both showcases rebuilt); from the pitch: auto-fit camera,
+`RRTPlanner` default extender; open items listed in TODO §5 (S41–S45).
+
 | Phase | Scope | When |
 | --- | --- | --- |
 | **D — docs as plan of record** | ROADMAP, README, DESIGN, AGENTS, TODO, plans index, install/examples READMEs aligned to §1–§4. No Python changes. | now, 1–2 days |
@@ -203,7 +224,8 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - **Held (v0.2):** discrete-domain scope for GRO501 — a z-domain tier in `analysis/` (ZOH/Tustin, z-plane `pzmap`, discrete Bode) vs teaching the Arduino law with `discretize` + simulation only. Maintainer paused this 2026-09-07; default is simulation only.
 - **Held (v0.2):** the `estimation/` band (Luenberger, Kalman). Paused 2026-09-07; it is the last unmet §4.2 row.
 - **Open (v0.2):** PyPI publication — wanted eventually as a third install option; conda stays recommended.
-- **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename.
+- **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename. Pitch-visible since 2026-09-09.
+- **Open (v1.0):** a single posed-geometry hook so the pitch's "two functions" (`f` and a drawing function) is literal; today animation is `tf` plus skin geometry.
 - **Open (v1.0):** evaluator/solver layering — evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; Diffrax as an optional JAX solve (later).
 - **Open (v0.2):** which pyro demos the courses still need (drives the parity audit's remaining rows).
 

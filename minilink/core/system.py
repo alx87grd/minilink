@@ -110,9 +110,11 @@ class System(SharedSystemFacades):
         self.traj = None
 
         # Standard camera hints (resolved by ``Animator`` via ``camera.py``).
+        # ``camera_scale=None`` (default) fits the view to the drawn geometry at
+        # animation time; set a half-width in metres to frame the scene yourself.
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
-        self.camera_scale = 10.0
+        self.camera_scale = None
         # Camera hints read by the ``Animator`` camera resolver.
         # ``camera_follow_frame`` is a ``tf`` key to track (or ``None`` for a
         # fixed view); ``camera_priority`` tie-breaks when several hint-carrying

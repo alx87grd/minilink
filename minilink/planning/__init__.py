@@ -53,6 +53,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # search
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
     "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),
+    "RRTOptions": ("minilink.planning.search.rrt", "RRTOptions"),
+    "KinodynamicExtender": (
+        "minilink.planning.search.extenders",
+        "KinodynamicExtender",
+    ),
+    "SteeringExtender": ("minilink.planning.search.extenders", "SteeringExtender"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

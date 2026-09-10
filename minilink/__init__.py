@@ -111,6 +111,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "PolicyEvaluator",
     ),
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
+    "RRTOptions": ("minilink.planning.search.rrt", "RRTOptions"),
+    "KinodynamicExtender": (
+        "minilink.planning.search.extenders",
+        "KinodynamicExtender",
+    ),
+    "SteeringExtender": ("minilink.planning.search.extenders", "SteeringExtender"),
     # optimization
     "MathematicalProgram": (
         "minilink.optimization.mathematical_program",

@@ -65,7 +65,6 @@ from minilink import (  # noqa: E402
     RRTPlanner,
     TrajectoryOptimizationPlanner,
 )
-from minilink.planning.search.extenders import KinodynamicExtender  # noqa: E402
 
 plant = Pendulum()
 plant.inputs["u"].lower_bound[:] = -5.0
@@ -89,9 +88,8 @@ loop = vi.get_controller() @ plant  # the policy is a controller
 loop.compute_trajectory(tf=10.0)
 loop.plot_trajectory()
 
-torques = [np.array([tau]) for tau in (-5.0, 0.0, 5.0)]
-rrt = RRTPlanner(problem, KinodynamicExtender(torques, horizon=0.3))
-tree_traj = rrt.solve().trajectory  # kinodynamic tree search
+rrt = RRTPlanner(problem, seed=0)
+tree_traj = rrt.solve().trajectory  # kinodynamic tree search, bang-bang inputs
 rrt.plot_tree(x_axis=0, y_axis=1)
 
 opt = TrajectoryOptimizationPlanner(

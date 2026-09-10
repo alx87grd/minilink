@@ -669,6 +669,11 @@ naming the block, the hook, and both shapes; a bare scalar is accepted for
 `n = 1`, custom port computes are not probed. Leaf, diagram, and step-diagram
 compiles all run this check.
 
+Speed lives in batches and compiled integrators, not in single calls: a
+jitted `f` call costs about the same as the NumPy one (dispatch dominates),
+while `rollout_batch` and the `rk4_integrate_*` primitives run 1000 rollouts of
+1000 RK4 steps in tens of milliseconds. Quote those; never a per-call ratio.
+
 `compile(system, backend)` returns a typed evaluator:
 
 On JAX the evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0, dt,
@@ -978,7 +983,13 @@ Plotly under `plotting` extra.
 **Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix
 (`camera_matrix`) each frame via `resolve_camera_from_hints`; pass
 `animate(camera=…)` for a constant matrix or callable override. One contract
-for all renderers.
+for all renderers. `camera_scale=None` (the `System` default) means **auto-fit**:
+the `Animator` frames the bounding box of everything drawn, fixed over the
+whole animation (`fit_camera_to_frames`, margin 1.15; backdrops such as
+`ground_line` and `Plane` and force glyphs such as `Arrow` are excluded via
+`primitive.camera_fit = False`), so a plant whose
+`params` change keeps a sensible view; a numeric `camera_scale` frames the
+scene yourself.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing

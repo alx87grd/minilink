@@ -19,6 +19,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import SolveMetadata, TrajectoryPlan
+from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.metric import euclidean
 from minilink.planning.search.tree import (
     NEAREST_BACKENDS,
@@ -117,7 +118,7 @@ class RRTPlanner(Planner):
     def __init__(
         self,
         problem: PlanningProblem,
-        extender,
+        extender=None,
         *,
         metric=euclidean,
         options: RRTOptions | None = None,
@@ -137,6 +138,9 @@ class RRTPlanner(Planner):
         nearest_backend=_UNSET,
     ) -> None:
         super().__init__(problem)
+        if extender is None:
+            # Bang-bang motion primitives from the input bounds, 0.3 s edges.
+            extender = KinodynamicExtender()
         self.extender = extender
         self.metric = metric
         self.options = _merge_rrt_options(

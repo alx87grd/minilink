@@ -111,6 +111,9 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "PolicyEvaluator",
         "RRTPlanner",
         "RRTStarPlanner",
+        "RRTOptions",
+        "KinodynamicExtender",
+        "SteeringExtender",
     ),
 }
 

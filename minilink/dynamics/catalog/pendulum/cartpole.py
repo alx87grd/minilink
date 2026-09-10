@@ -24,6 +24,7 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
+    ground_line,
 )
 from minilink.graphical.catalog.shapes import link_pose_3d, point_pose
 
@@ -272,16 +273,7 @@ class CartPole(MechanicalSystem):
         wheel_y = -cart_height / 2.0
         wheel_dx = cart_length / 4.0
         return {
-            "world": [
-                CustomLine(
-                    [
-                        [-self.ground_half_width, 0.0, 0.0],
-                        [self.ground_half_width, 0.0, 0.0],
-                    ],
-                    color="black",
-                    style="--",
-                )
-            ],
+            "world": [ground_line(length=2.0 * self.ground_half_width)],
             "body": [
                 Box(
                     length_x=cart_length,

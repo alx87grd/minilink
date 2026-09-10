@@ -6,7 +6,6 @@ examples/demos/compile/params_gradient.py minilink.core.backends
 examples/demos/compile/pid_autotuning_jax.py minilink.graphical.signals
 examples/demos/core/readme_examples.py minilink.core.kinematics
 examples/demos/core/readme_examples.py minilink.graphical.animation.primitives
-examples/demos/core/readme_examples.py minilink.planning.search.extenders
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.hybrid_composition
 examples/demos/hybrid/sampled_smc_pendulum.py minilink.core.hybrid_composition
@@ -56,6 +55,5 @@ examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime
 examples/learn/intro/showcase_jax.ipynb minilink.core.backends
 examples/learn/intro/showcase_minilink.ipynb minilink.core.kinematics
 examples/learn/intro/showcase_minilink.ipynb minilink.graphical.animation.primitives
-examples/learn/intro/showcase_minilink.ipynb minilink.planning.search.extenders
 examples/learn/teaching/articulated_robot_eom.ipynb minilink.experimental.symbolic.mechanics.model
 examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb minilink.planning.policy_synthesis
