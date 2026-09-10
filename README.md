@@ -8,20 +8,28 @@
 
 <table>
   <tr>
-    <td><img src="docs/_static/pendulum_impedance.gif" alt="pendulum under impedance control" width="360"/></td>
-    <td><img src="docs/_static/cartpole_swingup.gif" alt="cart-pole swing-up by trajectory optimization" width="360"/></td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/_static/pendulum_impedance.gif" alt="pendulum under impedance control" width="100%"/>
+      <br/>
+      <code>ImpedanceController() @ Pendulum()</code>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/_static/cartpole_swingup.gif" alt="cart-pole swing-up by trajectory optimization" width="100%"/>
+      <br/>
+      cart-pole swing-up by trajectory optimization
+    </td>
   </tr>
   <tr>
-    <td align="center"><code>ImpedanceController() @ Pendulum()</code></td>
-    <td align="center">cart-pole swing-up by trajectory optimization</td>
-  </tr>
-  <tr>
-    <td><img src="docs/_static/mpc_car.gif" alt="car under sampled model predictive control" width="360"/></td>
-    <td><img src="docs/_static/ur5_meshcat.gif" alt="UR5 arm under task-space impedance control in the meshcat 3D viewer" width="360"/></td>
-  </tr>
-  <tr>
-    <td align="center">model predictive control, sampled at 5 Hz</td>
-    <td align="center">UR5 under task-space impedance control, meshcat 3D viewer</td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/_static/mpc_car.gif" alt="car under sampled model predictive control" width="100%"/>
+      <br/>
+      model predictive control, sampled at 5 Hz
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/_static/ur5_meshcat.gif" alt="UR5 arm under task-space impedance control in the meshcat 3D viewer" width="100%"/>
+      <br/>
+      UR5 under task-space impedance control, meshcat 3D viewer
+    </td>
   </tr>
 </table>
 

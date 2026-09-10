@@ -7,4 +7,5 @@ without notice.
 - ``symbolic/`` — SymPy equations of motion (Lagrange / Kane) and export
 - ``engines/`` — hand-rolled JAX contact worlds and the ANCF tire
 - ``c_export`` — JAX → C transpiler for controller leaves
+- ``ppo_jax`` — PPO reinforcement learning in pure JAX on a compiled plant
 """

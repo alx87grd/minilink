@@ -89,6 +89,7 @@ a release process by themselves.
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2); batched `rollout_batch` facade first. |
 | C export (`experimental/c_export`) | research | 2 | Experimental JAX→C transpiler; two demos pass locally; not in CI. On the pitch deck as *experimental* since 2026-09-09. | Repo-only; add to the nightly sweep (pitch-visible). |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Experimental; not teaching path. | Keep isolated; repo-only. |
+| PPO in pure JAX (`experimental/ppo_jax`) | research | 2 | Prototype 2026-09-10: jitted rollouts on the compiled plant + PPO update, no Gymnasium / RL library; reproduces the learn-to-fly drone notebook in `examples/experimental/rl/` (100k steps in a few seconds on CPU). Unit smoke in `test_experimental_ppo_jax.py`. | Repo-only; awaiting architectural review. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later (`interfaces/mjx.py`). |
 | Pyro 2.0 overall | v0.2 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
