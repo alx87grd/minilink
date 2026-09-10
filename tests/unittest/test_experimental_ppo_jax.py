@@ -77,10 +77,15 @@ def test_features_terminate_and_log_std_options():
         def h(self, x, t=0.0, params=None):
             return 10.0  # terminal penalty for leaving the box
 
+    def reset(key):
+        import jax
+
+        return jax.random.uniform(key, (4,), minval=-1.0, maxval=1.0)
+
     ppo = PPO(
         plant,
         SwingUpCost(),
-        reset_mode="uniform",
+        reset_mode=reset,  # callable: task-specific initial states
         features=features,
         domain_exit="terminate",
         log_std_init=-1.0,

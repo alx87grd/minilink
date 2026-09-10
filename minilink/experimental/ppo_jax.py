@@ -66,8 +66,10 @@ class PPO:
         What leaving the state bounds does: ``"truncate"`` bootstraps with the
         critic (the Gymnasium bridge behaviour); ``"terminate"`` ends the
         episode with reward ``-h(x_next)`` and no bootstrap.
-    reset_mode : {"gaussian", "uniform", "determinist"}
-        Initial-state distribution around ``sys.x0``.
+    reset_mode : {"gaussian", "uniform", "determinist"} or callable
+        Initial-state distribution around ``sys.x0``, or a JAX-traceable
+        ``reset(key) -> x0`` for task-specific starts (e.g. random points
+        along a track).
     x0_std : array, optional
         Standard deviation for ``reset_mode="gaussian"`` (default: a tenth
         of the state range).
@@ -266,6 +268,8 @@ class PPO:
         jnp = require_jax_numpy()
         import jax
 
+        if callable(self.reset_mode):
+            return jnp.asarray(self.reset_mode(key), dtype=float)
         if self.reset_mode == "gaussian":
             return self.x0 + self.x0_std * jax.random.normal(key, (self.n,))
         if self.reset_mode == "uniform":
