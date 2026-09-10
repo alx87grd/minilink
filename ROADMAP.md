@@ -104,8 +104,8 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
 | Topic | Surface | Material | Gate |
 | --- | --- | --- | --- |
 | Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupTableController`, `plot_cost2go` / `plot_policy` | `pendulum_swing_up_cost_function_vi`, `pendulum_swing_up_vi_vs_lqr`, `demos/planning/value_iteration/` | `final_time` reads `problem.tf`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
-| LQR + linearization | `linearize`, `lqr`, `lqr_at_operating_point`, `plot_control_law` | `03_control`, `04_analysis`, `demos/statespace/` | — (green today) |
-| Trajectory optimization | `PlanningProblem`, `TrajectoryOptimizationPlanner` (`direct_collocation`, `shooting`), `QuadraticCost` | `09_planning`, `demos/trajopt/` | float64 by default on JAX; `success` means defects satisfied; canonical problems succeed with default optimizer |
+| LQR + linearization | `linearize`, `lqr`, `lqr_at_operating_point`, `plot_control_law` | `03_control`, `04_analysis`, `demos/control/` | — (green today) |
+| Trajectory optimization | `PlanningProblem`, `TrajectoryOptimizationPlanner` (`direct_collocation`, `shooting`), `QuadraticCost` | `09_planning`, `demos/planning/trajopt/` | float64 by default on JAX; `success` means defects satisfied; canonical problems succeed with default optimizer |
 | RL via `Sys2Gym` + SB3 | `Sys2Gym`, `SB3Controller`, `plot_control_law` | `drone_ppo_learn_to_fly`, `pendulum_swing_up_vi_vs_lqr_vs_ppo` | compiled `step`; PPO notebook trains to the same qualitative policy |
 
 **Cross-cutting gates**
@@ -113,8 +113,8 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
 1. Wrong-shape `f` / `h` / port computes fail at `compile()` on both backends;
    a forgotten `super().__init__()` gives a named error; the README custom
    plant composes with `@`.
-2. Default `compute_trajectory` returns a fixed output count (1 001) and never
-   selects a solver from the point count.
+2. Default `compute_trajectory` returns a fixed output count (10 001, the fine
+   reporting grid ruled 2026-09-07) and never selects a solver from the point count.
 3. Every GRO860 notebook and every `examples/learn/` and `examples/demos/`
    file imports only through the teaching surface (CI test).
 4. The Basic tier (NumPy + SciPy + Matplotlib, nothing else) runs
