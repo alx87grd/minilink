@@ -14,13 +14,11 @@ Run from repo root::
 
 import numpy as np
 
+from minilink import BicycleDynRate
 from minilink.control.mpc import ModelPredictiveController
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRate,
-)
 from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,
@@ -116,7 +114,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True)
+mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
 # =============================================================================
 # end ROS2 NODE __init__
 # =============================================================================

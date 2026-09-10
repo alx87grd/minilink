@@ -101,11 +101,6 @@ class DynamicsEvaluator(OutputEvaluator):
             "Jacobian callable is not available for this evaluator"
         )
 
-    def jacobian_f_params(self, x, u, t, params):
-        raise NotImplementedError(
-            "jacobian_f_params is not available for this evaluator"
-        )
-
 
 # =============================================================================
 # Public API — StepEvaluator

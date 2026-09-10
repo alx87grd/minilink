@@ -1,6 +1,7 @@
 # Vehicle abstraction (design only)
 
 Status: draft plan (June 2026). No implementation in this phase.
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 ## Scope
 
@@ -35,4 +36,4 @@ without renaming dynamics shelves.
 ## Follow-on
 
 When implementing: add view ports on `DynamicBicycle` behind this contract, reuse
-`ImpedanceController` / `FilteredController` with vehicle-specific labels.
+`ImpedanceController` / `PID` with vehicle-specific labels.

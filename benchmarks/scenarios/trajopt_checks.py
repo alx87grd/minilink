@@ -14,7 +14,7 @@ from benchmarks.scenarios.common import (
 from benchmarks.trajopt import jax_trajopt_available
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -35,7 +35,7 @@ SHOWCASE_TRAJOPT_FTOL = 1e-2
 def build_showcase_cartpole_problem() -> PlanningProblem:
     """Cart-pole swing-up aligned with ``showcase/minilink.ipynb`` trajopt section."""
     configure_jax(enable_x64=True)
-    sys = JaxCartPole()
+    sys = CartPole()
     sys.inputs["u"].lower_bound[0] = -10.0
     sys.inputs["u"].upper_bound[0] = 10.0
 
@@ -85,7 +85,7 @@ def run_showcase_cartpole_trajopt(
                 "disp": False,
             },
             record_solve_time=True,
-            solve_disp=False,
+            verbose=False,
         ),
     )
 

@@ -50,10 +50,11 @@ def lqr_at_operating_point(
     Q,
     R,
     u_bar=None,
-    *,
     t=0.0,
     params=None,
-    epsilon=1e-6,
+    *,
+    method="auto",
+    eps=1e-6,
 ):
     """Linearize ``sys`` about ``(x_bar, u_bar)`` and return an LQR controller.
 
@@ -75,25 +76,22 @@ def lqr_at_operating_point(
     t : float, optional
         Time at which Jacobians are evaluated.
     params : dict, optional
-        Parameter dict forwarded to ``sys.f`` / ``sys.h``.
-    epsilon : float, optional
-        Central-difference step for linearization.
+        Parameter dict forwarded to ``sys.f``.
+    method : {"auto", "fd", "jax"}, optional
+        Differentiation backend, see :func:`~minilink.analysis.derivatives.jacobian`.
+    eps : float, optional
+        Central-difference step.
 
     Returns
     -------
     StateFeedbackController
         Full-state feedback trimmed about ``(x_bar, u_bar)``.
     """
-    from minilink.analysis.linearize import linearize_matrices
+    from minilink.analysis.derivatives import jacobian, operating_point
 
-    x_bar = np.asarray(x_bar, dtype=float).reshape(-1)
-    if u_bar is None:
-        u_bar = sys.get_u_from_input_ports()
-    u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
-
-    A, B, _, _ = linearize_matrices(
-        sys, x_bar, u_bar, t=t, params=params, epsilon=epsilon
-    )
+    x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
+    A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, method=method, eps=eps)
+    B = jacobian(sys, "f", "u", x_bar, u_bar, t, params, method=method, eps=eps)
     return lqr(A, B, Q, R, xbar=x_bar, ubar=u_bar)
 
 

@@ -52,13 +52,13 @@ class StaticSimulator:
         self.sys = sys
         self.sys.refresh()
 
-        default_dt = sys.solver_info.get("smallest_time_constant", 0.001) * 0.1
+        # Outputs are sampled, not integrated: no dt policy, so the automatic
+        # grid is the DEFAULT_N_STEPS reporting grid.
         self.t, self.dt, self.n_pts = build_time_grid(
             t0,
             tf,
             n_steps=n_steps,
             dt=dt,
-            default_dt=default_dt,
             verbose=verbose,
         )
         self.compile_backend, self.evaluator = self._resolve_and_build_evaluator(

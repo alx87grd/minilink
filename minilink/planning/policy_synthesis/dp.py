@@ -27,7 +27,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, configure_jax
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
 from minilink.planning.planner import Planner
 from minilink.planning.policy_synthesis.discretizer import (
     PAIR_CHUNK_SIZE,
@@ -57,6 +57,7 @@ _DP_OPTION_KEYS = (
     "final_time",
     "record_history",
     "verbose",
+    "clean_infeasible",
 )
 
 
@@ -86,7 +87,8 @@ class DynamicProgrammingOptions:
         Finite penalty charged to inadmissible inputs or out-of-domain
         successors.
     final_time : float
-        Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``.
+        Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``. Left
+        at ``0.0``, the planner reads ``problem.tf`` when the problem sets one.
     record_history : bool
         Keep ``(t, J, pi)`` per sweep for animation.
     verbose : bool
@@ -106,6 +108,9 @@ class DynamicProgrammingOptions:
     final_time: float = 0.0
     record_history: bool = False
     verbose: bool = False
+    #: After each solve, pin saturated cost-to-go cells to ``out_of_bound_cost``
+    #: and their policy to the nominal action (:meth:`clean_infeasible_set`).
+    clean_infeasible: bool = True
 
 
 def _merge_dp_options(
@@ -175,6 +180,13 @@ class DynamicProgrammingPlanner(Planner):
     """
     Value-iteration planner over a discretized state space.
 
+    The common setup is one object::
+
+        DynamicProgrammingPlanner(problem, x_grid=(201, 201), u_grid=(21,), dt=0.05)
+
+    which builds the :class:`~minilink.planning.policy_synthesis.discretizer.StateSpaceGrid`
+    itself; pass ``grid=`` for custom grids (``precompute``, ``verbose``, ...).
+
     Parameters
     ----------
     problem : PlanningProblem
@@ -192,7 +204,10 @@ class DynamicProgrammingPlanner(Planner):
         self,
         problem: PlanningProblem,
         *,
-        grid: StateSpaceGrid,
+        grid: StateSpaceGrid | None = None,
+        x_grid=None,
+        u_grid=None,
+        dt=None,
         options: DynamicProgrammingOptions | None = None,
         backend=_UNSET,
         alpha=_UNSET,
@@ -203,9 +218,22 @@ class DynamicProgrammingPlanner(Planner):
         final_time=_UNSET,
         record_history=_UNSET,
         verbose=_UNSET,
+        clean_infeasible=_UNSET,
     ) -> None:
         super().__init__(problem)
         self.require_cost()
+        # Common case: shapes + dt build the grid here; custom grids come in
+        # through grid= (precompute / verbose options live on StateSpaceGrid).
+        if grid is None:
+            if x_grid is None or u_grid is None or dt is None:
+                raise ValueError(
+                    "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
+                )
+            grid = StateSpaceGrid(
+                problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt
+            )
+        elif x_grid is not None or u_grid is not None or dt is not None:
+            raise ValueError("pass either grid= or x_grid/u_grid/dt, not both")
         self.grid = grid
         self.options = _merge_dp_options(
             options,
@@ -218,7 +246,12 @@ class DynamicProgrammingPlanner(Planner):
             final_time=final_time,
             record_history=record_history,
             verbose=verbose,
+            clean_infeasible=clean_infeasible,
         )
+        if final_time is _UNSET and self.options.final_time == 0.0:
+            tf = getattr(problem, "tf", None)
+            if tf is not None and np.isfinite(tf):
+                self.options = replace(self.options, final_time=float(tf))
         if self.options.backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
             raise ValueError(f"Unknown backend {self.options.backend!r}")
         self._G = None  # running-cost table, cached when the grid is precomputed
@@ -347,15 +380,38 @@ class DynamicProgrammingPlanner(Planner):
         result = DynamicProgrammingResult(
             grid=grid, J=J, pi=pi, iterations=k, delta=delta, history=history
         )
-        return self._finish_policy(result)
+        return self._finish_policy(result, stop_on_tol=stop_on_tol)
 
-    def _finish_policy(self, result: DynamicProgrammingResult) -> PolicyPlan:
-        return self._store_policy_plan(
+    def _finish_policy(
+        self, result: DynamicProgrammingResult, *, stop_on_tol: bool
+    ) -> PolicyPlan:
+        # success = the Bellman sweeps converged to `tol` (a fixed-horizon
+        # solve_steps() always completes its sweeps); the metadata says which.
+        converged = (not stop_on_tol) or result.delta <= float(self.options.tol)
+        if not stop_on_tol:
+            message = f"{result.iterations} backward sweeps (fixed horizon)"
+        elif converged:
+            message = (
+                f"converged in {result.iterations} sweeps (delta={result.delta:.3g})"
+            )
+        else:
+            message = (
+                f"max_iterations={result.iterations} reached before tol="
+                f"{self.options.tol:g} (delta={result.delta:.3g})"
+            )
+        plan = self._store_policy_plan(
             PolicyPlan(
                 policy=result,
-                metadata=SolveMetadata(success=True),
+                metadata=SolveMetadata(
+                    success=converged,
+                    message=message,
+                    stats={"iterations": result.iterations, "delta": result.delta},
+                ),
             )
         )
+        if self.options.clean_infeasible:
+            self.clean_infeasible_set()  # pins saturated cells in place on `result`
+        return plan
 
     def _vectorized_step(self, J, t):
         """Vectorized Bellman backup over the precomputed lookup table (NumPy)."""
@@ -467,7 +523,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def _terminal_cost_jax(self, t):
         """Terminal cost-to-go at every grid node (JAX vmap over N nodes)."""
-        jax = configure_jax(enable_x64=True)
+        jax = ensure_jax_x64()
         jnp = jax.numpy
         grid = self.grid
         N = grid.nodes_n
@@ -552,7 +608,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def _running_cost_jax(self, action_ok, x_next_ok, t):
         """Running-cost lookup table G[s,a] = g(x,u,t)*dt (JAX vmap over N×A pairs)."""
-        jax = configure_jax(enable_x64=True)
+        jax = ensure_jax_x64()
         jnp = jax.numpy
         grid = self.grid
         g = self.problem.cost.g
@@ -625,7 +681,7 @@ class DynamicProgrammingPlanner(Planner):
         jitted ``lax.while_loop`` with ``map_coordinates`` interpolation. The
         compiled runner is cached so repeated solves pay compilation only once.
         """
-        jax = configure_jax(enable_x64=True)  # match NumPy float64 precision
+        jax = ensure_jax_x64()  # library float64 policy (MINILINK_JAX_X64)
         jnp = jax.numpy
         grid = self.grid
         opt = self.options
@@ -666,7 +722,7 @@ class DynamicProgrammingPlanner(Planner):
             delta=float(delta),
             history=None,
         )
-        return self._finish_policy(result)
+        return self._finish_policy(result, stop_on_tol=stop_on_tol)
 
     def _jax_step(self, jax, jnp):
         """Return (and cache) the jitted single Bellman backup."""
@@ -797,4 +853,4 @@ class DynamicProgrammingPlanner(Planner):
             delta=delta,
             history=history,
         )
-        return self._finish_policy(result)
+        return self._finish_policy(result, stop_on_tol=stop_on_tol)

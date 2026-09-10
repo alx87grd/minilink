@@ -1,5 +1,7 @@
 # MPC circuit lap-time tuning (`mpc_tuning`)
 
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
+
 Active design backlog for per-model MPC hyperparameter search on the
 rounded-rectangle circuit. Implementation home:
 [`examples/projects/mpc_tuning/`](../../examples/projects/mpc_tuning/).

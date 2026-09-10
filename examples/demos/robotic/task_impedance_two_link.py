@@ -1,24 +1,8 @@
-"""Two-link end-effector impedance — Pyro ``twolinkrobot_effector_impedance_controller``.
-
-Run from repo root::
-
-    python examples/demos/robotic/task_impedance_two_link.py
-
-Task-space law uses the internal FK/Jacobian model; feedback is joint space::
-
-    ref.r ─────────────► ctl.r          (desired p)
-    sys.q  ──┐
-    sys.dq ──┴─ Mux ─► ctl.y         ([q; dq])
-    ctl.u ──► sys.u                    (τ)
-
-End-effector step from ``p0 = (0.5, 0.5)`` to ``p1 = (-0.5, 0.5)`` at ``t = 4`` s.
-"""
+"""Two-link end-effector impedance — Pyro ``twolinkrobot_effector_impedance_controller``."""
 
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.control.robotic import TaskImpedance
-from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
+from minilink import Step, TaskImpedance, TwoLinkManipulator
 
 p0 = np.array([0.5, 0.5])
 p1 = np.array([-0.5, 0.5])
@@ -30,10 +14,14 @@ arm.x0 = np.zeros(4)
 
 ref = Step(initial_value=p0, final_value=p1, step_time=STEP_TIME)
 
-ctl = TaskImpedance(arm, gravity_comp=False, show_task_force=True)
-ctl.params["Kp"] = np.array([120.0, 120.0])
-ctl.params["Kd"] = np.array([12.0, 12.0])
-ctl.task_force_scale = 0.005
+ctl = TaskImpedance(
+    arm,
+    gravity_comp=False,
+    Kp=[120.0, 120.0],
+    Kd=[12.0, 12.0],
+    show_task_force=True,
+    task_force_scale=0.005,
+)
 
 diagram = ref >> ctl @ arm
 

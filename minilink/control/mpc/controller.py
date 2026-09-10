@@ -345,7 +345,7 @@ def ModelPredictiveController(
     *,
     dt_mpc: float,
     warm_start: bool = True,
-    step_disp: bool = False,
+    verbose: bool = False,
     t0: float = 0.0,
     debug: bool = False,
 ):
@@ -361,21 +361,21 @@ def ModelPredictiveController(
     warm_start : bool, optional
         If True, return a :class:`~minilink.core.system.StepSystem` with packed
         ``z`` on ``Computer.x``. If False, algebraic :class:`~minilink.core.system.System`.
-    step_disp, t0, debug
+    verbose, t0, debug
         Latch printouts, absolute-time epoch, and live debug figure auto-update.
     """
     if warm_start:
         return MPCStatefulController(
             planner,
             dt_mpc=dt_mpc,
-            step_disp=step_disp,
+            verbose=verbose,
             t0=t0,
             debug=debug,
         )
     return MPCStatelessController(
         planner,
         dt_mpc=dt_mpc,
-        step_disp=step_disp,
+        verbose=verbose,
         t0=t0,
         debug=debug,
     )
@@ -397,7 +397,7 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
         planner: TrajectoryOptimizationPlanner,
         *,
         dt_mpc: float,
-        step_disp: bool = False,
+        verbose: bool = False,
         t0: float = 0.0,
         debug: bool = False,
     ) -> None:
@@ -417,7 +417,7 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
         self._replan_divisor = 1
         self._latch = MPCTickLatch(
             planner,
-            step_disp=step_disp,
+            verbose=verbose,
             dt_mpc=self._dt_mpc,
             t0=self._t0,
         )
@@ -476,7 +476,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         planner: TrajectoryOptimizationPlanner,
         *,
         dt_mpc: float,
-        step_disp: bool = False,
+        verbose: bool = False,
         t0: float = 0.0,
         debug: bool = False,
     ) -> None:
@@ -495,7 +495,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         self._replan_divisor = 1
         self._latch = MPCTickLatch(
             planner,
-            step_disp=step_disp,
+            verbose=verbose,
             dt_mpc=self._dt_mpc,
             t0=self._t0,
         )
@@ -607,12 +607,12 @@ class MPCTickLatch:
         self,
         planner: TrajectoryOptimizationPlanner,
         *,
-        step_disp: bool = False,
+        verbose: bool = False,
         dt_mpc: float | None = None,
         t0: float = 0.0,
     ) -> None:
         self._planner = planner
-        self._step_disp = bool(step_disp)
+        self._verbose = bool(verbose)
         self._dt_mpc = None if dt_mpc is None else float(dt_mpc)
         self._t0 = float(t0)
         self._latch_k: int | None = None
@@ -692,11 +692,11 @@ class MPCTickLatch:
         self._latch = latch
         if self._after_solve is not None:
             self._after_solve()
-        if self._step_disp:
-            self._print_step_disp(k_int, result)
+        if self._verbose:
+            self._print_tick(k_int, result)
         return latch
 
-    def _print_step_disp(self, k_int, result) -> None:
+    def _print_tick(self, k_int, result) -> None:
         # solve = optimizer wall time; step = full from-tick (bind + solve + reconstruct).
         solve_s = result.solve_time_s
         if solve_s is None:

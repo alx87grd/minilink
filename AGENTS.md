@@ -12,13 +12,15 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 | --- | --- |
 | [README.md](README.md) | User workflows, install, examples table |
 | [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior, **product identity & scope** |
-| [ROADMAP.md](ROADMAP.md) | TRL / maturity claims, teaching-release criteria & priorities, review queue, out-of-scope |
+| [ROADMAP.md](ROADMAP.md) | **Plan of record**: releases and milestones, two-lane rule, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
 | [docs/plans/TODO.md](docs/plans/TODO.md) | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
 | [docs/plans/](docs/plans/) | Active **design** writeups only (multi-step plans; delete finished plan docs) |
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
+| [docs/pitch/](docs/pitch/) | The five-slide pitch (`slides.html` + `pitch.css`): single source for the docs landing page (`docs/index.rst`) and the standalone deck `docs/_static/pitch.html` built by `docs/make_assets.py` (also the README GIFs and diagram PNG; `ur5_meshcat.gif` is a screen recording, not rebuilt) |
 | [tests/README.md](tests/README.md) | Marker policy, test philosophy, **entry points (human · agent · CI)** |
+| [docs/reviews/](docs/reviews/) | Dated architecture audits and the interview decision records; read-only history, never a backlog |
 
-Do not add new markdown guides unless asked. Keep [README call chains](README.md#call-chains) minimal.
+Do not add new markdown guides unless asked. Keep [DESIGN.md call chains](DESIGN.md#8-call-chains) minimal.
 
 **Intro-doc scope:** [README.md](README.md), marketing showcases
 ([showcase/minilink.ipynb](examples/learn/intro/showcase_minilink.ipynb),
@@ -34,15 +36,47 @@ or maturity change. Add a README examples-table row only when a demo is a
 
 **Examples buckets** (see [examples/README.md](examples/README.md)):
 `learn/` (intro = library curriculum; teaching/ = domain lessons),
-`demos/<topic>/` (canonical single-file
-scripts), `projects/`, `tooling/` (notebooks and/or scripts), `sandbox/`
-(+ `scratch/`). Do not mix `.ipynb` and `.py` in the same leaf module folder
-(except inside one named project). Demo stems keep the topic when needed
-(e.g. `mpc/mpc_car_minimal.py`; no `demo_` prefix). Pedagogical compares stay
-in `demos/`; mission matrices go to `sandbox/` or `projects/`. Scripts are
-top-level open-and-run (no `main()`); do not add plant-only smokes — use catalog
-`__main__` instead. Tooling lives under `examples/tooling/`, plus
-`tests/demo_checks/` and `benchmarks/`.
+`demos/<chapter>/` (canonical single-file scripts, one folder per intro
+chapter), `projects/` (multi-file, research lane), `tooling/` (benches),
+`experimental/` (research-lane single files; `scratch/` for personal checks).
+Do not mix `.ipynb` and `.py` in the same leaf folder (except inside one named
+project). Demo stems keep the topic when needed (e.g. `mpc/mpc_car_minimal.py`;
+no `demo_` prefix). Pedagogical compares stay in `demos/`; mission matrices go
+to `experimental/` or `projects/`. Scripts are top-level open-and-run (no
+`main()`); do not add plant-only smokes — use catalog `__main__` instead.
+Tooling lives under `examples/tooling/`, plus `tests/demo_checks/` and
+`benchmarks/`.
+
+**Student-facing imports.** Code in `README.md`, `examples/learn/`, and
+`examples/demos/` imports through the **teaching surface** — the root prelude
+(`from minilink import Pendulum`) or a band facade (`from minilink.catalog
+import …`, `minilink.control`, `minilink.analysis`, `minilink.blocks`,
+`minilink.simulation`, `minilink.planning`). Deep defining-module imports are
+for library code, tests, and the research lane (`examples/projects/`,
+`examples/experimental/`). Where a band facade does not exist yet, use the shortest
+import that works and leave the facade to the planned step — never invent a
+name. Exception kept: a factory whose name matches its module is imported from
+the module (`from minilink.control.lqr import lqr`).
+
+**Public-facing text** (README, the two showcases, `docs/pitch/`, the docs
+landing page). Always positive about minilink; never name or compare against
+other tools — the allowed framing is that minilink *bridges* capabilities that
+usually live in separate tools. Foundational, not marketing: no superlatives,
+every number measured by a notebook cell (quote batches, never a per-call
+speedup: a jitted `f` call is no faster than NumPy), main line readable by an
+undergraduate, expert depth in short "under the hood" asides. The README does
+not link the deck for now. Verification grep before push:
+`grep -n -i "simulink|matlab|drake|casadi|mujoco"` over README, slides and
+notebook markdown must be empty. GIF assets stay under 1 MB and use the
+plants' catalog framing (the only camera override is the MPC clip following
+the car).
+
+**Demo-script headers.** One-line title docstring; everything else lives
+inline next to the code it describes. No run instructions, section maps, or
+flag explanations in the header — `examples/README.md` says how to run
+demos, and the code with its inline comments must tell the whole story
+(textbook rule). Notebooks are course material: do not trim their markdown
+unless asked.
 
 ## Core directives
 
@@ -52,6 +86,16 @@ top-level open-and-run (no `main()`); do not add plant-only smokes — use catal
 - **Minimalist UX**: beginner-friendly main workflow; complexity in orchestrators and backends.
 - **Prototype honestly**: unvalidated architecture gets `TODO: User Architectural Review`.
 - **Incremental refactoring**: no broad restructures unless the user asks.
+- **Consolidate, never strip**: simplification targets *maintenance cost* —
+  text edited twice when code changes, dead API, boilerplate a flag would
+  replace, NumPy/JAX twins one `xp` body covers. Clean, well-placed code is
+  not a liability; a deliberate ladder of implementations (e.g. the DP
+  planner's `loop` / `numpy` / `jax` backends) is not duplication. Never
+  remove a feature or a user-importable name without asking.
+- **Two lanes** ([ROADMAP.md §2](ROADMAP.md#2-two-lanes)): the teaching
+  surface is a contract (soft entry rule: demo or notebook, both-backends
+  test where it defines dynamics, docstring); the research lane is free and
+  repo-only. Keep the wheel scope honest.
 - **Preserve user edits**: never revert or "clean up" manual changes the user made in demos, notebooks, examples, or scratch code — commented-out plots, tuning constants (`TF`, gains, step times), disabled sections, exploratory variables — unless they explicitly ask you to change those lines. Commit/review passes must not overwrite user-tuned script state.
 - **No test harness in demos**: `examples/demos/` and `examples/learn/` never read CI/smoke env vars or branch on “are we in a test?” (`MINILINK_NOTEBOOK_SMOKE`, etc.). Smoke runners adapt outside the demo (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Teaching code may fall back on missing optional packages (e.g. Ipopt → SciPy) — that is user UX, not a test hook.
 - **Docs are contract**: update DESIGN / ROADMAP / README when public behavior or maturity claims change.
@@ -69,10 +113,17 @@ Reading minilink should feel like a controls/dynamics textbook.
 6. **The `xp` idiom**: `xp = array_module(x)` right after params unpacking — hybrid NumPy/JAX in one line.
 7. **Derived, not cached**: computable quantities are read-only properties, never stale cached attrs.
 8. **No shadow state**: initialize in `__init__`, never `hasattr`-or-create at use sites.
-9. **Libraries are silent**: no `print` except explicit `verbose=`; delete debug scaffolding.
-10. **Pre-1.0 no-alias rule**: rename cleanly; fix call sites in the same change.
-11. **Backend imports from `core/backends.py`**: never import from `core/compile/` in system libraries.
-12. **`__main__` hello-worlds**: ~10 lines max in core modules; bigger examples in `examples/`.
+9. **Systems are descriptions, facades are shortcuts**: a `System` holds ports,
+   params, equations and `x0`, plus thin shortcut methods (`compute_trajectory`,
+   `jacobian`, `linearize`) that delegate to the tool's own module — the module
+   (`Simulator`, `minilink.analysis.jacobian`) is what scripts and projects
+   import; the shortcut is for teaching and quick looks. No input/output data,
+   caches or run state on the object; `self.traj` is the one exception,
+   justified by daily use, and a new one needs a reason of that weight.
+10. **Libraries are silent**: no `print` except explicit `verbose=`; delete debug scaffolding.
+11. **Pre-1.0 no-alias rule**: rename cleanly; fix call sites in the same change.
+12. **Backend imports from `core/backends.py`**: never import from `core/compile/` in system libraries.
+13. **`__main__` hello-worlds**: ~10 lines max in core modules; bigger examples in `examples/`.
 
 ### General coding
 
@@ -101,6 +152,9 @@ Details in [DESIGN.md](DESIGN.md).
 
 - **Continuous-time core is the priority** — `DynamicSystem`, flow diagrams, `Simulator`, and analysis on `f` are the main framework. `StepSystem` / hybrid are subsidiary utilities for discrete control in the loop (MPC, SMC). On trade-offs, keep the continuous path clean; step/hybrid add-ons use sibling types and separate compile/sim paths — do not complicate flow `compile()`, `DiagramSystem`, or `Simulator`.
 - Equation paths stay **native-array**; conversions at boundaries only.
+- **JAX is float64 by default** (`MINILINK_JAX_X64=0` opts out); tools never require the caller to call `configure_jax`.
+- **Unconnected input ports read their nominal value, silently, by design** — never add a warning or error for it.
+- `verbose=True` keeps the framed simulation panel; unify flag *names* (`verbose`), not the format.
 - `params is None` → object defaults; any other `params` overrides — never `params or self.params`.
 - **Inheritance** for core system types; **composition** for diagrams and optional behaviors.
 - **`outputs()` / `outputs_p()` are boundary outputs only**; no `compute_outputs(..., ports=...)`.
@@ -113,7 +167,17 @@ Details in [DESIGN.md](DESIGN.md).
 
 **Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals).
 
-**Ask first:** delete/rename files; architecture refactors; new dependencies; evaluator/optimizer contract changes; removing user scratch code.
+**Ask first (maintainer-owned):** anything student-facing (`README.md`,
+`examples/`, notebooks, ROADMAP §1–§4, public names); **core architecture and
+the API of the main tools** (`System` family, diagrams, compile, `Simulator`,
+planners, `Optimizer`, controllers); any feature or user-importable-name
+removal; delete/rename files; new dependencies; removing user scratch code.
+
+**Agent-managed (decide, then report):** plotting interfaces, external
+interfaces (`interfaces/`), docs housekeeping, the TRL ledger, `TODO.md`,
+plan-doc housekeeping, tests, and internal code structure that does not
+change a public contract. When you spot an opportunity outside your lane,
+ask — do not act.
 
 **Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file → ask before proceeding.
 
@@ -122,7 +186,7 @@ stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` (CI
 ``regression`` job runs the same).
 
-Demos: under `examples/demos/` (canonical) or `examples/sandbox/`
+Demos: under `examples/demos/` (canonical) or `examples/experimental/`
 (non-core / WIP); runnable from repo root. Map: [examples/README.md](examples/README.md).
 
 ## Before push or PR (local CI gate)

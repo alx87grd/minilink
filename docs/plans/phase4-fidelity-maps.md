@@ -1,6 +1,7 @@
 # Phase 4 — Cross-fidelity maps (design)
 
 Status: draft plan (July 2026). Active backlog — not implemented yet.
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 Locked defaults: **bicycle ladder only** (Kin → Acc → Dyn → Rate → TauRate →
 Servo → Engine); Holonomic deferred. Maps live in
@@ -118,9 +119,9 @@ Phase 4 makes that shared and honest about when zeros are wrong.
 | Engine | Rate + `P` | `[P_cmd, δ_cmd]` |
 
 Reuse existing:
-[`BicycleDynRate.inverse_propulsion_dynamics`](../../minilink/dynamics/catalog/vehicles/jax_vehicles.py)
+[`BicycleDynRate.inverse_propulsion_dynamics`](../../minilink/dynamics/catalog/vehicles/dynamic_bicycle.py)
 for Rate→τ;
-[`CarProfile.power_torque_at_speed`](../../minilink/dynamics/catalog/vehicles/car_profile.py)
+[`CarProfile.power_torque_at_speed`](../../examples/projects/car_trajopt/vehicles/car_profile.py)
 only for **bounds/ratings**, not as the map body (Engine EoM is
 `τ=clip(P/ω,±τ_sat)`).
 

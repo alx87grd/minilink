@@ -1,26 +1,15 @@
-"""Hybrid MPC on the wide technical circuit (track + corridor + obstacles).
-
-``ModelPredictiveController`` with ``warm_start=True`` and ``mpc @ plant``.
-Scene matches the former wide-circuit lap demo (asymmetric loop + sphere keepouts).
-
-Run from repo root::
-
-    python examples/demos/mpc/mpc_car_circuit.py
-"""
+"""Hybrid MPC on the wide technical circuit (track + corridor + obstacles)."""
 
 import numpy as np
 
-from minilink.control.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
-from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
-from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+from minilink import (
     BicycleDynRate,
+    PlanningProblem,
+    QuadraticCost,
+    TrajectoryOptimizationPlanner,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
+from minilink.core.geometry import Sphere
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.paths import from_waypoints
@@ -32,11 +21,6 @@ from minilink.planning.spatial.shaping import (
     quadratic_hinge,
 )
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationPlanner,
-)
-
-configure_jax(enable_x64=True)
 
 # --- knobs ---
 U_TARGET = 20.0
@@ -156,7 +140,6 @@ cost = (
         R=np.diag([1.0, 22.0]),
         S=np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0]),
         xbar=x_cruise,
-        ubar=np.zeros(2),
     )
     + path_cost
     + corridor_cost
@@ -203,7 +186,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 150, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True)
+mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
 
 sys_sim = BicycleDynRate()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]

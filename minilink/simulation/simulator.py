@@ -12,7 +12,9 @@ sub-step behavior — see `DESIGN.md` §5 (*Discontinuous closed loops — known
 
 Public module symbols :data:`COMPILE_BACKEND_AUTO` and :data:`RK4_AUTO_MIN_TIME_POINTS`
 control automatic compile backend selection and optional fixed-step RK4 on long
-uniform grids when using the JAX compiler.
+*explicit* uniform grids when using the JAX compiler. With neither ``n_steps``
+nor ``dt``, adaptive solvers report on :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS`
+points and fixed-step solvers take ``dt`` from the plant time constant.
 """
 
 import time
@@ -86,9 +88,17 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
     "rk4_fixedsteps": ("rk4", {}),
 }
 
-# Long uniform rollouts can use fixed-step RK4 (JIT) instead of
-# SciPy when the output grid is long enough
+# Long *explicit* uniform rollouts can use fixed-step RK4 (JIT) instead of
+# SciPy when the output grid is long enough; the automatic grid never
+# triggers this rule.
 RK4_AUTO_MIN_TIME_POINTS = 10_000
+
+# Solvers that integrate on the output grid itself (every non-SciPy backend):
+# their automatic dt comes from the plant time constant instead of
+# DEFAULT_N_STEPS.
+FIXED_STEP_SOLVERS = tuple(
+    label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
+)
 
 # Default automatic dt scale relative to ``solver_info["smallest_time_constant"]``
 SMOOTH_AUTO_DT_SCALE = 0.1
@@ -185,9 +195,6 @@ class Simulator:
         self.last_traj = None
         self.last_debug = None
 
-        # Select the time vector
-        self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
-        self.n_pts = len(self.t)
         self.x0 = self._validate_x0(sys.x0 if x0 is None else x0, sys.n)
 
         # Compile the system
@@ -195,8 +202,19 @@ class Simulator:
             sys, compile_backend
         )
 
-        # Select the solver
-        self.solver_mode = self.select_solver(sys, solver)
+        # Solver and time grid. With an automatic grid the solver is chosen
+        # first and the grid is sized to it; with an explicit grid the solver
+        # may still be chosen from the grid (JAX auto-RK4 on long uniform grids).
+        if self.auto_time_grid:
+            self.solver_mode = self.select_solver(sys, solver)
+            self.t, dt, n_steps = self.select_time_vector(
+                t0, tf, None, None, sys, solver_mode=self.solver_mode
+            )
+            self.n_pts = len(self.t)
+        else:
+            self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
+            self.n_pts = len(self.t)
+            self.solver_mode = self.select_solver(sys, solver)
         solver_backend_key, self.solver_backend_options = self._parse_solver(
             self.solver_mode
         )
@@ -232,21 +250,25 @@ class Simulator:
                 notes=setup_notes or None,
             )
 
-    def select_time_vector(self, t0, tf, n_steps, dt, sys):
+    def select_time_vector(self, t0, tf, n_steps, dt, sys, solver_mode=None):
         """
         Build time samples on [t0, tf] and return (time_vector, dt, len).
 
-        Delegates to :func:`minilink.simulation.time_grid.build_time_grid`;
-        the automatic ``dt`` (neither ``n_steps`` nor ``dt`` given) comes from
-        the system's smallest time constant scaled by the smooth or
-        discontinuous auto-dt policy. If both ``n_steps`` and ``dt`` are set,
-        ``n_steps`` wins (a warning is logged).
+        Explicit ``n_steps`` or ``dt`` win (``n_steps`` if both are set, with a
+        logged warning). With neither, the automatic grid depends on the
+        solver: fixed-step solvers (:data:`FIXED_STEP_SOLVERS`) integrate on
+        the grid, so ``dt`` comes from the system's smallest time constant
+        scaled by the smooth or discontinuous policy; adaptive solvers pick
+        their own steps, so the grid is only a reporting resolution with
+        :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.
         """
-        if sys.solver_info.get("discontinuous_behavior", False):
-            scale = DISCONTINUOUS_AUTO_DT_SCALE
-        else:
-            scale = SMOOTH_AUTO_DT_SCALE
-        default_dt = sys.solver_info["smallest_time_constant"] * scale
+        default_dt = None  # -> DEFAULT_N_STEPS reporting grid
+        if solver_mode in FIXED_STEP_SOLVERS:
+            if sys.solver_info.get("discontinuous_behavior", False):
+                scale = DISCONTINUOUS_AUTO_DT_SCALE
+            else:
+                scale = SMOOTH_AUTO_DT_SCALE
+            default_dt = sys.solver_info["smallest_time_constant"] * scale
         return build_time_grid(t0, tf, n_steps=n_steps, dt=dt, default_dt=default_dt)
 
     def select_solver(self, sys, user_solver=None):
@@ -255,9 +277,10 @@ class Simulator:
 
         - If the user has specified a solver, return it.
         - If the system has discontinuous behavior, return ``"euler"``.
-        - If ``compile_backend`` is ``"jax"``, the time grid is uniform, and the
-          number of evaluation points is at least :data:`RK4_AUTO_MIN_TIME_POINTS`,
-          return ``"rk4_fixedsteps"`` (fast JIT rollout).
+        - If the time grid was given explicitly, ``compile_backend`` is
+          ``"jax"``, the grid is uniform, and it has at least
+          :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4_fixedsteps"``
+          (fast JIT rollout). The automatic grid never triggers this rule.
         - Otherwise, return ``"scipy"``.
         """
         if user_solver is not None:
@@ -265,7 +288,8 @@ class Simulator:
         if sys.solver_info.get("discontinuous_behavior", False):
             return "euler"
         if (
-            self.compile_backend == BACKEND_JAX
+            not self.auto_time_grid
+            and self.compile_backend == BACKEND_JAX
             and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
             and _time_grid_is_uniform(self.t)
         ):

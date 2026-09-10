@@ -11,11 +11,13 @@ import time
 
 import numpy as np
 
+from minilink.core.backends import ensure_jax_x64
 from minilink.core.compile.evaluators.evaluators import (
     DynamicsEvaluator,
     StaticEvaluator,
     StepEvaluator,
 )
+from minilink.core.compile.evaluators.jacobian import JaxJacobianMixin
 from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin
 from minilink.core.compile.evaluators.tiers import TraceTierMixin, register_jit_aliases
 from minilink.core.compile.execution_plan import (
@@ -341,6 +343,113 @@ class JaxIntegrationMixin:
             params,
         )
 
+    # --- Batched rollouts (research facade) ---
+
+    def rollout_batch(
+        self, x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None
+    ):
+        """Roll out a family of RK4 / ZOH trajectories in one ``jax.vmap`` call.
+
+        Parameters
+        ----------
+        x0s : array, shape ``(B, n)``
+            One initial state per family member.
+        u_sequences : None, ``(N, m)``, or ``(B, N, m)``
+            Held inputs per step: the compiled nominal input (``n_steps``
+            required), one sequence shared by the batch, or one per member.
+        t0, dt : float
+            Start time and step, shared by the batch.
+        params : None or pytree
+            ``None`` uses the compiled values. Otherwise a params pytree whose
+            leaves are either shared by the batch or carry a leading axis of
+            size ``B`` — a leaf with one more dimension than the compiled value
+            is a family (``{"l": jnp.linspace(0.5, 2.0, B)}`` sweeps a length).
+
+        Returns
+        -------
+        jax.Array, shape ``(B, N + 1, n)``
+            Sampled states, ``x0`` first, for every member of the family.
+        """
+        jax, jnp = self.jax, self.jnp
+        x0s = jnp.asarray(x0s, dtype=float)
+        if x0s.ndim != 2 or x0s.shape[1] != self.n:
+            raise ValueError(f"x0s must have shape (B, {self.n}); got {x0s.shape}")
+        batch = int(x0s.shape[0])
+
+        if u_sequences is None:
+            if n_steps is None:
+                raise ValueError("n_steps is required when u_sequences is None")
+            u_seq = jnp.broadcast_to(self._u_nominal, (int(n_steps), self.m))
+            u_axis = None
+        else:
+            u_seq = jnp.asarray(u_sequences, dtype=float)
+            if u_seq.ndim == 2:
+                u_axis = None
+            elif u_seq.ndim == 3 and u_seq.shape[0] == batch:
+                u_axis = 0
+            else:
+                raise ValueError(
+                    f"u_sequences must have shape (N, {self.m}) or "
+                    f"({batch}, N, {self.m}); got {u_seq.shape}"
+                )
+            if n_steps is not None and u_seq.shape[-2] != int(n_steps):
+                raise ValueError("n_steps disagrees with u_sequences")
+        t0 = jnp.asarray(t0, dtype=float)
+        dt = jnp.asarray(dt, dtype=float)
+
+        # One jitted vmap per (input layout, family layout): repeated sweeps
+        # with the same shapes reuse the compiled rollout instead of re-tracing.
+        cache = self.__dict__.setdefault("_rollout_batch_cache", {})
+        if params is None:
+            key = (u_axis, None)
+            fn = cache.get(key)
+            if fn is None:
+                fn = jax.jit(
+                    jax.vmap(
+                        self._rk4_integrate_zoh_trace_fn,
+                        in_axes=(0, u_axis, None, None),
+                    )
+                )
+                cache[key] = fn
+            return fn(x0s, u_seq, t0, dt)
+        axes = self._params_batch_axes(params, batch)
+        leaves, treedef = jax.tree_util.tree_flatten(axes, is_leaf=lambda a: a is None)
+        key = (u_axis, str(treedef), tuple(leaves))
+        fn = cache.get(key)
+        if fn is None:
+            fn = jax.jit(
+                jax.vmap(
+                    self._rk4_integrate_zoh_trace_p_fn,
+                    in_axes=(0, u_axis, None, None, axes),
+                )
+            )
+            cache[key] = fn
+        return fn(x0s, u_seq, t0, dt, params)
+
+    def _params_batch_axes(self, params, batch):
+        """``in_axes`` for ``params``: 0 on family leaves, ``None`` on shared ones.
+
+        A leaf is a family when it has one more dimension than the compiled
+        value at the same path; leaves without a compiled twin (partial nested
+        params) count as a family when their leading axis has size ``batch``.
+        """
+        from jax.tree_util import keystr, tree_leaves_with_path, tree_map_with_path
+
+        reference = {}
+        frozen = getattr(self, "_frozen_params", None)
+        if frozen is not None:
+            for path, leaf in tree_leaves_with_path(frozen):
+                reference[keystr(path)] = np.ndim(leaf)
+
+        def axis(path, leaf):
+            ndim = np.ndim(leaf)
+            ref_ndim = reference.get(keystr(path))
+            if ref_ndim is not None:
+                return 0 if ndim == ref_ndim + 1 else None
+            return 0 if (ndim >= 1 and np.shape(leaf)[0] == batch) else None
+
+        return tree_map_with_path(axis, params)
+
     # --- RK4 integrate linear ---
 
     def rk4_integrate_linear(self, x0, u_knots, t0, dt):
@@ -572,7 +681,9 @@ register_jit_aliases(
 # =============================================================================
 
 
-class JaxDynamicEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin):
+class JaxDynamicEvaluator(
+    JaxIntegrationMixin, JaxJacobianMixin, DynamicsEvaluator, TraceTierMixin
+):
     """Compiled evaluator for a :class:`DynamicSystem` using JAX."""
 
     def __init__(self, system: DynamicSystem, verbose=False):
@@ -581,6 +692,8 @@ class JaxDynamicEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
 
         import jax
         import jax.numpy as jnp
+
+        ensure_jax_x64()
 
         self.jax = jax
         self.jnp = jnp
@@ -638,12 +751,17 @@ class JaxDynamicEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
         self._f_ivp_jit_fn = tiers["_f_ivp_jit_fn"]
         self._f_ivp_trace_p_fn = tiers["_f_ivp_trace_p_fn"]
         self._f_ivp_jit_p_fn = tiers["_f_ivp_jit_p_fn"]
-        self._jac_f_params_jit_fn = tiers["_jac_f_params_jit_fn"]
         self._jac_ivp_jit_fn = tiers["_jac_ivp_jit_fn"]
         self._outputs_trace_fn = tiers["_outputs_trace_fn"]
         self._outputs_trace_p_fn = tiers["_outputs_trace_p_fn"]
         self._outputs_jit_fn = tiers["_outputs_jit_fn"]
         self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
+        self._jac_setup(
+            system,
+            "dynamic",
+            state_fn=self._f_trace_p_fn,
+            outputs_fn=self._outputs_trace_p_fn,
+        )
 
         self._setup_integration_tiers(jax, jnp)
 
@@ -683,11 +801,6 @@ class JaxDynamicEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
         """Pre-JIT parametric boundary outputs for JAX composition."""
         return self._outputs_trace_p_fn(x, u, t, params)
 
-    def jacobian_f_params(self, x, u, t, params):
-        if params is None:
-            raise ValueError("jacobian_f_params requires an explicit params pytree")
-        return self._jac_f_params_jit_fn(x, u, t, params)
-
 
 register_jit_aliases(JaxDynamicEvaluator, ("f", "outputs"))
 
@@ -697,13 +810,17 @@ register_jit_aliases(JaxDynamicEvaluator, ("f", "outputs"))
 # =============================================================================
 
 
-class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin):
+class JaxDiagramEvaluator(
+    JaxIntegrationMixin, JaxJacobianMixin, DynamicsEvaluator, TraceTierMixin
+):
     """JAX-compatible evaluator for a compiled diagram."""
 
     def __init__(self, plan: ExecutionPlan, diagram, verbose=False):
         try:
             import jax
             import jax.numpy as jnp
+
+            ensure_jax_x64()
         except ImportError as e:
             raise ImportError(
                 "JAX is required for the 'jax' backend. "
@@ -727,6 +844,7 @@ class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
         self._frozen_params = None
         self._u_nominal = jnp.array(diagram.get_u_from_input_ports())
         self._subsystem_ids = tuple(diagram.subsystems)
+        self._jac_setup(diagram, "dynamic", state_fn=None, outputs_fn=None, plan=plan)
 
         if verbose:
             t0 = time.perf_counter()
@@ -759,7 +877,6 @@ class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
 
         self._f_jit_p_fn = jax.jit(self._f_trace_p_fn)
         self._outputs_jit_p_fn = jax.jit(self._outputs_trace_p_fn)
-        self._jac_f_params_jit_fn = jax.jit(jax.jacfwd(self._f_trace_p_fn, argnums=3))
 
         def _f_ivp_trace_p_fn(x, t, p):
             return self._f_trace_p_fn(x, u_nom, t, p)
@@ -832,9 +949,13 @@ class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
         return dx
 
     def _f_trace_p_fn(self, x, u, t, params):
-        jnp = self._jnp
         dtype = self._infer_dtype(x, u)
         signals = self._compute_port_signals_p(x, u, t, dtype, params)
+        return self._dx_from_signals_p(x, u, t, params, signals)
+
+    def _dx_from_signals_p(self, x, u, t, params, signals):
+        jnp = self._jnp
+        dtype = self._infer_dtype(x, u)
         dx = jnp.zeros(self.plan.state_dim, dtype=dtype)
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
@@ -843,6 +964,32 @@ class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
             dx_piece = op.f_func(local_x, local_u, t, op_params)
             dx = dx.at[op.local_x_slice].set(dx_piece)
         return dx
+
+    def _jac_validate_params(self, params):
+        validate_diagram_params(params, self._subsystem_ids)
+
+    def _jac_probe(self, target, wire=None):
+        kind, key = target
+        infer_dtype = self._infer_dtype
+        signals_of = self._compute_port_signals_p
+
+        if kind == "state":
+            dx_of = self._dx_from_signals_p
+
+            def probe(x, u, t, params, delta):
+                dtype = infer_dtype(x, u)
+                signals = signals_of(x, u, t, dtype, params, inject=(wire, delta))
+                return dx_of(x, u, t, params, signals)
+
+            return probe
+
+        sl = self.plan.external_output_slices[key] if kind == "port" else key
+
+        def probe(x, u, t, params, delta):
+            dtype = infer_dtype(x, u)
+            return signals_of(x, u, t, dtype, params, inject=(wire, delta))[sl]
+
+        return probe
 
     def _outputs_trace_p_fn(self, x, u, t, params):
         dtype = self._infer_dtype(x, u)
@@ -877,14 +1024,6 @@ class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
         validate_diagram_params(params, self._subsystem_ids)
         return self._outputs_trace_p_fn(x, u, t, params)
 
-    def jacobian_f_params(self, x, u, t, params):
-        if params is None:
-            raise ValueError(
-                "jacobian_f_params requires an explicit nested params pytree"
-            )
-        validate_diagram_params(params, self._subsystem_ids)
-        return self._jac_f_params_jit_fn(x, u, t, params)
-
     def compute_internal_signals(self, x, u, t=0.0):
         return self._internal_signals_jit_fn(x, u, t)
 
@@ -917,7 +1056,8 @@ class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
             signals = signals.at[op.out_slice].set(y_out)
         return signals
 
-    def _compute_port_signals_p(self, x, u, t, dtype, params):
+    def _compute_port_signals_p(self, x, u, t, dtype, params, inject=None):
+        """Fill the signal buffer; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire."""
         jnp = self._jnp
         signals = jnp.zeros(self.plan.signal_dim, dtype=dtype)
         for op in self.plan.port_ops:
@@ -926,6 +1066,8 @@ class JaxDiagramEvaluator(JaxIntegrationMixin, DynamicsEvaluator, TraceTierMixin
             op_params = None if params is None else params.get(op.sys_id)
             y_out = op.compute_func(local_x, local_u, t, op_params)
             signals = signals.at[op.out_slice].set(y_out)
+            if inject is not None and op.out_slice == inject[0]:
+                signals = signals.at[op.out_slice].add(inject[1])
         return signals
 
 
@@ -937,7 +1079,7 @@ register_jit_aliases(JaxDiagramEvaluator, ("f", "outputs"))
 # =============================================================================
 
 
-class JaxStaticEvaluator(StaticEvaluator, TraceTierMixin):
+class JaxStaticEvaluator(JaxJacobianMixin, StaticEvaluator, TraceTierMixin):
     """JAX evaluator for a static ``System`` leaf."""
 
     def __init__(self, system: System, verbose=False):
@@ -948,6 +1090,8 @@ class JaxStaticEvaluator(StaticEvaluator, TraceTierMixin):
 
         import jax
         import jax.numpy as jnp
+
+        ensure_jax_x64()
 
         self.jax = jax
         self.jnp = jnp
@@ -997,6 +1141,9 @@ class JaxStaticEvaluator(StaticEvaluator, TraceTierMixin):
         self._outputs_trace_p_fn = tiers["_outputs_trace_p_fn"]
         self._outputs_jit_fn = tiers["_outputs_jit_fn"]
         self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
+        self._jac_setup(
+            system, "static", state_fn=None, outputs_fn=self._outputs_trace_p_fn
+        )
 
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
@@ -1024,7 +1171,9 @@ register_jit_aliases(JaxStaticEvaluator, ("outputs",))
 # =============================================================================
 
 
-class JaxStepEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
+class JaxStepEvaluator(
+    JaxJacobianMixin, StepEvaluator, StepRolloutMixin, TraceTierMixin
+):
     """Compiled evaluator for a :class:`StepSystem` using JAX."""
 
     def __init__(self, system: StepSystem, verbose=False):
@@ -1033,6 +1182,8 @@ class JaxStepEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
 
         import jax
         import jax.numpy as jnp
+
+        ensure_jax_x64()
 
         self.jax = jax
         self.jnp = jnp
@@ -1084,6 +1235,12 @@ class JaxStepEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
         self._outputs_jit_fn = tiers["_outputs_jit_fn"]
         self._outputs_jit_p_fn = tiers["_outputs_jit_p_fn"]
         self._rollout_jit_fn = build_jit_step_rollout(jax, jnp, self._step_jit_fn)
+        self._jac_setup(
+            system,
+            "step",
+            state_fn=self._step_trace_p_fn,
+            outputs_fn=self._outputs_trace_p_fn,
+        )
 
     def step(self, x, u, k=0):
         return self._step_jit_fn(self.jnp.asarray(x), self.jnp.asarray(u), k)
@@ -1142,12 +1299,16 @@ register_jit_aliases(JaxStepEvaluator, ("step", "outputs"))
 # =============================================================================
 
 
-class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
+class JaxStepDiagramEvaluator(
+    JaxJacobianMixin, StepEvaluator, StepRolloutMixin, TraceTierMixin
+):
     """JAX evaluator for a compiled step diagram."""
 
     def __init__(self, plan: StepExecutionPlan, diagram, verbose=False):
         import jax
         import jax.numpy as jnp
+
+        ensure_jax_x64()
 
         self.jax = jax
         self.jnp = jnp
@@ -1164,6 +1325,7 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
         self._u_nominal = jnp.array(diagram.get_u_from_input_ports())
         self._subsystem_ids = tuple(diagram.subsystems)
         self._dtype = jnp.float64
+        self._jac_setup(diagram, "step", state_fn=None, outputs_fn=None, plan=plan)
 
         dummy_x = jnp.zeros(self.n)
         dummy_k = 0
@@ -1200,122 +1362,114 @@ class JaxStepDiagramEvaluator(StepEvaluator, StepRolloutMixin, TraceTierMixin):
         if verbose:
             print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-        self._step_trace_fn = self._make_step_trace_fn()
-        self._step_trace_p_fn = self._make_step_trace_p_fn()
-        self._outputs_trace_fn = self._make_outputs_trace_fn()
-        self._outputs_trace_p_fn = self._make_outputs_trace_p_fn()
         self._step_jit_fn = jax.jit(self._step_trace_fn)
         self._step_jit_p_fn = jax.jit(self._step_trace_p_fn)
         self._outputs_jit_fn = jax.jit(self._outputs_trace_fn)
         self._outputs_jit_p_fn = jax.jit(self._outputs_trace_p_fn)
         self._rollout_jit_fn = build_jit_step_rollout(jax, jnp, self._step_jit_fn)
 
-    def _make_step_trace_fn(self):
+    def _compute_port_signals(self, x, u, k):
         plan = self.plan
         jnp = self.jnp
         dtype = self._dtype
+        signals = jnp.zeros(plan.signal_dim, dtype=dtype)
+        x_arr = jnp.asarray(x, dtype=dtype).reshape(plan.state_dim)
+        for op in plan.port_ops:
+            local_x = x_arr[op.local_x_slice]
+            local_u = gather_u_jax(op.gather_sources, op.u_dim, signals, u, jnp, dtype)
+            signals = signals.at[op.out_slice].set(
+                op.compute_func(local_x, local_u, k, op.bound_params)
+            )
+        return signals
 
-        def _step(x, u, k):
-            signals = jnp.zeros(plan.signal_dim, dtype=dtype)
-            x_work = jnp.asarray(x, dtype=dtype).reshape(plan.state_dim)
-            for op in plan.port_ops:
-                local_x = x_work[op.local_x_slice]
-                local_u = gather_u_jax(
-                    op.gather_sources, op.u_dim, signals, u, jnp, dtype
-                )
-                signals = signals.at[op.out_slice].set(
-                    op.compute_func(local_x, local_u, k, op.bound_params)
-                )
-            x_new = x_work
-            for op in plan.step_ops:
-                local_x = x_new[op.local_x_slice]
-                local_u = gather_u_jax(
-                    op.gather_sources, op.u_dim, signals, u, jnp, dtype
-                )
-                x_new = x_new.at[op.local_x_slice].set(
-                    op.step_func(local_x, local_u, k, op.bound_params)
-                )
-            return x_new
-
-        return _step
-
-    def _make_step_trace_p_fn(self):
+    def _compute_port_signals_p(self, x, u, k, params, inject=None):
+        """Fill the signal buffer; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire."""
         plan = self.plan
         jnp = self.jnp
         dtype = self._dtype
+        signals = jnp.zeros(plan.signal_dim, dtype=dtype)
+        x_arr = jnp.asarray(x, dtype=dtype).reshape(plan.state_dim)
+        for op in plan.port_ops:
+            local_x = x_arr[op.local_x_slice]
+            local_u = gather_u_jax(op.gather_sources, op.u_dim, signals, u, jnp, dtype)
+            op_params = None if params is None else params.get(op.sys_id)
+            signals = signals.at[op.out_slice].set(
+                op.compute_func(local_x, local_u, k, op_params)
+            )
+            if inject is not None and op.out_slice == inject[0]:
+                signals = signals.at[op.out_slice].add(inject[1])
+        return signals
 
-        def _step_p(x, u, k, params):
-            signals = jnp.zeros(plan.signal_dim, dtype=dtype)
-            x_work = jnp.asarray(x, dtype=dtype).reshape(plan.state_dim)
-            for op in plan.port_ops:
-                local_x = x_work[op.local_x_slice]
-                local_u = gather_u_jax(
-                    op.gather_sources, op.u_dim, signals, u, jnp, dtype
-                )
-                op_params = None if params is None else params.get(op.sys_id)
-                signals = signals.at[op.out_slice].set(
-                    op.compute_func(local_x, local_u, k, op_params)
-                )
-            x_new = x_work
-            for op in plan.step_ops:
-                local_x = x_new[op.local_x_slice]
-                local_u = gather_u_jax(
-                    op.gather_sources, op.u_dim, signals, u, jnp, dtype
-                )
-                op_params = None if params is None else params.get(op.sys_id)
-                x_new = x_new.at[op.local_x_slice].set(
-                    op.step_func(local_x, local_u, k, op_params)
-                )
-            return x_new
-
-        return _step_p
-
-    def _make_outputs_trace_fn(self):
+    def _x_next_from_signals(self, x, u, k, signals):
         plan = self.plan
         jnp = self.jnp
         dtype = self._dtype
+        x_new = jnp.asarray(x, dtype=dtype).reshape(plan.state_dim)
+        for op in plan.step_ops:
+            local_x = x_new[op.local_x_slice]
+            local_u = gather_u_jax(op.gather_sources, op.u_dim, signals, u, jnp, dtype)
+            x_new = x_new.at[op.local_x_slice].set(
+                op.step_func(local_x, local_u, k, op.bound_params)
+            )
+        return x_new
 
-        def _outputs(x, u, k):
-            signals = jnp.zeros(plan.signal_dim, dtype=dtype)
-            x_arr = jnp.asarray(x, dtype=dtype).reshape(plan.state_dim)
-            for op in plan.port_ops:
-                local_x = x_arr[op.local_x_slice]
-                local_u = gather_u_jax(
-                    op.gather_sources, op.u_dim, signals, u, jnp, dtype
-                )
-                signals = signals.at[op.out_slice].set(
-                    op.compute_func(local_x, local_u, k, op.bound_params)
-                )
-            return {
-                port_id: signals[sl]
-                for port_id, sl in plan.external_output_slices.items()
-            }
-
-        return _outputs
-
-    def _make_outputs_trace_p_fn(self):
+    def _x_next_from_signals_p(self, x, u, k, params, signals):
         plan = self.plan
         jnp = self.jnp
         dtype = self._dtype
+        x_new = jnp.asarray(x, dtype=dtype).reshape(plan.state_dim)
+        for op in plan.step_ops:
+            local_x = x_new[op.local_x_slice]
+            local_u = gather_u_jax(op.gather_sources, op.u_dim, signals, u, jnp, dtype)
+            op_params = None if params is None else params.get(op.sys_id)
+            x_new = x_new.at[op.local_x_slice].set(
+                op.step_func(local_x, local_u, k, op_params)
+            )
+        return x_new
 
-        def _outputs_p(x, u, k, params):
-            signals = jnp.zeros(plan.signal_dim, dtype=dtype)
-            x_arr = jnp.asarray(x, dtype=dtype).reshape(plan.state_dim)
-            for op in plan.port_ops:
-                local_x = x_arr[op.local_x_slice]
-                local_u = gather_u_jax(
-                    op.gather_sources, op.u_dim, signals, u, jnp, dtype
-                )
-                op_params = None if params is None else params.get(op.sys_id)
-                signals = signals.at[op.out_slice].set(
-                    op.compute_func(local_x, local_u, k, op_params)
-                )
-            return {
-                port_id: signals[sl]
-                for port_id, sl in plan.external_output_slices.items()
-            }
+    def _step_trace_fn(self, x, u, k):
+        return self._x_next_from_signals(x, u, k, self._compute_port_signals(x, u, k))
 
-        return _outputs_p
+    def _step_trace_p_fn(self, x, u, k, params):
+        signals = self._compute_port_signals_p(x, u, k, params)
+        return self._x_next_from_signals_p(x, u, k, params, signals)
+
+    def _outputs_trace_fn(self, x, u, k):
+        signals = self._compute_port_signals(x, u, k)
+        return {
+            port_id: signals[sl]
+            for port_id, sl in self.plan.external_output_slices.items()
+        }
+
+    def _outputs_trace_p_fn(self, x, u, k, params):
+        signals = self._compute_port_signals_p(x, u, k, params)
+        return {
+            port_id: signals[sl]
+            for port_id, sl in self.plan.external_output_slices.items()
+        }
+
+    def _jac_validate_params(self, params):
+        validate_diagram_params(params, self._subsystem_ids)
+
+    def _jac_probe(self, target, wire=None):
+        kind, key = target
+        signals_of = self._compute_port_signals_p
+
+        if kind == "state":
+            next_of = self._x_next_from_signals_p
+
+            def probe(x, u, k, params, delta):
+                signals = signals_of(x, u, k, params, inject=(wire, delta))
+                return next_of(x, u, k, params, signals)
+
+            return probe
+
+        sl = self.plan.external_output_slices[key] if kind == "port" else key
+
+        def probe(x, u, k, params, delta):
+            return signals_of(x, u, k, params, inject=(wire, delta))[sl]
+
+        return probe
 
     def step(self, x, u, k=0):
         return np.asarray(
@@ -1472,7 +1626,6 @@ def build_dynamic_leaf_tiers(jax, system, frozen_p, u_nom):
         return _f_trace_p_fn(x, u_nom, t, p)
 
     _f_ivp_jit_p_fn = jax.jit(_f_ivp_trace_p_fn)
-    _jac_f_params_jit_fn = jax.jit(jax.jacfwd(_f_trace_p_fn, argnums=3))
     _jac_ivp_jit_fn = jax.jit(jax.jacfwd(_f_ivp_jit_fn, argnums=0))
 
     def _outputs_trace_fn(x, u, t):
@@ -1504,7 +1657,6 @@ def build_dynamic_leaf_tiers(jax, system, frozen_p, u_nom):
         "_f_ivp_jit_fn": _f_ivp_jit_fn,
         "_f_ivp_trace_p_fn": _f_ivp_trace_p_fn,
         "_f_ivp_jit_p_fn": _f_ivp_jit_p_fn,
-        "_jac_f_params_jit_fn": _jac_f_params_jit_fn,
         "_jac_ivp_jit_fn": _jac_ivp_jit_fn,
         "_outputs_trace_fn": _outputs_trace_fn,
         "_outputs_trace_p_fn": _outputs_trace_p_fn,

@@ -1,6 +1,7 @@
 # Articulated mechanism layer (design)
 
 Status: draft plan (July 2026). No implementation in this phase.
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 ## Problem
 
@@ -8,7 +9,7 @@ UR5 spatial RNEA/ABA, kinematics, and the symbolic Lagrange path in
 [`articulated_robot_eom.ipynb`](../../examples/learn/teaching/articulated_robot_eom.ipynb)
 describe the **same robot twice**. Spatial helpers and tree sweeps live only in
 [`ur5.py`](../../minilink/dynamics/catalog/manipulators/ur5.py). Symbolic geometry
-lives in [`MechanicalModel.add_dh_chain`](../../minilink/symbolic/mechanics/model.py).
+lives in [`MechanicalModel.add_dh_chain`](../../minilink/experimental/symbolic/mechanics/model.py).
 
 We need a shared **mechanism description** layer (geometry + inertia + topology)
 with numeric and symbolic counterparts, while keeping minilink's **stateless
@@ -307,12 +308,12 @@ minilink/dynamics/mechanism/
     spatial.py        # rnea, aba, helpers
     plant.py          # SerialSpatialManipulator
 
-minilink/symbolic/mechanism/
+minilink/experimental/symbolic/mechanism/
     model.py          # SymbolicMechanismModel (+ derive)
     derivation.py     # moved from symbolic/mechanics/derivation.py
     adapters.py       # from_dh (symbolic)
 
-minilink/symbolic/mechanics/
+minilink/experimental/symbolic/mechanics/
     symbolic_system.py   # sym MechanicalSystem (EoM holder)
     export.py            # to_minilink
     model.py             # DEPRECATED alias → SymbolicMechanismModel (remove later)

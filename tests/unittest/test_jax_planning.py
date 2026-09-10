@@ -11,7 +11,7 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.sets import BallSet
 from minilink.core.system import DynamicSystem
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole, JaxCartPole
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
@@ -65,7 +65,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
 
     def test_jax_cartpole_matches_numpy_dynamics(self):
         sys_np = CartPole()
-        sys_jax = JaxCartPole()
+        sys_jax = CartPole()
         x = np.array([-0.3, 1.2, 0.4, -0.5])
         u = np.array([2.0])
         dx_np = sys_np.f(x, u)
@@ -182,10 +182,7 @@ pytest.importorskip("jax")
 from minilink.dynamics.catalog.vehicles.steering import (
     KinematicBicycle,
 )
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleKin,
-    BicycleAcc,
-)
+from examples.projects.car_trajopt.vehicles.ladder import BicycleAcc, BicycleKin
 
 
 @pytest.mark.optional

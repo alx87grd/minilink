@@ -39,6 +39,9 @@ class GraphicPrimitive:
         self.local_transform = (
             np.eye(4) if local_transform is None else np.asarray(local_transform, float)
         )
+        # False for backdrops (ground lines, planes) and force glyphs (arrows):
+        # they never drive the auto-fit camera.
+        self.camera_fit = True
 
 
 class CustomLine(GraphicPrimitive):
@@ -124,6 +127,7 @@ class Plane(GraphicPrimitive):
         opacity=0.65,
     ):
         super().__init__(color)
+        self.camera_fit = False
         self.normal = np.array(normal, dtype=float)
         self.offset = float(offset)
         self.size = float(size)
@@ -361,6 +365,7 @@ class Arrow(GraphicPrimitive):
         self.scale = float(scale)
         self.head_ratio = head_ratio
         self.pts = arrow_pts(self.base, self.vector, self.scale, head_ratio)
+        self.camera_fit = False  # a force glyph, not a body
 
     def points_at(self, t):
         """Nx3 arrow points at playback time *t* (geometry baked at construction)."""
@@ -404,6 +409,7 @@ class TorqueArrow(GraphicPrimitive):
         self.head_ratio = head_ratio
         self.n_arc_pts = n_arc_pts
         self.pts = torque_arc_pts(self.sweep, radius, head_ratio, n_arc_pts)
+        self.camera_fit = False  # a force glyph, not a body
 
     def points_at(self, t):
         """Nx3 arc points at playback time *t* (geometry baked at construction)."""
@@ -592,12 +598,14 @@ def empty_transform():
 
 def ground_line(length=20.0, y=0.0, color="black", style="--"):
     """Horizontal reference line of span *length* at height *y* (e.g. ground)."""
-    return CustomLine(
+    line = CustomLine(
         [[-0.5 * length, y, 0.0], [0.5 * length, y, 0.0]],
         color=color,
         linewidth=1,
         style=style,
     )
+    line.camera_fit = False
+    return line
 
 
 def spring_line(coils=6, amplitude=0.12, color="black", linewidth=1):
@@ -635,3 +643,71 @@ def vehicle_body(length=1.0, width=0.5, color="blue", opacity=0.85):
         ]
     )
     return CustomLine(pts, color=color, linewidth=2)
+
+
+# Extents (used by the auto-fit camera)
+
+
+def point3(value):
+    """A local point as a length-3 float array (planar ``(x, y)`` gets ``z = 0``)."""
+    v = np.asarray(value, dtype=float).reshape(-1)
+    if v.size == 2:
+        v = np.append(v, 0.0)
+    return v[:3]
+
+
+def bounding_points(primitive):
+    """Local points that bound the primitive, plus a radial pad, or ``None`` when excluded.
+
+    Returns ``(pts, pad)``: an ``(N, 3)`` array of local-frame points and a
+    scalar margin to add around them (a rod's radius, a sphere's radius). The
+    auto-fit camera transforms the points into the world and pads the box.
+    Backdrops and force glyphs (``primitive.camera_fit`` is ``False``) return ``None``;
+    unknown primitives count as their origin only.
+    """
+    if not getattr(primitive, "camera_fit", True):
+        return None
+    origin = np.zeros((1, 3))
+    if isinstance(primitive, Sphere):
+        return point3(primitive.center).reshape(1, 3), float(primitive.radius)
+    if isinstance(primitive, Circle):
+        c = point3(primitive.center)
+        r = float(primitive.radius)
+        return c + np.array([[r, 0, 0], [-r, 0, 0], [0, r, 0], [0, -r, 0]]), 0.0
+    if isinstance(primitive, Rod):
+        return np.array([[0.0, 0.0, 0.0], [0.0, -primitive.length, 0.0]]), float(
+            primitive.radius
+        )
+    if isinstance(primitive, Box):
+        half = 0.5 * np.array(
+            [primitive.length_x, primitive.length_y, primitive.length_z]
+        )
+        signs = np.array(
+            [[sx, sy, sz] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
+        )
+        return point3(primitive.center) + signs * half, 0.0
+    if isinstance(primitive, ExtrudedPolygon):
+        xy = np.asarray(primitive.pts_xy, dtype=float)
+        h = 0.5 * float(primitive.height)
+        pts = np.vstack([np.column_stack([xy, np.full(len(xy), z)]) for z in (-h, h)])
+        return point3(primitive.center) + pts, 0.0
+    if isinstance(primitive, Point):
+        return point3(primitive.pt).reshape(1, 3), 0.0
+    pts = getattr(primitive, "pts", None)
+    if pts is not None:
+        pts = np.asarray(pts, dtype=float)
+        if pts.size:
+            pts = pts.reshape(len(pts), -1)
+            if pts.shape[1] == 2:
+                pts = np.column_stack([pts, np.zeros(len(pts))])
+            return pts[:, :3], 0.0
+    return origin, 0.0
+
+
+def bounding_radius(primitive):
+    """Radius of a ball about the local origin containing the primitive (``None`` when excluded)."""
+    bounds = bounding_points(primitive)
+    if bounds is None:
+        return None
+    pts, pad = bounds
+    return float(np.max(np.linalg.norm(pts, axis=1)) + pad)

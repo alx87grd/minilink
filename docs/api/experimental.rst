@@ -3,11 +3,11 @@ Experimental
 
 These modules are intentionally low maturity; see the TRL table in the roadmap.
 
-.. automodule:: minilink.dynamics.engines.contact_jax
+.. automodule:: minilink.experimental.engines.contact_jax
    :members:
 
-.. automodule:: minilink.dynamics.engines.world
+.. automodule:: minilink.experimental.engines.world
    :members:
 
-.. automodule:: minilink.symbolic.mechanics.model
+.. automodule:: minilink.experimental.symbolic.mechanics.model
    :members:

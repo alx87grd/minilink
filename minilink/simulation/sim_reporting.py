@@ -36,7 +36,7 @@ def print_simulation_preamble(
     print(f"n={n}, m={m}")
     print(f"x0: {preview_vector(x0)}")
     print(f"interval: [{t0:g}, {tf:g}]")
-    grid_note = " (auto dt)" if auto_time_grid else ""
+    grid_note = " (auto grid)" if auto_time_grid else ""
     print(f"n_pts={n_pts}, dt={dt:g}{grid_note}")
     if user_solver is None:
         print(f"solver: {solver_mode!r} (auto-selected)")

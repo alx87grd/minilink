@@ -16,12 +16,10 @@ rather than a hand-written repulsion term.
 import matplotlib.pyplot as plt
 import numpy as np
 
+from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRatePorts,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
@@ -49,7 +47,7 @@ PLOT_BOUNDS = ((-2.0, U_0 * TF + 2.0), (-2.0, 2.0))
 
 configure_jax(enable_x64=True)
 
-sys = BicycleDynRatePorts()
+sys = BicycleDynRate(named_ports=True)
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 
 x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0])
@@ -92,7 +90,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=N_STEPS,
     transcription="direct_collocation",
     compile_backend="jax",
-    solve_disp=True,
+    verbose=True,
     optimizer_options={
         "maxiter": 500,
         "ftol": 1e-1,

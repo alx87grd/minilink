@@ -32,6 +32,7 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import SolveMetadata, TrajectoryPlan
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
+    dynamics_function,
 )
 
 _UNSET = object()
@@ -46,8 +47,9 @@ _TRAJOPT_OPTION_KEYS = (
     "record_history",
     "callback",
     "record_solve_time",
-    "solve_disp",
-    "step_disp",
+    "verbose",
+    "feasibility_tol",
+    "live_plot",
 )
 
 _TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
@@ -69,10 +71,10 @@ class TrajectoryOptimizationIteration:
 class TrajectoryOptimizationOptions:
     """Generic trajectory-optimization workflow options.
 
-    ``solve_disp`` prints a Minilink trajectory-optimization preamble and
-    report. It is separate from SciPy's ``options['disp']``.
-
-    ``step_disp`` prints per-tick timing on the parametric / from-solve path.
+    ``verbose`` prints the Minilink trajectory-optimization preamble and report
+    on :meth:`TrajectoryOptimizationPlanner.solve`, and one timing line per tick
+    on the online :meth:`TrajectoryOptimizationPlanner.solve_trajectory_from`
+    path. It is separate from SciPy's per-iteration ``options['disp']``.
 
     ``record_history=True`` reconstructs a full :class:`Trajectory` per
     optimizer iterate — convenient for live plots and teaching, but it adds
@@ -91,8 +93,22 @@ class TrajectoryOptimizationOptions:
     record_history: bool = False
     callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
     record_solve_time: bool = False
-    solve_disp: bool = False
-    step_disp: bool = False
+    verbose: bool = False
+    #: ``success`` is granted when the returned plan satisfies the program
+    #: constraints (equality residuals, inequality margins, bounds) to this
+    #: tolerance, even if the solver stopped on an iteration limit.
+    feasibility_tol: float = 1e-6
+    #: Redraw the iterate trajectory during the solve (matplotlib); a
+    #: custom ``callback`` takes precedence.
+    live_plot: bool = False
+
+
+def _within_tolerance(max_eq, min_ineq, max_bound, tol) -> bool:
+    """True when the worst residual, margin, and bound violation are within tol."""
+    tol = float(tol)
+    return bool(
+        max_eq <= tol and (min_ineq is None or min_ineq >= -tol) and max_bound <= tol
+    )
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -133,8 +149,9 @@ class TrajectoryOptimizationPlanner(Planner):
         record_history=_UNSET,
         callback=_UNSET,
         record_solve_time=_UNSET,
-        solve_disp=_UNSET,
-        step_disp=_UNSET,
+        verbose=_UNSET,
+        feasibility_tol=_UNSET,
+        live_plot=_UNSET,
     ) -> None:
         """
         Parameters
@@ -153,7 +170,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
         compile_backend, initial_guess, warm_start, optimizer_method,
         optimizer_options, use_hessian, record_history, callback,
-        record_solve_time, solve_disp, step_disp
+        record_solve_time, verbose, feasibility_tol, live_plot
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
         """
         super().__init__(problem)
@@ -170,8 +187,9 @@ class TrajectoryOptimizationPlanner(Planner):
             record_history=record_history,
             callback=callback,
             record_solve_time=record_solve_time,
-            solve_disp=solve_disp,
-            step_disp=step_disp,
+            verbose=verbose,
+            feasibility_tol=feasibility_tol,
+            live_plot=live_plot,
         )
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
@@ -223,7 +241,7 @@ class TrajectoryOptimizationPlanner(Planner):
         optimizer = self._make_optimizer(program, z0)
         compile_s = time.perf_counter() - compile_t0
 
-        if self.options.solve_disp:
+        if self.options.verbose:
             self._print_solve_preamble(
                 program=program,
                 optimizer=optimizer,
@@ -235,8 +253,8 @@ class TrajectoryOptimizationPlanner(Planner):
         self.iteration_history = []
         optimization_result = optimizer.solve(
             callback=self._make_callback(optimizer, compile_backend),
-            record_solve_time=self.options.record_solve_time or self.options.solve_disp,
-            disp=False,
+            record_solve_time=self.options.record_solve_time or self.options.verbose,
+            verbose=False,
         )
         reconstruct_t0 = time.perf_counter()
         trajectory = self.transcription.reconstruct_result(
@@ -252,23 +270,39 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimization_result = optimization_result
         self.last_solve_time_s = optimization_result.solve_time_s
         self.last_step_time_s = total_s
+        # success = the returned plan satisfies the constraints to
+        # feasibility_tol. The solver's own flag stays in `message` / `stats`:
+        # an iteration-limit stop on a feasible plan is not a failure, and a
+        # solver that reports convergence on an infeasible plan is.
+        max_eq, min_ineq, max_bound = optimizer.program_evaluator.constraint_violations(
+            optimization_result.z
+        )
+        feasible = _within_tolerance(
+            max_eq, min_ineq, max_bound, self.options.feasibility_tol
+        )
         plan = self._store_trajectory_plan(
             TrajectoryPlan(
                 trajectory=trajectory,
                 metadata=SolveMetadata(
-                    success=bool(optimization_result.success),
+                    success=feasible,
                     message=str(optimization_result.message),
                     cost=optimization_result.cost,
                     solve_time_s=optimization_result.solve_time_s,
                     stats=dict(optimization_result.stats),
+                    max_equality_violation=float(max_eq),
+                    min_inequality_margin=(
+                        None if min_ineq is None else float(min_ineq)
+                    ),
+                    max_bound_violation=float(max_bound),
+                    feasible=feasible,
                 ),
                 warm_state=optimization_result.z,
             )
         )
 
-        if self.options.solve_disp:
+        if self.options.verbose:
             self._print_solve_report(
-                optimizer=optimizer,
+                metadata=plan.metadata,
                 result=optimization_result,
                 trajectory=plan.trajectory,
                 transcribe_s=transcribe_s,
@@ -297,10 +331,10 @@ class TrajectoryOptimizationPlanner(Planner):
                 "compile_parametric_program requires compile_backend='jax' "
                 f"(got {self.options.compile_backend!r})."
             )
-        if not hasattr(self.transcription, "transcribe_parametric"):
+        if not getattr(self.transcription, "supports_parametric", False):
             raise TypeError(
-                f"{type(self.transcription).__name__} does not support "
-                "transcribe_parametric; use DirectCollocationTranscription."
+                f"{type(self.transcription).__name__} does not support a "
+                "parametric program; use transcription='direct_collocation'."
             )
 
         from minilink.planning.trajectory_optimization.parametric_evaluator import (
@@ -411,7 +445,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         z0 = self.transcription.pack_initial_guess(problem_k, initial_guess)
 
-        record_solve_time = self.options.record_solve_time or self.options.step_disp
+        record_solve_time = self.options.record_solve_time or self.options.verbose
         if record_solve_time:
             solve_t0 = time.perf_counter()
 
@@ -454,7 +488,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         )
 
-        if self.options.step_disp:
+        if self.options.verbose:
             j_txt = "n/a" if result.cost is None else f"{float(result.cost):.6g}"
             print(
                 f"TOP step: success={result.success} "
@@ -550,9 +584,28 @@ class TrajectoryOptimizationPlanner(Planner):
         optimizer: Optimizer,
         compile_backend: str,
     ) -> OptimizationProgressCallback | None:
-        if not self.options.record_history and self.options.callback is None:
+        callback = self.options.callback
+        if self.options.live_plot:
+            from minilink.planning.trajectory_optimization.live_plot import (
+                LiveTrajectoryPlotCallback,
+            )
+
+            live_callback = LiveTrajectoryPlotCallback(self.problem.sys)
+            if callback is None:
+                callback = live_callback
+            else:
+                user_callback = callback
+
+                def callback(iteration):  # both the live figure and the user's hook
+                    live_callback(iteration)
+                    user_callback(iteration)
+
+        if not self.options.record_history and callback is None:
             return None
 
+        # One dynamics callable for every iterate (reconstruct_result would
+        # otherwise compile the plant again on each optimizer step).
+        dynamics = dynamics_function(self.problem, compile_backend)
         iteration_index = 0
 
         def planner_progress(z: np.ndarray, J: float, _t: float) -> None:
@@ -564,11 +617,12 @@ class TrajectoryOptimizationPlanner(Planner):
                 compile_backend,
                 iteration_index,
                 cost=J,
+                dynamics=dynamics,
             )
             if self.options.record_history:
                 self.iteration_history.append(iteration)
-            if self.options.callback is not None:
-                self.options.callback(iteration)
+            if callback is not None:
+                callback(iteration)
             iteration_index += 1
 
         return planner_progress
@@ -581,6 +635,7 @@ class TrajectoryOptimizationPlanner(Planner):
         iteration_index: int,
         *,
         cost: float | None = None,
+        dynamics=None,
     ) -> TrajectoryOptimizationIteration:
         """Build one planning-aware optimizer iteration payload."""
         if cost is None:
@@ -589,6 +644,7 @@ class TrajectoryOptimizationPlanner(Planner):
             OptimizationResult(z=z, success=False, cost=cost),
             problem=self.problem,
             compile_backend=compile_backend,
+            dynamics=dynamics,
         )
         max_eq, min_ineq, _ = optimizer.program_evaluator.constraint_violations(z)
         return TrajectoryOptimizationIteration(
@@ -645,7 +701,7 @@ class TrajectoryOptimizationPlanner(Planner):
     def _print_solve_report(
         self,
         *,
-        optimizer: Optimizer,
+        metadata: SolveMetadata,
         result: OptimizationResult,
         trajectory: Trajectory,
         transcribe_s: float,
@@ -653,19 +709,20 @@ class TrajectoryOptimizationPlanner(Planner):
         reconstruct_s: float,
         total_s: float,
     ) -> None:
-        max_eq, min_ineq, max_bound = optimizer.program_evaluator.constraint_violations(
-            result.z
-        )
-
         print("Completed in", result.solve_time_s, "seconds")
         print(DISP_RULE_DIV)
-        print("success:", result.success)
+        print(
+            "success:",
+            metadata.success,
+            f"(plan feasible to tol={self.options.feasibility_tol:g})",
+        )
+        print("solver success:", result.success)
         print("message:", result.message)
         print("J*:", result.cost)
         print("stats:", result.stats)
-        print("max_eq:", max_eq)
-        print("min_ineq:", min_ineq)
-        print("max_bound:", max_bound)
+        print("max_eq:", metadata.max_equality_violation)
+        print("min_ineq:", metadata.min_inequality_margin)
+        print("max_bound:", metadata.max_bound_violation)
         print("x(0):", preview_vector(trajectory.x[:, 0]))
         print("x(tf):", preview_vector(trajectory.x[:, -1]))
         if self.problem.x_goal is not None:

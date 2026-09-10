@@ -8,8 +8,7 @@ only re-exports public teaching classes::
 
 from __future__ import annotations
 
-from importlib import import_module
-from typing import Any
+from minilink.core.facade import lazy_facade
 
 # name -> (module path, attribute)
 _EXPORTS: dict[str, tuple[str, str]] = {
@@ -18,7 +17,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "CartPole": ("minilink.dynamics.catalog.pendulum", "CartPole"),
     "DoublePendulum": ("minilink.dynamics.catalog.pendulum", "DoublePendulum"),
     "InvertedPendulum": ("minilink.dynamics.catalog.pendulum", "InvertedPendulum"),
-    "JaxCartPole": ("minilink.dynamics.catalog.pendulum", "JaxCartPole"),
     "Pendulum": ("minilink.dynamics.catalog.pendulum", "Pendulum"),
     "PendulumWithNoisePort": (
         "minilink.dynamics.catalog.pendulum",
@@ -78,26 +76,15 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Boat2D": ("minilink.dynamics.catalog.marine", "Boat2D"),
     "Boat2DWithCurrent": ("minilink.dynamics.catalog.marine", "Boat2DWithCurrent"),
     # vehicles
-    "ConstantSpeedKinematicCar": (
-        "minilink.dynamics.catalog.vehicles",
-        "ConstantSpeedKinematicCar",
-    ),
+    "BicycleDynRate": ("minilink.dynamics.catalog.vehicles", "BicycleDynRate"),
     "DynamicBicycle": ("minilink.dynamics.catalog.vehicles", "DynamicBicycle"),
     "DynamicBicycleCar3D": (
         "minilink.dynamics.catalog.vehicles",
         "DynamicBicycleCar3D",
     ),
-    "DynamicHolonomicMobileRobot": (
-        "minilink.dynamics.catalog.vehicles",
-        "DynamicHolonomicMobileRobot",
-    ),
     "HolonomicMobileRobot": (
         "minilink.dynamics.catalog.vehicles",
         "HolonomicMobileRobot",
-    ),
-    "HolonomicMobileRobot3D": (
-        "minilink.dynamics.catalog.vehicles",
-        "HolonomicMobileRobot3D",
     ),
     "KinematicBicycle": ("minilink.dynamics.catalog.vehicles", "KinematicBicycle"),
     "KinematicCar": ("minilink.dynamics.catalog.vehicles", "KinematicCar"),
@@ -114,7 +101,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.dynamics.catalog.vehicles",
         "QuarterCarOnRoughTerrain",
     ),
-    "UdeSRacecar": ("minilink.dynamics.catalog.vehicles", "UdeSRacecar"),
     # manipulators
     "FiveLinkPlanarManipulator": (
         "minilink.dynamics.catalog.manipulators",
@@ -139,18 +125,4 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "UR5Manipulator": ("minilink.dynamics.catalog.manipulators", "UR5Manipulator"),
 }
 
-__all__ = sorted(_EXPORTS)
-
-
-def __getattr__(name: str) -> Any:
-    try:
-        module_path, attr = _EXPORTS[name]
-    except KeyError as exc:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
-    value = getattr(import_module(module_path), attr)
-    globals()[name] = value
-    return value
-
-
-def __dir__() -> list[str]:
-    return sorted(set(globals()) | set(__all__))
+__all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

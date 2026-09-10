@@ -4,14 +4,11 @@ import unittest
 import numpy as np
 import pytest
 from minilink.analysis.equilibria import find_equilibrium
-from minilink.analysis.linearize import (
-    LinearizationFallbackWarning,
-    linearize,
-    linearize_matrices,
-)
+from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.analysis.structural import controllability, observability
 from minilink.control.lqr import lqr, lqr_at_operating_point, lqr_gain
 from minilink.core.backends import array_module
+from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
@@ -92,7 +89,7 @@ class TestLinearize(unittest.TestCase):
 
     def test_selected_input_ports_reduce_b_and_d_columns(self):
         A, B, C, D = linearize_matrices(
-            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], inputs=["bias"]
+            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], wrt="bias"
         )
         self.assertEqual(B.shape, (2, 1))
         self.assertEqual(D.shape, (1, 1))
@@ -103,7 +100,7 @@ class TestLinearize(unittest.TestCase):
 
     def test_selected_leaf_output_ports_reduce_c_and_d_rows(self):
         _, B, C, D = linearize_matrices(
-            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"]
+            _PortLinearSystem(), x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], of="speed"
         )
         self.assertEqual(C.shape, (1, 2))
         self.assertEqual(D.shape, (1, 2))
@@ -114,33 +111,31 @@ class TestLinearize(unittest.TestCase):
     def test_diagram_boundary_output_ports(self):
         diagram = _build_port_diagram()
         A, B, C, D = linearize_matrices(
-            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"]
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="y_meas"
         )
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[0.0, 1.0]], atol=1e-06)
         np.testing.assert_allclose(D, [[0.0]], atol=1e-06)
 
-    def test_diagram_internal_output_ports_fd(self):
+    def test_diagram_internal_wire_as_output(self):
         diagram = _build_port_diagram()
         A, B, C, D = linearize_matrices(
-            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=[("plant", "y")]
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="plant:y", method="fd"
         )
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(D, [[0.0]], atol=1e-06)
 
-    def test_jax_internal_output_falls_back_to_fd_with_warning(self):
+    @pytest.mark.optional
+    @pytest.mark.jax
+    def test_jax_internal_wire_is_exact(self):
+        pytest.importorskip("jax")
         diagram = _build_port_diagram()
-        with pytest.warns(LinearizationFallbackWarning):
-            A, B, C, D = linearize_matrices(
-                diagram,
-                x_bar=[1.0, 2.0],
-                u_bar=[3.0],
-                outputs=[("plant", "y")],
-                method="jax",
-            )
+        A, B, C, D = linearize_matrices(
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="plant:y", method="jax"
+        )
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0], [3.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
@@ -152,10 +147,10 @@ class TestLinearize(unittest.TestCase):
         pytest.importorskip("jax")
         plant = _PortLinearSystem()
         fd = linearize_matrices(
-            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"], method="fd"
+            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], of="speed", method="fd"
         )
         exact = linearize_matrices(
-            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], outputs=["speed"], method="jax"
+            plant, x_bar=[1.0, 2.0], u_bar=[3.0, 4.0], of="speed", method="jax"
         )
         for fd_matrix, exact_matrix in zip(fd, exact):
             np.testing.assert_allclose(fd_matrix, exact_matrix, atol=1e-06)
@@ -166,26 +161,23 @@ class TestLinearize(unittest.TestCase):
         pytest.importorskip("jax")
         diagram = _build_port_diagram()
         fd = linearize_matrices(
-            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"], method="fd"
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="y_meas", method="fd"
         )
         exact = linearize_matrices(
-            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], outputs=["y_meas"], method="jax"
+            diagram, x_bar=[1.0, 2.0], u_bar=[3.0], of="y_meas", method="jax"
         )
         for fd_matrix, exact_matrix in zip(fd, exact):
             np.testing.assert_allclose(fd_matrix, exact_matrix, atol=1e-06)
 
     @pytest.mark.optional
     @pytest.mark.jax
-    def test_incompatible_jax_output_falls_back_with_warning(self):
+    def test_untraceable_output_auto_uses_finite_differences_jax_strict_raises(self):
         pytest.importorskip("jax")
-        with pytest.warns(LinearizationFallbackWarning):
-            A, B, C, D = linearize_matrices(
-                _JaxIncompatibleOutputSystem(),
-                x_bar=[1.0, 2.0],
-                u_bar=[3.0, 4.0],
-                outputs=["bad"],
-                method="jax",
-            )
+        plant = _JaxIncompatibleOutputSystem()
+        with self.assertRaises(RuntimeError):
+            linearize_matrices(plant, [1.0, 2.0], [3.0, 4.0], of="bad", method="jax")
+        A, B, C, D = linearize_matrices(plant, [1.0, 2.0], [3.0, 4.0], of="bad")
+        self.assertEqual(compile_auto(plant)[0], "numpy")
         np.testing.assert_allclose(A, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-06)
         np.testing.assert_allclose(B, [[0.0, 1.0], [3.0, 5.0]], atol=1e-06)
         np.testing.assert_allclose(C, [[1.0, 0.0]], atol=1e-06)
@@ -253,7 +245,7 @@ class TestLQR(unittest.TestCase):
 
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
 from minilink.control.output import ProportionalController
-from minilink.control.siso import FilteredController
+from minilink.control.siso import PD, PI, PID
 from minilink.control.state import StateFeedbackController
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
@@ -308,9 +300,9 @@ class TestImpedanceIntegralController(unittest.TestCase):
         self.assertAlmostEqual(speed, 0.0, places=2)
 
 
-class TestFilteredController(unittest.TestCase):
+class TestPID(unittest.TestCase):
     def test_equations(self):
-        pid = FilteredController(Kp=10.0, Ki=1.0, Kd=1.0, tau=0.1)
+        pid = PID(Kp=10.0, Ki=1.0, Kd=1.0, tau=0.1, ports="reference")
         np.testing.assert_allclose(
             pid.f(np.array([0.0, 0.2]), np.array([1.0, 0.2])), [0.8, 0.0]
         )
@@ -323,7 +315,8 @@ class TestFilteredController(unittest.TestCase):
         jax = pytest.importorskip("jax")
         import jax.numpy as jnp
 
-        pid = FilteredController(
+        pid = PID(
+            ports="reference",
             Kp=10.0,
             Ki=1.0,
             Kd=1.0,
@@ -338,7 +331,7 @@ class TestFilteredController(unittest.TestCase):
 
     def test_closed_loop_removes_steady_state_error(self):
         plant = DoubleIntegrator()
-        pid = FilteredController()
+        pid = PID(ports="reference")
         pid.params.update({"Kp": 5.0, "Ki": 1.0, "Kd": 4.0})
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
@@ -380,9 +373,9 @@ class TestImpedanceController(unittest.TestCase):
         )
 
 
-class TestFilteredControllerMIMO(unittest.TestCase):
+class TestPIDMIMO(unittest.TestCase):
     def test_dof_two_diagonal(self):
-        pid = FilteredController(dof=2, Kp=2.0, Ki=1.0, Kd=0.5, tau=0.1)
+        pid = PID(dof=2, Kp=2.0, Ki=1.0, Kd=0.5, tau=0.1, ports="reference")
         np.testing.assert_allclose(
             pid.f(np.zeros(4), np.array([1.0, 2.0, 0.0, 0.0])), [1.0, 2.0, 0.0, 0.0]
         )
@@ -441,13 +434,13 @@ class TestAnimateModal(unittest.TestCase):
     @pytest.mark.optional
     def test_animate_one_mode_headless(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], 0, show=False)
+        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], mode=0, show=False)
         self.assertEqual(len(poles), 2)
 
     @pytest.mark.optional
     def test_animate_all_modes(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], "all", show=False)
+        poles, modes = animate_modal(Pendulum(), [0.0, 0.0], mode="all", show=False)
         self.assertEqual(len(poles), 2)
 
 
@@ -554,10 +547,8 @@ def test_bode_selects_named_port_and_component():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         w=[1.0],
     )
     G = 13.0 + 10.0 / (2.0 + 1j)
@@ -572,8 +563,8 @@ def test_bode_selects_nonprimary_output_port():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="bias",
-        output_port="sensor",
+        wrt="bias",
+        of="sensor",
         w=[1.0],
     )
     G = 17.0 + 28.0 / (2.0 + 1j)
@@ -587,8 +578,8 @@ def test_bode_selects_internal_diagram_output_port():
         diagram,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="bias",
-        output_port=("plant", "sensor"),
+        wrt="bias",
+        of="plant:sensor",
         w=[1.0],
     )
     G = 17.0 + 28.0 / (2.0 + 1j)
@@ -602,10 +593,8 @@ def test_pzmap_returns_zeros_poles_and_gain_for_selected_channel():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
     )
     np.testing.assert_allclose(zeros, [-36.0 / 13.0], atol=1e-06)
     np.testing.assert_allclose(poles, [-2.0], atol=1e-06)
@@ -621,10 +610,8 @@ def test_bode_jax_matches_fd_for_selected_channel():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         w=[1.0, 10.0],
         method="fd",
     )
@@ -632,10 +619,8 @@ def test_bode_jax_matches_fd_for_selected_channel():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         w=[1.0, 10.0],
         method="jax",
     )
@@ -652,20 +637,16 @@ def test_pzmap_jax_matches_fd_for_selected_channel():
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         method="fd",
     )
     exact = pzmap(
         plant,
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         method="jax",
     )
     for fd_value, exact_value in zip(fd, exact):
@@ -679,16 +660,14 @@ def test_plot_bode_facade_returns_plot_result():
     result = plant.plot_bode(
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         w=[1.0, 10.0],
         show=False,
     )
     assert isinstance(result, PlotResult)
     assert len(result.axes) == 2
-    assert "y[1] / force[1]" in result.axes[0].get_ylabel()
+    assert "From: force[1]  To: y[1]" in result.axes[0].get_title()
     plt.close(result.figure)
 
 
@@ -699,15 +678,13 @@ def test_plot_pzmap_facade_returns_plot_result():
     result = plant.plot_pzmap(
         x_bar=[0.0],
         u_bar=[0.0, 0.0, 0.0],
-        input_port="force",
-        input_index=1,
-        output_port="y",
-        output_index=1,
+        wrt=("force", 1),
+        of=("y", 1),
         show=False,
     )
     assert isinstance(result, PlotResult)
     assert result.axes is not None
-    assert "y[1] / force[1]" in result.axes.get_title()
+    assert "From: force[1]  To: y[1]" in result.axes.get_title()
     plt.close(result.figure)
 
 
@@ -828,8 +805,8 @@ class TestPhasePlane(unittest.TestCase):
 
     def test_unsupported_backend_reports_clear_error(self):
         sys = PhasePlaneTestSystem()
-        with self.assertRaisesRegex(ValueError, "backend='plotly'.*not implemented"):
-            plot_phase_plane(sys, backend="plotly", show=False)
+        with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
+            plot_phase_plane(sys, backend="bokeh", show=False)
 
 
 from minilink.analysis.discretize import discretize
@@ -884,14 +861,14 @@ class TestDiscretize(unittest.TestCase):
     def test_discretize_euler_matches_source_step(self):
         plant = DoubleIntegrator()
         dt = 0.05
-        step_leaf = discretize(plant, dt, method="euler")
+        step_leaf = discretize(plant, dt, integrator="euler")
         p = step_leaf.params
         x0 = np.array([0.2, -0.1])
         u = np.array([0.4])
         x1_ref = x0 + dt * plant.f(x0, u, 0.0, p)
         x1 = step_leaf.step(x0, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-        self.assertEqual(step_leaf.method, "euler")
+        self.assertEqual(step_leaf.integrator, "euler")
 
     def test_discretize_accepts_dt_in_params_only(self):
         step_leaf = discretize(_GainIntegrator(), params={"dt": 0.02})
@@ -918,10 +895,10 @@ class TestDiscretize(unittest.TestCase):
         x_long = step_leaf.step(x0, u, k=0, params=p_long)
         self.assertLess(x_short[0], x_long[0])
 
-    def test_discretize_rejects_unknown_method(self):
+    def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()
         with self.assertRaises(ValueError):
-            discretize(plant, 0.01, method="bdf")
+            discretize(plant, 0.01, integrator="bdf")
 
     def test_discretize_rejects_missing_dt(self):
         plant = DoubleIntegrator()
@@ -1030,3 +1007,129 @@ class TestStateSpaceSystem(unittest.TestCase):
         np.testing.assert_allclose(
             sys.f(x, u, params={"a": 0.0, "b": 1.0}), np.array([5.0])
         )
+
+
+class TestCompensatorStateLayout(unittest.TestCase):
+    """P / PI / PD carry only the states their terms need.
+
+    A gain is tunable, so ``PID`` cannot drop a state when ``Ki`` or ``Kd`` is
+    zero — the dead state would still show as an unobservable pole. The
+    dedicated forms make the absence structural, so pole and zero counts match
+    the hand calculation.
+    """
+
+    def setUp(self):
+        self.plant = Pendulum()
+        self.plant.params["d"] = 0.5
+        self.plant.x0 = np.zeros(2)
+
+    def test_state_dimensions(self):
+        self.assertEqual(ProportionalController(2.0, ports="error").n, 0)
+        self.assertEqual(PI(Kp=2.0, Ki=1.0).n, 1)
+        self.assertEqual(PD(Kp=2.0, Kd=1.0).n, 1)
+        self.assertEqual(PID(Kp=2.0, Ki=1.0, Kd=1.0).n, 2)
+        self.assertEqual(PI(Kp=2.0, Ki=1.0, dof=3).n, 3)
+        self.assertEqual(PD(Kp=2.0, Kd=1.0, dof=3).n, 3)
+
+    def test_loop_gain_pole_and_zero_counts(self):
+        plant_poles = 2
+        for controller, extra_poles, n_zeros in (
+            (ProportionalController(20.0, ports="error"), 0, 0),
+            (PI(Kp=20.0, Ki=10.0), 1, 1),
+            (PD(Kp=20.0, Kd=2.0, tau=0.05), 1, 1),
+            (PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05), 2, 2),
+        ):
+            with self.subTest(controller=type(controller).__name__):
+                zeros, poles, _ = (controller >> self.plant).pzmap()
+                self.assertEqual(len(poles), plant_poles + extra_poles)
+                self.assertEqual(len(zeros), n_zeros)
+
+    def test_pi_has_the_integrator_pole_and_pd_the_filter_pole(self):
+        _, pi_poles, _ = (PI(Kp=20.0, Ki=10.0) >> self.plant).pzmap()
+        self.assertEqual(np.sum(np.abs(pi_poles) < 1e-9), 1)
+
+        _, pd_poles, _ = (PD(Kp=20.0, Kd=2.0, tau=0.05) >> self.plant).pzmap()
+        self.assertEqual(np.sum(np.abs(pd_poles) < 1e-9), 0)
+        self.assertTrue(np.any(np.abs(pd_poles + 20.0) < 1e-9))  # -1/tau
+
+    def test_integral_action_removes_the_static_error(self):
+        from minilink.analysis import step_info
+
+        pd_final = step_info(
+            *(PD(Kp=20.0, Kd=2.0, tau=0.05) @ self.plant).step_response()
+        )
+        pid_final = step_info(
+            *(PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05) @ self.plant).step_response()
+        )
+        self.assertLess(pd_final.steady_state, 0.9)  # static offset without Ki
+        self.assertAlmostEqual(pid_final.steady_state, 1.0, places=2)
+
+    def test_pid_law_is_unchanged_by_the_split(self):
+        """The full form still computes what it did: u = Kp e + Ki e_int - Kd dm."""
+        ctl = PID(Kp=2.0, Ki=3.0, Kd=0.5, tau=0.1)
+        x, u = np.array([1.5, -0.25]), np.array([0.4])
+        dm = (-0.4 - (-0.25)) / 0.1
+        np.testing.assert_allclose(ctl.ctl(x, u), [2.0 * 0.4 + 3.0 * 1.5 - 0.5 * dm])
+        np.testing.assert_allclose(ctl.f(x, u), [0.4, dm])
+
+    def test_filter_time_constant_must_be_positive(self):
+        with self.assertRaises(ValueError):
+            PID(tau=0.0)
+        with self.assertRaises(ValueError):
+            PD(Kp=1.0, Kd=1.0, tau=-0.1)
+        PI(Kp=1.0, Ki=1.0)  # no filter, no tau to validate
+
+    def test_f_and_ctl_agree_on_tau(self):
+        """A tiny tau must drive the state rate and the command identically."""
+        ctl = PD(Kp=1.0, Kd=1.0, tau=1e-6)
+        x, u = np.zeros(1), np.array([1.0])
+        dm_filt = ctl.f(x, u)[0]
+        np.testing.assert_allclose(ctl.ctl(x, u), [1.0 * 1.0 - 1.0 * dm_filt])
+
+
+class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
+    """The automatic grid must contain the 0 dB crossing.
+
+    Roots at the origin carry no rate and a large static gain pushes the
+    crossover past the fastest root, so a band read from the poles and zeros
+    alone silently reports an infinite margin — the most dangerous wrong
+    answer a margin tool can give.
+    """
+
+    @staticmethod
+    def _tf(num, den):
+        from minilink.blocks.transfer_function import TransferFunction
+
+        return TransferFunction(num, den)
+
+    def test_integrator_loop(self):
+        loop = self._tf([10.0], [1.0, 10.0, 0.0])  # 10 / (s (s + 10))
+        self.assertAlmostEqual(loop.margins().phase_margin_deg, 84.3173, places=3)
+
+    def test_large_static_gain(self):
+        loop = self._tf([1000.0], [1.0, 1.0])  # crossover three decades up
+        self.assertAlmostEqual(loop.margins().phase_margin_deg, 90.0573, places=3)
+
+    def test_marginal_loop_is_exact(self):
+        loop = self._tf([1.0], [1.0, 1.0, 1.0, 0.0])  # L(j1) = -1 exactly
+        margins = loop.margins()
+        self.assertAlmostEqual(margins.phase_margin_deg, 0.0, places=3)
+        self.assertAlmostEqual(margins.gain_margin_db, 0.0, places=3)
+
+    def test_flat_low_frequency_gain_keeps_a_tidy_band(self):
+        from minilink.analysis import linear
+
+        loop = self._tf(
+            [1.0], np.polymul(np.polymul([1.0, 1.0], [1.0, 2.0]), [1.0, 3.0])
+        )
+        w_min, w_max = linear.frequency_range(loop.A(), loop.B(), loop.C(), loop.D())
+        self.assertAlmostEqual(w_min, 0.1)  # no walk down a DC plateau
+        self.assertAlmostEqual(w_max, 100.0)
+        self.assertTrue(np.isinf(loop.margins().phase_margin_deg))
+
+    def test_singular_feedback_gain_is_not_a_crash(self):
+        from minilink.analysis import linear
+
+        tf = self._tf([1.0, 2.0], [1.0, 1.0])  # d = 1, so K = -1 is singular
+        poles = linear.closed_loop_poles(tf.A(), tf.B(), tf.C(), tf.D(), -1.0)
+        self.assertTrue(np.all(np.isinf(poles)))

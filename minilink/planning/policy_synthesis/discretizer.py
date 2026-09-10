@@ -330,12 +330,12 @@ class StateSpaceGrid:
 
     def _compute_transition_jax(self, t):
         """Vectorized successor map and box validity masks on device."""
-        from minilink.core.backends import configure_jax
+        from minilink.core.backends import ensure_jax_x64
 
         if not isinstance(self.problem.X, BoxSet):
             raise ValueError("JAX precompute requires a BoxSet state constraint X")
 
-        jax = configure_jax(enable_x64=True)
+        jax = ensure_jax_x64()
         jnp = jax.numpy
 
         N, A, n = self.nodes_n, self.actions_n, self.n

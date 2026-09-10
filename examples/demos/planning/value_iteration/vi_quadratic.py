@@ -1,10 +1,13 @@
+"""Double integrator with a quadratic cost by value iteration."""
+
 import numpy as np
 
-from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
-from minilink.planning.problems import PlanningProblem
+from minilink import (
+    DoubleIntegrator,
+    DynamicProgrammingPlanner,
+    PlanningProblem,
+    QuadraticCost,
+)
 
 INF = 300.0
 
@@ -19,10 +22,11 @@ cost = QuadraticCost.from_system(
 )
 problem = PlanningProblem(plant, x_goal=np.zeros(2), cost=cost)
 
-grid = StateSpaceGrid(problem, x_grid_shape=(101, 101), u_grid_shape=(41,), dt=0.05)
 planner = DynamicProgrammingPlanner(
     problem,
-    grid=grid,
+    x_grid=(101, 101),
+    u_grid=(41,),
+    dt=0.05,
     alpha=1.0,
     tol=0.5,
     max_iterations=1000,
@@ -30,13 +34,11 @@ planner = DynamicProgrammingPlanner(
     verbose=True,
 )
 planner.solve()
-planner.clean_infeasible_set()
 planner.plot_cost2go(jmax=INF, show_3d=True)
 
 controller = planner.get_controller()
 controller.plot_control_law()  # interpolated law the closed loop actually feels
 diagram = controller @ plant
-diagram.name = "Double integrator (value iteration)"
 
 plant.x0 = np.array([5.0, 3.0])
 diagram.plot_diagram()

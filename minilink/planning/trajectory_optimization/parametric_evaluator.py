@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.core.backends import ensure_jax_x64
 from minilink.planning.trajectory_optimization.parametric_program import (
     ParametricMathematicalProgram,
 )
@@ -28,6 +29,8 @@ class JaxParametricProgramEvaluator:
         try:
             import jax
             import jax.numpy as jnp
+
+            ensure_jax_x64()
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise ImportError(
                 "JAX is required for parametric trajectory optimization. "

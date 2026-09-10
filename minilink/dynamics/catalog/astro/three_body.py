@@ -154,14 +154,7 @@ class ThreeBodyProblem(DynamicSystem):
                 acc = acc + G * masses[j] * dr / (dist_sq * xp.sqrt(dist_sq))
             a.append(acc)
 
-        dx = xp.zeros(18)
-        dx[0:3] = v[0]
-        dx[3:6] = a[0]
-        dx[6:9] = v[1]
-        dx[9:12] = a[1]
-        dx[12:15] = v[2]
-        dx[15:18] = a[2]
-        return dx
+        return xp.concatenate([v[0], a[0], v[1], a[1], v[2], a[2]])
 
     def h(self, x, u, t=0, params=None):
         return x

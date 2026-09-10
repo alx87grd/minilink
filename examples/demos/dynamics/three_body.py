@@ -1,0 +1,15 @@
+"""Three-body gravitational dynamics — nonlinear open-loop simulation."""
+
+from minilink import ThreeBodyProblem
+
+TF = 30.0
+N_STEPS = 30000
+
+sys = ThreeBodyProblem(preset="figure_eight")
+
+sys.x0[0] = 0.9
+
+traj = sys.compute_trajectory(tf=TF, n_steps=N_STEPS)
+
+# sys.plot_trajectory()
+sys.animate(renderer="meshcat")

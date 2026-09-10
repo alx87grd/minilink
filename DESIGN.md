@@ -1,15 +1,21 @@
 # Minilink Technical Design
 
-Architecture and public contracts. User guide and call chains: [README.md](README.md).
+Architecture and public contracts. User guide: [README.md](README.md). Call chains: [§8](#8-call-chains).
 
 ## 1. Design Principles
 
 1. **Math readability first**: e.g. `dx = A @ x + B @ u`.
 2. **Pure contracts, convenient boundaries**: equation paths stay functional;
-   facades (`compute_trajectory`, `plot_*`, `animate`) live at API boundaries.
-   Models are **stateless** — a `System` holds equations, ports, params, and
-   `x0`; evolving state lives in the simulator / returned `Trajectory`, not as
-   hidden mutable block state.
+   facades (`compute_trajectory`, `plot_*`, `animate`, `jacobian`) live at API
+   boundaries. A `System` is a **description** — equations, ports, params,
+   `x0` — plus thin shortcut methods, nothing else. Each shortcut delegates to
+   a tool that lives in its own module (`Simulator`, `analysis.jacobian`,
+   `analysis.linearize`); the shortcut is the teaching and quick-look
+   spelling, the module is the spelling scripts and projects use. No
+   input/output data, caches or run state on the object: evolving state lives
+   in the simulator and the returned `Trajectory`. `self.traj` is the one
+   exception, kept because it is used daily; a new exception needs a reason of
+   that weight.
 3. **Explicit data flow**: visible objects and direct calls; no global backend
    switches or hidden registries.
 4. **Backend-native math where simple**: one class for traceable NumPy/JAX algebra.
@@ -77,12 +83,17 @@ NumPy required; JAX optional (`minilink[jax]`), imported lazily via
 package, no global mode. Explicit `compile_backend` and evaluator backend args.
 `array_module()` only for small hybrid helpers.
 
+**Precision policy (adopted 2026-09, lands in Phase 0 of [ROADMAP.md](ROADMAP.md)):**
+JAX evaluators enable 64-bit floats on construction; `MINILINK_JAX_X64=0`
+opts out for GPU/RL workloads. Tools built on JAX evaluators (trajopt,
+`Optimizer`, DP) never require the caller to call `configure_jax` first.
+
 ## 2. Interface Layers
 
 | Layer | Use | Examples |
 | --- | --- | --- |
-| 1 Facades | Default | `compute_trajectory`, `plot_trajectory`, `+`/`>>`/`@` |
-| 2 Orchestrators | Repeat runs, trajopt, NLP | `Simulator`, `TrajectoryOptimizationPlanner`, `Optimizer` |
+| 1 Facades | Teaching, quick looks | `compute_trajectory`, `plot_trajectory`, `jacobian`, `linearize`, `+`/`>>`/`@` (`C >> G` is the loop gain, `C @ G` or `L @ 1` the loop closed through an Error block) |
+| 2 Tools and orchestrators | Scripts, projects, repeat runs, trajopt, NLP | `Simulator`, `analysis.jacobian`, `analysis.bode`, `TrajectoryOptimizationPlanner`, `Optimizer` |
 | 3 Contracts | Custom wiring, extension | `DiagramSystem.connect`, `compile()`, `MathematicalProgram` |
 
 ### Public imports (teaching-first)
@@ -92,7 +103,7 @@ deep defining-module paths stay valid but are not what README / intro show.
 
 | Layer | Example | Role |
 | --- | --- | --- |
-| **Root prelude** | `from minilink import Pendulum, ImpedanceController` | README / first-hour only (selective `__all__`) |
+| **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
 | **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis.linearize import linearize` | Canonical course / script API |
 | **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
 
@@ -106,25 +117,22 @@ Rules:
   `analysis.linearize`), import the factory from that module
   (`from minilink.control.lqr import lqr`) — do not shadow the submodule on
   the parent package.
-- Root `minilink/__init__.py` is a **small convenience prelude**, not the full
-  API — grow it slowly; prefer band imports in longer scripts.
-- Do **not** use `from minilink import *`. Do **not** re-export quarantine
-  (`symbolic/`, `dynamics/engines/`) from teaching surfaces.
+- Root `minilink/__init__.py` exports the **whole teaching surface** (lazily) so
+  student-facing code needs one import line; band facades organise the same
+  names by role. Research-lane names never appear at the root.
+- Do **not** use `from minilink import *`. Do **not** re-export the
+  `experimental/` tier from teaching surfaces.
 
-### API stability tiers (v0.1)
+### Two lanes (teaching surface vs research lane)
 
-The v0.1 teaching release freezes a **stable tier**; the rest is
-**provisional** (see [README.md — API stability](README.md#api-stability-v01)
-for the user-facing table and [ROADMAP.md](ROADMAP.md) for TRL detail):
-
-- **Stable**: `core/` contracts (`System` family, diagrams, composition
-  operators, `Trajectory`, compile facade), `Simulator` / `StaticSimulator`,
-  `blocks/`, catalog teaching plants, basic `control/` and `analysis/`.
-  Public names and semantics change only with a deprecation note.
-- **Provisional**: planning, MPC, hybrid/step, realtime, optimization,
-  spatial, placeholders, and the evaluator integration-helper grid beyond the
-  frozen subset in §5. These may change between minor releases; hardening
-  items live in the [docs/plans/TODO.md](docs/plans/TODO.md) pre-v0.2 backlog.
+Stability is a **contract between two lanes**, defined in
+[ROADMAP.md §2](ROADMAP.md#2-two-lanes). The **teaching surface** — root
+prelude plus the band facades — is registered in one place and tested as a
+set; names and semantics change only with a deprecation note; student-facing
+examples and notebooks import only through it. Everything else is the
+**research lane**: no stability promise, importable from a git checkout,
+outside the published wheel. Deep defining-module imports stay valid in both
+lanes.
 
 ## 3. Package Map
 
@@ -149,9 +157,9 @@ or neural network alike):
 | Package | Role |
 | --- | --- |
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
-| `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain, `engines/` plant-generating kernels (experimental) |
+| `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py`, `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
+| `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -162,18 +170,26 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`) |
-| `analysis/` | `linearize_matrices` (→ arrays), `linearize` (→ `LTISystem`, FD or JAX), controllability/observability, equilibria, `modal`, selected-channel Bode; `discretize` for continuous→step plant wrappers; more frequency tools planned |
+| `analysis/` | one calling pattern `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)`: `jacobian(sys, "f", "x")` (∂f/∂x; `of` / `wrt` name `f`, ports, `t`, `params`, or diagram wires `"block:port"`), `linearize` (→ `LTISystem`), one-channel `bode` / `pzmap` / `nyquist` / `margins` / `root_locus` / `step_response` / `transfer_function` (`of=` / `wrt=`) with their `plot_` twins — every one reduces to the state-space channel `(A, b, c, d)` and computes with `analysis/linear.py` (eigenvalues, the Rosenbrock pencil, `C (jwI - A)^-1 B + D`, `eig(A - B K C)`, one `expm`); the plots build one `ControlFigure` (`graphical/control/`) rendered by matplotlib or plotly in the MATLAB look; controllability/observability (matrices or an `LTISystem`), equilibria, `modal`; `discretize(integrator=)` for continuous→step wrappers. `method="auto"` is exact under JAX when the system traces, finite differences otherwise; the same verbs are methods on every `System`, stateless (each call compiles its evaluator) |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
 | `interfaces/` | `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
 
-**Quarantine** — experimental (TRL < 3); nothing may import these:
+**Experimental tier** — `experimental/` (TRL < 3, research lane, repo-only);
+nothing in the library imports it, and the path itself states the maturity:
 
-| Package | Role |
+| Module | Role |
 | --- | --- |
-| `symbolic/` | experimental symbolic mechanics (SymPy EoM derivation) |
+| `experimental/symbolic/` | symbolic mechanics (SymPy EoM derivation, Lagrange / Kane) and export |
+| `experimental/engines/` | hand-rolled JAX contact worlds, ANCF tire |
+| `experimental/c_export.py` | JAX → C transpiler for controller leaves |
+
+**Wheel scope.** The published package ships the teaching surface and the
+provisional planning / MPC / hybrid bands. The `experimental/` tier,
+`examples/projects/`, and
+`examples/experimental/` are repo-only (research lane).
 
 ### Dependency law
 
@@ -189,7 +205,7 @@ state-feedback block):
   producing those arrays lives in `analysis/`.
 - Tools import `core`; they may consume libraries in demos and benchmarks.
 - `graphical/` is imported lazily from anywhere; rendering stays optional.
-- Quarantined packages are imported by nothing.
+- The `experimental/` tier is imported by nothing.
 
 ### Placement algorithm
 
@@ -202,7 +218,7 @@ state-feedback block):
    find inputs/policies (`planning`), solve NLPs (`optimization`), fit to data
    (`identification`), render (`graphical`), talk to another ecosystem
    (`interfaces`).
-3. Neither, and unproven → quarantine at top level with a TRL tag.
+3. Neither, and unproven → `experimental/` with a TRL tag.
 
 Student-facing taxonomy: wiring from `blocks/`, plants from `minilink.catalog`
 (or `dynamics/catalog/…`), controllers from `control/`, analysis verbs from
@@ -220,8 +236,7 @@ Minilink's **primary framework** is continuous-time: `DynamicSystem`, flow
 
 **Step and hybrid** are a **narrow parallel add-on** — not a second framework of
 equal weight. They exist so discrete control laws (MPC, SMC, sampled regulators)
-can close the loop on a continuous plant without hand-rolled outer `while` loops.
-can close the loop on a continuous plant without hand-rolled outer `while` loops.
+can close the loop on a continuous plant without hand-rolled outer `while` loops
 (subset only — not full Simulink / discrete-dynamics parity).
 
 **Design trade-off rule:** when step or hybrid work conflicts with continuous-time
@@ -252,27 +267,25 @@ serial arms. Joint impedance / task impedance / computed torque use
 `control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
-**Vehicle JAX ladder** — :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles`
-(planning / trajopt plants; module-scoped names, no ``Jax`` prefix). Default
-``u`` / ``y = x``; named-port twins use the ``Ports`` suffix. Compare:
-``examples/projects/car_trajopt/car_trajopt_compare.py`` and
-[notebook](examples/projects/car_trajopt/car_trajopt.ipynb).
+**Vehicle ladder** — four teaching rungs in
+:mod:`~minilink.dynamics.catalog.vehicles`, all dual-backend:
 
 | Class | $n$ | Input $\mathbf{u}$ | Role |
 | --- | --- | --- | --- |
-| `Holonomic` | 2 | $[v_x, v_y]$ | holonomic point |
-| `HolonomicAccel` | 4 | $[a_x, a_y]$ | holonomic double integrator |
-| `BicycleKin` | 3 | $[v, \delta]$ | kinematic bicycle |
-| `BicycleAcc` | 5 | $[a_x, \dot\delta]$ | no-slip accel / steer rate |
-| `BicycleDyn` | 6 | $[\omega_r, \delta]$ | rigid body + linear tires |
-| `BicycleDynRate` | 8 | $[\dot\omega_r, \dot\delta]$ | integrated wheel / steer |
-| `BicycleDynTauRate` | 8 | $[\tau_r, \dot\delta]$ | torque + steer rate |
-| `BicycleDynServo` | 9 | $[\tau_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged torque + steer |
-| `BicycleDynEngine` | 9 | $[P_{\mathrm{cmd}}, \delta_{\mathrm{cmd}}]$ | lagged **power** + steer |
+| `HolonomicMobileRobot` | 2 | $[v_x, v_y]$ | holonomic point |
+| `KinematicBicycle` / `KinematicCar` | 3 | $[v, \delta]$ | kinematic bicycle (car skin) |
+| `DynamicBicycle` | 6 | `w_rear`, `delta` ports (`named_ports=False` stacks them) | rigid body + linear tires |
+| `BicycleDynRate` | 8 | $[\dot\omega_r, \dot\delta]$ (`named_ports=True` splits them) | integrated wheel / steer — the MPC plant |
 
-NumPy bicycle plants remain in :mod:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle`
-and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
-:mod:`~minilink.dynamics.catalog.vehicles.car_profile` (`apply_car_profile`).
+The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
+`BicycleDynTauRate`, `BicycleDynServo`, `BicycleDynEngine`), the extra variants
+(`ConstantSpeedKinematicCar`, `DynamicHolonomicMobileRobot`,
+`HolonomicMobileRobot3D`, `UdeSRacecar`) and the named envelopes
+(`CarProfile`, `apply_car_profile`) live with their scenarios in
+`examples/projects/car_trajopt/vehicles/`; every command plant takes
+`named_ports=True` instead of a `*Ports` twin. Compare:
+``examples/projects/car_trajopt/car_trajopt_compare.py`` and
+[notebook](examples/projects/car_trajopt/car_trajopt.ipynb).
 
 ## 4. Core Object Contracts
 
@@ -280,7 +293,11 @@ and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
 
 - **Math:** `h(x,u,t,params)` on the model and port `compute` functions; continuous
   evolution `f(x,u,t,params)` is on :class:`DynamicSystem` only (and stacked on
-  :class:`DiagramSystem`).
+  :class:`DiagramSystem`). **Default output:** on :class:`DynamicSystem` and
+  :class:`StepSystem`, `h` returns the full state `y = x` when the `y` port has
+  the state dimension (`p == n`) and zeros otherwise — the pyro convention, so a
+  plant declared with `output_dim=n` composes with `controller @ plant` without
+  overriding `h`.
 - **Dims:** `n` defaults to 0 (static IO shell); `m` from input ports; `p` from primary output
   `"y"` only (aux `"x"` does not change `p`; no `"y"` ⇒ `p==0`).
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
@@ -309,16 +326,12 @@ and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
   :func:`~minilink.core.composition.resolve_standard_feedback`);
   :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.export_to_computer`
   for warm-start MPC (also via ``mpc % schedule``).
-  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynRate`
-  exposes standard ``u`` / ``y`` ports for hybrid composition.
-  The JAX fidelity ladder in
-  :mod:`~minilink.dynamics.catalog.vehicles.jax_vehicles` runs through
-  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynServo`
-  (torque lag) and
-  :class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynEngine`
-  (wheel-frame power lag + stall torque + engine brake).
-  Named vehicle envelopes (parameters + planning limits) live in
-  :mod:`~minilink.dynamics.catalog.vehicles.car_profile`
+  Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.BicycleDynRate`
+  exposes standard ``u`` / ``y`` ports for hybrid composition; the research
+  ladder (``examples/projects/car_trajopt/vehicles/ladder.py``) runs through
+  ``BicycleDynServo`` (torque lag) and ``BicycleDynEngine`` (wheel-frame power
+  lag + stall torque + engine brake). Named vehicle envelopes (parameters +
+  planning limits) live in ``examples/projects/car_trajopt/vehicles/car_profile.py``
   (``passenger_car``, ``racecar``, ``udes_1_5``); apply with
   :func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
@@ -426,8 +439,14 @@ and :mod:`~minilink.dynamics.catalog.vehicles.steering`. Named envelopes:
   `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
   `compute_trajectory`, `plot_trajectory`, `animate`, …),
   `DynamicSystemFacades` on `DynamicSystem` (continuous `compute_trajectory`,
-  analysis plots, `game`), `StepSystemFacades` on `StepSystem`
-  (`compute_rollout`). **MRO** picks `compute_trajectory` implementation; no
+  the analysis family — `linearize`, `transfer_function`, `bode`, `pzmap`,
+  `plot_bode`, `plot_pzmap`, `modal_analysis`, `find_equilibrium` — and
+  `game`), `StepSystemFacades` on `StepSystem` (`compute_rollout`, `jacobian`
+  with `k`). Every facade is a two-line delegation to the tool's module and
+  stores nothing on the system (§1 principle 2): `jacobian` compiles its
+  evaluator per call, about a millisecond on the eager JAX path, and loops
+  keep the callable from `evaluator.jacobian(of, wrt)` instead. **MRO**
+  picks `compute_trajectory` implementation; no
   façade-layer `isinstance` routers. `self.traj` is a convenience cache of
   the latest facade rollout; library code never reads it as an input.
 
@@ -452,8 +471,13 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   The parametric tier (`f_p`/`h_p`/`outputs_p`) takes the nested dict on both
   backends and ignores `bound_params`. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
-  `jacobian_f_params` / `jax.grad` differentiate dynamics w.r.t. parameters
-  (see `examples/demos/identification/params_gradient.py`).
+  `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
+  w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
+  `evaluator.jacobian(of, wrt)` returns a callable `(x, u, t, params)` on every
+  evaluator (`jax.jacfwd` eagerly on JAX, central differences on NumPy); the
+  callable is jit-compatible for blocks written with `array_module` all the
+  way through, and diagrams address internal wires as `"block:port"`, as
+  output or as an additive perturbation.
 - **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets`
   today; `scene` is reserved (`None`) for pipeline B spatial overrides.
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
@@ -507,7 +531,37 @@ Visualization: subsystem `"world"` geometry merges into one shared diagram
 
 ### Control feedback profiles
 
-<!-- TODO: User Architectural Review — feedback-port declaration contract (v0.2 draft) -->
+**Compensators and the Error block (Sep 2026).** Classical laws are
+written once on the tracking error and take a port-layout switch:
+`ports="error"` declares one input `e` and command `u` (the compensator
+form, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`,
+`ProportionalController(ports="error")`),
+`ports="reference"` declares `r` and `y` (the controller form the generic
+framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). `@` keeps one rule — the left operand drives the right
+one and the output returns to the left — with two layouts: a declared
+measurement port is wired directly; an error-driven block
+(`core.feedback.error_input`: a declared `error_port`, or a single input
+with no roles — a compensator, a transfer function, a plant, a series
+diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`, `e`)
+inserted by `core.composition.feedback`, and `sys @ 1` closes any such
+system on itself (`sys @ K` through a `Gain`). Positive feedback still
+uses a signed `Sum`. A scalar error against a vector output takes
+component 0 through a visible `Demux`; equal dimensions close a vector loop;
+anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`
+block, no new operator.
+
+**Decision record (landed Aug 2026, reviewed Sep 2026).** A controller is
+an ordinary `System` whose port compute `ctl` *is* the control law; the
+feedback declaration is read-only context for tools and never changes how a
+block computes. Rejected on the way: a `StaticController` base owning a
+`control_law(y, r, t)` method with a base-class `ctl` unbundling ports
+(hid the block's real behaviour behind two methods and changed how students
+author controllers); per-family law bases (premature while families have
+1–3 members — revisit when an observer family lands); `plot_control_law` on
+`System` (a plant must not carry feedback vocabulary — it lives on the thin
+`Controller` / `DynamicController` markers). `error` and `output` profiles
+are split so error-driven laws and learned policies plot differently while
+wiring identically. Undeclared blocks keep working everywhere.
 
 A controller is an ordinary `System`: explicit ports, and `ctl` as the port
 compute — `ctl` *is* the control law. The **feedback-port declaration** is
@@ -608,7 +662,25 @@ deliberately not provided in v0.1.
 
 ## 5. Compilation And Simulation
 
+Before lowering, every leaf's textbook hooks are probed once at
+`(x0, u_nominal, t=0)` — `f` / `step` and the constructor-made `y` / `x`
+ports — and a wrong-length result (or a wrong-length `x0`) raises `ValueError`
+naming the block, the hook, and both shapes; a bare scalar is accepted for
+`n = 1`, custom port computes are not probed. Leaf, diagram, and step-diagram
+compiles all run this check.
+
+Speed lives in batches and compiled integrators, not in single calls: a
+jitted `f` call costs about the same as the NumPy one (dispatch dominates),
+while `rollout_batch` and the `rk4_integrate_*` primitives run 1000 rollouts of
+1000 RK4 steps in tens of milliseconds. Quote those; never a per-call ratio.
+
 `compile(system, backend)` returns a typed evaluator:
+
+On JAX the evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0, dt,
+n_steps, params=None)` — one `vmap` of the RK4 / ZOH rollout over a family of
+initial states, input sequences, and params (a params leaf with one more
+dimension than the compiled value is swept); the research facade for
+parameter-family experiments.
 
 - :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.DynamicsEvaluator`
   (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)
@@ -697,12 +769,22 @@ Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous di
 *diagram* (`n=0` stacked state) still subclasses `DynamicSystem` and uses
 `Simulator` with the diagram evaluator (signal-flow on a time grid).
 
-Unconnected inputs use port nominals; time-varying sources belong in the diagram;
-forcing via `compute_forced`. Facades default `compile_backend="numpy"`.
+**Unconnected inputs read their port nominal value — by design, and silently.**
+An input left unwired is a constant at its declared `nominal_value` (the
+Simulink "ground" semantics), never an error or a warning; `plot_diagram()`
+shows it as unconnected. Time-varying sources belong in the diagram; forcing
+via `compute_forced`. Facades default `compile_backend="numpy"`.
+
+**Automatic grid.** With neither `n_steps` nor `dt`, the solver is chosen first
+(user choice, else `euler` for discontinuous plants, else `scipy`) and the grid
+is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 10001` points (a
+plotting resolution — the integrator picks its own steps); fixed-step solvers
+take `dt` from `solver_info["smallest_time_constant"]` × 0.1. `StaticSimulator`
+shares the 10001-point default.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
-`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked when omitted). Planned: `SimulationOptions`
+`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked on JAX only for an explicit uniform grid of ≥ 10 000 points). Planned: `SimulationOptions`
 ([docs/plans/TODO.md](docs/plans/TODO.md) Later).
 
 ### Discontinuous closed loops — known issues
@@ -745,7 +827,7 @@ discontinuous mechanical SMC demos.
 **Hybrid contrast.** :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`
 holds controller torque constant between computer ticks (ZOH) and samples plant outputs
 at tick boundaries — the intended semantics for digital SMC. See
-``examples/demos/hybrid/smc_pendulum_rate.py``.
+``examples/demos/hybrid/sampled_smc_pendulum.py``.
 
 **Diagnostics.** ``scratch/confirm_smc_solver_bug.py`` compares solvers, ``ddq_f`` vs
 numerical ``Δdq/Δt``, and RK4 k1–k4 cancellation on the pendulum SMC demo.
@@ -769,7 +851,13 @@ require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 family).
 
 **Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
-`TrajectoryPlan`. **I-level constructors** take flat kwargs
+`TrajectoryPlan`. `SolveMetadata.success` means *the returned plan satisfies the
+program constraints to `feasibility_tol`* — nothing else: an iteration-limit
+stop on a feasible plan is not a failure, a solver that reports convergence on
+an infeasible plan is, and the solver's own flag stays in `message` / `stats`.
+The worst equality residual / inequality margin / bound violation are recorded
+on the metadata. Online ticks (`solve_trajectory_from`, the MPC path) report
+the solver flag without a residual check. **I-level constructors** take flat kwargs
 (`n_steps=…`, `transcription="direct_collocation"`, `compile_backend=…`,
 `optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
 `transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
@@ -798,7 +886,15 @@ default.
 **RRT / DP:** same two-tier idea — flat routine knobs on
 `RRTPlanner` / `RRTStarPlanner` / `DynamicProgrammingPlanner`, with
 `options=` as the advanced escape. Keep fundamental seams explicit
-(`extender`, `StateSpaceGrid`).
+(`extender`, `StateSpaceGrid`). The textbook DP setup
+`DynamicProgrammingPlanner(problem, x_grid=, u_grid=, dt=)` builds that grid
+itself (`grid=` for a custom one), and `solve()` then pins saturated
+cost-to-go cells to `out_of_bound_cost` (`clean_infeasible=False` keeps the raw
+table; `clean_infeasible_set(tol)` reruns the pass with another tolerance).
+`PolicyPlan.metadata.success` means the sweeps converged to `tol` (a
+fixed-horizon `solve_steps` always succeeds); `message` and `stats` carry the
+sweep count and the last cost-to-go change. `final_time` reads `problem.tf`
+when the problem sets one.
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
@@ -887,7 +983,13 @@ Plotly under `plotting` extra.
 **Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix
 (`camera_matrix`) each frame via `resolve_camera_from_hints`; pass
 `animate(camera=…)` for a constant matrix or callable override. One contract
-for all renderers.
+for all renderers. `camera_scale=None` (the `System` default) means **auto-fit**:
+the `Animator` frames the bounding box of everything drawn, fixed over the
+whole animation (`fit_camera_to_frames`, margin 1.15; backdrops such as
+`ground_line` and `Plane` and force glyphs such as `Arrow` are excluded via
+`primitive.camera_fit = False`), so a plant whose
+`params` change keeps a sensible view; a numeric `camera_scale` frames the
+scene yourself.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing
@@ -898,3 +1000,71 @@ which keep bare signatures per [AGENTS.md](AGENTS.md) Textbook Style); lazy opti
 namespace `__init__.py` files; plot subpackages may re-export small facades.
 Agents and maintainers run tests in the **`minilink`** conda env from
 [environment.yml](environment.yml) ([README.md#install](README.md#install)).
+
+## 8. Call Chains
+
+Minimal paths for debugging and extending workflows (moved here from the README, 2026-09).
+
+Facade methods for common workflows: `compute_trajectory(...)` (static leaves and
+continuous/diagram systems via MRO), `plot_trajectory(...)`,
+`plot_diagram(...)`, `animate(...)`, `jacobian(...)`, `linearize(...)`. They are
+shortcuts over the tools' own modules — `Simulator`, `minilink.analysis` — which
+scripts and projects import directly. Use lower-level APIs when you need explicit
+control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
+`compile()` / `DynamicsEvaluator`.
+
+### Package roles
+
+| Package | Owns |
+| --- | --- |
+| `core` | `System`, façade mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem`, ports, `Trajectory`, sets, costs |
+| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
+| `control` | control laws and design factories (`PID`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`, `mpc`) |
+| `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
+| `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
+| `simulation` | `Simulator`, `HybridSimulator`, `Computer`, solvers, time grids |
+| `graphical` | plots, diagrams, animation (`Animator` + renderers) |
+| `planning` | `PlanningProblem`, planners, transcriptions |
+| `optimization` | `MathematicalProgram`, `Optimizer` |
+
+### Main chains
+
+```text
+Model:     subclass System → f/h (+ ports or DynamicSystem options)
+
+Compose:   + / >> / @ / autowire  →  DiagramSystem
+           hybrid: block % dt  →  Computer; Computer @ plant  →  HybridDiagram
+           or add_subsystem + connect (+ connect_new_output_port)
+
+Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
+           →  compile  →  solve  →  Trajectory
+           StepSystem: compute_rollout  →  StepEvaluator.rollout (state-only k/x/u)
+           StepDiagram + schedule: Computer.tick  →  signal histories (not evaluator rollout)
+           HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
+           cache: self.traj (plant Trajectory), self.last_result (full result), self.rollout (computer)
+
+Compile:   sys.compile(backend)  →  DynamicsEvaluator
+
+Plot:      plot_trajectory*  →  graphical.signals  →  PlotResult
+           plot_phase_plane* →  graphical.phase_plane
+           plot_diagram      →  graphical.diagrams (DiagramSystem / StepDiagramSystem)
+           HybridDiagram.plot_diagram  →  hybrid composite (Plant + Computer clusters)
+
+Animate:   animate* / render  →  Animator  →  renderer backend
+           game  →  simulation.realtime.RealtimeSimulator  →  live Animator frames
+           HybridDiagram.animate  →  plant geometry + fine plant traj
+           planner.plot_solution / animate_solution  →  problem.sys.*
+
+Trajopt:   PlanningProblem + TrajectoryOptimizationPlanner
+           (flat ``n_steps`` / ``transcription="…"``; optional Transcription)
+           → transcribe → MathematicalProgram → Optimizer → TrajectoryPlan
+
+NLP:       MathematicalProgram → Optimizer → OptimizationResult
+```
+
+- `Trajectory` is numeric only (`t`, `x`, `u`, optional `signals`); labels stay on `System`.
+- Diagram internal signals in plots: `"sys_id:port_id"`, or ``(subsystem, "port")``
+  tuples; shortcut-built diagrams default to ``ref`` / ``ctl`` / ``sys``.
+- `DiagramSystem.connection_verbose` defaults to `False`; set `True` to print one line per connection.
+- Shortcuts flatten diagram operands instead of nesting them; `+` does not infer cross-wiring.
+- `compute_*` returns `Trajectory`; `plot_*` returns `PlotResult`; `show=False` skips display.

@@ -1,41 +1,21 @@
-"""Double pendulum swing-up by value iteration — 4-D state, JAX backend.
-
-Run from the repo root::
-
-    python examples/demos/planning/value_iteration/vi_double_pendulum_jax.py
-
-Mirrors pyro ``double_pendulum_optimal_swingup.py``: asymmetric state bounds,
-``(51, 41, 51, 41)`` state grid with ``(5, 5)`` torques, quadratic cost to
-the upright ``[0, 0, 0, 0]``, and swing-up from the hanging configuration
-``[-π, 1, 0, 0]``. At full scale this is ~4.4M nodes and ~109M state–action
-pairs — a stress test for the JAX lookup-table pipeline (grid transition, ``G``,
-and jitted Bellman sweeps).
-
-Set ``RESOLUTION = "fast"`` for a smaller grid when iterating locally (~15M
-pairs), or ``"high"`` for a finer state/control mesh and more Bellman sweeps.
-
-After planning, three closed-loop simulations mirror pyro (hanging and two
-additional starts): state/input time plots, ``(θ1, dθ1)`` and ``(θ2, dθ2)``
-phase planes, and animation.
-"""
+"""Double pendulum swing-up by value iteration — 4-D state, JAX backend."""
 
 import time
 
 import numpy as np
 
-from minilink.core.costs import QuadraticCost
-from minilink.core.diagram import DiagramSystem
-from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
-    DynamicProgrammingOptions,
+from minilink import (
+    DiagramSystem,
+    DoublePendulum,
     DynamicProgrammingPlanner,
+    PlanningProblem,
+    QuadraticCost,
+    StateSpaceGrid,
 )
-from minilink.planning.problems import PlanningProblem
 
 # RESOLUTION = "high"  # "fast" | "pyro" | "high"
 # RESOLUTION = "fast"  # "fast" | "pyro" | "high"
-RESOLUTION = "pyro"  # "fast" | "pyro" | "high"
+RESOLUTION = "pyro"  # "fast" (local iteration) | "pyro" (4.4M nodes) | "high"
 
 INF = 1000.0
 GOAL = np.zeros(4)
@@ -72,7 +52,7 @@ plant.state.lower_bound = np.array([-5.0, -1.5, -4.0, -4.0])
 plant.state.upper_bound = np.array([0.5, 4.0, 5.5, 7.0])
 plant.inputs["u"].lower_bound = np.array([-12.0, -12.0])
 plant.inputs["u"].upper_bound = np.array([12.0, 12.0])
-plant.x0 = HANGING.copy()
+plant.x0 = HANGING
 
 Q = np.diag([1.0, 0.5, 0.1, 0.05])
 R = np.diag([0.05, 0.05])
@@ -99,17 +79,14 @@ t_mesh = time.perf_counter()
 planner = DynamicProgrammingPlanner(
     problem,
     grid=grid,
-    options=DynamicProgrammingOptions(
-        backend="jax",
-        alpha=1.0,
-        max_iterations=n_steps,
-        out_of_bound_cost=INF,
-        verbose=True,
-    ),
+    backend="jax",
+    alpha=1.0,
+    max_iterations=n_steps,
+    out_of_bound_cost=INF,
+    verbose=True,
 )
 t_xnext = time.perf_counter()
 planner.solve_steps(n_steps)
-planner.clean_infeasible_set()
 t_done = time.perf_counter()
 
 print("\ntiming summary:")
@@ -131,7 +108,6 @@ diagram.add_subsystem(controller, "controller")
 diagram.add_subsystem(plant, "plant")
 diagram.connect("plant", "y", "controller", "x")
 diagram.connect("controller", "u", "plant", "u")
-diagram.name = "Double pendulum swing-up (value iteration, JAX)"
 
 for x0 in CLOSED_LOOP_X0:
     plant.x0 = x0.copy()

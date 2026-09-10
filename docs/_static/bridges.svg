@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 380" width="1000" height="380" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <style>
+    .canvas { fill: #f8fafc; stroke: #e2e8f0; }
+    .tile { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.3; }
+    .core { fill: #eff6ff; stroke: #2563eb; stroke-width: 1.8; }
+    .t { fill: #0f172a; font-size: 14.5px; font-weight: 700; }
+    .s { fill: #64748b; font-size: 11.5px; }
+    .h1 { fill: #0f172a; font-size: 20px; font-weight: 700; }
+    .code { fill: #1e40af; font-size: 14px; font-family: Menlo, Consolas, 'Courier New', monospace; }
+    .bus { stroke: #94a3b8; stroke-width: 1.5; fill: none; }
+    .dot { fill: #94a3b8; }
+  </style>
+  <rect class="canvas" x="0.5" y="0.5" width="999" height="379" rx="18"/>
+
+  <!-- top tiles: centers 135, 377, 619, 861 -->
+  <rect class="tile" x="24" y="28" width="222" height="64" rx="10"/>
+  <text class="t" x="135" y="54" text-anchor="middle">Block-diagram simulation</text>
+  <text class="s" x="135" y="75" text-anchor="middle">sources, blocks, +  &gt;&gt;  @, any wire plotted</text>
+  <rect class="tile" x="266" y="28" width="222" height="64" rx="10"/>
+  <text class="t" x="377" y="54" text-anchor="middle">Classical control</text>
+  <text class="s" x="377" y="75" text-anchor="middle">Bode, margins, root locus, PID, lead, lag</text>
+  <rect class="tile" x="508" y="28" width="222" height="64" rx="10"/>
+  <text class="t" x="619" y="54" text-anchor="middle">Nonlinear and robot control</text>
+  <text class="s" x="619" y="75" text-anchor="middle">LQR, impedance, computed torque, SMC</text>
+  <rect class="tile" x="750" y="28" width="222" height="64" rx="10"/>
+  <text class="t" x="861" y="54" text-anchor="middle">Planning</text>
+  <text class="s" x="861" y="75" text-anchor="middle">value iteration, RRT and RRT*</text>
+
+  <!-- bottom tiles -->
+  <rect class="tile" x="24" y="288" width="222" height="64" rx="10"/>
+  <text class="t" x="135" y="314" text-anchor="middle">Trajectory optimization</text>
+  <text class="s" x="135" y="335" text-anchor="middle">collocation, shooting, Ipopt or SciPy</text>
+  <rect class="tile" x="266" y="288" width="222" height="64" rx="10"/>
+  <text class="t" x="377" y="314" text-anchor="middle">Model predictive control</text>
+  <text class="s" x="377" y="335" text-anchor="middle">sampled controller, continuous plant</text>
+  <rect class="tile" x="508" y="288" width="222" height="64" rx="10"/>
+  <text class="t" x="619" y="314" text-anchor="middle">Reinforcement learning</text>
+  <text class="s" x="619" y="335" text-anchor="middle">Gymnasium environment from any plant</text>
+  <rect class="tile" x="750" y="288" width="222" height="64" rx="10"/>
+  <text class="t" x="861" y="314" text-anchor="middle">Animation, 2D and 3D</text>
+  <text class="s" x="861" y="335" text-anchor="middle">matplotlib, plotly, meshcat, pygame</text>
+
+  <!-- buses -->
+  <path class="bus" d="M135,92 L135,124 M377,92 L377,124 M619,92 L619,124 M861,92 L861,124 M135,124 L861,124 M500,124 L500,150"/>
+  <path class="bus" d="M135,288 L135,256 M377,288 L377,256 M619,288 L619,256 M861,288 L861,256 M135,256 L861,256 M500,256 L500,230"/>
+  <circle class="dot" cx="135" cy="124" r="3"/><circle class="dot" cx="377" cy="124" r="3"/><circle class="dot" cx="619" cy="124" r="3"/><circle class="dot" cx="861" cy="124" r="3"/>
+  <circle class="dot" cx="135" cy="256" r="3"/><circle class="dot" cx="377" cy="256" r="3"/><circle class="dot" cx="619" cy="256" r="3"/><circle class="dot" cx="861" cy="256" r="3"/>
+
+  <!-- core -->
+  <rect class="core" x="330" y="150" width="340" height="80" rx="12"/>
+  <text class="h1" x="500" y="183" text-anchor="middle">one System</text>
+  <text class="code" x="500" y="210" text-anchor="middle">f · h · tf  ·  NumPy or JAX</text>
+</svg>

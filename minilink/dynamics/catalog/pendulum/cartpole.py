@@ -8,19 +8,15 @@ slightly in ``z`` for volumetric renderers (MeshCat) so the rod cylinder does
 not pass through the cart body while matplotlib's default XY projection stays
 visually the same.
 
-JAX-readiness: ``CartPole`` / ``RotatingCartPole`` are NumPy plants (``H`` /
-``C`` / ``g`` build ``np`` arrays); use the explicit :class:`JaxCartPole`
-twin for ``jit`` / ``grad`` / ``vmap`` workflows.
+The equations are written with ``xp = array_module(q)``, so every plant here
+compiles on both backends (``jit`` / ``grad`` / ``vmap`` on JAX).
 """
 
 import numpy as np
 
-from minilink.core.backends import require_jax_numpy
+from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
-from minilink.dynamics.abstraction.mechanical import (
-    JaxMechanicalSystem,
-    MechanicalSystem,
-)
+from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
@@ -28,6 +24,7 @@ from minilink.graphical.animation.primitives import (
     Point,
     Rod,
     Sphere,
+    ground_line,
 )
 from minilink.graphical.catalog.shapes import link_pose_3d, point_pose
 
@@ -66,12 +63,13 @@ class RotatingCartPole(MechanicalSystem):
         l2 = params["l2"]
         I1 = params["I1"]
         I2 = params["I2"]
-        c2 = np.cos(q[1])
+        xp = array_module(q)
+        c2 = xp.cos(q[1])
 
         # coupled inertia of the two rotating links
         h01 = m2 * l1 * l2 * c2
         # fmt: off
-        return np.array([
+        return xp.array([
             [m2 * l1**2 + I1,             h01],
             [            h01, m2 * l2**2 + I2],
         ])
@@ -84,9 +82,10 @@ class RotatingCartPole(MechanicalSystem):
         l2 = params["l2"]
 
         # Coriolis coupling driven by the second joint rate
-        c01 = -m2 * l1 * l2 * np.sin(q[1]) * dq[1]
+        xp = array_module(q, dq)
+        c01 = -m2 * l1 * l2 * xp.sin(q[1]) * dq[1]
         # fmt: off
-        return np.array([
+        return xp.array([
             [0.0, c01],
             [0.0, 0.0],
         ])
@@ -99,7 +98,8 @@ class RotatingCartPole(MechanicalSystem):
         gravity = params["gravity"]
 
         # gravity torque acts on the second link only
-        return np.array([0.0, -m2 * gravity * l2 * np.sin(q[1])])
+        xp = array_module(q)
+        return xp.array([0.0, -m2 * gravity * l2 * xp.sin(q[1])])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -107,7 +107,7 @@ class RotatingCartPole(MechanicalSystem):
         d2 = params["d2"]
 
         # linear viscous joint damping
-        return np.diag([d1, d2]) @ dq
+        return array_module(dq).array([d1 * dq[0], d2 * dq[1]])
 
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]
@@ -173,15 +173,11 @@ class UnderactuatedRotatingCartPole(RotatingCartPole):
         )
 
     def B(self, q, params=None):
-        return np.array([[1.0], [0.0]])
+        return array_module(q).array([[1.0], [0.0]])
 
 
 def _configure_cartpole(sys, *, name):
-    """Set the shared EoM params, graphic attributes, and port metadata.
-
-    Used by both the NumPy :class:`CartPole` and JAX :class:`JaxCartPole` twins,
-    which have different base classes but identical configuration.
-    """
+    """Set the shared EoM params, graphic attributes, and port metadata."""
     sys.name = name
     sys.params = {
         "lcg": 0.5,
@@ -223,11 +219,12 @@ class CartPole(MechanicalSystem):
         m2 = params["m2"]
         lcg = params["lcg"]
         theta = q[1]
+        xp = array_module(q)
 
         # cart+pole translation coupled to the pole rotation
-        h01 = m2 * lcg * np.cos(theta)
+        h01 = m2 * lcg * xp.cos(theta)
         # fmt: off
-        return np.array([
+        return xp.array([
             [m1 + m2,        h01],
             [    h01, m2 * lcg**2],
         ])
@@ -239,11 +236,12 @@ class CartPole(MechanicalSystem):
         lcg = params["lcg"]
         theta = q[1]
         dtheta = dq[1]
+        xp = array_module(q, dq)
 
         # centrifugal term from the swinging pole
-        c01 = -m2 * lcg * np.sin(theta) * dtheta
+        c01 = -m2 * lcg * xp.sin(theta) * dtheta
         # fmt: off
-        return np.array([
+        return xp.array([
             [0.0, c01],
             [0.0, 0.0],
         ])
@@ -251,7 +249,7 @@ class CartPole(MechanicalSystem):
 
     def B(self, q, params=None):
         # the force actuates the cart only
-        return np.array([[1.0], [0.0]])
+        return array_module(q).array([[1.0], [0.0]])
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -259,12 +257,13 @@ class CartPole(MechanicalSystem):
         lcg = params["lcg"]
         gravity = params["gravity"]
         theta = q[1]
+        xp = array_module(q)
 
         # gravity torque on the pole
-        return np.array([0.0, m2 * gravity * lcg * np.sin(theta)])
+        return xp.array([0.0, m2 * gravity * lcg * xp.sin(theta)])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
-        return np.zeros(self.dof)
+        return array_module(q).zeros(self.dof)
 
     def get_kinematic_geometry(self):
         pole_length = self.pole_length
@@ -274,16 +273,7 @@ class CartPole(MechanicalSystem):
         wheel_y = -cart_height / 2.0
         wheel_dx = cart_length / 4.0
         return {
-            "world": [
-                CustomLine(
-                    [
-                        [-self.ground_half_width, 0.0, 0.0],
-                        [self.ground_half_width, 0.0, 0.0],
-                    ],
-                    color="black",
-                    style="--",
-                )
-            ],
+            "world": [ground_line(length=2.0 * self.ground_half_width)],
             "body": [
                 Box(
                     length_x=cart_length,
@@ -342,72 +332,6 @@ class CartPole(MechanicalSystem):
         }
 
 
-class JaxCartPole(JaxMechanicalSystem):
-    """JAX-traceable linear cart with one unactuated pendulum pole."""
-
-    def __init__(self):
-        super().__init__(dof=2, actuators=1)
-        _configure_cartpole(self, name="JAX Cart Pole")
-
-    def H(self, q, params=None):
-        params = self.params if params is None else params
-        jnp = require_jax_numpy()
-        m1 = params["m1"]
-        m2 = params["m2"]
-        lcg = params["lcg"]
-        theta = q[1]
-
-        # cart+pole translation coupled to the pole rotation
-        h01 = m2 * lcg * jnp.cos(theta)
-        # fmt: off
-        return jnp.array([
-            [m1 + m2,        h01],
-            [    h01, m2 * lcg**2],
-        ])
-        # fmt: on
-
-    def C(self, q, dq, params=None):
-        params = self.params if params is None else params
-        jnp = require_jax_numpy()
-        m2 = params["m2"]
-        lcg = params["lcg"]
-        theta = q[1]
-        dtheta = dq[1]
-
-        # centrifugal term from the swinging pole
-        c01 = -m2 * lcg * jnp.sin(theta) * dtheta
-        # fmt: off
-        return jnp.array([
-            [0.0, c01],
-            [0.0, 0.0],
-        ])
-        # fmt: on
-
-    def B(self, q, params=None):
-        jnp = require_jax_numpy()
-        return jnp.array([[1.0], [0.0]])
-
-    def g(self, q, params=None):
-        params = self.params if params is None else params
-        jnp = require_jax_numpy()
-        m2 = params["m2"]
-        lcg = params["lcg"]
-        gravity = params["gravity"]
-        theta = q[1]
-
-        # gravity torque on the pole
-        tau_g = m2 * gravity * lcg * jnp.sin(theta)
-        return jnp.array([0.0, tau_g])
-
-    def d(self, q, dq, u=None, t=0.0, params=None):
-        jnp = require_jax_numpy()
-        return jnp.zeros(self.dof)
-
-    get_kinematic_geometry = CartPole.get_kinematic_geometry
-    tf = CartPole.tf
-    get_dynamic_geometry = CartPole.get_dynamic_geometry
-
-
 if __name__ == "__main__":
     sys = RotatingCartPole()
     # sys = UnderactuatedRotatingCartPole()
@@ -420,7 +344,6 @@ if __name__ == "__main__":
     # sys.animate(renderer="meshcat")
 
     sys = CartPole()
-    # sys = JaxCartPole()
     sys.params["m1"] = 1.0
     sys.params["m2"] = 2.0
     sys.params["lcg"] = 2.0

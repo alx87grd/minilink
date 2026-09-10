@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from minilink.core.system import DynamicSystem, System, VectorSignal
+from minilink.core.system import DynamicSystem, StepSystem, System, VectorSignal
 
 
 class TestCoreComponents(unittest.TestCase):
@@ -385,3 +385,90 @@ class TestSystemEvolutionMaps(unittest.TestCase):
         import minilink.core.system as system_mod
 
         self.assertFalse(hasattr(system_mod, "StaticSystem"))
+
+
+class TestDefaultOutput(unittest.TestCase):
+    """``output_dim == n`` gives ``y = x`` by default (pyro semantics)."""
+
+    def test_dynamic_system_default_h_is_state(self):
+        sys = DynamicSystem(n=2, input_dim=1, output_dim=2)
+        x = np.array([1.5, -2.0])
+        np.testing.assert_array_equal(sys.h(x, np.zeros(1)), x)
+        np.testing.assert_array_equal(
+            sys.outputs["y"].compute(x, np.zeros(1), 0.0, None), x
+        )
+
+    def test_dynamic_system_default_h_zero_when_dims_differ(self):
+        sys = DynamicSystem(n=2, input_dim=1, output_dim=1)
+        np.testing.assert_array_equal(sys.h(np.ones(2), np.zeros(1)), np.zeros(1))
+
+    def test_step_system_default_h_is_state(self):
+        sys = StepSystem(n=2, input_dim=1, output_dim=2)
+        x = np.array([3.0, 4.0])
+        np.testing.assert_array_equal(sys.h(x, np.zeros(1)), x)
+
+    def test_custom_plant_composes_with_closed_loop(self):
+        from minilink.control.output import ProportionalController
+
+        class MassSpringDamper(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, output_dim=2)
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([x[1], u[0] - 0.3 * x[1] - 4.0 * x[0]])
+
+        plant = MassSpringDamper()
+        diagram = ProportionalController(K=np.array([[1.0, 0.5]])) @ plant
+        x = np.array([1.0, 0.0])
+        u_ctl = diagram.compute_subsys_output_port(
+            x, np.zeros(diagram.m), 0.0, "ctl", "u"
+        )
+        # r defaults to 0, so u = K (r - y) = -K x = -1.0
+        self.assertAlmostEqual(float(u_ctl[0]), -1.0)
+
+
+class TestForgottenSuperInit(unittest.TestCase):
+    """S06: a subclass that skips super().__init__() gets a named error."""
+
+    def test_message_names_the_class_and_the_fix(self):
+        class NoSuper(DynamicSystem):
+            def __init__(self):
+                self.params = {}
+
+            def f(self, x, u, t=0, params=None):
+                return np.zeros(2)
+
+        with self.assertRaises(AttributeError) as ctx:
+            NoSuper().compile()
+        self.assertIn(
+            "NoSuper.__init__() must call super().__init__", str(ctx.exception)
+        )
+
+    def test_unknown_attribute_is_still_a_plain_attribute_error(self):
+        sys = DynamicSystem(n=1)
+        with self.assertRaises(AttributeError):
+            sys.no_such_attribute
+        self.assertFalse(hasattr(sys, "no_such_attribute"))
+
+    def test_message_also_reaches_the_property_paths(self):
+        class NoSuper(DynamicSystem):
+            def __init__(self):
+                pass
+
+        for attr in ("p", "m", "n", "camera_scale"):
+            with self.assertRaises(AttributeError) as ctx:
+                getattr(NoSuper(), attr)
+            self.assertIn("must call super().__init__", str(ctx.exception))
+
+    def test_property_errors_name_the_real_missing_attribute(self):
+        class Typo(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+
+            @property
+            def gain(self):
+                return self.missing_thing
+
+        with self.assertRaises(AttributeError) as ctx:
+            Typo().gain
+        self.assertIn("missing_thing", str(ctx.exception))

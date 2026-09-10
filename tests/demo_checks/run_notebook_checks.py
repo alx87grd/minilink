@@ -9,7 +9,7 @@ Auto-discovers ``.ipynb`` under mature learn/tooling trees:
 Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
 Defaults: ``timeout=180``, ``requires=[]``. Overrides in
 ``notebook_overrides.json`` (``smoke: false`` drops a notebook from the
-default suite). Not smoked: ``projects/``, ``sandbox/``, long topic
+default suite). Not smoked: ``projects/``, ``experimental/``, long topic
 notebooks (UR5 symbolic EoM, DP grids, PPO training), and the tooling
 benchmark notebook (solver matrix; run locally via ``benchmarks/run_study.py``).
 

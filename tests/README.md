@@ -2,7 +2,7 @@
 
 **Entry points (human · agent · CI):** see [Entry points](#entry-points) below — authoritative for all three audiences.
 
-Six-layer vision (historical plan detail): [docs/plans/test-benchmark-consolidation.md](../docs/plans/test-benchmark-consolidation.md). Notebook smoke is an additional layer on top of that vision.
+The historical six-layer test plan was retired on 2026-09-05 (see [docs/plans/README.md](../docs/plans/README.md)); notebook smoke is an additional layer on top of the unit and demo-check layers.
 
 ---
 
