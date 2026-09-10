@@ -94,3 +94,4 @@ venv.bak/
 !docs/_static/*.gif
 !docs/_static/*.png
 !docs/_static/pitch.html
+!docs/pitch/*.html
