@@ -45,7 +45,9 @@ from minilink.core.facade import lazy_facade
 
 # Only names that do not collide with submodule filenames.
 _EXPORTS: dict[str, tuple[str, str]] = {
+    "LyapunovCertificate": ("minilink.analysis.lyapunov", "LyapunovCertificate"),
     "StructuralResult": ("minilink.analysis.structural", "StructuralResult"),
+    "VerificationReport": ("minilink.analysis.lyapunov", "VerificationReport"),
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),
     "bode": ("minilink.analysis.frequency", "bode"),
     "controllability": ("minilink.analysis.structural", "controllability"),
@@ -56,6 +58,14 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "modal_analysis": ("minilink.analysis.modal", "modal_analysis"),
     "nyquist": ("minilink.analysis.frequency", "nyquist"),
     "observability": ("minilink.analysis.structural", "observability"),
+    "region_of_attraction": (
+        "minilink.analysis.lyapunov",
+        "region_of_attraction",
+    ),
+    "plot_region_of_attraction": (
+        "minilink.analysis.lyapunov",
+        "plot_region_of_attraction",
+    ),
     "plot_bode": ("minilink.analysis.frequency", "plot_bode"),
     "plot_nyquist": ("minilink.analysis.frequency", "plot_nyquist"),
     "plot_pzmap": ("minilink.analysis.frequency", "plot_pzmap"),

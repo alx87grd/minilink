@@ -423,17 +423,11 @@ process noise inside `f`, the robust (minimax) problem class, GPU claims.
 
 ## 8b. The combination showcase (2026-09-11)
 
-`examples/experimental/rl/ur5_impedance_rl_codesign.py` exercises every
-seam at once: `impedance @ arm` as the RL plant (action port `r`), a
+`examples/learn/teaching/ur5_impedance_rl.ipynb` is the combination
+showcase: `impedance @ arm` as the RL plant (action port `r`), a
 `StochasticPlanningProblem` randomizing a subsystem parameter
-(`"sys.mass"`), Monte Carlo scoring of a hand law and the learned law,
-the learned law wired with the impedance block and the arm into one
-diagram (`find_equilibrium`, `linearize`), and `jax.grad` of the vmapped
-closed-loop cost with respect to the impedance gains through the network
-and the arm; a tool-force port on the arm gives the force-to-position Bode
-plot of the impedance loop and of the learned loop (`analysis.bode` on the
-nested diagram). Candidate for a teaching notebook once the maintainer has
-reviewed the story.
+(`"sys.mass"`), Monte Carlo scoring of the learned law, and the three
+blocks wired as one diagram.
 
 ## 9. Non-goals
 

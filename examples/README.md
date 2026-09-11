@@ -12,7 +12,7 @@ Start in Colab:
 ```
 examples/
   learn/
-    intro/         # tutorials of the library: 00_core … 10_graphical + two showcases
+    intro/         # tutorials of the library: 00_core … 11_reinforcement_learning + showcases
     teaching/      # subject lessons (swing-up, DP, PPO, robot EoM, autodiff rollouts)
   demos/<chapter>/ # canonical single-file scripts, one folder per intro chapter
   projects/<name>/ # multi-file experiments (run_demo.py + helpers ± notebook)
@@ -60,6 +60,7 @@ folders on GitHub, then open a notebook badge.
 | --- | --- |
 | [showcase_minilink](learn/intro/showcase_minilink.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb) |
 | [showcase_jax](learn/intro/showcase_jax.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_jax.ipynb) |
+| [showcase_from_rl_to_bode](learn/intro/showcase_from_rl_to_bode.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_from_rl_to_bode.ipynb) |
 | [00_core](learn/intro/00_core.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/00_core.ipynb) |
 | [01_blocks](learn/intro/01_blocks.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/01_blocks.ipynb) |
 | [02_dynamics](learn/intro/02_dynamics.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/02_dynamics.ipynb) |
@@ -86,6 +87,7 @@ Long notebooks (UR5 EoM, DP grids, PPO training) are not smoked by CI.
 | [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/drone_ppo_learn_to_fly.ipynb) |
 | [cartpole_rollout_gradients](learn/teaching/cartpole_rollout_gradients.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/cartpole_rollout_gradients.ipynb) |
 | [articulated_robot_eom](learn/teaching/articulated_robot_eom.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/articulated_robot_eom.ipynb) |
+| [ur5_impedance_rl](learn/teaching/ur5_impedance_rl.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/ur5_impedance_rl.ipynb) |
 
 ### Tooling
 
@@ -113,9 +115,9 @@ One demo folder per intro chapter; the research lane sits apart.
 | Compile / autodiff | [07_compile](learn/intro/07_compile.ipynb), [showcase_jax](learn/intro/showcase_jax.ipynb) | [`demos/compile/`](demos/compile/) | [cartpole_rollout_gradients](learn/teaching/cartpole_rollout_gradients.ipynb) |
 | Optimization | [08_optimization](learn/intro/08_optimization.ipynb) | [`demos/optimization/`](demos/optimization/) | |
 | Planning | [09_planning](learn/intro/09_planning.ipynb) | [`demos/planning/`](demos/planning/) (`trajopt/`, `rrt/`, `value_iteration/`) | [cost+VI](learn/teaching/pendulum_swing_up_cost_function_vi.ipynb), [VI vs LQR](learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb), [grid world DP](learn/teaching/grid_world_exact_dp.ipynb); [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
-| Reinforcement learning | [11_reinforcement_learning](learn/intro/11_reinforcement_learning.ipynb) | [`demos/rl/`](demos/rl/) | [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) (Gymnasium + SB3 path); research-lane prototypes in [`experimental/rl/`](experimental/rl/) |
+| Reinforcement learning | [11_reinforcement_learning](learn/intro/11_reinforcement_learning.ipynb), [showcase_from_rl_to_bode](learn/intro/showcase_from_rl_to_bode.ipynb) | [`demos/rl/`](demos/rl/) | [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) (Gymnasium + SB3 path); [ur5_impedance_rl](learn/teaching/ur5_impedance_rl.ipynb); research-lane prototypes in [`experimental/rl/`](experimental/rl/) |
 | Graphical | [10_graphical](learn/intro/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`) | |
-| RL | — | — | [VI vs LQR vs PPO](learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb), [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) |
+| RL | — | — | [VI vs LQR vs PPO](learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb), [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb), [ur5_impedance_rl](learn/teaching/ur5_impedance_rl.ipynb) |
 | Research lane | — | [`experimental/`](experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5) | not swept; `c_export` runs in the JAX regression job; C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` |
 | Solver benchmarks | — | [benchmark](tooling/notebooks/benchmark.ipynb) | Uses repo-root `benchmarks/` |
 

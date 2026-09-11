@@ -55,10 +55,26 @@ class NeuralPolicyController(Controller):
         or squashed by ``tanh`` (SAC family).
     seed : int
         Weight initialization seed.
+    show_setpoint : bool
+        Draw a ball at the commanded set-point (default ``False``).
+    setpoint_plant : System, optional
+        Plant whose ``forward_kinematics`` maps a joint action to a point.
+        Default: ``sys`` itself, or the first manipulator leaf in a diagram.
+    setpoint_radius : float
+        Ball radius in metres (default ``0.04``).
+    task_target : array, optional
+        Fixed task point ``p*``. When set, a second ball is drawn there.
+    task_target_radius : float
+        Radius of the task ball (default ``0.04``).
 
     The trainable weights are ``params["mlp"]``; the normalized-action range
     ``[-1, 1]`` maps onto the ``u`` port bounds, which is what makes
     exploration cover the whole input range from the first step.
+
+    Optional visualization: ``show_setpoint=True`` draws a ball at the
+    commanded set-point (``forward_kinematics(r)`` when the action is a
+    joint reference, or the action itself when it is already a task point).
+    ``task_target`` draws a second, fixed ball at the task point.
     """
 
     # Explicit port roles: state measurement, no boundary reference.
@@ -78,9 +94,22 @@ class NeuralPolicyController(Controller):
         squash="clip",
         seed=0,
         name="Neural Policy Controller",
+        show_setpoint=False,
+        setpoint_plant=None,
+        setpoint_radius=0.04,
+        task_target=None,
+        task_target_radius=0.04,
     ):
         super().__init__()
         self.name = name
+        self.sys = sys
+        self.show_setpoint = bool(show_setpoint)
+        self.setpoint_plant = setpoint_plant
+        self.setpoint_radius = float(setpoint_radius)
+        self.task_target = (
+            None if task_target is None else np.asarray(task_target, dtype=float)
+        )
+        self.task_target_radius = float(task_target_radius)
         if squash not in ("clip", "tanh"):
             raise ValueError(f"squash must be 'clip' or 'tanh', got {squash!r}")
         self.squash = squash
@@ -155,6 +184,60 @@ class NeuralPolicyController(Controller):
     def ctl(self, x, u, t=0, params=None):
         """State feedback; the ``x`` input port carries the plant state in ``u``."""
         return self.action(u, params)
+
+    def setpoint_position(self, x, params=None):
+        """Cartesian point for the commanded set-point, or ``None``."""
+        r = self.action(x, params)
+        plant = self.setpoint_plant
+        if plant is None:
+            plant = self.sys
+            for leaf in getattr(plant, "subsystems", {}).values():
+                if hasattr(leaf, "forward_kinematics") and hasattr(leaf, "dof"):
+                    plant = leaf
+                    break
+        if hasattr(plant, "forward_kinematics") and int(r.shape[0]) == int(
+            getattr(plant, "dof", -1)
+        ):
+            return plant.forward_kinematics(r)
+        if int(r.shape[0]) in (2, 3):
+            return r
+        return None
+
+    def tf(self, x, u, t=0, params=None):
+        from minilink.graphical.catalog.shapes import point_pose
+
+        frames = {}
+        if self.show_setpoint:
+            p = self.setpoint_position(u, params)
+            if p is not None:
+                frames["setpoint"] = point_pose(p)
+        if self.task_target is not None:
+            frames["task"] = point_pose(np.asarray(self.task_target, dtype=float))
+        return frames
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        from minilink.graphical.animation.primitives import Sphere
+
+        geom = {}
+        if self.show_setpoint and self.setpoint_position(u, params) is not None:
+            geom["setpoint"] = [
+                Sphere(
+                    radius=self.setpoint_radius,
+                    center=(0.0, 0.0, 0.0),
+                    color="limegreen",
+                    opacity=0.85,
+                )
+            ]
+        if self.task_target is not None:
+            geom["task"] = [
+                Sphere(
+                    radius=self.task_target_radius,
+                    center=(0.0, 0.0, 0.0),
+                    color="gold",
+                    opacity=0.9,
+                )
+            ]
+        return geom
 
 
 def angle_features(angles, scales=None):

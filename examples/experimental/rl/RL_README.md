@@ -33,20 +33,29 @@ randomized per episode (`params_distribution`).
 | `car_ppo_jax_circuit.py` | BicycleDynRate on the MPC circuit | 1.5M steps | 50 s | laps inside the corridor with the MPC demo's cost, about 9.5 s per 103 m lap at a 12 m/s target |
 | `rocket_ppo_jax_landing.py` | Rocket, one-sided thrust and gimbal | 4M steps | 80 s | free fall, braking burn, settles on the pad |
 
-`ur5_impedance_rl_codesign.py` (2026-09-11) is the combination piece: a
-joint impedance loop around the UR5 (with a 0.5 kg gripper, without which the
-wrist has no inertia to damp), a neural set-point law trained on the inner
-loop under random starts and payloads (Monte Carlo cost 0.17 against 0.28
-for the impedance loop alone), the three blocks wired as one diagram whose
-equilibrium and poles come from autodiff, and the impedance gains tuned by
-gradient descent through the learned law and the arm (cost 0.198 to 0.158 in
-five steps), and a tool-force disturbance port (`tau = u + J(q)^T f`) so the
-same blocks give the compliance Bode plot of each loop: 5.6 mm/N static
-compliance for the impedance loop alone, 0.7 mm/N with the learned law on
-top, which moves the set-point against a steady push like an integral term. Lessons specific to it: an inner loop is a plant whose action
-port is its reference `r`; a diagram's subsystem parameters are randomized
-with dotted names (`"sys.mass"`); a plant whose model has a zero inertia
-cannot be stepped at any useful `dt`, fix the model, not the integrator.
+[`ur5_impedance_rl.ipynb`](../../learn/teaching/ur5_impedance_rl.ipynb)
+(2026-09-11) is the combination piece: a joint impedance loop around the UR5
+(with a 0.5 kg gripper, without which the wrist has no inertia to damp), a
+neural set-point law trained on that inner loop under random starts and
+payloads, then the three blocks wired as one diagram. Lessons specific to it:
+an inner loop is a plant whose action port is its reference `r`; a diagram's
+subsystem parameters are randomized with dotted names (`"sys.mass"`); a plant
+whose model has a zero inertia cannot be stepped at any useful `dt`, fix the
+model, not the integrator.
+
+`pendulum_rl_lyapunov_certificate.py` (2026-09-11) asks what a control
+engineer asks of any learned law: *where is it guaranteed to work?* Every
+answer comes from a classical tool pointed at the network.
+`find_equilibrium` through the policy shows it commands +0.83 Nm at the exact
+upright, so its real equilibrium sits 0.077 rad off the target, a bias no
+training curve or Monte Carlo score reveals. `linearize` (autodiff through
+the network) gives the closed-loop poles, the Lyapunov equation gives `V`,
+and a vmapped sweep of `Vdot` along the *nonlinear* loop certifies a region
+of attraction: 0.19 rad and 0.54 rad/s, every state of it verified to
+converge by simulation. The certified set ends exactly where the policy
+saturates at 4 Nm, and it holds 6% of the simulated basin, the price of a
+quadratic certificate. The sublevel search is gridded, so it is a sharp
+estimate rather than a proof.
 
 Also solved, not kept as a demo: the mountain car (throttle 1 N against 1.57 N
 of slope, 700k steps, 8 s of training, hilltop in 5.7 s from rest).
