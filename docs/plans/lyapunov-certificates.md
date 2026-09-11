@@ -315,8 +315,7 @@ learned `V`; a discrete-time certificate. Each is a clean later step:
 **The demo** (`examples/demos/analysis/analysis_region_of_attraction.py`, as
 built) is 35 lines with no matplotlib in it at all: a torque-limited
 pendulum, one LQR, the actuator limit as a `Saturation` block, then
-`loop.region_of_attraction(X_UP)`, `verify()` and `plot(basin=True,
-verified=200)`. `Q` sits at the top with a comment inviting the reader to
+`loop.region_of_attraction(X_UP)`, `verify()` and `plot(basin=True)`. `Q` sits at the top with a comment inviting the reader to
 try `diag([1000, 10])`, which places faster poles and proves a region three
 times smaller while the basin simulation finds stays the same size — the
 lesson arrives by changing one line rather than by running two designs at
@@ -402,7 +401,10 @@ the quadratic method; a rigorous level needs §8's interval bounds or SOS.
   every layer it drew, a title from the system's own name (with the slice and
   sample-limited notes), `verified=N` overlaying the states
   :meth:`verify` tests coloured by whether they converged, and `limits=` to
-  override the window. Two rules keep it honest on a slice: the level's
+  override the window. The legend names each layer by what backs it — theory
+  for the certified level set, simulation for the basin, the verification
+  draw for the dots — since three layers about convergence in one figure are
+  otherwise easy to confuse. Two rules keep it honest on a slice: the level's
   limiting state is marked only when it lies on the plane, and the
   `V̇ = 0` curve is drawn only where `V̇` is genuinely positive — it vanishes
   at the equilibrium to within rounding, and that speck is not a curve.

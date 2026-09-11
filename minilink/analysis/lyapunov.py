@@ -402,7 +402,10 @@ def plot_region_of_attraction(
     — on a slice the two need not touch, since the binding state usually sits
     off the plane. ``verified=200`` draws the states
     :meth:`LyapunovCertificate.verify` would test, marked by whether they
-    converged (two-state loops only, where the draw lies on the plane).
+    converged. They lie *inside* the certified set, because the claim is what
+    is on trial and a state there that fails is a counterexample; whether
+    states outside converge is what ``basin`` answers. Two-state loops only,
+    where the draw lies on the plane.
     ``trajectories`` is a sequence of initial states to overlay.
 
     ``limits`` is an explicit ``((x_min, x_max), (y_min, y_max))`` window;
@@ -476,7 +479,9 @@ def draw_region(
         ax.contourf(
             GX, GY, reached.reshape(GX.shape), levels=[0.5, 1.5], colors=["#cfe3f7"]
         )
-        keys.append(Patch(facecolor="#cfe3f7", label="converges (simulated)"))
+        keys.append(
+            Patch(facecolor="#cfe3f7", label="empirical: converged in simulation")
+        )
 
     ax.contour(
         GX,
@@ -487,7 +492,13 @@ def draw_region(
         linewidths=2.0,
     )
     keys.append(
-        Line2D([], [], color="tab:red", linewidth=2.0, label=r"certified $V \leq c$")
+        Line2D(
+            [],
+            [],
+            color="tab:red",
+            linewidth=2.0,
+            label=r"theory: Lyapunov guarantee $V \leq c$",
+        )
     )
 
     if detail:
@@ -555,7 +566,7 @@ def draw_region(
                 color="tab:green",
                 marker=".",
                 linestyle="",
-                label=f"verified {int(converged.sum())}/{int(verified)}",
+                label=f"verify(): {int(converged.sum())}/{int(verified)} inside converged",
             )
         )
         if not converged.all():
@@ -573,7 +584,7 @@ def draw_region(
                     color="k",
                     marker="x",
                     linestyle="",
-                    label="did not converge",
+                    label="counterexample: did not converge",
                 )
             )
 

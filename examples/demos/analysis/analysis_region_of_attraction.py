@@ -5,8 +5,8 @@ import numpy as np
 from minilink import DiagramSystem, Pendulum, Saturation
 from minilink.control.lqr import lqr_at_operating_point
 
-TORQUE = 4.0  # Nm, against m g l = 9.81 Nm: too weak to hold the pendulum far over
-Q = np.diag([1.0, 0.1])  # try diag([1000, 10]): faster poles, a smaller certificate
+TORQUE = 8.0  # Nm, against m g l = 9.81 Nm: too weak to hold the pendulum far over
+Q = np.diag([1.0, 0.01])  # try diag([1000, 10]): faster poles, a smaller certificate
 X_UP = np.array([np.pi, 0.0])  # upright
 
 plant = Pendulum()
@@ -25,6 +25,7 @@ loop.add_subsystem(plant, "plant")
 loop.connect("plant", "y", "ctl", "x")
 loop.connect("ctl", "u", "limit", "u")
 loop.connect("limit", "y", "plant", "u")
+loop.plot_diagram()
 
 # Find the equilibrium, linearize there, solve A'P + PA = -Q, then sweep the
 # largest level set of V that still decreases along the true nonlinear loop.
@@ -32,4 +33,6 @@ certificate = loop.region_of_attraction(X_UP)
 print(certificate)
 print(certificate.verify())
 
-certificate.plot(basin=True, verified=200)
+certificate.plot()
+certificate.plot(basin=True)
+certificate.plot(verified=200)  # add verified=200 to draw what verify() tested
