@@ -35,7 +35,8 @@
     "requires": [
       "plotly",
       "meshcat"
-    ]
+    ],
+    "interactive": true
   },
   {
     "id": "mpc_integrator_numpy",
