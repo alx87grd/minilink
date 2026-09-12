@@ -1,116 +1,43 @@
 # Minilink AI Agent Instructions
 
-Source of truth for AI agents. Architectural tradeoffs: [CONSTITUTION.md](CONSTITUTION.md).
-Before writing or reviewing Python, read [RULES.md](RULES.md). User API:
-[README.md](README.md). Contracts: [DESIGN.md](DESIGN.md). Maturity:
-[ROADMAP.md](ROADMAP.md). Pytest policy: [tests/README.md](tests/README.md).
+**Always read CONSTITUTION.md before any interaction** — including questions,
+reviews, and plans that do not touch code.
 
-Keep math readable, interfaces thin, and docs synchronized with code.
+**Also read RULES.md before editing code** under `minilink/` (or tests, examples,
+and other Python that implements or exercises that code).
+
+This file is workflow: what to read, when to ask, and the local CI gate.
+User API: README.md. Contracts: DESIGN.md. Maturity: ROADMAP.md.
+Pytest policy: tests/README.md. Examples map: examples/README.md.
 
 ## Non-negotiables
 
-- **Math first:** equations read like textbook math, e.g. `dx = A @ x + B @ u`.
-- **Mechanical-engineering audience:** reviewable by someone who thinks in systems and
-  equations first.
 - **Preserve user edits:** never revert or "clean up" manual changes the user made in
   demos, notebooks, examples, or scratch code — commented-out plots, tuning constants
   (`TF`, gains, step times), disabled sections, exploratory variables — unless they
   explicitly ask. Commit/review passes must not overwrite user-tuned script state.
-- **Teaching imports:** student-facing code uses the root prelude or a band facade
-  (`from minilink import Pendulum`), never a deep defining-module path.
-- **No test harness in demos:** `examples/demos/`, `examples/tutorial/`, and
-  `examples/teaching/` never read CI/smoke env vars or branch on “are we in a test?”
-  (`MINILINK_NOTEBOOK_SMOKE`, etc.). Smoke runners adapt from the outside
-  (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Teaching code may fall back on
-  missing optional packages (e.g. Ipopt → SciPy) — that is user UX, not a test hook.
-- **Never remove** a feature or user-importable name without asking.
 - **Docs are contract:** update DESIGN / ROADMAP / README when public behavior or
   maturity claims change; CONSTITUTION / RULES when identity or review law changes.
 - **Coach the architecture:** name tradeoffs; steer toward the simplest clear interface.
-
-Code and review law (textbook style, placement, tests, consolidation): [RULES.md](RULES.md).
 
 ## Doc map
 
 | Doc | When to update |
 | --- | --- |
-| [CONSTITUTION.md](CONSTITUTION.md) | Vision, contract invariants, conflict precedence — maintainer-owned |
-| [RULES.md](RULES.md) | Universal code and review ladder (humans and agents) |
-| [README.md](README.md) | User workflows, install, examples table |
-| [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior |
-| [ROADMAP.md](ROADMAP.md) | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
-| [AGENTS.md](AGENTS.md) | Agent workflow, doc map, intro-doc and examples rules, local CI gate |
-| [docs/plans/TODO.md](docs/plans/TODO.md) | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
-| [docs/plans/](docs/plans/) | Active **design** writeups only (multi-step plans; delete finished plan docs) |
-| [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
-| [docs/pitch/](docs/pitch/) | The five-slide pitch (`slides.html` + `pitch.css`): single source for the docs landing page (`docs/index.rst`) and the standalone deck `docs/_static/pitch.html` built by `docs/make_assets.py` (also the README GIFs and diagram PNG; `ur5_meshcat.gif` is a screen recording, not rebuilt) |
-| [tests/README.md](tests/README.md) | Marker policy, test philosophy, **entry points (human · agent · CI)** |
-| [docs/reviews/](docs/reviews/) | Dated architecture audits and the interview decision records; read-only history, never a backlog |
+| CONSTITUTION.md | Vision, contract invariants, conflict precedence — maintainer-owned |
+| RULES.md | Universal code and review ladder (humans and agents) |
+| README.md | User workflows, install, examples table |
+| DESIGN.md | Public contracts, package layout, evaluator behavior |
+| ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
+| AGENTS.md | Agent workflow, doc map, local CI gate |
+| docs/plans/TODO.md | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
+| docs/plans/ | Active **design** writeups only (multi-step plans; delete finished plan docs) |
+| docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
+| docs/pitch/ | The five-slide pitch (`slides.html` + `pitch.css`): single source for the docs landing page (`docs/index.rst`) and the standalone deck `docs/_static/pitch.html` built by `docs/make_assets.py` (also the README GIFs and diagram PNG; `ur5_meshcat.gif` is a screen recording, not rebuilt) |
+| tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)** |
+| docs/reviews/ | Dated architecture audits and the interview decision records; read-only history, never a backlog |
 
-Do not add new markdown guides unless asked. Keep [DESIGN.md call chains](DESIGN.md#8-call-chains) minimal.
-
-**Cross-link sparingly.** Every link is a maintenance edge: renames and section
-moves break them silently (no link checker in CI). Link on first mention only,
-and only when the reader must open the target to act. Otherwise name the doc in
-plain text. Documents meant to be read top to bottom (principle lists, the
-constitution) aim for zero links; a table of "related documents" inside a doc
-usually means the content is in the wrong file.
-
-**Intro-doc scope:** [README.md](README.md), marketing showcases
-([showcase/minilink.ipynb](examples/tutorial/showcase_minilink.ipynb),
-[showcase/jax.ipynb](examples/tutorial/showcase_jax.ipynb)), and the
-[`tutorial/`](examples/tutorial/) module API notebooks present the **main
-core tools and features** — `System` / diagrams / simulate / compile / analysis /
-planning trajopt / the hybrid step path (`StepSystem`, `StepDiagramSystem`,
-`Computer`, `HybridDiagram`) / MPC as the hybrid exemplar. Do **not** update those
-intro surfaces to track every new demo, compare script, or `examples/projects/`
-experiment. New demos land under `examples/`; update DESIGN/ROADMAP when contracts
-or maturity change. Add a README examples-table row only when a demo is a
-**canonical** teaching entry for a core tool (e.g. `examples/demos/mpc/mpc_car_minimal.py`).
-
-**Examples buckets** (see [examples/README.md](examples/README.md)):
-`tutorial/` (library curriculum: numbered API + showcases), `teaching/`
-(universal, course-agnostic domain lessons: classical_control, optimal_control,
-reinforcement_learning, robotics), `demos/<chapter>/` (canonical single-file
-scripts, one folder per tutorial chapter), `projects/` (multi-file, research lane),
-`experimental/` (research-lane single files; `scratch/` for personal checks).
-Do not mix `.ipynb` and `.py` in the same leaf folder (except inside one named
-project). Demo stems keep the topic when needed (e.g. `mpc/mpc_car_minimal.py`;
-no `demo_` prefix). Pedagogical compares stay in `demos/`; mission matrices go
-to `experimental/` or `projects/`. Scripts are top-level open-and-run (no
-`main()`); do not add plant-only smokes — use catalog `__main__` instead.
-Developer benches and profiling live in repo-root `benchmarks/` (and `tests/demo_checks/`).
-
-**Student-facing imports.** Code in `README.md`, `examples/tutorial/`,
-`examples/teaching/`, and `examples/demos/` imports through the **teaching surface** — the root prelude
-(`from minilink import Pendulum`) or a band facade (`from minilink.catalog
-import …`, `minilink.control`, `minilink.analysis`, `minilink.blocks`,
-`minilink.simulation`, `minilink.planning`). Deep defining-module imports are
-for library code, tests, and the research lane (`examples/projects/`,
-`examples/experimental/`). Where a band facade does not exist yet, use the shortest
-import that works and leave the facade to the planned step — never invent a
-name. Exception kept: a factory whose name matches its module is imported from
-the module (`from minilink.control.lqr import lqr`).
-
-**Public-facing text** (README, the two showcases, `docs/pitch/`, the docs
-landing page). Always positive about minilink; never name or compare against
-other tools — the allowed framing is that minilink *bridges* capabilities that
-usually live in separate tools. Foundational, not marketing: no superlatives,
-every number measured by a notebook cell (quote batches, never a per-call
-speedup: a jitted `f` call is no faster than NumPy), main line readable by an
-undergraduate, expert depth in short "under the hood" asides. The README does
-not link the deck for now. Verification grep before push:
-`grep -n -i "simulink|matlab|drake|casadi|mujoco"` over README, slides and
-notebook markdown must be empty. GIF assets stay under 1 MB and use the
-plants' catalog framing (the only camera override is the MPC clip following
-the car).
-
-**Demo-script headers.** One-line title docstring; everything else lives
-inline next to the code it describes. No run instructions, section maps, or
-flag explanations in the header — `examples/README.md` says how to run
-demos, and the code with its inline comments must tell the whole story
-(textbook rule). Notebooks are course material: do not trim their markdown
-unless asked.
+Keep DESIGN.md call chains minimal.
 
 ## Workflow
 
@@ -138,12 +65,9 @@ stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` (CI
 ``regression`` job runs the same).
 
-Demos: under `examples/demos/` (canonical) or `examples/experimental/`
-(non-core / WIP); runnable from repo root. Map: [examples/README.md](examples/README.md).
-
 ## Before push or PR (local CI gate)
 
-**Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points) — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
+**Entry points:** tests/README.md (section "entry points") — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
 
 GitHub **CI** (`.github/workflows/test.yml`) runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
 
@@ -167,35 +91,20 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Compile backend, simulator, or trajopt changes (big review pass) | Regression gates: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 | Teaching notebooks | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
 
-Regression gates full command and CI `regression` job flags: [tests/README.md#entry-points](tests/README.md#entry-points).
+Regression gates full command and CI `regression` job flags: tests/README.md (entry points).
 
-Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for headless pygame; `sphinx-build` only when editing `docs/` (separate Docs workflow).
+Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for headless pygame; graphics visual checklist and demo-check runners in tests/README.md when graphical or user-facing demos changed; `sphinx-build` only when editing `docs/` (separate Docs workflow).
 
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
 
-## Verification
+Use conda env **`minilink`** from environment.yml; setup in README.md (install) (`PYTHONPATH` = repo root).
 
-Use conda env **`minilink`** from [environment.yml](environment.yml); setup in [README.md#install](README.md#install) (`PYTHONPATH` = repo root). **Test entry points:** [tests/README.md#entry-points](tests/README.md#entry-points).
-
-After substantial changes: `pytest` (proportionate to risk), ruff on touched Python, demo-check scripts when user-facing. JAX twin plants: nominal + nontrivial parameter test. Headless: `MPLBACKEND=Agg`; full suite notes in [tests/README.md](tests/README.md).
-
-**Big review pass** (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes): run the committed regression baselines before handoff:
+**Big review pass** (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes):
 
 ```bash
 python benchmarks/run_regression_check.py --suite all
 ```
 
-Use `--update` only after intentional perf or trajectory changes; review the JSON diff before committing. See [benchmarks/README.md](benchmarks/README.md).
+Use `--update` only after intentional perf or trajectory changes; review the JSON diff before committing. See benchmarks/README.md.
 
-## Revision pass
-
-Final pass after substantial changes — smaller, clearer diff:
-
-1. Re-read diff for scope creep and stale comments; **preserve user manual edits** in demos/notebooks.
-2. Simplify; match local patterns; lazy optional imports.
-3. Math-first locals in equation paths; conversion at boundaries only.
-4. Fold or update examples; runnable from repo root.
-5. Sync README (user API), DESIGN (contracts), ROADMAP (maturity if changed), CONSTITUTION / RULES if identity or review law changed.
-6. Tests for new behavior; benchmarks only when performance claims matter.
-7. Verify: **pre-push gate** (ruff + pytest per table above); headless graphics checks when relevant.
-8. Handoff: clean `git status`, short summary of changes and verification; run ruff before push if committing.
+**Handoff:** re-read the diff for scope creep; preserve user manual edits in demos/notebooks; clean `git status`; short summary of changes and verification.

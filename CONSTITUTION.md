@@ -82,12 +82,16 @@ The student syntax never breaks when graduating to advanced research.
 1. **One set of tools for every System.** Tools operate on the `System` abstraction. There is no
    tool for plants that cannot also inspect a closed loop or a subsystem.
 2. **Tools are verbs on a System.** Simulators, optimizers, and analysis tools take a `System`
-   and return trajectories, matrices, or figures. Tools *never* define dynamics.
+   and return trajectories, matrices, or figures.
 3. **Systems are descriptions; facades are shortcuts.** A `System` stores equations, ports,
    parameters, and nominal initial states. Facades (`compute_trajectory`, `linearize`) are
    convenient entry points that delegate directly to their standalone tool modules (`Simulator`, `analysis.linearize`).
 4. **Explicit data flow.** No hidden registries, no invisible global switches, and no implicit backend state.
 5. **Name by diagram role, not implementation technology.**
+6. **Arrays and core objects, not DTO layers.** Equation paths and tools take arrays in and
+   arrays out, or already-named domain objects (`System`, `Trajectory`, `PlanningProblem`,
+   sets, costs). Do not introduce adapter layers or input/output dataclasses that merely wrap
+   `x`, `u`, `t`, or a result the caller already holds.
 
 ## 5. Conflict Precedence
 
@@ -96,7 +100,7 @@ When trade-offs or design tensions arise, higher-ranked principles strictly over
 1. **Equation-path purity** (No statefulness or memory in dynamics; functional purity is non-negotiable).
 2. **Compositional closure** (The continuous set must close; a flow diagram behaves identically to a leaf).
 3. **Continuous contract is primary** (Do not complicate `f`, `DiagramSystem`, flow `compile()`, or `Simulator` for discrete convenience).
-4. **Domain readability** (Textbook mathematics over programmatic abstraction).
+4. **Domain readability** (Textbook mathematics over programmatic abstraction; arrays and core objects over DTO layers).
 5. **Single-path implementation** (Code deduplication is desirable, but never at the expense of readability or purity).
 
 ## 6. Architectural Notes

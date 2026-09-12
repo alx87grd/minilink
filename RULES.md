@@ -62,6 +62,11 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **2.4 No run state on a System.** A `System` does not store simulation trajectories, solver state,
   or run history. Exception: `self.traj` is the one daily-use shortcut; a new exception needs a
   reason of that weight.
+- **2.5 Prefer arrays and existing core objects.** New APIs take and return arrays or types
+  students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
+  request/response dataclasses, option bags, or adapter layers that only wrap those. A new
+  named record is justified when it is a domain noun (a trajectory, a certificate, a plan) —
+  not when it is a programming convenience.
 
 ---
 
@@ -74,7 +79,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   - An operation or algorithm on a system lives in its respective tool band (`minilink.simulation`,
     `minilink.analysis`, `minilink.control`, `minilink.planning`, `minilink.optimization`).
   - Unproven prototypes and research experiments live in the research lane (`examples/experimental/`
-    or `examples/projects/`).
+    or `examples/projects/`). Runnable example layout, naming, and promotion live in
+    examples/README.md. Developer benches live under `benchmarks/`.
 - **3.2 The dependency law:** Domain libraries (`control`, `analysis`, `simulation`, `planning`) may
   import only from `minilink.core` and shared mathematical bases. Peer domain libraries do not import
   each other without explicit architectural justification.
@@ -90,6 +96,18 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   graphical rendering libraries (Matplotlib, Pygame, Meshcat). Physical geometries are declared using
   lightweight declarative primitives (`Circle`, `Rod`), and rendering engines are loaded lazily by
   user scripts or simulator wrappers, ensuring dynamics remains 100% headless.
+- **3.6 A folder README must earn its keep.** Add one only when it states a policy, how to
+  run, or a bucket contract that a directory listing cannot. Do not add a README that
+  merely lists the files in that folder. The existing maps (root `README.md`,
+  `examples/README.md`, `tests/README.md`) stay the maps; leaf demo folders do not get
+  a second copy. Do not add new markdown guides unless the maintainer asks.
+- **3.7 Intro surfaces stay canonical.** README.md, the two showcase notebooks, and
+  `examples/tutorial/` present the main core tools: `System`, diagrams, simulate,
+  compile, analysis, planning trajopt, the hybrid step path (`StepSystem`,
+  `StepDiagramSystem`, `Computer`, `HybridDiagram`), and MPC as the hybrid exemplar.
+  Do not update them to track every new demo, compare script, or research-lane
+  experiment. New demos land under `examples/`. Add a README examples-table row only
+  when a demo is a canonical teaching entry for a core tool.
 
 ---
 
@@ -100,12 +118,15 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **4.1 Three import layers (prefer the shortest that remains clear):**
   - **Root prelude:** `from minilink import Pendulum, lqr, Simulator` (the primary teaching surface).
   - **Band facades:** `from minilink.control import lqr` or `from minilink.analysis import bode`.
-  - **Defining module:** `from minilink.control.lqr import lqr` (used by library internals and tests).
-- **4.2 Student code imports through the teaching surface.** Tutorials, teaching examples, and
-  demos import strictly via the root prelude or band facades, never through internal paths.
+  - **Defining module:** `from minilink.control.lqr import lqr` (library internals, tests,
+    and the research lane).
+- **4.2 Student code imports through the teaching surface.** README, tutorials, teaching
+  examples, and demos import strictly via the root prelude or band facades, never through
+  internal paths.
   Reader-facing imports stay light in demos; internal packages may import richly when that is
-  clearer. *(Exception: when a factory name matches its module, import from the module:
-  `from minilink.control.lqr import lqr`).*
+  clearer. Where a band facade does not exist yet, use the shortest import that works and
+  leave the facade to a planned step — do not invent a name. *(Exception: when a factory
+  name matches its module, import from the module: `from minilink.control.lqr import lqr`).*
 - **4.3 Preconditions met by named adapters.** Never ask the user to write a separate model for
   different tools. A tool requiring a linear model accepts any `System` via `linearize()`; a tool
   requiring discrete stepping accepts a continuous system via a discretization adapter.
@@ -217,14 +238,26 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   modules (`core/compile/`, evaluators) may carry compiler machinery.
 - **5.17 Native-array equation paths:** Keep $f$/$h$ on native arrays; convert at API boundaries only.
 - **5.18 `__main__` hello-worlds:** Core modules may ship a ~10-line `__main__` smoke. Bigger
-  examples live under `examples/`.
+  examples live under `examples/`. Do not add plant-only demo scripts whose only job is
+  to smoke a catalog class.
 - **5.19 JAX float64 by default:** JAX evaluators enable 64-bit floats on construction;
   `MINILINK_JAX_X64=0` opts out. Tools never require the caller to call `configure_jax` first.
 - **5.20 Match the neighborhood:** Change only what the task requires. Public APIs use type hints
   and NumPy docstrings except in equation paths (rule 5.1). Lazy optional imports. Prefer a low
   helper count in math tools; inline single-use helpers.
 - **5.21 Validation in proportion:** Validate at boundaries, not in every helper. Use dataclasses
-  for transparent records. Use `ABC` only when enforcement helps.
+  for transparent *domain* records (`Trajectory`, a certificate, a plan). Do not use them as
+  input/output wrappers around arrays (rule 2.5). Use `ABC` only when enforcement helps.
+- **5.22 Comment the steps, not the file.** Core math (`f`, `h`, costs, maps) is ventilated:
+  blank lines between the main steps. A short comment sits on its own line above each step
+  that the symbols do not already make obvious. Skip the comment when the line reads like
+  the textbook (`dx = A @ x + B @ u`). Comments name the step; they do not restate the
+  algebra in prose. Apply this to new math; do not restyle an existing dense equation path
+  unless the maintainer asks.
+- **5.23 No preamble walls.** A module or demo opens with a one-line title docstring. Do not
+  add a long introduction, section map, run recipe, or flag explanation at the top — the
+  code plus inline comments must tell the story. Notebooks are course material: do not
+  trim their markdown unless asked.
 
 ---
 
@@ -233,14 +266,18 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 *Trust in the toolbox is built on verifiable evidence, clean demos, and robust tests.*
 
 - **6.1 Demos are open-and-run scripts:** Demo scripts in `examples/demos/` must run from the top
-  level without requiring a `main()` function wrapper. They feature a clear one-line title docstring
-  and tell their pedagogical story through inline comments.
-- **6.2 No test harness code in demos:** Never add test environment branches (`if CI: ...`), mock
-  flags, or headless switches inside user-facing demos. Test runners adapt from the outside
-  (e.g., by setting `MPLBACKEND=Agg` or setting timeouts).
+  level without requiring a `main()` function wrapper. One-line title docstring; the pedagogical
+  story lives in short inline comments next to the code (rules 5.22–5.23).
+- **6.2 No test harness code in demos:** Never add test environment branches (`if CI: ...`),
+  smoke env vars (`MINILINK_NOTEBOOK_SMOKE`), mock flags, or headless switches inside
+  `examples/demos/`, `examples/tutorial/`, or `examples/teaching/`. Test runners adapt
+  from the outside (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Falling back when
+  an optional package is missing (Ipopt → SciPy) is user UX, not a test hook.
 - **6.3 Tests only when justified.** Write tests for stable public APIs, TRL milestones,
   mathematical contracts, boundary conditions, cross-backend parity (NumPy vs. JAX), or an
-  explicit maintainer request. Do not write brittle tests that assert internal helper details.
+  explicit maintainer request. JAX twin plants owe a nominal case and a nontrivial
+  parameter case. Do not write brittle tests that assert internal helper details.
+  Benchmarks only when a performance claim needs a gate.
 - **6.4 One parameterized test over many duplicates:** Consolidate related test configurations into
   parameterized fixtures rather than proliferating near-duplicate test files.
 - **6.5 Guard optional dependencies:** Third-party dependencies (JAX, Pygame, Meshcat) must be
@@ -253,6 +290,15 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   wall-clock cap is not the rule (trajopt and RL cells may take longer).
 - **6.8 Demo-gate maturity.** Nothing enters the teaching surface without a demo or notebook,
   a both-backends test where it defines dynamics, and a docstring (ROADMAP.md §2).
+- **6.9 Public-facing prose is foundational, not a bake-off.** README, the two showcases,
+  `docs/pitch/`, and the docs landing page stay positive about minilink and never name
+  other tools. Framing: minilink bridges capabilities that usually live in separate tools.
+  No superlatives; quote measured notebook batches, never a per-call speedup. The main
+  line is readable by an undergraduate; expert depth sits in short "under the hood"
+  asides. The README does not link the pitch deck for now. GIF assets stay under 1 MB
+  and use catalog plant framing (the MPC clip may follow the car). Before pushing those
+  files, `grep -n -i "simulink|matlab|drake|casadi|mujoco"` over README, slides, and
+  notebook markdown must be empty.
 
 ---
 
@@ -272,3 +318,10 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **7.4 Prototype honestly.** Unvalidated architecture gets `TODO: User Architectural Review`.
 - **7.5 Incremental refactoring.** No broad restructures unless the maintainer asks. Match the
   neighborhood; change only what the task requires.
+- **7.6 Cross-link sparingly.** Every link is a maintenance edge: renames and section
+  moves break them silently (no link checker in CI). Link on first mention only, and
+  only when the reader must open the target to act. Otherwise name the document in
+  plain text. Documents meant to be read top to bottom (principle lists, the
+  constitution) aim for zero links. A table of "related documents" inside a doc
+  usually means the content is in the wrong file. Do not weave "see also" tables,
+  comment pointers, or section anchors that go stale on rename.
