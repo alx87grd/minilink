@@ -13,10 +13,11 @@ from types import MappingProxyType
 
 import numpy as np
 
+from minilink.core.backends import require_jax
 from minilink.core.costs import CostFunction
 from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
 from minilink.core.system import System
-from minilink.planning.distributions import Distribution
+from minilink.planning.distributions import Distribution, Particles
 
 
 @dataclass(frozen=True)
@@ -437,13 +438,41 @@ class StochasticPlanningProblem(PlanningProblem):
         )
 
 
+def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
+    """
+    The same task as a stochastic problem, the inverse of :meth:`StochasticPlanningProblem.nominal`.
+
+    A stochastic problem is returned unchanged. A deterministic one keeps every
+    field and starts from its single ``x_start``, with no parameter or
+    disturbance draws: it trains and evaluates from one start, so coverage of
+    other starts comes from giving a stochastic problem a start distribution.
+    """
+    if isinstance(problem, StochasticPlanningProblem):
+        return problem
+    return StochasticPlanningProblem(
+        sys=problem.sys,
+        x_start=problem.x_start,
+        x_goal=problem.x_goal,
+        cost=problem.cost,
+        X=problem.X,
+        U=problem.U,
+        X0=problem.X0,
+        Xf=problem.Xf,
+        tf=problem.tf,
+        params=problem.params,
+        metadata=problem.metadata,
+        on_exit=problem.on_exit,
+        exit_cost=problem.exit_cost,
+        x0_distribution=Particles(np.atleast_2d(problem.x_start)),
+    )
+
+
 def split_keys(key, n):
     """``n`` independent keys from a JAX key, or the same NumPy generator ``n`` times."""
     if n == 0:
         return []
     if type(key).__module__.startswith("jax"):
-        import jax
-
+        jax = require_jax()
         return list(jax.random.split(key, n))
     rng = key if isinstance(key, np.random.Generator) else np.random.default_rng(key)
     return [rng] * n

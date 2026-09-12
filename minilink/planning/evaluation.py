@@ -39,6 +39,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import merge_params
 
@@ -175,9 +176,7 @@ class MonteCarloEvaluator:
     # Internal machinery
 
     def evaluate_jax(self, controller) -> MonteCarloReport:
-        import jax
-        import jax.numpy as jnp
-
+        jax, jnp = require_jax(), require_jax_numpy()
         from minilink.planning.reinforcement_learning.environment import (
             RolloutEnvironment,
         )
@@ -366,7 +365,7 @@ def static_law(controller, backend="jax"):
         start += port.dim
 
     if backend == "jax":
-        import jax.numpy as jnp
+        jnp = require_jax_numpy()
 
         u_nominal = jnp.asarray(controller.get_u_from_input_ports(), dtype=float)
         x_ctl = jnp.zeros(0)

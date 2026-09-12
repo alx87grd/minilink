@@ -1,13 +1,4 @@
-"""
-Neural state-feedback controllers.
-
-:class:`NeuralPolicyController` is the law ``u = pi(x)`` that reinforcement
-learning (or any policy search) trains: features of the state, a multilayer
-perceptron, and a map from the network's normalized output to the input-port
-bounds. It is a :class:`~minilink.core.feedback.Controller`, so
-``ctl @ plant`` closes the loop, ``plot_control_law`` draws the law, and the
-weights are ordinary ``params`` entries that a planner updates in place.
-"""
+"""Neural state-feedback controllers: the law ``u = pi(x)`` that policy search trains."""
 
 import numpy as np
 
@@ -33,6 +24,13 @@ def action_port_of(sys) -> str:
 class NeuralPolicyController(Controller):
     """
     State feedback ``u = u_mid + u_half * clip(MLP(z(x)), -1, 1)``.
+
+    The law reinforcement learning, or any policy search, trains: features of
+    the state, a multilayer perceptron, and a map from the network's normalized
+    output to the input-port bounds. It is a
+    :class:`~minilink.core.feedback.Controller`, so ``ctl @ plant`` closes the
+    loop, ``plot_control_law`` draws the law, and the weights are ordinary
+    ``params`` entries that a planner updates in place.
 
     Parameters
     ----------
@@ -177,8 +175,12 @@ class NeuralPolicyController(Controller):
     def action(self, x, params=None):
         """Plant input ``u = u_mid + u_half * squash(a)`` with ``squash`` clip or tanh."""
         xp = array_module(x)
+
+        # Normalized action a = MLP(z(x)), kept in [-1, 1] by the family's squash
         a = self.mean_action(x, params)
         a = xp.tanh(a) if self.squash == "tanh" else xp.clip(a, -1.0, 1.0)
+
+        # Affine map onto the input-port bounds
         return self.u_mid + self.u_half * a
 
     def ctl(self, x, u, t=0, params=None):

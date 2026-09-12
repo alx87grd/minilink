@@ -10,7 +10,8 @@ that policy:
   trajectory-optimization transcriptions, validated by
   :func:`normalize_backend`.
 - **Runtime helpers** — :func:`array_module` for hybrid equation paths and
-  :func:`require_jax_numpy` / :func:`configure_jax` for JAX-only code paths.
+  :func:`require_jax` / :func:`require_jax_numpy` / :func:`configure_jax` for
+  JAX-only code paths.
 - **Precision policy** — JAX runs with 64-bit floats by default
   (:func:`jax_x64_policy`, applied by :func:`ensure_jax_x64` from every
   JAX evaluator and from :func:`require_jax_numpy`); set ``MINILINK_JAX_X64=0``
@@ -47,6 +48,11 @@ BACKEND_NUMPY = "numpy"
 BACKEND_JAX = "jax"
 BACKEND_AUTO = "auto"
 BACKEND_DIRECT = "direct"
+
+_JAX_REQUIRED = (
+    "This code path requires JAX. "
+    "Install with `pip install minilink[jax]` (or `pip install jax jaxlib`)."
+)
 
 #: Backends accepted by :func:`minilink.core.compile.compiler.compile`.
 COMPILE_BACKENDS: tuple[str, ...] = (BACKEND_NUMPY, BACKEND_JAX)
@@ -108,15 +114,23 @@ def jax_installed() -> bool:
 
 
 @functools.lru_cache(maxsize=1)
+def require_jax() -> types.ModuleType:
+    """Return ``jax`` (lazy, cached) under the float64 policy. Raises if JAX is not installed."""
+    try:
+        import jax
+    except ImportError as e:
+        raise ImportError(_JAX_REQUIRED) from e
+    ensure_jax_x64()
+    return jax
+
+
+@functools.lru_cache(maxsize=1)
 def require_jax_numpy() -> types.ModuleType:
     """Return ``jax.numpy`` (lazy, cached). Raises if JAX is not installed."""
     try:
         import jax.numpy as jnp
     except ImportError as e:
-        raise ImportError(
-            "This code path requires JAX. "
-            "Install with `pip install minilink[jax]` (or `pip install jax jaxlib`)."
-        ) from e
+        raise ImportError(_JAX_REQUIRED) from e
     ensure_jax_x64()
     return jnp
 
@@ -145,10 +159,7 @@ def configure_jax(*, enable_x64: bool | None = None) -> types.ModuleType:
     try:
         import jax
     except ImportError as e:
-        raise ImportError(
-            "This code path requires JAX. "
-            "Install with `pip install minilink[jax]` (or `pip install jax jaxlib`)."
-        ) from e
+        raise ImportError(_JAX_REQUIRED) from e
 
     if enable_x64 is not None:
         jax.config.update("jax_enable_x64", bool(enable_x64))

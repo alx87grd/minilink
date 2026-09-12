@@ -1,11 +1,14 @@
 """The RL planner, its environment semantics, the neural policy block, and Monte Carlo evaluation."""
 
+import warnings
+
 import numpy as np
 import pytest
 
 from minilink import Pendulum
 from minilink.core.costs import CostFunction
-from minilink.planning.distributions import Uniform
+from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
+from minilink.planning.distributions import Gaussian, Uniform
 from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
 from minilink.planning.results import PolicyPlan, TrajectoryPlan
 
@@ -37,8 +40,8 @@ class HangCost(CostFunction):
         return 1.0
 
 
-def bounded_pendulum():
-    plant = Pendulum()
+def bounded_pendulum(plant=None):
+    plant = Pendulum() if plant is None else plant
     plant.inputs["u"].lower_bound = np.array([-4.0])
     plant.inputs["u"].upper_bound = np.array([4.0])
     plant.state.lower_bound = np.array([-np.pi, -8.0])
@@ -166,6 +169,91 @@ def test_planner_reads_the_cost_discount_and_rejects_bad_batches():
     np.testing.assert_allclose(float(r_later), float(r0), atol=1e-6)
     with pytest.raises(ValueError):
         ReinforcementLearningPlanner(prob, dt=0.1, algorithm="sac?", verbose=0)
+
+
+def test_the_discount_has_one_owner_and_an_announced_default():
+    class Discounted(HangCost):
+        discount_rate = 1.0
+
+    undiscounted = problem(tf=np.inf)
+    discounted = StochasticPlanningProblem(
+        bounded_pendulum(),
+        cost=Discounted(),
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+    )
+    small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32, verbose=0)
+
+    def build(prob, **kwargs):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            planner = ReinforcementLearningPlanner(prob, **{**small, **kwargs})
+        return planner, [w for w in caught if "undiscounted" in str(w.message)]
+
+    # nothing declared: the default, announced with its horizon
+    planner, announced = build(undiscounted)
+    assert planner.gamma == 0.99 and len(announced) == 1
+    assert "effective horizon of 9.9 s at dt=0.1" in str(announced[0].message)
+
+    # a declared rate, the planner's gamma, or the algorithm's own: silent
+    planner, announced = build(discounted)
+    np.testing.assert_allclose(planner.gamma, np.exp(-0.1))
+    assert not announced
+    planner, announced = build(undiscounted, gamma=0.95)
+    assert planner.gamma == 0.95 and not announced
+    planner, announced = build(undiscounted, algorithm=PPO(gamma=0.9, batch_size=32))
+    assert planner.gamma == planner.algorithm.gamma == 0.9 and not announced
+    assert "gamma" not in vars(planner)  # the planner keeps no second copy
+
+    with pytest.raises(ValueError, match="two discounts"):
+        build(undiscounted, algorithm=PPO(gamma=0.9, batch_size=32), gamma=0.95)
+
+
+def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
+    small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32, verbose=0)
+
+    # no disturbance port: the same law on the same plant as a trajectory solve
+    prob = problem(tf=np.inf)
+    planner = ReinforcementLearningPlanner(prob, **small)
+    key = np.asarray(planner.key)
+    nominal = planner.nominal_trajectory(tf=0.5)
+    np.testing.assert_array_equal(np.asarray(planner.key), key)  # no draw consumed
+    solved = planner.solve_trajectory_from(prob.x_start, tf=0.5).trajectory
+    np.testing.assert_array_equal(nominal.x, solved.x)
+    np.testing.assert_array_equal(nominal.u, solved.u)
+
+    # a disturbance port: the nominal rollout holds it at its nominal value
+    noisy = StochasticPlanningProblem(
+        bounded_pendulum(PendulumWithNoisePort()),
+        cost=HangCost(),
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        disturbances={"w": Gaussian([0.0], [1.0])},
+    )
+    planner = ReinforcementLearningPlanner(noisy, **small)
+    first, second = (
+        planner.nominal_trajectory(tf=0.5),
+        planner.nominal_trajectory(tf=0.5),
+    )
+    np.testing.assert_array_equal(first.x, second.x)
+    disturbed = planner.solve_trajectory_from(noisy.x_start, tf=0.5).trajectory
+    assert not np.array_equal(first.x, disturbed.x)
+
+
+def test_solve_keeps_the_full_evaluation_behind_the_reported_cost():
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf),
+        dt=0.1,
+        hidden=(8, 8),
+        n_envs=4,
+        n_steps=16,
+        batch_size=32,
+        verbose=0,
+    )
+    assert planner.last_evaluation is None
+    plan = planner.solve(timesteps=64, n_trials=4)
+    report = planner.last_evaluation
+    assert report.J.shape == (4,)
+    assert plan.metadata.cost == report.mean
+    assert plan.metadata.stats["failure_rate"] == report.failure_rate
 
 
 def test_plain_planning_problem_trains_from_its_single_start():

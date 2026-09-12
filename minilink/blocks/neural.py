@@ -1,9 +1,4 @@
-"""Minimal neural-network static blocks.
-
-These are ordinary :class:`~minilink.core.system.System` blocks: weights
-are model parameters, inputs and outputs are ports, and training lives outside
-the block.
-"""
+"""Minimal neural-network static blocks: weights are parameters, training lives outside."""
 
 import numpy as np
 
@@ -125,17 +120,29 @@ class MLP(System):
     def compute(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(u)
-        act = xp.tanh if self.activation == "tanh" else (lambda v: xp.maximum(v, 0.0))
+
+        def relu(v):
+            return xp.maximum(v, 0.0)
+
+        act = xp.tanh if self.activation == "tanh" else relu
+
+        # Hidden layers: a_k = act(W_k a_k-1 + b_k), from a_0 = u
         a = u
         for k in range(self.n_layers - 1):
-            a = act(params[f"W{k}"] @ a + params[f"b{k}"])
-        last = self.n_layers - 1
-        return params[f"W{last}"] @ a + params[f"b{last}"]
+            W, b = params[f"W{k}"], params[f"b{k}"]
+            a = act(W @ a + b)
+
+        # Output layer, affine: y = W_L a_L-1 + b_L
+        L = self.n_layers - 1
+        W, b = params[f"W{L}"], params[f"b{L}"]
+        return W @ a + b
 
 
 def orthogonal(rng, shape):
     """Orthogonal matrix of the given shape (QR of a Gaussian draw)."""
     rows, cols = shape
+
+    # QR of a Gaussian matrix; the signs of diag(R) make Q uniformly distributed
     a = rng.standard_normal((max(rows, cols), min(rows, cols)))
     q, r = np.linalg.qr(a)
     q = q * np.sign(np.diag(r))

@@ -7,7 +7,11 @@ from minilink import Pendulum
 from minilink.core.costs import CostFunction, QuadraticCost
 from minilink.planning.distributions import Gaussian, Particles, Sampler, Uniform
 from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
-from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
+from minilink.planning.problems import (
+    PlanningProblem,
+    StochasticPlanningProblem,
+    as_stochastic,
+)
 
 
 def pendulum():
@@ -171,6 +175,31 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
             x0_distribution=Gaussian([0.0, 0.0], 1.0),
             params_distribution={"nope": Uniform([0.0], [1.0])},
         )
+
+
+def test_as_stochastic_is_the_inverse_bridge_of_nominal():
+    plant = pendulum()
+    deterministic = PlanningProblem(
+        plant,
+        x_start=[0.3, -0.1],
+        cost=quadratic(plant),
+        tf=5.0,
+        on_exit="terminate",
+        exit_cost=10.0,
+    )
+    stochastic = as_stochastic(deterministic)
+    assert type(stochastic) is StochasticPlanningProblem
+    # every draw is the single start, and nothing else is random
+    np.testing.assert_allclose(stochastic.sample_x0(0, n=3), [[0.3, -0.1]] * 3)
+    assert stochastic.sample_params(0) == {} and stochastic.sample_disturbances(0) == {}
+    assert stochastic.criterion == "expectation"
+    assert (stochastic.tf, stochastic.on_exit, stochastic.exit_cost) == (
+        5.0,
+        "terminate",
+        10.0,
+    )
+    np.testing.assert_allclose(stochastic.nominal().x_start, [0.3, -0.1])
+    assert as_stochastic(stochastic) is stochastic
 
 
 # --- the shared scoring contract ---

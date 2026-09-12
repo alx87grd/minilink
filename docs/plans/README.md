@@ -24,6 +24,7 @@ the design needs a writeup.
 | [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | Solver backend factory for offline + parametric MPC | Research lane — draft, Later |
 | [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Research lane — draft, Later |
 | [rl-planner-vision.md](rl-planner-vision.md) | RL as a policy-family planner on the stochastic problem: exit rule and horizon semantics, feature/policy block, bare JAX vs Flax, Monte Carlo evaluation | Research lane — in progress: R1–R6 landed, R7 open |
+| [planning-solution.md](planning-solution.md) | One result for every planner: `PlanningSolution` with policy, trajectory, evaluation, optional cost-to-go and a typed solver record; open-loop plans return a time-based policy block | Teaching surface — design converged 2026-09-12, implementation postponed |
 | [lyapunov-certificates.md](lyapunov-certificates.md) | Region of attraction as an analysis verb: quadratic Lyapunov certificate, sampled sublevel search, Monte Carlo verification, phase-plane plot | Teaching surface — implemented 2026-09-11, awaiting rulings (D1–D5) |
 | [phase4-fidelity-maps.md](phase4-fidelity-maps.md) | Jax bicycle ladder lift/project maps + MPC broadcast | Research lane — draft, Later |
 | [articulated-mechanism.md](articulated-mechanism.md) | Mechanism IR, sym/num dual, spatial RNEA/ABA | Research lane — draft, Later |

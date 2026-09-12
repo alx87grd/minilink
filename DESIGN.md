@@ -131,6 +131,9 @@ provisional planning / MPC / hybrid bands. The `experimental/` tier,
   computed torque, `estimation/` EKFs.)
 - **Exception:** `control/mpc` may import `planning.trajectory_optimization`
   (receding-horizon controller wraps a traj-family planner).
+- **Exception:** `planning.reinforcement_learning` and `planning.evaluation`
+  may import `control.neural` and `blocks.neural` (a learned law is a control
+  block, and the critics share its multilayer perceptron).
 - Libraries may ship **factories for their own blocks** with array-in /
   block-out signatures (`control.lqr(A, B, Q, R) -> StateFeedback`,
   `estimation.kalman_design(A, C, Q, R) -> KalmanFilter`); the linearization

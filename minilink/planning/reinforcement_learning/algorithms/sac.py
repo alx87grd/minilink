@@ -1,20 +1,6 @@
-"""
-Soft Actor-Critic: the off-policy update on replayed transitions.
+"""Soft Actor-Critic: the off-policy update on replayed transitions."""
 
-Twin action-value critics with Polyak-averaged targets, a squashed Gaussian
-actor trained by the reparameterized gradient, and a learned temperature
-``alpha`` that holds the policy entropy at a target (``-m`` by default):
-
-``y = r + gamma (1 - done) [min_i Q_i'(x', a') - alpha log pi(a'|x')]``,
-``L_Q = E[(Q_i(x, a) - y)^2]``,
-``L_pi = E[alpha log pi(a|x) - min_i Q_i(x, a)]``,
-``L_alpha = -log_alpha E[log pi(a|x) + H_target]``.
-
-This file holds only the update rule and its train state; the replay buffer,
-the transition collector, the head and the critics are shared machinery.
-"""
-
-from minilink.core.backends import require_jax_numpy
+from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.planning.reinforcement_learning.algorithms.base import Algorithm
 from minilink.planning.reinforcement_learning.optim import Adam
 
@@ -25,11 +11,16 @@ class SAC(Algorithm):
     """
     Soft Actor-Critic.
 
+    Twin action-value critics with Polyak-averaged targets, a squashed
+    Gaussian actor trained by the reparameterized gradient, and a learned
+    temperature ``alpha`` that holds the policy entropy at a target.
+
     Parameters
     ----------
     learning_rate, gamma, tau, batch_size
         Step size (actor, critics, temperature), discount, Polyak rate, replay
-        minibatch.
+        minibatch. ``gamma=None`` lets the planner resolve the discount from
+        the task.
     buffer_size, learning_starts : int
         Replay capacity and the number of stored transitions before updates.
     gradient_steps : int, optional
@@ -45,7 +36,7 @@ class SAC(Algorithm):
         self,
         *,
         learning_rate=3e-4,
-        gamma=0.99,
+        gamma=None,
         tau=0.005,
         batch_size=256,
         buffer_size=200_000,
@@ -54,7 +45,7 @@ class SAC(Algorithm):
         target_entropy=None,
         max_grad_norm=None,
     ):
-        self.gamma = float(gamma)
+        self.gamma = None if gamma is None else float(gamma)
         self.tau = float(tau)
         self.batch_size = int(batch_size)
         self.buffer_size = int(buffer_size)
@@ -64,9 +55,8 @@ class SAC(Algorithm):
         self.optimizer = Adam(learning_rate, max_grad_norm=max_grad_norm)
 
     def init(self, key, params):
-        jnp = require_jax_numpy()
-        import jax
-
+        """Train state: weights, target critics, log-temperature, and one optimizer state each."""
+        jax, jnp = require_jax(), require_jax_numpy()
         if self.target_entropy is None:
             self.target_entropy = -float(self.functions.m)
         actor = {"actor": params["actor"], "head": params["head"]}
@@ -84,10 +74,8 @@ class SAC(Algorithm):
 
     def update(self, train_state, batch, key):
         """One SAC step on a replay minibatch ``{x, a, reward, x_next, terminated}``."""
-        jnp = require_jax_numpy()
-        import jax
-
-        fn = self.functions
+        jax, jnp = require_jax(), require_jax_numpy()
+        functions = self.functions
         params = train_state["params"]
         x, a, r, x_next, done = (
             batch[k] for k in ("x", "a", "reward", "x_next", "terminated")
@@ -97,17 +85,17 @@ class SAC(Algorithm):
         batch_size = x.shape[0]
 
         def policy_sample(actor, head, xs, keys):
-            mu = jax.vmap(fn.mean, in_axes=(None, 0))(actor, xs)
-            z = jax.vmap(fn.observe)(xs)
-            return jax.vmap(fn.head.sample_and_log_prob, in_axes=(None, 0, 0, 0))(
-                head, mu, z, keys
-            )
+            mu = jax.vmap(functions.mean, in_axes=(None, 0))(actor, xs)
+            z = jax.vmap(functions.observe)(xs)
+            return jax.vmap(
+                functions.head.sample_and_log_prob, in_axes=(None, 0, 0, 0)
+            )(head, mu, z, keys)
 
         def q_values(critic, xs, acts):
-            q = lambda p: jax.vmap(fn.q, in_axes=(None, 0, 0))(p, xs, acts)  # noqa: E731
-            return q(critic["q1"]), q(critic["q2"])
+            q = jax.vmap(functions.q, in_axes=(None, 0, 0))
+            return q(critic["q1"], xs, acts), q(critic["q2"], xs, acts)
 
-        # Critics: soft Bellman target from the current policy at x'
+        # Soft Bellman target: y = r + gamma (1 - done) [min_i Q_i'(x', a') - alpha log pi(a'|x')]
         a_next, logp_next = policy_sample(
             params["actor"],
             params["head"],
@@ -120,11 +108,12 @@ class SAC(Algorithm):
         )
         y = jax.lax.stop_gradient(y)
 
+        # Critic loss: L_Q = E[(Q_1(x, a) - y)^2] + E[(Q_2(x, a) - y)^2]
         def critic_loss(critic):
             q1, q2 = q_values(critic, x, a)
             return jnp.mean((q1 - y) ** 2) + jnp.mean((q2 - y) ** 2)
 
-        # Actor: reparameterized sample, maximize entropy-regularized value
+        # Actor loss, reparameterized: L_pi = E[alpha log pi(a|x) - min_i Q_i(x, a)]
         def actor_loss(actor_params):
             a_new, logp = policy_sample(
                 actor_params["actor"],
@@ -135,7 +124,7 @@ class SAC(Algorithm):
             q1, q2 = q_values(params["critic"], x, a_new)
             return jnp.mean(alpha * logp - jnp.minimum(q1, q2)), logp
 
-        # Temperature: hold the entropy at its target
+        # Temperature loss, holding the entropy at its target: L_alpha = -log alpha E[log pi + H_target]
         def alpha_loss(log_alpha, logp):
             return -log_alpha * jnp.mean(logp + self.target_entropy)
 
@@ -158,8 +147,9 @@ class SAC(Algorithm):
             alpha_grad, opt["alpha"], train_state["log_alpha"]
         )
 
+        # Target critics, Polyak-averaged: Q' = (1 - tau) Q' + tau Q
         target = jax.tree_util.tree_map(
-            lambda t, c: (1.0 - self.tau) * t + self.tau * c,
+            lambda q_target, q: (1.0 - self.tau) * q_target + self.tau * q,
             train_state["target"],
             critic,
         )

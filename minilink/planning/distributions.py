@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from minilink.core.backends import array_module
+from minilink.core.backends import array_module, require_jax
 from minilink.core.sets import BoxSet, Set
 
 # Public API
@@ -67,8 +67,7 @@ class Gaussian(Distribution):
     def sample(self, key, n=None):
         shape = (self.dim,) if n is None else (int(n), self.dim)
         if is_jax_key(key):
-            import jax
-
+            jax = require_jax()
             return self._mean + self.std * jax.random.normal(key, shape)
         return self._mean + self.std * generator(key).standard_normal(shape)
 
@@ -93,8 +92,7 @@ class Uniform(Distribution):
     def sample(self, key, n=None):
         shape = (self.dim,) if n is None else (int(n), self.dim)
         if is_jax_key(key):
-            import jax
-
+            jax = require_jax()
             return jax.random.uniform(key, shape, minval=self.lb, maxval=self.ub)
         return generator(key).uniform(self.lb, self.ub, size=shape)
 
@@ -117,8 +115,7 @@ class Particles(Distribution):
     def sample(self, key, n=None):
         count = self.points.shape[0]
         if is_jax_key(key):
-            import jax
-
+            jax = require_jax()
             xp = array_module(key)
             idx = jax.random.randint(key, () if n is None else (int(n),), 0, count)
             return xp.asarray(self.points)[idx]
@@ -151,8 +148,7 @@ class Sampler(Distribution):
         if n is None:
             return self.draw(key)
         if is_jax_key(key):
-            import jax
-
+            jax = require_jax()
             return jax.vmap(self.draw)(jax.random.split(key, int(n)))
         rng = generator(key)
         return np.stack([np.asarray(self.draw(rng)) for _ in range(int(n))])

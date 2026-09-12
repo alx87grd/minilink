@@ -21,6 +21,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.problems",
         "StochasticPlanningProblem",
     ),
+    "as_stochastic": ("minilink.planning.problems", "as_stochastic"),
     "Gaussian": ("minilink.planning.distributions", "Gaussian"),
     "Uniform": ("minilink.planning.distributions", "Uniform"),
     "Particles": ("minilink.planning.distributions", "Particles"),
