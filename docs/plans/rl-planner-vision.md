@@ -391,7 +391,7 @@ type, never the reverse.
 | **R4** (done) | `blocks/`: `Normalize`, `AngleFeatures`; `control/neural.py`: `NeuralPolicyController` composite | `ctl @ plant`, `plot_diagram`, `plot_control_law`, both backends |
 | **R5a** (done) | `ReinforcementLearningPlanner` + the shared machinery of §3.5 with PPO as the first algorithm; `PolicyPlan`, `get_controller`, `solve_trajectory_from` | the experimental demos re-expressed through the planner with the same outcomes and times |
 | **R5b** | SAC as the second algorithm (off-policy family: squashed head, twin Q, replay) | **done**: `algorithms/sac.py` + `SquashedGaussianHead`; pendulum swing-up by ~19k steps; the PPO file was not edited, the planner gained the `on_policy` branch only |
-| **R6** (done) | Teaching entry: `examples/learn/intro/11_reinforcement_learning.ipynb` (stochastic problem, Monte Carlo on a PD law, the RL planner, the differentiable closed loop) and `examples/demos/rl/` (five official demos mirroring the experimental scripts) | notebook smoke; examples README row |
+| **R6** (done) | Teaching entry: `examples/tutorial/11_reinforcement_learning.ipynb` (stochastic problem, Monte Carlo on a PD law, the RL planner, the differentiable closed loop) and `examples/demos/rl/` (five official demos mirroring the experimental scripts) | notebook smoke; examples README row |
 | **R7** | Retire `experimental/ppo_jax.py`; TRL ledger row moves to Planning / RL | nothing imports the experimental module |
 
 Deferred: SAC or other off-policy methods, running-statistics normalization,
@@ -423,7 +423,7 @@ process noise inside `f`, the robust (minimax) problem class, GPU claims.
 
 ## 8b. The combination showcase (2026-09-11)
 
-`examples/learn/teaching/ur5_impedance_rl.ipynb` is the combination
+`examples/teaching/robotics/ur5_impedance_rl.ipynb` is the combination
 showcase: `impedance @ arm` as the RL plant (action port `r`), a
 `StochasticPlanningProblem` randomizing a subsystem parameter
 (`"sys.mass"`), Monte Carlo scoring of the learned law, and the three

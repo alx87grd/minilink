@@ -1,69 +1,66 @@
 {
-  "examples/learn/intro/showcase_minilink.ipynb": {
+  "examples/tutorial/showcase_minilink.ipynb": {
     "requires": [
       "jax"
     ],
     "timeout": 300
   },
-  "examples/learn/intro/showcase_jax.ipynb": {
+  "examples/tutorial/showcase_jax.ipynb": {
     "requires": [
       "jax"
     ],
     "timeout": 300
   },
-  "examples/learn/intro/showcase_from_rl_to_bode.ipynb": {
+  "examples/tutorial/showcase_from_rl_to_bode.ipynb": {
     "requires": [
       "jax"
     ],
     "smoke": false
   },
-  "examples/learn/intro/07_compile.ipynb": {
+  "examples/tutorial/07_compile.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/learn/intro/09_planning.ipynb": {
+  "examples/tutorial/09_planning.ipynb": {
     "timeout": 300
   },
-  "examples/learn/intro/10_graphical.ipynb": {
+  "examples/tutorial/10_graphical.ipynb": {
     "requires": [
       "meshcat",
       "plotly"
     ]
   },
-  "examples/learn/teaching/cartpole_rollout_gradients.ipynb": {
+  "examples/tutorial/04_analysis.ipynb": {
+    "requires": [
+      "plotly"
+    ]
+  },
+  "examples/teaching/optimal_control/cartpole_rollout_gradients.ipynb": {
     "requires": [
       "jax"
     ],
     "timeout": 300
   },
-  "examples/learn/teaching/articulated_robot_eom.ipynb": {
+  "examples/teaching/robotics/articulated_robot_eom.ipynb": {
     "smoke": false
   },
-  "examples/learn/teaching/pendulum_swing_up_cost_function_vi.ipynb": {
+  "examples/teaching/optimal_control/pendulum_swing_up_cost_function_vi.ipynb": {
     "smoke": false
   },
-  "examples/learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb": {
+  "examples/teaching/optimal_control/pendulum_swing_up_vi_vs_lqr.ipynb": {
     "smoke": false
   },
-  "examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb": {
+  "examples/teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb": {
     "smoke": false
   },
-  "examples/learn/teaching/drone_ppo_learn_to_fly.ipynb": {
-    "smoke": false
-  },
-  "examples/learn/teaching/ur5_impedance_rl.ipynb": {
+  "examples/teaching/reinforcement_learning/drone_ppo_learn_to_fly.ipynb": {
     "smoke": false
   },
   "examples/tooling/notebooks/benchmark.ipynb": {
     "smoke": false
   },
-  "examples/learn/teaching/frequency_domain_tools.ipynb": {
-    "requires": [
-      "plotly"
-    ]
-  },
-  "examples/learn/intro/04_analysis.ipynb": {
+  "examples/teaching/classical_control/frequency_domain_tools.ipynb": {
     "requires": [
       "plotly"
     ]

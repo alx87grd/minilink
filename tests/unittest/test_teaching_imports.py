@@ -1,8 +1,8 @@
 """Student-facing code imports through the teaching surface (AGENTS, ROADMAP §2).
 
-Every ``from minilink... import`` in ``examples/learn/`` and ``examples/demos/``
-must target the root prelude or a band facade — or be listed, per file, in
-``teaching_import_allowlist.txt``. The allowlist only shrinks: it records the
+Every ``from minilink... import`` in ``examples/tutorial/``, ``examples/teaching/``,
+and ``examples/demos/`` must target the root prelude or a band facade — or be listed,
+per file, in ``teaching_import_allowlist.txt``. The allowlist only shrinks: it records the
 deep imports that predate the rule so the test is green today and the
 rewrite can proceed folder by folder.
 """
@@ -36,7 +36,7 @@ TEACHING_MODULES = {
     "minilink.interfaces.gymnasium",
 }
 
-ROOTS = ("examples/learn", "examples/demos")
+ROOTS = ("examples/tutorial", "examples/teaching", "examples/demos")
 
 
 def _sources():

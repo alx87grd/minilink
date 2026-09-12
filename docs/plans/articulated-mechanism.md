@@ -6,7 +6,7 @@ Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 ## Problem
 
 UR5 spatial RNEA/ABA, kinematics, and the symbolic Lagrange path in
-[`articulated_robot_eom.ipynb`](../../examples/learn/teaching/articulated_robot_eom.ipynb)
+[`articulated_robot_eom.ipynb`](../../examples/teaching/robotics/articulated_robot_eom.ipynb)
 describe the **same robot twice**. Spatial helpers and tree sweeps live only in
 [`ur5.py`](../../minilink/dynamics/catalog/manipulators/ur5.py). Symbolic geometry
 lives in [`MechanicalModel.add_dh_chain`](../../minilink/experimental/symbolic/mechanics/model.py).
@@ -277,7 +277,7 @@ class UR5Manipulator(SerialSpatialManipulator):
 
 ## Three FD pipelines (teaching)
 
-One robot, three engines — [`articulated_robot_eom.ipynb`](../../examples/learn/teaching/articulated_robot_eom.ipynb):
+One robot, three engines — [`articulated_robot_eom.ipynb`](../../examples/teaching/robotics/articulated_robot_eom.ipynb):
 
 | Pipeline | Path |
 | --- | --- |

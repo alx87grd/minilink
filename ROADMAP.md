@@ -121,7 +121,7 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
    plant composes with `@`.
 2. Default `compute_trajectory` returns a fixed output count (10 001, the fine
    reporting grid ruled 2026-09-07) and never selects a solver from the point count.
-3. Every GRO860 notebook and every `examples/learn/` and `examples/demos/`
+3. Every GRO860 notebook and every `examples/tutorial/`, `examples/teaching/`, and `examples/demos/`
    file imports only through the teaching surface (CI test).
 4. The Basic tier (NumPy + SciPy + Matplotlib, nothing else) runs
    sim / plot / phase plane / animate / linearize / LQR / VI in a clean
@@ -169,7 +169,7 @@ contract. Step-level work:
 **Cross-cutting gates**
 
 1. Every topic row above is green, with a demo or a notebook.
-2. One `examples/learn/teaching/` notebook per APP, Colab-first, Basic tier
+2. One `examples/teaching/` notebook per APP, Colab-first, Basic tier
    (NumPy + SciPy + Matplotlib) — no JAX on the GRO501 path.
 3. Every tool agrees with the hand calculation for the guide's §9 exercises;
    the closed-loop analysis exercises (§9.6, §9.7) are the acceptance test.

@@ -7,6 +7,10 @@ collision from ``problem.X``, the goal region from ``problem.Xf``/``x_goal``,
 sampling from ``problem.X`` (rejection when needed), dynamics from ``problem.sys``.
 The only swappable pieces are the injected ``extender`` (how two states connect)
 and ``metric`` (the nearest-neighbour distance).
+
+Note
+----
+Provisional tool — maintainer review before assigning for coursework.
 """
 
 from dataclasses import dataclass, replace

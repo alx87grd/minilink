@@ -12,7 +12,7 @@ from minilink.interfaces.gymnasium import SB3Controller, Sys2Gym
 training_timesteps = 100000  # same budget as the notebook (20k + 80k)
 
 
-# Dynamics: same plant as examples/learn/teaching/drone_ppo_learn_to_fly.ipynb
+# Dynamics: same plant as examples/teaching/reinforcement_learning/drone_ppo_learn_to_fly.ipynb
 class NormalizedDrone2D(Drone2D):
     """Planar drone with thrust inputs normalized between -1 and 1."""
 

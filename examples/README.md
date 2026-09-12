@@ -4,34 +4,42 @@ Human-facing runnable learning and experiments. Automated contracts and
 runners live under [`tests/`](../tests/) and [`benchmarks/`](../benchmarks/).
 
 Start in Colab:
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)
 (Colab opens **notebook files** only — use the per-notebook badges below. Folder browsing is on GitHub.)
 
 ## Layout
 
 ```
 examples/
-  learn/
-    intro/         # tutorials of the library: 00_core … 11_reinforcement_learning + showcases
-    teaching/      # subject lessons (swing-up, DP, PPO, robot EoM, autodiff rollouts)
-  demos/<chapter>/ # canonical single-file scripts, one folder per intro chapter
-  projects/<name>/ # multi-file experiments (run_demo.py + helpers ± notebook)
-  experimental/    # research-lane single files (engines, symbolic, C export, UR5)
-  tooling/         # benches (notebooks)
+  # --- Teaching Lane (Pedagogical contract: curated, canonical, CI-checked) ---
+  tutorial/                    # Numbered minilink API walk: 00_core … 11_reinforcement_learning + showcases
+  teaching/                    # Universal, course-agnostic domain lessons
+    classical_control/         # Frequency domain, Bode/Nyquist, PID, state observers
+    optimal_control/           # DP, value iteration, cartpole rollouts, trajopt
+    reinforcement_learning/    # PPO, policy gradients, RL swing-up compares
+    robotics/                  # Manipulator kinematics, Euler-Lagrange EoM, impedance
+  demos/<chapter>/             # Canonical single-file textbook scripts (1:1 with tutorial chapters)
+
+  # --- Research Lane (Repo-only, unconstrained, exploratory) ---
+  projects/<name>/             # Multi-file applications (pathtracking, car_trajopt, mpc)
+  experimental/<topic>/        # Bleeding-edge single-file prototypes, engine checks, scratch
+
+  # --- Developer Tooling ---
+  tooling/                     # Dev benches & profilers
 ```
 
 | Folder | Lane | When to use |
 | --- | --- | --- |
-| [`learn/intro/`](learn/intro/) | teaching, smoked | Learn **minilink** — numbered API notebooks + showcase |
-| [`learn/teaching/`](learn/teaching/) | teaching, smoked unless long | Learn a **subject** (reusable domain notebooks) |
+| [`tutorial/`](tutorial/) | teaching, smoked | Learn **minilink** — numbered API notebooks + showcases |
+| [`teaching/`](teaching/) | teaching, smoked unless long | Learn a **subject** — universal, course-agnostic domain lessons |
 | [`demos/<chapter>/`](demos/) | teaching, nightly sweep | Canonical single-file demo (incl. pedagogical compares) |
-| [`projects/<name>/`](projects/) | research | Multi-file experiment — outside the release contract, not CI-checked |
-| [`experimental/<topic>/`](experimental/) | research | Non-core single files, scenario sprawl, WIP; `scratch/` for personal checks (not README/CI) |
+| [`projects/<name>/`](projects/) | research | Multi-file experiment — outside release contract, repo-only |
+| [`experimental/<topic>/`](experimental/) | research | Non-core single files, scenario sprawl, WIP; `scratch/` for personal checks |
 | [`tooling/`](tooling/) | dev | Dev matrices / benches |
 
 **Promotion:** `experimental/scratch/` → `experimental/<topic>/` → `demos/<chapter>/`
-(single-file) **or** `projects/<name>/` (multi-file) → optional `learn/teaching/`
-twin → README / `intro` only if core-tool canonical.
+(single-file) **or** `projects/<name>/` (multi-file) → optional `teaching/`
+twin → README / `tutorial` only if core-tool canonical.
 
 **Compare rule:** method/API side-by-sides that *are* the lesson stay in
 `demos/` (e.g. RRT vs RRT*, VI vs LQR). Mission ladders and `*_v2*` live under
@@ -49,45 +57,57 @@ folders on GitHub, then open a notebook badge.
 
 | Folder (GitHub) |
 | --- |
-| [`learn/`](https://github.com/alx87grd/minilink/tree/main/examples/learn) |
-| [`learn/intro/`](https://github.com/alx87grd/minilink/tree/main/examples/learn/intro) |
-| [`learn/teaching/`](https://github.com/alx87grd/minilink/tree/main/examples/learn/teaching) |
+| [`tutorial/`](https://github.com/alx87grd/minilink/tree/main/examples/tutorial) |
+| [`teaching/`](https://github.com/alx87grd/minilink/tree/main/examples/teaching) |
 | [`tooling/notebooks/`](https://github.com/alx87grd/minilink/tree/main/examples/tooling/notebooks) |
 
-### Intro — learn minilink
+### Tutorial — learn minilink
 
 | Notebook | Colab |
 | --- | --- |
-| [showcase_minilink](learn/intro/showcase_minilink.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb) |
-| [showcase_jax](learn/intro/showcase_jax.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_jax.ipynb) |
-| [showcase_from_rl_to_bode](learn/intro/showcase_from_rl_to_bode.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_from_rl_to_bode.ipynb) |
-| [00_core](learn/intro/00_core.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/00_core.ipynb) |
-| [01_blocks](learn/intro/01_blocks.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/01_blocks.ipynb) |
-| [02_dynamics](learn/intro/02_dynamics.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/02_dynamics.ipynb) |
-| [03_control](learn/intro/03_control.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/03_control.ipynb) |
-| [04_analysis](learn/intro/04_analysis.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/04_analysis.ipynb) |
-| [05_simulation](learn/intro/05_simulation.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/05_simulation.ipynb) |
-| [06_hybrid](learn/intro/06_hybrid.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/06_hybrid.ipynb) |
-| [07_compile](learn/intro/07_compile.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/07_compile.ipynb) |
-| [08_optimization](learn/intro/08_optimization.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/08_optimization.ipynb) |
-| [09_planning](learn/intro/09_planning.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/09_planning.ipynb) |
-| [10_graphical](learn/intro/10_graphical.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/10_graphical.ipynb) |
+| [showcase_minilink](tutorial/showcase_minilink.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb) |
+| [showcase_jax](tutorial/showcase_jax.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb) |
+| [showcase_from_rl_to_bode](tutorial/showcase_from_rl_to_bode.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb) |
+| [00_core](tutorial/00_core.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/00_core.ipynb) |
+| [01_blocks](tutorial/01_blocks.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/01_blocks.ipynb) |
+| [02_dynamics](tutorial/02_dynamics.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/02_dynamics.ipynb) |
+| [03_control](tutorial/03_control.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/03_control.ipynb) |
+| [04_analysis](tutorial/04_analysis.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/04_analysis.ipynb) |
+| [05_simulation](tutorial/05_simulation.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/05_simulation.ipynb) |
+| [06_hybrid](tutorial/06_hybrid.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/06_hybrid.ipynb) |
+| [07_compile](tutorial/07_compile.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/07_compile.ipynb) |
+| [08_optimization](tutorial/08_optimization.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/08_optimization.ipynb) |
+| [09_planning](tutorial/09_planning.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/09_planning.ipynb) |
+| [10_graphical](tutorial/10_graphical.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/10_graphical.ipynb) |
+| [11_reinforcement_learning](tutorial/11_reinforcement_learning.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/11_reinforcement_learning.ipynb) |
 
-### Teaching
+### Teaching — learn a subject
 
-Long notebooks (UR5 EoM, DP grids, PPO training) are not smoked by CI.
+Universal, course-agnostic lessons organized by domain. Long notebooks (UR5 EoM, DP grids, PPO training) are skipped in fast CI smoke checks.
 
+#### Classical Control
 | Notebook | Colab |
 | --- | --- |
-| [frequency_domain_tools](learn/teaching/frequency_domain_tools.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/frequency_domain_tools.ipynb) |
-| [pendulum_swing_up_cost_function_vi](learn/teaching/pendulum_swing_up_cost_function_vi.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/pendulum_swing_up_cost_function_vi.ipynb) |
-| [pendulum_swing_up_vi_vs_lqr](learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb) |
-| [pendulum_swing_up_vi_vs_lqr_vs_ppo](learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) |
-| [grid_world_exact_dp](learn/teaching/grid_world_exact_dp.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/grid_world_exact_dp.ipynb) |
-| [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/drone_ppo_learn_to_fly.ipynb) |
-| [cartpole_rollout_gradients](learn/teaching/cartpole_rollout_gradients.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/cartpole_rollout_gradients.ipynb) |
-| [articulated_robot_eom](learn/teaching/articulated_robot_eom.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/articulated_robot_eom.ipynb) |
-| [ur5_impedance_rl](learn/teaching/ur5_impedance_rl.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/teaching/ur5_impedance_rl.ipynb) |
+| [frequency_domain_tools](teaching/classical_control/frequency_domain_tools.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/classical_control/frequency_domain_tools.ipynb) |
+
+#### Optimal Control
+| Notebook | Colab |
+| --- | --- |
+| [grid_world_exact_dp](teaching/optimal_control/grid_world_exact_dp.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/optimal_control/grid_world_exact_dp.ipynb) |
+| [pendulum_swing_up_cost_function_vi](teaching/optimal_control/pendulum_swing_up_cost_function_vi.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/optimal_control/pendulum_swing_up_cost_function_vi.ipynb) |
+| [pendulum_swing_up_vi_vs_lqr](teaching/optimal_control/pendulum_swing_up_vi_vs_lqr.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/optimal_control/pendulum_swing_up_vi_vs_lqr.ipynb) |
+| [cartpole_rollout_gradients](teaching/optimal_control/cartpole_rollout_gradients.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/optimal_control/cartpole_rollout_gradients.ipynb) |
+
+#### Reinforcement Learning
+| Notebook | Colab |
+| --- | --- |
+| [drone_ppo_learn_to_fly](teaching/reinforcement_learning/drone_ppo_learn_to_fly.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/reinforcement_learning/drone_ppo_learn_to_fly.ipynb) |
+| [pendulum_swing_up_vi_vs_lqr_vs_ppo](teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb) |
+
+#### Robotics
+| Notebook | Colab |
+| --- | --- |
+| [articulated_robot_eom](teaching/robotics/articulated_robot_eom.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/robotics/articulated_robot_eom.ipynb) |
 
 ### Tooling
 
@@ -101,23 +121,22 @@ use the `minilink` conda env (see root [README](../README.md#install)).
 
 ## By chapter
 
-One demo folder per intro chapter; the research lane sits apart.
+One demo folder per tutorial chapter; the research lane sits apart.
 
-| Chapter | Intro notebook | Demos | Teaching notebooks / projects |
+| Chapter | Tutorial notebook | Demos | Teaching notebooks / projects |
 | --- | --- | --- | --- |
-| Core / diagrams | [00_core](learn/intro/00_core.ipynb) | [`demos/core/`](demos/core/) | |
-| Blocks | [01_blocks](learn/intro/01_blocks.ipynb) | [`demos/blocks/`](demos/blocks/) | |
-| Dynamics catalog | [02_dynamics](learn/intro/02_dynamics.ipynb) | [`demos/dynamics/`](demos/dynamics/) | `from minilink import Pendulum, CartPole, …` |
-| Control | [03_control](learn/intro/03_control.ipynb) | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [articulated_robot_eom](learn/teaching/articulated_robot_eom.ipynb) |
-| Analysis | [04_analysis](learn/intro/04_analysis.ipynb) | [`demos/analysis/`](demos/analysis/) | [frequency_domain_tools](learn/teaching/frequency_domain_tools.ipynb) (Bode, margins, Nyquist, root locus, step response) |
-| Simulation | [05_simulation](learn/intro/05_simulation.ipynb) | [`demos/graphical/`](demos/graphical/) | |
-| Hybrid / step | [06_hybrid](learn/intro/06_hybrid.ipynb) | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack, dual-rate `mpc_dual_rate.py`), [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
-| Compile / autodiff | [07_compile](learn/intro/07_compile.ipynb), [showcase_jax](learn/intro/showcase_jax.ipynb) | [`demos/compile/`](demos/compile/) | [cartpole_rollout_gradients](learn/teaching/cartpole_rollout_gradients.ipynb) |
-| Optimization | [08_optimization](learn/intro/08_optimization.ipynb) | [`demos/optimization/`](demos/optimization/) | |
-| Planning | [09_planning](learn/intro/09_planning.ipynb) | [`demos/planning/`](demos/planning/) (`trajopt/`, `rrt/`, `value_iteration/`) | [cost+VI](learn/teaching/pendulum_swing_up_cost_function_vi.ipynb), [VI vs LQR](learn/teaching/pendulum_swing_up_vi_vs_lqr.ipynb), [grid world DP](learn/teaching/grid_world_exact_dp.ipynb); [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
-| Reinforcement learning | [11_reinforcement_learning](learn/intro/11_reinforcement_learning.ipynb), [showcase_from_rl_to_bode](learn/intro/showcase_from_rl_to_bode.ipynb) | [`demos/rl/`](demos/rl/) | [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb) (Gymnasium + SB3 path); [ur5_impedance_rl](learn/teaching/ur5_impedance_rl.ipynb); research-lane prototypes in [`experimental/rl/`](experimental/rl/) |
-| Graphical | [10_graphical](learn/intro/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`) | |
-| RL | — | — | [VI vs LQR vs PPO](learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb), [drone_ppo_learn_to_fly](learn/teaching/drone_ppo_learn_to_fly.ipynb), [ur5_impedance_rl](learn/teaching/ur5_impedance_rl.ipynb) |
+| Core / diagrams | [00_core](tutorial/00_core.ipynb) | [`demos/core/`](demos/core/) | |
+| Blocks | [01_blocks](tutorial/01_blocks.ipynb) | [`demos/blocks/`](demos/blocks/) | |
+| Dynamics catalog | [02_dynamics](tutorial/02_dynamics.ipynb) | [`demos/dynamics/`](demos/dynamics/) | `from minilink import Pendulum, CartPole, …` |
+| Control | [03_control](tutorial/03_control.ipynb) | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [articulated_robot_eom](teaching/robotics/articulated_robot_eom.ipynb) |
+| Analysis | [04_analysis](tutorial/04_analysis.ipynb) | [`demos/analysis/`](demos/analysis/) | [frequency_domain_tools](teaching/classical_control/frequency_domain_tools.ipynb) (Bode, margins, Nyquist, root locus, step response) |
+| Simulation | [05_simulation](tutorial/05_simulation.ipynb) | [`demos/graphical/`](demos/graphical/) | |
+| Hybrid / step | [06_hybrid](tutorial/06_hybrid.ipynb) | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack, dual-rate `mpc_dual_rate.py`), [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
+| Compile / autodiff | [07_compile](tutorial/07_compile.ipynb), [showcase_jax](tutorial/showcase_jax.ipynb) | [`demos/compile/`](demos/compile/) | [cartpole_rollout_gradients](teaching/optimal_control/cartpole_rollout_gradients.ipynb) |
+| Optimization | [08_optimization](tutorial/08_optimization.ipynb) | [`demos/optimization/`](demos/optimization/) | |
+| Planning | [09_planning](tutorial/09_planning.ipynb) | [`demos/planning/`](demos/planning/) (`trajopt/`, `rrt/`, `value_iteration/`) | [cost+VI](teaching/optimal_control/pendulum_swing_up_cost_function_vi.ipynb), [VI vs LQR](teaching/optimal_control/pendulum_swing_up_vi_vs_lqr.ipynb), [grid world DP](teaching/optimal_control/grid_world_exact_dp.ipynb); [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
+| Reinforcement learning | [11_reinforcement_learning](tutorial/11_reinforcement_learning.ipynb), [showcase_from_rl_to_bode](tutorial/showcase_from_rl_to_bode.ipynb) | [`demos/rl/`](demos/rl/) | [drone_ppo_learn_to_fly](teaching/reinforcement_learning/drone_ppo_learn_to_fly.ipynb); [VI vs LQR vs PPO](teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb); research prototypes in [`experimental/rl/`](experimental/rl/) |
+| Graphical | [10_graphical](tutorial/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`) | |
 | Research lane | — | [`experimental/`](experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5) | not swept; `c_export` runs in the JAX regression job; C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` |
 | Solver benchmarks | — | [benchmark](tooling/notebooks/benchmark.ipynb) | Uses repo-root `benchmarks/` |
 
@@ -126,7 +145,7 @@ Run demos from the repo root, e.g.
 
 ## CI smoke
 
-Notebook smoke covers `learn/intro/`, `learn/teaching/` (except long
+Notebook smoke covers `tutorial/`, `teaching/` (except long
 notebooks with `"smoke": false` — UR5 EoM, DP grids, PPO), and
 `tooling/notebooks/` (not `projects/` or `experimental/`). Locally:
 

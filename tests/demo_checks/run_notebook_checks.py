@@ -1,9 +1,9 @@
 """Execute teaching notebooks via nbclient (demo-check layer).
 
-Auto-discovers ``.ipynb`` under mature learn/tooling trees:
+Auto-discovers ``.ipynb`` under mature tutorial/teaching/tooling trees:
 
-* ``examples/learn/intro/``
-* ``examples/learn/teaching/``
+* ``examples/tutorial/``
+* ``examples/teaching/``
 * ``examples/tooling/notebooks/``
 
 Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
@@ -32,8 +32,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _CHECKS_DIR = Path(__file__).resolve().parent
 OVERRIDES_PATH = _CHECKS_DIR / "notebook_overrides.json"
 NOTEBOOK_ROOTS = (
-    REPO_ROOT / "examples" / "learn" / "intro",
-    REPO_ROOT / "examples" / "learn" / "teaching",
+    REPO_ROOT / "examples" / "tutorial",
+    REPO_ROOT / "examples" / "teaching",
     REPO_ROOT / "examples" / "tooling" / "notebooks",
 )
 DEFAULT_TIMEOUT = 180.0
@@ -49,11 +49,11 @@ class NotebookRow:
 def _notebook_id(rel_path: str) -> str:
     """Stable short id for CLI ``--notebook`` filters."""
     stem = Path(rel_path).stem
-    if "/learn/intro/" in rel_path:
+    if "/tutorial/" in rel_path or "/learn/intro/" in rel_path:
         if stem.startswith("showcase_"):
             return stem
-        return f"intro_{stem}"
-    if "/learn/teaching/" in rel_path:
+        return f"tutorial_{stem}"
+    if "/teaching/" in rel_path:
         return f"teaching_{stem}"
     if "/tooling/notebooks/" in rel_path:
         return f"tooling_{stem}"

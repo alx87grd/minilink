@@ -52,8 +52,8 @@ examples/demos/planning/trajopt/trajopt_holonomic_corridor.py minilink.planning.
 examples/demos/planning/value_iteration/vi_pendulum_lqr.py minilink.planning.policy_synthesis
 examples/demos/realtime/game_cartpole.py minilink.simulation.realtime
 examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime
-examples/learn/intro/showcase_jax.ipynb minilink.core.backends
-examples/learn/intro/showcase_minilink.ipynb minilink.core.kinematics
-examples/learn/intro/showcase_minilink.ipynb minilink.graphical.animation.primitives
-examples/learn/teaching/articulated_robot_eom.ipynb minilink.experimental.symbolic.mechanics.model
-examples/learn/teaching/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb minilink.planning.policy_synthesis
+examples/tutorial/showcase_jax.ipynb minilink.core.backends
+examples/tutorial/showcase_minilink.ipynb minilink.core.kinematics
+examples/tutorial/showcase_minilink.ipynb minilink.graphical.animation.primitives
+examples/teaching/robotics/articulated_robot_eom.ipynb minilink.experimental.symbolic.mechanics.model
+examples/teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb minilink.planning.policy_synthesis

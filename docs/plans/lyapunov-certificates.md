@@ -322,7 +322,7 @@ lesson arrives by changing one line rather than by running two designs at
 once. If a demo of this tool ever needs custom plotting again, the module
 is missing a feature.
 
-**The showcase** (`examples/learn/intro/showcase_from_rl_to_bode.ipynb`
+**The showcase** (`examples/tutorial/showcase_from_rl_to_bode.ipynb`
 §11) puts the same verb on the twelve-state UR5 loop with the trained
 network inside it, right after the Bode section: frequency response says how
 the loop *responds*, the certificate says from how far it *recovers*. It

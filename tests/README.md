@@ -157,15 +157,15 @@ job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated
 and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not throw.
 
 Demos and teaching notebooks must **not** branch on smoke/CI env vars — the runner
-only sets headless display knobs. A contract test scans ``examples/learn/`` and
-``examples/demos/`` for forbidden harness names (see
+only sets headless display knobs. A contract test scans ``examples/tutorial/``, ``examples/teaching/``,
+and ``examples/demos/`` for forbidden harness names (see
 ``test_examples_have_no_smoke_env_hooks``).
 
 ```bash
 python tests/demo_checks/run_catalog_checks.py --fast
 # Flagship whitelist: subprocess each demo's __main__ (no demo source changes):
 python tests/demo_checks/run_flagship_demos.py
-# Teaching notebooks under examples/learn/ (auto-discovered; overrides for deps/timeouts):
+# Teaching notebooks under examples/tutorial/ and examples/teaching/ (auto-discovered; overrides for deps/timeouts):
 MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
 # Nightly / local: every example script:
 python tests/demo_checks/run_all_demos.py --continue-on-error

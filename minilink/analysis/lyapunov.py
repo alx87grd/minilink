@@ -31,6 +31,10 @@ signal that the number is optimistic. :meth:`LyapunovCertificate.verify` is the 
 states inside the certified set and integrates them — and
 :meth:`LyapunovCertificate.plot` shows how much of the true basin a quadratic
 ``V`` gives up.
+
+Note
+----
+Provisional tool — maintainer review before assigning for coursework.
 """
 
 import textwrap

@@ -318,12 +318,12 @@ with an `e` input — a widened `autowire` heuristic that no test pins.
 **Done when.** DESIGN carries the table; a test pins the `e`-input autowire
 behaviour so it cannot drift silently.
 
-### P11. Two GRO501 notebooks
+### P11. Two classical control notebooks (course-agnostic)
 
-`examples/learn/teaching/gro501_app2_propulsion.ipynb` (multi-physics DC
+`examples/teaching/classical_control/dc_motor_propulsion.ipynb` (multi-physics DC
 motor + longitudinal dynamics → linearize → `H(s)` → root locus → PID to the
 Table 2 specs → discrete implementation → nonlinear check with disturbance and
-noise) and `gro501_app4_autopilot.ipynb` (bicycle model → controllability
+noise) and `bicycle_autopilot.ipynb` (bicycle model → controllability
 across speeds → LQR on the guide's cost → nested loops → pole placement →
 Kalman observer). Basic tier only, Colab-first, no JAX.
 

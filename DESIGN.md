@@ -925,8 +925,8 @@ box or blows up (non-finite state) ends the episode. The learned law is a `Syste
 `ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
 through the network, and the parametric tier (`rk4_step_trace_p` with
 `params={"ctl": ..., "sys": ...}`) gives gradients of a rollout with respect
-to the policy weights. Official demos: `examples/demos/rl/`; the intro
-chapter is `examples/learn/intro/11_reinforcement_learning.ipynb`. The
+to the policy weights. Official demos: `examples/demos/rl/`; the tutorial
+chapter is `examples/tutorial/11_reinforcement_learning.ipynb`. The
 spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `bind`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos

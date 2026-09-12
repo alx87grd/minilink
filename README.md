@@ -2,7 +2,7 @@
 
 **Write the equations once. Simulate, analyze, control, plan, optimize, learn.**
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)
 [![Docs](https://img.shields.io/badge/docs-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
@@ -193,8 +193,8 @@ default. Under the hood, `compile()` lowers a leaf or a wired diagram to flat
 NumPy or JAX primitives (`f`, `rk4_step`, `rk4_integrate_zoh`,
 `rollout_batch`); the trace tier (`f_trace`, `f_trace_p`) is what you
 differentiate inside your own `jit`. See
-[07_compile](examples/learn/intro/07_compile.ipynb) and the
-[JAX showcase](examples/learn/intro/showcase_jax.ipynb).
+[07_compile](examples/tutorial/07_compile.ipynb) and the
+[JAX showcase](examples/tutorial/showcase_jax.ipynb).
 
 ## Two audiences, one codebase
 
@@ -225,11 +225,11 @@ tier, pip, and options: [install.md](install.md).
 
 ## Learn more
 
-- [Showcase notebook](examples/learn/intro/showcase_minilink.ipynb), the tool ladder on real plants
-- [JAX showcase](examples/learn/intro/showcase_jax.ipynb), write `f` once, get every gradient
-- [From RL to Bode showcase](examples/learn/intro/showcase_from_rl_to_bode.ipynb), six-axis robot, impedance loop, neural policy, frequency response and Lyapunov certificates
-- [Intro series 00–11](examples/learn/intro/), one notebook per package (core dynamics to reinforcement learning)
-- [Teaching notebooks](examples/learn/teaching/), swing-up, DP, PPO, robot equations of motion
+- [Showcase notebook](examples/tutorial/showcase_minilink.ipynb), the tool ladder on real plants
+- [JAX showcase](examples/tutorial/showcase_jax.ipynb), write `f` once, get every gradient
+- [From RL to Bode showcase](examples/tutorial/showcase_from_rl_to_bode.ipynb), six-axis robot, impedance loop, neural policy, frequency response and Lyapunov certificates
+- [Tutorial series 00–11](examples/tutorial/), one notebook per package (core dynamics to reinforcement learning)
+- [Teaching notebooks](examples/teaching/), swing-up, DP, PPO, robot equations of motion
 - [Examples index](examples/README.md), demos and projects by chapter
 - [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](DESIGN.md), [ROADMAP.md](ROADMAP.md), [tests](tests/README.md)
 
