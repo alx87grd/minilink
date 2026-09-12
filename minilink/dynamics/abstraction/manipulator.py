@@ -36,7 +36,9 @@ class Manipulator(MechanicalSystem):
     y, x :
         Full state ``[q; q̇]`` (backward compatible).
 
-    Input port ``u`` carries joint torques ``τ``.
+    Input port ``u`` carries joint torques ``τ``. An optional world-frame
+    tool-force port ``f`` (added by a subclass) is drawn as a crimson arrow
+    at the tool when :meth:`get_dynamic_geometry` runs.
     """
 
     def __init__(self, dof=1, actuators=None, task_dim=2):
@@ -46,6 +48,7 @@ class Manipulator(MechanicalSystem):
             raise ValueError("task_dim must be positive")
 
         self.name = f"{dof}DoF Manipulator"
+        self.force_arrow_scale = 0.02  # m/N for the optional tool-force glyph
 
         p_labels = [f"p{i}" for i in range(self.task_dim)]
         pdot_labels = [f"pdot{i}" for i in range(self.task_dim)]
@@ -86,6 +89,29 @@ class Manipulator(MechanicalSystem):
 
         # task-space velocity: ṗ = J(q) q̇
         return J @ dq
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        """Crimson tool-force arrow when input port ``f`` is present and nonzero."""
+        if "f" not in self.inputs:
+            return {}
+        import numpy as np
+
+        f = np.asarray(u[self.get_input_port_slice("f")], dtype=float).reshape(-1)
+        if f.size not in (2, 3) or float(np.linalg.norm(f)) < 1e-12:
+            return {}
+        from minilink.graphical.animation.primitives import Arrow
+
+        return {
+            "force": [
+                Arrow(
+                    base=np.zeros(f.size),
+                    vector=f,
+                    scale=self.force_arrow_scale,
+                    color="crimson",
+                    linewidth=2.5,
+                )
+            ]
+        }
 
     def inverse_kinematics(
         self,

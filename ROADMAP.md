@@ -25,14 +25,17 @@ claims follow, each containing the previous:
    sensitivity to the physics, gradients through a rollout, batches over
    parameter families, on NumPy or JAX.
 
-The material that carries this pitch (README, `docs/pitch/`, the two showcase
-notebooks) is a spec: wherever the code needs a workaround to make a slide
-true, that is a priority. Full identity and landscape position:
+The material that carries this pitch (README, `docs/pitch/`, the three showcase
+notebooks: `showcase_minilink.ipynb`, `showcase_jax.ipynb`, and
+`showcase_from_rl_to_bode.ipynb`) is a spec: wherever the code needs a
+workaround to make a slide true, that is a priority. The continuous `System`
+family and flow block diagrams are the core center of gravity; discrete and
+hybrid tools are subsidiary utilities. Full identity and landscape position:
 [DESIGN.md — Product identity & scope](DESIGN.md#product-identity--scope).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via `Sys2Gym` + SB3. See §4.1. | Fall 2026 — term in progress; hardening lands during the term without breaking names the course notebooks already use |
+| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — term in progress; hardening lands during the term without breaking names the course notebooks already use |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), the deferred v0.1 items in §5 Phase 2, and a `pip install minilink` option (conda stays the recommended local install). | Winter 2027 |
 | **v1.0** | The foundation questions deferred in §6 (hybrid as a `System`, evaluator/solver layering, geometry unification), after two cohorts. | 2027 |
 
@@ -79,17 +82,19 @@ a release process by themselves.
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`. | Honest `final_time` / `success` metadata; `vi_ctl @ plant` in notebooks; `plot_cost2go` colour scale clipped at the out-of-bound cost by default. |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot. **`success` echoes solver status; float32 by default on JAX.** | float64 policy; `success` = defects satisfied; multiple-shooting parametric guard. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
-| Interfaces / RL bridge | teaching (GRO860) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call (jitted under JAX when the plant traces, NumPy otherwise; Euler kept as an option). | Vectorized envs; re-train the PPO notebooks on the RK4 step. |
+| Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call (jitted under JAX when the plant traces, NumPy otherwise; Euler kept as an option). Kept as an optional external bridge; not the primary course path. | Keep module for external interop; course material uses native RL. |
+| Analysis / Lyapunov certificates | provisional (research) | 4 | Landed 2026-09-11 from [lyapunov-certificates.md](docs/plans/lyapunov-certificates.md): `region_of_attraction` + `LyapunovCertificate` (`verify`, `plot`, `contains`), two `System` shortcuts, demo `analysis_region_of_attraction.py` and showcase §11 of `showcase_from_rl_to_bode.ipynb`. Quadratic `V` only; the level is a sampled estimate and the search reports `sample_limited` when halves disagree. | Student cohort validation; SOS and discrete-time later. |
+| Planning / RL planner (`reinforcement_learning/`) | teaching (GRO860) | 5 | Landed 2026-09-10: cost horizon/discount + problem exit rule, `StochasticPlanningProblem` + distributions, `MonteCarloEvaluator`, `NeuralPolicyController` + `MLP`, `ReinforcementLearningPlanner` with PPO and SAC in pure JAX. Primary GRO860 RL teaching tool; 40k steps in <60s on CPU; verified on UR5 impedance showcase. | Canonical demos in `examples/demos/rl/` + intro chapter `11_reinforcement_learning.ipynb`; R7 retire `experimental/ppo_jax`. |
 | Planning / search (RRT) | provisional | 5 | RRT/RRT*; spatial `Scene`. **`RRTPlanner(problem)` works from the input bounds alone** (bang-bang `KinodynamicExtender` default, 0.3 s edges; extenders and `RRTOptions` on the planning band, landed 2026-09-09). | RRT-Connect later. |
-| Geometry / spatial | provisional | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Glyph/solid naming split (v1.0). |
+| Geometry / spatial | provisional | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Bicubic SDF and CBF filter (`docs/plans/cbf-safety-filter.md`); glyph/solid naming split (v1.0). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers. **Auto-fit camera** (`camera_scale=None`, the `System` default, landed 2026-09-09): hint-less plants frame the drawn geometry over the whole animation; backdrops (`ground_line`, `Plane`) and force glyphs excluded. | Renderer polish; matplotlib renderer coverage; constructor-derived `camera_scale` hints → auto or params-derived so `params` changes keep the framing. |
-| Hybrid / step / MPC | provisional | 5 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. Not a `System`; not a GRO860 topic. Pitch-visible seam: the sampled loop is the one thing that is not a `System` (no `linearize`, no nesting). | Keep names through the term; `HybridLoop` / promotion question at v1.0. |
+| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. Research scaffold to exercise MPC; not the library core narrative. Pitch-visible seam: the sampled loop is the one thing that is not a `System`. | Keep names through the term; full promotion to official `HybridLoop` deferred to v1.0+. |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review. |
 | Estimation | planned (GRO501) | 1 | Placeholder. **The largest single GRO501 gap** (§4.2). | Luenberger, then Kalman, as diagram blocks (v0.2). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2); batched `rollout_batch` facade first. |
 | C export (`experimental/c_export`) | research | 2 | Experimental JAX→C transpiler; two demos pass locally; not in CI. On the pitch deck as *experimental* since 2026-09-09. | Repo-only; add to the nightly sweep (pitch-visible). |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Experimental; not teaching path. | Keep isolated; repo-only. |
-| PPO in pure JAX (`experimental/ppo_jax`) | research | 2 | Prototype 2026-09-10: jitted rollouts on the compiled plant + PPO update, no Gymnasium / RL library; reproduces the learn-to-fly drone notebook in `examples/experimental/rl/` (100k steps in a few seconds on CPU) and learns the cart-pole swing-up (`cartpole_ppo_jax_swing_up.py`, 1M steps, ~30 s) the underactuated pendulum swing-up (`pendulum_ppo_jax_swing_up.py`, ~100k steps, ~2 s), the circuit car (track-relative features, MPC demo cost) and the rocket landing; the Acrobot swing-up did not converge in 10M steps; tuning lessons in `examples/experimental/rl/RL_README.md`. Unit smoke in `test_experimental_ppo_jax.py`. | Repo-only; awaiting architectural review. |
+| PPO in pure JAX (`experimental/ppo_jax`) | research | 2 | Prototype 2026-09-10: jitted rollouts on the compiled plant + PPO update, no Gymnasium / RL library; reproduces the learn-to-fly drone notebook in `examples/experimental/rl/` (100k steps in a few seconds on CPU) and learns the cart-pole swing-up (`cartpole_ppo_jax_swing_up.py`, 1M steps, ~30 s) the underactuated pendulum swing-up (`pendulum_ppo_jax_swing_up.py`, ~100k steps, ~2 s), the circuit car (track-relative features, MPC demo cost) and the rocket landing; the Acrobot swing-up did not converge in 10M steps; tuning lessons in `examples/experimental/rl/RL_README.md`. Unit smoke in `test_experimental_ppo_jax.py`. | Repo-only; architecture review through [rl-planner-vision.md](docs/plans/rl-planner-vision.md) (steps R0–R7), then promotion to `planning/policy_synthesis/`. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later (`interfaces/mjx.py`). |
 | Pyro 2.0 overall | v0.2 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
@@ -107,7 +112,7 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
 | Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupTableController`, `plot_cost2go` / `plot_policy` | `pendulum_swing_up_cost_function_vi`, `pendulum_swing_up_vi_vs_lqr`, `demos/planning/value_iteration/` | `final_time` reads `problem.tf`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
 | LQR + linearization | `linearize`, `lqr`, `lqr_at_operating_point`, `plot_control_law` | `03_control`, `04_analysis`, `demos/control/` | — (green today) |
 | Trajectory optimization | `PlanningProblem`, `TrajectoryOptimizationPlanner` (`direct_collocation`, `shooting`), `QuadraticCost` | `09_planning`, `demos/planning/trajopt/` | float64 by default on JAX; `success` means defects satisfied; canonical problems succeed with default optimizer |
-| RL via `Sys2Gym` + SB3 | `Sys2Gym`, `SB3Controller`, `plot_control_law` | `drone_ppo_learn_to_fly`, `pendulum_swing_up_vi_vs_lqr_vs_ppo` | compiled `step`; PPO notebook trains to the same qualitative policy |
+| Reinforcement Learning (native JAX) | `StochasticPlanningProblem`, `ReinforcementLearningPlanner` (PPO/SAC), `NeuralPolicyController`, `MonteCarloEvaluator` | `11_reinforcement_learning.ipynb`, `showcase_from_rl_to_bode.ipynb`, `demos/rl/` | pure-JAX training on compiled plant (<60 s CPU); neural policy closed loop linearizes, simulates, and plots Bode; `Sys2Gym` + SB3 retained as external bridge |
 
 **Cross-cutting gates**
 
@@ -152,14 +157,14 @@ contract. Step-level work:
 | Multi-physics modelling — nonlinear `f`/`h`, block diagram, linearize, `H(s)` | custom `DynamicSystem`, `plot_diagram`, `linearize`, `transfer_function` | green | a DC-motor + longitudinal-vehicle plant in the catalog; order reduction (`minreal`) available |
 | Closed-loop analysis — poles, root locus, Bode, margins, step specs | `pzmap`, `root_locus`, `bode`, `margins`, `step_info`, `P` / `PI` / `PD` / `PID` | green | met 2026-09-07: every compensator form reports the poles and zeros of the hand calculation, and margins are found wherever the crossover sits |
 | Design to specification — rise time, overshoot, final error, phase margin | `PI`, `PD`, `PID`, `Lead`, `Lag`, `step_info`, `margins` | green | the Table 2 specs of the guide are checkable in one notebook |
-| Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | reachable today via `of="block:port"` | needs a named verb | `S` / `T` / `PS` / `CS` are one call on a closed-loop diagram |
+| Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | `analysis` (v0.2) | scheduled v0.2 | named `S` / `T` / `PS` / `CS` sensitivity shortcuts on closed-loop diagrams |
 | Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | continuous only, **z tier held** | the sampled loop is validated by simulation; a z tier stays out of v0.2 unless the sommatif examines z-plane analysis (§6) |
 | State-space MIMO — bicycle model, controllability at every nominal speed | `KinematicBicycle`, `controllability`, `observability` | green | — |
 | Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr_at_operating_point`, `StateFeedbackController` | green | — |
-| Pole placement — `K_sta` for a prescribed pole set | — | missing | `place(A, B, poles)` returning a `StateFeedbackController` |
+| Pole placement — `K_sta` for a prescribed pole set | `control` (v0.2) | scheduled v0.2 | `place(A, B, poles)` returning a `StateFeedbackController` |
 | Nested loops — inner speed loop, outer position loop | `@` composition | green (verified) | stays green with the observer in the loop |
-| State estimation — Luenberger observer and Kalman filter | `minilink/estimation/` placeholder | missing, **held** | an observer block that closes the loop on a diagram and simulates with measurement noise; not scheduled — the release contract will need revisiting if it stays out |
-| Reference scaling — the `N` matrix giving `y = r` at steady state | — | missing | a helper or a documented recipe |
+| State estimation — Luenberger observer and Kalman filter | `estimation` (v0.2) | scheduled v0.2 | `LuenbergerObserver` and steady-state `KalmanFilter` closing the loop as standard diagram blocks |
+| Reference scaling — the `N` matrix giving `y = r` at steady state | `control` (v0.2) | scheduled v0.2 | `steady_state_feedforward(sys)` or `N` matrix helper for tracking |
 
 **Cross-cutting gates**
 
@@ -192,7 +197,7 @@ docs landing page, both showcases rebuilt); from the pitch: auto-fit camera,
 | **0 — first-hour safety** | Default grid · shape validation · README example + `@` message · float64 policy · `super().__init__` guard · `verbose` flag names · nbstripout · trajopt `success` semantics. | immediately after D, ~1 agent-day |
 | **1 — teaching contract + the GRO860 path** | Teaching-surface registry + Basic-tier clean-env test · import-layer CI check · `simulation`/`planning`/`core` band facades · rewrite imports in `learn/` then `demos/` · compiled `Sys2Gym.step` · DP metadata honesty · delete `_jit` aliases and unreferenced evaluator methods · wheel excludes research lane · `c_export` in nightly · nightly demo sweep · branch hygiene · **consolidation inventory** (duplicated code and parallel implementations, ranked; no feature removal — see below). | weeks 2–4 of the term |
 | **2 — the JAX claim, and the research facade** | `xp` sweep of the NumPy-only catalog · both-backends contract test · retire `JaxCartPole` · four-rung vehicle ladder, `named_ports=` flag, research rungs → projects · `rollout_batch` for parameter-family sweeps · consolidation passes picked from the inventory. | rest of the term (v0.1.x) → v0.2 |
-| **3 — foundations** | Derived `x0` · geometry glyph/solid rename · `HybridLoop` or promotion · mechanical-base unification · frequency tools (native or bridge, per §6) · PyPI option · iLQR from parts (idea) · Diffrax as optional JAX solver (later) · evaluator/solver re-layering. | after the term (v0.2 → v1.0) |
+| **3 — foundations** | Derived `x0` · geometry glyph/solid rename · `HybridLoop` or promotion · mechanical-base unification · frequency tools (native or bridge, per §6) · PyPI option · iLQR from parts (idea) · Diffrax as optional JAX solver (later) · evaluator/solver re-layering · **RL as a planner** landed early and provisional (2026-09-10; R7 retire the prototype and the composite feature block remain — [rl-planner-vision.md](docs/plans/rl-planner-vision.md)). | after the term (v0.2 → v1.0) |
 
 **Simplify and consolidate — a standing principle, not a phase.** The repo
 must stay manageable by one maintainer, so every phase carries consolidation
@@ -223,12 +228,15 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - ~~Frequency analysis — NumPy-only vs a python-control bridge~~ — NumPy-only, landed 2026-09-07: `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response` on the state-space channel (`analysis/linear.py`), plots on matplotlib and plotly.
 - ~~`PID` spurious modes~~ — settled 2026-09-07: dedicated `PI` and `PD` classes carry only the states their terms need (`ProportionalController` already covered P); `PID` keeps its fixed `2n` layout so its gains stay tunable from zero. `minreal` still wanted for the general case (P2).
 - **Held (v0.2):** discrete-domain scope for GRO501 — a z-domain tier in `analysis/` (ZOH/Tustin, z-plane `pzmap`, discrete Bode) vs teaching the Arduino law with `discretize` + simulation only. Maintainer paused this 2026-09-07; default is simulation only.
-- **Held (v0.2):** the `estimation/` band (Luenberger, Kalman). Paused 2026-09-07; it is the last unmet §4.2 row.
+- **Open (v0.2):** the `estimation/` band (Luenberger observer, steady-state Kalman filter) — scheduled as the primary gap for the GRO501 wave (§4.2).
 - **Open (v0.2):** PyPI publication — wanted eventually as a third install option; conda stays recommended.
-- **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename. Pitch-visible since 2026-09-09.
+- **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename. Pitch-visible since 2026-09-09; kept as research scaffold through v0.1.
 - **Open (v1.0):** a single posed-geometry hook so the pitch's "two functions" (`f` and a drawing function) is literal; today animation is `tf` plus skin geometry.
 - **Open (v1.0):** evaluator/solver layering — evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; Diffrax as an optional JAX solve (later).
 - **Open (v0.2):** which pyro demos the courses still need (drives the parity audit's remaining rows).
+- **Open (v0.2):** Lyapunov certificates in the analysis band — [docs/plans/lyapunov-certificates.md](docs/plans/lyapunov-certificates.md): `region_of_attraction(sys)` returning a `LyapunovCertificate` with `contains`, `verify` (Monte Carlo inside the certified set) and `plot`, plus the two `System` shortcuts. Quadratic `V` only; provisional research lane pending cohort review and SOS study.
+- ~~RL as a planner~~ — settled 2026-09-11 ([docs/plans/v01-scope-alignment.md](docs/plans/v01-scope-alignment.md)): native pure-JAX `ReinforcementLearningPlanner` + `NeuralPolicyController` is the canonical GRO860 teaching path (`11_reinforcement_learning.ipynb`, `demos/rl/`, `showcase_from_rl_to_bode.ipynb`); `Sys2Gym` + SB3 retained as an external bridge in `interfaces/`.
+- **Open (v0.2 / Later):** Control Barrier Functions (CBF) & Spatial Safety Filters — [docs/plans/cbf-safety-filter.md](docs/plans/cbf-safety-filter.md): $C^1$ bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block.
 
 ## 7. Out of scope
 

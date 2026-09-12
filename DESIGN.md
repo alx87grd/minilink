@@ -170,7 +170,7 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`) |
-| `analysis/` | one calling pattern `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)`: `jacobian(sys, "f", "x")` (∂f/∂x; `of` / `wrt` name `f`, ports, `t`, `params`, or diagram wires `"block:port"`), `linearize` (→ `LTISystem`), one-channel `bode` / `pzmap` / `nyquist` / `margins` / `root_locus` / `step_response` / `transfer_function` (`of=` / `wrt=`) with their `plot_` twins — every one reduces to the state-space channel `(A, b, c, d)` and computes with `analysis/linear.py` (eigenvalues, the Rosenbrock pencil, `C (jwI - A)^-1 B + D`, `eig(A - B K C)`, one `expm`); the plots build one `ControlFigure` (`graphical/control/`) rendered by matplotlib or plotly in the MATLAB look; controllability/observability (matrices or an `LTISystem`), equilibria, `modal`; `discretize(integrator=)` for continuous→step wrappers. `method="auto"` is exact under JAX when the system traces, finite differences otherwise; the same verbs are methods on every `System`, stateless (each call compiles its evaluator) |
+| `analysis/` | one calling pattern `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)`: `jacobian(sys, "f", "x")` (∂f/∂x; `of` / `wrt` name `f`, ports, `t`, `params`, or diagram wires `"block:port"`), `linearize` (→ `LTISystem`), one-channel `bode` / `pzmap` / `nyquist` / `margins` / `root_locus` / `step_response` / `transfer_function` (`of=` / `wrt=`) with their `plot_` twins — every one reduces to the state-space channel `(A, b, c, d)` and computes with `analysis/linear.py` (eigenvalues, the Rosenbrock pencil, `C (jwI - A)^-1 B + D`, `eig(A - B K C)`, one `expm`); the plots build one `ControlFigure` (`graphical/control/`) rendered by matplotlib or plotly in the MATLAB look; controllability/observability (matrices or an `LTISystem`), equilibria, `modal`; `region_of_attraction(sys)` → a `LyapunovCertificate` (`V`, `V_dot`, `level`, `contains`, `verify`, `plot`) for any autonomous loop, LQR or neural alike — `method="quadratic"` solves `AᵀP + PA = -Q` at the equilibrium it *finds*, then samples the largest sublevel set on which `V̇ < 0` inside the state box, so the level is a sharp estimate — `sample_limited` flags the high-dimensional case where two halves of the samples disagree — and `verify()` is its Monte Carlo counter-check (`method="sos"` reserved); works on any system — exact Jacobian and a vmapped sweep under JAX, finite differences and a loop otherwise — and `plot` draws the *slice* through the equilibrium (`slice_extent`), not the set's shadow — legend, title, optional simulated basin and `verified=N` overlay of the states `verify` tests, so demos need no plotting code of their own; `discretize(integrator=)` for continuous→step wrappers. `method="auto"` is exact under JAX when the system traces, finite differences otherwise; the same verbs are methods on every `System`, stateless (each call compiles its evaluator) |
 | `planning/` | problems, trajopt, `spatial/` (scenes), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
@@ -849,6 +849,88 @@ require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 `x_start`/`x_goal` are shortcuts/representative points. Offline entry is
 `Planner.solve()` → `TrajectoryPlan` (traj family) or `PolicyPlan` (policy
 family).
+
+**Cost horizon and exit rule (landed 2026-09-10, research lane → planning
+band):** a `CostFunction` states its `horizon` (`"finite"` with `h` at `tf`,
+`"infinite"` with no terminal cost, or `None` to follow `problem.tf`) and a
+continuous `discount_rate` `rho`; planners convert it with
+`cost.discount_factor(dt)` (DP `alpha`, RL `gamma`). What leaving `X` costs
+is the **problem's** business, not the cost's: `PlanningProblem.on_exit`
+(`"infeasible"`, the hard-constraint default, or `"terminate"`) and
+`exit_cost` (scalar or `exit_cost(x, t)`). Trajopt keeps `X` hard; DP reads
+`exit_cost` as its default `out_of_bound_cost`; RL ends the episode there and
+charges it with no bootstrap **when the exit is priced** (`exit_cost` set or
+`on_exit="terminate"`); an unpriced exit is *truncated* and the critic's value
+at the exit state bootstraps the return — the Gymnasium convention, an
+approximation the training environment states in `describe()`. `h` keeps its
+one job: the end of a finite horizon.
+
+**One scoring contract:** `planning.evaluation.score_trajectory(problem, traj)`
+is the cost of a sampled closed-loop trajectory for every tool's reporting —
+the discounted running cost by the trapezoidal rule
+(`CostFunction.evaluate_trajectory`, which applies `discount_rate`), cut at
+the first sample outside `X` (a failure, charged when priced), plus `h` at a
+reached finite horizon. RL *trains* on the left-Riemann discretization of
+the same running cost (`r_k = -g dt`) with per-step factor
+`gamma = exp(-rho dt)`; `exp(-rho t)` is not folded into the reward (that
+would discount twice). Its plans report the trapezoidal Monte Carlo score.
+
+**Stochastic problem:** `StochasticPlanningProblem(PlanningProblem)` adds
+`x0_distribution` (its mean is `x_start`, its support `X0`),
+`params_distribution` (`{name: Distribution}` over `sys.params`, dotted names
+reaching a diagram's subsystem params such as `"sys.mass"`, one draw per
+episode carried through the parametric step `rk4_step_trace_p`),
+`disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
+port) and `criterion` (`"expectation"` default; `"worst_case"` is reported by
+the Monte Carlo evaluator and refused by the RL planner, which optimizes the
+expectation). A deterministic planner given a stochastic problem plans from
+the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the
+Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions
+(`planning/distributions.py`: `Gaussian`, `Uniform`, `Particles`, `Sampler`)
+are a duck type — `dim`, `mean()`, `sample(key)` on a NumPy generator or a
+JAX key (traceable). `nominal()` is the certainty-equivalent
+`PlanningProblem`. Every planner that takes a `PlanningProblem` takes the
+stochastic one.
+
+**Monte Carlo evaluation (the second verb):** `MonteCarloEvaluator(problem,
+dt=, n_trials=, backend=)` scores any state-feedback block on the draws —
+`MonteCarloReport` with per-trial `J`, mean / std / worst / failure rate
+(trials that left the box), `value(criterion)`. `backend="jax"` vmaps the
+compiled held-input rollout (static laws; parameter and disturbance draws
+applied); `backend="numpy"` produces the same samples one trial at a time on
+the NumPy evaluator (identical numbers, tested); `backend="simulator"` runs the
+continuous-time closed loop for any controller, dynamic ones included, without
+draws and without clipping the law (it warns when the law exceeds the port
+bounds). Same contract for LQR, DP, MPC and RL laws.
+
+**Reinforcement learning (`planning/reinforcement_learning/`):**
+`ReinforcementLearningPlanner(problem, dt=, hidden=, features=, algorithm=)`
+is a policy-family planner beside DP: `solve(timesteps=)` → `PolicyPlan`
+(controller, weights, history), `get_controller()` →
+`control.neural.NeuralPolicyController` (`u = u_mid + u_half · squash(MLP(z(x)))`,
+weights in `params["mlp"]`, features normalized by the state box or a user
+map), `solve_trajectory_from(x0)` → `TrajectoryPlan` of the learned law.
+Shared machinery — `RolloutEnvironment` (the problem's semantics as pure
+JAX step functions), heads (`GaussianHead`, `SquashedGaussianHead`), critics
+(`ValueFunction`, `QFunction`), collectors (`rollout` scan + GAE,
+`collect_transitions` + `ReplayBuffer`), `Adam` — and one file per algorithm
+under `algorithms/` (`PPO` on-policy, `SAC` off-policy) holding only its
+update rule and train state; `Algorithm.on_policy` picks the planner's loop.
+Bare JAX, no Flax/Optax dependency; an Optax-style optimizer can be passed.
+`control.angle_features(angles, scales)` builds the periodic feature map
+(`cos, sin` per listed angle, scaled rates). The action port is `u` when the
+plant has one, else its single input port — so an inner loop `impedance @
+arm` (input `r`) is a plant for an outer learned law; a step that leaves the
+box or blows up (non-finite state) ends the episode. The learned law is a `System`:
+`ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
+through the network, and the parametric tier (`rk4_step_trace_p` with
+`params={"ctl": ..., "sys": ...}`) gives gradients of a rollout with respect
+to the policy weights. Official demos: `examples/demos/rl/`; the intro
+chapter is `examples/learn/intro/11_reinforcement_learning.ipynb`. The
+spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `bind`,
+`car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
+`plot_track`) are exported on the `minilink.planning` facade so track demos
+import through the teaching surface.
 
 **Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
 `TrajectoryPlan`. `SolveMetadata.success` means *the returned plan satisfies the

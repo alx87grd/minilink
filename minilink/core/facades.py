@@ -844,6 +844,87 @@ class DynamicSystemFacades:
             eps=eps,
         )
 
+    def region_of_attraction(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        method="quadratic",
+        Q=None,
+        window=None,
+        samples=None,
+        search="auto",
+    ):
+        """Certify a region of attraction about an equilibrium of this loop.
+
+        See :func:`minilink.analysis.lyapunov.region_of_attraction`.
+        """
+        from minilink.analysis.lyapunov import region_of_attraction
+
+        return region_of_attraction(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            method=method,
+            Q=Q,
+            window=window,
+            samples=samples,
+            search=search,
+        )
+
+    def plot_region_of_attraction(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        x_axis=0,
+        y_axis=1,
+        basin=False,
+        detail=True,
+        verified=0,
+        trajectories=(),
+        n=201,
+        limits=None,
+        show=True,
+        method="quadratic",
+        Q=None,
+        window=None,
+        samples=None,
+        search="auto",
+    ):
+        """Certify a region of attraction and draw a slice of it.
+
+        See :func:`minilink.analysis.lyapunov.plot_region_of_attraction`.
+        """
+        certificate = self.region_of_attraction(
+            x_bar,
+            u_bar,
+            t,
+            params,
+            method=method,
+            Q=Q,
+            window=window,
+            samples=samples,
+            search=search,
+        )
+        return certificate.plot(
+            x_axis,
+            y_axis,
+            basin=basin,
+            detail=detail,
+            verified=verified,
+            trajectories=trajectories,
+            n=n,
+            limits=limits,
+            show=show,
+        )
+
     def plot_root_locus(
         self,
         x_bar=None,

@@ -10,6 +10,7 @@ The :class:`~minilink.planning.problems.PlanningProblem` remains
 declarative and does not solve itself.
 """
 
+import warnings
 from abc import ABC
 
 from minilink.core.costs import CostFunction
@@ -34,10 +35,21 @@ class Planner(ABC):
     :attr:`last_policy_plan`.
     """
 
+    #: Planners that read the uncertainty of a stochastic problem set this;
+    #: the others plan on the nominal start and warn.
+    accepts_stochastic = False
+
     def __init__(self, problem: PlanningProblem) -> None:
         self.problem = problem
         self.last_trajectory_plan: TrajectoryPlan | None = None
         self.last_policy_plan: PolicyPlan | None = None
+        if getattr(problem, "is_stochastic", False) and not self.accepts_stochastic:
+            warnings.warn(
+                f"{type(self).__name__} is a deterministic planner: it plans from the "
+                "mean start of this StochasticPlanningProblem and ignores its "
+                "distributions. Pass problem.nominal() to say so explicitly.",
+                stacklevel=2,
+            )
 
     def solve(self, **kwargs):
         """

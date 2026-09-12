@@ -6,6 +6,23 @@ this folder (September 2026). Every number below was measured on a laptop CPU
 backend, the rollout a `lax.scan` over the RK4 step with the policy sampled
 inside, and the whole PPO update one jitted call.
 
+## Where this stands now (2026-09-10)
+
+The prototype (`minilink/experimental/ppo_jax.py`) became a planner:
+`minilink.planning.ReinforcementLearningPlanner` on a
+`StochasticPlanningProblem`, with `algorithm="ppo"` or `"sac"`, the law as a
+`minilink.control.NeuralPolicyController`, and `MonteCarloEvaluator` to score
+any controller on the same task. `pendulum_rl_planner.py` in this folder is
+the planner-API version of the pendulum demo (PPO and SAC side by side), and
+`examples/demos/rl/` holds the official versions of every demo below on the
+full pipeline. The scripts in this folder stay on the prototype until the
+maintainer retires it (vision plan step R7). Every lesson below carries over: the exit rule is
+now a problem field (`on_exit`, `exit_cost`; the unpriced default still
+truncates and bootstraps, and the planner prints which rule is in force),
+normalization and the squash are inside the policy block, the discount can
+be declared on the cost (`discount_rate`), and plant parameters can be
+randomized per episode (`params_distribution`).
+
 ## The demos and what they took
 
 | demo | plant | budget | training | what the policy learns |
@@ -15,6 +32,30 @@ inside, and the whole PPO update one jitted call.
 | `cartpole_ppo_jax_swing_up.py` | CartPole, force 10 N | 1M steps | 30 s | swing-up and balance, cart back to center |
 | `car_ppo_jax_circuit.py` | BicycleDynRate on the MPC circuit | 1.5M steps | 50 s | laps inside the corridor with the MPC demo's cost, about 9.5 s per 103 m lap at a 12 m/s target |
 | `rocket_ppo_jax_landing.py` | Rocket, one-sided thrust and gimbal | 4M steps | 80 s | free fall, braking burn, settles on the pad |
+
+[`ur5_impedance_rl.ipynb`](../../learn/teaching/ur5_impedance_rl.ipynb)
+(2026-09-11) is the combination piece: a joint impedance loop around the UR5
+(with a 0.5 kg gripper, without which the wrist has no inertia to damp), a
+neural set-point law trained on that inner loop under random starts and
+payloads, then the three blocks wired as one diagram. Lessons specific to it:
+an inner loop is a plant whose action port is its reference `r`; a diagram's
+subsystem parameters are randomized with dotted names (`"sys.mass"`); a plant
+whose model has a zero inertia cannot be stepped at any useful `dt`, fix the
+model, not the integrator.
+
+`pendulum_rl_lyapunov_certificate.py` (2026-09-11) asks what a control
+engineer asks of any learned law: *where is it guaranteed to work?* Every
+answer comes from a classical tool pointed at the network.
+`find_equilibrium` through the policy shows it commands +0.83 Nm at the exact
+upright, so its real equilibrium sits 0.077 rad off the target, a bias no
+training curve or Monte Carlo score reveals. `linearize` (autodiff through
+the network) gives the closed-loop poles, the Lyapunov equation gives `V`,
+and a vmapped sweep of `Vdot` along the *nonlinear* loop certifies a region
+of attraction: 0.19 rad and 0.54 rad/s, every state of it verified to
+converge by simulation. The certified set ends exactly where the policy
+saturates at 4 Nm, and it holds 6% of the simulated basin, the price of a
+quadratic certificate. The sublevel search is gridded, so it is a sharp
+estimate rather than a proof.
 
 Also solved, not kept as a demo: the mountain car (throttle 1 N against 1.57 N
 of slope, 700k steps, 8 s of training, hilltop in 5.7 s from rest).

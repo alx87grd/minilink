@@ -19,6 +19,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.control.modelbased",
         "ComputedTorqueController",
     ),
+    "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
+    "angle_features": ("minilink.control.neural", "angle_features"),
     "PID": ("minilink.control.siso", "PID"),
     "PI": ("minilink.control.siso", "PI"),
     "PD": ("minilink.control.siso", "PD"),

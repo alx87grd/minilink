@@ -17,6 +17,14 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # problem and results
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
     "ProblemParameters": ("minilink.planning.problems", "ProblemParameters"),
+    "StochasticPlanningProblem": (
+        "minilink.planning.problems",
+        "StochasticPlanningProblem",
+    ),
+    "Gaussian": ("minilink.planning.distributions", "Gaussian"),
+    "Uniform": ("minilink.planning.distributions", "Uniform"),
+    "Particles": ("minilink.planning.distributions", "Particles"),
+    "Sampler": ("minilink.planning.distributions", "Sampler"),
     "TrajectoryPlan": ("minilink.planning.results", "TrajectoryPlan"),
     "PolicyPlan": ("minilink.planning.results", "PolicyPlan"),
     "SolveMetadata": ("minilink.planning.results", "SolveMetadata"),
@@ -50,6 +58,28 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.policy_synthesis.policy_eval",
         "PolicyEvaluator",
     ),
+    # reinforcement learning (policy synthesis) and Monte Carlo evaluation
+    "ReinforcementLearningPlanner": (
+        "minilink.planning.reinforcement_learning.planner",
+        "ReinforcementLearningPlanner",
+    ),
+    "MonteCarloEvaluator": ("minilink.planning.evaluation", "MonteCarloEvaluator"),
+    "MonteCarloReport": ("minilink.planning.evaluation", "MonteCarloReport"),
+    # spatial scene: tracks, collision geometry, cost shaping
+    "ReferenceTrack": ("minilink.planning.spatial.track", "ReferenceTrack"),
+    "from_waypoints": ("minilink.planning.spatial.paths", "from_waypoints"),
+    "Scene": ("minilink.planning.spatial.scene", "Scene"),
+    "bind": ("minilink.planning.spatial.collision", "bind"),
+    "car_outline": ("minilink.planning.spatial.collision", "car_outline"),
+    "point_probe": ("minilink.planning.spatial.collision", "point_probe"),
+    "quadratic_excess": ("minilink.planning.spatial.shaping", "quadratic_excess"),
+    "quadratic_hinge": ("minilink.planning.spatial.shaping", "quadratic_hinge"),
+    "inverse_barrier": ("minilink.planning.spatial.shaping", "inverse_barrier"),
+    "TrackCorridorOverlay": (
+        "minilink.planning.spatial.overlays",
+        "TrackCorridorOverlay",
+    ),
+    "plot_track": ("minilink.planning.spatial.plotting", "plot_track"),
     # search
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
     "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),

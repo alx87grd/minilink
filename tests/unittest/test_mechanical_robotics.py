@@ -620,6 +620,56 @@ class TestRoboticWrappers(unittest.TestCase):
         self.assertEqual(geom3["task_force"][0].vector.size, 3)
         self.assertIsInstance(geom3["task_target"][0], Sphere)
 
+    def test_ur5_tool_force_arrow_on_f_port(self):
+        arm = UR5Manipulator()
+        q = np.array([0.0, -1.0, 1.2, -1.4, 0.0, 0.0])
+        x = arm.q2x(q, np.zeros(6))
+        frames = arm.tf(x, np.zeros(6))
+        np.testing.assert_allclose(frames["force"][:3, 3], arm.forward_kinematics(q))
+        np.testing.assert_allclose(frames["force"][:3, :3], np.eye(3))
+        self.assertEqual(arm.get_dynamic_geometry(x, np.zeros(6)), {})
+
+        arm.add_input_port("f", dim=3, nominal_value=np.zeros(3))
+        f = np.array([1.0, -2.0, 4.0])
+        u = np.concatenate([np.zeros(6), f])
+        arrow = arm.get_dynamic_geometry(x, u)["force"][0]
+        self.assertIsInstance(arrow, Arrow)
+        np.testing.assert_allclose(arrow.vector, f)
+        self.assertEqual(arrow.scale, arm.force_arrow_scale)
+        self.assertEqual(
+            arm.get_dynamic_geometry(x, np.concatenate([np.zeros(6), np.zeros(3)])),
+            {},
+        )
+
+    def test_neural_setpoint_ball_on_joint_reference(self):
+        from minilink.control.neural import NeuralPolicyController
+
+        arm = TwoLinkManipulator()
+        inner = JointImpedance(arm) @ arm
+        inner.inputs["r"].lower_bound = -np.ones(2)
+        inner.inputs["r"].upper_bound = np.ones(2)
+        x = inner.x0
+        ctl = NeuralPolicyController(inner, hidden=(4,), seed=0)
+        self.assertEqual(ctl.tf(None, x), {})
+        self.assertEqual(ctl.get_dynamic_geometry(None, x), {})
+
+        ctl.show_setpoint = True
+        r = ctl.action(x)
+        p = arm.forward_kinematics(r)
+        frames = ctl.tf(None, x)
+        np.testing.assert_allclose(frames["setpoint"][:2, 3], p)
+        geom = ctl.get_dynamic_geometry(None, x)
+        self.assertIsInstance(geom["setpoint"][0], Sphere)
+        self.assertEqual(geom["setpoint"][0].radius, ctl.setpoint_radius)
+        self.assertNotIn("task", frames)
+
+        p_star = np.array([0.5, 0.4])
+        ctl.task_target = p_star
+        frames = ctl.tf(None, x)
+        np.testing.assert_allclose(frames["task"][:2, 3], p_star)
+        geom = ctl.get_dynamic_geometry(None, x)
+        self.assertEqual(geom["task"][0].color, "gold")
+
     def test_task_kinematic_law(self):
         arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
         ctl = TaskKinematic(arm, Kp=[1.0, 1.0])

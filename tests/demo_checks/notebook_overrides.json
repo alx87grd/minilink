@@ -11,6 +11,12 @@
     ],
     "timeout": 300
   },
+  "examples/learn/intro/showcase_from_rl_to_bode.ipynb": {
+    "requires": [
+      "jax"
+    ],
+    "smoke": false
+  },
   "examples/learn/intro/07_compile.ipynb": {
     "requires": [
       "jax"
@@ -44,6 +50,9 @@
     "smoke": false
   },
   "examples/learn/teaching/drone_ppo_learn_to_fly.ipynb": {
+    "smoke": false
+  },
+  "examples/learn/teaching/ur5_impedance_rl.ipynb": {
     "smoke": false
   },
   "examples/tooling/notebooks/benchmark.ipynb": {

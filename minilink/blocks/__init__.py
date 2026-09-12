@@ -37,6 +37,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Washout": ("minilink.blocks.filters", "Washout"),
     # neural
     "NeuralNetwork": ("minilink.blocks.neural", "NeuralNetwork"),
+    "MLP": ("minilink.blocks.neural", "MLP"),
     # discrete
     "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
 }
