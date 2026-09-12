@@ -21,14 +21,15 @@ Chaque document répond à **une seule question précise** pour un public claire
 
 ## 2. État d'avancement
 
-- [x] **`CONSTITUTION.md` révisé et validé (114 lignes) :**
+- [x] **`CONSTITUTION.md` révisé et validé (101 lignes) :**
   - Retrait des noms de cours et des logiciels concurrents.
-  - Priorité absolue accordée à la pureté de l'équation $f$ (5.1).
-  - Suppression de la règle 4.6 (consolidation).
+  - Priorité absolue accordée à la pureté de l'équation $f$ (#1) et fermeture algébrique (#2).
+  - Suppression de la règle 4.6 (consolidation déplacée dans RULES).
   - Intégration du principe de beauté et simplicité (« *Simplicity is the ultimate sophistication* »).
-- [x] **`RULES.md` créé et structuré (160 lignes) :**
+  - Clarification de $T = tf(x, u, t; p)$ : poses et géométries strictement déclaratives, sans moteur de rendu ni boucle d'affichage.
+- [x] **`RULES.md` créé et structuré (244 lignes) :**
   - Organisé selon l'échelle de revue à 7 questions ordonnées par coût d'erreur décroissant.
-  - Règles universelles pour humains et agents, testables et concrètes.
+  - Règles universelles pour humains et agents, testables et concrètes (bare signatures, idiome `xp`, dual params, convention SI/radians, topologie de rétroaction, validation anticipée des ports).
 
 ---
 

@@ -35,6 +35,8 @@ Two companion functions provide observation and rendering geometries:
     y  = h(x, u, t; p)     outputs       (default: full state x)
     T  = tf(x, u, t; p)    body poses    (default: unplaced)
 
+Poses ($T$) and visual shapes are declarative descriptions; dynamic systems contain no rendering engine or display loop.
+
 Memoryless components (static gains, saturations, error sums) define static systems:
 
     y = h(u, t; p)
