@@ -17,8 +17,11 @@ Dynamic programming, trajectory optimization, and direct methods:
 
 ### 3. [`reinforcement_learning/`](reinforcement_learning/)
 Policy gradients, deep RL on dynamical systems, and method comparisons:
-- [**`drone_ppo_learn_to_fly.ipynb`**](reinforcement_learning/drone_ppo_learn_to_fly.ipynb): PPO policy optimization for 2D quadrotor hover and stabilization.
-- [**`pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb`**](reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb): Pedagogical triad comparison: Dynamic Programming vs. LQR vs. Deep RL (PPO).
+- [**`policy_gradient_to_ppo.ipynb`**](reinforcement_learning/policy_gradient_to_ppo.ipynb): The mathematics from the policy gradient theorem to PPO — REINFORCE, baseline and advantage, actor-critic, GAE, the clipped objective — each checked against the planner's own functions.
+- [**`gymnasium_interface.ipynb`**](reinforcement_learning/gymnasium_interface.ipynb): The Gymnasium environment contract read in optimal-control terms, written by hand, obtained from a planning problem, and trained through.
+- [**`pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb`**](reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb): Dynamic programming vs. LQR vs. PPO on one plant and one cost, scored on one Monte Carlo yardstick.
+- [**`drone_learn_to_fly.ipynb`**](reinforcement_learning/drone_learn_to_fly.ipynb): PPO policy optimization for 2D quadrotor hover and stabilization.
+- [**`drone_ppo_learn_to_fly.ipynb`**](reinforcement_learning/drone_ppo_learn_to_fly.ipynb) and [**`pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb`**](reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb): the earlier versions of the last two, trained through Gymnasium with Stable-Baselines3.
 
 ### 4. [`robotics/`](robotics/)
 Multibody kinematics, dynamics, and control of articulated robots:

@@ -12,10 +12,9 @@ The prototype (`minilink/experimental/ppo_jax.py`) became a planner:
 `minilink.planning.ReinforcementLearningPlanner` on a
 `StochasticPlanningProblem`, with `algorithm="ppo"` or `"sac"`, the law as a
 `minilink.control.NeuralPolicyController`, and `MonteCarloEvaluator` to score
-any controller on the same task. `pendulum_rl_planner.py` in this folder is
-the planner-API version of the pendulum demo (PPO and SAC side by side), and
-`examples/demos/rl/` holds the official versions of every demo below on the
-full pipeline. The scripts in this folder stay on the prototype until the
+any controller on the same task. `examples/demos/rl/` holds the official
+versions of every demo below on the full pipeline, including
+`pendulum_ppo_vs_sac_rl.py`, PPO and SAC side by side on one task. The scripts in this folder stay on the prototype until the
 maintainer retires it (vision plan step R7). Every lesson below carries over: the exit rule is
 now a problem field (`on_exit`, `exit_cost`; the unpriced default still
 truncates and bootstraps, and the planner prints which rule is in force),

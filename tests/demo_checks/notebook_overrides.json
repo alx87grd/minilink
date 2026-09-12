@@ -61,5 +61,26 @@
     "requires": [
       "plotly"
     ]
+  },
+  "examples/teaching/reinforcement_learning/policy_gradient_to_ppo.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/teaching/reinforcement_learning/gymnasium_interface.ipynb": {
+    "requires": [
+      "gymnasium",
+      "jax"
+    ]
+  },
+  "examples/teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/teaching/reinforcement_learning/drone_learn_to_fly.ipynb": {
+    "requires": [
+      "jax"
+    ]
   }
 }

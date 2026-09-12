@@ -19,4 +19,4 @@ Step-by-step walkthroughs of the **minilink** framework, numbered sequentially b
 - [**`08_optimization.ipynb`**](08_optimization.ipynb): Mathematical programming, IPOPT and SciPy interfaces.
 - [**`09_planning.ipynb`**](09_planning.ipynb): Trajectory optimization, direct collocation, shooting methods.
 - [**`10_graphical.ipynb`**](10_graphical.ipynb): Visualizations, Meshcat 3D animations, interactive diagrams.
-- [**`11_reinforcement_learning.ipynb`**](11_reinforcement_learning.ipynb): Differentiable environments, stochastic rollouts, native JAX RL planning.
+- [**`11_reinforcement_learning.ipynb`**](11_reinforcement_learning.ipynb): Reinforcement learning as a planner: stochastic problems, the rollout environment, the discount, PPO and SAC, and the learned law as a controller block.
