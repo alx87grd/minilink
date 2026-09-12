@@ -204,7 +204,7 @@ Implementation notes (match [RULES.md](../../RULES.md)):
 - Analytic derivatives through `f` (FD on traj knots).
 - Changing `generate_nominal_interpolator` signature (callers lift first).
 - LOS `vehicle.py` / Simon plant changes.
-- View-ports from [vehicle-abstraction.md](vehicle-abstraction.md).
+- View-ports on `DynamicBicycle` (`pose` / `bodyvel` for impedance/PID) — TODO Later.
 
 ## Suggested implementation order
 

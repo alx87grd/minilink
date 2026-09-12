@@ -8,15 +8,19 @@
 
 <table>
   <tr>
+    <td width="50%" align="center" valign="bottom">
+      <img src="docs/_static/cartpole_swingup.gif" alt="cart-pole swing-up by trajectory optimization" width="100%"/>
+    </td>
+    <td width="50%" align="center" valign="bottom">
+      <img src="docs/_static/ur5_meshcat.gif" alt="UR5 under task-space impedance control" width="100%"/>
+    </td>
+  </tr>
+  <tr>
     <td width="50%" align="center" valign="top">
-      <img src="docs/_static/cartpole_swingup.gif" alt="cart-pole swing-up" width="100%"/>
-      <br/>
-      swing-up
+      cart-pole swing-up by trajectory optimization
     </td>
     <td width="50%" align="center" valign="top">
-      <img src="docs/_static/ur5_meshcat.gif" alt="UR5 arm" width="100%"/>
-      <br/>
-      UR5
+      UR5, task-space impedance control
     </td>
   </tr>
 </table>
@@ -54,12 +58,12 @@ diagram.animate()
 
 ## What is a System
 
-A model is three functions of the state `x`, the input `u`, the time `t` and
-the parameters `p`:
+A model is dynamics `f`, outputs `h` and body poses `tf`, functions of the
+state `x`, the input `u`, the time `t` and the parameters `params`:
 
-    dx/dt = f(x, u, t; p)      dynamics
-    y     = h(x, u, t; p)      outputs, default y = x
-    T     = tf(x, u, t; p)     body poses, for animation
+    dx/dt = f(x, u, t; params)      dynamics
+    y     = h(x, u, t; params)      one per output port, default y = x
+    T     = tf(x, u, t; params)     body poses, for animation
 
 ![a System: input ports, f, h, tf, and three output ports](docs/_static/system.svg)
 
@@ -104,7 +108,7 @@ loop.animate()  # renderer="plotly" | "meshcat" | "pygame"
 # msd.game()    # keyboard drives u, live
 ```
 
-`f`, `h` and `tf` are functions of `(x, u, t; p)` only: no hidden state on
+`f`, `h` and `tf` are functions of `(x, u, t; params)` only: no hidden state on
 the object. That one convention is what lets a model compose into diagrams,
 run in batches and differentiate later. A diagram flattens to one state vector
 and one `f`, so a closed loop linearizes, animates and nests like a plant.

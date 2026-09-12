@@ -116,7 +116,7 @@ After the term, in the order the cohort's questions suggest:
 - [ ] **S37** Evaluator / solver re-layering (v1.0; after S27).
 - [ ] Rename pass: the 43 `_method` names on `System` subclasses → plain names (maintainer style rule). **[ask per module]**
 - [ ] Carried-over hardening rows (research lane): RRT `KinodynamicExtender` ignores `problem.params.system`; MPC port computes drop `params`; `ShootingTranscription` orphaned from string presets; `ParametricMathematicalProgram` / `JaxParametricProgramEvaluator` placement (54% duplicate of `optimization/evaluators/jax_evaluator.py`); dual online-params façades; `HybridSimulator` conventions drift; `HybridDiagram` hand-copied facades; realtime `TODO: User Architectural Review`; `CostDensityField` / `WorkspaceField` export decision.
-- [ ] Later ideas: scene params / `J(z, p)` bind ([planning-pipeline-architecture.md](planning-pipeline-architecture.md)); `SolverFactory` ([optimizer-parametric-wiring.md](optimizer-parametric-wiring.md)); `MjxPlant`; Pacejka; stochastic forcing; neural MLP; ROS2 / FMI; sparse long-horizon trajopt; parametric `Shape` / `Set` / `Cost` overrides; trajectory post-filter; RRT-Connect; shared RNEA serial-chain stack; ABA on other RNEA arms.
+- [ ] Later ideas: vehicle view ports (`pose` / `bodyvel` on `DynamicBicycle` for impedance/PID); scene params / `J(z, p)` bind (DESIGN §4 planning-params pipeline B); `SolverFactory` ([optimizer-parametric-wiring.md](optimizer-parametric-wiring.md)); `MjxPlant`; Pacejka; stochastic forcing; neural MLP; ROS2 / FMI; sparse long-horizon trajopt; parametric `Shape` / `Set` / `Cost` overrides; trajectory post-filter; RRT-Connect; shared RNEA serial-chain stack; ABA on other RNEA arms.
 
 ---
 

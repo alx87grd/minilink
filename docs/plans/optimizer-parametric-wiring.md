@@ -7,8 +7,7 @@ Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP),
 [TODO.md](TODO.md) Later (`SolverFactory` / optimizer wiring).
 
-Related: [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
-(parametric `x0` bind; pipeline B extends to scene).
+Related: DESIGN §4 planning-params pipeline B (parametric `x0` / reserved `scene` bind).
 
 ---
 

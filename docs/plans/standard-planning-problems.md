@@ -4,8 +4,7 @@ Status: draft plan (July 2026). Design-only — no implementation in this
 Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 phase.
 
-Related: [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
-(algorithm / I/O stack), [DESIGN.md](../../DESIGN.md) §6,
+Related: [DESIGN.md](../../DESIGN.md) §6 (planning / NLP stack),
 [TODO.md](TODO.md) Later.
 
 ---

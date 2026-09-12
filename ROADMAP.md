@@ -240,7 +240,7 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - **Open (v1.0):** evaluator/solver layering — evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; Diffrax as an optional JAX solve (later).
 - **Open (v0.2):** which pyro demos the courses still need (drives the parity audit's remaining rows).
 - **Open (v0.2):** Lyapunov certificates in the analysis band — [docs/plans/lyapunov-certificates.md](docs/plans/lyapunov-certificates.md): `region_of_attraction(sys)` returning a `LyapunovCertificate` with `contains`, `verify` (Monte Carlo inside the certified set) and `plot`, plus the two `System` shortcuts. Quadratic `V` only; provisional research lane pending cohort review and SOS study.
-- ~~RL as a planner~~ — settled 2026-09-11 ([docs/plans/v01-scope-alignment.md](docs/plans/v01-scope-alignment.md)): native pure-JAX `ReinforcementLearningPlanner` + `NeuralPolicyController` is the canonical GRO860 teaching path (`11_reinforcement_learning.ipynb`, `demos/rl/`, `showcase_from_rl_to_bode.ipynb`); `Sys2Gym` + SB3 retained as an external bridge in `interfaces/`.
+- ~~RL as a planner~~ — settled 2026-09-11: native pure-JAX `ReinforcementLearningPlanner` + `NeuralPolicyController` is the canonical GRO860 teaching path (`11_reinforcement_learning.ipynb`, `demos/rl/`, `showcase_from_rl_to_bode.ipynb`); `Sys2Gym` + SB3 retained as an external bridge in `interfaces/`.
 - **Open (v0.2 / Later):** Control Barrier Functions (CBF) & Spatial Safety Filters — [docs/plans/cbf-safety-filter.md](docs/plans/cbf-safety-filter.md): $C^1$ bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block.
 
 ## 7. Out of scope

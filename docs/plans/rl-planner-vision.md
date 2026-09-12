@@ -1,18 +1,17 @@
 # Reinforcement learning as a planner — vision and plan (draft)
 
-Status: **in progress** (2026-09-10). Steps R1–R5b landed the same day
+Status: **in progress** (2026-09-10). Steps R1–R6 landed
 (`planning/reinforcement_learning/`, `planning/evaluation.py`,
-`control/neural.py`, the problem/cost semantics); R6–R7 open. Decisions
+`control/neural.py`, the problem/cost semantics, teaching notebook + demos);
+R7 open. Decisions
 D1–D5 applied as recommended; D3 landed as the single block with a feature
 function (the composite, diagram-visible block is still open).
 Lane: research → provisional planning band at v0.2.
 
 Builds on: [standard-planning-problems.md](standard-planning-problems.md)
 (the deterministic / stochastic / robust taxonomy — adopted here, not
-redrawn), [neural-blocks-collection.md](neural-blocks-collection.md) (NN
-blocks are ordinary blocks, weights are `params`, training lives outside),
-[planning-pipeline-architecture.md](planning-pipeline-architecture.md)
-(result families), DESIGN §6.
+redrawn). NN blocks are ordinary blocks (weights are `params`, training lives
+outside). Result families and parametric scene bind: DESIGN §6 and TODO Later.
 
 Evidence: `minilink/experimental/ppo_jax.py` and the six demos in
 `examples/experimental/rl/`, with the tuning record in

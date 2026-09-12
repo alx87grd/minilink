@@ -846,5 +846,5 @@ def reject_unknown_online_params(params) -> None:
             f"Online params key(s) {deferred} are reserved for pipeline B "
             "(ObstacleBank / ParametricMathematicalProgram J(z, p) bind). "
             "Pass params=None or {} for x0-only bind. See "
-            "docs/plans/planning-pipeline-architecture.md."
+            "docs/plans/TODO.md (Later: scene params / J(z, p) bind)."
         )

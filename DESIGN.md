@@ -418,7 +418,7 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
   or `{}` binds `x0` only; `params={"scene": …}` raises `NotImplementedError`
   until `ParametricMathematicalProgram` gains `J(z, p)` / `ObstacleBank`
-  ([planning-pipeline-architecture.md](docs/plans/planning-pipeline-architecture.md)).
+  ([docs/plans/TODO.md](docs/plans/TODO.md) Later).
   **TODO: Prioritize threading $p$ into JAX parametric programs.** This will allow 
   moving obstacles online without rebuilding the NLP, unlocking real-time dynamic obstacle avoidance.
   **Deferred** ([docs/plans/TODO.md](docs/plans/TODO.md) Later): call-time overrides
