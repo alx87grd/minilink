@@ -22,6 +22,13 @@ Keep math readable, interfaces thin, and docs synchronized with code.
 
 Do not add new markdown guides unless asked. Keep [DESIGN.md call chains](DESIGN.md#8-call-chains) minimal.
 
+**Cross-link sparingly.** Every link is a maintenance edge: renames and section
+moves break them silently (no link checker in CI). Link on first mention only,
+and only when the reader must open the target to act. Otherwise name the doc in
+plain text. Documents meant to be read top to bottom (principle lists, the
+constitution) aim for zero links; a table of "related documents" inside a doc
+usually means the content is in the wrong file.
+
 **Intro-doc scope:** [README.md](README.md), marketing showcases
 ([showcase/minilink.ipynb](examples/tutorial/showcase_minilink.ipynb),
 [showcase/jax.ipynb](examples/tutorial/showcase_jax.ipynb)), and the
