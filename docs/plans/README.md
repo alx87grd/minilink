@@ -20,8 +20,7 @@ the design needs a writeup.
 | [TODO.md](TODO.md) | Operational workboard (phases D–3, v0.2 pulls) | Ongoing |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.2 |
 | [gro501-classical-control.md](gro501-classical-control.md) | Fix plan for the GRO501 objective — phantom `PID` modes, `minreal`, `place`, observers, sensitivity verbs, the z-domain question | Teaching surface — draft, awaiting rulings (v0.2) |
-| [control-plots.md](control-plots.md) | Root locus, Nyquist, margins, step response; MATLAB look; one figure spec rendered on matplotlib and plotly | Teaching surface — implemented 2026-09-07 |
-| [derivatives-facade.md](derivatives-facade.md) | `sys.jacobian("f", "x")`, `sys.linearize(...)` and one calling pattern for the analysis family (`bode`, `pzmap`, `transfer_function`, …) | Teaching surface — implemented 2026-09-06 |
+| [cbf-safety-filter.md](cbf-safety-filter.md) | Control Barrier Functions (CBF): bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block | Research lane — design draft (2026-09-11) |
 | [planning-pipeline-architecture.md](planning-pipeline-architecture.md) | Result families + parametric scene bind (pipeline B) | Research lane — partial, Later |
 | [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | Solver backend factory for offline + parametric MPC | Research lane — draft, Later |
 | [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Research lane — draft, Later |
@@ -32,6 +31,8 @@ the design needs a writeup.
 | [phase4-fidelity-maps.md](phase4-fidelity-maps.md) | Jax bicycle ladder lift/project maps + MPC broadcast | Research lane — draft, Later |
 | [mpc-tuning.md](mpc-tuning.md) | MPC tuning project harness | Research lane — project notes |
 | [articulated-mechanism.md](articulated-mechanism.md) | Mechanism IR, sym/num dual, spatial RNEA/ABA | Research lane — draft, Later |
+| [v01-scope-alignment.md](v01-scope-alignment.md) | v0.1 doc/lane alignment: continuous core, RL vs SB3, hybrid long-term, module demote/promote checklist, examples `tutorial/`/`teaching/`, pip timing | Maintainer draft 2026-09-11 — apply to ROADMAP when approved |
 
-Deleted 2026-09-05 (landed; decision records folded into DESIGN / tests README):
-`control-block-contract.md`, `test-benchmark-consolidation.md`.
+Deleted (landed; decision records folded into DESIGN / tests README):
+- 2026-09-05: `control-block-contract.md`, `test-benchmark-consolidation.md`.
+- 2026-09-11: `control-plots.md`, `derivatives-facade.md`.

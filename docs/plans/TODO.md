@@ -101,8 +101,11 @@ After the term, in the order the cohort's questions suggest:
 - [ ] **S31** `HybridDiagram` → `HybridLoop`, `%` → `on_schedule()` — or promotion to a `System` (ROADMAP §6, v1.0). **[ask — core]**
 - [ ] **S32** Unify `MechanicalSystem` / `GeneralizedMechanicalSystem` (`N = I` special case); `Boat2D` / `Plane3D` gain `q` / `dq` ports. **[ask — core]**
 - [x] Frequency analysis — NumPy-only on the state-space channel: `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response` and their plots (2026-09-07).
-- [ ] PyPI publication as a third install option (conda stays recommended). **[ask]**
 - [x] **Pitch-driven (2026-09-09)** — auto-fit camera (`camera_scale=None` default, `bounding_points`, `camera_fit` flag; pendulum follows `params["l"]`, cart-pole ground via `ground_line`); `RRTPlanner(problem)` default bang-bang `KinodynamicExtender` (0.3 s edges) and `RRTOptions` / extenders on the planning band and root prelude; DESIGN §5 speed note; ROADMAP §1 north star = the pitch.
+- [x] **RL as primary planner (2026-09-10)** — `ReinforcementLearningPlanner` with pure-JAX PPO/SAC, `StochasticPlanningProblem`, `NeuralPolicyController`, `MonteCarloEvaluator`; verified on UR5 showcase; canonical demos in `examples/demos/rl/` and intro chapter `11_reinforcement_learning.ipynb`.
+- [x] **Lyapunov certificates (2026-09-11)** — `region_of_attraction()` returning `LyapunovCertificate` with `verify()`, `contains()`, `plot()`, and system shortcuts; verified on UR5 impedance loop in `showcase_from_rl_to_bode.ipynb`.
+- [x] **CBF design doc (2026-09-11)** — [docs/plans/cbf-safety-filter.md](cbf-safety-filter.md): $C^1$ bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block.
+- [ ] PyPI publication as a third install option (conda stays recommended). **[ask]**
 - [ ] **S41** Profile `rollout_batch` with a `params` family: 278 ms vs 27 ms for the plain batch (pendulum, 1000 × 1000 RK4 steps, 2026-09-09). Done when the family path is within 2× of the plain batch.
 - [ ] **S42** `plot_cost2go` colour scale clipped at `out_of_bound_cost` by default (the showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default.
 - [ ] **S43** Constructor-derived `camera_scale` hints (boat, steering, propulsion, plane, arms, rotating cart-poles) → auto-fit or params-derived; convert raw ground `CustomLine`s in catalog skins to `ground_line()` so the `camera_fit` flag applies.

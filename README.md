@@ -227,7 +227,8 @@ tier, pip, and options: [install.md](install.md).
 
 - [Showcase notebook](examples/learn/intro/showcase_minilink.ipynb), the tool ladder on real plants
 - [JAX showcase](examples/learn/intro/showcase_jax.ipynb), write `f` once, get every gradient
-- [Intro series 00–10](examples/learn/intro/), one notebook per package
+- [From RL to Bode showcase](examples/learn/intro/showcase_from_rl_to_bode.ipynb), six-axis robot, impedance loop, neural policy, frequency response and Lyapunov certificates
+- [Intro series 00–11](examples/learn/intro/), one notebook per package (core dynamics to reinforcement learning)
 - [Teaching notebooks](examples/learn/teaching/), swing-up, DP, PPO, robot equations of motion
 - [Examples index](examples/README.md), demos and projects by chapter
 - [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](DESIGN.md), [ROADMAP.md](ROADMAP.md), [tests](tests/README.md)
