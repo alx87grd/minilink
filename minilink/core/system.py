@@ -54,8 +54,11 @@ class System(SharedSystemFacades):
 
       Notes on purity
       ---------------
-      Overridden :meth:`h` and port ``compute`` functions should behave as
-      functions of ``(x, u, t, params)`` only (convention; not enforced).
+      Overridden :meth:`h` and port ``compute`` functions are functions of
+      ``(x, u, t, params)`` alone: no memory between calls, no cached side
+      effects. This is the first invariant of CONSTITUTION.md, and it is what
+      lets diagrams nest, solvers step, and JAX trace. Python cannot check it,
+      so the burden sits with whoever writes the equation.
     """
 
     #: Opt-in swappable look: a callable ``(plant) -> dict[str, list[prim]]`` or
@@ -233,7 +236,7 @@ class System(SharedSystemFacades):
             The input-port ids this output directly feeds through from
             (default: no direct feedthrough).
         """
-        self._validate_output_dependencies(id, dependencies)
+        self.validate_output_dependencies(id, dependencies)
         self.outputs[id] = OutputPort(
             id,
             dim=dim,
@@ -302,7 +305,8 @@ class System(SharedSystemFacades):
 
         return input_labels, input_units
 
-    def _validate_output_dependencies(self, output_id, dependencies):
+    def validate_output_dependencies(self, output_id, dependencies):
+        """Internal machinery: check the declared dependencies of an output port."""
         if dependencies == "all":
             return
         if dependencies in ("", None):

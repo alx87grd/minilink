@@ -1,4 +1,4 @@
-"""Student-facing code imports through the teaching surface (AGENTS, ROADMAP §2).
+"""Student-facing code imports through the teaching surface (RULES 4.2, ROADMAP §2).
 
 Every ``from minilink... import`` in ``examples/tutorial/``, ``examples/teaching/``,
 and ``examples/demos/`` must target the root prelude or a band facade — or be listed,

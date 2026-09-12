@@ -67,13 +67,13 @@ When $u$ controls acceleration (e.g., dynamic vehicle models, torque-driven mani
              +------------------ x --------------+
 ```
 
-1. **Geometry / Spatial layer** ([`minilink.planning.spatial`](file:///Users/agirard/code/minilink/minilink/planning/spatial/)):
+1. **Geometry / Spatial layer** (`minilink.planning.spatial`):
    - `GridSDF`: Holds 2D/3D signed distance grid with JAX bicubic interpolation.
    - `Scene.as_cbf(body_points)`: Returns an obstacle barrier function $h(x)$ evaluateable under NumPy and JAX.
 2. **Control layer** (`minilink.control.cbf`):
    - `CBFSafetyFilter(controller, cbf, bounds, gamma=0.1, slack_penalty=1e5)`: Wraps an existing controller or stands as an independent filter block in a `DiagramSystem`.
    - Per step: Solves a 1D–4D QP (OSQP, Clarabel, or an analytical projection for SISO).
-3. **Analysis layer** ([`minilink.analysis`](file:///Users/agirard/code/minilink/minilink/analysis/)):
+3. **Analysis layer** (`minilink.analysis`):
    - Forward-invariance verification tool comparing safe sets against simulated rollouts.
 
 ---

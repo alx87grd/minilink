@@ -30,6 +30,7 @@ Pytest policy: tests/README.md. Examples map: examples/README.md.
 | DESIGN.md | Public contracts, package layout, evaluator behavior |
 | ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
+| CLAUDE.md | Entry stub that points here; update only if this reading order changes |
 | docs/plans/TODO.md | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
 | docs/plans/ | Active **design** writeups only (multi-step plans; delete finished plan docs) |
 | docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
@@ -46,17 +47,17 @@ Keep DESIGN.md call chains minimal.
 **Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals).
 
 **Ask first (maintainer-owned):** anything student-facing (`README.md`,
-`examples/`, notebooks, ROADMAP §1–§4, public names); **core architecture and
-the API of the main tools** (`System` family, diagrams, compile, `Simulator`,
-planners, `Optimizer`, controllers); any feature or user-importable-name
-removal; delete/rename files; new dependencies; removing user scratch code;
-`CONSTITUTION.md` amendments.
+`examples/`, notebooks, ROADMAP §1, §2 and §4, public names); **core
+architecture and the API of the main tools** (`System` family, diagrams,
+compile, `Simulator`, planners, `Optimizer`, controllers); any feature or
+user-importable-name removal; delete/rename files; new dependencies; removing
+user scratch code; `CONSTITUTION.md` amendments.
 
 **Agent-managed (decide, then report):** plotting interfaces, external
-interfaces (`interfaces/`), docs housekeeping, the TRL ledger, `TODO.md`,
-plan-doc housekeeping, tests, `RULES.md` wording that does not change a
-public contract, and internal code structure that does not change a public
-contract. When you spot an opportunity outside your lane, ask — do not act.
+interfaces (`interfaces/`), docs housekeeping, the TRL ledger (ROADMAP §3),
+`TODO.md`, plan-doc housekeeping, tests, `RULES.md` wording that does not
+change a public contract, and internal code structure that does not change a
+public contract. When you spot an opportunity outside your lane, ask — do not act.
 
 **Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file, CONSTITUTION.md, or RULES.md → ask before proceeding.
 
@@ -69,7 +70,9 @@ stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 
 **Entry points:** tests/README.md (section "entry points") — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
 
-GitHub **CI** (`.github/workflows/test.yml`) runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+GitHub **CI** (`.github/workflows/test.yml`) is the merge gate and runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+
+Two workflows are **not** merge gates: `nightly.yml` runs every script under `examples/demos/` and every teaching notebook with the full optional stack, and `docs.yml` builds the Sphinx site. A demo that only the nightly sweep exercises still has to run — check it locally when you land one.
 
 **Always before push** (fast; mirrors CI `test` job):
 

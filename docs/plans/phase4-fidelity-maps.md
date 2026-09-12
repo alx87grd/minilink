@@ -5,8 +5,7 @@ Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 Locked defaults: **bicycle ladder only** (Kin → Acc → Dyn → Rate → TauRate →
 Servo → Engine); Holonomic deferred. Maps live in
-[`minilink/dynamics/catalog/vehicles/jax_vehicle_maps.py`](../../minilink/dynamics/catalog/vehicles/jax_vehicle_maps.py)
-(to create). Pointwise functions are the core; trajectory wrappers batch them
+`minilink/dynamics/catalog/vehicles/jax_vehicle_maps.py` (to create). Pointwise functions are the core; trajectory wrappers batch them
 and supply derivatives via finite differences (same spirit as MPC
 `_finite_diff_knots` in
 [`minilink/control/mpc/utilities.py`](../../minilink/control/mpc/utilities.py)).

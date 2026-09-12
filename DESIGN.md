@@ -58,14 +58,13 @@ Rules:
 
 ### Two lanes (teaching surface vs research lane)
 
-Stability is a **contract between two lanes**, defined in
-[ROADMAP.md §2](ROADMAP.md#2-two-lanes). The **teaching surface** — root
-prelude plus the band facades — is registered in one place and tested as a
-set; names and semantics change only with a deprecation note; student-facing
-examples and notebooks import only through it. Everything else is the
-**research lane**: no stability promise, importable from a git checkout,
-outside the published wheel. Deep defining-module imports stay valid in both
-lanes.
+The lane contract — entry rule, deprecation policy, wheel scope — is
+[ROADMAP.md §2](ROADMAP.md#2-two-lanes); it is not restated here. What this
+document adds: the teaching surface is the root prelude plus the band facades
+above, registered in `minilink/__init__.py` and the band `__init__` files, and
+checked as a set by `test_teaching_surface.py` — every exported name resolves,
+carries a docstring, and lives in a teaching-lane module. Deep defining-module
+imports stay valid in both lanes.
 
 ## 3. Package Map
 

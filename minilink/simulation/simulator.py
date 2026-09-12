@@ -195,10 +195,10 @@ class Simulator:
         self.last_traj = None
         self.last_debug = None
 
-        self.x0 = self._validate_x0(sys.x0 if x0 is None else x0, sys.n)
+        self.x0 = self.validate_x0(sys.x0 if x0 is None else x0, sys.n)
 
         # Compile the system
-        self.compile_backend, self.evaluator = self._resolve_and_build_evaluator(
+        self.compile_backend, self.evaluator = self.resolve_and_build_evaluator(
             sys, compile_backend
         )
 
@@ -215,10 +215,10 @@ class Simulator:
             self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
             self.n_pts = len(self.t)
             self.solver_mode = self.select_solver(sys, solver)
-        solver_backend_key, self.solver_backend_options = self._parse_solver(
+        solver_backend_key, self.solver_backend_options = self.parse_solver(
             self.solver_mode
         )
-        self.solver_backend = self._select_backend(solver_backend_key)
+        self.solver_backend = self.select_backend(solver_backend_key)
         self.dt = dt
 
         setup_notes = emit_discontinuous_solver_warnings(
@@ -361,7 +361,7 @@ class Simulator:
             State and input time series.
         """
         u_traj = coerce_forced_input(self.sys, self.t, u, input_port_id=input_port_id)
-        if not self._supports_forced_mode():
+        if not self.supports_forced_mode():
             raise ValueError(
                 f"Solver '{self.solver_mode}' does not support forced simulations"
             )
@@ -394,20 +394,20 @@ class Simulator:
 
         return traj
 
-    # Private: compile, validation, and backend wiring
-    def _build_evaluator(self, sys, compile_backend):
+    # Internal machinery
+    def build_evaluator(self, sys, compile_backend):
         return sys.compile(backend=compile_backend)
 
-    def _resolve_and_build_evaluator(self, sys, compile_backend):
+    def resolve_and_build_evaluator(self, sys, compile_backend):
         """
         Compile with *compile_backend*, or if it is :data:`COMPILE_BACKEND_AUTO`, try JAX
         then NumPy.
         """
         return resolve_auto_backend(
-            lambda backend: self._build_evaluator(sys, backend), compile_backend
+            lambda backend: self.build_evaluator(sys, backend), compile_backend
         )
 
-    def _validate_x0(self, x0, n):
+    def validate_x0(self, x0, n):
         x0_arr = np.asarray(x0, dtype=float)
         if x0_arr.ndim != 1:
             raise ValueError(f"x0 must be a 1-D array with shape ({n},)")
@@ -417,10 +417,10 @@ class Simulator:
             raise ValueError("x0 must contain only finite values")
         return x0_arr
 
-    def _supports_forced_mode(self):
+    def supports_forced_mode(self):
         return True
 
-    def _select_backend(self, solver_backend_key):
+    def select_backend(self, solver_backend_key):
         if solver_backend_key == "scipy":
             return SciPySolverBackend()
         if solver_backend_key == "euler":
@@ -431,7 +431,7 @@ class Simulator:
             return RK4SolverBackend()
         raise ValueError(f"Unknown solver '{solver_backend_key}'")
 
-    def _parse_solver(self, solver):
+    def parse_solver(self, solver):
         if solver not in _USER_SOLVER_MODES:
             raise ValueError(f"Unknown solver '{solver}'")
         return _USER_SOLVER_MODES[solver]

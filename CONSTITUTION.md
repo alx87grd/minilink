@@ -47,7 +47,10 @@ Memoryless components (static gains, saturations, error sums) define static syst
 
 ### The Five Contract Invariants
 1. **Everything that can be viewed as a system is a System.** Plants, controllers, observers,
-   filters, neural policies, and diagrams share the identical object model.
+   filters, neural policies, and flow diagrams share the identical object model. One seam
+   stands open: the sampled-loop containers `Computer` and `HybridDiagram` are not Systems,
+   though `StepSystem` and `StepDiagramSystem` are. Closing it is a v1.0 question in the
+   ROADMAP review queue, not a licence to open a second one.
 2. **Functional purity in equation paths.** Arrays in, arrays out. Equation paths ($f, h$)
    have no internal mutable state, no cached side effects, and no memory between calls.
    Purity is what enables arbitrary nesting, solver stepping, vectorized batches, and autodiff.
@@ -110,7 +113,10 @@ When trade-offs or design tensions arise, higher-ranked principles strictly over
 - **Hard physics behind leaves:** Contact engines and external multibody sit behind optional
   leaves. Downstream tools still see a `System`.
 - **Composition grammar is frozen early:** Series, parallel, and feedback (`>>`, `+`, `@`)
-  are the composition language. Do not grow a second wiring dialect.
+  are the composition language of the continuous algebra; `DiagramSystem.connect()` and
+  `feedback()` are the explicit-wiring entry points for topologies the operators do not
+  reach. The sibling hybrid algebra adds exactly one operator, `%`, which schedules a block
+  into a `Computer`. Do not grow a second wiring dialect in either algebra.
 - **Build vs run:** Wiring, validation, and `compile()` freeze diagram structure. Runtime
   stepping must not mutate topology.
 - **Backend-native math:** One equation path for NumPy and JAX. A backend-specific plant

@@ -224,6 +224,7 @@ tier, pip, and options: [install.md](install.md).
 - [Teaching notebooks](examples/teaching/), swing-up, DP, PPO, robot equations of motion
 - [Examples index](examples/README.md), demos and projects by chapter
 - [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](DESIGN.md), [ROADMAP.md](ROADMAP.md), [tests](tests/README.md)
+- [CONSTITUTION.md](CONSTITUTION.md) and [RULES.md](RULES.md), the design law and the code rules every contributor and agent follows
 
 Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro),
 the toolbox behind the robotics and control courses at Université de

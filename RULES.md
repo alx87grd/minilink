@@ -17,9 +17,9 @@ concrete formatting, ordered by the cost of being wrong:
 2. [What is it in domain terms? (System Modeling)](#2-what-is-it-in-domain-terms)
 3. [Where does it live? (Placement & Dependencies)](#3-where-does-it-live)
 4. [What should its API look like? (Interface & Facades)](#4-what-should-its-api-look-like)
-5. [What should its code look like? (Textbook Engineering Style)](#5-what-should-its-code-look-like)
+5. [What should its code look like? (Textbook Engineering Style)](#5-what-should-its-code-look-like-textbook-style)
 6. [What evidence does it owe? (Demos, Verification & Tests)](#6-what-evidence-does-it-owe)
-7. [Is it worth keeping? (Lifecycle & Consolidation)](#7-is-it-worth-keeping)
+7. [Is it worth keeping? (Lifecycle & Consolidation)](#7-is-it-worth-keeping-consolidation)
 
 ---
 
@@ -101,7 +101,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   merely lists the files in that folder. The existing maps (root `README.md`,
   `examples/README.md`, `tests/README.md`) stay the maps; leaf demo folders do not get
   a second copy. Do not add new markdown guides unless the maintainer asks.
-- **3.7 Intro surfaces stay canonical.** README.md, the two showcase notebooks, and
+- **3.7 Intro surfaces stay canonical.** README.md, the three showcase notebooks, and
   `examples/tutorial/` present the main core tools: `System`, diagrams, simulate,
   compile, analysis, planning trajopt, the hybrid step path (`StepSystem`,
   `StepDiagramSystem`, `Computer`, `HybridDiagram`), and MPC as the hybrid exemplar.
@@ -143,7 +143,10 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   composition: `>>` for series cascade, `+` for parallel sum, and `@` for feedback closure.
   While `@` provides rapid synthesis for standard negative feedback loops (`controller @ plant`),
   systems support multiple feedback topologies (unity feedback, sensor dynamics, observer loops,
-  MIMO architectures) composed via operator chaining or explicit wiring through `DiagramSystem.connect()`.
+  MIMO architectures) composed via operator chaining or explicit wiring through `DiagramSystem.connect()`
+  and `feedback()`. Those five entry points are the whole continuous wiring dialect. The sibling
+  hybrid algebra adds one operator, `block % schedule`, which returns a `Computer`; it is not a
+  sixth way to wire a flow diagram. Do not add a seventh.
 - **4.9 Canonical port terminology:** Prefer these names when they fit; this is not a rename sweep.
   Custom and multi-channel port names remain fully valid.
   - Inputs: `u` (control action / actuation), `r` (reference / setpoint), `w` (disturbance / exogenous input), `v` (measurement noise).
@@ -217,8 +220,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   $\to$ select algorithm backend $\to$ extract $f/h$ callables $\to$ execute core math in place.
   Heavy ceremony and validation belong in helper functions below.
 - **5.12 Backend imports come from `minilink.core.backends`:** Never import from `minilink.core.compile`
-  inside system libraries. Use `require_jax_numpy()`, `array_module()`, and `require_scipy()` from
-  `core.backends`.
+  inside the system libraries (`blocks/`, `dynamics/`, `control/`, `estimation/`). Use
+  `require_jax_numpy()`, `array_module()`, and `require_scipy()` from `core.backends`. Tools that
+  compile a system for a living (`simulation/`, `analysis/`) import the compiler directly.
 - **5.13 Familiar patterns first:** Do not introduce programming concepts or advanced Python
   styles absent from the repo and the maintainer's prior choices (e.g. `typing.Protocol`,
   metaclasses) unless there is a strong runtime or maintainability reason. Static-typing-only
@@ -237,9 +241,10 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   (`core/system.py`, `blocks/`, `dynamics/`, `control/`) read like a textbook. Library-developer
   modules (`core/compile/`, evaluators) may carry compiler machinery.
 - **5.17 Native-array equation paths:** Keep $f$/$h$ on native arrays; convert at API boundaries only.
-- **5.18 `__main__` hello-worlds:** Core modules may ship a ~10-line `__main__` smoke. Bigger
-  examples live under `examples/`. Do not add plant-only demo scripts whose only job is
-  to smoke a catalog class.
+- **5.18 `__main__` hello-worlds:** Core modules may ship a `__main__` smoke that constructs the
+  class and runs it once. Keep it short enough to read at a glance, and stop where the teaching
+  starts: a smoke that grows plots, sweeps, or commentary has become a demo and belongs under
+  `examples/`. Do not add plant-only demo scripts whose only job is to smoke a catalog class.
 - **5.19 JAX float64 by default:** JAX evaluators enable 64-bit floats on construction;
   `MINILINK_JAX_X64=0` opts out. Tools never require the caller to call `configure_jax` first.
 - **5.20 Match the neighborhood:** Change only what the task requires. Public APIs use type hints
@@ -290,15 +295,16 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   wall-clock cap is not the rule (trajopt and RL cells may take longer).
 - **6.8 Demo-gate maturity.** Nothing enters the teaching surface without a demo or notebook,
   a both-backends test where it defines dynamics, and a docstring (ROADMAP.md §2).
-- **6.9 Public-facing prose is foundational, not a bake-off.** README, the two showcases,
+- **6.9 Public-facing prose is foundational, not a bake-off.** README, the three showcases,
   `docs/pitch/`, and the docs landing page stay positive about minilink and never name
   other tools. Framing: minilink bridges capabilities that usually live in separate tools.
   No superlatives; quote measured notebook batches, never a per-call speedup. The main
   line is readable by an undergraduate; expert depth sits in short "under the hood"
   asides. The README does not link the pitch deck for now. GIF assets stay under 1 MB
   and use catalog plant framing (the MPC clip may follow the car). Before pushing those
-  files, `grep -n -i "simulink|matlab|drake|casadi|mujoco"` over README, slides, and
-  notebook markdown must be empty.
+  files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README, the slides, and the
+  showcase notebook markdown must be empty (the `-E` matters: without it the alternation is
+  literal and the gate passes on anything). `test_repo_contract.py` runs the same check.
 
 ---
 

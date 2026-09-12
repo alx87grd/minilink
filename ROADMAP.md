@@ -117,7 +117,7 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
 | Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupTableController`, `plot_cost2go` / `plot_policy` | `pendulum_swing_up_cost_function_vi`, `pendulum_swing_up_vi_vs_lqr`, `demos/planning/value_iteration/` | `final_time` reads `problem.tf`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
 | LQR + linearization | `linearize`, `lqr`, `lqr_at_operating_point`, `plot_control_law` | `03_control`, `04_analysis`, `demos/control/` | — (green today) |
 | Trajectory optimization | `PlanningProblem`, `TrajectoryOptimizationPlanner` (`direct_collocation`, `shooting`), `QuadraticCost` | `09_planning`, `demos/planning/trajopt/` | float64 by default on JAX; `success` means defects satisfied; canonical problems succeed with default optimizer |
-| Reinforcement Learning (native JAX) | `StochasticPlanningProblem`, `ReinforcementLearningPlanner` (PPO/SAC), `NeuralPolicyController`, `MonteCarloEvaluator` | `11_reinforcement_learning.ipynb`, `showcase_from_rl_to_bode.ipynb`, `demos/rl/` | pure-JAX training on compiled plant (<60 s CPU); neural policy closed loop linearizes, simulates, and plots Bode; `Sys2Gym` + SB3 retained as external bridge |
+| Reinforcement Learning (native JAX) | `StochasticPlanningProblem`, `ReinforcementLearningPlanner` (PPO/SAC), `NeuralPolicyController`, `MonteCarloEvaluator` | `11_reinforcement_learning.ipynb`, `showcase_from_rl_to_bode.ipynb`, `demos/rl/` | pure-JAX training on compiled plant (measured 2026-09-12: pendulum swing-up, 120k steps in 12.5 s on CPU, 0% failure over 50 trials); neural policy closed loop linearizes, simulates, and plots Bode. **Open gate:** the four names above are still band-facade only — promotion to the root prelude and its registry entry is a v0.1 goal (S46). Notebooks solve with the native planner; Gymnasium stays taught as the domain standard and `Sys2Gym` + SB3 stay as the external bridge |
 
 **Cross-cutting gates**
 
@@ -235,12 +235,13 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - **Held (v0.2):** discrete-domain scope for GRO501 — a z-domain tier in `analysis/` (ZOH/Tustin, z-plane `pzmap`, discrete Bode) vs teaching the Arduino law with `discretize` + simulation only. Maintainer paused this 2026-09-07; default is simulation only.
 - **Open (v0.2):** the `estimation/` band (Luenberger observer, steady-state Kalman filter) — scheduled as the primary gap for the GRO501 wave (§4.2).
 - **Open (v0.2):** PyPI publication — wanted eventually as a third install option; conda stays recommended.
+- **Open (after v0.2):** Zenodo archive and a citable DOI — tag a release, deposit it, add `CITATION.cff`. Sequenced after PyPI so a citation points at a release rather than a branch. This is also the JOSS entry ticket if that route is wanted: JOSS reviews the software against a checklist (install, docs, tests, license, contributing and issue guidelines) and requires a state-of-the-field section naming related tools — the one text that may, as a paper and not as repo prose, carry the landscape table from the 2026-09-12 editorial review. Decide the RULES 6.9 carve-out then, not before.
 - **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename. Pitch-visible since 2026-09-09; kept as research scaffold through v0.1.
 - **Open (v1.0):** a single posed-geometry hook so the pitch's "two functions" (`f` and a drawing function) is literal; today animation is `tf` plus skin geometry.
 - **Open (v1.0):** evaluator/solver layering — evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; Diffrax as an optional JAX solve (later).
 - **Open (v0.2):** which pyro demos the courses still need (drives the parity audit's remaining rows).
 - **Open (v0.2):** Lyapunov certificates in the analysis band — [docs/plans/lyapunov-certificates.md](docs/plans/lyapunov-certificates.md): `region_of_attraction(sys)` returning a `LyapunovCertificate` with `contains`, `verify` (Monte Carlo inside the certified set) and `plot`, plus the two `System` shortcuts. Quadratic `V` only; provisional research lane pending cohort review and SOS study.
-- ~~RL as a planner~~ — settled 2026-09-11: native pure-JAX `ReinforcementLearningPlanner` + `NeuralPolicyController` is the canonical GRO860 teaching path (`11_reinforcement_learning.ipynb`, `demos/rl/`, `showcase_from_rl_to_bode.ipynb`); `Sys2Gym` + SB3 retained as an external bridge in `interfaces/`.
+- ~~RL as a planner~~ — settled 2026-09-11: native pure-JAX `ReinforcementLearningPlanner` + `NeuralPolicyController` is the canonical GRO860 teaching path (`11_reinforcement_learning.ipynb`, `demos/rl/`, `showcase_from_rl_to_bode.ipynb`); `Sys2Gym` + SB3 retained as an external bridge in `interfaces/`. Extended 2026-09-12: the two paths coexist **by role**, not by replacement — notebooks *solve* with the native planner (it trains what SB3 tuning did not, and needs no pip install on Colab), while the Gymnasium environment interface is still *taught* as the standard of the domain, so the GRO860 week-5 lab and the `step` / `reset` exercise keep `Sys2Gym`. Promotion of the RL names to the teaching interface is a v0.1 goal and only partly done.
 - **Open (v0.2 / Later):** Control Barrier Functions (CBF) & Spatial Safety Filters — [docs/plans/cbf-safety-filter.md](docs/plans/cbf-safety-filter.md): $C^1$ bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block.
 
 ## 7. Out of scope
@@ -254,8 +255,11 @@ OS or a batched RL physics engine.
 What *is* in scope but subsidiary: the step/hybrid path (`StepSystem`,
 `StepDiagramSystem`, `Computer` with integer-divisor multi-rate schedules,
 `HybridDiagram`, `HybridSimulator`) exists so discrete control laws can close
-the loop on continuous plants; it is provisional, lives outside the `System`
-hierarchy today, and is not a v0.1 teaching topic. Live interaction is
+the loop on continuous plants. It is provisional, and the seam is narrower than
+"outside the hierarchy": `StepSystem` and `StepDiagramSystem` subclass
+`System`, while `Computer` and `HybridDiagram` do not. No v0.1 course row
+depends on it, but MPC is the intro surface's hybrid exemplar (RULES 3.7), so
+README, the showcases and the tutorial do present it. Live interaction is
 `simulation/realtime/`.
 
 ## 8. Backlog homes

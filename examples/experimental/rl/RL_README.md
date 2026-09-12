@@ -33,7 +33,7 @@ randomized per episode (`params_distribution`).
 | `car_ppo_jax_circuit.py` | BicycleDynRate on the MPC circuit | 1.5M steps | 50 s | laps inside the corridor with the MPC demo's cost, about 9.5 s per 103 m lap at a 12 m/s target |
 | `rocket_ppo_jax_landing.py` | Rocket, one-sided thrust and gimbal | 4M steps | 80 s | free fall, braking burn, settles on the pad |
 
-[`ur5_impedance_rl.ipynb`](../../teaching/robotics/ur5_impedance_rl.ipynb)
+[`showcase_from_rl_to_bode.ipynb`](../../tutorial/showcase_from_rl_to_bode.ipynb)
 (2026-09-11) is the combination piece: a joint impedance loop around the UR5
 (with a 0.5 kg gripper, without which the wrist has no inertia to damp), a
 neural set-point law trained on that inner loop under random starts and

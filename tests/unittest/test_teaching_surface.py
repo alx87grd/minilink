@@ -171,6 +171,31 @@ class TestTeachingSurface(unittest.TestCase):
             value = getattr(importlib.import_module(module_path), name)
             self.assertTrue((value.__doc__ or "").strip(), f"{module_path}.{name}")
 
+    def test_whole_root_prelude_is_checked_not_just_the_sample(self):
+        """Every name the root exports, so DESIGN §2's "tested as a set" is literal.
+
+        The curated table above pins the names a course depends on; this walks
+        ``minilink.__all__`` in full, so a new export cannot enter the teaching
+        surface undocumented or from the research lane.
+        """
+        root = importlib.import_module("minilink")
+        self.assertGreater(len(root.__all__), 100)
+        for name in root.__all__:
+            value = getattr(root, name)
+            self.assertTrue(
+                (getattr(value, "__doc__", None) or "").strip(),
+                f"minilink.{name} is exported to students with no docstring",
+            )
+            home = getattr(value, "__module__", "")
+            self.assertTrue(
+                home.startswith(TEACHING_LANE_PREFIXES),
+                f"minilink.{name} lives in {home}, outside the teaching lane",
+            )
+            self.assertFalse(
+                home.startswith(RESEARCH_LANE_PREFIXES),
+                f"minilink.{name} lives in the research lane ({home})",
+            )
+
     def test_catalog_plants_all_resolve(self):
         catalog = importlib.import_module("minilink.catalog")
         for name in catalog.__all__:

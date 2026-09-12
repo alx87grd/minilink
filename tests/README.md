@@ -113,6 +113,7 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 | **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `run_graphics_visual_check.py` | — |
 | **Demo checks** | Catalog + flagship demos must not throw | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
 | **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `regression` |
+| **Repo contract** | Doc links resolve, public prose names no other tool, no pseudo-private methods | `test_repo_contract.py` (in `pytest`) | `test` |
 
 ## Local environment
 
