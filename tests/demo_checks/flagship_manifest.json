@@ -32,7 +32,10 @@
   {
     "id": "animation_renderers",
     "path": "examples/demos/graphical/animation_renderers.py",
-    "requires": []
+    "requires": [
+      "plotly",
+      "meshcat"
+    ]
   },
   {
     "id": "mpc_integrator_numpy",

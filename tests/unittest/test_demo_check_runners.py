@@ -1,9 +1,9 @@
 """Demo-check runner subprocess tests (catalog + flagship demos + graphics).
 
 Thin CI bridge: invokes ``tests/demo_checks/`` runners; does not duplicate their
-assertions. Without JAX, JAX-required flagships skip here — the CI
-``regression`` job (``.github/workflows/test.yml``) re-runs
-``run_flagship_demos.py`` with JAX installed.
+assertions. Without optional extras (JAX, plotly, meshcat), those flagships
+skip here — the CI ``regression`` job (``.github/workflows/test.yml``) re-runs
+``run_flagship_demos.py`` with ``jax`` / ``visualization`` / ``plotting``.
 
 Notebook smoke checks run in the CI ``regression`` job (and via
 ``tests/run/run_notebook_checks.py``). Opt in here with
