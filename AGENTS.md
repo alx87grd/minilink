@@ -61,6 +61,17 @@ public contract. When you spot an opportunity outside your lane, ask — do not 
 
 **Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file, CONSTITUTION.md, or RULES.md → ask before proceeding.
 
+**Asking for a decision:** show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
+
+**Behavior-preserving refactor runs** (readability and textbook passes, restructures):
+
+1. Read the tests first; they are the output contract. Keep every asserted name working (a property can replace an attribute).
+2. Before touching code, capture a seeded baseline to JSON in the scratchpad: every branch the change touches (each algorithm family, each adapter path, each random-draw path, repeated calls), with timing fields left out. Run it twice and `cmp` the files to prove it is deterministic.
+3. One concern per step. After each: ruff, the targeted tests, the baseline again, `cmp` against the first capture. Byte-identical is the bar (RULES 7.7); an intended change gets its own test instead.
+4. Before redesigning a shape callers consume, count what they actually read across the library, examples, tests and benchmarks. Before naming a domain object, check the course notes' own vocabulary.
+5. Never edit modules while a background sweep imports them; write the next edit as a script in the scratchpad and apply it once the sweep reports.
+6. Finish with lint, full `pytest`, the affected demos, and the notebook checks.
+
 **Notebooks:** skip review unless updating renamed imports or user asks; outputs
 stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` (CI

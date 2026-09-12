@@ -129,7 +129,10 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   name matches its module, import from the module: `from minilink.control.lqr import lqr`).*
 - **4.3 Preconditions met by named adapters.** Never ask the user to write a separate model for
   different tools. A tool requiring a linear model accepts any `System` via `linearize()`; a tool
-  requiring discrete stepping accepts a continuous system via a discretization adapter.
+  requiring discrete stepping accepts a continuous system via a discretization adapter; a tool
+  requiring a stochastic problem accepts a deterministic one via `as_stochastic()`. Convert once
+  at the boundary, then use the richer object directly: never probe it with `hasattr` or
+  `getattr` defaults inside the math.
 - **4.4 Parameter override rule:** `params is None` resolves to the system's default parameters.
   Any provided `params` dictionary replaces them entirely (never write `params or self.params`).
 - **4.5 Unconnected input ports are silent.** Unconnected inputs automatically read their nominal
@@ -157,6 +160,10 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   return-shape checks at ODE time.
 - **4.11 Build vs run.** Wiring, validation, and `compile()` freeze diagram structure.
   Runtime stepping must not mutate topology.
+- **4.12 Defaults that change the mathematics are announced.** When a tool fills in a value
+  that changes what is optimized or reported (a discount, a horizon, a tolerance), it warns
+  once with `warnings.warn`, stating the consequence in domain units (an effective horizon in
+  seconds, not a factor), and stays silent when the caller sets the value.
 
 ---
 
@@ -190,6 +197,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   - Matrices: uppercase (`A`, `B`, `C`, `D`, `H`, `M`, `K`).
   - Vectors: lowercase (`x`, `u`, `y`, `q`, `v`, `dq`, `dx`).
   - Dimensions: lowercase integers (`n`, `m`, `p`).
+  - A symbol keeps one meaning across the codebase: `A` is the state matrix, `rho` the
+    discount rate, `z` the policy features. Name a local that would collide by its role
+    (`advantage`, `ratio`, `eps`) rather than reusing the symbol.
 - **5.5 Format 2D array literals row by row:** Align matrices visually using `# fmt: off` and
   `# fmt: on` to ensure equations remain readable at a glance:
   ```python
@@ -202,8 +212,14 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   ```
 - **5.6 Derived, not cached:** Computable quantities that depend on state or parameters must be
   read-only properties (`@property`), never cached mutable attributes that can become stale.
+  One owner per quantity: a value two components need (a discount, a time step) lives on one
+  object, and the other reads it through a property instead of keeping a copy that can
+  silently disagree.
 - **5.7 No shadow state:** Initialize all object attributes explicitly in `__init__`. Never dynamically
-  attach attributes at call sites or rely on `hasattr`-and-create patterns.
+  attach attributes at call sites or rely on `hasattr`-and-create patterns. A constructor that
+  grows reads as named steps: helpers below return values and `__init__` assigns them, so every
+  attribute is still visibly set there. Attributes that only one branch fills start as `None`
+  before the branch.
 - **5.8 No leading-underscore pseudo-privacy on public classes:** Do not mark methods with a leading
   underscore (`_`) on `System`, `Facade`, or `Simulator` classes. Separate public interfaces from
   internal machinery using standard file section comments (`# Public API` and `# Internal machinery`).
@@ -222,7 +238,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **5.12 Backend imports come from `minilink.core.backends`:** Never import from `minilink.core.compile`
   inside the system libraries (`blocks/`, `dynamics/`, `control/`, `estimation/`). Use
   `require_jax_numpy()`, `array_module()`, and `require_scipy()` from `core.backends`. Tools that
-  compile a system for a living (`simulation/`, `analysis/`) import the compiler directly.
+  compile a system for a living (`simulation/`, `analysis/`) import the compiler directly. A
+  JAX-only function opens with one binding line, `jax, jnp = require_jax(), require_jax_numpy()`,
+  never a bare `import jax`; the lazy-import rule (5.20) keeps that line inside the function.
 - **5.13 Familiar patterns first:** Do not introduce programming concepts or advanced Python
   styles absent from the repo and the maintainer's prior choices (e.g. `typing.Protocol`,
   metaclasses) unless there is a strong runtime or maintainability reason. Static-typing-only
@@ -257,8 +275,12 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   blank lines between the main steps. A short comment sits on its own line above each step
   that the symbols do not already make obvious. Skip the comment when the line reads like
   the textbook (`dx = A @ x + B @ u`). Comments name the step; they do not restate the
-  algebra in prose. Apply this to new math; do not restyle an existing dense equation path
-  unless the maintainer asks.
+  algebra in prose. When the code cannot use the textbook's symbols (dictionary lookups,
+  library calls, vectorization), the step comment gives the equation in textbook notation,
+  `# TD error: delta_k = r_k + gamma V(x_k+1) - V(x_k)`, and names the locals after those
+  symbols (`sigma`, `eps`, `advantage`). That comment is the one place an equation lives: never
+  a module or method docstring. Apply this to new math; do not restyle an existing dense
+  equation path unless the maintainer asks.
 - **5.23 No preamble walls.** A module or demo opens with a one-line title docstring. Do not
   add a long introduction, section map, run recipe, or flag explanation at the top — the
   code plus inline comments must tell the story. Notebooks are course material: do not
@@ -331,3 +353,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   constitution) aim for zero links. A table of "related documents" inside a doc
   usually means the content is in the wrong file. Do not weave "see also" tables,
   comment pointers, or section anchors that go stale on rename.
+- **7.7 Refactors that keep the numbers.** Renaming locals, naming temporaries, moving pure
+  statements, and extracting helpers leave the traced computation unchanged, so results stay
+  bit-identical. Reordering arithmetic (`a * b * c` into `a * (b * c)`), changing a pytree's
+  structure or leaf order (a sum over leaves), changing PRNG key splits, or reordering seeded
+  construction all change floating-point results even when the mathematics is equal. A
+  behavior-preserving refactor proves itself with a seeded baseline (AGENTS.md).
