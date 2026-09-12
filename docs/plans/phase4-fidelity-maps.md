@@ -170,7 +170,7 @@ lift_rate_to_engine = lift_servo_to_engine ∘ lift_taurate_to_servo ∘ lift_ra
 # P_cmd ≈ τ * ω_r; δ_cmd from steer
 ```
 
-Implementation notes (match [AGENTS.md](../../AGENTS.md)):
+Implementation notes (match [RULES.md](../../RULES.md)):
 
 - Pure functions; `params` dict (minimal EoM keys). Reuse `Jw*w_dot + tau_ground` math from `inverse_propulsion_dynamics`.
 - Unpack locals; math-readable names (`v`, `delta`, `w_rear`, `L`, `r_r`).

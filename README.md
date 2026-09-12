@@ -9,26 +9,14 @@
 <table>
   <tr>
     <td width="50%" align="center" valign="top">
-      <img src="docs/_static/pendulum_impedance.gif" alt="pendulum under impedance control" width="100%"/>
+      <img src="docs/_static/cartpole_swingup.gif" alt="cart-pole swing-up" width="100%"/>
       <br/>
-      <code>ImpedanceController() @ Pendulum()</code>
+      swing-up
     </td>
     <td width="50%" align="center" valign="top">
-      <img src="docs/_static/cartpole_swingup.gif" alt="cart-pole swing-up by trajectory optimization" width="100%"/>
+      <img src="docs/_static/ur5_meshcat.gif" alt="UR5 arm" width="100%"/>
       <br/>
-      cart-pole swing-up by trajectory optimization
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top">
-      <img src="docs/_static/mpc_car.gif" alt="car under sampled model predictive control" width="100%"/>
-      <br/>
-      model predictive control, sampled at 5 Hz
-    </td>
-    <td width="50%" align="center" valign="top">
-      <img src="docs/_static/ur5_meshcat.gif" alt="UR5 arm under task-space impedance control in the meshcat 3D viewer" width="100%"/>
-      <br/>
-      UR5 under task-space impedance control, meshcat 3D viewer
+      UR5
     </td>
   </tr>
 </table>
@@ -73,7 +61,7 @@ the parameters `p`:
     y     = h(x, u, t; p)      outputs, default y = x
     T     = tf(x, u, t; p)     body poses, for animation
 
-![a System is f, h, tf and ports; a diagram is a System](docs/_static/system.svg)
+![a System: input ports, f, h, tf, and three output ports](docs/_static/system.svg)
 
 Write `f`, and the plant simulates and plots. Add `tf` and a skin, and it
 animates on matplotlib, plotly, meshcat (3D) or pygame, and you can drive it
@@ -123,7 +111,7 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 
 ## One model, every tool
 
-![capabilities that usually live in separate tools, on one System](docs/_static/bridges.svg)
+![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](docs/_static/bridges.svg)
 
 | Verb | Call |
 | --- | --- |

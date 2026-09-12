@@ -1,87 +1,20 @@
 # Minilink Technical Design
 
-Architecture and public contracts. User guide: [README.md](README.md). Call chains: [§8](#8-call-chains).
-
-## 1. Design Principles
-
-1. **Math readability first**: e.g. `dx = A @ x + B @ u`.
-2. **Pure contracts, convenient boundaries**: equation paths stay functional;
-   facades (`compute_trajectory`, `plot_*`, `animate`, `jacobian`) live at API
-   boundaries. A `System` is a **description** — equations, ports, params,
-   `x0` — plus thin shortcut methods, nothing else. Each shortcut delegates to
-   a tool that lives in its own module (`Simulator`, `analysis.jacobian`,
-   `analysis.linearize`); the shortcut is the teaching and quick-look
-   spelling, the module is the spelling scripts and projects use. No
-   input/output data, caches or run state on the object: evolving state lives
-   in the simulator and the returned `Trajectory`. `self.traj` is the one
-   exception, kept because it is used daily; a new exception needs a reason of
-   that weight.
-3. **Explicit data flow**: visible objects and direct calls; no global backend
-   switches or hidden registries.
-4. **Backend-native math where simple**: one class for traceable NumPy/JAX algebra.
-5. **Specialize only when it clarifies**: `Jax<Plant>` twins when a single class
-   would sacrifice readability.
-
-Contributing style (textbook rules, workflow): [AGENTS.md](AGENTS.md).
-
-### Product identity & scope
-
-Minilink is a **Python/JAX block-diagram toolbox** for **modeling, simulating,
-controlling, optimizing, and learning** with dynamical systems — equations that
-read like textbook math (`dx = f(x,u,t;p)`).
-
-**Distinct edge:** one object model for plants, controllers, diagrams, and
-NN/ID blocks. Compose (`@`, `>>`), simulate, analyze, optimize
-trajectories/policies, and differentiate / `jit` through the same `f` via
-compile backends — without splitting a “sim stack” from a “learning stack.”
-
-**Primary use cases**
-
-1. **Model & teach** — readable continuous plants and closed-loop diagrams.
-2. **Control** — classical, model-based, and hybrid digital loops (sampled
-   MPC/SMC) on those diagrams.
-3. **Optimize** — trajopt / MPC / planning (search, DP) on the same `System`
-   and costs/sets.
-4. **Learn** — identify parameters, residual dynamics, or NN policies with
-   gradients through compiled dynamics.
-5. **Scale out plants later** — optional external multibody engines as leaves
-   when needed; not the product center.
-
-**Not trying to be:** a Simulink GUI/DAE product, a Multibody/contact OS, an
-OCP modeling language, or a batched RL physics engine.
-
-| Toolbox | They own | Minilink vs them |
-| --- | --- | --- |
-| **Simulink** (+ Stateflow/Simscape) | Industrial diagrams, GUI, DAE, codegen | Same block-diagram idea; code-first, causal, open, differentiable — no GUI/DAE ambition |
-| **MATLAB** (CST etc.) | Classical LTI / frequency design | Neighbor for LTI; we center nonlinear systems + optimize/learn in one Python stack |
-| **Drake** | Multibody, contact, events, deep MathProg | Complement for teaching / reduced-order / JAX-learning loops; not a second MultibodyPlant |
-| **MuJoCo / MJX** | Fast multibody + contact physics | Physics backend we can wrap later; they don’t own control-diagram + optimize/learn UX |
-| **CasADi** | Symbolic AD → NLP/OCP | Opt is a *tool on Systems*; we own diagram/sim/control/learn surface around it |
-| **acados / Crocoddyl** | Fast deployed MPC/DDP | Solver peers; we stay the Systems lab that can call solvers |
-| **Pinocchio** | Fast RBD + derivatives | Algorithm/engine peer — not a diagram framework |
-| **Modelica** | Acausal physical networks | We stay causal ODE/blocks (better fit for AD and learning) |
-| **python-control** | Classical control in Python | Interop; they stop at LTI, we continue nonlinear + optimize/learn |
-| **Brax / similar** | Batched differentiable physics for RL | Neighbor in JAX; we are Systems+control+opt, not an RL physics engine |
-| **Pyro** | Teaching dynamics lineage | Successor: keep readability; add diagrams, compile/JAX, optimize, learn |
-
-**Claim:** *Systems-first lab for simulate → control → optimize → learn in
-Python/JAX — not a physics OS, not an OCP language, not a Simulink
-replacement.*
-
-**Scope practices** (with the principles above): freeze the composition
-grammar early; put hard physics behind optional leaves; expose structure
-(don’t black-box dynamics); demo-gate maturity; lock build vs run
-(wire/validate/compile freezes structure); be hard where the identity is
-(compile vs reference parity, JAX twins, discontinuous closed-loop solvers).
-
+Architecture and public contracts. Identity and governing principles:
+[CONSTITUTION.md](CONSTITUTION.md). Code and review rules: [RULES.md](RULES.md).
+User guide: [README.md](README.md). Call chains: [§8](#8-call-chains).
 Maturity and scheduling: [ROADMAP.md](ROADMAP.md).
 
-### NumPy and JAX
+## 1. NumPy and JAX
 
 NumPy required; JAX optional (`minilink[jax]`), imported lazily via
 `minilink.core.backends` (`require_jax_numpy()`, `array_module()`). No `minilink.jax`
 package, no global mode. Explicit `compile_backend` and evaluator backend args.
 `array_module()` only for small hybrid helpers.
+
+**One class by default.** Catalog plants and equation paths share one NumPy/JAX body
+(`xp = array_module(x)`). A `Jax<Plant>` twin exists only when a single class would
+sacrifice textbook readability.
 
 **Precision policy (adopted 2026-09, lands in Phase 0 of [ROADMAP.md](ROADMAP.md)):**
 JAX evaluators enable 64-bit floats on construction; `MINILINK_JAX_X64=0`
@@ -300,6 +233,8 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   overriding `h`.
 - **Dims:** `n` defaults to 0 (static IO shell); `m` from input ports; `p` from primary output
   `"y"` only (aux `"x"` does not change `p`; no `"y"` ⇒ `p==0`).
+- **Shape:** Inheritance for core system types (`System`, `DynamicSystem`,
+  `StepSystem`); composition for diagrams and optional behaviors.
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
   slices with `get_port_values_from_u(u, "r", "y")`.
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
@@ -661,6 +596,10 @@ deliberately not provided in v0.1.
   `as_cost(shaping=...)`, not stored in the field.
 
 ## 5. Compilation And Simulation
+
+**Build vs run.** Wiring, validation, and `compile()` freeze diagram structure
+(topology, port dims, backend). Runtime stepping, forcing, and rollouts must not
+mutate that structure.
 
 Before lowering, every leaf's textbook hooks are probed once at
 `(x0, u_nominal, t=0)` — `f` / `step` and the constructor-made `y` / `x`
@@ -1078,7 +1017,7 @@ synthetic fixtures, `run_*` scripts) — outside the shipped package, importing
 minilink like an external user, and not a public contract.
 
 **Repo conventions:** Python 3.10+; typed public APIs (except equation paths,
-which keep bare signatures per [AGENTS.md](AGENTS.md) Textbook Style); lazy optional imports;
+which keep bare signatures per [RULES.md](RULES.md) §5.1); lazy optional imports;
 namespace `__init__.py` files; plot subpackages may re-export small facades.
 Agents and maintainers run tests in the **`minilink`** conda env from
 [environment.yml](environment.yml) ([README.md#install](README.md#install)).

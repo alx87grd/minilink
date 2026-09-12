@@ -1,53 +1,73 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 380" width="1000" height="380" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 400" width="1000" height="400" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="hub-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a1a1aa"/>
+    </marker>
+  </defs>
   <style>
-    .canvas { fill: #f8fafc; stroke: #e2e8f0; }
-    .tile { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.3; }
-    .core { fill: #eff6ff; stroke: #2563eb; stroke-width: 1.8; }
-    .t { fill: #0f172a; font-size: 14.5px; font-weight: 700; }
-    .s { fill: #64748b; font-size: 11.5px; }
-    .h1 { fill: #0f172a; font-size: 20px; font-weight: 700; }
-    .code { fill: #1e40af; font-size: 14px; font-family: Menlo, Consolas, 'Courier New', monospace; }
-    .bus { stroke: #94a3b8; stroke-width: 1.5; fill: none; }
-    .dot { fill: #94a3b8; }
+    .canvas { fill: #fafafa; stroke: #e5e7eb; }
+    .tile { fill: #ffffff; stroke: #d4d4d8; stroke-width: 1.4; }
+    .core { fill: #eff6ff; stroke: #2563eb; stroke-width: 2.6; }
+    .t { fill: #18181b; font-size: 18px; font-weight: 700; }
+    .s { fill: #71717a; font-size: 15px; }
+    .h1 { fill: #1e3a8a; font-size: 30px; font-weight: 700; }
+    .math { fill: #2563eb; font-size: 22px; font-style: italic; font-family: 'Times New Roman', Times, serif; }
+    .spoke { stroke: #a1a1aa; stroke-width: 1.7; fill: none; marker-end: url(#hub-ah); }
   </style>
-  <rect class="canvas" x="0.5" y="0.5" width="999" height="379" rx="18"/>
+  <rect class="canvas" x="0.5" y="0.5" width="999" height="399" rx="18"/>
 
-  <!-- top tiles: centers 135, 377, 619, 861 -->
-  <rect class="tile" x="24" y="28" width="222" height="64" rx="10"/>
-  <text class="t" x="135" y="54" text-anchor="middle">Block-diagram simulation</text>
-  <text class="s" x="135" y="75" text-anchor="middle">sources, blocks, +  &gt;&gt;  @, any wire plotted</text>
-  <rect class="tile" x="266" y="28" width="222" height="64" rx="10"/>
-  <text class="t" x="377" y="54" text-anchor="middle">Classical control</text>
-  <text class="s" x="377" y="75" text-anchor="middle">Bode, margins, root locus, PID, lead, lag</text>
-  <rect class="tile" x="508" y="28" width="222" height="64" rx="10"/>
-  <text class="t" x="619" y="54" text-anchor="middle">Nonlinear and robot control</text>
-  <text class="s" x="619" y="75" text-anchor="middle">LQR, impedance, computed torque, SMC</text>
-  <rect class="tile" x="750" y="28" width="222" height="64" rx="10"/>
-  <text class="t" x="861" y="54" text-anchor="middle">Planning</text>
-  <text class="s" x="861" y="75" text-anchor="middle">value iteration, RRT and RRT*</text>
+  <rect class="tile" x="32" y="16" width="219" height="76" rx="12"/>
+  <text class="t" x="141" y="48" text-anchor="middle">Simulation</text>
+  <text class="s" x="141" y="70" text-anchor="middle">trajectories</text>
 
-  <!-- bottom tiles -->
-  <rect class="tile" x="24" y="288" width="222" height="64" rx="10"/>
-  <text class="t" x="135" y="314" text-anchor="middle">Trajectory optimization</text>
-  <text class="s" x="135" y="335" text-anchor="middle">collocation, shooting, Ipopt or SciPy</text>
-  <rect class="tile" x="266" y="288" width="222" height="64" rx="10"/>
-  <text class="t" x="377" y="314" text-anchor="middle">Model predictive control</text>
-  <text class="s" x="377" y="335" text-anchor="middle">sampled controller, continuous plant</text>
-  <rect class="tile" x="508" y="288" width="222" height="64" rx="10"/>
-  <text class="t" x="619" y="314" text-anchor="middle">Reinforcement learning</text>
-  <text class="s" x="619" y="335" text-anchor="middle">Gymnasium environment from any plant</text>
-  <rect class="tile" x="750" y="288" width="222" height="64" rx="10"/>
-  <text class="t" x="861" y="314" text-anchor="middle">Animation, 2D and 3D</text>
-  <text class="s" x="861" y="335" text-anchor="middle">matplotlib, plotly, meshcat, pygame</text>
+  <rect class="tile" x="271" y="16" width="219" height="76" rx="12"/>
+  <text class="t" x="380" y="48" text-anchor="middle">Analysis</text>
+  <text class="s" x="380" y="70" text-anchor="middle">phase plane</text>
 
-  <!-- buses -->
-  <path class="bus" d="M135,92 L135,124 M377,92 L377,124 M619,92 L619,124 M861,92 L861,124 M135,124 L861,124 M500,124 L500,150"/>
-  <path class="bus" d="M135,288 L135,256 M377,288 L377,256 M619,288 L619,256 M861,288 L861,256 M135,256 L861,256 M500,256 L500,230"/>
-  <circle class="dot" cx="135" cy="124" r="3"/><circle class="dot" cx="377" cy="124" r="3"/><circle class="dot" cx="619" cy="124" r="3"/><circle class="dot" cx="861" cy="124" r="3"/>
-  <circle class="dot" cx="135" cy="256" r="3"/><circle class="dot" cx="377" cy="256" r="3"/><circle class="dot" cx="619" cy="256" r="3"/><circle class="dot" cx="861" cy="256" r="3"/>
+  <rect class="tile" x="510" y="16" width="219" height="76" rx="12"/>
+  <text class="t" x="619" y="48" text-anchor="middle">Classical control</text>
+  <text class="s" x="619" y="70" text-anchor="middle">PID, Bode</text>
 
-  <!-- core -->
-  <rect class="core" x="330" y="150" width="340" height="80" rx="12"/>
-  <text class="h1" x="500" y="183" text-anchor="middle">one System</text>
-  <text class="code" x="500" y="210" text-anchor="middle">f · h · tf  ·  NumPy or JAX</text>
+  <rect class="tile" x="749" y="16" width="219" height="76" rx="12"/>
+  <text class="t" x="858" y="48" text-anchor="middle">Nonlinear control</text>
+  <text class="s" x="858" y="70" text-anchor="middle">impedance, SMC</text>
+
+  <rect class="tile" x="32" y="162" width="219" height="76" rx="12"/>
+  <text class="t" x="141" y="194" text-anchor="middle">Linearization</text>
+  <text class="s" x="141" y="216" text-anchor="middle">Jacobian</text>
+
+  <rect class="tile" x="749" y="162" width="219" height="76" rx="12"/>
+  <text class="t" x="858" y="194" text-anchor="middle">Optimal control</text>
+  <text class="s" x="858" y="216" text-anchor="middle">LQR, MPC</text>
+
+  <rect class="tile" x="32" y="308" width="219" height="76" rx="12"/>
+  <text class="t" x="141" y="340" text-anchor="middle">Optimization</text>
+  <text class="s" x="141" y="362" text-anchor="middle">collocation</text>
+
+  <rect class="tile" x="271" y="308" width="219" height="76" rx="12"/>
+  <text class="t" x="380" y="340" text-anchor="middle">Animation</text>
+  <text class="s" x="380" y="362" text-anchor="middle">2D and 3D</text>
+
+  <rect class="tile" x="510" y="308" width="219" height="76" rx="12"/>
+  <text class="t" x="619" y="334" text-anchor="middle">Reinforcement</text>
+  <text class="t" x="619" y="356" text-anchor="middle">learning</text>
+
+  <rect class="tile" x="749" y="308" width="219" height="76" rx="12"/>
+  <text class="t" x="858" y="340" text-anchor="middle">Planning</text>
+  <text class="s" x="858" y="362" text-anchor="middle">RRT, DP</text>
+
+  <rect class="core" x="330" y="150" width="340" height="100" rx="16"/>
+  <text class="h1" x="500" y="194" text-anchor="middle">System</text>
+  <text class="math" x="500" y="226" text-anchor="middle">f, h, tf</text>
+
+  <path class="spoke" d="M430,150 Q240,120 141,92"/>
+  <path class="spoke" d="M470,150 Q400,120 380,92"/>
+  <path class="spoke" d="M530,150 Q600,120 620,92"/>
+  <path class="spoke" d="M570,150 Q760,120 858,92"/>
+  <path class="spoke" d="M330,200 L251,200"/>
+  <path class="spoke" d="M670,200 L749,200"/>
+  <path class="spoke" d="M430,250 Q240,280 141,308"/>
+  <path class="spoke" d="M470,250 Q400,280 380,308"/>
+  <path class="spoke" d="M530,250 Q600,280 620,308"/>
+  <path class="spoke" d="M570,250 Q760,280 858,308"/>
 </svg>

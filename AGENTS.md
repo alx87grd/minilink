@@ -1,18 +1,45 @@
 # Minilink AI Agent Instructions
 
-Source of truth for AI agents. User API: [README.md](README.md). Contracts:
-[DESIGN.md](DESIGN.md). Maturity: [ROADMAP.md](ROADMAP.md). Pytest policy:
-[tests/README.md](tests/README.md).
+Source of truth for AI agents. Architectural tradeoffs: [CONSTITUTION.md](CONSTITUTION.md).
+Before writing or reviewing Python, read [RULES.md](RULES.md). User API:
+[README.md](README.md). Contracts: [DESIGN.md](DESIGN.md). Maturity:
+[ROADMAP.md](ROADMAP.md). Pytest policy: [tests/README.md](tests/README.md).
 
 Keep math readable, interfaces thin, and docs synchronized with code.
+
+## Non-negotiables
+
+- **Math first:** equations read like textbook math, e.g. `dx = A @ x + B @ u`.
+- **Mechanical-engineering audience:** reviewable by someone who thinks in systems and
+  equations first.
+- **Preserve user edits:** never revert or "clean up" manual changes the user made in
+  demos, notebooks, examples, or scratch code — commented-out plots, tuning constants
+  (`TF`, gains, step times), disabled sections, exploratory variables — unless they
+  explicitly ask. Commit/review passes must not overwrite user-tuned script state.
+- **Teaching imports:** student-facing code uses the root prelude or a band facade
+  (`from minilink import Pendulum`), never a deep defining-module path.
+- **No test harness in demos:** `examples/demos/`, `examples/tutorial/`, and
+  `examples/teaching/` never read CI/smoke env vars or branch on “are we in a test?”
+  (`MINILINK_NOTEBOOK_SMOKE`, etc.). Smoke runners adapt from the outside
+  (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Teaching code may fall back on
+  missing optional packages (e.g. Ipopt → SciPy) — that is user UX, not a test hook.
+- **Never remove** a feature or user-importable name without asking.
+- **Docs are contract:** update DESIGN / ROADMAP / README when public behavior or
+  maturity claims change; CONSTITUTION / RULES when identity or review law changes.
+- **Coach the architecture:** name tradeoffs; steer toward the simplest clear interface.
+
+Code and review law (textbook style, placement, tests, consolidation): [RULES.md](RULES.md).
 
 ## Doc map
 
 | Doc | When to update |
 | --- | --- |
+| [CONSTITUTION.md](CONSTITUTION.md) | Vision, contract invariants, conflict precedence — maintainer-owned |
+| [RULES.md](RULES.md) | Universal code and review ladder (humans and agents) |
 | [README.md](README.md) | User workflows, install, examples table |
-| [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior, **product identity & scope** |
-| [ROADMAP.md](ROADMAP.md) | **Plan of record**: releases and milestones, two-lane rule, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
+| [DESIGN.md](DESIGN.md) | Public contracts, package layout, evaluator behavior |
+| [ROADMAP.md](ROADMAP.md) | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
+| [AGENTS.md](AGENTS.md) | Agent workflow, doc map, intro-doc and examples rules, local CI gate |
 | [docs/plans/TODO.md](docs/plans/TODO.md) | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
 | [docs/plans/](docs/plans/) | Active **design** writeups only (multi-step plans; delete finished plan docs) |
 | [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Pyro parity rows when library or demos land |
@@ -85,89 +112,6 @@ demos, and the code with its inline comments must tell the whole story
 (textbook rule). Notebooks are course material: do not trim their markdown
 unless asked.
 
-## Core directives
-
-- **Math readability first**: equations read like textbook math, e.g. `dx = A @ x + B @ u`.
-- **Mechanical-engineering audience**: reviewable by someone who thinks in systems and equations first.
-- **Coach the architecture**: name tradeoffs; steer toward the simplest clear interface.
-- **Minimalist UX**: beginner-friendly main workflow; complexity in orchestrators and backends.
-- **Prototype honestly**: unvalidated architecture gets `TODO: User Architectural Review`.
-- **Incremental refactoring**: no broad restructures unless the user asks.
-- **Consolidate, never strip**: simplification targets *maintenance cost* —
-  text edited twice when code changes, dead API, boilerplate a flag would
-  replace, NumPy/JAX twins one `xp` body covers. Clean, well-placed code is
-  not a liability; a deliberate ladder of implementations (e.g. the DP
-  planner's `loop` / `numpy` / `jax` backends) is not duplication. Never
-  remove a feature or a user-importable name without asking.
-- **Two lanes** ([ROADMAP.md §2](ROADMAP.md#2-two-lanes)): the teaching
-  surface is a contract (soft entry rule: demo or notebook, both-backends
-  test where it defines dynamics, docstring); the research lane is free and
-  repo-only. Keep the wheel scope honest.
-- **Preserve user edits**: never revert or "clean up" manual changes the user made in demos, notebooks, examples, or scratch code — commented-out plots, tuning constants (`TF`, gains, step times), disabled sections, exploratory variables — unless they explicitly ask you to change those lines. Commit/review passes must not overwrite user-tuned script state.
-- **No test harness in demos**: `examples/demos/`, `examples/tutorial/`, and `examples/teaching/` never read CI/smoke env vars or branch on “are we in a test?” (`MINILINK_NOTEBOOK_SMOKE`, etc.). Smoke runners adapt outside the demo (`MPLBACKEND=Agg`, timeouts, optional-dep skips). Teaching code may fall back on missing optional packages (e.g. Ipopt → SciPy) — that is user UX, not a test hook.
-- **Docs are contract**: update DESIGN / ROADMAP / README when public behavior or maturity claims change.
-- **Familiar patterns first**: do not introduce programming concepts or advanced Python styles absent from the repo and the user's prior choices (e.g. `typing.Protocol`, metaclasses) unless there is a strong runtime or maintainability reason. Static-typing-only wins are not enough on their own — prefer patterns already in use (mixins, unions, duck typing). If the tradeoff is unclear, validate with the user before landing the pattern.
-
-## Textbook style
-
-Reading minilink should feel like a controls/dynamics textbook.
-
-1. **Two-audience principle**: student reader (`core/system.py`, `blocks/`, `dynamics/`, `control/`) vs library developer (`core/compile/`, evaluators). Write each file for its primary reader.
-2. **First-screen rule**: docstring and primary class within the first screen; validation below the contract or in its own module.
-3. **Module section order**: primary contract → subclasses → public functions → private helpers (`# Public API`, `# Internal machinery`).
-4. **Selector-orchestrator split**: public math tools read as choose method → get `f`/`h` callables → compute Jacobians in place; ceremony in selector helpers below.
-5. **Bare signatures in equation paths**: no type hints in `f`/`h`/port computes; shapes in docstrings. Full hints on tools and structural APIs.
-6. **The `xp` idiom**: `xp = array_module(x)` right after params unpacking — hybrid NumPy/JAX in one line.
-7. **Derived, not cached**: computable quantities are read-only properties, never stale cached attrs.
-8. **No shadow state**: initialize in `__init__`, never `hasattr`-or-create at use sites.
-9. **Systems are descriptions, facades are shortcuts**: a `System` holds ports,
-   params, equations and `x0`, plus thin shortcut methods (`compute_trajectory`,
-   `jacobian`, `linearize`) that delegate to the tool's own module — the module
-   (`Simulator`, `minilink.analysis.jacobian`) is what scripts and projects
-   import; the shortcut is for teaching and quick looks. No input/output data,
-   caches or run state on the object; `self.traj` is the one exception,
-   justified by daily use, and a new one needs a reason of that weight.
-10. **Libraries are silent**: no `print` except explicit `verbose=`; delete debug scaffolding.
-11. **Pre-1.0 no-alias rule**: rename cleanly; fix call sites in the same change.
-12. **Backend imports from `core/backends.py`**: never import from `core/compile/` in system libraries.
-13. **`__main__` hello-worlds**: ~10 lines max in core modules; bigger examples in `examples/`.
-
-### General coding
-
-- Match the neighborhood; change only what the task requires.
-- Public APIs: type hints and NumPy docstrings — **except equation paths** (rule 5).
-- Lazy optional imports; explicit readable code with named temporaries in equation paths.
-- Low helper count in math tools; avoid single-use private methods (inline unless reused).
-- **No leading-underscore method names**: do not mark helpers “private” with a `_` prefix
-  on system / facade / simulator classes. Prefer a plain descriptive name even for
-  shared helpers — the file section (`# Public API` / `# Internal machinery`) is enough
-  to signal intent. Leading `_` is fine for module-level constants and truly local temps.
-- **Tests only when justified**: stable public APIs, TRL milestones, contracts, or user requests.
-- Validation in proportion; dataclasses for transparent records; `ABC` only when enforcement helps.
-
-### Math naming
-
-- Matrices `A`, `B`, `H`, `M`, `K`; vectors `x`, `u`, `y`, `q`, `v`, `dq`; dims `n`, `m`, `p`.
-- **Leaf = diagram role only** — reserve *leaf* for a subsystem node inside `DiagramSystem` / `StepDiagramSystem` (compile/plan context). Standalone `DynamicSystem` / `StepSystem` wrappers use descriptive type names (e.g. `DiscretizedDynamicSystem`), not `*Leaf`.
-- **Unpack `params` before equations**; **no `self.` in core equation lines** — bind locals first.
-- Lay out 2-D literals one row per line; use `# fmt: off` / `# fmt: on` for alignment.
-- Reader-facing imports stay light in demos; internal packages may import richly when clear.
-
-## Architecture reminders
-
-Details in [DESIGN.md](DESIGN.md).
-
-- **Continuous-time core is the priority** — `DynamicSystem`, flow diagrams, `Simulator`, and analysis on `f` are the main framework. `StepSystem` / hybrid are subsidiary utilities for discrete control in the loop (MPC, SMC). On trade-offs, keep the continuous path clean; step/hybrid add-ons use sibling types and separate compile/sim paths — do not complicate flow `compile()`, `DiagramSystem`, or `Simulator`.
-- Equation paths stay **native-array**; conversions at boundaries only.
-- **JAX is float64 by default** (`MINILINK_JAX_X64=0` opts out); tools never require the caller to call `configure_jax`.
-- **Unconnected input ports read their nominal value, silently, by design** — never add a warning or error for it.
-- `verbose=True` keeps the framed simulation panel; unify flag *names* (`verbose`), not the format.
-- `params is None` → object defaults; any other `params` overrides — never `params or self.params`.
-- **Inheritance** for core system types; **composition** for diagrams and optional behaviors.
-- **`outputs()` / `outputs_p()` are boundary outputs only**; no `compute_outputs(..., ports=...)`.
-- Package placement and dependency law: [DESIGN.md §3](DESIGN.md#package-map). Benchmarks in repo-root `benchmarks/`.
-- NumPy/JAX policy: [DESIGN.md §1](DESIGN.md#numpy-and-jax).
-
 ## Workflow
 
 **Do directly:** typos and stale docs; docstrings/types in files you are already changing for the task; small cleanups that directly support the requested change.
@@ -178,15 +122,16 @@ Details in [DESIGN.md](DESIGN.md).
 `examples/`, notebooks, ROADMAP §1–§4, public names); **core architecture and
 the API of the main tools** (`System` family, diagrams, compile, `Simulator`,
 planners, `Optimizer`, controllers); any feature or user-importable-name
-removal; delete/rename files; new dependencies; removing user scratch code.
+removal; delete/rename files; new dependencies; removing user scratch code;
+`CONSTITUTION.md` amendments.
 
 **Agent-managed (decide, then report):** plotting interfaces, external
 interfaces (`interfaces/`), docs housekeeping, the TRL ledger, `TODO.md`,
-plan-doc housekeeping, tests, and internal code structure that does not
-change a public contract. When you spot an opportunity outside your lane,
-ask — do not act.
+plan-doc housekeeping, tests, `RULES.md` wording that does not change a
+public contract, and internal code structure that does not change a public
+contract. When you spot an opportunity outside your lane, ask — do not act.
 
-**Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file → ask before proceeding.
+**Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file, CONSTITUTION.md, or RULES.md → ask before proceeding.
 
 **Notebooks:** skip review unless updating renamed imports or user asks; outputs
 stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
@@ -250,7 +195,7 @@ Final pass after substantial changes — smaller, clearer diff:
 2. Simplify; match local patterns; lazy optional imports.
 3. Math-first locals in equation paths; conversion at boundaries only.
 4. Fold or update examples; runnable from repo root.
-5. Sync README (user API), DESIGN (contracts), ROADMAP (maturity if changed).
+5. Sync README (user API), DESIGN (contracts), ROADMAP (maturity if changed), CONSTITUTION / RULES if identity or review law changed.
 6. Tests for new behavior; benchmarks only when performance claims matter.
 7. Verify: **pre-push gate** (ruff + pytest per table above); headless graphics checks when relevant.
 8. Handoff: clean `git status`, short summary of changes and verification; run ruff before push if committing.

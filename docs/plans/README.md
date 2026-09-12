@@ -32,7 +32,7 @@ the design needs a writeup.
 | [mpc-tuning.md](mpc-tuning.md) | MPC tuning project harness | Research lane — project notes |
 | [articulated-mechanism.md](articulated-mechanism.md) | Mechanism IR, sym/num dual, spatial RNEA/ABA | Research lane — draft, Later |
 | [v01-scope-alignment.md](v01-scope-alignment.md) | v0.1 doc/lane alignment: continuous core, RL vs SB3, hybrid long-term, module demote/promote checklist, examples `tutorial/`/`teaching/`, pip timing | Maintainer draft 2026-09-11 — apply to ROADMAP when approved |
-| [constitution-integration.md](constitution-integration.md) | Doc consolidation behind [CONSTITUTION.md](../../CONSTITUTION.md): separation of concerns across DESIGN/AGENTS/ROADMAP, the fate of DESIGN, the seven-layer review ladder | Maintainer draft 2026-09-12 — living, updated as slices land |
+| [constitution-integration.md](constitution-integration.md) | Doc consolidation behind [CONSTITUTION.md](../../CONSTITUTION.md): separation of concerns across DESIGN/AGENTS/ROADMAP, the fate of DESIGN, the seven-layer review ladder | Main slices landed 2026-09-12 ([second opinion](../reviews/2026-09-12-constitution-second-opinion.md)) |
 
 Deleted (landed; decision records folded into DESIGN / tests README):
 - 2026-09-05: `control-block-contract.md`, `test-benchmark-consolidation.md`.

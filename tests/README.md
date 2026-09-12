@@ -59,7 +59,7 @@ Optional toggles: constants at the top of each `tests/run/*.py` file.
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
 | Notebook change | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
 
-Rules: [AGENTS.md](../AGENTS.md).
+Agent workflow: [AGENTS.md](../AGENTS.md). Code and review rules: [RULES.md](../RULES.md).
 
 ### CI (GitHub Actions)
 

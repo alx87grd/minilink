@@ -1,7 +1,8 @@
 # Minilink Roadmap
 
-Maturity and priorities — the **plan of record**. Contracts and product
-identity: [DESIGN.md](DESIGN.md). Agent rules: [AGENTS.md](AGENTS.md).
+Maturity and priorities — the **plan of record**. Identity:
+[CONSTITUTION.md](CONSTITUTION.md). Contracts: [DESIGN.md](DESIGN.md).
+Code rules: [RULES.md](RULES.md). Agent workflow: [AGENTS.md](AGENTS.md).
 Operational backlog (step-level): [docs/plans/TODO.md](docs/plans/TODO.md).
 Point-in-time audits: [docs/reviews/](docs/reviews/).
 
@@ -30,8 +31,8 @@ notebooks: `showcase_minilink.ipynb`, `showcase_jax.ipynb`, and
 `showcase_from_rl_to_bode.ipynb`) is a spec: wherever the code needs a
 workaround to make a slide true, that is a priority. The continuous `System`
 family and flow block diagrams are the core center of gravity; discrete and
-hybrid tools are subsidiary utilities. Full identity and landscape position:
-[DESIGN.md — Product identity & scope](DESIGN.md#product-identity--scope).
+hybrid tools are subsidiary utilities. Identity and product boundaries:
+[CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
@@ -40,6 +41,10 @@ hybrid tools are subsidiary utilities. Full identity and landscape position:
 | **v1.0** | The foundation questions deferred in §6 (hybrid as a `System`, evaluator/solver layering, geometry unification), after two cohorts. | 2027 |
 
 ## 2. Two lanes
+
+Philosophy: [CONSTITUTION.md](CONSTITUTION.md) §3 (the student syntax never
+breaks). Placement shorthand: [RULES.md](RULES.md) §3.3. The operating
+contract is the table below — not a pointer.
 
 Minilink serves two audiences with one codebase. The boundary between them is
 a **contract**, not a documentation convention.
@@ -240,7 +245,7 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 
 ## 7. Out of scope
 
-By decision — see [DESIGN.md](DESIGN.md):
+By decision — see [CONSTITUTION.md](CONSTITUTION.md) §1.4:
 
 Full Simulink parity (GUI, DAE, arbitrary multi-clock scheduling,
 event-driven switching as a framework feature); becoming a multibody/contact
