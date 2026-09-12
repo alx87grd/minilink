@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 400" width="1000" height="400" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="hub-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a1a1aa"/>
+    </marker>
+  </defs>
+  <style>
+    .canvas { fill: #fafafa; stroke: #e5e7eb; }
+    .tile { fill: #ffffff; stroke: #d4d4d8; stroke-width: 1.4; }
+    .core { fill: #eff6ff; stroke: #2563eb; stroke-width: 2.6; }
+    .t { fill: #18181b; font-size: 18px; font-weight: 700; }
+    .s { fill: #71717a; font-size: 15px; }
+    .h1 { fill: #1e3a8a; font-size: 30px; font-weight: 700; }
+    .math { fill: #2563eb; font-size: 22px; font-style: italic; font-family: 'Times New Roman', Times, serif; }
+    .spoke { stroke: #a1a1aa; stroke-width: 1.7; fill: none; marker-end: url(#hub-ah); }
+  </style>
+  <rect class="canvas" x="0.5" y="0.5" width="999" height="399" rx="18"/>
+
+  <rect class="tile" x="32" y="16" width="219" height="76" rx="12"/>
+  <text class="t" x="141" y="48" text-anchor="middle">Simulation</text>
+  <text class="s" x="141" y="70" text-anchor="middle">trajectories</text>
+
+  <rect class="tile" x="271" y="16" width="219" height="76" rx="12"/>
+  <text class="t" x="380" y="48" text-anchor="middle">Analysis</text>
+  <text class="s" x="380" y="70" text-anchor="middle">phase plane</text>
+
+  <rect class="tile" x="510" y="16" width="219" height="76" rx="12"/>
+  <text class="t" x="619" y="48" text-anchor="middle">Classical control</text>
+  <text class="s" x="619" y="70" text-anchor="middle">PID, Bode</text>
+
+  <rect class="tile" x="749" y="16" width="219" height="76" rx="12"/>
+  <text class="t" x="858" y="48" text-anchor="middle">Nonlinear control</text>
+  <text class="s" x="858" y="70" text-anchor="middle">impedance, SMC</text>
+
+  <rect class="tile" x="32" y="162" width="219" height="76" rx="12"/>
+  <text class="t" x="141" y="194" text-anchor="middle">Linearization</text>
+  <text class="s" x="141" y="216" text-anchor="middle">Jacobian</text>
+
+  <rect class="tile" x="749" y="162" width="219" height="76" rx="12"/>
+  <text class="t" x="858" y="194" text-anchor="middle">Optimal control</text>
+  <text class="s" x="858" y="216" text-anchor="middle">LQR, MPC</text>
+
+  <rect class="tile" x="32" y="308" width="219" height="76" rx="12"/>
+  <text class="t" x="141" y="340" text-anchor="middle">Optimization</text>
+  <text class="s" x="141" y="362" text-anchor="middle">collocation</text>
+
+  <rect class="tile" x="271" y="308" width="219" height="76" rx="12"/>
+  <text class="t" x="380" y="340" text-anchor="middle">Animation</text>
+  <text class="s" x="380" y="362" text-anchor="middle">2D and 3D</text>
+
+  <rect class="tile" x="510" y="308" width="219" height="76" rx="12"/>
+  <text class="t" x="619" y="334" text-anchor="middle">Reinforcement</text>
+  <text class="t" x="619" y="356" text-anchor="middle">learning</text>
+
+  <rect class="tile" x="749" y="308" width="219" height="76" rx="12"/>
+  <text class="t" x="858" y="340" text-anchor="middle">Planning</text>
+  <text class="s" x="858" y="362" text-anchor="middle">RRT, DP</text>
+
+  <rect class="core" x="330" y="150" width="340" height="100" rx="16"/>
+  <text class="h1" x="500" y="194" text-anchor="middle">System</text>
+  <text class="math" x="500" y="226" text-anchor="middle">f, h, tf</text>
+
+  <path class="spoke" d="M430,150 Q240,120 141,92"/>
+  <path class="spoke" d="M470,150 Q400,120 380,92"/>
+  <path class="spoke" d="M530,150 Q600,120 620,92"/>
+  <path class="spoke" d="M570,150 Q760,120 858,92"/>
+  <path class="spoke" d="M330,200 L251,200"/>
+  <path class="spoke" d="M670,200 L749,200"/>
+  <path class="spoke" d="M430,250 Q240,280 141,308"/>
+  <path class="spoke" d="M470,250 Q400,280 380,308"/>
+  <path class="spoke" d="M530,250 Q600,280 620,308"/>
+  <path class="spoke" d="M570,250 Q760,280 858,308"/>
+</svg>

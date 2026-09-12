@@ -107,10 +107,6 @@ def jax_trajopt_available() -> bool:
     try:
         import jax  # noqa: F401
 
-        from minilink.dynamics.catalog.pendulum.cartpole import (
-            JaxCartPole,  # noqa: F401
-        )
-
         return True
     except ImportError:
         return False
@@ -597,10 +593,7 @@ def _problem(
     config: TrajectoryOptimizationBenchmarkConfig,
 ) -> PlanningProblem:
     if variant.compile_backend == "jax":
-        from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
-
         _configure_jax(variant)
-        return _cartpole_problem(JaxCartPole(), tf=config.tf)
     return _cartpole_problem(CartPole(), tf=config.tf)
 
 
@@ -665,10 +658,8 @@ def _warm_initial_trajectory(
             return Trajectory.load(path)
 
     if jax_trajopt_available():
-        from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
-
         configure_jax(enable_x64=True)
-        problem = _cartpole_problem(JaxCartPole(), tf=config.tf)
+        problem = _cartpole_problem(CartPole(), tf=config.tf)
         transcription = DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=config.n_steps)
         )

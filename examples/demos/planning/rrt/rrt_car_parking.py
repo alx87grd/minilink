@@ -1,39 +1,14 @@
-"""Forward car parking: kinodynamic RRT vs Dubins-steering RRT, side by side.
-
-Run from repo root::
-
-    python examples/demos/planning/rrt/rrt_car_parking.py
-
-The same parking problem is solved twice, changing only the two swappable parts
-of the planner -- the ``TrajectoryExtender`` and the nearest-neighbour
-``metric``:
-
-* **kinodynamic** -- forward-integrates the car under a fixed set of steering
-  motion primitives and selects nodes by a weighted state distance. It explores
-  with short rollouts and only ever reaches the goal *region*.
-* **dubins-steering** -- connects two poses along the exact shortest forward
-  Dubins curve (min turning radius ``wheelbase / tan(max_steering)``) and selects
-  nodes by Dubins path length. Each connect is dynamically feasible for the same
-  ``KinematicCar`` and can reach the goal pose *exactly*.
-
-Both run forward-only (Dubins cannot reverse), on the ``KinematicCar`` whose drawn
-skin is a ``length x width`` box centred on the state -- matched here by an
-oriented box ``car`` footprint, so the heading genuinely decides whether the car
-fits the slot. The exact connector typically needs far fewer nodes, lands the
-goal pose exactly, and returns a shorter, smoother path.
-"""
+"""Forward car parking: kinodynamic RRT vs Dubins-steering RRT, side by side."""
 
 import time
 
 import numpy as np
 
+from minilink import BallSet, BoxSet, KinematicCar, PlanningProblem, RRTPlanner
 from minilink.core.geometry import Box
-from minilink.core.sets import BallSet, BoxSet
-from minilink.dynamics.catalog.vehicles.steering import KinematicCar
-from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.metric import weighted
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
+from minilink.planning.search.rrt import RRTOptions
 from minilink.planning.search.steering import DubinsSteering
 from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.scene import Scene

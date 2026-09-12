@@ -12,15 +12,18 @@ the package attribute ``control.lqr`` (that name is the submodule itself).
 
 from __future__ import annotations
 
-from importlib import import_module
-from typing import Any
+from minilink.core.facade import lazy_facade
 
 _EXPORTS: dict[str, tuple[str, str]] = {
     "ComputedTorqueController": (
         "minilink.control.modelbased",
         "ComputedTorqueController",
     ),
-    "FilteredController": ("minilink.control.siso", "FilteredController"),
+    "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
+    "angle_features": ("minilink.control.neural", "angle_features"),
+    "PID": ("minilink.control.siso", "PID"),
+    "PI": ("minilink.control.siso", "PI"),
+    "PD": ("minilink.control.siso", "PD"),
     "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
     "ImpedanceIntegralController": (
         "minilink.control.impedance",
@@ -48,22 +51,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
 }
 
-__all__ = [*sorted(_EXPORTS), "mpc"]
-
-
-def __getattr__(name: str) -> Any:
-    if name == "mpc":
-        mpc_pkg = import_module("minilink.control.mpc")
-        globals()["mpc"] = mpc_pkg
-        return mpc_pkg
-    try:
-        module_path, attr = _EXPORTS[name]
-    except KeyError as exc:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
-    value = getattr(import_module(module_path), attr)
-    globals()[name] = value
-    return value
-
-
-def __dir__() -> list[str]:
-    return sorted(set(globals()) | set(__all__))
+__all__, __getattr__, __dir__ = lazy_facade(
+    globals(), _EXPORTS, modules={"mpc": "minilink.control.mpc"}
+)
+__all__ = [*__all__, "mpc"]

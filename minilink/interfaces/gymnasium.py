@@ -51,7 +51,7 @@ class Sys2Gym(gym.Env):
     cost : CostFunction
         Running / terminal cost pair defining the reward.
     dt : float
-        Time step for the forward-Euler integration of one env step.
+        Time step of one env step (zero-order hold on the action).
     tf : float
         Maximum duration of an episode (truncation).
     t0 : float
@@ -60,9 +60,20 @@ class Sys2Gym(gym.Env):
         Distribution of the initial state on :meth:`reset`.
     render_mode : None or "human"
         ``"human"`` renders the system with the matplotlib animator.
+    integrator : {"rk4", "euler"}
+        Integration scheme of one env step on the compiled plant. ``"euler"``
+        reproduces ``x + f(x, u, t) * dt`` exactly (the historical path).
+    compile_backend : {None, "numpy", "jax"}
+        Evaluator used for the step. ``None`` picks JAX when it is installed
+        and the plant traces (one jitted step per env step), NumPy otherwise;
+        :attr:`compile_backend` records the choice.
 
     Attributes
     ----------
+    compile_backend : str
+        Backend actually used for the step (``"numpy"`` or ``"jax"``).
+    evaluator : DynamicsEvaluator
+        Compiled plant the step runs on.
     clipping_inputs : bool
         Clip the actions to the input-port bounds (default ``True``).
     clipping_states : bool
@@ -86,12 +97,21 @@ class Sys2Gym(gym.Env):
         t0=0.0,
         render_mode=None,
         reset_mode="uniform",
+        integrator="rk4",
+        compile_backend=None,
     ):
         self.sys = sys
         self.cost = cost
         self.dt = dt
         self.t0 = t0
         self.tf = tf  # for truncation of episodes
+
+        # One compiled step for the whole training run (RK4 by default; a
+        # single jitted call per env step when the plant traces under JAX)
+        self.integrator = integrator
+        self.compile_backend, self.evaluator, self._step_fn = _compiled_step(
+            sys, integrator, compile_backend
+        )
 
         # Boundaries
         self.x_lb, self.x_ub = _state_bounds(sys)
@@ -122,6 +142,25 @@ class Sys2Gym(gym.Env):
         if self.render_mode == "human":
             self._init_render()
 
+    @classmethod
+    def from_problem(cls, problem, dt=0.05, episode_length=None, **kwargs):
+        """
+        The Gymnasium view of a :class:`~minilink.planning.problems.StochasticPlanningProblem`.
+
+        ``reset`` draws the initial state from the problem, the reward is the
+        problem's running cost, a finite horizon ends the episode at ``tf``
+        with the terminal cost ``h``, and leaving the allowed box follows the
+        problem's exit rule: charged and *terminated* when the problem prices
+        it (``exit_cost`` or ``on_exit="terminate"``), *truncated* otherwise.
+        Parameter and disturbance draws are not applied by this view.
+        """
+        finite = problem.horizon_kind() == "finite"
+        tf = float(problem.tf) if finite else float(episode_length or 10.0)
+        env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
+        env.problem = problem
+        env.finite_horizon = finite
+        return env
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
@@ -149,9 +188,8 @@ class Sys2Gym(gym.Env):
         # State and time at the beginning of the step
         x, t, dt = self.x, self.t, self.dt
 
-        # Forward-Euler integration over one step
-        dx = self.sys.f(x, u, t)
-        x_new = x + dx * dt
+        # One integration step on the compiled plant, action held (ZOH)
+        x_new = np.asarray(self._step_fn(x, u, t, dt), dtype=float)
         t_new = t + dt
 
         if self.clipping_states:
@@ -288,12 +326,72 @@ class SB3Controller(Controller):
         return self.action(u)
 
 
+class ProblemEnv(Sys2Gym):
+    """:class:`Sys2Gym` whose starts and episode ends follow a planning problem."""
+
+    problem = None
+    finite_horizon = False
+
+    def reset(self, seed=None, options=None):
+        y, info = super().reset(seed=seed, options=options)
+        self.x = np.asarray(self.problem.sample_x0(self.np_random), dtype=float)
+        y = np.asarray(
+            self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
+        )
+        return y, {"state": self.x, "action": self.u}
+
+    def step(self, u):
+        problem = self.problem
+        y, r, terminated, truncated, info = super().step(u)
+        x, t = self.x, self.t
+        out = bool(np.any(x < self.x_lb) or np.any(x > self.x_ub))
+        if out and (problem.exit_cost is not None or problem.on_exit == "terminate"):
+            penalty = problem.exit_penalty(x, t)
+            r -= 0.0 if penalty is None else float(penalty)
+            terminated, truncated = True, False
+        elif self.finite_horizon and t >= self.tf - 0.5 * self.dt:
+            r -= float(problem.require_cost().h(x, t))
+            terminated, truncated = True, False
+        return y, r, terminated, truncated, info
+
+
 def to_gymnasium(sys, cost, **kwargs) -> Sys2Gym:
     """Convenience factory returning a :class:`Sys2Gym` environment."""
     return Sys2Gym(sys, cost, **kwargs)
 
 
 # Internal machinery
+
+
+def _compiled_step(sys, integrator, compile_backend):
+    """Return ``(backend, evaluator, step)`` with ``step(x, u, t, dt) -> x_next``.
+
+    ``compile_backend=None`` tries JAX when it is installed and falls back to
+    NumPy for plants that do not trace (catalog plants written with NumPy
+    branches). Under JAX the whole RK4 / Euler step is one jitted call.
+    """
+    if integrator not in ("rk4", "euler"):
+        raise ValueError(f"integrator must be 'rk4' or 'euler', got {integrator!r}")
+    if compile_backend is None:
+        from minilink.core.compile.compiler import compile_auto
+
+        backend, evaluator = compile_auto(sys)
+    else:
+        backend = compile_backend
+        evaluator = sys.compile(backend=backend, verbose=False)
+
+    if backend == "jax":
+        import jax
+
+        trace = (
+            evaluator.rk4_step_trace
+            if integrator == "rk4"
+            else evaluator.euler_step_trace
+        )
+        step = jax.jit(trace)
+    else:
+        step = evaluator.rk4_step if integrator == "rk4" else evaluator.euler_step
+    return backend, evaluator, step
 
 
 def _box_bounds(space):

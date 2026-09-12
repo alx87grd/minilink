@@ -1,46 +1,41 @@
 # minilink
 
-Python-native block-diagram framework for modeling, simulating, optimizing, and
-visualizing dynamical systems.
+**Write the equations once. Simulate, analyze, control, plan, optimize, learn.**
 
-![diagram](https://github.com/user-attachments/assets/b5c2c740-ae0b-42ab-afba-e90f2dd92a26)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)
+[![Docs](https://img.shields.io/badge/docs-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
-Start here: [showcase](examples/learn/intro/showcase_minilink.ipynb) ·
-[JAX / autodiff showcase](examples/learn/intro/showcase_jax.ipynb) ·
-[examples](examples/README.md) ·
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)
+<table>
+  <tr>
+    <td width="50%" align="center" valign="bottom">
+      <img src="docs/_static/cartpole_swingup.gif" alt="cart-pole swing-up by trajectory optimization" width="100%"/>
+    </td>
+    <td width="50%" align="center" valign="bottom">
+      <img src="docs/_static/ur5_meshcat.gif" alt="UR5 under task-space impedance control" width="100%"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      cart-pole swing-up by trajectory optimization
+    </td>
+    <td width="50%" align="center" valign="top">
+      UR5, task-space impedance control
+    </td>
+  </tr>
+</table>
 
-## Install
+Minilink is an open-source Python toolbox for dynamical systems and control.
+A model is a short class whose equations read like the textbook, and diagrams
+are built from models with `+`, `>>` and `@`. Because every model, controller
+and diagram is the same kind of object, one set of tools applies to all of
+them: simulation and animation in 2D and 3D, frequency-domain analysis,
+classical and state-space control, value iteration, sampling-based planning, trajectory
+optimization, model predictive control and reinforcement learning. The same
+equations compile and differentiate under JAX, so a course model is also a
+research model.
 
-Python 3.10+. **Recommended** — full conda environment from [`environment.yml`](environment.yml):
-
-```bash
-git clone https://github.com/alx87grd/minilink.git && cd minilink
-conda env create -f environment.yml && conda activate minilink
-conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
-```
-
-Basic tier, pip, Colab setup cell, and options: [install.md](install.md).
-
-## Why minilink
-
-Minilink is designed for dynamical-system models where the code reads as close
-as possible to textbook math. Systems are regular Python objects, equations are
-written with NumPy-style array operations, and diagrams compose plants,
-controllers, sources, and analysis blocks without a GUI or code generation step.
-
-The core idea is simple: everything is a `System`. A plant is a system, a
-controller is a system, a source block is a system, and a full diagram is also a
-system that can be simulated, plotted, compiled, or embedded in a larger model.
-
-Systems represent equations and interfaces. They do not hide the evolving
-simulation state internally; state trajectories live in simulation results.
-
-Optional JAX compile and autodiff through the same dynamics unlocks fast
-trajopt, MPC, parameter fits, and learning — without a separate sim vs opt
-stack. See the [JAX showcase](examples/learn/intro/showcase_jax.ipynb).
-
-## Quick start
+## Ten lines
 
 ```python
 from minilink import ImpedanceController, Pendulum
@@ -59,340 +54,178 @@ diagram.plot_trajectory()
 diagram.animate()
 ```
 
-Longer scripts prefer band imports (`from minilink.catalog import …`,
-`from minilink.control import …`, `from minilink.analysis import …`). See
-[DESIGN.md §2](DESIGN.md#public-imports-teaching-first).
+![closed-loop diagram](docs/_static/diagram_closed_loop.png)
 
-## Features
+## What is a System
 
-### Models that read like the textbook
+A model is dynamics `f`, outputs `h` and body poses `tf`, functions of the
+state `x`, the input `u`, the time `t` and the parameters `params`:
 
-Custom dynamics subclass `DynamicSystem` and implement `f`; equation code stays
-close to forms like `dx = A @ x + B @ u`.
+    dx/dt = f(x, u, t; params)      dynamics
+    y     = h(x, u, t; params)      one per output port, default y = x
+    T     = tf(x, u, t; params)     body poses, for animation
+
+![a System: input ports, f, h, tf, and three output ports](docs/_static/system.svg)
+
+Write `f`, and the plant simulates and plots. Add `tf` and a skin, and it
+animates on matplotlib, plotly, meshcat (3D) or pygame, and you can drive it
+from the keyboard:
 
 ```python
 import numpy as np
-from minilink import DynamicSystem
+from minilink import DynamicSystem, Step
+from minilink.core.kinematics import translation
+from minilink.graphical.animation.primitives import Box, ground_line
 
 
 class MassSpringDamper(DynamicSystem):
+    # m p'' + c p' + k p = u
+
     def __init__(self):
-        super().__init__(n=2, input_dim=1, expose_state=True)
+        super().__init__(n=2, input_dim=1, output_dim=2)
+        self.params = {"m": 1.0, "k": 4.0, "c": 0.3}
+        self.skin = lambda sys: {
+            "world": [ground_line(length=8.0)],
+            "body": [Box(length_x=0.6, length_y=0.6, length_z=0.1)],
+        }
+        self.camera_scale = 4.0
 
     def f(self, x, u, t=0, params=None):
+        p = self.params if params is None else params
+        pos, vel = x
+        acc = (u[0] - p["c"] * vel - p["k"] * pos) / p["m"]
+        return np.array([vel, acc])
 
-        m = 1.0
-        k = 4.0
-        c = 0.3
+    def tf(self, x, u, t=0, params=None):
+        return {"body": translation(x[0], 0.0, 0.0)}
 
-        p = x[0]
-        pdot = x[1]
-        F = u[0]
 
-        pddot = (F - c * pdot - k * p) / m
-
-        dx = np.array([pdot, pddot])
-
-        return dx
+msd = MassSpringDamper()
+msd.x0[0] = 1.0
+loop = Step(final_value=np.array([10.0]), step_time=2.0) >> msd
+loop.compute_trajectory(tf=20.0)
+loop.animate()  # renderer="plotly" | "meshcat" | "pygame"
+# msd.game()    # keyboard drives u, live
 ```
 
-### Diagrams from operators
+`f`, `h` and `tf` are functions of `(x, u, t; params)` only: no hidden state on
+the object. That one convention is what lets a model compose into diagrams,
+run in batches and differentiate later. A diagram flattens to one state vector
+and one `f`, so a closed loop linearizes, animates and nests like a plant.
 
-Diagrams flatten subsystem states and port connections into one system-level
-interface, so a diagram can be used anywhere a system can — including inside
-another diagram.
+## One model, every tool
 
-| Shortcut | Meaning |
+![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](docs/_static/bridges.svg)
+
+| Verb | Call |
 | --- | --- |
-| `a + b + c` | Add subsystems without wiring |
-| `source >> plant` | Chain output to input |
-| `controller @ plant` | Build a simple feedback diagram |
-| `.autowire(strict=True)` | Connect matching named ports |
+| Simulate | `plant.compute_trajectory(tf=10.0)` |
+| Frequency domain | `plot_bode(plant, x_bar)`, `plot_root_locus(C >> G)` |
+| Classical loop | `PID(Kp, Ki, Kd) @ plant` |
+| State feedback | `lqr_at_operating_point(plant, x_bar, Q, R) @ plant` |
+| Robot control | `ComputedTorqueController(arm)`, `JointImpedance(arm)` |
+| 3D robots | `UR5Manipulator()`, then `animate(renderer="meshcat", is_3d=True)` |
+| Value iteration | `DynamicProgrammingPlanner(problem, x_grid=(101, 101))` |
+| Sampling search | `RRTPlanner(problem)` |
+| Trajectory optimization | `TrajectoryOptimizationPlanner(problem, transcription="direct_collocation")` |
+| Model predictive control | `ModelPredictiveController(planner, dt_mpc=0.1) @ plant` |
+| Reinforcement learning | `Sys2Gym(plant, cost)`, then any Gymnasium agent |
+| Identification | `plant.jacobian("f", "params", x_bar)` |
 
-Explicit wiring (`add_subsystem` / `connect`) is always available when the
-shortcuts are too implicit; see
-`examples/demos/diagrams/diagram_shortcuts.py` for both versions side by
-side. Any internal signal can be plotted by `"subsystem_id:port_id"` name.
-
-### One call to simulate, plot, animate
-
-Common facades: `compute_trajectory(...)` → `Trajectory`;
-`plot_trajectory(...)` / `plot_phase_plane(...)` / `plot_diagram()`;
-`animate()` (matplotlib, plotly, meshcat, pygame); `game()` for live keyboard
-sessions. Continuous plants and diagrams use `Simulator`; static leaves use
-`StaticSimulator`. Hybrid diagrams render plant + scheduled computer views.
-
-### Compiled execution and JAX
-
-Wired diagrams compile into a flat execution plan (NumPy or JAX). For autodiff
-inside an outer `jit`, use the **trace tier** (`f_trace`, `f_trace_p`, …):
+The objects between the tools are the textbook's nouns. A `PlanningProblem`
+is a system, a cost and boundary sets; every planner takes it and returns a
+`Trajectory`:
 
 ```python
-import jax
-import jax.numpy as jnp
-
-evaluator = diagram.compile(backend="jax")
-loss_and_grad = jax.jit(
-    jax.value_and_grad(
-        lambda theta: jnp.mean(
-            (evaluator.f_trace_p(x, u, 0.0, {"plant": theta}) - dx_ref) ** 2
-        )
-    )
-)
-```
-
-### Hybrid and discrete control
-
-Discrete laws (MPC, sampled SMC, …) close the loop on continuous plants via
-`StepSystem` → `Computer` → `HybridDiagram` (`Computer @ plant` or `mpc @ plant`):
-
-```python
-from minilink.control.mpc import ModelPredictiveController
-
-mpc = ModelPredictiveController(planner, dt_mpc=0.1, warm_start=True)
-diagram = mpc @ plant
-diagram.compute_trajectory(tf=10.0)
-```
-
-Deploy ticks: `cmd = mpc.compute_command(y, t=t)`; `u = cmd.u_ff`. NumPy rebuild
-mode and demos: `examples/demos/mpc/`.
-
-### Analyze and design
-
-Characterize a plant and design a controller from the same `System`:
-
-```python
-import numpy as np
-from minilink import InvertedPendulum
-from minilink.analysis.linearize import linearize
-from minilink.control.lqr import lqr
-
-plant = InvertedPendulum()
-lti = linearize(plant, x_bar=[0.0, 0.0])
-ctl = lqr(lti.A(), lti.B(), Q=np.diag([10.0, 1.0]), R=[[1.0]])
-diagram = ctl @ plant
-```
-
-Also: `bode` / `plot_bode`, `modal_analysis`, ctrb/obsv, equilibria.
-
-### Planning, search, and optimization
-
-`PlanningProblem` combines a continuous system, start/goal boundaries, costs,
-and spatial geometry. The same problem feeds trajopt, RRT/RRT*, and DP:
-
-```python
-import numpy as np
-from minilink import CartPole
-from minilink.core.costs import QuadraticCost
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationPlanner,
+from minilink import (
+    BallSet, DynamicProgrammingPlanner, Pendulum, PlanningProblem,
+    QuadraticCost, RRTPlanner, TrajectoryOptimizationPlanner,
 )
 
-sys = CartPole()
-x_goal = np.array([0.0, np.pi, 0.0, 0.0])
+plant = Pendulum()
+x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
 problem = PlanningProblem(
-    sys=sys,
-    x_start=np.array([-2.0, 1.0, 0.0, 0.0]),
-    x_goal=x_goal,
-    cost=QuadraticCost.from_system(sys, Q=np.diag([1.0, 1.0, 0.0, 0.0]), xbar=x_goal),
-    tf=5.0,
+    sys=plant, x_start=x_down, x_goal=x_up, Xf=BallSet(x_up, 0.2), tf=4.0,
+    cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
 )
-traj = (
-    TrajectoryOptimizationPlanner(
-        problem, n_steps=50, transcription="direct_collocation"
-    )
-    .solve()
-    .trajectory
-)
+
+vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
+vi.solve()                                   # value iteration on a grid
+loop = vi.get_controller() @ plant           # the policy is a controller
+
+rrt = RRTPlanner(problem, seed=0)
+tree_traj = rrt.solve().trajectory           # kinodynamic tree search, bang-bang inputs
+
+opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")
+opt_traj = opt.solve().trajectory            # direct collocation
 ```
 
-### Plant catalog
+Trajectory optimization transcribes the problem into a `MathematicalProgram`
+solved by an `Optimizer`; a sampled controller closes the loop on the
+continuous plant with `ctl % dt`, zero-order hold included.
 
-Ready-to-use models via `minilink.catalog` (implementation under
-`minilink.dynamics.catalog.*`), each with parameters, labeled ports, and
-animation geometry:
+## Differentiable and compiled
 
-| Domain | Models |
-| --- | --- |
-| `pendulum` | `Pendulum`, `DoublePendulum`, `Acrobot`, `CartPole`, rotating cart-poles |
-| `manipulators` | one- to five-link arms, planar and 3D |
-| `vehicles` | NumPy bicycles (`dynamic_bicycle`, `steering`); JAX ladder in `jax_vehicles`; `CarProfile`; propulsion, suspension |
-| `aerial` | planar drones, plane, rocket |
-| `marine` | planar boat, boat in current |
-| `mass_spring_damper` | one- to three-mass chains, floating variants |
-| `equations` | integrator chains, Van der Pol oscillator |
+The same `f` traces under JAX. One evaluator gives exact derivatives, batched
+rollouts and gradients through a whole simulation:
 
-### Symbolic mechanics (experimental)
+```python
+ev = plant.compile(backend="jax")
 
-`minilink.symbolic.mechanics` derives EoM symbolically (SymPy, Lagrange or Kane)
-from a DH-chain and exports a regular minilink mechanical system (including a
-JAX-traceable variant).
-
-## Technology
-
-Minilink keeps the user-facing API small, while the execution path supports
-larger diagrams and repeated simulation or optimization.
-
-- **System hierarchy**: `System` is the base IO shell (`n` defaults to 0 for static
-  blocks). Continuous plants subclass `DynamicSystem` (`f`, `h`). Mechanical
-  abstractions, library blocks, controllers, catalog plants, and `DiagramSystem`
-  compose on top.
-- **Textbook equations**: dynamic models implement `f(x, u, t, params)` on
-  `DynamicSystem`, so equation code can stay close to forms like `dx = A @ x + B @ u`.
-- **Stateless model objects**: a system defines equations, ports, parameters,
-  and initial conditions. The evolving state belongs to the simulator and
-  returned trajectory, not to hidden mutable block state.
-- **Composable diagrams**: diagrams flatten subsystem states and port
-  connections into one system-level interface. A diagram can be used anywhere a
-  system can.
-- **Compiled execution**: wired diagrams are converted into a flat execution
-  plan. With the JAX backend, diagram dynamics and outputs can be JIT-compiled
-  for fast simulation and optimization workflows.
-- **Layered dependencies**: NumPy is the baseline, SciPy handles common ODE
-  solvers, Matplotlib handles signal plots, Graphviz handles topology diagrams,
-  and optional layers add JAX, symbolic mechanics, animation, and Ipopt.
-
-For example, the class hierarchy can go from a generic system contract to a
-domain-specific model:
-
-```text
-System                    # static IO shell (n defaults to 0)
-  -> DynamicSystem        # dx = f(x, u, t)
-    -> MechanicalSystem
-      -> Pendulum
+A = plant.jacobian("f", "x", x_bar)               # exact linearization
+S = plant.jacobian("f", "params", x_bar)          # sensitivity to each physical parameter
+xs = ev.rollout_batch(x0s, n_steps=1000, dt=0.005,
+                      params=dict(plant.params, l=lengths))   # a family of rod lengths, one call
 ```
 
-## API stability (v0.1)
+Measured in the showcase notebook: 1000 rollouts of 1000 RK4 steps take
+27 ms as a compiled batch and about 32 s one step at a time in Python
+(Apple M4 Max). Derivatives are exact to machine precision, float64 by
+default. Under the hood, `compile()` lowers a leaf or a wired diagram to flat
+NumPy or JAX primitives (`f`, `rk4_step`, `rk4_integrate_zoh`,
+`rollout_batch`); the trace tier (`f_trace`, `f_trace_p`) is what you
+differentiate inside your own `jit`. See
+[07_compile](examples/tutorial/07_compile.ipynb) and the
+[JAX showcase](examples/tutorial/showcase_jax.ipynb).
 
-Minilink v0.1 freezes a **stable tier** for teaching; everything else is
-**provisional**. Stable public names and semantics only change with a
-deprecation note in the release notes; provisional APIs may change between
-minor releases (maturity detail: [ROADMAP.md](ROADMAP.md)).
+## Two audiences, one codebase
 
-| Tier | Bands |
-| --- | --- |
-| **Stable** | `core/` (`System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, composition operators, `Trajectory`, compile facade), `simulation` (`Simulator`, `StaticSimulator`), `blocks/`, catalog teaching plants (`minilink.catalog`), basic `control/` (output, state, SISO, impedance, robotic, model-based, LQR), basic `analysis/` (linearize, modal, frequency, equilibria, discretize) |
-| **Provisional** | `planning/` (trajopt, RRT, DP, spatial), `control.mpc`, hybrid (`StepDiagramSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`), `simulation.realtime`, `optimization/`, evaluator integration-helper grid beyond the documented subset ([DESIGN.md §5](DESIGN.md#compilation-and-simulation)), `estimation/` / `identification/` / `interfaces/` placeholders, quarantine (`symbolic/`, `dynamics/engines/`) |
+- **Teaching.** NumPy, SciPy and Matplotlib are enough for simulation, phase
+  planes, animation, linearization, LQR and value iteration. Runs in Colab
+  from one setup cell. One import line covers a course:
+  `from minilink import Pendulum, PID, lqr, PlanningProblem`.
+- **Research.** Optional JAX for compile and autodiff, Ipopt for large NLPs,
+  meshcat for 3D, a hybrid stack for sampled MPC, a Gymnasium bridge for RL.
+  Every catalog plant compiles on both backends.
 
-## Testing
+The boundary between the two is a contract, not a convention:
+[ROADMAP.md §2](ROADMAP.md#2-two-lanes).
 
-Use the **`minilink`** conda env from [Install](#install).
-**Entry points:** [tests/README.md#entry-points](tests/README.md#entry-points)
-(IDE: [`tests/run/run_contract_tests.py`](tests/run/run_contract_tests.py)).
+## Install
 
-## Call chains
+Python 3.10+. Recommended: the conda environment from
+[`environment.yml`](environment.yml).
 
-Minimal paths for debugging and extending workflows. Contracts:
-[DESIGN.md](DESIGN.md).
-
-Facade methods for common workflows: `compute_trajectory(...)` (static leaves and
-continuous/diagram systems via MRO), `plot_trajectory(...)`,
-`plot_diagram(...)`, `animate(...)`. Use lower-level APIs when you need explicit
-control: `DiagramSystem.add_subsystem(...)` / `connect(...)`, `Simulator`, or
-`compile()` / `DynamicsEvaluator`.
-
-### Package roles
-
-| Package | Owns |
-| --- | --- |
-| `core` | `System`, façade mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem`, ports, `Trajectory`, sets, costs |
-| `blocks` | generic wiring blocks (sources, `Integrator`, `TransferFunction`, routing, nonlinear, filters, neural) |
-| `control` | control laws and design factories (`FilteredController`, `ProportionalController`, `StateFeedbackController`, `lqr`, `modelbased`, `robotic`, `mpc`) |
-| `analysis` | `linearize`, `structural`, `equilibria`, `modal` (`modal_analysis`, `animate_modal`) |
-| `core/compile` | `ExecutionPlan`, `DynamicsEvaluator` |
-| `simulation` | `Simulator`, `HybridSimulator`, `Computer`, solvers, time grids |
-| `graphical` | plots, diagrams, animation (`Animator` + renderers) |
-| `planning` | `PlanningProblem`, planners, transcriptions |
-| `optimization` | `MathematicalProgram`, `Optimizer` |
-
-### Main chains
-
-```text
-Model:     subclass System → f/h (+ ports or DynamicSystem options)
-
-Compose:   + / >> / @ / autowire  →  DiagramSystem
-           hybrid: block % dt  →  Computer; Computer @ plant  →  HybridDiagram
-           or add_subsystem + connect (+ connect_new_output_port)
-
-Simulate:  compute_trajectory*  →  StaticSimulator (static leaf) or Simulator (DynamicSystem / diagram)
-           →  compile  →  solve  →  Trajectory
-           StepSystem: compute_rollout  →  StepEvaluator.rollout (state-only k/x/u)
-           StepDiagram + schedule: Computer.tick  →  signal histories (not evaluator rollout)
-           HybridDiagram: compute_forced  →  HybridSimulator  →  HybridSimResult
-           cache: self.traj (plant Trajectory), self.last_result (full result), self.rollout (computer)
-
-Compile:   sys.compile(backend)  →  DynamicsEvaluator
-
-Plot:      plot_trajectory*  →  graphical.signals  →  PlotResult
-           plot_phase_plane* →  graphical.phase_plane
-           plot_diagram      →  graphical.diagrams (DiagramSystem / StepDiagramSystem)
-           HybridDiagram.plot_diagram  →  hybrid composite (Plant + Computer clusters)
-
-Animate:   animate* / render  →  Animator  →  renderer backend
-           game  →  simulation.realtime.RealtimeSimulator  →  live Animator frames
-           HybridDiagram.animate  →  plant geometry + fine plant traj
-           planner.plot_solution / animate_solution  →  problem.sys.*
-
-Trajopt:   PlanningProblem + TrajectoryOptimizationPlanner
-           (flat ``n_steps`` / ``transcription="…"``; optional Transcription)
-           → transcribe → MathematicalProgram → Optimizer → TrajectoryPlan
-
-NLP:       MathematicalProgram → Optimizer → OptimizationResult
+```bash
+git clone https://github.com/alx87grd/minilink.git && cd minilink
+conda env create -f environment.yml && conda activate minilink
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-- `Trajectory` is numeric only (`t`, `x`, `u`, optional `signals`); labels stay on `System`.
-- Diagram internal signals in plots: `"sys_id:port_id"`, or ``(subsystem, "port")``
-  tuples; shortcut-built diagrams default to ``ref`` / ``ctl`` / ``sys``.
-- `DiagramSystem.connection_verbose` defaults to `False`; set `True` to print one line per connection.
-- Shortcuts flatten diagram operands instead of nesting them; `+` does not infer cross-wiring.
-- `compute_*` returns `Trajectory`; `plot_*` returns `PlotResult`; `show=False` skips display.
+Or open any notebook in Colab: the first cell clones the repository. Basic
+tier, pip, and options: [install.md](install.md).
 
-## Examples
+## Learn more
 
-Index and placement rules: [examples/README.md](examples/README.md)
-(`scripts/` = canonical · `experimental/` = non-core / scenario WIP ·
-`projects/` = multi-file).
+- [Showcase notebook](examples/tutorial/showcase_minilink.ipynb), the tool ladder on real plants
+- [JAX showcase](examples/tutorial/showcase_jax.ipynb), write `f` once, get every gradient
+- [From RL to Bode showcase](examples/tutorial/showcase_from_rl_to_bode.ipynb), six-axis robot, impedance loop, neural policy, frequency response and Lyapunov certificates
+- [Tutorial series 00–11](examples/tutorial/), one notebook per package (core dynamics to reinforcement learning)
+- [Teaching notebooks](examples/teaching/), swing-up, DP, PPO, robot equations of motion
+- [Examples index](examples/README.md), demos and projects by chapter
+- [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](DESIGN.md), [ROADMAP.md](ROADMAP.md), [tests](tests/README.md)
+- [CONSTITUTION.md](CONSTITUTION.md) and [RULES.md](RULES.md), the design law and the code rules every contributor and agent follows
 
-| Interest | Start here |
-| --- | --- |
-| Feature tour (marketing) | [examples/learn/intro/showcase_minilink.ipynb](examples/learn/intro/showcase_minilink.ipynb) |
-| Stateless / JAX / autodiff (marketing) | [examples/learn/intro/showcase_jax.ipynb](examples/learn/intro/showcase_jax.ipynb) |
-| Module API intros | [examples/learn/intro/](examples/learn/intro/) (`00_core` … `10_graphical`) |
-| Compile → evaluator API | [examples/learn/intro/07_compile.ipynb](examples/learn/intro/07_compile.ipynb) |
-| Diagrams | `examples/demos/diagrams/` · [intro/core](examples/learn/intro/00_core.ipynb) |
-| Blocks (routing, filters, nonlinear) | `examples/demos/blocks/` · [intro/blocks](examples/learn/intro/01_blocks.ipynb) |
-| Control | `examples/demos/control/` · [intro/control](examples/learn/intro/03_control.ipynb) |
-| Pyro SMC continuous (pendulum) | `examples/demos/control/sliding_mode_pendulum.py` |
-| Hybrid / step (multi-rate, SMC compare, `Computer`) | `examples/demos/hybrid/` · `examples/demos/step/` · [intro/hybrid](examples/learn/intro/06_hybrid.ipynb) |
-| MPC (minimal + dual-rate) | `examples/demos/mpc/` · [teaching/mpc](examples/learn/teaching/mpc.ipynb) · dual-rate: `examples/projects/mpc/mpc_dual_rate.py` |
-| MPC scenarios (path / slalom / spatial) | `examples/projects/mpc/` · circuit: `examples/demos/mpc/mpc_car_circuit.py` |
-| Robotic (impedance, computed torque, kinematic/nullspace, IK) | `examples/demos/robotic/` |
-| Analysis (linearize, trim, ctrb/obsv, modal) | `examples/demos/analysis/` · [intro/analysis](examples/learn/intro/04_analysis.ipynb) |
-| State-space / LQR | `examples/demos/statespace/` |
-| Identification (param gradients) | `examples/demos/identification/` |
-| Plotting | `examples/demos/plots/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |
-| Animation | `examples/demos/animation/` · [intro/graphical](examples/learn/intro/10_graphical.ipynb) |
-| Realtime game mode (keyboard → live plant → `Trajectory`) | `examples/demos/realtime/game_cartpole.py` |
-| Optimization | `examples/demos/optimization/` · [intro/optimization](examples/learn/intro/08_optimization.ipynb) |
-| Planning (RRT, DP) | `examples/demos/planning/` · [intro/planning](examples/learn/intro/09_planning.ipynb) |
-| Trajectory optimization | `examples/demos/trajopt/` · [car TrajOpt project](examples/projects/car_trajopt/) · [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/projects/car_trajopt/car_trajopt.ipynb) |
-| Path tracking projects | `examples/projects/pathtracking/` · `examples/projects/car_trajopt/` |
-| C export (P controller round-trip; filtered PID leaf) | `examples/demos/interfaces/c_export_proportional.py` · `c_export.py` |
-| Solver benchmarks | [examples/tooling/notebooks/benchmark.ipynb](examples/tooling/notebooks/benchmark.ipynb) (uses repo-root `benchmarks/`) |
-
-Catalog plants: `from minilink.catalog import …` (math under `minilink.dynamics.catalog.*`).
-
-## Docs
-
-- [DESIGN.md](DESIGN.md) — principles and contracts
-- [ROADMAP.md](ROADMAP.md) — TRL maturity and teaching-release priorities
-- [docs/plans/TODO.md](docs/plans/TODO.md) — operational backlog (fixes, demos, Later)
-- [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) — pyro 2.0 parity audit (library + all 195 demos)
-- [docs/plans/](docs/plans/) — active design backlog
-- [AGENTS.md](AGENTS.md) — contributor / agent rules
-- API reference (Sphinx): [alx87grd.github.io/minilink](https://alx87grd.github.io/minilink/) (built from `main` via [.github/workflows/docs.yml](.github/workflows/docs.yml)); local build: `pip install -e ".[docs]" && sphinx-build -b html docs docs/_build/html`
-
-Design rules: NumPy baseline, explicit JAX; native-array equation paths;
-`params is None` means object defaults, never `params or self.params`. Coding
-style: [AGENTS.md](AGENTS.md).
+Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro),
+the toolbox behind the robotics and control courses at Université de
+Sherbrooke. MIT license.

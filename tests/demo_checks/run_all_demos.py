@@ -28,11 +28,6 @@ FLAGSHIP_MANIFEST = CHECKS_DIR / "flagship_manifest.json"
 # Live keyboard / wall-clock sessions hang until the user quits — not suitable
 # for an unattended subprocess sweep. Keep discoverable under examples/; skip here.
 INTERACTIVE_DEMO_PREFIXES = ("examples/demos/realtime/",)
-INTERACTIVE_DEMO_PATHS = frozenset(
-    {
-        "examples/demos/animation/game_bicycle.py",
-    }
-)
 
 
 @dataclass(frozen=True)
@@ -44,9 +39,7 @@ class DemoRunRow:
 
 def _is_interactive_demo(path: Path) -> bool:
     rel = path.relative_to(REPO_ROOT).as_posix()
-    if any(rel.startswith(prefix) for prefix in INTERACTIVE_DEMO_PREFIXES):
-        return True
-    return rel in INTERACTIVE_DEMO_PATHS
+    return any(rel.startswith(prefix) for prefix in INTERACTIVE_DEMO_PREFIXES)
 
 
 def _discover_scripts() -> list[Path]:

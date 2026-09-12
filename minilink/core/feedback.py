@@ -12,12 +12,18 @@ module adds the read-only context that tools use to interpret such blocks:
 - :class:`Controller` / :class:`DynamicController` — thin marker/facade base
   classes providing the ``plot_control_law`` shortcut. They add no ports, no
   state, and no behavior.
+- :func:`error_input` / :class:`ErrorDriven` — the summing-junction side:
+  which input a loop closed with ``@`` should drive with ``e = r - y``, and
+  the port-layout switch (``ports="error"`` vs ``"reference"``) shared by
+  the classical blocks.
 
 Nothing here changes how a block computes. Undeclared blocks keep working
 everywhere; ``@`` composition falls back to its name/dimension heuristics.
 """
 
 from dataclasses import dataclass
+
+import numpy as np
 
 from minilink.core.system import DynamicSystem, System
 
@@ -137,3 +143,59 @@ class DynamicController(Controller, DynamicSystem):
     pinned at ``x0`` by default; ``x_axis`` / ``y_axis`` index the workspace
     ``z = [measurement-space; x_ctrl]`` for teaching slices (e.g. windup).
     """
+
+
+def error_input(block):
+    """Input port an Error block drives when ``block`` is closed on itself, or ``None``.
+
+    An explicit ``error_port`` attribute wins (:class:`ErrorDriven` sets it).
+    Otherwise a block with exactly one input port and no declared feedback
+    roles — a transfer function, a plant, a series diagram ``C >> G`` — is
+    error-driven at that port. Two-port controllers (``r``, ``y``) return
+    ``None``: ``@`` wires their measurement port instead.
+    """
+    inputs = getattr(block, "inputs", {})
+    declared = getattr(block, "error_port", None)
+    if declared is not None:
+        return declared if declared in inputs else None
+    if feedback_ports(block) is not None:
+        return None
+    return next(iter(inputs)) if len(inputs) == 1 else None
+
+
+class ErrorDriven:
+    """Port-layout switch for laws written on the tracking error ``e = r - y``.
+
+    ``ports="error"`` declares one input ``e`` — the compensator form, where
+    ``block @ plant`` inserts the Error block and ``block >> plant`` is
+    the loop gain. ``ports="reference"`` declares ``r`` and ``y`` — the
+    controller form, where ``@`` wires them to the plant. The law reads
+    ``e = self.error(u)`` either way, so it is written once.
+    """
+
+    PORT_LAYOUTS = ("error", "reference")
+
+    def add_error_ports(self, ports, dim, *, nominal_value=None):
+        """Declare the input ports of the chosen layout."""
+        if ports not in self.PORT_LAYOUTS:
+            raise ValueError(f"ports must be one of {self.PORT_LAYOUTS}, got {ports!r}")
+        self.port_layout = ports
+        nominal = np.zeros(dim) if nominal_value is None else nominal_value
+        if ports == "error":
+            self.add_input_port("e", dim=dim, nominal_value=nominal)
+            self.error_port = "e"
+        else:
+            self.add_input_port("r", dim=dim, nominal_value=nominal)
+            self.add_input_port("y", dim=dim, nominal_value=np.zeros(dim))
+
+    @property
+    def error_dependencies(self):
+        """Input ports the command feeds through from."""
+        return ("e",) if self.port_layout == "error" else ("r", "y")
+
+    def error(self, u):
+        """The tracking error from the flat input: ``u`` itself, or ``r - y``."""
+        if self.port_layout == "error":
+            return u
+        p = self.inputs["r"].dim
+        return u[:p] - u[p:]

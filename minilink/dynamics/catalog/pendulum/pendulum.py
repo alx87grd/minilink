@@ -30,10 +30,9 @@ class Pendulum(MechanicalSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphic parameters
+        # Graphic parameters: no camera_scale, so the view follows params["l"]
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
-        self.camera_scale = length * 1.5
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -126,8 +125,9 @@ class PendulumWithNoisePort(Pendulum):
 
     def h(self, x, u, t=0.0, params=None):
         v_noise = self.get_port_values_from_u(u, "v")
-        y = x.copy()
-        y[self.dof] = x[self.dof] + v_noise[0]
+        xp = array_module(x, u)
+        k = self.dof
+        y = xp.concatenate([x[:k], x[k : k + 1] + v_noise[0], x[k + 1 :]])
         return y
 
 

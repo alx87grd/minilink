@@ -19,6 +19,29 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn('PORT="r"', html)
         self.assertIn('PORT="u"', html)
 
+    def test_error_block_html_shows_plus_minus_e(self):
+        from minilink.blocks.routing import Error
+
+        html = get_system_block_html(Error(), "error")
+        self.assertIn("Error::error", html)
+        self.assertIn(">+<", html)
+        self.assertIn(">-<", html)
+        self.assertIn(">e<", html)
+        self.assertIn('PORT="plus"', html)
+        self.assertIn('PORT="minus"', html)
+        self.assertIn('PORT="e"', html)
+
+    def test_demux_block_html_shows_numpy_slices(self):
+        from minilink.blocks.routing import Demux
+
+        html = get_system_block_html(Demux(dims=(1, 1), port="y"), "demux")
+        self.assertIn("Demux::demux", html)
+        self.assertIn(">y[0]<", html)
+        self.assertIn(">y[1]<", html)
+        self.assertIn('PORT="y"', html)
+        self.assertIn('PORT="y_0"', html)
+        self.assertIn('PORT="y_1"', html)
+
     def test_system_diagram_contains_block_label(self):
         pytest.importorskip("graphviz")
         graph = get_diagram(Integrator())
@@ -338,3 +361,55 @@ class TestCompileTypes(unittest.TestCase):
     def test_compile_diagram_diagram_evaluator(self):
         diagram = _unity_feedback_diagram()
         self.assertIsInstance(diagram.compile(), NumpyDiagramEvaluator)
+
+
+class TestFeedbackMissingPortMessage(unittest.TestCase):
+    """S04: a plant without a 'y' port gets a message that names the fix."""
+
+    def test_missing_plant_output_port_message(self):
+        from minilink.control.output import ProportionalController
+        from minilink.core.system import DynamicSystem
+
+        class NoOutput(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, expose_state=True)
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([x[1], u[0] - x[0]])
+
+        with self.assertRaises(ValueError) as ctx:
+            ProportionalController() @ NoOutput()
+        message = str(ctx.exception)
+        self.assertIn("has no 'y' output port", message)
+        self.assertIn("output_dim=", message)
+        self.assertNotIn("dim None", message)
+
+
+class TestDiagramRenderWithoutDot(unittest.TestCase):
+    """plot_diagram() in a notebook without the Graphviz binary warns, never raises."""
+
+    def test_inline_render_warns_when_dot_is_missing(self):
+        import warnings
+        from unittest import mock
+
+        from minilink.control.impedance import ImpedanceController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+        from minilink.graphical.diagrams import dot as dot_module
+
+        try:
+            import IPython.display  # noqa: F401
+        except ImportError:
+            self.skipTest("IPython not installed")
+
+        graph = (ImpedanceController() @ Pendulum()).get_diagram()
+        if graph is None:
+            self.skipTest("graphviz Python package not installed")
+
+        with mock.patch(
+            "IPython.display.display",
+            side_effect=RuntimeError("failed to execute PosixPath('dot')"),
+        ):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                dot_module._render_diagram_graph(graph, show=True, show_inline=True)
+        self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))

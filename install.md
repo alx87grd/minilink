@@ -58,7 +58,7 @@ export PYTHONPATH="$PWD"                            # Windows PS: $env:PYTHONPAT
 ### Colab
 
 No local install. Open a notebook with **Open in Colab** (e.g.
-[showcase](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_minilink.ipynb)).
+[showcase](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)).
 Paste as the **first code cell** if you build your own notebook:
 
 ```python
@@ -106,7 +106,7 @@ export PYTHONPATH="$PWD"                            # Windows PS: $env:PYTHONPAT
 
 Same clone + path as Basic, then Full extras Colab does not ship (JAX is already
 on Colab). Example:
-[JAX showcase](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/learn/intro/showcase_jax.ipynb).
+[JAX showcase](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb).
 
 ```python
 # Local conda: minilink already installed. Colab: clone + path + Full extras.

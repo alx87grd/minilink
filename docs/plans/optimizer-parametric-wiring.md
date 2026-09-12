@@ -1,13 +1,13 @@
 # Optimizer wiring for parametric trajopt / MPC
 
 Status: **draft plan** (July 2026). Analysis + proposed fix for swapping
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 `optimizer_method` (e.g. SciPy SLSQP → IPOPT) on the parametric MPC path.
 
 Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP),
 [TODO.md](TODO.md) Later (`SolverFactory` / optimizer wiring).
 
-Related: [planning-pipeline-architecture.md](planning-pipeline-architecture.md)
-(parametric `x0` bind; pipeline B extends to scene).
+Related: DESIGN §4 planning-params pipeline B (parametric `x0` / reserved `scene` bind).
 
 ---
 
@@ -53,7 +53,7 @@ transcribe or a parametric compile.
 
 | Path | Entry | Solver wiring | IPOPT (`cyipopt`) |
 | --- | --- | --- | --- |
-| Offline / rebuild | `solve()` / `solve_trajectory_from` without parametric compile | `Optimizer(program, method=…)` | **Yes** — see `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py` |
+| Offline / rebuild | `solve()` / `solve_trajectory_from` without parametric compile | `Optimizer(program, method=…)` | **Yes** — see `examples/demos/planning/trajopt/trajopt_cartpole_collocation_jax.py` |
 | NumPy MPC rebuild | `compile_backend='numpy'`, no parametric compile | Same `Optimizer` via `_make_optimizer` | **Yes** (if optional dep installed) |
 | JAX MPC fast path | `compile_parametric_program()` + `solve_trajectory_from` | **Custom** `_make_parametric_optimizer_backend` | **No** — SciPy only |
 

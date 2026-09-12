@@ -1,22 +1,14 @@
-"""Minimal hybrid MPC without JAX — NumPy rebuild each replan tick.
-
-``compile_backend='numpy'`` skips parametric compile; each MPC tick
-transcribes and solves a fresh NLP. Suitable for teaching and small plants.
-
-Run from repo root::
-
-    python examples/demos/mpc/mpc_integrator_numpy.py
-"""
+"""Minimal hybrid MPC without JAX — NumPy rebuild each replan tick."""
 
 import numpy as np
 
-from minilink.control.mpc import ModelPredictiveController
-from minilink.core.costs import QuadraticCost
-from minilink.core.system import DynamicSystem
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.planner import (
+from minilink import (
+    DynamicSystem,
+    PlanningProblem,
+    QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
+from minilink.control.mpc import ModelPredictiveController
 
 
 class SingleIntegrator(DynamicSystem):
@@ -37,7 +29,7 @@ class SingleIntegrator(DynamicSystem):
 TF_SIM = 2.0
 MPC_DT = 0.2
 SIM_DT = 0.01
-STEP_DISP = True
+VERBOSE = True
 
 sys = SingleIntegrator()
 x0 = np.array([0.5])
@@ -54,7 +46,6 @@ planner = TrajectoryOptimizationPlanner(
             sys,
             Q=np.eye(1),
             R=0.1 * np.eye(1),
-            S=np.zeros((1, 1)),
             xbar=x_goal,
         ),
     ),
@@ -65,7 +56,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
+    planner, dt_mpc=MPC_DT, warm_start=True, verbose=VERBOSE
 )
 hybrid = mpc @ sys
 

@@ -15,11 +15,11 @@ from examples.projects.pathtracking.bicycle_los.motor_map import (
     AccelerationToThrottle,
     YawRateToSteering,
 )
-from examples.projects.pathtracking.bicycle_los.path_generator import (
+from examples.projects.pathtracking.bicycle_los.servo import HeadingServo, Servo
+from examples.projects.pathtracking.common.path_generator import (
     rounded_rectangle_path,
 )
-from examples.projects.pathtracking.bicycle_los.servo import HeadingServo, Servo
-from examples.projects.pathtracking.bicycle_los.vehicle import (
+from examples.projects.pathtracking.common.vehicle import (
     VehicleMeasurement,
     create_vehicle,
 )

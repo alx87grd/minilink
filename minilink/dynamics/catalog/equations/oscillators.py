@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 
 
@@ -21,11 +22,12 @@ class VanderPol(DynamicSystem):
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         mu = params["mu"]
+        xp = array_module(x)
         y, dy = x
 
         # Van der Pol oscillator: damping is negative (pumps energy) for |y| < 1
         ddy = -y + mu * dy * (1.0 - y**2)
-        return np.array([dy, ddy])
+        return xp.array([dy, ddy])
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -56,13 +58,14 @@ class Lorenz(DynamicSystem):
         sigma = params["sigma"]
         rho = params["rho"]
         beta = params["beta"]
+        xp = array_module(x)
         x_val, y, z = x
 
         # Lorenz equations
         dx = sigma * (y - x_val)
         dy = x_val * (rho - z) - y
         dz = x_val * y - beta * z
-        return np.array([dx, dy, dz])
+        return xp.array([dx, dy, dz])
 
     def h(self, x, u, t=0.0, params=None):
         return x

@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
@@ -41,11 +42,12 @@ class Rocket(MechanicalSystem):
         params = self.params if params is None else params
         mass = params["mass"]
         inertia = params["inertia"]
+        xp = array_module(q)
 
-        return np.diag([mass, mass, inertia])
+        return xp.diag(xp.array([mass, mass, inertia]))
 
     def C(self, q, dq, params=None):
-        return np.zeros((3, 3))
+        return array_module(q).zeros((3, 3))
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -53,17 +55,18 @@ class Rocket(MechanicalSystem):
         gravity = params["gravity"]
 
         # weight pulls along +y (d sits on the left side of the EoM)
-        return np.array([0.0, mass * gravity, 0.0])
+        return array_module(q).array([0.0, mass * gravity, 0.0])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         cda = params["cda"]
+        xp = array_module(dq)
 
         # quadratic aerodynamic drag plus a small linear damping term
-        return np.array(
+        return xp.array(
             [
-                cda * dq[0] * abs(dq[0]) + 0.01 * dq[0],
-                cda * dq[1] * abs(dq[1]) + 0.01 * dq[1],
+                cda * dq[0] * xp.abs(dq[0]) + 0.01 * dq[0],
+                cda * dq[1] * xp.abs(dq[1]) + 0.01 * dq[1],
                 0.01 * dq[2],
             ]
         )
@@ -73,13 +76,14 @@ class Rocket(MechanicalSystem):
         ycg = params["ycg"]
         thrust, delta = u
         theta = q[2]
+        xp = array_module(q, u)
 
         # gimballed thrust: force along the nozzle axis, torque about the c.g.
-        return thrust * np.array(
+        return thrust * xp.array(
             [
-                -np.sin(theta + delta),
-                np.cos(theta + delta),
-                -ycg * np.sin(delta),
+                -xp.sin(theta + delta),
+                xp.cos(theta + delta),
+                -ycg * xp.sin(delta),
             ]
         )
 

@@ -1,29 +1,13 @@
-"""RRT* live convergence — watch the tree rewire toward a shorter path.
-
-Run from repo root::
-
-    python examples/demos/planning/rrt/rrt_star_live.py
-
-A holonomic robot steers through a moderate obstacle field. RRT* runs with
-``optimize_after_goal=True``: after the first goal connection the search keeps
-extending and rewiring until the best goal path cost has not improved for
-``convergence_patience`` extensions (or ``max_nodes``).
-
-Set ``LIVE_PLOT = True`` to redraw the tree during the solve (pyro-style live
-display). With ``LIVE_PLOT_AFTER_GOAL_ONLY = True`` updates begin once the
-first goal is reached — the convergence / path-shortening phase.
-"""
+"""RRT* live convergence — watch the tree rewire toward a shorter path."""
 
 import time
 
 import numpy as np
 
+from minilink import BoxSet, HolonomicMobileRobot, PlanningProblem, RRTStarPlanner
 from minilink.core.geometry import Sphere
-from minilink.core.sets import BoxSet
-from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
-from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import SteeringExtender
-from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
+from minilink.planning.search.rrt_star import RRTStarOptions
 from minilink.planning.search.steering import StraightLineSteering
 from minilink.planning.spatial.collision import bind, disc
 from minilink.planning.spatial.scene import Scene
@@ -33,8 +17,8 @@ GOAL_TOLERANCE = 0.35
 MAX_NODES = 12000
 CONVERGENCE_PATIENCE = 600
 COST_TOL = 0.02
-LIVE_PLOT = True
-LIVE_PLOT_AFTER_GOAL_ONLY = True
+LIVE_PLOT = True  # redraw the tree during the solve
+LIVE_PLOT_AFTER_GOAL_ONLY = True  # start once the first goal is reached
 LIVE_PLOT_EVERY = 15
 LIVE_PLOT_PAUSE = 0.001
 REPLAY_HISTORY = False

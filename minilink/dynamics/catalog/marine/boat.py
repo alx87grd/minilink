@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
@@ -56,18 +57,20 @@ class Boat2D(GeneralizedMechanicalSystem):
         params = self.params if params is None else params
         mass = params["mass"]
         inertia = params["inertia"]
+        xp = array_module(q)
 
         # rigid-body inertia: equal surge/sway mass, separate yaw inertia
-        return np.diag([mass, mass, inertia])
+        return xp.diag(xp.array([mass, mass, inertia]))
 
     def C(self, q, v, params=None):
         params = self.params if params is None else params
         mass = params["mass"]
         yaw_rate = v[2]
+        xp = array_module(q, v)
 
         # Coriolis coupling induced by the body-frame yaw rate
         # fmt: off
-        return np.array([
+        return xp.array([
             [            0.0, -mass * yaw_rate, 0.0],
             [mass * yaw_rate,              0.0, 0.0],
             [            0.0,              0.0, 0.0],
@@ -76,11 +79,12 @@ class Boat2D(GeneralizedMechanicalSystem):
 
     def N(self, q, params=None):
         theta = q[2]
-        c, s = np.cos(theta), np.sin(theta)
+        xp = array_module(q)
+        c, s = xp.cos(theta), xp.sin(theta)
 
         # body-to-world rotation mapping body velocities to world rates
         # fmt: off
-        return np.array([
+        return xp.array([
             [  c,  -s, 0.0],
             [  s,   c, 0.0],
             [0.0, 0.0, 1.0],
@@ -93,7 +97,7 @@ class Boat2D(GeneralizedMechanicalSystem):
 
         # thrust acts a distance l_t aft of the c.g., adding a yaw moment
         # fmt: off
-        return np.array([
+        return array_module(q).array([
             [1.0,  0.0],
             [0.0,  1.0],
             [0.0, -l_t],
@@ -107,9 +111,10 @@ class Boat2D(GeneralizedMechanicalSystem):
         Cm_max = params["Cm_max"]
 
         # quadratic hydrodynamic coefficients vs. attack angle (Fossen Fig. 6.11)
-        Cx = -Cx_max * np.cos(alpha) * np.abs(np.cos(alpha))
-        Cy = Cy_max * np.sin(alpha) * np.abs(np.sin(alpha))
-        Cm = Cm_max * np.sin(2.0 * alpha)
+        xp = array_module(alpha)
+        Cx = -Cx_max * xp.cos(alpha) * xp.abs(xp.cos(alpha))
+        Cy = Cy_max * xp.sin(alpha) * xp.abs(xp.sin(alpha))
+        Cm = Cm_max * xp.sin(2.0 * alpha)
         return Cx, Cy, Cm
 
     def damping(self, relative_velocity, params=None):
@@ -122,8 +127,9 @@ class Boat2D(GeneralizedMechanicalSystem):
         N_max = params["N_max"]
 
         vr = relative_velocity
+        xp = array_module(vr)
         speed_squared = vr[0] ** 2 + vr[1] ** 2
-        alpha = -np.arctan2(vr[1], vr[0])  # attack angle of the relative flow
+        alpha = -xp.arctan2(vr[1], vr[0])  # attack angle of the relative flow
         Cx, Cy, Cm = self.current_coefficients(alpha, params)
 
         # linear plus quadratic hydrodynamic damping (Fossen 6.7)
@@ -131,8 +137,8 @@ class Boat2D(GeneralizedMechanicalSystem):
         fx = -0.5 * rho * Afc * Cx * speed_squared
         fy = -0.5 * rho * Alc * Cy * speed_squared
         mz = -0.5 * rho * Alc * loa * Cm * speed_squared
-        mz += N_max * rho * Alc * loa * np.abs(vr[2]) * vr[2]
-        return d_linear + np.array([fx, fy, mz])
+        mz += N_max * rho * Alc * loa * xp.abs(vr[2]) * vr[2]
+        return d_linear + xp.array([fx, fy, mz])
 
     def d(self, q, v, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -235,7 +241,8 @@ class Boat2DWithCurrent(Boat2D):
         current_velocity = params["current_velocity"]
 
         # damp the water-relative velocity (current subtracted in body frame)
-        world_current = np.array([current_velocity[0], current_velocity[1], 0.0])
+        xp = array_module(q, v)
+        world_current = xp.array([current_velocity[0], current_velocity[1], 0.0])
         body_current = self.N(q, params).T @ world_current
         return self.damping(v - body_current, params)
 

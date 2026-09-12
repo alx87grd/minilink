@@ -76,7 +76,7 @@ def _propagate_animation_camera(diagram, *sources):
 
     Prefer a source (or nested leaf) that already carries kinematic geometry —
     e.g. a catalog plant — over a bare ``Step`` / controller that would keep the
-    generic ``camera_scale=10`` default.
+    generic auto-fit default (``camera_scale=None``).
     """
     fallback = None
     for source in sources:
@@ -171,6 +171,133 @@ def series(
     return diagram
 
 
+def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSystem:
+    """Close ``sys`` on itself with an :class:`~minilink.blocks.routing.Error`
+    block: ``r -> e = r - y -> sys -> y``.
+
+    Negative feedback (the default) inserts ``Error``, so the diagram shows
+    ports ``+``, ``-``, and ``e``. Positive feedback still uses a signed
+    :class:`~minilink.blocks.routing.Sum`. The junction drives the one free
+    input of ``sys`` — a plant, a transfer function, a compensator, or a
+    series diagram such as ``C >> G``. ``sys`` is not modified: the result
+    is a new diagram sharing its blocks, with boundary input ``r`` and the
+    output of ``sys`` as boundary output ``y``. The operator form is
+    ``sys @ 1`` (and ``sys @ K`` for ``through=K``).
+
+    Parameters
+    ----------
+    through : 1, scalar, array, or System
+        The return path: ``1`` is a direct wire, a scalar or matrix inserts a
+        ``Gain`` block, a system (sensor dynamics) is inserted as a block.
+    of : str or (str, int), optional
+        Which output comes back: a boundary output port id, or
+        ``(port, index)`` for one component. Default: the whole output when
+        its dimension matches the input; a scalar input against a vector
+        output takes component 0 through a visible ``Demux``; any other
+        mismatch is an error.
+    sign : float
+        ``-1.0`` for negative feedback (default), ``+1.0`` for positive.
+    validate : bool
+        Run algebraic-loop detection before returning.
+    """
+    from minilink.blocks.routing import Demux, Error, Gain, Sum
+
+    diagram = DiagramSystem()
+    if isinstance(sys, DiagramSystem):
+        source_entry = _get_available_diagram_entry(sys)
+        id_map = _inline_diagram(diagram, sys, output_collision="replace")
+        entry_sys, entry_port = id_map[source_entry.sys_id], source_entry.port_id
+    else:
+        entry_sys = _add_system_to_diagram(diagram, sys)
+        entry_port = _default_input_port(sys)
+    entry_dim = diagram.subsystems[entry_sys].inputs[entry_port].dim
+
+    # The free boundary input that fed the entry goes away: the junction feeds it.
+    edge = diagram.connections[entry_sys][entry_port]
+    if edge is not None:
+        del diagram.inputs[edge[1]]
+        diagram.connections[entry_sys][entry_port] = None
+
+    if not diagram.outputs:
+        out_sys, out_port = _get_composition_output(diagram)
+        diagram.connect_new_output_port(out_sys, out_port, "y")
+    output_sys, output_port = _get_composition_output(diagram)
+
+    signal_sys, signal_port = _return_signal(diagram, of, entry_dim, Demux)
+
+    if isinstance(through, System):
+        sensor_id = _add_system_to_diagram(diagram, through, role="sensor")
+        diagram.connect(
+            signal_sys, signal_port, sensor_id, _default_input_port(through)
+        )
+        signal_sys, signal_port = sensor_id, _default_output_port(through)
+    elif not (np.isscalar(through) and float(through) == 1.0):
+        gain_id = _add_system_to_diagram(
+            diagram, Gain(through, dim=entry_dim), role="gain"
+        )
+        diagram.connect(signal_sys, signal_port, gain_id, "u")
+        signal_sys, signal_port = gain_id, "y"
+
+    if float(sign) == -1.0:
+        junction_id = _add_system_to_diagram(
+            diagram, Error(dim=entry_dim), role="error"
+        )
+        plus_port, minus_port, out_port = "+", "-", "e"
+    else:
+        junction_id = _add_system_to_diagram(
+            diagram, Sum(signs=(1.0, float(sign)), dim=entry_dim), role="sum"
+        )
+        plus_port, minus_port, out_port = "in0", "in1", "y"
+    diagram.add_input_port("r", dim=entry_dim)
+    diagram.connect("input", "r", junction_id, plus_port)
+    diagram.connect(signal_sys, signal_port, junction_id, minus_port)
+    diagram.connect(junction_id, out_port, entry_sys, entry_port)
+    diagram._composition_entry = (junction_id, plus_port)
+    diagram._composition_output = (output_sys, output_port)
+    diagram.name = f"Closed loop of {sys.name}"
+    if validate:
+        diagram.check_algebraic_loops()
+    return diagram
+
+
+def _return_signal(diagram, of, entry_dim, Demux):
+    """Source ``(sys_id, port_id)`` of what comes back to the junction."""
+    port_id, index = of if isinstance(of, tuple) else (of, None)
+    if port_id is None:
+        port_id = "y" if "y" in diagram.outputs else next(iter(diagram.outputs))
+    if port_id not in diagram.outputs:
+        raise ValueError(
+            f"Unknown output {port_id!r}; boundary outputs: {', '.join(diagram.outputs)}"
+        )
+    out_sys, out_port = diagram.connections["output"][port_id]
+    dim = diagram.subsystems[out_sys].outputs[out_port].dim
+    if index is None:
+        if dim == entry_dim:
+            return out_sys, out_port
+        if entry_dim == 1 and dim > 1:
+            index = 0  # the standard choice: the first component (the position)
+        else:
+            raise ValueError(
+                f"Cannot close the loop: the input takes {entry_dim} values and "
+                f"the output {port_id!r} has {dim}; pass of=({port_id!r}, index) "
+                "or wire a Demux / Mux explicitly."
+            )
+    index = int(index)
+    if not 0 <= index < dim:
+        raise ValueError(f"of index must be in [0, {dim - 1}] for {port_id!r}")
+    if entry_dim != 1:
+        raise ValueError("of=(port, index) selects one component; the input takes more")
+    parts = [d for d in (index, 1, dim - index - 1) if d > 0]
+    demux_id = _add_system_to_diagram(
+        diagram, Demux(dims=parts, port=out_port), role="demux"
+    )
+    diagram.connect(out_sys, out_port, demux_id, out_port)
+    return demux_id, f"{out_port}[{index}]"
+
+
+_close_with_junction = feedback
+
+
 def closed_loop(
     controller: System,
     plant: System,
@@ -184,7 +311,18 @@ def closed_loop(
     feedback: str = "auto",
     validate: bool = True,
 ) -> DiagramSystem:
-    """Build a Pyro-style controller/plant feedback diagram.
+    """Build a controller/plant feedback diagram — the ``controller @ plant`` operator.
+
+    Two layouts, one rule "A drives B and B's output returns to A":
+
+    - a controller with a measurement port (``r``, ``y`` → ``u``) is wired
+      the standard way, the measurement returning to ``y``;
+    - an error-driven block (:func:`~minilink.core.feedback.error_input`: a
+      compensator, a transfer function, a plant, a series diagram) gets an
+      :class:`~minilink.blocks.routing.Error` block ``e = r - y`` inserted by
+      :func:`feedback`; a scalar
+      or matrix ``plant`` is the return-path gain (``L @ 1`` is unity
+      feedback, ``L @ K`` is ``feedback(L, K)``).
 
     Parameters
     ----------
@@ -209,6 +347,13 @@ def closed_loop(
         A diagram exposing the controller reference as input and plant output as
         output.
     """
+    from minilink.core.feedback import error_input
+
+    if not isinstance(plant, System):
+        return _close_with_junction(controller, plant, validate=validate)
+    if error_input(controller) is not None:
+        return _close_with_junction(series(controller, plant), validate=validate)
+
     diagram = DiagramSystem()
     controller_id = _add_system_to_diagram(diagram, controller, role="ctl")
     plant_id = _add_system_to_diagram(diagram, plant, role="sys")
@@ -950,7 +1095,14 @@ def _feedback_path_from_declaration(
         mux_id = _add_qdq_mux(diagram, qdq_n)
         return _FeedbackPath(measurement, plant_output_port, mux_id)
 
-    plant_y = plant.outputs["y"].dim if "y" in plant.outputs else None
+    if "y" not in plant.outputs:
+        raise ValueError(
+            f"Cannot wire closed-loop feedback: plant '{plant.name}' ({plant_id}) "
+            "has no 'y' output port; declare it with output_dim=... (the standard "
+            "port, y = x by default) or wire ports explicitly with "
+            "add_subsystem/connect"
+        )
+    plant_y = plant.outputs["y"].dim
     hint = ""
     if qdq_n is not None:
         hint = (
@@ -1051,6 +1203,13 @@ def _feedback_mismatch_message(
     *,
     attempted: str,
 ) -> str:
+    if "y" not in plant.outputs and "y" in controller.inputs:
+        return (
+            f"Cannot wire closed-loop feedback: plant '{plant.name}' ({plant_id}) "
+            "has no 'y' output port; declare it with output_dim=... (the standard "
+            "port, y = x by default) or wire ports explicitly with "
+            "add_subsystem/connect"
+        )
     ctl_y = controller.inputs["y"].dim if "y" in controller.inputs else None
     plant_y = plant.outputs["y"].dim if "y" in plant.outputs else None
     qdq_n = _plant_qdq_dof(plant)
@@ -1145,7 +1304,7 @@ def _is_controller_like(sys) -> bool:
         return True
     outputs = sys.outputs
     inputs = sys.inputs
-    return "u" in outputs and ("r" in inputs or "y" in inputs)
+    return "u" in outputs and ("r" in inputs or "y" in inputs or "e" in inputs)
 
 
 def _default_subsystem_id(sys, *, role=None) -> str:

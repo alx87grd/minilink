@@ -1,7 +1,7 @@
 """Lane-change trajectory optimization with servo + torque bicycle inputs.
 
 Same setup as ``car_trajopt_lanechange.py``, but the plant is
-:class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleDynServo`
+``BicycleDynServo`` (``vehicles/ladder.py``)
 with ``u = [tau_cmd, delta_cmd]`` instead of wheel/steer rate commands.
 
 Run from repo root::
@@ -11,9 +11,9 @@ Run from repo root::
 
 import numpy as np
 
+from examples.projects.car_trajopt.vehicles.ladder import BicycleDynServo
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.vehicles.jax_vehicles import BicycleDynServo
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -75,7 +75,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=N_STEPS,
     transcription="direct_collocation",
     compile_backend="jax",
-    solve_disp=PRINT_SOLVE_REPORT,
+    verbose=PRINT_SOLVE_REPORT,
     optimizer_options={
         "disp": SCIPY_DISP,
         "maxiter": 500,

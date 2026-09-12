@@ -1,0 +1,213 @@
+<div class="ml-pitch">
+
+<!-- ===================== 1 · title ===================== -->
+<section class="slide" id="pitch-1">
+<div class="inner">
+  <p class="kicker">minilink</p>
+  <h1>Write the equations once.<span class="acc">Simulate, analyze, control, plan, optimize, learn.</span></h1>
+  <p class="lead">An open-source Python toolbox for dynamical systems and control. A model is a short class whose
+  equations read like the textbook. Every tool in the library, from a Bode plot to model predictive control and
+  reinforcement learning, takes that same model.</p>
+  <div class="btns">
+    <a class="btn primary" href="https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb">Open the showcase in Colab</a>
+    <a class="btn" href="https://github.com/alx87grd/minilink">GitHub</a>
+    <a class="btn" href="https://alx87grd.github.io/minilink/">Documentation</a>
+  </div>
+  <div class="gifs">
+    <figure><img src="_static/pendulum_impedance.gif" alt="pendulum under impedance control"><figcaption><code>ImpedanceController() @ Pendulum()</code></figcaption></figure>
+    <figure><img src="_static/cartpole_swingup.gif" alt="cart-pole swing-up"><figcaption>swing-up by trajectory optimization</figcaption></figure>
+    <figure><img src="_static/mpc_car.gif" alt="car under model predictive control"><figcaption>model predictive control, sampled at 5 Hz</figcaption></figure>
+    <figure><img src="_static/ur5_meshcat.gif" alt="UR5 arm in the meshcat 3D viewer"><figcaption>UR5, task-space impedance, meshcat 3D viewer</figcaption></figure>
+  </div>
+</div>
+</section>
+
+<!-- ===================== 2 · the contract ===================== -->
+<section class="slide" id="pitch-2">
+<div class="inner">
+  <p class="kicker">1 · the contract</p>
+  <h2>A model is three functions</h2>
+  <div class="cols wide-left">
+    <div>
+      <figure class="figure"><img src="_static/system.svg" alt="a System: input ports, f, h, tf, output ports"></figure>
+      <div class="aside"><b>Under the hood.</b> <code>f</code>, <code>h</code> and <code>tf</code> are functions of
+      <code>(x, u, t; params)</code> only: no hidden state on the object. That one convention is what lets a model compose
+      into diagrams, run in batches and differentiate later. The core needs NumPy, SciPy and Matplotlib.</div>
+    </div>
+    <div>
+<pre><code><span class="k">from</span> minilink <span class="k">import</span> ImpedanceController, Pendulum
+
+plant = Pendulum()
+plant.x0[0] = 2.0
+plant.params["l"] = 5.0
+
+diagram = ImpedanceController() @ plant
+diagram.compute_trajectory(tf=10.0)
+diagram.plot_diagram()
+diagram.plot_trajectory()
+diagram.animate()</code></pre>
+      <h3>From <code>f</code> and <code>tf</code> you get</h3>
+      <ul>
+        <li>simulation and labeled, unit-aware plots of every signal, including any wire inside a diagram</li>
+        <li>the same animation on matplotlib, plotly, meshcat (3D) and pygame</li>
+        <li><code>plant.game()</code>: drive the plant from the keyboard, in real time</li>
+        <li>diagrams from operators: <code>a + b</code>, <code>source &gt;&gt; plant</code>, <code>ctl @ plant</code>, a sampled controller with <code>ctl % dt</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===================== 3 · one interface ===================== -->
+<section class="slide" id="pitch-3">
+<div class="inner">
+  <p class="kicker">2 · one interface</p>
+  <h2>One model, every tool</h2>
+  <figure class="figure bridges"><img src="_static/bridges.svg" alt="one System (f, h, tf) connected to simulation, analysis, control, planning, learning"></figure>
+  <div class="cols">
+    <div>
+      <table class="verbs">
+        <tr><td>Simulate</td><td><code>plant.compute_trajectory(tf=10)</code></td></tr>
+        <tr><td>Frequency domain</td><td><code>plot_bode(plant, x_bar)</code> · <code>plot_root_locus(C &gt;&gt; G)</code></td></tr>
+        <tr><td>Classical loop</td><td><code>PID(Kp, Ki, Kd) @ plant</code></td></tr>
+        <tr><td>State feedback</td><td><code>lqr_at_operating_point(plant, x_bar, Q, R) @ plant</code></td></tr>
+        <tr><td>Robot control</td><td><code>ComputedTorqueController(arm)</code> · <code>JointImpedance(arm)</code></td></tr>
+        <tr><td>Value iteration</td><td><code>DynamicProgrammingPlanner(problem, x_grid=(101, 101))</code></td></tr>
+        <tr><td>Sampling search</td><td><code>RRTPlanner(problem)</code></td></tr>
+        <tr><td>Trajectory optimization</td><td><code>TrajectoryOptimizationPlanner(problem)</code></td></tr>
+        <tr><td>Model predictive control</td><td><code>ModelPredictiveController(planner, dt_mpc=0.1) @ plant</code></td></tr>
+        <tr><td>Reinforcement learning</td><td><code>Sys2Gym(plant, cost)</code> → Stable-Baselines3</td></tr>
+        <tr><td>Identification</td><td><code>plant.jacobian("f", "params", x_bar)</code></td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Textbook objects between the tools</h3>
+<pre><code>problem = PlanningProblem(
+    sys=plant, x_start=x_down, x_goal=x_up,
+    cost=QuadraticCost.from_system(plant, Q=Q, R=R, xbar=x_up),
+    tf=4.0,
+)
+DynamicProgrammingPlanner(problem).solve()      <span class="c"># grid value iteration</span>
+RRTPlanner(problem).solve()                     <span class="c"># tree search</span>
+TrajectoryOptimizationPlanner(problem).solve()  <span class="c"># collocation</span></code></pre>
+      <p>A <code>PlanningProblem</code> is a system, a cost and boundary sets. Every planner takes it and returns a
+      <code>Trajectory</code>; an optimizer sees a <code>MathematicalProgram</code>; a policy comes back as a
+      controller you close the loop with: <code>planner.get_controller() @ plant</code>.</p>
+      <div class="aside"><b>Under the hood.</b> A diagram flattens to one state vector and one <code>f</code>, so the
+      closed loop linearizes, animates and nests like a plant. Every wire is a named signal. A sampled controller is
+      <code>ctl % dt</code> with zero-order hold; the continuous plant is integrated between ticks.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===================== 4 · differentiable ===================== -->
+<section class="slide" id="pitch-4">
+<div class="inner">
+  <p class="kicker">3 · differentiable</p>
+  <h2>The same <code>f</code> is differentiable and compiled</h2>
+  <div class="cols wide-left">
+    <div>
+<pre><code>ev = plant.compile(backend="jax")       <span class="c"># one JIT-compiled evaluator</span>
+
+A = plant.jacobian("f", "x", x_bar)     <span class="c"># exact linearization</span>
+S = plant.jacobian("f", "params", x_bar) <span class="c"># sensitivity to each parameter</span>
+
+xs = ev.rollout_batch(                  <span class="c"># a family of lengths, one call</span>
+    x0s, n_steps=1000, dt=0.005,
+    params=dict(plant.params, l=lengths),
+)
+
+<span class="k">def</span> loss(gains):                        <span class="c"># a closed-loop rollout, traced</span>
+    xs = ev.rk4_integrate_zoh_trace_p(x0, U, 0.0, dt, {"ctl": gains})
+    <span class="k">return</span> cost(xs)
+
+gains = gains - lr * jax.grad(loss)(gains) <span class="c"># tune through the simulation</span></code></pre>
+      <div class="stats">
+        <div class="stat"><div class="n">27 ms</div><div class="l">1000 rollouts × 1000 RK4 steps, compiled batch</div></div>
+        <div class="stat"><div class="n">32 s</div><div class="l">the same steps one at a time in Python</div></div>
+        <div class="stat"><div class="n">exact</div><div class="l">∂f/∂x, ∂f/∂u, ∂f/∂p to machine precision, float64 by default</div></div>
+      </div>
+      <p class="small">Measured with the showcase notebook cell on an Apple M4 Max laptop; your numbers will differ.</p>
+    </div>
+    <div>
+      <div class="jaxbox">
+        <p class="kicker">What is JAX?</p>
+        <p>An open-source library from Google for accelerated numerical computing, and the
+        numerical core of much of Google DeepMind's machine-learning research. It keeps NumPy's
+        array API and adds three function transformations:</p>
+        <ul>
+          <li><code>jit</code>: compiles a Python function to fast machine code for CPU, GPU or TPU</li>
+          <li><code>grad</code>: exact derivatives of any function, by automatic differentiation</li>
+          <li><code>vmap</code>: runs one function over a whole batch, with no loop</li>
+        </ul>
+        <p>In minilink it is an optional backend. The same <code>f</code> written with NumPy
+        semantics runs under JAX unchanged: <code>plant.compile(backend="jax")</code>.</p>
+      </div>
+      <div class="aside"><b>Under the hood.</b> <code>compile()</code> lowers a leaf or a wired diagram to flat NumPy
+      or JAX primitives (<code>f</code>, <code>rk4_step</code>, <code>rk4_integrate_zoh</code>,
+      <code>rollout_batch</code>). The trace tier (<code>f_trace</code>, <code>f_trace_p</code>) is what you
+      differentiate inside your own <code>jit</code>; the jit tier is what simulators and planners call.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===================== 5 · what it unlocks ===================== -->
+<section class="slide" id="pitch-5">
+<div class="inner">
+  <p class="kicker">4 · what it unlocks</p>
+  <h2>What compile and autodiff unlock</h2>
+  <p class="lead">One traced <code>f</code>, six things a plain simulator cannot do. Each one is a demo or a
+  notebook in the repository.</p>
+  <div class="cards3">
+    <div class="card">
+      <h3>Learning on the model</h3>
+      <p>Gradient descent through the simulation: tune controller gains, identify physical parameters,
+      or train a neural-network controller block over batched closed-loop rollouts.
+      <code>jax.grad</code> of a cost built on <code>rk4_integrate_zoh_trace_p</code>.</p>
+      <p class="small"><code>demos/compile/neural_controller_jax.py</code> · <code>pid_autotuning_jax.py</code></p>
+    </div>
+    <div class="card">
+      <h3>Sampling and Monte Carlo</h3>
+      <p><code>vmap</code> compiles one rollout into thousands: batches of initial states, sampled
+      disturbances, a family of parameters. Robustness statistics and sampling-based control at the
+      cost of one call.</p>
+      <p class="small"><code>ev.rollout_batch(x0s, params=family)</code> · 1000 × 1000 steps in 27 ms</p>
+    </div>
+    <div class="card">
+      <h3>Trajectory optimization and MPC</h3>
+      <p>Exact Jacobians of the dynamics defects, jitted residuals, and a program re-solved at the
+      control rate with a warm start. The same planner runs offline and inside <code>mpc @ plant</code>.</p>
+      <p class="small"><code>TrajectoryOptimizationPlanner(problem, compile_backend="jax")</code></p>
+    </div>
+    <div class="card">
+      <h3>Reinforcement learning</h3>
+      <p>The Gymnasium environment's step is one jitted RK4 call on the compiled plant, so
+      training loops spend their time in the agent, not in the simulator. Float32 mode for GPU
+      workloads.</p>
+      <p class="small"><code>Sys2Gym(plant, cost)</code> · <code>MINILINK_JAX_X64=0</code></p>
+    </div>
+    <div class="card">
+      <h3>GPU and TPU</h3>
+      <p>JAX places the compiled evaluator on an accelerator; nothing in the model changes. Large
+      batches of rollouts, value-iteration sweeps and learning runs scale with the hardware.</p>
+      <p class="small">the <code>jax</code> DP backend · batched rollouts · learning loops</p>
+    </div>
+    <div class="card">
+      <h3>C code generation <span class="tag">experimental</span></h3>
+      <p>A traced control block becomes a C function (float32), compiled and checked against
+      Python to machine tolerance: the path from a diagram block to a microcontroller.</p>
+      <p class="small"><code>export_system_to_c(controller, "evaluate_controller")</code> · <code>examples/experimental/c_export/</code></p>
+    </div>
+  </div>
+  <p class="small">Get started:
+    <a href="https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb">showcase in Colab</a> ·
+    <a href="https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb">JAX showcase</a> ·
+    <a href="https://github.com/alx87grd/minilink">GitHub</a> ·
+    <a href="https://alx87grd.github.io/minilink/">documentation</a>.
+    Python 3.10+, MIT license; the core needs NumPy, SciPy and Matplotlib, JAX is optional.</p>
+</div>
+</section>
+
+</div>

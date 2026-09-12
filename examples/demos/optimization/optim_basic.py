@@ -1,7 +1,8 @@
+"""Minimize a quadratic with MathematicalProgram and Optimizer."""
+
 import numpy as np
 
-from minilink.optimization.mathematical_program import MathematicalProgram
-from minilink.optimization.optimizer import Optimizer
+from minilink import MathematicalProgram, Optimizer
 
 z_bar = np.array([1.0, -0.5, 2.0])
 
@@ -11,4 +12,4 @@ prog = MathematicalProgram(
     grad_J=lambda z: z - z_bar,
 )
 
-Optimizer(prog, z0=np.zeros(3), method="scipy_slsqp").solve(disp=True)
+Optimizer(prog, z0=np.zeros(3), method="scipy_slsqp").solve(verbose=True)

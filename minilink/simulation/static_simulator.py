@@ -52,28 +52,30 @@ class StaticSimulator:
         self.sys = sys
         self.sys.refresh()
 
-        default_dt = sys.solver_info.get("smallest_time_constant", 0.001) * 0.1
+        # Outputs are sampled, not integrated: no dt policy, so the automatic
+        # grid is the DEFAULT_N_STEPS reporting grid.
         self.t, self.dt, self.n_pts = build_time_grid(
             t0,
             tf,
             n_steps=n_steps,
             dt=dt,
-            default_dt=default_dt,
             verbose=verbose,
         )
-        self.compile_backend, self.evaluator = self._resolve_and_build_evaluator(
+        self.compile_backend, self.evaluator = self.resolve_and_build_evaluator(
             sys, compile_backend
         )
 
     def solve(self):
-        u_traj = self._nominal_u_traj()
-        return self._build_trajectory(u_traj)
+        u_traj = self.nominal_u_traj()
+        return self.build_trajectory(u_traj)
 
     def solve_forced(self, u, input_port_id=None):
         u_traj = coerce_forced_input(self.sys, self.t, u, input_port_id=input_port_id)
-        return self._build_trajectory(u_traj)
+        return self.build_trajectory(u_traj)
 
-    def _build_trajectory(self, u_traj):
+    # Internal machinery
+
+    def build_trajectory(self, u_traj):
         n_pts = self.n_pts
         m = self.sys.m
         x_traj = np.zeros((0, n_pts))
@@ -91,7 +93,7 @@ class StaticSimulator:
 
         return Trajectory(t=self.t, x=x_traj, u=u_traj, signals=signals)
 
-    def _nominal_u_traj(self):
+    def nominal_u_traj(self):
         m = self.sys.m
         u_traj = np.zeros((m, self.n_pts))
         if m > 0:
@@ -99,7 +101,7 @@ class StaticSimulator:
             u_traj[:, :] = np.asarray(u_bar).reshape(m, 1)
         return u_traj
 
-    def _resolve_and_build_evaluator(self, sys, compile_backend):
+    def resolve_and_build_evaluator(self, sys, compile_backend):
         return resolve_auto_backend(
             lambda backend: sys.compile(backend=backend), compile_backend
         )

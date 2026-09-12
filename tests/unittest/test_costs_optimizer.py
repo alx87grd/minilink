@@ -167,7 +167,7 @@ def test_scipy_minimize_disp_prints_report(capsys):
         method="scipy_slsqp",
         options={"disp": False, "maxiter": 50},
     )
-    out = opt.solve(disp=True)
+    out = opt.solve(verbose=True)
     captured = capsys.readouterr()
     assert "Optimization Program" in captured.out
     assert "method=" in captured.out

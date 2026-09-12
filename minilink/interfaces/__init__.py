@@ -8,7 +8,8 @@ Available modules:
 - ``gymnasium.py`` — :class:`~minilink.interfaces.gymnasium.Sys2Gym` exposes a
   system + cost as an RL environment (``reward = -g * dt``); trained policies
   come back as :class:`~minilink.interfaces.gymnasium.SB3Controller` feedback
-  blocks. Requires the optional ``gymnasium`` dependency (``pip install
+  blocks. The env step is one compiled RK4 call (jitted under JAX when the
+  plant traces). Requires the optional ``gymnasium`` dependency (``pip install
   minilink[rl]``); training itself stays external (e.g. stable-baselines3).
 
 Planned modules (see ROADMAP.md Later):

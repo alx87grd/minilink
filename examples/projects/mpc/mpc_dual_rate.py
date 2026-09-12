@@ -12,15 +12,13 @@ Run from repo root::
 
 import numpy as np
 
+from minilink import BicycleDynRate
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
 )
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRate,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -66,7 +64,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
+    planner, dt_mpc=MPC_DT, warm_start=True, verbose=STEP_DISP
 )
 computer = mpc.dual_rate_computer(dt_broadcast=DT_BROADCAST)
 hybrid = computer @ sys

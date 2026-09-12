@@ -11,6 +11,7 @@ orchestrator selects the best collision-free candidate.
 - :class:`SteeringExtender` makes one exact candidate via a `SteeringFunction`.
 """
 
+import itertools
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
@@ -36,16 +37,20 @@ class KinodynamicExtender(TrajectoryExtender):
 
     Parameters
     ----------
-    controls : sequence of array_like, or int
-        Either an explicit list of control inputs (motion primitives), or an int
-        ``n`` meaning "``n`` random samples of ``problem.U`` per extension".
+    controls : sequence of array_like, int, or ``"bang-bang"``
+        An explicit list of control inputs (motion primitives); an int ``n``
+        meaning "``n`` random samples of ``problem.U`` per extension"; or
+        ``"bang-bang"`` (default): the corners of the box ``problem.U`` plus
+        its centre, so every planner call works from the input bounds alone.
     horizon : float
         Edge duration; the control is held over ``n_substeps`` of ``dt = horizon / n_substeps``.
     n_substeps : int
         Integration steps per edge.
     """
 
-    def __init__(self, controls, *, horizon: float = 0.5, n_substeps: int = 5) -> None:
+    def __init__(
+        self, controls="bang-bang", *, horizon: float = 0.3, n_substeps: int = 6
+    ) -> None:
         self.controls = controls
         self.horizon = float(horizon)
         self.n_substeps = int(n_substeps)
@@ -63,6 +68,12 @@ class KinodynamicExtender(TrajectoryExtender):
     def _controls(self, problem, rng):
         if isinstance(self.controls, int):
             return [problem.U.sample(rng)[0] for _ in range(self.controls)]
+        if isinstance(self.controls, str):
+            if self.controls != "bang-bang":
+                raise ValueError(
+                    f"unknown controls preset {self.controls!r}; use 'bang-bang'"
+                )
+            return bang_bang_controls(problem.U)
         return list(self.controls)
 
     def _rollout(self, evaluator, from_state, u) -> Edge:
@@ -85,6 +96,36 @@ class KinodynamicExtender(TrajectoryExtender):
             self._evaluator = sys.compile(backend="numpy", verbose=False)
             self._sys = sys
         return self._evaluator
+
+
+def bang_bang_controls(U):
+    """Corners of the box input set *U* plus its centre (axis extremes above 3 inputs)."""
+    box = getattr(U, "box", None)
+    if box is None:
+        raise ValueError(
+            "the 'bang-bang' preset needs a box input set (input port bounds); "
+            "pass KinodynamicExtender(controls=[...]) for other input sets"
+        )
+    lower = np.asarray(box.lower, dtype=float)
+    upper = np.asarray(box.upper, dtype=float)
+    if not np.all(np.isfinite(lower)) or not np.all(np.isfinite(upper)):
+        raise ValueError("the 'bang-bang' preset needs finite input bounds")
+    centre = 0.5 * (lower + upper)
+    controls = [centre]
+    if lower.size <= 3:
+        for corner in itertools.product(*zip(lower, upper)):
+            controls.append(np.asarray(corner, dtype=float))
+    else:
+        for i in range(lower.size):
+            for value in (lower[i], upper[i]):
+                u = centre.copy()
+                u[i] = value
+                controls.append(u)
+    unique = []
+    for u in controls:
+        if not any(np.allclose(u, v) for v in unique):
+            unique.append(u)
+    return unique
 
 
 class SteeringExtender(TrajectoryExtender):

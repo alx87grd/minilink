@@ -642,9 +642,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
 
 
 pytest.importorskip("jax")
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRate,
-)
+from minilink import BicycleDynRate
 from minilink.simulation.computer import Computer
 
 
@@ -963,9 +961,7 @@ pytest.importorskip("jax")
 from minilink.blocks.routing import Demux
 from minilink.control.mpc.utilities import mpc_default_computer_x0, mpc_warm_start_guess
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRatePorts,
-)
+from minilink import BicycleDynRate
 from minilink.simulation.computer import Computer, StepSchedule
 
 
@@ -974,8 +970,8 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     u_target = 4.0
     mpc_horizon = 1.0
     mpc_steps = 8
-    sys_mpc = BicycleDynRatePorts()
-    sys_sim = BicycleDynRatePorts()
+    sys_mpc = BicycleDynRate(named_ports=True)
+    sys_sim = BicycleDynRate(named_ports=True)
     sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
     w_rear_max = 90.0
     delta_max = 0.55
@@ -1033,8 +1029,8 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     plant_diagram.add_subsystem(Demux(dims=(1, 1)), "split")
     plant_diagram.add_input_port("u", dim=2)
     plant_diagram.connect("input", "u", "split", "u")
-    plant_diagram.connect("split", "out0", "bike", "w_rear_dot")
-    plant_diagram.connect("split", "out1", "bike", "delta_dot")
+    plant_diagram.connect("split", "u[0]", "bike", "w_rear_dot")
+    plant_diagram.connect("split", "u[1]", "bike", "delta_dot")
     plant_diagram.connect_new_output_port("bike", "y", "y")
     hybrid = HybridDiagram(
         computer=Computer(step_diagram, StepSchedule(dt_base=mpc_dt)),
@@ -1106,8 +1102,8 @@ DELTA_DOT_MAX = 2.0
 
 def _configure_bicycle_systems():
     configure_jax(enable_x64=True)
-    sys_mpc = BicycleDynRatePorts()
-    sys_sim = BicycleDynRatePorts()
+    sys_mpc = BicycleDynRate(named_ports=True)
+    sys_sim = BicycleDynRate(named_ports=True)
     sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
     sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
     for sys in (sys_mpc, sys_sim):
@@ -1220,8 +1216,8 @@ def build_hybrid_warm_mpc(*, sys_mpc, sys_sim, planner):
     plant_diagram.add_subsystem(Demux(dims=(1, 1)), "split")
     plant_diagram.add_input_port("u", dim=2)
     plant_diagram.connect("input", "u", "split", "u")
-    plant_diagram.connect("split", "out0", "bike", "w_rear_dot")
-    plant_diagram.connect("split", "out1", "bike", "delta_dot")
+    plant_diagram.connect("split", "u[0]", "bike", "w_rear_dot")
+    plant_diagram.connect("split", "u[1]", "bike", "delta_dot")
     plant_diagram.connect_new_output_port("bike", "y", "y")
     hybrid = HybridDiagram(
         computer=Computer(step_diagram, StepSchedule(dt_base=MPC_DT)),

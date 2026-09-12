@@ -1,0 +1,45 @@
+# Nightly — every example script and every teaching notebook, with the full
+# optional stack. Not a merge gate (see tests/README.md); CI `test` /
+# `regression` remain the per-push gates. Run on demand with workflow_dispatch.
+name: Nightly demos
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  demos:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install system dependencies
+      run: sudo apt-get update && sudo apt-get install -y graphviz coinor-libipopt-dev pkg-config
+
+    - name: Install dependencies (full optional stack)
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,jax,visualization,plotting,rl,ipopt]"
+
+    - name: All example scripts under examples/demos
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        MPLBACKEND: Agg
+        SDL_VIDEODRIVER: dummy
+      run: |
+        python tests/demo_checks/run_all_demos.py --timeout 180 --continue-on-error
+
+    - name: Teaching notebooks
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        MPLBACKEND: Agg
+        SDL_VIDEODRIVER: dummy
+      run: |
+        python tests/demo_checks/run_notebook_checks.py

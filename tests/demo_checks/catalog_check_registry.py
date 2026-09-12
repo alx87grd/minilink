@@ -12,6 +12,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from minilink.blocks.transfer_function import TransferFunction
+from minilink.catalog import (
+    DoublePendulum,
+    DynamicBicycle,
+    DynamicBicycleCar3D,
+    PendulumWithNoisePort,
+    Plane3D,
+)
 from minilink.dynamics.catalog.aerial.drone import (
     ConstantSpeedHelicopterTunnel,
     Drone2D,
@@ -55,25 +62,16 @@ from minilink.dynamics.catalog.pendulum.pendulum import (
     Pendulum,
     TwoIndependentPendulums,
 )
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleAcc,
-    BicycleKin,
-    Holonomic,
-    HolonomicAccel,
-)
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalFrontWheelDriveCarWithTorqueInput,
     LongitudinalFrontWheelDriveCarWithWheelSlipInput,
 )
 from minilink.dynamics.catalog.vehicles.steering import (
-    ConstantSpeedKinematicCar,
-    DynamicHolonomicMobileRobot,
     HolonomicMobileRobot,
-    HolonomicMobileRobot3D,
     KinematicBicycle,
     KinematicCar,
-    UdeSRacecar,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
 
@@ -124,24 +122,9 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("UnderactuatedRotatingCartPole", UnderactuatedRotatingCartPole),
     CatalogCheckEntry("CartPole", CartPole),
     CatalogCheckEntry("KinematicBicycle", KinematicBicycle),
-    CatalogCheckEntry("BicycleKin", BicycleKin, requires_jax=True),
-    CatalogCheckEntry(
-        "BicycleAcc",
-        BicycleAcc,
-        requires_jax=True,
-    ),
     CatalogCheckEntry("KinematicCar", KinematicCar),
-    CatalogCheckEntry("ConstantSpeedKinematicCar", ConstantSpeedKinematicCar),
     CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),
-    CatalogCheckEntry("DynamicHolonomicMobileRobot", DynamicHolonomicMobileRobot),
-    CatalogCheckEntry("Holonomic", Holonomic, requires_jax=True),
-    CatalogCheckEntry(
-        "HolonomicAccel",
-        HolonomicAccel,
-        requires_jax=True,
-    ),
-    CatalogCheckEntry("HolonomicMobileRobot3D", HolonomicMobileRobot3D),
-    CatalogCheckEntry("UdeSRacecar", UdeSRacecar),
+    CatalogCheckEntry("BicycleDynRate", BicycleDynRate),
     CatalogCheckEntry(
         "LongitudinalFrontWheelDriveCarWithWheelSlipInput",
         LongitudinalFrontWheelDriveCarWithWheelSlipInput,
@@ -158,6 +141,11 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("ConstantSpeedHelicopterTunnel", ConstantSpeedHelicopterTunnel),
     CatalogCheckEntry("Rocket", Rocket),
     CatalogCheckEntry("Plane2D", Plane2D),
+    CatalogCheckEntry("Plane3D", Plane3D),
+    CatalogCheckEntry("DoublePendulum", DoublePendulum),
+    CatalogCheckEntry("PendulumWithNoisePort", PendulumWithNoisePort),
+    CatalogCheckEntry("DynamicBicycle", DynamicBicycle),
+    CatalogCheckEntry("DynamicBicycleCar3D", DynamicBicycleCar3D),
     CatalogCheckEntry("Boat2D", Boat2D),
     CatalogCheckEntry("Boat2DWithCurrent", Boat2DWithCurrent),
     CatalogCheckEntry(
