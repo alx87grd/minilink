@@ -11,7 +11,7 @@ Defaults: ``timeout=180``, ``requires=[]``. Overrides in
 default suite). Not smoked: ``projects/``, ``experimental/``, and long topic
 notebooks (UR5 symbolic EoM, DP grids, PPO training). Performance benchmarks
 live under ``benchmarks/`` (run via ``benchmarks/run_study.py`` or
-``benchmarks/benchmark.ipynb``).
+``benchmarks/ode_solver_benchmark.ipynb``).
 
 Usage (from repo root)::
 

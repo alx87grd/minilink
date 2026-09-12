@@ -1,6 +1,6 @@
 # Benchmarks
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/benchmarks/benchmark.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/benchmarks/ode_solver_benchmark.ipynb)
 
 Performance tracking and end-to-end numerical regression for minilink — not
 collected by default pytest (pytest only guards benchmark helper imports) and not
@@ -21,7 +21,7 @@ scene for fast RRT contract tests.
 
 | Path | Role |
 | --- | --- |
-| [`benchmark.ipynb`](benchmark.ipynb) | **Interactive notebook** — ODE solver × backend sweeps on local or Colab hardware |
+| [`ode_solver_benchmark.ipynb`](ode_solver_benchmark.ipynb) | **Interactive notebook** — ODE solver × backend sweeps on local or Colab hardware |
 | [`run_regression_check.py`](run_regression_check.py) | Single entry point for all committed baselines |
 | [`run_study.py`](run_study.py) | **Benchmark study** unified machine-exploration presets (replaces older `run_*_speed.py` / backend sweeps) |
 | [`studies/presets.py`](studies/presets.py) | Preset implementations invoked by `run_study.py` |

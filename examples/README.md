@@ -127,7 +127,7 @@ One demo folder per tutorial chapter; the research lane sits apart.
 | Reinforcement learning | [11_reinforcement_learning](tutorial/11_reinforcement_learning.ipynb), [showcase_from_rl_to_bode](tutorial/showcase_from_rl_to_bode.ipynb) | [`demos/rl/`](demos/rl/) | [drone_ppo_learn_to_fly](teaching/reinforcement_learning/drone_ppo_learn_to_fly.ipynb); [VI vs LQR vs PPO](teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb); research prototypes in [`experimental/rl/`](experimental/rl/) |
 | Graphical | [10_graphical](tutorial/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`) | |
 | Research lane | — | [`experimental/`](experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5) | not swept; `c_export` runs in the JAX regression job; C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` |
-| Solver benchmarks | — | [`benchmarks/`](../benchmarks/) | Performance tracking and backend sweeps live in repo-root [`benchmarks/`](../benchmarks/) (run locally or in Colab via [`benchmarks/benchmark.ipynb`](../benchmarks/benchmark.ipynb)) |
+| Solver benchmarks | — | [`benchmarks/`](../benchmarks/) | Performance tracking and backend sweeps live in repo-root [`benchmarks/`](../benchmarks/) (run locally or in Colab via [`benchmarks/ode_solver_benchmark.ipynb`](../benchmarks/ode_solver_benchmark.ipynb)) |
 
 Run demos from the repo root, e.g.
 `PYTHONPATH=. python examples/demos/core/readme_examples.py`.
