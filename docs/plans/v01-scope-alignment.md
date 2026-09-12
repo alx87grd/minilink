@@ -93,9 +93,6 @@ examples/
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
   projects/<name>/             # Multi-file applications (pathtracking, flight sim, active suspension)
   experimental/<topic>/        # Single-file WIP prototypes, engine checks, scratch
-
-  # --- Developer Tooling ---
-  tooling/                     # Dev benches & profilers
 ```
 
 ### Recommendation on `projects/` and `experimental/` vs `demos/`

@@ -1,17 +1,17 @@
 """Execute teaching notebooks via nbclient (demo-check layer).
 
-Auto-discovers ``.ipynb`` under mature tutorial/teaching/tooling trees:
+Auto-discovers ``.ipynb`` under mature tutorial/teaching trees:
 
 * ``examples/tutorial/``
 * ``examples/teaching/``
-* ``examples/tooling/notebooks/``
 
 Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
 Defaults: ``timeout=180``, ``requires=[]``. Overrides in
 ``notebook_overrides.json`` (``smoke: false`` drops a notebook from the
-default suite). Not smoked: ``projects/``, ``experimental/``, long topic
-notebooks (UR5 symbolic EoM, DP grids, PPO training), and the tooling
-benchmark notebook (solver matrix; run locally via ``benchmarks/run_study.py``).
+default suite). Not smoked: ``projects/``, ``experimental/``, and long topic
+notebooks (UR5 symbolic EoM, DP grids, PPO training). Performance benchmarks
+live under ``benchmarks/`` (run via ``benchmarks/run_study.py`` or
+``benchmarks/benchmark.ipynb``).
 
 Usage (from repo root)::
 
@@ -34,7 +34,6 @@ OVERRIDES_PATH = _CHECKS_DIR / "notebook_overrides.json"
 NOTEBOOK_ROOTS = (
     REPO_ROOT / "examples" / "tutorial",
     REPO_ROOT / "examples" / "teaching",
-    REPO_ROOT / "examples" / "tooling" / "notebooks",
 )
 DEFAULT_TIMEOUT = 180.0
 
@@ -55,8 +54,6 @@ def _notebook_id(rel_path: str) -> str:
         return f"tutorial_{stem}"
     if "/teaching/" in rel_path:
         return f"teaching_{stem}"
-    if "/tooling/notebooks/" in rel_path:
-        return f"tooling_{stem}"
     return "_".join(Path(rel_path).with_suffix("").parts[-2:])
 
 

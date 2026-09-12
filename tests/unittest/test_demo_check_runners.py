@@ -29,7 +29,6 @@ _DEMO_ROOTS = (
     REPO_ROOT / "examples" / "tutorial",
     REPO_ROOT / "examples" / "teaching",
     REPO_ROOT / "examples" / "demos",
-    REPO_ROOT / "examples" / "tooling",
 )
 
 
@@ -60,7 +59,7 @@ class TestDemoCheckRunners(unittest.TestCase):
                     hits.append(path.relative_to(REPO_ROOT).as_posix())
         if hits:
             self.fail(
-                "examples/tutorial, examples/teaching, examples/demos, and examples/tooling must not "
+                "examples/tutorial, examples/teaching, and examples/demos must not "
                 "contain smoke/CI harness hooks (adapt in tests/demo_checks "
                 "instead):\n  " + "\n  ".join(hits)
             )

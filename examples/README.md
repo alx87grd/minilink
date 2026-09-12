@@ -23,9 +23,6 @@ examples/
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
   projects/<name>/             # Multi-file applications (pathtracking, car_trajopt, mpc)
   experimental/<topic>/        # Bleeding-edge single-file prototypes, engine checks, scratch
-
-  # --- Developer Tooling ---
-  tooling/                     # Dev benches & profilers
 ```
 
 | Folder | Lane | When to use |
@@ -35,7 +32,6 @@ examples/
 | [`demos/<chapter>/`](demos/) | teaching, nightly sweep | Canonical single-file demo (incl. pedagogical compares) |
 | [`projects/<name>/`](projects/) | research | Multi-file experiment — outside release contract, repo-only |
 | [`experimental/<topic>/`](experimental/) | research | Non-core single files, scenario sprawl, WIP; `scratch/` for personal checks |
-| [`tooling/`](tooling/) | dev | Dev matrices / benches |
 
 **Promotion:** `experimental/scratch/` → `experimental/<topic>/` → `demos/<chapter>/`
 (single-file) **or** `projects/<name>/` (multi-file) → optional `teaching/`
@@ -59,7 +55,6 @@ folders on GitHub, then open a notebook badge.
 | --- |
 | [`tutorial/`](https://github.com/alx87grd/minilink/tree/main/examples/tutorial) |
 | [`teaching/`](https://github.com/alx87grd/minilink/tree/main/examples/teaching) |
-| [`tooling/notebooks/`](https://github.com/alx87grd/minilink/tree/main/examples/tooling/notebooks) |
 
 ### Tutorial — learn minilink
 
@@ -109,12 +104,6 @@ Universal, course-agnostic lessons organized by domain. Long notebooks (UR5 EoM,
 | --- | --- |
 | [articulated_robot_eom](teaching/robotics/articulated_robot_eom.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/robotics/articulated_robot_eom.ipynb) |
 
-### Tooling
-
-| Notebook | Colab |
-| --- | --- |
-| [benchmark](tooling/notebooks/benchmark.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tooling/notebooks/benchmark.ipynb) |
-
 **Colab tip:** open a badge → **File → Save a copy in Drive** → run from the top.
 The first code cell clones the repo and installs `meshcat` when needed. Locally,
 use the `minilink` conda env (see root [README](../README.md#install)).
@@ -138,16 +127,16 @@ One demo folder per tutorial chapter; the research lane sits apart.
 | Reinforcement learning | [11_reinforcement_learning](tutorial/11_reinforcement_learning.ipynb), [showcase_from_rl_to_bode](tutorial/showcase_from_rl_to_bode.ipynb) | [`demos/rl/`](demos/rl/) | [drone_ppo_learn_to_fly](teaching/reinforcement_learning/drone_ppo_learn_to_fly.ipynb); [VI vs LQR vs PPO](teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb); research prototypes in [`experimental/rl/`](experimental/rl/) |
 | Graphical | [10_graphical](tutorial/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`) | |
 | Research lane | — | [`experimental/`](experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5) | not swept; `c_export` runs in the JAX regression job; C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` |
-| Solver benchmarks | — | [benchmark](tooling/notebooks/benchmark.ipynb) | Uses repo-root `benchmarks/` |
+| Solver benchmarks | — | [`benchmarks/`](../benchmarks/) | Performance tracking and backend sweeps live in repo-root [`benchmarks/`](../benchmarks/) (run locally or in Colab via [`benchmarks/benchmark.ipynb`](../benchmarks/benchmark.ipynb)) |
 
 Run demos from the repo root, e.g.
 `PYTHONPATH=. python examples/demos/core/readme_examples.py`.
 
 ## CI smoke
 
-Notebook smoke covers `tutorial/`, `teaching/` (except long
-notebooks with `"smoke": false` — UR5 EoM, DP grids, PPO), and
-`tooling/notebooks/` (not `projects/` or `experimental/`). Locally:
+Notebook smoke covers `tutorial/` and `teaching/` (except long
+notebooks with `"smoke": false` — UR5 EoM, DP grids, PPO;
+not `projects/` or `experimental/`). Locally:
 
 ```bash
 MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
