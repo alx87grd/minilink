@@ -132,15 +132,15 @@ traj_jax = cl_jax.compute_trajectory(tf=10.0, dt=0.01)
 cl_jax.plot_trajectory(traj_jax)
 
 # --- Performance: realized cost J along each closed-loop trajectory ---
-J_sb3 = cost.evaluate_trajectory(cl_sb3.trajectory_of(plant, traj_sb3))
-J_jax = cost.evaluate_trajectory(cl_jax.trajectory_of(plant, traj_jax))
+J_sb3 = cl_sb3.compute_cost(cost, of=plant)
+J_jax = cl_jax.compute_cost(cost, of=plant)
 
 print("\nTraining budget:", training_timesteps, "steps")
 print(f"SB3 PPO : {sb3_time:6.1f} s  ({training_timesteps / sb3_time:6.0f} steps/s)")
 print(f"JAX PPO : {jax_time:6.1f} s  ({training_timesteps / jax_time:6.0f} steps/s)")
 print("Closed-loop cost J from x0 = [-1, -2, 1, 0, 0, 0]:")
-print("SB3 PPO :", round(float(J_sb3.signals["cost"][0, -1]), 1))
-print("JAX PPO :", round(float(J_jax.signals["cost"][0, -1]), 1))
+print("SB3 PPO :", round(J_sb3, 1))
+print("JAX PPO :", round(J_jax, 1))
 
 plt.show()
 cl_jax.animate(traj_jax)
