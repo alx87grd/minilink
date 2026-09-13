@@ -189,8 +189,7 @@ def _nested_and_flat_outer_loops():
     flat.connect("sys", "y", "ctl", "y")
     flat.connect("ctl", "u", "sys", "u")
 
-    x0 = np.array([0.0, 0.0, 1.0, 0.0])
-    nested.x0, flat.x0 = x0, x0
+    mass.x0 = np.array([1.0, 0.0])  # a diagram rebuilds its x0 from its blocks' x0
     return nested, flat
 
 
@@ -314,6 +313,7 @@ class TestWiringMixin(unittest.TestCase):
         )
         traj_nested = nested.compute_trajectory(tf=2.0, dt=0.01, verbose=False)
         traj_flat = flat.compute_trajectory(tf=2.0, dt=0.01, verbose=False)
+        self.assertGreater(np.abs(traj_flat.x).max(), 0.1)  # the loop actually moves
         np.testing.assert_allclose(traj_nested.x, traj_flat.x, atol=1e-10)
 
     def test_nested_closed_loop_matches_flat_diagram_jax(self):
