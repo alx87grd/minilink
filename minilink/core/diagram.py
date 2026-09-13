@@ -129,6 +129,43 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         return traj.with_signals(internal_signals)
 
+    def trajectory_of(self, subsystem, traj=None) -> Trajectory:
+        """
+        The trajectory of one block of this diagram, as that block saw it.
+
+        ``x`` is the block's own state and ``u`` the input it received from
+        the diagram (connected signals, boundary inputs, or nominal values), on
+        the time grid of the diagram trajectory. Anything written for the block
+        alone applies to it, such as the cost of the plant inside a closed loop:
+        ``cost.total_cost(closed_loop.trajectory_of(plant))``.
+
+        Parameters
+        ----------
+        subsystem : System
+            A block added to this diagram (for a block inside a nested diagram,
+            call ``trajectory_of`` once per level).
+        traj : Trajectory, optional
+            Trajectory of this diagram; defaults to the last one computed.
+
+        Returns
+        -------
+        Trajectory
+            ``t`` of ``traj``, ``x`` with shape ``(subsystem.n, N)`` and ``u``
+            with shape ``(subsystem.m, N)``.
+        """
+        traj = self.traj if traj is None else traj
+        if traj is None:
+            raise ValueError("no trajectory: pass traj or call compute_trajectory()")
+        sys_id = self.subsystem_id(subsystem)
+
+        x = np.zeros((subsystem.n, traj.n_samples))
+        u = np.zeros((subsystem.m, traj.n_samples))
+        for k, t in enumerate(traj.t):
+            x[:, k] = self.get_local_state(traj.x[:, k], sys_id)
+            u[:, k] = self.get_local_input(traj.x[:, k], traj.u[:, k], t, sys_id)
+
+        return Trajectory(t=traj.t, x=x, u=u)
+
 
 class StepDiagramSystem(WiredDiagramMixin, StepSystem):
     """

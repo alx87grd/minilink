@@ -436,8 +436,14 @@ flattens state; compiled `ExecutionPlan` is the main execution path (reference
 recursive path must stay equivalent).
 Wiring, port gather, params nesting, and `check_algebraic_loops` live on
 `WiredDiagramMixin` in `wiring.py`; `DiagramSystem` adds flow-only `f`,
-`compile`, and `reconstruct_internal_signals`. Public `DiagramSystem` API is
-unchanged (methods inherited from the mixin).
+`compile`, `reconstruct_internal_signals`, and `trajectory_of`. Public
+`DiagramSystem` API is unchanged (methods inherited from the mixin).
+`loop.trajectory_of(plant, traj=None)` returns one block's trajectory as that
+block saw it — its own state and the input it received — on the diagram
+trajectory's grid (default: the last one computed). A cost written for the
+plant alone scores the plant inside any loop:
+`cost.total_cost(loop.trajectory_of(plant))`. The input is recomputed from the
+stored states with the blocks' current `params`, the ones the simulation used.
 `connect()` validates port existence and dimensions at wiring time and is
 quiet by default (`connection_verbose=False`; set `True` for one line per connection).
 A diagram boundary output (`connect_new_output_port`, and every shortcut's `y`)

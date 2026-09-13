@@ -337,6 +337,29 @@ def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
     np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
 
 
+def test_simulator_backend_scores_a_controller_with_internal_state():
+    """The controller state is stacked first; the score reads the plant's own trajectory."""
+    from minilink import PID, SingleMass
+    from minilink.control import StateFeedbackController
+    from minilink.planning.distributions import Particles
+    from minilink.planning.evaluation import MonteCarloEvaluator
+
+    mass = SingleMass()
+    problem = StochasticPlanningProblem(
+        mass,
+        cost=quadratic(mass),
+        tf=np.inf,
+        x0_distribution=Particles([[0.5, 0.0]]),
+    )
+    evaluator = MonteCarloEvaluator(
+        problem, dt=0.01, n_trials=1, episode_length=2.0, backend="simulator"
+    )
+    J_pid = evaluator.evaluate(PID(Kp=4.0)).J  # a proportional law with filter states
+    evaluator.backend = "numpy"
+    J_static = evaluator.evaluate(StateFeedbackController(K=[[4.0, 0.0]])).J
+    np.testing.assert_allclose(J_pid, J_static, rtol=0.05)
+
+
 @pytest.mark.optional
 @pytest.mark.jax
 def test_randomized_parameters_reach_the_dynamics_on_both_backends():

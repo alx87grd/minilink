@@ -5,7 +5,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import CostFunction, Rocket, Trajectory
+from minilink import CostFunction, Rocket
 from minilink.experimental.ppo_jax import PPO
 
 TRAINING_TIMESTEPS = 4_000_000  # lands from every test start by ~3.8M steps (~80 s)
@@ -105,9 +105,8 @@ cl_sys.name = "Rocket with PPO controller (JAX)"
 traj = cl_sys.compute_trajectory(tf=TF, dt=0.01)
 cl_sys.plot_trajectory(traj)
 
-# Realized cost J and the touchdown quality, inputs rebuilt from the policy
-u_sim, _ = ppo.predict(traj.x.T, deterministic=True)
-plant_traj = cost.evaluate_trajectory(Trajectory(t=traj.t, x=traj.x, u=u_sim.T))
+# Realized cost J and the touchdown quality, the rocket as it ran inside the loop
+plant_traj = cost.evaluate_trajectory(cl_sys.trajectory_of(plant, traj))
 final = traj.x[:, -1] - X_LANDED
 print("Total trajectory cost J =", round(float(plant_traj.signals["cost"][0, -1]), 1))
 print("Final position error:", round(float(np.hypot(final[0], final[1])), 2), "m")

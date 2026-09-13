@@ -327,6 +327,35 @@ class TestWiringMixin(unittest.TestCase):
             atol=1e-12,
         )
 
+    def test_trajectory_of_is_the_block_seen_from_its_ports(self):
+        """State slice and received input match the reconstructed internal signals."""
+        nested, flat = _nested_and_flat_outer_loops()
+        mass = flat.subsystems["sys"]
+        traj = flat.compute_trajectory(tf=1.0, dt=0.01, verbose=False)
+        signals = flat.reconstruct_internal_signals(traj).signals
+
+        mass_traj = flat.trajectory_of(mass)
+        np.testing.assert_array_equal(mass_traj.t, traj.t)
+        np.testing.assert_allclose(mass_traj.x, signals["sys:x"])
+        np.testing.assert_allclose(mass_traj.u, signals["ctl:u"])
+
+        # A block inside a nested loop: one call per level
+        inner = nested.subsystems["inner"]
+        inner_traj = nested.trajectory_of(
+            inner, nested.compute_trajectory(tf=1.0, dt=0.01, verbose=False)
+        )
+        mass_traj_nested = inner.trajectory_of(mass, inner_traj)
+        np.testing.assert_allclose(mass_traj_nested.x, mass_traj.x, atol=1e-10)
+        np.testing.assert_allclose(mass_traj_nested.u, mass_traj.u, atol=1e-8)
+
+    def test_trajectory_of_needs_a_trajectory_and_a_member_block(self):
+        diagram = _build_closed_loop()
+        with self.assertRaises(ValueError):
+            diagram.trajectory_of(diagram.subsystems["plant"])
+        diagram.compute_trajectory(tf=0.1, dt=0.05, verbose=False)
+        with self.assertRaises(ValueError):
+            diagram.trajectory_of(Integrator())
+
     def test_closed_loop_euler_trajectory_matches_compiled_f(self):
         """Reference ``diagram.f`` and compiled evaluator stay aligned over rollout."""
         diagram = _build_closed_loop()

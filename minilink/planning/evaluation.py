@@ -305,14 +305,19 @@ class MonteCarloEvaluator:
         x0s = np.asarray(problem.sample_x0(rng, n=self.n_trials), dtype=float)
         trajectories = [] if self.record else None
         x0_saved = np.asarray(sys.x0, dtype=float).copy()
+        action_port = env_action_port(sys)
         try:
             for i, x0 in enumerate(x0s):
                 sys.x0 = np.asarray(x0, dtype=float)
                 cl_sys = controller @ sys
-                traj = cl_sys.compute_trajectory(tf=self.tf, dt=self.dt, verbose=False)
-                traj = cl_sys.reconstruct_internal_signals(traj)
-                u = traj.signals[next(k for k in traj.signals if k.endswith(":u"))]
-                traj = Trajectory(t=traj.t, x=traj.x, u=u)
+                cl_traj = cl_sys.compute_trajectory(
+                    tf=self.tf, dt=self.dt, verbose=False
+                )
+
+                # The plant as it ran in the loop; the cost reads its action port
+                plant_traj = cl_sys.trajectory_of(sys, cl_traj)
+                u = sys.get_port_values_from_u(plant_traj.u, action_port)
+                traj = Trajectory(t=plant_traj.t, x=plant_traj.x, u=u)
                 J[i], failed[i] = score_trajectory(problem, traj)
                 if trajectories is not None:
                     trajectories.append(traj)

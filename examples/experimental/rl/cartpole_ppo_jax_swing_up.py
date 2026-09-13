@@ -5,7 +5,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import CartPole, CostFunction, Trajectory
+from minilink import CartPole, CostFunction
 from minilink.core.backends import array_module
 from minilink.experimental.ppo_jax import PPO
 
@@ -97,9 +97,8 @@ cl_sys.name = "Cart-pole with PPO controller (JAX)"
 traj = cl_sys.compute_trajectory(tf=TF, dt=0.01)
 cl_sys.plot_trajectory(traj)
 
-# Realized cost J along the closed-loop flight, inputs rebuilt from the policy
-u_sim, _ = ppo.predict(traj.x.T, deterministic=True)
-plant_traj = cost.evaluate_trajectory(Trajectory(t=traj.t, x=traj.x, u=u_sim.T))
+# Realized cost J of the cart-pole as it ran inside the loop
+plant_traj = cost.evaluate_trajectory(cl_sys.trajectory_of(plant, traj))
 angle_error = np.abs(np.mod(traj.x[1], 2 * np.pi) - np.pi)
 print("Total trajectory cost J =", round(float(plant_traj.signals["cost"][0, -1]), 1))
 print(

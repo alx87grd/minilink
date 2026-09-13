@@ -5,7 +5,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import CostFunction, Drone2D, Trajectory
+from minilink import CostFunction, Drone2D
 from minilink.experimental.ppo_jax import PPO as JaxPPO
 from minilink.interfaces.gymnasium import SB3Controller, Sys2Gym
 
@@ -132,11 +132,8 @@ traj_jax = cl_jax.compute_trajectory(tf=10.0, dt=0.01)
 cl_jax.plot_trajectory(traj_jax)
 
 # --- Performance: realized cost J along each closed-loop trajectory ---
-u_sb3, _ = nn.predict(traj_sb3.x.T.astype(np.float32), deterministic=True)
-J_sb3 = cost.evaluate_trajectory(Trajectory(t=traj_sb3.t, x=traj_sb3.x, u=u_sb3.T))
-
-u_jax, _ = ppo.predict(traj_jax.x.T, deterministic=True)
-J_jax = cost.evaluate_trajectory(Trajectory(t=traj_jax.t, x=traj_jax.x, u=u_jax.T))
+J_sb3 = cost.evaluate_trajectory(cl_sb3.trajectory_of(plant, traj_sb3))
+J_jax = cost.evaluate_trajectory(cl_jax.trajectory_of(plant, traj_jax))
 
 print("\nTraining budget:", training_timesteps, "steps")
 print(f"SB3 PPO : {sb3_time:6.1f} s  ({training_timesteps / sb3_time:6.0f} steps/s)")
