@@ -17,10 +17,10 @@
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
-      cart-pole swing-up by trajectory optimization
+      trajectory optimization
     </td>
     <td width="50%" align="center" valign="top">
-      UR5, task-space impedance control
+      task-space impedance control
     </td>
   </tr>
 </table>
