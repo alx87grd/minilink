@@ -9,10 +9,10 @@
 <table>
   <tr>
     <td width="50%" align="center" valign="bottom">
-      <img src="docs/_static/cartpole_swingup.gif" alt="cart-pole swing-up by trajectory optimization" width="100%"/>
+      <img src="docs/_static/cartpole_swingup.gif" alt="trajectory optimization" width="100%"/>
     </td>
     <td width="50%" align="center" valign="bottom">
-      <img src="docs/_static/ur5_meshcat.gif" alt="UR5 under task-space impedance control" width="100%"/>
+      <img src="docs/_static/ur5_meshcat.gif" alt="task-space impedance control" width="100%"/>
     </td>
   </tr>
   <tr>
