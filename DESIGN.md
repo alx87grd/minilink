@@ -440,6 +440,11 @@ Wiring, port gather, params nesting, and `check_algebraic_loops` live on
 unchanged (methods inherited from the mixin).
 `connect()` validates port existence and dimensions at wiring time and is
 quiet by default (`connection_verbose=False`; set `True` for one line per connection).
+A diagram boundary output (`connect_new_output_port`, and every shortcut's `y`)
+derives its direct feedthrough from the current wiring — the boundary inputs its
+source reaches through `dependencies` edges — unless declared explicitly. A closed
+loop nested with `add_subsystem` therefore declares what the same leaf would, and
+closing an outer loop around it is not a false algebraic loop.
 
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
 (with ``closed_loop(..., feedback="auto"|"y"|"qdq")`` and ``closed_loop_qdq``),

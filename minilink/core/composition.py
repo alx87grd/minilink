@@ -730,24 +730,16 @@ def _connect_new_output_port_like(
     output_port_id: str,
     output_port,
 ) -> None:
-    def compute(x, u, t, params=None):
-        return diagram.compute_subsys_output_port(
-            x, u, t, source_sys_id, source_port_id, params=params
-        )
-
-    diagram.add_output_port(
+    diagram.connect_new_output_port(
+        source_sys_id,
+        source_port_id,
         output_port_id,
-        dim=output_port.dim,
-        function=compute,
-        dependencies="all",
         nominal_value=output_port.nominal_value,
         labels=output_port.labels,
         units=output_port.units,
         lower_bound=output_port.lower_bound,
         upper_bound=output_port.upper_bound,
     )
-
-    diagram.connect(source_sys_id, source_port_id, "output", output_port_id)
 
 
 def _output_port_id(diagram, output_id: str, collision: str) -> str:

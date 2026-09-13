@@ -13,7 +13,8 @@ class DiscretizedDynamicSystem(StepSystem):
     def __init__(self, source: DynamicSystem, params: dict, *, integrator: str):
         y_deps = ()
         if "y" in source.outputs:
-            y_deps = tuple(source.outputs["y"].dependencies)
+            y_deps = source.outputs["y"].dependencies
+            y_deps = y_deps if y_deps == "all" else tuple(y_deps)
         super().__init__(
             n=source.n,
             input_dim=source.m if source.m else None,

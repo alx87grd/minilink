@@ -155,6 +155,45 @@ def _build_closed_loop():
     return diagram
 
 
+def _nested_and_flat_outer_loops():
+    """A PID loop nested under an outer gain law, and the same blocks wired flat."""
+    from minilink.blocks.routing import Gain
+    from minilink.control.siso import PID
+    from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
+
+    pid = PID(Kp=5.0, Ki=2.0, Kd=1.0, ports="reference")
+    mass = SingleMass()
+    outer = Gain([-0.5])
+
+    inner = DiagramSystem()
+    inner.add_subsystem(pid, "ctl")
+    inner.add_subsystem(mass, "sys")
+    inner.add_input_port("r")
+    inner.connect("input", "r", "ctl", "r")
+    inner.connect("sys", "y", "ctl", "y")
+    inner.connect("ctl", "u", "sys", "u")
+    inner.connect_new_output_port("sys", "y", "y")
+
+    nested = DiagramSystem()
+    nested.add_subsystem(outer, "outer")
+    nested.add_subsystem(inner, "inner")
+    nested.connect("inner", "y", "outer", "u")
+    nested.connect("outer", "y", "inner", "r")
+
+    flat = DiagramSystem()
+    flat.add_subsystem(outer, "outer")
+    flat.add_subsystem(pid, "ctl")
+    flat.add_subsystem(mass, "sys")
+    flat.connect("sys", "y", "outer", "u")
+    flat.connect("outer", "y", "ctl", "r")
+    flat.connect("sys", "y", "ctl", "y")
+    flat.connect("ctl", "u", "sys", "u")
+
+    x0 = np.array([0.0, 0.0, 1.0, 0.0])
+    nested.x0, flat.x0 = x0, x0
+    return nested, flat
+
+
 def _build_feedthrough_loop():
 
     class FeedthroughSystem(System):
@@ -245,6 +284,48 @@ class TestWiringMixin(unittest.TestCase):
         diagram = _build_closed_loop()
         with self.assertRaises(ValueError):
             diagram.params = {"typo": {"Kp": 1.0}}
+
+    def test_boundary_output_feedthrough_is_derived_from_wiring(self):
+        diagram = _build_closed_loop()
+        diagram.connect_new_output_port("plant", "y", "y_meas")
+        diagram.connect_new_output_port("ctl", "u", "u_meas")
+        diagram.connect_new_output_port("ctl", "u", "u_all", dependencies="all")
+        self.assertEqual(diagram.outputs["y_meas"].dependencies, ())
+        self.assertEqual(diagram.outputs["u_meas"].dependencies, ("r",))
+        self.assertEqual(diagram.outputs["u_all"].dependencies, "all")
+
+    def test_boundary_output_feedthrough_tracks_later_wiring(self):
+        diagram = DiagramSystem()
+        diagram.add_subsystem(ProportionalController(2.5), "ctl")
+        diagram.add_input_port("r")
+        diagram.connect_new_output_port("ctl", "u", "u")
+        self.assertEqual(diagram.outputs["u"].dependencies, ())
+        diagram.connect("input", "r", "ctl", "r")
+        self.assertEqual(diagram.outputs["u"].dependencies, ("r",))
+
+    def test_nested_closed_loop_matches_flat_diagram(self):
+        """A closed loop nested in an outer loop is the same system as the flat wiring."""
+        nested, flat = _nested_and_flat_outer_loops()
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        np.testing.assert_allclose(nested.f(x, u, 0.0), flat.f(x, u, 0.0))
+        np.testing.assert_allclose(
+            nested.compile().f(x, u, 0.0), flat.compile().f(x, u, 0.0)
+        )
+        traj_nested = nested.compute_trajectory(tf=2.0, dt=0.01, verbose=False)
+        traj_flat = flat.compute_trajectory(tf=2.0, dt=0.01, verbose=False)
+        np.testing.assert_allclose(traj_nested.x, traj_flat.x, atol=1e-10)
+
+    def test_nested_closed_loop_matches_flat_diagram_jax(self):
+        pytest.importorskip("jax")
+        nested, flat = _nested_and_flat_outer_loops()
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        np.testing.assert_allclose(
+            nested.compile(backend="jax").f(x, u, 0.0),
+            flat.compile(backend="jax").f(x, u, 0.0),
+            atol=1e-12,
+        )
 
     def test_closed_loop_euler_trajectory_matches_compiled_f(self):
         """Reference ``diagram.f`` and compiled evaluator stay aligned over rollout."""

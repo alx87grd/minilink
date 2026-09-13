@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.signals import VectorSignal
+from minilink.core.signals import OutputPort, VectorSignal
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -129,6 +129,78 @@ def check_algebraic_loops(
             visit_port(sys_id, port_id)
 
     return order
+
+
+def feedthrough_inputs(diagram, sys_id, port_id) -> tuple[str, ...]:
+    """
+    Diagram boundary inputs that reach one subsystem output by direct feedthrough.
+
+    Walks the ``dependencies`` edges back from ``sys_id:port_id``; a state
+    breaks the path, a boundary input ends it. The result is what a leaf would
+    declare for the same port, in diagram input order. An algebraic loop inside
+    the diagram ends the walk here and is reported by :func:`check_algebraic_loops`.
+    """
+    reached = set()
+    visited = set()
+    stack = [(sys_id, port_id)]
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+
+        source_sys_id, source_port_id = node
+        subsystem = diagram.subsystems[source_sys_id]
+        deps = subsystem.outputs[source_port_id].dependencies
+        for in_port_id in subsystem.inputs if deps == "all" else deps:
+            source = diagram.connections[source_sys_id].get(in_port_id)
+            if source is None:
+                continue
+            if source[0] == "input":
+                reached.add(source[1])
+            else:
+                stack.append(source)
+
+    return tuple(input_id for input_id in diagram.inputs if input_id in reached)
+
+
+class DiagramOutputPort(OutputPort):
+    """
+    A diagram boundary output: one subsystem output port exposed on the diagram.
+
+    Its direct feedthrough is derived from the current wiring
+    (:func:`feedthrough_inputs`) unless declared explicitly, so a nested
+    diagram reports exactly the dependencies a leaf would, and wiring done
+    after the port was exposed is still accounted for.
+    """
+
+    def __init__(
+        self, diagram, source_sys_id, source_port_id, id, *, dependencies=None, **kw
+    ):
+        self.diagram = diagram
+        self.source = (source_sys_id, source_port_id)
+        self.declared_dependencies = None
+        OutputPort.__init__(
+            self, id, function=self.source_output, dependencies=dependencies, **kw
+        )
+
+    @property
+    def dependencies(self):
+        """Declared dependencies, else the boundary inputs the source feeds through from."""
+        if self.declared_dependencies is not None:
+            return self.declared_dependencies
+        return feedthrough_inputs(self.diagram, *self.source)
+
+    @dependencies.setter
+    def dependencies(self, value):
+        self.declared_dependencies = value
+
+    def source_output(self, x, u, t=0, params=None):
+        """The exposed subsystem port, evaluated through the diagram."""
+        source_sys_id, source_port_id = self.source
+        return self.diagram.compute_subsys_output_port(
+            x, u, t, source_sys_id, source_port_id, params=params
+        )
 
 
 class WiredDiagramMixin:
@@ -262,21 +334,32 @@ class WiredDiagramMixin:
             )
 
     def connect_new_output_port(
-        self, source_sys_id, source_port_id, output_port_id, dependencies="all"
+        self,
+        source_sys_id,
+        source_port_id,
+        output_port_id,
+        dependencies=None,
+        **metadata,
     ):
-        """Expose a subsystem output port as a new diagram boundary output."""
+        """
+        Expose a subsystem output port as a new diagram boundary output.
+
+        ``dependencies=None`` derives the port's direct feedthrough from the
+        wiring (see :class:`DiagramOutputPort`); a sequence of input ids or
+        ``"all"`` declares it instead. ``metadata`` (``nominal_value``,
+        ``labels``, ``units``, bounds) is passed to the port.
+        """
         port = self.subsystems[source_sys_id].outputs[source_port_id]
-
-        def compute(x, u, t, params=None):
-            return self.compute_subsys_output_port(
-                x, u, t, source_sys_id, source_port_id, params=params
-            )
-
-        self.add_output_port(
+        if dependencies is not None:
+            self.validate_output_dependencies(output_port_id, dependencies)
+        self.outputs[output_port_id] = DiagramOutputPort(
+            self,
+            source_sys_id,
+            source_port_id,
             output_port_id,
             dim=port.dim,
-            function=compute,
             dependencies=dependencies,
+            **metadata,
         )
 
         self.connect(source_sys_id, source_port_id, "output", output_port_id)

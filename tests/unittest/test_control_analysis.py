@@ -870,6 +870,12 @@ class TestDiscretize(unittest.TestCase):
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
         self.assertEqual(step_leaf.integrator, "euler")
 
+    def test_discretize_keeps_full_feedthrough(self):
+        plant = _GainIntegrator()
+        plant.outputs["y"].dependencies = "all"
+        step_leaf = discretize(plant, 0.1)
+        self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
+
     def test_discretize_accepts_dt_in_params_only(self):
         step_leaf = discretize(_GainIntegrator(), params={"dt": 0.02})
         self.assertEqual(step_leaf.params["dt"], 0.02)
