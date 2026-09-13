@@ -98,8 +98,8 @@ traj = cl_sys.compute_trajectory(tf=TF, dt=0.01)
 cl_sys.plot_trajectory(traj)
 
 # Realized cost J of the cart-pole as it ran inside the loop
-angle_error = np.abs(np.mod(traj.x[1], 2 * np.pi) - np.pi)
 print("Total trajectory cost J =", round(cl_sys.compute_cost(cost, of=plant), 1))
+angle_error = np.abs(np.mod(traj.x[1], 2 * np.pi) - np.pi)
 print(
     "Angle error to upright, last 2 s:",
     round(float(angle_error[-200:].max()), 3),

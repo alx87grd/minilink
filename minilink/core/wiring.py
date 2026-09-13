@@ -175,13 +175,34 @@ class DiagramOutputPort(OutputPort):
     """
 
     def __init__(
-        self, diagram, source_sys_id, source_port_id, id, *, dependencies=None, **kw
+        self,
+        diagram,
+        source_sys_id,
+        source_port_id,
+        id,
+        *,
+        dim=None,
+        dependencies=None,
+        nominal_value=None,
+        labels=None,
+        units=None,
+        lower_bound=None,
+        upper_bound=None,
     ):
         self.diagram = diagram
         self.source = (source_sys_id, source_port_id)
         self.declared_dependencies = None
         OutputPort.__init__(
-            self, id, function=self.source_output, dependencies=dependencies, **kw
+            self,
+            id,
+            dim=dim,
+            function=self.source_output,
+            dependencies=dependencies,
+            nominal_value=nominal_value,
+            labels=labels,
+            units=units,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
         )
 
     @property
@@ -339,15 +360,20 @@ class WiredDiagramMixin:
         source_port_id,
         output_port_id,
         dependencies=None,
-        **metadata,
+        *,
+        nominal_value=None,
+        labels=None,
+        units=None,
+        lower_bound=None,
+        upper_bound=None,
     ):
         """
         Expose a subsystem output port as a new diagram boundary output.
 
         ``dependencies=None`` derives the port's direct feedthrough from the
         wiring (see :class:`DiagramOutputPort`); a sequence of input ids or
-        ``"all"`` declares it instead. ``metadata`` (``nominal_value``,
-        ``labels``, ``units``, bounds) is passed to the port.
+        ``"all"`` declares it instead. The remaining keywords are the port's
+        metadata, as in :meth:`add_output_port`.
         """
         port = self.subsystems[source_sys_id].outputs[source_port_id]
         if dependencies is not None:
@@ -359,7 +385,11 @@ class WiredDiagramMixin:
             output_port_id,
             dim=port.dim,
             dependencies=dependencies,
-            **metadata,
+            nominal_value=nominal_value,
+            labels=labels,
+            units=units,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
         )
 
         self.connect(source_sys_id, source_port_id, "output", output_port_id)

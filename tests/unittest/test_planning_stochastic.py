@@ -351,12 +351,17 @@ def test_simulator_backend_scores_a_controller_with_internal_state():
         tf=np.inf,
         x0_distribution=Particles([[0.5, 0.0]]),
     )
-    evaluator = MonteCarloEvaluator(
-        problem, dt=0.01, n_trials=1, episode_length=2.0, backend="simulator"
+    settings = dict(dt=0.01, n_trials=1, episode_length=2.0)
+    J_pid = (  # a proportional law with filter states
+        MonteCarloEvaluator(problem, backend="simulator", **settings)
+        .evaluate(PID(Kp=4.0))
+        .J
     )
-    J_pid = evaluator.evaluate(PID(Kp=4.0)).J  # a proportional law with filter states
-    evaluator.backend = "numpy"
-    J_static = evaluator.evaluate(StateFeedbackController(K=[[4.0, 0.0]])).J
+    J_static = (
+        MonteCarloEvaluator(problem, backend="numpy", **settings)
+        .evaluate(StateFeedbackController(K=[[4.0, 0.0]]))
+        .J
+    )
     np.testing.assert_allclose(J_pid, J_static, rtol=0.05)
 
 

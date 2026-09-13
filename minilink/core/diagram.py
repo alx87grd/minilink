@@ -135,9 +135,11 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         ``x`` is the block's own state and ``u`` the input it received from
         the diagram (connected signals, boundary inputs, or nominal values), on
-        the time grid of the diagram trajectory. Anything written for the block
-        alone applies to it, such as the cost of the plant inside a closed loop:
-        ``cost.total_cost(closed_loop.trajectory_of(plant))``.
+        the time grid of the diagram trajectory. The input is recomputed from
+        the stored states with the blocks' current ``params``, so change them
+        only after scoring the trajectory they produced. Anything written for
+        the block alone applies to it, such as the cost of the plant inside a
+        closed loop: ``cost.total_cost(closed_loop.trajectory_of(plant))``.
 
         Parameters
         ----------
