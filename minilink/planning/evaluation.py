@@ -25,9 +25,12 @@ rate. Three backends produce the samples:
   NumPy evaluator (static laws; identical numbers, no JAX needed);
 - ``"simulator"``: the continuous-time closed loop integrated by the
   :class:`~minilink.simulation.simulator.Simulator` (any controller, dynamic
-  ones included; no parameter or disturbance draws, and the law is applied
-  as the block computes it — a law that exceeds the input-port bounds is
-  not clipped, and the evaluator warns).
+  ones included; no parameter or disturbance draws).
+
+Every backend applies the law as the block computes it. Input-port bounds are
+information, not saturation: a law that must respect them saturates inside
+its own equations or through a :class:`~minilink.blocks.nonlinear.Saturation`
+block.
 
 Reinforcement learning trains on the left-Riemann discretization of the same
 running cost (``r_k = -g dt``); the trapezoidal score is the reporting rule
@@ -204,7 +207,7 @@ class MonteCarloEvaluator:
                 )
                 x_next = env.plant_step(x, u_full, t, theta)
                 t_next = t + dt
-                u_next = jnp.clip(law(x_next), env.u_lb, env.u_ub)
+                u_next = law(x_next)
                 g_next = jnp.exp(-rho * t_next) * env.running_cost(
                     x_next, u_next, t_next
                 )
@@ -249,8 +252,6 @@ class MonteCarloEvaluator:
             slices[port_id] = slice(i, i + port.dim)
             i += port.dim
         action_port = env_action_port(sys)
-        u_lb = np.asarray(sys.inputs[action_port].lower_bound, dtype=float)
-        u_ub = np.asarray(sys.inputs[action_port].upper_bound, dtype=float)
         randomizes = bool(getattr(problem, "params_distribution", None))
 
         J = np.zeros(self.n_trials)
@@ -268,7 +269,7 @@ class MonteCarloEvaluator:
             us = np.zeros((sys.inputs[action_port].dim, n_steps + 1))
             xs[:, 0] = x0
             for k in range(n_steps + 1):
-                us[:, k] = np.clip(law(xs[:, k]), u_lb, u_ub)
+                us[:, k] = law(xs[:, k])
                 if k == n_steps:
                     break
                 u_full = u_nominal.copy()
@@ -304,10 +305,6 @@ class MonteCarloEvaluator:
         x0s = np.asarray(problem.sample_x0(rng, n=self.n_trials), dtype=float)
         trajectories = [] if self.record else None
         x0_saved = np.asarray(sys.x0, dtype=float).copy()
-        action_port = env_action_port(sys)
-        u_lb = np.asarray(sys.inputs[action_port].lower_bound, dtype=float)
-        u_ub = np.asarray(sys.inputs[action_port].upper_bound, dtype=float)
-        saturation_warned = False
         try:
             for i, x0 in enumerate(x0s):
                 sys.x0 = np.asarray(x0, dtype=float)
@@ -315,15 +312,6 @@ class MonteCarloEvaluator:
                 traj = cl_sys.compute_trajectory(tf=self.tf, dt=self.dt, verbose=False)
                 traj = cl_sys.reconstruct_internal_signals(traj)
                 u = traj.signals[next(k for k in traj.signals if k.endswith(":u"))]
-                if not saturation_warned and (
-                    np.any(u < u_lb[:, None]) or np.any(u > u_ub[:, None])
-                ):
-                    warnings.warn(
-                        "the simulator backend applies the law unsaturated and it exceeds "
-                        "the input-port bounds; the jax and numpy backends clip to them",
-                        stacklevel=2,
-                    )
-                    saturation_warned = True
                 traj = Trajectory(t=traj.t, x=traj.x, u=u)
                 J[i], failed[i] = score_trajectory(problem, traj)
                 if trajectories is not None:

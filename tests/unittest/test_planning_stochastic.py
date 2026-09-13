@@ -303,6 +303,42 @@ def test_monte_carlo_backends_share_the_score_on_identical_starts():
 
 @pytest.mark.optional
 @pytest.mark.jax
+def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
+    """Port bounds are information: no backend clips a law that exceeds them."""
+    pytest.importorskip("jax")
+    from minilink.control import StateFeedbackController
+    from minilink.planning.distributions import Particles
+    from minilink.planning.evaluation import MonteCarloEvaluator
+
+    plant = pendulum()
+    plant.inputs["u"].lower_bound = np.array([-0.5])
+    plant.inputs["u"].upper_bound = np.array([0.5])
+    ctl = StateFeedbackController(K=[[30.0, 8.0]])  # |u| = 15 N m at the start
+
+    class Effort(CostFunction):
+        def g(self, x, u, t=0.0, params=None):
+            return u[0] ** 2
+
+        def h(self, x, t=0.0, params=None):
+            return 0.0
+
+    problem = StochasticPlanningProblem(
+        plant, cost=Effort(), tf=np.inf, x0_distribution=Particles([[0.5, 0.0]])
+    )
+    reports = {
+        backend: MonteCarloEvaluator(
+            problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
+        ).evaluate(ctl)
+        for backend in ("jax", "numpy", "simulator")
+    }
+    saturated_bound = 0.5**2 * 1.0
+    assert reports["numpy"].J[0] > 10 * saturated_bound
+    np.testing.assert_allclose(reports["jax"].J, reports["numpy"].J, rtol=1e-6)
+    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
 def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     pytest.importorskip("jax")
     from minilink.control import NeuralPolicyController

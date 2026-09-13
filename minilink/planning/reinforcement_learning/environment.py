@@ -109,14 +109,13 @@ class RolloutEnvironment:
         """
         Full plant input: the action on its port, fresh disturbance draws elsewhere.
 
-        Without a ``key`` the disturbance ports keep their nominal values.
+        The action is applied as given; the port bounds only scale the learned
+        law. Without a ``key`` the disturbance ports keep their nominal values.
         """
         jnp = require_jax_numpy()
 
         # The nominal input vector, with the action written into its port
-        u_full = self.u_nominal.at[self.port_slices[self.action_port]].set(
-            jnp.clip(u, self.u_lb, self.u_ub)
-        )
+        u_full = self.u_nominal.at[self.port_slices[self.action_port]].set(u)
         if key is None:
             return u_full
 

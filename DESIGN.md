@@ -846,8 +846,9 @@ compiled held-input rollout (static laws; parameter and disturbance draws
 applied); `backend="numpy"` produces the same samples one trial at a time on
 the NumPy evaluator (identical numbers, tested); `backend="simulator"` runs the
 continuous-time closed loop for any controller, dynamic ones included, without
-draws and without clipping the law (it warns when the law exceeds the port
-bounds). Same contract for LQR, DP, MPC and RL laws.
+draws. No backend clips the law: port bounds are information, and saturation
+lives inside the law or in a `Saturation` block. Same contract for LQR, DP, MPC
+and RL laws.
 
 **Reinforcement learning (`planning/reinforcement_learning/`):**
 `ReinforcementLearningPlanner(problem, dt=, hidden=, features=, algorithm=)`
