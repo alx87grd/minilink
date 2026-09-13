@@ -241,6 +241,53 @@ class SharedSystemFacades:
             show=show,
         )
 
+    def compute_cost(self, cost, *, of=None, traj=None):
+        """
+        Convenience shortcut returning the cost ``J`` of a trajectory, as a number.
+
+        ``J`` is the running cost integrated along the trajectory plus the
+        terminal cost at its end
+        (:meth:`~minilink.core.costs.CostFunction.total_cost`).
+
+        Parameters
+        ----------
+        cost : CostFunction
+            Cost written for the system that is scored.
+        of : System, optional
+            On a diagram, the block to score, as it ran inside the diagram
+            (:meth:`~minilink.core.diagram.DiagramSystem.trajectory_of`).
+            ``None`` scores this whole system in its own ``(x, u)``.
+        traj : Trajectory, optional
+            Trajectory of this system; defaults to the last one computed.
+
+        Returns
+        -------
+        float
+            The cost ``J``.
+        """
+        return cost.total_cost(_scored_trajectory(self, of, traj))
+
+    def plot_cost(self, cost, *, of=None, traj=None, backend="matplotlib", show=True):
+        """
+        Convenience shortcut plotting the running cost and the cumulative cost ``J(t)``.
+
+        The signals are ``cost_rate`` (the discounted running cost) and
+        ``cost`` (its integral from the start); :meth:`compute_cost` adds the
+        terminal cost to the final value. ``of`` and ``traj`` select the scored
+        trajectory as in :meth:`compute_cost`.
+
+        Returns
+        -------
+        PlotResult
+            The plot result from
+            :func:`minilink.graphical.signals.plot_time_signals`.
+        """
+        scored_system = self if of is None else of
+        scored = cost.evaluate_trajectory(_scored_trajectory(self, of, traj))
+        return scored_system.plot_trajectory(
+            scored, signals=("cost_rate", "cost"), backend=backend, show=show
+        )
+
     def plot_input_output_map(self, **kwargs):
         """
         Convenience shortcut plotting one output component over swept inputs.
@@ -1307,3 +1354,24 @@ class StepSystemFacades:
             backend=backend,
             show=show,
         )
+
+
+# Internal machinery
+
+
+def _scored_trajectory(system, of, traj):
+    """The trajectory a cost shortcut scores: the system's own, or one block's inside it."""
+    from minilink.core.diagram import DiagramSystem
+
+    traj = system.traj if traj is None else traj
+    if traj is None:
+        raise ValueError(
+            "no trajectory to score: call compute_trajectory() first, or pass traj"
+        )
+    if of is None:
+        return traj
+    if not isinstance(system, DiagramSystem):
+        raise ValueError(
+            f"of= names a block inside a diagram; {system.name!r} is not a diagram"
+        )
+    return system.trajectory_of(of, traj)

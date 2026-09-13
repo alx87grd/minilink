@@ -104,6 +104,51 @@ def test_total_cost_on_trajectory():
     assert s.total_cost(traj) == pytest.approx(2.0 * c.total_cost(traj))
 
 
+def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+    from minilink import Pendulum
+    from minilink.control import StateFeedbackController
+
+    plant = Pendulum()
+    plant.x0 = np.array([0.5, 0.0])
+    cost = QuadraticCost.from_system(plant, S=np.eye(2))
+
+    # Open loop: the plant's own trajectory
+    traj = plant.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
+    assert plant.compute_cost(cost) == pytest.approx(cost.total_cost(traj))
+
+    # Closed loop: the plant as it ran inside the loop, last or given trajectory
+    loop = StateFeedbackController(K=[[5.0, 1.0]]) @ plant
+    loop_traj = loop.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
+    J = cost.total_cost(loop.trajectory_of(plant, loop_traj))
+    assert loop.compute_cost(cost, of=plant) == pytest.approx(J)
+    assert loop.compute_cost(cost, of=plant, traj=loop_traj) == pytest.approx(J)
+
+    # of=None scores the loop in its own (x, u): here x = plant state, u = r
+    loop_cost = QuadraticCost.from_system(loop, S=np.eye(2))
+    assert loop.compute_cost(loop_cost) == pytest.approx(
+        loop_cost.total_cost(loop_traj)
+    )
+
+    result = loop.plot_cost(cost, of=plant, show=False)
+    assert result is not None
+    assert plant.plot_cost(cost, show=False) is not None
+
+
+def test_compute_cost_needs_a_trajectory_and_a_diagram_for_of():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant)
+    with pytest.raises(ValueError, match="compute_trajectory"):
+        plant.compute_cost(cost)
+    plant.compute_trajectory(tf=0.1, dt=0.05, verbose=False)
+    with pytest.raises(ValueError, match="not a diagram"):
+        plant.compute_cost(cost, of=plant)
+
+
 def test_jax_twin_cost_grad():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp

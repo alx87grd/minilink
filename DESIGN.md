@@ -444,6 +444,12 @@ trajectory's grid (default: the last one computed). A cost written for the
 plant alone scores the plant inside any loop:
 `cost.total_cost(loop.trajectory_of(plant))`. The input is recomputed from the
 stored states with the blocks' current `params`, the ones the simulation used.
+Every `System` has the two cost shortcuts over that path:
+`sys.compute_cost(cost, of=None, traj=None)` returns `J` as a number and
+`sys.plot_cost(...)` plots the running cost and `J(t)`; `of=None` scores the
+whole system in its own `(x, u)`, `of=block` one block of a diagram, and `traj`
+defaults to the last trajectory computed (a user shortcut; library code passes
+it).
 `connect()` validates port existence and dimensions at wiring time and is
 quiet by default (`connection_verbose=False`; set `True` for one line per connection).
 A diagram boundary output (`connect_new_output_port`, and every shortcut's `y`)
