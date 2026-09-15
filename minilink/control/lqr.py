@@ -226,8 +226,7 @@ def trajectory_lqr(
     S = np.empty((N, n, n))
     S[-1] = solve_continuous_are(A[-1], B[-1], Q, R) if S_f is None else S_f
     for k in range(N - 1, 0, -1):
-        E = riccati_transition(A[k - 1], B[k - 1], Q, R_inv, t[k] - t[k - 1])
-        S[k - 1] = riccati_map(E, S[k])
+        S[k - 1] = riccati_step(A[k - 1], B[k - 1], Q, R_inv, S[k], t[k] - t[k - 1])
 
     K = R_inv @ np.swapaxes(B, 1, 2) @ S
     return TrajectoryFeedbackController(trajectory, K)
@@ -236,20 +235,34 @@ def trajectory_lqr(
 # Riccati differential equation, one exact step at a time
 
 
-def riccati_transition(A, B, Q, R_inv, dt):
-    """Transition ``E = expm(-H dt)`` of the Hamiltonian system over one interval.
-
-    With the co-state ``λ = S x``, the pair ``z = [x; λ]`` follows the linear
-    system ``ż = H z`` with ``H = [[A, -B R⁻¹ Bᵀ], [-Q, -Aᵀ]]``; ``E`` carries it
-    one step backward in time.
-    """
+def hamiltonian_matrix(A, B, Q, R_inv):
+    """``H = [[A, -B R⁻¹ Bᵀ], [-Q, -Aᵀ]]``: with the co-state ``λ = S x``, ``z = [x; λ]`` follows ``ż = H z``."""
     # fmt: off
-    H = np.block([
+    return np.block([
         [A, -B @ R_inv @ B.T],
         [-Q, -A.T],
     ])
     # fmt: on
-    return expm(-H * dt)
+
+
+def riccati_transition(A, B, Q, R_inv, dt):
+    """Transition ``E = expm(-H dt)`` of the Hamiltonian system, one step backward in time."""
+    return expm(-hamiltonian_matrix(A, B, Q, R_inv) * dt)
+
+
+def riccati_step(A, B, Q, R_inv, S, dt):
+    """``S(t) → S(t - dt)`` with the dynamics frozen over the interval, exactly.
+
+    The interval is cut into substeps with ``‖H‖ dt ≤ 1`` each, so that the
+    transition stays well conditioned however stiff the dynamics or long the
+    interval; the map is exact on every substep and preserves ``S ⪰ 0``.
+    """
+    H = hamiltonian_matrix(A, B, Q, R_inv)
+    n_sub = max(1, int(np.ceil(np.linalg.norm(H, 2) * dt)))
+    E = expm(-H * dt / n_sub)
+    for _ in range(n_sub):
+        S = riccati_map(E, S)
+    return S
 
 
 def riccati_map(E, S):

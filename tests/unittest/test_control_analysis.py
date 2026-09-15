@@ -294,6 +294,30 @@ class TestTrajectoryLQR(unittest.TestCase):
         traj = loop.compute_trajectory(tf=8.0, n_steps=801, verbose=False)
         np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], atol=0.02)
 
+    def test_stiff_weights_on_a_coarse_reference_stay_exact(self):
+        # heavy state weight and a 0.4 s knot spacing: explicit Euler blows up here
+        from scipy.integrate import solve_ivp
+        from scipy.linalg import solve_continuous_are
+
+        reference = self.sinusoid(tf=8.0, n=21)
+        Q = 1e3 * self.Q
+        A, B, R_inv = self.A, self.B, np.linalg.inv(self.R)
+        K = trajectory_lqr(DoubleIntegrator(), reference, Q, self.R).params["K"]
+
+        def riccati_rhs(tau, s):
+            S = s.reshape(2, 2)
+            return (S @ A + A.T @ S - S @ B @ R_inv @ B.T @ S + Q).ravel()
+
+        # the same equation integrated adaptively, from the final sample back to t = 0
+        t = reference.t
+        S = solve_continuous_are(A, B, Q, self.R)
+        for k in range(len(t) - 1, 0, -1):
+            solution = solve_ivp(
+                riccati_rhs, (0.0, t[k] - t[k - 1]), S.ravel(), rtol=1e-10, atol=1e-12
+            )
+            S = solution.y[:, -1].reshape(2, 2)
+        np.testing.assert_allclose(K[0], R_inv @ B.T @ S, rtol=1e-6)
+
     def test_block_interpolates_and_holds_the_end_point(self):
         reference = self.sinusoid(tf=1.0, n=3)  # samples at t = 0, 0.5, 1
         K = np.zeros((3, 1, 2))
