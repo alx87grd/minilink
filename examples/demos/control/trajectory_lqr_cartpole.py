@@ -54,3 +54,5 @@ loop.animate()
 replay = TrajectorySource(reference.t, reference.u) >> plant
 replay.compute_trajectory(tf=2 * TF)
 replay.plot_trajectory()
+
+replay.animate()
