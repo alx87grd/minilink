@@ -131,7 +131,7 @@ After the term, in the order the cohort's questions suggest:
 ## 6. v0.2 pulls
 
 - [ ] Pyro parity open rows — [pyro-port-remaining.md](pyro-port-remaining.md).
-- [ ] GMC714 modelling ladder: manipulators + the four-rung vehicle ladder as a `02_dynamics` lesson; robotic PID wrappers; trajectory LQR.
+- [ ] GMC714 modelling ladder: manipulators + the four-rung vehicle ladder as a `02_dynamics` lesson; robotic PID wrappers; trajectory LQR landed 2026-09-15 (`trajectory_lqr` / `TrajectoryFeedbackController`, `demos/control/trajectory_lqr_cartpole.py`, section 6 of `teaching/optimal_control/cartpole_lqr.ipynb`).
 - [ ] **GRO501 objective** ([ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end)) — steps P1–P11 in [gro501-classical-control.md](gro501-classical-control.md). Wave 1 first, it is the correctness wave:
   - [x] **P1** `PI` and `PD` classes carrying only the states their terms need (`ProportionalController` already covered P); `PID` unchanged so its gains stay tunable from zero. Landed 2026-09-07.
   - [x] **F1** `frequency_range` widens until it brackets `|G| = 1` — `margins()` reported `inf` for every PI/I loop and every high-static-gain loop. Landed 2026-09-07.

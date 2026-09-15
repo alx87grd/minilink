@@ -12,7 +12,9 @@ from minilink.control.lqr import (
     lqr_finite_horizon,
     lqr_gain,
     lqr_gain_schedule,
+    trajectory_lqr,
 )
+from minilink.core.trajectory import Trajectory
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
@@ -255,8 +257,59 @@ from minilink.control.siso import PD, PI, PID
 from minilink.control.state import (
     StateFeedbackController,
     TimeVaryingStateFeedbackController,
+    TrajectoryFeedbackController,
 )
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
+
+
+class TestTrajectoryLQR(unittest.TestCase):
+    A = np.array([[0.0, 1.0], [0.0, 0.0]])
+    B = np.array([[0.0], [1.0]])
+    Q = np.diag([10.0, 1.0])
+    R = np.array([[1.0]])
+
+    @staticmethod
+    def sinusoid(tf=8.0, n=161):
+        # x_d = [sin t, cos t] is a trajectory of the double integrator under u_d = -sin t
+        t = np.linspace(0.0, tf, n)
+        x_d = np.vstack([np.sin(t), np.cos(t)])
+        u_d = -np.sin(t).reshape(1, -1)
+        return Trajectory(t=t, x=x_d, u=u_d)
+
+    def test_equilibrium_reference_gives_the_stationary_gain_everywhere(self):
+        t = np.linspace(0.0, 5.0, 51)
+        rest = Trajectory(t=t, x=np.zeros((2, 51)), u=np.zeros((1, 51)))
+        ctl = trajectory_lqr(DoubleIntegrator(), rest, self.Q, self.R)
+        K_inf = lqr_gain(self.A, self.B, self.Q, self.R)
+        np.testing.assert_allclose(
+            ctl.params["K"], np.broadcast_to(K_inf, (51, 1, 2)), atol=1e-6
+        )
+
+    def test_tracks_a_moving_reference_from_a_perturbed_start(self):
+        reference = self.sinusoid()
+        plant = DoubleIntegrator()
+        ctl = trajectory_lqr(plant, reference, self.Q, self.R)
+        plant.x0 = reference.x[:, 0] + np.array([0.5, 0.5])
+        loop = ctl @ plant
+        traj = loop.compute_trajectory(tf=8.0, n_steps=801, verbose=False)
+        np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], atol=0.02)
+
+    def test_block_interpolates_and_holds_the_end_point(self):
+        reference = self.sinusoid(tf=1.0, n=3)  # samples at t = 0, 0.5, 1
+        K = np.zeros((3, 1, 2))
+        K[:, 0, 0] = [1.0, 2.0, 3.0]
+        ctl = TrajectoryFeedbackController(reference, K)
+        x = reference.x[:, 1]  # on the reference at t = 0.5: only the feedforward acts
+        np.testing.assert_allclose(ctl.ctl(None, x, t=0.5), reference.u[:, 1])
+        x = reference.x[:, 2] + np.array(
+            [1.0, 0.0]
+        )  # one unit off the end point, past t_f
+        expected = reference.u[:, 2] - K[2] @ np.array([1.0, 0.0])
+        np.testing.assert_allclose(ctl.ctl(None, x, t=4.0), expected)
+        # between two samples, reference and gain are interpolated linearly
+        x_mid = (reference.x[:, 0] + reference.x[:, 1]) / 2.0
+        u_mid = (reference.u[:, 0] + reference.u[:, 1]) / 2.0
+        np.testing.assert_allclose(ctl.ctl(None, x_mid, t=0.25), u_mid)
 
 
 class TestFiniteHorizonLQR(unittest.TestCase):

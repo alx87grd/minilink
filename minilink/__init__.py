@@ -66,9 +66,14 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "lqr": ("minilink.control.lqr", "lqr"),
     "lqr_at_operating_point": ("minilink.control.lqr", "lqr_at_operating_point"),
     "lqr_finite_horizon": ("minilink.control.lqr", "lqr_finite_horizon"),
+    "trajectory_lqr": ("minilink.control.lqr", "trajectory_lqr"),
     "TimeVaryingStateFeedbackController": (
         "minilink.control.state",
         "TimeVaryingStateFeedbackController",
+    ),
+    "TrajectoryFeedbackController": (
+        "minilink.control.state",
+        "TrajectoryFeedbackController",
     ),
     # analysis
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),

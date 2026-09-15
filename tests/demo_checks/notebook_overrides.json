@@ -52,7 +52,10 @@
     "smoke": false
   },
   "examples/teaching/optimal_control/cartpole_lqr.ipynb": {
-    "timeout": 300
+    "requires": [
+      "jax"
+    ],
+    "timeout": 600
   },
   "examples/teaching/optimal_control/double_integrator_minimum_time_vi.ipynb": {
     "timeout": 300
