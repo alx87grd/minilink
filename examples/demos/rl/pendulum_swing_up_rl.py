@@ -58,8 +58,8 @@ planner = ReinforcementLearningPlanner(
     learning_rate=3e-3,
     gamma=0.97,
 )
-plan = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(f"\n{plan.metadata.message} in {plan.metadata.solve_time_s:.1f} s")
+solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+print(f"\n{solution.solver}")
 planner.plot_learning_curve()
 
 # The learned law is a controller block: draw it, score it, close the loop

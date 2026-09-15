@@ -68,8 +68,8 @@ problem = StochasticPlanningProblem(
 planner = ReinforcementLearningPlanner(
     problem, dt=DT, normalize=False, n_envs=1, n_steps=2048, batch_size=64
 )
-plan = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(f"\n{plan.metadata.message} in {plan.metadata.solve_time_s:.1f} s")
+solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+print(f"\n{solution.solver}")
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()

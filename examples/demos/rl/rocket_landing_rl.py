@@ -72,8 +72,8 @@ planner = ReinforcementLearningPlanner(
     gamma=0.995,
     log_std_init=-1.0,  # gentle exploration: a twitchy attitude loop
 )
-plan = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(f"\n{plan.metadata.message} in {plan.metadata.solve_time_s:.1f} s")
+solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+print(f"\n{solution.solver}")
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()

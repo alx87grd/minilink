@@ -250,12 +250,12 @@ def run_bicycle_parametric(
         plan = planner.solve_trajectory_from(x_start)
         total_times.append(time.perf_counter() - t0)
         traj = plan.trajectory
-        cost_val = float(plan.metadata.cost)
-        success = bool(plan.metadata.success)
+        cost_val = float(plan.solver.cost)
+        success = bool(plan.success)
         if planner.last_solve_time_s is not None:
             solve_times.append(float(planner.last_solve_time_s))
-        elif plan.metadata.solve_time_s is not None:
-            solve_times.append(float(plan.metadata.solve_time_s))
+        elif plan.solver.solve_time_s is not None:
+            solve_times.append(float(plan.solver.solve_time_s))
         else:
             solve_times.append(float(total_times[-1]))
 

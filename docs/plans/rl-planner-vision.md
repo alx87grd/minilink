@@ -1,9 +1,12 @@
 # Reinforcement learning as a planner — vision and plan (draft)
 
-Status: **in progress** (2026-09-10). Steps R1–R6 landed
+Status: **in progress** (2026-09-15). Steps R1–R6 landed
 (`planning/reinforcement_learning/`, `planning/evaluation.py`,
 `control/neural.py`, the problem/cost semantics, teaching notebook + demos);
-R7 open. Decisions
+R7 open. 2026-09-15: the module was rebuilt on domain objects (§3.5 layout
+below) and gained the course's foundational algorithms, REINFORCE and an
+advantage actor-critic in the neural family and a tabular family
+(Q-learning, SARSA, Monte Carlo control) on the value-iteration grid. Decisions
 D1–D5 applied as recommended; D3 landed as the single block with a feature
 function (the composite, diagram-visible block is still open).
 Lane: research → provisional planning band at v0.2.
@@ -55,7 +58,7 @@ Evidence: `minilink/experimental/ppo_jax.py` and the six demos in
 StochasticPlanningProblem   what world, what is random, what we want (E[J] or max J)
         │
         ├── solve   ──►  Planner (policy family): ReinforcementLearningPlanner, DP, gain search
-        │                     └─► PolicyPlan  ──►  get_controller() → Controller block
+        │                     └─► PlanningSolution  ──►  get_controller() → Controller block
         │                                            (NeuralPolicyController: features ∘ MLP ∘ denormalize)
         ├── solve   ──►  Planner (trajectory family): trajopt, RRT on problem.nominal()
         │
@@ -147,14 +150,14 @@ read the same way:
 planner = DynamicProgrammingPlanner(problem, x_grid=(201, 201), u_grid=(21,), dt=0.05)
 planner = ReinforcementLearningPlanner(problem, dt=0.05, policy=MLPPolicy(hidden=(64, 64)))
 
-plan = planner.solve(timesteps=1_000_000)   # PolicyPlan (weights, spec, history, metadata)
+solution = planner.solve(timesteps=1_000_000)   # PlanningSolution (policy, solver record, cost_to_go)
 ctl = planner.get_controller()              # NeuralPolicyController, ctl @ plant
 planner.plot_learning_curve()
-planner.solve_trajectory_from(x0)           # rollout of the learned law → TrajectoryPlan
+planner.solve_trajectory_from(x0)           # rollout of the learned law → PlanningSolution
 ```
 
-- `solve()` / `solve_policy()` return a `PolicyPlan` whose payload is the
-  policy spec + weights + training history; `solve_steps(n)` is the
+- `solve()` / `solve_policy()` return a `PlanningSolution` whose policy is the
+  controller block and whose solver record carries the training history; `solve_steps(n)` is the
   incremental call (the notebook's 20k + 80k), like DP's `solve_steps`.
 - `solve_trajectory_from(x0)` rolls the learned law out so `plot_solution`
   and `animate_solution` work unchanged (the two output families the
@@ -196,13 +199,16 @@ search is an algorithm whose "batch" is the differentiable rollout itself.
 Layout inside `planning/reinforcement_learning/`:
 
 ```text
-environment.py   RolloutEnvironment (problem + dt + exit rule + episode length)
-heads.py         GaussianHead, SquashedGaussianHead   (sample, log_prob, mean, entropy)
-critics.py       ValueFunction, QFunction
-collect.py       rollout (on-policy scan, GAE), ReplayBuffer (off-policy)
-optim.py         adam, clip_by_global_norm (Optax duck-typed if passed)
-algorithms/      base.py (Algorithm), ppo.py, sac.py, ...
-planner.py       ReinforcementLearningPlanner: learn loops, PolicyPlan, get_controller
+environment.py   RolloutEnvironment (problem + dt + exit rule + episode length), NumPy or JAX
+policy.py        StochasticPolicy (controller block + head: sample, log_prob, entropy, input),
+                 GaussianHead, SquashedGaussianHead
+critics.py       ValueFunction V_w(x), QFunction Q_w(x, a)
+collect.py       rollout (one scan for both families), advantages + gae, returns_to_go, ReplayBuffer
+optim.py         Adam, clip_by_global_norm (Optax duck-typed if passed)
+algorithms/      base.py (Algorithm), reinforce.py, actor_critic.py, ppo.py, sac.py
+planner.py       ReinforcementLearningPlanner: learn loops, PlanningSolution, get_controller
+tabular.py       TabularLearningPlanner on a StateSpaceGrid: QLearning, SARSA, MonteCarloControl,
+                 EpsilonGreedy, UCB (NumPy only; the result is a DynamicProgrammingResult)
 ```
 
 The proof that the seam is right is a second algorithm of the *other*
@@ -388,7 +394,7 @@ type, never the reverse.
 | **R2** (done, `Sys2Gym.from_problem` added 2026-09-10 after review) | `StochasticPlanningProblem` + distributions + `nominal()` | the drone notebook's setup expressed as a problem; `Sys2Gym(problem)` passes the existing gym tests |
 | **R3** (done) | `MonteCarloEvaluator` on JAX (`vmap`) and NumPy | report for LQR vs DP vs PPO on the pendulum over 100 starts |
 | **R4** (done) | `blocks/`: `Normalize`, `AngleFeatures`; `control/neural.py`: `NeuralPolicyController` composite | `ctl @ plant`, `plot_diagram`, `plot_control_law`, both backends |
-| **R5a** (done) | `ReinforcementLearningPlanner` + the shared machinery of §3.5 with PPO as the first algorithm; `PolicyPlan`, `get_controller`, `solve_trajectory_from` | the experimental demos re-expressed through the planner with the same outcomes and times |
+| **R5a** (done) | `ReinforcementLearningPlanner` + the shared machinery of §3.5 with PPO as the first algorithm; `PlanningSolution` (S48), `get_controller`, `solve_trajectory_from` | the experimental demos re-expressed through the planner with the same outcomes and times |
 | **R5b** | SAC as the second algorithm (off-policy family: squashed head, twin Q, replay) | **done**: `algorithms/sac.py` + `SquashedGaussianHead`; pendulum swing-up by ~19k steps; the PPO file was not edited, the planner gained the `on_policy` branch only |
 | **R6** (done) | Teaching entry: `examples/tutorial/11_reinforcement_learning.ipynb` (stochastic problem, Monte Carlo on a PD law, the RL planner, the differentiable closed loop) and `examples/demos/rl/` (five official demos mirroring the experimental scripts) | notebook smoke; examples README row |
 | **R7** | Retire `experimental/ppo_jax.py`; TRL ledger row moves to Planning / RL | nothing imports the experimental module |

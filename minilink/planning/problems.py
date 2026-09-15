@@ -257,6 +257,11 @@ class PlanningProblem:
         """Return ``True`` when a terminal goal or boundary set is available."""
         return self.Xf is not None
 
+    @property
+    def is_stochastic(self) -> bool:
+        """``True`` when the problem draws starts, parameters or disturbances."""
+        return False
+
     def exit_penalty(self, x, t=0.0):
         """Cost charged at an exit state (scalar or ``exit_cost(x, t)``); ``None`` if unset."""
         if self.exit_cost is None:

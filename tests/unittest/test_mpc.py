@@ -15,6 +15,7 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.hybrid_diagram import HybridDiagram
 from minilink.core.system import DynamicSystem, StepSystem, System
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -22,6 +23,7 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
+    TrajectoryOptimizationRecord,
 )
 
 
@@ -79,16 +81,17 @@ class TestModelPredictiveController(unittest.TestCase):
     def test_compute_command_fields(self):
         planner = self._make_planner(0.1)
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
-        self.assertIsNone(mpc.get_solve_metadata())
+        self.assertIsNone(mpc.get_solver_record())
         cmd = mpc.compute_command(np.array([0.1]), k=0)
         self.assertIsInstance(cmd, Command)
         self.assertEqual(cmd.k, 0)
         self.assertAlmostEqual(cmd.t_solve, 0.0)
-        self.assertTrue(hasattr(cmd.plan.metadata, "success"))
-        self.assertIs(cmd.metadata, cmd.plan.metadata)
-        self.assertIs(mpc.get_solve_metadata(), cmd.metadata)
-        self.assertIsNotNone(cmd.plan.warm_state)
-        np.testing.assert_allclose(cmd.u_ff, cmd.plan.trajectory.u[:, 0])
+        self.assertIsInstance(cmd.solution, PlanningSolution)
+        self.assertIsInstance(cmd.solution.success, bool)
+        self.assertIs(cmd.solver, cmd.solution.solver)
+        self.assertIs(mpc.get_solver_record(), cmd.solver)
+        self.assertIsNotNone(planner.last_optimization_result.z)
+        np.testing.assert_allclose(cmd.u_ff, cmd.solution.trajectory.u[:, 0])
         self.assertIs(mpc.last_command, cmd)
 
     def test_reset_clears_deploy_state(self):
@@ -96,10 +99,10 @@ class TestModelPredictiveController(unittest.TestCase):
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
         cmd0 = mpc.compute_command(np.array([0.1]))
         self.assertEqual(cmd0.k, 0)
-        self.assertIsNotNone(mpc.get_solve_metadata())
+        self.assertIsNotNone(mpc.get_solver_record())
         mpc.reset()
         self.assertIsNone(mpc.last_command)
-        self.assertIsNotNone(mpc.get_solve_metadata())
+        self.assertIsNotNone(mpc.get_solver_record())
         cmd1 = mpc.compute_command(np.array([0.1]))
         self.assertEqual(cmd1.k, 0)
 
@@ -139,7 +142,7 @@ class TestModelPredictiveController(unittest.TestCase):
         u0 = mpc.get_nominal_u(0.0)
         np.testing.assert_allclose(u0, cmd.u_ff, atol=1e-05)
         x0 = mpc.get_nominal_x(0.0)
-        np.testing.assert_allclose(x0, cmd.plan.trajectory.x[:, 0], atol=1e-05)
+        np.testing.assert_allclose(x0, cmd.solution.trajectory.x[:, 0], atol=1e-05)
         t_mid = 0.5
         u_m = mpc.get_nominal_u(t_mid)
         self.assertEqual(u_m.shape, (1,))
@@ -148,7 +151,7 @@ class TestModelPredictiveController(unittest.TestCase):
         self.assertEqual(du.shape, (1,))
         self.assertEqual(dx.shape, (1,))
         u_end = mpc.get_nominal_u(1000.0)
-        np.testing.assert_allclose(u_end, cmd.plan.trajectory.u[:, -1], atol=1e-05)
+        np.testing.assert_allclose(u_end, cmd.solution.trajectory.u[:, -1], atol=1e-05)
 
     def test_deploy_shaped_two_rate_hand_loop(self):
         """Mirrors RAS: replan + interpolator, then many get_nominal_u."""
@@ -531,7 +534,8 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         plan = planner.solve()
         traj = plan.trajectory
         np.testing.assert_allclose(traj.x[:, 0], problem.x_start, atol=1e-05)
-        self.assertIs(planner.last_trajectory_plan, plan)
+        self.assertIs(planner.last_solution, plan)
+        self.assertIsInstance(plan.solver, TrajectoryOptimizationRecord)
 
 
 pytest.importorskip("jax")
@@ -576,17 +580,21 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         np.testing.assert_allclose(plan.trajectory.x, traj.x, atol=1e-08)
         np.testing.assert_allclose(plan.trajectory.u, traj.u, atol=1e-08)
         np.testing.assert_allclose(
-            plan.warm_state, planner_from.last_optimization_result.z, atol=1e-08
+            planner_from.last_optimization_result.z,
+            planner_step.last_optimization_result.z,
+            atol=1e-08,
         )
-        self.assertIs(planner_from.last_trajectory_plan, plan)
+        self.assertIs(planner_from.last_solution, plan)
 
-    def test_metadata_present(self):
+    def test_solver_record_present(self):
         planner = self.make_planner(self.make_problem(0.1))
         plan = planner.solve_trajectory_from(np.array([0.1]))
-        self.assertTrue(hasattr(plan.metadata, "success"))
-        self.assertIsInstance(plan.metadata.success, bool)
-        self.assertIsNotNone(plan.metadata.message)
-        self.assertIsNotNone(plan.warm_state)
+        self.assertIsInstance(plan.success, bool)
+        self.assertIsNotNone(plan.solver.message)
+        self.assertIsNone(plan.solver.feasible)  # an online tick runs no residual check
+        self.assertEqual(plan.success, plan.solver.solver_success)
+        self.assertIsNone(plan.evaluation)  # not asked
+        self.assertIsNotNone(planner.last_optimization_result.z)
 
     def test_params_none_and_empty_ok(self):
         planner = self.make_planner(self.make_problem(0.0))
@@ -638,7 +646,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         )
         plan = planner.solve_trajectory_from(np.array([0.05]), initial_guess=guess)
         np.testing.assert_allclose(plan.trajectory.x[:, 0], [0.05], atol=1e-05)
-        self.assertIsNotNone(plan.warm_state)
+        self.assertIsNotNone(planner.last_optimization_result.z)
 
 
 pytest.importorskip("jax")
@@ -784,7 +792,7 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(rebuild_msgs, [])
         self.assertTrue(cmd.success)
         self.assertIsNotNone(planner.last_program)
-        np.testing.assert_allclose(cmd.u_ff, cmd.plan.trajectory.u[:, 0])
+        np.testing.assert_allclose(cmd.u_ff, cmd.solution.trajectory.u[:, 0])
 
     def test_rebuild_per_tick_new_program(self):
         planner = _make_numpy_planner(0.0)

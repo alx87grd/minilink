@@ -39,7 +39,7 @@ Evaluator + z0
     → OptimizerBackend.solve() → OptimizationResult
 
 OptimizationResult
-    → Transcription.reconstruct_result() → Trajectory / TrajectoryPlan
+    → Transcription.reconstruct_result() → Trajectory / PlanningSolution
 ```
 
 **Design law:** transcription and parametric bind are upstream; solver choice is

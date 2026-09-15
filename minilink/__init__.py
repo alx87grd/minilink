@@ -89,7 +89,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "StaticSimulator": ("minilink.simulation.static_simulator", "StaticSimulator"),
     # planning
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
-    "TrajectoryPlan": ("minilink.planning.results", "TrajectoryPlan"),
+    "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",

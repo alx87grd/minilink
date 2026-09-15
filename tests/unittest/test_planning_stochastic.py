@@ -5,6 +5,7 @@ import pytest
 
 from minilink import Pendulum
 from minilink.core.costs import CostFunction, QuadraticCost
+from minilink.core.trajectory import Trajectory
 from minilink.planning.distributions import Gaussian, Particles, Sampler, Uniform
 from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
 from minilink.planning.problems import (
@@ -459,3 +460,74 @@ def test_gymnasium_view_of_a_stochastic_problem():
     for _ in range(20):
         _, r, terminated, truncated, _ = env.step(np.array([0.0]))
     assert terminated
+
+
+# --- the Evaluation record, and open-loop policies replayed by the evaluator ---
+
+
+def test_evaluation_of_one_trajectory_prints_a_single_cost():
+    from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
+
+    plant = pendulum()
+    problem = PlanningProblem(plant, cost=quadratic(plant), tf=1.0)
+    t = np.linspace(0.0, 1.0, 6)
+    traj = Trajectory(t=t, x=np.vstack([0.1 * t, np.zeros(6)]), u=np.zeros((1, 6)))
+    single = Evaluation.of_trajectory(problem, traj)
+    assert single.n_trials == 1 and single.trajectories[0] is traj
+    assert str(single).startswith("J = ") and "trials" not in str(single)
+    # a deterministic problem is one trial for the evaluator as well
+    from minilink.control import StateFeedbackController
+
+    law = StateFeedbackController(K=[[1.0, 0.5]], xbar=[0.0, 0.0])
+    report = MonteCarloEvaluator(problem, dt=0.1, n_trials=1, backend="numpy").evaluate(
+        law
+    )
+    assert report.n_trials == 1 and np.all(report.x0[0] == problem.x_start)
+
+
+def test_open_loop_source_scores_like_its_replayed_trajectory_on_every_backend():
+    from minilink.blocks import TrajectorySource
+    from minilink.planning.evaluation import MonteCarloEvaluator, score_trajectory
+
+    plant = pendulum()
+    plant.inputs["u"].lower_bound = np.array([-5.0])
+    plant.inputs["u"].upper_bound = np.array([5.0])
+    problem = PlanningProblem(plant, x_start=[0.3, 0.0], cost=quadratic(plant), tf=1.0)
+    dt, n_steps = 0.1, 10
+    t = dt * np.arange(n_steps + 1)
+    u = 2.0 * np.sin(3.0 * t)[None, :]
+    source = TrajectorySource(t, u)
+    assert int(source.m) == 0  # no input port: an open-loop policy
+
+    # the same held-input rollout by hand, scored under the contract
+    evaluator = plant.compile(backend="numpy", verbose=False)
+    x = np.zeros((2, n_steps + 1))
+    x[:, 0] = problem.x_start
+    for k in range(n_steps):
+        x[:, k + 1] = evaluator.rk4_step(x[:, k], u[:, k], t[k], dt)
+    J_hand, _ = score_trajectory(problem, Trajectory(t=t, x=x, u=u))
+
+    reports = {}
+    for backend in ("numpy", "simulator") + (("jax",) if jax_available() else ()):
+        reports[backend] = MonteCarloEvaluator(
+            problem, dt=dt, n_trials=1, backend=backend
+        ).evaluate(source)
+    np.testing.assert_allclose(reports["numpy"].J[0], J_hand, rtol=1e-10)
+    if "jax" in reports:
+        np.testing.assert_allclose(reports["jax"].J[0], J_hand, rtol=1e-8)
+    # the simulator integrates the source in series and lands within its step error
+    np.testing.assert_allclose(reports["simulator"].J[0], J_hand, rtol=0.05)
+
+    # a held (zero-order) replay keeps each sample until the next
+    held = TrajectorySource(t, u, interpolation="previous")
+    empty = np.zeros(0)
+    np.testing.assert_allclose(held.h(empty, empty, 0.15), u[:, 1])
+    np.testing.assert_allclose(source.h(empty, empty, 0.15), 0.5 * (u[:, 1] + u[:, 2]))
+    with pytest.raises(ValueError):
+        TrajectorySource(t, u, interpolation="cubic")
+
+
+def jax_available():
+    import importlib.util
+
+    return importlib.util.find_spec("jax") is not None

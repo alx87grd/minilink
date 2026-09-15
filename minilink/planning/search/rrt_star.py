@@ -11,11 +11,11 @@ improved by at least ``cost_tol`` for ``convergence_patience`` consecutive
 successful extensions.
 """
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 
 import numpy as np
 
-from minilink.planning.results import TrajectoryPlan
+from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.rrt import (
     _RRT_OPTION_KEYS,
@@ -206,11 +206,11 @@ class RRTStarPlanner(RRTPlanner):
         self.best_goal_cost: float | None = None
         self.history: list[RRTStarSnapshot] = []
 
-    def solve(self) -> TrajectoryPlan:
-        """Offline traj-family entry."""
-        return self.solve_trajectory()
+    def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        """Offline traj-family entry (see :meth:`RRTPlanner.solve`)."""
+        return self.solve_trajectory(evaluate=evaluate, n_trials=n_trials)
 
-    def solve_trajectory(self) -> TrajectoryPlan:
+    def solve_trajectory(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """Grow an RRT* until goal convergence, patience, or ``max_nodes``."""
         options = self.options
         self._validate_nearest_backend()
@@ -289,7 +289,22 @@ class RRTStarPlanner(RRTPlanner):
             if not options.return_best_effort:
                 raise RuntimeError("RRT* failed to reach goal within max_nodes")
 
-        return self._finish_trajectory(self.tree.extract_trajectory(self.solution_node))
+        return self._finish_trajectory(
+            self.tree.extract_trajectory(self.solution_node), evaluate, n_trials
+        )
+
+    def search_record(self):
+        """The RRT* record: the best goal cost, and whether patience declared convergence."""
+        record = super().search_record()
+        cost = (
+            record.cost if self.best_goal_cost is None else float(self.best_goal_cost)
+        )
+        return replace(
+            record,
+            cost=cost,
+            converged=bool(self.converged),
+            history=list(self.history),
+        )
 
     def animate_convergence(self, **kwargs):
         """Animate recorded RRT* history (requires ``record_history=True``)."""

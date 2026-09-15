@@ -65,6 +65,46 @@ never produced a deterministic swing-up from hanging. Ideas not tried yet:
 energy-based shaping, a curriculum on the initial states, longer horizons with
 a larger critic.
 
+## 0b. The ladder below PPO (2026-09-15)
+
+REINFORCE, an advantage actor-critic and the tabular learners joined the
+planner; what it took to make each rung learn:
+
+- **REINFORCE learns from complete episodes**, so the planner restarts every
+  plant before a collection and runs one episode length. Sixty-four plants with
+  4 s episodes and a learning rate of 1e-2 learned the fully actuated
+  pendulum (torque 12 Nm) in 200k steps; sixteen plants with 10 s episodes
+  made 62 updates in 800k steps and learned nothing. With a *priced* exit at
+  |θ| = 2π it needed 64 plants and 800k steps (2 s of compute); with the angle
+  unbounded, 16 plants and 200k. It never learned the underactuated swing-up
+  (torque 4 Nm) in 1M steps.
+- **The actor-critic is the fragile rung**: one gradient step per batch on
+  advantages the critic has not yet learned. Sixteen plants, 32-step rollouts
+  and a learning rate of 3e-3 learned the torque-12 pendulum in 300k steps and
+  came close to PPO's score; on the double integrator every setting tried
+  diverged at least once inside 100k steps before recovering. PPO's clipping
+  and its 80 minibatch steps per batch are the difference.
+- **The exit exploit hits the critic-free rung hardest.** With an unpriced
+  angle box at ±4π, REINFORCE and the actor-critic learned to spin out of the
+  box (the truncated return is smaller); PPO's bootstrap resisted. Unbounding
+  the angle (±1e3, periodic features) removed the exploit for every rung.
+- **Tabular Q-learning converges to value iteration on the same grid** when
+  three things match: the grid's Euler step (`integrator="euler"`), the same
+  exit price on the problem (`on_exit="terminate"`, `exit_cost=`), and
+  *stochastic rounding* of the successor to a neighbouring node with the
+  multilinear weights (`rounding="stochastic"`), which makes the sampled
+  world the interpolated one value iteration sweeps. Nearest-node rounding
+  aliases a coarse grid: from a node with a small speed the Euler step rounds
+  back to the same node and the learner never moves. With a quadratic cost
+  (values of order 100) the learned table came within 3% of J* after 8000
+  episodes at η = 0.3; with the small-valued `1 + cos θ` cost the relative
+  error stayed near 50% and the greedy law scored 2 to 4 against value
+  iteration's 1.1, the price of a constant step size on random targets.
+- **SARSA beside a cliff** (double integrator, set point near a priced wall,
+  ε = 0.2 kept constant): SARSA fell off in 12% of its training episodes,
+  Q-learning in 32%; Q-learning's greedy law then scored 1.9 against SARSA's
+  2.3. The textbook contrast, in 3000 episodes.
+
 ## 1. The state-box exit is the exploit to watch for
 
 The single most common failure. Symptom: the *exploration* return looks great

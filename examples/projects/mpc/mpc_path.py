@@ -178,7 +178,7 @@ while t < TF_SIM - 1e-12:
         # =============================================================================
 
         # offline only: stash horizon for animation overlay
-        plan = cmd.plan.trajectory
+        plan = cmd.solution.trajectory
         mpc_plans.append(
             (t, Trajectory(t=plan.t + t, x=plan.x.copy(), u=plan.u.copy()))
         )

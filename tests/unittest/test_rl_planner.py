@@ -10,7 +10,7 @@ from minilink.core.costs import CostFunction
 from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
 from minilink.planning.distributions import Gaussian, Uniform
 from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
-from minilink.planning.results import PolicyPlan, TrajectoryPlan
+from minilink.planning.results import PlanningSolution
 
 pytest.importorskip("jax")
 import jax  # noqa: E402
@@ -131,18 +131,21 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     )
     assert isinstance(planner.algorithm, PPO)
     assert planner.gamma == 0.99  # undiscounted cost -> the usual default
-    plan = planner.solve(timesteps=256)
-    assert isinstance(plan, PolicyPlan) and plan.metadata.success
+    solution = planner.solve(timesteps=256)
+    assert isinstance(solution, PlanningSolution) and solution.success
+    assert solution.solver.timesteps == 256 and solution.solver.algorithm == "PPO"
+    assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.num_timesteps == 256 and len(planner.history) == 2
     ctl = planner.get_controller()
-    assert isinstance(ctl, NeuralPolicyController)
+    assert isinstance(ctl, NeuralPolicyController) and solution.policy is ctl
     # the controller carries the trained weights
-    actor = planner.algorithm.params(planner.train_state)["actor"]
+    actor = planner.algorithm.params(planner.train_state)["policy"]["mlp"]
     np.testing.assert_allclose(ctl.params["mlp"]["W0"], np.asarray(actor["W0"]))
-    tp = planner.solve_trajectory_from(np.zeros(2), tf=0.5)
-    assert isinstance(tp, TrajectoryPlan) and tp.trajectory.n_samples == 6
-    J, _ = score_trajectory(prob, tp.trajectory)
-    np.testing.assert_allclose(tp.metadata.cost, J)
+    rollout = planner.solve_trajectory_from(np.zeros(2), tf=0.5, evaluate=True)
+    assert isinstance(rollout, PlanningSolution) and rollout.trajectory.n_samples == 6
+    J, _ = score_trajectory(prob, rollout.trajectory)
+    np.testing.assert_allclose(rollout.evaluation.mean, J)
+    assert planner.last_solution is solution  # an online rollout is not stored
     u, _ = planner.predict(np.zeros((3, 2)))
     assert u.shape == (3, 1)
 
@@ -238,7 +241,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
     assert not np.array_equal(first.x, disturbed.x)
 
 
-def test_solve_keeps_the_full_evaluation_behind_the_reported_cost():
+def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
     planner = ReinforcementLearningPlanner(
         problem(tf=np.inf),
         dt=0.1,
@@ -246,14 +249,18 @@ def test_solve_keeps_the_full_evaluation_behind_the_reported_cost():
         n_envs=4,
         n_steps=16,
         batch_size=32,
+        episode_length=0.5,  # episodes end inside a collection: the record's cost is a number
         verbose=0,
     )
-    assert planner.last_evaluation is None
-    plan = planner.solve(timesteps=64, n_trials=4)
-    report = planner.last_evaluation
-    assert report.J.shape == (4,)
-    assert plan.metadata.cost == report.mean
-    assert plan.metadata.stats["failure_rate"] == report.failure_rate
+    solution = planner.solve(timesteps=64, evaluate=True, n_trials=4)
+    assert solution.evaluation.J.shape == (4,)
+    assert 0.0 <= solution.evaluation.failure_rate <= 1.0
+    np.testing.assert_array_equal(solution.trajectory.x, planner.nominal_trajectory().x)
+    assert np.isfinite(solution.solver.cost) and "plant steps" in str(solution.solver)
+    assert solution.solver.history[-1]["cost"] == -planner.history[-1]["ep_return_mean"]
+    assert "feedback" in str(solution)
+    # the critic estimates the training discount, not the problem's: no cost-to-go
+    assert solution.cost_to_go is None
 
 
 def test_plain_planning_problem_trains_from_its_single_start():
@@ -318,8 +325,8 @@ def test_sac_trains_through_the_same_planner_loop():
     assert "critic_loss" in planner.history[-1] and "alpha" in planner.history[-1]
     u = planner.get_controller().action(np.zeros(2))
     assert -4.0 <= u[0] <= 4.0
-    tp = planner.solve_trajectory_from(np.zeros(2), tf=0.3)
-    assert isinstance(tp, TrajectoryPlan)
+    rollout = planner.solve_trajectory_from(np.zeros(2), tf=0.3)
+    assert isinstance(rollout, PlanningSolution) and rollout.evaluation is None
 
 
 # --- the learned law is a System: compile, differentiate, linearize ---
@@ -350,9 +357,9 @@ def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
     )
-    plan = planner.solve(timesteps=64, n_trials=4)
-    assert np.isfinite(plan.metadata.cost) and plan.metadata.success
-    assert 0.0 <= plan.metadata.stats["failure_rate"] <= 1.0
+    solution = planner.solve(timesteps=64, evaluate=True, n_trials=4)
+    assert np.isfinite(solution.evaluation.mean) and solution.success
+    assert 0.0 <= solution.evaluation.failure_rate <= 1.0
     assert "truncates" in planner.env.describe()
 
     worst = StochasticPlanningProblem(
@@ -468,3 +475,142 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
         and bool(truncated)
         and np.isfinite(float(r))
     )
+
+
+# --- the policy-gradient ladder, and the pieces the algorithms share ---
+
+
+@pytest.mark.parametrize("algorithm", ["reinforce", "actor_critic"])
+def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
+    from minilink.planning.reinforcement_learning import REINFORCE, ActorCritic
+
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf),
+        dt=0.1,
+        hidden=(8, 8),
+        algorithm=algorithm,
+        n_envs=4,
+        n_steps=16,
+        episode_length=0.5,
+        verbose=0,
+    )
+    expected = {"reinforce": REINFORCE, "actor_critic": ActorCritic}[algorithm]
+    assert isinstance(planner.algorithm, expected) and planner.algorithm.on_policy
+    if algorithm == "reinforce":
+        assert planner.critic is None and planner.n_steps == 5  # one episode length
+    else:
+        assert planner.critic is not None and planner.n_steps == 16
+    before = np.asarray(planner.get_controller().params["mlp"]["W0"]).copy()
+    planner.learn(2 * planner.n_steps * planner.n_envs)
+    assert len(planner.history) == 2
+    assert not np.array_equal(planner.get_controller().params["mlp"]["W0"], before)
+    solution = planner.solve(timesteps=planner.n_steps * planner.n_envs)
+    assert (
+        solution.success
+        and solution.solver.algorithm == type(planner.algorithm).__name__
+    )
+
+
+def test_gae_limits_are_the_td_error_and_the_return_minus_the_baseline():
+    from minilink.planning.reinforcement_learning import gae, returns_to_go
+
+    key = jax.random.PRNGKey(0)
+    reward, value, last_value = (
+        jax.random.normal(k, shape)
+        for k, shape in zip(jax.random.split(key, 3), ((6, 2), (6, 2), (2,)))
+    )
+    done = jnp.zeros((6, 2)).at[3, 0].set(1.0)
+    gamma = 0.9
+    value_next = jnp.concatenate([value[1:], last_value[None]])
+    delta = reward + gamma * value_next * (1.0 - done) - value
+
+    np.testing.assert_allclose(gae(delta, done, gamma, 0.0), delta)
+    G, returns = last_value, []
+    for k in reversed(range(6)):
+        G = reward[k] + gamma * G * (1.0 - done[k])
+        returns.append(G)
+    returns = jnp.stack(returns[::-1])
+    np.testing.assert_allclose(
+        gae(delta, done, gamma, 1.0), returns - value, atol=1e-12
+    )
+    # the Monte Carlo return of an episode stops at its end
+    R = returns_to_go(reward, done, gamma)
+    np.testing.assert_allclose(R[3, 0], reward[3, 0])
+    np.testing.assert_allclose(R[2, 0], reward[2, 0] + gamma * reward[3, 0])
+
+
+def test_stochastic_policy_and_critics_take_one_state_or_a_batch():
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf),
+        dt=0.1,
+        hidden=(8,),
+        n_envs=2,
+        n_steps=8,
+        batch_size=16,
+        verbose=0,
+    )
+    pi, V = planner.policy, planner.critic
+    theta, w = planner.algorithm.params(planner.train_state).values()
+    x = jnp.array([[0.1, 0.2], [-0.3, 0.4], [0.5, -0.6]])
+    keys = jax.random.split(jax.random.PRNGKey(1), 3)
+
+    a = pi.sample(theta, x, keys)
+    logp = pi.log_prob(theta, x, a)
+    assert a.shape == (3, 1) and logp.shape == (3,)
+    for i in range(3):
+        np.testing.assert_allclose(pi.sample(theta, x[i], keys[i]), a[i])
+        np.testing.assert_allclose(pi.log_prob(theta, x[i], a[i]), logp[i])
+        np.testing.assert_allclose(V.value(w, x[i]), V.value(w, x)[i])
+    # the plant input of a normalized action spans the port bounds
+    np.testing.assert_allclose(pi.input(jnp.array([1.0])), [4.0])
+    np.testing.assert_allclose(pi.input(jnp.array([-3.0])), [-4.0])
+    assert pi.deterministic is planner.get_controller()
+
+
+def test_numpy_and_jax_environments_take_the_same_step():
+    prob = problem(tf=np.inf)
+    env_jax = RolloutEnvironment(prob, dt=0.1, episode_length=1.0)
+    env_np = RolloutEnvironment(prob, dt=0.1, episode_length=1.0, backend="numpy")
+    x, u = np.array([0.3, -0.2]), np.array([1.5])
+    x_jax, t_jax, r_jax, term_jax, trunc_jax = env_jax.step(
+        jnp.asarray(x), 0.0, jnp.asarray(u), jax.random.PRNGKey(0)
+    )
+    x_np, t_np, r_np, term_np, trunc_np = env_np.step(
+        x, 0.0, u, np.random.default_rng(0)
+    )
+    np.testing.assert_allclose(np.asarray(x_jax), x_np, atol=1e-12)
+    np.testing.assert_allclose(float(r_jax), float(r_np), atol=1e-12)
+    assert bool(term_jax) == bool(term_np) and bool(trunc_jax) == bool(trunc_np)
+    assert isinstance(x_np, np.ndarray)
+
+
+def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
+    class Discounted(HangCost):
+        discount_rate = 1.0
+
+    prob = StochasticPlanningProblem(
+        bounded_pendulum(),
+        cost=Discounted(),
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+    )
+    planner = ReinforcementLearningPlanner(
+        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
+    )
+    solution = planner.solve(timesteps=64)
+    x = np.array([0.2, 0.0])
+    w = planner.algorithm.params(planner.train_state)["critic"]
+    np.testing.assert_allclose(
+        solution.cost_to_go(x), -float(planner.critic.value(w, jnp.asarray(x)))
+    )
+    # the same problem trained at another discount estimates something else
+    other = ReinforcementLearningPlanner(
+        prob,
+        dt=0.1,
+        hidden=(8, 8),
+        n_envs=4,
+        n_steps=16,
+        batch_size=32,
+        gamma=0.5,
+        verbose=0,
+    )
+    assert other.solve(timesteps=64).cost_to_go is None

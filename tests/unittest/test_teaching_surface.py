@@ -103,7 +103,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
     "minilink.optimization": ("MathematicalProgram", "Optimizer"),
     "minilink.planning": (
         "PlanningProblem",
-        "TrajectoryPlan",
+        "PlanningSolution",
         "TrajectoryOptimizationPlanner",
         "StateSpaceGrid",
         "DynamicProgrammingPlanner",

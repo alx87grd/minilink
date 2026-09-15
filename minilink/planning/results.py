@@ -1,133 +1,79 @@
-"""
-Typed planning results for traj-family and policy-family solvers.
-
-Keeps :class:`~minilink.core.trajectory.Trajectory` as a pure ``(t, x, u)``
-schedule; metadata and warm-start extras live on the wrappers.
-"""
+"""The planning solution: the policy, its cost-to-go, and the evidence for them."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 
-import numpy as np
-
+from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
+from minilink.planning.evaluation import Evaluation
+
+# Public API
 
 
 @dataclass(frozen=True)
-class SolveMetadata:
-    """Extras from a planner or NLP solve (not part of the schedule)."""
-
-    success: bool
-    message: str = ""
-    cost: float | None = None
-    solve_time_s: float | None = None
-    stats: dict[str, object] = field(default_factory=dict)
-    #: Constraint check of the returned plan (trajopt offline solves): worst
-    #: equality residual, worst inequality margin (negative = violated), worst
-    #: bound violation, and whether all three are within ``feasibility_tol``.
-    max_equality_violation: float | None = None
-    min_inequality_margin: float | None = None
-    max_bound_violation: float | None = None
-    feasible: bool | None = None
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "stats", dict(self.stats))
-        if self.solve_time_s is not None:
-            object.__setattr__(self, "solve_time_s", float(self.solve_time_s))
-
-
-@dataclass(frozen=True)
-class TrajectoryPlan:
+class PlanningSolution:
     """
-    Traj-family planning result.
+    What every planner returns: the optimal-control pair and the evidence for it.
 
     Parameters
     ----------
-    trajectory : Trajectory
-        Sampled ``(t, x, u)`` schedule.
-    metadata : SolveMetadata
-        Success / timing / solver stats.
-    warm_state : array_like, optional
-        Packed warm-start vector for the next solve (e.g. NLP ``z``).
-    x_dot, u_dot : ndarray, optional
-        Reserved knot rates; default ``None``.
+    policy : System
+        The law. Feedback ``u = pi(x)`` is a controller block, ``policy @ plant``
+        closes the loop; open loop ``u = pi(t)`` is a
+        :class:`~minilink.blocks.sources.TrajectorySource`, ``policy >> plant``
+        drives the plant.
+    solver : record
+        The planner's account of the solve, one dataclass per planner
+        (``TrajectoryOptimizationRecord``, ``TreeSearchRecord``,
+        ``ValueIterationRecord``, ``TabularLearningRecord``,
+        ``ReinforcementLearningRecord``), each with a ``success`` flag.
+    trajectory : Trajectory or None
+        What the policy produces from the problem's start on the planner's
+        grid with nominal parameters: the schedule of an open-loop planner,
+        the rollout of a feedback law when the solve was asked to evaluate.
+    evaluation : Evaluation or None
+        The cost over the problem's draws under the one scoring contract
+        (one trial on a deterministic problem), when the solve was asked to
+        evaluate; ``None`` otherwise, or when the problem declares no cost.
+    cost_to_go : callable or None
+        ``J(x)`` where the method produces it: the interpolated table of
+        dynamic programming and tabular learning, the critic of a learned law
+        when it estimates the problem's own discount.
     """
 
-    trajectory: Trajectory
-    metadata: SolveMetadata
-    warm_state: np.ndarray | None = None
-    x_dot: np.ndarray | None = None
-    u_dot: np.ndarray | None = None
+    policy: System
+    solver: object
+    trajectory: Trajectory | None
+    evaluation: Evaluation | None
+    cost_to_go: Callable | None = None
 
-    def __post_init__(self) -> None:
-        if self.warm_state is not None:
-            object.__setattr__(
-                self,
-                "warm_state",
-                np.asarray(self.warm_state, dtype=float).reshape(-1).copy(),
-            )
-        if self.x_dot is not None:
-            object.__setattr__(
-                self, "x_dot", np.asarray(self.x_dot, dtype=float).copy()
-            )
-        if self.u_dot is not None:
-            object.__setattr__(
-                self, "u_dot", np.asarray(self.u_dot, dtype=float).copy()
-            )
+    @property
+    def success(self) -> bool:
+        """The solver record's own success: feasible, converged, goal reached, finite weights."""
+        return bool(self.solver.success)
 
-    def to_flat(self) -> np.ndarray:
-        """Flatten ``(t, x, u)`` into one vector: ``t``, then ``x`` row-major, then ``u``."""
-        traj = self.trajectory
-        return np.concatenate(
+    @property
+    def open_loop(self) -> bool:
+        """``True`` for a time-based policy (a source with no input port)."""
+        return int(self.policy.m) == 0
+
+    def __str__(self) -> str:
+        law = "u = pi(t), open loop" if self.open_loop else "u = pi(x), feedback"
+        if self.trajectory is None:
+            trajectory = "not rolled out (solve with evaluate=True)"
+        else:
+            trajectory = (
+                f"{self.trajectory.n_samples} samples over "
+                f"{self.trajectory.time_duration:.3g} s"
+            )
+        evaluation = "none" if self.evaluation is None else str(self.evaluation)
+        return "\n".join(
             [
-                traj.t.reshape(-1),
-                traj.x.reshape(-1),
-                traj.u.reshape(-1),
+                f"policy: {self.policy.name} ({law})",
+                f"trajectory: {trajectory}",
+                f"evaluation: {evaluation}",
+                f"solver: {self.solver}",
             ]
         )
-
-    @classmethod
-    def from_flat(
-        cls,
-        flat: np.ndarray,
-        *,
-        n: int,
-        m: int,
-        n_samples: int,
-        metadata: SolveMetadata | None = None,
-    ) -> TrajectoryPlan:
-        """Inverse of :meth:`to_flat` for a known ``(n, m, N)`` layout."""
-        flat = np.asarray(flat, dtype=float).reshape(-1)
-        n_t = int(n_samples)
-        n_x = int(n) * n_t
-        n_u = int(m) * n_t
-        expected = n_t + n_x + n_u
-        if flat.size != expected:
-            raise ValueError(
-                f"flat has length {flat.size}, expected {expected} for "
-                f"n={n}, m={m}, N={n_samples}"
-            )
-        t = flat[:n_t]
-        x = flat[n_t : n_t + n_x].reshape(n, n_t)
-        u = flat[n_t + n_x :].reshape(m, n_t)
-        if metadata is None:
-            metadata = SolveMetadata(success=True)
-        return cls(trajectory=Trajectory(t=t, x=x, u=u), metadata=metadata)
-
-
-@dataclass(frozen=True)
-class PolicyPlan:
-    """
-    Policy-family planning result.
-
-    Parameters
-    ----------
-    policy : object
-        Solver-specific policy payload (e.g. DP tables, lookup table).
-    metadata : SolveMetadata
-        Success / timing / solver stats.
-    """
-
-    policy: object
-    metadata: SolveMetadata

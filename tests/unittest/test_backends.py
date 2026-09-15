@@ -224,7 +224,7 @@ problem = PlanningProblem(p, x_start=np.zeros(2), x_goal=goal, tf=3.0,
     cost=QuadraticCost.from_system(p, Q=np.eye(2), R=np.eye(1), xbar=goal))
 plan = TrajectoryOptimizationPlanner(problem, n_steps=30, transcription="direct_collocation",
     compile_backend="jax").solve()
-print(plan.metadata.success)
+print(plan.success)
 """
 
 

@@ -49,7 +49,7 @@ def plot_tree(
                 states[:, x_axis], states[:, y_axis], color=tree_color, lw=0.4, zorder=1
             )
 
-    if planner.last_trajectory_plan is not None:
+    if planner.last_solution is not None:
         if path_style == "waypoints":
             waypoints = _solution_waypoints(planner)
             if waypoints is not None:
@@ -62,7 +62,7 @@ def plot_tree(
                     label="path",
                 )
         else:
-            traj = planner.last_trajectory_plan.trajectory
+            traj = planner.last_solution.trajectory
             ax.plot(
                 traj.x[x_axis],
                 traj.x[y_axis],
@@ -130,8 +130,8 @@ def animate_search(
                 states[:, x_axis], states[:, y_axis], color=tree_color, lw=0.4, zorder=1
             )
             drawn.append(line)
-        if target >= len(edges) and planner.last_trajectory_plan is not None:
-            traj = planner.last_trajectory_plan.trajectory
+        if target >= len(edges) and planner.last_solution is not None:
+            traj = planner.last_solution.trajectory
             ax.plot(traj.x[x_axis], traj.x[y_axis], color=path_color, lw=2.5, zorder=3)
         return drawn
 

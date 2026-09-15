@@ -82,5 +82,11 @@
     "requires": [
       "jax"
     ]
+  },
+  "examples/teaching/reinforcement_learning/from_value_iteration_to_ppo.ipynb": {
+    "requires": [
+      "jax"
+    ],
+    "timeout": 900
   }
 }

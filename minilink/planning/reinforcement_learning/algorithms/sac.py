@@ -29,8 +29,7 @@ class SAC(Algorithm):
         Entropy target of the temperature loss; default ``-m``.
     """
 
-    on_policy = False
-    squash = "tanh"
+    on_policy, head_kind, critic_kind = False, "squashed", "Q"
 
     def __init__(
         self,
@@ -54,20 +53,21 @@ class SAC(Algorithm):
         self.target_entropy = target_entropy
         self.optimizer = Adam(learning_rate, max_grad_norm=max_grad_norm)
 
-    def init(self, key, params):
-        """Train state: weights, target critics, log-temperature, and one optimizer state each."""
-        jax, jnp = require_jax(), require_jax_numpy()
+    def init(self, key):
+        """Train state: weights, twin critics with their targets, log-temperature, one optimizer state each."""
+        jnp = require_jax_numpy()
+        pi, Q = self.policy, self.critic
         if self.target_entropy is None:
-            self.target_entropy = -float(self.functions.m)
-        actor = {"actor": params["actor"], "head": params["head"]}
-        critic = params["critic"]
+            self.target_entropy = -float(pi.m)
+        theta = pi.init()
+        w = {"q1": Q.init(), "q2": Q.init(Q.seed + 1)}
         return {
-            "params": params,
-            "target": jax.tree_util.tree_map(lambda w: w, critic),
+            "params": {"policy": theta, "critic": w},
+            "target": w,
             "log_alpha": jnp.asarray(0.0),
             "opt": {
-                "actor": self.optimizer.init(actor),
-                "critic": self.optimizer.init(critic),
+                "actor": self.optimizer.init(theta),
+                "critic": self.optimizer.init(w),
                 "alpha": self.optimizer.init(jnp.asarray(0.0)),
             },
         }
@@ -75,96 +75,68 @@ class SAC(Algorithm):
     def update(self, train_state, batch, key):
         """One SAC step on a replay minibatch ``{x, a, reward, x_next, terminated}``."""
         jax, jnp = require_jax(), require_jax_numpy()
-        functions = self.functions
-        params = train_state["params"]
-        x, a, r, x_next, done = (
+        pi, Q = self.policy, self.critic
+        params, opt = train_state["params"], train_state["opt"]
+        theta, w, w_target = params["policy"], params["critic"], train_state["target"]
+        x, a, r, x_next, terminated = (
             batch[k] for k in ("x", "a", "reward", "x_next", "terminated")
         )
         k_next, k_actor = jax.random.split(key)
+        keys_next = jax.random.split(k_next, x.shape[0])
+        keys_actor = jax.random.split(k_actor, x.shape[0])
         alpha = jnp.exp(train_state["log_alpha"])
-        batch_size = x.shape[0]
 
-        def policy_sample(actor, head, xs, keys):
-            mu = jax.vmap(functions.mean, in_axes=(None, 0))(actor, xs)
-            z = jax.vmap(functions.observe)(xs)
-            return jax.vmap(
-                functions.head.sample_and_log_prob, in_axes=(None, 0, 0, 0)
-            )(head, mu, z, keys)
+        def twin_q(w, x, a):
+            return Q.value(w["q1"], x, a), Q.value(w["q2"], x, a)
 
-        def q_values(critic, xs, acts):
-            q = jax.vmap(functions.q, in_axes=(None, 0, 0))
-            return q(critic["q1"], xs, acts), q(critic["q2"], xs, acts)
-
-        # Soft Bellman target: y = r + gamma (1 - done) [min_i Q_i'(x', a') - alpha log pi(a'|x')]
-        a_next, logp_next = policy_sample(
-            params["actor"],
-            params["head"],
-            x_next,
-            jax.random.split(k_next, batch_size),
-        )
-        q1_t, q2_t = q_values(train_state["target"], x_next, a_next)
-        y = r + self.gamma * (1.0 - done) * (
-            jnp.minimum(q1_t, q2_t) - alpha * logp_next
+        # Soft Bellman target: y = r + gamma (1 - terminated) [min_i Q_i'(x', a') - alpha ln pi(a'|x')], a' ~ pi(.|x')
+        a_next, logp_next = pi.sample_and_log_prob(theta, x_next, keys_next)
+        q1_target, q2_target = twin_q(w_target, x_next, a_next)
+        y = r + self.gamma * (1.0 - terminated) * (
+            jnp.minimum(q1_target, q2_target) - alpha * logp_next
         )
         y = jax.lax.stop_gradient(y)
 
         # Critic loss: L_Q = E[(Q_1(x, a) - y)^2] + E[(Q_2(x, a) - y)^2]
-        def critic_loss(critic):
-            q1, q2 = q_values(critic, x, a)
+        def critic_loss(w):
+            q1, q2 = twin_q(w, x, a)
             return jnp.mean((q1 - y) ** 2) + jnp.mean((q2 - y) ** 2)
 
-        # Actor loss, reparameterized: L_pi = E[alpha log pi(a|x) - min_i Q_i(x, a)]
-        def actor_loss(actor_params):
-            a_new, logp = policy_sample(
-                actor_params["actor"],
-                actor_params["head"],
-                x,
-                jax.random.split(k_actor, batch_size),
-            )
-            q1, q2 = q_values(params["critic"], x, a_new)
+        # Actor loss, reparameterized: L_pi = E[alpha ln pi(a|x) - min_i Q_i(x, a)], a ~ pi(.|x)
+        def actor_loss(theta):
+            a_new, logp = pi.sample_and_log_prob(theta, x, keys_actor)
+            q1, q2 = twin_q(w, x, a_new)
             return jnp.mean(alpha * logp - jnp.minimum(q1, q2)), logp
 
-        # Temperature loss, holding the entropy at its target: L_alpha = -log alpha E[log pi + H_target]
+        # Temperature loss, holding the entropy at its target: L_alpha = -ln alpha E[ln pi + H_target]
         def alpha_loss(log_alpha, logp):
             return -log_alpha * jnp.mean(logp + self.target_entropy)
 
-        opt = train_state["opt"]
-        critic_grads = jax.grad(critic_loss)(params["critic"])
-        critic, opt_critic = self.optimizer.update(
-            critic_grads, opt["critic"], params["critic"]
-        )
-
-        actor_params = {"actor": params["actor"], "head": params["head"]}
+        # Gradients of the three losses at the current weights, then one Adam step each
+        critic_grads = jax.grad(critic_loss)(w)
         (loss_pi, logp), actor_grads = jax.value_and_grad(actor_loss, has_aux=True)(
-            actor_params
+            theta
         )
-        actor_params, opt_actor = self.optimizer.update(
-            actor_grads, opt["actor"], actor_params
-        )
-
         alpha_grad = jax.grad(alpha_loss)(train_state["log_alpha"], logp)
+        w, opt_critic = self.optimizer.update(critic_grads, opt["critic"], w)
+        theta, opt_actor = self.optimizer.update(actor_grads, opt["actor"], theta)
         log_alpha, opt_alpha = self.optimizer.update(
             alpha_grad, opt["alpha"], train_state["log_alpha"]
         )
 
-        # Target critics, Polyak-averaged: Q' = (1 - tau) Q' + tau Q
-        target = jax.tree_util.tree_map(
-            lambda q_target, q: (1.0 - self.tau) * q_target + self.tau * q,
-            train_state["target"],
-            critic,
+        # Target critics, Polyak-averaged: Q' <- (1 - tau) Q' + tau Q
+        w_target = jax.tree_util.tree_map(
+            lambda q_target, q: (1.0 - self.tau) * q_target + self.tau * q, w_target, w
         )
+
         new_state = {
-            "params": {
-                "actor": actor_params["actor"],
-                "head": actor_params["head"],
-                "critic": critic,
-            },
-            "target": target,
+            "params": {"policy": theta, "critic": w},
+            "target": w_target,
             "log_alpha": log_alpha,
             "opt": {"actor": opt_actor, "critic": opt_critic, "alpha": opt_alpha},
         }
         stats = {
-            "critic_loss": critic_loss(critic),
+            "critic_loss": critic_loss(w),
             "actor_loss": loss_pi,
             "alpha": alpha,
             "entropy": -jnp.mean(logp),

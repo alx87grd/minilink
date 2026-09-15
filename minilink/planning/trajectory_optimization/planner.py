@@ -29,7 +29,7 @@ from minilink.optimization.reporting import (
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import SolveMetadata, TrajectoryPlan
+from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
     dynamics_function,
@@ -101,6 +101,55 @@ class TrajectoryOptimizationOptions:
     #: Redraw the iterate trajectory during the solve (matplotlib); a
     #: custom ``callback`` takes precedence.
     live_plot: bool = False
+
+
+@dataclass(frozen=True)
+class TrajectoryOptimizationRecord:
+    """
+    The optimizer's account of one solve, and the plan's constraint check.
+
+    ``success`` is *the returned plan satisfies the program constraints to
+    ``feasibility_tol``*, nothing else: an iteration-limit stop on a feasible
+    plan is not a failure, a solver that reports convergence on an infeasible
+    plan is. The solver's own flag and message stay beside it. An online tick
+    (``solve_trajectory_from`` on a compiled program) runs no residual check,
+    ``feasible`` is ``None`` and ``success`` is the solver's flag.
+    """
+
+    cost: float | None
+    solver_success: bool
+    message: str
+    iterations: int | None
+    solve_time_s: float | None
+    feasibility_tol: float
+    max_equality_violation: float | None
+    min_inequality_margin: float | None
+    max_bound_violation: float | None
+    feasible: bool | None
+    stats: dict
+
+    @property
+    def success(self) -> bool:
+        if self.feasible is None:
+            return bool(self.solver_success)
+        return bool(self.feasible)
+
+    def __str__(self) -> str:
+        cost = "n/a" if self.cost is None else f"{float(self.cost):.6g}"
+        if self.feasible is None:
+            check = "online tick, no residual check"
+        elif self.feasible:
+            check = f"feasible to {self.feasibility_tol:g}"
+        else:
+            check = f"infeasible at {self.feasibility_tol:g}"
+        if self.max_equality_violation is not None:
+            check += f" (max defect {self.max_equality_violation:.2g})"
+        solver = f"solver {'ok' if self.solver_success else 'stopped'}: {self.message}"
+        if self.iterations is not None:
+            solver += f", {self.iterations} iterations"
+        if self.solve_time_s is not None:
+            solver += f", {self.solve_time_s:.3g} s"
+        return f"J* = {cost}, {check}; {solver}"
 
 
 def _within_tolerance(max_eq, min_ineq, max_bound, tol) -> bool:
@@ -214,16 +263,31 @@ class TrajectoryOptimizationPlanner(Planner):
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
         warm_start: bool | None = None,
-    ) -> TrajectoryPlan:
-        """Offline trajopt entry (``solve_trajectory``)."""
-        return self.solve_trajectory(initial_guess=initial_guess, warm_start=warm_start)
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
+        """
+        Offline trajopt entry (``solve_trajectory``).
+
+        The solution's policy is the optimized input as a source block,
+        ``policy >> plant``; ``evaluate=True`` also replays it over the
+        problem's draws (one trial when nothing is random).
+        """
+        return self.solve_trajectory(
+            initial_guess=initial_guess,
+            warm_start=warm_start,
+            evaluate=evaluate,
+            n_trials=n_trials,
+        )
 
     def solve_trajectory(
         self,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
         warm_start: bool | None = None,
-    ) -> TrajectoryPlan:
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
         """Compute and store a trajectory-optimization solution (always rebuild)."""
         workflow_t0 = time.perf_counter()
         compile_backend = self.options.compile_backend
@@ -280,38 +344,35 @@ class TrajectoryOptimizationPlanner(Planner):
         feasible = _within_tolerance(
             max_eq, min_ineq, max_bound, self.options.feasibility_tol
         )
-        plan = self._store_trajectory_plan(
-            TrajectoryPlan(
-                trajectory=trajectory,
-                metadata=SolveMetadata(
-                    success=feasible,
-                    message=str(optimization_result.message),
-                    cost=optimization_result.cost,
-                    solve_time_s=optimization_result.solve_time_s,
-                    stats=dict(optimization_result.stats),
-                    max_equality_violation=float(max_eq),
-                    min_inequality_margin=(
-                        None if min_ineq is None else float(min_ineq)
-                    ),
-                    max_bound_violation=float(max_bound),
-                    feasible=feasible,
-                ),
-                warm_state=optimization_result.z,
-            )
+        record = TrajectoryOptimizationRecord(
+            cost=optimization_result.cost,
+            solver_success=bool(optimization_result.success),
+            message=str(optimization_result.message),
+            iterations=dict(optimization_result.stats).get("nit"),
+            solve_time_s=optimization_result.solve_time_s,
+            feasibility_tol=float(self.options.feasibility_tol),
+            max_equality_violation=float(max_eq),
+            min_inequality_margin=(None if min_ineq is None else float(min_ineq)),
+            max_bound_violation=float(max_bound),
+            feasible=feasible,
+            stats=dict(optimization_result.stats),
+        )
+        solution = self.store_solution(
+            self.trajectory_solution(trajectory, record, evaluate, n_trials)
         )
 
         if self.options.verbose:
             self._print_solve_report(
-                metadata=plan.metadata,
+                record=record,
                 result=optimization_result,
-                trajectory=plan.trajectory,
+                trajectory=trajectory,
                 transcribe_s=transcribe_s,
                 compile_s=compile_s,
                 reconstruct_s=reconstruct_s,
                 total_s=total_s,
             )
 
-        return plan
+        return solution
 
     def compile_parametric_program(self) -> None:
         """Build and JIT-compile a parametric NLP once (idempotent).
@@ -376,7 +437,9 @@ class TrajectoryOptimizationPlanner(Planner):
         *,
         params=None,
         initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> TrajectoryPlan:
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
         """
         Online traj-family solve from measured ``x0``.
 
@@ -401,9 +464,11 @@ class TrajectoryOptimizationPlanner(Planner):
         reject_unknown_online_params(params)
         if self.has_parametric_program:
             return self._solve_trajectory_from_parametric(
-                x0, initial_guess=initial_guess
+                x0, initial_guess=initial_guess, evaluate=evaluate, n_trials=n_trials
             )
-        return self._solve_trajectory_from_rebuild(x0, initial_guess=initial_guess)
+        return self._solve_trajectory_from_rebuild(
+            x0, initial_guess=initial_guess, evaluate=evaluate, n_trials=n_trials
+        )
 
     def step(
         self,
@@ -419,7 +484,9 @@ class TrajectoryOptimizationPlanner(Planner):
         x0,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> TrajectoryPlan:
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
         if self.program_evaluator is None or self.optimizer_backend is None:
             raise RuntimeError(
                 "compile_parametric_program() must run before parametric from-solve."
@@ -474,18 +541,21 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         self.last_step_time_s = time.perf_counter() - step_t0
         self.last_optimization_result = result
-        plan = self._store_trajectory_plan(
-            TrajectoryPlan(
-                trajectory=trajectory,
-                metadata=SolveMetadata(
-                    success=bool(result.success),
-                    message=str(result.message),
-                    cost=result.cost,
-                    solve_time_s=result.solve_time_s,
-                    stats=dict(result.stats),
-                ),
-                warm_state=result.z,
-            )
+        record = TrajectoryOptimizationRecord(
+            cost=result.cost,
+            solver_success=bool(result.success),
+            message=str(result.message),
+            iterations=dict(result.stats).get("nit"),
+            solve_time_s=result.solve_time_s,
+            feasibility_tol=float(self.options.feasibility_tol),
+            max_equality_violation=None,
+            min_inequality_margin=None,
+            max_bound_violation=None,
+            feasible=None,
+            stats=dict(result.stats),
+        )
+        solution = self.store_solution(
+            self.trajectory_solution(trajectory, record, evaluate, n_trials)
         )
 
         if self.options.verbose:
@@ -497,14 +567,16 @@ class TrajectoryOptimizationPlanner(Planner):
                 f"step={self.last_step_time_s:.6g}s"
             )
 
-        return plan
+        return solution
 
     def _solve_trajectory_from_rebuild(
         self,
         x0,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> TrajectoryPlan:
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
         if not self._warned_uncompiled_from:
             backend = normalize_backend(self.options.compile_backend, allow_direct=True)
             if backend == BACKEND_JAX:
@@ -529,9 +601,27 @@ class TrajectoryOptimizationPlanner(Planner):
             X0=SingletonSet(x_arr),
         )
         try:
-            return self.solve_trajectory(initial_guess=initial_guess, warm_start=False)
+            return self.solve_trajectory(
+                initial_guess=initial_guess,
+                warm_start=False,
+                evaluate=evaluate,
+                n_trials=n_trials,
+            )
         finally:
             self.problem = saved_problem
+
+    def trajectory_solution(
+        self, trajectory, record, evaluate, n_trials
+    ) -> PlanningSolution:
+        """The schedule as a solution: its input replayed by a source block, scored over the draws when asked."""
+        policy = self.open_loop_policy(trajectory)
+        evaluation = None
+        if evaluate:
+            dt = float(trajectory.t[1] - trajectory.t[0])
+            evaluation = self.evaluate(
+                policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
+            )
+        return PlanningSolution(policy, record, trajectory, evaluation)
 
     def _make_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray
@@ -570,8 +660,8 @@ class TrajectoryOptimizationPlanner(Planner):
             return initial_guess
 
         use_warm_start = self.options.warm_start if warm_start is None else warm_start
-        if use_warm_start and self.last_trajectory_plan is not None:
-            return self.last_trajectory_plan.trajectory
+        if use_warm_start and self.last_solution is not None:
+            return self.last_solution.trajectory
 
         if self.options.initial_guess is not None:
             return self.options.initial_guess
@@ -701,7 +791,7 @@ class TrajectoryOptimizationPlanner(Planner):
     def _print_solve_report(
         self,
         *,
-        metadata: SolveMetadata,
+        record: TrajectoryOptimizationRecord,
         result: OptimizationResult,
         trajectory: Trajectory,
         transcribe_s: float,
@@ -713,16 +803,16 @@ class TrajectoryOptimizationPlanner(Planner):
         print(DISP_RULE_DIV)
         print(
             "success:",
-            metadata.success,
+            record.success,
             f"(plan feasible to tol={self.options.feasibility_tol:g})",
         )
         print("solver success:", result.success)
         print("message:", result.message)
         print("J*:", result.cost)
         print("stats:", result.stats)
-        print("max_eq:", metadata.max_equality_violation)
-        print("min_ineq:", metadata.min_inequality_margin)
-        print("max_bound:", metadata.max_bound_violation)
+        print("max_eq:", record.max_equality_violation)
+        print("min_ineq:", record.min_inequality_margin)
+        print("max_bound:", record.max_bound_violation)
         print("x(0):", preview_vector(trajectory.x[:, 0]))
         print("x(tf):", preview_vector(trajectory.x[:, -1]))
         if self.problem.x_goal is not None:

@@ -230,7 +230,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(guess.x[:, 0], x_start)
         np.testing.assert_allclose(guess.x[:, -1], x_goal)
 
-    def test_planner_require_trajectory_plan_before_solve(self):
+    def test_planner_require_solution_before_solve(self):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(
@@ -243,7 +243,9 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
         with self.assertRaises(ValueError):
-            planner.require_trajectory_plan()
+            planner.require_solution()
+        with self.assertRaises(ValueError):
+            planner.get_controller()
 
     def test_mathematical_program_constraints_are_backend_neutral(self):
         program = MathematicalProgram(
@@ -785,8 +787,15 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
             seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
         ),
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert planner.reached_goal and solution.success
+    assert solution.solver.reached_goal and solution.solver.nodes == len(
+        planner.tree.nodes
+    )
+    assert (
+        int(solution.policy.m) == 0 and solution.evaluation is None
+    )  # open loop; no cost to score
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -1108,8 +1117,11 @@ def test_rrt_star_reaches_goal():
         extender=make_steering_extender(),
         options=RRTStarOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert planner.reached_goal and solution.success
+    assert solution.solver.cost == planner.best_goal_cost
+    assert solution.solver.converged == planner.converged
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -2345,7 +2357,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             transcription="direct_collocation",
             compile_backend="numpy",
         ).solve()
-        md = plan.metadata
+        md = plan.solver
         self.assertTrue(md.success)
         self.assertTrue(md.feasible)
         self.assertIsNotNone(md.max_equality_violation)
@@ -2359,7 +2371,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             transcription="direct_collocation",
             compile_backend="numpy",
         ).solve()
-        md = plan.metadata
+        md = plan.solver
         self.assertFalse(md.feasible)
         self.assertFalse(md.success)
         self.assertGreater(md.max_equality_violation, 1e-3)
@@ -2383,9 +2395,10 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
                 transcription="direct_collocation",
                 compile_backend="numpy",
             ).solve()
-        self.assertEqual(plan.metadata.message, "solver claims success")
-        self.assertFalse(plan.metadata.feasible)
-        self.assertFalse(plan.metadata.success)
+        self.assertEqual(plan.solver.message, "solver claims success")
+        self.assertTrue(plan.solver.solver_success)
+        self.assertFalse(plan.solver.feasible)
+        self.assertFalse(plan.success)
 
 
 class TestDpOneObjectSetup(unittest.TestCase):
@@ -2419,22 +2432,34 @@ class TestDpOneObjectSetup(unittest.TestCase):
         capped = DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, max_iterations=2
         ).solve()
-        self.assertFalse(capped.metadata.success)
-        self.assertIn("max_iterations", capped.metadata.message)
-        self.assertEqual(capped.metadata.stats["iterations"], 2)
+        self.assertFalse(capped.success)
+        self.assertIn("max_iterations", str(capped.solver))
+        self.assertEqual(capped.solver.iterations, 2)
 
-        converged = DynamicProgrammingPlanner(
+        planner = DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, tol=1.0, max_iterations=500
-        ).solve()
-        self.assertTrue(converged.metadata.success)
-        self.assertIn("converged", converged.metadata.message)
-        self.assertLessEqual(converged.policy.delta, 1.0)
+        )
+        converged = planner.solve()
+        self.assertTrue(converged.success)
+        self.assertIn("converged", str(converged.solver))
+        self.assertLessEqual(converged.solver.delta, 1.0)
+        # the solution is the pair: the greedy lookup law and the interpolated cost-to-go
+        self.assertIs(converged.policy, planner.get_controller())
+        self.assertEqual(
+            converged.cost_to_go(problem.x_start), planner.value_at(problem.x_start)
+        )
+        self.assertIsNone(converged.trajectory)  # not rolled out unless asked
 
         fixed = DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05
-        ).solve_steps(3)
-        self.assertTrue(fixed.metadata.success)
-        self.assertEqual(fixed.policy.iterations, 3)
+        ).solve_steps(3, evaluate=True)
+        self.assertTrue(fixed.success)
+        self.assertEqual(fixed.solver.iterations, 3)
+        self.assertEqual(
+            fixed.evaluation.n_trials, 1
+        )  # a deterministic problem: one trial
+        np.testing.assert_allclose(fixed.trajectory.x[:, 0], problem.x_start)
+        self.assertAlmostEqual(fixed.trajectory.t[1] - fixed.trajectory.t[0], 0.05)
 
     def test_final_time_reads_the_problem_horizon(self):
         from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner

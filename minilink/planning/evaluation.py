@@ -1,5 +1,5 @@
 """
-Scoring and Monte Carlo evaluation of controllers on a planning problem (the second verb).
+Scoring and Monte Carlo evaluation of policies on a planning problem (the second verb).
 
 ``solve(problem)`` finds a law; ``evaluate(problem, law)`` scores one. Both
 verbs, and the reporting of every planner, use one contract for the cost of a
@@ -14,16 +14,18 @@ sampled trajectory, :func:`score_trajectory`:
 - plus the terminal cost ``h(x_f, tf)`` when a finite horizon is reached.
 
 :class:`MonteCarloEvaluator` draws initial states (and plant parameters and
-disturbances when the problem randomizes them), closes the loop with a
-state-feedback block, samples the closed loop on the control grid, and
-reports the distribution of that score: mean, spread, worst case, failure
-rate. Three backends produce the samples:
+disturbances when the problem randomizes them), connects the policy by what
+its ports declare — a feedback block ``u = pi(x)`` through ``@``, an
+open-loop source ``u = pi(t)`` (a planned input, replayed) through ``>>`` —
+samples the loop on the control grid, and reports the distribution of that
+score as an :class:`Evaluation`: mean, spread, worst case, failure rate. A
+deterministic problem gives one trial. Three backends produce the samples:
 
 - ``"jax"``: every trial in one ``vmap`` over the compiled plant, the law held
-  over each control period (static laws ``u = pi(x)`` that trace);
+  over each control period (static laws that trace, and sources);
 - ``"numpy"``: the same held-input RK4 samples, one trial at a time on the
-  NumPy evaluator (static laws; identical numbers, no JAX needed);
-- ``"simulator"``: the continuous-time closed loop integrated by the
+  NumPy evaluator (identical numbers, no JAX needed);
+- ``"simulator"``: the continuous-time loop integrated by the
   :class:`~minilink.simulation.simulator.Simulator` (any controller, dynamic
   ones included; no parameter or disturbance draws).
 
@@ -44,7 +46,7 @@ import numpy as np
 
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.trajectory import Trajectory
-from minilink.planning.problems import merge_params
+from minilink.planning.problems import as_stochastic
 
 # Public API
 
@@ -75,13 +77,29 @@ def score_trajectory(problem, traj: Trajectory, params=None):
 
 
 @dataclass
-class MonteCarloReport:
-    """Per-trial costs and their summary; ``failed`` marks trials that left the box."""
+class Evaluation:
+    """
+    The cost of a policy on the problem's draws: per-trial ``J`` and its summary.
+
+    ``failed`` marks the trials that left the allowed box; ``x0`` holds the
+    starts; ``trajectories`` the recorded trials when asked for. One trial is
+    a deterministic problem's whole evaluation.
+    """
 
     J: np.ndarray
     failed: np.ndarray
     x0: np.ndarray
     trajectories: list | None = None
+
+    @classmethod
+    def of_trajectory(cls, problem, traj: Trajectory) -> "Evaluation":
+        """One trial: a sampled trajectory scored under the problem's contract."""
+        J, failed = score_trajectory(problem, traj)
+        return cls(np.array([J]), np.array([failed]), traj.x[:, :1].T.copy(), [traj])
+
+    @property
+    def n_trials(self) -> int:
+        return int(np.size(self.J))
 
     @property
     def mean(self) -> float:
@@ -108,20 +126,25 @@ class MonteCarloReport:
         raise ValueError(f"unknown criterion {criterion!r}")
 
     def __str__(self) -> str:
+        if self.n_trials == 1:
+            note = ", left the box" if bool(self.failed[0]) else ""
+            return f"J = {self.mean:.2f}{note}"
         return (
-            f"J over {self.J.size} trials: mean {self.mean:.2f}, std {self.std:.2f}, "
+            f"J over {self.n_trials} trials: mean {self.mean:.2f}, std {self.std:.2f}, "
             f"worst {self.worst:.2f}, failure rate {100 * self.failure_rate:.0f}%"
         )
 
 
 class MonteCarloEvaluator:
     """
-    Score a controller over draws of a stochastic planning problem.
+    Score a policy over the draws of a planning problem.
 
     Parameters
     ----------
     problem : StochasticPlanningProblem
-        Task (plant, cost, box, exit rule, horizon, distributions).
+        Task (plant, cost, box, exit rule, horizon, distributions). A
+        deterministic :class:`~minilink.planning.problems.PlanningProblem` is
+        scored from its single start.
     dt : float
         Control period (the law is held over it) and sampling step.
     n_trials : int
@@ -151,7 +174,7 @@ class MonteCarloEvaluator:
         seed=0,
         record=False,
     ):
-        self.problem = problem
+        self.problem = as_stochastic(problem)
         self.dt = float(dt)
         self.n_trials = int(n_trials)
         self.episode_length = episode_length
@@ -168,8 +191,8 @@ class MonteCarloEvaluator:
             return float(problem.tf)
         return 10.0 if self.episode_length is None else float(self.episode_length)
 
-    def evaluate(self, controller) -> MonteCarloReport:
-        """Return the :class:`MonteCarloReport` of ``controller`` on the problem."""
+    def evaluate(self, controller) -> Evaluation:
+        """Return the :class:`Evaluation` of a policy block on the problem."""
         if self.backend == "jax":
             return self.evaluate_jax(controller)
         if self.backend == "numpy":
@@ -178,122 +201,100 @@ class MonteCarloEvaluator:
 
     # Internal machinery
 
-    def evaluate_jax(self, controller) -> MonteCarloReport:
+    def evaluate_jax(self, controller) -> Evaluation:
         jax, jnp = require_jax(), require_jax_numpy()
         from minilink.planning.reinforcement_learning.environment import (
             RolloutEnvironment,
         )
 
         env = RolloutEnvironment(self.problem, dt=self.dt, episode_length=self.tf)
-        n_steps = env.n_steps_per_episode
-        law = static_law(controller, backend="jax")
-        charged = env.charge_exit
-        finite = env.finite_horizon
-        dt = env.dt
-        rho = env.discount_rate
-        x_lb, x_ub = env.x_lb, env.x_ub
+        dt, rho, g = env.dt, env.discount_rate, env.cost.g
+        law = control_law(
+            controller, dt * np.arange(env.n_steps_per_episode + 1), "jax"
+        )
 
         def trial(key):
-            k0, k_theta, k_steps = jax.random.split(key, 3)
+            k0, k_params, k_steps = jax.random.split(key, 3)
             x0 = env.reset(k0)
-            theta = env.sample_params(k_theta)
+            params = env.sample_params(k_params)
 
             def body(carry, key):
                 x, t, J, alive, failed = carry
-                u = law(x)
-                u_full = env.input_vector(u, key)
-                g = jnp.exp(-rho * t) * env.running_cost(
-                    x, u_full[env.port_slices[env.action_port]], t
-                )
-                x_next = env.plant_step(x, u_full, t, theta)
+                u = law(x, t)
+                x_next = env.plant_step(x, env.input_vector(u, key), t, params)
                 t_next = t + dt
-                u_next = law(x_next)
-                g_next = jnp.exp(-rho * t_next) * env.running_cost(
-                    x_next, u_next, t_next
-                )
-                # trapezoid on this interval while alive; an exit sample is the last one counted
-                J = J + alive * 0.5 * (g + g_next) * dt
+
+                # Discounted running cost at both ends of the period, trapezoid while alive
+                g_k = jnp.exp(-rho * t) * g(x, u, t)
+                g_next = jnp.exp(-rho * t_next) * g(x_next, law(x_next, t_next), t_next)
+                J = J + alive * 0.5 * (g_k + g_next) * dt
+
+                # An exit sample is the last one counted, and is charged when priced
                 out = (
-                    jnp.any(x_next < x_lb)
-                    | jnp.any(x_next > x_ub)
+                    jnp.any(x_next < env.x_lb)
+                    | jnp.any(x_next > env.x_ub)
                     | ~jnp.all(jnp.isfinite(x_next))
                 )
                 exits = alive & out
-                if charged:
-                    penalty = env.problem.exit_penalty(x_next, t_next)
-                    J = J + exits * (0.0 if penalty is None else penalty)
+                if env.charge_exit:
+                    J = J + exits * env.exit_penalty(x_next, t_next)
                 failed = failed | exits
                 alive = alive & ~out
                 return (x_next, t_next, J, alive, failed), None
 
             init = (x0, 0.0, 0.0, jnp.bool_(True), jnp.bool_(False))
             (x, t, J, alive, failed), _ = jax.lax.scan(
-                body, init, jax.random.split(k_steps, n_steps)
+                body, init, jax.random.split(k_steps, env.n_steps_per_episode)
             )
-            if finite:
+            if env.finite_horizon:
                 J = J + alive * env.cost.h(x, t)
             return J, failed, x0
 
         keys = jax.random.split(jax.random.PRNGKey(self.seed), self.n_trials)
         J, failed, x0 = jax.jit(jax.vmap(trial))(keys)
-        return MonteCarloReport(np.asarray(J), np.asarray(failed), np.asarray(x0))
+        return Evaluation(np.asarray(J), np.asarray(failed), np.asarray(x0))
 
-    def evaluate_numpy(self, controller) -> MonteCarloReport:
+    def evaluate_numpy(self, controller) -> Evaluation:
+        from minilink.planning.reinforcement_learning.environment import (
+            RolloutEnvironment,
+        )
+
         problem = self.problem
-        sys = problem.sys
-        evaluator = sys.compile(backend="numpy", verbose=False)
-        law = static_law(controller, backend="numpy")
+        env = RolloutEnvironment(
+            problem, dt=self.dt, episode_length=self.tf, backend="numpy"
+        )
         rng = np.random.default_rng(self.seed)
-        n_steps = int(round(self.tf / self.dt))
-        dt = self.dt
-        u_nominal = np.asarray(sys.get_u_from_input_ports(), dtype=float)
-        slices, i = {}, 0
-        for port_id, port in sys.inputs.items():
-            slices[port_id] = slice(i, i + port.dim)
-            i += port.dim
-        action_port = env_action_port(sys)
-        randomizes = bool(getattr(problem, "params_distribution", None))
+        n_steps, dt = env.n_steps_per_episode, env.dt
+        law = control_law(controller, dt * np.arange(n_steps + 1), "numpy")
 
         J = np.zeros(self.n_trials)
         failed = np.zeros(self.n_trials, dtype=bool)
         x0s = np.asarray(problem.sample_x0(rng, n=self.n_trials), dtype=float)
         trajectories = [] if self.record else None
         for i, x0 in enumerate(x0s):
-            params = (
-                merge_params(sys.params, problem.sample_params(rng))
-                if randomizes
-                else None
-            )
+            params = env.sample_params(rng)
             t = dt * np.arange(n_steps + 1)
-            xs = np.zeros((sys.n, n_steps + 1))
-            us = np.zeros((sys.inputs[action_port].dim, n_steps + 1))
+            xs = np.zeros((env.n, n_steps + 1))
+            us = np.zeros((env.m, n_steps + 1))
             xs[:, 0] = x0
+
+            # The law held over each control period, one plant step at a time
             for k in range(n_steps + 1):
-                us[:, k] = law(xs[:, k])
+                us[:, k] = law(xs[:, k], t[k])
                 if k == n_steps:
                     break
-                u_full = u_nominal.copy()
-                u_full[slices[action_port]] = us[:, k]
-                for port_id, value in problem.sample_disturbances(rng).items():
-                    u_full[slices[port_id]] = value
-                if params is None:
-                    xs[:, k + 1] = evaluator.rk4_step(xs[:, k], u_full, t[k], dt)
-                else:
-                    xs[:, k + 1] = evaluator.rk4_step_p(
-                        xs[:, k], u_full, t[k], dt, params
-                    )
+                u_full = env.input_vector(us[:, k], rng)
+                xs[:, k + 1] = env.plant_step(xs[:, k], u_full, t[k], params)
             traj = Trajectory(t=t, x=xs, u=us)
             J[i], failed[i] = score_trajectory(problem, traj)
             if trajectories is not None:
                 trajectories.append(traj)
-        return MonteCarloReport(J, failed, x0s, trajectories)
+        return Evaluation(J, failed, x0s, trajectories)
 
-    def evaluate_simulator(self, controller) -> MonteCarloReport:
+    def evaluate_simulator(self, controller) -> Evaluation:
         problem = self.problem
         sys = problem.sys
-        if getattr(problem, "params_distribution", None) or getattr(
-            problem, "disturbances", None
-        ):
+        if problem.params_distribution or problem.disturbances:
             warnings.warn(
                 "the simulator backend ignores parameter and disturbance draws; "
                 "use backend='jax' or 'numpy' for a randomized plant",
@@ -309,7 +310,11 @@ class MonteCarloEvaluator:
         try:
             for i, x0 in enumerate(x0s):
                 sys.x0 = np.asarray(x0, dtype=float)
-                cl_sys = controller @ sys
+
+                # An open-loop source drives the plant in series; a feedback block closes the loop
+                cl_sys = (
+                    controller >> sys if int(controller.m) == 0 else controller @ sys
+                )
                 cl_traj = cl_sys.compute_trajectory(
                     tf=self.tf, dt=self.dt, verbose=False
                 )
@@ -323,13 +328,49 @@ class MonteCarloEvaluator:
                     trajectories.append(traj)
         finally:
             sys.x0 = x0_saved
-        return MonteCarloReport(J, failed, x0s, trajectories)
+        return Evaluation(J, failed, x0s, trajectories)
+
+
+def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
+    """
+    The policy from the problem's start on a control grid, nominal parameters and disturbances.
+
+    One recorded trial of the NumPy evaluator on the certainty-equivalent
+    problem: the trajectory a feedback planner reports beside its policy.
+    """
+    nominal = problem.nominal() if problem.is_stochastic else problem
+    evaluator = MonteCarloEvaluator(
+        nominal, dt=dt, n_trials=1, episode_length=tf, backend="numpy", record=True
+    )
+    return evaluator.evaluate(policy).trajectories[0]
 
 
 def env_action_port(sys) -> str:
     from minilink.control.neural import action_port_of
 
     return action_port_of(sys)
+
+
+def control_law(controller, t, backend="jax"):
+    """``u = pi(x, t)`` of a policy block: a source by its time table, a feedback block by its state law."""
+    if int(controller.m) == 0:
+        return time_law(controller, t, backend)
+    pi = static_law(controller, backend)
+    return lambda x, t: pi(x)
+
+
+def time_law(source, t, backend="jax"):
+    """``u = pi(t)`` of a source block, sampled on the trial grid ``t`` and held over each period."""
+    empty = np.zeros(0)
+    table = np.stack(
+        [np.asarray(source.h(empty, empty, float(t_k)), dtype=float) for t_k in t]
+    )
+    dt = float(t[1] - t[0])
+    if backend == "jax":
+        jnp = require_jax_numpy()
+        table = jnp.asarray(table)
+        return lambda x, t: table[jnp.rint(t / dt).astype(int)]
+    return lambda x, t: table[int(round(t / dt))]
 
 
 def static_law(controller, backend="jax"):

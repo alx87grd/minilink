@@ -1,9 +1,10 @@
-"""Planning: problems, trajectory optimization, dynamic programming, search.
+"""Planning: problems, trajectory optimization, dynamic programming, reinforcement learning, search.
 
 Band facade for short teaching imports::
 
     from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
     from minilink.planning import StateSpaceGrid, DynamicProgrammingPlanner
+    from minilink.planning import ReinforcementLearningPlanner, TabularLearningPlanner
 
 Defining modules stay importable (``minilink.planning.problems``, ...).
 """
@@ -26,9 +27,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Uniform": ("minilink.planning.distributions", "Uniform"),
     "Particles": ("minilink.planning.distributions", "Particles"),
     "Sampler": ("minilink.planning.distributions", "Sampler"),
-    "TrajectoryPlan": ("minilink.planning.results", "TrajectoryPlan"),
-    "PolicyPlan": ("minilink.planning.results", "PolicyPlan"),
-    "SolveMetadata": ("minilink.planning.results", "SolveMetadata"),
+    "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     # trajectory optimization
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
@@ -64,8 +63,17 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.reinforcement_learning.planner",
         "ReinforcementLearningPlanner",
     ),
+    "TabularLearningPlanner": (
+        "minilink.planning.reinforcement_learning.tabular",
+        "TabularLearningPlanner",
+    ),
+    "EpsilonGreedy": (
+        "minilink.planning.reinforcement_learning.tabular",
+        "EpsilonGreedy",
+    ),
+    "UCB": ("minilink.planning.reinforcement_learning.tabular", "UCB"),
     "MonteCarloEvaluator": ("minilink.planning.evaluation", "MonteCarloEvaluator"),
-    "MonteCarloReport": ("minilink.planning.evaluation", "MonteCarloReport"),
+    "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     # spatial scene: tracks, collision geometry, cost shaping
     "ReferenceTrack": ("minilink.planning.spatial.track", "ReferenceTrack"),
     "from_waypoints": ("minilink.planning.spatial.paths", "from_waypoints"),

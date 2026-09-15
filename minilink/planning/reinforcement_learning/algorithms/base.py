@@ -5,55 +5,47 @@ from abc import ABC, abstractmethod
 # Public API
 
 
-class PolicyFunctions:
-    """
-    Callables an algorithm consumes, built once by the planner.
-
-    ``mean(actor_params, x)`` normalized mean action; ``observe(x)`` the
-    policy's features; ``m`` the action dimension; ``head`` the exploration
-    distribution; ``value(critic_params, x)`` state value (on-policy) or
-    ``q(q_params, x, a)`` action value (off-policy).
-    """
-
-    def __init__(self, *, mean, head, observe, m, value=None, q=None):
-        self.mean = mean
-        self.head = head
-        self.observe = observe
-        self.m = int(m)
-        self.value = value
-        self.q = q
-
-
 class Algorithm(ABC):
     """
-    Update rule of a reinforcement learning method.
+    Update rule of a reinforcement learning method, and its train state.
 
-    An algorithm receives the callables the planner built from the policy
-    block, the exploration head and the critics, initializes its train state
-    (weights plus optimizer moments, target networks, temperatures) and
-    updates it from a batch of experience. Everything else is shared, so a new
-    method is one file subclassing this class. ``on_policy`` declares which
-    training loop the planner runs: collect a rollout then update, or step,
-    store in the replay buffer, and update from samples.
+    The planner builds the stochastic policy and the critic the method's
+    family needs and binds them with the one discount; ``init`` creates the
+    train state (weights, optimizer moments, target networks, temperatures)
+    and ``update`` moves it from a batch of experience. Everything else is
+    shared, so a new method is one file subclassing this class.
+
+    Three class attributes state the family. ``on_policy`` chooses the
+    planner's loop: collect a batch then update, or step, store and update
+    from replayed minibatches. ``head_kind`` names the exploration
+    distribution, ``"gaussian"`` or ``"squashed"``. ``critic_kind`` names
+    what the critic estimates, ``"V"``, ``"Q"`` or ``None``. An ``episodic``
+    method learns from complete episodes: every plant restarts before a
+    collection, which then lasts one episode.
     """
 
     on_policy = True
+    head_kind = "gaussian"
+    critic_kind = "V"
+    episodic = False
 
     #: Discount per control period; ``None`` until the planner resolves it in :meth:`bind`.
     gamma = None
 
-    #: The policy and critic callables, set by :meth:`bind`.
-    functions = None
+    #: The stochastic policy and its critic, bound by the planner.
+    policy = None
+    critic = None
 
-    def bind(self, functions: PolicyFunctions, gamma: float):
-        """Receive the policy and critic callables and the one discount (called once by the planner)."""
-        self.functions = functions
+    def bind(self, policy, critic, gamma):
+        """Receive the policy, its critic (``None`` for a critic-free method) and the one discount."""
+        self.policy = policy
+        self.critic = critic
         self.gamma = float(gamma)
         return self
 
     @abstractmethod
-    def init(self, key, params):
-        """Train state from the initial ``params`` pytree ``{"actor", "head", "critic", ...}``."""
+    def init(self, key):
+        """Train state from the policy's and the critic's initial weights."""
         ...
 
     @abstractmethod
@@ -63,5 +55,5 @@ class Algorithm(ABC):
 
     @staticmethod
     def params(train_state):
-        """Current weights pytree from a train state."""
+        """Current weights pytree ``{"policy", "critic"}`` from a train state."""
         return train_state["params"]

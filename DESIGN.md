@@ -131,9 +131,10 @@ provisional planning / MPC / hybrid bands. The `experimental/` tier,
   computed torque, `estimation/` EKFs.)
 - **Exception:** `control/mpc` may import `planning.trajectory_optimization`
   (receding-horizon controller wraps a traj-family planner).
-- **Exception:** `planning.reinforcement_learning` and `planning.evaluation`
-  may import `control.neural` and `blocks.neural` (a learned law is a control
-  block, and the critics share its multilayer perceptron).
+- **Exception:** `planning.reinforcement_learning`, `planning.evaluation`
+  and `planning.planner` may import `control.neural` and `blocks` (a learned
+  law is a control block, the critics share its multilayer perceptron, and an
+  open-loop plan is a `TrajectorySource` block).
 - Libraries may ship **factories for their own blocks** with array-in /
   block-out signatures (`control.lqr(A, B, Q, R) -> StateFeedback`,
   `estimation.kalman_design(A, C, Q, R) -> KalmanFilter`); the linearization
@@ -333,8 +334,8 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   ``Computer.x``. Deploy / hand loop:
   :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.compute_command`
   → :class:`~minilink.control.mpc.controller.Command`; telemetry via
-  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.get_solve_metadata`
-  and ``Command.metadata`` (alias of ``plan.metadata``); ``reset()`` clears
+  :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.get_solver_record`
+  and ``Command.solver`` (the record of ``Command.solution``); ``reset()`` clears
   deploy counter, last command, nominal cache, and tick latch. High-rate
   nominal (opt-in):
   :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.generate_nominal_interpolator`
@@ -806,8 +807,16 @@ kind is class-type routing only — ``solver_info["continuous_time_equation"]`` 
 `tf` (`None` unset, `+inf` infinite-horizon, or a finite length — trajopt/MPC
 require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 `x_start`/`x_goal` are shortcuts/representative points. Offline entry is
-`Planner.solve()` → `TrajectoryPlan` (traj family) or `PolicyPlan` (policy
-family).
+`Planner.solve()` → `PlanningSolution`, one result for every planner: the
+`policy` (a controller block `u = pi(x)`, or a `TrajectorySource` `u = pi(t)`
+for the trajectory family — `solution.open_loop`), the `solver` record (one
+frozen dataclass per planner with `success` and a one-line `str`), the
+`trajectory` (native for open-loop planners; the feedback law's nominal
+rollout on the planner's grid otherwise), the Monte Carlo `evaluation`, and
+`cost_to_go` where the method produces one (the DP and tabular tables; the RL
+critic when the training discount equals the cost's). A planner computes only
+what its solve computes natively; `solve(evaluate=True, n_trials=)` fills the
+rest through the evaluator. `get_controller()` returns the policy.
 
 **Cost horizon and exit rule (landed 2026-09-10, research lane → planning
 band):** a `CostFunction` states its `horizon` (`"finite"` with `h` at `tf`,
@@ -853,7 +862,7 @@ stochastic one.
 
 **Monte Carlo evaluation (the second verb):** `MonteCarloEvaluator(problem,
 dt=, n_trials=, backend=)` scores any state-feedback block on the draws —
-`MonteCarloReport` with per-trial `J`, mean / std / worst / failure rate
+an `Evaluation` with per-trial `J`, mean / std / worst / failure rate
 (trials that left the box), `value(criterion)`. `backend="jax"` vmaps the
 compiled held-input rollout (static laws; parameter and disturbance draws
 applied); `backend="numpy"` produces the same samples one trial at a time on
@@ -863,20 +872,56 @@ draws. No backend clips the law: port bounds are information, and saturation
 lives inside the law or in a `Saturation` block. Same contract for LQR, DP, MPC
 and RL laws.
 
-**Reinforcement learning (`planning/reinforcement_learning/`):**
+**Reinforcement learning (`planning/reinforcement_learning/`):** two
+policy-family planners beside DP, one per representation of the law.
+
+`TabularLearningPlanner(problem, x_grid=, u_grid=, dt=, algorithm=)` learns
+the cost-to-go table `Q(x, u)` on a `StateSpaceGrid` from transitions alone,
+NumPy only: the state is rounded to its nearest node, the action taken among
+the grid's input levels, and every algorithm is a moving average toward its
+own sample of the cost-to-go, `Q <- Q + eta (q - Q)`: `QLearning` (target
+`c + alpha min Q(x', .)`, off-policy), `SARSA` (the action taken next,
+on-policy), `MonteCarloControl` (the cost observed to the episode's end).
+Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. The result is
+a `DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), so
+`plot_cost2go`, `plot_policy` and `get_controller` (a `LookupTableController`)
+are those of value iteration, and the same grid solved by
+`DynamicProgrammingPlanner` is the exact answer the learner approaches.
+
 `ReinforcementLearningPlanner(problem, dt=, hidden=, features=, algorithm=)`
-is a policy-family planner beside DP: `solve(timesteps=)` → `PolicyPlan`
-(controller, weights, history), `get_controller()` →
+learns a neural law in pure JAX: `solve(timesteps=)` → `PlanningSolution`
+(the controller as `policy`, a `ReinforcementLearningRecord`, the critic as
+`cost_to_go` when the discounts match), `get_controller()` →
 `control.neural.NeuralPolicyController` (`u = u_mid + u_half · squash(MLP(z(x)))`,
 weights in `params["mlp"]`, features normalized by the state box or a user
-map), `solve_trajectory_from(x0)` → `TrajectoryPlan` of the learned law.
-Shared machinery — `RolloutEnvironment` (the problem's semantics as pure
-JAX step functions), heads (`GaussianHead`, `SquashedGaussianHead`), critics
-(`ValueFunction`, `QFunction`), collectors (`rollout` scan + GAE,
-`collect_transitions` + `ReplayBuffer`), `Adam` — and one file per algorithm
-under `algorithms/` (`PPO` on-policy, `SAC` off-policy) holding only its
-update rule and train state; `Algorithm.on_policy` picks the planner's loop.
-Bare JAX, no Flax/Optax dependency; an Optax-style optimizer can be passed.
+map), `solve_trajectory_from(x0)` → a `PlanningSolution` carrying the
+learned law's rollout.
+What the algorithm trains is a `StochasticPolicy`: the controller block's
+mean action with an exploration head around it (`GaussianHead`, a learned
+state-independent spread, for the policy-gradient family;
+`SquashedGaussianHead`, tanh with a state-dependent spread, for SAC), one
+pytree `theta = {"mlp", "head"}`, and the methods `sample`, `log_prob`,
+`entropy` and `input(a)` (the normalized action mapped onto the port bounds)
+on one state or a batch. Critics `ValueFunction` (`V_w(x)`) and `QFunction`
+(`Q_w(x, a)`) sit on the same features. One collector, `rollout`, scans
+`n_envs` plants over `n_steps` and returns transitions
+`(x, a, reward, x_next, terminated, done)`; `advantages` forms the critic's
+TD errors and `gae` runs the λ-recursion; `returns_to_go` the Monte Carlo
+return; `ReplayBuffer` stores transitions for off-policy methods. One file
+per algorithm under `algorithms/`, each owning only its update rule and train
+state: `REINFORCE` (complete episodes, no critic), `ActorCritic` (one step
+per batch on the advantage), `PPO` (clipped ratio, epochs of minibatches),
+`SAC` (twin Q, replay, temperature). Three class attributes declare the
+family: `on_policy` picks the planner's loop, `head_kind` the exploration
+head, `critic_kind` the critic (`"V"`, `"Q"` or `None`); an `episodic`
+method restarts every plant before a collection. Bare JAX, no Flax/Optax
+dependency; an Optax-style optimizer can be passed. Training is silent unless
+`verbose=True`.
+
+`RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
+step functions on either backend — the reward `r = -g dt`, the exit rule and
+the horizon — shared by the JAX collectors, the tabular learners and the NumPy
+Monte Carlo trials, so one object owns what an episode means.
 `control.angle_features(angles, scales)` builds the periodic feature map
 (`cos, sin` per listed angle, scaled rates). The action port is `u` when the
 plant has one, else its single input port — so an inner loop `impedance @
@@ -886,19 +931,24 @@ box or blows up (non-finite state) ends the episode. The learned law is a `Syste
 through the network, and the parametric tier (`rk4_step_trace_p` with
 `params={"ctl": ..., "sys": ...}`) gives gradients of a rollout with respect
 to the policy weights. Official demos: `examples/demos/rl/`; the tutorial
-chapter is `examples/tutorial/11_reinforcement_learning.ipynb`. The
+chapter is `examples/tutorial/11_reinforcement_learning.ipynb`, the
+algorithm ladder from value iteration to PPO is
+`examples/teaching/reinforcement_learning/from_value_iteration_to_ppo.ipynb`. The
 spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `bind`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos
 import through the teaching surface.
 
 **Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
-`TrajectoryPlan`. `SolveMetadata.success` means *the returned plan satisfies the
-program constraints to `feasibility_tol`* — nothing else: an iteration-limit
-stop on a feasible plan is not a failure, a solver that reports convergence on
-an infeasible plan is, and the solver's own flag stays in `message` / `stats`.
-The worst equality residual / inequality margin / bound violation are recorded
-on the metadata. Online ticks (`solve_trajectory_from`, the MPC path) report
+`PlanningSolution` whose policy is a linear `TrajectorySource` of the knot
+inputs (the transcriptions integrate a linear input between knots, so
+`policy >> plant` replays the plan). `TrajectoryOptimizationRecord.success`
+means *the returned plan satisfies the program constraints to
+`feasibility_tol`* — nothing else: an iteration-limit stop on a feasible plan
+is not a failure, a solver that reports convergence on an infeasible plan is,
+and the solver's own flag stays in `message` / `stats`. The worst equality
+residual / inequality margin / bound violation are recorded on the record.
+Online ticks (`solve_trajectory_from`, the MPC path) report
 the solver flag without a residual check. **I-level constructors** take flat kwargs
 (`n_steps=…`, `transcription="direct_collocation"`, `compile_backend=…`,
 `optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
@@ -933,10 +983,9 @@ default.
 itself (`grid=` for a custom one), and `solve()` then pins saturated
 cost-to-go cells to `out_of_bound_cost` (`clean_infeasible=False` keeps the raw
 table; `clean_infeasible_set(tol)` reruns the pass with another tolerance).
-`PolicyPlan.metadata.success` means the sweeps converged to `tol` (a
-fixed-horizon `solve_steps` always succeeds); `message` and `stats` carry the
-sweep count and the last cost-to-go change. `final_time` reads `problem.tf`
-when the problem sets one.
+`ValueIterationRecord.success` means the sweeps converged to `tol` (a
+fixed-horizon `solve_steps` always succeeds); the record carries the sweep
+count and the last cost-to-go change.
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
@@ -944,8 +993,10 @@ comes from a `BoxSet`/`BoxInputSet` (so it stays finite), grid *validity* from
 `X.contains`/`U.contains` (so `X = bounds & free` still works), and successors from a
 forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the grid, not
 on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
-to tolerance, `solve_steps` for a fixed horizon — returning a `PolicyPlan` whose
-`.policy` holds cost-to-go `J` and greedy policy `pi` (action ids); out-of-domain
+to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
+`policy` is the `LookupTableController` of the greedy table and whose `cost_to_go`
+interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on
+`planner.result`); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`). Three interchangeable backward-step backends share this workflow: `loop` (per-node
 Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table, the default),
@@ -1001,7 +1052,8 @@ best-effort fallback (`return_best_effort`). The two swappable pieces are an inj
 `KinodynamicExtender` forward-integrates controls, `SteeringExtender` connects exactly
 via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callable
 (nearest-neighbour distance). Every system is an ODE, so an `Edge` always carries real
-`(t,x,u)`; `solve() → TrajectoryPlan`. `RRTStarPlanner` extends the attach step
+`(t,x,u)`; `solve() → PlanningSolution` with a held (`interpolation="previous"`)
+`TrajectorySource` as policy and a `TreeSearchRecord`. `RRTStarPlanner` extends the attach step
 with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
 `optimize_after_goal`, the search continues after the first goal connection until
@@ -1099,7 +1151,7 @@ Animate:   animate* / render  →  Animator  →  renderer backend
 
 Trajopt:   PlanningProblem + TrajectoryOptimizationPlanner
            (flat ``n_steps`` / ``transcription="…"``; optional Transcription)
-           → transcribe → MathematicalProgram → Optimizer → TrajectoryPlan
+           → transcribe → MathematicalProgram → Optimizer → PlanningSolution
 
 NLP:       MathematicalProgram → Optimizer → OptimizationResult
 ```

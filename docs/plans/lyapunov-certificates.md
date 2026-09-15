@@ -25,7 +25,7 @@ to turn those 200 lines into one verb.
    compiled `f`, and `vmap` over a grid. The tool is assembly, not new math.
 3. **The answer is three coupled quantities** — the equilibrium `x_bar`, the
    matrix `P`, and the level `c` — plus the system they belong to. That is a
-   record object, like `TrajectoryPlan` or `MonteCarloReport`.
+   record object, like `PlanningSolution` or `Evaluation`.
 4. **The sublevel search is sampled, so the level is sharp but not rigorous.**
    In the prototype the same policy gave `c = 0.045`, `0.044`, `0.042` on three
    different search windows. A window-refinement pass fixes that instability;
@@ -114,7 +114,7 @@ class LyapunovCertificate:
     def contains(self, x): ...   # V(x) <= level
     def verify(self, n=200, tf=None, tol=None) -> VerificationReport: ...
     def plot(self, x_axis=0, y_axis=1, basin=False, show=True, ax=None): ...
-    def __str__(self): ...       # one line, like MonteCarloReport
+    def __str__(self): ...       # one line, like Evaluation
 ```
 
 `__str__` is the teaching surface's first impression:

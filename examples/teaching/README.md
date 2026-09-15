@@ -17,6 +17,7 @@ Dynamic programming, trajectory optimization, and direct methods:
 
 ### 3. [`reinforcement_learning/`](reinforcement_learning/)
 Policy gradients, deep RL on dynamical systems, and method comparisons:
+- [**`from_value_iteration_to_ppo.ipynb`**](reinforcement_learning/from_value_iteration_to_ppo.ipynb): The algorithm ladder of a reinforcement-learning course on one pendulum: value iteration with the model, then without it Q-learning, SARSA and Monte Carlo control on the same grid with ε-greedy and UCB exploration, then REINFORCE, actor-critic, PPO and SAC with a neural policy, all scored on one Monte Carlo yardstick.
 - [**`policy_gradient_to_ppo.ipynb`**](reinforcement_learning/policy_gradient_to_ppo.ipynb): The mathematics from the policy gradient theorem to PPO — REINFORCE, baseline and advantage, actor-critic, GAE, the clipped objective — each checked against the planner's own functions.
 - [**`gymnasium_interface.ipynb`**](reinforcement_learning/gymnasium_interface.ipynb): The Gymnasium environment contract read in optimal-control terms, written by hand, obtained from a planning problem, and trained through.
 - [**`pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb`**](reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb): Dynamic programming vs. LQR vs. PPO on one plant and one cost, scored on one Monte Carlo yardstick.
