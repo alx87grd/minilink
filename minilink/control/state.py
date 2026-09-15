@@ -117,3 +117,23 @@ class TimeVaryingStateFeedbackController(Controller):
         K = xp.where(t > ts[-1], xp.asarray(K_after), K)
 
         return ubar - K @ (x_meas - r)
+
+    def plot_gain_schedule(self, ax=None, show=True):
+        """Draw every entry of the gain schedule ``K(t)`` against time."""
+        import matplotlib.pyplot as plt
+
+        t, K = self.params["t"], self.params["K"]
+        _, m, n = K.shape
+        if ax is None:
+            _, ax = plt.subplots(figsize=(8, 3))
+        for i in range(m):
+            for j in range(n):
+                ax.plot(t, K[:, i, j], label=f"$K_{{{i + 1},{j + 1}}}$")
+        ax.set_xlabel("t [s]")
+        ax.set_ylabel("K(t)")
+        ax.set_title(self.name)
+        ax.legend(ncol=max(1, m * n // 2), fontsize=8)
+        ax.grid(True, alpha=0.3)
+        if show and plt.get_backend().lower() != "agg":
+            plt.show()
+        return ax

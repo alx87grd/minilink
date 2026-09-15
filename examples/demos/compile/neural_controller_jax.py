@@ -10,10 +10,7 @@ from minilink.blocks import NeuralNetwork
 from minilink.graphical.common.environment import is_blocking_needed
 from minilink.graphical.common.matplotlib_style import DPI_FIGURE
 
-print("=" * 70)
-print("Part 1 - Build a neural closed-loop controller")
-print("=" * 70)
-
+# Part 1: build a neural closed-loop controller
 plant = Integrator()
 mux = Mux(dims=(1, 1))
 controller = NeuralNetwork(input_dim=2, output_dim=1, hidden_dim=8, seed=2, scale=0.2)
@@ -39,13 +36,8 @@ diagram.plot_trajectory()
 evaluator = diagram.compile(backend="jax")
 f_p = evaluator.f_p
 
-print("Compiled diagram with state order:", list(diagram.subsystems.keys()))
 
-
-print("\n" + "=" * 70)
-print("Part 2 - Train on several initial conditions and references")
-print("=" * 70)
-
+# Part 2: train on several initial conditions and references
 dt = 0.05
 n_steps = 120
 t_span = dt * jnp.arange(n_steps)
@@ -94,7 +86,7 @@ initial_loss = batch_loss(nn_params)
 print(f"{'iter':>6} {'loss':>12}")
 for i in range(10000):
     value, grad = loss_and_grad(nn_params)
-    if i % 20 == 0:
+    if i % 1000 == 0:
         print(f"{i:>6} {float(value):>12.5f}")
     nn_params = jax.tree_util.tree_map(
         lambda param, dparam: param - learning_rate * dparam,
@@ -105,20 +97,12 @@ for i in range(10000):
 final_loss = batch_loss(nn_params)
 learned_params = {key: jax.device_get(value) for key, value in nn_params.items()}
 
-print()
-print(f"Initial batch loss: {float(initial_loss):.5f}")
-print(f"Final batch loss:   {float(final_loss):.5f}")
-print(
-    "Learned controller output at [r=1, y=0]:",
-    controller.compute([], jnp.array([1.0, 0.0]), params=learned_params),
-)
+print(f"batch loss: {float(initial_loss):.5f} -> {float(final_loss):.5f}")
 
 assert final_loss < initial_loss, "training did not reduce the batched rollout loss"
 
 
-print("\n" + "=" * 70)
-print("Part 3 - Control-law heatmap u = f(r, y)")
-print("=" * 70)
+# Part 3: the control law u = f(r, y) before and after training
 
 R_MIN, R_MAX = -0.5, 1.0
 Y_MIN, Y_MAX = -3.0, 3.0
@@ -168,10 +152,7 @@ for ax, nn_p, title in zip(
 plt.show(block=is_blocking_needed())
 
 
-print("\n" + "=" * 70)
-print("Part 4 - Simulate with the learned controller")
-print("=" * 70)
-
+# Part 4: simulate with the learned controller
 diagram.params = {"nn": learned_params}
 diagram.compute_trajectory()
 diagram.plot_trajectory()

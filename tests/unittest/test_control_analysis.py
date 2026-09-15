@@ -307,6 +307,16 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.0), [-3.0])
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.5), [-7.0])
 
+    def test_gain_schedule_plot_draws_every_entry(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        ctl = lqr_finite_horizon(
+            self.A, self.B, self.Q, self.R, S_f=np.zeros((2, 2)), tf=1.0
+        )
+        ax = ctl.plot_gain_schedule(show=False)
+        self.assertEqual(len(ax.lines), 2)  # one line per entry of the 1 x 2 gain
+
     def test_finite_horizon_after_stationary_keeps_regulating(self):
         ctl = lqr_finite_horizon(
             self.A,
