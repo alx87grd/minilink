@@ -915,8 +915,9 @@ per batch on the advantage), `PPO` (clipped ratio, epochs of minibatches),
 family: `on_policy` picks the planner's loop, `head_kind` the exploration
 head, `critic_kind` the critic (`"V"`, `"Q"` or `None`); an `episodic`
 method restarts every plant before a collection. Bare JAX, no Flax/Optax
-dependency; an Optax-style optimizer can be passed. Training is silent unless
-`verbose=True`.
+dependency; an Optax-style optimizer can be passed. Training prints one line
+per update; pass `verbose=False` on the constructor, or on `learn` / `solve`
+for one call, to silence it.
 
 `RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
 step functions on either backend — the reward `r = -g dt`, the exit rule and

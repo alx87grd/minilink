@@ -12,7 +12,7 @@ from minilink.planning import (
     Uniform,
 )
 
-TRAINING_TIMESTEPS = 1_000_000  # about 30 s on a laptop CPU
+TRAINING_TIMESTEPS = 2_000_000  # about 30 s on a laptop CPU
 DT = 0.05
 
 # Plant: catalog cart-pole, theta = 0 hanging, pi upright, force |F| <= 10 N.

@@ -5,7 +5,6 @@ import numpy as np
 from minilink import CostFunction, Drone2D
 from minilink.planning import (
     Gaussian,
-    MonteCarloEvaluator,
     ReinforcementLearningPlanner,
     StochasticPlanningProblem,
 )
@@ -69,20 +68,20 @@ planner = ReinforcementLearningPlanner(
     problem, dt=DT, normalize=False, n_envs=1, n_steps=2048, batch_size=64
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(f"\n{solution.solver}")
+
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()
-ppo_ctl.plot_control_law(x_axis=2, y_axis=5, u_axis=0)  # T1 vs (theta, omega)
-ppo_ctl.plot_control_law(x_axis=2, y_axis=5, u_axis=1)  # T2 vs (theta, omega)
 
-report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
-print("Monte Carlo over the task's starts:", report)
+ppo_ctl.plot_control_law(x_axis=2, y_axis=5, u_axis=0)  # T1 vs (theta, omega)
+# ppo_ctl.plot_control_law(x_axis=2, y_axis=5, u_axis=1)  # T2 vs (theta, omega)
+
+# report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
+# print("Monte Carlo over the task's starts:", report)
 
 plant.x0 = np.array([-1.0, -2.0, 1.0, 0.0, 0.0, 0.0])
 cl_sys = ppo_ctl @ plant
 cl_sys.name = "Drone with the learned law"
 traj = cl_sys.compute_trajectory(tf=10.0, dt=0.01)
-cl_sys.plot_trajectory(traj)
-print("Final state:", np.round(traj.x[:, -1], 3))
+# cl_sys.plot_trajectory(traj)
 cl_sys.animate(traj)

@@ -150,6 +150,24 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert u.shape == (3, 1)
 
 
+def test_learn_and_solve_verbose_override_the_constructor(capsys):
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf),
+        dt=0.1,
+        hidden=(8, 8),
+        n_envs=4,
+        n_steps=8,
+        batch_size=32,
+        verbose=False,
+    )
+    capsys.readouterr()
+    planner.learn(32, verbose=True)
+    logged = capsys.readouterr().out
+    assert "steps" in logged and planner.verbose is False
+    planner.solve(timesteps=32, verbose=False)
+    assert capsys.readouterr().out == ""
+
+
 def test_planner_reads_the_cost_discount_and_rejects_bad_batches():
     class Discounted(HangCost):
         discount_rate = 1.0
