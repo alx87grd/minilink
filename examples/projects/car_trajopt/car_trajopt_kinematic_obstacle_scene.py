@@ -6,17 +6,17 @@ Run from repo root::
 
 Same obstacle-avoidance workflow as
 ``car_trajopt_obstacle_scene.py``, but on
-:class:`~minilink.dynamics.catalog.vehicles.jax_vehicles.BicycleAcc`
+``BicycleAcc`` (``vehicles/ladder.py``)
 (state ``[x, y, theta, v, delta]``, inputs ``[a_x, delta_dot]``).
 """
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+from examples.projects.car_trajopt.vehicles.ladder import BicycleAcc
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
-from minilink.dynamics.catalog.vehicles.jax_vehicles import BicycleAcc
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
@@ -86,7 +86,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=N_STEPS,
     transcription="direct_collocation",
     compile_backend="jax",
-    solve_disp=True,
+    verbose=True,
     optimizer_options={
         "maxiter": 500,
         "ftol": 1e-1,

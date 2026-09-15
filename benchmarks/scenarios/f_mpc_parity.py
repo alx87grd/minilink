@@ -16,13 +16,11 @@ from benchmarks.scenarios.common import (
     sample_trajectory_at_times,
 )
 from benchmarks.trajopt import jax_trajopt_available
+from minilink import BicycleDynRate
 from minilink.control.mpc import ModelPredictiveController, mpc_default_computer_x0
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRate,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
@@ -94,7 +92,7 @@ def _bicycle_planner():
 
 def _nlp_solve_sum(planner) -> float:
     total = 0.0
-    # Prefer last_trajectory_plan metadata when available; hybrid accumulates
+    # Prefer last_solution record when available; hybrid accumulates
     # via planner.last_solve_time_s only for the last tick — sum from history
     # is not stored. Use wall time as primary; expose last_solve as secondary.
     if planner.last_solve_time_s is not None:
@@ -121,8 +119,8 @@ def run_hybrid_zoh() -> list[MetricRecord]:
     traj = result.plant
     assert_simulation_finite(traj)
     success = True
-    if planner.last_trajectory_plan is not None:
-        success = bool(planner.last_trajectory_plan.metadata.success)
+    if planner.last_solution is not None:
+        success = bool(planner.last_solution.success)
     return _metrics(
         prefix="f.hybrid_zoh",
         traj=traj,
@@ -202,8 +200,8 @@ def run_dual_rate() -> list[MetricRecord]:
     traj = result.plant
     assert_simulation_finite(traj)
     success = True
-    if planner.last_trajectory_plan is not None:
-        success = bool(planner.last_trajectory_plan.metadata.success)
+    if planner.last_solution is not None:
+        success = bool(planner.last_solution.success)
     return _metrics(
         prefix="f.dual_rate",
         traj=traj,

@@ -1,26 +1,8 @@
-"""Two-link arm joint impedance — Pyro ``twolinkrobot_joint_impedance_controller``.
-
-Run from repo root::
-
-    python examples/demos/robotic/joint_impedance_two_link.py
-
-Joint-space virtual spring-damper on ``[q, dq]`` via ``closed_loop_qdq``::
-
-    ref.r ─────────────► ctl.r
-    sys.q  ──┐
-    sys.dq ──┴─ Mux ─► ctl.y
-    ctl.u ──► sys.u          (τ = PD + optional g(q))
-
-Same end-effector step task as ``task_impedance_two_link.py`` (``p0`` → ``p1``),
-with joint references from inverse kinematics.
-"""
+"""Two-link arm joint impedance — Pyro ``twolinkrobot_joint_impedance_controller``."""
 
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.control.robotic import JointImpedance
-from minilink.core.composition import closed_loop_qdq
-from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
+from minilink import JointImpedance, Step, TwoLinkManipulator, closed_loop_qdq
 
 p0 = np.array([0.5, 0.5])
 p1 = np.array([-0.5, 0.5])
@@ -35,9 +17,7 @@ q1 = arm.inverse_kinematics(p1)
 
 ref = Step(initial_value=q0, final_value=q1, step_time=STEP_TIME)
 
-ctl = JointImpedance(arm, gravity_comp=False)
-ctl.params["Kp"] = np.array([20.0, 20.0])
-ctl.params["Kd"] = np.array([5.0, 5.0])
+ctl = JointImpedance(arm, gravity_comp=False, Kp=[20.0, 20.0], Kd=[5.0, 5.0])
 ctl.plot_control_law()  # Kp·e + Kd·de plane (first joint)
 
 diagram = ref >> closed_loop_qdq(ctl, arm)

@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
@@ -36,19 +37,22 @@ class MountainCar(MechanicalSystem):
         params = self.params if params is None else params
         a = params["a"]
         w = params["w"]
-        return a * np.cos(w * x)
+        xp = array_module(x)
+        return a * xp.cos(w * x)
 
     def dz_dx(self, x, params=None):
         params = self.params if params is None else params
         a = params["a"]
         w = params["w"]
-        return -a * w * np.sin(w * x)
+        xp = array_module(x)
+        return -a * w * xp.sin(w * x)
 
     def d2z_dx2(self, x, params=None):
         params = self.params if params is None else params
         a = params["a"]
         w = params["w"]
-        return -a * w**2 * np.cos(w * x)
+        xp = array_module(x)
+        return -a * w**2 * xp.cos(w * x)
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -56,7 +60,7 @@ class MountainCar(MechanicalSystem):
         slope = self.dz_dx(q[0], params)
 
         # effective inertia of the bead sliding along the curve z(x)
-        return np.array([[mass * (1.0 + slope**2)]])
+        return array_module(q).array([[mass * (1.0 + slope**2)]])
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
@@ -65,14 +69,15 @@ class MountainCar(MechanicalSystem):
         curvature = self.d2z_dx2(q[0], params)
 
         # Coriolis term from the slope changing along the path
-        return np.array([[mass * slope * curvature * dq[0]]])
+        return array_module(q, dq).array([[mass * slope * curvature * dq[0]]])
 
     def B(self, q, params=None):
         params = self.params if params is None else params
         slope = self.dz_dx(q[0], params)
+        xp = array_module(q)
 
         # throttle acts tangent to the curve; this projects it onto x
-        return np.array([[np.sqrt(1.0 + slope**2)]])
+        return xp.array([[xp.sqrt(1.0 + slope**2)]])
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -81,10 +86,10 @@ class MountainCar(MechanicalSystem):
         slope = self.dz_dx(q[0], params)
 
         # gravity pulls the bead back down along the slope
-        return np.array([mass * gravity * slope])
+        return array_module(q).array([mass * gravity * slope])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
-        return np.zeros(1)
+        return array_module(q).zeros(1)
 
     def forward_kinematic_effector(self, q):
         return np.array([q[0], self.z(q[0])])

@@ -54,8 +54,11 @@ class System(SharedSystemFacades):
 
       Notes on purity
       ---------------
-      Overridden :meth:`h` and port ``compute`` functions should behave as
-      functions of ``(x, u, t, params)`` only (convention; not enforced).
+      Overridden :meth:`h` and port ``compute`` functions are functions of
+      ``(x, u, t, params)`` alone: no memory between calls, no cached side
+      effects. This is the first invariant of CONSTITUTION.md, and it is what
+      lets diagrams nest, solvers step, and JAX trace. Python cannot check it,
+      so the burden sits with whoever writes the equation.
     """
 
     #: Opt-in swappable look: a callable ``(plant) -> dict[str, list[prim]]`` or
@@ -110,9 +113,11 @@ class System(SharedSystemFacades):
         self.traj = None
 
         # Standard camera hints (resolved by ``Animator`` via ``camera.py``).
+        # ``camera_scale=None`` (default) fits the view to the drawn geometry at
+        # animation time; set a half-width in metres to frame the scene yourself.
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
-        self.camera_scale = 10.0
+        self.camera_scale = None
         # Camera hints read by the ``Animator`` camera resolver.
         # ``camera_follow_frame`` is a ``tf`` key to track (or ``None`` for a
         # fixed view); ``camera_priority`` tie-breaks when several hint-carrying
@@ -231,7 +236,7 @@ class System(SharedSystemFacades):
             The input-port ids this output directly feeds through from
             (default: no direct feedthrough).
         """
-        self._validate_output_dependencies(id, dependencies)
+        self.validate_output_dependencies(id, dependencies)
         self.outputs[id] = OutputPort(
             id,
             dim=dim,
@@ -300,7 +305,8 @@ class System(SharedSystemFacades):
 
         return input_labels, input_units
 
-    def _validate_output_dependencies(self, output_id, dependencies):
+    def validate_output_dependencies(self, output_id, dependencies):
+        """Internal machinery: check the declared dependencies of an output port."""
         if dependencies == "all":
             return
         if dependencies in ("", None):
@@ -348,6 +354,26 @@ class System(SharedSystemFacades):
         """Per-frame geometry as ``dict[str, list[primitive]]`` (rebuilt each frame)."""
         return {}
 
+    # Contract guard
+
+    def __getattr__(self, name):
+        # Reached only when normal lookup fails. On a System the usual cause
+        # is a subclass whose __init__ never called super().__init__(...).
+        if "inputs" not in vars(self):
+            raise AttributeError(
+                f"{type(self).__name__}.__init__() must call "
+                f"super().__init__(n=...) before the system is used "
+                f"(missing attribute {name!r})"
+            )
+        descriptor = getattr(type(self), name, None)
+        if isinstance(descriptor, property):
+            # The getter raised AttributeError and Python discarded it; run it
+            # again so the real missing name reaches the user.
+            return descriptor.__get__(self, type(self))
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
+
     # Composition Operators
 
     def __add__(self, other: object) -> "DiagramSystem":
@@ -372,7 +398,15 @@ class System(SharedSystemFacades):
         return series(self, other)
 
     def __matmul__(self, other: object) -> "DiagramSystem":
-        """Return a closed-loop diagram ``self @ other``."""
+        """Return a closed-loop diagram ``self @ other``.
+
+        ``controller @ plant`` wires the standard feedback ports; an
+        error-driven left operand (a compensator, a transfer function, a
+        series diagram ``C >> G``) gets an Error block ``e = r - y``
+        inserted; ``sys @ 1`` closes ``sys`` on itself with unity feedback.
+        See :func:`~minilink.core.composition.closed_loop` and
+        :func:`~minilink.core.composition.feedback`.
+        """
         from minilink.core.composition import closed_loop
 
         return closed_loop(self, other)
@@ -422,7 +456,8 @@ class DynamicSystem(DynamicSystemFacades, System):
         input_dim : int, optional
             If provided, create a standard input port named ``u``.
         output_dim : int, optional
-            If provided, create a standard primary output port named ``y``.
+            If provided, create a standard primary output port named ``y``
+            (``y = x`` by default when ``output_dim == n``; override :meth:`h`).
         expose_state : bool, optional
             If True, create an auxiliary state output port named ``x``.
         y_dependencies : tuple or "all", optional
@@ -462,6 +497,30 @@ class DynamicSystem(DynamicSystemFacades, System):
         """
         dx = np.zeros(self.n)
         return dx
+
+    def h(self, x, u, t=0, params=None):
+        """
+        Output ``y = h(x, u, t; p)``.
+
+        Default: the full state, ``y = x``, when the ``y`` port has the state
+        dimension (``p == n``); zeros otherwise. Override for any other
+        measurement.
+
+        Parameters
+        ----------
+        x : array of shape (n,)
+        u : array of shape (m,)
+        t : float
+        params : dict, optional
+
+        Returns
+        -------
+        y : array of shape (p,)
+        """
+        if self.p == self.n:
+            return x
+        y = np.zeros(self.p)
+        return y
 
 
 class StepSystem(StepSystemFacades, System):
@@ -539,6 +598,8 @@ class StepSystem(StepSystemFacades, System):
         """
         Output ``y_k = h(x, u, k; p)``.
 
+        Default: ``y = x`` when ``p == n``; zeros otherwise.
+
         Parameters
         ----------
         x : array of shape (n,)
@@ -550,6 +611,8 @@ class StepSystem(StepSystemFacades, System):
         -------
         y : array of shape (p,)
         """
+        if self.p == self.n:
+            return x
         y = np.zeros(self.p)
         return y
 

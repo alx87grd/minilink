@@ -1,4 +1,4 @@
-"""Compare TrajOpt across the jax_vehicles fidelity ladder on two missions.
+"""Compare TrajOpt across the vehicle fidelity ladder on two missions.
 
 Run from repo root::
 
@@ -22,21 +22,20 @@ from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
-from minilink.core.geometry import Sphere
-from minilink.core.trajectory import Trajectory
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+from examples.projects.car_trajopt.vehicles.ladder import (
     BicycleAcc,
-    BicycleDyn,
     BicycleDynEngine,
-    BicycleDynRate,
     BicycleDynServo,
     BicycleDynTauRate,
     BicycleKin,
     Holonomic,
     HolonomicAccel,
 )
+from minilink import BicycleDynRate, DynamicBicycle
+from minilink.core.backends import configure_jax
+from minilink.core.costs import QuadraticCost
+from minilink.core.geometry import Sphere
+from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline, disc, point_probe
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
@@ -194,7 +193,7 @@ def _obs_build_bicycle_acc():
 
 
 def _obs_build_dynamic():
-    sys = BicycleDyn()
+    sys = DynamicBicycle(named_ports=False)
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * OBS_U_TARGET / r_r
     sys.inputs["u"].lower_bound = np.array([0.0, -OBS_DELTA_MAX])
@@ -495,7 +494,7 @@ def _corner_build_bicycle_acc(track: ReferenceTrack):
 
 def _corner_build_dynamic(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
-    sys = BicycleDyn()
+    sys = DynamicBicycle(named_ports=False)
     r_r = sys.params["r_r"]
     sys.inputs["u"].lower_bound = np.array([0.0, -CORNER_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([90.0, CORNER_DELTA_MAX])

@@ -8,12 +8,12 @@ from tests.unittest.graphics_contract_helpers import resolve_draw_frame
 
 pytest.importorskip("jax")
 import jax.numpy as jnp
-from minilink.dynamics.engines.contact_jax import (
+from minilink.experimental.engines.contact_jax import (
     PlaneModel,
     SphereModel,
     make_world_model,
 )
-from minilink.dynamics.engines.world import PhysicsWorldSystem
+from minilink.experimental.engines.world import PhysicsWorldSystem
 
 
 @pytest.mark.optional
@@ -85,7 +85,7 @@ class TestPhysicsSystemMinilink(unittest.TestCase):
 
 pytest.importorskip("jax")
 import jax
-from minilink.dynamics.engines.contact_jax import (
+from minilink.experimental.engines.contact_jax import (
     PlaneModel,
     SphereModel,
     make_world_model,
@@ -149,7 +149,7 @@ class TestPhysicsEngineJax(unittest.TestCase):
 
 
 pytest.importorskip("jax")
-from minilink.dynamics.engines.ancf_tire_jax import (
+from minilink.experimental.engines.ancf_tire_jax import (
     ANCFTireSystem,
     ancf_tire_initial_state,
     ancf_tire_ode,

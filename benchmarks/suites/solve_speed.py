@@ -139,7 +139,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
                 "disp": False,
             },
             record_solve_time=True,
-            solve_disp=False,
+            verbose=False,
         ),
     )
 

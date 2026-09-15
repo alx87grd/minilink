@@ -230,7 +230,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(guess.x[:, 0], x_start)
         np.testing.assert_allclose(guess.x[:, -1], x_goal)
 
-    def test_planner_require_trajectory_plan_before_solve(self):
+    def test_planner_require_solution_before_solve(self):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(
@@ -243,7 +243,9 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
         with self.assertRaises(ValueError):
-            planner.require_trajectory_plan()
+            planner.require_solution()
+        with self.assertRaises(ValueError):
+            planner.get_controller()
 
     def test_mathematical_program_constraints_are_backend_neutral(self):
         program = MathematicalProgram(
@@ -319,7 +321,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(traj.has_signal("dx"))
         self.assertTrue(traj.has_signal("cost"))
 
-    def test_trajopt_solve_disp_prints_planning_report(self):
+    def test_trajopt_solve_verbose_prints_planning_report(self):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
@@ -329,7 +331,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             options=TrajectoryOptimizationOptions(
                 compile_backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
-                solve_disp=True,
+                verbose=True,
             ),
         )
         stdout = io.StringIO()
@@ -785,8 +787,15 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
             seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
         ),
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert planner.reached_goal and solution.success
+    assert solution.solver.reached_goal and solution.solver.nodes == len(
+        planner.tree.nodes
+    )
+    assert (
+        int(solution.policy.m) == 0 and solution.evaluation is None
+    )  # open loop; no cost to score
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -1108,8 +1117,11 @@ def test_rrt_star_reaches_goal():
         extender=make_steering_extender(),
         options=RRTStarOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert planner.reached_goal and solution.success
+    assert solution.solver.cost == planner.best_goal_cost
+    assert solution.solver.converged == planner.converged
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -1341,10 +1353,9 @@ def test_record_history_for_animation():
 from dataclasses import dataclass
 from minilink.core.backends import array_module
 from minilink.core.geometry import Sphere
-from minilink.core.kinematics import apply
+from minilink.core.kinematics import apply, translation
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
-    HolonomicMobileRobot3D,
     KinematicCar,
 )
 from minilink.planning.spatial.collision import (
@@ -1407,8 +1418,21 @@ def test_bind_disc_body_pose():
     assert apply(T, np.zeros(2)) == pytest.approx([1.5, -2.0])
 
 
+class _Point3D(DynamicSystem):
+    """Velocity-controlled point in 3-D whose ``body`` frame sits at its position."""
+
+    def __init__(self):
+        super().__init__(n=3, input_dim=3, output_dim=3)
+
+    def f(self, x, u, t=0, params=None):
+        return np.asarray(u)
+
+    def tf(self, x, u, t=0, params=None):
+        return {"body": translation(x[0], x[1], x[2])}
+
+
 def test_bind_disc_in_3d():
-    body = bind(HolonomicMobileRobot3D(), Sphere(np.zeros(3), 0.5))
+    body = bind(_Point3D(), Sphere(np.zeros(3), 0.5))
     (T,) = body.body_poses(np.array([1.0, 2.0, 3.0]))
     assert T.shape == (4, 4)
     assert apply(T, np.zeros(3)) == pytest.approx([1.0, 2.0, 3.0])
@@ -1482,7 +1506,7 @@ def test_bound_jax_twin_margin_matches_and_differentiates():
 
 def test_clearance_pipeline_in_3d():
     scene = Scene(obstacles=(Sphere([0.0, 0.0, 0.0], 1.0),))
-    body = bind(HolonomicMobileRobot3D(), Sphere(np.zeros(3), 0.5))
+    body = bind(_Point3D(), Sphere(np.zeros(3), 0.5))
     field = scene.clearance_field(body)
     assert field.value(np.array([3.0, 0.0, 0.0])) == pytest.approx(3.0 - 1.0 - 0.5)
     free = field.as_constraint()
@@ -1870,6 +1894,11 @@ from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingResult,
 )
 from minilink.planning.policy_synthesis import plotting
+from minilink.planning.policy_synthesis.approximation import (
+    LinearApproximator,
+    QuadraticFeatures,
+    RadialBasisFeatures,
+)
 from minilink.planning.policy_synthesis.policy_eval import PolicyEvaluator
 
 
@@ -2267,3 +2296,385 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         _, result = solve(problem)
         with self.assertRaisesRegex(ValueError, "feedback declaration"):
             PolicyEvaluator(problem, grid=result.grid, policy=Integrator())
+
+
+class TestFunctionApproximation(unittest.TestCase):
+    def test_quadratic_features_recover_an_exact_quadratic(self):
+        xbar = np.array([1.0, -2.0])
+        S = np.array([[2.0, 0.5], [0.5, 3.0]])
+        b = np.array([0.3, -0.7])
+        rng = np.random.default_rng(0)
+        X = rng.uniform(-3.0, 3.0, size=(60, 2))
+        dx = X - xbar
+        y = 4.0 + dx @ b + np.einsum("ij,jk,ik->i", dx, S, dx)
+
+        features = QuadraticFeatures(xbar)
+        approx = LinearApproximator(features)
+        w = approx.fit(X, y)
+
+        c_hat, b_hat, S_hat = features.quadratic_form(w)
+        self.assertAlmostEqual(c_hat, 4.0)
+        np.testing.assert_allclose(b_hat, b, atol=1e-9)
+        np.testing.assert_allclose(S_hat, S, atol=1e-9)
+        np.testing.assert_allclose(approx(X), y, atol=1e-9)
+        self.assertAlmostEqual(approx(X[0]), y[0])
+
+    def test_radial_bases_on_a_grid_and_concatenation(self):
+        rbf = RadialBasisFeatures.on_grid([-1.0, -1.0], [1.0, 1.0], (3, 5))
+        self.assertEqual(rbf.n_features, 15)
+        self.assertAlmostEqual(rbf.sigma, 1.0)  # largest mesh spacing
+        self.assertAlmostEqual(rbf.phi(rbf.centers[4])[4], 1.0)
+        both = QuadraticFeatures(np.zeros(2)) + rbf
+        self.assertEqual(both.n_features, 6 + 15)
+        self.assertEqual(both.matrix(rbf.centers).shape, (15, 21))
+
+    def test_sgd_steps_move_toward_the_least_squares_weights(self):
+        rng = np.random.default_rng(1)
+        X = rng.uniform(-1.0, 1.0, size=(200, 1))
+        y = 1.0 + 2.0 * X[:, 0]
+        features = QuadraticFeatures(np.zeros(1))
+        target = LinearApproximator(features).fit(X, y)
+
+        online = LinearApproximator(features)
+        for _ in range(20):
+            for x_i, y_i in zip(X, y):
+                online.sgd_step(x_i, y_i, eta=0.1)
+        np.testing.assert_allclose(online.w, target, atol=1e-3)
+
+
+class TestPolicyEvaluatorPlots(unittest.TestCase):
+    def test_value_at_and_plots_after_solve(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        problem = make_problem()
+        planner, result = solve(problem)
+        evaluator = PolicyEvaluator(
+            problem,
+            grid=result.grid,
+            policy=planner.get_controller(),
+            options=planner.options,
+        )
+        with self.assertRaisesRegex(ValueError, "solve"):
+            evaluator.value_at(np.zeros(2))
+        evaluator.solve()
+        self.assertAlmostEqual(
+            evaluator.value_at(np.zeros(2)),
+            float(result.grid.interpolate(evaluator.last_J, np.zeros((1, 2)))[0]),
+        )
+        fig, _ = evaluator.plot_cost2go(vmax=10.0, show=False)
+        self.assertIsNotNone(fig)
+        fig, _ = result.grid.plot_value(evaluator.last_J, show_3d=True, show=False)
+        self.assertIsNotNone(fig)
+
+
+class TestParametricCapabilityFlag(unittest.TestCase):
+    """S42: multiple shooting no longer inherits collocation's parametric build."""
+
+    def test_multiple_shooting_declares_no_parametric_support(self):
+        from minilink.planning.trajectory_optimization.direct_collocation import (
+            DirectCollocationTranscription,
+        )
+        from minilink.planning.trajectory_optimization.multiple_shooting import (
+            MultipleShootingTranscription,
+        )
+
+        self.assertTrue(DirectCollocationTranscription.supports_parametric)
+        self.assertFalse(MultipleShootingTranscription.supports_parametric)
+
+    @pytest.mark.optional
+    @pytest.mark.jax
+    def test_planner_refuses_parametric_compile_for_multiple_shooting(self):
+        pytest.importorskip("jax")
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        problem = PlanningProblem(
+            plant,
+            x_start=np.zeros(2),
+            x_goal=goal,
+            tf=2.0,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            n_steps=10,
+            transcription="multiple_shooting",
+            compile_backend="jax",
+        )
+        with self.assertRaises(TypeError):
+            planner.compile_parametric_program()
+
+
+class TestTrajoptSuccessSemantics(unittest.TestCase):
+    """S09: success means the plan satisfies the constraints, not the solver's mood."""
+
+    def _pendulum_problem(self, u_max, tf=3.0):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        plant.inputs["u"].lower_bound = np.array([-u_max])
+        plant.inputs["u"].upper_bound = np.array([u_max])
+        goal = np.array([np.pi, 0.0])
+        return PlanningProblem(
+            plant,
+            x_start=np.zeros(2),
+            x_goal=goal,
+            tf=tf,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+
+    def test_feasible_plan_records_violations_and_succeeds(self):
+        plan = TrajectoryOptimizationPlanner(
+            self._pendulum_problem(20.0),
+            n_steps=20,
+            transcription="direct_collocation",
+            compile_backend="numpy",
+        ).solve()
+        md = plan.solver
+        self.assertTrue(md.success)
+        self.assertTrue(md.feasible)
+        self.assertIsNotNone(md.max_equality_violation)
+        self.assertLessEqual(md.max_equality_violation, 1e-5)
+        self.assertLessEqual(md.max_bound_violation, 1e-5)
+
+    def test_unactuated_swing_up_is_reported_infeasible(self):
+        plan = TrajectoryOptimizationPlanner(
+            self._pendulum_problem(0.0, tf=1.0),
+            n_steps=10,
+            transcription="direct_collocation",
+            compile_backend="numpy",
+        ).solve()
+        md = plan.solver
+        self.assertFalse(md.feasible)
+        self.assertFalse(md.success)
+        self.assertGreater(md.max_equality_violation, 1e-3)
+
+    def test_solver_success_on_an_infeasible_plan_is_not_success(self):
+        from dataclasses import replace
+        from unittest import mock
+
+        from minilink.optimization.optimizer import Optimizer
+
+        original_solve = Optimizer.solve
+
+        def lying_solve(optimizer, *args, **kwargs):
+            result = original_solve(optimizer, *args, **kwargs)
+            return replace(result, success=True, message="solver claims success")
+
+        with mock.patch.object(Optimizer, "solve", lying_solve):
+            plan = TrajectoryOptimizationPlanner(
+                self._pendulum_problem(0.0, tf=1.0),
+                n_steps=10,
+                transcription="direct_collocation",
+                compile_backend="numpy",
+            ).solve()
+        self.assertEqual(plan.solver.message, "solver claims success")
+        self.assertTrue(plan.solver.solver_success)
+        self.assertFalse(plan.solver.feasible)
+        self.assertFalse(plan.success)
+
+
+class TestDpOneObjectSetup(unittest.TestCase):
+    """DynamicProgrammingPlanner builds its grid from x_grid / u_grid / dt."""
+
+    def _problem(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        return PlanningProblem(
+            plant,
+            x_goal=goal,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+
+    def test_shapes_and_dt_build_the_grid(self):
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        planner = DynamicProgrammingPlanner(
+            self._problem(), x_grid=(11, 11), u_grid=(3,), dt=0.05
+        )
+        self.assertEqual(planner.grid.x_grid_shape, (11, 11))
+        self.assertEqual(planner.grid.u_grid_shape, (3,))
+        self.assertAlmostEqual(planner.grid.dt, 0.05)
+
+    def test_success_reports_convergence(self):
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        problem = make_problem()
+        capped = DynamicProgrammingPlanner(
+            problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, max_iterations=2
+        ).solve()
+        self.assertFalse(capped.success)
+        self.assertIn("max_iterations", str(capped.solver))
+        self.assertEqual(capped.solver.iterations, 2)
+
+        planner = DynamicProgrammingPlanner(
+            problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, tol=1.0, max_iterations=500
+        )
+        converged = planner.solve()
+        self.assertTrue(converged.success)
+        self.assertIn("converged", str(converged.solver))
+        self.assertLessEqual(converged.solver.delta, 1.0)
+        # the solution is the pair: the greedy lookup law and the interpolated cost-to-go
+        self.assertIs(converged.policy, planner.get_controller())
+        self.assertEqual(
+            converged.cost_to_go(problem.x_start), planner.value_at(problem.x_start)
+        )
+        self.assertIsNone(converged.trajectory)  # not rolled out unless asked
+
+        fixed = DynamicProgrammingPlanner(
+            problem, x_grid=(11, 11), u_grid=(3,), dt=0.05
+        ).solve_steps(3, evaluate=True)
+        self.assertTrue(fixed.success)
+        self.assertEqual(fixed.solver.iterations, 3)
+        self.assertEqual(
+            fixed.evaluation.n_trials, 1
+        )  # a deterministic problem: one trial
+        np.testing.assert_allclose(fixed.trajectory.x[:, 0], problem.x_start)
+        self.assertAlmostEqual(fixed.trajectory.t[1] - fixed.trajectory.t[0], 0.05)
+
+    def test_final_time_reads_the_problem_horizon(self):
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        sys = DoubleIntegrator()
+        cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+        timed = PlanningProblem(sys, x_goal=np.zeros(2), cost=cost, tf=2.0)
+        planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
+        self.assertEqual(planner.options.final_time, 2.0)
+        explicit = DynamicProgrammingPlanner(
+            timed, x_grid=(5, 5), u_grid=(3,), dt=0.1, final_time=0.5
+        )
+        self.assertEqual(explicit.options.final_time, 0.5)
+        untimed = DynamicProgrammingPlanner(
+            make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1
+        )
+        self.assertEqual(untimed.options.final_time, 0.0)
+
+    def test_grid_and_shapes_are_exclusive(self):
+        from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        problem = self._problem()
+        grid = StateSpaceGrid(
+            problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.05
+        )
+        with self.assertRaises(ValueError):
+            DynamicProgrammingPlanner(problem, grid=grid, dt=0.05)
+        with self.assertRaises(ValueError):
+            DynamicProgrammingPlanner(problem, x_grid=(11, 11))
+
+
+class TestTextbookOptions(unittest.TestCase):
+    """clean_infeasible runs after each DP solve; live_plot builds the callback."""
+
+    def test_dp_solve_cleans_infeasible_by_default(self):
+        planner, result = solve(make_problem())
+        penalty = planner.options.out_of_bound_cost
+        self.assertTrue(planner.options.clean_infeasible)
+        saturated = result.J > penalty - 1.0
+        self.assertTrue(np.all(result.J[saturated] == penalty))
+
+    def test_dp_clean_infeasible_can_be_disabled(self):
+        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+
+        problem = make_problem()
+        planner = DynamicProgrammingPlanner(
+            problem,
+            x_grid=(11, 11),
+            u_grid=(3,),
+            dt=0.05,
+            max_iterations=5,
+            clean_infeasible=False,
+            verbose=False,
+        )
+        self.assertFalse(planner.options.clean_infeasible)
+        from unittest import mock
+
+        with mock.patch.object(
+            DynamicProgrammingPlanner, "clean_infeasible_set"
+        ) as cleanup:
+            planner.solve()
+        cleanup.assert_not_called()
+        planner.options.clean_infeasible = True
+        with mock.patch.object(
+            DynamicProgrammingPlanner, "clean_infeasible_set"
+        ) as cleanup:
+            planner.solve()
+        cleanup.assert_called_once()
+
+    def test_trajopt_live_plot_builds_a_callback(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+        from minilink.planning.trajectory_optimization.live_plot import (
+            LiveTrajectoryPlotCallback,
+        )
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        problem = PlanningProblem(
+            plant,
+            x_start=np.zeros(2),
+            x_goal=goal,
+            tf=1.0,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+        planner = TrajectoryOptimizationPlanner(
+            problem, n_steps=5, transcription="direct_collocation", live_plot=True
+        )
+        self.assertTrue(planner.options.live_plot)
+        self.assertIsNotNone(planner._make_callback(None, "numpy"))
+        planner.options.live_plot = False
+        self.assertIsNone(planner._make_callback(None, "numpy"))
+        self.assertTrue(callable(LiveTrajectoryPlotCallback))
+
+    def test_trajopt_live_plot_composes_with_a_user_callback(self):
+        from unittest import mock
+
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        problem = PlanningProblem(
+            plant,
+            x_start=np.zeros(2),
+            x_goal=goal,
+            tf=1.0,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+        )
+        seen = []
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            n_steps=5,
+            transcription="direct_collocation",
+            live_plot=True,
+            callback=seen.append,
+        )
+        live = mock.MagicMock()
+        with mock.patch(
+            "minilink.planning.trajectory_optimization.live_plot."
+            "LiveTrajectoryPlotCallback",
+            return_value=live,
+        ):
+            progress = planner._make_callback(mock.MagicMock(), "numpy")
+            planner._iteration_from_z = lambda *a, **k: "iteration"
+            progress(np.zeros(3), 0.0, 0.0)
+        self.assertEqual(seen, ["iteration"])
+        live.assert_called_once_with("iteration")
+
+
+def test_rrt_default_extender_is_bang_bang_from_input_bounds():
+    """``RRTPlanner(problem)`` needs no extender: corners of ``problem.U`` plus its centre."""
+    from minilink.planning.search.extenders import bang_bang_controls
+
+    problem, X = make_holonomic_obstacle_problem()
+    planner = RRTPlanner(problem, options=RRTOptions(seed=0, max_nodes=50))
+    assert isinstance(planner.extender, KinodynamicExtender)
+    controls = planner.extender._controls(problem, np.random.default_rng(0))
+    lower, upper = problem.U.box.lower, problem.U.box.upper
+    assert len(controls) == 1 + 2**lower.size
+    assert any(np.allclose(u, 0.5 * (lower + upper)) for u in controls)
+    assert any(np.allclose(u, lower) for u in controls)
+    assert any(np.allclose(u, upper) for u in controls)
+    assert bang_bang_controls(problem.U)[0].shape == lower.shape

@@ -44,10 +44,12 @@ from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalFrontWheelDriveCarWithTorqueInput,
     LongitudinalFrontWheelDriveCarWithWheelSlipInput,
 )
-from minilink.dynamics.catalog.vehicles.steering import (
+from examples.projects.car_trajopt.vehicles.extras import (
     DynamicHolonomicMobileRobot,
-    HolonomicMobileRobot,
     HolonomicMobileRobot3D,
+)
+from minilink.dynamics.catalog.vehicles.steering import (
+    HolonomicMobileRobot,
     KinematicBicycle,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
@@ -502,20 +504,17 @@ import pytest
 
 pytest.importorskip("jax")
 from minilink.core.backends import configure_jax
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+from examples.projects.car_trajopt.vehicles.ladder import (
     BicycleDynEngine,
-    BicycleDynEnginePorts,
-    BicycleDynRate,
-    BicycleDynRatePorts,
     BicycleDynServo,
-    BicycleDynServoPorts,
 )
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 
 
 class TestBicycleDynRate(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
-        self.named = BicycleDynRatePorts()
+        self.named = BicycleDynRate(named_ports=True)
         self.uy = BicycleDynRate()
 
     def test_standard_ports(self):
@@ -556,7 +555,7 @@ class TestBicycleDynRate(unittest.TestCase):
 class TestBicycleDynServo(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
-        self.named = BicycleDynServoPorts()
+        self.named = BicycleDynServo(named_ports=True)
         self.uy = BicycleDynServo()
 
     def test_standard_ports(self):
@@ -599,7 +598,7 @@ class TestBicycleDynServo(unittest.TestCase):
 class TestBicycleDynEngine(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
-        self.named = BicycleDynEnginePorts()
+        self.named = BicycleDynEngine(named_ports=True)
         self.uy = BicycleDynEngine()
 
     def test_standard_ports(self):
@@ -654,7 +653,7 @@ class TestBicycleDynEngine(unittest.TestCase):
 
 class TestCarProfile(unittest.TestCase):
     def test_registered_profiles(self):
-        from minilink.dynamics.catalog.vehicles.car_profile import (
+        from examples.projects.car_trajopt.vehicles.car_profile import (
             CAR_PROFILES,
             get_car_profile,
             list_car_profiles,
@@ -665,7 +664,7 @@ class TestCarProfile(unittest.TestCase):
             self.assertIs(get_car_profile(name), CAR_PROFILES[name])
 
     def test_racecar_matches_demo_vehicle_geometry(self):
-        from minilink.dynamics.catalog.vehicles.car_profile import racecar_profile
+        from examples.projects.car_trajopt.vehicles.car_profile import racecar_profile
 
         profile = racecar_profile()
         self.assertEqual(profile.mass, 700.0)
@@ -682,7 +681,7 @@ class TestCarProfile(unittest.TestCase):
         self.assertEqual(profile.limits.tau_rear_min, -3400.0)
 
     def test_propulsion_limits_from_power_at_nominal(self):
-        from minilink.dynamics.catalog.vehicles.car_profile import (
+        from examples.projects.car_trajopt.vehicles.car_profile import (
             get_car_profile,
             list_car_profiles,
         )
@@ -707,7 +706,7 @@ class TestCarProfile(unittest.TestCase):
             self.assertLessEqual(profile.v_nom, profile.limits.vx_max)
 
     def test_actuator_limits_exceed_traction_reference(self):
-        from minilink.dynamics.catalog.vehicles.car_profile import (
+        from examples.projects.car_trajopt.vehicles.car_profile import (
             get_car_profile,
             list_car_profiles,
         )
@@ -728,8 +727,8 @@ class TestCarProfile(unittest.TestCase):
                 self.assertGreater(profile.actuator_traction_headroom(), 1.0, msg=name)
 
     def test_udes_matches_kinematic_racecar_geometry(self):
-        from minilink.dynamics.catalog.vehicles.car_profile import udes_1_5_profile
-        from minilink.dynamics.catalog.vehicles.steering import UdeSRacecar
+        from examples.projects.car_trajopt.vehicles.car_profile import udes_1_5_profile
+        from examples.projects.car_trajopt.vehicles.extras import UdeSRacecar
 
         udes = UdeSRacecar()
         profile = udes_1_5_profile()
@@ -738,7 +737,7 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(profile.length, udes.params["length"])
 
     def test_apply_car_profile_rate_plant(self):
-        from minilink.dynamics.catalog.vehicles.car_profile import (
+        from examples.projects.car_trajopt.vehicles.car_profile import (
             apply_car_profile,
             passenger_car_profile,
         )
@@ -747,10 +746,10 @@ class TestCarProfile(unittest.TestCase):
         apply_car_profile(sys, passenger_car_profile())
         profile = passenger_car_profile()
         self.assertAlmostEqual(sys.params["mass"], profile.mass)
-        self.assertAlmostEqual(sys.params["length"], profile.a + profile.b)
+        self.assertAlmostEqual(sys.params["a"] + sys.params["b"], profile.a + profile.b)
         self.assertAlmostEqual(sys.params["Ca"], profile.Ca)
-        self.assertAlmostEqual(sys.a, profile.a)
-        self.assertAlmostEqual(sys.b, profile.b)
+        self.assertAlmostEqual(sys.params["a"], profile.a)
+        self.assertAlmostEqual(sys.params["b"], profile.b)
         self.assertFalse(hasattr(sys, "tire_model_f"))
         self.assertAlmostEqual(sys.state.upper_bound[6], profile.limits.w_rear_max)
         self.assertAlmostEqual(
@@ -761,7 +760,7 @@ class TestCarProfile(unittest.TestCase):
         )
 
     def test_apply_car_profile_servo_plant(self):
-        from minilink.dynamics.catalog.vehicles.car_profile import (
+        from examples.projects.car_trajopt.vehicles.car_profile import (
             apply_car_profile,
             racecar_profile,
         )
@@ -777,7 +776,7 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
 
     def test_apply_car_profile_engine_plant(self):
-        from minilink.dynamics.catalog.vehicles.car_profile import (
+        from examples.projects.car_trajopt.vehicles.car_profile import (
             apply_car_profile,
             racecar_profile,
         )

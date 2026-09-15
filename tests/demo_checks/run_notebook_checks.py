@@ -1,17 +1,17 @@
 """Execute teaching notebooks via nbclient (demo-check layer).
 
-Auto-discovers ``.ipynb`` under mature learn/tooling trees:
+Auto-discovers ``.ipynb`` under mature tutorial/teaching trees:
 
-* ``examples/learn/intro/``
-* ``examples/learn/teaching/``
-* ``examples/tooling/notebooks/``
+* ``examples/tutorial/``
+* ``examples/teaching/``
 
 Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
 Defaults: ``timeout=180``, ``requires=[]``. Overrides in
 ``notebook_overrides.json`` (``smoke: false`` drops a notebook from the
-default suite). Not smoked: ``projects/``, ``sandbox/``, long topic
-notebooks (UR5 symbolic EoM, DP grids, PPO training), and the tooling
-benchmark notebook (solver matrix; run locally via ``benchmarks/run_study.py``).
+default suite). Not smoked: ``projects/``, ``experimental/``, and long topic
+notebooks (UR5 symbolic EoM, DP grids, PPO training). Performance benchmarks
+live under ``benchmarks/`` (run via ``benchmarks/run_study.py`` or
+``benchmarks/ode_solver_benchmark.ipynb``).
 
 Usage (from repo root)::
 
@@ -32,9 +32,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _CHECKS_DIR = Path(__file__).resolve().parent
 OVERRIDES_PATH = _CHECKS_DIR / "notebook_overrides.json"
 NOTEBOOK_ROOTS = (
-    REPO_ROOT / "examples" / "learn" / "intro",
-    REPO_ROOT / "examples" / "learn" / "teaching",
-    REPO_ROOT / "examples" / "tooling" / "notebooks",
+    REPO_ROOT / "examples" / "tutorial",
+    REPO_ROOT / "examples" / "teaching",
 )
 DEFAULT_TIMEOUT = 180.0
 
@@ -49,14 +48,12 @@ class NotebookRow:
 def _notebook_id(rel_path: str) -> str:
     """Stable short id for CLI ``--notebook`` filters."""
     stem = Path(rel_path).stem
-    if "/learn/intro/" in rel_path:
+    if "/tutorial/" in rel_path or "/learn/intro/" in rel_path:
         if stem.startswith("showcase_"):
             return stem
-        return f"intro_{stem}"
-    if "/learn/teaching/" in rel_path:
+        return f"tutorial_{stem}"
+    if "/teaching/" in rel_path:
         return f"teaching_{stem}"
-    if "/tooling/notebooks/" in rel_path:
-        return f"tooling_{stem}"
     return "_".join(Path(rel_path).with_suffix("").parts[-2:])
 
 

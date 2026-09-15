@@ -1,24 +1,9 @@
-"""Two-link kinematic end-effector control — Pyro ``twolinkrobot_kinematic_controller``.
-
-Run from repo root::
-
-    python examples/demos/robotic/kinematic_two_link.py
-
-Velocity-controlled plant with task-space kinematic law::
-
-    ref.r ─────────────► ctl.r              (p_d)
-    plant.y ───────────► ctl.y              (q)
-    ctl.u ─────────────► plant.u            (dq)
-"""
+"""Two-link kinematic end-effector control — Pyro ``twolinkrobot_kinematic_controller``."""
 
 import numpy as np
 
-from minilink.blocks.sources import Source
-from minilink.control.robotic import TaskKinematic
-from minilink.dynamics.catalog.manipulators.arms import (
-    SpeedControlledManipulator,
-    TwoLinkManipulator,
-)
+from minilink import Source, SpeedControlledManipulator, TwoLinkManipulator
+from minilink.control import TaskKinematic
 
 p_d = np.array([0.5, 0.5])
 

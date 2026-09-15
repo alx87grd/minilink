@@ -102,7 +102,7 @@
     "requires": [
       "jax"
     ],
-    "module": "minilink.dynamics.catalog.vehicles.jax_vehicles",
+    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
     "class": "BicycleDynRate",
     "params": {},
     "x": [

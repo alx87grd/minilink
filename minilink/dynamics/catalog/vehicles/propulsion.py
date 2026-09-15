@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
@@ -44,7 +45,8 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         mu_slope = params["mu_slope"]
 
         # sigmoid traction curve: friction ratio mu = |Fx / Fz| vs slip
-        return mu_max * (2.0 / (1.0 + np.exp(-mu_slope * slip)) - 1.0)
+        xp = array_module(slip)
+        return mu_max * (2.0 / (1.0 + xp.exp(-mu_slope * slip)) - 1.0)
 
     def acceleration(self, speed, slip, params=None):
         params = self.params if params is None else params
@@ -59,7 +61,7 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         rr = xc / length  # ground share behind the c.g. (load on driven wheels)
         ry = yc / length  # c.g. height ratio driving the load transfer
         mu = self.slip2force(slip, params)
-        drag = 0.5 * rho * cdA * speed * abs(speed)
+        drag = 0.5 * rho * cdA * speed * array_module(speed).abs(speed)
 
         # longitudinal acceleration with dynamic load transfer onto the wheels
         return (mu * mass * gravity * rr - drag) / (mass * (1.0 + mu * ry))
@@ -69,7 +71,7 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         acceleration = self.acceleration(speed, u[0], params)
 
         # state derivative: position rate is speed, speed rate is acceleration
-        return np.array([speed, acceleration])
+        return array_module(x, u).array([speed, acceleration])
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -157,8 +159,9 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         wheel_radius = params["wheel_radius"]
 
         # tire slip ratio, clipped: contact-point speed vs ground speed
-        denominator = abs(speed) + 1e-6
-        return np.clip((wheel_radius * wheel_speed - speed) / denominator, -0.5, 0.5)
+        xp = array_module(speed, wheel_speed)
+        denominator = xp.abs(speed) + 1e-6
+        return xp.clip((wheel_radius * wheel_speed - speed) / denominator, -0.5, 0.5)
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -171,19 +174,20 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         speed = x[1]
         wheel_speed = x[2]
         torque = u[0]
+        xp = array_module(x, u)
         slip = self._slip(speed, wheel_speed, params)
         acceleration = self.acceleration(speed, slip, params)
-        drag = 0.5 * rho * cdA * speed * abs(speed)
+        drag = 0.5 * rho * cdA * speed * xp.abs(speed)
 
         # wheel spin-up: drive torque minus the traction + drag reaction torque
         wheel_acceleration = (
             torque - wheel_radius * (mass * acceleration + drag)
         ) / wheel_inertia
 
-        return np.array([speed, acceleration, wheel_acceleration, wheel_speed])
+        return xp.array([speed, acceleration, wheel_acceleration, wheel_speed])
 
     def h(self, x, u, t=0.0, params=None):
-        return np.array([self._slip(x[1], x[2], params)])
+        return array_module(x).array([self._slip(x[1], x[2], params)])
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         slip = self._slip(x[1], x[2])

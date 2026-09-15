@@ -3,7 +3,17 @@ Cost functions for deterministic planning.
 
 The planning cost follows the textbook optimal-control form
 
-``J = integral g(x, u, t) dt + h(x(tf), tf)``.
+``J = integral exp(-rho t) g(x, u, t) dt + h(x(tf), tf)``.
+
+A cost also states the *kind* of objective it is: :attr:`CostFunction.horizon`
+(``"finite"`` with the terminal cost ``h`` at ``tf``, ``"infinite"`` with no
+terminal cost, or ``None`` to follow the planning problem's ``tf``) and the
+continuous discount rate :attr:`CostFunction.discount_rate` ``rho`` (``0`` is
+undiscounted). Planners convert the rate to their own factor with
+:meth:`CostFunction.discount_factor`: value iteration's ``alpha`` and
+reinforcement learning's ``gamma`` are both ``exp(-rho dt)``. What happens when
+a trajectory leaves the allowed set is not the cost's business — it is the
+planning problem's exit rule (``PlanningProblem.on_exit`` / ``exit_cost``).
 
 Costs live in :mod:`minilink.core` (not on
 :class:`~minilink.core.system.System`) so the same model can be reused
@@ -33,7 +43,17 @@ class CostFunction(ABC):
     ``h(x, t)``. Both methods accept optional parameters so planning
     problems can later support parameter sweeps without putting costs on
     the system object.
+
+    Class attributes (override by assignment in a subclass or instance):
+
+    - ``horizon``: ``"finite"``, ``"infinite"``, or ``None`` (follow the
+      problem's ``tf``: finite ``tf`` is a finite horizon).
+    - ``discount_rate``: continuous rate ``rho >= 0`` in
+      ``J = int exp(-rho t) g dt``; ``0`` is undiscounted.
     """
+
+    horizon = None
+    discount_rate = 0.0
 
     @abstractmethod
     def g(self, x, u, t=0.0, params=None):
@@ -45,6 +65,22 @@ class CostFunction(ABC):
         """Return the native scalar terminal cost ``h(x, t)``."""
         ...
 
+    def horizon_kind(self, tf=None) -> str:
+        """Return ``"finite"`` or ``"infinite"``, resolving ``None`` from ``tf``."""
+        if self.horizon is not None:
+            if self.horizon not in ("finite", "infinite"):
+                raise ValueError(
+                    f"horizon must be 'finite', 'infinite' or None, got {self.horizon!r}"
+                )
+            return self.horizon
+        if tf is None or not np.isfinite(tf):
+            return "infinite"
+        return "finite"
+
+    def discount_factor(self, dt) -> float:
+        """Per-step factor ``exp(-rho dt)`` for a planner with time step ``dt``."""
+        return float(np.exp(-float(self.discount_rate) * float(dt)))
+
     def evaluate_trajectory(
         self,
         traj: Trajectory,
@@ -54,13 +90,16 @@ class CostFunction(ABC):
         Return ``traj`` with sampled running and cumulative costs.
 
         The added signals are ``"cost_rate"`` and ``"cost"`` with shape
-        ``(1, N)``. The cumulative integral uses the trapezoidal rule and
-        excludes the terminal cost; callers can add ``h(x(tf), tf)`` when
-        they need the full objective scalar.
+        ``(1, N)``. ``cost_rate`` is the discounted integrand
+        ``exp(-rho t) g(x, u, t)``; the cumulative integral uses the
+        trapezoidal rule and excludes the terminal cost; callers can add
+        ``h(x(tf), tf)`` when they need the full objective scalar.
         """
         dJ = np.zeros(traj.n_samples, dtype=float)
+        rho = float(self.discount_rate)
         for i, t in enumerate(traj.t):
-            dJ[i] = float(self.g(traj.x[:, i], traj.u[:, i], float(t), params=params))
+            g = float(self.g(traj.x[:, i], traj.u[:, i], float(t), params=params))
+            dJ[i] = np.exp(-rho * float(t)) * g
 
         J = np.zeros(traj.n_samples, dtype=float)
         if traj.n_samples > 1:

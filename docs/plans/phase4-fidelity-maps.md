@@ -1,11 +1,11 @@
 # Phase 4 — Cross-fidelity maps (design)
 
 Status: draft plan (July 2026). Active backlog — not implemented yet.
+Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
 
 Locked defaults: **bicycle ladder only** (Kin → Acc → Dyn → Rate → TauRate →
 Servo → Engine); Holonomic deferred. Maps live in
-[`minilink/dynamics/catalog/vehicles/jax_vehicle_maps.py`](../../minilink/dynamics/catalog/vehicles/jax_vehicle_maps.py)
-(to create). Pointwise functions are the core; trajectory wrappers batch them
+`minilink/dynamics/catalog/vehicles/jax_vehicle_maps.py` (to create). Pointwise functions are the core; trajectory wrappers batch them
 and supply derivatives via finite differences (same spirit as MPC
 `_finite_diff_knots` in
 [`minilink/control/mpc/utilities.py`](../../minilink/control/mpc/utilities.py)).
@@ -118,9 +118,9 @@ Phase 4 makes that shared and honest about when zeros are wrong.
 | Engine | Rate + `P` | `[P_cmd, δ_cmd]` |
 
 Reuse existing:
-[`BicycleDynRate.inverse_propulsion_dynamics`](../../minilink/dynamics/catalog/vehicles/jax_vehicles.py)
+[`BicycleDynRate.inverse_propulsion_dynamics`](../../minilink/dynamics/catalog/vehicles/dynamic_bicycle.py)
 for Rate→τ;
-[`CarProfile.power_torque_at_speed`](../../minilink/dynamics/catalog/vehicles/car_profile.py)
+[`CarProfile.power_torque_at_speed`](../../examples/projects/car_trajopt/vehicles/car_profile.py)
 only for **bounds/ratings**, not as the map body (Engine EoM is
 `τ=clip(P/ω,±τ_sat)`).
 
@@ -169,7 +169,7 @@ lift_rate_to_engine = lift_servo_to_engine ∘ lift_taurate_to_servo ∘ lift_ra
 # P_cmd ≈ τ * ω_r; δ_cmd from steer
 ```
 
-Implementation notes (match [AGENTS.md](../../AGENTS.md)):
+Implementation notes (match [RULES.md](../../RULES.md)):
 
 - Pure functions; `params` dict (minimal EoM keys). Reuse `Jw*w_dot + tau_ground` math from `inverse_propulsion_dynamics`.
 - Unpack locals; math-readable names (`v`, `delta`, `w_rear`, `L`, `r_r`).
@@ -203,7 +203,7 @@ Implementation notes (match [AGENTS.md](../../AGENTS.md)):
 - Analytic derivatives through `f` (FD on traj knots).
 - Changing `generate_nominal_interpolator` signature (callers lift first).
 - LOS `vehicle.py` / Simon plant changes.
-- View-ports from [vehicle-abstraction.md](vehicle-abstraction.md).
+- View-ports on `DynamicBicycle` (`pose` / `bodyvel` for impedance/PID) — TODO Later.
 
 ## Suggested implementation order
 

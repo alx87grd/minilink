@@ -23,6 +23,8 @@ import copy
 import time
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from minilink.core.backends import (
     BACKEND_NUMPY,
     normalize_backend,
@@ -44,6 +46,56 @@ if TYPE_CHECKING:
 
 
 # Public API
+def validate_equation_shapes(system, label=None):
+    """Probe the textbook hooks once and check their declared shapes.
+
+    ``f`` (continuous leaves), ``step`` (discrete leaves), and the standard
+    output ports created by the constructor (``y`` -> ``h``, ``x`` -> state)
+    are evaluated at ``(x0, u_nominal, t=0)``; a wrong-length result raises
+    ``ValueError`` naming the block, the hook, and both shapes. Custom port
+    computes are not probed (they may be expensive or stateful).
+    """
+    from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+    from minilink.core.system import DynamicSystem, StepSystem
+
+    if isinstance(system, (DiagramSystem, StepDiagramSystem)):
+        return
+    name = label or getattr(system, "name", type(system).__name__)
+    n = int(system.n)
+    x0 = np.asarray(system.x0, dtype=float).reshape(-1)
+    if x0.shape != (n,):
+        raise ValueError(
+            f"x0 of '{name}' has shape {x0.shape}; expected ({n},) for n={n}"
+        )
+    u0 = np.asarray(system.get_u_from_input_ports(), dtype=float).reshape(-1)
+
+    if isinstance(system, DynamicSystem) and n > 0:
+        _check_shape(system.f(x0, u0, 0.0), (n,), f"f() of '{name}'", f"for n={n}")
+    elif isinstance(system, StepSystem):
+        _check_shape(system.step(x0, u0, 0), (n,), f"step() of '{name}'", f"for n={n}")
+
+    for port_id, port in system.outputs.items():
+        function = port.compute
+        if getattr(function, "__self__", None) is not system:
+            continue
+        hook = getattr(function, "__name__", "")
+        if hook not in ("h", "compute_state"):
+            continue
+        _check_shape(
+            function(x0, u0, 0.0),
+            (port.dim,),
+            f"{hook}() of '{name}'",
+            f"for output port '{port_id}'",
+        )
+
+
+def _check_shape(value, expected, what, context):
+    shape = np.shape(value)
+    if shape == expected or (shape == () and expected == (1,)):
+        return  # a bare scalar is fine for a one-dimensional equation
+    raise ValueError(f"{what} returned shape {shape}; expected {expected} {context}")
+
+
 def compile(system, backend=BACKEND_NUMPY, verbose=False):
     """Compile a system into a typed evaluator.
 
@@ -72,6 +124,7 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
         return compile_step_diagram(system, backend=backend, verbose=verbose)
 
     key = normalize_backend(backend)
+    validate_equation_shapes(system)
 
     if isinstance(system, StepSystem):
         if key == BACKEND_NUMPY:
@@ -125,6 +178,26 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
     return evaluator
+
+
+def compile_auto(system, verbose=False):
+    """Compile with JAX when it is installed and ``system`` traces, else with NumPy.
+
+    Returns ``(backend, evaluator)``. Only two verdicts fall back to NumPy:
+    JAX cannot be imported, or the system is "not JAX-traceable"; any other
+    error from the JAX compile surfaces.
+    """
+    from minilink.core.backends import BACKEND_JAX, jax_installed
+
+    if jax_installed():
+        try:
+            return BACKEND_JAX, compile(system, backend=BACKEND_JAX, verbose=verbose)
+        except ImportError:
+            pass  # present on disk but not importable (e.g. blocked, broken install)
+        except RuntimeError as exc:
+            if "JAX-traceable" not in str(exc):
+                raise
+    return BACKEND_NUMPY, compile(system, backend=BACKEND_NUMPY, verbose=verbose)
 
 
 def compile_diagram(
@@ -189,6 +262,8 @@ def compile_diagram(
         t0 = time.perf_counter()
         print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
 
+    for sys_id, subsystem in diagram.subsystems.items():
+        validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
     port_execution_order = check_algebraic_loops(diagram)
 
     if verbose:

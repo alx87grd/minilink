@@ -1,9 +1,7 @@
 import numpy as np
 
+from minilink import BicycleDynRate
 from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRatePorts,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -20,7 +18,7 @@ U_TARGET = U_0 * 0.0
 Y_GOAL = 2.5
 HEADING_TARGET = 0.0
 
-sys = BicycleDynRatePorts()
+sys = BicycleDynRate(named_ports=True)
 
 x_start = np.array([0.0, 0.0, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0])
 x_ref = np.array(
@@ -70,7 +68,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     compile_backend="jax",
     # optimizer_method="ipopt",
-    solve_disp=PRINT_SOLVE_REPORT,
+    verbose=PRINT_SOLVE_REPORT,
     optimizer_options={
         "disp": SCIPY_DISP,
         "maxiter": 500,

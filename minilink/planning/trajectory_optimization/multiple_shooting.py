@@ -2,7 +2,12 @@
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
+from minilink.core.backends import (
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+    ensure_jax_x64,
+    normalize_backend,
+)
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -32,6 +37,16 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     ``z = [x[0, :], ..., x[n-1, :], u[0, :], ..., u[m-1, :]]``.
     Dynamics are enforced by RK4 shooting defects between neighboring knots.
     """
+
+    # The collocation parametric build assumes collocation defects; multiple
+    # shooting has no parametric (MPC) form yet.
+    supports_parametric = False
+
+    def transcribe_parametric(self, *args, **kwargs):
+        raise NotImplementedError(
+            "MultipleShootingTranscription has no parametric (MPC) form; use "
+            "transcription='direct_collocation' for compile_parametric_program"
+        )
 
     def __init__(self, options: MultipleShootingOptions):
         self.options = options
@@ -82,8 +97,8 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         compile_backend: str,
     ) -> MathematicalProgram:
         """Build a JAX-vectorized multiple-shooting program."""
-        import jax
-        import jax.numpy as jnp
+        jax = ensure_jax_x64()
+        jnp = jax.numpy
 
         cost = problem.require_cost()
         t = jnp.asarray(self.options.t(problem))

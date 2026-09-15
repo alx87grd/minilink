@@ -33,12 +33,13 @@ class TestPublicImports(unittest.TestCase):
         self.assertTrue(callable(modal_analysis))
         self.assertTrue(callable(ImpedanceController))
 
-    def test_root_all_is_selective(self):
+    def test_root_prelude_is_the_teaching_surface(self):
         import minilink
 
         self.assertIn("Pendulum", minilink.__all__)
-        self.assertNotIn("Boat2D", minilink.__all__)
-        self.assertNotIn("ModelPredictiveController", minilink.__all__)
+        self.assertIn("Boat2D", minilink.__all__)  # the catalog is teaching surface
+        self.assertNotIn("ModelPredictiveController", minilink.__all__)  # research lane
+        self.assertNotIn("HybridDiagram", minilink.__all__)
 
     def test_simulation_band_exports_simulators(self):
         from minilink.simulation import Simulator, StaticSimulator
@@ -49,6 +50,35 @@ class TestPublicImports(unittest.TestCase):
 
         self.assertIs(Simulator, SimulatorDef)
         self.assertIs(StaticSimulator, StaticSimulatorDef)
+
+    def test_planning_and_core_band_exports(self):
+        from minilink.core import (
+            DiagramSystem,
+            DynamicSystem,
+            QuadraticCost,
+            Trajectory,
+        )
+        from minilink.core.costs import QuadraticCost as QuadraticCostDef
+        from minilink.core.system import DynamicSystem as DynamicSystemDef
+        from minilink.planning import (
+            DynamicProgrammingPlanner,
+            PlanningProblem,
+            StateSpaceGrid,
+            TrajectoryOptimizationPlanner,
+        )
+        from minilink.planning.problems import PlanningProblem as PlanningProblemDef
+
+        self.assertIs(DynamicSystem, DynamicSystemDef)
+        self.assertIs(QuadraticCost, QuadraticCostDef)
+        self.assertIs(PlanningProblem, PlanningProblemDef)
+        for value in (
+            DiagramSystem,
+            Trajectory,
+            TrajectoryOptimizationPlanner,
+            DynamicProgrammingPlanner,
+            StateSpaceGrid,
+        ):
+            self.assertTrue(callable(value))
 
     def test_blocks_band_exports(self):
         from minilink.blocks import Integrator, Step, Sum
@@ -62,7 +92,14 @@ class TestPublicImports(unittest.TestCase):
         """Every `_EXPORTS` name on a stable band facade resolves lazily."""
         import importlib
 
-        for band in ("minilink", "minilink.blocks", "minilink.simulation"):
+        for band in (
+            "minilink",
+            "minilink.blocks",
+            "minilink.simulation",
+            "minilink.planning",
+            "minilink.optimization",
+            "minilink.core",
+        ):
             module = importlib.import_module(band)
             for name in module.__all__:
                 self.assertIsNotNone(getattr(module, name), f"{band}.{name}")

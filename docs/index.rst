@@ -1,20 +1,15 @@
-Minilink Documentation
-======================
+:hide-toc:
+
+Minilink
+========
+
+.. raw:: html
+   :file: pitch/slides.html
 
 .. raw:: html
 
-   <p class="minilink-lead">
-   Python-native block-diagram framework for modeling, simulating, optimizing, and
-   visualizing dynamical systems — equations written like textbook math, composed
-   with <code>+</code>, <code>&gt;&gt;</code>, and <code>@</code>.
-   </p>
-
-   <ul class="minilink-links">
-   <li><a href="https://github.com/alx87grd/minilink/blob/main/README.md">User guide (README)</a></li>
-   <li><a href="https://github.com/alx87grd/minilink/blob/main/DESIGN.md">Design &amp; contracts</a></li>
-   <li><a href="https://github.com/alx87grd/minilink">GitHub repository</a></li>
-   <li><a href="https://github.com/alx87grd/minilink/tree/main/examples">Examples</a></li>
-   </ul>
+   <p class="ml-deck-link">Present these slides full screen:
+   <a href="_static/pitch.html">the standalone pitch deck</a> (arrow keys, F for fullscreen).</p>
 
 .. toctree::
    :maxdepth: 2

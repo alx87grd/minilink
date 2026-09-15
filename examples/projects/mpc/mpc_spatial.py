@@ -3,7 +3,7 @@
 Walks the ``planning/spatial`` pipeline: track + obstacles → fields → costs →
 ``PlanningProblem`` + ``TrajectoryOptimizationPlanner`` (not solved).
 
-Full NLP + hybrid MPC: ``examples/learn/teaching/mpc.ipynb``.
+Full NLP + hybrid MPC: ``examples/projects/mpc/mpc_spatial_stack.ipynb``.
 Closed-loop hybrid script: ``examples/demos/mpc/mpc_car_circuit.py``.
 
 Set ``SHOW_PLOTS = False`` for a headless walkthrough.
@@ -16,13 +16,11 @@ Run from repo root::
 import matplotlib.pyplot as plt
 import numpy as np
 
+from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.core.sets import BoxSet
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRatePorts,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
@@ -141,7 +139,7 @@ plot_bounds = (
 
 print(f"lap length = {track.path.total_length:.2f} m")
 
-sys_mpc = BicycleDynRatePorts()
+sys_mpc = BicycleDynRate(named_ports=True)
 sys_mpc.state.lower_bound[6] = 0.0
 sys_mpc.state.upper_bound[6] = 90.0
 sys_mpc.state.lower_bound[7] = -0.55
@@ -198,11 +196,13 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     compile_backend="jax",
     optimizer_method="scipy_slsqp",
-    solve_disp=False,
+    verbose=False,
     optimizer_options={"maxiter": 150, "ftol": 0.1},
 )
 print(f"planner ready (not solved): horizon={MPC_HORIZON}s, n_steps={MPC_STEPS}")
-print("Next: learn/teaching/mpc.ipynb (full stack) or demos/mpc/mpc_car_circuit.py")
+print(
+    "Next: projects/mpc/mpc_spatial_stack.ipynb (full stack) or demos/mpc/mpc_car_circuit.py"
+)
 
 if SHOW_PLOTS:
     path_viz = track.distance_field(probe).as_cost(

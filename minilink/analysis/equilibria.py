@@ -1,17 +1,13 @@
-"""Find equilibria (trim points) of a system by root-finding on ``f``.
+"""Equilibria of :class:`~minilink.core.system.DynamicSystem` models."""
 
-An equilibrium is a state where the dynamics vanish for a held input:
-``f(x_eq, u, t) = 0``. :func:`find_equilibrium` solves this with
-``scipy.optimize.fsolve`` from a user guess, the usual first step before
-linearizing and designing a controller about that point.
-"""
+from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import fsolve
 
 
-def find_equilibrium(sys, x_guess, u=None, *, t=0.0, params=None, tol=1e-9):
-    """Return a state ``x_eq`` near ``x_guess`` with ``f(x_eq, u, t) ≈ 0``.
+def find_equilibrium(sys, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
+    """Return a state ``x_eq`` near ``x_guess`` with ``f(x_eq, u_bar, t) ≈ 0``.
 
     Parameters
     ----------
@@ -20,10 +16,12 @@ def find_equilibrium(sys, x_guess, u=None, *, t=0.0, params=None, tol=1e-9):
         or wired diagram with stacked ``f``).
     x_guess : array of shape (n,)
         Initial guess for the equilibrium state.
-    u : array of shape (m,), optional
+    u_bar : array of shape (m,), optional
         Held input. Defaults to the system's nominal port values.
     t : float, optional
         Time at which to evaluate ``f``.
+    params : dict, optional
+        Parameter set forwarded to ``f``.
     tol : float, optional
         Tolerance on ``‖f‖`` for the success check.
 
@@ -38,12 +36,12 @@ def find_equilibrium(sys, x_guess, u=None, *, t=0.0, params=None, tol=1e-9):
         If the solver does not drive ``‖f‖`` below ``tol``.
     """
     x_guess = np.asarray(x_guess, dtype=float).reshape(-1)
-    if u is None:
-        u = sys.get_u_from_input_ports()
-    u = np.asarray(u, dtype=float).reshape(-1)
+    if u_bar is None:
+        u_bar = sys.get_u_from_input_ports()
+    u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
 
     def residual(x):
-        return np.asarray(sys.f(x, u, t, params), dtype=float).reshape(-1)
+        return np.asarray(sys.f(x, u_bar, t, params), dtype=float).reshape(-1)
 
     x_eq = fsolve(residual, x_guess, xtol=tol)
 
@@ -58,4 +56,4 @@ if __name__ == "__main__":
     pendulum = Pendulum()
     # With zero torque, the upright start relaxes to the hanging equilibrium.
     x_eq = find_equilibrium(pendulum, x_guess=[0.3, 0.0])
-    print("equilibrium:", np.round(x_eq, 6))
+    print("equilibrium:", x_eq)

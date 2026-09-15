@@ -9,7 +9,10 @@ import time
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import BACKEND_NUMPY, normalize_backend, require_jax_numpy
-from minilink.core.compile.compiler import _build_gather_sources
+from minilink.core.compile.compiler import (
+    _build_gather_sources,
+    validate_equation_shapes,
+)
 from minilink.core.compile.execution_plan import PortOperation
 from minilink.core.compile.step_execution_plan import StepExecutionPlan, StepOperation
 from minilink.core.system import DynamicSystem, StepSystem
@@ -50,6 +53,8 @@ def compile_step_diagram(
                 f"DynamicSystem leaf '{sys_id}' cannot be compiled inside a step "
                 "diagram; use DiagramSystem for continuous subsystems."
             )
+        validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
+        validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
 
     t_total = time.perf_counter() if verbose else None
 

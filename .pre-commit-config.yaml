@@ -6,4 +6,4 @@ repos:
     rev: 0.9.1
     hooks:
       - id: nbstripout
-        files: ^examples/notebooks/.*\.ipynb$
+        files: ^examples/.*\.ipynb$

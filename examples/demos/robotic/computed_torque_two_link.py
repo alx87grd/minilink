@@ -1,24 +1,8 @@
-"""Two-link arm with computed torque — Pyro ``twolinkrobot_computed_torque_controller``.
-
-Run from repo root::
-
-    python examples/demos/robotic/computed_torque_two_link.py
-
-Joint-space feedback with PD gains inside :class:`ComputedTorqueController`::
-
-    ref.r ─────────────► ctl.r
-    sys.y ─────────────► ctl.y              ([q; dq])
-    ctl.u ──► sys.u
-
-Same end-effector step task as ``task_impedance_two_link.py`` (``p0`` → ``p1``),
-with joint references from inverse kinematics.
-"""
+"""Two-link arm with computed torque — Pyro ``twolinkrobot_computed_torque_controller``."""
 
 import numpy as np
 
-from minilink.blocks.sources import Step
-from minilink.control.modelbased import ComputedTorqueController
-from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
+from minilink import ComputedTorqueController, Step, TwoLinkManipulator
 
 p0 = np.array([0.5, 0.5])
 p1 = np.array([-0.5, 0.5])
@@ -33,9 +17,9 @@ q1 = arm.inverse_kinematics(p1)
 
 ref = Step(initial_value=q0, final_value=q1, step_time=STEP_TIME)
 
-ctl = ComputedTorqueController(arm, tracking_ref=False)
-ctl.params["Kp"] = np.array([20.0, 20.0])
-ctl.params["Kd"] = np.array([10.0, 10.0])
+ctl = ComputedTorqueController(
+    arm, tracking_ref=False, Kp=[20.0, 20.0], Kd=[10.0, 10.0]
+)
 ctl.plot_control_law()  # τ1 over (q0, dq0)
 
 diagram = ref >> ctl @ arm

@@ -10,16 +10,17 @@ Run from repo root::
 
 import numpy as np
 
-from examples.projects.pathtracking.mpc_v1.allocation import Allocation
+from examples.projects.pathtracking.common.allocation import Allocation
+from examples.projects.pathtracking.common.path_generator import rounded_rectangle_path
+from examples.projects.pathtracking.common.vehicle import create_vehicle
 from examples.projects.pathtracking.mpc_v1.mpc_dual_rate import dual_rate_computer_ahead
 from examples.projects.pathtracking.mpc_v1.nominal_refs import NominalRefs
-from examples.projects.pathtracking.mpc_v1.path_generator import rounded_rectangle_path
 from examples.projects.pathtracking.mpc_v1.plant_to_mpc import (
     PlantToMpcState,
     plant_y_to_mpc_x,
 )
 from examples.projects.pathtracking.mpc_v1.servos import Servos
-from examples.projects.pathtracking.mpc_v1.vehicle import create_vehicle
+from minilink import BicycleDynRate
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
@@ -29,9 +30,6 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
 from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-    BicycleDynRate,
-)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.paths import from_waypoints
@@ -101,7 +99,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, step_disp=True)
+mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
 computer = dual_rate_computer_ahead(
     mpc, dt_broadcast=DT_BROADCAST, dt_project=DT_PROJECT
 )

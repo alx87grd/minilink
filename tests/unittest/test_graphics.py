@@ -15,6 +15,7 @@ from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation import Animator
 from minilink.graphical.animation.camera import resolve_camera_from_hints
+from minilink.graphical.animation.renderers.timing import trajectory_frame_schedule
 from minilink.graphical.animation.primitives import (
     Arrow,
     Point,
@@ -825,12 +826,12 @@ class TestAdvancedPlotting(unittest.TestCase):
 
     def test_resolve_plot_signals_dynamic_controller(self):
         from minilink.blocks.sources import Step
-        from minilink.control.siso import FilteredController
+        from minilink.control.siso import PID
         from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
         diagram = (
             Step(final_value=[1.0], step_time=0.0)
-            >> FilteredController() @ DoubleIntegrator()
+            >> PID(ports="reference") @ DoubleIntegrator()
         )
         self.assertEqual(resolve_plot_signals(diagram), ("x", "ref:y", "ctl:u"))
 
@@ -952,6 +953,7 @@ class TestPlotlyRenderer(unittest.TestCase):
     def test_static_2d_frame_builds_figure_without_showing(self):
         sys = DynamicSystem(1, input_dim=1, output_dim=1, expose_state=True)
         sys.skin = debug_state_skin
+        sys.camera_scale = 10.0  # explicit hint: fixed +-10 window
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
         x = np.array([0.5])
@@ -1031,6 +1033,7 @@ class TestPlotlyRenderer(unittest.TestCase):
     def test_inline_animation_uses_fixed_camera_2d_axes(self):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
         sys.skin = debug_state_skin
+        sys.camera_scale = 10.0  # explicit hint: fixed +-10 window
         traj = Trajectory(
             t=np.array([0.0, 0.1, 0.2]),
             x=np.array([[0.0, 25.0, -5.0]]),
@@ -1188,7 +1191,7 @@ from minilink.blocks.nonlinear import Saturation  # noqa: E402
 from minilink.control.impedance import ImpedanceController  # noqa: E402
 from minilink.control.modelbased import ComputedTorqueController  # noqa: E402
 from minilink.control.output import ProportionalController  # noqa: E402
-from minilink.control.siso import FilteredController  # noqa: E402
+from minilink.control.siso import PID  # noqa: E402
 from minilink.control.state import StateFeedbackController  # noqa: E402
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum  # noqa: E402
 from minilink.graphical import port_map  # noqa: E402
@@ -1284,7 +1287,7 @@ class TestPlotControlLaw(unittest.TestCase):
 
     def test_dynamic_law_pins_internal_state_at_x0(self):
         Kp, Ki, Kd, tau = 4.0, 1.0, 0.5, 0.1
-        pid = FilteredController(Kp=Kp, Ki=Ki, Kd=Kd, tau=tau)
+        pid = PID(Kp=Kp, Ki=Ki, Kd=Kd, tau=tau, ports="reference")
         res = pid.plot_control_law(bounds=(-1.0, 1.0), show=False)
         line = res.axes.lines[0]
         e = line.get_xdata()
@@ -1295,7 +1298,7 @@ class TestPlotControlLaw(unittest.TestCase):
 
     def test_dynamic_law_windup_slice(self):
         Kp, Ki = 4.0, 1.0
-        pid = FilteredController(Kp=Kp, Ki=Ki, Kd=0.0)
+        pid = PID(Kp=Kp, Ki=Ki, Kd=0.0, ports="reference")
         res = pid.plot_control_law(
             x_axis=0,
             y_axis=1,
@@ -1335,11 +1338,12 @@ class TestPlotControlLaw(unittest.TestCase):
             def __init__(self):
                 super().__init__()
                 self.add_input_port("v", dim=1)
+                self.add_input_port("w_in", dim=1)
                 self.add_output_port(
                     "w",
                     dim=1,
-                    function=lambda x, u, t, params=None: u,
-                    dependencies=("v",),
+                    function=lambda x, u, t, params=None: u[:1],
+                    dependencies=("v", "w_in"),
                 )
 
         with self.assertRaisesRegex(ValueError, "feedback_profile"):
@@ -1363,3 +1367,68 @@ class TestPlotControlLaw(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "not a static map"):
             port_map.plot_control_law(SolverLike(), show=False)
+
+
+class TestAutoFitCamera(unittest.TestCase):
+    """``camera_scale=None`` fits the view to the drawn geometry (DESIGN §7)."""
+
+    def test_bounding_radius_of_primitives(self):
+        from minilink.graphical.animation.primitives import (
+            Box,
+            Circle,
+            Plane,
+            Rod,
+            bounding_radius,
+        )
+
+        self.assertAlmostEqual(bounding_radius(Rod(length=2.0, radius=0.1)), 2.1)
+        self.assertAlmostEqual(
+            bounding_radius(Circle(radius=0.5, center=(1.0, 0.0, 0.0))), 1.5
+        )
+        self.assertAlmostEqual(
+            bounding_radius(Box(length_x=2.0, length_y=0.0, length_z=0.0)), 1.0
+        )
+        self.assertIsNone(bounding_radius(Plane()))
+
+    def test_animation_camera_frames_the_whole_trajectory(self):
+        from minilink.core.kinematics import translation
+        from minilink.graphical.animation.primitives import Box
+
+        class Slider(DynamicSystem):
+            def __init__(self):
+                super().__init__(1, output_dim=1, expose_state=True)
+                self.skin = lambda sys: {"body": [Box(1.0, 1.0, 1.0)]}
+
+            def f(self, x, u, t=0, params=None):
+                return np.zeros(1)
+
+            def tf(self, x, u, t=0, params=None):
+                return {"body": translation(x[0], 0.0, 0.0)}
+
+        sys = Slider()
+        self.assertIsNone(sys.camera_scale)
+        traj = Trajectory(
+            t=np.array([0.0, 0.1, 0.2]),
+            x=np.array([[0.0, 25.0, -5.0]]),
+            u=np.zeros((0, 3)),
+        )
+        animator = Animator(sys)
+        schedule = trajectory_frame_schedule(traj, 1.0)
+        frames = animator._build_frames(
+            traj, schedule, kinematic=sys.get_kinematic_geometry(), camera_override=None
+        )
+        cameras = [frame["camera"] for frame in frames]
+        self.assertTrue(all(np.array_equal(c, cameras[0]) for c in cameras))
+        target, scale = cameras[0][:3, 3], cameras[0][3, 3]
+        self.assertAlmostEqual(target[0], 10.0, places=6)  # midpoint of [-5, 25]
+        self.assertGreater(scale, 15.0)  # half-span (15 + box radius) with margin
+        self.assertLess(scale, 20.0)
+
+    def test_explicit_hint_wins_over_auto_fit(self):
+        sys = DynamicSystem(1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
+        sys.camera_scale = 3.0
+        frame = Animator(sys)._resolve_frame(
+            np.array([25.0]), np.array([]), 0.0, kinematic=sys.get_kinematic_geometry()
+        )
+        self.assertEqual(frame["camera"][3, 3], 3.0)

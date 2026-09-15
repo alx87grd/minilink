@@ -37,8 +37,8 @@ html_baseurl = "https://alx87grd.github.io/minilink/"
 
 html_theme = "furo"
 html_title = "Minilink"
-html_static_path = ["_static"]
-html_css_files = ["custom.css"]
+html_static_path = ["_static", "pitch"]  # pitch/ holds the landing slides + their CSS
+html_css_files = ["custom.css", "pitch.css"]
 
 html_theme_options = {
     "source_repository": "https://github.com/alx87grd/minilink/",

@@ -7,6 +7,10 @@ collision from ``problem.X``, the goal region from ``problem.Xf``/``x_goal``,
 sampling from ``problem.X`` (rejection when needed), dynamics from ``problem.sys``.
 The only swappable pieces are the injected ``extender`` (how two states connect)
 and ``metric`` (the nearest-neighbour distance).
+
+Note
+----
+Provisional tool — maintainer review before assigning for coursework.
 """
 
 from dataclasses import dataclass, replace
@@ -18,7 +22,8 @@ from minilink.core.sets import BallSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import SolveMetadata, TrajectoryPlan
+from minilink.planning.results import PlanningSolution
+from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.metric import euclidean
 from minilink.planning.search.tree import (
     NEAREST_BACKENDS,
@@ -86,6 +91,32 @@ def _merge_rrt_options(
     return replace(base, **updates)
 
 
+@dataclass(frozen=True)
+class TreeSearchRecord:
+    """Whether the goal was reached, how much of the budget the search took, and the path's cost-to-come."""
+
+    reached_goal: bool
+    iterations: int
+    nodes: int
+    cost: float
+    converged: bool
+    history: list
+
+    @property
+    def success(self) -> bool:
+        return bool(self.reached_goal)
+
+    def __str__(self) -> str:
+        outcome = "goal reached" if self.reached_goal else "goal not reached"
+        text = (
+            f"{outcome} after {self.iterations} extensions ({self.nodes} nodes), "
+            f"path cost {self.cost:.4g}"
+        )
+        if self.converged:
+            text += ", converged"
+        return text
+
+
 class RRTPlanner(Planner):
     """
     Rapidly-exploring random tree over a `PlanningProblem`.
@@ -117,7 +148,7 @@ class RRTPlanner(Planner):
     def __init__(
         self,
         problem: PlanningProblem,
-        extender,
+        extender=None,
         *,
         metric=euclidean,
         options: RRTOptions | None = None,
@@ -137,6 +168,9 @@ class RRTPlanner(Planner):
         nearest_backend=_UNSET,
     ) -> None:
         super().__init__(problem)
+        if extender is None:
+            # Bang-bang motion primitives from the input bounds, 0.3 s edges.
+            extender = KinodynamicExtender()
         self.extender = extender
         self.metric = metric
         self.options = _merge_rrt_options(
@@ -162,11 +196,17 @@ class RRTPlanner(Planner):
         self.iterations: int = 0
         self._sample_box = BoxSet.from_system_state(problem.sys)
 
-    def solve(self) -> TrajectoryPlan:
-        """Offline traj-family entry."""
-        return self.solve_trajectory()
+    def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        """
+        Offline traj-family entry.
 
-    def solve_trajectory(self) -> TrajectoryPlan:
+        The solution's policy is the path's input held by a source block,
+        ``policy >> plant``; ``evaluate=True`` replays it over the problem's
+        draws when the problem declares a cost.
+        """
+        return self.solve_trajectory(evaluate=evaluate, n_trials=n_trials)
+
+    def solve_trajectory(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """Grow the tree until the goal region is reached or the budget is spent."""
         options = self.options
         self._validate_nearest_backend()
@@ -198,7 +238,9 @@ class RRTPlanner(Planner):
                 self.reached_goal = True
                 self.solution_node = node
                 self._on_search_step(phase="explore")
-                return self._finish_trajectory(self.tree.extract_trajectory(node))
+                return self._finish_trajectory(
+                    self.tree.extract_trajectory(node), evaluate, n_trials
+                )
 
             self._on_search_step(phase="explore")
 
@@ -207,14 +249,35 @@ class RRTPlanner(Planner):
         self.solution_node = closest
         if not options.return_best_effort:
             raise RuntimeError("RRT failed to reach goal within max_nodes")
-        return self._finish_trajectory(self.tree.extract_trajectory(closest))
+        return self._finish_trajectory(
+            self.tree.extract_trajectory(closest), evaluate, n_trials
+        )
 
-    def _finish_trajectory(self, trajectory: Trajectory) -> TrajectoryPlan:
-        return self._store_trajectory_plan(
-            TrajectoryPlan(
-                trajectory=trajectory,
-                metadata=SolveMetadata(success=bool(self.reached_goal)),
+    def _finish_trajectory(
+        self, trajectory: Trajectory, evaluate, n_trials
+    ) -> PlanningSolution:
+        """The path as a solution: its input held by a source block, the search's record, scored when asked."""
+        policy = self.open_loop_policy(trajectory, interpolation="previous")
+        evaluation = None
+        if evaluate:
+            dt = float(np.median(np.diff(trajectory.t)))
+            evaluation = self.evaluate(
+                policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
             )
+        return self.store_solution(
+            PlanningSolution(policy, self.search_record(), trajectory, evaluation)
+        )
+
+    def search_record(self) -> "TreeSearchRecord":
+        """The search's account: goal reached or not, the budget it took, the path's cost-to-come."""
+        node = self.solution_node
+        return TreeSearchRecord(
+            reached_goal=bool(self.reached_goal),
+            iterations=int(self.iterations),
+            nodes=len(self.tree.nodes),
+            cost=float("nan") if node is None else float(node.cost),
+            converged=False,
+            history=[],
         )
 
     def plot_tree(self, **kwargs):

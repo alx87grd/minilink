@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
@@ -45,7 +46,8 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         phi = params["phi"]
 
         # ground height: superposed sinusoidal road profile
-        return np.sum(a * np.sin(w * (x - phi)))
+        xp = array_module(x)
+        return xp.sum(a * xp.sin(w * (x - phi)))
 
     def dz(self, x, params=None):
         params = self.params if params is None else params
@@ -54,7 +56,8 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         phi = params["phi"]
 
         # ground slope: spatial derivative of the road profile
-        return np.sum(a * w * np.cos(w * (x - phi)))
+        xp = array_module(x)
+        return xp.sum(a * w * xp.cos(w * (x - phi)))
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -70,7 +73,7 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         # mass y'' = u - k (y - z) - b (y' - z'): sprung mass over the road
         acceleration = (u[0] - k * (y - ground) - b * (dy - ground_slope)) / mass
 
-        return np.array([acceleration, dy, vx])
+        return array_module(x, u).array([acceleration, dy, vx])
 
     def h(self, x, u, t=0.0, params=None):
         return x

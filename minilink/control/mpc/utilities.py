@@ -8,7 +8,6 @@ import numpy as np
 
 from minilink.core.trajectory import Trajectory
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.results import TrajectoryPlan
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -170,24 +169,24 @@ def _finite_diff_knots(tau: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def build_nominal_cache(
-    plan: TrajectoryPlan,
+    trajectory: Trajectory,
     t_solve: float,
     *,
     derivatives: bool = True,
 ) -> NominalCache:
     """
-    Build a :class:`NominalCache` from a latched traj plan.
+    Build a :class:`NominalCache` from a latched solution's trajectory.
 
     Parameters
     ----------
-    plan : TrajectoryPlan
-        Latched solve result (plan-local ``trajectory.t``).
+    trajectory : Trajectory
+        The latched solve's schedule (plan-local ``t``).
     t_solve : float
         Absolute solve time (τ = 0).
     derivatives : bool, optional
         If True, attach FD knot rates ``x_dot`` / ``u_dot``.
     """
-    traj = plan.trajectory
+    traj = trajectory
     tau = np.asarray(traj.t, dtype=float).reshape(-1)
     x = np.asarray(traj.x, dtype=float)
     u = np.asarray(traj.u, dtype=float)

@@ -1,39 +1,14 @@
-"""Compare finite-difference and JAX linearization on a tiny plant.
-
-Run from the repo root::
-
-    python examples/demos/analysis/analysis_linearize_fd_vs_jax.py
-"""
+"""Compare finite-difference and exact (JAX) Jacobians on two plants."""
 
 import numpy as np
 
-from minilink.analysis.linearize import linearize_matrices
-from minilink.dynamics.catalog.pendulum.cartpole import JaxCartPole
-from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
+from minilink import CartPole, DoublePendulum
 
 np.set_printoptions(precision=4, suppress=True)
 
-plant = JaxCartPole()
-xbar = np.array([0.0, 0.0, 0.0, 0.0])
-ubar = np.array([0.0])
-
-
-A, B, C, D = linearize_matrices(plant, xbar, ubar, method="fd")
-print("JaxCartPole (fd):")
-print("A =\n", A)
-
-A, B, C, D = linearize_matrices(plant, xbar, ubar, method="jax")
-print("JaxCartPole (jax):")
-print("A =\n", A)
-
-plant = DoublePendulum()
-xbar = np.array([0.0, 0.0, 0.0, 0.0])
-ubar = np.array([0.0, 0.0])
-
-A, B, C, D = linearize_matrices(plant, xbar, ubar, method="fd")
-print("DoublePendulum (fd):")
-print("A =\n", A)
-
-A, B, C, D = linearize_matrices(plant, xbar, ubar, method="jax")
-print("DoublePendulum (jax):")
-print("A =\n", A)
+for plant in (CartPole(), DoublePendulum()):
+    x_bar = np.zeros(plant.n)
+    A_fd = plant.jacobian("f", "x", x_bar, method="fd")
+    A_jax = plant.jacobian("f", "x", x_bar, method="jax")
+    print(f"{plant.name}: A (finite differences) =\n{A_fd}")
+    print(f"{plant.name}: max |A_jax - A_fd| = {np.max(np.abs(A_jax - A_fd)):.2e}\n")

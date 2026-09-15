@@ -51,6 +51,8 @@ class TestBlocks(unittest.TestCase):
 
     def test_transfer_function_first_order_step(self):
         plant = TransferFunction([1.0], [1.0, 1.0])
+        self.assertEqual(list(plant.inputs), ["u"])
+        self.assertEqual(list(plant.outputs), ["y", "x"])
         x = np.array([0.0])
         u = np.array([1.0])
         dx = plant.f(x, u)
@@ -93,12 +95,24 @@ class TestBlocks(unittest.TestCase):
 
 from minilink.blocks.filters import LowPassFilter, NotchFilter, Washout
 from minilink.blocks.nonlinear import DeadZone, Relay, Saturation
-from minilink.blocks.routing import Demux, Gain, Mux, Sum
+from minilink.blocks.routing import Demux, Error, Gain, Mux, Sum
 from minilink.blocks.sources import TrajectorySource
 from minilink.core.trajectory import Trajectory
 
 
 class TestRoutingBlocks(unittest.TestCase):
+    def test_error_is_r_minus_y(self):
+        block = Error()
+        e = block.outputs["e"].compute(None, np.array([5.0, 2.0]))
+        np.testing.assert_allclose(e, [3.0])
+        self.assertEqual(list(block.inputs), ["+", "-"])
+        self.assertEqual(list(block.outputs), ["e"])
+
+    def test_error_vector(self):
+        block = Error(dim=2)
+        e = block.outputs["e"].compute(None, np.array([1.0, 4.0, 0.5, 1.0]))
+        np.testing.assert_allclose(e, [0.5, 3.0])
+
     def test_sum_default_is_tracking_error(self):
         block = Sum()
         y = block.outputs["y"].compute(None, np.array([5.0, 2.0]))
@@ -136,8 +150,13 @@ class TestRoutingBlocks(unittest.TestCase):
         u = np.array([1.0, 2.0, 9.0])
         np.testing.assert_allclose(mux.outputs["y"].compute(None, u), u)
         demux = Demux(dims=(2, 1))
-        np.testing.assert_allclose(demux.outputs["out0"].compute(None, u), [1.0, 2.0])
-        np.testing.assert_allclose(demux.outputs["out1"].compute(None, u), [9.0])
+        self.assertEqual(list(demux.inputs), ["u"])
+        self.assertEqual(list(demux.outputs), ["u[0:2]", "u[2]"])
+        np.testing.assert_allclose(demux.outputs["u[0:2]"].compute(None, u), [1.0, 2.0])
+        np.testing.assert_allclose(demux.outputs["u[2]"].compute(None, u), [9.0])
+        named = Demux(dims=(1, 1), port="y")
+        self.assertEqual(list(named.inputs), ["y"])
+        self.assertEqual(list(named.outputs), ["y[0]", "y[1]"])
 
 
 class TestNonlinearBlocks(unittest.TestCase):

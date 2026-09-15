@@ -571,7 +571,7 @@ class MatplotlibRenderer(AnimationRenderer):
         print(f"Saving animation to {file_name}.gif ...")
         ani.save(
             file_name + ".gif",
-            writer="imagemagick",
+            writer="pillow",
             fps=schedule.target_fps,
             dpi=DPI_EXPORT,
         )

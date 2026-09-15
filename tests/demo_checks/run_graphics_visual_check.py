@@ -38,13 +38,13 @@ CHECKS = (
     ),
     (
         "Meshcat 3D (physics in diagram — optional meshcat extra)",
-        [sys.executable, "examples/sandbox/engine/engine_physics_in_diagram.py"],
+        [sys.executable, "examples/experimental/engine/engine_physics_in_diagram.py"],
     ),
     (
         "Cartpole trajopt animate (set LIVE_PLOT=True for Plotly iterates)",
         [
             sys.executable,
-            "examples/demos/trajopt/trajopt_cartpole_collocation_jax.py",
+            "examples/demos/planning/trajopt/trajopt_cartpole_collocation_jax.py",
         ],
     ),
 )

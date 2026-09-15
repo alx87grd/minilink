@@ -803,9 +803,7 @@ class TestAsComputer(unittest.TestCase):
         from minilink.control.mpc import ModelPredictiveController
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
-        from minilink.dynamics.catalog.vehicles.jax_vehicles import (
-            BicycleDynRate,
-        )
+        from minilink import BicycleDynRate
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
             DirectCollocationOptions,
@@ -1024,3 +1022,60 @@ class TestRealtimeSimulator(unittest.TestCase):
         self.assertIn("budget=", out)
         self.assertIn("Completed in", out)
         self.assertIn("n_frames:", out)
+
+
+class TestAutomaticTimeGrid(unittest.TestCase):
+    """S01: solver first, then a grid sized to it."""
+
+    def test_adaptive_default_is_a_fine_reporting_grid_with_scipy(self):
+        from minilink.simulation.time_grid import DEFAULT_N_STEPS
+
+        sim = Simulator(StableLinearSystem(), tf=10.0, verbose=False)
+        self.assertEqual(sim.solver_mode, "scipy")
+        self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
+        self.assertAlmostEqual(sim.dt, 10.0 / (DEFAULT_N_STEPS - 1))
+        self.assertTrue(sim.auto_time_grid)
+
+    def test_fixed_step_solver_takes_dt_from_time_constant(self):
+        sys = StableLinearSystem()
+        sys.solver_info["smallest_time_constant"] = 0.1
+        sim = Simulator(sys, tf=1.0, solver="rk4_fixedsteps", verbose=False)
+        self.assertAlmostEqual(sim.dt, 0.01)  # 0.1 * SMOOTH_AUTO_DT_SCALE
+        self.assertEqual(sim.n_pts, 101)
+
+    def test_discontinuous_plant_defaults_to_euler_with_time_constant_dt(self):
+        import warnings
+
+        sys = StableLinearSystem()
+        sys.solver_info["discontinuous_behavior"] = True
+        sys.solver_info["smallest_time_constant"] = 0.05
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sim = Simulator(sys, tf=1.0, verbose=False)
+        self.assertEqual(sim.solver_mode, "euler")
+        self.assertAlmostEqual(sim.dt, 0.005)
+
+    def test_explicit_grid_still_wins(self):
+        sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=51, verbose=False)
+        self.assertEqual(sim.n_pts, 51)
+        self.assertFalse(sim.auto_time_grid)
+
+    def test_static_simulator_shares_the_default(self):
+        from minilink.blocks.sources import Step
+        from minilink.simulation.static_simulator import StaticSimulator
+        from minilink.simulation.time_grid import DEFAULT_N_STEPS
+
+        sim = StaticSimulator(Step(), tf=10.0, verbose=False)
+        self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
+
+    @pytest.mark.optional
+    @pytest.mark.jax
+    @unittest.skipUnless(_have_jax(), "jax not installed")
+    def test_jax_automatic_grid_never_selects_rk4(self):
+        from minilink.simulation.time_grid import DEFAULT_N_STEPS
+
+        sim = Simulator(
+            StableLinearSystem(), tf=10.0, compile_backend="jax", verbose=False
+        )
+        self.assertEqual(sim.solver_mode, "scipy")
+        self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)

@@ -6,6 +6,7 @@ from minilink.graphical.phase_plane.phase_plane import (
     build_phase_plane_spec,
     plot_phase_plane,
     render_phase_plane_matplotlib,
+    render_phase_plane_plotly,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "build_phase_plane_spec",
     "plot_phase_plane",
     "render_phase_plane_matplotlib",
+    "render_phase_plane_plotly",
 ]

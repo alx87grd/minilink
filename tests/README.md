@@ -2,7 +2,7 @@
 
 **Entry points (human · agent · CI):** see [Entry points](#entry-points) below — authoritative for all three audiences.
 
-Six-layer vision (historical plan detail): [docs/plans/test-benchmark-consolidation.md](../docs/plans/test-benchmark-consolidation.md). Notebook smoke is an additional layer on top of that vision.
+The historical six-layer test plan was retired on 2026-09-05 (see [docs/plans/README.md](../docs/plans/README.md)); notebook smoke is an additional layer on top of the unit and demo-check layers.
 
 ---
 
@@ -59,7 +59,7 @@ Optional toggles: constants at the top of each `tests/run/*.py` file.
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
 | Notebook change | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
 
-Rules: [AGENTS.md](../AGENTS.md).
+Agent workflow: [AGENTS.md](../AGENTS.md). Code and review rules: [RULES.md](../RULES.md).
 
 ### CI (GitHub Actions)
 
@@ -113,6 +113,7 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 | **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `run_graphics_visual_check.py` | — |
 | **Demo checks** | Catalog + flagship demos must not throw | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
 | **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `regression` |
+| **Repo contract** | Doc links resolve, public prose names no other tool, no pseudo-private methods | `test_repo_contract.py` (in `pytest`) | `test` |
 
 ## Local environment
 
@@ -157,15 +158,15 @@ job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated
 and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not throw.
 
 Demos and teaching notebooks must **not** branch on smoke/CI env vars — the runner
-only sets headless display knobs. A contract test scans ``examples/learn/`` and
-``examples/demos/`` for forbidden harness names (see
+only sets headless display knobs. A contract test scans ``examples/tutorial/``, ``examples/teaching/``,
+and ``examples/demos/`` for forbidden harness names (see
 ``test_examples_have_no_smoke_env_hooks``).
 
 ```bash
 python tests/demo_checks/run_catalog_checks.py --fast
 # Flagship whitelist: subprocess each demo's __main__ (no demo source changes):
 python tests/demo_checks/run_flagship_demos.py
-# Teaching notebooks under examples/learn/ (auto-discovered; overrides for deps/timeouts):
+# Teaching notebooks under examples/tutorial/ and examples/teaching/ (auto-discovered; overrides for deps/timeouts):
 MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
 # Nightly / local: every example script:
 python tests/demo_checks/run_all_demos.py --continue-on-error

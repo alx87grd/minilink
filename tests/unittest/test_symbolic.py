@@ -1,4 +1,4 @@
-"""Tests for minilink.symbolic.mechanics (requires SymPy)."""
+"""Tests for minilink.experimental.symbolic.mechanics (requires SymPy)."""
 
 import unittest
 
@@ -9,10 +9,12 @@ try:
     import sympy as sp
     from sympy.physics.mechanics import dynamicsymbols
 
-    from minilink.symbolic.mechanics.derivation import derive_lagrange
-    from minilink.symbolic.mechanics.export import create_minilink_system
-    from minilink.symbolic.mechanics.model import MechanicalModel
-    from minilink.symbolic.mechanics.symbolic_system import MechanicalSystem
+    from minilink.experimental.symbolic.mechanics.derivation import derive_lagrange
+    from minilink.experimental.symbolic.mechanics.export import create_minilink_system
+    from minilink.experimental.symbolic.mechanics.model import MechanicalModel
+    from minilink.experimental.symbolic.mechanics.symbolic_system import (
+        MechanicalSystem,
+    )
 
     HAS_SYMPY = True
 except ImportError:

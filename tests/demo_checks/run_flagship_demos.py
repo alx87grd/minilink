@@ -2,6 +2,7 @@
 
 Runs each manifest entry's ``__main__`` unchanged — demos do **not** need a
 ``run_smoke()`` hook. Uses ``MPLBACKEND=Agg`` so matplotlib stays headless.
+Entries with ``"interactive": true`` are skipped (viewer / prompt demos).
 
 For a full sweep of every example script, use ``run_all_demos.py``.
 
@@ -76,6 +77,9 @@ def run_flagship_demos(
     for entry in _load_manifest():
         demo_id = entry["id"]
         if demo_filter is not None and demo_id != demo_filter:
+            continue
+        if entry.get("interactive"):
+            rows.append(DemoRow(demo_id, "skip", "interactive"))
             continue
         requires = tuple(entry.get("requires") or ())
         missing = False

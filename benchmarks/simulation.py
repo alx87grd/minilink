@@ -427,9 +427,9 @@ class _TimedSimulator(Simulator):
         self._last_solve_s = 0.0
         super().__init__(*args, **kwargs)
 
-    def _build_evaluator(self, sys, compile_backend):
+    def build_evaluator(self, sys, compile_backend):
         t0 = time.perf_counter()
-        evaluator = super()._build_evaluator(sys, compile_backend)
+        evaluator = super().build_evaluator(sys, compile_backend)
         self._last_compile_s = time.perf_counter() - t0
         return evaluator
 
@@ -449,10 +449,10 @@ class _CachedCompileTimedSimulator(_TimedSimulator):
         self._eval_cache = _eval_cache
         super().__init__(*args, **kwargs)
 
-    def _build_evaluator(self, sys, compile_backend):
+    def build_evaluator(self, sys, compile_backend):
         key = (id(sys), compile_backend)
         if key not in self._eval_cache:
-            self._eval_cache[key] = super()._build_evaluator(sys, compile_backend)
+            self._eval_cache[key] = super().build_evaluator(sys, compile_backend)
             return self._eval_cache[key]
         self._last_compile_s = 0.0
         return self._eval_cache[key]

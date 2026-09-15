@@ -4,6 +4,12 @@ import logging
 
 import numpy as np
 
+# Automatic output grid (points on [t0, tf]) when neither ``n_steps`` nor ``dt``
+# is given and the solver picks its own steps: a reporting resolution, not an
+# integration step, fine enough (1 ms over 10 s) for smooth plots of fast
+# oscillations. Fixed-step solvers derive ``dt`` from the plant instead.
+DEFAULT_N_STEPS = 10001
+
 
 def build_time_grid(
     t0,
@@ -11,14 +17,16 @@ def build_time_grid(
     *,
     n_steps=None,
     dt=None,
-    default_dt=0.001,
+    default_dt=None,
     verbose=False,
 ) -> tuple[np.ndarray, float, int]:
     """
     Build time samples on ``[t0, tf]`` and return ``(time_vector, dt, n_steps)``.
 
     If ``n_steps`` is set, uses a uniform grid of that many points. If only
-    ``dt`` is set, uses ``arange``. If neither, uses ``default_dt``.
+    ``dt`` is set, uses ``arange``. If neither, uses ``default_dt`` when the
+    caller supplies one (fixed-step solvers) and otherwise the
+    :data:`DEFAULT_N_STEPS` reporting grid.
     """
     try:
         t0, tf = float(t0), float(tf)
@@ -29,7 +37,12 @@ def build_time_grid(
     if tf <= t0:
         raise ValueError("tf must be greater than t0")
 
-    if n_steps is None and dt is None:
+    if n_steps is None and dt is None and default_dt is None:
+        time_vector = np.linspace(t0, tf, DEFAULT_N_STEPS)
+        if verbose:
+            print(f"Automatic {DEFAULT_N_STEPS}-point output grid")
+
+    elif n_steps is None and dt is None:
         dt = _validate_dt(default_dt, label="automatic dt")
         time_vector = np.arange(t0, tf + dt, dt)
         if verbose:

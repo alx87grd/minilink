@@ -1,16 +1,16 @@
+"""Pendulum swing-up: value iteration vs LQR."""
+
 import numpy as np
 
-from minilink.control.lqr import lqr_at_operating_point
-from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.planning.policy_synthesis import plotting
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
-    DynamicProgrammingOptions,
+from minilink import (
     DynamicProgrammingPlanner,
+    Pendulum,
+    PlanningProblem,
+    PolicyEvaluator,
+    QuadraticCost,
+    lqr_at_operating_point,
 )
-from minilink.planning.policy_synthesis.policy_eval import PolicyEvaluator
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.policy_synthesis import plotting
 
 INF = 500.0
 UPRIGHT = np.array([-np.pi, 0.0])
@@ -29,14 +29,11 @@ plant.inputs["u"].upper_bound = np.array([TORQUE])
 cost = QuadraticCost.from_system(plant, xbar=UPRIGHT, Q=Q, R=R)
 problem = PlanningProblem(plant, x_goal=UPRIGHT, cost=cost)
 
-grid = StateSpaceGrid(problem, x_grid_shape=(101, 101), u_grid_shape=(11,), dt=0.05)
 planner = DynamicProgrammingPlanner(
-    problem,
-    grid=grid,
-    options=DynamicProgrammingOptions(alpha=1.0, tol=0.1, max_iterations=2000),
+    problem, x_grid=(101, 101), u_grid=(11,), dt=0.05, tol=0.1, max_iterations=2000
 )
+grid = planner.grid  # shared with the LQR policy evaluation below
 planner.solve()
-planner.clean_infeasible_set()
 
 lqr_plant = Pendulum()
 lqr_plant.state.lower_bound = np.array([LO, LO])
@@ -76,8 +73,8 @@ lqr_diagram = lqr @ sim_lqr
 vi_diagram.name = "Pendulum swing-up (value iteration)"
 lqr_diagram.name = "Pendulum swing-up (LQR)"
 
-sim_vi.x0 = X0.copy()
-sim_lqr.x0 = X0.copy()
+sim_vi.x0 = X0
+sim_lqr.x0 = X0
 vi_diagram.plot_diagram()
 lqr_diagram.plot_diagram()
 vi_traj = vi_diagram.compute_trajectory(tf=10.0)

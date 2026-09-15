@@ -2,7 +2,6 @@
 
 from minilink.dynamics.catalog.pendulum.cartpole import (
     CartPole,
-    JaxCartPole,
     RotatingCartPole,
     UnderactuatedRotatingCartPole,
 )
@@ -19,7 +18,6 @@ __all__ = [
     "CartPole",
     "DoublePendulum",
     "InvertedPendulum",
-    "JaxCartPole",
     "Pendulum",
     "PendulumWithNoisePort",
     "RotatingCartPole",

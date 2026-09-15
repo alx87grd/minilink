@@ -539,9 +539,9 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         for key in out_n:
             np.testing.assert_allclose(np.asarray(out_j[key]), out_n[key], atol=1e-05)
 
-    def test_jacobian_f_params_analytic(self):
+    def test_jacobian_wrt_params_analytic(self):
         params = {"ctl": {"Kp": 2.5}, "plant": {"k": 1.0}}
-        jac = self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, params)
+        jac = self.ev.jacobian("f", "params")(self.x_j, self.u_j, 0.0, params)
         np.testing.assert_allclose(
             np.asarray(jac["plant"]["k"]), [2.5 * 1.5], atol=1e-05
         )
@@ -556,9 +556,9 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         g = jax.grad(dx0)({"plant": {"k": 1.0}})
         self.assertAlmostEqual(float(g["plant"]["k"]), 2.5 * 1.5, places=4)
 
-    def test_jacobian_f_params_requires_params(self):
+    def test_jacobian_wrt_params_requires_params(self):
         with self.assertRaises(ValueError):
-            self.ev.jacobian_f_params(self.x_j, self.u_j, 0.0, None)
+            self.ev.jacobian("f", "params")(self.x_j, self.u_j, 0.0, None)
 
 
 from minilink.blocks.routing import Gain
@@ -969,3 +969,164 @@ def test_jax_evaluator_autodiff_when_available():
     np.testing.assert_allclose(program_evaluator.jacobian_h([1.0, 2.0]), [[1.0, 1.0]])
     np.testing.assert_allclose(program_evaluator.jacobian_g([1.0, 2.0]), np.eye(2))
     assert jax is not None
+
+
+class TestEquationShapeValidation(unittest.TestCase):
+    """S02: wrong-shape f / h fail loudly at compile on both backends."""
+
+    def _bad_f(self):
+        class BadF(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, output_dim=2)
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([x[1]])  # (1,) instead of (2,)
+
+        return BadF()
+
+    def _bad_h(self):
+        class BadH(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, output_dim=2)
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([x[1], -x[0]])
+
+            def h(self, x, u, t=0, params=None):
+                return np.array([x[0]])  # (1,) instead of (2,)
+
+        return BadH()
+
+    def test_wrong_f_shape_raises_on_numpy(self):
+        with self.assertRaises(ValueError) as ctx:
+            self._bad_f().compile(backend="numpy")
+        self.assertIn("f() of", str(ctx.exception))
+        self.assertIn("returned shape (1,); expected (2,)", str(ctx.exception))
+
+    def test_scalar_f_is_accepted_for_a_first_order_plant(self):
+        class FirstOrder(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+
+            def f(self, x, u, t=0, params=None):
+                return -x[0] + u[0]  # a bare scalar, as students write it
+
+        traj = FirstOrder().compute_trajectory(tf=1.0, show=False, verbose=False)
+        self.assertEqual(traj.x.shape[0], 1)
+
+    def test_wrong_x0_shape_is_reported_at_compile(self):
+        sys = DynamicSystem(n=2, input_dim=1, output_dim=2)
+        sys.x0 = np.array([0.1])
+        with self.assertRaises(ValueError) as ctx:
+            sys.compile(backend="numpy")
+        self.assertIn("x0 of", str(ctx.exception))
+        self.assertIn("expected (2,)", str(ctx.exception))
+
+    def test_wrong_step_shape_inside_a_step_diagram_raises(self):
+        from minilink.core.diagram import StepDiagramSystem
+        from minilink.core.system import StepSystem
+
+        class BadStep(StepSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, output_dim=2)
+
+            def step(self, x, u, k=0, params=None):
+                return np.array([x[1]])  # (1,) instead of (2,)
+
+        diagram = StepDiagramSystem()
+        diagram.add_subsystem(BadStep(), "plant")
+        diagram.add_input_port("u")
+        diagram.connect("input", "u", "plant", "u")
+        with self.assertRaises(ValueError) as ctx:
+            diagram.compile()
+        self.assertIn("step() of", str(ctx.exception))
+        self.assertIn("(plant)", str(ctx.exception))
+
+    def test_wrong_f_shape_raises_from_compute_trajectory(self):
+        with self.assertRaises(ValueError):
+            self._bad_f().compute_trajectory(tf=1.0, verbose=False)
+
+    def test_wrong_h_shape_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            self._bad_h().compile(backend="numpy")
+        self.assertIn("h() of", str(ctx.exception))
+        self.assertIn("output port 'y'", str(ctx.exception))
+
+    def test_wrong_f_shape_inside_a_diagram(self):
+        from minilink.blocks.sources import Step
+
+        with self.assertRaises(ValueError):
+            (Step() >> self._bad_f()).compile(backend="numpy")
+
+    @pytest.mark.optional
+    @pytest.mark.jax
+    def test_wrong_f_shape_raises_on_jax(self):
+        pytest.importorskip("jax")
+        with self.assertRaises(ValueError):
+            self._bad_f().compile(backend="jax")
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+@unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
+class TestRolloutBatch(unittest.TestCase):
+    """rollout_batch equals a loop of single rollouts for x0, input, and params families."""
+
+    def setUp(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        self.sys = Pendulum()
+        self.ev = self.sys.compile(backend="jax")
+        self.rng = np.random.default_rng(0)
+        self.x0s = self.rng.standard_normal((4, 2))
+        self.dt = 0.02
+        self.n_steps = 15
+        self.u_nominal = np.tile(self.sys.get_u_from_input_ports(), (self.n_steps, 1))
+
+    def test_family_of_initial_states_under_the_nominal_input(self):
+        xs = np.asarray(
+            self.ev.rollout_batch(self.x0s, n_steps=self.n_steps, dt=self.dt)
+        )
+        self.assertEqual(xs.shape, (4, self.n_steps + 1, 2))
+        for i in range(4):
+            single = self.ev.rk4_integrate_zoh(
+                self.x0s[i], self.u_nominal, 0.0, self.dt
+            )
+            np.testing.assert_allclose(
+                xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
+            )
+
+    def test_one_input_sequence_per_member(self):
+        u_seqs = 0.5 * self.rng.standard_normal((4, self.n_steps, 1))
+        xs = np.asarray(self.ev.rollout_batch(self.x0s, u_seqs, dt=self.dt))
+        for i in range(4):
+            single = self.ev.rk4_integrate_zoh(self.x0s[i], u_seqs[i], 0.0, self.dt)
+            np.testing.assert_allclose(
+                xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
+            )
+
+    def test_params_family_sweeps_one_leaf(self):
+        lengths = np.linspace(0.5, 2.0, 4)
+        params = dict(self.sys.params, l=lengths)
+        xs = np.asarray(
+            self.ev.rollout_batch(
+                self.x0s, n_steps=self.n_steps, dt=self.dt, params=params
+            )
+        )
+        for i in range(4):
+            p_i = dict(self.sys.params, l=float(lengths[i]))
+            single = self.ev.rk4_integrate_zoh_p(
+                self.x0s[i], self.u_nominal, 0.0, self.dt, p_i
+            )
+            np.testing.assert_allclose(
+                xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
+            )
+        self.assertGreater(np.abs(xs[0] - xs[-1]).max(), 1e-3)
+
+    def test_shape_errors(self):
+        with self.assertRaises(ValueError):
+            self.ev.rollout_batch(self.x0s, dt=self.dt)
+        with self.assertRaises(ValueError):
+            self.ev.rollout_batch(self.x0s[:, :1], n_steps=3, dt=self.dt)
+        with self.assertRaises(ValueError):
+            self.ev.rollout_batch(self.x0s, np.zeros((3, 5, 1)), dt=self.dt)

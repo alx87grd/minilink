@@ -68,6 +68,7 @@ jobs:
           --speed-gate-suffixes solve_s,nlp_s,speedup
 
     # JAX flagships skip in the ``test`` job (no jax extra); gate them here.
+    # Interactive flagships (viewer demos) stay skipped in both jobs.
     - name: Flagship demo checks (incl. JAX)
       env:
         PYTHONPATH: ${{ github.workspace }}

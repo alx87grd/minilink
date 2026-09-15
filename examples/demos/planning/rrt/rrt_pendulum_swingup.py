@@ -1,24 +1,10 @@
-"""Pendulum swing-up with a kinodynamic RRT — minilink's take on pyro's randomtree demo.
-
-Run from repo root::
-
-    python examples/demos/planning/rrt/rrt_pendulum_swingup.py
-
-The pendulum is underactuated: the torque limit (±5 Nm) is below the gravity
-torque needed to hold it horizontal (m·g·l ≈ 9.8 Nm), so the planner must pump
-energy by swinging back and forth. The kinodynamic extender forward-integrates
-the pendulum ODE under a few discrete torques, and the tree explores the
-``(theta, dtheta)`` phase space until the inverted goal region is reached. No
-obstacles — this is pure state-space planning with the dynamics.
-"""
+"""Pendulum swing-up with a kinodynamic RRT — minilink's take on pyro's randomtree demo."""
 
 import numpy as np
 
-from minilink.core.sets import BallSet
-from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.planning.problems import PlanningProblem
+from minilink import BallSet, Pendulum, PlanningProblem, RRTPlanner
 from minilink.planning.search.extenders import KinodynamicExtender
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
+from minilink.planning.search.rrt import RRTOptions
 
 sys = Pendulum()  # state [theta, dtheta]; theta=0 hangs down, theta=pi inverted
 sys.state.lower_bound = np.array([-2.0 * np.pi, -12.0])

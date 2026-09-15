@@ -129,7 +129,7 @@ class OptimizationResult:
     solve_time_s : float, optional
         Wall-clock time in seconds for the backend solver only, when the caller
         requested timing on :meth:`~minilink.optimization.optimizer.Optimizer.solve`
-        (``record_solve_time=True``) or a summary report (``disp=True``).
+        (``record_solve_time=True``) or a summary report (``verbose=True``).
         ``None`` means not measured.
     """
 

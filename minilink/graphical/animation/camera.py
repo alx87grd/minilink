@@ -20,6 +20,7 @@ defined in :mod:`minilink.graphical.animation.primitives` and re-exported here.
 import numpy as np
 
 from minilink.graphical.animation.primitives import (  # noqa: F401  (re-export)
+    bounding_points,
     camera_matrix,
     world_to_camera,
 )
@@ -59,6 +60,10 @@ def resolve_camera_from_hints(source, frames, x=None, u=None, t=0.0, *, override
     ).reshape(3)
     plot_axes = getattr(source, "camera_plot_axes", _DEFAULT_PLOT_AXES)
     scale = getattr(source, "camera_scale", _DEFAULT_SCALE)
+    if scale is None:
+        # No hint: the animator fits the view to the drawn geometry
+        # (fit_camera_to_frames); this placeholder only keeps the 4x4 well-formed.
+        scale = _DEFAULT_SCALE
 
     follow = getattr(source, "camera_follow_frame", None)
     if follow is not None and follow in frames:
@@ -66,6 +71,38 @@ def resolve_camera_from_hints(source, frames, x=None, u=None, t=0.0, *, override
         return camera_matrix(target=target, plot_axes=plot_axes, scale=scale)
 
     return camera_matrix(target=target, plot_axes=plot_axes, scale=scale)
+
+
+def fit_camera_to_frames(
+    frames, *, plot_axes=_DEFAULT_PLOT_AXES, margin=1.15, min_scale=0.5
+):
+    """Camera that frames every primitive of *frames*: the auto-fit for hint-less drawables.
+
+    *frames* are the animator's per-frame dicts (``primitives`` plus world
+    ``transforms``). Backdrops (planes) are ignored. The view is centred on the
+    bounding box of everything drawn, with a square half-width *margin* times
+    the larger box half-extent along *plot_axes*.
+    """
+    lo = np.full(3, np.inf)
+    hi = np.full(3, -np.inf)
+    for frame in frames:
+        for primitive, T in zip(frame["primitives"], frame["transforms"]):
+            bounds = bounding_points(primitive)
+            if bounds is None:
+                continue
+            pts, pad = bounds
+            T = np.asarray(T, dtype=float)
+            world = pts @ T[:3, :3].T + T[:3, 3]
+            lo = np.minimum(lo, world.min(axis=0) - pad)
+            hi = np.maximum(hi, world.max(axis=0) + pad)
+    if not np.all(np.isfinite(lo)):
+        return camera_matrix(plot_axes=plot_axes, scale=_DEFAULT_SCALE)
+    target = 0.5 * (lo + hi)
+    a, b = plot_axes
+    half = 0.5 * max(hi[a] - lo[a], hi[b] - lo[b])
+    return camera_matrix(
+        target=target, plot_axes=plot_axes, scale=max(min_scale, margin * half)
+    )
 
 
 def follow_frame_camera(

@@ -1,5 +1,6 @@
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.manipulator import Manipulator
@@ -151,7 +152,7 @@ class SpeedControlledManipulator(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         # velocity-controlled joints: the input is the joint-rate command
-        return np.asarray(u)
+        return array_module(u).asarray(u)
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -162,12 +163,12 @@ class SpeedControlledManipulator(DynamicSystem):
     def forward_kinematics(self, q, params=None):
         if self._kin_arm is not None:
             return self._kin_arm.forward_kinematics(q, params)
-        return np.zeros(self.effector_dim)
+        return array_module(q).zeros(self.effector_dim)
 
     def J(self, q, params=None):
         if self._kin_arm is not None:
             return self._kin_arm.J(q, params)
-        return np.zeros((self.effector_dim, self.dof))
+        return array_module(q).zeros((self.effector_dim, self.dof))
 
     def forward_differential_kinematic_effector(self, q, dq):
         return self.J(q) @ dq
@@ -226,10 +227,10 @@ class OneLinkManipulator(Manipulator):
         I1 = params["I1"]
 
         # rotational inertia of the single link about the pivot
-        return np.array([[m1 * lc1**2 + I1]])
+        return array_module(q).array([[m1 * lc1**2 + I1]])
 
     def C(self, q, dq, params=None):
-        return np.zeros((1, 1))
+        return array_module(q).zeros((1, 1))
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -238,25 +239,28 @@ class OneLinkManipulator(Manipulator):
         gravity = params["gravity"]
 
         # gravity torque about the pivot
-        return np.array([-m1 * gravity * lc1 * np.sin(q[0])])
+        xp = array_module(q)
+        return xp.array([-m1 * gravity * lc1 * xp.sin(q[0])])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         d1 = params["d1"]
 
         # linear viscous joint damping
-        return np.array([d1 * dq[0]])
+        return array_module(dq).array([d1 * dq[0]])
 
     def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
-        return np.array([l1 * np.sin(q[0]), l1 * np.cos(q[0])])
+        xp = array_module(q)
+        return xp.array([l1 * xp.sin(q[0]), l1 * xp.cos(q[0])])
 
     def J(self, q, params=None):
         l1 = self.params["l1"]
+        xp = array_module(q)
         # fmt: off
-        return np.array([
-            [ l1 * np.cos(q[0])],
-            [-l1 * np.sin(q[0])],
+        return xp.array([
+            [ l1 * xp.cos(q[0])],
+            [-l1 * xp.sin(q[0])],
         ])
         # fmt: on
 
@@ -302,13 +306,14 @@ class TwoLinkManipulator(Manipulator):
         _set_planar_reach_camera(self, self.params["l1"] + self.params["l2"])
 
     def _trig(self, q):
+        xp = array_module(q)
         return (
-            np.cos(q[0]),
-            np.sin(q[0]),
-            np.cos(q[1]),
-            np.sin(q[1]),
-            np.cos(q[0] + q[1]),
-            np.sin(q[0] + q[1]),
+            xp.cos(q[0]),
+            xp.sin(q[0]),
+            xp.cos(q[1]),
+            xp.sin(q[1]),
+            xp.cos(q[0] + q[1]),
+            xp.sin(q[0] + q[1]),
         )
 
     def H(self, q, params=None):
@@ -328,7 +333,7 @@ class TwoLinkManipulator(Manipulator):
         h12 = m2 * lc2**2 + m2 * l1 * lc2 * c2 + I2
         h22 = m2 * lc2**2 + I2
         # fmt: off
-        return np.array([
+        return array_module(q).array([
             [h11, h12],
             [h12, h22],
         ])
@@ -345,7 +350,7 @@ class TwoLinkManipulator(Manipulator):
         # Coriolis/centrifugal coupling driven by the second joint rate
         h = m2 * l1 * lc2 * s2
         # fmt: off
-        return np.array([
+        return array_module(q, dq).array([
             [-h * dq[1], -h * (dq[0] + dq[1])],
             [ h * dq[0],                  0.0],
         ])
@@ -365,7 +370,7 @@ class TwoLinkManipulator(Manipulator):
         # gravity torque on each joint
         g1 = (m1 * lc1 + m2 * l1) * gravity
         g2 = m2 * lc2 * gravity
-        return np.array([-g1 * s1 - g2 * s12, -g2 * s12])
+        return array_module(q).array([-g1 * s1 - g2 * s12, -g2 * s12])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -373,21 +378,20 @@ class TwoLinkManipulator(Manipulator):
         d2 = params["d2"]
 
         # linear viscous joint damping
-        return np.diag([d1, d2]) @ dq
+        return array_module(dq).array([d1 * dq[0], d2 * dq[1]])
 
     def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
-        _, s1, _, _, c12, s12 = self._trig(q)
-        c1 = np.cos(q[0])
-        return np.array([l1 * s1 + l2 * s12, l1 * c1 + l2 * c12])
+        c1, s1, _, _, c12, s12 = self._trig(q)
+        return array_module(q).array([l1 * s1 + l2 * s12, l1 * c1 + l2 * c12])
 
     def J(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         c1, s1, _, _, c12, s12 = self._trig(q)
         # fmt: off
-        return np.array([
+        return array_module(q).array([
             [ l1 * c1 + l2 * c12,  l2 * c12],
             [-l1 * s1 - l2 * s12, -l2 * s12],
         ])
@@ -454,10 +458,11 @@ class ThreeLinkManipulator3D(Manipulator):
         self.camera_target = np.array([0.0, 0.0, -0.5 * reach])
 
     def _trig(self, q):
-        c1, s1 = np.cos(q[0]), np.sin(q[0])
-        c2, s2 = np.cos(q[1]), np.sin(q[1])
-        c3, s3 = np.cos(q[2]), np.sin(q[2])
-        c23, s23 = np.cos(q[1] + q[2]), np.sin(q[1] + q[2])
+        xp = array_module(q)
+        c1, s1 = xp.cos(q[0]), xp.sin(q[0])
+        c2, s2 = xp.cos(q[1]), xp.sin(q[1])
+        c3, s3 = xp.cos(q[2]), xp.sin(q[2])
+        c23, s23 = xp.cos(q[1] + q[2]), xp.sin(q[1] + q[2])
         return c1, s1, c2, s2, c3, s3, c23, s23
 
     def H(self, q, params=None):
@@ -493,7 +498,7 @@ class ThreeLinkManipulator3D(Manipulator):
         h23 = I3x + m3 * r2**2 + m3 * l1 * r2 * c3
         h33 = I3x + m3 * r2**2
         # fmt: off
-        return np.array([
+        return array_module(q).array([
             [h11, 0.0, 0.0],
             [0.0, h22, h23],
             [0.0, h23, h33],
@@ -526,7 +531,7 @@ class ThreeLinkManipulator3D(Manipulator):
         T311 = -T113
         T322 = l1 * m3 * r2 * s3
         # fmt: off
-        return np.array([
+        return array_module(q, dq).array([
             [T112 * dq[1] + T113 * dq[2], T112 * dq[0],           T113 * dq[0]],
             [               T211 * dq[0], T223 * dq[2], T223 * (dq[1] + dq[2])],
             [               T311 * dq[0], T322 * dq[1],                    0.0],
@@ -547,7 +552,7 @@ class ThreeLinkManipulator3D(Manipulator):
         # gravity torque on the shoulder and elbow joints
         g2 = (m2 * gravity * lc2 + m3 * gravity * l2) * c2 + m3 * gravity * lc3 * c23
         g3 = m3 * gravity * lc3 * c23
-        return np.array([0.0, -g2, -g3])
+        return array_module(q).array([0.0, -g2, -g3])
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -556,7 +561,7 @@ class ThreeLinkManipulator3D(Manipulator):
         d3 = params["d3"]
 
         # linear viscous joint damping
-        return np.diag([d1, d2, d3]) @ dq
+        return array_module(dq).array([d1 * dq[0], d2 * dq[1], d3 * dq[2]])
 
     def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
@@ -564,7 +569,9 @@ class ThreeLinkManipulator3D(Manipulator):
         l3 = self.params["l3"]
         c1, s1, c2, s2, _, _, c23, s23 = self._trig(q)
         radius = l2 * c2 + l3 * c23
-        return np.array([radius * c1, radius * s1, l1 - l2 * s2 - l3 * s23])
+        return array_module(q).array(
+            [radius * c1, radius * s1, l1 - l2 * s2 - l3 * s23]
+        )
 
     def J(self, q, params=None):
         l2 = self.params["l2"]
@@ -573,7 +580,7 @@ class ThreeLinkManipulator3D(Manipulator):
         radius = l2 * c2 + l3 * c23
         vertical = l2 * s2 + l3 * s23
         # fmt: off
-        return np.array([
+        return array_module(q).array([
             [-radius * s1, -vertical * c1, -l3 * s23 * c1],
             [ radius * c1, -vertical * s1, -l3 * s23 * s1],
             [         0.0,        -radius,      -l3 * c23],
@@ -655,22 +662,27 @@ class FiveLinkPlanarManipulator(Manipulator):
         _set_planar_reach_camera(self, float(np.sum(self.params["l"])))
 
     def _absolute_trig(self, q):
-        angles = np.cumsum(q)
-        return np.cos(angles), np.sin(angles)
+        xp = array_module(q)
+        angles = xp.cumsum(q)
+        return xp.cos(angles), xp.sin(angles)
 
     def forward_kinematics(self, q, params=None):
         l = self.params["l"]
+        xp = array_module(q)
         cos_abs, sin_abs = self._absolute_trig(q)
-        return np.array([np.sum(l * sin_abs), np.sum(l * cos_abs)])
+        return xp.array([xp.sum(l * sin_abs), xp.sum(l * cos_abs)])
 
     def J(self, q, params=None):
         l = self.params["l"]
+        xp = array_module(q)
         cos_abs, sin_abs = self._absolute_trig(q)
-        J = np.zeros((2, self.dof))
-        for joint in range(self.dof):
-            J[0, joint] = np.sum(l[joint:] * cos_abs[joint:])
-            J[1, joint] = -np.sum(l[joint:] * sin_abs[joint:])
-        return J
+        # column j: the effector moves with every link from joint j outward
+        return xp.array(
+            [
+                [xp.sum(l[j:] * cos_abs[j:]) for j in range(self.dof)],
+                [-xp.sum(l[j:] * sin_abs[j:]) for j in range(self.dof)],
+            ]
+        )
 
     def get_kinematic_geometry(self):
         return _planar_kinematic_geometry(self.params["l"])

@@ -19,6 +19,29 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn('PORT="r"', html)
         self.assertIn('PORT="u"', html)
 
+    def test_error_block_html_shows_plus_minus_e(self):
+        from minilink.blocks.routing import Error
+
+        html = get_system_block_html(Error(), "error")
+        self.assertIn("Error::error", html)
+        self.assertIn(">+<", html)
+        self.assertIn(">-<", html)
+        self.assertIn(">e<", html)
+        self.assertIn('PORT="plus"', html)
+        self.assertIn('PORT="minus"', html)
+        self.assertIn('PORT="e"', html)
+
+    def test_demux_block_html_shows_numpy_slices(self):
+        from minilink.blocks.routing import Demux
+
+        html = get_system_block_html(Demux(dims=(1, 1), port="y"), "demux")
+        self.assertIn("Demux::demux", html)
+        self.assertIn(">y[0]<", html)
+        self.assertIn(">y[1]<", html)
+        self.assertIn('PORT="y"', html)
+        self.assertIn('PORT="y_0"', html)
+        self.assertIn('PORT="y_1"', html)
+
     def test_system_diagram_contains_block_label(self):
         pytest.importorskip("graphviz")
         graph = get_diagram(Integrator())
@@ -132,6 +155,44 @@ def _build_closed_loop():
     return diagram
 
 
+def _nested_and_flat_outer_loops():
+    """A PID loop nested under an outer gain law, and the same blocks wired flat."""
+    from minilink.blocks.routing import Gain
+    from minilink.control.siso import PID
+    from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
+
+    pid = PID(Kp=5.0, Ki=2.0, Kd=1.0, ports="reference")
+    mass = SingleMass()
+    outer = Gain([-0.5])
+
+    inner = DiagramSystem()
+    inner.add_subsystem(pid, "ctl")
+    inner.add_subsystem(mass, "sys")
+    inner.add_input_port("r")
+    inner.connect("input", "r", "ctl", "r")
+    inner.connect("sys", "y", "ctl", "y")
+    inner.connect("ctl", "u", "sys", "u")
+    inner.connect_new_output_port("sys", "y", "y")
+
+    nested = DiagramSystem()
+    nested.add_subsystem(outer, "outer")
+    nested.add_subsystem(inner, "inner")
+    nested.connect("inner", "y", "outer", "u")
+    nested.connect("outer", "y", "inner", "r")
+
+    flat = DiagramSystem()
+    flat.add_subsystem(outer, "outer")
+    flat.add_subsystem(pid, "ctl")
+    flat.add_subsystem(mass, "sys")
+    flat.connect("sys", "y", "outer", "u")
+    flat.connect("outer", "y", "ctl", "r")
+    flat.connect("sys", "y", "ctl", "y")
+    flat.connect("ctl", "u", "sys", "u")
+
+    mass.x0 = np.array([1.0, 0.0])  # a diagram rebuilds its x0 from its blocks' x0
+    return nested, flat
+
+
 def _build_feedthrough_loop():
 
     class FeedthroughSystem(System):
@@ -222,6 +283,78 @@ class TestWiringMixin(unittest.TestCase):
         diagram = _build_closed_loop()
         with self.assertRaises(ValueError):
             diagram.params = {"typo": {"Kp": 1.0}}
+
+    def test_boundary_output_feedthrough_is_derived_from_wiring(self):
+        diagram = _build_closed_loop()
+        diagram.connect_new_output_port("plant", "y", "y_meas")
+        diagram.connect_new_output_port("ctl", "u", "u_meas")
+        diagram.connect_new_output_port("ctl", "u", "u_all", dependencies="all")
+        self.assertEqual(diagram.outputs["y_meas"].dependencies, ())
+        self.assertEqual(diagram.outputs["u_meas"].dependencies, ("r",))
+        self.assertEqual(diagram.outputs["u_all"].dependencies, "all")
+
+    def test_boundary_output_feedthrough_tracks_later_wiring(self):
+        diagram = DiagramSystem()
+        diagram.add_subsystem(ProportionalController(2.5), "ctl")
+        diagram.add_input_port("r")
+        diagram.connect_new_output_port("ctl", "u", "u")
+        self.assertEqual(diagram.outputs["u"].dependencies, ())
+        diagram.connect("input", "r", "ctl", "r")
+        self.assertEqual(diagram.outputs["u"].dependencies, ("r",))
+
+    def test_nested_closed_loop_matches_flat_diagram(self):
+        """A closed loop nested in an outer loop is the same system as the flat wiring."""
+        nested, flat = _nested_and_flat_outer_loops()
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        np.testing.assert_allclose(nested.f(x, u, 0.0), flat.f(x, u, 0.0))
+        np.testing.assert_allclose(
+            nested.compile().f(x, u, 0.0), flat.compile().f(x, u, 0.0)
+        )
+        traj_nested = nested.compute_trajectory(tf=2.0, dt=0.01, verbose=False)
+        traj_flat = flat.compute_trajectory(tf=2.0, dt=0.01, verbose=False)
+        self.assertGreater(np.abs(traj_flat.x).max(), 0.1)  # the loop actually moves
+        np.testing.assert_allclose(traj_nested.x, traj_flat.x, atol=1e-10)
+
+    def test_nested_closed_loop_matches_flat_diagram_jax(self):
+        pytest.importorskip("jax")
+        nested, flat = _nested_and_flat_outer_loops()
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        np.testing.assert_allclose(
+            nested.compile(backend="jax").f(x, u, 0.0),
+            flat.compile(backend="jax").f(x, u, 0.0),
+            atol=1e-12,
+        )
+
+    def test_trajectory_of_is_the_block_seen_from_its_ports(self):
+        """State slice and received input match the reconstructed internal signals."""
+        nested, flat = _nested_and_flat_outer_loops()
+        mass = flat.subsystems["sys"]
+        traj = flat.compute_trajectory(tf=1.0, dt=0.01, verbose=False)
+        signals = flat.reconstruct_internal_signals(traj).signals
+
+        mass_traj = flat.trajectory_of(mass)
+        np.testing.assert_array_equal(mass_traj.t, traj.t)
+        np.testing.assert_allclose(mass_traj.x, signals["sys:x"])
+        np.testing.assert_allclose(mass_traj.u, signals["ctl:u"])
+
+        # A block inside a nested loop: one call per level
+        inner = nested.subsystems["inner"]
+        inner_traj = nested.trajectory_of(
+            inner, nested.compute_trajectory(tf=1.0, dt=0.01, verbose=False)
+        )
+        mass_traj_nested = inner.trajectory_of(mass, inner_traj)
+        np.testing.assert_allclose(mass_traj_nested.x, mass_traj.x, atol=1e-10)
+        np.testing.assert_allclose(mass_traj_nested.u, mass_traj.u, atol=1e-8)
+
+    def test_trajectory_of_needs_a_trajectory_and_a_member_block(self):
+        diagram = _build_closed_loop()
+        with self.assertRaises(ValueError):
+            diagram.trajectory_of(diagram.subsystems["plant"])
+        diagram.compute_trajectory(tf=0.1, dt=0.05, verbose=False)
+        with self.assertRaises(ValueError):
+            diagram.trajectory_of(Integrator())
 
     def test_closed_loop_euler_trajectory_matches_compiled_f(self):
         """Reference ``diagram.f`` and compiled evaluator stay aligned over rollout."""
@@ -338,3 +471,55 @@ class TestCompileTypes(unittest.TestCase):
     def test_compile_diagram_diagram_evaluator(self):
         diagram = _unity_feedback_diagram()
         self.assertIsInstance(diagram.compile(), NumpyDiagramEvaluator)
+
+
+class TestFeedbackMissingPortMessage(unittest.TestCase):
+    """S04: a plant without a 'y' port gets a message that names the fix."""
+
+    def test_missing_plant_output_port_message(self):
+        from minilink.control.output import ProportionalController
+        from minilink.core.system import DynamicSystem
+
+        class NoOutput(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=2, input_dim=1, expose_state=True)
+
+            def f(self, x, u, t=0, params=None):
+                return np.array([x[1], u[0] - x[0]])
+
+        with self.assertRaises(ValueError) as ctx:
+            ProportionalController() @ NoOutput()
+        message = str(ctx.exception)
+        self.assertIn("has no 'y' output port", message)
+        self.assertIn("output_dim=", message)
+        self.assertNotIn("dim None", message)
+
+
+class TestDiagramRenderWithoutDot(unittest.TestCase):
+    """plot_diagram() in a notebook without the Graphviz binary warns, never raises."""
+
+    def test_inline_render_warns_when_dot_is_missing(self):
+        import warnings
+        from unittest import mock
+
+        from minilink.control.impedance import ImpedanceController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+        from minilink.graphical.diagrams import dot as dot_module
+
+        try:
+            import IPython.display  # noqa: F401
+        except ImportError:
+            self.skipTest("IPython not installed")
+
+        graph = (ImpedanceController() @ Pendulum()).get_diagram()
+        if graph is None:
+            self.skipTest("graphviz Python package not installed")
+
+        with mock.patch(
+            "IPython.display.display",
+            side_effect=RuntimeError("failed to execute PosixPath('dot')"),
+        ):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                dot_module._render_diagram_graph(graph, show=True, show_inline=True)
+        self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))

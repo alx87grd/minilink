@@ -22,7 +22,7 @@ from minilink.control.mpc.utilities import (
 from minilink.core.backends import BACKEND_JAX, normalize_backend
 from minilink.core.system import StepSystem, System
 from minilink.core.trajectory import Trajectory
-from minilink.planning.results import SolveMetadata, TrajectoryPlan
+from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
     reject_unknown_online_params,
@@ -40,11 +40,11 @@ class Command:
     """
     One replan tick result for deploy or debugging.
 
-    ``plan.trajectory.t`` is plan-local time with zero at the solve instant.
-    Absolute solve time is ``t_solve``.
+    ``solution.trajectory.t`` is plan-local time with zero at the solve
+    instant. Absolute solve time is ``t_solve``.
     """
 
-    plan: TrajectoryPlan
+    solution: PlanningSolution
     k: int
     t_solve: float
     u_ff: np.ndarray
@@ -53,14 +53,9 @@ class Command:
     success: bool
 
     @property
-    def plan_flat(self) -> np.ndarray:
-        """Flattened ``(t, x, u)`` from :meth:`TrajectoryPlan.to_flat`."""
-        return self.plan.to_flat()
-
-    @property
-    def metadata(self) -> SolveMetadata:
-        """Solve extras for this tick (alias of ``plan.metadata``)."""
-        return self.plan.metadata
+    def solver(self):
+        """The optimizer's record of this tick's solve (``solution.solver``)."""
+        return self.solution.solver
 
 
 # Public API — factory + mixin
@@ -115,20 +110,20 @@ class ModelPredictiveControllerMixin:
             d = 1
         return int(k_tick) // d
 
-    def get_solve_metadata(self) -> SolveMetadata | None:
+    def get_solver_record(self):
         """
-        Last NLP solve extras for deploy / logging (ROS-agnostic).
+        The last NLP solve's record for deploy / logging (ROS-agnostic).
 
-        Prefers :attr:`last_command` metadata; otherwise the planner's
-        :attr:`~minilink.planning.planner.Planner.last_trajectory_plan`
-        (e.g. after a hybrid tick with no deploy call). ``None`` if nothing
-        has been solved yet.
+        Prefers :attr:`last_command`; otherwise the planner's
+        :attr:`~minilink.planning.planner.Planner.last_solution` (e.g. after
+        a hybrid tick with no deploy call). ``None`` if nothing has been
+        solved yet.
         """
         if self._last_command is not None:
-            return self._last_command.metadata
-        plan = self._planner.last_trajectory_plan
-        if plan is not None:
-            return plan.metadata
+            return self._last_command.solver
+        solution = self._planner.last_solution
+        if solution is not None:
+            return solution.solver
         return None
 
     def reset(self) -> None:
@@ -153,10 +148,10 @@ class ModelPredictiveControllerMixin:
         derivatives : bool, optional
             If True, attach FD knot rates for ``get_nominal_*_dot``.
         """
-        plan = self._planner.last_trajectory_plan
-        if plan is None:
+        solution = self._planner.last_solution
+        if solution is None:
             raise RuntimeError(
-                "generate_nominal_interpolator requires a latched plan; "
+                "generate_nominal_interpolator requires a latched solution; "
                 "call compute_command (or run a replan tick) first."
             )
         if self._last_command is not None:
@@ -165,7 +160,9 @@ class ModelPredictiveControllerMixin:
             t_solve = self._latch.last_t_solve
             if t_solve is None:
                 t_solve = float(self._t0)
-        cache = build_nominal_cache(plan, t_solve, derivatives=bool(derivatives))
+        cache = build_nominal_cache(
+            solution.trajectory, t_solve, derivatives=bool(derivatives)
+        )
         self._nominal_cache = cache
         return cache
 
@@ -260,15 +257,15 @@ class ModelPredictiveControllerMixin:
             dt_mpc=self._dt_mpc if z_warm is not None else None,
             params=params,
         )
-        plan = self._planner.require_trajectory_plan()
+        solution = self._planner.require_solution()
         cmd = Command(
-            plan=plan,
+            solution=solution,
             k=k_int,
             t_solve=t_solve,
             u_ff=np.asarray(tick.u_ff, dtype=float).copy(),
             x_ff=np.asarray(tick.x_ff, dtype=float).copy(),
             z=np.asarray(tick.z, dtype=float).copy(),
-            success=bool(plan.metadata.success),
+            success=bool(solution.success),
         )
         self._last_command = cmd
         if self._debug:
@@ -329,7 +326,7 @@ class ModelPredictiveControllerMixin:
         ax.set_xlabel("plan-local time τ")
         ax.set_ylabel("state / input")
         ax.set_title(f"MPC debug k={use.k} t_solve={use.t_solve:.3g}")
-        traj = use.plan.trajectory
+        traj = use.solution.trajectory
         for i in range(int(traj.x.shape[0])):
             ax.plot(traj.t, traj.x[i], label=f"x[{i}]")
         for i in range(int(traj.u.shape[0])):
@@ -345,7 +342,7 @@ def ModelPredictiveController(
     *,
     dt_mpc: float,
     warm_start: bool = True,
-    step_disp: bool = False,
+    verbose: bool = False,
     t0: float = 0.0,
     debug: bool = False,
 ):
@@ -361,21 +358,21 @@ def ModelPredictiveController(
     warm_start : bool, optional
         If True, return a :class:`~minilink.core.system.StepSystem` with packed
         ``z`` on ``Computer.x``. If False, algebraic :class:`~minilink.core.system.System`.
-    step_disp, t0, debug
+    verbose, t0, debug
         Latch printouts, absolute-time epoch, and live debug figure auto-update.
     """
     if warm_start:
         return MPCStatefulController(
             planner,
             dt_mpc=dt_mpc,
-            step_disp=step_disp,
+            verbose=verbose,
             t0=t0,
             debug=debug,
         )
     return MPCStatelessController(
         planner,
         dt_mpc=dt_mpc,
-        step_disp=step_disp,
+        verbose=verbose,
         t0=t0,
         debug=debug,
     )
@@ -397,7 +394,7 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
         planner: TrajectoryOptimizationPlanner,
         *,
         dt_mpc: float,
-        step_disp: bool = False,
+        verbose: bool = False,
         t0: float = 0.0,
         debug: bool = False,
     ) -> None:
@@ -417,7 +414,7 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
         self._replan_divisor = 1
         self._latch = MPCTickLatch(
             planner,
-            step_disp=step_disp,
+            verbose=verbose,
             dt_mpc=self._dt_mpc,
             t0=self._t0,
         )
@@ -476,7 +473,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         planner: TrajectoryOptimizationPlanner,
         *,
         dt_mpc: float,
-        step_disp: bool = False,
+        verbose: bool = False,
         t0: float = 0.0,
         debug: bool = False,
     ) -> None:
@@ -495,7 +492,7 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         self._replan_divisor = 1
         self._latch = MPCTickLatch(
             planner,
-            step_disp=step_disp,
+            verbose=verbose,
             dt_mpc=self._dt_mpc,
             t0=self._t0,
         )
@@ -607,12 +604,12 @@ class MPCTickLatch:
         self,
         planner: TrajectoryOptimizationPlanner,
         *,
-        step_disp: bool = False,
+        verbose: bool = False,
         dt_mpc: float | None = None,
         t0: float = 0.0,
     ) -> None:
         self._planner = planner
-        self._step_disp = bool(step_disp)
+        self._verbose = bool(verbose)
         self._dt_mpc = None if dt_mpc is None else float(dt_mpc)
         self._t0 = float(t0)
         self._latch_k: int | None = None
@@ -692,11 +689,11 @@ class MPCTickLatch:
         self._latch = latch
         if self._after_solve is not None:
             self._after_solve()
-        if self._step_disp:
-            self._print_step_disp(k_int, result)
+        if self._verbose:
+            self._print_tick(k_int, result)
         return latch
 
-    def _print_step_disp(self, k_int, result) -> None:
+    def _print_tick(self, k_int, result) -> None:
         # solve = optimizer wall time; step = full from-tick (bind + solve + reconstruct).
         solve_s = result.solve_time_s
         if solve_s is None:

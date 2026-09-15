@@ -11,7 +11,7 @@ Typical use::
 
     program = MathematicalProgram(n_z=2, J=J, grad_J=grad_J)
     opt = Optimizer(program, z0=[0.0, 0.0], method="scipy_slsqp")
-    result = opt.solve(disp=True)
+    result = opt.solve(verbose=True)
 
 Optional progress hook: ``callback(z, J, t)`` on :meth:`Optimizer.solve` with
 ``t`` = elapsed wall seconds; see :data:`OptimizationProgressCallback`.
@@ -154,7 +154,7 @@ class Optimizer:
         z0=None,
         callback: OptimizationProgressCallback | None = None,
         record_solve_time: bool = False,
-        disp: bool = False,
+        verbose: bool = False,
     ) -> OptimizationResult:
         """
         Solve the bound finite-dimensional mathematical program.
@@ -176,13 +176,13 @@ class Optimizer:
             backend solve started. Each invocation evaluates ``J(z)`` again
             (one extra objective call per iterate). Not supported by the Ipopt
             backend (native path); use SciPy or omit.
-        disp : bool, optional
-            If True, print one framed ``disp`` panel.
+        verbose : bool, optional
+            If True, print the framed solve panel (preamble and report).
         """
         z_start = self.z0 if z0 is None else self._decision_vector(z0, self.program.n_z)
-        time_solve = record_solve_time or disp
+        time_solve = record_solve_time or verbose
 
-        if disp:
+        if verbose:
             self._print_solve_preamble(z_start)
         if time_solve:
             t0 = time.perf_counter()
@@ -210,7 +210,7 @@ class Optimizer:
             elapsed = time.perf_counter() - t0
             result = replace(result, solve_time_s=elapsed)
 
-        if disp:
+        if verbose:
             self._print_solve_report(result)
 
         return result
@@ -239,7 +239,7 @@ class Optimizer:
         self,
         result: OptimizationResult,
     ) -> None:
-        """Print the **After solve** section and close the ``disp`` panel."""
+        """Print the **After solve** section and close the solve panel."""
         print("Completed in", result.solve_time_s, "seconds")
         print(DISP_RULE_DIV)
         print("success:", result.success)
@@ -284,6 +284,6 @@ if __name__ == "__main__":
 
     out = opt.solve(
         callback=callback,
-        disp=True,
+        verbose=True,
     )
     print(out)

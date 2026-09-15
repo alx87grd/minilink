@@ -1,9 +1,9 @@
 """Demo-check runner subprocess tests (catalog + flagship demos + graphics).
 
 Thin CI bridge: invokes ``tests/demo_checks/`` runners; does not duplicate their
-assertions. Without JAX, JAX-required flagships skip here — the CI
-``regression`` job (``.github/workflows/test.yml``) re-runs
-``run_flagship_demos.py`` with JAX installed.
+assertions. Without optional extras (JAX, …), those flagships skip here — the
+CI ``regression`` job re-runs ``run_flagship_demos.py`` with extras.
+Interactive flagships (viewer / prompt demos) always skip.
 
 Notebook smoke checks run in the CI ``regression`` job (and via
 ``tests/run/run_notebook_checks.py``). Opt in here with
@@ -26,9 +26,9 @@ _FORBIDDEN_DEMO_HARNESS = re.compile(
     r"MINILINK_NOTEBOOK_SMOKE|_NOTEBOOK_SMOKE\b|MINILINK_.*_SMOKE"
 )
 _DEMO_ROOTS = (
-    REPO_ROOT / "examples" / "learn",
+    REPO_ROOT / "examples" / "tutorial",
+    REPO_ROOT / "examples" / "teaching",
     REPO_ROOT / "examples" / "demos",
-    REPO_ROOT / "examples" / "tooling",
 )
 
 
@@ -59,7 +59,7 @@ class TestDemoCheckRunners(unittest.TestCase):
                     hits.append(path.relative_to(REPO_ROOT).as_posix())
         if hits:
             self.fail(
-                "examples/learn, examples/demos, and examples/tooling must not "
+                "examples/tutorial, examples/teaching, and examples/demos must not "
                 "contain smoke/CI harness hooks (adapt in tests/demo_checks "
                 "instead):\n  " + "\n  ".join(hits)
             )

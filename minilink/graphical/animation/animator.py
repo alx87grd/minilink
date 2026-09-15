@@ -23,7 +23,10 @@ import warnings
 
 import numpy as np
 
-from minilink.graphical.animation.camera import resolve_camera_from_hints
+from minilink.graphical.animation.camera import (
+    fit_camera_to_frames,
+    resolve_camera_from_hints,
+)
 from minilink.graphical.animation.drawables import validate_overlay
 from minilink.graphical.animation.renderers.matplotlib_renderer import (
     MatplotlibRenderer,
@@ -90,6 +93,14 @@ class Animator:
     def __init__(self, sys):
         self.sys = sys
         self._overlay_kinematics = {}
+        # Auto-fit camera (``camera_scale is None``): fixed for the whole session
+        # so live frames do not jitter; animations refit over the trajectory.
+        self._auto_camera = None
+
+    def camera_is_auto(self, camera_override=None) -> bool:
+        return (
+            camera_override is None and getattr(self.sys, "camera_scale", None) is None
+        )
 
     @staticmethod
     def _coerce_overlays(overlays):
@@ -148,7 +159,14 @@ class Animator:
             "transforms": transforms,
             "camera": camera,
         }
-        return self._merge_overlays(frame, overlays, t)
+        frame = self._merge_overlays(frame, overlays, t)
+        if self.camera_is_auto(camera_override):
+            if self._auto_camera is None:
+                self._auto_camera = fit_camera_to_frames(
+                    [frame], plot_axes=getattr(self.sys, "camera_plot_axes", (0, 1))
+                )
+            frame["camera"] = self._auto_camera
+        return frame
 
     def show(
         self,
@@ -204,6 +222,12 @@ class Animator:
                     overlays=overlays,
                 )
             )
+        if self.camera_is_auto(camera_override) and frames:
+            self._auto_camera = fit_camera_to_frames(
+                frames, plot_axes=getattr(self.sys, "camera_plot_axes", (0, 1))
+            )
+            for frame in frames:
+                frame["camera"] = self._auto_camera
         return frames
 
     def animate_simulation(

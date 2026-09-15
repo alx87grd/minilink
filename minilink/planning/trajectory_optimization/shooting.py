@@ -7,6 +7,7 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
     array_module,
+    ensure_jax_x64,
     normalize_backend,
 )
 from minilink.core.sets import BoxInputSet, SingletonSet
@@ -89,8 +90,8 @@ class ShootingTranscription(Transcription):
         compile_backend: str,
     ) -> MathematicalProgram:
         """Build a JAX scan-based single-shooting program."""
-        import jax
-        import jax.numpy as jnp
+        jax = ensure_jax_x64()
+        jnp = jax.numpy
 
         cost = problem.require_cost()
         t = jnp.asarray(self.options.t(problem))

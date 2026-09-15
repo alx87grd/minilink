@@ -17,6 +17,9 @@ from minilink.graphical.signals.signal_colors import (
 TIME_ABSCISSA_LABEL = "Time [s]"
 STEP_ABSCISSA_LABEL = "Step [k]"
 
+# The channels CostFunction.evaluate_trajectory adds, labeled as in the textbook
+_COST_SIGNAL_LABELS = {"cost_rate": "dJ/dt", "cost": "J"}
+
 
 @dataclass(frozen=True)
 class SignalTrace:
@@ -312,6 +315,8 @@ def _units_for_vector(units, dim: int) -> tuple[str, ...]:
 
 
 def _labels_and_units_for_extra_signal(sys, name: str, dim: int):
+    if name in _COST_SIGNAL_LABELS and dim == 1:
+        return (_COST_SIGNAL_LABELS[name],), ("",)
     if ":" in name and isinstance(sys, DiagramSystem):
         sys_id, port_id = name.split(":", 1)
         subsystem = sys.subsystems.get(sys_id)

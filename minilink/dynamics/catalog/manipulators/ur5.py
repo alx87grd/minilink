@@ -21,7 +21,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.dynamics.abstraction.manipulator import Manipulator
-from minilink.graphical.catalog.shapes import link_pose_3d
+from minilink.graphical.catalog.shapes import link_pose_3d, point_pose
 from minilink.graphical.catalog.skins import ur5_skin
 
 
@@ -445,6 +445,9 @@ class UR5Manipulator(Manipulator):
             frames[f"link{i}"] = link_pose_3d(points[i], points[i + 1])
             frames[f"joint{i}"] = joint_frames[i]
         frames["joint6"] = links[-1]
+        # Translation-only frame so a world-frame tool force is not rotated
+        # by the wrist (see Manipulator.get_dynamic_geometry, port ``f``).
+        frames["force"] = point_pose(tip)
         return frames
 
 

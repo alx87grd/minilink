@@ -1,35 +1,20 @@
-"""Minimal hybrid MPC: ``ModelPredictiveController`` then ``mpc @ plant``.
-
-Warm-start via ``warm_start=True`` (packed ``z`` on ``Computer.x``).
-
-Run from repo root::
-
-    python examples/demos/mpc/mpc_car_minimal.py
-"""
+"""Minimal hybrid MPC: ``ModelPredictiveController`` then ``mpc @ plant``."""
 
 import numpy as np
 
-from minilink.control.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
-from minilink.core.backends import configure_jax
-from minilink.core.costs import QuadraticCost
-from minilink.dynamics.catalog.vehicles.jax_vehicles import (
+from minilink import (
     BicycleDynRate,
-)
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.planner import (
+    PlanningProblem,
+    QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
-
-configure_jax(enable_x64=True)
+from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
 
 U_TARGET = 4.0
 TF_SIM = 5.0
 MPC_DT = 0.02
 SIM_DT = 0.01
-STEP_DISP = True
+VERBOSE = True
 REF_X_PAD = 20.0
 
 sys = BicycleDynRate()
@@ -51,7 +36,6 @@ planner = TrajectoryOptimizationPlanner(
             R=np.diag([1.0, 25.0]),
             S=np.diag([0.0, 30.0, 40.0, 2.0, 12.0, 18.0, 0.1, 100.0]),
             xbar=x_ref,
-            ubar=np.zeros(2),
         ),
     ),
     n_steps=5,
@@ -63,7 +47,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, step_disp=STEP_DISP
+    planner, dt_mpc=MPC_DT, warm_start=True, verbose=VERBOSE
 )
 
 hybrid = mpc @ sys

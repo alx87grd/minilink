@@ -237,39 +237,50 @@ class WhiteNoise(Source):
 
 
 class TrajectorySource(Source):
-    """Replay a stored signal ``y(t)`` sampled at times ``t`` (linear interpolation).
+    """Replay a stored signal ``y(t)`` sampled at times ``t``.
 
-    The modern replacement for an open-loop "controller": feed a planned input
-    trajectory into a diagram. Values outside ``[t[0], t[-1]]`` hold the nearest
-    endpoint. ``values`` has shape ``(p, N)`` (or ``(N,)`` for a scalar signal)
-    aligned with the ``N`` sample times in ``t``.
+    The open-loop policy ``u = pi(t)``: feed a planned input trajectory into a
+    diagram, ``source >> plant``. Between samples the signal is interpolated
+    linearly (``interpolation="linear"``, what a collocation or shooting
+    transcription assumes) or held at the previous sample
+    (``"previous"``, the zero-order hold of a sampled controller). Values
+    outside ``[t[0], t[-1]]`` hold the nearest endpoint. ``values`` has shape
+    ``(p, N)`` (or ``(N,)`` for a scalar signal) aligned with the ``N``
+    sample times in ``t``.
     """
 
-    def __init__(self, t, values):
+    INTERPOLATIONS = ("linear", "previous")
+
+    def __init__(self, t, values, *, interpolation="linear"):
         t = np.asarray(t, dtype=float).reshape(-1)
         values = np.asarray(values, dtype=float)
         if values.ndim == 1:
             values = values.reshape(1, -1)
         if values.shape[1] != t.size:
             raise ValueError("values must have shape (p, len(t))")
+        if interpolation not in self.INTERPOLATIONS:
+            raise ValueError(
+                f"interpolation must be one of {self.INTERPOLATIONS}, got {interpolation!r}"
+            )
 
         Source.__init__(self, values.shape[0])
         self.name = "Trajectory Source"
         self.sample_times = t
         self.sample_values = values
+        self.interpolation = interpolation
         self.refresh()
 
     @classmethod
-    def from_trajectory(cls, traj, signal="u"):
+    def from_trajectory(cls, traj, signal="u", *, interpolation="linear"):
         """Build a source that replays a :class:`Trajectory` signal (``u`` or ``x``)."""
-        return cls(traj.t, getattr(traj, signal))
+        return cls(traj.t, getattr(traj, signal), interpolation=interpolation)
 
     def refresh(self):
         self._interpolators = [
             interp1d(
                 self.sample_times,
                 self.sample_values[i, :],
-                kind="linear",
+                kind=self.interpolation,
                 bounds_error=False,
                 fill_value=(self.sample_values[i, 0], self.sample_values[i, -1]),
                 assume_sorted=True,

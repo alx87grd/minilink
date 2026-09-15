@@ -27,7 +27,8 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, configure_jax
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
+from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.policy_synthesis.discretizer import (
     PAIR_CHUNK_SIZE,
@@ -38,7 +39,7 @@ from minilink.planning.policy_synthesis.discretizer import (
     print_build_complete,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import PolicyPlan, SolveMetadata
+from minilink.planning.results import PlanningSolution
 
 #: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
 BACKEND_LOOP = "loop"
@@ -57,6 +58,7 @@ _DP_OPTION_KEYS = (
     "final_time",
     "record_history",
     "verbose",
+    "clean_infeasible",
 )
 
 
@@ -74,6 +76,8 @@ class DynamicProgrammingOptions:
     alpha : float
         Discount (exponential forgetting) factor; use ``alpha < 1`` for
         guaranteed contraction in infinite-horizon value iteration.
+        When omitted, the cost's ``discount_factor(dt)`` is used if the
+        cost declares a positive ``discount_rate``; otherwise ``1`` (undiscounted).
     tol : float
         Stopping tolerance on the largest cost-to-go change per sweep.
     max_iterations : int
@@ -86,7 +90,8 @@ class DynamicProgrammingOptions:
         Finite penalty charged to inadmissible inputs or out-of-domain
         successors.
     final_time : float
-        Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``.
+        Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``. Left
+        at ``0.0``, the planner reads ``problem.tf`` when the problem sets one.
     record_history : bool
         Keep ``(t, J, pi)`` per sweep for animation.
     verbose : bool
@@ -106,6 +111,9 @@ class DynamicProgrammingOptions:
     final_time: float = 0.0
     record_history: bool = False
     verbose: bool = False
+    #: After each solve, pin saturated cost-to-go cells to ``out_of_bound_cost``
+    #: and their policy to the nominal action (:meth:`clean_infeasible_set`).
+    clean_infeasible: bool = True
 
 
 def _merge_dp_options(
@@ -171,9 +179,42 @@ class DynamicProgrammingResult:
         )
 
 
+@dataclass(frozen=True)
+class ValueIterationRecord:
+    """Sweeps run, the last cost-to-go change, and whether the sweeps converged to ``tol``."""
+
+    iterations: int
+    delta: float
+    tol: float
+    converged: bool
+    fixed_horizon: bool
+
+    @property
+    def success(self) -> bool:
+        """The sweeps converged (a fixed-horizon solve always completes its sweeps)."""
+        return bool(self.converged)
+
+    def __str__(self) -> str:
+        if self.fixed_horizon:
+            return f"{self.iterations} backward sweeps (fixed horizon)"
+        if self.converged:
+            return f"converged in {self.iterations} sweeps (delta={self.delta:.3g})"
+        return (
+            f"max_iterations={self.iterations} reached before tol={self.tol:g} "
+            f"(delta={self.delta:.3g})"
+        )
+
+
 class DynamicProgrammingPlanner(Planner):
     """
     Value-iteration planner over a discretized state space.
+
+    The common setup is one object::
+
+        DynamicProgrammingPlanner(problem, x_grid=(201, 201), u_grid=(21,), dt=0.05)
+
+    which builds the :class:`~minilink.planning.policy_synthesis.discretizer.StateSpaceGrid`
+    itself; pass ``grid=`` for custom grids (``precompute``, ``verbose``, ...).
 
     Parameters
     ----------
@@ -192,7 +233,10 @@ class DynamicProgrammingPlanner(Planner):
         self,
         problem: PlanningProblem,
         *,
-        grid: StateSpaceGrid,
+        grid: StateSpaceGrid | None = None,
+        x_grid=None,
+        u_grid=None,
+        dt=None,
         options: DynamicProgrammingOptions | None = None,
         backend=_UNSET,
         alpha=_UNSET,
@@ -203,9 +247,22 @@ class DynamicProgrammingPlanner(Planner):
         final_time=_UNSET,
         record_history=_UNSET,
         verbose=_UNSET,
+        clean_infeasible=_UNSET,
     ) -> None:
         super().__init__(problem)
         self.require_cost()
+        # Common case: shapes + dt build the grid here; custom grids come in
+        # through grid= (precompute / verbose options live on StateSpaceGrid).
+        if grid is None:
+            if x_grid is None or u_grid is None or dt is None:
+                raise ValueError(
+                    "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
+                )
+            grid = StateSpaceGrid(
+                problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt
+            )
+        elif x_grid is not None or u_grid is not None or dt is not None:
+            raise ValueError("pass either grid= or x_grid/u_grid/dt, not both")
         self.grid = grid
         self.options = _merge_dp_options(
             options,
@@ -218,30 +275,67 @@ class DynamicProgrammingPlanner(Planner):
             final_time=final_time,
             record_history=record_history,
             verbose=verbose,
+            clean_infeasible=clean_infeasible,
         )
+        # The problem's exit rule is the default price of leaving the grid
+        if out_of_bound_cost is _UNSET and isinstance(problem.exit_cost, float):
+            self.options = replace(self.options, out_of_bound_cost=problem.exit_cost)
+        # The cost's continuous rate becomes the per-step factor unless alpha is set
+        if (
+            alpha is _UNSET
+            and problem.cost is not None
+            and float(problem.cost.discount_rate) > 0.0
+        ):
+            self.options = replace(
+                self.options, alpha=problem.cost.discount_factor(self.grid.dt)
+            )
+        if final_time is _UNSET and self.options.final_time == 0.0:
+            tf = getattr(problem, "tf", None)
+            if tf is not None and np.isfinite(tf):
+                self.options = replace(self.options, final_time=float(tf))
         if self.options.backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
             raise ValueError(f"Unknown backend {self.options.backend!r}")
+        self.result: DynamicProgrammingResult | None = (
+            None  # tables of the latest solve
+        )
         self._G = None  # running-cost table, cached when the grid is precomputed
         self._jax_cache = {}  # compiled JAX runners keyed by (stop_on_tol, n)
         if self.options.backend == BACKEND_JAX:
             self.grid.ensure_jax_transition(self.options.final_time)
 
-    def solve(self) -> PolicyPlan:
-        """Offline policy-family entry."""
-        return self.solve_policy()
+    def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        """
+        Run value iteration until convergence (or ``max_iterations``).
 
-    def solve_policy(self) -> PolicyPlan:
-        """Run value iteration until convergence (or ``max_iterations``)."""
-        return self._solve(max_iterations=self.options.max_iterations, stop_on_tol=True)
+        The solution's policy is the greedy lookup table, its ``cost_to_go``
+        the interpolated ``J``. ``evaluate=True`` also rolls the law out from
+        the problem's start and scores it over the problem's draws.
+        """
+        return self._solve(
+            max_iterations=self.options.max_iterations,
+            stop_on_tol=True,
+            evaluate=evaluate,
+            n_trials=n_trials,
+        )
 
-    def solve_steps(self, n: int) -> PolicyPlan:
+    def solve_policy(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        """Policy-family name of :meth:`solve`."""
+        return self.solve(evaluate=evaluate, n_trials=n_trials)
+
+    def solve_steps(self, n: int, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """Run exactly ``n`` backward sweeps (finite-horizon / time-varying)."""
-        return self._solve(max_iterations=int(n), stop_on_tol=False)
+        return self._solve(
+            max_iterations=int(n),
+            stop_on_tol=False,
+            evaluate=evaluate,
+            n_trials=n_trials,
+        )
 
-    @property
-    def result(self) -> DynamicProgrammingResult:
-        """Cost-to-go field and greedy policy from the latest solve."""
-        return self.require_policy_plan().policy
+    def nominal_trajectory(self, tf=None):
+        """The greedy law from the problem's start on the grid's control period."""
+        return nominal_trajectory(
+            self.problem, self.get_controller(), dt=self.grid.dt, tf=tf
+        )
 
     def clean_infeasible_set(self, tol: float = 1.0) -> DynamicProgrammingResult:
         """
@@ -280,6 +374,9 @@ class DynamicProgrammingPlanner(Planner):
         return plotting.animate_policy(self.result, **kwargs)
 
     def get_controller(self, **kwargs):
+        """The solution's greedy lookup law; ``interpolation=`` builds a variant of it."""
+        if not kwargs:
+            return self.require_solution().policy
         from minilink.planning.policy_synthesis import plotting
 
         return plotting.get_controller(self.result, **kwargs)
@@ -290,9 +387,12 @@ class DynamicProgrammingPlanner(Planner):
 
     # Internal machinery
 
-    def _solve(self, *, max_iterations, stop_on_tol):
+    def _solve(self, *, max_iterations, stop_on_tol, evaluate, n_trials):
         if self.options.backend == BACKEND_JAX:
-            return self._solve_jax(max_iterations, stop_on_tol)
+            result = self._solve_jax(max_iterations, stop_on_tol)
+            return self._finish_policy(
+                result, stop_on_tol=stop_on_tol, evaluate=evaluate, n_trials=n_trials
+            )
 
         grid = self.grid
         opt = self.options
@@ -347,14 +447,36 @@ class DynamicProgrammingPlanner(Planner):
         result = DynamicProgrammingResult(
             grid=grid, J=J, pi=pi, iterations=k, delta=delta, history=history
         )
-        return self._finish_policy(result)
+        return self._finish_policy(
+            result, stop_on_tol=stop_on_tol, evaluate=evaluate, n_trials=n_trials
+        )
 
-    def _finish_policy(self, result: DynamicProgrammingResult) -> PolicyPlan:
-        return self._store_policy_plan(
-            PolicyPlan(
-                policy=result,
-                metadata=SolveMetadata(success=True),
-            )
+    def _finish_policy(
+        self, result: DynamicProgrammingResult, *, stop_on_tol, evaluate, n_trials
+    ) -> PlanningSolution:
+        """The tables as a solution: the greedy lookup law, the interpolated J, the sweep record."""
+        from minilink.planning.policy_synthesis import plotting
+
+        self.result = result
+        if self.options.clean_infeasible:
+            self.clean_infeasible_set()  # pins saturated cells in place, before the law is built
+        policy = plotting.get_controller(result)
+
+        # success = the Bellman sweeps converged to `tol` (a fixed-horizon
+        # solve_steps() always completes its sweeps); the record says which.
+        record = ValueIterationRecord(
+            iterations=result.iterations,
+            delta=float(result.delta),
+            tol=float(self.options.tol),
+            converged=(not stop_on_tol) or result.delta <= float(self.options.tol),
+            fixed_horizon=not stop_on_tol,
+        )
+        trajectory = evaluation = None
+        if evaluate:
+            trajectory = nominal_trajectory(self.problem, policy, dt=self.grid.dt)
+            evaluation = self.evaluate(policy, dt=self.grid.dt, n_trials=n_trials)
+        return self.store_solution(
+            PlanningSolution(policy, record, trajectory, evaluation, result.value_at)
         )
 
     def _vectorized_step(self, J, t):
@@ -467,7 +589,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def _terminal_cost_jax(self, t):
         """Terminal cost-to-go at every grid node (JAX vmap over N nodes)."""
-        jax = configure_jax(enable_x64=True)
+        jax = ensure_jax_x64()
         jnp = jax.numpy
         grid = self.grid
         N = grid.nodes_n
@@ -552,7 +674,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def _running_cost_jax(self, action_ok, x_next_ok, t):
         """Running-cost lookup table G[s,a] = g(x,u,t)*dt (JAX vmap over N×A pairs)."""
-        jax = configure_jax(enable_x64=True)
+        jax = ensure_jax_x64()
         jnp = jax.numpy
         grid = self.grid
         g = self.problem.cost.g
@@ -625,7 +747,7 @@ class DynamicProgrammingPlanner(Planner):
         jitted ``lax.while_loop`` with ``map_coordinates`` interpolation. The
         compiled runner is cached so repeated solves pay compilation only once.
         """
-        jax = configure_jax(enable_x64=True)  # match NumPy float64 precision
+        jax = ensure_jax_x64()  # library float64 policy (MINILINK_JAX_X64)
         jnp = jax.numpy
         grid = self.grid
         opt = self.options
@@ -666,7 +788,7 @@ class DynamicProgrammingPlanner(Planner):
             delta=float(delta),
             history=None,
         )
-        return self._finish_policy(result)
+        return result
 
     def _jax_step(self, jax, jnp):
         """Return (and cache) the jitted single Bellman backup."""
@@ -797,4 +919,4 @@ class DynamicProgrammingPlanner(Planner):
             delta=delta,
             history=history,
         )
-        return self._finish_policy(result)
+        return result

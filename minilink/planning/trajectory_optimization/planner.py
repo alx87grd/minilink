@@ -29,9 +29,10 @@ from minilink.optimization.reporting import (
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import SolveMetadata, TrajectoryPlan
+from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
+    dynamics_function,
 )
 
 _UNSET = object()
@@ -46,8 +47,9 @@ _TRAJOPT_OPTION_KEYS = (
     "record_history",
     "callback",
     "record_solve_time",
-    "solve_disp",
-    "step_disp",
+    "verbose",
+    "feasibility_tol",
+    "live_plot",
 )
 
 _TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
@@ -69,10 +71,10 @@ class TrajectoryOptimizationIteration:
 class TrajectoryOptimizationOptions:
     """Generic trajectory-optimization workflow options.
 
-    ``solve_disp`` prints a Minilink trajectory-optimization preamble and
-    report. It is separate from SciPy's ``options['disp']``.
-
-    ``step_disp`` prints per-tick timing on the parametric / from-solve path.
+    ``verbose`` prints the Minilink trajectory-optimization preamble and report
+    on :meth:`TrajectoryOptimizationPlanner.solve`, and one timing line per tick
+    on the online :meth:`TrajectoryOptimizationPlanner.solve_trajectory_from`
+    path. It is separate from SciPy's per-iteration ``options['disp']``.
 
     ``record_history=True`` reconstructs a full :class:`Trajectory` per
     optimizer iterate — convenient for live plots and teaching, but it adds
@@ -91,8 +93,71 @@ class TrajectoryOptimizationOptions:
     record_history: bool = False
     callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
     record_solve_time: bool = False
-    solve_disp: bool = False
-    step_disp: bool = False
+    verbose: bool = False
+    #: ``success`` is granted when the returned plan satisfies the program
+    #: constraints (equality residuals, inequality margins, bounds) to this
+    #: tolerance, even if the solver stopped on an iteration limit.
+    feasibility_tol: float = 1e-6
+    #: Redraw the iterate trajectory during the solve (matplotlib); a
+    #: custom ``callback`` takes precedence.
+    live_plot: bool = False
+
+
+@dataclass(frozen=True)
+class TrajectoryOptimizationRecord:
+    """
+    The optimizer's account of one solve, and the plan's constraint check.
+
+    ``success`` is *the returned plan satisfies the program constraints to
+    ``feasibility_tol``*, nothing else: an iteration-limit stop on a feasible
+    plan is not a failure, a solver that reports convergence on an infeasible
+    plan is. The solver's own flag and message stay beside it. An online tick
+    (``solve_trajectory_from`` on a compiled program) runs no residual check,
+    ``feasible`` is ``None`` and ``success`` is the solver's flag.
+    """
+
+    cost: float | None
+    solver_success: bool
+    message: str
+    iterations: int | None
+    solve_time_s: float | None
+    feasibility_tol: float
+    max_equality_violation: float | None
+    min_inequality_margin: float | None
+    max_bound_violation: float | None
+    feasible: bool | None
+    stats: dict
+
+    @property
+    def success(self) -> bool:
+        if self.feasible is None:
+            return bool(self.solver_success)
+        return bool(self.feasible)
+
+    def __str__(self) -> str:
+        cost = "n/a" if self.cost is None else f"{float(self.cost):.6g}"
+        if self.feasible is None:
+            check = "online tick, no residual check"
+        elif self.feasible:
+            check = f"feasible to {self.feasibility_tol:g}"
+        else:
+            check = f"infeasible at {self.feasibility_tol:g}"
+        if self.max_equality_violation is not None:
+            check += f" (max defect {self.max_equality_violation:.2g})"
+        solver = f"solver {'ok' if self.solver_success else 'stopped'}: {self.message}"
+        if self.iterations is not None:
+            solver += f", {self.iterations} iterations"
+        if self.solve_time_s is not None:
+            solver += f", {self.solve_time_s:.3g} s"
+        return f"J* = {cost}, {check}; {solver}"
+
+
+def _within_tolerance(max_eq, min_ineq, max_bound, tol) -> bool:
+    """True when the worst residual, margin, and bound violation are within tol."""
+    tol = float(tol)
+    return bool(
+        max_eq <= tol and (min_ineq is None or min_ineq >= -tol) and max_bound <= tol
+    )
 
 
 class TrajectoryOptimizationPlanner(Planner):
@@ -133,8 +198,9 @@ class TrajectoryOptimizationPlanner(Planner):
         record_history=_UNSET,
         callback=_UNSET,
         record_solve_time=_UNSET,
-        solve_disp=_UNSET,
-        step_disp=_UNSET,
+        verbose=_UNSET,
+        feasibility_tol=_UNSET,
+        live_plot=_UNSET,
     ) -> None:
         """
         Parameters
@@ -153,7 +219,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
         compile_backend, initial_guess, warm_start, optimizer_method,
         optimizer_options, use_hessian, record_history, callback,
-        record_solve_time, solve_disp, step_disp
+        record_solve_time, verbose, feasibility_tol, live_plot
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
         """
         super().__init__(problem)
@@ -170,8 +236,9 @@ class TrajectoryOptimizationPlanner(Planner):
             record_history=record_history,
             callback=callback,
             record_solve_time=record_solve_time,
-            solve_disp=solve_disp,
-            step_disp=step_disp,
+            verbose=verbose,
+            feasibility_tol=feasibility_tol,
+            live_plot=live_plot,
         )
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
@@ -196,16 +263,31 @@ class TrajectoryOptimizationPlanner(Planner):
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
         warm_start: bool | None = None,
-    ) -> TrajectoryPlan:
-        """Offline trajopt entry (``solve_trajectory``)."""
-        return self.solve_trajectory(initial_guess=initial_guess, warm_start=warm_start)
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
+        """
+        Offline trajopt entry (``solve_trajectory``).
+
+        The solution's policy is the optimized input as a source block,
+        ``policy >> plant``; ``evaluate=True`` also replays it over the
+        problem's draws (one trial when nothing is random).
+        """
+        return self.solve_trajectory(
+            initial_guess=initial_guess,
+            warm_start=warm_start,
+            evaluate=evaluate,
+            n_trials=n_trials,
+        )
 
     def solve_trajectory(
         self,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
         warm_start: bool | None = None,
-    ) -> TrajectoryPlan:
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
         """Compute and store a trajectory-optimization solution (always rebuild)."""
         workflow_t0 = time.perf_counter()
         compile_backend = self.options.compile_backend
@@ -223,7 +305,7 @@ class TrajectoryOptimizationPlanner(Planner):
         optimizer = self._make_optimizer(program, z0)
         compile_s = time.perf_counter() - compile_t0
 
-        if self.options.solve_disp:
+        if self.options.verbose:
             self._print_solve_preamble(
                 program=program,
                 optimizer=optimizer,
@@ -235,8 +317,8 @@ class TrajectoryOptimizationPlanner(Planner):
         self.iteration_history = []
         optimization_result = optimizer.solve(
             callback=self._make_callback(optimizer, compile_backend),
-            record_solve_time=self.options.record_solve_time or self.options.solve_disp,
-            disp=False,
+            record_solve_time=self.options.record_solve_time or self.options.verbose,
+            verbose=False,
         )
         reconstruct_t0 = time.perf_counter()
         trajectory = self.transcription.reconstruct_result(
@@ -252,32 +334,45 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimization_result = optimization_result
         self.last_solve_time_s = optimization_result.solve_time_s
         self.last_step_time_s = total_s
-        plan = self._store_trajectory_plan(
-            TrajectoryPlan(
-                trajectory=trajectory,
-                metadata=SolveMetadata(
-                    success=bool(optimization_result.success),
-                    message=str(optimization_result.message),
-                    cost=optimization_result.cost,
-                    solve_time_s=optimization_result.solve_time_s,
-                    stats=dict(optimization_result.stats),
-                ),
-                warm_state=optimization_result.z,
-            )
+        # success = the returned plan satisfies the constraints to
+        # feasibility_tol. The solver's own flag stays in `message` / `stats`:
+        # an iteration-limit stop on a feasible plan is not a failure, and a
+        # solver that reports convergence on an infeasible plan is.
+        max_eq, min_ineq, max_bound = optimizer.program_evaluator.constraint_violations(
+            optimization_result.z
+        )
+        feasible = _within_tolerance(
+            max_eq, min_ineq, max_bound, self.options.feasibility_tol
+        )
+        record = TrajectoryOptimizationRecord(
+            cost=optimization_result.cost,
+            solver_success=bool(optimization_result.success),
+            message=str(optimization_result.message),
+            iterations=dict(optimization_result.stats).get("nit"),
+            solve_time_s=optimization_result.solve_time_s,
+            feasibility_tol=float(self.options.feasibility_tol),
+            max_equality_violation=float(max_eq),
+            min_inequality_margin=(None if min_ineq is None else float(min_ineq)),
+            max_bound_violation=float(max_bound),
+            feasible=feasible,
+            stats=dict(optimization_result.stats),
+        )
+        solution = self.store_solution(
+            self.trajectory_solution(trajectory, record, evaluate, n_trials)
         )
 
-        if self.options.solve_disp:
+        if self.options.verbose:
             self._print_solve_report(
-                optimizer=optimizer,
+                record=record,
                 result=optimization_result,
-                trajectory=plan.trajectory,
+                trajectory=trajectory,
                 transcribe_s=transcribe_s,
                 compile_s=compile_s,
                 reconstruct_s=reconstruct_s,
                 total_s=total_s,
             )
 
-        return plan
+        return solution
 
     def compile_parametric_program(self) -> None:
         """Build and JIT-compile a parametric NLP once (idempotent).
@@ -297,10 +392,10 @@ class TrajectoryOptimizationPlanner(Planner):
                 "compile_parametric_program requires compile_backend='jax' "
                 f"(got {self.options.compile_backend!r})."
             )
-        if not hasattr(self.transcription, "transcribe_parametric"):
+        if not getattr(self.transcription, "supports_parametric", False):
             raise TypeError(
-                f"{type(self.transcription).__name__} does not support "
-                "transcribe_parametric; use DirectCollocationTranscription."
+                f"{type(self.transcription).__name__} does not support a "
+                "parametric program; use transcription='direct_collocation'."
             )
 
         from minilink.planning.trajectory_optimization.parametric_evaluator import (
@@ -342,7 +437,9 @@ class TrajectoryOptimizationPlanner(Planner):
         *,
         params=None,
         initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> TrajectoryPlan:
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
         """
         Online traj-family solve from measured ``x0``.
 
@@ -367,9 +464,11 @@ class TrajectoryOptimizationPlanner(Planner):
         reject_unknown_online_params(params)
         if self.has_parametric_program:
             return self._solve_trajectory_from_parametric(
-                x0, initial_guess=initial_guess
+                x0, initial_guess=initial_guess, evaluate=evaluate, n_trials=n_trials
             )
-        return self._solve_trajectory_from_rebuild(x0, initial_guess=initial_guess)
+        return self._solve_trajectory_from_rebuild(
+            x0, initial_guess=initial_guess, evaluate=evaluate, n_trials=n_trials
+        )
 
     def step(
         self,
@@ -385,7 +484,9 @@ class TrajectoryOptimizationPlanner(Planner):
         x0,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> TrajectoryPlan:
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
         if self.program_evaluator is None or self.optimizer_backend is None:
             raise RuntimeError(
                 "compile_parametric_program() must run before parametric from-solve."
@@ -411,7 +512,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         z0 = self.transcription.pack_initial_guess(problem_k, initial_guess)
 
-        record_solve_time = self.options.record_solve_time or self.options.step_disp
+        record_solve_time = self.options.record_solve_time or self.options.verbose
         if record_solve_time:
             solve_t0 = time.perf_counter()
 
@@ -440,21 +541,24 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         self.last_step_time_s = time.perf_counter() - step_t0
         self.last_optimization_result = result
-        plan = self._store_trajectory_plan(
-            TrajectoryPlan(
-                trajectory=trajectory,
-                metadata=SolveMetadata(
-                    success=bool(result.success),
-                    message=str(result.message),
-                    cost=result.cost,
-                    solve_time_s=result.solve_time_s,
-                    stats=dict(result.stats),
-                ),
-                warm_state=result.z,
-            )
+        record = TrajectoryOptimizationRecord(
+            cost=result.cost,
+            solver_success=bool(result.success),
+            message=str(result.message),
+            iterations=dict(result.stats).get("nit"),
+            solve_time_s=result.solve_time_s,
+            feasibility_tol=float(self.options.feasibility_tol),
+            max_equality_violation=None,
+            min_inequality_margin=None,
+            max_bound_violation=None,
+            feasible=None,
+            stats=dict(result.stats),
+        )
+        solution = self.store_solution(
+            self.trajectory_solution(trajectory, record, evaluate, n_trials)
         )
 
-        if self.options.step_disp:
+        if self.options.verbose:
             j_txt = "n/a" if result.cost is None else f"{float(result.cost):.6g}"
             print(
                 f"TOP step: success={result.success} "
@@ -463,14 +567,16 @@ class TrajectoryOptimizationPlanner(Planner):
                 f"step={self.last_step_time_s:.6g}s"
             )
 
-        return plan
+        return solution
 
     def _solve_trajectory_from_rebuild(
         self,
         x0,
         *,
         initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> TrajectoryPlan:
+        evaluate: bool = False,
+        n_trials: int = 50,
+    ) -> PlanningSolution:
         if not self._warned_uncompiled_from:
             backend = normalize_backend(self.options.compile_backend, allow_direct=True)
             if backend == BACKEND_JAX:
@@ -495,9 +601,27 @@ class TrajectoryOptimizationPlanner(Planner):
             X0=SingletonSet(x_arr),
         )
         try:
-            return self.solve_trajectory(initial_guess=initial_guess, warm_start=False)
+            return self.solve_trajectory(
+                initial_guess=initial_guess,
+                warm_start=False,
+                evaluate=evaluate,
+                n_trials=n_trials,
+            )
         finally:
             self.problem = saved_problem
+
+    def trajectory_solution(
+        self, trajectory, record, evaluate, n_trials
+    ) -> PlanningSolution:
+        """The schedule as a solution: its input replayed by a source block, scored over the draws when asked."""
+        policy = self.open_loop_policy(trajectory)
+        evaluation = None
+        if evaluate:
+            dt = float(trajectory.t[1] - trajectory.t[0])
+            evaluation = self.evaluate(
+                policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
+            )
+        return PlanningSolution(policy, record, trajectory, evaluation)
 
     def _make_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray
@@ -536,8 +660,8 @@ class TrajectoryOptimizationPlanner(Planner):
             return initial_guess
 
         use_warm_start = self.options.warm_start if warm_start is None else warm_start
-        if use_warm_start and self.last_trajectory_plan is not None:
-            return self.last_trajectory_plan.trajectory
+        if use_warm_start and self.last_solution is not None:
+            return self.last_solution.trajectory
 
         if self.options.initial_guess is not None:
             return self.options.initial_guess
@@ -550,9 +674,28 @@ class TrajectoryOptimizationPlanner(Planner):
         optimizer: Optimizer,
         compile_backend: str,
     ) -> OptimizationProgressCallback | None:
-        if not self.options.record_history and self.options.callback is None:
+        callback = self.options.callback
+        if self.options.live_plot:
+            from minilink.planning.trajectory_optimization.live_plot import (
+                LiveTrajectoryPlotCallback,
+            )
+
+            live_callback = LiveTrajectoryPlotCallback(self.problem.sys)
+            if callback is None:
+                callback = live_callback
+            else:
+                user_callback = callback
+
+                def callback(iteration):  # both the live figure and the user's hook
+                    live_callback(iteration)
+                    user_callback(iteration)
+
+        if not self.options.record_history and callback is None:
             return None
 
+        # One dynamics callable for every iterate (reconstruct_result would
+        # otherwise compile the plant again on each optimizer step).
+        dynamics = dynamics_function(self.problem, compile_backend)
         iteration_index = 0
 
         def planner_progress(z: np.ndarray, J: float, _t: float) -> None:
@@ -564,11 +707,12 @@ class TrajectoryOptimizationPlanner(Planner):
                 compile_backend,
                 iteration_index,
                 cost=J,
+                dynamics=dynamics,
             )
             if self.options.record_history:
                 self.iteration_history.append(iteration)
-            if self.options.callback is not None:
-                self.options.callback(iteration)
+            if callback is not None:
+                callback(iteration)
             iteration_index += 1
 
         return planner_progress
@@ -581,6 +725,7 @@ class TrajectoryOptimizationPlanner(Planner):
         iteration_index: int,
         *,
         cost: float | None = None,
+        dynamics=None,
     ) -> TrajectoryOptimizationIteration:
         """Build one planning-aware optimizer iteration payload."""
         if cost is None:
@@ -589,6 +734,7 @@ class TrajectoryOptimizationPlanner(Planner):
             OptimizationResult(z=z, success=False, cost=cost),
             problem=self.problem,
             compile_backend=compile_backend,
+            dynamics=dynamics,
         )
         max_eq, min_ineq, _ = optimizer.program_evaluator.constraint_violations(z)
         return TrajectoryOptimizationIteration(
@@ -645,7 +791,7 @@ class TrajectoryOptimizationPlanner(Planner):
     def _print_solve_report(
         self,
         *,
-        optimizer: Optimizer,
+        record: TrajectoryOptimizationRecord,
         result: OptimizationResult,
         trajectory: Trajectory,
         transcribe_s: float,
@@ -653,19 +799,20 @@ class TrajectoryOptimizationPlanner(Planner):
         reconstruct_s: float,
         total_s: float,
     ) -> None:
-        max_eq, min_ineq, max_bound = optimizer.program_evaluator.constraint_violations(
-            result.z
-        )
-
         print("Completed in", result.solve_time_s, "seconds")
         print(DISP_RULE_DIV)
-        print("success:", result.success)
+        print(
+            "success:",
+            record.success,
+            f"(plan feasible to tol={self.options.feasibility_tol:g})",
+        )
+        print("solver success:", result.success)
         print("message:", result.message)
         print("J*:", result.cost)
         print("stats:", result.stats)
-        print("max_eq:", max_eq)
-        print("min_ineq:", min_ineq)
-        print("max_bound:", max_bound)
+        print("max_eq:", record.max_equality_violation)
+        print("min_ineq:", record.min_inequality_margin)
+        print("max_bound:", record.max_bound_violation)
         print("x(0):", preview_vector(trajectory.x[:, 0]))
         print("x(tf):", preview_vector(trajectory.x[:, -1]))
         if self.problem.x_goal is not None:
@@ -789,5 +936,5 @@ def reject_unknown_online_params(params) -> None:
             f"Online params key(s) {deferred} are reserved for pipeline B "
             "(ObstacleBank / ParametricMathematicalProgram J(z, p) bind). "
             "Pass params=None or {} for x0-only bind. See "
-            "docs/plans/planning-pipeline-architecture.md."
+            "docs/plans/TODO.md (Later: scene params / J(z, p) bind)."
         )
