@@ -1894,6 +1894,11 @@ from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingResult,
 )
 from minilink.planning.policy_synthesis import plotting
+from minilink.planning.policy_synthesis.approximation import (
+    LinearApproximator,
+    QuadraticFeatures,
+    RadialBasisFeatures,
+)
 from minilink.planning.policy_synthesis.policy_eval import PolicyEvaluator
 
 
@@ -2291,6 +2296,76 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         _, result = solve(problem)
         with self.assertRaisesRegex(ValueError, "feedback declaration"):
             PolicyEvaluator(problem, grid=result.grid, policy=Integrator())
+
+
+class TestFunctionApproximation(unittest.TestCase):
+    def test_quadratic_features_recover_an_exact_quadratic(self):
+        xbar = np.array([1.0, -2.0])
+        S = np.array([[2.0, 0.5], [0.5, 3.0]])
+        b = np.array([0.3, -0.7])
+        rng = np.random.default_rng(0)
+        X = rng.uniform(-3.0, 3.0, size=(60, 2))
+        dx = X - xbar
+        y = 4.0 + dx @ b + np.einsum("ij,jk,ik->i", dx, S, dx)
+
+        features = QuadraticFeatures(xbar)
+        approx = LinearApproximator(features)
+        w = approx.fit(X, y)
+
+        c_hat, b_hat, S_hat = features.quadratic_form(w)
+        self.assertAlmostEqual(c_hat, 4.0)
+        np.testing.assert_allclose(b_hat, b, atol=1e-9)
+        np.testing.assert_allclose(S_hat, S, atol=1e-9)
+        np.testing.assert_allclose(approx(X), y, atol=1e-9)
+        self.assertAlmostEqual(approx(X[0]), y[0])
+
+    def test_radial_bases_on_a_grid_and_concatenation(self):
+        rbf = RadialBasisFeatures.on_grid([-1.0, -1.0], [1.0, 1.0], (3, 5))
+        self.assertEqual(rbf.n_features, 15)
+        self.assertAlmostEqual(rbf.sigma, 1.0)  # largest mesh spacing
+        self.assertAlmostEqual(rbf.phi(rbf.centers[4])[4], 1.0)
+        both = QuadraticFeatures(np.zeros(2)) + rbf
+        self.assertEqual(both.n_features, 6 + 15)
+        self.assertEqual(both.matrix(rbf.centers).shape, (15, 21))
+
+    def test_sgd_steps_move_toward_the_least_squares_weights(self):
+        rng = np.random.default_rng(1)
+        X = rng.uniform(-1.0, 1.0, size=(200, 1))
+        y = 1.0 + 2.0 * X[:, 0]
+        features = QuadraticFeatures(np.zeros(1))
+        target = LinearApproximator(features).fit(X, y)
+
+        online = LinearApproximator(features)
+        for _ in range(20):
+            for x_i, y_i in zip(X, y):
+                online.sgd_step(x_i, y_i, eta=0.1)
+        np.testing.assert_allclose(online.w, target, atol=1e-3)
+
+
+class TestPolicyEvaluatorPlots(unittest.TestCase):
+    def test_value_at_and_plots_after_solve(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        problem = make_problem()
+        planner, result = solve(problem)
+        evaluator = PolicyEvaluator(
+            problem,
+            grid=result.grid,
+            policy=planner.get_controller(),
+            options=planner.options,
+        )
+        with self.assertRaisesRegex(ValueError, "solve"):
+            evaluator.value_at(np.zeros(2))
+        evaluator.solve()
+        self.assertAlmostEqual(
+            evaluator.value_at(np.zeros(2)),
+            float(result.grid.interpolate(evaluator.last_J, np.zeros((1, 2)))[0]),
+        )
+        fig, _ = evaluator.plot_cost2go(vmax=10.0, show=False)
+        self.assertIsNotNone(fig)
+        fig, _ = result.grid.plot_value(evaluator.last_J, show_3d=True, show=False)
+        self.assertIsNotNone(fig)
 
 
 class TestParametricCapabilityFlag(unittest.TestCase):

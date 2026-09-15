@@ -6,7 +6,15 @@ import pytest
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.analysis.structural import controllability, observability
-from minilink.control.lqr import lqr, lqr_at_operating_point, lqr_gain
+from minilink.control.lqr import (
+    lqr,
+    lqr_at_operating_point,
+    lqr_finite_horizon,
+    lqr_gain,
+    lqr_gain_schedule,
+    trajectory_lqr,
+)
+from minilink.core.trajectory import Trajectory
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
@@ -246,8 +254,172 @@ class TestLQR(unittest.TestCase):
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
 from minilink.control.output import ProportionalController
 from minilink.control.siso import PD, PI, PID
-from minilink.control.state import StateFeedbackController
+from minilink.control.state import (
+    StateFeedbackController,
+    TimeVaryingStateFeedbackController,
+    TrajectoryFeedbackController,
+)
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
+
+
+class TestTrajectoryLQR(unittest.TestCase):
+    A = np.array([[0.0, 1.0], [0.0, 0.0]])
+    B = np.array([[0.0], [1.0]])
+    Q = np.diag([10.0, 1.0])
+    R = np.array([[1.0]])
+
+    @staticmethod
+    def sinusoid(tf=8.0, n=161):
+        # x_d = [sin t, cos t] is a trajectory of the double integrator under u_d = -sin t
+        t = np.linspace(0.0, tf, n)
+        x_d = np.vstack([np.sin(t), np.cos(t)])
+        u_d = -np.sin(t).reshape(1, -1)
+        return Trajectory(t=t, x=x_d, u=u_d)
+
+    def test_equilibrium_reference_gives_the_stationary_gain_everywhere(self):
+        t = np.linspace(0.0, 5.0, 51)
+        rest = Trajectory(t=t, x=np.zeros((2, 51)), u=np.zeros((1, 51)))
+        ctl = trajectory_lqr(DoubleIntegrator(), rest, self.Q, self.R)
+        K_inf = lqr_gain(self.A, self.B, self.Q, self.R)
+        np.testing.assert_allclose(
+            ctl.params["K"], np.broadcast_to(K_inf, (51, 1, 2)), atol=1e-6
+        )
+
+    def test_tracks_a_moving_reference_from_a_perturbed_start(self):
+        reference = self.sinusoid()
+        plant = DoubleIntegrator()
+        ctl = trajectory_lqr(plant, reference, self.Q, self.R)
+        plant.x0 = reference.x[:, 0] + np.array([0.5, 0.5])
+        loop = ctl @ plant
+        traj = loop.compute_trajectory(tf=8.0, n_steps=801, verbose=False)
+        np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], atol=0.02)
+
+    def test_stiff_weights_on_a_coarse_reference_stay_exact(self):
+        # heavy state weight and a 0.4 s knot spacing: explicit Euler blows up here
+        from scipy.integrate import solve_ivp
+        from scipy.linalg import solve_continuous_are
+
+        reference = self.sinusoid(tf=8.0, n=21)
+        Q = 1e3 * self.Q
+        A, B, R_inv = self.A, self.B, np.linalg.inv(self.R)
+        K = trajectory_lqr(DoubleIntegrator(), reference, Q, self.R).params["K"]
+
+        def riccati_rhs(tau, s):
+            S = s.reshape(2, 2)
+            return (S @ A + A.T @ S - S @ B @ R_inv @ B.T @ S + Q).ravel()
+
+        # the same equation integrated adaptively, from the final sample back to t = 0
+        t = reference.t
+        S = solve_continuous_are(A, B, Q, self.R)
+        for k in range(len(t) - 1, 0, -1):
+            solution = solve_ivp(
+                riccati_rhs, (0.0, t[k] - t[k - 1]), S.ravel(), rtol=1e-10, atol=1e-12
+            )
+            S = solution.y[:, -1].reshape(2, 2)
+        np.testing.assert_allclose(K[0], R_inv @ B.T @ S, rtol=1e-6)
+
+    def test_block_interpolates_and_holds_the_end_point(self):
+        reference = self.sinusoid(tf=1.0, n=3)  # samples at t = 0, 0.5, 1
+        K = np.zeros((3, 1, 2))
+        K[:, 0, 0] = [1.0, 2.0, 3.0]
+        ctl = TrajectoryFeedbackController(reference, K)
+        x = reference.x[:, 1]  # on the reference at t = 0.5: only the feedforward acts
+        np.testing.assert_allclose(ctl.ctl(None, x, t=0.5), reference.u[:, 1])
+        x = reference.x[:, 2] + np.array(
+            [1.0, 0.0]
+        )  # one unit off the end point, past t_f
+        expected = reference.u[:, 2] - K[2] @ np.array([1.0, 0.0])
+        np.testing.assert_allclose(ctl.ctl(None, x, t=4.0), expected)
+        # between two samples, reference and gain are interpolated linearly
+        x_mid = (reference.x[:, 0] + reference.x[:, 1]) / 2.0
+        u_mid = (reference.u[:, 0] + reference.u[:, 1]) / 2.0
+        np.testing.assert_allclose(ctl.ctl(None, x_mid, t=0.25), u_mid)
+
+
+class TestFiniteHorizonLQR(unittest.TestCase):
+    A = np.array([[0.0, 1.0], [0.0, 0.0]])
+    B = np.array([[0.0], [1.0]])
+    Q = np.eye(2)
+    R = np.array([[1.0]])
+
+    def test_schedule_starts_at_the_terminal_weight(self):
+        S_f = np.diag([3.0, 2.0])
+        t, K, S = lqr_gain_schedule(self.A, self.B, self.Q, self.R, S_f, tf=2.0)
+        self.assertEqual(K.shape, (1001, 1, 2))
+        np.testing.assert_allclose(t[[0, -1]], [0.0, 2.0])
+        np.testing.assert_allclose(S[-1], S_f)
+        np.testing.assert_allclose(K[-1], np.linalg.solve(self.R, self.B.T @ S_f))
+
+    def test_long_horizon_recovers_the_stationary_gain(self):
+        _, K, _ = lqr_gain_schedule(
+            self.A, self.B, self.Q, self.R, np.zeros((2, 2)), tf=30.0
+        )
+        np.testing.assert_allclose(
+            K[0], lqr_gain(self.A, self.B, self.Q, self.R), atol=1e-6
+        )
+
+    def test_schedule_matches_the_riccati_equation(self):
+        t, _, S = lqr_gain_schedule(
+            self.A, self.B, self.Q, self.R, np.diag([1.0, 2.0]), tf=3.0, n_steps=3001
+        )
+        R_inv = np.linalg.inv(self.R)
+        A, B, Q = self.A, self.B, self.Q
+        # central difference of S against the right-hand side, at an interior sample
+        k = 1500
+        dS_dt = (S[k + 1] - S[k - 1]) / (t[k + 1] - t[k - 1])
+        rhs = -(S[k] @ A + A.T @ S[k] - S[k] @ B @ R_inv @ B.T @ S[k] + Q)
+        np.testing.assert_allclose(dS_dt, rhs, atol=1e-5)
+        np.testing.assert_allclose(S, np.swapaxes(S, 1, 2))  # symmetric throughout
+
+    def test_scheduled_gain_interpolates_and_holds(self):
+        t = np.array([0.0, 1.0, 2.0])
+        K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
+        ctl = TimeVaryingStateFeedbackController(t, K)
+        z = np.array([1.0, 0.0, 0.0, 0.0])  # x = [1, 0], r = 0
+        np.testing.assert_allclose(ctl.ctl(None, z, t=-1.0), [-1.0])
+        np.testing.assert_allclose(ctl.ctl(None, z, t=0.0), [-1.0])
+        np.testing.assert_allclose(ctl.ctl(None, z, t=1.5), [-2.5])
+        np.testing.assert_allclose(ctl.ctl(None, z, t=9.0), [-3.0])
+        stationary = TimeVaryingStateFeedbackController(t, K, K_after=[[7.0, 0.0]])
+        np.testing.assert_allclose(stationary.ctl(None, z, t=2.0), [-3.0])
+        np.testing.assert_allclose(stationary.ctl(None, z, t=2.5), [-7.0])
+
+    def test_gain_schedule_plot_draws_every_entry(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        ctl = lqr_finite_horizon(
+            self.A, self.B, self.Q, self.R, S_f=np.zeros((2, 2)), tf=1.0
+        )
+        ax = ctl.plot_gain_schedule(show=False)
+        self.assertEqual(len(ax.lines), 2)  # one line per entry of the 1 x 2 gain
+
+    def test_finite_horizon_after_stationary_keeps_regulating(self):
+        ctl = lqr_finite_horizon(
+            self.A,
+            self.B,
+            self.Q,
+            self.R,
+            S_f=np.zeros((2, 2)),
+            tf=2.0,
+            after="stationary",
+        )
+        z = np.array([1.0, 0.0, 0.0, 0.0])
+        np.testing.assert_allclose(ctl.ctl(None, z, t=2.0), [0.0], atol=1e-12)
+        np.testing.assert_allclose(
+            ctl.ctl(None, z, t=5.0),
+            -lqr_gain(self.A, self.B, self.Q, self.R) @ [1.0, 0.0],
+        )
+
+    def test_finite_horizon_loop_reaches_the_target(self):
+        ctl = lqr_finite_horizon(
+            self.A, self.B, self.Q, self.R, S_f=20.0 * np.eye(2), tf=5.0
+        )
+        plant = DoubleIntegrator()
+        plant.x0 = np.array([1.0, 0.0])
+        loop = ctl @ plant
+        traj = loop.compute_trajectory(tf=5.0, n_steps=501, verbose=False)
+        np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.02)
 
 
 class TestProportionalController(unittest.TestCase):

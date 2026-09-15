@@ -43,6 +43,14 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.control.state",
         "StateFeedbackController",
     ),
+    "TimeVaryingStateFeedbackController": (
+        "minilink.control.state",
+        "TimeVaryingStateFeedbackController",
+    ),
+    "TrajectoryFeedbackController": (
+        "minilink.control.state",
+        "TrajectoryFeedbackController",
+    ),
     "TaskImpedance": ("minilink.control.robotic", "TaskImpedance"),
     "TaskKinematic": ("minilink.control.robotic", "TaskKinematic"),
     "TaskKinematicNullspace": (

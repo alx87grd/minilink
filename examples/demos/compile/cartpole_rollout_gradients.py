@@ -4,7 +4,6 @@
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink import CartPole, Trajectory
@@ -60,26 +59,12 @@ def task_cost(x_final, u_seq):
 
 
 def print_result(tag, x_final, u_seq, p_vec, J):
-    u_np = np.asarray(u_seq)
-    print(f"J({tag})               = {J:.3e}")
-    print(f"target  final θ     : {theta_target:.3f} rad  (π = upright)")
-    print(f"reached final θ     : {float(x_final[1]):.3f} rad")
-    print(f"angle error         : {float(x_final[1]) - theta_target:+.3e} rad")
+    u_rms = float(np.sqrt(np.mean(np.asarray(u_seq) ** 2)))
+    p = np.asarray(p_vec)
     print(
-        f"final state x_N     : "
-        f"x={float(x_final[0]):+.3f} m, "
-        f"θ={float(x_final[1]):+.3f} rad, "
-        f"dx={float(x_final[2]):+.3f}, "
-        f"dθ={float(x_final[3]):+.3f}"
-    )
-    print(
-        f"u*  min / max / rms : "
-        f"{u_np.min():+.3f} / {u_np.max():+.3f} / "
-        f"{np.sqrt(np.mean(u_np**2)):.3f} N"
-    )
-    print(
-        f"params (lcg, m1, m2): "
-        f"{float(p_vec[0]):.3f} m, {float(p_vec[1]):.3f} kg, {float(p_vec[2]):.3f} kg"
+        f"{tag}:  J = {J:.3e}   theta_N = {float(x_final[1]):.3f} "
+        f"(target {theta_target:.3f})   u_rms = {u_rms:.3f} N   "
+        f"p = (lcg {p[0]:.3f} m, m1 {p[1]:.3f} kg, m2 {p[2]:.3f} kg)"
     )
 
 
@@ -113,9 +98,6 @@ def pump_init():
 # ---------------------------------------------------------------------------
 # (a) Optimize U only — physics fixed at catalog nominal
 # ---------------------------------------------------------------------------
-print("=" * 70)
-print("(a) Optimize U only — full swing-up (physics fixed at nominal p)")
-print("=" * 70)
 
 
 def cost_u(u_seq):
@@ -131,30 +113,13 @@ for lr in (0.4, 0.2, 0.1, 0.05):
         u_a = jnp.clip(u_a - lr * g, -u_bound, u_bound)
 
 x_final_a, traj_a = rollout(u_a, p_nom)
-traj_a = np.asarray(traj_a)
-u_a_np = np.asarray(u_a)
-t = dt * np.arange(H)
 J_a = float(cost_u(u_a))
-print_result("U*", x_final_a, u_a, p_nom, J_a)
+print_result("(a) U-only", x_final_a, u_a, p_nom, J_a)
 
-fig, ax = plt.subplots(1, 2, figsize=(10, 3.2))
-ax[0].plot(t, traj_a[:, 0], label=r"$x(t)$ [m]")
-ax[0].plot(t, traj_a[:, 1], label=r"$\theta(t)$ [rad]")
-ax[0].axhline(theta_target, ls="--", color="k", lw=0.8, label=r"$\theta^\star=\pi$")
-ax[0].set_xlabel("time [s]")
-ax[0].set_title("(a) U-only swing-up trajectory")
-ax[0].legend()
-ax[1].step(t, u_a_np, where="post", color="C1", label=r"$U^\star$ (a)")
-ax[1].axhline(0.0, color="k", lw=0.5)
-ax[1].set_xlabel("time [s]")
-ax[1].set_ylabel("force [N]")
-ax[1].set_title(r"(a) optimized force sequence")
-ax[1].legend()
-fig.tight_layout()
-plt.show()
-
+# The rollout as a minilink Trajectory: the catalog plant plots and animates it
 traj_a_ml = make_trajectory(x0, traj_a, u_a, dt)
 sys_a = plant_from_params(p_nom, "CartPole (a) U-only")
+sys_a.plot_trajectory(traj_a_ml)
 if ANIMATE:
     sys_a.animate(traj_a_ml)
 
@@ -162,10 +127,6 @@ if ANIMATE:
 # ---------------------------------------------------------------------------
 # (b) Co-optimize U and (lcg, m1, m2)
 # ---------------------------------------------------------------------------
-print()
-print("=" * 70)
-print("(b) Co-optimize U and params (lcg, m1, m2) — full swing-up")
-print("=" * 70)
 
 
 def cost_co(decision):
@@ -185,64 +146,12 @@ for lr_u, lr_p in ((0.4, 0.03), (0.2, 0.015), (0.1, 0.008), (0.05, 0.003)):
         p_b = jnp.clip(p_b - lr_p * g_p, p_lo, p_hi)
 
 x_final_b, traj_b = rollout(u_b, p_b)
-traj_b = np.asarray(traj_b)
-u_b_np = np.asarray(u_b)
 J_b = float(cost_co((u_b, p_b)))
-J_b_task = float(task_cost(x_final_b, u_b))
-print_result("U*,p*", x_final_b, u_b, p_b, J_b)
-print(f"task cost (no reg)  : {J_b_task:.3e}")
-print(
-    f"Δparams vs nominal  : "
-    f"Δlcg={float(p_b[0] - p_nom[0]):+.3f} m, "
-    f"Δm1={float(p_b[1] - p_nom[1]):+.3f} kg, "
-    f"Δm2={float(p_b[2] - p_nom[2]):+.3f} kg"
-)
-
-fig, ax = plt.subplots(1, 3, figsize=(12, 3.2))
-ax[0].plot(t, traj_a[:, 1], ls=":", color="C0", label=r"(a) $\theta(t)$")
-ax[0].plot(t, traj_b[:, 1], color="C0", label=r"(b) $\theta(t)$")
-ax[0].axhline(theta_target, ls="--", color="k", lw=0.8, label=r"$\theta^\star=\pi$")
-ax[0].set_xlabel("time [s]")
-ax[0].set_ylabel("theta [rad]")
-ax[0].set_title("(a) vs (b) pole angle")
-ax[0].legend()
-ax[1].step(t, u_a_np, where="post", ls=":", color="C1", label=r"(a) $U^\star$")
-ax[1].step(t, u_b_np, where="post", color="C1", label=r"(b) $U^\star$")
-ax[1].axhline(0.0, color="k", lw=0.5)
-ax[1].set_xlabel("time [s]")
-ax[1].set_ylabel("force [N]")
-ax[1].set_title("(a) vs (b) force sequence")
-ax[1].legend()
-labels = [r"$\ell_{\mathrm{cg}}$", r"$m_1$", r"$m_2$"]
-x_bar = np.arange(3)
-ax[2].bar(x_bar - 0.15, np.asarray(p_nom), width=0.3, label="nominal", color="0.7")
-ax[2].bar(x_bar + 0.15, np.asarray(p_b), width=0.3, label=r"$p^\star$ (b)", color="C2")
-ax[2].set_xticks(x_bar, labels)
-ax[2].set_title("(b) co-designed params")
-ax[2].legend()
-fig.tight_layout()
-plt.show()
+print_result("(b) co-opt", x_final_b, u_b, p_b, J_b)
+print(f"(b) task cost without the regularizer: {float(task_cost(x_final_b, u_b)):.3e}")
 
 traj_b_ml = make_trajectory(x0, traj_b, u_b, dt)
 sys_b = plant_from_params(p_b, "CartPole (b) co-opt")
+sys_b.plot_trajectory(traj_b_ml)
 if ANIMATE:
     sys_b.animate(traj_b_ml)
-
-# Side-by-side summary
-print()
-print("=" * 70)
-print("Comparison (same full swing-up task)")
-print("=" * 70)
-print(f"{'':22} {'(a) U-only':>14} {'(b) co-opt':>14}")
-print(f"{'J':22} {J_a:14.3e} {J_b:14.3e}")
-print(f"{'task cost':22} {J_a:14.3e} {J_b_task:14.3e}")
-print(
-    f"{'u rms [N]':22} "
-    f"{np.sqrt(np.mean(u_a_np**2)):14.3f} "
-    f"{np.sqrt(np.mean(u_b_np**2)):14.3f}"
-)
-print(
-    f"{'|θ_N - π| [rad]':22} "
-    f"{abs(float(x_final_a[1]) - theta_target):14.3e} "
-    f"{abs(float(x_final_b[1]) - theta_target):14.3e}"
-)

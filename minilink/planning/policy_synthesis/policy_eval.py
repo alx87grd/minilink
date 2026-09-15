@@ -77,6 +77,18 @@ class PolicyEvaluator:
         self.last_J = J
         return J
 
+    def value_at(self, x) -> float:
+        """Interpolate the policy's cost-to-go at an arbitrary state ``x``."""
+        if self.last_J is None:
+            raise ValueError("call solve() before value_at()")
+        return float(self.grid.interpolate(self.last_J, np.atleast_2d(x))[0])
+
+    def plot_cost2go(self, **kwargs):
+        """Draw the policy's cost-to-go field; options as in :meth:`StateSpaceGrid.plot_value`."""
+        if self.last_J is None:
+            raise ValueError("call solve() before plot_cost2go()")
+        return self.grid.plot_value(self.last_J, **kwargs)
+
     # Internal machinery
 
     def _policy_transition(self, t):

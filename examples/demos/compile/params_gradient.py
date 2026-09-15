@@ -61,10 +61,7 @@ class TraceableImpedanceController(System):
         return xp.array([tau])
 
 
-# Part 1: leaf sensitivity ∂f/∂params, exact vs finite differences
-print("=" * 70)
-print("Part 1 — leaf pendulum: jacobian('f', 'params') exact vs finite differences")
-print("=" * 70)
+# Part 1: leaf sensitivity df/dparams, exact (autodiff) vs finite differences
 
 plant = TraceablePendulum()
 x = np.array([0.8, -0.3])
@@ -79,11 +76,7 @@ for key in plant.params:
     print(f"{key:>10} {exact[key][1]:>22.6f} {fd[key][1]:>22.6f}")
 print("Finite-difference check passed.")
 
-# Part 2: closed-loop diagram, identify plant params from data
-print()
-print("=" * 70)
-print("Part 2 — closed loop: identify gravity and damping by equation error")
-print("=" * 70)
+# Part 2: closed-loop diagram, identify gravity and damping by equation error
 
 diagram = DiagramSystem()
 diagram.connection_verbose = False

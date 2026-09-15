@@ -72,6 +72,9 @@ print("Monte Carlo over the task's starts:", report)
 plant.x0 = np.array([0.0, 0.05, 0.0, 0.0])  # hanging, a tiny tip
 cl_sys = ppo_ctl @ plant
 cl_sys.name = "Cart-pole with the learned law"
+cl_sys.plot_diagram()
+
+
 traj = cl_sys.compute_trajectory(tf=10.0, dt=0.01)
 cl_sys.plot_trajectory(traj)
 angle_error = np.abs(np.mod(traj.x[1], 2 * np.pi) - np.pi)
