@@ -528,6 +528,27 @@ class StateSpaceGrid:
                 out[i, j] = grid_nd[tuple(index)]
         return out
 
+    # Plotting
+
+    def plot_value(self, values, *, show_3d=False, **kwargs):
+        """
+        Draw a node-indexed field on this grid: a heatmap, or a surface with ``show_3d``.
+
+        ``values`` has shape ``(nodes_n,)`` — a cost-to-go, a policy's value, a
+        fitted approximation. Options (``axes``, ``anchor``, ``vmin``, ``vmax``,
+        ``title``, ``show``) are those of
+        :func:`~minilink.planning.policy_synthesis.plotting.plot_value`.
+        """
+        from minilink.planning.policy_synthesis import plotting
+
+        values = np.asarray(values, dtype=float)
+        if show_3d:
+            vmin, vmax = kwargs.pop("vmin", None), kwargs.pop("vmax", None)
+            if vmin is not None or vmax is not None:
+                values = np.clip(values, vmin, vmax)
+            return plotting.plot_value_3d(self, values, **kwargs)
+        return plotting.plot_value(self, values, **kwargs)
+
     # Persistence
 
     def save(self, path: str) -> None:

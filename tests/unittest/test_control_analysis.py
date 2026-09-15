@@ -6,7 +6,13 @@ import pytest
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.analysis.linearize import linearize, linearize_matrices
 from minilink.analysis.structural import controllability, observability
-from minilink.control.lqr import lqr, lqr_at_operating_point, lqr_gain
+from minilink.control.lqr import (
+    lqr,
+    lqr_at_operating_point,
+    lqr_finite_horizon,
+    lqr_gain,
+    lqr_gain_schedule,
+)
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
@@ -246,8 +252,53 @@ class TestLQR(unittest.TestCase):
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
 from minilink.control.output import ProportionalController
 from minilink.control.siso import PD, PI, PID
-from minilink.control.state import StateFeedbackController
+from minilink.control.state import (
+    StateFeedbackController,
+    TimeVaryingStateFeedbackController,
+)
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
+
+
+class TestFiniteHorizonLQR(unittest.TestCase):
+    A = np.array([[0.0, 1.0], [0.0, 0.0]])
+    B = np.array([[0.0], [1.0]])
+    Q = np.eye(2)
+    R = np.array([[1.0]])
+
+    def test_schedule_starts_at_the_terminal_weight(self):
+        S_f = np.diag([3.0, 2.0])
+        t, K, S = lqr_gain_schedule(self.A, self.B, self.Q, self.R, S_f, tf=2.0)
+        self.assertEqual(K.shape, (1001, 1, 2))
+        np.testing.assert_allclose(t[[0, -1]], [0.0, 2.0])
+        np.testing.assert_allclose(S[-1], S_f)
+        np.testing.assert_allclose(K[-1], np.linalg.solve(self.R, self.B.T @ S_f))
+
+    def test_long_horizon_recovers_the_stationary_gain(self):
+        _, K, _ = lqr_gain_schedule(
+            self.A, self.B, self.Q, self.R, np.zeros((2, 2)), tf=30.0
+        )
+        np.testing.assert_allclose(
+            K[0], lqr_gain(self.A, self.B, self.Q, self.R), atol=1e-6
+        )
+
+    def test_scheduled_gain_holds_the_last_sample(self):
+        t = np.array([0.0, 1.0, 2.0])
+        K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
+        ctl = TimeVaryingStateFeedbackController(t, K)
+        z = np.array([1.0, 0.0, 0.0, 0.0])  # x = [1, 0], r = 0
+        np.testing.assert_allclose(ctl.ctl(None, z, t=0.0), [-1.0])
+        np.testing.assert_allclose(ctl.ctl(None, z, t=1.5), [-2.0])
+        np.testing.assert_allclose(ctl.ctl(None, z, t=9.0), [-3.0])
+
+    def test_finite_horizon_loop_reaches_the_target(self):
+        ctl = lqr_finite_horizon(
+            self.A, self.B, self.Q, self.R, S_f=20.0 * np.eye(2), tf=5.0
+        )
+        plant = DoubleIntegrator()
+        plant.x0 = np.array([1.0, 0.0])
+        loop = ctl @ plant
+        traj = loop.compute_trajectory(tf=5.0, n_steps=501, verbose=False)
+        np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.02)
 
 
 class TestProportionalController(unittest.TestCase):

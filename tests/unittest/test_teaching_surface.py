@@ -70,6 +70,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
     "minilink.control": (
         "ProportionalController",
         "StateFeedbackController",
+        "TimeVaryingStateFeedbackController",
         "PID",
         "PI",
         "PD",
@@ -109,6 +110,9 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "DynamicProgrammingPlanner",
         "LookupTableController",
         "PolicyEvaluator",
+        "QuadraticFeatures",
+        "RadialBasisFeatures",
+        "LinearApproximator",
         "RRTPlanner",
         "RRTStarPlanner",
         "RRTOptions",
@@ -121,6 +125,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
 TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.lqr", "lqr"),
     ("minilink.control.lqr", "lqr_at_operating_point"),
+    ("minilink.control.lqr", "lqr_finite_horizon"),
     ("minilink.analysis.linearize", "linearize"),
     ("minilink.analysis.discretize", "discretize"),
 )

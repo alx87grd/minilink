@@ -9,14 +9,23 @@ optimal gain, and ``lqr`` wraps it as a ready-to-wire
 :func:`~minilink.analysis.linearize.linearize_matrices`, lazy-imported) and
 returns the trimmed controller in one step.
 
+``lqr_gain_schedule`` integrates the Riccati differential equation backward
+over a finite horizon and ``lqr_finite_horizon`` wraps the resulting gain
+schedule ``K(t)`` as a
+:class:`~minilink.control.state.TimeVaryingStateFeedbackController`.
+
 For matrix-only design, pass Jacobians from any source into ``lqr_gain`` /
 ``lqr`` directly.
 """
 
 import numpy as np
+from scipy.integrate import solve_ivp
 from scipy.linalg import solve_continuous_are
 
-from minilink.control.state import StateFeedbackController
+from minilink.control.state import (
+    StateFeedbackController,
+    TimeVaryingStateFeedbackController,
+)
 
 
 def lqr_gain(A, B, Q, R):
@@ -93,6 +102,55 @@ def lqr_at_operating_point(
     A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, method=method, eps=eps)
     B = jacobian(sys, "f", "u", x_bar, u_bar, t, params, method=method, eps=eps)
     return lqr(A, B, Q, R, xbar=x_bar, ubar=u_bar)
+
+
+def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
+    """Return ``(t, K, S)``: the finite-horizon gain ``K(t)`` and Riccati matrix ``S(t)``.
+
+    Integrates the Riccati differential equation backward from the terminal
+    weight ``S(t_f) = S_f``,
+
+        -dS/dt = SA + AᵀS - SBR⁻¹BᵀS + Q,
+
+    and returns ``K(t) = R⁻¹BᵀS(t)`` for the law ``u = -K(t) x``. ``t`` holds
+    ``n_steps`` samples from ``0`` to ``tf``; ``K`` has shape ``(n_steps, m, n)``
+    and ``S`` shape ``(n_steps, n, n)``.
+    """
+    A = np.asarray(A, dtype=float)
+    B = np.atleast_2d(np.asarray(B, dtype=float))
+    Q = np.asarray(Q, dtype=float)
+    R = np.atleast_2d(np.asarray(R, dtype=float))
+    S_f = np.asarray(S_f, dtype=float)
+    n = A.shape[0]
+    R_inv = np.linalg.inv(R)
+
+    # Riccati equation in time-to-go tau = tf - t, integrated forward from S_f
+    def riccati(tau, s):
+        S = s.reshape(n, n)
+        dS = S @ A + A.T @ S - S @ B @ R_inv @ B.T @ S + Q
+        return dS.ravel()
+
+    tau = np.linspace(0.0, float(tf), int(n_steps))
+    solution = solve_ivp(
+        riccati, (0.0, float(tf)), S_f.ravel(), t_eval=tau, rtol=1e-8, atol=1e-10
+    )
+
+    # back to forward time t = tf - tau, increasing
+    t = float(tf) - tau[::-1]
+    S = solution.y.T.reshape(-1, n, n)[::-1]
+    K = R_inv @ B.T @ S
+    return t, K, S
+
+
+def lqr_finite_horizon(A, B, Q, R, S_f, tf, *, n_steps=1001, xbar=None, ubar=None):
+    """Design a finite-horizon LQR and return a ``TimeVaryingStateFeedbackController``.
+
+    The block implements ``u = ubar - K(t) (x - r)`` with ``K(t)`` from
+    :func:`lqr_gain_schedule`, minimizing
+    ``∫₀^tf xᵀQx + uᵀRu dt + x(tf)ᵀ S_f x(tf)`` for the linear model.
+    """
+    t, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+    return TimeVaryingStateFeedbackController(t, K, xbar=xbar, ubar=ubar)
 
 
 if __name__ == "__main__":

@@ -69,3 +69,9 @@ Policy synthesis
 
 .. automodule:: minilink.planning.policy_synthesis.dp
    :members:
+
+.. automodule:: minilink.planning.policy_synthesis.policy_eval
+   :members:
+
+.. automodule:: minilink.planning.policy_synthesis.approximation
+   :members:

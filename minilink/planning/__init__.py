@@ -4,6 +4,7 @@ Band facade for short teaching imports::
 
     from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
     from minilink.planning import StateSpaceGrid, DynamicProgrammingPlanner
+    from minilink.planning import QuadraticFeatures, LinearApproximator
 
 Defining modules stay importable (``minilink.planning.problems``, ...).
 """
@@ -58,6 +59,19 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PolicyEvaluator": (
         "minilink.planning.policy_synthesis.policy_eval",
         "PolicyEvaluator",
+    ),
+    # function approximation (cost-to-go fits, approximate dynamic programming)
+    "QuadraticFeatures": (
+        "minilink.planning.policy_synthesis.approximation",
+        "QuadraticFeatures",
+    ),
+    "RadialBasisFeatures": (
+        "minilink.planning.policy_synthesis.approximation",
+        "RadialBasisFeatures",
+    ),
+    "LinearApproximator": (
+        "minilink.planning.policy_synthesis.approximation",
+        "LinearApproximator",
     ),
     # reinforcement learning (policy synthesis) and Monte Carlo evaluation
     "ReinforcementLearningPlanner": (

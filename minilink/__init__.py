@@ -65,6 +65,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "SlidingModeController": ("minilink.control.modelbased", "SlidingModeController"),
     "lqr": ("minilink.control.lqr", "lqr"),
     "lqr_at_operating_point": ("minilink.control.lqr", "lqr_at_operating_point"),
+    "lqr_finite_horizon": ("minilink.control.lqr", "lqr_finite_horizon"),
+    "TimeVaryingStateFeedbackController": (
+        "minilink.control.state",
+        "TimeVaryingStateFeedbackController",
+    ),
     # analysis
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
     "linearize": ("minilink.analysis.linearize", "linearize"),
@@ -105,6 +110,18 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "LookupTableController": (
         "minilink.planning.policy_synthesis.lookup_policy",
         "LookupTableController",
+    ),
+    "QuadraticFeatures": (
+        "minilink.planning.policy_synthesis.approximation",
+        "QuadraticFeatures",
+    ),
+    "RadialBasisFeatures": (
+        "minilink.planning.policy_synthesis.approximation",
+        "RadialBasisFeatures",
+    ),
+    "LinearApproximator": (
+        "minilink.planning.policy_synthesis.approximation",
+        "LinearApproximator",
     ),
     "PolicyEvaluator": (
         "minilink.planning.policy_synthesis.policy_eval",

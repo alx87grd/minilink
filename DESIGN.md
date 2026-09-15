@@ -557,7 +557,7 @@ declaration only unlocks the smart tools.
 | `error` | `output.py` | `y` (error-driven, `u = c(r - y)`) | error `e = r − y` |
 | `output` | (reserved) | `y` used absolutely, `u = c(y, r)` (learned policies) | measurement, `r` pinned |
 | `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane |
-| `state` | `state.py` | full state `x` | `(x0, x1)` |
+| `state` | `state.py` | full state `x`; constant gain `K` (`StateFeedbackController`, what `lqr` returns) or a gain schedule `K(t)` held between samples (`TimeVaryingStateFeedbackController`, what `lqr_finite_horizon` returns) | `(x0, x1)` |
 | `siso` | `siso.py` | `y` dim `n` only (decoupled loops) | error per axis |
 | `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute |
 | `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement |
@@ -955,7 +955,15 @@ successor table for per-sweep recomputation (memory vs time-varying support). Pl
 `DynamicProgrammingPlanner` (`plot_cost2go`, `plot_policy`, `animate_*`, `get_controller`) and
 in `planning/policy_synthesis/plotting.py` for loaded results (`plotting.get_controller(result)`).
 `get_controller()` returns a `LookupTableController` (a static `System`, so `controller >> plant` simulates);
-`PolicyEvaluator` gives the cost-to-go of any fixed law. Benchmark: `benchmarks/run_dp_backends.py`.
+`PolicyEvaluator` gives the cost-to-go of any fixed law (`value_at`, `plot_cost2go`), and
+`StateSpaceGrid.plot_value` draws any node-indexed field. **Function approximation**
+(`policy_synthesis/approximation.py`): linear-in-the-weights fits `f_hat(x | w) = wᵀφ(x)` with fixed
+features — `QuadraticFeatures(xbar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads
+`(c, b, S)` back) and `RadialBasisFeatures` (Gaussian bumps, `on_grid` for a mesh of centres),
+stacked with `+` — and a `LinearApproximator` that fits by least squares (`fit`) or one
+stochastic-gradient step per sample (`sgd_step`). It is the seed of approximate dynamic
+programming: fit a cost-to-go from value iteration, or learn one online. Benchmark:
+`benchmarks/run_dp_backends.py`.
 
 **Spatial scene** (`planning/spatial/`): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
