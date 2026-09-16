@@ -26,7 +26,6 @@ OTHER_TOOLS = re.compile(r"simulink|matlab|drake|casadi|mujoco", re.IGNORECASE)
 
 PROSE_FILES = (
     "README.md",
-    "docs/pitch/slides.html",
     "docs/index.rst",
 )
 PROSE_NOTEBOOKS = (

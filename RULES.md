@@ -353,13 +353,13 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **6.8 Demo-gate maturity.** Nothing enters the teaching surface without a demo or notebook,
   a both-backends test where it defines dynamics, and a docstring (ROADMAP.md §2).
 - **6.9 Public-facing prose is foundational, not a bake-off.** README, the three showcases,
-  `docs/pitch/`, and the docs landing page stay positive about minilink and never name
+  and the docs landing page stay positive about minilink and never name
   other tools. Framing: minilink bridges capabilities that usually live in separate tools.
   No superlatives; quote measured notebook batches, never a per-call speedup. The main
   line is readable by an undergraduate; expert depth sits in short "under the hood"
-  asides. The README does not link the pitch deck for now. GIF assets stay under 1 MB
+  asides. GIF assets stay under 1 MB
   and use catalog plant framing (the MPC clip may follow the car). Before pushing those
-  files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README, the slides, and the
+  files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README and the
   showcase notebook markdown must be empty (the `-E` matters: without it the alternation is
   literal and the gate passes on anything). `test_repo_contract.py` runs the same check.
 - **6.10 Flat demos.** No functions or classes in a demo or a teaching notebook except the

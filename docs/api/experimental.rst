@@ -1,7 +1,8 @@
 Experimental
 ============
 
-These modules are intentionally low maturity; see the TRL table in the roadmap.
+These modules are intentionally low maturity; see the TRL table in
+`ROADMAP.md <https://github.com/alx87grd/minilink/blob/main/ROADMAP.md>`_.
 
 .. automodule:: minilink.experimental.engines.contact_jax
    :members:
