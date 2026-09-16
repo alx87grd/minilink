@@ -44,7 +44,7 @@ Keep DESIGN.md call chains minimal.
 
 **Do directly:** typos and stale docs; docstrings/types in files you are already changing for the task; small cleanups that directly support the requested change.
 
-**Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals).
+**Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals). Do not rename or move anything under `examples/teaching/courses/` without the course notes and webpage in the same change.
 
 **Ask first (maintainer-owned):** anything student-facing (`README.md`,
 `examples/`, notebooks, ROADMAP §1, §2 and §4, public names); **core

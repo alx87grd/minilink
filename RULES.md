@@ -123,7 +123,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   - **Teaching:** standalone. Zero hrefs to other notebooks, demos, tutorials, or
     library source. Keep Colab self-badge, `git clone`, and external library docs
     (Gymnasium, SB3). A repo-root `[minilink](https://github.com/alx87grd/minilink)`
-    link may stay.
+    link may stay. `teaching/topics/` is the textbook; `teaching/courses/<id>/`
+    is a live homework pin (names in `examples/README.md`).
   - **Demos / projects:** no markdown links to notebooks. Comment twins
     (`# Teaching twin: …`) stay unless the maintainer asks to drop them.
 
@@ -372,15 +373,15 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **6.12 Cheap rules are tests.** When a rule can be checked by an AST walk or a grep, the
   check lands with the rule (`test_teaching_imports.py`, `test_repo_contract.py`, the
   set-probe and flat-demo checks).
-- **6.13 `print` is rare; a teaching cell stays readable.** A demo or notebook cell is the
-  API sequence, then a native plot or `animate`. `print` is not how the student is shown
-  what happened. Use it only when the number is the lesson *and* no `__str__`, `plot_*`, or
-  `animate` already shows it. Then print the object (`print(solution)`, `print(report)`), or
-  in a notebook leave the value as the last expression (`np.linalg.eigvals(lin.A())`,
-  `problem.sample_x0(0, n=3)`). Markdown already explains; do not restate it in an f-string,
-  and do not add a cell whose only job is a diagnostic dump. Never bury arithmetic,
-  formatting, or a second construction inside `print` — that line is what the student
-  reads, and it must stay a library verb.
+- **6.13 `print` is rare; a teaching cell stays readable.** A demo *script* is the API
+  sequence, then a native plot or `animate`. A notebook splits that (6.14). `print` is
+  not how the student is shown what happened. Use it only when the number is the lesson
+  *and* no `__str__`, `plot_*`, or `animate` already shows it. Then print the object
+  (`print(solution)`, `print(report)`), or in a notebook leave the value as the last
+  expression (`np.linalg.eigvals(lin.A())`, `problem.sample_x0(0, n=3)`). Markdown
+  already explains; do not restate it in an f-string, and do not add a cell whose only
+  job is a diagnostic dump. Never bury arithmetic, formatting, or a second construction
+  inside `print` — that line is what the student reads, and it must stay a library verb.
   ```python
   # Bad — unreadable; the cell is a log, not the API:
   print(f"planner.gamma = {planner.gamma}: a horizon of {DT / -np.log(planner.gamma):.1f} s")
@@ -396,6 +397,15 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   print(report)
   np.linalg.eigvals(lin.A())
   ```
+- **6.14 One figure per notebook cell.** In a teaching or tutorial notebook, a call that
+  draws (`plot_*`, `animate`, `plot_diagram`, `plot_tree`, `scene.plot`, ...) is the only
+  statement in that cell. Setup, `solve`, and `compute_trajectory` stay in the cell
+  above; the figure cell is one library verb. Two slices
+  (`plot_control_law(..., u_axis=0)` then `u_axis=1`) are two cells. Jupyter displays
+  one figure per cell: a later `plot_*` in the same cell hides, races, or drops an
+  overlay (`show=False` then `plt.show()`, stacked `animate`). A script may still plot
+  after the API in one file. Apply this when writing or editing a notebook; do not
+  restyle an existing dense notebook unless asked.
 
 ---
 

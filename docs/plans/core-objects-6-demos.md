@@ -20,5 +20,5 @@ The census behind the rule: docs/reviews/2026-09-15-foundations-review.md, comme
   the tutorial chapters (`11_reinforcement_learning.ipynb` and `showcase_jax.ipynb` first),
   then the 20 non-clean demos, then the teaching notebooks; the three `compile/` demos wait for
   the differentiable closed-loop cost (their helpers *are* that feature);
-  `articulated_robot_eom.ipynb` is reviewed for which of its 26 helpers the text teaches. Done
+  `manipulator_eom.ipynb` is reviewed for which of its 26 helpers the text teaches. Done
   when the allowlist of 6.2 is empty and the notebook checks pass.
