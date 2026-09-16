@@ -55,10 +55,9 @@ class Source(System):
             (same policy as
             :func:`minilink.graphical.signals.plot_time_signals`);
             if an axis is passed, the caller controls display.
-
-        TODO: fold this into a generic signal-plotting interface in
-        :mod:`minilink.graphical` instead of bespoke matplotlib code here.
         """
+        # TODO: fold this into a generic signal-plotting interface in
+        # minilink.graphical instead of bespoke matplotlib code here.
         import matplotlib.pyplot as plt
 
         from minilink.graphical.common.environment import (
