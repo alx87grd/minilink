@@ -4,16 +4,17 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)
 [![Notebooks](https://img.shields.io/badge/notebooks-examples%2Ftutorial-F37626?logo=jupyter&logoColor=white)](https://github.com/alx87grd/minilink/tree/main/examples/tutorial)
+[![PyPI](https://img.shields.io/pypi/v/minilink)](https://pypi.org/project/minilink/)
 [![API](https://img.shields.io/badge/API-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 <table>
   <tr>
     <td width="50%" align="center" valign="bottom">
-      <img src="docs/_static/cartpole_swingup.gif" alt="trajectory optimization" width="100%"/>
+      <img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/cartpole_swingup.gif" alt="trajectory optimization" width="100%"/>
     </td>
     <td width="50%" align="center" valign="bottom">
-      <img src="docs/_static/ur5_meshcat.gif" alt="task-space impedance control" width="100%"/>
+      <img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/ur5_meshcat.gif" alt="task-space impedance control" width="100%"/>
     </td>
   </tr>
   <tr>
@@ -55,7 +56,7 @@ diagram.plot_trajectory()
 diagram.animate()
 ```
 
-![closed-loop diagram](docs/_static/diagram_closed_loop.png)
+![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
 
 ## What is a System
 
@@ -114,7 +115,7 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 
 ## One model, every tool
 
-![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](docs/_static/bridges.svg)
+![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/bridges.svg)
 
 | Verb | Call |
 | --- | --- |
@@ -204,8 +205,15 @@ The boundary between the two is a contract, not a convention:
 
 ## Install
 
-Python 3.10+. Recommended: the conda environment from
-[`environment.yml`](environment.yml).
+Python 3.10+. Once the `0.1.0` tag is on PyPI:
+
+```bash
+pip install minilink
+```
+
+Until then, from a clone: `pip install -e .` at the repo root. The Full local
+stack (JAX, notebooks, 3-D, PPO) is the conda environment from
+[`environment.yml`](environment.yml):
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -213,8 +221,8 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Or open any notebook in Colab: the first cell clones the repository. Tiers
-and Colab: [install.md](install.md) (conda is the supported local install).
+Or open any notebook in Colab: the first cell clones the repository. Tiers,
+extras, and publishing a release: [install.md](install.md).
 
 ## Learn more
 

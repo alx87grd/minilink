@@ -51,9 +51,14 @@ dev = [
     "pre-commit",
     "pytest",
     "ruff",
+    "build",
+    "twine",
     "nbclient",
     "nbformat",
     "ipykernel",
+]
+full = [
+    "minilink[diagrams,visualization,plotting,symbolic,jax,rl]",
 ]
 docs = [
     "sphinx>=7",
@@ -146,6 +151,13 @@ fallback-version = "0.0.0"
 
 [tool.hatch.version.raw-options]
 git_describe_command = "git describe --dirty --tags --long --match '0.*'"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/minilink/experimental",
+    "/examples/experimental",
+    "/examples/projects",
+]
 
 [tool.hatch.build.targets.wheel]
 # Only the library ships; tests/ and benchmarks/ stay repo-only. The research

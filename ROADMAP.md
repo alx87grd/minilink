@@ -12,8 +12,8 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **0.1.0 cut**; conda from `environment.yml` is the supported install. Names the course notebooks already use stay frozen. PyPI publication is v0.2. |
-| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), the deferred v0.1 items in §5 Phase 2, and a `pip install minilink` option (conda stays the recommended local install). | Winter 2027 |
+| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **0.1.0 cut**; the `0.1.0` tag publishes the wheel from GitHub. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen. |
+| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), and the deferred v0.1 items in §5 Phase 2. Conda stays the recommended Full local install. | Winter 2027 |
 | **v1.0** | The foundation questions deferred in §6 (hybrid as a `System`, evaluator/solver layering, geometry unification), after two cohorts. | 2027 |
 
 ## 2. Two lanes
@@ -125,11 +125,14 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
    `environment.yml` both run every GRO860 notebook top to bottom.
 6. `ruff` + `pytest` + notebook smoke green; nightly full demo sweep green.
 7. No name a GRO860 notebook imports today changes during the term.
+8. Tagging `0.1.0` publishes `minilink` to PyPI from GitHub (Trusted Publishing
+   in `.github/workflows/publish.yml`). `pip install minilink` installs the
+   teaching surface; extras (`[jax]`, `[visualization]`, …) match
+   `pyproject.toml`. Conda remains the Full local stack (JAX, Ipopt, notebooks).
 
 Out of the v0.1 checklist by decision: MPC/hybrid (provisional, lesson keeps
 shipping), estimation, identification, frequency-domain tools (landed
-2026-09-07 but gated by §4.2, not by v0.1), PyPI publication (later; conda
-remains the local path).
+2026-09-07 but gated by §4.2, not by v0.1).
 
 ### 4.2 v0.2 — GRO501 end to end
 
@@ -189,9 +192,11 @@ renumbered; `c_export` nightly duplicate retired).
 
 **Status 2026-09-16:** Sphinx site is autodoc of the teaching-lane API only
 (`docs/api/`; experimental page dropped); the five-slide deck and
-`docs/roadmap.rst` are gone. The user guide is `examples/tutorial/`. Supported
-local install is conda + `PYTHONPATH`; pip files are prepared, not supported.
-C export is TRL 1.
+`docs/roadmap.rst` are gone. The user guide is `examples/tutorial/`. C export
+is TRL 1. **PyPI is a v0.1 goal:** hatch-vcs versions the wheel, the wheel
+excludes `experimental/`, and `.github/workflows/publish.yml` publishes from a
+`0.*` tag via Trusted Publishing. Conda from `environment.yml` stays the Full
+local stack.
 
 | Phase | Scope | When |
 | --- | --- | --- |
@@ -199,7 +204,7 @@ C export is TRL 1.
 | **0 — first-hour safety** | Default grid · shape validation · README example + `@` message · float64 policy · `super().__init__` guard · `verbose` flag names · nbstripout · trajopt `success` semantics. | immediately after D, ~1 agent-day |
 | **1 — teaching contract + the GRO860 path** | Teaching-surface registry + Basic-tier clean-env test · import-layer CI check · `simulation`/`planning`/`core` band facades · rewrite imports in `learn/` then `demos/` · compiled `Sys2Gym.step` · DP metadata honesty · delete `_jit` aliases and unreferenced evaluator methods · wheel excludes research lane · `c_export` flagship smoke · nightly demo sweep · branch hygiene · **consolidation inventory** (duplicated code and parallel implementations, ranked; no feature removal — see below). | weeks 2–4 of the term |
 | **2 — the JAX claim, and the research facade** | `xp` sweep of the NumPy-only catalog · both-backends contract test · retire `JaxCartPole` · four-rung vehicle ladder, `named_ports=` flag, research rungs → projects · `rollout_batch` for parameter-family sweeps · consolidation passes picked from the inventory. | rest of the term (v0.1.x) → v0.2 |
-| **3 — foundations** | Derived `x0` · geometry glyph/solid rename · `HybridLoop` or promotion · mechanical-base unification · frequency tools (native or bridge, per §6) · PyPI option · iLQR from parts (idea) · Diffrax as optional JAX solver (later) · evaluator/solver re-layering · **RL as a planner** landed (2026-09-10; R7 retired the prototype 2026-09-15 — DESIGN / this TRL table). | after the term (v0.2 → v1.0) |
+| **3 — foundations** | Derived `x0` · geometry glyph/solid rename · `HybridLoop` or promotion · mechanical-base unification · frequency tools (native or bridge, per §6) · iLQR from parts (idea) · Diffrax as optional JAX solver (later) · evaluator/solver re-layering · **RL as a planner** landed (2026-09-10; R7 retired the prototype 2026-09-15 — DESIGN / this TRL table). | after the term (v0.2 → v1.0) |
 
 **Simplify and consolidate — a standing principle, not a phase.** The repo
 must stay manageable by one maintainer, so every phase carries consolidation
@@ -231,7 +236,7 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - ~~`PID` spurious modes~~ — settled 2026-09-07: dedicated `PI` and `PD` classes carry only the states their terms need (`ProportionalController` already covered P); `PID` keeps its fixed `2n` layout so its gains stay tunable from zero. `minreal` still wanted for the general case (P2).
 - **Held (v0.2):** discrete-domain scope for GRO501 — a z-domain tier in `analysis/` (ZOH/Tustin, z-plane `pzmap`, discrete Bode) vs teaching the Arduino law with `discretize` + simulation only. Maintainer paused this 2026-09-07; default is simulation only.
 - **Open (v0.2):** the `estimation/` band (Luenberger observer, steady-state Kalman filter) — scheduled as the primary gap for the GRO501 wave (§4.2).
-- **Open (v0.2):** PyPI publication — wanted eventually as a third install option; conda stays recommended.
+- ~~**v0.1:** PyPI publication~~ — settled 2026-09-16: `pip install minilink` is a v0.1 goal. The wheel is hatch-vcs versioned, excludes the research lane, and `.github/workflows/publish.yml` uploads from a `0.*` GitHub tag (Trusted Publishing). Conda stays the recommended Full local stack. First upload is the `0.1.0` tag after a PyPI trusted publisher is registered for `alx87grd/minilink` / `publish.yml` / environment `pypi`.
 - **Open (after v0.2):** Zenodo archive and a citable DOI — tag a release, deposit it, add `CITATION.cff`. Sequenced after PyPI so a citation points at a release rather than a branch. This is also the JOSS entry ticket if that route is wanted: JOSS reviews the software against a checklist (install, docs, tests, license, contributing and issue guidelines) and requires a state-of-the-field section naming related tools — the one text that may, as a paper and not as repo prose, carry the landscape table from the 2026-09-12 editorial review. Decide the RULES 6.9 carve-out then, not before.
 - **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename. Kept as research scaffold through v0.1.
 - **Open (v1.0):** a single posed-geometry hook so "two functions" (`f` and a drawing function) is literal; today animation is `tf` plus skin geometry.

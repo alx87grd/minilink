@@ -123,7 +123,8 @@ not on that site.
 **Wheel scope.** The published package ships the teaching surface and the
 provisional planning / MPC / hybrid bands. The `experimental/` tier,
 `examples/projects/`, and
-`examples/experimental/` are repo-only (research lane).
+`examples/experimental/` are repo-only (research lane). A `0.*` GitHub tag
+publishes that wheel to PyPI (`.github/workflows/publish.yml`).
 
 ### Dependency law
 

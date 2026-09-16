@@ -6,36 +6,45 @@ A basic Python environment with NumPy, SciPy, and Matplotlib is enough for most
 of the library. Skip `plot_diagram()` (needs Graphviz) and optional plotting or
 optimization backends.
 
-**The supported local install is conda** from
-[`environment.yml`](environment.yml) (Full) or
-[`environment-basic.yml`](environment-basic.yml) (Basic), plus `PYTHONPATH` to
-the repo root. That is the path [README](README.md#install) documents and CI
-validates.
+**v0.1 publishes to PyPI.** Tagging `0.1.0` on GitHub uploads `minilink`; then
+`pip install minilink` is the one-liner (see [Publish from GitHub](#publish-from-github)).
+Until that tag, install from a clone or from GitHub (table below).
+**Conda** from [`environment.yml`](environment.yml) stays the Full local stack
+(JAX, Ipopt, notebooks) that CI and the course validate.
 
-Pip `requirements-*.txt` files and `pip install -e ".[…]"` extras exist so a
-wheel can be built later; they are **not** the supported install. Graphviz and
-Ipopt are non-Python binaries pip cannot install. Graphviz is only for
-`plot_diagram()`. Ipopt is an optional NLP backend; trajopt defaults to SciPy.
-If you use the pip files anyway, install Graphviz first
-([download](https://graphviz.org/download/), or `apt` / `brew`) or pick a
-`*-nographviz.txt` file below.
+Graphviz and Ipopt are non-Python binaries pip cannot install. Graphviz is only
+for `plot_diagram()`. Ipopt is an optional NLP backend; trajopt defaults to SciPy.
 
 ## Pick a tier
 
-| | **Basic** | **Full** (recommended) |
+| | **Basic** | **Full** (recommended locally) |
 | --- | --- | --- |
 | **For** | Scripts: sim, trajectory plots, LQR, value iteration | Notebooks, JAX, animators, symbolic, PPO |
+| **PyPI** | `pip install minilink` | `pip install "minilink[full]"` |
 | **Conda** | [`environment-basic.yml`](environment-basic.yml) | [`environment.yml`](environment.yml) |
-| **Pip** | [`requirements.txt`](requirements.txt) | [`requirements-full.txt`](requirements-full.txt) |
-| **Pip, no Graphviz** | [`requirements-nographviz.txt`](requirements-nographviz.txt) | [`requirements-full-nographviz.txt`](requirements-full-nographviz.txt) |
+| **From a clone** | `pip install -e .` | `pip install -e ".[full]"` |
 | **Colab** | clone + path (NumPy/SciPy/Matplotlib already present) | clone + path + Full extras |
 
-PPO notebooks need **Full**. VI and LQR run on **Basic**. The pip rows are
-prepared extras, not a supported path.
+PPO notebooks need **Full**. VI and LQR run on **Basic**. Pip extras: `jax`,
+`visualization`, `plotting`, `diagrams`, `symbolic`, `rl`, `ipopt`, `full`
+(everything except `ipopt` — that extra needs a system Ipopt).
 
 ---
 
 ## Basic
+
+### PyPI
+
+```bash
+pip install minilink
+```
+
+Until the `0.1.0` tag is on PyPI, install from a clone (`pip install -e .`
+below) or from GitHub:
+
+```bash
+pip install "minilink @ git+https://github.com/alx87grd/minilink.git"
+```
 
 ### Conda
 
@@ -46,18 +55,17 @@ conda activate minilink-basic
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink-basic
 ```
 
-### Pip (prepared, not supported)
+### From a clone (pip)
 
-pip installs the Graphviz Python wrapper; you also need the system `dot` binary
-(`apt install graphviz`, `brew install graphviz`, or
-[Windows installer](https://graphviz.org/download/)). Use
-`requirements-nographviz.txt` to skip Graphviz and `plot_diagram()`.
+pip installs the Graphviz Python wrapper when you add the `diagrams` extra; you
+also need the system `dot` binary (`apt install graphviz`, `brew install graphviz`,
+or [Windows installer](https://graphviz.org/download/)). Skip that extra to skip
+`plot_diagram()`.
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt                     # or requirements-nographviz.txt
-export PYTHONPATH="$PWD"                            # Windows PS: $env:PYTHONPATH = (Get-Location)
+pip install -e .
 ```
 
 ### Colab
@@ -77,11 +85,22 @@ if "google.colab" in sys.modules:
 ```
 
 Colab already ships NumPy, SciPy, and Matplotlib (the Basic stack). Skip
-`plot_diagram()` unless you install Graphviz on the runtime.
+`plot_diagram()` unless you install Graphviz on the runtime. After `0.1.0` is
+on PyPI, `%pip install minilink` is enough for Basic scripts.
 
 ---
 
 ## Full
+
+### PyPI
+
+```bash
+pip install "minilink[full]"
+```
+
+Same GitHub fallback as Basic until the tag lands. Pip Full does not include
+Ipopt/`cyipopt` (conda Full does); trajopt still runs with SciPy. For Ipopt:
+`pip install "minilink[full,ipopt]"` after a system Ipopt.
 
 ### Conda
 
@@ -94,17 +113,14 @@ conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-### Pip (prepared, not supported)
+### From a clone (pip)
 
-Same Graphviz note as Basic (`dot` binary, or `requirements-full-nographviz.txt`).
-Pip Full does not include Ipopt/`cyipopt` (conda Full does); trajopt still runs
-with SciPy.
+Same Graphviz note as Basic (`dot` binary, or skip the `diagrams` extra).
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements-full.txt                # or requirements-full-nographviz.txt
-export PYTHONPATH="$PWD"                            # Windows PS: $env:PYTHONPATH = (Get-Location)
+pip install -e ".[full]"
 ```
 
 ### Colab
@@ -128,9 +144,34 @@ if "google.colab" in sys.modules:
 
 ---
 
+## Publish from GitHub
+
+The wheel is built by hatchling + hatch-vcs. Version comes from a **`0.*` git
+tag** (`0.1.0`, not `v0.1.0`). The published package is the teaching surface
+plus provisional bands; `minilink/experimental/` stays repo-only.
+
+`.github/workflows/publish.yml` builds the sdist and wheel on a `0.*` tag (and
+on `workflow_dispatch` for a dry build) and uploads to PyPI with Trusted
+Publishing. One-time setup, on the maintainer account:
+
+1. Create a GitHub Environment named `pypi` on `alx87grd/minilink`.
+2. On PyPI, add a trusted publisher: owner `alx87grd`, repository `minilink`,
+   workflow `publish.yml`, environment `pypi`. A pending publisher is enough
+   before the first upload; the first successful publish creates the project.
+3. Tag and push: `git tag 0.1.0 && git push origin 0.1.0`.
+
+`workflow_dispatch` without a tag only builds; it does not upload.
+
+---
+
 ## Troubleshooting
 
-- **`No module named 'minilink'`** — set `PYTHONPATH` to the repo root (`export PYTHONPATH="$PWD"`).
-- **`failed to execute 'dot'`** — install Graphviz, or reinstall with a `*-nographviz.txt` file and skip `plot_diagram()`.
+- **`No module named 'minilink'`** — `pip install minilink` (or `pip install -e .`
+  at the repo root). On conda-only setups, set `PYTHONPATH` to the repo root
+  (`export PYTHONPATH="$PWD"`).
+- **`failed to execute 'dot'`** — install Graphviz, or skip `plot_diagram()` /
+  the `diagrams` extra.
 - **Missing `stable_baselines3` / `torch`** — you need the **Full** tier for PPO notebooks.
 - **`cyipopt` / Ipopt errors** — optional; Basic omits it. Use default SciPy solvers, or Full conda / `conda install -c conda-forge ipopt cyipopt`.
+- **PyPI 404 for `minilink`** — the first upload is the `0.1.0` tag. Until then
+  use a clone or `pip install "minilink @ git+https://github.com/alx87grd/minilink.git"`.
