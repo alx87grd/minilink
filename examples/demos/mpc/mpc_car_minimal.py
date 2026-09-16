@@ -12,7 +12,7 @@ from minilink.control.mpc import ModelPredictiveController, mpc_animation_overla
 
 U_TARGET = 4.0
 TF_SIM = 5.0
-MPC_DT = 0.02
+MPC_DT = 0.05
 SIM_DT = 0.01
 VERBOSE = True
 REF_X_PAD = 20.0

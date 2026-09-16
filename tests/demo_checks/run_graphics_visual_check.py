@@ -44,7 +44,7 @@ CHECKS = (
         "Cartpole trajopt animate (set LIVE_PLOT=True for Plotly iterates)",
         [
             sys.executable,
-            "examples/demos/planning/trajopt/trajopt_cartpole_collocation_jax.py",
+            "examples/demos/trajopt/trajopt_cartpole_collocation_jax.py",
         ],
     ),
 )

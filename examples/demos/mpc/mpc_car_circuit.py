@@ -23,7 +23,7 @@ from minilink.planning.spatial.shaping import (
 from minilink.planning.spatial.track import ReferenceTrack
 
 # --- knobs ---
-U_TARGET = 20.0
+U_TARGET = 12.0
 VX0 = 5.0
 TF_SIM = 24.0
 MPC_DT = 0.2

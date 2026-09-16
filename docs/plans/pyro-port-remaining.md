@@ -111,7 +111,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/car_propulsion/longitudinal_car_with_torque_input.py` | **TODO** | Representative closed-loop for car_propulsion |
 | `demos_by_system/car_steering/bicycle.py` | **TODO** | Representative closed-loop for car_steering |
 | `demos_by_system/car_steering/bicycle_exploration_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
-| `demos_by_system/car_steering/bicycle_parallel_parking_with_rrt.py` | **Partial** | examples/demos/planning/rrt/rrt_car_parking.py |
+| `demos_by_system/car_steering/bicycle_parallel_parking_with_rrt.py` | **Drop** | parking demo removed; kinodynamic RRT remains in `examples/demos/rrt/` |
 | `demos_by_system/car_steering/car.py` | **TODO** | Representative closed-loop for car_steering |
 | `demos_by_system/car_steering/car_trajectory_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
 | `demos_by_system/car_steering/car_with_custom_lateral_controller.py` | **TODO** | Representative closed-loop for car_steering |
@@ -175,7 +175,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/pendulum_simple/simple_pendulum_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
-| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/demos/planning/value_iteration/vi_minimum_time.py (mass) + examples/demos/planning/value_iteration/vi_pendulum_swingup.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/demos/value_iteration/vi_minimum_time.py (mass) + examples/demos/value_iteration/vi_pendulum_swingup.py |
 | `demos_by_system/plane/plane_cobra.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/plane/plane_simple_controller.py` | **TODO** | Representative closed-loop for plane |
 | `demos_by_system/robot_arm_2dof/twolinkrobot_effector_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
@@ -209,9 +209,9 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/dynamicprogramming/active_suspension.py` | **TODO** | DP specialty demo not ported |
 | `demos_by_tool/dynamicprogramming/braking_reachability.py` | **TODO** | DP specialty demo not ported |
 | `demos_by_tool/dynamicprogramming/car_braking.py` | **TODO** | DP specialty demo not ported |
-| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/demos/planning/value_iteration/vi_double_pendulum_jax.py |
+| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/demos/value_iteration/vi_double_pendulum_jax.py |
 | `demos_by_tool/dynamicprogramming/helicopter_tunnel.py` | **TODO** | DP specialty demo not ported |
-| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/planning/value_iteration/vi_pendulum_swingup.py (grid tuning differs) |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/value_iteration/vi_pendulum_swingup.py (grid tuning differs) |
 | `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | ReachabilityCost exists; demo TODO |
 | `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_tool/optimal_control_demo.py` | **TODO** | Not yet audited |

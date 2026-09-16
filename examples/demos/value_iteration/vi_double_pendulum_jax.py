@@ -111,14 +111,8 @@ diagram.connect("controller", "u", "plant", "u")
 
 for x0 in CLOSED_LOOP_X0:
     plant.x0 = x0.copy()
-    print(f"\nclosed loop from x0 = {np.round(x0, 3)}")
-    print("predicted cost-to-go:", round(planner.value_at(x0), 2))
     trajectory = diagram.compute_trajectory(tf=8.0, n_steps=4001, solver="euler")
     diagram.plot_trajectory(trajectory, signals=("x", "u"))
     diagram.plot_phase_plane(trajectory, x_axis=0, y_axis=2, title="(θ1, dθ1)")
     diagram.plot_phase_plane(trajectory, x_axis=1, y_axis=3, title="(θ2, dθ2)")
     diagram.animate()
-
-    final = trajectory.x[:, -1]
-    print("final state:", np.round(final, 3))
-    print("goal error ||x - x*||:", round(float(np.linalg.norm(final - GOAL)), 3))

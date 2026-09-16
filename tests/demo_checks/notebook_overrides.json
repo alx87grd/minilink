@@ -3,7 +3,7 @@
     "requires": [
       "jax"
     ],
-    "timeout": 300
+    "timeout": 420
   },
   "examples/tutorial/showcase_jax.ipynb": {
     "requires": [

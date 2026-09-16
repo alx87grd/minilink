@@ -40,6 +40,12 @@ planner = TrajectoryOptimizationPlanner(
 reference = planner.solve().trajectory
 planner.plot_solution()
 
+# Open-loop replay of the reference
+replay = TrajectorySource(reference.t, reference.u) >> plant
+replay.compute_trajectory(tf=2 * TF)
+# replay.plot_trajectory()
+replay.animate()
+
 # 2. Feedback along the reference: u = u_d(t) - K(t) (x - x_d(t))
 controller = trajectory_lqr(
     plant, reference, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.diag([1.0])
@@ -52,9 +58,3 @@ loop = controller @ plant
 loop.compute_trajectory(tf=2 * TF)
 loop.plot_trajectory()
 loop.animate()
-
-replay = TrajectorySource(reference.t, reference.u) >> plant
-replay.compute_trajectory(tf=2 * TF)
-replay.plot_trajectory()
-
-replay.animate()
