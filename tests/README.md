@@ -19,7 +19,6 @@ tests/
   demo_checks/           ← catalog + demo check scripts
   unittest/              ← contract tests (pytest)
   fixtures/              ← graphics/regression fixtures
-  merge_contract_tests.py ← dev tool to re-merge domain modules
 
 benchmarks/
   run_regression_check.py   ← regression gates (+ host speed context)
@@ -136,8 +135,7 @@ many near-duplicate files.
 `test_control_analysis`, `test_costs_optimizer`, `test_planning`, `test_mpc`,
 `test_graphics`, `test_geometry`, `test_engine_jax`, `test_jax_planning`,
 `test_symbolic`, `test_benchmark_helpers`, `test_demo_check_runners`,
-`test_flagship_graphics_contract`. Re-merge helper:
-[`merge_contract_tests.py`](merge_contract_tests.py).
+`test_flagship_graphics_contract`.
 
 Kinematic render check (graphics contract): ``run_flagship_graphics.py`` and manifest under
 ``tests/fixtures/kinematic_baseline/``.

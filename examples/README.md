@@ -83,7 +83,7 @@ Universal, course-agnostic lessons organized by domain. Long notebooks (UR5 EoM,
 #### Classical Control
 | Notebook | Colab |
 | --- | --- |
-| [frequency_domain_tools](teaching/classical_control/frequency_domain_tools.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/classical_control/frequency_domain_tools.ipynb) |
+| [frequency_domain_tools](teaching/classical_control/frequency_domain_tools.ipynb) (Bode, Nyquist, margins) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/classical_control/frequency_domain_tools.ipynb) |
 
 #### Optimal Control
 | Notebook | Colab |
@@ -109,7 +109,7 @@ Universal, course-agnostic lessons organized by domain. Long notebooks (UR5 EoM,
 #### Robotics
 | Notebook | Colab |
 | --- | --- |
-| [articulated_robot_eom](teaching/robotics/articulated_robot_eom.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/robotics/articulated_robot_eom.ipynb) |
+| [articulated_robot_eom](teaching/robotics/articulated_robot_eom.ipynb) (UR5 ABA, RNEA, Euler-Lagrange) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/robotics/articulated_robot_eom.ipynb) |
 
 **Colab tip:** open a badge → **File → Save a copy in Drive** → run from the top.
 The first code cell clones the repo and installs `meshcat` when needed. Locally,

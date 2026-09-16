@@ -9,7 +9,7 @@ RULES, AGENTS, DESIGN, ROADMAP, TODO, the three 2026-09-12 governance reviews, t
 architecture review, `core/{system,signals,sets,costs,trajectory,geometry}.py`,
 `planning/{problems,distributions,results,evaluation}.py`, every library consumer of a set or
 a distribution, and the plans that will consume them next (cost-params, cbf-safety-filter,
-standard-planning-problems, rl-planner-vision, naming).
+standard-planning-problems, naming).
 **Applied:** Phase 1 landed the same day on the maintainer's go: the wording of Part B is in
 CONSTITUTION §1.4, §2 and §4; RULES 2.3, 2.5, 4.3, 5.1, 5.2, 5.4, 5.17, 5.21, 6.1 and
 6.10–6.12; AGENTS (the ask-first list); DESIGN §4; ROADMAP §6; `examples/README.md`. DESIGN

@@ -5,9 +5,9 @@ Code: `minilink/analysis/lyapunov.py`, `tests/unittest/test_analysis_lyapunov.py
 `examples/demos/analysis/analysis_region_of_attraction.py`.
 Lane: candidate for the **analysis band** (teaching surface, GRO860 topic).
 
-Related: [DESIGN.md](../../DESIGN.md) §5 (analysis), the derivatives facade
-(landed 2026-09-06), [rl-planner-vision.md](rl-planner-vision.md) (the learned
-laws this tool is asked about).
+Related: [DESIGN.md](../../DESIGN.md) §5 (analysis) and §6 (planners), the
+derivatives facade (landed 2026-09-06). The learned laws this tool is asked
+about are `ReinforcementLearningPlanner` on a `StochasticPlanningProblem`.
 
 Evidence: `examples/experimental/rl/pendulum_rl_lyapunov_certificate.py`
 (2026-09-11) does all of this by hand in 200 lines. This plan is the proposal
