@@ -3,6 +3,7 @@
 **Write the equations once. Simulate, analyze, control, plan, optimize, learn.**
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)
+[![Notebooks](https://img.shields.io/badge/notebooks-examples%2Ftutorial-F37626?logo=jupyter&logoColor=white)](https://github.com/alx87grd/minilink/tree/main/examples/tutorial)
 [![API](https://img.shields.io/badge/API-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
@@ -64,8 +65,6 @@ state `x`, the input `u`, the time `t` and the parameters `params`:
     dx/dt = f(x, u, t; params)      dynamics
     y     = h(x, u, t; params)      one per output port, default y = x
     T     = tf(x, u, t; params)     body poses, for animation
-
-![a System: input ports, f, h, tf, and three output ports](docs/_static/system.svg)
 
 Write `f`, and the plant simulates and plots. Add `tf` and a skin, and it
 animates on matplotlib, plotly, meshcat (3D) or pygame, and you can drive it
