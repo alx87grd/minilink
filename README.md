@@ -3,7 +3,7 @@
 **Write the equations once. Simulate, analyze, control, plan, optimize, learn.**
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)
-[![Docs](https://img.shields.io/badge/docs-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
+[![API](https://img.shields.io/badge/API-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 <table>
@@ -214,8 +214,8 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Or open any notebook in Colab: the first cell clones the repository. Basic
-tier, pip, and options: [install.md](install.md).
+Or open any notebook in Colab: the first cell clones the repository. Tiers
+and Colab: [install.md](install.md) (conda is the supported local install).
 
 ## Learn more
 

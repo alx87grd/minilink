@@ -110,7 +110,9 @@ state-feedback block):
 | `interfaces/` | `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
 
 **Experimental tier** — `experimental/` (TRL < 3, research lane, repo-only);
-nothing in the library imports it, and the path itself states the maturity:
+nothing in the library imports it, and the path itself states the maturity.
+The Sphinx API site autodocs the teaching-lane packages only; this tier is
+not on that site.
 
 | Module | Role |
 | --- | --- |

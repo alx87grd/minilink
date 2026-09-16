@@ -24,4 +24,3 @@ The user guide is the tutorial notebooks; this site is the API reference.
    api/optimization
    api/planning
    api/graphical
-   api/experimental

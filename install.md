@@ -1,20 +1,24 @@
 # Install minilink
 
-Python **3.10+**. Two tiers — **Basic** or **Full** — each with conda, pip, and Colab.
+Python **3.10+**. Two tiers — **Basic** or **Full**.
 
 A basic Python environment with NumPy, SciPy, and Matplotlib is enough for most
 of the library. Skip `plot_diagram()` (needs Graphviz) and optional plotting or
 optimization backends.
 
-**Conda is recommended.** [`environment.yml`](environment.yml) installs all
-optional extras so every minilink feature is available. It is the validated and
-supported path.
+**The supported local install is conda** from
+[`environment.yml`](environment.yml) (Full) or
+[`environment-basic.yml`](environment-basic.yml) (Basic), plus `PYTHONPATH` to
+the repo root. That is the path [README](README.md#install) documents and CI
+validates.
 
-**Pip warning.** Graphviz and Ipopt are non-Python binaries that pip cannot
-install. Graphviz is only for `plot_diagram()`. Ipopt is an optional NLP
-backend; trajopt defaults to SciPy. Install Graphviz first
-([download](https://graphviz.org/download/), or `apt` / `brew`) if you need
-diagrams, or use a `*-nographviz.txt` file below.
+Pip `requirements-*.txt` files and `pip install -e ".[…]"` extras exist so a
+wheel can be built later; they are **not** the supported install. Graphviz and
+Ipopt are non-Python binaries pip cannot install. Graphviz is only for
+`plot_diagram()`. Ipopt is an optional NLP backend; trajopt defaults to SciPy.
+If you use the pip files anyway, install Graphviz first
+([download](https://graphviz.org/download/), or `apt` / `brew`) or pick a
+`*-nographviz.txt` file below.
 
 ## Pick a tier
 
@@ -26,7 +30,8 @@ diagrams, or use a `*-nographviz.txt` file below.
 | **Pip, no Graphviz** | [`requirements-nographviz.txt`](requirements-nographviz.txt) | [`requirements-full-nographviz.txt`](requirements-full-nographviz.txt) |
 | **Colab** | clone + path (NumPy/SciPy/Matplotlib already present) | clone + path + Full extras |
 
-PPO notebooks need **Full**. VI and LQR run on **Basic**.
+PPO notebooks need **Full**. VI and LQR run on **Basic**. The pip rows are
+prepared extras, not a supported path.
 
 ---
 
@@ -41,7 +46,7 @@ conda activate minilink-basic
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink-basic
 ```
 
-### Pip
+### Pip (prepared, not supported)
 
 pip installs the Graphviz Python wrapper; you also need the system `dot` binary
 (`apt install graphviz`, `brew install graphviz`, or
@@ -89,7 +94,7 @@ conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-### Pip
+### Pip (prepared, not supported)
 
 Same Graphviz note as Basic (`dot` binary, or `requirements-full-nographviz.txt`).
 Pip Full does not include Ipopt/`cyipopt` (conda Full does); trajopt still runs
