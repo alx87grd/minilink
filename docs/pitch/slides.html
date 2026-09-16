@@ -76,8 +76,8 @@ diagram.animate()</code></pre>
         <tr><td>Sampling search</td><td><code>RRTPlanner(problem)</code></td></tr>
         <tr><td>Trajectory optimization</td><td><code>TrajectoryOptimizationPlanner(problem)</code></td></tr>
         <tr><td>Model predictive control</td><td><code>ModelPredictiveController(planner, dt_mpc=0.1) @ plant</code></td></tr>
-        <tr><td>Reinforcement learning</td><td><code>Sys2Gym(plant, cost)</code> → Stable-Baselines3</td></tr>
-        <tr><td>Identification</td><td><code>plant.jacobian("f", "params", x_bar)</code></td></tr>
+        <tr><td>Reinforcement learning</td><td><code>ReinforcementLearningPlanner(problem)</code></td></tr>
+        <tr><td>Sensitivity</td><td><code>plant.jacobian("f", "params", x_bar)</code></td></tr>
       </table>
     </div>
     <div>
@@ -91,7 +91,7 @@ DynamicProgrammingPlanner(problem).solve()      <span class="c"># grid value ite
 RRTPlanner(problem).solve()                     <span class="c"># tree search</span>
 TrajectoryOptimizationPlanner(problem).solve()  <span class="c"># collocation</span></code></pre>
       <p>A <code>PlanningProblem</code> is a system, a cost and boundary sets. Every planner takes it and returns a
-      <code>Trajectory</code>; an optimizer sees a <code>MathematicalProgram</code>; a policy comes back as a
+      <code>PlanningSolution</code>; an optimizer sees a <code>MathematicalProgram</code>; the policy is a
       controller you close the loop with: <code>planner.get_controller() @ plant</code>.</p>
       <div class="aside"><b>Under the hood.</b> A diagram flattens to one state vector and one <code>f</code>, so the
       closed loop linearizes, animates and nests like a plant. Every wire is a named signal. A sampled controller is
@@ -183,10 +183,10 @@ gains = gains - lr * jax.grad(loss)(gains) <span class="c"># tune through the si
     </div>
     <div class="card">
       <h3>Reinforcement learning</h3>
-      <p>The Gymnasium environment's step is one jitted RK4 call on the compiled plant, so
-      training loops spend their time in the agent, not in the simulator. Float32 mode for GPU
-      workloads.</p>
-      <p class="small"><code>Sys2Gym(plant, cost)</code> · <code>MINILINK_JAX_X64=0</code></p>
+      <p>The same compiled plant trains a neural policy in pure JAX. PPO, SAC, actor-critic
+      and the tabular learners share one <code>PlanningProblem</code>; the policy is a
+      controller you close the loop with. Float32 mode for GPU workloads.</p>
+      <p class="small"><code>ReinforcementLearningPlanner(problem)</code> · <code>MINILINK_JAX_X64=0</code></p>
     </div>
     <div class="card">
       <h3>GPU and TPU</h3>

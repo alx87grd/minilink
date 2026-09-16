@@ -144,6 +144,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.reinforcement_learning.planner",
         "ReinforcementLearningPlanner",
     ),
+    "TabularLearningPlanner": (
+        "minilink.planning.reinforcement_learning.tabular",
+        "TabularLearningPlanner",
+    ),
     "MonteCarloEvaluator": ("minilink.planning.evaluation", "MonteCarloEvaluator"),
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
@@ -178,3 +182,21 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 _EXPORTS.update({name: ("minilink.catalog", name) for name in _CATALOG_NAMES})
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)
+
+
+def _package_version():
+    try:
+        from minilink._version import __version__ as ver
+
+        return ver
+    except ImportError:
+        pass
+    try:
+        from importlib.metadata import version as package_version
+
+        return package_version("minilink")
+    except Exception:
+        return "0.0.0"
+
+
+__version__ = _package_version()

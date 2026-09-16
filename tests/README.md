@@ -8,7 +8,7 @@ The historical six-layer test plan was retired on 2026-09-05 (see [docs/plans/RE
 
 ## Entry points
 
-**Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (see [README.md#install](../README.md#install)).
+**Prerequisites:** repo root, conda env **`minilink`**, `pip install -e .` (see [README.md#install](../README.md#install)). `PYTHONPATH=.` still works as a fallback.
 
 ### Folder layout (everything under `tests/` or `benchmarks/`)
 

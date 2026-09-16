@@ -17,7 +17,7 @@ gap noted · **TODO** = planned/in-scope · **Drop** = explicit non-goal.
 | Library symbols | 105 | 80 | 11 | 8 | 6 |
 | Example scripts | 195 | 28 | 45 | 87 | 35 |
 
-Parity is the **v0.2** milestone ([ROADMAP.md §1](../../ROADMAP.md#1-north-star)); v0.1 is GRO860 end to end.
+Parity is the **v0.2** milestone ([ROADMAP.md §1](../../ROADMAP.md#1-releases)); v0.1 is GRO860 end to end.
 Release criterion carried over: every **in-scope** pyro library module has a minilink home or a documented drop; representative closed-loop demo per major plant family; README pyro → minilink migration guide (built from the name map below).
 
 ## 1. Library modules — pyro → minilink

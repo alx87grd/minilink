@@ -129,12 +129,12 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 | Sampling search | `RRTPlanner(problem)` |
 | Trajectory optimization | `TrajectoryOptimizationPlanner(problem, transcription="direct_collocation")` |
 | Model predictive control | `ModelPredictiveController(planner, dt_mpc=0.1) @ plant` |
-| Reinforcement learning | `Sys2Gym(plant, cost)`, then any Gymnasium agent |
-| Identification | `plant.jacobian("f", "params", x_bar)` |
+| Reinforcement learning | `ReinforcementLearningPlanner(problem)` |
+| Sensitivity | `plant.jacobian("f", "params", x_bar)` |
 
 The objects between the tools are the textbook's nouns. A `PlanningProblem`
 is a system, a cost and boundary sets; every planner takes it and returns a
-`Trajectory`:
+`PlanningSolution` (a policy, plus the trajectory when the solver computes one):
 
 ```python
 from minilink import (
@@ -196,8 +196,9 @@ differentiate inside your own `jit`. See
   from one setup cell. One import line covers a course:
   `from minilink import Pendulum, PID, lqr, PlanningProblem, ReinforcementLearningPlanner`.
 - **Research.** Optional JAX for compile and autodiff, Ipopt for large NLPs,
-  meshcat for 3D, a hybrid stack for sampled MPC, a Gymnasium bridge for RL.
-  Every catalog plant compiles on both backends.
+  meshcat for 3D, a hybrid stack for sampled MPC, a Gymnasium bridge
+  (`Sys2Gym`) for external RL agents. Every catalog plant compiles on both
+  backends.
 
 The boundary between the two is a contract, not a convention:
 [ROADMAP.md §2](ROADMAP.md#2-two-lanes).
@@ -205,16 +206,17 @@ The boundary between the two is a contract, not a convention:
 ## Install
 
 Python 3.10+. Recommended: the conda environment from
-[`environment.yml`](environment.yml).
+[`environment.yml`](environment.yml), then an editable install so `minilink`
+is a real package (`__version__` included).
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 conda env create -f environment.yml && conda activate minilink
-conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+pip install -e .
 ```
 
 Or open any notebook in Colab: the first cell clones the repository. Basic
-tier, pip, and options: [install.md](install.md).
+tier, pip extras (`[jax]`, `[diagrams]`, …), and options: [install.md](install.md).
 
 ## Learn more
 

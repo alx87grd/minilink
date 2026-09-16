@@ -12,7 +12,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — term in progress; hardening lands during the term without breaking names the course notebooks already use |
+| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **0.1.0 cut**: install from the repo (`conda` + `pip install -e .`). Names the course notebooks already use stay frozen. PyPI index publication is v0.2. |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), the deferred v0.1 items in §5 Phase 2, and a `pip install minilink` option (conda stays the recommended local install). | Winter 2027 |
 | **v1.0** | The foundation questions deferred in §6 (hybrid as a `System`, evaluator/solver layering, geometry unification), after two cohorts. | 2027 |
 
@@ -76,7 +76,7 @@ a release process by themselves.
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response — matplotlib and plotly. **The automatic frequency band brackets the 0 dB crossing** (landed 2026-09-07), so integrator and high-gain loops no longer report infinite margins. | `minreal`; named `S`/`T`/`PS`/`CS`; Nichols chart; multi-system overlays. Discrete-time (z) plots held. |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine`/`Ramp`/`Chirp`/`Delay`/`Switch` (v0.2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`; returns a `PlanningSolution` (lookup policy, `ValueIterationRecord`, `cost_to_go`; 2026-09-15). | `vi_ctl @ plant` in notebooks; `plot_cost2go` colour scale clipped at the out-of-bound cost by default. |
-| Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; returns a `PlanningSolution` with a linear `TrajectorySource` policy and a `TrajectoryOptimizationRecord` (`success` = defects satisfied to `feasibility_tol`). **float32 by default on JAX.** | float64 policy; multiple-shooting parametric guard. |
+| Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; returns a `PlanningSolution` with a linear `TrajectorySource` policy and a `TrajectoryOptimizationRecord` (`success` = defects satisfied to `feasibility_tol`). JAX evaluators enable float64 on construction (`MINILINK_JAX_X64=0` opts out). | Harden SciPy/Ipopt before TRL 6; multiple-shooting parametric guard landed. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call (jitted under JAX when the plant traces, NumPy otherwise; Euler kept as an option). Kept as an optional external bridge; not the primary course path. | Keep module for external interop; course material uses native RL. |
 | Analysis / Lyapunov certificates | provisional (research) | 4 | Landed 2026-09-11 from [lyapunov-certificates.md](docs/plans/lyapunov-certificates.md): `region_of_attraction` + `LyapunovCertificate` (`verify`, `plot`, `contains`), two `System` shortcuts, demo `analysis_region_of_attraction.py` and showcase §11 of `showcase_from_rl_to_bode.ipynb`. Quadratic `V` only; the level is a sampled estimate and the search reports `sample_limited` when halves disagree. | Student cohort validation; SOS and discrete-time later. |
@@ -128,8 +128,9 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
 
 Out of the v0.1 checklist by decision: MPC/hybrid (provisional, lesson keeps
 shipping), estimation, identification, frequency-domain tools (landed
-2026-09-07 but gated by §4.2, not by v0.1), PyPI publication (later; conda
-remains the local path).
+2026-09-07 but gated by §4.2, not by v0.1), PyPI *index* publication (later;
+`pip install -e .` from the clone is the 0.1 path, conda remains the
+recommended local env).
 
 ### 4.2 v0.2 — GRO501 end to end
 

@@ -5,8 +5,7 @@
 # Create:
 #   conda env create -f environment-basic.yml
 #   conda activate minilink-basic
-#   conda env config vars set PYTHONPATH="$PWD"
-#   conda deactivate && conda activate minilink-basic
+#   pip install -e .
 #
 # Full stack: environment.yml. Tiers: install.md.
 
