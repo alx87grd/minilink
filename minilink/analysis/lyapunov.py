@@ -45,7 +45,7 @@ from scipy.linalg import solve_continuous_lyapunov, solve_triangular
 
 from minilink.analysis.derivatives import jacobian
 from minilink.analysis.equilibria import find_equilibrium
-from minilink.core.sets import BoxSet
+from minilink.core.sets import BoxSet, Set
 
 #: Families of Lyapunov function this tool can build.
 METHODS = ("quadratic", "sos")
@@ -339,7 +339,7 @@ def region_of_attraction(
 
     backend, evaluator = compiled(sys)
     f_many = dynamics_on(backend, evaluator, u_bar, t, params)
-    domain = state_box(sys)
+    domain = sys.state.box
     n = int(sys.n)
     search = ("grid" if n <= 2 else "random") if search == "auto" else search
     samples = (201**2 if n <= 2 else 50_000) if samples is None else int(samples)
@@ -639,20 +639,15 @@ def lyapunov_matrix(sys, x_bar, u_bar, t, params, Q):
     return solve_continuous_lyapunov(A.T, -Q), Q, poles
 
 
-def state_box(sys) -> BoxSet:
-    """The model's own domain: the state-port bounds, infinite where unset."""
-    n = int(sys.n)
-    lower = sys.state.lower_bound
-    upper = sys.state.upper_bound
-    lower = np.full(n, -np.inf) if lower is None else np.asarray(lower, dtype=float)
-    upper = np.full(n, np.inf) if upper is None else np.asarray(upper, dtype=float)
-    return BoxSet(lower, upper)
-
-
 def as_box(window) -> BoxSet:
-    """Coerce a user window: a ``BoxSet`` or a ``(lower, upper)`` pair."""
-    if isinstance(window, BoxSet):
-        return window
+    """Coerce a user window: a set with a bounding box, or a ``(lower, upper)`` pair."""
+    if isinstance(window, Set):
+        box = window.bounding_box()
+        if box is None:
+            raise ValueError(
+                "window must be a set with a bounding box or a (lower, upper) pair"
+            )
+        return box
     lower, upper = window
     return BoxSet(np.asarray(lower, dtype=float), np.asarray(upper, dtype=float))
 

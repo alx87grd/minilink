@@ -21,8 +21,8 @@ DT = 0.05
 plant = CartPole()
 plant.inputs["u"].lower_bound = np.array([-10.0])
 plant.inputs["u"].upper_bound = np.array([10.0])
-plant.state.lower_bound = np.array([-5.0, -1e3, -20.0, -30.0])
-plant.state.upper_bound = np.array([5.0, 1e3, 20.0, 30.0])
+plant.state.lower_bound = np.array([-5.0, -5.0, -20.0, -30.0])
+plant.state.upper_bound = np.array([5.0, 5.0, 20.0, 30.0])
 
 
 # Cost: periodic angle term, small cart, velocity and effort penalties (the

@@ -247,3 +247,53 @@ def test_jax_x64_opt_out_env_var_keeps_float32():
 def test_trajopt_succeeds_on_jax_without_caller_enabling_x64():
     pytest.importorskip("jax")
     assert _run_fresh_python(_TRAJOPT_PROBE, {}) == "True"
+
+
+def test_intersection_flattens_nested_and():
+    box = BoxSet(lower=np.array([-1.0, -2.0]), upper=np.array([1.0, 2.0]))
+    ball = BallSet(center=np.zeros(2), radius=1.0)
+    singleton = SingletonSet(np.array([0.0, 0.0]))
+    nested = (box & ball) & singleton
+    assert isinstance(nested, IntersectionSet)
+    assert nested.sets == (box, ball, singleton)
+    z = np.array([0.25, -0.5])
+    np.testing.assert_allclose(
+        nested.margin(z),
+        np.concatenate((box.margin(z), ball.margin(z), singleton.margin(z))),
+    )
+
+
+def test_box_sample_follows_the_draw_convention():
+    box = BoxSet(lower=np.array([-1.0, -2.0]), upper=np.array([1.0, 2.0]))
+    one = box.sample(0)
+    assert one.shape == (2,) and box.contains(one)
+    many = box.sample(np.random.default_rng(0), n=5)
+    assert many.shape == (5, 2) and all(box.contains(z) for z in many)
+    np.testing.assert_allclose(many[0], one)  # one draw is the first of many
+    jax = pytest.importorskip("jax")
+    key = jax.random.PRNGKey(0)
+    assert box.sample(key).shape == (2,)
+    traced = jax.jit(lambda k: box.sample(k, n=4))(key)
+    assert traced.shape == (4, 2) and all(box.contains(np.asarray(z)) for z in traced)
+
+
+def test_bounding_boxes():
+    from minilink.core.sets import BoxInputSet, CallableSet
+
+    box = BoxSet(lower=np.array([-1.0, -2.0]), upper=np.array([1.0, 2.0]))
+    ball = BallSet(center=np.array([0.5, 0.0]), radius=1.0)
+    singleton = SingletonSet(np.array([0.1, 0.2]))
+    free = CallableSet(lambda z, t, params: z)
+    assert box.bounding_box() is box
+    np.testing.assert_allclose(ball.bounding_box().lower, [-0.5, -1.0])
+    np.testing.assert_allclose(ball.bounding_box().upper, [1.5, 1.0])
+    np.testing.assert_allclose(singleton.bounding_box().lower, [0.1, 0.2])
+    np.testing.assert_allclose(singleton.bounding_box().upper, [0.1, 0.2])
+    assert free.bounding_box() is None
+    assert (free & free).bounding_box() is None
+    tight = (box & ball & free).bounding_box()
+    np.testing.assert_allclose(tight.lower, [-0.5, -1.0])
+    np.testing.assert_allclose(tight.upper, [1.0, 1.0])
+    np.testing.assert_allclose(
+        BoxInputSet.from_bounds([-3.0], [3.0]).bounding_box().lower, [-3.0]
+    )

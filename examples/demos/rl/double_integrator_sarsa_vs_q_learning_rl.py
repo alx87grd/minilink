@@ -35,8 +35,8 @@ problem = StochasticPlanningProblem(
     cost=cost,
     tf=np.inf,
     x0_distribution=Uniform([-1.0, -0.2], [0.0, 0.2]),
-    on_exit="terminate",
-    exit_cost=CLIFF_COST,
+    infeasible_cost=CLIFF_COST,
+    X=plant.state.box,
 )
 
 # Two learners on one grid, one exploration rule; only the target of the update differs:

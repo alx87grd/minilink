@@ -5,8 +5,8 @@ import pytest
 
 from minilink import Pendulum
 from minilink.core.costs import CostFunction, QuadraticCost
+from minilink.core.distributions import Gaussian, Particles, Sampler, Uniform
 from minilink.core.trajectory import Trajectory
-from minilink.planning.distributions import Gaussian, Particles, Sampler, Uniform
 from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
 from minilink.planning.problems import (
     PlanningProblem,
@@ -54,27 +54,25 @@ def test_cost_horizon_follows_tf_unless_declared():
 def test_problem_exit_rule_and_penalty():
     plant = pendulum()
     problem = PlanningProblem(plant, cost=quadratic(plant), tf=np.inf)
-    assert problem.on_exit == "infeasible"
-    assert problem.exit_penalty(np.zeros(2)) is None
+    assert problem.infeasible_cost is None
+    assert problem.infeasible_penalty(np.zeros(2)) is None
+    assert problem.X.contains(np.array([1e9, -1e9]))  # unconstrained by default
     assert problem.horizon_kind() == "infinite"
 
-    scalar = PlanningProblem(plant, tf=2.0, on_exit="terminate", exit_cost=50)
-    assert scalar.exit_cost == 50.0
-    assert scalar.exit_penalty(np.zeros(2), 1.0) == 50.0
+    scalar = PlanningProblem(plant, tf=2.0, infeasible_cost=50)
+    assert scalar.infeasible_cost == 50.0
+    assert scalar.infeasible_penalty(np.zeros(2), 1.0) == 50.0
     assert scalar.horizon_kind() == "finite"
 
     shaped = PlanningProblem(
-        plant, on_exit="terminate", exit_cost=lambda x, t: 10.0 * float(x[0] ** 2)
+        plant, infeasible_cost=lambda x, t: 10.0 * float(x[0] ** 2)
     )
-    assert shaped.exit_penalty(np.array([2.0, 0.0])) == 40.0
-
-    with pytest.raises(ValueError):
-        PlanningProblem(plant, on_exit="penalize")
+    assert shaped.infeasible_penalty(np.array([2.0, 0.0])) == 40.0
 
 
-def test_dp_reads_the_problem_exit_cost():
+def test_dp_reads_the_problem_infeasible_cost():
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=quadratic(plant), exit_cost=42.0)
+    problem = PlanningProblem(plant, cost=quadratic(plant), infeasible_cost=42.0)
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
     assert planner.options.out_of_bound_cost == 42.0
     explicit = DynamicProgrammingPlanner(
@@ -111,13 +109,13 @@ def test_distributions_sample_on_numpy():
     gauss = Gaussian([1.0, 2.0], 0.1)
     assert gauss.sample(rng).shape == (2,)
     assert gauss.sample(rng, n=5).shape == (5, 2)
-    np.testing.assert_allclose(gauss.mean(), [1.0, 2.0])
+    np.testing.assert_allclose(gauss.mean, [1.0, 2.0])
 
     box = Uniform([-1.0, 0.0], [1.0, 2.0])
     samples = box.sample(3, n=100)
     assert samples.shape == (100, 2)
     assert box.support.contains(samples[0])
-    np.testing.assert_allclose(box.mean(), [0.0, 1.0])
+    np.testing.assert_allclose(box.mean, [0.0, 1.0])
 
     pts = Particles([[0.0, 0.0], [1.0, 1.0]])
     assert pts.sample(rng, n=4).shape == (4, 2)
@@ -154,8 +152,7 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
         tf=np.inf,
         x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
         params_distribution={"m": Uniform([0.8], [1.2])},
-        on_exit="terminate",
-        exit_cost=100.0,
+        infeasible_cost=100.0,
     )
     assert isinstance(problem, PlanningProblem)
     np.testing.assert_allclose(problem.x_start, [0.0, 0.0])
@@ -166,7 +163,7 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
     nominal = problem.nominal()
     assert type(nominal) is PlanningProblem
     np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])
-    assert nominal.exit_cost == 100.0 and nominal.on_exit == "terminate"
+    assert nominal.infeasible_cost == 100.0
 
     with pytest.raises(ValueError):
         StochasticPlanningProblem(plant, x0_distribution=Gaussian([0.0], 1.0))
@@ -185,8 +182,7 @@ def test_as_stochastic_is_the_inverse_bridge_of_nominal():
         x_start=[0.3, -0.1],
         cost=quadratic(plant),
         tf=5.0,
-        on_exit="terminate",
-        exit_cost=10.0,
+        infeasible_cost=10.0,
     )
     stochastic = as_stochastic(deterministic)
     assert type(stochastic) is StochasticPlanningProblem
@@ -194,9 +190,8 @@ def test_as_stochastic_is_the_inverse_bridge_of_nominal():
     np.testing.assert_allclose(stochastic.sample_x0(0, n=3), [[0.3, -0.1]] * 3)
     assert stochastic.sample_params(0) == {} and stochastic.sample_disturbances(0) == {}
     assert stochastic.criterion == "expectation"
-    assert (stochastic.tf, stochastic.on_exit, stochastic.exit_cost) == (
+    assert (stochastic.tf, stochastic.infeasible_cost) == (
         5.0,
-        "terminate",
         10.0,
     )
     np.testing.assert_allclose(stochastic.nominal().x_start, [0.3, -0.1])
@@ -248,16 +243,21 @@ def test_score_trajectory_cuts_at_the_exit_and_charges_the_problem_price():
     exits = Trajectory(t=t, x=x_exit, u=u)
 
     finite = PlanningProblem(
-        plant, cost=Unit(), tf=1.0, on_exit="terminate", exit_cost=50.0
+        plant, cost=Unit(), tf=1.0, X=plant.state.box, infeasible_cost=50.0
     )
     J, failed = score_trajectory(finite, inside)
     assert not failed and np.isclose(J, 1.0 + 7.0)  # running cost + h at tf
     J, failed = score_trajectory(finite, exits)
     assert failed and np.isclose(J, 0.5 + 50.0)  # cut at the exit sample, charged, no h
 
-    unpriced = PlanningProblem(plant, cost=Unit(), tf=np.inf)
+    unpriced = PlanningProblem(plant, cost=Unit(), tf=np.inf, X=plant.state.box)
     J, failed = score_trajectory(unpriced, exits)
-    assert failed and np.isclose(J, 0.5)
+    assert failed and np.isinf(J)  # no price declared, none derived: infinity itself
+    J, failed = score_trajectory(unpriced, exits, infeasible_cost=30.0)
+    assert failed and np.isclose(J, 0.5 + 30.0)  # the evaluator's derived bound
+    free = PlanningProblem(plant, cost=Unit(), tf=np.inf)  # unconstrained: no failure
+    J, failed = score_trajectory(free, exits)
+    assert not failed and np.isclose(J, 1.0)
 
 
 @pytest.mark.optional
@@ -265,7 +265,7 @@ def test_score_trajectory_cuts_at_the_exit_and_charges_the_problem_price():
 def test_monte_carlo_backends_share_the_score_on_identical_starts():
     pytest.importorskip("jax")
     from minilink.control import NeuralPolicyController
-    from minilink.planning.distributions import Particles
+    from minilink.core.distributions import Particles
     from minilink.planning.evaluation import MonteCarloEvaluator
 
     plant = pendulum()
@@ -285,7 +285,7 @@ def test_monte_carlo_backends_share_the_score_on_identical_starts():
     one_start = Particles([[2.5, 0.0]])
     for kwargs in (
         {"tf": np.inf},
-        {"tf": 1.0, "on_exit": "terminate", "exit_cost": 20.0},
+        {"tf": 1.0, "infeasible_cost": 20.0},
     ):
         problem = StochasticPlanningProblem(
             plant, cost=Discounted(), x0_distribution=one_start, **kwargs
@@ -308,7 +308,7 @@ def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
     """Port bounds are information: no backend clips a law that exceeds them."""
     pytest.importorskip("jax")
     from minilink.control import StateFeedbackController
-    from minilink.planning.distributions import Particles
+    from minilink.core.distributions import Particles
     from minilink.planning.evaluation import MonteCarloEvaluator
 
     plant = pendulum()
@@ -342,7 +342,7 @@ def test_simulator_backend_scores_a_controller_with_internal_state():
     """The controller state is stacked first; the score reads the plant's own trajectory."""
     from minilink import PID, SingleMass
     from minilink.control import StateFeedbackController
-    from minilink.planning.distributions import Particles
+    from minilink.core.distributions import Particles
     from minilink.planning.evaluation import MonteCarloEvaluator
 
     mass = SingleMass()
@@ -371,7 +371,7 @@ def test_simulator_backend_scores_a_controller_with_internal_state():
 def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     pytest.importorskip("jax")
     from minilink.control import NeuralPolicyController
-    from minilink.planning.distributions import Particles
+    from minilink.core.distributions import Particles
     from minilink.planning.evaluation import MonteCarloEvaluator
 
     plant = pendulum()
@@ -431,8 +431,8 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
 
 def test_gymnasium_view_of_a_stochastic_problem():
     pytest.importorskip("gymnasium")
+    from minilink.core.distributions import Particles
     from minilink.interfaces.gymnasium import Sys2Gym
-    from minilink.planning.distributions import Particles
 
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-4.0])
@@ -441,9 +441,9 @@ def test_gymnasium_view_of_a_stochastic_problem():
         plant,
         cost=quadratic(plant),
         tf=1.0,
+        X=plant.state.box,
         x0_distribution=Particles([[0.3, 0.0], [-0.3, 0.0]]),
-        on_exit="terminate",
-        exit_cost=50.0,
+        infeasible_cost=50.0,
     )
     env = Sys2Gym.from_problem(problem, dt=0.05)
     starts = {

@@ -194,8 +194,7 @@ def double_integrator_problem():
         x_start=[1.0, 0.0],
         cost=cost,
         tf=np.inf,
-        on_exit="terminate",
-        exit_cost=20.0,
+        infeasible_cost=20.0,
     )
 
 

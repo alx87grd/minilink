@@ -47,14 +47,15 @@ class LookupTableController(Controller):
         n, m = grid.n, grid.m
 
         # Port bounds mirror the grid domain (plot sweeps and color limits).
-        self.add_input_port("x", dim=n, lower_bound=grid.x_lb, upper_bound=grid.x_ub)
+        X, U = grid.X, grid.U
+        self.add_input_port("x", dim=n, lower_bound=X.lower, upper_bound=X.upper)
         self.add_output_port(
             "u",
             dim=m,
             function=self.ctl,
             dependencies=("x",),
-            lower_bound=grid.u_lb,
-            upper_bound=grid.u_ub,
+            lower_bound=U.box.lower,
+            upper_bound=U.box.upper,
         )
 
         # One interpolator per input axis over the policy's input table.

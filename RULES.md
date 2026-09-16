@@ -59,6 +59,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   equations accept an explicit argument (`f(x, u, t, params=None)`) for computing parameter gradients
   ($\partial f / \partial p$) and system identification. However, the core framework remains forgiving:
   models where a student hard-codes constants directly into equations must simulate without friction.
+  The same rule holds for costs, sets, fields and shapes: `params is None` resolves to the
+  object's own defaults; any dictionary replaces them at that level.
 - **2.4 No run state on a System.** A `System` does not store simulation trajectories, solver state,
   or run history. Exception: `self.traj` is the one daily-use shortcut; a new exception needs a
   reason of that weight.
@@ -66,7 +68,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
   request/response dataclasses, option bags, or adapter layers that only wrap those. A new
   named record is justified when it is a domain noun (a trajectory, a certificate, a plan) —
-  not when it is a programming convenience.
+  not when it is a programming convenience. Before adding a record, name the object it already
+  is: a `(lower, upper)` pair is a `BoxSet`, a reset rule is a `Distribution`, a sublevel set
+  is a `Set`, a scalar function of the state is a `Field`, a sampled run is a `Trajectory`.
 
 ---
 
@@ -132,7 +136,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   requiring discrete stepping accepts a continuous system via a discretization adapter; a tool
   requiring a stochastic problem accepts a deterministic one via `as_stochastic()`. Convert once
   at the boundary, then use the richer object directly: never probe it with `hasattr` or
-  `getattr` defaults inside the math.
+  `getattr` defaults inside the math. A tool that needs a box asks the set
+  (`X.bounding_box()`); it does not `isinstance` the set. The one `isinstance` on a set is the
+  lowering at the solver boundary: a singleton to an equality residual, a box to decision bounds.
 - **4.4 Parameter override rule:** `params is None` resolves to the system's default parameters.
   Any provided `params` dictionary replaces them entirely (never write `params or self.params`).
 - **4.5 Unconnected input ports are silent.** Unconnected inputs automatically read their nominal
@@ -171,11 +177,12 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
 *Reading Minilink source code should feel like reading an engineering textbook.*
 
-- **5.1 Bare signatures in equation paths:** Do not put type hints inside $f, h, tf$ or port
-  computations. Document expected array shapes and physical units clearly in the NumPy-style docstring.
+- **5.1 Bare signatures in equation paths:** Do not put type hints inside $f, h, tf$, port
+  computations, or any other native-array equation path (`Set.margin`, `CostFunction.g` / `h`,
+  `Field.value`, `Shape.sdf`, `Distribution.sample`). Document expected array shapes and physical units clearly in the NumPy-style docstring.
   Type hints belong on class constructors, public methods, and tool orchestrators.
-- **5.2 The `xp` idiom for hybrid NumPy/JAX:** Immediately after unpacking parameters in $f$ or $h$,
-  bind the array module:
+- **5.2 The `xp` idiom for hybrid NumPy/JAX:** Immediately after unpacking parameters in any
+  equation path ($f$, $h$, `margin`, `g`, `value`, `sdf`, ...), bind the array module:
   ```python
   xp = array_module(x)
   ```
@@ -197,9 +204,13 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   - Matrices: uppercase (`A`, `B`, `C`, `D`, `H`, `M`, `K`).
   - Vectors: lowercase (`x`, `u`, `y`, `q`, `v`, `dq`, `dx`).
   - Dimensions: lowercase integers (`n`, `m`, `p`).
-  - A symbol keeps one meaning across the codebase: `A` is the state matrix, `rho` the
-    discount rate, `z` the policy features. Name a local that would collide by its role
-    (`advantage`, `ratio`, `eps`) rather than reusing the symbol.
+  - A symbol keeps one meaning within an object, and one meaning across the codebase wherever
+    the literature allows: `A` is the state matrix, `rho` the discount rate, `z` the policy
+    features. Name a local that would collide by its role (`advantage`, `ratio`, `eps`)
+    rather than reusing the symbol. The textbook's own overloads across objects (`h`: output
+    map on a `System`, terminal cost on a `CostFunction`; `g`: running cost, gravity vector,
+    NLP inequality; `B`, `C`: mechanical vs state-space) are inherited, listed in DESIGN §4 as
+    a closed list, and never added to.
 - **5.5 Format 2D array literals row by row:** Align matrices visually using `# fmt: off` and
   `# fmt: on` to ensure equations remain readable at a glance:
   ```python
@@ -258,7 +269,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **5.16 Two-audience files:** Write each file for its primary reader. Student-facing modules
   (`core/system.py`, `blocks/`, `dynamics/`, `control/`) read like a textbook. Library-developer
   modules (`core/compile/`, evaluators) may carry compiler machinery.
-- **5.17 Native-array equation paths:** Keep $f$/$h$ on native arrays; convert at API boundaries only.
+- **5.17 Native-array equation paths:** Keep every equation path (the list of 5.1) on native
+  arrays, traceable in every argument, `params` included; convert at API boundaries only.
 - **5.18 `__main__` hello-worlds:** Core modules may ship a `__main__` smoke that constructs the
   class and runs it once. Keep it short enough to read at a glance, and stop where the teaching
   starts: a smoke that grows plots, sweeps, or commentary has become a demo and belongs under
@@ -268,8 +280,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **5.20 Match the neighborhood:** Change only what the task requires. Public APIs use type hints
   and NumPy docstrings except in equation paths (rule 5.1). Lazy optional imports. Prefer a low
   helper count in math tools; inline single-use helpers.
-- **5.21 Validation in proportion:** Validate at boundaries, not in every helper. Use dataclasses
-  for transparent *domain* records (`Trajectory`, a certificate, a plan). Do not use them as
+- **5.21 Validation in proportion:** Validate at boundaries, not in every helper. Frozen dataclasses
+  for value objects — a `Trajectory`, a set, a shape, a certificate, a solver record; plain
+  classes with `params` for parametric equation objects — systems, costs. Never dataclasses as
   input/output wrappers around arrays (rule 2.5). Use `ABC` only when enforcement helps.
 - **5.22 Comment the steps, not the file.** Core math (`f`, `h`, costs, maps) is ventilated:
   blank lines between the main steps. A short comment sits on its own line above each step
@@ -292,9 +305,15 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
 *Trust in the toolbox is built on verifiable evidence, clean demos, and robust tests.*
 
-- **6.1 Demos are open-and-run scripts:** Demo scripts in `examples/demos/` must run from the top
-  level without requiring a `main()` function wrapper. One-line title docstring; the pedagogical
-  story lives in short inline comments next to the code (rules 5.22–5.23).
+- **6.1 A demo is the API, and nothing else.** *Simplicity is the ultimate sophistication*
+  holds for a demo or a teaching notebook as it does for the core: the shortest sequence of
+  library verbs that tells the story — build, compose, solve, evaluate, plot, animate — run
+  from the top level, with constants at the top, a one-line title docstring and the story in
+  short inline comments (5.22–5.23). Less is better. Reporting goes through the objects
+  themselves: their `print` (`__str__`) and their native plots (`plot_trajectory`,
+  `plot_solution`, `plot_control_law`, `plot_cost2go`, `plot_learning_curve`, `plot_tree`,
+  `scene.plot`, ...). A report the library cannot give is first a library gap — a missing
+  `__str__` or `plot_*`, in the agent's plotting lane — and only then a demo cell.
 - **6.2 No test harness code in demos:** Never add test environment branches (`if CI: ...`),
   smoke env vars (`MINILINK_NOTEBOOK_SMOKE`), mock flags, or headless switches inside
   `examples/demos/`, `examples/tutorial/`, or `examples/teaching/`. Test runners adapt
@@ -327,6 +346,17 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README, the slides, and the
   showcase notebook markdown must be empty (the `-E` matters: without it the alternation is
   literal and the gate passes on anything). `test_repo_contract.py` runs the same check.
+- **6.10 Flat demos.** No functions or classes in a demo or a teaching notebook except the
+  model or cost it is about (its `f`, `h`, `g`) and a step the notebook's text teaches by hand
+  (a hand-written RK4, a policy-gradient update). No wiring, tuning or plotting helpers, no
+  configuration dictionaries feeding them, no `main()`, no `try / except ImportError` around
+  plots (6.2). A loop over variants is fine; a factory is not.
+- **6.11 Side work is quarantined.** A custom plot or a side analysis that earns its place is
+  its own cell in a notebook, or its own block at the end of a script under one comment line.
+  It never interleaves with the API lines, and the demo still reads with that cell removed.
+- **6.12 Cheap rules are tests.** When a rule can be checked by an AST walk or a grep, the
+  check lands with the rule (`test_teaching_imports.py`, `test_repo_contract.py`, the
+  set-probe and flat-demo checks).
 
 ---
 

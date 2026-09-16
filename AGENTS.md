@@ -48,8 +48,10 @@ Keep DESIGN.md call chains minimal.
 
 **Ask first (maintainer-owned):** anything student-facing (`README.md`,
 `examples/`, notebooks, ROADMAP §1, §2 and §4, public names); **core
-architecture and the API of the main tools** (`System` family, diagrams,
-compile, `Simulator`, planners, `Optimizer`, controllers); any feature or
+architecture and the API of the main tools** (`System` family, the core
+mathematical objects — `Trajectory`, sets, distributions, costs, fields,
+`PlanningProblem`, `PlanningSolution` — diagrams, compile, `Simulator`,
+planners, `Optimizer`, controllers); any feature or
 user-importable-name removal; delete/rename files; new dependencies; removing
 user scratch code; `CONSTITUTION.md` amendments.
 

@@ -20,6 +20,7 @@ import numpy as np
 from gymnasium import spaces
 
 from minilink.core.feedback import Controller
+from minilink.core.sets import BoxInputSet
 
 # Public API
 
@@ -149,16 +150,31 @@ class Sys2Gym(gym.Env):
 
         ``reset`` draws the initial state from the problem, the reward is the
         problem's running cost, a finite horizon ends the episode at ``tf``
-        with the terminal cost ``h``, and leaving the allowed box follows the
-        problem's exit rule: charged and *terminated* when the problem prices
-        it (``exit_cost`` or ``on_exit="terminate"``), *truncated* otherwise.
+        with the terminal cost ``h``, leaving the constraint set ``X`` is a
+        failure (*terminated*, charged the price of infeasibility) and leaving
+        the plant's state box, the training zone, is a *truncation*.
         Parameter and disturbance draws are not applied by this view.
         """
         finite = problem.horizon_kind() == "finite"
         tf = float(problem.tf) if finite else float(episode_length or 10.0)
+        from minilink.control.neural import action_port_of
+        from minilink.planning.reinforcement_learning.environment import (
+            feasible_cost_bound,
+        )
+
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
         env.problem = problem
         env.finite_horizon = finite
+        env.infeasible_cost = problem.infeasible_cost
+        if env.infeasible_cost is None:
+            env.infeasible_cost = feasible_cost_bound(
+                problem,
+                problem.sys.state.box,
+                action_port_of(problem.sys),
+                dt,
+                int(round(tf / dt)),
+                float(problem.require_cost().discount_rate),
+            )
         return env
 
     def reset(self, seed=None, options=None):
@@ -331,6 +347,7 @@ class ProblemEnv(Sys2Gym):
 
     problem = None
     finite_horizon = False
+    infeasible_cost = None
 
     def reset(self, seed=None, options=None):
         y, info = super().reset(seed=seed, options=options)
@@ -344,10 +361,9 @@ class ProblemEnv(Sys2Gym):
         problem = self.problem
         y, r, terminated, truncated, info = super().step(u)
         x, t = self.x, self.t
-        out = bool(np.any(x < self.x_lb) or np.any(x > self.x_ub))
-        if out and (problem.exit_cost is not None or problem.on_exit == "terminate"):
-            penalty = problem.exit_penalty(x, t)
-            r -= 0.0 if penalty is None else float(penalty)
+        if not problem.X.contains(x, t):
+            price = self.infeasible_cost
+            r -= float(price(x, t) if callable(price) else price)
             terminated, truncated = True, False
         elif self.finite_horizon and t >= self.tf - 0.5 * self.dt:
             r -= float(problem.require_cost().h(x, t))
@@ -405,27 +421,11 @@ def _box_bounds(space):
 
 def _state_bounds(sys):
     """Return the state bounds ``(lb, ub)`` as float32 arrays."""
-    lb, ub = sys.state.lower_bound, sys.state.upper_bound
-    if lb is None or ub is None:
-        raise ValueError(
-            "Sys2Gym requires state bounds; set sys.state.lower_bound and "
-            "sys.state.upper_bound."
-        )
-    return (
-        np.asarray(lb, dtype=np.float32),
-        np.asarray(ub, dtype=np.float32),
-    )
+    box = sys.state.box
+    return box.lower.astype(np.float32), box.upper.astype(np.float32)
 
 
 def _input_bounds(sys):
     """Return stacked input-port bounds ``(lb, ub)`` as float32 arrays."""
-    lb = np.full(sys.m, -np.inf, dtype=np.float32)
-    ub = np.full(sys.m, +np.inf, dtype=np.float32)
-    i = 0
-    for port in sys.inputs.values():
-        if port.lower_bound is not None:
-            lb[i : i + port.dim] = port.lower_bound
-        if port.upper_bound is not None:
-            ub[i : i + port.dim] = port.upper_bound
-        i += port.dim
-    return lb, ub
+    box = BoxInputSet.from_system_inputs(sys).box
+    return box.lower.astype(np.float32), box.upper.astype(np.float32)

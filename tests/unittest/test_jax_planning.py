@@ -60,7 +60,12 @@ class TestJaxDirectCollocation(unittest.TestCase):
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
         return PlanningProblem(
-            sys=sys, tf=1.0, x_start=np.array([0.0]), x_goal=np.array([1.0]), cost=cost
+            sys=sys,
+            tf=1.0,
+            x_start=np.array([0.0]),
+            x_goal=np.array([1.0]),
+            cost=cost,
+            X=sys.state.box,
         )
 
     def test_jax_cartpole_matches_numpy_dynamics(self):

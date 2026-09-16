@@ -305,7 +305,9 @@ penalty), and the prototype showed the exit penalty needs a task-dependent
 not a modeling one.
 
 **O4 — horizon and discount on the cost, exit rule on the problem
-(recommended).**
+(recommended; the exit rule was replaced 2026-09-15 — `X` is a hard constraint, unconstrained
+unless declared, `infeasible_cost` its price, and the training zone is a planner option:
+core-objects-3-exit-rule.md).**
 
 - `CostFunction` states its **horizon kind** and **discount**:
   `horizon="finite" | "infinite"` (default inferred from `problem.tf`:
@@ -371,7 +373,7 @@ block. Architecture configuration is a small spec, not a framework:
 
 | Piece | Home | Note |
 | --- | --- | --- |
-| `StochasticPlanningProblem`, distributions | `planning/problems.py`, `planning/distributions.py` | taxonomy plan placement |
+| `StochasticPlanningProblem`, distributions | `planning/problems.py`, `core/distributions.py` (moved to core 2026-09-15: the dependency law) | taxonomy plan placement |
 | `ReinforcementLearningPlanner`, PPO update, GAE | `planning/reinforcement_learning.py` (+ `ppo.py`) | sibling of `dp.py` |
 | `NeuralPolicyController`, `MLP` layers | `control/neural.py`, `blocks/neural/` | neural-blocks plan |
 | `Normalize`, `AngleFeatures`, `Scale` | `blocks/` | reusable beyond RL |

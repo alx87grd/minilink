@@ -52,8 +52,8 @@ problem = StochasticPlanningProblem(
     x0_distribution=Gaussian(
         [0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]
     ),
-    on_exit="terminate",
-    exit_cost=100.0,
+    infeasible_cost=100.0,
+    X=plant.state.box,
 )
 
 # Policy features: the error to the landed state, metres scaled by 0.25

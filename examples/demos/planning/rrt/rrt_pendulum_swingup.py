@@ -15,7 +15,11 @@ sys.inputs["u"].upper_bound = np.array([5.0])
 x_start = np.array([0.0, 0.0])  # hanging down, at rest
 x_goal = np.array([np.pi, 0.0])  # inverted, at rest
 problem = PlanningProblem(
-    sys=sys, x_start=x_start, x_goal=x_goal, Xf=BallSet(x_goal, 0.2)
+    sys=sys,
+    x_start=x_start,
+    x_goal=x_goal,
+    Xf=BallSet(x_goal, 0.2),
+    X=sys.state.box,
 )
 
 torques = [np.array([tau]) for tau in (-5.0, -2.0, 0.0, 2.0, 5.0)]

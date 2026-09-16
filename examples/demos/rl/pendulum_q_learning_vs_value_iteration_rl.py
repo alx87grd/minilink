@@ -39,8 +39,8 @@ problem = StochasticPlanningProblem(
     cost=cost,
     tf=np.inf,
     x0_distribution=Uniform(HANGING - 0.5, HANGING + 0.5),
-    on_exit="terminate",
-    exit_cost=INF,
+    infeasible_cost=INF,
+    X=plant.state.box,
 )
 
 # With the model: value iteration sweeps every node of the grid until the Bellman

@@ -166,6 +166,18 @@ def configure_jax(*, enable_x64: bool | None = None) -> types.ModuleType:
     return jax
 
 
+def is_jax_key(key) -> bool:
+    """``True`` for a JAX PRNG key (concrete or traced)."""
+    return array_module(key) is not np
+
+
+def numpy_generator(key) -> np.random.Generator:
+    """A NumPy generator from a generator, an integer seed, or ``None``."""
+    if isinstance(key, np.random.Generator):
+        return key
+    return np.random.default_rng(key)
+
+
 def array_module(*values) -> types.ModuleType:
     """Return ``jax.numpy`` if any value is a JAX array/tracer, else ``numpy``.
 

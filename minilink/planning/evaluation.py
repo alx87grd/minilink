@@ -8,9 +8,10 @@ sampled trajectory, :func:`score_trajectory`:
 - the discounted running cost ``exp(-rho t) g(x, u, t)`` integrated by the
   trapezoidal rule on the trajectory's own samples
   (:meth:`~minilink.core.costs.CostFunction.evaluate_trajectory`);
-- cut at the first sample outside the allowed box ``X`` — that sample is the
-  last one counted, the trial is a *failure*, and the exit is charged when the
-  problem prices it (``exit_cost`` or ``on_exit="terminate"``);
+- cut at the first sample outside the constraint set ``X`` — that sample is the
+  last one counted, the trial is a *failure*, and the price of infeasibility is
+  charged (the problem's ``infeasible_cost``, else the bound the environment
+  derives, else ``+inf``);
 - plus the terminal cost ``h(x_f, tf)`` when a finite horizon is reached.
 
 :class:`MonteCarloEvaluator` draws initial states (and plant parameters and
@@ -51,13 +52,15 @@ from minilink.planning.problems import as_stochastic
 # Public API
 
 
-def score_trajectory(problem, traj: Trajectory, params=None):
+def score_trajectory(problem, traj: Trajectory, params=None, infeasible_cost=np.inf):
     """
     Return ``(J, failed)`` of a sampled closed-loop trajectory under the problem's contract.
 
     ``traj`` carries the states and the applied inputs on a time grid;
     ``params`` are the cost parameters. ``failed`` is ``True`` when the
-    trajectory left the allowed box before the end of the grid.
+    trajectory left ``X`` before the end of the grid; the trial is then charged
+    the problem's ``infeasible_cost``, else ``infeasible_cost`` given here (an
+    evaluator passes the bound its environment derived; ``+inf`` otherwise).
     """
     cost = problem.require_cost()
     inside = np.array([problem.X.contains(traj.x[:, k]) for k in range(traj.n_samples)])
@@ -68,9 +71,8 @@ def score_trajectory(problem, traj: Trajectory, params=None):
     )
     J = float(cost.evaluate_trajectory(kept, params=params).signals["cost"][0, -1])
     if failed:
-        penalty = problem.exit_penalty(traj.x[:, last], float(traj.t[last]))
-        if penalty is not None:
-            J += float(penalty)
+        penalty = problem.infeasible_penalty(traj.x[:, last], float(traj.t[last]))
+        J += float(infeasible_cost if penalty is None else penalty)
     elif problem.horizon_kind() == "finite" and traj.t[-1] >= problem.tf - 1e-6:
         J += float(cost.h(traj.x[:, -1], float(traj.t[-1]), params=params))
     return J, failed
@@ -142,7 +144,7 @@ class MonteCarloEvaluator:
     Parameters
     ----------
     problem : StochasticPlanningProblem
-        Task (plant, cost, box, exit rule, horizon, distributions). A
+        Task (plant, cost, constraint set and its price, horizon, distributions). A
         deterministic :class:`~minilink.planning.problems.PlanningProblem` is
         scored from its single start.
     dt : float
@@ -155,7 +157,7 @@ class MonteCarloEvaluator:
         See the module docstring.
     seed : int
         Seed of the draws (the same seed gives the same draws on the JAX and
-        NumPy backends only through a :class:`~minilink.planning.distributions.Particles`
+        NumPy backends only through a :class:`~minilink.core.distributions.Particles`
         start distribution; the two random streams differ otherwise).
     record : bool
         Keep the trial trajectories (NumPy and simulator backends).
@@ -229,15 +231,12 @@ class MonteCarloEvaluator:
                 g_next = jnp.exp(-rho * t_next) * g(x_next, law(x_next, t_next), t_next)
                 J = J + alive * 0.5 * (g_k + g_next) * dt
 
-                # An exit sample is the last one counted, and is charged when priced
-                out = (
-                    jnp.any(x_next < env.x_lb)
-                    | jnp.any(x_next > env.x_ub)
-                    | ~jnp.all(jnp.isfinite(x_next))
-                )
+                # A failure (x_next left X) is the last sample counted, and is charged
+                out = ~jnp.all(
+                    env.X.margin(x_next, t_next, env.set_params) >= 0.0
+                ) | ~jnp.all(jnp.isfinite(x_next))
                 exits = alive & out
-                if env.charge_exit:
-                    J = J + exits * env.exit_penalty(x_next, t_next)
+                J = J + jnp.where(exits, env.infeasible_penalty(x_next, t_next), 0.0)
                 failed = failed | exits
                 alive = alive & ~out
                 return (x_next, t_next, J, alive, failed), None
@@ -286,7 +285,9 @@ class MonteCarloEvaluator:
                 u_full = env.input_vector(us[:, k], rng)
                 xs[:, k + 1] = env.plant_step(xs[:, k], u_full, t[k], params)
             traj = Trajectory(t=t, x=xs, u=us)
-            J[i], failed[i] = score_trajectory(problem, traj)
+            J[i], failed[i] = score_trajectory(
+                problem, traj, infeasible_cost=env.infeasible_cost
+            )
             if trajectories is not None:
                 trajectories.append(traj)
         return Evaluation(J, failed, x0s, trajectories)

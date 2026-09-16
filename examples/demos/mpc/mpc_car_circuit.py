@@ -178,7 +178,9 @@ if SHOW_COST_FIELD:
     plot_cost_field_3d(grid, title="Combined cost field", log_scale=True)
 
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON),
+    PlanningProblem(
+        sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON, X=sys_mpc.state.box
+    ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     compile_backend="jax",

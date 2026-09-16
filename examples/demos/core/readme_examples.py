@@ -80,6 +80,7 @@ problem = PlanningProblem(
     Xf=BallSet(x_up, 0.2),
     tf=4.0,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
+    X=plant.state.box,
 )
 
 vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)

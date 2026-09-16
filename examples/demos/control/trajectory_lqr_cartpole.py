@@ -27,7 +27,9 @@ plant.inputs["u"].upper_bound[0] = 10.0
 cost = QuadraticCost.from_system(
     plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), xbar=X_GOAL
 )
-problem = PlanningProblem(plant, tf=TF, x_start=X_START, x_goal=X_GOAL, cost=cost)
+problem = PlanningProblem(
+    plant, tf=TF, x_start=X_START, x_goal=X_GOAL, cost=cost, X=plant.state.box
+)
 planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=40,

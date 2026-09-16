@@ -37,6 +37,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "BallSet": ("minilink.core.sets", "BallSet"),
     "closed_loop_qdq": ("minilink.core.composition", "closed_loop_qdq"),
     "SingletonSet": ("minilink.core.sets", "SingletonSet"),
+    # distributions
+    "Distribution": ("minilink.core.distributions", "Distribution"),
+    "Gaussian": ("minilink.core.distributions", "Gaussian"),
+    "Uniform": ("minilink.core.distributions", "Uniform"),
+    "Particles": ("minilink.core.distributions", "Particles"),
+    "Sampler": ("minilink.core.distributions", "Sampler"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

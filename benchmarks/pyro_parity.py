@@ -128,7 +128,7 @@ def _pendulum_problem(*, bounds=10.0):
         R=np.array([[1.0]]),
         S=np.diag([10.0, 10.0]),
     )
-    return PlanningProblem(sys, x_goal=UPRIGHT_PYRO, cost=cost)
+    return PlanningProblem(sys, x_goal=UPRIGHT_PYRO, cost=cost, X=sys.state.box)
 
 
 def _double_pendulum_problem():
@@ -140,7 +140,7 @@ def _double_pendulum_problem():
     Q = np.diag([1.0, 0.5, 0.1, 0.05])
     R = np.diag([0.05, 0.05])
     cost = QuadraticCost.from_system(plant, xbar=GOAL_DOUBLE, Q=Q, R=R, S=Q)
-    return PlanningProblem(plant, x_goal=GOAL_DOUBLE, cost=cost)
+    return PlanningProblem(plant, x_goal=GOAL_DOUBLE, cost=cost, X=plant.state.box)
 
 
 def _sample_j_on_grid(grid, J: np.ndarray, n_sample: int = 200, rng=None):
@@ -316,6 +316,7 @@ def run_minilink_pendulum_rrt(*, seed=0, max_nodes=20000) -> ParityRow:
         x_start=x_start,
         x_goal=x_goal,
         Xf=BallSet(x_goal, 0.2),
+        X=sys.state.box,
     )
     extender = EulerKinodynamicExtender(controls=torques, horizon=0.1, n_substeps=1)
 

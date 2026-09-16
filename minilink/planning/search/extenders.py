@@ -67,7 +67,7 @@ class KinodynamicExtender(TrajectoryExtender):
 
     def _controls(self, problem, rng):
         if isinstance(self.controls, int):
-            return [problem.U.sample(rng)[0] for _ in range(self.controls)]
+            return [problem.U.sample(rng) for _ in range(self.controls)]
         if isinstance(self.controls, str):
             if self.controls != "bang-bang":
                 raise ValueError(

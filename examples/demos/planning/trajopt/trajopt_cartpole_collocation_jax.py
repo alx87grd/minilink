@@ -31,6 +31,7 @@ problem = PlanningProblem(
     x_start=x_start,
     x_goal=x_goal,
     cost=cost,
+    X=sys.state.box,
 )
 
 planner = TrajectoryOptimizationPlanner(

@@ -353,14 +353,16 @@ class DirectCollocationTranscription(Transcription):
         lower = np.full(n_z, -np.inf)
         upper = np.full(n_z, np.inf)
 
-        if isinstance(problem.X, BoxSet):
-            lower[: n * n_steps] = np.repeat(problem.X.lower, n_steps)
-            upper[: n * n_steps] = np.repeat(problem.X.upper, n_steps)
+        X_box = problem.X.bounding_box()
+        if X_box is not None:
+            lower[: n * n_steps] = np.repeat(X_box.lower, n_steps)
+            upper[: n * n_steps] = np.repeat(X_box.upper, n_steps)
 
-        if isinstance(problem.U, BoxInputSet):
+        U_box = problem.U.bounding_box()
+        if U_box is not None:
             start = n * n_steps
-            lower[start:] = np.repeat(problem.U.box.lower, n_steps)
-            upper[start:] = np.repeat(problem.U.box.upper, n_steps)
+            lower[start:] = np.repeat(U_box.lower, n_steps)
+            upper[start:] = np.repeat(U_box.upper, n_steps)
 
         return lower, upper
 
@@ -464,6 +466,8 @@ class DirectCollocationTranscription(Transcription):
         *,
         inequalities: list[ConstraintFunction],
     ) -> None:
+        # lowering (RULES 4.3): a box is already in the decision bounds; any other
+        # set contributes its margins as path inequalities
         if problem.X is not None and not isinstance(problem.X, BoxSet):
 
             def state_margins(z):

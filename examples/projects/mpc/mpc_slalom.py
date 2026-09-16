@@ -77,7 +77,9 @@ cost = QuadraticCost.from_system(
 )
 
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON),
+    PlanningProblem(
+        sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON, X=sys_mpc.state.box
+    ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     compile_backend="jax",

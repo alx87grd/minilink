@@ -81,7 +81,12 @@ class TestPlanningArchitecture(unittest.TestCase):
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
         return PlanningProblem(
-            sys=sys, tf=1.0, x_start=np.array([0.0]), x_goal=np.array([1.0]), cost=cost
+            sys=sys,
+            tf=1.0,
+            x_start=np.array([0.0]),
+            x_goal=np.array([1.0]),
+            cost=cost,
+            X=sys.state.box,
         )
 
     def test_box_and_boundary_sets(self):
@@ -2678,3 +2683,100 @@ def test_rrt_default_extender_is_bang_bang_from_input_bounds():
     assert any(np.allclose(u, lower) for u in controls)
     assert any(np.allclose(u, upper) for u in controls)
     assert bang_bang_controls(problem.U)[0].shape == lower.shape
+
+
+def test_collocation_bounds_survive_an_intersection():
+    """``X = bounds & free`` keeps the box in the decision bounds; the rest stays a margin."""
+    from minilink.core.sets import CallableSet
+    from minilink.planning.trajectory_optimization.direct_collocation import (
+        DirectCollocationOptions,
+        DirectCollocationTranscription,
+    )
+
+    class DoubleIntegrator(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=2, input_dim=1, output_dim=2)
+            self.state.lower_bound = np.array([-2.0, -3.0])
+            self.state.upper_bound = np.array([2.0, 3.0])
+            self.inputs["u"].lower_bound = np.array([-1.0])
+            self.inputs["u"].upper_bound = np.array([1.0])
+
+        def f(self, x, u, t=0, params=None):
+            return np.array([x[1], u[0]])
+
+    sys = DoubleIntegrator()
+    cost = QuadraticCost.from_system(sys)
+    free = CallableSet(lambda z, t, params: np.reshape(1.0 - abs(z[0]), (1,)))
+    boxed = PlanningProblem(
+        sys, x_start=np.zeros(2), x_goal=np.ones(2), cost=cost, tf=1.0, X=sys.state.box
+    )
+    mixed = PlanningProblem(
+        sys,
+        x_start=np.zeros(2),
+        x_goal=np.ones(2),
+        cost=cost,
+        tf=1.0,
+        X=sys.state.box & free,
+    )
+    transcription = DirectCollocationTranscription(DirectCollocationOptions(n_steps=4))
+    lower_boxed, upper_boxed = transcription.decision_bounds(boxed)
+    lower_mixed, upper_mixed = transcription.decision_bounds(mixed)
+    np.testing.assert_allclose(lower_mixed, lower_boxed)
+    np.testing.assert_allclose(upper_mixed, upper_boxed)
+    assert np.all(np.isfinite(lower_mixed))
+
+
+def test_box_probes_stay_at_the_solver_boundary():
+    """RULES 4.3: a tool asks a set for its bounding box; only the NLP lowering may probe a box type."""
+    import ast
+    import pathlib
+
+    import minilink
+
+    root = pathlib.Path(minilink.__file__).parent
+    lowering = {
+        "planning/trajectory_optimization/direct_collocation.py",
+        "planning/trajectory_optimization/shooting.py",
+        "planning/policy_synthesis/discretizer.py",
+    }
+    offenders = []
+    for path in sorted(root.rglob("*.py")):
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith("experimental/") or rel in lowering:
+            continue
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "id", None) == "isinstance"
+            ):
+                continue
+            if len(node.args) == 2:
+                names = {
+                    n.id for n in ast.walk(node.args[1]) if isinstance(n, ast.Name)
+                }
+                if names & {"BoxSet", "BoxInputSet"}:
+                    offenders.append(f"{rel}:{node.lineno}")
+    assert offenders == [], offenders
+
+
+def test_grid_exposes_the_boxes_it_spans():
+    from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
+
+    class DoubleIntegrator(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=2, input_dim=1, output_dim=2)
+            self.state.lower_bound = np.array([-2.0, -3.0])
+            self.state.upper_bound = np.array([2.0, 3.0])
+            self.inputs["u"].lower_bound = np.array([-1.0])
+            self.inputs["u"].upper_bound = np.array([1.0])
+
+        def f(self, x, u, t=0, params=None):
+            return np.array([x[1], u[0]])
+
+    problem = PlanningProblem(DoubleIntegrator(), x_goal=np.zeros(2))
+    grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+    np.testing.assert_allclose(grid.X.lower, [-2.0, -3.0])
+    np.testing.assert_allclose(grid.X.upper, [2.0, 3.0])
+    np.testing.assert_allclose(grid.U.box.lower, [-1.0])
+    assert all(grid.X.contains(x) for x in grid.states)
+    assert all(grid.U.contains(u) for u in grid.inputs)

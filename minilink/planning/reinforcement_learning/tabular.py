@@ -1,14 +1,16 @@
 """Tabular reinforcement learning on a state-space grid: Q-learning, SARSA and Monte Carlo control."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
-from minilink.core.sets import BoxSet
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingResult
+from minilink.planning.policy_synthesis.dp import (
+    DynamicProgrammingOptions,
+    DynamicProgrammingResult,
+)
 from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
 
@@ -117,12 +119,18 @@ class TabularLearningPlanner(Planner):
                 problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt
             )
         self.grid = grid
+        # The world is the grid: leaving it is infeasible, at the problem's price or
+        # value iteration's default, so the learner approaches the same table
+        price = problem.infeasible_cost
+        if price is None:
+            price = DynamicProgrammingOptions().out_of_bound_cost
         self.env = RolloutEnvironment(
-            problem,
+            replace(problem, X=problem.X & grid.X, infeasible_cost=price),
             dt=grid.dt,
             episode_length=episode_length,
             integrator=integrator,
             backend="numpy",
+            training_zone=grid.X,
         )
         if rounding not in ("stochastic", "nearest"):
             raise ValueError(
@@ -134,7 +142,6 @@ class TabularLearningPlanner(Planner):
         self.eta = None if eta is None else float(eta)
         self.alpha = cost.discount_factor(grid.dt) if alpha is None else float(alpha)
         self.exploring_starts = bool(exploring_starts)
-        self.grid_box = BoxSet(grid.x_lb, grid.x_ub)  # where exploring starts are drawn
         self.rng = np.random.default_rng(seed)
 
         self.Q = np.zeros((grid.nodes_n, grid.actions_n))
@@ -323,7 +330,7 @@ class TabularLearningPlanner(Planner):
     def start(self):
         """An episode's first state: anywhere on the grid, or the problem's own draw."""
         if self.exploring_starts:
-            return self.grid_box.sample(self.rng)[0]
+            return self.grid.X.sample(self.rng)  # anywhere on the grid
         return self.env.reset(self.rng)
 
     def node(self, x):

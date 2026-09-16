@@ -29,16 +29,19 @@ def double_integrator_problem(stochastic=False):
     plant.inputs["u"].lower_bound = np.array([-1.0])
     plant.inputs["u"].upper_bound = np.array([1.0])
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
-    exit_rule = dict(on_exit="terminate", exit_cost=20.0)  # one price for both tools
+    exit_rule = dict(infeasible_cost=20.0)  # one price for both tools
     if stochastic:
         return StochasticPlanningProblem(
             plant,
             cost=cost,
             tf=np.inf,
+            X=plant.state.box,
             x0_distribution=Uniform([-1, -1], [1, 1]),
             **exit_rule,
         )
-    return PlanningProblem(plant, x_start=[1.0, 0.0], cost=cost, tf=np.inf, **exit_rule)
+    return PlanningProblem(
+        plant, x_start=[1.0, 0.0], cost=cost, tf=np.inf, X=plant.state.box, **exit_rule
+    )
 
 
 def test_q_learning_approaches_value_iteration_on_the_same_grid():

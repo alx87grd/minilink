@@ -48,6 +48,7 @@ planner = TrajectoryOptimizationPlanner(
             R=0.1 * np.eye(1),
             xbar=x_goal,
         ),
+        X=sys.state.box,
     ),
     n_steps=8,
     transcription="direct_collocation",

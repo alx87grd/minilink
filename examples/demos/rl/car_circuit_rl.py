@@ -138,8 +138,8 @@ problem = StochasticPlanningProblem(
     cost=TrackCost(),
     tf=np.inf,
     x0_distribution=Sampler(start_anywhere, mean=x_start),
-    on_exit="terminate",
-    exit_cost=200.0,
+    infeasible_cost=200.0,
+    X=sys.state.box,
 )
 
 # Policy features: what a localized car senses — signed lateral offset,

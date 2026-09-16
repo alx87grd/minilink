@@ -1,15 +1,8 @@
-"""
-Deterministic allowable sets for planning problems.
+"""Allowable sets: ``x(t) in X(t)``, ``u(t) in U(x, t)`` and boundary sets ``x(tf) in Xf``.
 
-Sets model constraints such as ``x(t) in X(t)``, ``u(t) in U(x, t)``,
-and terminal goals ``x(tf) in Xf``. They expose boolean membership for
-search-style planners and nonnegative margins for optimization-style
-transcriptions.
-
-Construction, membership checks, and sampling are NumPy/Python boundary
-utilities. The equation methods ``margin`` and ``residual`` are native-array
-math paths: with NumPy input they return NumPy arrays, and with JAX input they
-return JAX arrays when the set formula is traceable.
+Membership is ``margin >= 0`` componentwise; ``margin`` is a native-array
+equation path (NumPy in, NumPy out; JAX in, JAX out), ``contains`` and
+``sample`` are NumPy boundary utilities.
 """
 
 from abc import ABC, abstractmethod
@@ -18,7 +11,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.backends import array_module
+from minilink.core.backends import (
+    array_module,
+    is_jax_key,
+    numpy_generator,
+    require_jax,
+)
 
 
 class Set(ABC):
@@ -31,13 +29,8 @@ class Set(ABC):
     """
 
     @abstractmethod
-    def margin(
-        self,
-        z: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
-        """Return nonnegative feasibility margins for ``z``."""
+    def margin(self, z, t=0.0, params=None):
+        """Return nonnegative feasibility margins for ``z``, shape ``(k,)``."""
         ...
 
     def contains(
@@ -51,24 +44,25 @@ class Set(ABC):
         margin = np.asarray(self.margin(z_arr, t=t, params=params), dtype=float)
         return bool(np.all(margin >= 0.0))
 
-    def sample(
-        self,
-        rng: np.random.Generator | None = None,
-        n: int = 1,
-        params=None,
-    ) -> np.ndarray:
+    def sample(self, key=None, n=None, params=None):
         """
-        Draw samples from the set when supported.
+        Draw one point ``(dim,)`` or ``n`` points ``(n, dim)`` from the set when supported.
 
-        Search planners can use this optional method for samplable sets
-        such as boxes. Complex sets may leave it unimplemented and rely
-        on solver-provided samplers.
+        ``key`` is a NumPy generator, an integer seed, ``None`` (unseeded) or a JAX
+        PRNG key (JAX arrays out, traceable): the draw convention of
+        :class:`~minilink.core.distributions.Distribution`. Search planners use
+        this optional method on samplable sets such as boxes; other sets leave it
+        unimplemented and are sampled by rejection from a box.
         """
         raise NotImplementedError("Sampling is not available for this set")
 
+    def bounding_box(self):
+        """The tightest :class:`BoxSet` containing the set, or ``None`` when it has none."""
+        return None
+
     def __and__(self, other: "Set") -> "IntersectionSet":
         """Return the intersection ``self & other`` of two sets."""
-        return IntersectionSet((self, other))
+        return IntersectionSet.of(self, other)
 
 
 class InputSet(ABC):
@@ -81,14 +75,8 @@ class InputSet(ABC):
     """
 
     @abstractmethod
-    def margin(
-        self,
-        u: np.ndarray,
-        x: np.ndarray | None = None,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
-        """Return nonnegative feasibility margins for ``u``."""
+    def margin(self, u, x=None, t=0.0, params=None):
+        """Return nonnegative feasibility margins for ``u``, shape ``(k,)``."""
         ...
 
     def contains(
@@ -107,16 +95,13 @@ class InputSet(ABC):
         )
         return bool(np.all(margin >= 0.0))
 
-    def sample(
-        self,
-        rng: np.random.Generator | None = None,
-        n: int = 1,
-        x: np.ndarray | None = None,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
-        """Draw input samples when supported."""
+    def sample(self, key=None, n=None, x=None, t=0.0, params=None):
+        """Draw one input ``(m,)`` or ``n`` inputs ``(n, m)`` when supported (same convention as :meth:`Set.sample`)."""
         raise NotImplementedError("Sampling is not available for this input set")
+
+    def bounding_box(self):
+        """The tightest :class:`BoxSet` of inputs containing the set, or ``None`` when it has none."""
+        return None
 
 
 @dataclass(frozen=True)
@@ -150,32 +135,32 @@ class BoxSet(Set):
 
     @classmethod
     def from_system_state(cls, sys) -> "BoxSet":
-        """Create a state box from ``sys.state`` metadata."""
-        return cls(sys.state.lower_bound, sys.state.upper_bound)
+        """The state box of ``sys``: its state bounds (``sys.state.box``)."""
+        return sys.state.box
 
-    def margin(
-        self,
-        z: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
-        """Return lower and upper bound margins."""
+    def bounding_box(self):
+        """A box is its own bounding box."""
+        return self
+
+    def margin(self, z, t=0.0, params=None):
+        """Return the margins to the lower and upper faces, shape ``(2n,)``."""
         xp = array_module(z)
-        return xp.concatenate((z - self.lower, self.upper - z))
+        lower, upper = self.lower, self.upper
 
-    def sample(
-        self,
-        rng: np.random.Generator | None = None,
-        n: int = 1,
-        params=None,
-    ) -> np.ndarray:
-        """Draw uniformly from a finite box."""
-        if n < 1:
-            raise ValueError("n must be greater than or equal to 1")
-        if not (np.all(np.isfinite(self.lower)) and np.all(np.isfinite(self.upper))):
+        return xp.concatenate((z - lower, upper - z))
+
+    def sample(self, key=None, n=None, params=None):
+        """Draw uniformly from a finite box: ``(dim,)`` for one point, ``(n, dim)`` with ``n``."""
+        lower, upper = self.lower, self.upper
+        if not (np.all(np.isfinite(lower)) and np.all(np.isfinite(upper))):
             raise ValueError("Cannot sample from a box with infinite bounds")
-        generator = np.random.default_rng() if rng is None else rng
-        return generator.uniform(self.lower, self.upper, size=(int(n), self.dim))
+        if n is not None and int(n) < 1:
+            raise ValueError("n must be greater than or equal to 1")
+        shape = (self.dim,) if n is None else (int(n), self.dim)
+        if is_jax_key(key):
+            jax = require_jax()
+            return jax.random.uniform(key, shape, minval=lower, maxval=upper)
+        return numpy_generator(key).uniform(lower, upper, size=shape)
 
 
 @dataclass(frozen=True)
@@ -191,26 +176,26 @@ class BoxInputSet(InputSet):
         """Create an input box from lower and upper arrays."""
         return cls(BoxSet(lower, upper))
 
-    def margin(
-        self,
-        u: np.ndarray,
-        x: np.ndarray | None = None,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
-        """Return lower and upper input-bound margins."""
-        return self.box.margin(u, t=t, params=params)
+    @classmethod
+    def from_system_inputs(cls, sys) -> "BoxInputSet":
+        """The input box of ``sys``: its input ports' bounds, stacked in port order."""
+        boxes = [port.box for port in sys.inputs.values()]
+        lower = np.concatenate([box.lower for box in boxes]) if boxes else np.zeros(0)
+        upper = np.concatenate([box.upper for box in boxes]) if boxes else np.zeros(0)
+        return cls(BoxSet(lower, upper))
 
-    def sample(
-        self,
-        rng: np.random.Generator | None = None,
-        n: int = 1,
-        x: np.ndarray | None = None,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
-        """Draw uniformly from the input box."""
-        return self.box.sample(rng=rng, n=n, params=params)
+    def bounding_box(self):
+        """The input box itself."""
+        return self.box
+
+    def margin(self, u, x=None, t=0.0, params=None):
+        """Return the margins to the input box faces, shape ``(2m,)``."""
+        box = self.box
+        return box.margin(u, t=t, params=params)
+
+    def sample(self, key=None, n=None, x=None, t=0.0, params=None):
+        """Draw uniformly from the input box: ``(m,)`` for one input, ``(n, m)`` with ``n``."""
+        return self.box.sample(key, n, params)
 
 
 @dataclass(frozen=True)
@@ -234,18 +219,20 @@ class SingletonSet(Set):
         """Dimension of the singleton point."""
         return int(self.point.size)
 
-    def residual(self, z: np.ndarray) -> np.ndarray:
-        """Return equality residual ``z - point``."""
-        return z - self.point
+    def bounding_box(self):
+        """The degenerate box ``point <= z <= point``."""
+        return BoxSet(self.point, self.point)
 
-    def margin(
-        self,
-        z: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
+    def residual(self, z):
+        """Return the equality residual ``z - point``, shape ``(n,)``."""
+        point = self.point
+        return z - point
+
+    def margin(self, z, t=0.0, params=None):
         """Return zero only when ``z`` equals the singleton point."""
         xp = array_module(z)
+
+        # equality as a degenerate inequality: -|z - p| >= 0 holds only at p
         return -xp.abs(self.residual(z))
 
 
@@ -271,17 +258,20 @@ class BallSet(Set):
         """Dimension of the ball center."""
         return int(self.center.size)
 
-    def margin(
-        self,
-        z: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
-        """Return the signed distance margin to the ball boundary."""
+    def bounding_box(self):
+        """The box of half-width ``radius`` about the center."""
+        center, radius = self.center, self.radius
+        return BoxSet(center - radius, center + radius)
+
+    def margin(self, z, t=0.0, params=None):
+        """Return the signed distance to the ball boundary, shape ``(1,)``."""
         xp = array_module(z)
-        return xp.reshape(self.radius - xp.linalg.norm(z - self.center), (1,))
+        center, radius = self.center, self.radius
+
+        return xp.reshape(radius - xp.linalg.norm(z - center), (1,))
 
 
+@dataclass(frozen=True)
 class CallableSet(Set):
     """
     Set backed by user callables.
@@ -289,32 +279,24 @@ class CallableSet(Set):
     Parameters
     ----------
     margin_fn : callable, optional
-        Function ``margin_fn(z, t, params) -> np.ndarray``.
+        Function ``margin_fn(z, t, params) -> array``.
     contains_fn : callable, optional
         Function ``contains_fn(z, t, params) -> bool``.
     """
 
-    def __init__(
-        self,
-        margin_fn: Callable[[np.ndarray, float, object | None], np.ndarray]
-        | None = None,
-        contains_fn: Callable[[np.ndarray, float, object | None], bool] | None = None,
-    ) -> None:
-        self.margin_fn = margin_fn
-        self.contains_fn = contains_fn
+    margin_fn: Callable | None = None
+    contains_fn: Callable | None = None
+
+    def __post_init__(self) -> None:
         if self.margin_fn is None and self.contains_fn is None:
             raise ValueError("Provide at least one of margin_fn or contains_fn")
 
-    def margin(
-        self,
-        z: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
+    def margin(self, z, t=0.0, params=None):
         """Evaluate the user-supplied margin function."""
-        if self.margin_fn is None:
+        margin_fn = self.margin_fn
+        if margin_fn is None:
             raise NotImplementedError("This CallableSet has no margin function")
-        return self.margin_fn(z, t, params)
+        return margin_fn(z, t, params)
 
     def contains(
         self,
@@ -328,27 +310,59 @@ class CallableSet(Set):
         return super().contains(z, t=t, params=params)
 
 
+@dataclass(frozen=True)
 class IntersectionSet(Set):
     """
-    Intersection of multiple sets.
+    Intersection of several sets, ``z in Z_1 and z in Z_2 and ...``.
 
-    This is a small convenience for combining boxes, goal regions, and
-    collision-free domains without introducing a separate constraint layer.
+    Built by the ``&`` operator on :class:`Set`; ``a & b & c`` is one flat
+    intersection of three members.
     """
 
-    def __init__(self, sets: tuple[Set, ...] | list[Set]) -> None:
+    sets: tuple
+
+    def __post_init__(self) -> None:
+        sets = tuple(self.sets)
         if not sets:
             raise ValueError("IntersectionSet requires at least one set")
-        self.sets = tuple(sets)
+        object.__setattr__(self, "sets", sets)
 
-    def margin(
-        self,
-        z: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> np.ndarray:
-        """Concatenate margins from all member sets."""
+    @classmethod
+    def of(cls, *sets: Set) -> "IntersectionSet":
+        """Build an intersection, flattening nested intersections into one member list."""
+        members: list[Set] = []
+        for set_ in sets:
+            if isinstance(set_, IntersectionSet):
+                members.extend(set_.sets)
+            else:
+                members.append(set_)
+        return cls(tuple(members))
+
+    def bounding_box(self):
+        """The intersection of the members' boxes; ``None`` when no member has one."""
+        boxes = [
+            box
+            for box in (set_.bounding_box() for set_ in self.sets)
+            if box is not None
+        ]
+        if not boxes:
+            return None
+        lower = np.max([box.lower for box in boxes], axis=0)
+        upper = np.min([box.upper for box in boxes], axis=0)
+        return BoxSet(lower, upper)
+
+    def margin(self, z, t=0.0, params=None):
+        """Concatenate the margins of all member sets."""
         xp = array_module(z)
+        sets = self.sets
+
         return xp.concatenate(
-            [set_.margin(z, t=t, params=params).reshape(-1) for set_ in self.sets]
+            [set_.margin(z, t=t, params=params).reshape(-1) for set_ in sets]
         )
+
+
+def is_finite_box(box) -> bool:
+    """``True`` for a box with finite bounds on every axis."""
+    return box is not None and bool(
+        np.all(np.isfinite(box.lower)) and np.all(np.isfinite(box.upper))
+    )

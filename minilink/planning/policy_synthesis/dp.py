@@ -277,9 +277,11 @@ class DynamicProgrammingPlanner(Planner):
             verbose=verbose,
             clean_infeasible=clean_infeasible,
         )
-        # The problem's exit rule is the default price of leaving the grid
-        if out_of_bound_cost is _UNSET and isinstance(problem.exit_cost, float):
-            self.options = replace(self.options, out_of_bound_cost=problem.exit_cost)
+        # The problem's price of infeasibility is the default price of leaving the grid
+        if out_of_bound_cost is _UNSET and isinstance(problem.infeasible_cost, float):
+            self.options = replace(
+                self.options, out_of_bound_cost=problem.infeasible_cost
+            )
         # The cost's continuous rate becomes the per-step factor unless alpha is set
         if (
             alpha is _UNSET
@@ -530,8 +532,8 @@ class DynamicProgrammingPlanner(Planner):
                     # Forward dynamics
                     x_next = sys.f(x, u, t, params.system) * dt + x
 
-                    # if the next state is not out-of-bound
-                    if X.contains(x_next, t, params.sets):
+                    # if the next state is in X and on the grid (the table's domain)
+                    if X.contains(x_next, t, params.sets) and grid.X.contains(x_next):
                         # Estimated (interpolation) cost to go of arrival x_next state
                         J_next = J_interpol(x_next)[0]
 

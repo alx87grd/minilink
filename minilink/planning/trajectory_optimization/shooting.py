@@ -196,9 +196,10 @@ class ShootingTranscription(Transcription):
         n_z = self.decision_dimension(problem)
         lower = np.full(n_z, -np.inf)
         upper = np.full(n_z, np.inf)
-        if isinstance(problem.U, BoxInputSet):
-            lower[:] = np.repeat(problem.U.box.lower, self.options.n_steps)
-            upper[:] = np.repeat(problem.U.box.upper, self.options.n_steps)
+        U_box = problem.U.bounding_box()
+        if U_box is not None:
+            lower[:] = np.repeat(U_box.lower, self.options.n_steps)
+            upper[:] = np.repeat(U_box.upper, self.options.n_steps)
         return lower, upper
 
     def pack_initial_guess(
@@ -331,6 +332,7 @@ class ShootingTranscription(Transcription):
 
             inequalities.append(state_margins)
 
+        # lowering (RULES 4.3): an input box is already in the decision bounds
         if problem.U is not None and not isinstance(problem.U, BoxInputSet):
 
             def input_margins(z):

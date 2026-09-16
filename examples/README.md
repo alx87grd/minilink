@@ -42,8 +42,8 @@ twin → README / `tutorial` only if core-tool canonical.
 `experimental/<topic>/` or `projects/`.
 
 **Demo naming:** no `demo_` prefix. Keep the topic in the stem when needed —
-e.g. `mpc/mpc_car_minimal.py`. **Demo style:** one-line docstring, top-level
-constants + sequential calls (open and run); no `def main()`. Do not mix
+e.g. `mpc/mpc_car_minimal.py`. **Demo style:** RULES 6.1, 6.10 and 6.11 — the
+shortest sequence of library verbs, native prints and plots, flat, side work in its own cell. Do not mix
 `.ipynb` and `.py` in the same leaf folder (except inside one named project).
 
 ## Open in Colab

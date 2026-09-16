@@ -7,8 +7,8 @@ import pytest
 
 from minilink import Pendulum
 from minilink.core.costs import CostFunction
+from minilink.core.distributions import Gaussian, Uniform
 from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
-from minilink.planning.distributions import Gaussian, Uniform
 from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
 from minilink.planning.results import PlanningSolution
 
@@ -54,6 +54,7 @@ def problem(**kwargs):
     return StochasticPlanningProblem(
         plant,
         cost=HangCost(),
+        X=plant.state.box,
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
         **kwargs,
     )
@@ -62,9 +63,18 @@ def problem(**kwargs):
 # --- environment semantics ---
 
 
-def test_environment_infinite_horizon_truncates_and_bootstraps_by_default():
-    env = RolloutEnvironment(problem(tf=np.inf), dt=0.1, episode_length=0.3)
-    assert not env.finite_horizon and not env.charge_exit
+def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default():
+    # no X declared: the plant's state box is the training zone, not a constraint
+    free = StochasticPlanningProblem(
+        bounded_pendulum(),
+        cost=HangCost(),
+        tf=np.inf,
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+    )
+    env = RolloutEnvironment(free, dt=0.1, episode_length=0.3)
+    assert not env.finite_horizon and np.isfinite(
+        env.infeasible_cost
+    )  # bound over the zone
     x, t = jnp.zeros(2), 0.0
     for _ in range(2):
         x, t, r, terminated, truncated = env.step(
@@ -73,18 +83,20 @@ def test_environment_infinite_horizon_truncates_and_bootstraps_by_default():
         assert not bool(terminated) and not bool(truncated)
     x, t, r, terminated, truncated = env.step(x, t, jnp.zeros(1), jax.random.PRNGKey(0))
     assert bool(truncated) and not bool(terminated)  # episode length reached
-    # leaving the box: truncated (bootstrap), no charge
+    # leaving the training zone: truncated (bootstrap), no charge
     _, _, r_exit, terminated, truncated = env.step(
         jnp.array([3.1, 7.9]), 0.0, jnp.array([4.0]), jax.random.PRNGKey(0)
     )
     assert bool(truncated) and not bool(terminated)
+    expected = -float(env.cost.g(jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0)) * env.dt
+    np.testing.assert_allclose(
+        float(r_exit), expected
+    )  # the running cost only, no price
 
 
-def test_environment_finite_horizon_charges_h_and_exit_cost():
-    env = RolloutEnvironment(
-        problem(tf=0.2, on_exit="terminate", exit_cost=50.0), dt=0.1
-    )
-    assert env.finite_horizon and env.charge_exit
+def test_environment_finite_horizon_charges_h_and_infeasible_cost():
+    env = RolloutEnvironment(problem(tf=0.2, infeasible_cost=50.0), dt=0.1)
+    assert env.finite_horizon and env.infeasible_cost == 50.0
     x, t, r1, terminated, _ = env.step(
         jnp.zeros(2), 0.0, jnp.zeros(1), jax.random.PRNGKey(0)
     )
@@ -391,7 +403,7 @@ def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
 
 
 def test_planner_trains_with_randomized_parameters():
-    from minilink.planning.distributions import Particles
+    from minilink.core.distributions import Particles
 
     plant = bounded_pendulum()
     prob = StochasticPlanningProblem(
@@ -418,7 +430,7 @@ def test_planner_trains_with_randomized_parameters():
 
 def test_outer_loop_on_an_inner_loop_with_nested_params():
     from minilink.control import StateFeedbackController
-    from minilink.planning.distributions import Particles
+    from minilink.core.distributions import Particles
     from minilink.planning.evaluation import MonteCarloEvaluator
     from minilink.planning.problems import lookup_param, merge_params
 
