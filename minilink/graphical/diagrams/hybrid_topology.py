@@ -103,9 +103,7 @@ def export_hybrid_topology(
 
         return export_hybrid_mermaid(topology, **kwargs)
     raise ValueError(
-        "Unknown hybrid topology backend {!r}. Expected 'graphviz' or 'mermaid'.".format(
-            backend
-        )
+        f"Unknown hybrid topology backend {backend!r}. Expected 'graphviz' or 'mermaid'."
     )
 
 

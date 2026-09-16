@@ -203,9 +203,7 @@ def plot_time_signals(
 
         return render_plotly_signal_plot(spec, show=show, **kwargs)
     raise ValueError(
-        "Unknown signal backend {!r}. Expected 'matplotlib' or 'plotly'.".format(
-            backend
-        )
+        f"Unknown signal backend {backend!r}. Expected 'matplotlib' or 'plotly'."
     )
 
 
@@ -258,9 +256,7 @@ def open_time_signal_plot(
             **kwargs,
         )
     raise ValueError(
-        "Unknown signal backend {!r}. Expected 'matplotlib' or 'plotly'.".format(
-            backend
-        )
+        f"Unknown signal backend {backend!r}. Expected 'matplotlib' or 'plotly'."
     )
 
 
