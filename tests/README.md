@@ -8,7 +8,7 @@ The historical six-layer test plan was retired on 2026-09-05 (see [docs/plans/RE
 
 ## Entry points
 
-**Prerequisites:** repo root, conda env **`minilink`**, `pip install -e .` (see [README.md#install](../README.md#install)). `PYTHONPATH=.` still works as a fallback.
+**Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (see [README.md#install](../README.md#install)).
 
 ### Folder layout (everything under `tests/` or `benchmarks/`)
 
@@ -198,7 +198,7 @@ Or install library extras in another Python 3.10+ environment (this is not the
 Full teaching stack — no Jupyter / SB3; see [install.md](../install.md)):
 
 ```bash
-pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt,rl]"
+pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt,rl,diagrams]"
 SDL_VIDEODRIVER=dummy pytest
 ```
 

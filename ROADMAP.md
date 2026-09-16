@@ -12,7 +12,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **0.1.0 cut**: install from the repo (`conda` + `pip install -e .`). Names the course notebooks already use stay frozen. PyPI index publication is v0.2. |
+| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **0.1.0 cut**; conda from `environment.yml` is the supported install. Names the course notebooks already use stay frozen. PyPI publication is v0.2. |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), the deferred v0.1 items in §5 Phase 2, and a `pip install minilink` option (conda stays the recommended local install). | Winter 2027 |
 | **v1.0** | The foundation questions deferred in §6 (hybrid as a `System`, evaluator/solver layering, geometry unification), after two cohorts. | 2027 |
 
@@ -128,9 +128,8 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
 
 Out of the v0.1 checklist by decision: MPC/hybrid (provisional, lesson keeps
 shipping), estimation, identification, frequency-domain tools (landed
-2026-09-07 but gated by §4.2, not by v0.1), PyPI *index* publication (later;
-`pip install -e .` from the clone is the 0.1 path, conda remains the
-recommended local env).
+2026-09-07 but gated by §4.2, not by v0.1), PyPI publication (later; conda
+remains the local path).
 
 ### 4.2 v0.2 — GRO501 end to end
 

@@ -8,15 +8,13 @@ optimization backends.
 
 **Conda is recommended.** [`environment.yml`](environment.yml) installs all
 optional extras so every minilink feature is available. It is the validated and
-supported path. Then `pip install -e .` registers the package (and
-`minilink.__version__`) in that env.
+supported path.
 
 **Pip warning.** Graphviz and Ipopt are non-Python binaries that pip cannot
-install. Graphviz is only for `plot_diagram()`; the core extra `[diagrams]`
-installs the Python wrapper, and you still need the system `dot` binary.
-Ipopt is an optional NLP backend; trajopt defaults to SciPy. Install Graphviz
-first ([download](https://graphviz.org/download/), or `apt` / `brew`) if you
-need diagrams, or skip `[diagrams]` / use a `*-nographviz.txt` file below.
+install. Graphviz is only for `plot_diagram()`. Ipopt is an optional NLP
+backend; trajopt defaults to SciPy. Install Graphviz first
+([download](https://graphviz.org/download/), or `apt` / `brew`) if you need
+diagrams, or use a `*-nographviz.txt` file below.
 
 ## Pick a tier
 
@@ -40,23 +38,22 @@ PPO notebooks need **Full**. VI and LQR run on **Basic**.
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 conda env create -f environment-basic.yml
 conda activate minilink-basic
-pip install -e .
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink-basic
 ```
 
 ### Pip
 
-The system `dot` binary is only for `plot_diagram()` (`apt` / `brew` /
-[Windows installer](https://graphviz.org/download/)). Skip it with
-`pip install -e .` (no `[diagrams]` extra).
+pip installs the Graphviz Python wrapper; you also need the system `dot` binary
+(`apt install graphviz`, `brew install graphviz`, or
+[Windows installer](https://graphviz.org/download/)). Use
+`requirements-nographviz.txt` to skip Graphviz and `plot_diagram()`.
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[diagrams]"                        # or: pip install -e .  (skip plot_diagram)
+pip install -r requirements.txt                     # or requirements-nographviz.txt
+export PYTHONPATH="$PWD"                            # Windows PS: $env:PYTHONPATH = (Get-Location)
 ```
-
-`pip install -e .` is the v0.1 install. The `requirements*.txt` files are the
-same dependency lists if you prefer to pin them by hand.
 
 ### Colab
 
@@ -89,20 +86,20 @@ Same as [README § Install](README.md#install):
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 conda env create -f environment.yml
 conda activate minilink
-pip install -e .
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
 ### Pip
 
-Same Graphviz note as Basic (`dot` binary, or omit `[diagrams]`).
+Same Graphviz note as Basic (`dot` binary, or `requirements-full-nographviz.txt`).
 Pip Full does not include Ipopt/`cyipopt` (conda Full does); trajopt still runs
-with SciPy. The `requirements-full*.txt` files match those extras if you pin
-by hand.
+with SciPy.
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[jax,visualization,plotting,symbolic,rl,diagrams]"
+pip install -r requirements-full.txt                # or requirements-full-nographviz.txt
+export PYTHONPATH="$PWD"                            # Windows PS: $env:PYTHONPATH = (Get-Location)
 ```
 
 ### Colab
@@ -128,8 +125,7 @@ if "google.colab" in sys.modules:
 
 ## Troubleshooting
 
-- **`No module named 'minilink'`** — from the repo root, `pip install -e .` (or
-  `export PYTHONPATH="$PWD"`).
+- **`No module named 'minilink'`** — set `PYTHONPATH` to the repo root (`export PYTHONPATH="$PWD"`).
 - **`failed to execute 'dot'`** — install Graphviz, or reinstall with a `*-nographviz.txt` file and skip `plot_diagram()`.
 - **Missing `stable_baselines3` / `torch`** — you need the **Full** tier for PPO notebooks.
 - **`cyipopt` / Ipopt errors** — optional; Basic omits it. Use default SciPy solvers, or Full conda / `conda install -c conda-forge ipopt cyipopt`.

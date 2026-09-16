@@ -118,7 +118,7 @@ After the term, in the order the cohort's questions suggest:
 - [x] **RL as primary planner (2026-09-10)** — `ReinforcementLearningPlanner` with pure-JAX PPO/SAC, `StochasticPlanningProblem`, `NeuralPolicyController`, `MonteCarloEvaluator`; verified on UR5 showcase; canonical demos in `examples/demos/rl/` and intro chapter `11_reinforcement_learning.ipynb`.
 - [x] **Lyapunov certificates (2026-09-11)** — `region_of_attraction()` returning `LyapunovCertificate` with `verify()`, `contains()`, `plot()`, and system shortcuts; verified on UR5 impedance loop in `showcase_from_rl_to_bode.ipynb`.
 - [x] **CBF design doc (2026-09-11)** — [docs/plans/cbf-safety-filter.md](cbf-safety-filter.md): $C^1$ bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block.
-- [x] **v0.1 install path (2026-09-16)** — `pip install -e .` from the clone (conda env still recommended); `minilink.__version__` from hatch-vcs; Graphviz is the `[diagrams]` extra, not a core dependency.
+- [x] **v0.1 pip packaging (2026-09-16)** — hatch-vcs `__version__`, Graphviz as the `[diagrams]` extra, CI installs that extra. Supported local install remains conda + `PYTHONPATH` (README / install.md).
 - [ ] PyPI publication as a third install option (conda stays recommended). **[ask]**
 - [ ] **S41** Profile `rollout_batch` with a `params` family: 278 ms vs 27 ms for the plain batch (pendulum, 1000 × 1000 RK4 steps, 2026-09-09). Done when the family path is within 2× of the plain batch.
 - [ ] **S42** `plot_cost2go` colour scale clipped at `out_of_bound_cost` by default (the showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default.

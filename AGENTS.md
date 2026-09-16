@@ -113,8 +113,7 @@ Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for he
 
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
 
-Use conda env **`minilink`** from environment.yml; setup in README.md (install)
-(`pip install -e .` from the repo root).
+Use conda env **`minilink`** from environment.yml; setup in README.md (install) (`PYTHONPATH` = repo root).
 
 **Big review pass** (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes):
 

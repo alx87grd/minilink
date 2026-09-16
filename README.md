@@ -206,17 +206,16 @@ The boundary between the two is a contract, not a convention:
 ## Install
 
 Python 3.10+. Recommended: the conda environment from
-[`environment.yml`](environment.yml), then an editable install so `minilink`
-is a real package (`__version__` included).
+[`environment.yml`](environment.yml).
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
 conda env create -f environment.yml && conda activate minilink
-pip install -e .
+conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
 Or open any notebook in Colab: the first cell clones the repository. Basic
-tier, pip extras (`[jax]`, `[diagrams]`, …), and options: [install.md](install.md).
+tier, pip, and options: [install.md](install.md).
 
 ## Learn more
 

@@ -7,10 +7,11 @@
 # Create:
 #   conda env create -f environment.yml
 #   conda activate minilink
-#   pip install -e .
 #
-# `pip install -e .` registers the package in this env (and writes
-# minilink/_version.py). PYTHONPATH="$PWD" still works as a fallback.
+# Repo-root import (matches README). Inside this env, `pip install -e ".[dev]"`
+# is an alternative to PYTHONPATH (dev tools are already in the yml):
+#   conda env config vars set PYTHONPATH="$PWD"
+#   conda deactivate && conda activate minilink
 #
 # CI tests Python 3.10–3.13; pin below to match your local conda env.
 
