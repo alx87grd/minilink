@@ -115,6 +115,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         x_start=x_start,
         x_goal=x_goal,
         cost=cost,
+        X=sys.state.box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
@@ -220,7 +221,9 @@ def run_bicycle_parametric(
             0.0,
         ]
     )
-    problem = PlanningProblem(sys=sys, x_start=x_start, cost=cost, tf=BICYCLE_TF)
+    problem = PlanningProblem(
+        sys=sys, x_start=x_start, cost=cost, tf=BICYCLE_TF, X=sys.state.box
+    )
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=DirectCollocationTranscription(

@@ -51,7 +51,9 @@ class Drone2D(MechanicalSystem):
         xp = array_module(q)
 
         # diagonal translational and rotational inertia
-        return xp.diag(xp.array([mass, mass, inertia]))
+        H = xp.diag(xp.array([mass, mass, inertia]))
+
+        return H
 
     def C(self, q, dq, params=None):
         return array_module(q).zeros((3, 3))
@@ -64,12 +66,14 @@ class Drone2D(MechanicalSystem):
 
         # both thrusters push along the body vertical; their difference yaws
         # fmt: off
-        return xp.array([
+        B = xp.array([
             [    -s,     -s],
             [     c,      c],
             [-offset, offset],
         ])
         # fmt: on
+
+        return B
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -77,7 +81,9 @@ class Drone2D(MechanicalSystem):
         gravity = params["gravity"]
 
         # weight pulls down along +y in screen coordinates
-        return array_module(q).array([0.0, mass * gravity, 0.0])
+        g = array_module(q).array([0.0, mass * gravity, 0.0])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -85,13 +91,15 @@ class Drone2D(MechanicalSystem):
         xp = array_module(dq)
 
         # quadratic aero drag on translation plus light linear damping on all DOF
-        return xp.array(
+        tau_d = xp.array(
             [
                 cda * dq[0] * xp.abs(dq[0]) + 0.01 * dq[0],
                 cda * dq[1] * xp.abs(dq[1]) + 0.01 * dq[1],
                 0.01 * dq[2],
             ]
         )
+
+        return tau_d
 
     def get_kinematic_geometry(self):
         return {
@@ -150,7 +158,9 @@ class Drone2DWithSideThruster(Drone2D):
 
         # extend the two-thruster matrix with a body-lateral thruster column
         lateral = xp.array([xp.cos(theta), xp.sin(theta), 0.0])
-        return xp.column_stack([super().B(q, params), lateral])
+        B = xp.column_stack([super().B(q, params), lateral])
+
+        return B
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         dynamic = super().get_dynamic_geometry(x, u[:2], t)
@@ -183,7 +193,9 @@ class SpeedControlledDrone2D(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         # the commanded velocity is the position rate directly
-        return array_module(u).asarray(u)
+        dx = array_module(u).asarray(u)
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -235,7 +247,9 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
         vx = params["vx"]
 
         # vertical force drives altitude; horizontal cruise speed stays constant
-        return array_module(x, u).array([u[0] / mass, x[0], vx])
+        dx = array_module(x, u).array([u[0] / mass, x[0], vx])
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x

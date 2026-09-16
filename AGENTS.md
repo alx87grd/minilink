@@ -34,7 +34,7 @@ Pytest policy: tests/README.md. Examples map: examples/README.md.
 | docs/plans/TODO.md | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
 | docs/plans/ | Active **design** writeups only (multi-step plans; delete finished plan docs) |
 | docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
-| docs/pitch/ | The five-slide pitch (`slides.html` + `pitch.css`): single source for the docs landing page (`docs/index.rst`) and the standalone deck `docs/_static/pitch.html` built by `docs/make_assets.py` (also the README GIFs and diagram PNG; `ur5_meshcat.gif` is a screen recording, not rebuilt) |
+| docs/ | Sphinx autodoc of the teaching-lane API (`docs/api/`, `docs/index.rst`); `experimental/` is repo-only and not on the site. The user guide is `examples/tutorial/`. README GIFs and diagram PNG from `docs/make_assets.py` (`ur5_meshcat.gif` is a screen recording, not rebuilt) |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)** |
 | docs/reviews/ | Dated architecture audits and the interview decision records; read-only history, never a backlog |
 
@@ -44,12 +44,14 @@ Keep DESIGN.md call chains minimal.
 
 **Do directly:** typos and stale docs; docstrings/types in files you are already changing for the task; small cleanups that directly support the requested change.
 
-**Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals).
+**Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals). Do not rename or move anything under `examples/teaching/courses/` without the course notes and webpage in the same change.
 
 **Ask first (maintainer-owned):** anything student-facing (`README.md`,
 `examples/`, notebooks, ROADMAP §1, §2 and §4, public names); **core
-architecture and the API of the main tools** (`System` family, diagrams,
-compile, `Simulator`, planners, `Optimizer`, controllers); any feature or
+architecture and the API of the main tools** (`System` family, the core
+mathematical objects — `Trajectory`, sets, distributions, costs, fields,
+`PlanningProblem`, `PlanningSolution` — diagrams, compile, `Simulator`,
+planners, `Optimizer`, controllers); any feature or
 user-importable-name removal; delete/rename files; new dependencies; removing
 user scratch code; `CONSTITUTION.md` amendments.
 

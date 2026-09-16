@@ -59,6 +59,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   equations accept an explicit argument (`f(x, u, t, params=None)`) for computing parameter gradients
   ($\partial f / \partial p$) and system identification. However, the core framework remains forgiving:
   models where a student hard-codes constants directly into equations must simulate without friction.
+  The same rule holds for costs, sets, fields and shapes: `params is None` resolves to the
+  object's own defaults; any dictionary replaces them at that level.
 - **2.4 No run state on a System.** A `System` does not store simulation trajectories, solver state,
   or run history. Exception: `self.traj` is the one daily-use shortcut; a new exception needs a
   reason of that weight.
@@ -66,7 +68,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
   request/response dataclasses, option bags, or adapter layers that only wrap those. A new
   named record is justified when it is a domain noun (a trajectory, a certificate, a plan) —
-  not when it is a programming convenience.
+  not when it is a programming convenience. Before adding a record, name the object it already
+  is: a `(lower, upper)` pair is a `BoxSet`, a reset rule is a `Distribution`, a sublevel set
+  is a `Set`, a scalar function of the state is a `Field`, a sampled run is a `Trajectory`.
 
 ---
 
@@ -108,6 +112,21 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   Do not update them to track every new demo, compare script, or research-lane
   experiment. New demos land under `examples/`. Add a README examples-table row only
   when a demo is a canonical teaching entry for a core tool.
+- **3.8 Notebooks are not a second map.** The catalog is `examples/README.md` (plus
+  root README entry points). Do not duplicate it with See also / Where next /
+  Scripts for depth / peer hrefs.
+  - **Tutorial (`00`–`11`):** at most one same-folder **Next** link, numbered
+    successor. No previous, no skip-ahead, no teaching/demo/project/benchmark/doc
+    hrefs.
+  - **Showcases:** self-contained. No Where next / See also hubs. Chapter names may
+    stay as unlinked backticks (`00_core`).
+  - **Teaching:** standalone. Zero hrefs to other notebooks, demos, tutorials, or
+    library source. Keep Colab self-badge, `git clone`, and external library docs
+    (Gymnasium, SB3). A repo-root `[minilink](https://github.com/alx87grd/minilink)`
+    link may stay. `teaching/topics/` is the textbook; `teaching/courses/<id>/`
+    is a live homework pin (names in `examples/README.md`).
+  - **Demos / projects:** no markdown links to notebooks. Comment twins
+    (`# Teaching twin: …`) stay unless the maintainer asks to drop them.
 
 ---
 
@@ -132,7 +151,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   requiring discrete stepping accepts a continuous system via a discretization adapter; a tool
   requiring a stochastic problem accepts a deterministic one via `as_stochastic()`. Convert once
   at the boundary, then use the richer object directly: never probe it with `hasattr` or
-  `getattr` defaults inside the math.
+  `getattr` defaults inside the math. A tool that needs a box asks the set
+  (`X.bounding_box()`); it does not `isinstance` the set. The one `isinstance` on a set is the
+  lowering at the solver boundary: a singleton to an equality residual, a box to decision bounds.
 - **4.4 Parameter override rule:** `params is None` resolves to the system's default parameters.
   Any provided `params` dictionary replaces them entirely (never write `params or self.params`).
 - **4.5 Unconnected input ports are silent.** Unconnected inputs automatically read their nominal
@@ -171,35 +192,63 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
 *Reading Minilink source code should feel like reading an engineering textbook.*
 
-- **5.1 Bare signatures in equation paths:** Do not put type hints inside $f, h, tf$ or port
-  computations. Document expected array shapes and physical units clearly in the NumPy-style docstring.
+- **5.1 Bare signatures in equation paths:** Do not put type hints inside $f, h, tf$, port
+  computations, or any other native-array equation path (`Set.margin`, `CostFunction.g` / `h`,
+  `Field.value`, `Shape.sdf`, `Distribution.sample`). Document expected array shapes and physical units clearly in the NumPy-style docstring.
   Type hints belong on class constructors, public methods, and tool orchestrators.
-- **5.2 The `xp` idiom for hybrid NumPy/JAX:** Immediately after unpacking parameters in $f$ or $h$,
-  bind the array module:
+- **5.2 The `xp` idiom for hybrid NumPy/JAX:** Immediately after unpacking parameters in any
+  equation path ($f$, $h$, `margin`, `g`, `value`, `sdf`, ...), bind the array module:
   ```python
   xp = array_module(x)
   ```
   Write the subsequent mathematical algebra using `xp` so the exact same equation path executes
   on both NumPy and JAX arrays without branching.
-- **5.3 Unpack parameters before equations; no `self.` in math lines:** Bind parameters to local
-  variables first. Use named temporaries in equation paths so the algebra stays readable.
-  Core equations must read as pure mathematics:
+- **5.3 Three beats in an equation path; no `self.` in math lines:** Every native-array
+  equation method (`f`, `h`, `g`, `margin`, `value`, `sdf`, `forward_dynamics`, …) is
+  three beats, with a blank line between them so the core equation is the thing the
+  eye lands on:
+
+  1. **Unpack.** Bind `params`, split `x`, and copy `self.` fields into short textbook
+     names. No `self.` remains in the algebra.
+  2. **Core math.** The equation as a **named assignment**. A short textbook
+     comment belongs here only when it is not a copy of the code (rule 5.22).
+     The equation is never on the `return` line.
+  3. **Output machinery.** Stack, wrap, or `return` the named result. This beat is
+     plumbing, not the lesson.
+
   ```python
-  # Good:
+  # Good — the comment is the implicit form; the code is the solved assignment:
+  params = self.params if params is None else params
   m, l, g, d = params["m"], params["l"], params["g"], params["d"]
+  xp = array_module(x)
+  theta, omega = x
+  tau = u[0]
+
+  # (m l²) ω̇ = τ − m g l sin(θ) − d ω
   dtheta = omega
-  domega = (u - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
-  
-  # Bad:
-  domega = (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
+  domega = (tau - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
+
+  return xp.array([dtheta, domega])
+
+  # Good — the assignment is already the textbook; no copy-comment:
+  dx = A @ x + B @ u
+
+  return dx
+
+  # Bad — self. in the algebra, and the equation lives on the return line:
+  return (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
   ```
 - **5.4 Mathematical naming conventions:**
   - Matrices: uppercase (`A`, `B`, `C`, `D`, `H`, `M`, `K`).
   - Vectors: lowercase (`x`, `u`, `y`, `q`, `v`, `dq`, `dx`).
   - Dimensions: lowercase integers (`n`, `m`, `p`).
-  - A symbol keeps one meaning across the codebase: `A` is the state matrix, `rho` the
-    discount rate, `z` the policy features. Name a local that would collide by its role
-    (`advantage`, `ratio`, `eps`) rather than reusing the symbol.
+  - A symbol keeps one meaning within an object, and one meaning across the codebase wherever
+    the literature allows: `A` is the state matrix, `rho` the discount rate, `z` the policy
+    features. Name a local that would collide by its role (`advantage`, `ratio`, `eps`)
+    rather than reusing the symbol. The textbook's own overloads across objects (`h`: output
+    map on a `System`, terminal cost on a `CostFunction`; `g`: running cost, gravity vector,
+    NLP inequality; `B`, `C`: mechanical vs state-space) are inherited, listed in DESIGN §4 as
+    a closed list, and never added to.
 - **5.5 Format 2D array literals row by row:** Align matrices visually using `# fmt: off` and
   `# fmt: on` to ensure equations remain readable at a glance:
   ```python
@@ -258,7 +307,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **5.16 Two-audience files:** Write each file for its primary reader. Student-facing modules
   (`core/system.py`, `blocks/`, `dynamics/`, `control/`) read like a textbook. Library-developer
   modules (`core/compile/`, evaluators) may carry compiler machinery.
-- **5.17 Native-array equation paths:** Keep $f$/$h$ on native arrays; convert at API boundaries only.
+- **5.17 Native-array equation paths:** Keep every equation path (the list of 5.1) on native
+  arrays, traceable in every argument, `params` included; convert at API boundaries only.
 - **5.18 `__main__` hello-worlds:** Core modules may ship a `__main__` smoke that constructs the
   class and runs it once. Keep it short enough to read at a glance, and stop where the teaching
   starts: a smoke that grows plots, sweeps, or commentary has become a demo and belongs under
@@ -268,19 +318,22 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **5.20 Match the neighborhood:** Change only what the task requires. Public APIs use type hints
   and NumPy docstrings except in equation paths (rule 5.1). Lazy optional imports. Prefer a low
   helper count in math tools; inline single-use helpers.
-- **5.21 Validation in proportion:** Validate at boundaries, not in every helper. Use dataclasses
-  for transparent *domain* records (`Trajectory`, a certificate, a plan). Do not use them as
+- **5.21 Validation in proportion:** Validate at boundaries, not in every helper. Frozen dataclasses
+  for value objects — a `Trajectory`, a set, a shape, a certificate, a solver record; plain
+  classes with `params` for parametric equation objects — systems, costs. Never dataclasses as
   input/output wrappers around arrays (rule 2.5). Use `ABC` only when enforcement helps.
-- **5.22 Comment the steps, not the file.** Core math (`f`, `h`, costs, maps) is ventilated:
-  blank lines between the main steps. A short comment sits on its own line above each step
-  that the symbols do not already make obvious. Skip the comment when the line reads like
-  the textbook (`dx = A @ x + B @ u`). Comments name the step; they do not restate the
-  algebra in prose. When the code cannot use the textbook's symbols (dictionary lookups,
-  library calls, vectorization), the step comment gives the equation in textbook notation,
-  `# TD error: delta_k = r_k + gamma V(x_k+1) - V(x_k)`, and names the locals after those
-  symbols (`sigma`, `eps`, `advantage`). That comment is the one place an equation lives: never
-  a module or method docstring. Apply this to new math; do not restyle an existing dense
-  equation path unless the maintainer asks.
+- **5.22 Comment only when it is not a copy of the code.** Beat 2 of rule 5.3 is
+  the highlighted equation: a blank line, then a named assignment. Add a short
+  textbook comment on its own line only when that comment is *not* a copy of the
+  assignment — when the code cannot write the textbook form (`# (m l²) ω̇ = τ − …`
+  above a solved `domega = (tau - …) / (m * l**2)`; `# H v̇ = τ − C v − g − d`
+  above `solve`; `# dx = [v; v̇]` above `q2x`; `# g = 0 on the target, 1 elsewhere`
+  above `xp.where`). Skip the comment when the assignment is already ~90% the
+  textbook (`dx = A @ x + B @ u`, `g = dx.T @ Q @ dx + du.T @ R @ du`,
+  `H = xp.array([[m * l**2 + I]])`) — the name and the blank lines still highlight
+  it. Never put the equation on `return`; never put it in a module or method
+  docstring. Apply this to new math; when restyling an existing path (only if the
+  maintainer asks), use the three beats of rule 5.3.
 - **5.23 No preamble walls.** A module or demo opens with a one-line title docstring. Do not
   add a long introduction, section map, run recipe, or flag explanation at the top — the
   code plus inline comments must tell the story. Notebooks are course material: do not
@@ -292,9 +345,16 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
 *Trust in the toolbox is built on verifiable evidence, clean demos, and robust tests.*
 
-- **6.1 Demos are open-and-run scripts:** Demo scripts in `examples/demos/` must run from the top
-  level without requiring a `main()` function wrapper. One-line title docstring; the pedagogical
-  story lives in short inline comments next to the code (rules 5.22–5.23).
+- **6.1 A demo is the API, and nothing else.** *Simplicity is the ultimate sophistication*
+  holds for a demo or a teaching notebook as it does for the core: the shortest sequence of
+  library verbs that tells the story — build, compose, solve, evaluate, plot, animate — run
+  from the top level, with constants at the top, a one-line title docstring and the story in
+  short inline comments (5.22–5.23). Less is better. Reporting goes through the objects
+  themselves: their `print` (`__str__`) and their native plots (`plot_trajectory`,
+  `plot_solution`, `plot_control_law`, `plot_cost2go`, `plot_learning_curve`, `plot_tree`,
+  `scene.plot`, ...). That is `print(solution)` or `planner.plot_learning_curve()`, not an
+  f-string of fields (6.13). A report the library cannot give is first a library gap — a
+  missing `__str__` or `plot_*`, in the agent's plotting lane — and only then a demo cell.
 - **6.2 No test harness code in demos:** Never add test environment branches (`if CI: ...`),
   smoke env vars (`MINILINK_NOTEBOOK_SMOKE`), mock flags, or headless switches inside
   `examples/demos/`, `examples/tutorial/`, or `examples/teaching/`. Test runners adapt
@@ -318,15 +378,59 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **6.8 Demo-gate maturity.** Nothing enters the teaching surface without a demo or notebook,
   a both-backends test where it defines dynamics, and a docstring (ROADMAP.md §2).
 - **6.9 Public-facing prose is foundational, not a bake-off.** README, the three showcases,
-  `docs/pitch/`, and the docs landing page stay positive about minilink and never name
+  and the docs landing page stay positive about minilink and never name
   other tools. Framing: minilink bridges capabilities that usually live in separate tools.
   No superlatives; quote measured notebook batches, never a per-call speedup. The main
   line is readable by an undergraduate; expert depth sits in short "under the hood"
-  asides. The README does not link the pitch deck for now. GIF assets stay under 1 MB
+  asides. GIF assets stay under 1 MB
   and use catalog plant framing (the MPC clip may follow the car). Before pushing those
-  files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README, the slides, and the
+  files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README and the
   showcase notebook markdown must be empty (the `-E` matters: without it the alternation is
   literal and the gate passes on anything). `test_repo_contract.py` runs the same check.
+- **6.10 Flat demos.** No functions or classes in a demo or a teaching notebook except the
+  model or cost it is about (its `f`, `h`, `g`) and a step the notebook's text teaches by hand
+  (a hand-written RK4, a policy-gradient update). No wiring, tuning or plotting helpers, no
+  configuration dictionaries feeding them, no `main()`, no `try / except ImportError` around
+  plots (6.2). A loop over variants is fine; a factory is not.
+- **6.11 Side work is quarantined.** A custom plot or a side analysis that earns its place is
+  its own cell in a notebook, or its own block at the end of a script under one comment line.
+  It never interleaves with the API lines, and the demo still reads with that cell removed.
+- **6.12 Cheap rules are tests.** When a rule can be checked by an AST walk or a grep, the
+  check lands with the rule (`test_teaching_imports.py`, `test_repo_contract.py`, the
+  set-probe and flat-demo checks).
+- **6.13 `print` is rare; a teaching cell stays readable.** A demo *script* is the API
+  sequence, then a native plot or `animate`. A notebook splits that (6.14). `print` is
+  not how the student is shown what happened. Use it only when the number is the lesson
+  *and* no `__str__`, `plot_*`, or `animate` already shows it. Then print the object
+  (`print(solution)`, `print(report)`), or in a notebook leave the value as the last
+  expression (`np.linalg.eigvals(lin.A())`, `problem.sample_x0(0, n=3)`). Markdown
+  already explains; do not restate it in an f-string, and do not add a cell whose only
+  job is a diagnostic dump. Never bury arithmetic, formatting, or a second construction
+  inside `print` — that line is what the student reads, and it must stay a library verb.
+  ```python
+  # Bad — unreadable; the cell is a log, not the API:
+  print(f"planner.gamma = {planner.gamma}: a horizon of {DT / -np.log(planner.gamma):.1f} s")
+  default = ReinforcementLearningPlanner(problem, dt=DT, hidden=(8,), verbose=False)
+  print(f"default gamma = {default.gamma}: a horizon of {DT / -np.log(default.gamma):.1f} s")
+
+  # Bad — a plot or __str__ already said this:
+  print("the five worst of", report.J.size, "trials:", np.round(np.sort(report.J)[-5:], 2))
+  print("open-loop poles:", np.round(np.linalg.eigvals(plant.linearize(xbar).A()), 2))
+
+  # Good — native object, or the last expression:
+  print(solution)
+  print(report)
+  np.linalg.eigvals(lin.A())
+  ```
+- **6.14 One figure per notebook cell.** In a teaching or tutorial notebook, a call that
+  draws (`plot_*`, `animate`, `plot_diagram`, `plot_tree`, `scene.plot`, ...) is the only
+  statement in that cell. Setup, `solve`, and `compute_trajectory` stay in the cell
+  above; the figure cell is one library verb. Two slices
+  (`plot_control_law(..., u_axis=0)` then `u_axis=1`) are two cells. Jupyter displays
+  one figure per cell: a later `plot_*` in the same cell hides, races, or drops an
+  overlay (`show=False` then `plt.show()`, stacked `animate`). A script may still plot
+  after the API in one file. Apply this when writing or editing a notebook; do not
+  restyle an existing dense notebook unless asked.
 
 ---
 

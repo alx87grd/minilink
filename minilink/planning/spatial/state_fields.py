@@ -57,8 +57,9 @@ class ClearanceField(StateField):
         c = []
         for world, radius in iter_probes(self.body, x, u, t, params):
             c.append(scene.clearance(world, t=t, params=params) - radius)
+        clearance = xp.min(xp.stack(c))
 
-        return xp.min(xp.stack(c))
+        return clearance
 
 
 @dataclass(frozen=True)
@@ -74,8 +75,9 @@ class CostDensityField(StateField):
         d = []
         for world, _ in iter_probes(self.body, x, u, t, params):
             d.append(scene.cost_density(world, t=t, params=params))
+        density = xp.max(xp.stack(d))
 
-        return xp.max(xp.stack(d))
+        return density
 
 
 @dataclass(frozen=True)
@@ -155,8 +157,9 @@ class FieldCost(CostFunction):
         weight = self.weight
         v = field.value(x, u, t=t, params=params)
         shaped = v if shaping is None else shaping(v)
+        g = weight * shaped
 
-        return weight * shaped
+        return g
 
     def h(self, x, t=0.0, params=None):
         return 0.0

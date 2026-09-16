@@ -43,7 +43,10 @@ def lqr_gain(A, B, Q, R):
     R = np.atleast_2d(np.asarray(R, dtype=float))
 
     P = solve_continuous_are(A, B, Q, R)
-    return np.linalg.solve(R, B.T @ P)
+
+    K = np.linalg.solve(R, B.T @ P)
+
+    return K
 
 
 def lqr(A, B, Q, R, xbar=None, ubar=None):

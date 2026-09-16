@@ -69,11 +69,13 @@ class RotatingCartPole(MechanicalSystem):
         # coupled inertia of the two rotating links
         h01 = m2 * l1 * l2 * c2
         # fmt: off
-        return xp.array([
+        H = xp.array([
             [m2 * l1**2 + I1,             h01],
             [            h01, m2 * l2**2 + I2],
         ])
         # fmt: on
+
+        return H
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
@@ -85,11 +87,13 @@ class RotatingCartPole(MechanicalSystem):
         xp = array_module(q, dq)
         c01 = -m2 * l1 * l2 * xp.sin(q[1]) * dq[1]
         # fmt: off
-        return xp.array([
+        C = xp.array([
             [0.0, c01],
             [0.0, 0.0],
         ])
         # fmt: on
+
+        return C
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -99,7 +103,10 @@ class RotatingCartPole(MechanicalSystem):
 
         # gravity torque acts on the second link only
         xp = array_module(q)
-        return xp.array([0.0, -m2 * gravity * l2 * xp.sin(q[1])])
+
+        g = xp.array([0.0, -m2 * gravity * l2 * xp.sin(q[1])])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -107,7 +114,9 @@ class RotatingCartPole(MechanicalSystem):
         d2 = params["d2"]
 
         # linear viscous joint damping
-        return array_module(dq).array([d1 * dq[0], d2 * dq[1]])
+        tau_d = array_module(dq).array([d1 * dq[0], d2 * dq[1]])
+
+        return tau_d
 
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]
@@ -224,11 +233,13 @@ class CartPole(MechanicalSystem):
         # cart+pole translation coupled to the pole rotation
         h01 = m2 * lcg * xp.cos(theta)
         # fmt: off
-        return xp.array([
+        H = xp.array([
             [m1 + m2,        h01],
             [    h01, m2 * lcg**2],
         ])
         # fmt: on
+
+        return H
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
@@ -241,11 +252,13 @@ class CartPole(MechanicalSystem):
         # centrifugal term from the swinging pole
         c01 = -m2 * lcg * xp.sin(theta) * dtheta
         # fmt: off
-        return xp.array([
+        C = xp.array([
             [0.0, c01],
             [0.0, 0.0],
         ])
         # fmt: on
+
+        return C
 
     def B(self, q, params=None):
         # the force actuates the cart only
@@ -260,7 +273,9 @@ class CartPole(MechanicalSystem):
         xp = array_module(q)
 
         # gravity torque on the pole
-        return xp.array([0.0, m2 * gravity * lcg * xp.sin(theta)])
+        g = xp.array([0.0, m2 * gravity * lcg * xp.sin(theta)])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         return array_module(q).zeros(self.dof)

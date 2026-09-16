@@ -13,11 +13,10 @@ from types import MappingProxyType
 
 import numpy as np
 
-from minilink.core.backends import require_jax
 from minilink.core.costs import CostFunction
+from minilink.core.distributions import Distribution, Particles, split_keys
 from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
 from minilink.core.system import System
-from minilink.planning.distributions import Distribution, Particles
 
 
 @dataclass(frozen=True)
@@ -72,9 +71,13 @@ class PlanningProblem:
     cost : CostFunction, optional
         Planning cost. Required by solvers that optimize an objective.
     X : Set, optional
-        State allowable set. Defaults to the system state bounds.
+        State constraint ``x(t) in X``: a hard constraint, leaving it is a
+        failure. Unconstrained by default (the whole state space); pass
+        ``X=sys.state.box`` to constrain the plant to its declared state range,
+        or any set (``sys.state.box & free``).
     U : InputSet, optional
-        Input allowable set. Defaults to the system input-port bounds.
+        Input constraint ``u(t) in U(x, t)``. Defaults to the input ports' box:
+        an actuator limit is part of the plant model.
     X0, Xf : Set, optional
         Initial and terminal boundary sets. These are the authoritative
         feasibility constraints; ``x_start`` and ``x_goal`` are shortcuts or
@@ -86,18 +89,14 @@ class PlanningProblem:
         explicitly. Knot count ``N`` lives on transcription options.
     params : ProblemParameters, optional
         Explicit parameter bundle for system, cost, and set evaluation.
-    on_exit : {"infeasible", "terminate"}
-        What a trajectory leaving ``X`` means. ``"infeasible"`` (default): a
-        hard constraint — trajectory optimization rejects it, value iteration
-        charges its out-of-bound cost. ``"terminate"``: the trajectory ends
-        there and ``exit_cost`` is charged — the rule reinforcement learning
-        trains with, so that trajopt, DP and RL score the same trajectory the
-        same way.
-    exit_cost : float or callable, optional
-        Price of leaving ``X``: a scalar, or ``exit_cost(x, t)`` evaluated at
-        the exit state. Read by value iteration as its default
-        ``out_of_bound_cost`` and by RL as the terminal penalty. Should exceed
-        the cost-to-go of finishing the task from a typical start.
+    infeasible_cost : float or callable, optional
+        The finite stand-in for the infinite cost of an infeasible trajectory (one
+        that leaves ``X``): a scalar, or ``infeasible_cost(x, t)`` evaluated at the
+        exit state. Value iteration reads it as its default ``out_of_bound_cost``;
+        the learners and the Monte Carlo score charge it when a trajectory leaves
+        ``X``. Unset, the sampling tools derive a bound of any feasible cost and
+        announce it; a declared price should exceed the cost-to-go of finishing the
+        task from a typical start.
     """
 
     sys: System
@@ -111,21 +110,14 @@ class PlanningProblem:
     tf: float | None = None
     params: ProblemParameters | None = None
     metadata: Mapping[str, object] | None = None
-    on_exit: str = "infeasible"
-    exit_cost: object = None
-
-    EXIT_RULES = ("infeasible", "terminate")
+    infeasible_cost: object = None
 
     def __post_init__(self) -> None:
         n = int(self.sys.n)
 
         tf = self._coerce_tf(self.tf)
-        if self.on_exit not in self.EXIT_RULES:
-            raise ValueError(
-                f"on_exit must be one of {self.EXIT_RULES}, got {self.on_exit!r}"
-            )
-        if self.exit_cost is not None and not callable(self.exit_cost):
-            object.__setattr__(self, "exit_cost", float(self.exit_cost))
+        if self.infeasible_cost is not None and not callable(self.infeasible_cost):
+            object.__setattr__(self, "infeasible_cost", float(self.infeasible_cost))
 
         x_start = self._coerce_state(
             self._default_x_start(),
@@ -138,8 +130,8 @@ class PlanningProblem:
             required=False,
         )
 
-        X = BoxSet.from_system_state(self.sys) if self.X is None else self.X
-        U = self._default_input_set(self.sys) if self.U is None else self.U
+        X = unconstrained(n) if self.X is None else self.X
+        U = BoxInputSet.from_system_inputs(self.sys) if self.U is None else self.U
         X0 = SingletonSet(x_start) if self.X0 is None else self.X0
         Xf = SingletonSet(x_goal) if self.Xf is None and x_goal is not None else self.Xf
         params = self._coerce_params(self.params)
@@ -241,17 +233,6 @@ class PlanningProblem:
         if not set_.contains(point, params=set_params):
             raise ValueError(f"{point_label} must belong to {set_label}")
 
-    @staticmethod
-    def _default_input_set(sys: object) -> BoxInputSet:
-        lower = np.zeros(sys.m)
-        upper = np.zeros(sys.m)
-        i = 0
-        for port in sys.inputs.values():
-            lower[i : i + port.dim] = port.lower_bound
-            upper[i : i + port.dim] = port.upper_bound
-            i += port.dim
-        return BoxInputSet.from_bounds(lower, upper)
-
     @property
     def has_goal(self) -> bool:
         """Return ``True`` when a terminal goal or boundary set is available."""
@@ -262,13 +243,12 @@ class PlanningProblem:
         """``True`` when the problem draws starts, parameters or disturbances."""
         return False
 
-    def exit_penalty(self, x, t=0.0):
-        """Cost charged at an exit state (scalar or ``exit_cost(x, t)``); ``None`` if unset."""
-        if self.exit_cost is None:
+    def infeasible_penalty(self, x, t=0.0):
+        """The declared price of infeasibility at ``(x, t)`` (scalar or callable); ``None`` when unset."""
+        price = self.infeasible_cost
+        if price is None:
             return None
-        if callable(self.exit_cost):
-            return self.exit_cost(x, t)
-        return self.exit_cost
+        return price(x, t) if callable(price) else price
 
     def horizon_kind(self) -> str:
         """``"finite"`` or ``"infinite"``: the cost's declaration, else from ``tf``."""
@@ -337,17 +317,21 @@ class StochasticPlanningProblem(PlanningProblem):
         Law of the initial state ``x(0) ~ p(x0)``. Its mean is the default
         ``x_start`` and its support (when it has one) the default ``X0``.
     params_distribution : mapping, optional
-        ``{name: Distribution}`` over entries of ``sys.params`` (domain
-        randomization, robustness sweeps); each sample overrides those entries.
-        A dotted name reaches into a diagram's subsystem params
-        (``"sys.mass"`` for the plant inside a closed loop).
+        Mapping of parameter names to :class:`~minilink.core.distributions.Distribution`
+        over entries of ``sys.params`` (domain randomization, robustness
+        sweeps); each sample overrides those entries. A dotted name reaches
+        into a diagram's subsystem params (``sys.mass`` for the plant inside
+        a closed loop).
     disturbances : mapping, optional
-        ``{port_id: Distribution}`` over input ports of ``sys``: a fresh draw
-        per step held on that port (a seeded disturbance signal).
+        Mapping of input port ids to :class:`~minilink.core.distributions.Distribution`
+        on ``sys``: a fresh draw per step held on that port (a seeded
+        disturbance signal).
     criterion : {"expectation", "worst_case"}
         What "optimal" means over the draws. Reinforcement learning optimizes
         the expectation; Monte Carlo evaluation reports both.
 
+    Notes
+    -----
     Solve verbs (RL, gain search) and the evaluate verb (Monte Carlo) both
     read this description; :meth:`nominal` returns the certainty-equivalent
     :class:`PlanningProblem` for trajectory optimization and LQR.
@@ -364,7 +348,7 @@ class StochasticPlanningProblem(PlanningProblem):
         if self.x0_distribution is None:
             raise ValueError("StochasticPlanningProblem requires x0_distribution")
         if self.x_start is None:
-            object.__setattr__(self, "x_start", self.x0_distribution.mean())
+            object.__setattr__(self, "x_start", self.x0_distribution.mean)
         if self.X0 is None and self.x0_distribution.support is not None:
             object.__setattr__(self, "X0", self.x0_distribution.support)
         super().__post_init__()
@@ -429,7 +413,7 @@ class StochasticPlanningProblem(PlanningProblem):
         """Certainty-equivalent deterministic problem: mean start, no draws."""
         return PlanningProblem(
             sys=self.sys,
-            x_start=self.x0_distribution.mean(),
+            x_start=self.x0_distribution.mean,
             x_goal=self.x_goal,
             cost=self.cost,
             X=self.X,
@@ -438,8 +422,7 @@ class StochasticPlanningProblem(PlanningProblem):
             tf=self.tf,
             params=self.params,
             metadata=self.metadata,
-            on_exit=self.on_exit,
-            exit_cost=self.exit_cost,
+            infeasible_cost=self.infeasible_cost,
         )
 
 
@@ -466,21 +449,14 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
         tf=problem.tf,
         params=problem.params,
         metadata=problem.metadata,
-        on_exit=problem.on_exit,
-        exit_cost=problem.exit_cost,
+        infeasible_cost=problem.infeasible_cost,
         x0_distribution=Particles(np.atleast_2d(problem.x_start)),
     )
 
 
-def split_keys(key, n):
-    """``n`` independent keys from a JAX key, or the same NumPy generator ``n`` times."""
-    if n == 0:
-        return []
-    if type(key).__module__.startswith("jax"):
-        jax = require_jax()
-        return list(jax.random.split(key, n))
-    rng = key if isinstance(key, np.random.Generator) else np.random.default_rng(key)
-    return [rng] * n
+def unconstrained(n):
+    """The whole state space as a set: no constraint on ``x``."""
+    return BoxSet(np.full(int(n), -np.inf), np.full(int(n), np.inf))
 
 
 def lookup_param(params, name):

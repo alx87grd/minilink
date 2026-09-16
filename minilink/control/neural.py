@@ -113,10 +113,9 @@ class NeuralPolicyController(Controller):
         self.squash = squash
         port = sys.inputs[action_port_of(sys)]
         n, m = int(sys.n), int(port.dim)
-        x_lb = np.asarray(sys.state.lower_bound, dtype=float)
-        x_ub = np.asarray(sys.state.upper_bound, dtype=float)
-        u_lb = np.asarray(port.lower_bound, dtype=float)
-        u_ub = np.asarray(port.upper_bound, dtype=float)
+        x_box, u_box = sys.state.box, port.box
+        x_lb, x_ub = x_box.lower, x_box.upper
+        u_lb, u_ub = u_box.lower, u_box.upper
         if not (np.all(np.isfinite(u_lb)) and np.all(np.isfinite(u_ub))):
             raise ValueError(
                 "NeuralPolicyController needs finite bounds on the plant's action port"

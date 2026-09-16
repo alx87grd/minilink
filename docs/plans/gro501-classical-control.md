@@ -320,14 +320,14 @@ behaviour so it cannot drift silently.
 
 ### P11. Two classical control notebooks (course-agnostic)
 
-`examples/teaching/classical_control/dc_motor_propulsion.ipynb` (multi-physics DC
+`examples/teaching/topics/classical_control/dc_motor_propulsion.ipynb` (multi-physics DC
 motor + longitudinal dynamics → linearize → `H(s)` → root locus → PID to the
 Table 2 specs → discrete implementation → nonlinear check with disturbance and
-noise) and `bicycle_autopilot.ipynb` (bicycle model → controllability
+noise) and `examples/teaching/topics/classical_control/bicycle_autopilot.ipynb` (bicycle model → controllability
 across speeds → LQR on the guide's cost → nested loops → pole placement →
 Kalman observer). Basic tier only, Colab-first, no JAX.
 
-The existing `frequency_domain_tools.ipynb` stays as the tool tour; these two
+The existing `frequency_response.ipynb` stays as the tool tour; these two
 are the course path. Maintainer owns student-facing material, so these are
 drafted for review, not merged by the agent.
 

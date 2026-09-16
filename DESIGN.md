@@ -36,7 +36,7 @@ deep defining-module paths stay valid but are not what README / intro show.
 
 | Layer | Example | Role |
 | --- | --- | --- |
-| **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
+| **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner, ReinforcementLearningPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
 | **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis.linearize import linearize` | Canonical course / script API |
 | **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
 
@@ -79,7 +79,7 @@ in [ROADMAP.md](ROADMAP.md) (teaching-release priorities) and
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ façade mixins: `SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, costs, geometry (`geometry.py`) |
+| `core/` | `System` (+ façade mixins: `SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`) |
 | `core/compile/` | `ExecutionPlan`, compiler, NumPy/JAX evaluators |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -110,7 +110,9 @@ state-feedback block):
 | `interfaces/` | `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
 
 **Experimental tier** — `experimental/` (TRL < 3, research lane, repo-only);
-nothing in the library imports it, and the path itself states the maturity:
+nothing in the library imports it, and the path itself states the maturity.
+The Sphinx API site autodocs the teaching-lane packages only; this tier is
+not on that site.
 
 | Module | Role |
 | --- | --- |
@@ -121,7 +123,8 @@ nothing in the library imports it, and the path itself states the maturity:
 **Wheel scope.** The published package ships the teaching surface and the
 provisional planning / MPC / hybrid bands. The `experimental/` tier,
 `examples/projects/`, and
-`examples/experimental/` are repo-only (research lane).
+`examples/experimental/` are repo-only (research lane). A `0.*` GitHub tag
+publishes that wheel to PyPI (`.github/workflows/publish.yml`).
 
 ### Dependency law
 
@@ -390,9 +393,12 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
 
 ### Native-array equation rule
 
-Applies to `f`, `h`, port compute, sets, costs, transcriptions, `MathematicalProgram`
-`J`/`h`/`g`. Native in, native out; no `np.asarray` / `float()` inside equation
-paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
+Applies to `f`, `h`, port compute, sets (`margin`), costs (`g`, `h`), fields (`value`),
+shapes (`sdf`), `Distribution.sample`, transcriptions, `MathematicalProgram` `J`/`h`/`g`.
+Native in, native out; no `np.asarray` / `float()` inside equation paths. Convert at
+boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Traceable in every argument,
+`params` included, is the goal for every object (CONSTITUTION §2, one signature); where an
+object does not read `params` yet, the gap is tracked below.
 
 ### Parameters
 
@@ -424,10 +430,10 @@ paths. Convert at boundaries (evaluators, solvers, plotting, `Trajectory`, I/O).
   ([docs/plans/TODO.md](docs/plans/TODO.md) Later).
   **TODO: Prioritize threading $p$ into JAX parametric programs.** This will allow 
   moving obstacles online without rebuilding the NLP, unlocking real-time dynamic obstacle avoidance.
-  **Deferred** ([docs/plans/TODO.md](docs/plans/TODO.md) Later): call-time overrides
-  on base `Shape`, `Set`, and `CostFunction` primitives in `core/` — those types
-  declare `(t, params)` but still read frozen attributes only until a follow-up
-  pass.
+  **Gap, tracked** ([docs/plans/TODO.md](docs/plans/TODO.md) Later, core-objects-5):
+  call-time `params` on the base `Shape`, `Set`, `CostFunction` and field primitives in
+  `core/` — those types declare `(t, params)` but read their own attributes only. The
+  constitution's one-signature rule makes this a gap to close, not a design.
 
 ### `DiagramSystem`
 
@@ -591,11 +597,21 @@ deliberately not provided in v0.1.
 ### `Trajectory`, sets, costs, geometry
 
 - `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
-- Sets: `margin ≥ 0` feasible; `contains`/`sample` may convert to NumPy. Compose with
+- Sets: `margin ≥ 0` feasible; `contains` is a NumPy boundary utility; `sample(key, n=None)`
+  follows the distributions' draw convention below (`BoxSet.sample` traces);
+  `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
+  box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
+  set's type. Compose with
   `&` → `IntersectionSet`. `margin(z, t, params)` is threaded by transcriptions via
   `problem.params.sets`; field-backed spatial sets forward that same parameter
   object to their scene queries. Base `Set` subclasses other than `FieldSet` /
   `CallableSet` do not yet read `params` (deferred — see [docs/plans/TODO.md](docs/plans/TODO.md)).
+- Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
+  `sample(key, n=None)` with `key` a NumPy generator, an integer seed or a JAX PRNG key
+  (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support` an
+  optional `Set`. `Uniform(lower, upper)` holds its `BoxSet`; the same `sample` convention
+  holds on sets. `Gaussian`, `Uniform`, `Particles`, `Sampler`; sets are support,
+  distributions are probability.
 - Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
   `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
   `ScaledCost` (e.g. `base + w * obstacle_cost`). `g`/`h` receive
@@ -615,6 +631,11 @@ deliberately not provided in v0.1.
   bounded `[0,1]` score: an SDF keeps a well-scaled gradient everywhere, which a squashed
   occupancy would lose. Normalized/occupancy views are derived at the **edge** via
   `as_cost(shaping=...)`, not stored in the field.
+- **Notation collisions** (inherited, closed list; RULES 5.4): `h` — output map on a
+  `System`, terminal cost on a `CostFunction`; `g` — running cost, `MechanicalSystem.g(q)`
+  gravity, `MathematicalProgram.g ≥ 0`; `B` — `MechanicalSystem.B` actuator map,
+  `StateSpaceSystem.B` input matrix; `C` — `MechanicalSystem.C` Coriolis,
+  `StateSpaceSystem.C` output matrix. One meaning within each object; no new collision is added.
 
 ## 5. Compilation And Simulation
 
@@ -803,7 +824,8 @@ kind is class-type routing only — ``solver_info["continuous_time_equation"]`` 
 **NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;
 `Optimizer` binds method preset (`scipy_slsqp`, `scipy_trust_constr`, `ipopt`).
 
-**Planning:** `PlanningProblem` owns system, sets, cost, and continuous horizon
+**Planning:** `PlanningProblem` owns system, sets (`X` unconstrained unless declared,
+`U` the input ports' box), cost, and continuous horizon
 `tf` (`None` unset, `+inf` infinite-horizon, or a finite length — trajopt/MPC
 require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 `x_start`/`x_goal` are shortcuts/representative points. Offline entry is
@@ -818,20 +840,28 @@ critic when the training discount equals the cost's). A planner computes only
 what its solve computes natively; `solve(evaluate=True, n_trials=)` fills the
 rest through the evaluator. `get_controller()` returns the policy.
 
-**Cost horizon and exit rule (landed 2026-09-10, research lane → planning
-band):** a `CostFunction` states its `horizon` (`"finite"` with `h` at `tf`,
-`"infinite"` with no terminal cost, or `None` to follow `problem.tf`) and a
-continuous `discount_rate` `rho`; planners convert it with
-`cost.discount_factor(dt)` (DP `alpha`, RL `gamma`). What leaving `X` costs
-is the **problem's** business, not the cost's: `PlanningProblem.on_exit`
-(`"infeasible"`, the hard-constraint default, or `"terminate"`) and
-`exit_cost` (scalar or `exit_cost(x, t)`). Trajopt keeps `X` hard; DP reads
-`exit_cost` as its default `out_of_bound_cost`; RL ends the episode there and
-charges it with no bootstrap **when the exit is priced** (`exit_cost` set or
-`on_exit="terminate"`); an unpriced exit is *truncated* and the critic's value
-at the exit state bootstraps the return — the Gymnasium convention, an
-approximation the training environment states in `describe()`. `h` keeps its
-one job: the end of a finite horizon.
+**Cost horizon (landed 2026-09-10) and the constraint set (ruled 2026-09-15):** a
+`CostFunction` states its `horizon` (`"finite"` with `h` at `tf`, `"infinite"`
+with no terminal cost, or `None` to follow `problem.tf`) and a continuous
+`discount_rate` `rho`; planners convert it with `cost.discount_factor(dt)` (DP
+`alpha`, RL `gamma`). `X` is a hard constraint in every tool: a trajectory that
+leaves it is a failure, with infinite cost. `X` is **unconstrained unless
+declared** (the whole state space; `X=sys.state.box` constrains the plant to its
+declared range); `U` defaults to the input ports' box, an actuator limit being
+part of the plant model. Where a number must stand in for infinity, it is the
+problem's `infeasible_cost` (scalar or `infeasible_cost(x, t)`): trajopt and
+RRT keep `X` exact; DP reads `infeasible_cost` as its default
+`out_of_bound_cost`, and treats leaving the *grid* as infeasible too (the table
+has no value off its domain); the learners and the Monte Carlo score charge it
+at the exit, or, unset, a bound of any feasible cost that the environment
+derives from the running cost over the zone and announces. The learners also
+take a **training zone** (`ReinforcementLearningPlanner(training_zone=)`, the
+plant's state box by default): leaving it *truncates* the episode, the critic's
+value at that state standing in for the rest, because the model is not studied
+there; it is a training choice, not a constraint. The former `on_exit` field
+is gone: an exit is always a failure, and "terminate without cost", the Gym
+default, rewards escaping under a cost. `h` keeps its one job: the end of a
+finite horizon.
 
 **One scoring contract:** `planning.evaluation.score_trajectory(problem, traj)`
 is the cost of a sampled closed-loop trajectory for every tool's reporting —
@@ -854,7 +884,7 @@ the Monte Carlo evaluator and refused by the RL planner, which optimizes the
 expectation). A deterministic planner given a stochastic problem plans from
 the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the
 Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions
-(`planning/distributions.py`: `Gaussian`, `Uniform`, `Particles`, `Sampler`)
+(`core/distributions.py`: `Gaussian`, `Uniform`, `Particles`, `Sampler`)
 are a duck type — `dim`, `mean()`, `sample(key)` on a NumPy generator or a
 JAX key (traceable). `nominal()` is the certainty-equivalent
 `PlanningProblem`. Every planner that takes a `PlanningProblem` takes the
@@ -923,18 +953,19 @@ for one call, to silence it.
 step functions on either backend — the reward `r = -g dt`, the exit rule and
 the horizon — shared by the JAX collectors, the tabular learners and the NumPy
 Monte Carlo trials, so one object owns what an episode means.
-`control.angle_features(angles, scales)` builds the periodic feature map
-(`cos, sin` per listed angle, scaled rates). The action port is `u` when the
+Teaching demos write the observation map by hand
+(``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
+is the same map as a helper for scripts. The action port is `u` when the
 plant has one, else its single input port — so an inner loop `impedance @
 arm` (input `r`) is a plant for an outer learned law; a step that leaves the
 box or blows up (non-finite state) ends the episode. The learned law is a `System`:
 `ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
 through the network, and the parametric tier (`rk4_step_trace_p` with
 `params={"ctl": ..., "sys": ...}`) gives gradients of a rollout with respect
-to the policy weights. Official demos: `examples/demos/rl/`; the tutorial
-chapter is `examples/tutorial/11_reinforcement_learning.ipynb`, the
-algorithm ladder from value iteration to PPO is
-`examples/teaching/reinforcement_learning/from_value_iteration_to_ppo.ipynb`. The
+to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, cart-pole,
+drone, rocket); the tutorial chapter is
+`examples/tutorial/11_reinforcement_learning.ipynb`; native teaching
+notebooks are `pendulum_value_iteration_vs_lqr_vs_rl` and `drone_ppo`. The
 spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `bind`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos
@@ -990,8 +1021,9 @@ count and the last cost-to-go change.
 
 **Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
-comes from a `BoxSet`/`BoxInputSet` (so it stays finite), grid *validity* from
-`X.contains`/`U.contains` (so `X = bounds & free` still works), and successors from a
+comes from the sets' bounding boxes (so it stays finite), grid *validity* from
+the sets (`contains` on NumPy, `margin >= 0` on the JAX precompute, so `X = bounds & free`
+works on both); `grid.X` and `grid.U` are the boxes it spans, and successors from a
 forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the grid, not
 on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
@@ -1053,8 +1085,7 @@ Build viz costs with ``bind(sys, point_probe())``; MPC may still use ``car_outli
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
 sources every concern from the problem — collision `problem.X.contains` (optional
 orchestrator `edge_resolution` densification along edges), goal `problem.Xf`/`x_goal`,
-free-space sampling from `problem.X` (direct `Set.sample` or rejection from state
-bounds), dynamics `problem.sys.f` — so the system stays pure. After
+free-space sampling from `problem.X` (direct `Set.sample` or rejection from the bounding box of `X`), dynamics `problem.sys.f` — so the system stays pure. After
 `solve()`, `reached_goal` and `solution_node` report success vs
 best-effort fallback (`return_best_effort`). The two swappable pieces are an injected
 `TrajectoryExtender` (`propose(from, toward, problem, rng) → Iterable[Edge]`:

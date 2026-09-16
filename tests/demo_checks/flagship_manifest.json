@@ -26,7 +26,7 @@
   },
   {
     "id": "rrt_holonomic_obstacles",
-    "path": "examples/demos/planning/rrt/rrt_holonomic_obstacles.py",
+    "path": "examples/demos/rrt/rrt_holonomic_obstacles.py",
     "requires": []
   },
   {
@@ -45,7 +45,7 @@
   },
   {
     "id": "trajopt_cartpole_jax",
-    "path": "examples/demos/planning/trajopt/trajopt_cartpole_collocation_jax.py",
+    "path": "examples/demos/trajopt/trajopt_cartpole_collocation_jax.py",
     "requires": [
       "jax",
       "cyipopt"

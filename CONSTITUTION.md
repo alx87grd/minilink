@@ -26,6 +26,9 @@ is well-architected, or is worth keeping, this document is the governing authori
      multibody) is wrapped as optional leaves when needed; scale-out plants are not
      the product center.
    - It is **not** an optimization modeling language or solver framework (optimization is a verb that operates on Systems).
+   - It is **not** a probability or set-algebra library. Sets and distributions are the few
+     textbook objects the tools need — a box, a ball, a level set; a Gaussian, a uniform law,
+     particles — each with a two-method surface, not a general library.
 
 ## 2. The Contract
 
@@ -45,14 +48,47 @@ Memoryless components (static gains, saturations, error sums) define static syst
 
     y = h(u, t; p)
 
+### The Mathematical Objects
+
+Around the model, the tools speak the textbook's own nouns, and a tool that takes or returns
+one of these quantities takes or returns the object, never its arrays:
+
+- `Trajectory` — the sampled evolution `(t, x, u)` every simulation and plan returns.
+- `Set` — an allowable region, `z ∈ Z(t)`, written as `margin(z, t) ≥ 0`: the state box, a
+  goal ball, free space, a level set.
+- `Distribution` — a probability law over a vector, `sample(key)` and `mean`. Sets are
+  support, distributions are probability; never one for the other.
+- `Field` — a scalar function on the model's `(x, u, t)`, the signature of `f` and `g`: a
+  Lyapunov function `V(x)`, a cost-to-go `J(x, t)`, a Q-function `Q(x, u)`, a barrier `h(x)`,
+  a clearance `d(x)`. Its sublevel and superlevel sets are `Set`s over `x`, or `InputSet`s
+  over `u` at a given `x`; its shaping is a `CostFunction`.
+- `CostFunction` — the running cost `g(x, u, t)` and the terminal cost `h(x, t)` of `J`.
+- `PlanningProblem` — a system, its sets, a cost and a horizon; the stochastic sibling adds
+  distributions over starts, parameters and disturbances.
+- `PlanningSolution` — a policy, itself a `System`, and the evidence for it.
+- `MathematicalProgram` — the one NLP shape every transcription lowers to.
+
+**Lower late.** A tool carries these objects to the solver boundary and converts to arrays
+there, once.
+
+**One signature.** An object's mathematics is a method on the model's arguments
+`(x, u, t; p)`, or the subset it reads: `f`, `h`, `tf` on a system; `g`, `h` on a cost;
+`margin` on a set; `value` on a field; `sdf` on a shape; `sample(key)` on a distribution. It
+is stateless, takes and returns native arrays on NumPy or JAX through one equation path, and
+traces under JAX in every argument, `params` included — so `jit`, `grad`, `vmap` and a
+parameter family reach any object the way they reach `f`. An object that does not yet read
+`params` is a gap to close, not a design.
+
 ### The Five Contract Invariants
 1. **Everything that can be viewed as a system is a System.** Plants, controllers, observers,
    filters, neural policies, and flow diagrams share the identical object model. One seam
    stands open: the sampled-loop containers `Computer` and `HybridDiagram` are not Systems,
    though `StepSystem` and `StepDiagramSystem` are. Closing it is a v1.0 question in the
    ROADMAP review queue, not a licence to open a second one.
-2. **Functional purity in equation paths.** Arrays in, arrays out. Equation paths ($f, h$)
-   have no internal mutable state, no cached side effects, and no memory between calls.
+2. **Functional purity in equation paths.** Arrays in, arrays out. Equation paths — $f$, $h$,
+   and the equation methods of sets, costs, fields, shapes and distributions (`margin`, `g`,
+   `h`, `value`, `sdf`, `sample`) — have no internal mutable state, no cached side effects,
+   and no memory between calls.
    Purity is what enables arbitrary nesting, solver stepping, vectorized batches, and autodiff.
 3. **Compositional closure.** Wiring continuous Systems together via operators (`@`, `>>`, `+`)
    yields a continuous `System`. The set of continuous Systems is algebraically closed under
@@ -85,7 +121,8 @@ The student syntax never breaks when graduating to advanced research.
 1. **One set of tools for every System.** Tools operate on the `System` abstraction. There is no
    tool for plants that cannot also inspect a closed loop or a subsystem.
 2. **Tools are verbs on a System.** Simulators, optimizers, and analysis tools take a `System`
-   and return trajectories, matrices, or figures.
+   (or a `PlanningProblem`) and return domain objects — trajectories, plans, certificates —
+   or matrices and figures.
 3. **Systems are descriptions; facades are shortcuts.** A `System` stores equations, ports,
    parameters, and nominal initial states. Facades (`compute_trajectory`, `linearize`) are
    convenient entry points that delegate directly to their standalone tool modules (`Simulator`, `analysis.linearize`).

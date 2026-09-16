@@ -1,10 +1,13 @@
 """The rollout environment: a stochastic planning problem as pure step functions, on NumPy or JAX."""
 
+import warnings
+
 import numpy as np
+from scipy.stats import qmc
 
 from minilink.control.neural import action_port_of
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, array_module
-from minilink.core.sets import BoxSet
+from minilink.core.sets import is_finite_box
 from minilink.planning.problems import as_stochastic, merge_params
 
 # Public API
@@ -16,7 +19,9 @@ class RolloutEnvironment:
 
     The plant is compiled once. ``step`` integrates it over ``dt`` with the input
     held, scores the period with the problem's own cost and tells how the episode
-    ends, under the problem's exit rule and horizon. On the JAX backend every
+    ends: at the horizon, at a failure (the state left the constraint set ``X``, a
+    priced terminal event), or at the edge of the training zone (a truncation: the
+    model is not studied there, the value of the state stands in for the rest). On the JAX backend every
     method traces, so collectors ``vmap`` over plants and ``scan`` over time with
     no Python per step; on NumPy the same methods drive plain loops (tabular
     learning, Monte Carlo trials).
@@ -24,8 +29,8 @@ class RolloutEnvironment:
     Parameters
     ----------
     problem : StochasticPlanningProblem
-        The task: plant, cost, box, exit rule, horizon, start distribution,
-        optional parameter and disturbance distributions. A deterministic
+        The task: plant, cost, constraint set ``X`` and its price of infeasibility,
+        horizon, start distribution, optional parameter and disturbance distributions. A deterministic
         :class:`~minilink.planning.problems.PlanningProblem` is adapted by
         :func:`~minilink.planning.problems.as_stochastic` and restarts at its
         ``x_start``.
@@ -38,10 +43,20 @@ class RolloutEnvironment:
         Integration scheme of one step.
     backend : {"jax", "numpy"}
         Arrays the step functions run on.
+    training_zone : Set, optional
+        Where episodes run; leaving it truncates the episode. A training
+        management choice, not a constraint: the plant's state box by default.
     """
 
     def __init__(
-        self, problem, *, dt=0.05, episode_length=None, integrator="rk4", backend="jax"
+        self,
+        problem,
+        *,
+        dt=0.05,
+        episode_length=None,
+        integrator="rk4",
+        backend="jax",
+        training_zone=None,
     ):
         problem = as_stochastic(problem)
         self.problem = problem
@@ -68,16 +83,19 @@ class RolloutEnvironment:
         self.params_distribution = dict(problem.params_distribution)
         self.randomizes_params = bool(self.params_distribution)
 
-        # Allowed box and exit rule: charge and terminate, or truncate and bootstrap
-        self.x_lb, self.x_ub = self.allowed_box()
-        self.charge_exit = (
-            problem.exit_cost is not None or problem.on_exit == "terminate"
+        # The constraint X: leaving it is a failure, charged the price of infeasibility
+        # (declared on the problem, else a bound of any feasible cost, announced once)
+        self.X = problem.X
+        self.set_params = problem.params.sets
+        self.training_zone = (
+            self.sys.state.box if training_zone is None else training_zone
         )
 
         # Input vector: the action fills its port, disturbances fill theirs
         self.action_port = action_port_of(self.sys)
         self.m = int(self.sys.inputs[self.action_port].dim)
         self.nominal_inputs = self.nominal_port_values()
+        self.infeasible_cost = self.price_of_infeasibility()
 
     def reset(self, key):
         """An initial state drawn from the problem's start distribution."""
@@ -97,10 +115,9 @@ class RolloutEnvironment:
         ``params`` is the episode's parameter draws (``None`` or empty: nominal);
         ``key`` draws the disturbances (``None``: nominal). ``terminated`` ends
         the episode with its cost fully accounted: the finite horizon is
-        reached, or the box is left under a priced exit rule. ``truncated``
+        reached, or the state left ``X`` (a failure, charged). ``truncated``
         ends it with the value of ``x_next`` still to come: the episode length
-        is reached, or the box is left under an unpriced rule, which a policy
-        can exploit by leaving on purpose.
+        is reached, or the state left the training zone.
         """
         xp = array_module(x)
         dt = self.dt
@@ -118,21 +135,20 @@ class RolloutEnvironment:
         finite = xp.all(xp.isfinite(x_next))
         x_next = xp.where(finite, x_next, x)
 
-        # Leaving the allowed box, and reaching the end of the horizon
-        outside = xp.any(x_next < self.x_lb) | xp.any(x_next > self.x_ub) | ~finite
+        # Leaving X is a failure; leaving the training zone is not; the horizon ends
+        X, zone, set_params = self.X, self.training_zone, self.set_params
+        failed = ~xp.all(X.margin(x_next, t_next, set_params) >= 0.0) | ~finite
+        left_zone = ~xp.all(zone.margin(x_next, t_next, set_params) >= 0.0)
         horizon_reached = xp.asarray(t_next >= self.tf - 0.5 * dt)
 
-        # Exit rule: a priced exit pays its penalty; a finite horizon pays h(x_N)
-        if self.charge_exit:
-            reward = reward - outside * self.exit_penalty(x_next, t_next)
+        # A failure pays the price of infeasibility; a finite horizon pays h(x_N)
+        reward = reward - xp.where(failed, self.infeasible_penalty(x_next, t_next), 0.0)
         if self.finite_horizon:
             reward = reward - horizon_reached * self.cost.h(x_next, t_next)
 
         # What is paid is terminal; what is left unpaid is truncated
-        terminated = (outside & self.charge_exit) | (
-            horizon_reached & self.finite_horizon
-        )
-        truncated = (outside & (not self.charge_exit)) | (
+        terminated = failed | (horizon_reached & self.finite_horizon)
+        truncated = (left_zone & ~failed) | (
             horizon_reached & (not self.finite_horizon)
         )
         return x_next, t_next, reward, terminated, truncated
@@ -159,30 +175,29 @@ class RolloutEnvironment:
             [xp.asarray(ports[port_id], dtype=float) for port_id in ports]
         )
 
-    def exit_penalty(self, x, t):
-        """The price of leaving the box at ``(x, t)``; zero under an unpriced termination."""
-        penalty = self.problem.exit_penalty(x, t)
-        return 0.0 if penalty is None else penalty
+    def infeasible_penalty(self, x, t):
+        """The price of infeasibility at ``(x, t)``: the problem's, scalar or callable."""
+        price = self.infeasible_cost
+        return price(x, t) if callable(price) else price
 
     def full_params(self, params):
         """The plant's params with the episode's draws merged in (other entries untouched)."""
         return merge_params(self.sys.params, params)
 
     def describe(self) -> str:
-        """One line naming the horizon, the exit rule and the randomization in force."""
+        """One line naming the horizon, the constraint's price, the training zone and the randomization."""
         kind = "finite horizon" if self.finite_horizon else "infinite horizon"
-        if self.charge_exit:
-            exit_rule = "leaving the box terminates and is charged"
-        else:
-            exit_rule = "leaving the box truncates (value bootstrapped, no charge)"
+        price = self.infeasible_cost
+        charged = "infeasible_cost(x, t)" if callable(price) else f"{price:.3g}"
         randomized = (
             f", randomized params {sorted(self.params_distribution)}"
             if self.randomizes_params
             else ""
         )
         return (
-            f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; "
-            f"{exit_rule}{randomized}"
+            f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; a failure (leaving X, "
+            f"or a non-finite state) terminates and is charged {charged}; leaving the "
+            f"training zone truncates (value bootstrapped){randomized}"
         )
 
     # Internal machinery
@@ -206,14 +221,25 @@ class RolloutEnvironment:
             raise ValueError(f"integrator must be 'rk4' or 'euler', got {integrator!r}")
         return steps[integrator]
 
-    def allowed_box(self):
-        """The box episodes must stay in: the problem's ``X`` when it is a box, else the state bounds."""
-        X = self.problem.X
-        if isinstance(X, BoxSet):
-            x_lb, x_ub = X.lower, X.upper
-        else:
-            x_lb, x_ub = self.sys.state.lower_bound, self.sys.state.upper_bound
-        return np.asarray(x_lb, dtype=float), np.asarray(x_ub, dtype=float)
+    def price_of_infeasibility(self):
+        """The problem's ``infeasible_cost``; else a bound of any feasible cost, announced once."""
+        if self.problem.infeasible_cost is not None:
+            return self.problem.infeasible_cost
+        bound = feasible_cost_bound(
+            self.problem,
+            self.training_zone,
+            self.action_port,
+            self.dt,
+            self.n_steps_per_episode,
+            self.discount_rate,
+        )
+        if is_finite_box(self.X.bounding_box()) and np.isfinite(bound):
+            warnings.warn(
+                f"leaving X is charged {bound:.3g}, a bound of any feasible cost over "
+                f"{self.tf:g} s; set infeasible_cost on the problem to choose",
+                stacklevel=3,
+            )
+        return bound
 
     def nominal_port_values(self):
         """The nominal value of each input port, in port order."""
@@ -223,3 +249,46 @@ class RolloutEnvironment:
             values[port_id] = u_nominal[i : i + port.dim]
             i += port.dim
         return values
+
+
+def feasible_cost_bound(
+    problem, zone, action_port, dt, n_steps, discount_rate, samples=4096
+):
+    """
+    A bound of the discounted cost of any trajectory that stays in the zone.
+
+    Samples the running cost on the box of the zone (else of ``X``) and of the
+    action port, the other ports at their nominal values (a Halton set), for its
+    maximum ``g_max``, then sums it over the episode with the discount:
+    ``g_max dt (1 - gamma^N) / (1 - gamma)``. A failure charged this much is
+    never preferable to any feasible continuation (the penalty method). ``+inf``
+    when no finite box bounds the cost.
+    """
+    sys = problem.sys
+    X_box = zone.bounding_box()
+    if not is_finite_box(X_box):
+        X_box = problem.X.bounding_box()
+    U_box = sys.inputs[action_port].box
+    if not (is_finite_box(X_box) and is_finite_box(U_box)):
+        return np.inf
+    lower = np.concatenate([X_box.lower, U_box.lower])
+    upper = np.concatenate([X_box.upper, U_box.upper])
+    unit = qmc.Halton(d=lower.size, scramble=False).random(int(samples) + 1)[1:]
+    points = lower + unit * (upper - lower)
+    n = X_box.dim
+    g = problem.cost.g
+    u_full = np.asarray(sys.get_u_from_input_ports(), dtype=float)
+    action = sys.get_input_port_slice(action_port)
+
+    def running_cost(point):
+        u = u_full.copy()
+        u[action] = point[n:]
+        return float(g(point[:n], u, 0.0))
+
+    g_max = max(running_cost(p) for p in points)
+
+    # sum_k gamma^k g_max dt over N steps, gamma = exp(-rho dt)
+    gamma = float(np.exp(-discount_rate * dt))
+    if gamma >= 1.0:
+        return g_max * dt * n_steps
+    return g_max * dt * (1.0 - gamma**n_steps) / (1.0 - gamma)

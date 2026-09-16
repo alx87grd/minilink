@@ -1,21 +1,14 @@
-:hide-toc:
-
 Minilink
 ========
 
-.. raw:: html
-   :file: pitch/slides.html
+Write the equations once. Simulate, analyze, control, plan, optimize, learn.
 
-.. raw:: html
+The user guide is the tutorial notebooks; this site is the API reference.
 
-   <p class="ml-deck-link">Present these slides full screen:
-   <a href="_static/pitch.html">the standalone pitch deck</a> (arrow keys, F for fullscreen).</p>
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Project
-
-   roadmap
+- `README <https://github.com/alx87grd/minilink>`_
+- `Showcase notebook <https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb>`_
+- `Tutorial series 00–11 <https://github.com/alx87grd/minilink/tree/main/examples/tutorial>`_
+- `Teaching notebooks <https://github.com/alx87grd/minilink/tree/main/examples/teaching>`_
 
 .. toctree::
    :maxdepth: 2
@@ -31,4 +24,3 @@ Minilink
    api/optimization
    api/planning
    api/graphical
-   api/experimental

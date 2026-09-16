@@ -30,7 +30,9 @@ def quadratic_hinge(threshold: float = 0.0):
 
     def shape(v):
         xp = array_module(v)
-        return xp.maximum(threshold - v, 0.0) ** 2
+        penalty = xp.maximum(threshold - v, 0.0) ** 2
+
+        return penalty
 
     return shape
 
@@ -47,7 +49,9 @@ def quadratic_excess(threshold: float = 0.0):
 
     def shape(v):
         xp = array_module(v)
-        return xp.maximum(v - threshold, 0.0) ** 2
+        penalty = xp.maximum(v - threshold, 0.0) ** 2
+
+        return penalty
 
     return shape
 
@@ -63,7 +67,9 @@ def inverse_barrier(epsilon: float = 1e-2):
 
     def shape(v):
         xp = array_module(v)
-        return 1.0 / xp.maximum(v, epsilon) ** 2
+        barrier = 1.0 / xp.maximum(v, epsilon) ** 2
+
+        return barrier
 
     return shape
 
@@ -80,6 +86,8 @@ def occupancy(scale: float = 1.0):
 
     def shape(v):
         xp = array_module(v)
-        return 1.0 / (1.0 + xp.exp(v / scale))
+        occupancy = 1.0 / (1.0 + xp.exp(v / scale))
+
+        return occupancy
 
     return shape

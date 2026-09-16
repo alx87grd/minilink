@@ -23,7 +23,7 @@ from minilink.planning.spatial.shaping import (
 from minilink.planning.spatial.track import ReferenceTrack
 
 # --- knobs ---
-U_TARGET = 20.0
+U_TARGET = 12.0
 VX0 = 5.0
 TF_SIM = 24.0
 MPC_DT = 0.2
@@ -178,7 +178,9 @@ if SHOW_COST_FIELD:
     plot_cost_field_3d(grid, title="Combined cost field", log_scale=True)
 
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON),
+    PlanningProblem(
+        sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON, X=sys_mpc.state.box
+    ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     compile_backend="jax",

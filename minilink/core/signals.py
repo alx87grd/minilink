@@ -20,6 +20,8 @@ construction time, not at simulation time.
 
 import numpy as np
 
+from minilink.core.sets import BoxSet
+
 
 def _as_optional_vector(value, *, dim, field_name, signal_id):
     """Convert one metadata field (bound or nominal value) to a float vector.
@@ -226,6 +228,11 @@ class VectorSignal:
             self.nominal_value = value.copy()
         else:
             self.nominal_value = np.zeros(self.dim)
+
+    @property
+    def box(self) -> BoxSet:
+        """The bounds as a set, ``lower_bound <= z <= upper_bound``, derived on each read."""
+        return BoxSet(self.lower_bound, self.upper_bound)
 
     def __repr__(self):
         return f"VectorSignal: dim={self.dim}, nominal={self.nominal_value}"

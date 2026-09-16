@@ -49,7 +49,9 @@ class StateFeedbackController(Controller):
         x_meas = u[:n]
         r = u[n:]
 
-        return ubar - K @ (x_meas - r)
+        u_cmd = ubar - K @ (x_meas - r)
+
+        return u_cmd
 
 
 class TimeVaryingStateFeedbackController(Controller):
@@ -110,7 +112,9 @@ class TimeVaryingStateFeedbackController(Controller):
         K = interpolate_schedule(xp, t_schedule, K_schedule, t)
         K = xp.where(t > t_schedule[-1], xp.asarray(K_after), K)
 
-        return ubar - K @ (x_meas - r)
+        u_cmd = ubar - K @ (x_meas - r)
+
+        return u_cmd
 
     def plot_gain_schedule(self, ax=None, show=True):
         """Draw every entry of the gain schedule ``K(t)`` against time."""
@@ -171,7 +175,9 @@ class TrajectoryFeedbackController(Controller):
         u_ref = interpolate_schedule(xp, t_schedule, u_d, t)
         K = interpolate_schedule(xp, t_schedule, K_schedule, t)
 
-        return u_ref - K @ (x_meas - x_ref)
+        u_cmd = u_ref - K @ (x_meas - x_ref)
+
+        return u_cmd
 
     def plot_gain_schedule(self, ax=None, show=True):
         """Draw every entry of the gain schedule ``K(t)`` against time."""
@@ -196,7 +202,9 @@ def interpolate_schedule(xp, t_samples, values, t):
     # interval [t_i, t_i+1] holding t, clipped to the schedule
     i = xp.clip(xp.searchsorted(ts, t, side="right") - 1, 0, len(t_samples) - 2)
     w = xp.clip((t - ts[i]) / (ts[i + 1] - ts[i]), 0.0, 1.0)
-    return (1.0 - w) * values[i] + w * values[i + 1]
+    value = (1.0 - w) * values[i] + w * values[i + 1]
+
+    return value
 
 
 def plot_gain_schedule(t, K, *, title="Gain schedule", ax=None, show=True):

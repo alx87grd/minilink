@@ -213,7 +213,7 @@ separate evaluator tool later — not a second problem taxonomy.
 | `PlanningProblem` | `minilink/planning/problems.py` (exists) |
 | `StochasticPlanningProblem` | same module (or `planning/standard_problems.py`) |
 | `RobustPlanningProblem` | same, when needed |
-| Distributions duck types | `planning/distributions.py` or thin `core/` helpers |
+| Distributions duck types | `core/distributions.py` (ruled 2026-09-15) |
 | Monte Carlo / risk evaluators | planning tools (not interfaces) |
 | Gym adapter | `interfaces/gymnasium.py` |
 

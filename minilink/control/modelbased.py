@@ -84,7 +84,9 @@ class ComputedTorqueController(Controller):
         qdd_des = Kp * (q_d - q) - Kd * dq
         # Embedded model: plant live self.params (DESIGN §4 embedded-model rule).
         tau = self.plant.inverse_dynamics(q, dq, qdd_des)
-        return xp.asarray(tau).reshape(-1)
+        tau = xp.asarray(tau).reshape(-1)
+
+        return tau
 
     def _ctl_tracking(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -103,7 +105,9 @@ class ComputedTorqueController(Controller):
         qdd_des = Kp * (q_d - q) + Kd * (dq_d - dq)
         # Embedded model: plant live self.params (DESIGN §4 embedded-model rule).
         tau = self.plant.inverse_dynamics(q, dq, qdd_des)
-        return xp.asarray(tau).reshape(-1)
+        tau = xp.asarray(tau).reshape(-1)
+
+        return tau
 
 
 class SlidingModeController(ComputedTorqueController):
@@ -187,4 +191,6 @@ class SlidingModeController(ComputedTorqueController):
         K = xp.diag(gain) + H @ xp.diag(nab)
         u_computed = self.plant.inverse_dynamics(q, dq, ddq_r)
         u_discontinuous = K @ xp.sign(s)
-        return xp.asarray(u_computed - u_discontinuous).reshape(-1)
+        u = xp.asarray(u_computed - u_discontinuous).reshape(-1)
+
+        return u

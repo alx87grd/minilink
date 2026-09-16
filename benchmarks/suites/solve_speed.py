@@ -124,6 +124,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
         x_start=x_start,
         x_goal=x_goal,
         cost=cost,
+        X=sys.state.box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,

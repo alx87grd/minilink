@@ -52,6 +52,7 @@ def build_showcase_cartpole_problem() -> PlanningProblem:
         x_start=x_start,
         x_goal=x_goal,
         cost=cost,
+        X=sys.state.box,
     )
 
 

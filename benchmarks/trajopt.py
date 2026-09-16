@@ -710,7 +710,12 @@ def _cartpole_problem(sys, *, tf: float) -> PlanningProblem:
         ubar=np.zeros(sys.m),
     )
     return PlanningProblem(
-        sys=sys, x_start=x_start, x_goal=x_goal, cost=cost, tf=float(tf)
+        sys=sys,
+        x_start=x_start,
+        x_goal=x_goal,
+        cost=cost,
+        tf=float(tf),
+        X=sys.state.box,
     )
 
 

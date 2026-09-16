@@ -156,7 +156,9 @@ class DynamicBicycle(DynamicSystem):
         inertia = params["inertia"]
         xp = array_module(q)
 
-        return xp.diag(xp.array([mass, mass, inertia], dtype=float))
+        M = xp.diag(xp.array([mass, mass, inertia], dtype=float))
+
+        return M
 
     def C(self, q, v, params=None):
         params = self.params if params is None else params
@@ -165,7 +167,7 @@ class DynamicBicycle(DynamicSystem):
 
         w = v[2]
         # fmt: off
-        return xp.array(
+        C = xp.array(
             [
                 [     0.0, -mass * w, 0.0],
                 [mass * w,       0.0, 0.0],
@@ -174,6 +176,8 @@ class DynamicBicycle(DynamicSystem):
         )
         # fmt: on
 
+        return C
+
     def N(self, q, params=None):
         theta = q[2]
         xp = array_module(q)
@@ -181,7 +185,7 @@ class DynamicBicycle(DynamicSystem):
 
         # World-frame velocity kinematics: dq = N(q) v
         # fmt: off
-        return xp.array(
+        N = xp.array(
             [
                 [c, -s, 0.0],
                 [s,  c, 0.0],
@@ -189,6 +193,8 @@ class DynamicBicycle(DynamicSystem):
             ]
         )
         # fmt: on
+
+        return N
 
     def compute_wheel_velocities(self, v_body, u_inputs, params=None):
         params = self.params if params is None else params
@@ -290,7 +296,9 @@ class DynamicBicycle(DynamicSystem):
         # Rigid-body EoM in body frame: M dv + C v + d = 0; dq = N v
         dv = xp.linalg.solve(M, -C @ v - d)
         dq = N @ v
-        return xp.concatenate([dq, dv])
+        dx = xp.concatenate([dq, dv])
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -542,7 +550,9 @@ class BicycleDynRate(DynamicBicycle):
         # Body follows the rigid-body EoM; wheel rate and steer integrate the inputs
         dv = xp.linalg.solve(M, -C @ v - d)
         dq = N @ v
-        return xp.concatenate([dq, dv, self.rates(x, u)])
+        dx = xp.concatenate([dq, dv, self.rates(x, u)])
+
+        return dx
 
     def _u_in(self, x, u):
         return x[6:8]

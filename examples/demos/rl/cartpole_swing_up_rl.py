@@ -3,9 +3,9 @@
 import jax.numpy as jnp
 import numpy as np
 
-from minilink import CartPole, CostFunction
-from minilink.control import angle_features
-from minilink.planning import (
+from minilink import (
+    CartPole,
+    CostFunction,
     MonteCarloEvaluator,
     ReinforcementLearningPlanner,
     StochasticPlanningProblem,
@@ -21,8 +21,8 @@ DT = 0.05
 plant = CartPole()
 plant.inputs["u"].lower_bound = np.array([-10.0])
 plant.inputs["u"].upper_bound = np.array([10.0])
-plant.state.lower_bound = np.array([-5.0, -1e3, -20.0, -30.0])
-plant.state.upper_bound = np.array([5.0, 1e3, 20.0, 30.0])
+plant.state.lower_bound = np.array([-5.0, -5.0, -20.0, -30.0])
+plant.state.upper_bound = np.array([5.0, 5.0, 20.0, 30.0])
 
 
 # Cost: periodic angle term, small cart, velocity and effort penalties (the
@@ -48,10 +48,16 @@ problem = StochasticPlanningProblem(
     x0_distribution=Uniform([-1.0, -np.pi, -1.0, -1.0], [1.0, np.pi, 1.0, 1.0]),
 )
 
+
+def features(x):
+    pos, theta, dpos, dtheta = x
+    return jnp.array([pos, jnp.cos(theta), jnp.sin(theta), 0.2 * dpos, 0.1 * dtheta])
+
+
 planner = ReinforcementLearningPlanner(
     problem,
     dt=DT,
-    features=angle_features(angles=[1], scales={2: 0.2, 3: 0.1}),
+    features=features,
     hidden=(64, 64),
     algorithm="ppo",
     n_envs=16,
@@ -60,28 +66,18 @@ planner = ReinforcementLearningPlanner(
     gamma=0.99,
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(f"\n{solution.solver}")
+print(solution.solver)
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()
 ppo_ctl.plot_control_law(x_axis=1, y_axis=3, u_axis=0)  # force vs (theta, dtheta)
 
 report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
-print("Monte Carlo over the task's starts:", report)
+print(report)
 
 plant.x0 = np.array([0.0, 0.05, 0.0, 0.0])  # hanging, a tiny tip
 cl_sys = ppo_ctl @ plant
 cl_sys.name = "Cart-pole with the learned law"
-cl_sys.plot_diagram()
-
-
 traj = cl_sys.compute_trajectory(tf=10.0, dt=0.01)
 cl_sys.plot_trajectory(traj)
-angle_error = np.abs(np.mod(traj.x[1], 2 * np.pi) - np.pi)
-print(
-    "Angle error to upright, last 2 s:",
-    round(float(angle_error[-200:].max()), 3),
-    "rad",
-)
-print("Cart excursion max |x| =", round(float(np.abs(traj.x[0]).max()), 2), "m")
 cl_sys.animate(traj)

@@ -53,7 +53,8 @@ class ReinforcementLearningPlanner(Planner):
     Policy-family planner that learns ``u = pi(x)`` by reinforcement learning.
 
     The training objective is the expected discounted return on the control
-    grid, ``E[-sum_k gamma^k g(x_k, u_k) dt]`` under the problem's exit rule.
+    grid, ``E[-sum_k gamma^k g(x_k, u_k) dt]``: a failure (leaving ``X``) pays the
+    problem's price of infeasibility, leaving the training zone truncates the episode.
     ``solve`` returns the learned law as a
     :class:`~minilink.planning.results.PlanningSolution`; asked to evaluate, it
     also rolls the law out and scores it by Monte Carlo on the problem's own
@@ -68,7 +69,7 @@ class ReinforcementLearningPlanner(Planner):
     Parameters
     ----------
     problem : StochasticPlanningProblem
-        Task with a start distribution, cost, box and exit rule. A plain
+        Task with a start distribution, cost and constraint set. A plain
         :class:`~minilink.planning.problems.PlanningProblem` is accepted and
         trained from its single ``x_start``.
     dt : float
@@ -84,6 +85,9 @@ class ReinforcementLearningPlanner(Planner):
     n_envs, n_steps : int
         Plants simulated in parallel and control periods per collection (an
         episodic method collects one episode length instead of ``n_steps``).
+    training_zone : Set, optional
+        Where episodes run (the plant's state box by default); leaving it truncates
+        the episode. A training choice, not a constraint: the constraint is ``problem.X``.
     episode_length : float, optional
         Episode duration for an infinite-horizon problem (default 10 s).
     gamma : float, optional
@@ -133,6 +137,7 @@ class ReinforcementLearningPlanner(Planner):
         gamma=None,
         log_std_init=0.0,
         integrator="rk4",
+        training_zone=None,
         seed=0,
         verbose=True,
         **algorithm_kwargs,
@@ -150,7 +155,11 @@ class ReinforcementLearningPlanner(Planner):
 
         # The task, compiled for rollouts
         self.env = RolloutEnvironment(
-            problem, dt=dt, episode_length=episode_length, integrator=integrator
+            problem,
+            dt=dt,
+            episode_length=episode_length,
+            integrator=integrator,
+            training_zone=training_zone,
         )
         self.require_expectation_criterion()
         if self.verbose:

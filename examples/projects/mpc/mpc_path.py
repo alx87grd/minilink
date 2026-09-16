@@ -106,7 +106,9 @@ cost = (
 x0 = np.array([waypoints[0, 0], waypoints[0, 1], 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
 
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON),
+    PlanningProblem(
+        sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON, X=sys_mpc.state.box
+    ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     compile_backend=BACKEND,

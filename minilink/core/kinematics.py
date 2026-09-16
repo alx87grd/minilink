@@ -38,12 +38,14 @@ def Rx(theta):
     one, zero = xp.ones_like(c), xp.zeros_like(c)
 
     # fmt: off
-    return xp.array([
+    R = xp.array([
         [ one, zero, zero],
         [zero,    c,   -s],
         [zero,    s,    c],
     ])
     # fmt: on
+
+    return R
 
 
 def Ry(theta):
@@ -53,12 +55,14 @@ def Ry(theta):
     one, zero = xp.ones_like(c), xp.zeros_like(c)
 
     # fmt: off
-    return xp.array([
+    R = xp.array([
         [   c, zero,    s],
         [zero,  one, zero],
         [  -s, zero,    c],
     ])
     # fmt: on
+
+    return R
 
 
 def Rz(theta):
@@ -68,12 +72,14 @@ def Rz(theta):
     one, zero = xp.ones_like(c), xp.zeros_like(c)
 
     # fmt: off
-    return xp.array([
+    R = xp.array([
         [   c,   -s, zero],
         [   s,    c, zero],
         [zero, zero,  one],
     ])
     # fmt: on
+
+    return R
 
 
 # Pose layer — 4x4 homogeneous transforms T (SE(3))
@@ -90,7 +96,9 @@ def SE3(R, p=0.0):
 
     top = xp.concatenate([R, p.reshape(3, 1)], axis=1)
     bottom = xp.asarray([[0.0, 0.0, 0.0, 1.0]])
-    return xp.concatenate([top, bottom], axis=0)
+    T = xp.concatenate([top, bottom], axis=0)
+
+    return T
 
 
 def SE2(x, y, theta):
@@ -104,13 +112,15 @@ def SE2(x, y, theta):
     x, y = x * one, y * one
 
     # fmt: off
-    return xp.array([
+    T = xp.array([
         [   c,   -s, zero,    x],
         [   s,    c, zero,    y],
         [zero, zero,  one, zero],
         [zero, zero, zero,  one],
     ])
     # fmt: on
+
+    return T
 
 
 def translation(dx=0.0, dy=0.0, dz=0.0):
@@ -120,13 +130,15 @@ def translation(dx=0.0, dy=0.0, dz=0.0):
     dx, dy, dz = dx * one, dy * one, dz * one
 
     # fmt: off
-    return xp.array([
+    T = xp.array([
         [ one, zero, zero,   dx],
         [zero,  one, zero,   dy],
         [zero, zero,  one,   dz],
         [zero, zero, zero,  one],
     ])
     # fmt: on
+
+    return T
 
 
 def identity(xp=None):
@@ -148,7 +160,9 @@ def inv(T):
     R_inv = R.T
     top = xp.concatenate([R_inv, (-R_inv @ p).reshape(3, 1)], axis=1)
     bottom = xp.asarray([[0.0, 0.0, 0.0, 1.0]])
-    return xp.concatenate([top, bottom], axis=0)
+    T_inv = xp.concatenate([top, bottom], axis=0)
+
+    return T_inv
 
 
 def apply(T, pts):

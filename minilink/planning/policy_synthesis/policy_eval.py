@@ -115,7 +115,11 @@ class PolicyEvaluator:
             xnext = x + f(x, u, t, sys_params) * dt
 
             x_next[s] = xnext
-            valid = U.contains(u, x, t, set_params) and X.contains(xnext, t, set_params)
+            valid = (
+                U.contains(u, x, t, set_params)
+                and X.contains(xnext, t, set_params)
+                and grid.X.contains(xnext)
+            )
             G[s] = float(g(x, u, t, cost_params)) * dt if valid else out_of_bound_cost
 
         return x_next, G

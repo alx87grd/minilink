@@ -3,16 +3,18 @@
 **Write the equations once. Simulate, analyze, control, plan, optimize, learn.**
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb)
-[![Docs](https://img.shields.io/badge/docs-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
+[![Notebooks](https://img.shields.io/badge/notebooks-examples%2Ftutorial-F37626?logo=jupyter&logoColor=white)](https://github.com/alx87grd/minilink/tree/main/examples/tutorial)
+[![PyPI](https://img.shields.io/pypi/v/minilink)](https://pypi.org/project/minilink/)
+[![API](https://img.shields.io/badge/API-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 <table>
   <tr>
     <td width="50%" align="center" valign="bottom">
-      <img src="docs/_static/cartpole_swingup.gif" alt="trajectory optimization" width="100%"/>
+      <img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/cartpole_swingup.gif" alt="trajectory optimization" width="100%"/>
     </td>
     <td width="50%" align="center" valign="bottom">
-      <img src="docs/_static/ur5_meshcat.gif" alt="task-space impedance control" width="100%"/>
+      <img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/ur5_meshcat.gif" alt="task-space impedance control" width="100%"/>
     </td>
   </tr>
   <tr>
@@ -54,7 +56,7 @@ diagram.plot_trajectory()
 diagram.animate()
 ```
 
-![closed-loop diagram](docs/_static/diagram_closed_loop.png)
+![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
 
 ## What is a System
 
@@ -64,8 +66,6 @@ state `x`, the input `u`, the time `t` and the parameters `params`:
     dx/dt = f(x, u, t; params)      dynamics
     y     = h(x, u, t; params)      one per output port, default y = x
     T     = tf(x, u, t; params)     body poses, for animation
-
-![a System: input ports, f, h, tf, and three output ports](docs/_static/system.svg)
 
 Write `f`, and the plant simulates and plots. Add `tf` and a skin, and it
 animates on matplotlib, plotly, meshcat (3D) or pygame, and you can drive it
@@ -115,7 +115,7 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 
 ## One model, every tool
 
-![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](docs/_static/bridges.svg)
+![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/bridges.svg)
 
 | Verb | Call |
 | --- | --- |
@@ -129,12 +129,12 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 | Sampling search | `RRTPlanner(problem)` |
 | Trajectory optimization | `TrajectoryOptimizationPlanner(problem, transcription="direct_collocation")` |
 | Model predictive control | `ModelPredictiveController(planner, dt_mpc=0.1) @ plant` |
-| Reinforcement learning | `Sys2Gym(plant, cost)`, then any Gymnasium agent |
-| Identification | `plant.jacobian("f", "params", x_bar)` |
+| Reinforcement learning | `ReinforcementLearningPlanner(problem)` |
+| Sensitivity | `plant.jacobian("f", "params", x_bar)` |
 
 The objects between the tools are the textbook's nouns. A `PlanningProblem`
 is a system, a cost and boundary sets; every planner takes it and returns a
-`Trajectory`:
+`PlanningSolution` (a policy, plus the trajectory when the solver computes one):
 
 ```python
 from minilink import (
@@ -147,6 +147,7 @@ x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
 problem = PlanningProblem(
     sys=plant, x_start=x_down, x_goal=x_up, Xf=BallSet(x_up, 0.2), tf=4.0,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
+    X=plant.state.box,
 )
 
 vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
@@ -193,18 +194,26 @@ differentiate inside your own `jit`. See
 - **Teaching.** NumPy, SciPy and Matplotlib are enough for simulation, phase
   planes, animation, linearization, LQR and value iteration. Runs in Colab
   from one setup cell. One import line covers a course:
-  `from minilink import Pendulum, PID, lqr, PlanningProblem`.
+  `from minilink import Pendulum, PID, lqr, PlanningProblem, ReinforcementLearningPlanner`.
 - **Research.** Optional JAX for compile and autodiff, Ipopt for large NLPs,
-  meshcat for 3D, a hybrid stack for sampled MPC, a Gymnasium bridge for RL.
-  Every catalog plant compiles on both backends.
+  meshcat for 3D, a hybrid stack for sampled MPC, a Gymnasium bridge
+  (`Sys2Gym`) for external RL agents. Every catalog plant compiles on both
+  backends.
 
 The boundary between the two is a contract, not a convention:
 [ROADMAP.md §2](ROADMAP.md#2-two-lanes).
 
 ## Install
 
-Python 3.10+. Recommended: the conda environment from
-[`environment.yml`](environment.yml).
+Python 3.10+. Once the `0.1.0` tag is on PyPI:
+
+```bash
+pip install minilink
+```
+
+Until then, from a clone: `pip install -e .` at the repo root. The Full local
+stack (JAX, notebooks, 3-D, PPO) is the conda environment from
+[`environment.yml`](environment.yml):
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -212,8 +221,8 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Or open any notebook in Colab: the first cell clones the repository. Basic
-tier, pip, and options: [install.md](install.md).
+Or open any notebook in Colab: the first cell clones the repository. Tiers,
+extras, and publishing a release: [install.md](install.md).
 
 ## Learn more
 

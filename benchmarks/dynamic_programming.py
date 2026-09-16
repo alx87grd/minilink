@@ -49,7 +49,7 @@ def pendulum_problem():
     sys.inputs["u"].lower_bound = np.array([-5.0])
     sys.inputs["u"].upper_bound = np.array([5.0])
     cost = QuadraticCost.from_system(sys, xbar=UPRIGHT, R=np.eye(1))
-    return PlanningProblem(sys, x_goal=UPRIGHT, cost=cost)
+    return PlanningProblem(sys, x_goal=UPRIGHT, cost=cost, X=sys.state.box)
 
 
 def benchmark_backend(

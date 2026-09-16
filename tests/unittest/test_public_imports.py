@@ -38,8 +38,17 @@ class TestPublicImports(unittest.TestCase):
 
         self.assertIn("Pendulum", minilink.__all__)
         self.assertIn("Boat2D", minilink.__all__)  # the catalog is teaching surface
+        self.assertIn("ReinforcementLearningPlanner", minilink.__all__)
+        self.assertIn("TabularLearningPlanner", minilink.__all__)
+        self.assertIn("StochasticPlanningProblem", minilink.__all__)
         self.assertNotIn("ModelPredictiveController", minilink.__all__)  # research lane
         self.assertNotIn("HybridDiagram", minilink.__all__)
+
+    def test_package_exposes_a_version(self):
+        import minilink
+
+        self.assertTrue(minilink.__version__)
+        self.assertRegex(minilink.__version__, r"^0\.")
 
     def test_simulation_band_exports_simulators(self):
         from minilink.simulation import Simulator, StaticSimulator

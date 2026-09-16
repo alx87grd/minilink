@@ -41,8 +41,9 @@ class Pendulum(MechanicalSystem):
         I = params["I"]
         xp = array_module(q)
 
-        # rotational inertia of the bob about the pivot
-        return xp.array([[m * l**2 + I]])
+        H = xp.array([[m * l**2 + I]])
+
+        return H
 
     def C(self, q, dq, params=None):
         xp = array_module(q)
@@ -54,15 +55,21 @@ class Pendulum(MechanicalSystem):
         l = params["l"]
         gravity = params["gravity"]
         xp = array_module(q)
+        theta = q[0]
 
-        # gravity restoring torque
-        return xp.array([m * gravity * l * xp.sin(q[0])])
+        g = xp.array([m * gravity * l * xp.sin(theta)])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         d = params["d"]
         xp = array_module(q)
-        return xp.array([d * dq[0]])
+        omega = dq[0]
+
+        tau_d = xp.array([d * omega])
+
+        return tau_d
 
     def get_kinematic_geometry(self):
         length = self.params["l"]
@@ -178,9 +185,12 @@ class TwoIndependentPendulums(MechanicalSystem):
         m = params["m"]
         l = params["l"]
         I = params["I"]
-        inertia = m * l**2 + I
         xp = array_module(q)
-        return xp.diag(xp.array([inertia, inertia]))
+
+        inertia = m * l**2 + I
+        H = xp.diag(xp.array([inertia, inertia]))
+
+        return H
 
     def C(self, q, dq, params=None):
         xp = array_module(q)
@@ -192,13 +202,19 @@ class TwoIndependentPendulums(MechanicalSystem):
         l = params["l"]
         gravity = params["gravity"]
         xp = array_module(q)
-        return m * gravity * l * xp.sin(q)
+
+        g = m * gravity * l * xp.sin(q)
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         d = params["d"]
         xp = array_module(q)
-        return d * xp.asarray(dq)
+
+        tau_d = d * xp.asarray(dq)
+
+        return tau_d
 
     def get_kinematic_geometry(self):
         length = self.params["l"]

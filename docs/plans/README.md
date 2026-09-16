@@ -23,9 +23,11 @@ the design needs a writeup.
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control Barrier Functions (CBF): bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block | Research lane — design draft (2026-09-11) |
 | [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | Solver backend factory for offline + parametric MPC | Research lane — draft, Later |
 | [standard-planning-problems.md](standard-planning-problems.md) | Deterministic / stochastic / robust problem taxonomy | Research lane — draft, Later |
-| [rl-planner-vision.md](rl-planner-vision.md) | RL as a policy-family planner on the stochastic problem: exit rule and horizon semantics, feature/policy block, bare JAX vs Flax, Monte Carlo evaluation | Research lane — in progress: R1–R6 landed, R7 open |
 | [cost-params.md](cost-params.md) | Cost parameters as a dictionary like a system's, composite costs nested like diagram params; the cost-integrator block toward a differentiable closed-loop cost | Core contract — design agreed 2026-09-13, not started |
 | [naming.md](naming.md) | One naming rule for blocks and signals: audit of class names, display names, ids, role keys, wires, params paths and labels; six quick wins and the larger alignments | Core contract — audit done 2026-09-13, nothing applied |
+| [core-objects-4-fields.md](core-objects-4-fields.md) | The `Field` object on `(x, u, t)`: `QuadraticField`, `GridField`, `CallableField`, the Lyapunov certificate, DP and the approximator speaking it; CBF plan amended | Core contract — agreed 2026-09-15, not started |
+| [core-objects-5-later-nouns.md](core-objects-5-later-nouns.md) | `Gaussian(cov=)` with the disturbance convention, parameter-dictionary sets and distributions, the Hamiltonian, `NoiseSource`, `UnionSet` | Later / v0.2 |
+| [core-objects-6-demos.md](core-objects-6-demos.md) | Demos and notebooks to the minimal rule: native plots and prints, the flat-demo ratchet, the sweep file by file | Student-facing — rule agreed 2026-09-15, sweep not started |
 | [lyapunov-certificates.md](lyapunov-certificates.md) | Region of attraction as an analysis verb: quadratic Lyapunov certificate, sampled sublevel search, Monte Carlo verification, phase-plane plot | Teaching surface — implemented 2026-09-11, awaiting rulings (D1–D5) |
 | [phase4-fidelity-maps.md](phase4-fidelity-maps.md) | Jax bicycle ladder lift/project maps + MPC broadcast | Research lane — draft, Later |
 | [articulated-mechanism.md](articulated-mechanism.md) | Mechanism IR, sym/num dual, spatial RNEA/ABA | Research lane — draft, Later |
@@ -33,4 +35,5 @@ the design needs a writeup.
 Deleted (landed; decision records folded into DESIGN / ROADMAP / tests README / reviews):
 - 2026-09-05: `control-block-contract.md`, `test-benchmark-consolidation.md`.
 - 2026-09-11: `control-plots.md`, `derivatives-facade.md`, `planning-pipeline-architecture.md`, `neural-blocks-collection.md`, `mpc-tuning.md`.
-- 2026-09-12: `constitution-integration.md` (record: [constitution second opinion](../reviews/2026-09-12-constitution-second-opinion.md)), `v01-scope-alignment.md` (rulings in ROADMAP §6), `vehicle-abstraction.md` (teaching ladder S25; view ports → TODO Later).
+- 2026-09-12: `constitution-integration.md` (rulings in [2026-09-12-governance-stack-audit.md](../reviews/2026-09-12-governance-stack-audit.md)), `v01-scope-alignment.md` (rulings in ROADMAP §6), `vehicle-abstraction.md` (teaching ladder S25; view ports → TODO Later).
+- 2026-09-15: `core-objects-1-governance.md`, `core-objects-2-sets-distributions.md`, `core-objects-3-exit-rule.md` (contracts in CONSTITUTION / RULES / DESIGN), `rl-planner-vision.md` (R1–R7 landed; planner is DESIGN / ROADMAP TRL).

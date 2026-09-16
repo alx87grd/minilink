@@ -39,10 +39,14 @@ def _gravity_feedforward(plant, gravity, q, model_params=None):
 
 def _impedance_joint_torque(ref_dim, n, r, q, dq, Kp, Kd, xp):
     if ref_dim == n:
-        return Kp * (r - q) - Kd * dq
+        tau = Kp * (r - q) - Kd * dq
+
+        return tau
     pos_d = r[:n]
     vel_d = r[n:]
-    return Kp * (pos_d - q) + Kd * (vel_d - dq)
+    tau = Kp * (pos_d - q) + Kd * (vel_d - dq)
+
+    return tau
 
 
 class ModelJointImpedance(Controller):
@@ -373,9 +377,13 @@ class TaskKinematic(Controller):
         Kp = xp.asarray(params["Kp"])
 
         v_task = Kp * (p_d - p)
+        # J q̇ = v_task
         if dof == n:
-            return xp.linalg.solve(J, v_task)
-        return xp.linalg.pinv(J) @ v_task
+            dq = xp.linalg.solve(J, v_task)
+        else:
+            dq = xp.linalg.pinv(J) @ v_task
+
+        return dq
 
 
 class TaskKinematicNullspace(TaskKinematic):
@@ -437,4 +445,6 @@ class TaskKinematicNullspace(TaskKinematic):
         v_task = Kp * (p_d - p)
         J_pinv = xp.linalg.pinv(J)
         null_proj = xp.eye(dof) - J_pinv @ J
-        return J_pinv @ v_task + null_proj @ (K_null * (q_null - q))
+        dq = J_pinv @ v_task + null_proj @ (K_null * (q_null - q))
+
+        return dq

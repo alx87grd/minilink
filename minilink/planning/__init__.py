@@ -24,10 +24,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "StochasticPlanningProblem",
     ),
     "as_stochastic": ("minilink.planning.problems", "as_stochastic"),
-    "Gaussian": ("minilink.planning.distributions", "Gaussian"),
-    "Uniform": ("minilink.planning.distributions", "Uniform"),
-    "Particles": ("minilink.planning.distributions", "Particles"),
-    "Sampler": ("minilink.planning.distributions", "Sampler"),
+    "Gaussian": ("minilink.core.distributions", "Gaussian"),
+    "Uniform": ("minilink.core.distributions", "Uniform"),
+    "Particles": ("minilink.core.distributions", "Particles"),
+    "Sampler": ("minilink.core.distributions", "Sampler"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     # trajectory optimization
     "TrajectoryOptimizationPlanner": (

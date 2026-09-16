@@ -1,4 +1,4 @@
-"""Build the README / landing-page assets: diagram PNG, GIFs, standalone pitch deck."""
+"""Build the README assets: diagram PNG and GIFs."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ os.environ.setdefault("MPLBACKEND", "Agg")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 STATIC = ROOT / "docs" / "_static"
-PITCH = ROOT / "docs" / "pitch"
 
 import numpy as np  # noqa: E402
 
@@ -178,56 +177,11 @@ def gif_mpc_car() -> None:
     shrink_gif(out)
 
 
-def pitch_html() -> None:
-    """Inline slides.html + pitch.css into a standalone deck (offline-capable)."""
-    slides = PITCH / "slides.html"
-    css = PITCH / "pitch.css"
-    if not slides.exists() or not css.exists():
-        print("pitch: docs/pitch/slides.html or pitch.css missing, skipped")
-        return
-    body = slides.read_text().replace("_static/", "")
-    nav = """
-<script>
-(() => {
-  const slides = [...document.querySelectorAll('.slide')];
-  const counter = document.createElement('div');
-  counter.className = 'ml-counter';
-  document.body.appendChild(counter);
-  let i = 0;
-  const current = () => {
-    const y = window.scrollY + window.innerHeight / 2;
-    return slides.findIndex(s => s.offsetTop <= y && y < s.offsetTop + s.offsetHeight);
-  };
-  const go = k => { i = Math.max(0, Math.min(slides.length - 1, k)); slides[i].scrollIntoView({behavior: 'smooth'}); };
-  const update = () => { const k = current(); if (k >= 0) i = k; counter.textContent = `${i + 1} / ${slides.length}`; };
-  window.addEventListener('scroll', update, {passive: true});
-  window.addEventListener('keydown', e => {
-    if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(i + 1); }
-    else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(i - 1); }
-    else if (e.key === 'Home') go(0);
-    else if (e.key === 'End') go(slides.length - 1);
-    else if (e.key.toLowerCase() === 'f') document.documentElement.requestFullscreen?.();
-  });
-  update();
-})();
-</script>
-"""
-    html = (
-        '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        "<title>minilink</title>\n<style>\n" + css.read_text() + "\n</style>\n</head>\n"
-        '<body class="ml-deck">\n' + body + nav + "</body>\n</html>\n"
-    )
-    (STATIC / "pitch.html").write_text(html)
-    print("pitch.html")
-
-
 STEPS = {
     "diagram": diagram_png,
     "pendulum": gif_pendulum,
     "cartpole": gif_cartpole,
     "mpc": gif_mpc_car,
-    "pitch": pitch_html,
 }
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ from typing import Callable
 
 import numpy as np
 
-from minilink.core.sets import BallSet, BoxSet, SingletonSet
+from minilink.core.sets import BallSet, SingletonSet, is_finite_box
 from minilink.core.trajectory import Trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
@@ -131,11 +131,14 @@ class RRTPlanner(Planner):
         Pairwise nearest-neighbour distance ``metric(a, b) -> float``.
     options : RRTOptions
         Tier-2 workflow bag. Flat kwargs below overlay matching fields.
-    max_nodes, goal_bias, goal_tolerance, seed, edge_resolution,
-    max_sample_attempts, return_best_effort, callback, live_plot,
-    live_plot_every, live_plot_pause, live_plot_after_goal_only,
-    live_plot_ax, nearest_backend
-        Tier-1 flat mirrors of :class:`RRTOptions`.
+
+    Notes
+    -----
+    Flat keyword arguments overlay :class:`RRTOptions`: ``max_nodes``,
+    ``goal_bias``, ``goal_tolerance``, ``seed``, ``edge_resolution``,
+    ``max_sample_attempts``, ``return_best_effort``, ``callback``,
+    ``live_plot``, ``live_plot_every``, ``live_plot_pause``,
+    ``live_plot_after_goal_only``, ``live_plot_ax``, ``nearest_backend``.
 
     Attributes
     ----------
@@ -194,7 +197,8 @@ class RRTPlanner(Planner):
         self.reached_goal: bool = False
         self.solution_node: Node | None = None
         self.iterations: int = 0
-        self._sample_box = BoxSet.from_system_state(problem.sys)
+        box = problem.X.bounding_box()
+        self._sample_box = problem.sys.state.box if not is_finite_box(box) else box
 
     def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """
@@ -389,14 +393,14 @@ class RRTPlanner(Planner):
         X = problem.X
 
         try:
-            sample = X.sample(rng, n=1, params=set_params)[0]
+            sample = X.sample(rng, params=set_params)
             if X.contains(sample, params=set_params):
                 return np.asarray(sample, dtype=float)
         except NotImplementedError:
             pass
 
         for _ in range(self.options.max_sample_attempts):
-            candidate = self._sample_box.sample(rng)[0]
+            candidate = self._sample_box.sample(rng)
             if X.contains(candidate, params=set_params):
                 return np.asarray(candidate, dtype=float)
 

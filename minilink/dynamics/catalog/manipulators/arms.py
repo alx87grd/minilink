@@ -152,7 +152,9 @@ class SpeedControlledManipulator(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         # velocity-controlled joints: the input is the joint-rate command
-        return array_module(u).asarray(u)
+        dx = array_module(u).asarray(u)
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -227,7 +229,9 @@ class OneLinkManipulator(Manipulator):
         I1 = params["I1"]
 
         # rotational inertia of the single link about the pivot
-        return array_module(q).array([[m1 * lc1**2 + I1]])
+        H = array_module(q).array([[m1 * lc1**2 + I1]])
+
+        return H
 
     def C(self, q, dq, params=None):
         return array_module(q).zeros((1, 1))
@@ -240,29 +244,37 @@ class OneLinkManipulator(Manipulator):
 
         # gravity torque about the pivot
         xp = array_module(q)
-        return xp.array([-m1 * gravity * lc1 * xp.sin(q[0])])
+        g = xp.array([-m1 * gravity * lc1 * xp.sin(q[0])])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         d1 = params["d1"]
 
         # linear viscous joint damping
-        return array_module(dq).array([d1 * dq[0]])
+        tau_d = array_module(dq).array([d1 * dq[0]])
+
+        return tau_d
 
     def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
         xp = array_module(q)
-        return xp.array([l1 * xp.sin(q[0]), l1 * xp.cos(q[0])])
+        p = xp.array([l1 * xp.sin(q[0]), l1 * xp.cos(q[0])])
+
+        return p
 
     def J(self, q, params=None):
         l1 = self.params["l1"]
         xp = array_module(q)
         # fmt: off
-        return xp.array([
+        J = xp.array([
             [ l1 * xp.cos(q[0])],
             [-l1 * xp.sin(q[0])],
         ])
         # fmt: on
+
+        return J
 
     def get_kinematic_geometry(self):
         return _planar_kinematic_geometry(np.array([self.params["l1"]]))
@@ -333,11 +345,13 @@ class TwoLinkManipulator(Manipulator):
         h12 = m2 * lc2**2 + m2 * l1 * lc2 * c2 + I2
         h22 = m2 * lc2**2 + I2
         # fmt: off
-        return array_module(q).array([
+        H = array_module(q).array([
             [h11, h12],
             [h12, h22],
         ])
         # fmt: on
+
+        return H
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
@@ -350,11 +364,13 @@ class TwoLinkManipulator(Manipulator):
         # Coriolis/centrifugal coupling driven by the second joint rate
         h = m2 * l1 * lc2 * s2
         # fmt: off
-        return array_module(q, dq).array([
+        C = array_module(q, dq).array([
             [-h * dq[1], -h * (dq[0] + dq[1])],
             [ h * dq[0],                  0.0],
         ])
         # fmt: on
+
+        return C
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -370,7 +386,9 @@ class TwoLinkManipulator(Manipulator):
         # gravity torque on each joint
         g1 = (m1 * lc1 + m2 * l1) * gravity
         g2 = m2 * lc2 * gravity
-        return array_module(q).array([-g1 * s1 - g2 * s12, -g2 * s12])
+        g = array_module(q).array([-g1 * s1 - g2 * s12, -g2 * s12])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -378,24 +396,30 @@ class TwoLinkManipulator(Manipulator):
         d2 = params["d2"]
 
         # linear viscous joint damping
-        return array_module(dq).array([d1 * dq[0], d2 * dq[1]])
+        tau_d = array_module(dq).array([d1 * dq[0], d2 * dq[1]])
+
+        return tau_d
 
     def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         c1, s1, _, _, c12, s12 = self._trig(q)
-        return array_module(q).array([l1 * s1 + l2 * s12, l1 * c1 + l2 * c12])
+        p = array_module(q).array([l1 * s1 + l2 * s12, l1 * c1 + l2 * c12])
+
+        return p
 
     def J(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         c1, s1, _, _, c12, s12 = self._trig(q)
         # fmt: off
-        return array_module(q).array([
+        J = array_module(q).array([
             [ l1 * c1 + l2 * c12,  l2 * c12],
             [-l1 * s1 - l2 * s12, -l2 * s12],
         ])
         # fmt: on
+
+        return J
 
     def _lengths(self):
         return np.array([self.params["l1"], self.params["l2"]])
@@ -498,12 +522,14 @@ class ThreeLinkManipulator3D(Manipulator):
         h23 = I3x + m3 * r2**2 + m3 * l1 * r2 * c3
         h33 = I3x + m3 * r2**2
         # fmt: off
-        return array_module(q).array([
+        H = array_module(q).array([
             [h11, 0.0, 0.0],
             [0.0, h22, h23],
             [0.0, h23, h33],
         ])
         # fmt: on
+
+        return H
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
@@ -531,12 +557,14 @@ class ThreeLinkManipulator3D(Manipulator):
         T311 = -T113
         T322 = l1 * m3 * r2 * s3
         # fmt: off
-        return array_module(q, dq).array([
+        C = array_module(q, dq).array([
             [T112 * dq[1] + T113 * dq[2], T112 * dq[0],           T113 * dq[0]],
             [               T211 * dq[0], T223 * dq[2], T223 * (dq[1] + dq[2])],
             [               T311 * dq[0], T322 * dq[1],                    0.0],
         ])
         # fmt: on
+
+        return C
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -552,7 +580,9 @@ class ThreeLinkManipulator3D(Manipulator):
         # gravity torque on the shoulder and elbow joints
         g2 = (m2 * gravity * lc2 + m3 * gravity * l2) * c2 + m3 * gravity * lc3 * c23
         g3 = m3 * gravity * lc3 * c23
-        return array_module(q).array([0.0, -g2, -g3])
+        g = array_module(q).array([0.0, -g2, -g3])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -561,7 +591,9 @@ class ThreeLinkManipulator3D(Manipulator):
         d3 = params["d3"]
 
         # linear viscous joint damping
-        return array_module(dq).array([d1 * dq[0], d2 * dq[1], d3 * dq[2]])
+        tau_d = array_module(dq).array([d1 * dq[0], d2 * dq[1], d3 * dq[2]])
+
+        return tau_d
 
     def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
@@ -569,9 +601,9 @@ class ThreeLinkManipulator3D(Manipulator):
         l3 = self.params["l3"]
         c1, s1, c2, s2, _, _, c23, s23 = self._trig(q)
         radius = l2 * c2 + l3 * c23
-        return array_module(q).array(
-            [radius * c1, radius * s1, l1 - l2 * s2 - l3 * s23]
-        )
+        p = array_module(q).array([radius * c1, radius * s1, l1 - l2 * s2 - l3 * s23])
+
+        return p
 
     def J(self, q, params=None):
         l2 = self.params["l2"]
@@ -580,12 +612,14 @@ class ThreeLinkManipulator3D(Manipulator):
         radius = l2 * c2 + l3 * c23
         vertical = l2 * s2 + l3 * s23
         # fmt: off
-        return array_module(q).array([
+        J = array_module(q).array([
             [-radius * s1, -vertical * c1, -l3 * s23 * c1],
             [ radius * c1, -vertical * s1, -l3 * s23 * s1],
             [         0.0,        -radius,      -l3 * c23],
         ])
         # fmt: on
+
+        return J
 
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]

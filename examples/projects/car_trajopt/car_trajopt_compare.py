@@ -644,7 +644,11 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
         shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
     )
     problem = PlanningProblem(
-        sys=sys, tf=OBS_TF, x_start=x_start, cost=tracking_cost + obstacle_cost
+        sys=sys,
+        tf=OBS_TF,
+        x_start=x_start,
+        cost=tracking_cost + obstacle_cost,
+        X=sys.state.box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
@@ -684,6 +688,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         tf=CORNER_TF,
         x_start=x_start,
         cost=tracking_cost + path_cost + corridor_cost,
+        X=sys.state.box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,

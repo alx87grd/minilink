@@ -116,7 +116,9 @@ class Plane2D(MechanicalSystem):
         mass = params["mass"]
         inertia = params["inertia"]
 
-        return xp.diag(xp.array([mass, mass, inertia]))
+        H = xp.diag(xp.array([mass, mass, inertia]))
+
+        return H
 
     def C(self, q, dq, params=None):
         xp = array_module(q)
@@ -128,7 +130,9 @@ class Plane2D(MechanicalSystem):
         mass = params["mass"]
         gravity = params["gravity"]
 
-        return xp.array([0.0, mass * gravity, 0.0])
+        g = xp.array([0.0, mass * gravity, 0.0])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -161,14 +165,18 @@ class Plane2D(MechanicalSystem):
                 [0.0, 0.0, 1.0],
             ]
         )
-        return -(R @ wind_load)
+        tau_d = -(R @ wind_load)
+
+        return tau_d
 
     def generalized_force(self, q, dq, u, t=0.0, params=None):
         xp = array_module(q)
         thrust = u[0]
         theta = q[2]
 
-        return thrust * xp.array([xp.cos(theta), xp.sin(theta), 0.0])
+        tau = thrust * xp.array([xp.cos(theta), xp.sin(theta), 0.0])
+
+        return tau
 
     def body_shape(self):
         """Side-view fuselage silhouette with the c.g. at the local origin.
@@ -488,7 +496,9 @@ class Plane3D(GeneralizedMechanicalSystem):
         Ixx = params["inertia_xx"]
         Iyy = params["inertia_yy"]
         Izz = params["inertia_zz"]
-        return xp.diag(xp.array([mass, mass, mass, Ixx, Iyy, Izz]))
+        M = xp.diag(xp.array([mass, mass, mass, Ixx, Iyy, Izz]))
+
+        return M
 
     def C(self, q, v, params=None):
         params = self.params if params is None else params
@@ -501,7 +511,7 @@ class Plane3D(GeneralizedMechanicalSystem):
 
         # Rigid-body Coriolis in body axes: m ω×v_lin and ω×(Iω).
         # fmt: off
-        return xp.array([
+        C = xp.array([
             [        0.0, -mass * r,  mass * q_rate, 0.0, 0.0, 0.0],
             [  mass * r,        0.0, -mass * p, 0.0, 0.0, 0.0],
             [-mass * q_rate,  mass * p,        0.0, 0.0, 0.0, 0.0],
@@ -510,6 +520,8 @@ class Plane3D(GeneralizedMechanicalSystem):
             [0.0, 0.0, 0.0, Iyy * q_rate, -Ixx * p,        0.0],
         ])
         # fmt: on
+
+        return C
 
     def N(self, q, params=None):
         xp = array_module(q)
@@ -533,7 +545,9 @@ class Plane3D(GeneralizedMechanicalSystem):
         z03 = xp.zeros((3, 3))
         top = xp.concatenate([R, z03], axis=1)
         bottom = xp.concatenate([z03, E_body], axis=1)
-        return xp.concatenate([top, bottom], axis=0)
+        N = xp.concatenate([top, bottom], axis=0)
+
+        return N
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -545,7 +559,9 @@ class Plane3D(GeneralizedMechanicalSystem):
         # so g_world = [0, 0, m g], then express in body axes.
         g_world = xp.array([0.0, 0.0, mass * gravity])
         g_body = R.T @ g_world
-        return xp.concatenate([g_body, xp.zeros(3)])
+        g = xp.concatenate([g_body, xp.zeros(3)])
+
+        return g
 
     def d(self, q, v, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -558,12 +574,16 @@ class Plane3D(GeneralizedMechanicalSystem):
             speed, alpha, beta, delta_e, delta_a, delta_r, params
         )
         wrench = xp.concatenate([force, moment])
-        return -wrench
+        tau_d = -wrench
+
+        return tau_d
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
         xp = array_module(q)
         thrust = u[0]
-        return xp.array([thrust, 0.0, 0.0, 0.0, 0.0, 0.0])
+        tau = xp.array([thrust, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+        return tau
 
     def tf(self, x, u, t=0, params=None):
         q = x[:6]

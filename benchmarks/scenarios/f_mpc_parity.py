@@ -76,6 +76,7 @@ def _bicycle_planner():
                 xbar=x_ref,
                 ubar=np.zeros(2),
             ),
+            X=sys.state.box,
         ),
         transcription=DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=N_STEPS)

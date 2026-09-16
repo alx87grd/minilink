@@ -20,7 +20,7 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
-from minilink.core.sets import BoxInputSet, BoxSet
+from minilink.core.sets import BoxInputSet, BoxSet, is_finite_box
 from minilink.planning.problems import PlanningProblem
 
 PAIR_CHUNK_SIZE = 50_000
@@ -226,6 +226,22 @@ class StateSpaceGrid:
             if precompute_backend == BACKEND_JAX:
                 self._jax_transition = True
 
+    def on_grid(self, x_next):
+        """Mask of successors inside the grid's box, the table's domain (``(N, A)`` for an ``(N, A, n)`` table)."""
+        return np.all(x_next >= self.x_lb, axis=-1) & np.all(
+            x_next <= self.x_ub, axis=-1
+        )
+
+    @property
+    def X(self) -> BoxSet:
+        """The state box the grid spans, ``x_lb <= x <= x_ub``."""
+        return BoxSet(self.x_lb, self.x_ub)
+
+    @property
+    def U(self) -> BoxInputSet:
+        """The input box the grid's actions span, ``u_lb <= u <= u_ub``."""
+        return BoxInputSet.from_bounds(self.u_lb, self.u_ub)
+
     def ensure_jax_transition(self, t: float = 0.0) -> None:
         """Build or rebuild transition tables with the JAX backend.
 
@@ -307,7 +323,9 @@ class StateSpaceGrid:
 
                 x_next[s, a] = xnext
                 action_ok[s, a] = U.contains(u, x, t, set_params)
-                x_next_ok[s, a] = X.contains(xnext, t, set_params)
+                x_next_ok[s, a] = X.contains(xnext, t, set_params) and bool(
+                    self.on_grid(xnext)
+                )
 
                 pairs_done += 1
                 maybe_print_build_progress(
@@ -332,9 +350,6 @@ class StateSpaceGrid:
         """Vectorized successor map and box validity masks on device."""
         from minilink.core.backends import ensure_jax_x64
 
-        if not isinstance(self.problem.X, BoxSet):
-            raise ValueError("JAX precompute requires a BoxSet state constraint X")
-
         jax = ensure_jax_x64()
         jnp = jax.numpy
 
@@ -343,9 +358,9 @@ class StateSpaceGrid:
         sys_params = self.problem.params.system
         states = jnp.asarray(self.states)
         inputs = jnp.asarray(self.inputs)
-        x_lb = jnp.asarray(self.problem.X.lower)
-        x_ub = jnp.asarray(self.problem.X.upper)
-        box_inputs = isinstance(self.problem.U, BoxInputSet)
+        X, U = self.problem.X, self.problem.U
+        set_params = self.problem.params.sets
+        grid_box = BoxSet(jnp.asarray(self.x_lb), jnp.asarray(self.x_ub))
 
         if self.verbose:
             print(
@@ -359,23 +374,25 @@ class StateSpaceGrid:
 
             # forward Euler step of the continuous dynamics
             xnext = x + self.sys.f(x, u, t, sys_params) * dt
-            x_next_ok = jnp.all((xnext >= x_lb) & (xnext <= x_ub))
-            return xnext, x_next_ok
 
-        x_next, x_next_ok = self._build_xnext_jax_chunks(
+            # validity from the problem's sets and the grid: u in U(x, t), x_next in X(t)
+            # and on the grid (the table's domain; off the grid is infeasible)
+            action_ok = jnp.all(U.margin(u, x, t, set_params) >= 0.0)
+            x_next_ok = jnp.all(X.margin(xnext, t, set_params) >= 0.0) & jnp.all(
+                grid_box.margin(xnext) >= 0.0
+            )
+            return xnext, action_ok, x_next_ok
+
+        x_next, action_ok, x_next_ok = self._build_xnext_jax_chunks(
             pair, N, A, n, jax, jnp, interval=PAIR_CHUNK_SIZE
         )
-        if box_inputs:
-            action_ok = np.ones((N, A), dtype=bool)
-        else:
-            action_ok, x_next_ok = self._validity_masks(x_next, t)
-
         return x_next, action_ok, x_next_ok
 
     def _build_xnext_jax_chunks(self, pair, N, A, n, jax, jnp, *, interval):
         """Fill ``x_next`` in fixed-size JAX chunks with optional progress lines."""
         total_pairs = N * A
         x_next = np.empty((N, A, n), dtype=float)
+        action_ok = np.empty((N, A), dtype=bool)
         x_next_ok = np.empty((N, A), dtype=bool)
         verbose = self.verbose
 
@@ -383,8 +400,8 @@ class StateSpaceGrid:
         def eval_chunk(sa):
             s = sa // A
             a = sa % A
-            xnext, ok = jax.vmap(pair)(s, a)
-            return xnext, ok
+            xnext, u_ok, ok = jax.vmap(pair)(s, a)
+            return xnext, u_ok, ok
 
         build_start = time.time()
         progress = {"enabled": verbose}
@@ -393,19 +410,21 @@ class StateSpaceGrid:
             count = end - begin
             if count == interval:
                 sa = jnp.arange(begin, end)
-                xnext_chunk, ok_chunk = eval_chunk(sa)
+                xnext_chunk, u_ok_chunk, ok_chunk = eval_chunk(sa)
             else:
                 sa = jnp.arange(begin, end)
                 s = sa // A
                 a = sa % A
-                xnext_chunk, ok_chunk = jax.vmap(pair)(s, a)
+                xnext_chunk, u_ok_chunk, ok_chunk = jax.vmap(pair)(s, a)
 
             xnext_chunk = np.asarray(xnext_chunk)
+            u_ok_chunk = np.asarray(u_ok_chunk)
             ok_chunk = np.asarray(ok_chunk)
             idx = np.arange(begin, end)
             s_idx = idx // A
             a_idx = idx % A
             x_next[s_idx, a_idx] = xnext_chunk
+            action_ok[s_idx, a_idx] = u_ok_chunk
             x_next_ok[s_idx, a_idx] = ok_chunk
             maybe_print_build_progress(
                 end,
@@ -423,7 +442,7 @@ class StateSpaceGrid:
                 f"({total_pairs:,} pairs)",
             )
 
-        return x_next, x_next_ok
+        return x_next, action_ok, x_next_ok
 
     def _validity_masks(self, x_next, t):
         """Input and successor validity masks for a precomputed ``x_next`` table."""
@@ -431,10 +450,13 @@ class StateSpaceGrid:
         X, U = self.problem.X, self.problem.U
         set_params = self.problem.params.sets
 
+        # lowering (RULES 4.3): a box validity mask is one vectorized compare
         if isinstance(U, BoxInputSet) and isinstance(X, BoxSet):
             action_ok = np.ones((N, A), dtype=bool)
-            x_next_ok = np.all(x_next >= X.lower, axis=2) & np.all(
-                x_next <= X.upper, axis=2
+            x_next_ok = (
+                np.all(x_next >= X.lower, axis=2)
+                & np.all(x_next <= X.upper, axis=2)
+                & self.on_grid(x_next)
             )
             return action_ok, x_next_ok
 
@@ -446,7 +468,7 @@ class StateSpaceGrid:
                 x = self.states[s]
                 action_ok[s, a] = U.contains(u, x, t, set_params)
                 x_next_ok[s, a] = X.contains(x_next[s, a], t, set_params)
-        return action_ok, x_next_ok
+        return action_ok, x_next_ok & self.on_grid(x_next)
 
     def _print_mesh_summary(self):
         """Print grid size summary (mirrors pyro ``GridDynamicSystem.compute``)."""
@@ -600,15 +622,15 @@ class StateSpaceGrid:
         return shape
 
     def _state_bounds(self, problem):
-        box = (
-            problem.X
-            if isinstance(problem.X, BoxSet)
-            else BoxSet.from_system_state(self.sys)
-        )
+        box = problem.X.bounding_box()
+        if not is_finite_box(box):
+            box = self.sys.state.box
         return self._require_finite_box(box.lower, box.upper, "state")
 
     def _input_bounds(self, problem):
-        box = problem.U.box
+        box = problem.U.bounding_box()
+        if box is None:
+            raise ValueError("StateSpaceGrid needs an input set with a bounding box")
         return self._require_finite_box(box.lower, box.upper, "input")
 
     @staticmethod

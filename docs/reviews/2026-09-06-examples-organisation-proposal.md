@@ -5,7 +5,7 @@ research-lane placement in `minilink/`, with one recommended layout.
 
 **Applied 2026-09-06** after the maintainer's rulings (§1 `experimental/`: yes;
 §2 regroup: yes; all dedupe items: fix; VI-vs-LQR pair kept — 4 of 25 cells
-shared, two lessons). Record in `2026-09-05-evening-session.md`.
+shared, two lessons). Session log retired 2026-09-16.
 
 ## 1. Stable vs experimental in the package
 

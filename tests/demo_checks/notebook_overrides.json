@@ -3,7 +3,7 @@
     "requires": [
       "jax"
     ],
-    "timeout": 300
+    "timeout": 420
   },
   "examples/tutorial/showcase_jax.ipynb": {
     "requires": [
@@ -36,72 +36,73 @@
       "plotly"
     ]
   },
-  "examples/teaching/optimal_control/cartpole_rollout_gradients.ipynb": {
+  "examples/teaching/topics/optimal_control/cartpole_rollout_gradients.ipynb": {
     "requires": [
       "jax"
     ],
     "timeout": 300
   },
-  "examples/teaching/robotics/articulated_robot_eom.ipynb": {
+  "examples/teaching/topics/robotics/manipulator_eom.ipynb": {
     "smoke": false
   },
-  "examples/teaching/optimal_control/pendulum_swing_up_cost_function_vi.ipynb": {
+  "examples/teaching/courses/udes_gro860/pendulum_value_iteration.ipynb": {
     "smoke": false
   },
-  "examples/teaching/optimal_control/pendulum_swing_up_vi_vs_lqr.ipynb": {
+  "examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr.ipynb": {
     "smoke": false
   },
-  "examples/teaching/optimal_control/cartpole_lqr.ipynb": {
+  "examples/teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb": {
+    "smoke": false
+  },
+  "examples/teaching/courses/udes_gro860/cartpole_lqr.ipynb": {
     "requires": [
       "jax"
     ],
     "timeout": 600
   },
-  "examples/teaching/optimal_control/double_integrator_minimum_time_vi.ipynb": {
+  "examples/teaching/courses/udes_gro860/double_integrator_minimum_time.ipynb": {
     "timeout": 300
   },
-  "examples/teaching/optimal_control/double_integrator_policy_evaluation.ipynb": {
+  "examples/teaching/courses/udes_gro860/double_integrator_policy_evaluation.ipynb": {
     "timeout": 300
   },
-  "examples/teaching/reinforcement_learning/cost_to_go_function_approximation.ipynb": {
-    "timeout": 600
-  },
-  "examples/teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb": {
+  "examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb": {
     "smoke": false
   },
-  "examples/teaching/reinforcement_learning/drone_ppo_learn_to_fly.ipynb": {
+  "examples/teaching/courses/udes_gro860/drone_ppo_sb3.ipynb": {
     "smoke": false
   },
-  "examples/teaching/classical_control/frequency_domain_tools.ipynb": {
+  "examples/teaching/topics/classical_control/frequency_response.ipynb": {
     "requires": [
       "plotly"
     ]
   },
-  "examples/teaching/reinforcement_learning/policy_gradient_to_ppo.ipynb": {
-    "requires": [
-      "jax"
-    ]
-  },
-  "examples/teaching/reinforcement_learning/gymnasium_interface.ipynb": {
+  "examples/teaching/courses/udes_gro860/gymnasium_interface.ipynb": {
     "requires": [
       "gymnasium",
-      "jax"
-    ]
-  },
-  "examples/teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb": {
-    "requires": [
-      "jax"
-    ]
-  },
-  "examples/teaching/reinforcement_learning/drone_learn_to_fly.ipynb": {
-    "requires": [
-      "jax"
-    ]
-  },
-  "examples/teaching/reinforcement_learning/from_value_iteration_to_ppo.ipynb": {
-    "requires": [
-      "jax"
+      "jax",
+      "stable_baselines3"
     ],
-    "timeout": 900
+    "smoke": false
+  },
+  "examples/teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/teaching/topics/reinforcement_learning/drone_ppo.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_rl.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/teaching/courses/udes_gro860/drone_ppo.ipynb": {
+    "requires": [
+      "jax"
+    ]
   }
 }

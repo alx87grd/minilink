@@ -71,6 +71,6 @@ class GaussianField(WorkspaceField):
         sigma = self.sigma
 
         d2 = xp.sum((p - center) ** 2)
+        density = amplitude * xp.exp(-0.5 * d2 / sigma**2)
 
-        # Gaussian penalty envelope
-        return amplitude * xp.exp(-0.5 * d2 / sigma**2)
+        return density
