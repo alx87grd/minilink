@@ -112,6 +112,20 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   Do not update them to track every new demo, compare script, or research-lane
   experiment. New demos land under `examples/`. Add a README examples-table row only
   when a demo is a canonical teaching entry for a core tool.
+- **3.8 Notebooks are not a second map.** The catalog is `examples/README.md` (plus
+  root README entry points). Do not duplicate it with See also / Where next /
+  Scripts for depth / peer hrefs.
+  - **Tutorial (`00`–`11`):** at most one same-folder **Next** link, numbered
+    successor. No previous, no skip-ahead, no teaching/demo/project/benchmark/doc
+    hrefs.
+  - **Showcases:** self-contained. No Where next / See also hubs. Chapter names may
+    stay as unlinked backticks (`00_core`).
+  - **Teaching:** standalone. Zero hrefs to other notebooks, demos, tutorials, or
+    library source. Keep Colab self-badge, `git clone`, and external library docs
+    (Gymnasium, SB3). A repo-root `[minilink](https://github.com/alx87grd/minilink)`
+    link may stay.
+  - **Demos / projects:** no markdown links to notebooks. Comment twins
+    (`# Teaching twin: …`) stay unless the maintainer asks to drop them.
 
 ---
 

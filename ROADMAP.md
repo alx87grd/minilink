@@ -6,33 +6,9 @@ Code rules: [RULES.md](RULES.md). Agent workflow: [AGENTS.md](AGENTS.md).
 Operational backlog (step-level): [docs/plans/TODO.md](docs/plans/TODO.md).
 Point-in-time audits: [docs/reviews/](docs/reviews/).
 
-## 1. North star
+## 1. Releases
 
-Minilink is the pyro successor for teaching dynamics, control, and optimal
-control, and the research substrate of the maintainer's group. The promise:
-**write the equations once, then simulate, analyze, control, plan, optimize
-and learn on the same model.** A model is three functions of `(x, u, t; p)`:
-`f` (dynamics), `h` (outputs, default `y = x`) and `tf` (body poses). Three
-claims follow, each containing the previous:
-
-1. **Block diagrams as readable Python, with graphics for free** — `+`, `>>`,
-   `@`; from `f` and `tf` come simulation, plots, the same animation on four
-   renderers and a keyboard game mode; the core is NumPy, SciPy, Matplotlib.
-2. **One interface, every tool, textbook objects in between** — everything is
-   a `System`; `PlanningProblem = sys + cost + boundaries` feeds every planner,
-   `MathematicalProgram` → `Optimizer` is the one NLP shape, `Trajectory` is
-   what every tool returns.
-3. **The same `f` is differentiable and compiled** — exact Jacobians,
-   sensitivity to the physics, gradients through a rollout, batches over
-   parameter families, on NumPy or JAX.
-
-The material that carries this pitch (README, `docs/pitch/`, the three showcase
-notebooks: `showcase_minilink.ipynb`, `showcase_jax.ipynb`, and
-`showcase_from_rl_to_bode.ipynb`) is a spec: wherever the code needs a
-workaround to make a slide true, that is a priority. The continuous `System`
-family and flow block diagrams are the core center of gravity; discrete and
-hybrid tools are subsidiary utilities. Identity and product boundaries:
-[CONSTITUTION.md](CONSTITUTION.md).
+Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
@@ -104,7 +80,7 @@ a release process by themselves.
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call (jitted under JAX when the plant traces, NumPy otherwise; Euler kept as an option). Kept as an optional external bridge; not the primary course path. | Keep module for external interop; course material uses native RL. |
 | Analysis / Lyapunov certificates | provisional (research) | 4 | Landed 2026-09-11 from [lyapunov-certificates.md](docs/plans/lyapunov-certificates.md): `region_of_attraction` + `LyapunovCertificate` (`verify`, `plot`, `contains`), two `System` shortcuts, demo `analysis_region_of_attraction.py` and showcase §11 of `showcase_from_rl_to_bode.ipynb`. Quadratic `V` only; the level is a sampled estimate and the search reports `sample_limited` when halves disagree. | Student cohort validation; SOS and discrete-time later. |
-| Planning / RL planner (`reinforcement_learning/`) | teaching (GRO860) | 6 | Landed 2026-09-10: cost horizon/discount + problem exit rule, `StochasticPlanningProblem` + distributions, `MonteCarloEvaluator`, `NeuralPolicyController` + `MLP`, `ReinforcementLearningPlanner` with PPO and SAC in pure JAX; verified on UR5 impedance showcase. Rebuilt 2026-09-15 on domain objects (`StochasticPolicy`, one collector, algorithms owning their state; bit-identical to the seeded baseline) and completed with the course's foundational algorithms: `REINFORCE`, `ActorCritic`, and `TabularLearningPlanner` (`QLearning`, `SARSA`, `MonteCarloControl`, `EpsilonGreedy`, `UCB`) on the value-iteration grid, NumPy only. S48 landed 2026-09-15: both return a `PlanningSolution`, the evaluator an `Evaluation`. | Canonical demos in `examples/demos/rl/` (pendulum, cart-pole, drone, rocket), intro chapter `11_reinforcement_learning.ipynb`, native twins `pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb` and `drone_learn_to_fly.ipynb`; S46 root-prelude promotion. |
+| Planning / RL planner (`reinforcement_learning/`) | teaching (GRO860) | 6 | Landed 2026-09-10: cost horizon/discount + problem exit rule, `StochasticPlanningProblem` + distributions, `MonteCarloEvaluator`, `NeuralPolicyController` + `MLP`, `ReinforcementLearningPlanner` with PPO and SAC in pure JAX; verified on UR5 impedance showcase. Rebuilt 2026-09-15 on domain objects (`StochasticPolicy`, one collector, algorithms owning their state; bit-identical to the seeded baseline) and completed with the course's foundational algorithms: `REINFORCE`, `ActorCritic`, and `TabularLearningPlanner` (`QLearning`, `SARSA`, `MonteCarloControl`, `EpsilonGreedy`, `UCB`) on the value-iteration grid, NumPy only. S48 landed 2026-09-15: both return a `PlanningSolution`, the evaluator an `Evaluation`. S46 landed 2026-09-16: the GRO860 names are on the root prelude. | Canonical demos in `examples/demos/rl/` (pendulum, cart-pole, drone, rocket), intro chapter `11_reinforcement_learning.ipynb`, native twins `pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb` and `drone_learn_to_fly.ipynb`. |
 | Planning / search (RRT) | provisional | 5 | RRT/RRT*; spatial `Scene`. **`RRTPlanner(problem)` works from the input bounds alone** (bang-bang `KinodynamicExtender` default, 0.3 s edges; extenders and `RRTOptions` on the planning band, landed 2026-09-09). Returns a `PlanningSolution` with a held `TrajectorySource` policy and a `TreeSearchRecord` (2026-09-15). | RRT-Connect later. |
 | Geometry / spatial | provisional | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Bicubic SDF and CBF filter (`docs/plans/cbf-safety-filter.md`); glyph/solid naming split (v1.0). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers. **Auto-fit camera** (`camera_scale=None`, the `System` default, landed 2026-09-09): hint-less plants frame the drawn geometry over the whole animation; backdrops (`ground_line`, `Plane`) and force glyphs excluded. | Renderer polish; matplotlib renderer coverage; constructor-derived `camera_scale` hints → auto or params-derived so `params` changes keep the framing. |
@@ -131,7 +107,7 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
 | Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupTableController`, `plot_cost2go` / `plot_policy` | `pendulum_swing_up_cost_function_vi`, `pendulum_swing_up_vi_vs_lqr`, `demos/planning/value_iteration/` | `final_time` reads `problem.tf`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
 | LQR + linearization | `linearize`, `lqr`, `lqr_at_operating_point`, `plot_control_law` | `03_control`, `04_analysis`, `demos/control/` | — (green today) |
 | Trajectory optimization | `PlanningProblem`, `TrajectoryOptimizationPlanner` (`direct_collocation`, `shooting`), `QuadraticCost` | `09_planning`, `demos/planning/trajopt/` | float64 by default on JAX; `success` means defects satisfied; canonical problems succeed with default optimizer |
-| Reinforcement Learning (tabular on the grid, neural in native JAX) | `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control; `EpsilonGreedy`, `UCB`), `StochasticPlanningProblem`, `ReinforcementLearningPlanner` (REINFORCE / actor-critic / PPO / SAC), `NeuralPolicyController`, `MonteCarloEvaluator` | `11_reinforcement_learning.ipynb`, `pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb`, `drone_learn_to_fly.ipynb`, `gymnasium_interface.ipynb`, `showcase_from_rl_to_bode.ipynb`, `demos/rl/` (pendulum, cart-pole, drone, rocket) | pure-JAX training on compiled plant (measured 2026-09-12: pendulum swing-up, 120k steps in 12.5 s on CPU, 0% failure over 50 trials); neural policy closed loop linearizes, simulates, and plots Bode. **Open gate:** the four names above are still band-facade only — promotion to the root prelude and its registry entry is a v0.1 goal (S46). Notebooks solve with the native planner; Gymnasium stays taught as the domain standard and `Sys2Gym` + SB3 stay as the external bridge |
+| Reinforcement Learning (tabular on the grid, neural in native JAX) | `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control; `EpsilonGreedy`, `UCB`), `StochasticPlanningProblem`, `ReinforcementLearningPlanner` (REINFORCE / actor-critic / PPO / SAC), `NeuralPolicyController`, `MonteCarloEvaluator` | `11_reinforcement_learning.ipynb`, `pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb`, `drone_learn_to_fly.ipynb`, `gymnasium_interface.ipynb`, `showcase_from_rl_to_bode.ipynb`, `demos/rl/` (pendulum, cart-pole, drone, rocket) | pure-JAX training on compiled plant (measured 2026-09-12: pendulum swing-up, 120k steps in 12.5 s on CPU, 0% failure over 50 trials); neural policy closed loop linearizes, simulates, and plots Bode. **S46 landed:** those names (plus `Evaluation`, `Gaussian` / `Uniform`) are on the root prelude and the teaching-surface registry; `angle_features` stays on the control band. Notebooks solve with the native planner; Gymnasium stays taught as the domain standard and `Sys2Gym` + SB3 stay as the external bridge |
 
 **Cross-cutting gates**
 
@@ -259,7 +235,7 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - **Open (v0.2):** one naming rule for blocks and signals — class name, display `name`, `id`, role keys (`ref`, `ctl`, `sys`), diagram keys, wire strings (`"ctl:u"`), params paths (`"sys.mass"`), state labels, diagram block labels (`Name::key`), plot titles and printed text. Settled 2026-09-13: string keys stay, with `id` as the explicit override (no variable-name or attribute magic). Audit 2026-09-13 (no text form for `print(sys)`, user subclasses named `DynamicSystem`, three closed-loop and shortcut naming styles, `sys` vs `plant` for one plant across loop kinds, mixed separators and display-name styles), six quick wins and the larger alignments: docs/plans/naming.md.
 - **Open (v0.2):** which pyro demos the courses still need (drives the parity audit's remaining rows).
 - **Open (v0.2):** Lyapunov certificates in the analysis band — [docs/plans/lyapunov-certificates.md](docs/plans/lyapunov-certificates.md): `region_of_attraction(sys)` returning a `LyapunovCertificate` with `contains`, `verify` (Monte Carlo inside the certified set) and `plot`, plus the two `System` shortcuts. Quadratic `V` only; provisional research lane pending cohort review and SOS study.
-- ~~RL as a planner~~ — settled 2026-09-11: native pure-JAX `ReinforcementLearningPlanner` + `NeuralPolicyController` is the canonical GRO860 teaching path (`11_reinforcement_learning.ipynb`, `demos/rl/`, `showcase_from_rl_to_bode.ipynb`); `Sys2Gym` + SB3 retained as an external bridge in `interfaces/`. Extended 2026-09-12: the two paths coexist **by role**, not by replacement — notebooks *solve* with the native planner (it trains what SB3 tuning did not, and needs no pip install on Colab), while the Gymnasium environment interface is still *taught* as the standard of the domain, so the GRO860 week-5 lab and the `step` / `reset` exercise keep `Sys2Gym`. Promotion of the RL names to the teaching interface is a v0.1 goal and only partly done.
+- ~~RL as a planner~~ — settled 2026-09-11: native pure-JAX `ReinforcementLearningPlanner` + `NeuralPolicyController` is the canonical GRO860 teaching path (`11_reinforcement_learning.ipynb`, `demos/rl/`, `showcase_from_rl_to_bode.ipynb`); `Sys2Gym` + SB3 retained as an external bridge in `interfaces/`. Extended 2026-09-12: the two paths coexist **by role**, not by replacement — notebooks *solve* with the native planner (it trains what SB3 tuning did not, and needs no pip install on Colab), while the Gymnasium environment interface is still *taught* as the standard of the domain, so the GRO860 week-5 lab and the `step` / `reset` exercise keep `Sys2Gym`. S46 (2026-09-16) put the RL names on the root prelude.
 - **Open (v0.2 / Later):** Control Barrier Functions (CBF) & Spatial Safety Filters — [docs/plans/cbf-safety-filter.md](docs/plans/cbf-safety-filter.md): $C^1$ bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block.
 
 ## 7. Out of scope

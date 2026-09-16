@@ -3,10 +3,10 @@
 import jax.numpy as jnp
 import numpy as np
 
-from minilink import CostFunction, Pendulum
-from minilink.control import angle_features
-from minilink.planning import (
+from minilink import (
+    CostFunction,
     MonteCarloEvaluator,
+    Pendulum,
     ReinforcementLearningPlanner,
     StochasticPlanningProblem,
     Uniform,
@@ -44,12 +44,18 @@ problem = StochasticPlanningProblem(
     x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
 )
 
-# The planner: PPO on 64 plants in parallel, a small network on periodic
-# features (cos theta, sin theta, scaled rate), a fast learning rate
+
+# The planner: PPO on 64 plants in parallel, a small network on
+# (cos theta, sin theta, scaled rate), a fast learning rate
+def features(x):
+    theta, dtheta = x
+    return jnp.array([jnp.cos(theta), jnp.sin(theta), 0.1 * dtheta])
+
+
 planner = ReinforcementLearningPlanner(
     problem,
     dt=DT,
-    features=angle_features(angles=[0], scales={1: 0.1}),
+    features=features,
     hidden=(32, 32),
     algorithm="ppo",
     n_envs=64,

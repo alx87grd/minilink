@@ -38,6 +38,8 @@ class TestPublicImports(unittest.TestCase):
 
         self.assertIn("Pendulum", minilink.__all__)
         self.assertIn("Boat2D", minilink.__all__)  # the catalog is teaching surface
+        self.assertIn("ReinforcementLearningPlanner", minilink.__all__)
+        self.assertIn("StochasticPlanningProblem", minilink.__all__)
         self.assertNotIn("ModelPredictiveController", minilink.__all__)  # research lane
         self.assertNotIn("HybridDiagram", minilink.__all__)
 

@@ -36,7 +36,7 @@ deep defining-module paths stay valid but are not what README / intro show.
 
 | Layer | Example | Role |
 | --- | --- | --- |
-| **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
+| **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner, ReinforcementLearningPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
 | **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis.linearize import linearize` | Canonical course / script API |
 | **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
 
@@ -950,8 +950,9 @@ for one call, to silence it.
 step functions on either backend — the reward `r = -g dt`, the exit rule and
 the horizon — shared by the JAX collectors, the tabular learners and the NumPy
 Monte Carlo trials, so one object owns what an episode means.
-`control.angle_features(angles, scales)` builds the periodic feature map
-(`cos, sin` per listed angle, scaled rates). The action port is `u` when the
+Teaching demos write the observation map by hand
+(``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
+is the same map as a helper for scripts. The action port is `u` when the
 plant has one, else its single input port — so an inner loop `impedance @
 arm` (input `r`) is a plant for an outer learned law; a step that leaves the
 box or blows up (non-finite state) ends the episode. The learned law is a `System`:

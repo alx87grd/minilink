@@ -2,11 +2,12 @@
 
 import numpy as np
 
-from minilink import CostFunction, Rocket
-from minilink.planning import (
+from minilink import (
+    CostFunction,
     Gaussian,
     MonteCarloEvaluator,
     ReinforcementLearningPlanner,
+    Rocket,
     StochasticPlanningProblem,
 )
 

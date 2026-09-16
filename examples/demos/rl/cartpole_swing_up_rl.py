@@ -3,9 +3,9 @@
 import jax.numpy as jnp
 import numpy as np
 
-from minilink import CartPole, CostFunction
-from minilink.control import angle_features
-from minilink.planning import (
+from minilink import (
+    CartPole,
+    CostFunction,
     MonteCarloEvaluator,
     ReinforcementLearningPlanner,
     StochasticPlanningProblem,
@@ -48,10 +48,16 @@ problem = StochasticPlanningProblem(
     x0_distribution=Uniform([-1.0, -np.pi, -1.0, -1.0], [1.0, np.pi, 1.0, 1.0]),
 )
 
+
+def features(x):
+    pos, theta, dpos, dtheta = x
+    return jnp.array([pos, jnp.cos(theta), jnp.sin(theta), 0.2 * dpos, 0.1 * dtheta])
+
+
 planner = ReinforcementLearningPlanner(
     problem,
     dt=DT,
-    features=angle_features(angles=[1], scales={2: 0.2, 3: 0.1}),
+    features=features,
     hidden=(64, 64),
     algorithm="ppo",
     n_envs=16,

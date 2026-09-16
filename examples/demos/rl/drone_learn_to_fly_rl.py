@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from minilink import CostFunction, Drone2D
-from minilink.planning import (
+from minilink import (
+    CostFunction,
+    Drone2D,
     Gaussian,
     MonteCarloEvaluator,
     ReinforcementLearningPlanner,

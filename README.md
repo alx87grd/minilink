@@ -194,7 +194,7 @@ differentiate inside your own `jit`. See
 - **Teaching.** NumPy, SciPy and Matplotlib are enough for simulation, phase
   planes, animation, linearization, LQR and value iteration. Runs in Colab
   from one setup cell. One import line covers a course:
-  `from minilink import Pendulum, PID, lqr, PlanningProblem`.
+  `from minilink import Pendulum, PID, lqr, PlanningProblem, ReinforcementLearningPlanner`.
 - **Research.** Optional JAX for compile and autodiff, Ipopt for large NLPs,
   meshcat for 3D, a hybrid stack for sampled MPC, a Gymnasium bridge for RL.
   Every catalog plant compiles on both backends.
