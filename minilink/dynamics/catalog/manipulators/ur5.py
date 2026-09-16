@@ -386,7 +386,9 @@ class UR5Manipulator(Manipulator):
             for direction in xp.eye(self.dof)
         ]
         H = xp.stack(columns, axis=1)
-        return 0.5 * (H + H.T)
+        H = 0.5 * (H + H.T)
+
+        return H
 
     def C(self, q, dq, params=None):
         """Coriolis matrix chosen so ``C(q, dq) @ dq`` is the RNEA bias force."""
@@ -399,7 +401,9 @@ class UR5Manipulator(Manipulator):
         denom = xp.maximum(speed_squared, 1e-12)
         bias = self._rnea(q, dq, xp.zeros(self.dof), params, gravity=False)
         C = xp.outer(bias, dq) / denom
-        return xp.where(speed_squared < 1e-12, xp.zeros((self.dof, self.dof)), C)
+        C = xp.where(speed_squared < 1e-12, xp.zeros((self.dof, self.dof)), C)
+
+        return C
 
     def g(self, q, params=None):
         """Gravity generalized force."""
@@ -415,7 +419,9 @@ class UR5Manipulator(Manipulator):
         xp = array_module(q, dq)
         dq = xp.asarray(dq)
         damping = xp.asarray(params["damping"])
-        return damping * dq
+        tau_d = damping * dq
+
+        return tau_d
 
     def forward_kinematics(self, q, params=None):
         """Tool-center position in the world frame."""

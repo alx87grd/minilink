@@ -60,7 +60,9 @@ class Boat2D(GeneralizedMechanicalSystem):
         xp = array_module(q)
 
         # rigid-body inertia: equal surge/sway mass, separate yaw inertia
-        return xp.diag(xp.array([mass, mass, inertia]))
+        H = xp.diag(xp.array([mass, mass, inertia]))
+
+        return H
 
     def C(self, q, v, params=None):
         params = self.params if params is None else params
@@ -70,12 +72,14 @@ class Boat2D(GeneralizedMechanicalSystem):
 
         # Coriolis coupling induced by the body-frame yaw rate
         # fmt: off
-        return xp.array([
+        C = xp.array([
             [            0.0, -mass * yaw_rate, 0.0],
             [mass * yaw_rate,              0.0, 0.0],
             [            0.0,              0.0, 0.0],
         ])
         # fmt: on
+
+        return C
 
     def N(self, q, params=None):
         theta = q[2]
@@ -84,12 +88,14 @@ class Boat2D(GeneralizedMechanicalSystem):
 
         # body-to-world rotation mapping body velocities to world rates
         # fmt: off
-        return xp.array([
+        N = xp.array([
             [  c,  -s, 0.0],
             [  s,   c, 0.0],
             [0.0, 0.0, 1.0],
         ])
         # fmt: on
+
+        return N
 
     def B(self, q, params=None):
         params = self.params if params is None else params
@@ -97,12 +103,14 @@ class Boat2D(GeneralizedMechanicalSystem):
 
         # thrust acts a distance l_t aft of the c.g., adding a yaw moment
         # fmt: off
-        return array_module(q).array([
+        B = array_module(q).array([
             [1.0,  0.0],
             [0.0,  1.0],
             [0.0, -l_t],
         ])
         # fmt: on
+
+        return B
 
     def current_coefficients(self, alpha, params=None):
         params = self.params if params is None else params
@@ -138,7 +146,9 @@ class Boat2D(GeneralizedMechanicalSystem):
         fy = -0.5 * rho * Alc * Cy * speed_squared
         mz = -0.5 * rho * Alc * loa * Cm * speed_squared
         mz += N_max * rho * Alc * loa * xp.abs(vr[2]) * vr[2]
-        return d_linear + xp.array([fx, fy, mz])
+        d = d_linear + xp.array([fx, fy, mz])
+
+        return d
 
     def d(self, q, v, u=None, t=0.0, params=None):
         params = self.params if params is None else params

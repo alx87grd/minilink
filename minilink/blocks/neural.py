@@ -135,7 +135,9 @@ class MLP(System):
         # Output layer, affine: y = W_L a_L-1 + b_L
         L = self.n_layers - 1
         W, b = params[f"W{L}"], params[f"b{L}"]
-        return W @ a + b
+        y = W @ a + b
+
+        return y
 
 
 def orthogonal(rng, shape):

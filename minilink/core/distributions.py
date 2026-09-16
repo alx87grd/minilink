@@ -59,8 +59,11 @@ class Gaussian(Distribution):
         # x = mean + std * eps, eps ~ N(0, I)
         if is_jax_key(key):
             jax = require_jax()
-            return mean + std * jax.random.normal(key, shape)
-        return mean + std * numpy_generator(key).standard_normal(shape)
+            x = mean + std * jax.random.normal(key, shape)
+        else:
+            x = mean + std * numpy_generator(key).standard_normal(shape)
+
+        return x
 
 
 class Uniform(Distribution):

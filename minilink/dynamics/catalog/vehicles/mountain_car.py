@@ -60,7 +60,9 @@ class MountainCar(MechanicalSystem):
         slope = self.dz_dx(q[0], params)
 
         # effective inertia of the bead sliding along the curve z(x)
-        return array_module(q).array([[mass * (1.0 + slope**2)]])
+        H = array_module(q).array([[mass * (1.0 + slope**2)]])
+
+        return H
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
@@ -69,7 +71,9 @@ class MountainCar(MechanicalSystem):
         curvature = self.d2z_dx2(q[0], params)
 
         # Coriolis term from the slope changing along the path
-        return array_module(q, dq).array([[mass * slope * curvature * dq[0]]])
+        C = array_module(q, dq).array([[mass * slope * curvature * dq[0]]])
+
+        return C
 
     def B(self, q, params=None):
         params = self.params if params is None else params
@@ -77,7 +81,9 @@ class MountainCar(MechanicalSystem):
         xp = array_module(q)
 
         # throttle acts tangent to the curve; this projects it onto x
-        return xp.array([[xp.sqrt(1.0 + slope**2)]])
+        B = xp.array([[xp.sqrt(1.0 + slope**2)]])
+
+        return B
 
     def g(self, q, params=None):
         params = self.params if params is None else params
@@ -86,7 +92,9 @@ class MountainCar(MechanicalSystem):
         slope = self.dz_dx(q[0], params)
 
         # gravity pulls the bead back down along the slope
-        return array_module(q).array([mass * gravity * slope])
+        g = array_module(q).array([mass * gravity * slope])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         return array_module(q).zeros(1)

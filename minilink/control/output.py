@@ -39,4 +39,7 @@ class ProportionalController(ErrorDriven, Controller):
         params = self.params if params is None else params
         K = params["K"]
         e = self.error(u)
-        return K @ e
+
+        u_cmd = K @ e
+
+        return u_cmd

@@ -72,8 +72,9 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
 
         # mass y'' = u - k (y - z) - b (y' - z'): sprung mass over the road
         acceleration = (u[0] - k * (y - ground) - b * (dy - ground_slope)) / mass
+        dx = array_module(x, u).array([acceleration, dy, vx])
 
-        return array_module(x, u).array([acceleration, dy, vx])
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x

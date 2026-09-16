@@ -210,13 +210,14 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
   1. **Unpack.** Bind `params`, split `x`, and copy `self.` fields into short textbook
      names. No `self.` remains in the algebra.
-  2. **Core math.** A short comment in textbook notation (rule 5.22), then the equation
-     as a **named assignment**. The equation is never on the `return` line.
+  2. **Core math.** The equation as a **named assignment**. A short textbook
+     comment belongs here only when it is not a copy of the code (rule 5.22).
+     The equation is never on the `return` line.
   3. **Output machinery.** Stack, wrap, or `return` the named result. This beat is
      plumbing, not the lesson.
 
   ```python
-  # Good:
+  # Good — the comment is the implicit form; the code is the solved assignment:
   params = self.params if params is None else params
   m, l, g, d = params["m"], params["l"], params["g"], params["d"]
   xp = array_module(x)
@@ -228,6 +229,11 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   domega = (tau - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
 
   return xp.array([dtheta, domega])
+
+  # Good — the assignment is already the textbook; no copy-comment:
+  dx = A @ x + B @ u
+
+  return dx
 
   # Bad — self. in the algebra, and the equation lives on the return line:
   return (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
@@ -316,17 +322,18 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   for value objects — a `Trajectory`, a set, a shape, a certificate, a solver record; plain
   classes with `params` for parametric equation objects — systems, costs. Never dataclasses as
   input/output wrappers around arrays (rule 2.5). Use `ABC` only when enforcement helps.
-- **5.22 Comment the core math, not the file.** Beat 2 of rule 5.3 is the highlighted
-  equation: a blank line, a short comment on its own line, then a named assignment.
-  The comment is textbook notation (`# (m l²) ω̇ = τ − m g l sin(θ) − d ω`,
-  `# g = dxᵀ Q dx + duᵀ R du`, `# dx = A x + B u`). It names the step; it does not
-  restate the Python in prose. Skip the comment only when the assignment *is* the
-  textbook (`dx = A @ x + B @ u`) — the name and the blank lines still highlight it.
-  When the code cannot use the textbook's symbols (dictionary lookups, library calls,
-  `solve`), the comment is the one place the equation lives, and the locals take those
-  symbols (`vdot`, `sigma`, `eps`, `advantage`). Never put that equation on `return`;
-  never put it in a module or method docstring. Apply this to new math; when restyling
-  an existing path (only if the maintainer asks), use the three beats of rule 5.3.
+- **5.22 Comment only when it is not a copy of the code.** Beat 2 of rule 5.3 is
+  the highlighted equation: a blank line, then a named assignment. Add a short
+  textbook comment on its own line only when that comment is *not* a copy of the
+  assignment — when the code cannot write the textbook form (`# (m l²) ω̇ = τ − …`
+  above a solved `domega = (tau - …) / (m * l**2)`; `# H v̇ = τ − C v − g − d`
+  above `solve`; `# dx = [v; v̇]` above `q2x`; `# g = 0 on the target, 1 elsewhere`
+  above `xp.where`). Skip the comment when the assignment is already ~90% the
+  textbook (`dx = A @ x + B @ u`, `g = dx.T @ Q @ dx + du.T @ R @ du`,
+  `H = xp.array([[m * l**2 + I]])`) — the name and the blank lines still highlight
+  it. Never put the equation on `return`; never put it in a module or method
+  docstring. Apply this to new math; when restyling an existing path (only if the
+  maintainer asks), use the three beats of rule 5.3.
 - **5.23 No preamble walls.** A module or demo opens with a one-line title docstring. Do not
   add a long introduction, section map, run recipe, or flag explanation at the top — the
   code plus inline comments must tell the story. Notebooks are course material: do not

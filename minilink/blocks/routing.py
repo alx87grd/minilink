@@ -39,7 +39,10 @@ class Error(System):
 
     def compute(self, x, u, t=0, params=None):
         r, y = u.reshape(2, self.dim)
-        return r - y
+
+        e = r - y
+
+        return e
 
 
 class Sum(System):
@@ -72,7 +75,9 @@ class Sum(System):
 
         # weighted sum over the stacked input ports
         stacked = u.reshape(self.signs.size, self.dim)
-        return signs @ stacked
+        y = signs @ stacked
+
+        return y
 
 
 class Gain(System):
@@ -106,7 +111,9 @@ class Gain(System):
         params = self.params if params is None else params
         K = params["K"]
 
-        return K @ u
+        y = K @ u
+
+        return y
 
 
 class Mux(System):

@@ -623,7 +623,9 @@ if __name__ == "__main__":
             super().__init__(n=2, input_dim=1, output_dim=2)
 
         def f(self, x, u, t=0, params=None):
-            return np.array([x[1], u[0]])
+            dx = np.array([x[1], u[0]])
+
+            return dx
 
     sys = DoubleIntegrator()
     print(sys.f(x=np.array([0.0, 1.0]), u=np.array([2.0])))

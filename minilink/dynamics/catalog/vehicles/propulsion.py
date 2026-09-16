@@ -64,14 +64,18 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         drag = 0.5 * rho * cdA * speed * array_module(speed).abs(speed)
 
         # longitudinal acceleration with dynamic load transfer onto the wheels
-        return (mu * mass * gravity * rr - drag) / (mass * (1.0 + mu * ry))
+        acceleration = (mu * mass * gravity * rr - drag) / (mass * (1.0 + mu * ry))
+
+        return acceleration
 
     def f(self, x, u, t=0.0, params=None):
         speed = x[1]
         acceleration = self.acceleration(speed, u[0], params)
 
         # state derivative: position rate is speed, speed rate is acceleration
-        return array_module(x, u).array([speed, acceleration])
+        dx = array_module(x, u).array([speed, acceleration])
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -183,8 +187,9 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         wheel_acceleration = (
             torque - wheel_radius * (mass * acceleration + drag)
         ) / wheel_inertia
+        dx = xp.array([speed, acceleration, wheel_acceleration, wheel_speed])
 
-        return xp.array([speed, acceleration, wheel_acceleration, wheel_speed])
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return array_module(x).array([self._slip(x[1], x[2], params)])

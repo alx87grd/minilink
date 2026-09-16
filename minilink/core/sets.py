@@ -147,7 +147,9 @@ class BoxSet(Set):
         xp = array_module(z)
         lower, upper = self.lower, self.upper
 
-        return xp.concatenate((z - lower, upper - z))
+        margin = xp.concatenate((z - lower, upper - z))
+
+        return margin
 
     def sample(self, key=None, n=None, params=None):
         """Draw uniformly from a finite box: ``(dim,)`` for one point, ``(n, dim)`` with ``n``."""
@@ -233,7 +235,9 @@ class SingletonSet(Set):
         xp = array_module(z)
 
         # equality as a degenerate inequality: -|z - p| >= 0 holds only at p
-        return -xp.abs(self.residual(z))
+        margin = -xp.abs(self.residual(z))
+
+        return margin
 
 
 @dataclass(frozen=True)
@@ -268,7 +272,9 @@ class BallSet(Set):
         xp = array_module(z)
         center, radius = self.center, self.radius
 
-        return xp.reshape(radius - xp.linalg.norm(z - center), (1,))
+        margin = xp.reshape(radius - xp.linalg.norm(z - center), (1,))
+
+        return margin
 
 
 @dataclass(frozen=True)
@@ -356,9 +362,11 @@ class IntersectionSet(Set):
         xp = array_module(z)
         sets = self.sets
 
-        return xp.concatenate(
+        margin = xp.concatenate(
             [set_.margin(z, t=t, params=params).reshape(-1) for set_ in sets]
         )
+
+        return margin
 
 
 def is_finite_box(box) -> bool:

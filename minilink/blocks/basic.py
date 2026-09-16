@@ -20,8 +20,14 @@ class Integrator(DynamicSystem):
         params = self.params if params is None else params
         k = params["k"]
         xp = array_module(u)
-        return xp.array([k * u[0]])
+
+        dx = xp.array([k * u[0]])
+
+        return dx
 
     def h(self, x, u, t=0, params=None):
         xp = array_module(x)
-        return xp.array([x[0]])
+
+        y = xp.array([x[0]])
+
+        return y

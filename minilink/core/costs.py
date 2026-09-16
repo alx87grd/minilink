@@ -228,7 +228,6 @@ class QuadraticCost(CostFunction):
         dx = x - xbar
         du = u - ubar
 
-        # g = dxᵀ Q dx + duᵀ R du
         g = dx.T @ Q @ dx + du.T @ R @ du
 
         return g
@@ -238,7 +237,6 @@ class QuadraticCost(CostFunction):
         S, xbar = self.S, self.xbar
         dx = x - xbar
 
-        # h = dxᵀ S dx
         h = dx.T @ S @ dx
 
         return h
@@ -332,9 +330,15 @@ class ScaledCost(CostFunction):
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
         weight = self.weight
-        return weight * self.cost.g(x, u, t, params)
+
+        g = weight * self.cost.g(x, u, t, params)
+
+        return g
 
     def h(self, x, t=0.0, params=None):
         """Return the weighted terminal cost."""
         weight = self.weight
-        return weight * self.cost.h(x, t, params)
+
+        h = weight * self.cost.h(x, t, params)
+
+        return h

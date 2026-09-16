@@ -122,7 +122,9 @@ class PID(ErrorDriven, DynamicController):
             rates.append(self._integrator_rate(e, e_int, u_unsat, params, xp))
         if self.has_filter:
             rates.append(dm_filt)
-        return xp.concatenate(rates) if rates else xp.zeros(0)
+        dx = xp.concatenate(rates) if rates else xp.zeros(0)
+
+        return dx
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -132,7 +134,9 @@ class PID(ErrorDriven, DynamicController):
         e_int, m_filt = x[: self.n_int], x[self.n_int :]
         dm_filt = self._filter_rate(u, m_filt, params, xp)
         u_cmd = self._command(e, e_int, dm_filt, params, xp)
-        return xp.clip(u_cmd, xp.asarray(params["u_min"]), xp.asarray(params["u_max"]))
+        u = xp.clip(u_cmd, xp.asarray(params["u_min"]), xp.asarray(params["u_max"]))
+
+        return u
 
     # -- the law, one term per carried state -------------------------------
 

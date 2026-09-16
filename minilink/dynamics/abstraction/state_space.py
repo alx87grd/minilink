@@ -93,7 +93,6 @@ class StateSpaceSystem(DynamicSystem):
         A = self.A(t, params)
         B = self.B(t, params)
 
-        # dx = A x + B u
         dx = A @ x + B @ u
 
         return dx
@@ -103,7 +102,6 @@ class StateSpaceSystem(DynamicSystem):
         C = self.C(t, params)
         D = self.D(t, params)
 
-        # y = C x + D u
         y = C @ x + D @ u
 
         return y

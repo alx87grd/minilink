@@ -41,7 +41,6 @@ class Pendulum(MechanicalSystem):
         I = params["I"]
         xp = array_module(q)
 
-        # H = m l² + I
         H = xp.array([[m * l**2 + I]])
 
         return H
@@ -58,7 +57,6 @@ class Pendulum(MechanicalSystem):
         xp = array_module(q)
         theta = q[0]
 
-        # g(θ) = m g l sin(θ)
         g = xp.array([m * gravity * l * xp.sin(theta)])
 
         return g
@@ -69,7 +67,6 @@ class Pendulum(MechanicalSystem):
         xp = array_module(q)
         omega = dq[0]
 
-        # τ_d = d ω
         tau_d = xp.array([d * omega])
 
         return tau_d
@@ -190,7 +187,6 @@ class TwoIndependentPendulums(MechanicalSystem):
         I = params["I"]
         xp = array_module(q)
 
-        # H = (m l² + I) I₂
         inertia = m * l**2 + I
         H = xp.diag(xp.array([inertia, inertia]))
 
@@ -207,7 +203,6 @@ class TwoIndependentPendulums(MechanicalSystem):
         gravity = params["gravity"]
         xp = array_module(q)
 
-        # g(θ) = m g l sin(θ)
         g = m * gravity * l * xp.sin(q)
 
         return g
@@ -217,7 +212,6 @@ class TwoIndependentPendulums(MechanicalSystem):
         d = params["d"]
         xp = array_module(q)
 
-        # τ_d = d ω
         tau_d = d * xp.asarray(dq)
 
         return tau_d

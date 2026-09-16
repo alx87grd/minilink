@@ -44,7 +44,6 @@ def lqr_gain(A, B, Q, R):
 
     P = solve_continuous_are(A, B, Q, R)
 
-    # K = R⁻¹ Bᵀ P
     K = np.linalg.solve(R, B.T @ P)
 
     return K

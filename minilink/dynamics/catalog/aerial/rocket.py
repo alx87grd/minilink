@@ -44,7 +44,9 @@ class Rocket(MechanicalSystem):
         inertia = params["inertia"]
         xp = array_module(q)
 
-        return xp.diag(xp.array([mass, mass, inertia]))
+        H = xp.diag(xp.array([mass, mass, inertia]))
+
+        return H
 
     def C(self, q, dq, params=None):
         return array_module(q).zeros((3, 3))
@@ -55,7 +57,9 @@ class Rocket(MechanicalSystem):
         gravity = params["gravity"]
 
         # weight pulls along +y (d sits on the left side of the EoM)
-        return array_module(q).array([0.0, mass * gravity, 0.0])
+        g = array_module(q).array([0.0, mass * gravity, 0.0])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -63,13 +67,15 @@ class Rocket(MechanicalSystem):
         xp = array_module(dq)
 
         # quadratic aerodynamic drag plus a small linear damping term
-        return xp.array(
+        tau_d = xp.array(
             [
                 cda * dq[0] * xp.abs(dq[0]) + 0.01 * dq[0],
                 cda * dq[1] * xp.abs(dq[1]) + 0.01 * dq[1],
                 0.01 * dq[2],
             ]
         )
+
+        return tau_d
 
     def generalized_force(self, q, dq, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -79,13 +85,15 @@ class Rocket(MechanicalSystem):
         xp = array_module(q, u)
 
         # gimballed thrust: force along the nozzle axis, torque about the c.g.
-        return thrust * xp.array(
+        tau = thrust * xp.array(
             [
                 -xp.sin(theta + delta),
                 xp.cos(theta + delta),
                 -ycg * xp.sin(delta),
             ]
         )
+
+        return tau
 
     def body_shape(self):
         """Side-view rocket silhouette with the c.g. at the local origin."""

@@ -145,7 +145,6 @@ class MechanicalSystem(DynamicSystem):
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
 
-        # τ = H v̇ + C v + g + d
         tau = H @ acceleration + C @ v + g + d
 
         return tau
@@ -182,7 +181,6 @@ class MechanicalSystem(DynamicSystem):
         params = self.params if params is None else params
         H = self.H(q, params)
 
-        # T = ½ vᵀ H v
         T = 0.5 * (v @ (H @ v))
 
         return T

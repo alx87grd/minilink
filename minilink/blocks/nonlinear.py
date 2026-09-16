@@ -39,7 +39,10 @@ class Saturation(System):
         upper = params["upper"]
 
         xp = array_module(u)
-        return xp.clip(u, lower, upper)
+
+        y = xp.clip(u, lower, upper)
+
+        return y
 
 
 class DeadZone(System):
@@ -67,7 +70,9 @@ class DeadZone(System):
         xp = array_module(u)
         above = xp.where(u > width, u - width, 0.0)
         below = xp.where(u < -width, u + width, 0.0)
-        return above + below
+        y = above + below
+
+        return y
 
 
 class Relay(System):
@@ -89,7 +94,10 @@ class Relay(System):
         amplitude = params["amplitude"]
 
         xp = array_module(u)
-        return amplitude * xp.sign(u)
+
+        y = amplitude * xp.sign(u)
+
+        return y
 
 
 if __name__ == "__main__":

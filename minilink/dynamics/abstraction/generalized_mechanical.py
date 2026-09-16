@@ -116,7 +116,6 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         """Configuration derivative ``qdot = N(q) @ v``."""
         params = self.params if params is None else params
 
-        # q̇ = N(q) v
         qdot = self.N(q, params) @ v
 
         return qdot
@@ -129,7 +128,6 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
 
-        # τ = M v̇ + C v + g + d
         tau = M @ acceleration + C @ v + g + d
 
         return tau
@@ -168,7 +166,6 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         params = self.params if params is None else params
         M = self.M(q, params)
 
-        # T = ½ vᵀ M v
         T = 0.5 * (v @ (M @ v))
 
         return T

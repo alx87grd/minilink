@@ -23,11 +23,17 @@ class SimpleIntegrator(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         xp = array_module(x)
-        return xp.array([u[0]])
+
+        dx = xp.array([u[0]])
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         xp = array_module(x)
-        return xp.array([x[0]])
+
+        y = xp.array([x[0]])
+
+        return y
 
     def get_kinematic_geometry(self):
         return {}
@@ -58,11 +64,17 @@ class DoubleIntegrator(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         xp = array_module(x)
-        return xp.array([x[1], u[0]])
+
+        dx = xp.array([x[1], u[0]])
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         xp = array_module(x)
-        return xp.array([x[0]])
+
+        y = xp.array([x[0]])
+
+        return y
 
     def get_kinematic_geometry(self):
         return {}
@@ -95,11 +107,17 @@ class TripleIntegrator(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         xp = array_module(x)
-        return xp.array([x[1], x[2], u[0]])
+
+        dx = xp.array([x[1], x[2], u[0]])
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         xp = array_module(x)
-        return xp.array([x[0]])
+
+        y = xp.array([x[0]])
+
+        return y
 
     def get_kinematic_geometry(self):
         return {}
