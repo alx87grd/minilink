@@ -68,14 +68,14 @@ planner = ReinforcementLearningPlanner(
     problem, dt=DT, normalize=False, n_envs=1, n_steps=2048, batch_size=64
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(f"\n{solution.solver}")
+print(solution.solver)
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()
 ppo_ctl.plot_control_law(x_axis=2, y_axis=5, u_axis=0)  # T1 vs (theta, omega)
 
 report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
-print("Monte Carlo over the task's starts:", report)
+print(report)
 
 plant.x0 = np.array([-1.0, -2.0, 1.0, 0.0, 0.0, 0.0])
 cl_sys = ppo_ctl @ plant

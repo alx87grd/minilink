@@ -59,7 +59,7 @@ planner = ReinforcementLearningPlanner(
     gamma=0.97,
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(f"\n{solution.solver}")
+print(solution.solver)
 planner.plot_learning_curve()
 
 # The learned law is a controller block: draw it, score it, close the loop
@@ -67,20 +67,11 @@ ppo_ctl = planner.get_controller()
 ppo_ctl.plot_control_law(x_axis=0, y_axis=1, u_axis=0)  # torque vs (theta, dtheta)
 
 report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
-print("Monte Carlo over the task's starts:", report)
+print(report)
 
 plant.x0 = np.array([0.05, 0.0])  # hanging, a tiny tip to break the symmetry
 cl_sys = ppo_ctl @ plant
 cl_sys.name = "Pendulum with the learned law"
 traj = cl_sys.compute_trajectory(tf=10.0, dt=0.01)
 cl_sys.plot_trajectory(traj)
-angle_error = np.abs(np.mod(traj.x[0], 2 * np.pi) - np.pi)
-print(
-    "Time to reach upright:", round(float(traj.t[np.argmax(angle_error < 0.1)]), 2), "s"
-)
-print(
-    "Angle error to upright, last 2 s:",
-    round(float(angle_error[-200:].max()), 3),
-    "rad",
-)
 cl_sys.animate(traj)

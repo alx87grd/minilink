@@ -74,26 +74,18 @@ planner = ReinforcementLearningPlanner(
     log_std_init=-1.0,  # gentle exploration: a twitchy attitude loop
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(f"\n{solution.solver}")
+print(solution.solver)
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()
 ppo_ctl.plot_control_law(x_axis=1, y_axis=4, u_axis=0)  # thrust vs (altitude, vy)
 
 report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
-print("Monte Carlo over the task's starts (failure = touched the ground):", report)
+print(report)
 
 plant.x0 = np.array([10.0, 30.0, 0.0, 0.0, 0.0, 0.0])
 cl_sys = ppo_ctl @ plant
 cl_sys.name = "Rocket with the learned law"
 traj = cl_sys.compute_trajectory(tf=TF, dt=0.01)
 cl_sys.plot_trajectory(traj)
-final = traj.x[:, -1] - X_LANDED
-print("Final position error:", round(float(np.hypot(final[0], final[1])), 2), "m")
-print("Final speed:", round(float(np.hypot(final[3], final[4])), 2), "m/s")
-print(
-    "Lowest altitude of the c.g.:",
-    round(float(traj.x[1].min()), 2),
-    "m (1.0 = on the pad)",
-)
 cl_sys.animate(traj)
