@@ -6,10 +6,7 @@ A basic Python environment with NumPy, SciPy, and Matplotlib is enough for most
 of the library. Skip `plot_diagram()` (needs Graphviz) and optional plotting or
 optimization backends.
 
-**v0.1 publishes to PyPI.** Tagging `0.1.0` on GitHub uploads `minilink`; then
-`pip install minilink` is the one-liner (see [Publish from GitHub](#publish-from-github)).
-Until that tag, install from a clone or from GitHub (table below).
-**Conda** from [`environment.yml`](environment.yml) stays the Full local stack
+**Conda** from [`environment.yml`](environment.yml) is the Full local stack
 (JAX, Ipopt, notebooks) that CI and the course validate.
 
 Graphviz and Ipopt are non-Python binaries pip cannot install. Graphviz is only
