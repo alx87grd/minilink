@@ -156,14 +156,15 @@ class MechanicalSystem(DynamicSystem):
         d = self.d(q, v, u, t, params)
         tau = self.generalized_force(q, v, u, t, params)
 
-        rhs = tau - C @ v - g - d
-        return xp.linalg.solve(H, rhs)
+        # H v̇ = τ − C v − g − d
+        vdot = xp.linalg.solve(H, tau - C @ v - g - d)
+        return vdot
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         q, v = self.x2q(x)
-        acceleration = self.forward_dynamics(q, v, u, t, params)
-        return self.q2x(v, acceleration)
+        vdot = self.forward_dynamics(q, v, u, t, params)
+        return self.q2x(v, vdot)
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -232,13 +233,15 @@ class JaxMechanicalSystem(MechanicalSystem):
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
         tau = self.generalized_force(q, v, u, t, params)
-        rhs = tau - C @ v - g - d
-        return jnp.linalg.solve(H, rhs)
+
+        # H v̇ = τ − C v − g − d
+        vdot = jnp.linalg.solve(H, tau - C @ v - g - d)
+        return vdot
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         jnp = require_jax_numpy()
         u = jnp.asarray(u)
         q, v = self.x2q(x)
-        acceleration = self.forward_dynamics(q, v, u, t, params)
-        return self.q2x(v, acceleration)
+        vdot = self.forward_dynamics(q, v, u, t, params)
+        return self.q2x(v, vdot)

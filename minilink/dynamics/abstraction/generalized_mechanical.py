@@ -134,6 +134,8 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
         tau = self.generalized_force(q, v, u, t, params)
+
+        # M v̇ = τ − C v − g − d
         rhs = tau - C @ v - g - d
         xp = array_module(rhs)
         return xp.linalg.solve(M, rhs)
@@ -141,10 +143,9 @@ class GeneralizedMechanicalSystem(DynamicSystem):
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         q, v = self.x2qv(x)
-        return self.qv2x(
-            self.qdot(q, v, params),
-            self.forward_dynamics(q, v, u, t, params),
-        )
+        qdot = self.qdot(q, v, params)
+        vdot = self.forward_dynamics(q, v, u, t, params)
+        return self.qv2x(qdot, vdot)
 
     def h(self, x, u, t=0.0, params=None):
         return x
