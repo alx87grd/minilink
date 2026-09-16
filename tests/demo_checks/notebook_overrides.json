@@ -63,9 +63,6 @@
   "examples/teaching/optimal_control/double_integrator_policy_evaluation.ipynb": {
     "timeout": 300
   },
-  "examples/teaching/reinforcement_learning/cost_to_go_function_approximation.ipynb": {
-    "timeout": 600
-  },
   "examples/teaching/reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb": {
     "smoke": false
   },
@@ -75,11 +72,6 @@
   "examples/teaching/classical_control/frequency_domain_tools.ipynb": {
     "requires": [
       "plotly"
-    ]
-  },
-  "examples/teaching/reinforcement_learning/policy_gradient_to_ppo.ipynb": {
-    "requires": [
-      "jax"
     ]
   },
   "examples/teaching/reinforcement_learning/gymnasium_interface.ipynb": {
@@ -97,11 +89,5 @@
     "requires": [
       "jax"
     ]
-  },
-  "examples/teaching/reinforcement_learning/from_value_iteration_to_ppo.ipynb": {
-    "requires": [
-      "jax"
-    ],
-    "timeout": 900
   }
 }

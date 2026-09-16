@@ -312,8 +312,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   short inline comments (5.22–5.23). Less is better. Reporting goes through the objects
   themselves: their `print` (`__str__`) and their native plots (`plot_trajectory`,
   `plot_solution`, `plot_control_law`, `plot_cost2go`, `plot_learning_curve`, `plot_tree`,
-  `scene.plot`, ...). A report the library cannot give is first a library gap — a missing
-  `__str__` or `plot_*`, in the agent's plotting lane — and only then a demo cell.
+  `scene.plot`, ...). That is `print(solution)` or `planner.plot_learning_curve()`, not an
+  f-string of fields (6.13). A report the library cannot give is first a library gap — a
+  missing `__str__` or `plot_*`, in the agent's plotting lane — and only then a demo cell.
 - **6.2 No test harness code in demos:** Never add test environment branches (`if CI: ...`),
   smoke env vars (`MINILINK_NOTEBOOK_SMOKE`), mock flags, or headless switches inside
   `examples/demos/`, `examples/tutorial/`, or `examples/teaching/`. Test runners adapt
@@ -357,6 +358,30 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **6.12 Cheap rules are tests.** When a rule can be checked by an AST walk or a grep, the
   check lands with the rule (`test_teaching_imports.py`, `test_repo_contract.py`, the
   set-probe and flat-demo checks).
+- **6.13 `print` is rare; a teaching cell stays readable.** A demo or notebook cell is the
+  API sequence, then a native plot or `animate`. `print` is not how the student is shown
+  what happened. Use it only when the number is the lesson *and* no `__str__`, `plot_*`, or
+  `animate` already shows it. Then print the object (`print(solution)`, `print(report)`), or
+  in a notebook leave the value as the last expression (`np.linalg.eigvals(lin.A())`,
+  `problem.sample_x0(0, n=3)`). Markdown already explains; do not restate it in an f-string,
+  and do not add a cell whose only job is a diagnostic dump. Never bury arithmetic,
+  formatting, or a second construction inside `print` — that line is what the student
+  reads, and it must stay a library verb.
+  ```python
+  # Bad — unreadable; the cell is a log, not the API:
+  print(f"planner.gamma = {planner.gamma}: a horizon of {DT / -np.log(planner.gamma):.1f} s")
+  default = ReinforcementLearningPlanner(problem, dt=DT, hidden=(8,), verbose=False)
+  print(f"default gamma = {default.gamma}: a horizon of {DT / -np.log(default.gamma):.1f} s")
+
+  # Bad — a plot or __str__ already said this:
+  print("the five worst of", report.J.size, "trials:", np.round(np.sort(report.J)[-5:], 2))
+  print("open-loop poles:", np.round(np.linalg.eigvals(plant.linearize(xbar).A()), 2))
+
+  # Good — native object, or the last expression:
+  print(solution)
+  print(report)
+  np.linalg.eigvals(lin.A())
+  ```
 
 ---
 

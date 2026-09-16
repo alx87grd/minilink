@@ -1,9 +1,9 @@
 # Reinforcement learning as a planner — vision and plan (draft)
 
-Status: **in progress** (2026-09-15). Steps R1–R6 landed
+Status: **R7 done** (2026-09-15). Steps R1–R7 landed
 (`planning/reinforcement_learning/`, `planning/evaluation.py`,
-`control/neural.py`, the problem/cost semantics, teaching notebook + demos);
-R7 open. 2026-09-15: the module was rebuilt on domain objects (§3.5 layout
+`control/neural.py`, the problem/cost semantics, teaching notebook + demos;
+the prototype `experimental.ppo_jax` is retired). 2026-09-15: the module was rebuilt on domain objects (§3.5 layout
 below) and gained the course's foundational algorithms, REINFORCE and an
 advantage actor-critic in the neural family and a tabular family
 (Q-learning, SARSA, Monte Carlo control) on the value-iteration grid. Decisions
@@ -16,9 +16,9 @@ Builds on: [standard-planning-problems.md](standard-planning-problems.md)
 redrawn). NN blocks are ordinary blocks (weights are `params`, training lives
 outside). Result families and parametric scene bind: DESIGN §6 and TODO Later.
 
-Evidence: `minilink/experimental/ppo_jax.py` and the six demos in
-`examples/experimental/rl/`, with the tuning record in
-[RL_README.md](../../examples/experimental/rl/RL_README.md).
+Evidence: the official demos in `examples/demos/rl/`, with the tuning
+record in [2026-09-10-rl-tuning.md](../reviews/2026-09-10-rl-tuning.md)
+(measured on the retired prototype; the lessons carry over).
 
 ---
 
@@ -278,7 +278,7 @@ four rows. That silence is what the RL policies exploited.
 changes; each planner documents its convention. Cheapest, and it is what
 DP already does with `out_of_bound_cost`. Cost: the meaning of "this policy
 scored J" differs per tool, and RL users must rediscover the penalty rules
-of RL_README §1 for every task.
+of the tuning notes in `docs/reviews/2026-09-10-rl-tuning.md` §1 for every task.
 
 **O2 — declare the exit rule on the problem, once.** `PlanningProblem`
 (and the stochastic sibling) gains
@@ -399,7 +399,7 @@ type, never the reverse.
 | **R5a** (done) | `ReinforcementLearningPlanner` + the shared machinery of §3.5 with PPO as the first algorithm; `PlanningSolution` (S48), `get_controller`, `solve_trajectory_from` | the experimental demos re-expressed through the planner with the same outcomes and times |
 | **R5b** | SAC as the second algorithm (off-policy family: squashed head, twin Q, replay) | **done**: `algorithms/sac.py` + `SquashedGaussianHead`; pendulum swing-up by ~19k steps; the PPO file was not edited, the planner gained the `on_policy` branch only |
 | **R6** (done) | Teaching entry: `examples/tutorial/11_reinforcement_learning.ipynb` (stochastic problem, Monte Carlo on a PD law, the RL planner, the differentiable closed loop) and `examples/demos/rl/` (five official demos mirroring the experimental scripts) | notebook smoke; examples README row |
-| **R7** | Retire `experimental/ppo_jax.py`; TRL ledger row moves to Planning / RL | nothing imports the experimental module |
+| **R7** (done 2026-09-15) | Retire `experimental/ppo_jax.py`; TRL ledger row moves to Planning / RL | nothing imports the experimental module |
 
 Deferred: SAC or other off-policy methods, running-statistics normalization,
 process noise inside `f`, the robust (minimax) problem class, GPU claims.

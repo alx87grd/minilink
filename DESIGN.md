@@ -958,10 +958,10 @@ box or blows up (non-finite state) ends the episode. The learned law is a `Syste
 `ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
 through the network, and the parametric tier (`rk4_step_trace_p` with
 `params={"ctl": ..., "sys": ...}`) gives gradients of a rollout with respect
-to the policy weights. Official demos: `examples/demos/rl/`; the tutorial
-chapter is `examples/tutorial/11_reinforcement_learning.ipynb`, the
-algorithm ladder from value iteration to PPO is
-`examples/teaching/reinforcement_learning/from_value_iteration_to_ppo.ipynb`. The
+to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, cart-pole,
+drone, rocket); the tutorial chapter is
+`examples/tutorial/11_reinforcement_learning.ipynb`; native teaching
+notebooks are `pendulum_swing_up_vi_vs_lqr_vs_rl` and `drone_learn_to_fly`. The
 spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `bind`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos

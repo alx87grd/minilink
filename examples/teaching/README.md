@@ -20,13 +20,10 @@ Dynamic programming, trajectory optimization, and direct methods:
 
 ### 3. [`reinforcement_learning/`](reinforcement_learning/)
 Policy gradients, deep RL on dynamical systems, and method comparisons:
-- [**`from_value_iteration_to_ppo.ipynb`**](reinforcement_learning/from_value_iteration_to_ppo.ipynb): The algorithm ladder of a reinforcement-learning course on one pendulum: value iteration with the model, then without it Q-learning, SARSA and Monte Carlo control on the same grid with ε-greedy and UCB exploration, then REINFORCE, actor-critic, PPO and SAC with a neural policy, all scored on one Monte Carlo yardstick.
-- [**`policy_gradient_to_ppo.ipynb`**](reinforcement_learning/policy_gradient_to_ppo.ipynb): The mathematics from the policy gradient theorem to PPO — REINFORCE, baseline and advantage, actor-critic, GAE, the clipped objective — each checked against the planner's own functions.
 - [**`gymnasium_interface.ipynb`**](reinforcement_learning/gymnasium_interface.ipynb): The Gymnasium environment contract read in optimal-control terms, written by hand, obtained from a planning problem, and trained through.
 - [**`pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb`**](reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_rl.ipynb): Dynamic programming vs. LQR vs. PPO on one plant and one cost, scored on one Monte Carlo yardstick.
 - [**`drone_learn_to_fly.ipynb`**](reinforcement_learning/drone_learn_to_fly.ipynb): PPO policy optimization for 2D quadrotor hover and stabilization.
 - [**`function_approximation_sgd.ipynb`**](reinforcement_learning/function_approximation_sgd.ipynb): Fitting a function from noisy samples — least squares in one line, stochastic gradient descent one sample at a time, and the learning-rate, sample-count and noise trade-offs (plain `numpy`).
-- [**`cost_to_go_function_approximation.ipynb`**](reinforcement_learning/cost_to_go_function_approximation.ipynb): The pendulum's cost-to-go from value iteration, approximated by a quadratic form (compared with the LQR Riccati matrix) and by radial bases of increasing resolution.
 - [**`drone_ppo_learn_to_fly.ipynb`**](reinforcement_learning/drone_ppo_learn_to_fly.ipynb) and [**`pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb`**](reinforcement_learning/pendulum_swing_up_vi_vs_lqr_vs_ppo.ipynb): the earlier versions of the last two, trained through Gymnasium with Stable-Baselines3.
 
 ### 4. [`robotics/`](robotics/)

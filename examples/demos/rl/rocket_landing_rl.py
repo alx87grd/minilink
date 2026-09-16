@@ -36,8 +36,9 @@ class LandingCost(CostFunction):
     R = 0.1 * np.diag([1e-8, 1.0])
 
     def g(self, x, u, t=0.0, params=None):
+        Q, R = self.Q, self.R
         dx = x - X_LANDED
-        return dx @ self.Q @ dx + u @ self.R @ u
+        return dx @ Q @ dx + u @ R @ u
 
     def h(self, x, t=0.0, params=None):
         return 0.0
